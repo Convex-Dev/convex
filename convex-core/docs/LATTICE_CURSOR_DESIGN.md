@@ -1,276 +1,195 @@
 # Lattice Cursor Design
 
-## Overview
+Lattice cursors are cursors that understand lattice merge semantics. They give
+applications a fork-and-sync model over immutable lattice data: fork a working copy,
+make several updates, then sync back through lattice merge, with signing and
+timestamping handled transparently by the cursor chain. The cursor model is specified
+in [CAD035](https://docs.convex.world/docs/cad/cursors); this document explains the
+class hierarchy and the design choices in `convex.lattice.cursor`.
 
-**Lattice Cursors** are cursors aware of lattice merge semantics, supporting fork/sync patterns for transactional updates to immutable lattice data structures.
+## Key points
 
-Applications working with the Data Lattice need to:
+- `path(key)` is the single navigation primitive and mirrors `ALattice.path(key)`: one
+  resolves the sub-lattice at a key, the other navigates to a cursor there using
+  whatever sub-lattice exists.
+- Lattice hierarchies are continuous. Once `lattice.path(key)` returns null, everything
+  below has no lattice: sync becomes write-back and merge bubbles up to the nearest
+  ancestor with a lattice.
+- `sync()` always succeeds because it merges; `AForkableCursor.merge(detached)` is a
+  CAS that can fail. Forks stay usable after sync for incremental work.
+- Writes never promote `null` to a map silently. With a lattice, missing intermediates
+  are created from `lattice.zero()`; without one, they throw.
+- Update lambdas receive `zero()` instead of null for uninitialised paths; `get()`
+  still returns null.
+- A lattice declares its own write boundaries. The cursor inserts a `SignedCursor` or
+  `StampedCursor` where the lattice says so, with no `instanceof` on lattice types.
+- Every write is prepared exactly once per logical write, not once per CAS retry, so
+  signing that reaches a wallet or remote signer is not repeated under contention.
+- All operations are lock-free over `AtomicReference`; immutable values make concurrent
+  reads safe and merge associativity makes sync order irrelevant.
 
-1. **Fork** a working copy of lattice state for local modifications
-2. Make multiple updates to the working copy
-3. **Sync** changes back to the parent, using proper lattice merge semantics
-
-This supports transactional updates, nested transactions, concurrent modifications with automatic conflict resolution, and deferred signing through the cursor hierarchy.
-
-## Class Hierarchy
+## Class hierarchy
 
 ```
 ACursor<V>
-│
-└── AForkableCursor<V>                       # Supports fork/detach operations
-    │
-    ├── Root<V>                              # Atomic value holder (CAS-based)
-    ├── PathCursor<V>                        # Navigation into value (internal)
-    │
-    └── ALatticeCursor<V>                    # Lattice-aware cursor
-        │
-        ├── RootLatticeCursor<V>             # Root of lattice tree
-        ├── ForkedLatticeCursor<V>           # Independent working copy
-        ├── DescendedCursor<V>               # Navigated into sub-path
-        └── AUpdateCursor<V,S>               # Overrides update-on-write (shared funnel)
-            ├── StampedCursor<V>             # V → V — update override: stamp on write (LWW)
-            └── SignedCursor<V>              # SignedData<V> → V — view boundary: sign on write
+└── AForkableCursor<V>                    fork / detach
+    ├── Root<V>                           atomic value holder (CAS)
+    ├── PathCursor<V>                     navigation for non-lattice cursors
+    └── ALatticeCursor<V>                 lattice-aware cursor
+        ├── RootLatticeCursor<V>          root of a lattice tree
+        ├── ForkedLatticeCursor<V>        independent working copy
+        ├── DescendedCursor<V>            navigated into a sub-path
+        └── AUpdateCursor<V,S>            prepare-on-write funnel
+            ├── StampedCursor<V>          same type: stamp timestamp on write
+            └── SignedCursor<V>           SignedData<V> to V: sign on write
 ```
 
-`PathCursor` remains as the `ACursor.path()` implementation for non-lattice cursors. `ALatticeCursor.path()` overrides to return `ALatticeCursor` — a `DescendedCursor` with the sub-lattice from `ALattice.path(key)`, or `null` if no sub-lattice exists at that key.
+`ALatticeCursor.path()` returns a `DescendedCursor` carrying the sub-lattice from
+`ALattice.path(key)`, or one with a null lattice when no sub-lattice exists.
 
 ## Operations
 
 | Operation | Level | Description |
-|-----------|-------|-------------|
-| `get()` | `ACursor` | Returns current value |
-| `set(V)` | `ACursor` | Sets value atomically |
-| `assoc(key, value)` | `ACursor` | Write at a single key (lattice-aware on `ALatticeCursor`) |
-| `assocIn(value, keys...)` | `ACursor` | Write at a nested path (lattice-aware on `ALatticeCursor`) |
-| `compareAndSet(expected, new)` | `ACursor` | CAS operation |
-| `updateAndGet(fn)` | `ACursor` | Apply function, return new value |
-| `path(keys...)` | `ACursor` | Navigate to sub-path with canonical keys (lattice-aware on `ALatticeCursor`) |
-| `resolve(keys...)` | `ALatticeCursor` | Resolve external/logical keys via `resolveKey`, then navigate — user-facing counterpart to `path` |
-| `fork()` | `ALatticeCursor` | Create independent working copy |
-| `sync()` | `ALatticeCursor` | Push local changes to parent |
-| `merge(V)` | `ALatticeCursor` | Merge external value into cursor |
-| `getLattice()` | `ALatticeCursor` | Get lattice for this cursor (may be null) |
-| `getContext()` | `ALatticeCursor` | Get merge context |
-| `withContext(ctx)` | `ALatticeCursor` | Return cursor with new context |
+|---|---|---|
+| `get()`, `set(v)`, `compareAndSet`, `updateAndGet(fn)` | `ACursor` | Atomic value access |
+| `assoc(key, v)`, `assocIn(v, keys...)` | `ACursor` | Lattice-aware nested writes |
+| `path(keys...)` | `ACursor` | Navigate with canonical keys |
+| `resolve(keys...)` | `ALatticeCursor` | Canonicalise external keys via `resolveKey`, then `path` |
+| `fork()`, `sync()` | `ALatticeCursor` | Working copy; merge back to the parent |
+| `merge(v)` | `ALatticeCursor` | Merge an external value into this position |
+| `getLattice()`, `getContext()`, `withContext(ctx)` | `ALatticeCursor` | Lattice and merge context |
 
-### `assoc` / `assocIn` — Lattice-Aware Writes
+### Writes
 
-`assoc(key, value)` and `assocIn(value, keys...)` are the cursor write primitives for nested data structures. They parallel `RT.assoc` / `RT.assocIn` but operate in a cursor/lattice context:
+`LatticeOps.assocIn` is the shared engine for nested writes and decides how to create a
+missing intermediate at each depth:
 
-`LatticeOps.assocIn` chooses how to create a missing intermediate at each depth:
+- **No lattice**: throw. Callers pre-initialise the structure.
+- **Typed lattice**: `lattice.zero()` supplies the correctly typed empty container, for
+  example an `Index` rather than a hash map.
+- **Structural lattice** (`isStructural()`, such as `JSONLattice`): the container is
+  chosen from the key shape (integer to vector, string to map, keyword or blob to
+  index), which lets deep writes work below a whole-value leaf without a declared type
+  hierarchy.
 
-- **No lattice**: throws — callers must pre-initialise the structure. Prevents the silent `null → AHashMap` promotion that `RT.assocIn` performs.
-- **Typed lattice**: uses `lattice.zero()` for the correctly-typed empty container (e.g. `Index` instead of `AHashMap`).
-- **Structural lattice** (`isStructural()`, e.g. `JSONLattice`): builds the container from the *key shape* via `containerForKey` (integer → `Vector`, string → `AHashMap`, keyword/blob → `Index`). This is what makes deep writes work below a whole-value leaf without declaring a full type hierarchy.
+Writes are copy-on-change: a level whose child did not change is returned by reference,
+so a no-op write allocates nothing.
 
-`assocIn` is recursive and **copy-on-change**: each level rebuilds via `RT.assoc`, which returns the existing structure unchanged when the child didn't change — so a no-op write returns the original value by reference and allocates nothing.
+### Navigation
 
-## Unified Navigation: `path()`
+With a sub-lattice, a descended cursor has full lattice semantics: `merge` uses the
+sub-lattice and `fork`/`sync` resolve conflicts by lattice merge. With a null lattice
+it still supports every operation, with simpler semantics:
 
-`path()` is the single navigation primitive, parallel to `ALattice.path()`:
+| Operation | With lattice | Without lattice |
+|---|---|---|
+| `sync()` | Lattice merge with the parent value | Write-back at the path |
+| `merge(v)` | Sub-lattice merge, written to the parent | Build the parent-level value and call `merge` on the parent cursor |
 
-- `ALattice.path(key)` resolves the sub-lattice at a key
-- `ALatticeCursor.path(key)` navigates to a cursor at that key, using the sub-lattice if one exists
+Consecutive `path` steps collapse into one `DescendedCursor` holding a multi-key path,
+so a navigation such as `[:fs owner :value "drive"]` costs one `getIn` per read rather
+than a chain of cursors. The chain breaks only where the lattice declares a write
+boundary.
 
-When `path(key)` is called on a lattice cursor:
+`resolve` is the entry point for external keys (JSON strings, hex, decimal). It
+canonicalises each key against the cursor's own lattice and composes:
+`c.resolve(a).resolve(b)` reaches `c.resolve(a, b)`, an identity resolver reduces it to
+`path`, and an unresolvable key throws.
 
-1. If the lattice declares a write-interception boundary at this key (`isWriteBoundary`), insert the cursor it builds (`createPathCursor`) — e.g. `SignedLattice` → `SignedCursor` (`assocIn` cannot write through `SignedData`), or `StampingLattice` → `StampedCursor`
-2. Otherwise resolve `lattice.path(key)` for a sub-lattice and create a `DescendedCursor` (which may have null lattice)
+### Auto-initialisation
 
-### With sub-lattice (lattice-aware navigation)
+A descended cursor computes its value lattice by walking `path` to the endpoint. Update
+lambdas then receive `valueLattice.zero()` in place of null, which removes null guards
+from application code (a feed post lambda receives an empty `Index`). `get()` is
+unaffected and returns null for absent paths.
 
-The descended cursor has full lattice semantics: `merge()` uses the sub-lattice, `fork()`/`sync()` use lattice merge for conflict resolution.
+## Write interception
 
-### Without sub-lattice (null lattice)
+Some lattices must transform a value on the way in: sign it, or stamp it with the
+context timestamp. `AUpdateCursor<V, S>` wraps a base cursor holding the stored type
+`S`, presents the view type `V`, and implements every atomic operation and `sync()`
+through two hooks:
 
-The descended cursor supports all operations, with simpler semantics:
+- `prepareWrite(V) -> S` authors the stored cell; it may consult the `LatticeContext`
+  and may throw to enforce a precondition.
+- `view(S) -> V` reads a stored cell back; identity unless the boundary changes type.
 
-| Operation | With lattice | Without lattice (null) |
-|-----------|-------------|------------------------|
-| `get()` | `RT.getIn(parent, key)` | Same |
-| `set(v)` | `LatticeOps.assocIn(parent, key, v)` | Same |
-| `fork()` | Local copy, sync uses lattice merge | Local copy, sync overwrites |
-| `sync()` | Lattice merge with parent (`merge(parentVal, localVal)`) | Write-back (overwrite at path) |
-| `merge(v)` | `sublattice.merge(current, v)`, write to parent | `parent.merge(LatticeOps.assocIn(parent.get(), key, v))` |
+Two rules hold for every subclass. A write that leaves the view unchanged keeps the
+current cell, so an unchanged value keeps its signature or timestamp. And preparation
+happens once per logical write: the retry loop re-invokes the update function under
+contention, but a fixed value is prepared exactly once and a computed value is
+re-prepared only if a retry genuinely produces a different one.
 
-**merge() with null lattice** bubbles up: the cursor constructs a parent-level value via `LatticeOps.assocIn` and calls `merge()` on the parent cursor. This propagates up the chain until it reaches a cursor with a lattice, which performs the actual lattice merge. This means a merge at a deep path with no local lattice still benefits from ancestor lattice semantics.
+| Cursor | Stored type | `prepareWrite` | `view` | `merge` |
+|---|---|---|---|---|
+| `StampedCursor<V>` | `V` | inject timestamp | identity | select an existing value, no re-stamp |
+| `SignedCursor<V>` | `SignedData<V>` | sign as the bound owner | `getValue` | synthesise, re-sign |
 
-**sync() with null lattice** does a simple write-back — the forked value overwrites the parent at this path. This is correct for leaf-level navigation where there are no meaningful merge semantics. Lattice merge happens at higher levels in the cursor chain where lattices exist.
+`SignedCursor` is the enforcement point for authorship. A write asks
+`LatticeContext.signAs` for a signer authorised for the owner the path selected and
+throws `IllegalStateException` if there is none. That is the same rule `OwnerLattice`
+applies to data arriving on merge, so local state is never written in a form a peer
+would reject.
 
-### Multi-key path collapsing
-
-`path(:fs, ownerKey, :value, "myDrive")` walks keys one at a time, checking `lattice.path(key)` at each step. Consecutive steps that don't require a specialised cursor (e.g. `SignedCursor`) collapse into a single `DescendedCursor` with a multi-key path:
-
-```
-path(:fs, ownerKey, :value, "myDrive")
-
-RootLatticeCursor                                 [KeyedLattice]
-  → DescendedCursor([:fs, ownerKey], SignedLattice) ← collapsed
-    → SignedCursor                                  ← must break here
-      → DescendedCursor(["myDrive"], DLFSLattice)
-```
-
-The collapsed cursor uses a single `RT.getIn`/`LatticeOps.assocIn` call for the full multi-key path instead of nested cursors at each level. The leaf's sub-lattice is used for `merge()`/`fork()`/`sync()`.
-
-The chain breaks only at write-interception boundaries the lattice declares (`isWriteBoundary`): e.g. a `SignedLattice` (where `assocIn` cannot write through `SignedData`, so a `SignedCursor` is inserted) or a `StampingLattice` (a transparent `StampedCursor`).
-
-### Lattice continuity
-
-Lattice hierarchies are continuous trees. Each lattice level explicitly declares its children via `lattice.path(key)` — if this returns null, no child lattice semantics exist at or below that key. Once the sub-lattice becomes null during traversal, it stays null for all remaining keys. There is no mechanism for lattice semantics to "resume" after a gap, because there is no lattice object to call `path()` on.
-
-This means navigating beyond the lattice hierarchy (e.g. into leaf data structures) produces a `DescendedCursor` with null lattice, giving write-back sync and bubble-up merge — the correct semantics for plain data that has no merge function of its own. If lattice semantics are needed at a deeper level, the lattice hierarchy must be extended to be continuous through that path.
-
-### Auto-initialisation via `valueLattice.zero()`
-
-When a `PathCursor` (or `DescendedCursor` which delegates to `PathCursor`) is created with a lattice, it computes a `valueLattice` by walking `baseLattice.path(keys...)` to the endpoint. This enables automatic initialisation of leaf values:
-
-- **`assocIn` (path intermediates)**: `LatticeOps.assocIn` uses `lattice.zero()` for null intermediates at each depth, creating correctly-typed empty containers.
-- **Update lambdas (leaf values)**: `updateAndGet(fn)` and similar methods substitute `valueLattice.zero()` for null, so the lambda receives an empty container instead of null. This eliminates null guards in application code (e.g. `Feed.post()` receives an empty `Index` instead of checking for null).
-
-Note: `get()` still returns null for non-existent paths — the zero-substitution only applies within update lambdas.
-
-### Raw vs logical keys — `path` vs `resolve`
-
-`path(keys...)` navigates with **canonical** keys and is the hot primitive — no resolution, keys stored and used as-is. `resolve(keys...)` is the user-facing entry for **external/logical** keys (JSON strings, hex, decimal): it canonicalises each key against the cursor's own lattice via `resolveKey`, then delegates to `path`. Resolving against the cursor's own lattice makes it compose — `c.resolve(a).resolve(b)` reaches the same position as `c.resolve(a, b)`; with an identity resolver it reduces exactly to `path`, and it throws on an unresolvable key. Resolution is copy-on-change: already-canonical keys are returned unchanged, so `resolve` allocates nothing extra in that case.
-
-## Write Interception (update cursors)
-
-A lattice may need to **transform values on write** at a boundary — sign them, stamp them with a timestamp, etc. This is handled generically: the cursor knows nothing about specific lattice types; the lattice declares its own boundary.
-
-### `AUpdateCursor<V, S>`
-
-The shared concept is **prepare-on-write**: every write is funnelled through one function that authors the cell to store. `AUpdateCursor` wraps a `base` cursor holding the *stored* type `S`, presents the *view* type `V`, and implements all eight atomic operations (`set`, `getAndSet`, `getAndUpdate`, `updateAndGet`, accumulate, `compareAndSet`) plus `sync()` in terms of two hooks:
-
-- `prepareWrite(V value) → S` — **the** write funnel. Authors the stored cell for a new view value; may consult `context` and may throw to enforce a precondition.
-- `view(S) → V` — how a stored cell reads back. **Identity by default** — the stored type *is* the view type; only a type-changing boundary overrides it.
-
-Two rules are uniform, so no subclass restates them. A write that leaves the view unchanged keeps the current cell — `prepareWrite` is not called, and an unchanged value keeps its existing signature or timestamp. And **preparing happens once per logical write, not once per CAS attempt**: the atomic operations run over a retry loop that re-invokes its update function under contention, while authoring a cell can reach outside the JVM (signing may consult a wallet, key store or remote signer). A write of a fixed value prepares exactly once however often it retries; a write computed from the current value re-prepares only if a retry genuinely computes a different value.
-
-`merge` is **abstract**: convergence either *selects* an existing value (store as-is) or *synthesises* a new one (author it through `prepareWrite`), so each cursor states which rather than inheriting a default that silently does the wrong thing. `compareAndSet` is single-shot value-equality (across a type-changing boundary a reference CAS is impossible).
-
-Two instances — a same-type **update override** and a type-changing **view boundary**:
-
-| Cursor | `S` | `prepareWrite` | `view` | `merge` | shape |
-|--------|-----|----------------|--------|---------|-------|
-| `StampedCursor<V>` | `V` | **stamp** (inject timestamp) | identity (inherited) | select — no re-stamp | same-type, transparent |
-| `SignedCursor<V>` | `SignedData<V>` | **sign** as the bound owner | `getValue` (`:value` child) | synthesise — re-sign | type-changing, key-consuming (`:value`) |
-
-`StampedCursor` never changes the view: the cell keeps every field, timestamp included; it only changes how a write lands. `SignedCursor` is a genuine envelope boundary and the signing **enforcement point**: reads always work; a write asks `LatticeContext.signAs` for a signer authorised for the owner the path selected, and throws `IllegalStateException` if there is none. That is the same authorisation rule `OwnerLattice` applies to data arriving on merge, so a slot is never written locally in a form a peer would reject.
-
-### Lattice-declared boundaries
-
-`ALatticeCursor.path()` inserts an update cursor by asking the lattice, via three `ALattice` hooks (no `instanceof`, no lattice-specific knowledge in the cursor):
-
-| Hook | Meaning | Default |
-|------|---------|---------|
-| `isWriteBoundary(key)` | cheap, allocation-free gate checked on every key | `false` |
-| `createPathCursor(base, key, ctx)` | build the update cursor (only when the gate fires) | `null` |
-| `consumesPathKey(key)` | virtual key consumed (`:value`) vs transparent (stamp) | `true` |
-
-`SignedLattice` returns `true`/`SignedCursor` for `:value` (consuming); `StampingLattice` returns `true`/`StampedCursor` for any key (transparent). Forking below a boundary gives local storage of the *view* type; the boundary re-applies `prepareWrite` on `sync()`.
+The cursor learns where boundaries are from three `ALattice` hooks: `isWriteBoundary(key)`
+(a cheap gate checked at every step), `createPathCursor(base, key, ctx)` (builds the
+update cursor when the gate fires) and `consumesPathKey(key)` (whether the key is a
+virtual segment such as `:value`, or transparent as for stamping). `SignedLattice` and
+`StampingLattice` implement them; forking below a boundary stores the view type
+locally and the boundary re-applies `prepareWrite` on `sync()`.
 
 ## Examples
 
-### Fork, modify, sync
-
 ```java
+// Fork, modify, sync
 RootLatticeCursor<ASet<ACell>> root = Cursors.createLattice(SetLattice.create(), Sets.empty());
-
 ALatticeCursor<ASet<ACell>> fork = root.fork();
 fork.updateAndGet(s -> s.include(item1));
 fork.updateAndGet(s -> s.include(item2));
-fork.sync();
-// root now contains both items
-```
+fork.sync();                                  // root now contains both items
 
-### Concurrent forks merge via lattice
+// Concurrent forks merge via the lattice
+ALatticeCursor<ASet<ACell>> f1 = root.fork(), f2 = root.fork();
+f1.updateAndGet(s -> s.include(a));
+f2.updateAndGet(s -> s.include(b));
+f1.sync(); f2.sync();                         // root has a and b (set union)
 
-```java
-ALatticeCursor<ASet<ACell>> fork1 = root.fork();
-ALatticeCursor<ASet<ACell>> fork2 = root.fork();
-
-fork1.updateAndGet(s -> s.include(itemA));
-fork2.updateAndGet(s -> s.include(itemB));
-
-fork1.sync();  // root has itemA
-fork2.sync();  // root has itemA AND itemB (set union)
-```
-
-### Navigate through signing boundary
-
-```java
-// Navigate from root to a DLFS drive, crossing the SignedData boundary
+// Navigate through a signing boundary, then batch with deferred signing
 ALatticeCursor<AVector<ACell>> drive = root.path(
-    Keywords.FS,       // KeyedLattice → OwnerLattice
-    ownerKey,          // OwnerLattice → SignedLattice
-    Keywords.VALUE,    // SignedLattice → SignedCursor (enforcement point)
-    driveName          // MapLattice → DLFSLattice
-);
-
-// Fork for batch operations — deferred signing
-ALatticeCursor<AVector<ACell>> fork = drive.fork();
-fork.updateAndGet(state -> addFile(state, "a.txt"));   // local, unsigned
-fork.updateAndGet(state -> addFile(state, "b.txt"));   // local, unsigned
-fork.sync();  // signs once via SignedCursor, merges into parent
+    Keywords.FS,        // KeyedLattice -> OwnerLattice
+    ownerKey,           // OwnerLattice -> SignedLattice
+    Keywords.VALUE,     // SignedLattice -> SignedCursor
+    driveName);         // MapLattice -> DLFSLattice
+ALatticeCursor<AVector<ACell>> work = drive.fork();
+work.updateAndGet(state -> addFile(state, "a.txt"));   // local, unsigned
+work.updateAndGet(state -> addFile(state, "b.txt"));
+work.sync();                                           // signs once, merges into parent
 ```
 
-### Sub-lattice merge via path()
+## Design decisions
 
-```java
-RootLatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> root =
-    Cursors.createLattice(mapLattice, Maps.of(Keywords.FOO, Sets.of(CVMLong.ONE)));
+| Question | Decision |
+|---|---|
+| One `path()` or `path()` plus `descend()`? | One. A descended cursor with a null lattice is a path cursor; the lattice hierarchy, not the method, determines capabilities. |
+| `assoc`/`assocIn` or `set(value, path...)`? | `assoc` forms, mirroring `RT.assoc`, avoiding overload ambiguity with `set(V)` and never promoting null silently. |
+| `sync()` or CAS merge? | Both exist; `sync()` is the lattice operation that always succeeds, like a filesystem sync. |
+| Where do signing and stamping live? | In `AUpdateCursor` subclasses inserted at lattice-declared boundaries, so cursor code stays lattice-agnostic. |
+| Collapse multi-key paths? | Yes, to avoid intermediate cursors and merges; break only at write boundaries. |
 
-// path() resolves SetLattice at :foo — merge uses set union
-ALatticeCursor<ASet<CVMLong>> fooCursor = root.path(Keywords.FOO);
-fooCursor.merge(Sets.of(CVMLong.create(2)));
-// fooCursor.get() == #{1, 2}
-```
+## Where the code lives
 
-### Lattice-aware writes via assoc
+- `convex.lattice.cursor` — every class in the hierarchy above, plus `Cursors`
+  factories and `TimeCache`/`Transformer` views.
+- `convex.lattice.LatticeOps` — the nested-write engine.
+- `convex.lattice.ALattice` — `path`, `zero`, `isStructural`, `resolveKey` and the
+  write-boundary hooks.
+- `convex.lattice.LatticeContext` — signing, timestamps and owner verification.
+- `convex.lattice.SignedLattice`, `StampingLattice`, `JSONLattice`, `OwnerLattice` —
+  the lattices that exercise boundaries and structural navigation.
 
-```java
-// On a lattice cursor, assoc auto-initialises from lattice.zero()
-ALatticeCursor<Index<Keyword, ACell>> cursor = root.path(ownerKey, Keywords.FEED);
-cursor.updateAndGet(feed -> feed.assoc(postKey, postData));
-// feed is auto-initialised to Index.EMPTY if it was null
-```
+## Related
 
-## Design Decisions
-
-### Unified `path()` instead of `path()` + `descend()`
-
-A `DescendedCursor` with null lattice is functionally identical to a `PathCursor`: both read via `RT.getIn`, write via `LatticeOps.assocIn`, propagate writes to parent. The only difference is whether a lattice is attached for merge/fork/sync. Having two separate navigation methods (`path()` for data, `descend()` for lattice) is an artificial distinction — the lattice hierarchy determines what capabilities exist at each level, not the choice of method.
-
-`cursor.path(key)` parallels `lattice.path(key)`: one resolves the sub-lattice, the other navigates to a cursor at that key using whatever sub-lattice exists.
-
-### `assoc`/`assocIn` instead of `set` with path
-
-Cursor writes use `assoc(key, value)` and `assocIn(value, keys...)` rather than `set(value, path...)`. This mirrors `RT.assoc`/`RT.assocIn` naming and avoids overload ambiguity with `set(V)`. The critical difference from `RT.assocIn`: cursors **never** silently promote `null` to `AHashMap`. Without a lattice, null intermediates throw. With a lattice, `lattice.zero()` provides the correctly-typed container.
-
-### `sync()` vs CAS-based `merge()`
-
-`AForkableCursor.merge(detached)` uses CAS and can fail if the parent changed. `ALatticeCursor.sync()` uses lattice merge and always succeeds — like filesystem sync, it pushes local changes to the parent. With null lattice, sync falls back to simple write-back (overwrite). After `sync()`, the fork's value equals the merged result, allowing continued use and incremental syncs.
-
-### Update cursors (`AUpdateCursor`)
-
-Some writes need work on the way through — a stamp injected, or a `SignedData` re-signed (it is immutable, so `assocIn` cannot write through it). `AUpdateCursor` factors this into one `prepareWrite` funnel, so both an update override (stamping) and a view boundary (signing) share one implementation and only the funnel — and, for the type-changing case, the `view` projection — differ. Code above and below is unaware of it. Forking below gives local storage of the (view) value; `ForkedLatticeCursor` works unchanged because `sync()` calls `parent.updateAndGet()`, and the parent re-applies `prepareWrite`.
-
-### Multi-key collapsing
-
-Consecutive `path()` steps are collapsed into a single `DescendedCursor` to avoid unnecessary allocations and intermediate merges. The chain breaks only at **write-interception boundaries**, where an update cursor must be inserted (e.g. a `SignedCursor`, because `assocIn` cannot write through immutable `SignedData`). The collapsed cursor holds the full multi-key path and the leaf's sub-lattice.
-
-The cursor's `path()` walks `lattice.path(key)` at each step and asks `lattice.isWriteBoundary(key)` — a cheap boolean gate — to decide whether to insert an update cursor. No `instanceof`, no knowledge of specific lattice types: each lattice declares its own boundary (see [Write Interception](#write-interception-update-cursors)).
-
-### `LatticeOps` as internal engine
-
-`LatticeOps.assocIn` is the shared implementation for lattice-aware path writes. It is used by:
-- `ACursor.assoc`/`assocIn` (with null lattice — throws on null intermediates)
-- `ALatticeCursor.assoc`/`assocIn` (with lattice — auto-initialises via `zero()`)
-- `PathCursor` internal writes (with the parent cursor's lattice)
-- `DescendedCursor.merge()` bubble-up (with the parent cursor's lattice)
-
-The public API is `assoc`/`assocIn` on the cursor; `LatticeOps` is an implementation detail.
-
-## Thread Safety
-
-All operations are lock-free via `AtomicReference`. Immutable values ensure safe concurrent reads. Concurrent forks can sync independently — lattice merge associativity guarantees consistent results regardless of sync order.
+- [CAD035 Lattice Cursors](https://docs.convex.world/docs/cad/cursors) — cursor model and guarantees.
+- [CAD024 Data Lattice](https://docs.convex.world/docs/cad/data_lattice) — merge properties and merge context.
+- [CAD038 Lattice Authorisation](https://docs.convex.world/docs/cad/lattice_auth) — signer authorisation at the merge boundary.
+- [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md) — building components over cursors.

@@ -1,146 +1,103 @@
 # Lattice Application Patterns
 
-Best practices for building applications on the Convex Data Lattice using typed
-components over cursor-based state. `convex-dlfs`, `convex-p2p` and
-`convex-social` provide concrete examples.
+How to build an application on the Convex Data Lattice: design a lattice for the data,
+wrap it in typed components over cursors, and connect it to a local store or a hosting
+node without the application knowing which. The patterns are specified in
+[CAD045](https://docs.convex.world/docs/cad/lattice_apps); this document is the
+practical companion for `convex-core`, with `convex-social`, `convex-dlfs` and
+`convex-p2p` as worked examples. Cursor internals are in
+[LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
 
-For cursor internals and the cursor class hierarchy, see [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
+## Key points
 
-## Architecture Overview
+- Design the state tree first, then choose a merge strategy for each leaf and compose
+  lattices bottom-up. `path()` and `zero()` on your lattice are what make cursors
+  navigate and auto-initialise correctly.
+- Wrap per-user data in `OwnerLattice` so every owner's slot is signed by that owner
+  and forgeries are rejected on merge.
+- One component, one path. An `ALatticeComponent` holds a cursor at exactly one lattice
+  path and exposes domain operations; an `ALatticeApplication` composes regions at the
+  root; a facade spanning paths contains components rather than being one.
+- Applications never call merge directly. They write through cursors and let the
+  cursor chain handle signing, typing and propagation.
+- Accept a `RootComponent`, not a `NodeServer` or `AStore`. The same application code
+  runs over a local store or a networked node.
+- Persist, sync and flush are three different boundaries: persistence writes cells,
+  sync merges and publishes, flush is physical durability.
+- Under union merges a removed key resurrects, so tombstone; for durable deletes use a
+  whole-value LWW leaf.
+- The `LatticeContext` is the write policy: who signs, what time it is, which signers
+  may act for which owners. One logical write resolves the clock once.
 
-A hosted lattice application has five layers:
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Domain components        DLFSDrive, Social     │  One component per path
-├─────────────────────────────────────────────────┤
-│  Application component    ALatticeApplication   │  Region composition
-├─────────────────────────────────────────────────┤
-│  Root component           RootComponent         │  Persistence + publication
-├─────────────────────────────────────────────────┤
-│  Cursor/lattice           path(), fork(), merge │  State + merge semantics
-├─────────────────────────────────────────────────┤
-│  Optional host runtime    NodeServer             │  Replication + lifecycle
-└─────────────────────────────────────────────────┘
+Domain components        DLFSDrive, Social        one component per path
+Application component    ALatticeApplication      region composition
+Root component           RootComponent            persistence and publication
+Cursor and lattice       path(), fork(), merge    state and merge semantics
+Optional host runtime    NodeServer               replication and lifecycle
 ```
 
-`RootComponent` is the developer-facing lattice host. It always has an `AStore`
-and owns the root publication policy, but does not own the store lifecycle. A
-standalone root publishes to that store. `NodeServer` can host the same root and
-configures its replication pipeline before launch completes; application branches
-do not know that a `NodeServer` exists.
+`RootComponent` is the developer-facing host. It always has an `AStore` and owns the
+root publication policy but not the store lifecycle. `NodeServer` can host the same
+root and installs its replication pipeline during launch; application branches never
+know a node exists.
 
-`ALatticeApplication` is the root-level composition point. It shares the hosted
-root cursor and attaches independently located regions beneath itself. A domain
-`ALatticeComponent` represents one specific lattice path. A convenience facade
-that spans unrelated paths should contain multiple components rather than claim
-to be a component itself.
+## Designing the lattice
 
-Applications never call lattice merge directly. They navigate typed components
-and cursors, read and write values, and let the cursor chain handle signing, type
-safety and merge propagation.
-
-## Designing the Lattice
-
-### 1. Start from the data model
-
-Sketch the state tree your application needs. For a social network:
+**Start from the data model.** Sketch the tree, for example a social network:
 
 ```
 :social (OwnerLattice)
   └── <ownerKey> (SignedData)
-        └── (Index<Keyword, ACell>)        ← per-user record
-              ├── :feed    → Index<Blob, ACell>       posts by timestamp
+        └── Index<Keyword, ACell>            per-user record
+              ├── :feed    → Index<Blob, ACell>        posts by timestamp
               ├── :profile → AHashMap<Keyword, ACell>  profile fields
               └── :follows → AHashMap<ACell, ACell>    follow records
 ```
 
-### 2. Choose merge strategies bottom-up
-
-Pick a lattice primitive for each leaf, then compose upward:
+**Choose merge strategies bottom-up.**
 
 | Primitive | Use when | `zero()` | `merge()` |
-|-----------|----------|----------|-----------|
-| `LWWLattice` | Single values that get overwritten (profiles, individual posts) | `null` | Higher timestamp wins |
-| `IndexLattice` | Ordered collections keyed by blob (feeds, logs) | `Index.EMPTY` | Union of keys, child merge per entry |
-| `MapLattice` | Unordered collections (follow lists, metadata) | `Maps.empty()` | Union of keys, child merge per entry |
+|---|---|---|---|
+| `LWWLattice` | Single overwritten values (profiles, posts) | `null` | Higher timestamp wins |
+| `IndexLattice` | Ordered collections keyed by blob (feeds, logs) | `Index.EMPTY` | Key union, child merge per entry |
+| `MapLattice` | Unordered collections (follows, metadata) | `Maps.empty()` | Key union, child merge per entry |
 | `SetLattice` | Grow-only sets (tags, memberships) | `Sets.empty()` | Set union |
 | `OwnerLattice` | Per-owner signed namespaces | `Maps.empty()` | Per-key merge with signature verification |
 
-Composition reads naturally from the data model:
-
 ```java
-// Feed: ordered by timestamp, LWW per post (edits/deletes resolve by timestamp)
 IndexLattice<Blob, ACell> FEED_LATTICE = IndexLattice.create(LWWLattice.INSTANCE);
-
-// Follows: unordered map, LWW per entry (follow/unfollow resolves by timestamp)
 MapLattice<ACell, ACell> FOLLOWS_LATTICE = MapLattice.create(LWWLattice.INSTANCE);
 ```
 
-### 3. Write a custom lattice for structured records
+**Write a custom lattice for structured records.** When a node has named children with
+different strategies, extend `ALattice` and implement `merge` (child by child), `path`
+(the sub-lattice at each key) and `zero` (the correctly typed empty container).
+`path()` is what lets cursors navigate and auto-initialise; without it a child has no
+lattice semantics.
 
-When a node has multiple named children with different merge strategies, extend `ALattice` directly:
-
-```java
-public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
-
-    @Override
-    public Index<Keyword, ACell> merge(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
-        // Merge each child using its specific lattice
-        Index<Blob, ACell> mergedFeed = FEED_LATTICE.merge(getFeed(own), getFeed(other));
-        ACell mergedProfile = LWWLattice.INSTANCE.merge(own.get(KEY_PROFILE), other.get(KEY_PROFILE));
-        AHashMap<ACell, ACell> mergedFollows = FOLLOWS_LATTICE.merge(getFollows(own), getFollows(other));
-        // ... reconstruct result
-    }
-
-    @Override
-    public <T extends ACell> ALattice<T> path(ACell childKey) {
-        if (KEY_FEED.equals(childKey))    return (ALattice<T>) FEED_LATTICE;
-        if (KEY_PROFILE.equals(childKey)) return (ALattice<T>) LWWLattice.INSTANCE;
-        if (KEY_FOLLOWS.equals(childKey)) return (ALattice<T>) FOLLOWS_LATTICE;
-        return null;
-    }
-
-    @Override
-    public Index<Keyword, ACell> zero() {
-        return (Index<Keyword, ACell>) Index.EMPTY;
-    }
-}
-```
-
-The `path()` method is critical — it tells cursors what sub-lattice exists at each key, enabling lattice-aware navigation and auto-initialisation (see [LATTICE_CURSOR_DESIGN.md § Auto-initialisation](LATTICE_CURSOR_DESIGN.md#auto-initialisation-via-valuelatticezero)).
-
-### 4. Wrap with OwnerLattice for self-sovereign data
-
-Most applications want per-user ownership with cryptographic signing:
+**Wrap with `OwnerLattice`** for self-sovereign data:
 
 ```java
-public static final OwnerLattice<Index<Keyword, ACell>> SOCIAL_LATTICE =
-    OwnerLattice.create(SocialLattice.INSTANCE);
+OwnerLattice<Index<Keyword, ACell>> SOCIAL_LATTICE = OwnerLattice.create(SocialLattice.INSTANCE);
 ```
 
-This gives you: owner key → `SignedData<V>` → your application state. The `OwnerLattice` rejects data signed by the wrong key during network merge.
-
-### 5. Register with the root lattice
-
-Applications plug into a node's root `KeyedLattice` under a keyword. See [LATTICE_REGIONS.md](LATTICE_REGIONS.md) for the existing root regions and their lattice types.
+**Register with the root.** A node opts in by adding the lattice under a keyword; the
+keyword becomes the first path element. Existing regions are catalogued in
+[LATTICE_REGIONS.md](LATTICE_REGIONS.md).
 
 ```java
 KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
 ```
 
-This is how a node opts in to hosting your application's data. The keyword (`:social`) becomes the first path element when navigating from the root.
+## Building the application layer
 
-## Building the Application Layer
-
-### Compose from a generic host
-
-Keep application code independent of storage and networking implementations:
+**Compose from a generic host.** Application code depends on `RootComponent` only:
 
 ```java
-public final class MyApplication
-        extends ALatticeApplication<Index<Keyword, ACell>> {
-
+public final class MyApplication extends ALatticeApplication<Index<Keyword, ACell>> {
     private final Social social;
     private final DLFSRegion files;
 
@@ -149,436 +106,211 @@ public final class MyApplication
         social = Social.connect(this);
         files = DLFSRegion.connect(this, Keyword.intern("documents"));
     }
-
-    public static MyApplication connect(
-            RootComponent<Index<Keyword, ACell>> host) {
+    public static MyApplication connect(RootComponent<Index<Keyword, ACell>> host) {
         return new MyApplication(host);
     }
 }
-```
 
-The same application can be attached to a local store-backed root or to a root
-hosted by network infrastructure:
-
-```java
-RootComponent<Index<Keyword, ACell>> local =
-    RootComponent.open(applicationLattice, store);
+// Local
+RootComponent<Index<Keyword, ACell>> local = RootComponent.open(applicationLattice, store);
 MyApplication app = MyApplication.connect(local);
 
-NodeServer<Index<Keyword, ACell>> node =
-    new NodeServer<>(applicationLattice, store, config);
+// Hosted by a node: identical application code
+NodeServer<Index<Keyword, ACell>> node = new NodeServer<>(applicationLattice, store, config);
 MyApplication networked = MyApplication.connect(node.getRootComponent());
 node.launch();
 ```
 
-The caller owns and closes `store` and `node`. Components are views and own
-neither resource.
+The caller owns and closes `store` and `node`; components are views and own neither.
+`NodeServer` must serve from the root component's store so published roots never
+reference data the primary store lacks. Publication policy is a lifecycle concern: a
+root defaults to local store publication, and network infrastructure installs and
+freezes its policy during launch.
 
-### One component, one path
-
-Each level of the data model gets an `ALatticeComponent` subclass that holds a
-cursor at exactly one path and exposes domain operations:
+**One component, one path.** Each level of the data model is an `ALatticeComponent`
+subclass holding a cursor at one path and navigating one level deeper with
+`cursor.path(key)`:
 
 ```
-Social          → cursor at OwnerLattice level
-  SocialUser    → cursor at SocialLattice level (through signing boundary)
-    Feed        → cursor at IndexLattice<Blob, ACell> level
-    Follows     → cursor at MapLattice<ACell, ACell> level
+Social        cursor at OwnerLattice level
+  SocialUser  cursor at SocialLattice level (through the signing boundary)
+    Feed      cursor at IndexLattice<Blob, ACell>
+    Follows   cursor at MapLattice<ACell, ACell>
 ```
 
-Each wrapper navigates one level deeper via `cursor.path(key)`:
+The component parent supplies application policy and host store access; the cursor
+parent supplies navigation and synchronisation. They are deliberately separate: a fork
+keeps its component parent while its cursor syncs to the live cursor it was forked
+from. Signing is transparent: `Feed` never sees `SignedData`.
+
+Constructors must copy caller-supplied path arrays. Long-lived application and region
+components are fine; owner and session views should be held by the service that routes
+them or recreated on demand, never accumulated in an unbounded cache.
+
+**Write through cursors.** Use `updateAndGet` for read-modify-write; the lambda
+receives `lattice.zero()` for an uninitialised path, so no null guard is needed:
 
 ```java
-public class Social extends ALatticeComponent<
-        AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> {
-
-    public SocialUser user(AccountKey ownerKey) {
-        ALatticeCursor<Index<Keyword, ACell>> userCursor =
-            cursor.path(ownerKey, Keywords.VALUE);
-        return new SocialUser(this, userCursor, ownerKey);
-    }
-}
-
-public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
-
-    SocialUser(Social parent, ALatticeCursor<Index<Keyword, ACell>> cursor,
-            AccountKey ownerKey) {
-        super(parent, cursor);
-    }
-
-    public Feed feed() {
-        return new Feed(this, cursor.path(SocialLattice.KEY_FEED), ownerKey);
-    }
-}
-```
-
-The component parent supplies containing application policy and internal access to
-the host `AStore`. The cursor parent supplies logical navigation and synchronisation.
-These relationships are deliberately separate: a fork keeps the same component
-parent while its cursor synchronises to the live cursor it was forked from. The
-cursor chain also handles signing transparently—`Feed` does not know about
-`SignedData` at all.
-
-Do not retain caller-controlled path arrays; component and cursor constructors must
-take an owned copy. Long-lived application and region components are appropriate.
-Owner/session views should be retained by the service that routes them, or recreated
-cheaply on demand rather than accumulated in an unbounded global cache. Forked
-components are normally temporary working views.
-
-### Writing through cursors
-
-Use `updateAndGet` for read-modify-write operations. When a lattice is present, the update lambda receives `lattice.zero()` instead of null for uninitialised paths, so you don't need null guards:
-
-```java
-// Feed.post() — no null check needed, feed is auto-initialised to Index.EMPTY
 public Blob post(String text) {
     long ts = System.currentTimeMillis();
     Blob key = SocialPost.createKey(ts);
-    AHashMap<Keyword, ACell> post = SocialPost.createPost(text, ts);
-    cursor.updateAndGet(feed -> feed.assoc(key, post));
+    cursor.updateAndGet(feed -> feed.assoc(key, SocialPost.createPost(text, ts)));
     return key;
 }
 ```
 
-For simple key-value writes, use `assoc` or `assocIn` on the cursor directly:
+`cursor.assoc(key, value)` and `cursor.assocIn(value, keys...)` cover simple writes and
+auto-initialise intermediates from `zero()`. Reads use `cursor.get()` and
+`cursor.get(keys...)`, which return null for absent paths.
+
+**Keep record construction in static helpers** (`SocialPost.createPost`), separating
+data format from cursor mechanics. Rules of thumb:
+
+- Always include `:timestamp` in LWW-merged records; it is the tiebreaker.
+- Use `Keyword` keys for record fields and `Blob` keys (big-endian timestamps) for
+  ordered collections in an `Index`.
+- Use `Index` for lattice-level containers where `path()` and `zero()` matter, and
+  `AHashMap` for leaf records and dynamic key sets. `Index` resolves `Keyword` and
+  `AString` keys identically, which matters for JSON interoperability.
+
+## Fork and sync
+
+A fork is an independent working copy; `sync()` merges it back through its cursor
+parent with lattice semantics and always succeeds. This is separate from publication
+and durability:
 
 ```java
-cursor.assoc(key, value);              // single key
-cursor.assocIn(value, key1, key2);     // nested path
-```
-
-These are lattice-aware: with a lattice, null intermediates are auto-initialised from `lattice.zero()`. Without a lattice, null intermediates throw (see [LATTICE_CURSOR_DESIGN.md § assoc/assocIn](LATTICE_CURSOR_DESIGN.md#assoc--associnlattice-aware-writes)).
-
-### Reading from cursors
-
-Use `cursor.get()` for the current value, `cursor.get(keys...)` for nested reads:
-
-```java
-public AHashMap<Keyword, ACell> getPost(Blob key) {
-    Index<Blob, ACell> feed = cursor.get();
-    if (feed == null) return null;        // get() returns null, not zero()
-    return (AHashMap<Keyword, ACell>) feed.get(key);
-}
-```
-
-Note: `get()` returns null for uninitialised paths. The zero-substitution only applies inside update lambdas.
-
-### Static helpers for data construction
-
-Keep post/record construction in static helper classes. This separates data format from cursor mechanics:
-
-```java
-public class SocialPost {
-    public static final Keyword TEXT = Keyword.intern("text");
-    public static final Keyword TIMESTAMP = Keyword.intern("timestamp");
-
-    public static AHashMap<Keyword, ACell> createPost(String text, long timestamp) {
-        return Maps.of(TEXT, Strings.create(text), TIMESTAMP, CVMLong.create(timestamp));
-    }
-}
-```
-
-Rules for record design:
-- **Always include `:timestamp`** in LWW-merged records — it drives the merge tiebreaker
-- **Use `Keyword` keys** for record fields — compact, interned, fast comparison
-- **Use `Blob` keys** for collection entries that need ordering (feeds use 8-byte big-endian timestamp blobs for chronological order in `Index`)
-- **Tombstone under union merges** — with additive merges (`IndexLattice`, `MapLattice`, `SetLattice`) a removed key resurrects when an older replica merges back, so set a `:deleted` field rather than removing entries. Under **whole-value LWW** (see [Durable deletes](#durable-deletes-with-whole-value-lww)) removals *are* durable and you can delete directly.
-
-## Fork/Sync for Batch Operations
-
-Fork creates an independent working copy. Sync merges changes back through the
-fork's immediate logical cursor parent using lattice semantics (always succeeds).
-That is separate from publishing and durability. This enables:
-
-- **Batch writes** — multiple updates with a single signing pass
-- **Speculative changes** — try operations locally, sync only if successful
-- **Concurrent access** — independent forks merge deterministically
-
-```java
-// Fork for batch posting
 Social forked = social.fork();
 forked.user(myKey).feed().post("Post 1");
 forked.user(myKey).feed().post("Post 2");
-forked.user(myKey).feed().post("Post 3");
-forked.sync();  // merge into the live Social component
-app.sync();     // publish the complete hosted root
-app.flush();    // optional physical durability barrier
+forked.sync();   // merge into the live component
+app.sync();      // publish the hosted root
+app.flush();     // optional physical durability barrier
 ```
 
-Domain components should expose `fork()` with their exact component type when batch
-operations are a use case. `sync()` is inherited from `ALatticeComponent`:
-
-```java
-public class Social extends ALatticeComponent<
-        AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> {
-    public Social fork() {
-        return new Social(parent(), cursor.fork());
-    }
-}
-```
-
-See [LATTICE_CURSOR_DESIGN.md § sync() vs CAS-based merge()](LATTICE_CURSOR_DESIGN.md#sync-vs-cas-based-merge) for details on how sync handles concurrent modifications.
-
-### Persistence, publication and durability
-
-The three boundaries have intentionally different meanings:
+Domain components expose `fork()` with their exact type when batching is a use case;
+`sync()` is inherited from `ALatticeComponent`.
 
 | Operation | Meaning | Moves a cursor? |
-|-----------|---------|-----------------|
-| `component.persist()` | Write reachable cells through the host store and return the store-backed value | No |
-| `component.sync()` | Merge through its cursor parent; at the root, run host publication policy | Yes, where merge/publication selects a value |
-| `application.flush()` | Pass through to the underlying store's physical durability barrier | No |
+|---|---|---|
+| `component.persist()` | Write reachable cells through the host store; return the store-backed value | No |
+| `component.sync()` | Merge through the cursor parent; at the root, run publication policy | Yes, where merge selects a value |
+| `application.flush()` | The store's physical durability barrier | No |
 
-Incremental blob writers use the host `AStore` at intervals to replace eligible
-direct references with store-backed soft references and relieve memory pressure.
-They must explicitly install the returned value in working state. Persistence
-neither selects a retained root nor grants permission to garbage collect; those are
-application policy.
+Incremental writers may persist at intervals to swap direct references for
+store-backed soft references and relieve memory pressure; they must install the
+returned value themselves. Persistence neither selects a retained root nor licenses
+garbage collection.
 
-## Connecting to Host Infrastructure
+## Write policy: `LatticeContext`
 
-Application and region components accept components, not `NodeServer`, propagators
-or stores. This keeps the ownership direction clear:
-
-```text
-runtime/bootstrap owns RootComponent and resource lifecycle
-        ↓
-ALatticeApplication composes root-level regions
-        ↓
-ALatticeComponent subclasses provide path-specific domain APIs
-```
-
-For a local process, construct or open a `RootComponent` over any `AStore`. For a
-networked process, obtain the same abstraction from `NodeServer.getRootComponent()`.
-The application code is identical after that point. `NodeServer` must use the root
-component's store as its primary serving store, so published roots never contain
-references unavailable to that primary.
-
-Host publication configuration is a lifecycle concern. A root defaults to local
-store publication, allowing useful pre-launch sync. Network infrastructure installs
-and freezes its publication policy during launch; application code cannot silently
-replace that policy later.
-
-### LatticeContext
-
-The `LatticeContext` is the application's **write/merge policy**: who signs, what time
-it is, and which signers are authorised for which owners. It is an abstract class, so a
-policy can be fixed (deterministic tests) or resolve dynamically from an application
-clock, wallet or key store. Install it once on the application or root cursor and every
-descendant inherits it live:
+The context answers who signs, what time it is and which signers act for which
+owners. Install it once on the application or root cursor and every descendant
+inherits it live. A fixed context suits deterministic tests; an application policy
+resolves dynamically from a clock, wallet or key store and must be thread-safe if
+shared. The `with...` methods (`withTimestamp`, `withSigningKey`, `withOwnerVerifier`,
+`withMaxFutureTimestampSkew`) override one capability and delegate the rest.
 
 ```java
-// one in-memory key, runtime clock
-cursor.setContext(LatticeContext.create(null, myKeyPair));
-
-// fixed clock as well — fully deterministic, typically for tests
-cursor.setContext(LatticeContext.create(CVMLong.create(1000), myKeyPair));
-
-// an application policy: several identities, an application clock
-cursor.setContext(new LatticeContext() {
-    @Override public CVMLong currentTimestamp() { return myClock.now(); }
-    @Override public <T extends ACell> SignedData<T> sign(AccountKey account, T value) {
-        return myWallet.signWith(account, value);   // null if unavailable
-    }
-});
+cursor.setContext(LatticeContext.create(null, myKeyPair));                  // runtime clock
+cursor.setContext(LatticeContext.create(CVMLong.create(1000), myKeyPair));  // fixed clock
 ```
 
-A dynamic policy installed on a shared cursor must be thread-safe. The `with...` methods
-(`withTimestamp`, `withSigningKey`, `withOwnerVerifier`, `withMaxFutureTimestampSkew`)
-override one capability and delegate the rest, so a fixed timestamp does not freeze a
-dynamic signing policy.
+**Time.** `currentTimestamp()` is resolved once per logical write, even under retry,
+and components consume it exactly: no incrementing, no comparing with stored values to
+invent a later one, no hidden logical clock. Reusing a timestamp deliberately creates a
+tie, which the local (`own`) operand wins. Where ordering across replicas matters,
+especially delete followed by recreate, the application supplies timestamps that
+express it.
 
-**Time.** `currentTimestamp()` resolves the write clock; with no fixed timestamp it
-returns runtime time. Lattice components consume the resolved value exactly: they must
-not increment it, compare it with stored values to invent a later value, or otherwise
-implement a hidden logical clock. One logical write resolves the clock once, even when
-it retries under contention. DLFS node writes resolve time exclusively this way:
-`DLFileSystem` and `DLFSLocal` do not hold or advance a separate timestamp. Reusing a
-timestamp deliberately creates a tie; a local update is the current (`own`) merge
-operand and therefore wins that tie against an older snapshot.
+**Signing.** `signAs(owner, value)` is the single authorship rule and is exactly what
+`verifyOwner` checks on merge. An `AccountKey` owner requires that key; an indirect
+owner (address, DID) is resolved by the owner verifier, lenient when none is installed.
+A write the policy cannot author throws `IllegalStateException`, so a slot no peer would
+accept never reaches local state.
 
-**Signing.** `signAs(owner, value)` is the single rule for authoring owned data, and it
-is exactly the rule `verifyOwner` applies to data arriving on merge. An owner that is an
-`AccountKey` requires that key; an indirect owner (Address, DID) is resolved by the
-owner verifier, which is lenient when none is installed. A write through a `SignedCursor`
-that the policy cannot author throws `IllegalStateException`, so a slot no peer would
-accept never reaches local state. When operations must be ordered across replicas—especially delete followed by
-recreate—the application must supply timestamps expressing that order.
+## Security model
 
-## Security Model
+`OwnerLattice` maps owner keys to `SignedData<V>` and, on merge, rejects any value
+whose signer does not match the owner. The same rule runs when a value is authored: a
+`SignedCursor` write for an owner the context cannot sign for throws and stores
+nothing. A merge that would have to synthesise a value for an owner this node cannot
+sign for keeps its own value instead; merging validly signed data never fails and never
+attaches a non-owner signature.
 
-### What OwnerLattice protects
+Local state is trusted in the sense that matters: nothing polices what an owner writes
+into their own slot, only that slots are written in a form peers accept. Write
+adversarial tests that construct forged state at the raw data level and assert that
+`OwnerLattice.merge` drops it.
 
-`OwnerLattice` maps owner keys to `SignedData<V>`. During **network merge** (node-to-node replication), it verifies that the signer key matches the owner key. Forgeries — data signed by key A placed under key B — are silently rejected.
+## Deletes
 
-### One rule, both boundaries
+Additive merges union keys, so a removed key returns when an older replica merges
+back. Under `IndexLattice`, `MapLattice` or `SetLattice`, delete by tombstone: set a
+`:deleted` field and bump `:timestamp` so the deletion wins.
 
-The same authorisation rule runs when a value is authored and when one arrives. If
-Alice's node writes to Bob's slot, the `SignedCursor` asks the context for a signer
-authorised for Bob; with no such key the write throws and nothing is stored. A merge
-that must *synthesise* a new value for an owner the node cannot sign for keeps the own
-value instead — a merge of validly signed data never fails just because this node cannot
-author the result on someone else's behalf, and never attaches a non-owner signature.
-
-Local state is still trusted in the sense that matters: nothing polices *what* an owner
-writes into their own slot. What is enforced is that a slot is only ever written in a
-form a peer would accept.
-
-### Testing security
-
-Write adversarial tests that construct forged state at the raw data level and verify that `OwnerLattice.merge` rejects it:
+For durable deletes, model the region as a single whole-value LWW leaf built from
+three single-concern layers:
 
 ```java
-// Alice signs data, places it under Bob's key
-SignedData<V> forged = alice.signData(fakeState);
-AHashMap<ACell, SignedData<V>> attackerNode = Maps.of(bob.getAccountKey(), forged);
-
-// Merge should reject the forgery
-AHashMap<ACell, SignedData<V>> merged =
-    ownerLattice.merge(context, honestNode, attackerNode);
-
-assertNull(merged.get(bob.getAccountKey()),
-    "Forgery should be rejected: signer != owner");
-```
-
-## Choosing Data Structures
-
-| Need | Use | Why |
-|------|-----|-----|
-| Ordered entries (timelines, logs) | `Index<Blob, ACell>` | Sorted radix tree, lexicographic blob ordering |
-| Named fields (records) | `Index<Keyword, ACell>` or `AHashMap<Keyword, ACell>` | `Index` when the lattice hierarchy uses it; `AHashMap` for leaf records |
-| Dynamic key sets (follows, tags) | `AHashMap<ACell, ACell>` | Hash-based, unordered, efficient merge |
-| Append-only sequences | `Index` with monotonic blob keys | Big-endian timestamp keys give chronological ordering |
-| Single values (profile, status) | Direct `ACell` with `LWWLattice` | Last-write-wins register |
-
-### Index vs AHashMap
-
-Both are associative, both support `mergeDifferences`. The choice matters for:
-
-- **Lattice hierarchy**: `KeyedLattice` and `SocialLattice` use `Index<Keyword, ACell>` because the lattice root expects `Index`. The cursor's `assocIn` creates containers via `lattice.zero()` — if the lattice returns `Index.EMPTY`, you get an `Index`.
-- **Ordering**: `Index` keys are sorted lexicographically (blob order). `AHashMap` keys are unordered.
-- **JSON compatibility**: `Index` resolves `Keyword` and `AString` identically (same blob), which matters for JSON interop.
-
-Rule of thumb: use `Index` for lattice-level containers (where `path()` and `zero()` matter), `AHashMap` for leaf records and dynamic collections.
-
-## LWW and Timestamps
-
-`LWWLattice` resolves conflicts by comparing `:timestamp` fields. Best practices:
-
-- **Use `System.currentTimeMillis()`** for timestamps — good enough for distributed LWW
-- **Include `:timestamp` in every LWW-merged record** — the default `LWWLattice.INSTANCE` extracts it from `AHashMap` values via the `:timestamp` keyword
-- **Tombstone deletions**: add a `:deleted` field and update `:timestamp` so the deletion wins over older versions of the same entry
-
-```java
-// Deletion via tombstone
-public void delete(Blob postKey) {
-    long ts = System.currentTimeMillis();
-    cursor.updateAndGet(feed -> {
-        AHashMap<Keyword, ACell> post = (AHashMap<Keyword, ACell>) feed.get(postKey);
-        if (post == null) return feed;
-        post = post.assoc(DELETED, CVMLong.create(ts));
-        post = post.assoc(TIMESTAMP, CVMLong.create(ts));  // ensures LWW picks this version
-        return feed.assoc(postKey, post);
-    });
-}
-```
-
-### Durable deletes with whole-value LWW
-
-Additive merges (`IndexLattice`/`MapLattice`) union keys, so a removed key reappears when an older replica merges back — hence tombstones. When you need **real deletions** to survive merge-back, model the region as a single **whole-value LWW leaf**, composed from three single-concern lattice layers:
-
-```java
-// merge = whole-value LWW (deletions durable) · nav = JSON structure · write = stamp
 ALattice<ACell> state = StampingLattice.create(
     LWWLattice.create(JSONLattice.INSTANCE, tsFn),   // whole-value merge over JSON navigation
-    (v, ts) -> v.assoc(KEY_TIMESTAMP, ts));          // inject the context timestamp on every write
+    (v, ts) -> v.assoc(KEY_TIMESTAMP, ts));          // stamp the context timestamp on every write
 ```
 
-- `JSONLattice` — recursive structural navigation; `assocIn` builds containers by key shape, so sub-paths below the leaf stay navigable and writable.
-- `LWWLattice(inner)` — merges the *whole* value by `:timestamp` (never per-key), so a smaller map with a newer timestamp replaces the old one and the deleted key does not resurrect.
-- `StampingLattice(inner, stampFn)` — inserts a `StampedCursor` so every deep write re-stamps the whole leaf with the timestamp from the `LatticeContext` (the single write clock); the `stampFn` only says *where* to put it. Whole-value LWW then picks it.
+`JSONLattice` provides structural navigation below the leaf, `LWWLattice` merges the
+whole value by `:timestamp` so a smaller map with a newer timestamp replaces the old
+one, and `StampingLattice` inserts a `StampedCursor` so every deep write re-stamps the
+leaf. A delete is then a read-modify-write that dissociates the key.
 
-Each layer adds exactly one concern (merge / navigation / stamping) and delegates the rest, so they compose freely — `StampingLattice` stamps over anything, `LWWLattice` merges over any navigable inner. To delete, read-modify-write the sub-path out — e.g. `cursor.updateAndGet(m -> m.dissoc(key))` — and whole-value LWW propagates the removal.
+## Testing
 
-## Testing Patterns
-
-### 1. Standalone unit tests
-
-Test application logic without node infrastructure:
-
-```java
-AKeyPair kp = AKeyPair.generate();
-Social social = Social.create(kp);
-Feed feed = social.user(kp.getAccountKey()).feed();
-Blob key = feed.post("Hello!");
-assertEquals("Hello!", SocialPost.getText(feed.getPost(key)));
-```
-
-### 2. Connected integration tests
-
-Test that writes propagate to the root cursor:
-
-```java
-KeyedLattice lattice = Lattice.ROOT.addLattice(
-    Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-RootComponent<Index<Keyword, ACell>> root = RootComponent.create(lattice, store);
-root.cursor().setContext(LatticeContext.create(null, kp));
-Social social = Social.connect(root);
-
-social.user(kp.getAccountKey()).feed().post("Propagated");
-assertNotNull(root.cursor().get(), "Write should propagate to root");
-```
-
-### 3. Fork/sync tests
-
-Test that forked changes merge correctly:
+- **Standalone**: exercise components over an in-memory root with a fixed context.
+- **Connected**: assert that writes propagate to the root cursor.
+- **Fork and sync**: changes in a fork are invisible until `sync()`, then merged.
+- **Multi-user**: different owners' data is independent.
+- **Adversarial**: forgeries are rejected at `OwnerLattice.merge`.
 
 ```java
 Social forked = social.fork();
 forked.user(key).feed().post("In fork");
-assertEquals(0, social.user(key).feed().count());  // not visible yet
+assertEquals(0, social.user(key).feed().count());
 forked.sync();
-assertEquals(1, social.user(key).feed().count());  // merged
+assertEquals(1, social.user(key).feed().count());
 ```
 
-### 4. Multi-user tests
-
-Test that different users' data is independent:
-
-```java
-social.user(alice.getAccountKey()).feed().post("Alice");
-social.user(bob.getAccountKey()).feed().post("Bob");
-assertEquals(1, social.user(alice.getAccountKey()).feed().count());
-assertEquals(1, social.user(bob.getAccountKey()).feed().count());
-```
-
-### 5. Adversarial security tests
-
-Test that forgeries are rejected at the network merge boundary (see Security Model above).
+Follow the repository conventions: no sleeps, wait on real signals; no fixed ports.
 
 ## Checklist
 
-When building a new lattice application:
+- [ ] Design the state tree, then choose a merge strategy per leaf.
+- [ ] Compose lattice primitives bottom-up; write a custom `ALattice` with `merge`,
+      `path` and `zero` for structured records.
+- [ ] Wrap with `OwnerLattice` for per-user ownership; register under a root keyword.
+- [ ] Derive an `ALatticeApplication`; one `ALatticeComponent` per lattice path;
+      facades contain components.
+- [ ] Accept `RootComponent` in factories; provide local `open()` and host-neutral
+      `connect()`.
+- [ ] Write with `updateAndGet`, navigate with `cursor.path(key)`, return exact types
+      from `fork()`.
+- [ ] Treat persist, sync and flush as distinct boundaries.
+- [ ] Include `:timestamp` in LWW records; tombstone under union merges.
+- [ ] Write standalone, connected, fork/sync, multi-user and adversarial tests.
 
-- [ ] Design the state tree (what data, what keys, what nesting)
-- [ ] Choose merge strategies for each leaf (LWW, set union, custom)
-- [ ] Compose lattice primitives bottom-up (`IndexLattice`, `MapLattice`, etc.)
-- [ ] Write a custom `ALattice` for structured records with `merge()` and `path()`
-- [ ] Implement `zero()` returning the correct empty container type
-- [ ] Wrap with `OwnerLattice` if per-user ownership is needed
-- [ ] Register under a keyword in the root `KeyedLattice`
-- [ ] Derive an `ALatticeApplication` as the root-level region composition point
-- [ ] Build `ALatticeComponent` subclasses: one lattice path per component
-- [ ] Keep multi-path conveniences as facades containing path-specific components
-- [ ] Accept `RootComponent`, not `NodeServer` or `AStore`, in application factories
-- [ ] Use `updateAndGet` for writes — rely on auto-initialisation, no null guards
-- [ ] Use `cursor.path(key)` for navigation — signing is transparent
-- [ ] Return exact component types from `fork()`; inherit `sync()`
-- [ ] Treat component sync, application publication and store flush as distinct boundaries
-- [ ] Delegate `persist()` through component parents without moving cursors
-- [ ] Let the routing/service layer retain bounded owner or session components
-- [ ] Provide local `open()` and host-neutral `connect(RootComponent)` factories
-- [ ] Include `:timestamp` in all LWW-merged records
-- [ ] Tombstone instead of delete
-- [ ] Write adversarial tests for `OwnerLattice.merge` forgery rejection
-- [ ] Write standalone, connected, fork/sync, and multi-user tests
+## Where the code lives
+
+- `convex.lattice.ALatticeApplication`, `ALatticeComponent`, `RootComponent` — the
+  component layer.
+- `convex.lattice.LatticeContext`, `OwnerLattice`, `SignedLattice`, `StampingLattice`,
+  `JSONLattice`, `LWWLattice`, `IndexLattice`, `MapLattice`, `SetLattice` — lattices
+  and write policy.
+- `convex.node.NodeServer` (`convex-peer`) — the host runtime.
+- `convex-social` (`Social`, `SocialUser`, `Feed`, `SocialPost`) and `convex-dlfs` —
+  worked examples.
+
+## Related
+
+- [CAD045 Lattice Applications](https://docs.convex.world/docs/cad/lattice_apps) — the normative patterns.
+- [CAD024 Data Lattice](https://docs.convex.world/docs/cad/data_lattice) and [CAD036 Lattice Node](https://docs.convex.world/docs/cad/lattice_node) — lattice model and hosting.
+- [CAD038 Lattice Authorisation](https://docs.convex.world/docs/cad/lattice_auth) — signer authorisation.
+- [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) and [LATTICE_REGIONS.md](LATTICE_REGIONS.md).

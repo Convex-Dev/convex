@@ -52,7 +52,19 @@ ACell result = ctx.getResult();  // Returns 6
 ## Documentation
 
 - [Javadoc API Reference](https://javadoc.io/doc/world.convex/convex-core)
-- [Lattice application and component patterns](docs/LATTICE_APPLICATIONS.md)
+- Design documents under [`docs/`](docs/), each an implementation companion to a
+  CAD:
+  - [Encoder design](docs/ENCODER_DESIGN.md) — encoding lengths, embedding, encoder hierarchy, multi-cell messages
+  - [Consensus](docs/CONSENSUS.md) — determinism boundary, time handling, attack surfaces
+  - [Network upgrades](docs/UPGRADE.md) — protocol versions, migrations, test state policy
+  - [CNS implementation notes](docs/CNS.md) — registry layout and the planned v1 registry migration
+  - [Etch v3](docs/ETCHv3.md) — header, durability and encryption overlay
+  - [Etch garbage collection](docs/ETCH_GC.md) — online collection, cutover and recovery
+  - [Lattice regions](docs/LATTICE_REGIONS.md) — the root lattice catalogue
+  - [Lattice cursors](docs/LATTICE_CURSOR_DESIGN.md) — fork/sync, navigation, write boundaries
+  - [Lattice applications](docs/LATTICE_APPLICATIONS.md) — component patterns over cursors
+  - [CellExplorer](docs/CELL_EXPLORER_DESIGN.md) — budget-bounded JSON5 rendering
+  - [JSON Schema](docs/JSON_SCHEMA.md) — ACell-native schema validation
 - [Java Examples](https://github.com/Convex-Dev/convex/tree/develop/convex-core/src/test/java/convex/core/examples) (see `RawCVM.java` for running CVM code directly)
 - [Convex Lisp Examples](https://github.com/Convex-Dev/convex/tree/develop/convex-core/src/test/resources/examples)
 - [Convex Documentation](https://docs.convex.world)
