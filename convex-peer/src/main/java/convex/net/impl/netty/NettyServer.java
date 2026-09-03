@@ -58,7 +58,7 @@ public class NettyServer extends AServer {
 
 	/** Shared, byte-bounded queue of replies to all inbound connections. */
 	private final ServerOutboundQueue outbound = new ServerOutboundQueue(
-		Config.SERVER_OUTBOUND_QUEUE_BYTE_LIMIT, Config.OUTBOUND_QUEUE_BYTE_LIMIT);
+		Config.SERVER_OUTBOUND_QUEUE_BYTE_LIMIT, Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT);
 
 	/**
 	 * Delivery function for inbound messages. Returns null if accepted,

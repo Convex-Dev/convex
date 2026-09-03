@@ -12,10 +12,11 @@ import io.netty.channel.Channel;
  * AConnection for server-side inbound Netty channels.
  *
  * Encodes on the caller thread, then offers the message to the server's shared
- * {@link ServerOutboundQueue}. Replies are refused only when that queue's total
- * byte bound, or this connection's share of it, would be exceeded, so a burst
- * of results is absorbed rather than dropped while the channel is briefly
- * unwritable. One instance per accepted client channel.
+ * {@link ServerOutboundQueue}. Replies are refused only when that queue's byte
+ * bound is full, or when this channel already holds more than its cap of bytes
+ * handed to Netty and unwritten, so a burst of results is absorbed rather than
+ * dropped while the channel is briefly unwritable, and a reader that stalls
+ * loses only its own replies. One instance per accepted client channel.
  */
 class NettyServerConnection extends AConnection {
 
@@ -23,8 +24,8 @@ class NettyServerConnection extends AConnection {
 	private final NettyInboundHandler inboundHandler;
 	private final ServerOutboundQueue outbound;
 
-	/** Encoded bytes queued for this connection and not yet reported written. */
-	private final AtomicLong outboundBytes = new AtomicLong();
+	/** Encoded bytes handed to Netty for this channel and not yet reported written. */
+	private final AtomicLong pendingBytes = new AtomicLong();
 
 	NettyServerConnection(Channel channel, NettyInboundHandler inboundHandler, ServerOutboundQueue outbound) {
 		this.channel = channel;
@@ -43,21 +44,12 @@ class NettyServerConnection extends AConnection {
 		return outbound.offer(this, ch, msg, Utils.checkedInt(length));
 	}
 
-	boolean reserveOutbound(int bytes, long limit) {
-		long current;
-		do {
-			current = outboundBytes.get();
-			if (current + bytes > limit) return false;
-		} while (!outboundBytes.compareAndSet(current, current + bytes));
-		return true;
+	void addPendingBytes(int delta) {
+		pendingBytes.addAndGet(delta);
 	}
 
-	void releaseOutbound(int bytes) {
-		outboundBytes.addAndGet(-bytes);
-	}
-
-	long getOutboundBytes() {
-		return outboundBytes.get();
+	long getPendingBytes() {
+		return pendingBytes.get();
 	}
 
 	@Override

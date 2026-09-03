@@ -162,12 +162,20 @@ public class Config {
 	public static final int OUTBOUND_QUEUE_BYTE_LIMIT = 16 * 1024 * 1024;
 
 	/**
-	 * Maximum encoded bytes of replies queued across all inbound connections of a
-	 * server, counted until Netty reports each write complete. One shared bound
-	 * absorbs bursts of results; each connection may hold at most
-	 * {@link #OUTBOUND_QUEUE_BYTE_LIMIT} of it.
+	 * Maximum encoded bytes of replies held in a server's shared outbound queue,
+	 * not yet handed to Netty. One shared bound absorbs bursts of results across
+	 * all inbound connections; bytes leave it as soon as the writer hands them
+	 * to the transport, so no single connection can pin it.
 	 */
-	public static final int SERVER_OUTBOUND_QUEUE_BYTE_LIMIT = 128 * 1024 * 1024;
+	public static final int SERVER_OUTBOUND_QUEUE_BYTE_LIMIT = 64 * 1024 * 1024;
+
+	/**
+	 * Bytes handed to Netty for one inbound connection but not yet written, beyond
+	 * which that connection's further replies are refused. Bounds the memory a
+	 * reader that stops draining its socket can pin to roughly this much plus one
+	 * message, without affecting any other connection.
+	 */
+	public static final int SERVER_CONNECTION_PENDING_BYTE_LIMIT = 1024 * 1024;
 
 	/** A coalesced priority message must remain a small consensus/control root. */
 	public static final int PRIORITY_OUTBOUND_MESSAGE_LIMIT = 64 * 1024;
