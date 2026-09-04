@@ -16,8 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Orders, which is skipped for a peer whose outbound queue is under pressure.
   The priority slot, resend window and DATA-ahead chunking are gone from CPoS;
   a peer that misses data now requests it from the sender instead of waiting
-  for the status poll. Block production defers transactions beyond an
-  encoded-byte budget so an Order update always fits one message. The
+  for the status poll. An update that does not fit one message goes out as
+  DATA messages of at most the message limit each, followed by its root, so a
+  Block of any size is carried without one oversized frame. The
   `:max-belief-delta-broadcast-size` peer configuration key is removed.
 - Peer: messages for a lagging peer are buffered per connection up to 256 MB,
   the last message admitted may exceed it, before anything is dropped, and
@@ -28,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Peer: a transaction whose size alone costs more juice than any transaction may
+  use was accepted, proposed in a Block and propagated to every peer before
+  failing with `:JUICE` at execution. It is now refused at intake with the same
+  error.
+- Peer: a consensus message from a trusted peer that could not be queued within
+  8 s was silently dropped. The connection is now paused until the message fits,
+  so a busy receiver slows the sender instead of losing its updates.
 - `ConvexDirect`: `message`, `messageRaw`, `acquire` and `requestStatus` returned
   null, so a direct client could only query and transact, and anything sent to
   it through the message API was silently lost. It now handles every protocol

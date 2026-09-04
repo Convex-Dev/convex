@@ -78,17 +78,18 @@ other peer connections.
 offered to every peer with a non-blocking send before the next is built, so the
 two reach each peer's ordered queue in this order:
 
-- **Own Order** (inner layer): our latest signed `Order` as the top cell of one
-  delta carrying everything reachable from it that this peer has not yet
-  announced, normally one new Block with its transactions. It is sent whenever
-  our Order changes, and as a 130-byte root-only keepalive every
-  `BELIEF_REBROADCAST_DELAY` otherwise. It is our consensus vote, so it is
-  offered before any relay work starts. Block production keeps the delta within
-  the message limit by deferring transactions beyond an encoded-byte budget to
-  the next loop.
-- **Belief** (outer layer): the Belief as the top cell of one delta carrying
-  everything not announced by the Order update, which is other peers' Orders
-  and, the first time this peer relays them, their Blocks. It is sent whenever
+- **Own Order** (inner layer): our latest signed `Order` with everything
+  reachable from it that this peer has not yet announced, normally one new Block
+  with its transactions. It is sent whenever our Order changes, and as a
+  130-byte root-only keepalive every `BELIEF_REBROADCAST_DELAY` otherwise. It is
+  our consensus vote, so it is offered before any relay work starts. A Block of
+  any size is carried: when the update fits one message it is a single delta
+  with the Order as its top cell, otherwise DATA messages of at most the message
+  limit each precede the Order on the same ordered queue. Block production
+  bounds Blocks by transaction count only and knows nothing of message sizes.
+- **Belief** (outer layer): the Belief with everything not announced by the
+  Order update, which is other peers' Orders and, the first time this peer
+  relays them, their Blocks, shaped the same way. It is sent whenever
   any Order in the Belief changes and every `BELIEF_FULL_BROADCAST_DELAY`
   otherwise. It is withheld from a peer whose outbound queue is under pressure:
   the Belief is relay, not consensus, and the next change carries it again. A
@@ -101,9 +102,13 @@ which message is essential and which is optional is the propagator's decision.
 
 Ordered delivery on one queue means data always precedes the Order that commits
 it, so nothing is superseded and nothing is resent. Announcing is therefore
-honest: a cell is announced when its delta is offered to the peers. A delta that
-would exceed the message limit is sent as its root alone, which only happens for
-a peer catching up, and the receiver pulls the rest.
+honest: a cell is announced when its messages are offered to the peers. What one
+update materialises is bounded by bytes, never by cell count, at the peer queue
+bound (`BeliefPropagator.MAX_UPDATE_BYTES`); novelty beyond it stays in the store
+and the receiver pulls it. A peer whose queue cannot take the data is offered the
+root alone, so it too learns what to pull. `UpdateAccumulator` does this shaping;
+it is peer code, because what to carry eagerly is a peer's decision, not the data
+layer's.
 
 Every remaining way to miss data, a full queue or a relayed Order whose Blocks
 this peer has not seen, ends in a request rather than a timer:
@@ -113,7 +118,11 @@ data has arrived. The 2 s status poll remains the recovery of last resort.
 
 Inbound CPoS DATA and BELIEF messages share one ordered, byte-bounded processing
 queue off the Netty event loop. This preserves the DATA-before-root order for a
-connection while keeping decoding and store work away from network I/O.
+connection while keeping decoding and store work away from network I/O. A
+trusted connection whose message does not fit is paused until it does: consensus
+traffic is never timed out or dropped on the receiving side, so the pressure
+reaches the sender's queue, which is where drops are decided. The queue admits
+one message over its byte bound, so any legal frame is eventually accepted.
 
 ## Memory budgets
 
@@ -131,7 +140,8 @@ protocol limits:
 | Outbound queue, per client connection | 128 messages and 16 MiB | `Config` constants |
 | Outbound queue, per connection to a peer | 65,536 messages and 256 MB; the last message admitted may exceed it | `Config` constants |
 | Priority outbound slot, per connection | one message, at most 64 KiB | `Config` constants |
-| Novelty references collected per attempt | at most 65,536, also byte-budgeted | `Cells.MAX_NOVELTY_CELLS` |
+| Materialised messages per consensus update | 256 MB | `BeliefPropagator.MAX_UPDATE_BYTES` |
+| Lattice novelty retained per attempt | at most 65,536 cells, also byte-budgeted | `convex.node.NoveltyCollector` |
 
 The complete inbound lattice-value limit is separately configured with
 `LatticePropagatorConfig.maxInboundValueSize`; it does not need to equal the
@@ -162,7 +172,8 @@ sync, CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
 ## Relevant implementation
 
 - `convex.core.message.Message` — bounded DATA construction
-- `convex.core.data.Cells.NoveltyCollector` — bounded novelty collection
+- `convex.peer.UpdateAccumulator` — shapes one consensus update into DATA messages then its root
+- `convex.node.NoveltyCollector` — bounded novelty collection for lattice deltas
 - `convex.core.message.BoundedMessageQueue` — count- and byte-bounded FIFO
 - `convex.node.LatticePropagator` — lattice chunking and root fallback
 - `convex.peer.BeliefPropagator` — own-Order then Belief update cadence

@@ -244,6 +244,20 @@ public abstract class AConnectionManager implements Closeable {
 	 * @return aggregate enqueue outcome
 	 */
 	public BroadcastResult broadcastSequence(List<Message> messages, Message fallback) {
+		return broadcastSequence(messages, fallback, false);
+	}
+
+	/**
+	 * Broadcasts an ordered message sequence as {@link #broadcastSequence(List, Message)},
+	 * optionally skipping peers whose outbound queue is under pressure, as
+	 * {@link #broadcast(Message, boolean)} does for one message.
+	 *
+	 * @param messages ordered messages to send
+	 * @param fallback message to try after a partial send, or null
+	 * @param skipBusy true to skip peers whose outbound queue is under pressure
+	 * @return aggregate enqueue outcome
+	 */
+	public BroadcastResult broadcastSequence(List<Message> messages, Message fallback, boolean skipBusy) {
 		ArrayList<Convex> peers=new ArrayList<>(connections.values());
 		Utils.shuffle(peers);
 		int attempted=0;
@@ -252,6 +266,7 @@ public abstract class AConnectionManager implements Closeable {
 		int dropped=0;
 		for (Convex peer:peers) {
 			if (peer==null || !peer.isConnected()) continue;
+			if (skipBusy && peer.isOutboundBusy()) continue;
 			attempted++;
 			boolean sent=true;
 			for (Message message:messages) {

@@ -19,13 +19,13 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Index;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.BoundedMessageQueue;
 import convex.core.message.MessageType;
@@ -133,13 +133,42 @@ public class BeliefPropagator extends AThreadedComponent {
 		return beliefQueue.offer(beliefMessage);
 	}
 
+	/** Interval between attempts to queue a held-back trusted message, in milliseconds. */
+	private static final long QUEUE_WAIT_SLICE=1000;
+
+	/** Time after which a held-back trusted message is logged, in milliseconds. */
+	private static final long QUEUE_WAIT_WARNING=10_000;
+
+	/**
+	 * Queues a Belief or DATA message from a trusted connection, waiting as long as
+	 * it takes for the queue to have room. Consensus traffic is never timed out on the
+	 * receiving side: the caller has paused the connection, so waiting applies
+	 * backpressure to the sender, whose own queue decides what to drop. Gives up only
+	 * if this server stops or the connection closes.
+	 *
+	 * @param message Message to queue
+	 * @return true once queued, false if the server stopped or the connection closed first
+	 */
 	boolean queueBeliefBlocking(Message message) {
+		AConnection conn=message.getConnection();
+		long waited=0;
 		try {
-			return beliefQueue.offer(message,Config.DEFAULT_INTERNAL_TIMEOUT,TimeUnit.MILLISECONDS);
+			while (server.isLive() && (conn==null || !conn.isClosed())) {
+				if (beliefQueue.offer(message,QUEUE_WAIT_SLICE,TimeUnit.MILLISECONDS)) return true;
+				waited+=QUEUE_WAIT_SLICE;
+				if (waited==QUEUE_WAIT_WARNING) {
+					log.warn("Belief queue full for {} ms, holding back {}",waited,conn);
+				}
+			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-			return false;
 		}
+		return false;
+	}
+
+	/** Test hook: removes and returns the oldest queued Belief message, or null if none. */
+	Message pollQueuedBelief() {
+		return beliefQueue.poll();
 	}
 
 	/**
@@ -237,16 +266,16 @@ public class BeliefPropagator extends AThreadedComponent {
 		try {
 			// Own Order first: offered to every peer before the Belief is even built
 			if (orderDue) {
-				Message order=createOrderUpdateMessage();
+				List<Message> order=createOrderUpdateMessages();
 				lastBroadcastTime=ts;
-				if (order!=null) offered|=server.manager.broadcast(order)>0;
+				offered|=offerUpdate(order,false);
 			}
 			// Belief second: relay only, so a peer under outbound pressure is skipped
 			if (beliefDue) {
-				Message beliefUpdate=createBeliefUpdateMessage();
+				List<Message> beliefUpdate=createBeliefUpdateMessages();
 				lastFullBroadcastTime=ts;
 				beliefChanged=false;
-				offered|=server.manager.broadcast(beliefUpdate,true)>0;
+				offered|=offerUpdate(beliefUpdate,true);
 			}
 		} catch (Exception e) {
 			if (server.isLive()) {
@@ -255,6 +284,27 @@ public class BeliefPropagator extends AThreadedComponent {
 		}
 		if (offered) beliefBroadcastCount++;
 		return offered;
+	}
+
+	/**
+	 * Offers an update to every peer in order: one message directly, a longer sequence
+	 * with its root as the fallback, so a peer whose queue cannot take the data still
+	 * learns the root and pulls what it lacks.
+	 *
+	 * @param update Messages ending with the update's root
+	 * @param skipBusy true to withhold the update from peers under outbound pressure
+	 * @return true if at least one peer took the root
+	 */
+	private boolean offerUpdate(List<Message> update, boolean skipBusy) {
+		int n=update.size();
+		if (n==0) return false;
+		if (n==1) return server.manager.broadcast(update.get(0),skipBusy)>0;
+		var result=server.manager.broadcastSequence(update,update.get(n-1),skipBusy);
+		if (result.fallback()>0 || result.dropped()>0) {
+			log.debug("Update of {} messages: {} peer(s) took the root only, {} took nothing",
+				n,result.fallback(),result.dropped());
+		}
+		return result.complete()+result.fallback()>0;
 	}
 	
 	@Override public void start() {
@@ -498,68 +548,59 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 	/**
-	 * Creates the own-Order update: our signed Order as the top cell of one delta
-	 * carrying everything reachable from it that this peer has not yet announced,
-	 * normally one new Block with its transactions. Announcing here is honest because
-	 * the message is offered to every peer on its ordered queue and never superseded.
-	 * Block production keeps the delta within the message limit, so the root-only
-	 * fallback, which makes receivers pull the Block, is exceptional.
-	 *
-	 * @return the update, or null if this peer has no Order yet
+	 * Maximum encoded bytes materialised for one update: what a peer's queue can
+	 * absorb. Novelty beyond it stays in the store for receivers to pull.
 	 */
-	protected Message createOrderUpdateMessage() throws IOException {
+	static final long MAX_UPDATE_BYTES=Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT;
+
+	/**
+	 * Creates the own-Order update: our signed Order and everything reachable from it
+	 * that this peer has not yet announced, normally one new Block with its
+	 * transactions. A Block of any size is carried: when the update does not fit one
+	 * delta, DATA messages precede the Order on each peer's ordered queue. Announcing
+	 * here is honest because every message is offered to every peer and never
+	 * superseded.
+	 *
+	 * @return the update's messages, ending with the Order; empty if this peer has no Order yet
+	 */
+	protected List<Message> createOrderUpdateMessages() throws IOException {
 		AccountKey key=server.getPeerKey();
 		Index<AccountKey, SignedData<Order>> orders = belief.getOrders();
 		SignedData<Order> order=orders.get(key);
-		if (order==null) return null;
-		int limit=Config.getBeliefDeltaMessageSize(server.getConfig());
-		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(limit);
-		order=Cells.announce(order,novelty,server.getStore());
+		if (order==null) return List.of();
+		UpdateAccumulator update=newUpdate(order);
+		order=Cells.announce(order,update,server.getStore());
 		belief=belief.withOrders(orders.assoc(key,order));
-		if (novelty.getOmittedCount()>0) {
-			log.debug("Own Order novelty exceeds the message limit; {} cell(s) left to pull",novelty.getOmittedCount());
-		}
-		return createDeltaMessage(order,novelty.getCells(),limit);
+		return finishUpdate(update,order,"Own Order");
 	}
 
 	/**
-	 * Creates the Belief update: the Belief as the top cell of one delta carrying
-	 * everything not yet announced. Built only once the own-Order update has been
-	 * offered, so it carries other peers' Orders and, the first time this peer relays
-	 * them, their Blocks, never our own Order's novelty. If
-	 * the novelty does not fit one message the root goes alone and receivers pull what
-	 * they lack, which is the catch-up case.
+	 * Creates the Belief update: the Belief and everything not yet announced. Built
+	 * only once the own-Order update has been offered, so it carries other peers'
+	 * Orders and, the first time this peer relays them, their Blocks, never our own
+	 * Order's novelty. Shaped like the Order update: one delta when it fits, else
+	 * DATA messages then the Belief.
 	 *
-	 * @return the update
+	 * @return the update's messages, ending with the Belief
 	 */
-	protected Message createBeliefUpdateMessage() throws IOException {
-		int limit=Config.getBeliefDeltaMessageSize(server.getConfig());
-		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(limit);
-		belief=Cells.announce(belief,novelty,server.getStore());
-		if (novelty.getOmittedCount()>0) {
-			log.debug("Belief novelty exceeds the message limit; {} cell(s) left to pull",novelty.getOmittedCount());
-		}
-		return createDeltaMessage(belief,novelty.getCells(),limit);
+	protected List<Message> createBeliefUpdateMessages() throws IOException {
+		UpdateAccumulator update=newUpdate(belief);
+		belief=Cells.announce(belief,update,server.getStore());
+		return finishUpdate(update,belief,"Belief");
 	}
 
-	/**
-	 * Creates one BELIEF delta message with the payload as its top cell and the given
-	 * non-embedded novelty as children. The payload is always the top cell, embedded
-	 * or not: a SignedData wrapping a branch Order is only 130 bytes. If the delta
-	 * exceeds the limit the root goes alone and receivers pull the rest.
-	 */
-	static Message createDeltaMessage(ACell payload, List<ACell> novelty, int maxMessageLength) {
-		ArrayList<ACell> cells=new ArrayList<>(novelty.size()+1);
-		for (ACell c: novelty) {
-			if (c.isEmbedded() || payload.equals(c)) continue;
-			cells.add(c);
+	private UpdateAccumulator newUpdate(ACell root) {
+		int limit=Config.getBeliefDeltaMessageSize(server.getConfig());
+		return new UpdateAccumulator(limit,MAX_UPDATE_BYTES,root.getHash());
+	}
+
+	private List<Message> finishUpdate(UpdateAccumulator update, ACell root, String what) {
+		List<Message> messages=update.toMessages(root);
+		if (update.getOmittedCount()>0) {
+			log.debug("{} novelty exceeds the {} byte update budget; {} cell(s) left to pull",
+				what,MAX_UPDATE_BYTES,update.getOmittedCount());
 		}
-		cells.add(payload);
-		if (Format.getDeltaEncodingLength(cells)<=maxMessageLength) {
-			return Message.create(MessageType.BELIEF,payload,Format.encodeDelta(cells,maxMessageLength));
-		}
-		log.debug("Delta for {} exceeds {} bytes; sending root only",Utils.getClassName(payload),maxMessageLength);
-		return Message.create(MessageType.BELIEF,payload,payload.getEncoding());
+		return messages;
 	}
 
 

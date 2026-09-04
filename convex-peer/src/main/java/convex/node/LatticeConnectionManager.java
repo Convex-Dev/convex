@@ -964,8 +964,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Sends a delta sequence with root fallback once per remote identity. */
 	@Override
-	public BroadcastResult broadcastSequence(List<Message> messages, Message fallback) {
-		BroadcastResult outbound = super.broadcastSequence(messages, fallback);
+	public BroadcastResult broadcastSequence(List<Message> messages, Message fallback, boolean skipBusy) {
+		BroadcastResult outbound = super.broadcastSequence(messages, fallback, skipBusy);
 		ArrayList<AConnection> routes = new ArrayList<>(getSupplementalInboundRoutes());
 		Utils.shuffle(routes);
 
@@ -974,6 +974,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		int fallbackCount = outbound.fallback();
 		int dropped = outbound.dropped();
 		for (AConnection route : routes) {
+			if (skipBusy && route.isOutboundBusy()) continue;
 			attempted++;
 			boolean sent = true;
 			for (Message message : messages) {

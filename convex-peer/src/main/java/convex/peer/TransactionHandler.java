@@ -21,6 +21,7 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
+import convex.core.cvm.Juice;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
@@ -212,6 +213,11 @@ public class TransactionHandler extends AThreadedComponent {
 					m.returnResult(error.withSource(SourceCodes.PEER));
 					continue;
 				}
+				if (isTooLargeToExecute(sd)) {
+					m.returnResult(Result.error(ErrorCodes.JUICE,
+						Strings.create("Transaction too large: its size alone exceeds the maximum transaction juice")).withSource(SourceCodes.PEER));
+					continue;
+				}
 				sigs[i]=sd;
 				toVerify.add(sd);
 			} catch (Exception e) {
@@ -399,38 +405,24 @@ public class TransactionHandler extends AThreadedComponent {
 		int ntrans=newTransactions.size();
 		if (ntrans==0) return null;
 
-		boolean produced=false;
 		try {
-			// The Blocks proposed in one loop travel together in the own-Order update,
-			// which must fit one message. Take transactions up to an encoded-byte budget
-			// and leave the rest for the next loop. A single transaction beyond the
-			// budget still goes alone; its Block is then pulled rather than pushed.
-			long budget=Config.getBeliefDeltaMessageSize(server.getConfig())/2;
-			long bytes=0;
-			int taken=0;
-			while (taken<ntrans) {
-				long len=newTransactions.get(taken).getEncodingLength();
-				if (taken>0 && bytes+len>budget) break;
-				bytes+=len;
-				taken++;
-			}
-
+			// Blocks are bounded by transaction count only. Their size is the messaging
+			// layer's concern: an Order update of any size is carried in bounded messages.
 			int maxBlockSize=Constants.MAX_TRANSACTIONS_PER_BLOCK;
-			int nblocks=((taken-1)/maxBlockSize)+1;
+			int nblocks=((ntrans-1)/maxBlockSize)+1;
 
 			@SuppressWarnings("unchecked")
 			SignedData<Block>[] signedBlocks=new SignedData[nblocks];
 
 			for (int i=0; i<nblocks; i++) {
 				int start=i*maxBlockSize;
-				int end=Math.min(taken, (i+1)*maxBlockSize);
+				int end=Math.min(ntrans, (i+1)*maxBlockSize);
 				Block block = Block.create(timestamp, newTransactions.subList(start, end));
 				SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
 				signedBlock=Cells.persist(signedBlock, server.getStore());
 				signedBlocks[i]=signedBlock;
 			}
-			newTransactions.subList(0, taken).clear(); // deferred transactions stay for the next loop
-			produced=true;
+			newTransactions.clear();
 			lastBlockPublishedTime=timestamp;
 			return signedBlocks;
 		} catch (Exception e) {
@@ -442,7 +434,7 @@ public class TransactionHandler extends AThreadedComponent {
 			// hang — notify each interested client of the failure and clear interests
 			// before discarding. Phase 3 intake persistence is the primary guard that
 			// stops faulty transactions ever reaching here; this is a safety net.
-			if (!produced && !newTransactions.isEmpty()) {
+			if (!newTransactions.isEmpty()) {
 				log.warn("Discarded "+newTransactions.size()+" potentially faulty / malicious transactions");
 				for (SignedData<ATransaction> sd : newTransactions) {
 					Hash h=sd.getHash();
@@ -456,8 +448,25 @@ public class TransactionHandler extends AThreadedComponent {
 		}
 	}
 
+	/**
+	 * Checks whether a transaction's size alone costs more juice than any transaction
+	 * may use, in which case it can never execute and is refused at intake rather than
+	 * proposed and propagated. A transaction whose data is not all present yet is not
+	 * judged here; intake persistence reports that case.
+	 *
+	 * @param sd Signed transaction to check
+	 * @return true if the transaction can never execute because of its size
+	 */
+	static boolean isTooLargeToExecute(SignedData<ATransaction> sd) {
+		try {
+			return Juice.priceTransaction(sd.getValue())>Constants.MAX_TRANSACTION_JUICE;
+		} catch (MissingDataException e) {
+			return false;
+		}
+	}
+
 	Long minBlockTime=null;
-	
+
 	/** 
 	 * Get the minimum time between proposing blocks. Default 10ms. 
 	 * @return

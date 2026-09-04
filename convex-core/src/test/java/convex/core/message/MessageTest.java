@@ -232,23 +232,6 @@ public class MessageTest {
 	}
 
 	@Test
-	public void testNoveltyCollectorRetainsBoundedTail() {
-		Cells.NoveltyCollector collector=new Cells.NoveltyCollector(700,2);
-		Blob first=Blobs.createRandom(300);
-		Blob middle=Blobs.createRandom(300);
-		Blob last=Blobs.createRandom(300);
-		collector.accept(first.getRef());
-		collector.accept(middle.getRef());
-		collector.accept(last.getRef());
-
-		List<ACell> retained=collector.getCells();
-		assertTrue(retained.size()<=2);
-		assertSame(last,retained.get(retained.size()-1));
-		assertTrue(collector.getEstimatedBytes()<=700);
-		assertTrue(collector.getOmittedCount()>0);
-	}
-	
-	@Test
 	public void testStatusMessage() throws BadFormatException {
 		Message m=Message.createStatusRequest(2);
 		assertEquals(RT.cvm(2),m.getID());

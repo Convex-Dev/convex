@@ -1151,8 +1151,8 @@ public class LatticePropagator implements Closeable {
 
 			// 1. Announce to store (writes cells, collects novelty for delta)
 			boolean hasPeers=!connectionManager.getPeers().isEmpty();
-			Cells.NoveltyCollector noveltyCollector=hasPeers
-				?new Cells.NoveltyCollector(maxDeltaBroadcastSize):null;
+			NoveltyCollector noveltyCollector=hasPeers
+				?new NoveltyCollector(maxDeltaBroadcastSize):null;
 			value = Cells.announce(value, noveltyCollector, store);
 			if (workingCursor == null) {
 				workingCursor = Cursors.createLattice(lattice, value, mergeContext);

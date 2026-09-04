@@ -2,8 +2,6 @@ package convex.core.data;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.function.Consumer;
@@ -21,66 +19,6 @@ import convex.core.util.Utils;
  * Static utility class for dealing with cells
  */
 public class Cells {
-
-	/** Conservative cap on references retained while collecting propagation novelty. */
-	public static final int MAX_NOVELTY_CELLS = 65_536;
-
-	/**
-	 * Bounded novelty callback retaining the most recently announced non-embedded
-	 * cells. Store announcement still visits and records every cell; only the eager
-	 * propagation working set is truncated. Keeping the tail favours cells nearest
-	 * the announced root, while omitted branches remain available by hash.
-	 */
-	public static final class NoveltyCollector implements Consumer<Ref<ACell>> {
-		private final long byteLimit;
-		private final int cellLimit;
-		private final ArrayDeque<ACell> cells=new ArrayDeque<>();
-		private long estimatedBytes;
-		private long omitted;
-
-		public NoveltyCollector(long byteLimit) {
-			this(byteLimit,MAX_NOVELTY_CELLS);
-		}
-
-		public NoveltyCollector(long byteLimit, int cellLimit) {
-			if (byteLimit<1) throw new IllegalArgumentException("Novelty byte limit must be positive");
-			if (cellLimit<1) throw new IllegalArgumentException("Novelty cell limit must be positive");
-			this.byteLimit=byteLimit;
-			this.cellLimit=cellLimit;
-		}
-
-		@Override
-		public void accept(Ref<ACell> ref) {
-			ACell cell=ref.getValue();
-			if (cell==null || cell.isEmbedded()) return;
-			long estimate=cell.getEncodingLength()+Format.MAX_VLQ_LONG_LENGTH
-				+Ref.INDIRECT_ENCODING_LENGTH;
-			if (estimate>byteLimit) {
-				omitted++;
-				return;
-			}
-			cells.addLast(cell);
-			estimatedBytes+=estimate;
-			while (cells.size()>cellLimit || estimatedBytes>byteLimit) {
-				ACell removed=cells.removeFirst();
-				estimatedBytes-=removed.getEncodingLength()+Format.MAX_VLQ_LONG_LENGTH
-					+Ref.INDIRECT_ENCODING_LENGTH;
-				omitted++;
-			}
-		}
-
-		public ArrayList<ACell> getCells() {
-			return new ArrayList<>(cells);
-		}
-
-		public long getEstimatedBytes() {
-			return estimatedBytes;
-		}
-
-		public long getOmittedCount() {
-			return omitted;
-		}
-	}
 
 	/**
 	 * An empty Java array of cells
