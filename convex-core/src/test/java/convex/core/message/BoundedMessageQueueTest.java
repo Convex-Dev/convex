@@ -41,19 +41,19 @@ public class BoundedMessageQueueTest {
 		Message large=Message.create(MessageType.UNKNOWN,Blobs.createRandom(1000));
 		assertTrue(queue.offer(large,1,TimeUnit.MILLISECONDS));
 		assertFalse(queue.offer(m),"at or over the bound nothing more is admitted");
-		assertTrue(queue.isOverHalfFull());
+		assertTrue(queue.getFillFraction()>1.0,"a message larger than the bound overshoots it");
 		assertSame(large,queue.poll());
-		assertFalse(queue.isOverHalfFull());
+		assertEquals(0.0,queue.getFillFraction());
 
 		assertTrue(queue.offer(m));
 		assertTrue(queue.offer(m),"the last message admitted may take the queue over the bound");
 		assertFalse(queue.offer(m));
-		assertTrue(queue.isOverHalfFull(),"a queue that has just refused a message is under pressure");
+		assertTrue(queue.getFillFraction()>=1.0,"a queue that has just refused a message is full");
 
 		// Raising the bounds admits more at once
 		queue.setLimits(10,oneSize*10);
 		assertTrue(queue.offer(m));
 		assertEquals(3,queue.size());
-		assertFalse(queue.isOverHalfFull());
+		assertEquals(0.3,queue.getFillFraction(),1e-9);
 	}
 }

@@ -294,14 +294,18 @@ public class NettyConnection extends AConnection {
 		}
 	}
 
+	/** Outbound queue fill fraction above which this connection reports busy. */
+	private static final double BUSY_FILL_FRACTION = 0.5;
+
 	/**
-	 * Both thresholds are half of the corresponding bound, so a connection that has
-	 * just refused a non-blocking send always reports busy: optional traffic is never
-	 * queued behind an essential message that was refused.
+	 * Busy once the outbound queue is over half full by count or by bytes. A
+	 * connection that has just refused a non-blocking send is at least full, so it
+	 * always reports busy: optional traffic is never queued behind an essential
+	 * message that was refused.
 	 */
 	@Override
 	public boolean isOutboundBusy() {
-		return outbound.isOverHalfFull();
+		return outbound.getFillFraction() > BUSY_FILL_FRACTION;
 	}
 
 	@Override

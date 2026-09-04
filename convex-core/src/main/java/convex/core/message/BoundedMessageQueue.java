@@ -137,14 +137,18 @@ public final class BoundedMessageQueue {
 	}
 
 	/**
-	 * Checks whether more than half of either bound is in use, that is whether the
-	 * queue is under pressure. A queue that has just refused a message is always
-	 * over half full.
+	 * Gets how full the queue is as a fraction of its bounds: the larger of the
+	 * message count ratio and the byte ratio. It is 0.0 when empty, at least 1.0
+	 * whenever an offer would be refused, and above 1.0 when the last message
+	 * admitted took the queue over its byte bound. Callers apply their own policy
+	 * to it, such as treating anything above one half as pressure.
 	 *
-	 * @return true if over half of either bound is used
+	 * @return Fill fraction of the fuller bound
 	 */
-	public synchronized boolean isOverHalfFull() {
-		return (long)queue.size()*2>messageLimit || queuedBytes*2>byteLimit;
+	public synchronized double getFillFraction() {
+		double byCount=(double)queue.size()/messageLimit;
+		double byBytes=(double)queuedBytes/byteLimit;
+		return Math.max(byCount,byBytes);
 	}
 
 	/** Wakes timed producers, for example when the owning service stops admission. */
