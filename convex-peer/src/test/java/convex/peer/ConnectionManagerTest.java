@@ -307,6 +307,24 @@ public class ConnectionManagerTest {
 		assertSame(priority,second.priority);
 	}
 
+	@Test
+	public void testBroadcastSkipsBusyPeersOnlyWhenAsked() {
+		TestConnectionManager manager=new TestConnectionManager();
+		SequencedConvex idle=new SequencedConvex(-1);
+		SequencedConvex busy=new SequencedConvex(-1);
+		busy.busy=true;
+		manager.add(AKeyPair.generate().getAccountKey(),idle);
+		manager.add(AKeyPair.generate().getAccountKey(),busy);
+		Message essential=Message.createPing(1);
+		Message optional=Message.createPing(2);
+
+		// Essential traffic reaches every peer; optional traffic skips the busy one
+		assertEquals(2,manager.broadcast(essential));
+		assertEquals(1,manager.broadcast(optional,true));
+		assertEquals(List.of(essential,optional),idle.sent);
+		assertEquals(List.of(essential),busy.sent);
+	}
+
 	private static final class TestConnectionManager extends AConnectionManager {
 		void add(AccountKey key,Convex connection) { connections.put(key,connection); }
 		@Override public void close() { closeAllConnections(); }
@@ -317,6 +335,7 @@ public class ConnectionManagerTest {
 		final int failAt;
 		int attempts;
 		boolean connected=true;
+		boolean busy=false;
 		Message priority;
 
 		SequencedConvex(int failAt) { super(null,null); this.failAt=failAt; }
@@ -332,6 +351,7 @@ public class ConnectionManagerTest {
 			return true;
 		}
 		@Override public boolean isConnected() { return connected; }
+		@Override public boolean isOutboundBusy() { return busy; }
 		@Override public CompletableFuture<Result> transact(SignedData<ATransaction> tx) {
 			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
 		}

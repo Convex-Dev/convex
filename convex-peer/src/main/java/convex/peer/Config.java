@@ -183,15 +183,8 @@ public class Config {
 	/** Peer configuration key for the maximum encoded belief delta chunk size. */
 	public static final Keyword MAX_BELIEF_DELTA_MESSAGE_SIZE = Keyword.intern("max-belief-delta-message-size");
 
-	/** Default belief delta chunk size. Large beliefs are sent as DATA-ahead batches. */
+	/** Default belief delta message size. A delta that does not fit is sent root-only and pulled. */
 	public static final int DEFAULT_MAX_BELIEF_DELTA_MESSAGE_SIZE = 4 * 1024 * 1024;
-
-	/** Peer configuration key for total eager Belief delta materialisation. */
-	public static final Keyword MAX_BELIEF_DELTA_BROADCAST_SIZE =
-		Keyword.intern("max-belief-delta-broadcast-size");
-
-	/** Default eager Belief delta working set. */
-	public static final int DEFAULT_MAX_BELIEF_DELTA_BROADCAST_SIZE = 16 * 1024 * 1024;
 
 	/** Gets and validates the application-specific belief delta chunk limit. */
 	public static int getBeliefDeltaMessageSize(Map<Keyword, Object> config) {
@@ -203,21 +196,6 @@ public class Config {
 			throw new IllegalArgumentException(MAX_BELIEF_DELTA_MESSAGE_SIZE
 				+" must be between 1 and "+convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH
 				+": "+value);
-		}
-		return value;
-	}
-
-	/** Gets and validates the total encoded-byte budget for one Belief broadcast. */
-	public static int getBeliefDeltaBroadcastSize(Map<Keyword, Object> config) {
-		int messageLimit=getBeliefDeltaMessageSize(config);
-		Object configured=config.get(MAX_BELIEF_DELTA_BROADCAST_SIZE);
-		int defaultValue=Math.max(messageLimit,DEFAULT_MAX_BELIEF_DELTA_BROADCAST_SIZE);
-		defaultValue=(int)Math.min(defaultValue,convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
-		int value=(configured==null)?defaultValue:Utils.toInt(configured);
-		if (value<messageLimit || value>convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH) {
-			throw new IllegalArgumentException(MAX_BELIEF_DELTA_BROADCAST_SIZE
-				+" must be between "+messageLimit+" and "
-				+convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH+": "+value);
 		}
 		return value;
 	}

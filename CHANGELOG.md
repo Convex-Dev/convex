@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Consensus propagation is simplified to two ordered messages per update: the
+  peer's own Order with its new Block, then the Belief carrying other peers'
+  Orders, which is skipped for a peer whose outbound queue is under pressure.
+  The priority slot, resend window and DATA-ahead chunking are gone from CPoS;
+  a peer that misses data now requests it from the sender instead of waiting
+  for the status poll. Block production defers transactions beyond an
+  encoded-byte budget so an Order update always fits one message. The
+  `:max-belief-delta-broadcast-size` peer configuration key is removed.
+
 ### Fixed
 
 - Consensus: a Block whose novelty exceeded the 64 KB priority message limit was

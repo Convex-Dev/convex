@@ -16,9 +16,9 @@ The propagation path maintains five distinct invariants:
    objects are shared across destination peers rather than reconstructed for
    each peer.
 3. Backpressure from one receiver must not delay sends to other receivers.
-4. CPoS consensus participation takes priority over bulk cross-replication. A
-   peer's latest own signed Order remains sendable when full-Belief propagation
-   is congested.
+4. CPoS consensus participation comes before bulk cross-replication. A peer's
+   own signed Order is always sent; the Belief that relays other peers' Orders
+   is skipped for a receiver whose outbound queue is congested.
 5. All retained queues and eager encoded working sets are bounded by bytes as
    well as, where useful, by item count.
 
@@ -64,32 +64,48 @@ state.
 The default Netty connection has a count- and byte-bounded ordinary outbound
 queue. It writes the already encoded messages only while the channel is
 writable, with one flush after a drain batch. A small, replaceable priority slot
-is separate from the bulk queue. Slow or non-reading receivers therefore cannot
-block the propagator thread, the Netty event loop, other peer connections, or
-CPoS order publication.
+exists for lattice control roots; CPoS does not use it. Slow or non-reading
+receivers therefore cannot block the propagator thread, the Netty event loop or
+other peer connections.
 
 ## CPoS scheduling
 
-`BeliefPropagator` treats two outputs differently:
+`BeliefPropagator` sends consensus updates in two layers. Each is built and then
+offered to every peer with a non-blocking send before the next is built, so the
+two reach each peer's ordered queue in this order:
 
-- The local peer's latest signed `Order` is a small BELIEF message carrying the
-  Order's novel cells inline whenever they fit the priority message limit, so a
-  receiver can merge it immediately. It is offered to the per-connection
-  priority slot and supersedes an older unsent Order. Because announcing the
-  Order consumes announce-novelty whether or not the message is ultimately
-  sent, novelty carried by quick updates is retained and folded into the next
-  full Belief broadcast — a superseded priority message therefore delays eager
-  delivery by at most one full-broadcast interval rather than losing the cells
-  from every delta.
-- A full Belief is cross-replication. When due, its novelty is encoded once as a
-  bounded DATA-ahead sequence ending in a BELIEF root, then offered
-  independently to each peer.
+- **Own Order** (inner layer): our latest signed `Order` as the top cell of one
+  delta carrying everything reachable from it that this peer has not yet
+  announced, normally one new Block with its transactions. It is sent whenever
+  our Order changes, and as a 130-byte root-only keepalive every
+  `BELIEF_REBROADCAST_DELAY` otherwise. It is our consensus vote, so it is
+  offered before any relay work starts. Block production keeps the delta within
+  the message limit by deferring transactions beyond an encoded-byte budget to
+  the next loop.
+- **Belief** (outer layer): the Belief as the top cell of one delta carrying
+  everything not announced by the Order update, which is other peers' Orders
+  and, the first time this peer relays them, their Blocks. It is sent whenever
+  any Order in the Belief changes and every `BELIEF_FULL_BROADCAST_DELAY`
+  otherwise. It is withheld from a peer whose outbound queue is under pressure:
+  the Belief is relay, not consensus, and the next change carries it again. A
+  peer that refused the Order for want of queue space always counts as under
+  pressure, so it is never offered the Belief alone.
 
-The own Order is offered before any full-Belief encoding. Full Beliefs are
-attempted at most once per `BELIEF_FULL_BROADCAST_DELAY` (currently 500 ms),
-while intervening updates can publish only the latest own Order. Congestion may
-therefore reduce a peer temporarily to direct consensus participation without
-making bulk propagation a prerequisite for consensus progress.
+The connection manager is message-agnostic. It offers whatever it is given to
+every peer in call order, with one option to skip peers under outbound pressure;
+which message is essential and which is optional is the propagator's decision.
+
+Ordered delivery on one queue means data always precedes the Order that commits
+it, so nothing is superseded and nothing is resent. Announcing is therefore
+honest: a cell is announced when its delta is offered to the peers. A delta that
+would exceed the message limit is sent as its root alone, which only happens for
+a peer catching up, and the receiver pulls the rest.
+
+Every remaining way to miss data, a full queue or a relayed Order whose Blocks
+this peer has not seen, ends in a request rather than a timer:
+`ConnectionManager.alertMissing` acquires the missing hash from the peer that
+sent the message, rate limited per hash, and the next update merges once the
+data has arrived. The 2 s status poll remains the recovery of last resort.
 
 Inbound CPoS DATA and BELIEF messages share one ordered, byte-bounded processing
 queue off the Netty event loop. This preserves the DATA-before-root order for a
@@ -105,8 +121,7 @@ protocol limits:
 | Lattice delta message or DATA body | 4 MiB | `LatticePropagatorConfig.maxDeltaMessageSize` |
 | One eager lattice propagation | 16 MiB | `LatticePropagatorConfig.maxDeltaBroadcastSize` |
 | Node inbound processing queue | 1,024 messages and 16 MiB | `inboundQueueSize`, `maxInboundQueueBytes` |
-| Belief delta message or DATA body | 4 MiB | `:max-belief-delta-message-size` |
-| One eager Belief propagation | 16 MiB | `:max-belief-delta-broadcast-size` |
+| Belief or own-Order delta message | 4 MiB | `:max-belief-delta-message-size` |
 | Trusted CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
 | Untrusted CPoS DATA/BELIEF queue | 10 messages and 4 MiB | `Config` constants |
 | Ordinary outbound queue, per connection | 128 messages and 16 MiB | `Config` constants |
@@ -145,6 +160,6 @@ sync, CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
 - `convex.core.data.Cells.NoveltyCollector` — bounded novelty collection
 - `convex.core.message.BoundedMessageQueue` — count- and byte-bounded FIFO
 - `convex.node.LatticePropagator` — lattice chunking and root fallback
-- `convex.peer.BeliefPropagator` — own-Order priority and full-Belief cadence
-- `convex.peer.AConnectionManager` — non-blocking shared-sequence fan-out
-- `convex.net.impl.netty.NettyConnection` — per-connection queues and priority slot
+- `convex.peer.BeliefPropagator` — own-Order then Belief update cadence
+- `convex.peer.AConnectionManager` — message-agnostic non-blocking fan-out, optionally skipping peers under outbound pressure
+- `convex.net.impl.netty.NettyConnection` — per-connection queues and outbound pressure signal

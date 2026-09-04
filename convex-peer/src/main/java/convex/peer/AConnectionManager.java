@@ -178,19 +178,41 @@ public abstract class AConnectionManager implements Closeable {
 	// ========== Broadcast ==========
 
 	/**
-	 * Broadcasts a message to all connected peers using non-blocking sends.
-	 * If a peer's outbound queue is full, it is skipped rather than blocking
-	 * the caller. Beliefs are rebroadcast periodically, so skipping one
-	 * cycle is acceptable.
+	 * Offers a message to every connected peer with a non-blocking send. A peer
+	 * whose outbound queue is full is skipped rather than blocking the caller.
+	 * Successive calls from one thread reach each peer in call order.
 	 *
-	 * @param msg Message to broadcast
+	 * @param message Message to broadcast
+	 * @return number of peers that accepted the message
 	 */
-	public void broadcast(Message msg) {
-		for (Convex peer : connections.values()) {
-			if (peer != null && peer.isConnected()) {
-				peer.trySend(msg);
-			}
+	public int broadcast(Message message) {
+		return broadcast(message, false);
+	}
+
+	/**
+	 * Offers a message to every connected peer with a non-blocking send. A peer
+	 * whose outbound queue is full is skipped rather than blocking the caller, and
+	 * with {@code skipBusy} so is a peer whose outbound queue is under pressure.
+	 * That lets a sender withhold optional traffic from a slow receiver while still
+	 * offering it every essential message. The manager does not know what a message
+	 * carries; it only gets messages to peers in call order. Successive calls from
+	 * one thread reach each peer in that order. Peers are visited in a shuffled
+	 * order so that none is always served first.
+	 *
+	 * @param message Message to broadcast
+	 * @param skipBusy true to skip peers whose outbound queue is under pressure
+	 * @return number of peers that accepted the message
+	 */
+	public int broadcast(Message message, boolean skipBusy) {
+		ArrayList<Convex> peers = new ArrayList<>(connections.values());
+		Utils.shuffle(peers);
+		int accepted = 0;
+		for (Convex peer : peers) {
+			if (peer == null || !peer.isConnected()) continue;
+			if (skipBusy && peer.isOutboundBusy()) continue;
+			if (peer.trySend(message)) accepted++;
 		}
+		return accepted;
 	}
 
 	/**

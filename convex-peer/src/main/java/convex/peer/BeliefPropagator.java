@@ -1,7 +1,6 @@
 package convex.peer;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -15,12 +14,10 @@ import org.slf4j.LoggerFactory;
 import convex.core.cpos.Belief;
 import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.Block;
-import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Index;
@@ -111,9 +108,12 @@ public class BeliefPropagator extends AThreadedComponent {
 	long lastBroadcastTime=0;
 	
 	/**
-	 * Time of last full belief broadcast
+	 * Time of last Belief update broadcast
 	 */
 	long lastFullBroadcastTime=-1;
+
+	/** True if the Belief changed (any Order) since the last Belief update was sent. */
+	private boolean beliefChanged=false;
 	
 	private long beliefBroadcastCount=0L;
 	
@@ -207,41 +207,54 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 
 
-	protected boolean maybeBroadcast(boolean updated) throws InterruptedException {
+	/**
+	 * Broadcasts consensus updates in two layers on each peer's ordered queue.
+	 *
+	 * <p>The inner layer is our own signed Order together with everything a receiver
+	 * needs to use it, normally one new Block; it goes out whenever our Order changed,
+	 * and as a small root-only keepalive every {@link #BELIEF_REBROADCAST_DELAY} when
+	 * it did not. It is our consensus vote, so it is built and offered to every peer
+	 * before any relay work starts. The outer layer is the Belief, built only once
+	 * the Order has been offered; its delta omits whatever the Order update announced
+	 * and so carries only the Orders of other peers, and their Blocks the first time
+	 * this peer relays them. It goes out whenever any Order in the Belief changed and
+	 * as a keepalive every {@link #BELIEF_FULL_BROADCAST_DELAY}, and is withheld from
+	 * a peer whose outbound queue is under pressure. Ordered delivery means data
+	 * always precedes the Order that commits it, so nothing is ever superseded or
+	 * resent. A peer whose queue cannot take an update requests the data it later
+	 * finds missing.</p>
+	 *
+	 * @param updated true if our own Order changed this loop
+	 * @return true if an update was offered to at least one peer
+	 */
+	protected boolean maybeBroadcast(boolean updated) {
 		long ts=server.getTimestamp();
-		if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
-			lastBroadcastTime=ts;
-			try {
-				boolean fullDue=(lastFullBroadcastTime<0)
-					||(ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY);
-				boolean attempted=false;
-				// Publish our own signed Order first. Full Belief announcement and
-				// delta encoding are best-effort work and must not delay our vote.
-				attempted=broadcastQuickUpdate();
-				if (fullDue) {
-					List<Message> messages=createFullUpdateMessages();
-					lastFullBroadcastTime=ts;
-					if (!messages.isEmpty()) {
-						var result=server.manager.broadcastSequence(messages,null);
-						attempted|=result.peers()>0;
-						if (result.dropped()>0) {
-							log.debug("Dropped full Belief delta for {} peer(s); own Order and polling will recover",
-								result.dropped());
-						}
-					}
-				}
-				if (attempted) {
-					beliefBroadcastCount++;
-					return true;
-				}
-				
-			} catch (Exception e) {
-				if (server.isLive()) {
-					log.warn("Error attempting to create broadcast message",e);
-				}
+		boolean orderDue=updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY);
+		boolean beliefDue=beliefChanged||(lastFullBroadcastTime<0)
+			||(ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY);
+		if (!(orderDue||beliefDue)) return false;
+		boolean offered=false;
+		try {
+			// Own Order first: offered to every peer before the Belief is even built
+			if (orderDue) {
+				Message order=createOrderUpdateMessage();
+				lastBroadcastTime=ts;
+				if (order!=null) offered|=server.manager.broadcast(order)>0;
+			}
+			// Belief second: relay only, so a peer under outbound pressure is skipped
+			if (beliefDue) {
+				Message beliefUpdate=createBeliefUpdateMessage();
+				lastFullBroadcastTime=ts;
+				beliefChanged=false;
+				offered|=server.manager.broadcast(beliefUpdate,true)>0;
+			}
+		} catch (Exception e) {
+			if (server.isLive()) {
+				log.warn("Error attempting to create broadcast message",e);
 			}
 		}
-		return false;
+		if (offered) beliefBroadcastCount++;
+		return offered;
 	}
 	
 	@Override public void start() {
@@ -273,6 +286,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		SignedData<Block>[] signedBlocks= server.transactionHandler.maybeGenerateBlocks(); 
 		if (signedBlocks!=null) {
 			belief=belief.proposeBlock(server.getKeyPair(),signedBlocks);
+			beliefChanged=true;
 			published=true;
 			
 			if (log.isDebugEnabled()) {
@@ -317,19 +331,21 @@ public class BeliefPropagator extends AThreadedComponent {
 			Order oldOrder=belief.getOrder(key);
 			Order newOrder=newBelief.getOrder(key);
 			
-			boolean beliefChanged=false;
+			boolean ownChanged=false;
 			if (oldOrder==null) {
-				beliefChanged=newOrder!=null;
+				ownChanged=newOrder!=null;
 			} else {
 				if (newOrder==null) {
-					beliefChanged=true; // old order must have been removed
+					ownChanged=true; // old order must have been removed
 				} else {
-					beliefChanged=!newOrder.consensusEquals(oldOrder);
+					ownChanged=!newOrder.consensusEquals(oldOrder);
 				}
 			}
+			// Any change to the Belief, including other peers' Orders, is worth relaying
+			if (newBelief!=belief) beliefChanged=true;
 			belief=newBelief;
 
-			return beliefChanged;
+			return ownChanged;
 		} catch (MissingDataException e) {
 			// Shouldn't happen if beliefs are correctly persisted
 			// e.printStackTrace();
@@ -481,171 +497,69 @@ public class BeliefPropagator extends AThreadedComponent {
 		}
 	}
 	
-	protected Message createFullUpdateMessage() throws IOException {
-		List<Message> messages=createFullUpdateMessages();
-		return messages.isEmpty()?null:messages.get(messages.size()-1);
-	}
-
-	/** Creates a bounded DATA-ahead sequence ending in one Belief announcement. */
-	protected List<Message> createFullUpdateMessages() throws IOException {
-		int broadcastLimit=Config.getBeliefDeltaBroadcastSize(server.getConfig());
-		Cells.NoveltyCollector noveltyCollector=new Cells.NoveltyCollector(broadcastLimit);
-
-		// persist the state of the Peer, announcing the new Belief
-		// (ensure we can handle missing data requests etc.)
-		belief=Cells.announce(belief, noveltyCollector, server.getStore());
-		lastFullBroadcastBelief=belief;
-
-		// Include cells already announced through quick own-Order updates: a receiver
-		// whose priority message was superseded would otherwise never see them in any
-		// delta. Sending them once more is idempotent for receivers that did.
-		ArrayList<ACell> cells=new ArrayList<>(quickNovelty);
-		quickNovelty.clear();
-		cells.addAll(noveltyCollector.getCells());
-
-		return createPartialBeliefMessages(belief,cells,
-			Config.getBeliefDeltaMessageSize(server.getConfig()),broadcastLimit);
-	}
-	
 	/**
-	 * Creates the single message form of the quick own-Order update: the priority
-	 * delta when the novelty fits it, otherwise the root of the DATA-ahead sequence.
-	 * Test and diagnostic hook; broadcasting uses {@link #broadcastQuickUpdate()}.
-	 */
-	protected Message createQuickUpdateMessage() throws IOException {
-		List<Message> messages=createQuickUpdateMessages();
-		return messages.isEmpty()?null:messages.get(messages.size()-1);
-	}
-
-	/**
-	 * Broadcasts our signed own Order with its novel cells so receivers can merge it
-	 * at once. A small update goes through the replaceable priority slot; a larger one
-	 * goes as a DATA-ahead sequence on the ordinary queue.
+	 * Creates the own-Order update: our signed Order as the top cell of one delta
+	 * carrying everything reachable from it that this peer has not yet announced,
+	 * normally one new Block with its transactions. Announcing here is honest because
+	 * the message is offered to every peer on its ordered queue and never superseded.
+	 * Block production keeps the delta within the message limit, so the root-only
+	 * fallback, which makes receivers pull the Block, is exceptional.
 	 *
-	 * @return true if the update was offered to at least one peer
+	 * @return the update, or null if this peer has no Order yet
 	 */
-	private boolean broadcastQuickUpdate() throws IOException {
-		List<Message> messages=createQuickUpdateMessages();
-		if (messages.isEmpty()) return false;
-		if (messages.size()==1) return server.manager.broadcastPriority(messages.get(0))>0;
-		var result=server.manager.broadcastSequence(messages,null);
-		if (result.dropped()>0) {
-			log.debug("Dropped own Order delta for {} peer(s); full broadcast and polling will recover",
-				result.dropped());
-		}
-		return result.peers()>0;
-	}
-
-	/**
-	 * Creates the signed own-Order update used for priority consensus participation.
-	 *
-	 * <p>Announcing the Order consumes announce-novelty for its whole tree, new Blocks
-	 * included, so everything announced here must actually be sent: a root-only
-	 * message would leave later full broadcasts without that data and force receivers
-	 * onto status polling for every confirmation round (observed as a 2 s stall per
-	 * large Block). The novelty is therefore collected up to the full broadcast limit.
-	 * When it fits the priority message limit the result is one delta for the priority
-	 * slot; otherwise it is a bounded DATA-ahead sequence ending in the Order, for the
-	 * ordinary queue. Only novelty beyond the broadcast limit is left to polling.</p>
-	 */
-	private List<Message> createQuickUpdateMessages() throws IOException {
+	protected Message createOrderUpdateMessage() throws IOException {
 		AccountKey key=server.getPeerKey();
 		Index<AccountKey, SignedData<Order>> orders = belief.getOrders();
 		SignedData<Order> order=orders.get(key);
-		if (order==null) return List.of();
-		int broadcastLimit=Config.getBeliefDeltaBroadcastSize(server.getConfig());
-		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(broadcastLimit);
+		if (order==null) return null;
+		int limit=Config.getBeliefDeltaMessageSize(server.getConfig());
+		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(limit);
 		order=Cells.announce(order,novelty,server.getStore());
-		orders=orders.assoc(key,order);
-		belief=belief.withOrders(orders);
+		belief=belief.withOrders(orders.assoc(key,order));
 		if (novelty.getOmittedCount()>0) {
-			log.debug("Own Order novelty exceeds the broadcast limit; {} cell(s) left to polling",
-				novelty.getOmittedCount());
+			log.debug("Own Order novelty exceeds the message limit; {} cell(s) left to pull",novelty.getOmittedCount());
 		}
-		// This update's novelty in full, plus the resend window of earlier priority
-		// deltas. The window is bounded in cells and must never truncate the current
-		// novelty: a Block with more cells than the window would otherwise lose its
-		// oldest cells from the delta and be undecodable until the next poll.
-		ArrayList<ACell> cells=new ArrayList<>(quickNovelty);
-		cells.addAll(novelty.getCells());
-		List<Message> messages=createPartialBeliefMessages(order,cells,
-			Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT,broadcastLimit);
-		if (messages.size()==1) {
-			// A priority delta can be superseded before it is sent: keep its cells for
-			// resending in the next delta until a full broadcast carries them.
-			addQuickNovelty(novelty.getCells());
-		} else {
-			// An ordered sequence on the ordinary queue is not superseded, so the
-			// window it existed for can start afresh.
-			quickNovelty.clear();
-		}
-		return messages;
+		return createDeltaMessage(order,novelty.getCells(),limit);
 	}
 
 	/**
-	 * Cells announced through own-Order quick updates since the last full broadcast.
-	 * A priority message can be superseded before it is sent, yet announcing already
-	 * consumed these cells from every later delta — so quick deltas resend the whole
-	 * window and the next full broadcast folds it into its DATA-ahead sequence.
-	 * Bounded: on overflow eager delivery is abandoned and polling recovers.
+	 * Creates the Belief update: the Belief as the top cell of one delta carrying
+	 * everything not yet announced. Built only once the own-Order update has been
+	 * offered, so it carries other peers' Orders and, the first time this peer relays
+	 * them, their Blocks, never our own Order's novelty. If
+	 * the novelty does not fit one message the root goes alone and receivers pull what
+	 * they lack, which is the catch-up case.
+	 *
+	 * @return the update
 	 */
-	private final ArrayDeque<ACell> quickNovelty=new ArrayDeque<>();
-	private static final int QUICK_NOVELTY_CELL_LIMIT=1024;
-
-	private void addQuickNovelty(List<ACell> cells) {
-		for (ACell cell: cells) {
-			quickNovelty.addLast(cell);
+	protected Message createBeliefUpdateMessage() throws IOException {
+		int limit=Config.getBeliefDeltaMessageSize(server.getConfig());
+		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(limit);
+		belief=Cells.announce(belief,novelty,server.getStore());
+		if (novelty.getOmittedCount()>0) {
+			log.debug("Belief novelty exceeds the message limit; {} cell(s) left to pull",novelty.getOmittedCount());
 		}
-		while (quickNovelty.size()>QUICK_NOVELTY_CELL_LIMIT) {
-			quickNovelty.removeFirst();
-		}
-	}
-	
-	/** Creates one bounded Belief delta, or DATA-ahead chunks followed by its root. */
-	static List<Message> createPartialBeliefMessages(ACell payload, List<ACell> novelty,
-			int maxMessageLength) {
-		return createPartialBeliefMessages(payload,novelty,maxMessageLength,
-			(int)CPoSConstants.MAX_MESSAGE_LENGTH);
+		return createDeltaMessage(belief,novelty.getCells(),limit);
 	}
 
-	static List<Message> createPartialBeliefMessages(ACell payload, List<ACell> novelty,
-			int maxMessageLength, int maxBroadcastLength) {
-		if (maxBroadcastLength<maxMessageLength
-				|| maxBroadcastLength>CPoSConstants.MAX_MESSAGE_LENGTH) {
-			throw new IllegalArgumentException("Belief broadcast limit must be between "
-				+maxMessageLength+" and "+CPoSConstants.MAX_MESSAGE_LENGTH+": "+maxBroadcastLength);
+	/**
+	 * Creates one BELIEF delta message with the payload as its top cell and the given
+	 * non-embedded novelty as children. The payload is always the top cell, embedded
+	 * or not: a SignedData wrapping a branch Order is only 130 bytes. If the delta
+	 * exceeds the limit the root goes alone and receivers pull the rest.
+	 */
+	static Message createDeltaMessage(ACell payload, List<ACell> novelty, int maxMessageLength) {
+		ArrayList<ACell> cells=new ArrayList<>(novelty.size()+1);
+		for (ACell c: novelty) {
+			if (c.isEmbedded() || payload.equals(c)) continue;
+			cells.add(c);
 		}
-		// The payload is always the top cell of the delta, embedded or not. Embedded
-		// novelty cells travel inside their parents and are dropped, but the payload
-		// itself may legitimately be embedded: a SignedData wrapping a branch Order is
-		// only 130 bytes. Dropping it left a peer's own Order out of every quick update
-		// until the next status poll (#706).
-		novelty.removeIf(c -> c.isEmbedded() || payload.equals(c));
-		novelty.add(payload);
-		if (Format.getDeltaEncodingLength(novelty)<=maxMessageLength) {
-			Blob data=Format.encodeDelta(novelty,maxMessageLength);
-			return List.of(Message.create(MessageType.BELIEF,payload,data));
+		cells.add(payload);
+		if (Format.getDeltaEncodingLength(cells)<=maxMessageLength) {
+			return Message.create(MessageType.BELIEF,payload,Format.encodeDelta(cells,maxMessageLength));
 		}
-		Message root=Message.create(MessageType.BELIEF,payload,payload.getEncoding());
-		if (root.getMessageData().count()>maxMessageLength) return List.of();
-		try {
-			long dataBudget=maxBroadcastLength-root.getMessageData().count();
-			ArrayList<Message> messages=(dataBudget>0)
-				?new ArrayList<>(Message.createDataMessages(novelty,maxMessageLength,dataBudget))
-				:new ArrayList<>();
-			messages.add(root);
-			return messages;
-		} catch (IllegalArgumentException e) {
-			// The root still lets the receiver detect divergence and pull a branch
-			// that cannot fit within this application's delta chunk limit.
-			return List.of(root);
-		}
-	}
-
-	private Belief lastFullBroadcastBelief;
-
-	public Belief getLastBroadcastBelief() {
-		return lastFullBroadcastBelief;
+		log.debug("Delta for {} exceeds {} bytes; sending root only",Utils.getClassName(payload),maxMessageLength);
+		return Message.create(MessageType.BELIEF,payload,payload.getEncoding());
 	}
 
 

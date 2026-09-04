@@ -4,13 +4,14 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ConcurrentHashMap;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -134,30 +135,6 @@ public class ConnectionManager extends AConnectionManager {
 		if (convex == null) throw new IllegalArgumentException("Connection must not be null");
 		log.debug("Connected to Peer: {} at {}", peerKey, convex.getHostAddress());
 		connections.put(peerKey, convex);
-	}
-
-	/**
-	 * Broadcasts a Message to all connected Peers in shuffled order.
-	 * Uses non-blocking sends to avoid stalling on one slow peer.
-	 */
-	@Override
-	public void broadcast(Message msg) {
-		Map<AccountKey, Convex> hm = getConnections();
-
-		if (hm.isEmpty()) {
-			log.debug("No connections to broadcast to from {}", server.getPeerKey());
-			return;
-		}
-
-		ArrayList<Map.Entry<AccountKey, Convex>> list = new ArrayList<>(hm.entrySet());
-		Utils.shuffle(list);
-
-		for (Map.Entry<AccountKey, Convex> me : list) {
-			Convex pc = me.getValue();
-			if (pc != null && pc.isConnected()) {
-				pc.trySend(msg);
-			}
-		}
 	}
 
 	// ========== Maintenance ==========
@@ -397,20 +374,44 @@ public class ConnectionManager extends AConnectionManager {
 		log.warn(reason);
 	}
 
+	/** Minimum interval between requests for the same missing hash. */
+	static final long MISSING_REQUEST_INTERVAL = 1000;
+
+	/** Recently requested missing hashes with request time, bounding repeat requests. */
+	private final ConcurrentHashMap<Hash, Long> missingRequests = new ConcurrentHashMap<>();
+
 	/**
-	 * Called to signal missing data in a Belief / Order
+	 * Called to signal missing data in a received Belief or Order. Requests the
+	 * missing value, and transitively whatever it needs, from the peer that sent the
+	 * message, since it must hold the data, or failing that from the Order's author.
+	 * The message itself is dropped; the next update from that peer merges once the
+	 * data has arrived. Requests for one hash are rate limited so a merge that keeps
+	 * failing while the acquisition is in flight does not repeat the request.
+	 *
 	 * @param m Message which caused alert
 	 * @param e Missing data exception encountered
-	 * @param peerKey Peer key which triggered missing data
+	 * @param peerKey Peer key which triggered missing data, or null if unknown
 	 */
 	public void alertMissing(Message m, MissingDataException e, AccountKey peerKey) {
 		try {
-			Convex conn = getConnection(peerKey);
-			if (conn == null) return;
+			Hash h = e.getMissingHash();
+			if (h == null) return;
+			AccountKey sender = (m.getConnection() == null) ? null : m.getConnection().getTrustedKey();
+			Convex conn = (sender == null) ? null : getConnection(sender);
+			if ((conn == null) && (peerKey != null)) conn = getConnection(peerKey);
+			if ((conn == null) || !conn.isConnected()) return;
 
-			if (log.isDebugEnabled()) {
-				log.info("Missing data alert {}", e.getMissingHash());
-			}
+			long now = Utils.getCurrentTimestamp();
+			Long last = missingRequests.get(h);
+			if ((last != null) && (now - last < MISSING_REQUEST_INTERVAL)) return;
+			if (missingRequests.size() > 4096) missingRequests.clear();
+			missingRequests.put(h, now);
+
+			log.debug("Requesting missing data {}", h);
+			conn.acquire(h).whenComplete((value, ex) -> {
+				missingRequests.remove(h);
+				if (ex != null) log.debug("Missing data request for {} failed: {}", h, ex.getMessage());
+			});
 		} catch (Exception ex) {
 			log.warn("Unexpected error responding to missing data", ex);
 		}

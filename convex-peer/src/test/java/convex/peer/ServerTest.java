@@ -549,27 +549,22 @@ public class ServerTest {
 	}
 
 	@Test
-	public void testBeliefDeltaUsesBoundedDataAheadMessages() {
+	public void testDeltaMessageFallsBackToRootOnly() throws Exception {
 		Belief belief=network.SERVER.getBelief();
 		ArrayList<ACell> novelty=new ArrayList<>();
 		for (int i=0; i<6; i++) novelty.add(Blobs.createRandom(600));
 		int limit=Math.max(1024,belief.getEncodingLength()+100);
 
-		List<Message> messages=BeliefPropagator.createPartialBeliefMessages(
-			belief,novelty,limit);
+		// Novelty that does not fit the limit: the root goes alone, receivers pull
+		Message rootOnly=BeliefPropagator.createDeltaMessage(belief,novelty,limit);
+		assertEquals(MessageType.BELIEF,rootOnly.getType());
+		assertTrue(rootOnly.getMessageData().count()<=limit);
+		assertEquals(belief,Message.create(rootOnly.getMessageData()).getPayload(new MemoryStore()));
 
-		assertTrue(messages.size()>1);
-		for (Message message:messages) assertTrue(message.getMessageData().count()<=limit);
-		for (int i=0; i<messages.size()-1; i++) {
-			assertEquals(MessageType.DATA,messages.get(i).getType());
-		}
-		assertEquals(MessageType.BELIEF,messages.get(messages.size()-1).getType());
-
-		ArrayList<ACell> boundedNovelty=new ArrayList<>();
-		for (int i=0; i<20; i++) boundedNovelty.add(Blobs.createRandom(600));
-		List<Message> bounded=BeliefPropagator.createPartialBeliefMessages(
-			belief,boundedNovelty,limit,2200);
-		assertTrue(bounded.stream().mapToLong(m -> m.getMessageData().count()).sum()<=2200);
+		// Novelty that fits: one delta carrying it all, decodable without a store
+		Message delta=BeliefPropagator.createDeltaMessage(belief,novelty,1<<20);
+		assertTrue(delta.getMessageData().count()>rootOnly.getMessageData().count());
+		assertEquals(belief,Message.create(delta.getMessageData()).getPayload(new MemoryStore()));
 	}
 
 	/**
@@ -588,21 +583,18 @@ public class ServerTest {
 		assertFalse(order.isEmbedded());
 		SignedData<Order> signed=kp.signData(order);
 		assertTrue(signed.isEmbedded());
-		int limit=Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT;
+		int limit=Config.DEFAULT_MAX_BELIEF_DELTA_MESSAGE_SIZE;
 		MemoryStore store=new MemoryStore();
 
 		// With novelty: the Order travels with its signed wrapper as the top cell
-		List<Message> messages=BeliefPropagator.createPartialBeliefMessages(
-			signed,new ArrayList<>(List.of(order)),limit);
-		assertEquals(1,messages.size());
-		ACell payload=messages.get(0).getPayload(store);
+		Message message=BeliefPropagator.createDeltaMessage(signed,List.of(order),limit);
+		ACell payload=message.getPayload(store);
 		assertEquals(signed,payload);
 		SignedData<Order> received=Belief.extractOrders(payload).iterator().next();
 		assertEquals(order.getBlockCount(),received.getValue().getBlockCount());
 
 		// Without novelty: the message is still the signed Order, never empty
-		Message rebroadcast=BeliefPropagator.createPartialBeliefMessages(
-			signed,new ArrayList<>(),limit).get(0);
+		Message rebroadcast=BeliefPropagator.createDeltaMessage(signed,List.of(),limit);
 		assertTrue(rebroadcast.getMessageData().count()>0);
 		assertEquals(signed,rebroadcast.getPayload(store));
 	}
@@ -621,26 +613,33 @@ public class ServerTest {
 	}
 
 	@Test
-	public void testBeliefDeltaMaterialisationConfig() {
-		assertEquals(16 * 1024 * 1024,Config.getBeliefDeltaBroadcastSize(Map.of()));
-		Map<Keyword,Object> configured=Map.of(
-			Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,1024,
-			Config.MAX_BELIEF_DELTA_BROADCAST_SIZE,4096);
-		assertEquals(4096,Config.getBeliefDeltaBroadcastSize(configured));
-		Map<Keyword,Object> invalid=Map.of(
-			Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,4096,
-			Config.MAX_BELIEF_DELTA_BROADCAST_SIZE,1024);
+	public void testBeliefDeltaMessageSizeConfig() {
+		assertEquals(4 * 1024 * 1024,Config.getBeliefDeltaMessageSize(Map.of()));
+		Map<Keyword,Object> configured=Map.of(Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,4096);
+		assertEquals(4096,Config.getBeliefDeltaMessageSize(configured));
+		Map<Keyword,Object> invalid=Map.of(Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,0);
 		assertThrows(IllegalArgumentException.class,
-			() -> Config.getBeliefDeltaBroadcastSize(invalid));
+			() -> Config.getBeliefDeltaMessageSize(invalid));
 	}
 
 	@Test
-	public void testQuickBeliefUpdateIsOwnOrderRootOnly() throws Exception {
-		Message quick=network.SERVER.getBeliefPropagator().createQuickUpdateMessage();
-		assertNotNull(quick);
-		assertEquals(MessageType.BELIEF,quick.getType());
-		assertTrue(quick.getPayload() instanceof SignedData<?>);
-		assertTrue(quick.getMessageData().count()<=Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
+	public void testConsensusUpdateMessages() throws Exception {
+		BeliefPropagator propagator=network.SERVER.getBeliefPropagator();
+		int limit=Config.getBeliefDeltaMessageSize(network.SERVER.getConfig());
+
+		// Inner layer: our own signed Order, one bounded delta
+		Message order=propagator.createOrderUpdateMessage();
+		assertNotNull(order);
+		assertEquals(MessageType.BELIEF,order.getType());
+		assertTrue(order.getPayload() instanceof SignedData<?>);
+		assertTrue(order.getMessageData().count()<=limit);
+
+		// Outer layer: the Belief, one bounded delta omitting what the Order announced
+		Message belief=propagator.createBeliefUpdateMessage();
+		assertNotNull(belief);
+		assertEquals(MessageType.BELIEF,belief.getType());
+		assertTrue(belief.getPayload() instanceof Belief);
+		assertTrue(belief.getMessageData().count()<=limit);
 	}
 
 	@Test

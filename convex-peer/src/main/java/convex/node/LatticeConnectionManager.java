@@ -943,11 +943,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Broadcasts once per remote identity across both physical route forms. */
 	@Override
-	public void broadcast(Message message) {
-		super.broadcast(message);
+	public int broadcast(Message message, boolean skipBusy) {
+		int accepted = super.broadcast(message, skipBusy);
 		for (AConnection route : getSupplementalInboundRoutes()) {
-			route.trySendMessage(message);
+			if (skipBusy && route.isOutboundBusy()) continue;
+			if (route.trySendMessage(message)) accepted++;
 		}
+		return accepted;
 	}
 
 	/** Broadcasts a priority message once per remote identity. */

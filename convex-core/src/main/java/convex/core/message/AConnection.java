@@ -120,6 +120,18 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * Checks whether this connection's outbound queue is under pressure, i.e. a
+	 * substantial share of its capacity is already waiting to be sent. Senders use
+	 * this to skip optional traffic for a slow receiver while still offering the
+	 * essential messages. Returns false by default.
+	 *
+	 * @return true if outbound capacity is substantially used
+	 */
+	public boolean isOutboundBusy() {
+		return false;
+	}
+
+	/**
 	 * Sends a message over this connection. May block with a bounded timeout
 	 * if the outbound queue is full (e.g. outbound client connections under
 	 * backpressure). Callers that must not block should use

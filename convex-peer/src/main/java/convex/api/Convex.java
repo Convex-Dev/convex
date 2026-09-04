@@ -803,6 +803,15 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
+	 * Checks whether this connection's outbound queue is under pressure. Senders
+	 * use this to skip optional traffic for a slow receiver. False by default.
+	 * @return true if outbound capacity is substantially used
+	 */
+	public boolean isOutboundBusy() {
+		return false;
+	}
+
+	/**
 	 * Non-blocking send for a small replaceable consensus/control root. The
 	 * default has ordinary non-blocking semantics; connected transports may
 	 * coalesce it ahead of bulk data.

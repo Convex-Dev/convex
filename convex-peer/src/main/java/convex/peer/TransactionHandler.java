@@ -399,23 +399,38 @@ public class TransactionHandler extends AThreadedComponent {
 		int ntrans=newTransactions.size();
 		if (ntrans==0) return null;
 
+		boolean produced=false;
 		try {
-			
+			// The Blocks proposed in one loop travel together in the own-Order update,
+			// which must fit one message. Take transactions up to an encoded-byte budget
+			// and leave the rest for the next loop. A single transaction beyond the
+			// budget still goes alone; its Block is then pulled rather than pushed.
+			long budget=Config.getBeliefDeltaMessageSize(server.getConfig())/2;
+			long bytes=0;
+			int taken=0;
+			while (taken<ntrans) {
+				long len=newTransactions.get(taken).getEncodingLength();
+				if (taken>0 && bytes+len>budget) break;
+				bytes+=len;
+				taken++;
+			}
+
 			int maxBlockSize=Constants.MAX_TRANSACTIONS_PER_BLOCK;
-			int nblocks=((ntrans-1)/maxBlockSize)+1;
-			
+			int nblocks=((taken-1)/maxBlockSize)+1;
+
 			@SuppressWarnings("unchecked")
 			SignedData<Block>[] signedBlocks=new SignedData[nblocks];
-		
+
 			for (int i=0; i<nblocks; i++) {
 				int start=i*maxBlockSize;
-				int end=Math.min(ntrans, (i+1)*maxBlockSize);
+				int end=Math.min(taken, (i+1)*maxBlockSize);
 				Block block = Block.create(timestamp, newTransactions.subList(start, end));
 				SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
 				signedBlock=Cells.persist(signedBlock, server.getStore());
-				signedBlocks[i]=signedBlock;		
+				signedBlocks[i]=signedBlock;
 			}
-			newTransactions.clear();
+			newTransactions.subList(0, taken).clear(); // deferred transactions stay for the next loop
+			produced=true;
 			lastBlockPublishedTime=timestamp;
 			return signedBlocks;
 		} catch (Exception e) {
@@ -427,7 +442,7 @@ public class TransactionHandler extends AThreadedComponent {
 			// hang — notify each interested client of the failure and clear interests
 			// before discarding. Phase 3 intake persistence is the primary guard that
 			// stops faulty transactions ever reaching here; this is a safety net.
-			if (!newTransactions.isEmpty()) {
+			if (!produced && !newTransactions.isEmpty()) {
 				log.warn("Discarded "+newTransactions.size()+" potentially faulty / malicious transactions");
 				for (SignedData<ATransaction> sd : newTransactions) {
 					Hash h=sd.getHash();

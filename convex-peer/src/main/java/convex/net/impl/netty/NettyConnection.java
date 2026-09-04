@@ -334,6 +334,19 @@ public class NettyConnection extends AConnection {
 		}
 	}
 
+	/**
+	 * Both thresholds are half of the corresponding rejection limit, so a connection
+	 * that has just refused a non-blocking send always reports busy: optional traffic
+	 * is never queued behind an essential message that was refused.
+	 */
+	@Override
+	public boolean isOutboundBusy() {
+		if (outbound.size()*2>Config.OUTBOUND_QUEUE_SIZE) return true;
+		synchronized (outboundCapacity) {
+			return outboundBytes*2>Config.OUTBOUND_QUEUE_BYTE_LIMIT;
+		}
+	}
+
 	private boolean hasOutboundCapacity(int bytes) {
 		if (bytes<0) return false;
 		if (outboundBytes==0) return bytes<=convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;

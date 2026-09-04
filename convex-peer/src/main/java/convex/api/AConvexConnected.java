@@ -278,6 +278,12 @@ public abstract class AConvexConnected extends Convex {
 	}
 
 	@Override
+	public boolean isOutboundBusy() {
+		AConnection conn = connection;
+		return conn != null && conn.isOutboundBusy();
+	}
+
+	@Override
 	public boolean trySendPriority(Message msg) {
 		AConnection conn=connection;
 		if (conn==null) return false;
