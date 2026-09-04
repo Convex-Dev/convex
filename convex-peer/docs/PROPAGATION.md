@@ -62,8 +62,12 @@ is also safe because later root sync and pull-based acquisition recover the
 state.
 
 The default Netty connection has a count- and byte-bounded ordinary outbound
-queue. It writes the already encoded messages only while the channel is
-writable, with one flush after a drain batch. A small, replaceable priority slot
+queue, holding the shared encoded messages on the heap until the channel can
+take them. A connection to a peer is buffered for up to 256 MB before anything
+is refused, and then only for that peer; a client connection gets 16 MiB. The
+last message admitted may exceed the bound, so a large update is never refused
+merely because the queue is nearly full. It writes the already encoded messages
+only while the channel is writable, with one flush after a drain batch. A small, replaceable priority slot
 exists for lattice control roots; CPoS does not use it. Slow or non-reading
 receivers therefore cannot block the propagator thread, the Netty event loop or
 other peer connections.
@@ -124,7 +128,8 @@ protocol limits:
 | Belief or own-Order delta message | 4 MiB | `:max-belief-delta-message-size` |
 | Trusted CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
 | Untrusted CPoS DATA/BELIEF queue | 10 messages and 4 MiB | `Config` constants |
-| Ordinary outbound queue, per connection | 128 messages and 16 MiB | `Config` constants |
+| Outbound queue, per client connection | 128 messages and 16 MiB | `Config` constants |
+| Outbound queue, per connection to a peer | 65,536 messages and 256 MB; the last message admitted may exceed it | `Config` constants |
 | Priority outbound slot, per connection | one message, at most 64 KiB | `Config` constants |
 | Novelty references collected per attempt | at most 65,536, also byte-budgeted | `Cells.MAX_NOVELTY_CELLS` |
 

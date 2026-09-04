@@ -3,7 +3,6 @@ package convex.net.impl.netty;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -14,10 +13,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.data.Vectors;
+import convex.core.message.BoundedMessageQueue;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.Shutdown;
-import convex.core.util.Utils;
 import convex.core.message.AConnection;
 import convex.peer.Config;
 import io.netty.bootstrap.Bootstrap;
@@ -51,13 +50,16 @@ public class NettyConnection extends AConnection {
 	private NettyInboundHandler inboundHandler;
 
 	/**
-	 * Bounded outbound message queue. Application threads put messages here;
-	 * the Netty event loop drains them to the channel when writable.
+	 * Bounded outbound message queue. Application threads put messages here; the
+	 * Netty event loop drains them to the channel while it is writable, so encoded
+	 * messages stay shared on the heap until they are about to enter the socket
+	 * buffer. Client bounds by default; {@link #setOutboundLimits} raises them for a
+	 * connection to a Peer. The last message admitted may take the queue over its
+	 * byte bound, so a large update is never refused merely because the queue is
+	 * nearly full.
 	 */
-	private final ArrayBlockingQueue<Message> outbound =
-		new ArrayBlockingQueue<>(Config.OUTBOUND_QUEUE_SIZE);
-	private final Object outboundCapacity=new Object();
-	private long outboundBytes;
+	private final BoundedMessageQueue outbound = new BoundedMessageQueue(
+		Config.OUTBOUND_QUEUE_SIZE, Config.OUTBOUND_QUEUE_BYTE_LIMIT, true);
 
 	/** Latest small priority root, coalesced independently of the bulk queue. */
 	private final AtomicReference<Message> priorityOutbound=new AtomicReference<>();
@@ -198,31 +200,15 @@ public class NettyConnection extends AConnection {
 	public boolean sendMessage(Message m) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
-		long length=encodedLength(m);
-		if (length<0) return false;
-		int bytes=Utils.checkedInt(length);
-		boolean reserved=false;
+		if (encodedLength(m)<0) return false;
+		boolean queued;
 		try {
-			reserved=reserveOutbound(bytes,Config.DEFAULT_INTERNAL_TIMEOUT);
-			if (!reserved) return false;
-			if (!ch.isActive()) {
-				releaseOutbound(bytes);
-				return false;
-			}
-			boolean queued = outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT,
-				TimeUnit.MILLISECONDS);
-			if (!queued) releaseOutbound(bytes);
-			if (queued && !ch.isActive() && outbound.remove(m)) {
-				releaseOutbound(bytes);
-				queued=false;
-			}
-			if (queued) flushPending();
-			return queued;
+			queued = outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
-			if (reserved) releaseOutbound(bytes);
 			Thread.currentThread().interrupt();
 			return false;
 		}
+		return queued && afterQueue(ch, m);
 	}
 
 	/**
@@ -232,27 +218,18 @@ public class NettyConnection extends AConnection {
 	public boolean trySendMessage(Message m) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
-		long length=encodedLength(m);
-		if (length<0) return false;
-		int bytes=Utils.checkedInt(length);
-		try {
-			if (!reserveOutbound(bytes,0)) return false;
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
+		if (encodedLength(m)<0) return false;
+		return outbound.offer(m) && afterQueue(ch, m);
+	}
+
+	/** Schedules a drain for a queued message, or withdraws it if the channel died meanwhile. */
+	private boolean afterQueue(Channel ch, Message m) {
 		if (!ch.isActive()) {
-			releaseOutbound(bytes);
+			outbound.remove(m);
 			return false;
 		}
-		boolean queued = outbound.offer(m);
-		if (!queued) releaseOutbound(bytes);
-		if (queued && !ch.isActive() && outbound.remove(m)) {
-			releaseOutbound(bytes);
-			queued=false;
-		}
-		if (queued) flushPending();
-		return queued;
+		flushPending();
+		return true;
 	}
 
 	/**
@@ -307,10 +284,7 @@ public class NettyConnection extends AConnection {
 		int count = 0;
 		while (ch.isWritable() && ch.isActive()) {
 			Message m=priorityOutbound.getAndSet(null);
-			if (m==null) {
-				m = outbound.poll();
-				if (m!=null) releaseOutbound(Utils.checkedInt(m.getMessageData().count()));
-			}
+			if (m==null) m = outbound.poll();
 			if (m == null) break;
 			ch.write(m);
 			count++;
@@ -320,52 +294,23 @@ public class NettyConnection extends AConnection {
 		}
 	}
 
-	private boolean reserveOutbound(int bytes, long timeoutMillis) throws InterruptedException {
-		long remaining=TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
-		long deadline=System.nanoTime()+remaining;
-		synchronized (outboundCapacity) {
-			while (!hasOutboundCapacity(bytes)) {
-				if (remaining<=0) return false;
-				TimeUnit.NANOSECONDS.timedWait(outboundCapacity,remaining);
-				remaining=deadline-System.nanoTime();
-			}
-			outboundBytes+=bytes;
-			return true;
-		}
-	}
-
 	/**
-	 * Both thresholds are half of the corresponding rejection limit, so a connection
-	 * that has just refused a non-blocking send always reports busy: optional traffic
-	 * is never queued behind an essential message that was refused.
+	 * Both thresholds are half of the corresponding bound, so a connection that has
+	 * just refused a non-blocking send always reports busy: optional traffic is never
+	 * queued behind an essential message that was refused.
 	 */
 	@Override
 	public boolean isOutboundBusy() {
-		if (outbound.size()*2>Config.OUTBOUND_QUEUE_SIZE) return true;
-		synchronized (outboundCapacity) {
-			return outboundBytes*2>Config.OUTBOUND_QUEUE_BYTE_LIMIT;
-		}
+		return outbound.isOverHalfFull();
 	}
 
-	private boolean hasOutboundCapacity(int bytes) {
-		if (bytes<0) return false;
-		if (outboundBytes==0) return bytes<=convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
-		return outboundBytes+bytes<=Config.OUTBOUND_QUEUE_BYTE_LIMIT;
-	}
-
-	private void releaseOutbound(int bytes) {
-		synchronized (outboundCapacity) {
-			outboundBytes-=bytes;
-			if (outboundBytes<0) outboundBytes=0;
-			outboundCapacity.notifyAll();
-		}
+	@Override
+	public void setOutboundLimits(int messageLimit, long byteLimit) {
+		outbound.setLimits(messageLimit, byteLimit);
 	}
 
 	private void clearOutbound() {
-		Message message;
-		while ((message=outbound.poll())!=null) {
-			releaseOutbound(Utils.checkedInt(message.getMessageData().count()));
-		}
+		outbound.clear();
 	}
 
 	protected ChannelFuture send(Message m) {

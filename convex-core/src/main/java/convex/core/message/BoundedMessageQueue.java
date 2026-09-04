@@ -7,18 +7,49 @@ import java.util.concurrent.TimeUnit;
 /**
  * FIFO message queue bounded by both message count and encoded body bytes.
  * Count-only bounds are insufficient when one entry may occupy several MiB.
+ *
+ * <p>The byte bound is strict by default: a message that would take the queue over
+ * it is refused, and so is any message larger than the bound itself. A queue created
+ * with {@code allowOvershoot} instead admits any message while it holds fewer bytes
+ * than the bound, so the bound is exceeded by at most the last message admitted.
+ * That suits an outbound queue, where refusing one large message leaves the receiver
+ * with a gap, while the queue must still stop growing once it is full.</p>
  */
 public final class BoundedMessageQueue {
 	private final ArrayDeque<Message> queue=new ArrayDeque<>();
-	private final int messageLimit;
-	private final long byteLimit;
+	private final boolean allowOvershoot;
+	private int messageLimit;
+	private long byteLimit;
 	private long queuedBytes;
 
 	public BoundedMessageQueue(int messageLimit, long byteLimit) {
-		if (messageLimit<1) throw new IllegalArgumentException("Message limit must be positive");
-		if (byteLimit<1) throw new IllegalArgumentException("Byte limit must be positive");
+		this(messageLimit,byteLimit,false);
+	}
+
+	public BoundedMessageQueue(int messageLimit, long byteLimit, boolean allowOvershoot) {
+		checkLimits(messageLimit,byteLimit);
 		this.messageLimit=messageLimit;
 		this.byteLimit=byteLimit;
+		this.allowOvershoot=allowOvershoot;
+	}
+
+	private static void checkLimits(int messageLimit, long byteLimit) {
+		if (messageLimit<1) throw new IllegalArgumentException("Message limit must be positive");
+		if (byteLimit<1) throw new IllegalArgumentException("Byte limit must be positive");
+	}
+
+	/**
+	 * Replaces both bounds, for example once the remote end is known to be a trusted
+	 * peer. Raising them wakes any producer waiting for space.
+	 *
+	 * @param messageLimit New maximum number of queued messages
+	 * @param byteLimit New maximum queued encoded bytes
+	 */
+	public synchronized void setLimits(int messageLimit, long byteLimit) {
+		checkLimits(messageLimit,byteLimit);
+		this.messageLimit=messageLimit;
+		this.byteLimit=byteLimit;
+		notifyAll();
 	}
 
 	public synchronized boolean offer(Message message) {
@@ -33,7 +64,7 @@ public final class BoundedMessageQueue {
 	public synchronized boolean offer(Message message, long timeout, TimeUnit unit)
 			throws InterruptedException {
 		long bytes=messageBytes(message);
-		if (bytes>byteLimit) return false;
+		if (!allowOvershoot && bytes>byteLimit) return false;
 		long remaining=unit.toNanos(timeout);
 		long deadline=System.nanoTime()+remaining;
 		while (!canOffer(bytes)) {
@@ -97,13 +128,34 @@ public final class BoundedMessageQueue {
 		return queuedBytes;
 	}
 
+	public synchronized int getMessageLimit() {
+		return messageLimit;
+	}
+
+	public synchronized long getByteLimit() {
+		return byteLimit;
+	}
+
+	/**
+	 * Checks whether more than half of either bound is in use, that is whether the
+	 * queue is under pressure. A queue that has just refused a message is always
+	 * over half full.
+	 *
+	 * @return true if over half of either bound is used
+	 */
+	public synchronized boolean isOverHalfFull() {
+		return (long)queue.size()*2>messageLimit || queuedBytes*2>byteLimit;
+	}
+
 	/** Wakes timed producers, for example when the owning service stops admission. */
 	public synchronized void signalAll() {
 		notifyAll();
 	}
 
 	private boolean canOffer(long bytes) {
-		return bytes<=byteLimit && queue.size()<messageLimit && queuedBytes+bytes<=byteLimit;
+		if (queue.size()>=messageLimit) return false;
+		if (allowOvershoot) return queuedBytes<byteLimit;
+		return bytes<=byteLimit && queuedBytes+bytes<=byteLimit;
 	}
 
 	private Message removeFirst() {

@@ -480,7 +480,8 @@ The queue applies three policies:
   unaffected: Belief propagation runs on outbound connections with their own queues,
   and hands beliefs to the executor through a latest-value slot that never blocks.
 - **A stalled reader loses only its own replies.** Bytes handed to Netty but not
-  yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`).
+  yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`,
+  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified peer).
   Over that cap the connection's results are refused at once, never waited for, and
   logged at debug. The client sees a `:TIMEOUT`.
 - **Trusted peers first.** Replies to verified peer connections go into a lane the

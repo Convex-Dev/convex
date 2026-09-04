@@ -158,8 +158,23 @@ public class Config {
 	 */
 	public static final int OUTBOUND_QUEUE_SIZE = 128;
 
-	/** Maximum ordinary encoded bytes queued per outbound Peer connection. */
+	/** Maximum encoded bytes queued per outbound client connection. */
 	public static final int OUTBOUND_QUEUE_BYTE_LIMIT = 16 * 1024 * 1024;
+
+	/**
+	 * Maximum messages queued for one outbound connection to a Peer. Far larger
+	 * than the client bound: a lagging peer is buffered for, not dropped, until
+	 * this much is waiting for it alone.
+	 */
+	public static final int PEER_OUTBOUND_QUEUE_SIZE = 65536;
+
+	/**
+	 * Maximum encoded bytes queued for one outbound connection to a Peer, and the
+	 * pending allowance for replies to a verified Peer that connected inbound. The
+	 * last message admitted may take a queue over this bound. Encoded messages are
+	 * shared between peers, so many lagging peers cost about one such buffer.
+	 */
+	public static final long PEER_OUTBOUND_QUEUE_BYTE_LIMIT = 256L * 1024 * 1024;
 
 	/**
 	 * Maximum encoded bytes of replies held in a server's shared outbound queue,

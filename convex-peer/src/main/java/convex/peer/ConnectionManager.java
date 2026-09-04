@@ -134,6 +134,8 @@ public class ConnectionManager extends AConnectionManager {
 		if (peerKey == null) throw new IllegalArgumentException("Peer key must not be null");
 		if (convex == null) throw new IllegalArgumentException("Connection must not be null");
 		log.debug("Connected to Peer: {} at {}", peerKey, convex.getHostAddress());
+		// A peer we chose to connect to is buffered for, not dropped, until it is far behind
+		convex.setOutboundLimits(Config.PEER_OUTBOUND_QUEUE_SIZE, Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT);
 		connections.put(peerKey, convex);
 	}
 

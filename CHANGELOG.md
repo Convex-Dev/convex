@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the status poll. Block production defers transactions beyond an
   encoded-byte budget so an Order update always fits one message. The
   `:max-belief-delta-broadcast-size` peer configuration key is removed.
+- Peer: messages for a lagging peer are buffered per connection up to 256 MB,
+  the last message admitted may exceed it, before anything is dropped, and
+  then only for that peer. Replies to a verified peer that connected inbound
+  get the same allowance. Client connections keep the 16 MB bound. Encoded
+  messages are shared between peers, so many lagging peers cost about one
+  such buffer.
 
 ### Fixed
 

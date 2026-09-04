@@ -96,6 +96,8 @@ No polling, no extra threads, no unbounded buffering.
 | Parameter | Value | Location |
 |-----------|-------|----------|
 | `OUTBOUND_QUEUE_SIZE` | 128 | `Config` |
+| `OUTBOUND_QUEUE_BYTE_LIMIT` | 16 MiB | `Config` |
+| `PEER_OUTBOUND_QUEUE_SIZE` / `PEER_OUTBOUND_QUEUE_BYTE_LIMIT` | 65,536 / 256 MB, connections to peers only | `Config` |
 | `WriteBufferWaterMark` low | 32 KB | Client bootstrap |
 | `WriteBufferWaterMark` high | 64 KB | Client bootstrap |
 | Send timeout | `DEFAULT_CLIENT_TIMEOUT` (8s) | `Config` |

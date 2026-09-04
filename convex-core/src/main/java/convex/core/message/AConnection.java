@@ -132,6 +132,17 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * Sets the bounds of this connection's outbound queue, for example to buffer far
+	 * more for a verified peer than for an ordinary client. No effect by default.
+	 *
+	 * @param messageLimit Maximum queued messages
+	 * @param byteLimit Maximum queued encoded bytes
+	 */
+	public void setOutboundLimits(int messageLimit, long byteLimit) {
+		// no outbound queue by default
+	}
+
+	/**
 	 * Sends a message over this connection. May block with a bounded timeout
 	 * if the outbound queue is full (e.g. outbound client connections under
 	 * backpressure). Callers that must not block should use

@@ -157,6 +157,33 @@ public class ServerOutboundQueueTest {
 	}
 
 	@Test
+	public void testTrustedPeerHasItsOwnLargerAllowance() {
+		Message m = message(600);
+		int size = size(m);
+		// A client may have 1.5 replies pending; a verified peer 3.5
+		ServerOutboundQueue queue = new ServerOutboundQueue(size * 10, size + size / 2, 3 * size + size / 2, false);
+		StuckHandler stuck = new StuckHandler();
+		EmbeddedChannel slow = new EmbeddedChannel(stuck);
+		try {
+			NettyServerConnection conn = connection(slow, queue);
+			conn.setTrustedKey(AKeyPair.generate().getAccountKey());
+			for (int i = 0; i < 4; i++) {
+				assertTrue(conn.trySendMessage(m), "reply " + i + " is within the peer allowance");
+				assertEquals(1, queue.drainBatch());
+			}
+			assertEquals(4 * size, conn.getPendingBytes());
+			assertFalse(conn.trySendMessage(m), "over the peer allowance, further replies are refused");
+
+			stuck.complete();
+			assertEquals(0, conn.getPendingBytes());
+			assertTrue(conn.trySendMessage(m));
+		} finally {
+			queue.close();
+			slow.finishAndReleaseAll();
+		}
+	}
+
+	@Test
 	public void testTrustedPeerServedFirstAndNeverWaits() {
 		Message m = message(600);
 		int size = size(m);

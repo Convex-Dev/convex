@@ -196,6 +196,8 @@ public abstract class AConvexConnected extends Convex {
 		if (curr == conn) return;
 		if (curr!=null) close();
 		this.connection = conn;
+		// A reconnected peer connection keeps the bounds it was given
+		if (conn != null && outboundByteLimit > 0) conn.setOutboundLimits(outboundMessageLimit, outboundByteLimit);
 	}
 
 	/**
@@ -281,6 +283,18 @@ public abstract class AConvexConnected extends Convex {
 	public boolean isOutboundBusy() {
 		AConnection conn = connection;
 		return conn != null && conn.isOutboundBusy();
+	}
+
+	/** Outbound bounds to apply to the current and any later connection; zero if unset. */
+	private int outboundMessageLimit;
+	private long outboundByteLimit;
+
+	@Override
+	public void setOutboundLimits(int messageLimit, long byteLimit) {
+		outboundMessageLimit = messageLimit;
+		outboundByteLimit = byteLimit;
+		AConnection conn = connection;
+		if (conn != null) conn.setOutboundLimits(messageLimit, byteLimit);
 	}
 
 	@Override

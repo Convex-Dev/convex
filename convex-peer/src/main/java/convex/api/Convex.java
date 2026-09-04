@@ -812,6 +812,17 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
+	 * Sets the bounds of the outbound queue behind this connection, if it has one.
+	 * A peer raises them for its connections to other peers. No effect by default.
+	 *
+	 * @param messageLimit Maximum queued messages
+	 * @param byteLimit Maximum queued encoded bytes
+	 */
+	public void setOutboundLimits(int messageLimit, long byteLimit) {
+		// no outbound queue by default
+	}
+
+	/**
 	 * Non-blocking send for a small replaceable consensus/control root. The
 	 * default has ordinary non-blocking semantics; connected transports may
 	 * coalesce it ahead of bulk data.

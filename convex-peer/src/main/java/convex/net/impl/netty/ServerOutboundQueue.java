@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.message.Message;
+import convex.peer.Config;
 import io.netty.channel.Channel;
 
 /**
@@ -17,8 +18,10 @@ import io.netty.channel.Channel;
  * burst absorber bounded by the total encoded bytes it holds: bytes are
  * released as soon as a message is handed to Netty, so a slow reader can never
  * pin the shared bound or delay other connections. What a connection has
- * handed to Netty but not yet written is bounded separately per connection;
- * once over that cap its further replies are refused, and only its own.</p>
+ * handed to Netty but not yet written is bounded separately per connection: a
+ * small allowance for a client, a large one for a verified peer, which is
+ * buffered for rather than cut off when it lags. Once over its allowance a
+ * connection's further replies are refused, and only its own.</p>
  *
  * <p>Two policies sit on top of the bound. Traffic to trusted peers is queued
  * in a lane that the writer drains first and that is exempt from the shared
@@ -38,6 +41,7 @@ final class ServerOutboundQueue {
 
 	private final long byteLimit;
 	private final long connectionByteLimit;
+	private final long trustedConnectionByteLimit;
 
 	/** Replies to trusted peers, drained first and exempt from the shared bound. Guarded by this. */
 	private final ArrayDeque<Entry> priority = new ArrayDeque<>();
@@ -51,17 +55,27 @@ final class ServerOutboundQueue {
 
 	/**
 	 * @param byteLimit Maximum encoded bytes held in the queue for untrusted connections
-	 * @param connectionByteLimit Bytes handed to Netty but unwritten beyond which a connection's replies are refused
+	 * @param connectionByteLimit Bytes handed to Netty but unwritten beyond which a client connection's replies are refused
 	 */
 	ServerOutboundQueue(long byteLimit, long connectionByteLimit) {
-		this(byteLimit, connectionByteLimit, true);
+		this(byteLimit, connectionByteLimit, Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT, true);
 	}
 
 	/** Test hook: a queue without a writer thread is drained explicitly via {@link #drainBatch()}. */
 	ServerOutboundQueue(long byteLimit, long connectionByteLimit, boolean startWriter) {
-		if (byteLimit < 1 || connectionByteLimit < 1) throw new IllegalArgumentException("Byte limits must be positive");
+		this(byteLimit, connectionByteLimit, Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT, startWriter);
+	}
+
+	/**
+	 * @param trustedConnectionByteLimit The same allowance for a verified peer connection
+	 */
+	ServerOutboundQueue(long byteLimit, long connectionByteLimit, long trustedConnectionByteLimit, boolean startWriter) {
+		if (byteLimit < 1 || connectionByteLimit < 1 || trustedConnectionByteLimit < 1) {
+			throw new IllegalArgumentException("Byte limits must be positive");
+		}
 		this.byteLimit = byteLimit;
 		this.connectionByteLimit = connectionByteLimit;
+		this.trustedConnectionByteLimit = trustedConnectionByteLimit;
 		this.writer = startWriter ? Thread.ofVirtual().name("Server outbound writer").start(this::drain) : null;
 	}
 
@@ -94,7 +108,8 @@ final class ServerOutboundQueue {
 
 	private boolean offer(NettyServerConnection connection, Channel channel, Message message, int bytes,
 			long timeoutMillis) throws InterruptedException {
-		if (bytes < 0 || connection.getPendingBytes() >= connectionByteLimit) return false;
+		long allowance = connection.isTrusted() ? trustedConnectionByteLimit : connectionByteLimit;
+		if (bytes < 0 || connection.getPendingBytes() >= allowance) return false;
 		Entry e = new Entry(connection, channel, message, bytes);
 		synchronized (this) {
 			if (!running) return false;
