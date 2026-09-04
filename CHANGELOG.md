@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ConvexDirect`: `message`, `messageRaw`, `acquire` and `requestStatus` returned
+  null, so a direct client could only query and transact, and anything sent to
+  it through the message API was silently lost. It now handles every protocol
+  message type synchronously against its in-memory Peer, including Belief
+  merges, data requests and status, and `close` actually disconnects it.
 - Consensus: a Block whose novelty exceeded the 64 KB priority message limit was
   announced to other peers as a root-only update, so they could not decode it
   until the 2 s status poll. Any burst of more than a few hundred transactions

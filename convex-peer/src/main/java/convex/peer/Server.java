@@ -755,7 +755,16 @@ public class Server implements Closeable {
 	 * @return Status vector
 	 */
 	public AVector<ACell> getStatusData() {
-		Peer peer=getPeer();
+		return getStatusData(getPeer());
+	}
+
+	/**
+	 * Gets the status vector for a Peer, laid out as {@link #getStatusData()} describes.
+	 * Shared with in-process clients that answer STATUS requests without a Server.
+	 * @param peer Peer to report on
+	 * @return Status vector
+	 */
+	public static AVector<ACell> getStatusData(Peer peer) {
 		Belief belief=peer.getBelief();
 		
 		State state=peer.getConsensusState();
