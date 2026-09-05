@@ -134,7 +134,7 @@ final class NodeDirectory {
 		server.getCursor().path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES).merge(entry);
 		server.getCursor().sync();
 		refresh();
-		log.info("Published NodeInfo: transports={}, pops={}, relay={}, type={}, version={}",
+		log.debug("Published NodeInfo: transports={}, pops={}, relay={}, type={}, version={}",
 			transports,pointsOfPresence,relay,type,version);
 	}
 

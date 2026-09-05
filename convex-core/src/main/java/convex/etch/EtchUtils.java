@@ -316,7 +316,7 @@ public class EtchUtils {
 				throw new IOException("Etch GC recovery files use mixed versions "+versions
 						+"; supply an explicit matching Etch version to force cross-version recovery");
 			}
-			warn("Etch GC recovery explicitly allowing mixed file versions {} under configured v{}",
+			debug("Etch GC recovery explicitly allowing mixed file versions {} under configured v{}",
 					versions,config.getVersion());
 		}
 	}

@@ -15,6 +15,7 @@ import convex.api.ConvexRemote;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.data.AVector;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.message.Message;
@@ -143,6 +144,7 @@ public class LatticeListenerTest {
 			try (ConvexRemote client=ConvexRemote.connect(listener.getHostAddress())) {
 				Result denied=client.message(Message.createPing(6)).get(5,TimeUnit.SECONDS);
 				assertEquals(ErrorCodes.TRUST,denied.getErrorCode());
+				assertEquals(Strings.create("Inbound propagation policy failed"),denied.getValue());
 			}
 			assertTrue(node.isRunning());
 			assertTrue(listener.isRunning());

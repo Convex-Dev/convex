@@ -128,8 +128,9 @@ public final class LatticeListener implements Closeable {
 		if (connection==null) return reject(message);
 		LatticePropagator propagator=assignments.get(connection);
 		if (propagator==null) {
-			propagator=select(connection);
-			if (propagator==null) return reject(message);
+			Selection selection=select(connection);
+			propagator=selection.propagator();
+			if (propagator==null) return reject(message,selection.rejection());
 			LatticePropagator previous=assignments.putIfAbsent(connection,propagator);
 			if (previous!=null) propagator=previous;
 			else {
@@ -176,6 +177,10 @@ public final class LatticeListener implements Closeable {
 
 	/** Best-effort correlated denial; optimistic pushes are simply rejected. */
 	private Predicate<Message> reject(Message message) {
+		return reject(message,"No propagation policy admits this connection");
+	}
+
+	private Predicate<Message> reject(Message message,String reason) {
 		boolean returned=false;
 		try {
 			// Decode only the bounded top-level protocol envelope so a correlated
@@ -184,7 +189,7 @@ public final class LatticeListener implements Closeable {
 			message.getPayload(null);
 			if (message.getRequestID()!=null) {
 				returned=message.returnResult(Result.error(ErrorCodes.TRUST,
-					Strings.create("No propagation policy admits this connection")));
+					Strings.create(reason)));
 			}
 		} catch (Exception ignored) {
 			// The frame may be malformed or have no usable return path.
@@ -197,24 +202,30 @@ public final class LatticeListener implements Closeable {
 		return null;
 	}
 
-	private LatticePropagator select(AConnection connection) {
+	private record Selection(LatticePropagator propagator,String rejection) {}
+
+	private Selection select(AConnection connection) {
 		Function<AConnection,LatticePropagator> policy=selector;
-		if (policy==null) return null;
+		if (policy==null) return new Selection(null,"No propagation policy is configured");
 		try {
 			LatticePropagator selected=policy.apply(connection);
-			if (selected==null) return null;
+			if (selected==null) return new Selection(null,"No propagation policy admits this connection");
 			if (!allowedPropagators.contains(selected)) {
 				log.warn("Inbound policy selected a propagator not registered with this listener");
-				return null;
+				return new Selection(null,"Inbound propagation policy selected an unavailable group");
 			}
-			return selected;
+			return new Selection(selected,null);
 		} catch (VirtualMachineError e) {
 			if (!(e instanceof StackOverflowError)) throw e;
-			log.warn("Inbound propagation policy overflowed; connection remains unassigned",e);
-			return null;
+			log.warn("Inbound propagation policy overflowed for {}; connection denied",
+				connection.getRemoteAddress());
+			log.debug("Inbound propagation policy overflow",e);
+			return new Selection(null,"Inbound propagation policy exceeded its execution stack");
 		} catch (Throwable e) {
-			log.warn("Inbound propagation policy failed; connection remains unassigned",e);
-			return null;
+			log.warn("Inbound propagation policy failed for {}; connection denied: {}: {}",
+				connection.getRemoteAddress(),e.getClass().getSimpleName(),e.getMessage());
+			log.debug("Inbound propagation policy failure",e);
+			return new Selection(null,"Inbound propagation policy failed");
 		}
 	}
 

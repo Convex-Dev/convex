@@ -511,7 +511,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		CompletableFuture<AConnection> waiter = upgradedRouteWaiters.remove(peerKey);
 		if (waiter != null) waiter.complete(connection);
 		maintenanceSignal.release();
-		log.info("Upgraded authenticated inbound connection to outbound propagation route for {}", peerKey);
+		log.debug("Upgraded authenticated inbound connection to outbound propagation route for {}", peerKey);
 		return connection;
 	}
 
@@ -1153,7 +1153,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		completePeerWaiter(peerKey,pending.connection);
 		notifyPeerAdmitted(peerKey,pending.connection);
 		pending.admission.complete(pending.connection);
-		log.info("Verified and admitted peer {} at {}", peerKey, pending.connection.getHostAddress());
+		log.debug("Verified and admitted peer {} at {}", peerKey, pending.connection.getHostAddress());
 	}
 
 	/** Rejects one still-current limbo client and schedules its desired peer retry. */

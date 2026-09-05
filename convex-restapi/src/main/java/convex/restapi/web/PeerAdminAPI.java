@@ -51,7 +51,7 @@ public class PeerAdminAPI extends ABaseAPI {
 				})
 	public void shutDown(Context ctx) {
 		restServer.getAdminAuthorizer().require(ctx);
-		log.warn("Peer shutting down due to an authorised REST administration request");
+		log.info("Peer shutting down due to an authorised REST administration request");
 		server.shutdown();
 
 		ctx.result("Shutdown initiated.");
