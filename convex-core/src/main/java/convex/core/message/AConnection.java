@@ -14,7 +14,7 @@ import convex.core.data.prim.CVMLong;
  * reference to the {@code AConnection} it arrived on, enabling the server to:
  * <ul>
  *   <li>Route result messages back to the originator via {@link #sendMessage(Message)}</li>
- *   <li>Check trust status via {@link #isTrusted()} for Belief priority and backpressure</li>
+ *   <li>Check trust status via {@link #isTrusted()} for Belief admission and backpressure</li>
  *   <li>Close misbehaving connections via {@link #close()}</li>
  * </ul>
  *
@@ -120,18 +120,6 @@ public abstract class AConnection {
 	}
 
 	/**
-	 * Checks whether this connection's outbound queue is under pressure, i.e. a
-	 * substantial share of its capacity is already waiting to be sent. Senders use
-	 * this to skip optional traffic for a slow receiver while still offering the
-	 * essential messages. Returns false by default.
-	 *
-	 * @return true if outbound capacity is substantially used
-	 */
-	public boolean isOutboundBusy() {
-		return false;
-	}
-
-	/**
 	 * Sets the bounds of this connection's outbound queue, for example to buffer far
 	 * more for a verified peer than for an ordinary client. No effect by default.
 	 *
@@ -168,18 +156,6 @@ public abstract class AConnection {
 	 * @return true if message queued successfully, false if it could not be sent without blocking
 	 */
 	public abstract boolean trySendMessage(Message msg);
-
-	/**
-	 * Sends a small, replaceable priority message without blocking. Queue-based
-	 * transports may coalesce an older unsent priority message so the latest
-	 * consensus/control root is not trapped behind bulk propagation data.
-	 *
-	 * @param msg small priority message
-	 * @return true if accepted for delivery
-	 */
-	public boolean trySendPriorityMessage(Message msg) {
-		return trySendMessage(msg);
-	}
 
 	/**
 	 * Returns the remote socket address associated with this connection, or null if

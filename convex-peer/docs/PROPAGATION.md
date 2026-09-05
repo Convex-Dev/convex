@@ -17,10 +17,11 @@ The propagation path maintains five distinct invariants:
    each peer.
 3. Backpressure from one receiver must not delay sends to other receivers.
 4. CPoS consensus participation comes before bulk cross-replication. A peer's
-   own signed Order is always sent; the Belief that relays other peers' Orders
-   is skipped for a receiver whose outbound queue is congested.
-5. All retained queues and eager encoded working sets are bounded by bytes as
-   well as, where useful, by item count.
+   own signed Order is offered before the Belief that relays other peers' Orders.
+5. Retained wire-message queues and eager encoded working sets are bounded by
+   bytes and, where useful, item count. Complete values already acquired into a
+   local store use count-bounded reference queues and are never re-encoded for
+   queue accounting.
 
 ## Delta construction and fan-out
 
@@ -56,10 +57,9 @@ queueing failure cannot lose the local publication or prevent later recovery.
 
 `AConnectionManager.broadcastSequence` uses non-blocking offers independently
 for each peer. A full outbound queue stops the sequence for that peer only; the
-manager continues immediately with the remaining peers. For lattice deltas it
-then attempts a root-only fallback for the affected peer. Failure of that offer
-is also safe because later root sync and pull-based acquisition recover the
-state.
+manager continues immediately with the remaining peers. It does not retry or
+offer a fallback to the same full queue. A slow peer receives a later update or
+learns the value through another peer.
 
 The default Netty connection has a count- and byte-bounded ordinary outbound
 queue, holding the shared encoded messages on the heap until the channel can
@@ -67,10 +67,9 @@ take them. A connection to a peer is buffered for up to 256 MB before anything
 is refused, and then only for that peer; a client connection gets 16 MiB. The
 last message admitted may exceed the bound, so a large update is never refused
 merely because the queue is nearly full. It writes the already encoded messages
-only while the channel is writable, with one flush after a drain batch. A small, replaceable priority slot
-exists for lattice control roots; CPoS does not use it. Slow or non-reading
-receivers therefore cannot block the propagator thread, the Netty event loop or
-other peer connections.
+only while the channel is writable, with one flush after a drain batch. Slow or
+non-reading receivers therefore cannot block the propagator thread, the Netty
+event loop or other peer connections.
 
 ## CPoS scheduling
 
@@ -91,38 +90,48 @@ two reach each peer's ordered queue in this order:
   Order update, which is other peers' Orders and, the first time this peer
   relays them, their Blocks, shaped the same way. It is sent whenever
   any Order in the Belief changes and every `BELIEF_FULL_BROADCAST_DELAY`
-  otherwise. It is withheld from a peer whose outbound queue is under pressure:
-  the Belief is relay, not consensus, and the next change carries it again. A
-  peer that refused the Order for want of queue space always counts as under
-  pressure, so it is never offered the Belief alone.
+  otherwise.
 
 The connection manager is message-agnostic. It offers whatever it is given to
-every peer in call order, with one option to skip peers under outbound pressure;
-which message is essential and which is optional is the propagator's decision.
+every peer in call order. Each offer is non-blocking and definitive.
 
-Ordered delivery on one queue means data always precedes the Order that commits
-it, so nothing is superseded and nothing is resent. Announcing is therefore
-honest: a cell is announced when its messages are offered to the peers. What one
+For a peer that accepts a complete sequence, ordered delivery on one queue means
+data precedes the Order that commits it. A peer that refuses any message misses
+the rest of that update; no special retry or fallback is attempted. What one
 update materialises is bounded by bytes, never by cell count, at the peer queue
-bound (`BeliefPropagator.MAX_UPDATE_BYTES`); novelty beyond it stays in the store
-and the receiver pulls it. A peer whose queue cannot take the data is offered the
-root alone, so it too learns what to pull. `UpdateAccumulator` does this shaping;
-it is peer code, because what to carry eagerly is a peer's decision, not the data
-layer's.
+bound (`BeliefPropagator.MAX_UPDATE_BYTES`); novelty beyond it stays in the store.
+`UpdateAccumulator` does this shaping because what to carry eagerly is a peer's
+decision, not the data layer's.
 
 Every remaining way to miss data, a full queue or a relayed Order whose Blocks
 this peer has not seen, ends in a request rather than a timer:
 `ConnectionManager.alertMissing` acquires the missing hash from the peer that
 sent the message, rate limited per hash, and the next update merges once the
-data has arrived. The 2 s status poll remains the recovery of last resort.
+data has arrived. Periodic status polling remains the recovery of last resort,
+including for idle peers which have outbound connections but receive no inbound
+propagation. One random outbound peer is probed per interval; an unchanged Belief
+hash costs no acquisition.
 
 Inbound CPoS DATA and BELIEF messages share one ordered, byte-bounded processing
 queue off the Netty event loop. This preserves the DATA-before-root order for a
-connection while keeping decoding and store work away from network I/O. A
-trusted connection whose message does not fit is paused until it does: consensus
-traffic is never timed out or dropped on the receiving side, so the pressure
-reaches the sender's queue, which is where drops are decided. The queue admits
-one message over its byte bound, so any legal frame is eventually accepted.
+connection while keeping decoding and store work away from network I/O. The
+queue admits one message over its byte bound, so any legal frame can enter when
+capacity is available. If either bound is already full, the incoming DATA or
+BELIEF is dropped. Propagation never pauses the connection, so control messages
+and recovery requests behind it can continue to make progress.
+
+Status polling is a separate local path. Once `Acquiror` has completed and
+persisted a remote Belief, `ConnectionManager` offers that `Belief` directly to
+a bounded FIFO of merge-ready values. It is not wrapped in a `Message`: doing so
+would make queue byte accounting encode the complete value as one wire frame,
+which is both unnecessary and invalid when the value exceeds the 50 MB frame
+limit. The propagator drains every retained acquired Belief alongside wire
+updates and compares all signed Orders before performing one merge; values from
+different peers never overwrite each other in a shared pending slot. Polling is
+deferred while either trusted input queue is full and capacity is checked again
+before acquisition. A STATUS timeout is initially only a missed health probe; a
+connection is retired if it remains unresponsive for a full minute, while any
+non-connectivity result resets that period.
 
 ## Memory budgets
 
@@ -137,9 +146,9 @@ protocol limits:
 | Belief or own-Order delta message | 4 MiB | `:max-belief-delta-message-size` |
 | Trusted CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
 | Untrusted CPoS DATA/BELIEF queue | 10 messages and 4 MiB | `Config` constants |
+| Complete Beliefs acquired by status polling | 200 Belief references | `Config.BELIEF_QUEUE_SIZE` |
 | Outbound queue, per client connection | 128 messages and 16 MiB | `Config` constants |
 | Outbound queue, per connection to a peer | 65,536 messages and 256 MB; the last message admitted may exceed it | `Config` constants |
-| Priority outbound slot, per connection | one message, at most 64 KiB | `Config` constants |
 | Materialised messages per consensus update | 256 MB | `BeliefPropagator.MAX_UPDATE_BYTES` |
 | Lattice novelty retained per attempt | at most 65,536 cells, also byte-budgeted | `convex.node.NoveltyCollector` |
 
@@ -166,8 +175,8 @@ receiving side. A later LATTICE_VALUE or BELIEF root activates normal processing
 and requests any missing cells.
 
 Dropping an eager delta is therefore a loss of realtime delivery, not permanent
-data loss. Recovery paths are the root-only fallback, periodic lattice root
-sync, CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
+data loss. Recovery paths are later propagation, periodic lattice root sync,
+CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
 
 ## Relevant implementation
 
@@ -175,7 +184,7 @@ sync, CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
 - `convex.peer.UpdateAccumulator` — shapes one consensus update into DATA messages then its root
 - `convex.node.NoveltyCollector` — bounded novelty collection for lattice deltas
 - `convex.core.message.BoundedMessageQueue` — count- and byte-bounded FIFO
-- `convex.node.LatticePropagator` — lattice chunking and root fallback
+- `convex.node.LatticePropagator` — lattice chunking and periodic root sync
 - `convex.peer.BeliefPropagator` — own-Order then Belief update cadence
-- `convex.peer.AConnectionManager` — message-agnostic non-blocking fan-out, optionally skipping peers under outbound pressure
-- `convex.net.impl.netty.NettyConnection` — per-connection queues and outbound pressure signal
+- `convex.peer.AConnectionManager` — message-agnostic non-blocking fan-out
+- `convex.net.impl.netty.NettyConnection` — per-connection outbound queues

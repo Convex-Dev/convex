@@ -279,12 +279,6 @@ public abstract class AConvexConnected extends Convex {
 		return conn.trySendMessage(msg);
 	}
 
-	@Override
-	public boolean isOutboundBusy() {
-		AConnection conn = connection;
-		return conn != null && conn.isOutboundBusy();
-	}
-
 	/** Outbound bounds to apply to the current and any later connection; zero if unset. */
 	private int outboundMessageLimit;
 	private long outboundByteLimit;
@@ -295,13 +289,6 @@ public abstract class AConvexConnected extends Convex {
 		outboundByteLimit = byteLimit;
 		AConnection conn = connection;
 		if (conn != null) conn.setOutboundLimits(messageLimit, byteLimit);
-	}
-
-	@Override
-	public boolean trySendPriority(Message msg) {
-		AConnection conn=connection;
-		if (conn==null) return false;
-		return conn.trySendPriorityMessage(msg);
 	}
 
 	@Override

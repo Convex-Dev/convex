@@ -11,9 +11,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -21,15 +23,23 @@ import org.junit.jupiter.api.Test;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.api.ConvexRemote;
+import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.Belief;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
+import convex.core.cvm.Peer;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.init.Init;
 import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.lang.RT;
@@ -37,6 +47,7 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
+import convex.core.store.MemoryStore;
 
 /**
  * Regression tests for ConnectionManager and AConnectionManager.
@@ -274,6 +285,166 @@ public class ConnectionManagerTest {
 	}
 
 	@Test
+	public void testStatusPollDoesNotAcquireUnchangedBelief() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(201));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey remoteKey=AKeyPair.createSeeded(202).getAccountKey();
+			PollingConvex connection=new PollingConvex();
+			connection.statusResult=Result.create(CVMLong.ZERO,server.getStatusData());
+			manager.addConnection(remoteKey,connection);
+
+			manager.pollBelief(remoteKey,connection);
+
+			assertEquals(0,connection.acquireCount);
+			assertTrue(connection.isConnected());
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testStatusPollAcquiresChangedBelief() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(203));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AKeyPair remote=AKeyPair.createSeeded(204);
+			Belief remoteBelief=Belief.create(remote,Order.create());
+			PollingConvex connection=new PollingConvex();
+			connection.setStore(server.getStore());
+			AVector<ACell> status=server.getStatusData().assoc(0,remoteBelief.getHash());
+			connection.statusResult=Result.create(CVMLong.ZERO,status);
+			connection.acquired=remoteBelief;
+			manager.addConnection(remote.getAccountKey(),connection);
+
+			manager.pollBelief(remote.getAccountKey(),connection);
+
+			assertEquals(1,connection.acquireCount);
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testStatusPollDoesNotAcquireIntoSaturatedInput() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(209));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AKeyPair remote=AKeyPair.createSeeded(210);
+			Belief remoteBelief=Belief.create(remote,Order.create());
+			PollingConvex connection=new PollingConvex();
+			connection.setStore(server.getStore());
+			AVector<ACell> status=server.getStatusData().assoc(0,remoteBelief.getHash());
+			connection.statusResult=Result.create(CVMLong.ZERO,status);
+			connection.acquired=remoteBelief;
+			manager.addConnection(remote.getAccountKey(),connection);
+
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			Message filler=Message.createBelief(server.getBelief());
+			for (int i=0;i<Config.BELIEF_QUEUE_SIZE;i++) {
+				assertTrue(propagator.queuePropagation(filler));
+			}
+			manager.pollBelief(remote.getAccountKey(),connection);
+
+			assertEquals(0,connection.acquireCount);
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testStatusTimeoutAgesOutConnection() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(205));
+		try {
+			AtomicLong clock=new AtomicLong(1000);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey remoteKey=AKeyPair.createSeeded(206).getAccountKey();
+			PollingConvex connection=new PollingConvex();
+			connection.statusResult=Result.error(ErrorCodes.TIMEOUT,"test timeout");
+			manager.addConnection(remoteKey,connection);
+
+			manager.pollBelief(remoteKey,connection);
+			assertTrue(connection.isConnected(),"one timeout must not remove a peer");
+
+			clock.addAndGet(ConnectionManager.UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS-1);
+			manager.pollBelief(remoteKey,connection);
+			assertTrue(connection.isConnected(),"the full grace period must elapse");
+
+			clock.incrementAndGet();
+			manager.pollBelief(remoteKey,connection);
+			assertFalse(connection.isConnected());
+			assertNull(manager.getConnection(remoteKey));
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testSuccessfulStatusResetsTimeoutAge() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(207));
+		try {
+			AtomicLong clock=new AtomicLong(1000);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey remoteKey=AKeyPair.createSeeded(208).getAccountKey();
+			PollingConvex connection=new PollingConvex();
+			manager.addConnection(remoteKey,connection);
+
+			connection.statusResult=Result.error(ErrorCodes.TIMEOUT,"test timeout");
+			manager.pollBelief(remoteKey,connection);
+
+			clock.addAndGet(ConnectionManager.UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS-1);
+			connection.statusResult=Result.create(CVMLong.ZERO,server.getStatusData());
+			manager.pollBelief(remoteKey,connection);
+
+			clock.addAndGet(ConnectionManager.UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS);
+			connection.statusResult=Result.error(ErrorCodes.TIMEOUT,"test timeout");
+			manager.pollBelief(remoteKey,connection);
+			assertTrue(connection.isConnected(),"a success starts a new failure window");
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testNonKeywordStatusErrorIsNotConnectivityFailure() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(211));
+		try {
+			AtomicLong clock=new AtomicLong(1000);
+			server.setTimeSource(clock::get);
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey remoteKey=AKeyPair.createSeeded(212).getAccountKey();
+			PollingConvex connection=new PollingConvex();
+			manager.addConnection(remoteKey,connection);
+
+			connection.statusResult=Result.error(ErrorCodes.TIMEOUT,"test timeout");
+			manager.pollBelief(remoteKey,connection);
+
+			clock.addAndGet(ConnectionManager.UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS-1);
+			connection.statusResult=Result.create(CVMLong.ZERO,Strings.create("test error"),CVMLong.ONE);
+			manager.pollBelief(remoteKey,connection);
+
+			clock.addAndGet(ConnectionManager.UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS);
+			connection.statusResult=Result.error(ErrorCodes.TIMEOUT,"test timeout");
+			manager.pollBelief(remoteKey,connection);
+			assertTrue(connection.isConnected(),"an arbitrary error code starts no connectivity-failure window");
+		} finally {
+			server.close();
+		}
+	}
+
+	private static Server createPollingServer(AKeyPair keyPair) throws Exception {
+		State genesis=Init.createState(List.of(keyPair.getAccountKey()));
+		Peer peer=Peer.createGenesisPeer(keyPair,genesis);
+		HashMap<convex.core.data.Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config);
+		server.getCVMExecutor().setPeer(peer);
+		return server;
+	}
+
+	@Test
 	public void testSequenceBackpressureIsIsolatedPerPeer() {
 		TestConnectionManager manager=new TestConnectionManager();
 		SequencedConvex good=new SequencedConvex(-1);
@@ -281,48 +452,11 @@ public class ConnectionManagerTest {
 		manager.add(AKeyPair.generate().getAccountKey(),good);
 		manager.add(AKeyPair.generate().getAccountKey(),slow);
 		List<Message> sequence=List.of(Message.createPing(1),Message.createPing(2),Message.createPing(3));
-		Message fallback=Message.createPing(99);
 
-		AConnectionManager.BroadcastResult result=manager.broadcastSequence(sequence,fallback);
-
-		assertEquals(2,result.peers());
-		assertEquals(1,result.complete());
-		assertEquals(1,result.fallback());
+		assertEquals(1,manager.broadcastSequence(sequence));
 		assertEquals(sequence,good.sent);
-		assertEquals(List.of(sequence.get(0),fallback),slow.sent);
+		assertEquals(List.of(sequence.get(0)),slow.sent);
 		for (int i=0; i<sequence.size(); i++) assertSame(sequence.get(i),good.sent.get(i));
-	}
-
-	@Test
-	public void testPriorityBroadcastReusesOneMessageForEveryPeer() {
-		TestConnectionManager manager=new TestConnectionManager();
-		SequencedConvex first=new SequencedConvex(-1);
-		SequencedConvex second=new SequencedConvex(-1);
-		manager.add(AKeyPair.generate().getAccountKey(),first);
-		manager.add(AKeyPair.generate().getAccountKey(),second);
-		Message priority=Message.createPing(101);
-
-		assertEquals(2,manager.broadcastPriority(priority));
-		assertSame(priority,first.priority);
-		assertSame(priority,second.priority);
-	}
-
-	@Test
-	public void testBroadcastSkipsBusyPeersOnlyWhenAsked() {
-		TestConnectionManager manager=new TestConnectionManager();
-		SequencedConvex idle=new SequencedConvex(-1);
-		SequencedConvex busy=new SequencedConvex(-1);
-		busy.busy=true;
-		manager.add(AKeyPair.generate().getAccountKey(),idle);
-		manager.add(AKeyPair.generate().getAccountKey(),busy);
-		Message essential=Message.createPing(1);
-		Message optional=Message.createPing(2);
-
-		// Essential traffic reaches every peer; optional traffic skips the busy one
-		assertEquals(2,manager.broadcast(essential));
-		assertEquals(1,manager.broadcast(optional,true));
-		assertEquals(List.of(essential,optional),idle.sent);
-		assertEquals(List.of(essential),busy.sent);
 	}
 
 	private static final class TestConnectionManager extends AConnectionManager {
@@ -330,13 +464,11 @@ public class ConnectionManagerTest {
 		@Override public void close() { closeAllConnections(); }
 	}
 
-	private static final class SequencedConvex extends Convex {
+	private static class SequencedConvex extends Convex {
 		final ArrayList<Message> sent=new ArrayList<>();
 		final int failAt;
 		int attempts;
 		boolean connected=true;
-		boolean busy=false;
-		Message priority;
 
 		SequencedConvex(int failAt) { super(null,null); this.failAt=failAt; }
 
@@ -346,12 +478,7 @@ public class ConnectionManagerTest {
 			sent.add(message);
 			return true;
 		}
-		@Override public boolean trySendPriority(Message message) {
-			priority=message;
-			return true;
-		}
 		@Override public boolean isConnected() { return connected; }
-		@Override public boolean isOutboundBusy() { return busy; }
 		@Override public CompletableFuture<Result> transact(SignedData<ATransaction> tx) {
 			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
 		}
@@ -377,5 +504,25 @@ public class ConnectionManagerTest {
 		@Override public InetSocketAddress getHostAddress() { return null; }
 		@Override public void reconnect() { connected=true; }
 		@Override public String toString() { return "Sequenced test connection"; }
+	}
+
+	private static final class PollingConvex extends SequencedConvex {
+		Result statusResult;
+		ACell acquired;
+		int acquireCount;
+
+		PollingConvex() {
+			super(-1);
+		}
+
+		@Override public CompletableFuture<Result> requestStatus() {
+			return CompletableFuture.completedFuture(statusResult);
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override public <T extends ACell> CompletableFuture<T> acquire(Hash hash,AStore store) {
+			acquireCount++;
+			return CompletableFuture.completedFuture((T)acquired);
+		}
 	}
 }

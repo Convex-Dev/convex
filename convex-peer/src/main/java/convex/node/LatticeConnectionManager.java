@@ -943,39 +943,22 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Broadcasts once per remote identity across both physical route forms. */
 	@Override
-	public int broadcast(Message message, boolean skipBusy) {
-		int accepted = super.broadcast(message, skipBusy);
+	public int broadcast(Message message) {
+		int accepted = super.broadcast(message);
 		for (AConnection route : getSupplementalInboundRoutes()) {
-			if (skipBusy && route.isOutboundBusy()) continue;
 			if (route.trySendMessage(message)) accepted++;
 		}
 		return accepted;
 	}
 
-	/** Broadcasts a priority message once per remote identity. */
+	/** Sends a delta sequence once per remote identity. */
 	@Override
-	public int broadcastPriority(Message message) {
-		int accepted = super.broadcastPriority(message);
-		for (AConnection route : getSupplementalInboundRoutes()) {
-			if (route.trySendPriorityMessage(message)) accepted++;
-		}
-		return accepted;
-	}
-
-	/** Sends a delta sequence with root fallback once per remote identity. */
-	@Override
-	public BroadcastResult broadcastSequence(List<Message> messages, Message fallback, boolean skipBusy) {
-		BroadcastResult outbound = super.broadcastSequence(messages, fallback, skipBusy);
+	public int broadcastSequence(List<Message> messages) {
+		int complete = super.broadcastSequence(messages);
 		ArrayList<AConnection> routes = new ArrayList<>(getSupplementalInboundRoutes());
 		Utils.shuffle(routes);
 
-		int attempted = outbound.peers();
-		int complete = outbound.complete();
-		int fallbackCount = outbound.fallback();
-		int dropped = outbound.dropped();
 		for (AConnection route : routes) {
-			if (skipBusy && route.isOutboundBusy()) continue;
-			attempted++;
 			boolean sent = true;
 			for (Message message : messages) {
 				if (!route.trySendMessage(message)) {
@@ -985,13 +968,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			}
 			if (sent) {
 				complete++;
-			} else if (fallback != null && route.trySendMessage(fallback)) {
-				fallbackCount++;
-			} else {
-				dropped++;
 			}
 		}
-		return new BroadcastResult(attempted, complete, fallbackCount, dropped);
+		return complete;
 	}
 
 	/**

@@ -171,7 +171,6 @@ public class Server implements Closeable {
 	 */
 	private final Predicate<Message> txnRetry = transactionHandler::offerTransactionBlocking;
 	private final Predicate<Message> queryRetry = queryHandler::offerQueryBlocking;
-	private final Predicate<Message> beliefRetry = propagator::queueBeliefBlocking;
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -528,8 +527,10 @@ public class Server implements Closeable {
 	/**
 	 * Dispatches a decoded inbound message to the appropriate handler.
 	 *
-	 * <p>Client messages (transactions and queries) are offered to bounded queues. Protocol
-	 * messages (beliefs, challenges, status) are handled inline since they are lightweight.
+	 * <p>Client requests are offered to bounded queues and may request connection
+	 * backpressure when full. BELIEF and DATA propagation is offered once to its
+	 * dedicated queue and dropped if full. Lightweight control messages are handled
+	 * inline.
 	 *
 	 * <p>Non-blocking on the fast path: a single {@code queue.offer()} and return. If the
 	 * target queue is full, returns a pre-allocated retry predicate instead of an error —
@@ -539,7 +540,7 @@ public class Server implements Closeable {
 	 * <p>SECURITY: Must anticipate malicious or malformed messages.
 	 *
 	 * @param m Message to process (already decoded)
-	 * @return null if accepted, or a retry Predicate that blocks until delivered or timeout
+	 * @return a retry Predicate for a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> processMessage(Message m) {
 		try {
@@ -553,11 +554,14 @@ public class Server implements Closeable {
 				if (queryHandler.offerQuery(m)) return null;
 				return queryRetry;
 
-			// Belief and DATA preserve wire order on the bounded propagator queue.
+			// Propagation is best-effort. A full queue drops this update rather than
+			// pausing the connection and blocking later protocol messages.
 			case BELIEF:
-				return processBelief(m)?null:beliefRetry;
+				processBelief(m);
+				return null;
 			case DATA:
-				return processData(m)?null:beliefRetry;
+				processData(m);
+				return null;
 			case CHALLENGE:
 				processChallenge(m);
 				return null;
@@ -601,7 +605,7 @@ public class Server implements Closeable {
 		}
 	}
 
-	/** Queues DATA with Beliefs so staging preserves per-connection wire order off the I/O thread. */
+	/** Offers DATA to the propagation queue so it retains wire order off the I/O thread. */
 	private boolean processData(Message message) {
 		AConnection conn=message.getConnection();
 		if (conn!=null && !conn.isTrusted()) {
@@ -609,7 +613,7 @@ public class Server implements Closeable {
 			returnError(message,ErrorCodes.TRUST,Strings.create("DATA requires a verified Peer"));
 			return true;
 		}
-		return propagator.queueBelief(message);
+		return propagator.queuePropagation(message);
 	}
 
 	/** Stages a previously authorised DATA message on the Belief propagator thread. */
@@ -630,12 +634,12 @@ public class Server implements Closeable {
 
 	/**
 	 * Delivers an inbound message: decodes payload, observes, and dispatches.
-	 * Returns null if accepted, or a blocking retry predicate if the queue was full.
+	 * Returns a blocking retry predicate only for a saturated request queue.
 	 *
 	 * This is the primary entry point for both Netty and ConvexLocal message delivery.
 	 *
 	 * @param m Message to deliver
-	 * @return null if accepted, or a retry Predicate that blocks until delivered or timeout
+	 * @return a retry Predicate for a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> deliverMessage(Message m) {
 		try {
@@ -711,13 +715,12 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Adds an event to the inbound server event queue.
-	 * @param event Signed event to add to inbound event queue
-	 * @return True if Belief was successfully queued, false otherwise
+	 * Adds a complete locally acquired Belief to the merge queue.
+	 * @param acquiredBelief complete Belief already acquired into this server's store
+	 * @return true if queued, false if the bounded queue is full
 	 */
-	public boolean queueBelief(Message event) {
-		boolean offered=propagator.queueBelief(event);
-		return offered;
+	public boolean queueBelief(Belief acquiredBelief) {
+		return propagator.queueBelief(acquiredBelief);
 	}
 	
 	/**
@@ -811,11 +814,11 @@ public class Server implements Closeable {
 	protected boolean processBelief(Message m) {
 		AConnection conn=m.getConnection();
 		if (conn==null || conn.isTrusted()) {
-			// Trusted or local (ConvexLocal) — main queue
-			return propagator.queueBelief(m);
+			// Trusted or local (ConvexLocal) — ordered propagation queue
+			return propagator.queuePropagation(m);
 		} else {
 			// Untrusted inbound — best-effort queue, trigger verification
-			propagator.queueUntrustedBelief(m);
+			propagator.queueUntrustedPropagation(m);
 			inboundVerifier.maybeStart(conn);
 			return true;
 		}

@@ -12,8 +12,8 @@ import java.util.concurrent.TimeUnit;
  * it is refused, and so is any message larger than the bound itself. A queue created
  * with {@code allowOvershoot} instead admits any message while it holds fewer bytes
  * than the bound, so the bound is exceeded by at most the last message admitted.
- * That suits an outbound queue, where refusing one large message leaves the receiver
- * with a gap, while the queue must still stop growing once it is full.</p>
+	 * That suits queues which must accept one legal large message when otherwise
+	 * available, while still stopping further growth once full.</p>
  */
 public final class BoundedMessageQueue {
 	private final ArrayDeque<Message> queue=new ArrayDeque<>();

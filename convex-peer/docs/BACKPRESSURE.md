@@ -51,7 +51,7 @@ that need the full pipeline (NettyServer, ConvexLocal).
 |------|-------------|--------|
 | TRANSACT | Yes — `txMessageQueue` | Primary client workload |
 | QUERY, DATA_REQUEST | Yes — `queryQueue` | Primary client workload |
-| BELIEF | No | Peer protocol, small dedicated queue, must not block |
+| BELIEF, DATA | No | Best-effort peer propagation; drop if its dedicated queue is full |
 | STATUS | No | Inline response, no queue |
 | CHALLENGE / RESPONSE | No | Authentication protocol, must complete promptly |
 | GOODBYE | No | Connection teardown, must not delay |
@@ -102,6 +102,14 @@ compared to per-message polling.
 
 The TransactionHandler further batches messages into blocks for consensus. The
 QueryHandler processes each query against the current consensus state independently.
+
+The consensus propagator has separate bounded inputs: an ordered, byte-bounded
+message queue for wire DATA/BELIEF sequences, and a count-bounded FIFO for complete
+Beliefs already acquired into the local store by status polling. Local Beliefs are
+never encoded merely to measure their queue footprint. Either queue drops a new
+entry when full; neither applies connection backpressure. Periodic status polling
+is deferred while either trusted input queue is full, and a changed remote Belief
+is acquired only while that capacity remains available.
 
 ## Connection Limiting
 

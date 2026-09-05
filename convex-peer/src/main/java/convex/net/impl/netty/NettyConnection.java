@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -60,9 +59,6 @@ public class NettyConnection extends AConnection {
 	 */
 	private final BoundedMessageQueue outbound = new BoundedMessageQueue(
 		Config.OUTBOUND_QUEUE_SIZE, Config.OUTBOUND_QUEUE_BYTE_LIMIT, true);
-
-	/** Latest small priority root, coalesced independently of the bulk queue. */
-	private final AtomicReference<Message> priorityOutbound=new AtomicReference<>();
 
 	private NettyConnection(Channel channel, NettyInboundHandler inbound) {
 		this.channel = channel;
@@ -168,7 +164,6 @@ public class NettyConnection extends AConnection {
 				public void channelInactive(ChannelHandlerContext ctx) {
 					// Clear queue to wake any threads blocked on offer(timeout)
 					client.clearOutbound();
-					client.priorityOutbound.set(null);
 					ctx.fireChannelInactive();
 				}
 			},
@@ -245,22 +240,6 @@ public class NettyConnection extends AConnection {
 		}
 	}
 
-	@Override
-	public boolean trySendPriorityMessage(Message m) {
-		Channel ch=channel;
-		if (ch==null || !ch.isActive()) return false;
-		long size=encodedLength(m);
-		if (size<0) return false;
-		if (size>Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT) return trySendMessage(m);
-		priorityOutbound.set(m);
-		if (!ch.isActive()) {
-			priorityOutbound.compareAndSet(m,null);
-			return false;
-		}
-		flushPending();
-		return true;
-	}
-
 	/**
 	 * Schedule a drain on the Netty event loop.
 	 */
@@ -283,8 +262,7 @@ public class NettyConnection extends AConnection {
 		if (ch == null) return;
 		int count = 0;
 		while (ch.isWritable() && ch.isActive()) {
-			Message m=priorityOutbound.getAndSet(null);
-			if (m==null) m = outbound.poll();
+			Message m=outbound.poll();
 			if (m == null) break;
 			ch.write(m);
 			count++;
@@ -292,20 +270,6 @@ public class NettyConnection extends AConnection {
 		if (count > 0) {
 			ch.flush();
 		}
-	}
-
-	/** Outbound queue fill fraction above which this connection reports busy. */
-	private static final double BUSY_FILL_FRACTION = 0.5;
-
-	/**
-	 * Busy once the outbound queue is over half full by count or by bytes. A
-	 * connection that has just refused a non-blocking send is at least full, so it
-	 * always reports busy: optional traffic is never queued behind an essential
-	 * message that was refused.
-	 */
-	@Override
-	public boolean isOutboundBusy() {
-		return outbound.getFillFraction() > BUSY_FILL_FRACTION;
 	}
 
 	@Override

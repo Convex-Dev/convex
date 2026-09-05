@@ -213,11 +213,6 @@ public class TransactionHandler extends AThreadedComponent {
 					m.returnResult(error.withSource(SourceCodes.PEER));
 					continue;
 				}
-				if (isTooLargeToExecute(sd)) {
-					m.returnResult(Result.error(ErrorCodes.JUICE,
-						Strings.create("Transaction too large: its size alone exceeds the maximum transaction juice")).withSource(SourceCodes.PEER));
-					continue;
-				}
 				sigs[i]=sd;
 				toVerify.add(sd);
 			} catch (Exception e) {
@@ -257,6 +252,12 @@ public class TransactionHandler extends AThreadedComponent {
 			try {
 				if (!sd.checkSignature()) {
 					m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
+					continue;
+				}
+				Result affordability=checkTransactionAffordability(
+					server.getPeer().getConsensusState(),sd.getValue());
+				if (affordability!=null) {
+					m.returnResult(affordability);
 					continue;
 				}
 				// Force full persistence of the SignedData cell tree. If any referenced
@@ -449,20 +450,26 @@ public class TransactionHandler extends AThreadedComponent {
 	}
 
 	/**
-	 * Checks whether a transaction's size alone costs more juice than any transaction
-	 * may use, in which case it can never execute and is refused at intake rather than
-	 * proposed and propagated. A transaction whose data is not all present yet is not
-	 * judged here; intake persistence reports that case.
+	 * Applies the peer's intake policy for the mandatory transaction-size fee. This
+	 * is deliberately not a consensus validity check: the execution allowance has
+	 * its own limit, while a sufficiently funded account may pay a larger size fee.
 	 *
-	 * @param sd Signed transaction to check
-	 * @return true if the transaction can never execute because of its size
+	 * @param state current consensus state used for intake policy
+	 * @param tx transaction to assess
+	 * @return a peer-sourced error when the origin cannot cover the fee, otherwise null
 	 */
-	static boolean isTooLargeToExecute(SignedData<ATransaction> sd) {
-		try {
-			return Juice.priceTransaction(sd.getValue())>Constants.MAX_TRANSACTION_JUICE;
-		} catch (MissingDataException e) {
-			return false;
+	static Result checkTransactionAffordability(State state, ATransaction tx) {
+		AccountStatus account=state.getAccount(tx.getOrigin());
+		if (account==null) {
+			return Result.error(ErrorCodes.NOBODY,Strings.NO_SUCH_ACCOUNT).withSource(SourceCodes.PEER);
 		}
+		long sizeFee=Juice.mul(Juice.priceTransaction(tx),state.getJuicePrice().longValue());
+		if (sizeFee>account.getBalance()) {
+			return Result.error(ErrorCodes.JUICE,
+				Strings.create("Insufficient balance for transaction size fee of "+sizeFee))
+				.withSource(SourceCodes.PEER);
+		}
+		return null;
 	}
 
 	Long minBlockTime=null;

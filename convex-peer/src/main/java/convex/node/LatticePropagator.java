@@ -1228,10 +1228,7 @@ public class LatticePropagator implements Closeable {
 			}
 		}
 
-		var result=connectionManager.broadcastSequence(messages,rootMessage);
-		if (result.dropped()>0) {
-			log.debug("Dropped lattice delta for {} peer(s); root sync will recover",result.dropped());
-		}
+		connectionManager.broadcastSequence(messages);
 		lastBroadcastTime = Utils.getCurrentTimestamp();
 		broadcastCount.incrementAndGet();
 	}

@@ -11,14 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Consensus propagation is simplified to two ordered messages per update: the
-  peer's own Order with its new Block, then the Belief carrying other peers'
-  Orders, which is skipped for a peer whose outbound queue is under pressure.
-  The priority slot, resend window and DATA-ahead chunking are gone from CPoS;
-  a peer that misses data now requests it from the sender instead of waiting
-  for the status poll. An update that does not fit one message goes out as
-  DATA messages of at most the message limit each, followed by its root, so a
-  Block of any size is carried without one oversized frame. The
+- Consensus propagation offers the peer's own Order before the Belief carrying
+  other peers' Orders. An update that does not fit one message goes out as DATA
+  messages of at most the message limit each, followed by its root, so a Block
+  of any size is carried without one oversized frame. Every offer is
+  non-blocking; if a slow peer refuses one message, the rest of that update is
+  abandoned for that peer and later or cross-peer propagation recovers it. The
+  priority slot, resend window and queue fallback are removed. The
   `:max-belief-delta-broadcast-size` peer configuration key is removed.
 - Peer: messages for a lagging peer are buffered per connection up to 256 MB,
   the last message admitted may exceed it, before anything is dropped, and
@@ -29,19 +28,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Peer: a transaction whose size alone costs more juice than any transaction may
-  use was accepted, proposed in a Block and propagated to every peer before
-  failing with `:JUICE` at execution. It is now refused at intake with the same
-  error.
-- Peer: a consensus message from a trusted peer that could not be queued within
-  8 s was silently dropped. The connection is now paused until the message fits,
-  so a busy receiver slows the sender instead of losing its updates.
+- Peer: the transaction-size intake policy now rejects a transaction only when
+  its origin account cannot cover the mandatory size fee at the current Juice
+  price. Size fees are separate from the maximum execution allowance and may
+  legitimately exceed it for a sufficiently funded account.
+- Peer: the trusted consensus queue admits one message over its byte threshold,
+  so any legal frame can enter when capacity is available. BELIEF and DATA
+  propagation is dropped when this queue is already full instead of pausing the
+  connection and blocking later status or recovery traffic.
+- Peer: status polling now queues each fully acquired Belief directly in a
+  bounded local FIFO. It no longer wraps the value in a wire message, which
+  attempted to encode an entire large Belief into one 50 MB frame, and distinct
+  polled Beliefs are retained until the propagator compares their signed Orders.
+  Polling is periodic rather than being triggered by an old consensus timestamp,
+  skips acquisition for an unchanged hash or saturated consensus input, and
+  retires a connection only after a minute of persistent STATUS timeouts.
 - `ConvexDirect`: `message`, `messageRaw`, `acquire` and `requestStatus` returned
   null, so a direct client could only query and transact, and anything sent to
   it through the message API was silently lost. It now handles every protocol
   message type synchronously against its in-memory Peer, including Belief
   merges, data requests and status, and `close` actually disconnects it.
-- Consensus: a Block whose novelty exceeded the 64 KB priority message limit was
+- Consensus: a Block whose novelty exceeded the former 64 KB message limit was
   announced to other peers as a root-only update, so they could not decode it
   until the 2 s status poll. Any burst of more than a few hundred transactions
   therefore cost about 2 s per Block. Such updates now go out as a DATA-ahead

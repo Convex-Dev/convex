@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.ConcurrentHashMap;
 
 import convex.api.Convex;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
@@ -66,11 +67,18 @@ public class ConnectionManager extends AConnectionManager {
 	/** Timeout for acquiring a belief after polling. */
 	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 12000;
 
+	/** Grace period before repeated STATUS timeouts retire an active connection. */
+	static final long UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS = 60000;
+
 	protected final Server server;
 
 	private final SecureRandom random = new SecureRandom();
-	private long pollDelay;
+	private long pollDelay = SERVER_POLL_DELAY;
+	private long lastPollTime;
 	private long lastConnectionUpdate = Utils.getCurrentTimestamp();
+
+	/** First STATUS timeout for each connection which has not responded since. */
+	private final ConcurrentHashMap<AccountKey, Long> unresponsiveSince = new ConcurrentHashMap<>();
 
 	/** Background thread for connection maintenance and belief polling. */
 	private Thread thread;
@@ -87,6 +95,7 @@ public class ConnectionManager extends AConnectionManager {
 	public void start() {
 		Object _pollDelay = server.getConfig().get(Keywords.POLL_DELAY);
 		this.pollDelay = (_pollDelay == null) ? SERVER_POLL_DELAY : Utils.toInt(_pollDelay);
+		lastPollTime = server.getTimestamp();
 
 		thread = Thread.ofVirtual().name("Connection Manager thread at " + server.getPort()).start(() -> {
 			while (server.isRunning() && !Thread.currentThread().isInterrupted()) {
@@ -114,6 +123,7 @@ public class ConnectionManager extends AConnectionManager {
 			broadcast(msg);
 		} finally {
 			closeAllConnections();
+			unresponsiveSince.clear();
 			if (thread != null) {
 				thread.interrupt();
 			}
@@ -136,6 +146,7 @@ public class ConnectionManager extends AConnectionManager {
 		log.debug("Connected to Peer: {} at {}", peerKey, convex.getHostAddress());
 		// A peer we chose to connect to is buffered for, not dropped, until it is far behind
 		convex.setOutboundLimits(Config.PEER_OUTBOUND_QUEUE_SIZE, Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT);
+		unresponsiveSince.remove(peerKey);
 		connections.put(peerKey, convex);
 	}
 
@@ -144,6 +155,7 @@ public class ConnectionManager extends AConnectionManager {
 	protected void maintainConnections() throws InterruptedException {
 		// Prune dead connections first
 		pruneDeadConnections();
+		unresponsiveSince.keySet().removeIf(key -> !connections.containsKey(key));
 
 		State s = server.getPeer().getConsensusState();
 		long now = Utils.getCurrentTimestamp();
@@ -246,21 +258,34 @@ public class ConnectionManager extends AConnectionManager {
 	// ========== Belief Polling ==========
 
 	private void maybePollBelief() throws InterruptedException {
+		long now=server.getTimestamp();
+		if (now-lastPollTime<pollDelay) return;
+		if (!server.getBeliefPropagator().hasBeliefPollCapacity()) return;
+
+		ArrayList<AccountKey> peers = new ArrayList<>(connections.keySet());
+		if (peers.isEmpty()) return;
+
+		AccountKey peerKey = peers.get(random.nextInt(peers.size()));
+		Convex connection = getConnection(peerKey);
+		if (connection==null) return;
+
 		try {
-			long lastConsensus = server.getPeer().getConsensusState().getTimestamp().longValue();
-			if (lastConsensus + pollDelay >= Utils.getCurrentTimestamp()) return;
+			pollBelief(peerKey,connection);
+		} finally {
+			// Space attempts from completion, including slow or failed acquisitions.
+			lastPollTime=server.getTimestamp();
+		}
+	}
 
-			ArrayList<Convex> conns = new ArrayList<>(connections.values());
-			if (conns.isEmpty()) return;
-
-			Convex c = conns.get(random.nextInt(conns.size()));
-			if (!c.isConnected()) return;
-
-			Result result = c.requestStatusSync(POLL_TIMEOUT_MILLIS);
+	/** Polls one outbound peer for anti-entropy and connection health. */
+	void pollBelief(AccountKey peerKey, Convex connection) throws InterruptedException {
+		try {
+			Result result = connection.requestStatusSync(POLL_TIMEOUT_MILLIS);
 			if (result.isError()) {
-				log.warn("Failure requesting status during polling: {}", result);
+				handleStatusFailure(peerKey,connection,result);
 				return;
 			}
+			unresponsiveSince.remove(peerKey);
 
 			AMap<Keyword, ACell> status = API.ensureStatusMap(result.getValue());
 			if (status == null) {
@@ -268,13 +293,49 @@ public class ConnectionManager extends AConnectionManager {
 				return;
 			}
 			Hash h = RT.ensureHash(status.get(Keywords.BELIEF));
+			if (h==null) {
+				log.warn("Status response has no Belief hash: {}",result);
+				return;
+			}
+			if (h.equals(server.getBelief().getHash())) return;
+			if (!server.getBeliefPropagator().hasBeliefPollCapacity()) return;
 
-			Belief sb = (Belief) c.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
-			server.queueBelief(Message.createBelief(sb));
+			ACell acquired = connection.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+			if (!(acquired instanceof Belief belief)) {
+				log.warn("Peer returned non-Belief value for advertised Belief hash {}",h);
+				return;
+			}
+			if (!server.queueBelief(belief)) {
+				log.debug("Discarding acquired Belief because the local queue filled during polling");
+			}
+		} catch (InterruptedException e) {
+			throw e;
 		} catch (Exception t) {
 			if (server.isLive()) {
 				log.info("Belief Polling failed: {}", t.getClass().toString() + " : " + t.getMessage());
 			}
+		}
+	}
+
+	/** Ages out a connection only when connectivity failures persist. */
+	private void handleStatusFailure(AccountKey peerKey, Convex connection, Result result) {
+		ACell code=result.getErrorCode();
+		if (!ErrorCodes.TIMEOUT.equals(code) && !ErrorCodes.CONNECT.equals(code)) {
+			// A LOAD or application error is not evidence that the remote endpoint vanished.
+			unresponsiveSince.remove(peerKey);
+			log.debug("Peer status probe returned {}",result);
+			return;
+		}
+		if (connections.get(peerKey)!=connection) return;
+
+		long now=server.getTimestamp();
+		long since=unresponsiveSince.computeIfAbsent(peerKey,key -> now);
+		long unavailableFor=Math.max(0,now-since);
+		if (unavailableFor>=UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS) {
+			unresponsiveSince.remove(peerKey);
+			closeConnection(peerKey,connection,"No STATUS response for "+unavailableFor+" ms");
+		} else {
+			log.debug("Peer status probe failed after {} ms unavailable: {}",unavailableFor,result);
 		}
 	}
 

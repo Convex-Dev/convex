@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -33,6 +34,7 @@ import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.Juice;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
@@ -543,7 +545,7 @@ public class ServerTest {
 		// Queue more untrusted beliefs than the queue can hold
 		// They should be silently dropped
 		for (int i = 0; i < Config.UNTRUSTED_BELIEF_QUEUE_SIZE + 5; i++) {
-			propagator.queueUntrustedBelief(
+			propagator.queueUntrustedPropagation(
 				convex.core.message.Message.createBelief(server.getBelief()));
 		}
 		// No exception, no blocking — bounded queue works
@@ -664,39 +666,100 @@ public class ServerTest {
 		for (Message m: belief) assertTrue(m.getMessageData().count()<=limit);
 	}
 
-	/**
-	 * A trusted peer's consensus message is never timed out on the receiving side:
-	 * when the queue is full the offer waits for room instead of failing.
-	 */
+	/** Complete local Beliefs are retained independently until the bounded queue fills. */
 	@Test
-	public void testTrustedBeliefWaitsForQueueSpace() throws Exception {
-		BeliefPropagator propagator=new BeliefPropagator(network.SERVER); // never started: nothing drains it
-		Message filler=Message.createBelief(network.SERVER.getBelief());
-		while (propagator.queueBelief(filler)) {} // fill to the bound
+	public void testAcquiredBeliefQueueIsBoundedFifo() throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config); // not launched: queue is not drained
+		try {
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			assertTrue(propagator.hasBeliefPollCapacity());
+			Belief first=Belief.create(AKeyPair.createSeeded(101),Order.create());
+			Belief second=Belief.create(AKeyPair.createSeeded(102),Order.create());
+			assertTrue(propagator.queueBelief(first));
+			assertTrue(propagator.queueBelief(second));
+			for (int i=2; i<Config.BELIEF_QUEUE_SIZE; i++) {
+				assertTrue(propagator.queueBelief(Belief.initial()));
+			}
+			assertFalse(propagator.queueBelief(Belief.initial()));
+			assertFalse(propagator.hasBeliefPollCapacity());
+		} finally {
+			server.close();
+		}
+	}
 
-		Message waiting=Message.createPing(7);
-		CompletableFuture<Boolean> queued=CompletableFuture.supplyAsync(()->propagator.queueBeliefBlocking(waiting));
-		assertFalse(queued.isDone(),"a full queue makes the offer wait, not fail");
+	/** Distinct completed polls are accumulated in one merge cycle, never replaced. */
+	@Test
+	public void testAcquiredBeliefsAreMergedTogether() throws Exception {
+		AKeyPair local=AKeyPair.createSeeded(110);
+		AKeyPair remoteA=AKeyPair.createSeeded(111);
+		AKeyPair remoteB=AKeyPair.createSeeded(112);
+		State genesis=Init.createState(List.of(
+			local.getAccountKey(),remoteA.getAccountKey(),remoteB.getAccountKey()));
+		Peer peer=Peer.createGenesisPeer(local,genesis);
 
-		// Making room lets it through
-		assertSame(filler,propagator.pollQueuedBelief());
-		assertTrue(queued.get(5,TimeUnit.SECONDS));
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config);
+		try {
+			server.getCVMExecutor().setPeer(peer);
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			propagator.belief=peer.getBelief();
+			assertTrue(propagator.queueBelief(Belief.create(remoteA,Order.create())));
+			assertTrue(propagator.queueBelief(Belief.create(remoteB,Order.create())));
+
+			// Runs exactly one normal propagator cycle and returns immediately because
+			// locally acquired Beliefs are already queued.
+			propagator.loop();
+			assertNotNull(propagator.belief.getOrders().get(remoteA.getAccountKey()));
+			assertNotNull(propagator.belief.getOrders().get(remoteB.getAccountKey()));
+		} finally {
+			server.close();
+		}
+	}
+
+	/** Saturated wire propagation is dropped without producing connection backpressure. */
+	@Test
+	public void testTrustedBeliefQueueDropsWithoutBackpressure() throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config); // not launched: queue is not drained
+		try {
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			assertTrue(propagator.hasBeliefPollCapacity());
+			Message belief=Message.createBelief(network.SERVER.getBelief());
+			for (int i=0; i<Config.BELIEF_QUEUE_SIZE; i++) {
+				assertTrue(propagator.queuePropagation(belief));
+			}
+			assertFalse(propagator.queuePropagation(belief));
+			assertFalse(propagator.hasBeliefPollCapacity());
+			assertNull(server.processMessage(belief));
+
+			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024);
+			assertNull(server.processMessage(data));
+		} finally {
+			server.close();
+		}
 	}
 
 	/**
-	 * A transaction whose size alone costs more juice than any transaction may use
-	 * can never execute, so intake refuses it instead of proposing and propagating it.
+	 * Transaction size is charged separately from the execution limit. Intake rejects
+	 * it only when the origin cannot cover its mandatory size fee at the current price.
 	 */
 	@Test
-	public void testOversizedTransactionRefusedAtIntake() throws Exception {
+	public void testLargeTransactionAffordabilityPolicy() throws Exception {
 		Convex client=network.getClient();
 		ACell[] parts=new ACell[300];
 		for (int i=0; i<parts.length; i++) parts[i]=Blobs.createRandom(4000);
 		ATransaction tx=Invoke.create(client.getAddress(),0,Vectors.create(parts));
-		assertTrue(TransactionHandler.isTooLargeToExecute(client.getKeyPair().signData(tx)));
-
-		Result r=client.transact(tx).get(3000,TimeUnit.MILLISECONDS);
-		assertEquals(ErrorCodes.JUICE,r.getErrorCode(),r.toString());
+		assertTrue(Juice.priceTransaction(tx)>convex.core.Constants.MAX_TRANSACTION_JUICE);
+		long fee=Juice.mul(Juice.priceTransaction(tx),network.SERVER.getState().getJuicePrice().longValue());
+		assertNull(TransactionHandler.checkTransactionAffordability(
+			network.SERVER.getState().withBalance(client.getAddress(),fee),tx));
+		Result error=TransactionHandler.checkTransactionAffordability(
+			network.SERVER.getState().withBalance(client.getAddress(),fee-1),tx);
+		assertEquals(ErrorCodes.JUICE,error.getErrorCode());
 	}
 
 	@Test

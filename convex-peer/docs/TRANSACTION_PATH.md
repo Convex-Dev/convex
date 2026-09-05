@@ -28,7 +28,7 @@ Client                          Peer Server
          │                         ArrayBlockingQueue (30,000)
          ▼
 ┌──────────────────┐
-│ BeliefPropagator  │  awaitBelief(): poll beliefQueue for 30ms     ◄── WAIT
+│ BeliefPropagator  │  awaitBelief(): poll propagationQueue for 30ms ◄── WAIT
 │    (single thread)│  maybeGenerateBlocks():
 │                   │    transactionQueue.drainTo()
 │                   │    Block.create (max 1024 txns each)          ◄── BOUNDED
@@ -88,9 +88,14 @@ processMessages();
 |-------|------|------|
 | 1. Extract + cheap checks | Format, account, sequence, key match | ~5us/txn |
 | 2. Parallel sig verify | `Peer.preValidateSignatures()` on SIGN_POOL | ~70us/txn ÷ N cores |
-| 3. Cache check + queue | `sd.checkSignature()` (cached), `transactionQueue.offer()`, `registerInterest()` | ~1us/txn |
+| 3. Admit + queue | Cached signature check, size-fee affordability, persistence, interest registration and queueing | Variable |
 
 **Output queue:** `transactionQueue` — `ArrayBlockingQueue(30,000)`
+
+After signature verification, intake prices the mandatory transaction-size fee
+against the origin account's balance in the current consensus state. This is a
+peer policy check, not a transaction validity rule: the execution allowance is
+bounded separately, and a funded account may pay a size fee above that limit.
 
 `transactionQueue.put()` blocks if full — this propagates backpressure: the
 TransactionHandler thread blocks → stops draining `txMessageQueue` → `txMessageQueue`
@@ -126,7 +131,10 @@ protected void loop() throws InterruptedException {
 ### awaitBelief()
 
 ```java
-Message firstEvent = beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
+Belief acquired = beliefQueue.poll();
+Message firstEvent = (acquired == null)
+    ? propagationQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS)
+    : propagationQueue.poll();
 ```
 
 **`AWAIT_BELIEFS_PAUSE = 30ms`** — waits for incoming peer beliefs. On a single-peer
@@ -236,7 +244,7 @@ For each new finalised block:
 | txMessageQueue wait | 0-11ms | poll(10ms) + sleep(1ms) |
 | TransactionHandler processing | 1-30ms | Depends on batch size, parallel sigs |
 | transactionQueue wait | 0-30ms | **Waits for BeliefPropagator loop** |
-| BeliefPropagator awaitBelief | **up to 30ms** | Polls beliefQueue, no peers = full wait |
+| BeliefPropagator awaitBelief | **up to 30ms** | Polls propagationQueue when no acquired Belief is ready |
 | Block creation + sign + persist | 1-10ms | Per block: sign (~70us) + persist |
 | CVMExecutor wake | ~0ms | `notify()` from `queueUpdate()` |
 | CVM execution | varies | State application |
@@ -378,7 +386,7 @@ private Belief awaitBelief() throws InterruptedException {
     long waitTime = server.transactionHandler.hasTransactions()
         ? 0
         : AWAIT_BELIEFS_PAUSE;
-    Message firstEvent = beliefQueue.poll(waitTime, TimeUnit.MILLISECONDS);
+    Message firstEvent = propagationQueue.poll(waitTime, TimeUnit.MILLISECONDS);
     ...
 }
 ```
@@ -410,8 +418,8 @@ server.beliefPropagator.notifyTransactions();
 
 // In BeliefPropagator:
 private Belief awaitBelief() throws InterruptedException {
-    Message firstEvent = beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
-    // poll returns early if notified via beliefQueue
+    Message firstEvent = propagationQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
+    // poll returns early if notified via propagationQueue
     ...
 }
 ```
@@ -525,7 +533,7 @@ Etch on spinning disk), this adds latency between CVM execution and result repor
 | `MAX_TRANSACTIONS_PER_BLOCK` | 1024 | Constants | Block size limit |
 | `DEFAULT_MIN_BLOCK_TIME` | 10ms | TransactionHandler | Min interval between blocks |
 | `AWAIT_BELIEFS_PAUSE` | 30ms | BeliefPropagator | Belief poll timeout |
-| `BELIEF_QUEUE_SIZE` | 200 | Config | Incoming belief queue |
+| `BELIEF_QUEUE_SIZE` | 200 | Config | Acquired Belief and trusted propagation queue capacities |
 | `DEFAULT_CLIENT_TIMEOUT` | 8000ms | Config | Client gives up after this |
 | `SIGN_CHUNK_SIZE` | 100 | Peer | Txns per parallel sig task |
 | CVMExecutor poll timeout | 100ms | CVMExecutor | Idle belief poll |

@@ -129,11 +129,17 @@ public class Config {
 	public static final long DEFAULT_INTERNAL_TIMEOUT = 8000;
 
 	/**
-	 * Size of incoming Belief queue
+	 * Entry bound for each trusted consensus input queue: complete acquired Beliefs
+	 * and ordered DATA/BELIEF propagation messages.
 	 */
 	public static final int BELIEF_QUEUE_SIZE = 200;
 
-	/** Maximum encoded bytes retained by the trusted Belief/DATA queue. */
+	/**
+	 * Encoded-byte threshold for the trusted wire propagation queue. The last admitted
+	 * message may exceed it, so every legal frame can enter an otherwise available
+	 * trusted queue. Further propagation is dropped until the queue falls below the
+	 * threshold.
+	 */
 	public static final int BELIEF_QUEUE_BYTE_LIMIT = 16 * 1024 * 1024;
 
 	/**
@@ -192,13 +198,10 @@ public class Config {
 	 */
 	public static final int SERVER_CONNECTION_PENDING_BYTE_LIMIT = 1024 * 1024;
 
-	/** A coalesced priority message must remain a small consensus/control root. */
-	public static final int PRIORITY_OUTBOUND_MESSAGE_LIMIT = 64 * 1024;
-
 	/** Peer configuration key for the maximum encoded belief delta chunk size. */
 	public static final Keyword MAX_BELIEF_DELTA_MESSAGE_SIZE = Keyword.intern("max-belief-delta-message-size");
 
-	/** Default belief delta message size. A delta that does not fit is sent root-only and pulled. */
+	/** Default belief delta message size. */
 	public static final int DEFAULT_MAX_BELIEF_DELTA_MESSAGE_SIZE = 4 * 1024 * 1024;
 
 	/** Gets and validates the application-specific belief delta chunk limit. */
