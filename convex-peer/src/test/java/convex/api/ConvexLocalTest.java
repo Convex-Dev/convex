@@ -165,4 +165,21 @@ public class ConvexLocalTest {
 		}
 	}
 
+	@Test
+	public void testCloseAndReconnect() {
+		ConvexLocal convex=network.getLocalClient();
+		try {
+			assertTrue(convex.isConnected());
+			convex.close();
+			assertFalse(convex.isConnected());
+			assertEquals(ErrorCodes.CONNECT,convex.requestStatus().join().getErrorCode());
+
+			convex.reconnect();
+			assertTrue(convex.isConnected());
+			assertFalse(convex.requestStatus().join().isError());
+		} finally {
+			convex.close();
+		}
+	}
+
 }

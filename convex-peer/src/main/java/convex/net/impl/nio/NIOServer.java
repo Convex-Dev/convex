@@ -47,11 +47,13 @@ public class NIOServer extends AServer {
 
 	protected static final long PRUNE_TIMEOUT = 60000;
 
-	private ServerSocketChannel ssc = null;
+	private volatile ServerSocketChannel ssc = null;
 
-	private Selector selector = null;
+	private volatile Selector selector = null;
 
-	private boolean running = false;
+	private volatile boolean running = false;
+
+	private volatile Thread selectorThread;
 
 	private Consumer<Message> receiveAction;
 
@@ -89,53 +91,59 @@ public class NIOServer extends AServer {
 	 *
 	 * @throws IOException in case of IO problem
 	 */
-	public void launch() throws IOException {
-		ssc = ServerSocketChannel.open();
+	public synchronized void launch() throws IOException {
+		if (running) return;
+		try {
+			ssc = ServerSocketChannel.open();
 
-		// Set receive buffer size
-		ssc.socket().setReceiveBufferSize(Config.SOCKET_SERVER_BUFFER_SIZE);
-		ssc.socket().setReuseAddress(true);
+			// Set receive buffer size
+			ssc.socket().setReceiveBufferSize(Config.SOCKET_SERVER_BUFFER_SIZE);
+			ssc.socket().setReuseAddress(true);
 
-		String bindAddress = "::";
+			String bindAddress = "::";
 
-		// Bind to a port
-		{
-			InetSocketAddress bindSA;
-			Integer port=getPort();
-			if (port == null) {
-				port = 0;
-			}
-			if (port<=0) {
-				try {
-					bindWithIPv4Fallback(bindAddress, Constants.DEFAULT_PEER_PORT);
-				} catch (IOException e) {
-					// try again with random port
-					bindWithIPv4Fallback(bindAddress, 0);
+			// Bind to a port
+			{
+				InetSocketAddress bindSA;
+				Integer port=getPort();
+				if (port == null) {
+					port = 0;
 				}
-			} else {
-				bindWithIPv4Fallback(bindAddress, port);
+				if (port<=0) {
+					try {
+						bindWithIPv4Fallback(bindAddress, Constants.DEFAULT_PEER_PORT);
+					} catch (IOException e) {
+						// try again with random port
+						bindWithIPv4Fallback(bindAddress, 0);
+					}
+				} else {
+					bindWithIPv4Fallback(bindAddress, port);
+				}
+
+				// Find out which port we actually bound to
+				bindSA = (InetSocketAddress) ssc.getLocalAddress();
+				setPort(bindSA.getPort());
 			}
-
-			// Find out which port we actually bound to
-			bindSA = (InetSocketAddress) ssc.getLocalAddress();
-			setPort(ssc.socket().getLocalPort());
-		}
 		
-		// change to bnon-blocking mode
-		ssc.configureBlocking(false);
+			// change to non-blocking mode
+			ssc.configureBlocking(false);
 
-		// Register for accept. Do this before selection loop starts and
-		// before we return from launch!
-		selector = Selector.open();
-		ssc.register(selector, SelectionKey.OP_ACCEPT);
+			// Register for accept before the selection loop starts and launch returns.
+			selector = Selector.open();
+			ssc.register(selector, SelectionKey.OP_ACCEPT);
 
-		// set running status now, so that loops don't terminate
-		running = true;
+			// Set running status now, so that the loop does not immediately terminate.
+			running = true;
 
-		Thread selectorThread = new Thread(selectorLoop, "NIO Server loop on port: " + getPort());
-		selectorThread.setDaemon(true); // daemon thread so it doesn't stop shutdown
-		selectorThread.start();
-		log.debug("NIO server started on port {}", getPort());
+			selectorThread = new Thread(selectorLoop, "NIO Server loop on port: " + getPort());
+			selectorThread.setDaemon(true); // daemon thread so it doesn't stop shutdown
+			selectorThread.start();
+			log.debug("NIO server started on port {}", getPort());
+		} catch (IOException | RuntimeException e) {
+			running=false;
+			closeResources();
+			throw e;
+		}
 	}
 	
 	long lastConnectionPrune=0;
@@ -171,12 +179,11 @@ public class NIOServer extends AServer {
 								selectWrite(key);
 							}
 						} catch (IOException e) {
-							// IO Exception, just lose the key?
 							log.debug("IOException, closing channel");
-							key.cancel();
+							closeKey(key);
 						}  catch (CancelledKeyException e) {
 							log.debug("Cancelled key: {}", e.getMessage());
-							key.cancel();
+							closeKey(key);
 						} 
 					}
 					
@@ -192,29 +199,8 @@ public class NIOServer extends AServer {
 			} catch (Exception e) {
 				log.error("Unexpected Exception, terminating selector loop: ", e);
 			} finally {
-				try {
-					// close all client channels
-					for (SelectionKey key : selector.keys()) {
-						key.channel().close();
-					}
-					selector.close();
-					selector = null;
-				} catch (IOException e) {
-					log.error("IOException while closing NIO server",e);
-				} finally {
-					selector = null;
-				}
-
-				if (ssc != null) {
-					try {
-						ssc.close();
-					} catch (IOException e) {
-						log.error("IOException while closing NIO socket channel",e);
-					} finally {
-						ssc = null;
-					}
-				}
-
+				closeResources();
+				selectorThread=null;
 			}
 			log.debug("Selector loop ended on port: " + getPort());
 		}
@@ -242,13 +228,12 @@ public class NIOServer extends AServer {
 		for (SelectionKey key:keys) {
 			Connection conn=(Connection) key.attachment();
 			if (conn!=null) {
-				long age=conn.getLastActivity()-ts;
+				long age=ts-conn.getLastActivity();
 				
 				// prune more aggressively if we have more connections 
 				if (age>(1000000L/(n+10))) {
 					log.info("Pruning inactive client connection, age = {}",age);
-					conn.close();
-					key.cancel();
+					closeKey(key);
 				}
 			}
 		}
@@ -295,22 +280,21 @@ public class NIOServer extends AServer {
 		try {
 			int n = conn.handleChannelRecieve();
 			if (n < 0) {
-				key.cancel();
+				closeKey(key);
 				log.trace("EOS on channel?");
 			} else if (n==0) {
 				log.trace("No bytes received for key: {}", key);
 			}
 		} catch (ClosedChannelException | SocketException e) {
 			log.trace("Channel closed ("+Utils.getClassName(e)+") from: {}", conn.getRemoteAddress());
-			key.cancel();
+			closeKey(key);
 		} catch (BadFormatException e) {
-			log.info("Cancelled connection: Bad data format from: {} message: {}", conn.getRemoteAddress(),
+			log.info("Closed connection: Bad data format from: {} message: {}", conn.getRemoteAddress(),
 					e.getMessage());
-			// TODO: blacklist peer?
-			key.cancel();
+			closeKey(key);
 		} catch (Exception e) {
-			log.warn("Unexpected exception in receive handler", e.getCause());
-			key.cancel();
+			log.warn("Unexpected exception in receive handler", e);
+			closeKey(key);
 		}
 	}
 
@@ -322,10 +306,71 @@ public class NIOServer extends AServer {
 	@Override
 	public void close() {
 		running = false;
-		if (selector != null) {
-			selector.wakeup();
-		}
+		Selector currentSelector=selector;
+		if (currentSelector != null) currentSelector.wakeup();
 
+		Thread thread=selectorThread;
+		if (thread == null) {
+			closeResources();
+			return;
+		}
+		if (thread == Thread.currentThread()) return;
+		boolean interrupted=false;
+		while (thread.isAlive()) {
+			try {
+				thread.join();
+			} catch (InterruptedException e) {
+				interrupted=true;
+				thread.interrupt();
+			}
+		}
+		if (interrupted) Thread.currentThread().interrupt();
+	}
+
+	/** Closes a client registration and reports its disconnect once. */
+	private void closeKey(SelectionKey key) {
+		key.cancel();
+		Object attachment=key.attachment();
+		try {
+			key.channel().close();
+		} catch (IOException e) {
+			log.debug("Unable to close NIO client channel",e);
+		}
+		if (attachment instanceof Connection connection) {
+			try {
+				getDisconnectAction().accept(connection);
+			} catch (Exception e) {
+				log.warn("NIO disconnect handler failed",e);
+			}
+		}
+	}
+
+	/** Closes listener, selector and every channel registered with it. */
+	private void closeResources() {
+		Selector currentSelector=selector;
+		selector=null;
+		if (currentSelector != null) {
+			try {
+				for (SelectionKey key : currentSelector.keys()) closeKey(key);
+			} catch (Exception e) {
+				log.error("Error while closing NIO server connections",e);
+			} finally {
+				try {
+					currentSelector.close();
+				} catch (IOException e) {
+					log.error("Unable to close NIO selector",e);
+				}
+			}
+		}
+		ServerSocketChannel currentServer=ssc;
+		ssc=null;
+		if (currentServer != null) {
+			try {
+				currentServer.close();
+			} catch (IOException e) {
+				log.error("IOException while closing NIO socket channel",e);
+			}
+		}
 	}
 
 	private void accept(Selector selector) throws IOException, ClosedChannelException {

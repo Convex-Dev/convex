@@ -80,8 +80,14 @@ public class ConnectionManager extends AConnectionManager {
 	/** First STATUS timeout for each connection which has not responded since. */
 	private final ConcurrentHashMap<AccountKey, Long> unresponsiveSince = new ConcurrentHashMap<>();
 
+	/** Manager-owned sockets currently awaiting remote peer identification. */
+	private final Set<Convex> pendingConnections=ConcurrentHashMap.newKeySet();
+
 	/** Background thread for connection maintenance and belief polling. */
 	private Thread thread;
+
+	/** Prevents late asynchronous connection attempts from being admitted after close. */
+	private volatile boolean closed;
 
 	public ConnectionManager(Server server) {
 		this.server = server;
@@ -92,7 +98,9 @@ public class ConnectionManager extends AConnectionManager {
 	/**
 	 * Starts the connection manager's background maintenance thread.
 	 */
-	public void start() {
+	public synchronized void start() {
+		if (closed) throw new IllegalStateException("Connection manager is closed");
+		if (thread != null) return;
 		Object _pollDelay = server.getConfig().get(Keywords.POLL_DELAY);
 		this.pollDelay = (_pollDelay == null) ? SERVER_POLL_DELAY : Utils.toInt(_pollDelay);
 		lastPollTime = server.getTimestamp();
@@ -116,17 +124,37 @@ public class ConnectionManager extends AConnectionManager {
 	}
 
 	@Override
-	public void close() {
-		// Broadcast GOODBYE to all outgoing remote peers
+	public synchronized void close() {
+		if (closed) return;
+		closed = true;
+
+		Thread managerThread=thread;
+		thread=null;
+		if (managerThread != null) {
+			managerThread.interrupt();
+			if (managerThread != Thread.currentThread()) {
+				boolean interrupted=false;
+				while (managerThread.isAlive()) {
+					try {
+						managerThread.join();
+					} catch (InterruptedException e) {
+						interrupted=true;
+						managerThread.interrupt();
+					}
+				}
+				if (interrupted) Thread.currentThread().interrupt();
+			}
+		}
+
+		// Broadcast GOODBYE after maintenance has stopped, then close every route.
 		try {
 			Message msg = Message.createGoodBye();
 			broadcast(msg);
 		} finally {
+			for (Convex pending : pendingConnections) closeSilently(pending);
+			pendingConnections.clear();
 			closeAllConnections();
 			unresponsiveSince.clear();
-			if (thread != null) {
-				thread.interrupt();
-			}
 		}
 	}
 
@@ -140,14 +168,27 @@ public class ConnectionManager extends AConnectionManager {
 
 	// ========== Connection Management ==========
 
-	public void addConnection(AccountKey peerKey, Convex convex) {
+	public boolean addConnection(AccountKey peerKey, Convex convex) {
 		if (peerKey == null) throw new IllegalArgumentException("Peer key must not be null");
 		if (convex == null) throw new IllegalArgumentException("Connection must not be null");
-		log.debug("Connected to Peer: {} at {}", peerKey, convex.getHostAddress());
-		// A peer we chose to connect to is buffered for, not dropped, until it is far behind
-		convex.setOutboundLimits(Config.PEER_OUTBOUND_QUEUE_SIZE, Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT);
-		unresponsiveSince.remove(peerKey);
-		connections.put(peerKey, convex);
+		Convex replaced=null;
+		boolean accepted;
+		synchronized (this) {
+			accepted=!closed && convex.isConnected();
+			if (accepted) {
+				log.debug("Connected to Peer: {} at {}", peerKey, convex.getHostAddress());
+				// A peer we chose to connect to is buffered for, not dropped, until it is far behind
+				convex.setOutboundLimits(Config.PEER_OUTBOUND_QUEUE_SIZE, Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT);
+				unresponsiveSince.remove(peerKey);
+				replaced=connections.put(peerKey, convex);
+			}
+		}
+		if (!accepted) {
+			closeSilently(convex);
+			return false;
+		}
+		if (replaced != null && replaced != convex) closeSilently(replaced);
+		return true;
 	}
 
 	// ========== Maintenance ==========
@@ -351,13 +392,28 @@ public class ConnectionManager extends AConnectionManager {
 	 */
 	public CompletableFuture<Convex> connectToPeer(InetSocketAddress hostAddress) {
 		CompletableFuture<Convex> result = new CompletableFuture<>();
+		if (closed) {
+			return CompletableFuture.failedFuture(
+				new IllegalStateException("Connection manager is closed"));
+		}
 
+		Convex opened=null;
 		try {
-			Convex convex = Convex.connect(hostAddress);
+			opened = Convex.connect(hostAddress);
+			Convex convex=opened;
+			synchronized (this) {
+				if (closed) {
+					convex.close();
+					return CompletableFuture.failedFuture(
+						new IllegalStateException("Connection manager is closed"));
+				}
+				pendingConnections.add(convex);
+			}
 			convex.setStore(server.getStore());
 			convex.setKeyPair(server.getKeyPair());
 
 			identifyPeer(convex).whenComplete((peerKey, ex) -> {
+				pendingConnections.remove(convex);
 				if (peerKey == null || ex != null) {
 					convex.close();
 					result.completeExceptionally(ex != null ? ex
@@ -365,16 +421,25 @@ public class ConnectionManager extends AConnectionManager {
 					return;
 				}
 
-				Convex existing = getConnection(peerKey);
-				if ((existing != null) && existing.isConnected()) {
-					convex.close();
-					result.complete(existing);
-				} else {
-					addConnection(peerKey, convex);
-					result.complete(convex);
+				Convex existing;
+				synchronized (ConnectionManager.this) {
+					existing=getConnection(peerKey);
+					if (existing == null && !closed && addConnection(peerKey, convex)) {
+						existing=convex;
+					}
 				}
+				if (existing == null) {
+					convex.close();
+					result.completeExceptionally(new IllegalStateException(
+						"Connection manager closed during peer identification"));
+					return;
+				}
+				if (existing != convex) convex.close();
+				result.complete(existing);
 			});
 		} catch (Exception e) {
+			if (opened!=null) pendingConnections.remove(opened);
+			closeSilently(opened);
 			result.completeExceptionally(e);
 		}
 		return result;

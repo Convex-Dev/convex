@@ -40,7 +40,7 @@ public abstract class AConvexConnected extends Convex {
 	/**
 	 * Current Connection, may be null or a closed connection.
 	 */
-	protected AConnection connection;
+	protected volatile AConnection connection;
 
 	/**
 	 * Map of results awaiting completion. ConcurrentHashMap allows lock-free access

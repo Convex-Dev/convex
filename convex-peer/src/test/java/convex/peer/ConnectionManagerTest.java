@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -48,6 +49,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.net.impl.netty.NettyServer;
 
 /**
  * Regression tests for ConnectionManager and AConnectionManager.
@@ -459,6 +461,85 @@ public class ConnectionManagerTest {
 		for (int i=0; i<sequence.size(); i++) assertSame(sequence.get(i),good.sent.get(i));
 	}
 
+	@Test
+	public void testReplacingConnectionClosesPreviousOwner() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(213));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey key=AKeyPair.createSeeded(214).getAccountKey();
+			SequencedConvex first=new SequencedConvex(-1);
+			SequencedConvex second=new SequencedConvex(-1);
+
+			assertTrue(manager.addConnection(key,first));
+			assertTrue(manager.addConnection(key,second));
+
+			assertEquals(1,first.closeCount);
+			assertSame(second,manager.getConnection(key));
+		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testPruningClosesStaleConnection() {
+		TestConnectionManager manager=new TestConnectionManager();
+		AccountKey key=AKeyPair.createSeeded(215).getAccountKey();
+		SequencedConvex stale=new SequencedConvex(-1);
+		stale.connected=false;
+		manager.add(key,stale);
+
+		assertNull(manager.getConnection(key));
+		assertEquals(1,stale.closeCount);
+		assertEquals(0,manager.getConnectionCount());
+	}
+
+	@Test
+	public void testClosedManagerRejectsLateConnection() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(216));
+		ConnectionManager manager=server.getConnectionManager();
+		manager.close();
+		SequencedConvex late=new SequencedConvex(-1);
+
+		assertFalse(manager.addConnection(AKeyPair.createSeeded(217).getAccountKey(),late));
+		assertEquals(1,late.closeCount);
+		server.close();
+	}
+
+	@Test
+	public void testCloseCancelsPendingPeerIdentification() throws Exception {
+		try (NettyServer remote=new NettyServer(0)) {
+			remote.setReceiveAction(message -> {});
+			remote.launch();
+			Server server=createPollingServer(AKeyPair.createSeeded(218));
+			try {
+				ConnectionManager manager=server.getConnectionManager();
+				CompletableFuture<Convex> connecting=manager.connectToPeer(remote.getHostAddress());
+
+				manager.close();
+
+				assertThrows(ExecutionException.class,
+					() -> connecting.get(1,TimeUnit.SECONDS));
+				assertEquals(0,manager.getConnectionCount());
+			} finally {
+				server.close();
+			}
+		}
+	}
+
+	@Test
+	public void testFailedPeerSyncClosesSourceConnection() {
+		AKeyPair keyPair=AKeyPair.createSeeded(219);
+		PollingConvex source=new PollingConvex();
+		source.statusResult=Result.error(ErrorCodes.CONNECT,"bad source");
+		HashMap<convex.core.data.Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR,keyPair);
+		config.put(Keywords.STORE,new MemoryStore());
+		config.put(Keywords.SOURCE,source);
+
+		assertThrows(LaunchException.class,() -> API.launchPeer(config));
+		assertEquals(1,source.closeCount);
+	}
+
 	private static final class TestConnectionManager extends AConnectionManager {
 		void add(AccountKey key,Convex connection) { connections.put(key,connection); }
 		@Override public void close() { closeAllConnections(); }
@@ -469,6 +550,7 @@ public class ConnectionManagerTest {
 		final int failAt;
 		int attempts;
 		boolean connected=true;
+		int closeCount;
 
 		SequencedConvex(int failAt) { super(null,null); this.failAt=failAt; }
 
@@ -500,7 +582,7 @@ public class ConnectionManagerTest {
 		@Override public CompletableFuture<Result> query(ACell query,Address address) {
 			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
 		}
-		@Override public void close() { connected=false; }
+		@Override public void close() { closeCount++; connected=false; }
 		@Override public InetSocketAddress getHostAddress() { return null; }
 		@Override public void reconnect() { connected=true; }
 		@Override public String toString() { return "Sequenced test connection"; }

@@ -2518,6 +2518,36 @@ public class NodeServerTest {
 		assertEquals(2,cm.getDesiredPeers().size());
 	}
 
+	@Test
+	public void testRejectedOwnedPeerConnectionIsClosed() {
+		LatticeConnectionManager cm=new LatticeConnectionManager(store);
+		cm.setMaxDesiredPeers(1);
+		cm.addPeer(AKeyPair.createSeeded(301).getAccountKey());
+		ControlledVerificationConvex rejected=new ControlledVerificationConvex();
+
+		CompletableFuture<Convex> admission=cm.addPeer(
+			AKeyPair.createSeeded(302).getAccountKey(),rejected);
+
+		assertTrue(admission.isCompletedExceptionally());
+		assertFalse(rejected.isConnected());
+		assertEquals(1,rejected.closeCount);
+		cm.close();
+	}
+
+	@Test
+	public void testClosedLatticeManagerRejectsLateConnection() {
+		LatticeConnectionManager cm=new LatticeConnectionManager(store);
+		cm.close();
+		ControlledVerificationConvex rejected=new ControlledVerificationConvex();
+
+		CompletableFuture<Convex> admission=cm.addPeer(
+			AKeyPair.createSeeded(303).getAccountKey(),rejected);
+
+		assertTrue(admission.isCompletedExceptionally());
+		assertFalse(rejected.isConnected());
+		assertEquals(1,rejected.closeCount);
+	}
+
 	/**
 	 * Test that a dead connection is detected and pruned, and the desired
 	 * peer entry survives for reconnection.
@@ -2748,6 +2778,7 @@ public class NodeServerTest {
 	private static final class ControlledVerificationConvex extends Convex {
 		private final CompletableFuture<AccountKey> verification = new CompletableFuture<>();
 		private volatile boolean connected = true;
+		private int closeCount;
 
 		ControlledVerificationConvex() {
 			super(null, null);
@@ -2815,6 +2846,7 @@ public class NodeServerTest {
 
 		@Override
 		public void close() {
+			closeCount++;
 			connected = false;
 			verifiedPeer = null;
 		}

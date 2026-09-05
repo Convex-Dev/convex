@@ -72,7 +72,7 @@ public class MainGUI extends AbstractGUI {
 	public void launchWallet() {
 	    Convex convex=ConnectPanel.tryConnect(this);
 	    if (convex!=null) {
-	    	new WalletApp(convex).run();
+	    new WalletApp(convex,true).run();
 	    }
 	}
 	
@@ -96,7 +96,7 @@ public class MainGUI extends AbstractGUI {
 	public void launchTerminalClient() {
 	    Convex convex=ConnectPanel.tryConnect(this);
 	    if (convex!=null) {
-	    	new REPLClient(convex).run();
+	    new REPLClient(convex,true).run();
 	    }
 	}
 	

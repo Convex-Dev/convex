@@ -190,34 +190,46 @@ public class Connection extends AConnection {
 		ensureSelectorLoop();
 		
 		SocketChannel clientChannel = SocketChannel.open();
-		clientChannel.configureBlocking(false);
-		clientChannel.socket().setReceiveBufferSize(receiveBufferSize);
-		clientChannel.socket().setSendBufferSize(sendBufferSize);
-		
-		// Disable Nagle, we don't want this as we want to send one-way traffic as fast as possible
-		clientChannel.socket().setTcpNoDelay(true);
-		clientChannel.connect(socketAddress);	
-		
-		// System.out.println("Connection: attempting to connect to: "+socketAddress);
+		boolean connected=false;
+		try {
+			clientChannel.configureBlocking(false);
+			clientChannel.socket().setReceiveBufferSize(receiveBufferSize);
+			clientChannel.socket().setSendBufferSize(sendBufferSize);
 
-		long start = Utils.getCurrentTimestamp();
-		while (!clientChannel.finishConnect()) {
-			long now = Utils.getCurrentTimestamp();
-			long elapsed=now-start;
-			if (elapsed > Config.DEFAULT_INTERNAL_TIMEOUT)
-				throw new TimeoutException("Couldn't connect after "+elapsed+"ms");
-			try {
-				Thread.sleep(10+elapsed/3);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				throw new IOException("Connect interrupted", e);
+			// Disable Nagle, we don't want this as we want to send one-way traffic as fast as possible
+			clientChannel.socket().setTcpNoDelay(true);
+			clientChannel.connect(socketAddress);
+
+			// System.out.println("Connection: attempting to connect to: "+socketAddress);
+
+			long start = Utils.getCurrentTimestamp();
+			while (!clientChannel.finishConnect()) {
+				long now = Utils.getCurrentTimestamp();
+				long elapsed=now-start;
+				if (elapsed > Config.DEFAULT_INTERNAL_TIMEOUT)
+					throw new TimeoutException("Couldn't connect after "+elapsed+"ms");
+				try {
+					Thread.sleep(10+elapsed/3);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					throw new IOException("Connect interrupted", e);
+				}
+			}
+
+			Connection pc = create(clientChannel, receiveAction, trustedPeerKey, maxMessageLength);
+			pc.startClientListening();
+			connected=true;
+			log.trace("Connect succeeded for host: {}", socketAddress);
+			return pc;
+		} finally {
+			if (!connected) {
+				try {
+					clientChannel.close();
+				} catch (IOException e) {
+					// Preserve the connection failure which brought us here.
+				}
 			}
 		}
-
-		Connection pc = create(clientChannel, receiveAction, trustedPeerKey, maxMessageLength);
-		pc.startClientListening();
-		log.trace("Connect succeeded for host: {}", socketAddress);
-		return pc;
 	}
 
 	public long getReceivedCount() {
@@ -402,13 +414,10 @@ public class Connection extends AConnection {
 
 	@Override
 	public synchronized void close() {
-		SocketChannel chan = (SocketChannel) channel;
-		if (chan != null) {
-			try {
-				chan.close();
-			} catch (IOException e) {
-				// TODO OK to ignore?
-			}
+		try {
+			channel.close();
+		} catch (IOException e) {
+			// Best effort: close is idempotent and has no useful recovery path.
 		}
 	}
 	
@@ -493,10 +502,10 @@ public class Connection extends AConnection {
 						} catch (ClosedChannelException e) {
 							// channel was closed, just lose the key?
 							log.trace("Unexpected ChannelClosedException, cancelling key: {}", e);
-							key.cancel();
+							closeKey(key);
 						} catch (IOException e) {
-							log.trace("Unexpected IOException, cancelling key: {}", e);
-							key.cancel();
+							log.trace("Unexpected IOException, closing connection: {}", e);
+							closeKey(key);
 						} catch (CancelledKeyException e) {
 							log.trace("Cancelled key");
 						}
@@ -524,22 +533,31 @@ public class Connection extends AConnection {
 		try {
 			int n = conn.handleChannelRecieve();
 			if (n<0) {
-				// Deregister interest in reading if EOS
-				log.trace("Cancelled Key due to EOS");
-				key.cancel();
+				log.trace("Closing connection due to EOS");
+				closeKey(key);
 			}
 			// log.finest("Received bytes: " + n);
 		} catch (ClosedChannelException e) {
 			log.trace("Channel closed from: {}", conn.getRemoteAddress());
-			key.cancel();
+			closeKey(key);
 		} catch (BadFormatException e) {
-			log.info("Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " "
+			log.info("Closed connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " "
 					+ e.getMessage());
-			key.cancel();
+			closeKey(key);
 		} catch (HandlerException e) {
-			log.warn("Cancelled connection: error in handler: " +e.getMessage());
-			key.cancel();
+			log.warn("Closed connection: error in handler: " +e.getMessage());
+			closeKey(key);
 			
+		}
+	}
+
+	/** Cancels a selector registration and closes its owned channel. */
+	private static void closeKey(SelectionKey key) {
+		key.cancel();
+		try {
+			key.channel().close();
+		} catch (IOException e) {
+			// Best effort after a terminal connection condition.
 		}
 	}
 
@@ -555,14 +573,14 @@ public class Connection extends AConnection {
 	 * @throws BadFormatException If there is an encoding error
 	 */
 	public int handleChannelRecieve() throws IOException, BadFormatException, HandlerException {
-		int recd= receiver.receiveFromChannel(channel);
-		int total =recd;
-		while (recd>0) {
+		int total=0;
+		int recd;
+		do {
 			recd=receiver.receiveFromChannel(channel);
-			total+=recd;
-		}
-		if (recd>0) lastActivity=System.currentTimeMillis();
-		return total;
+			if (recd>0) total+=recd;
+		} while (recd>0);
+		if (total>0) lastActivity=System.currentTimeMillis();
+		return (total==0 && recd<0) ? -1 : total;
 	}
 
 	/**

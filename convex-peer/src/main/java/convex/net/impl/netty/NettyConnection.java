@@ -44,7 +44,7 @@ public class NettyConnection extends AConnection {
 
 	static volatile Bootstrap clientBootstrap = null;
 
-	private Channel channel;
+	private volatile Channel channel;
 
 	private NettyInboundHandler inboundHandler;
 
@@ -132,46 +132,52 @@ public class NettyConnection extends AConnection {
 			int maxMessageLength) throws InterruptedException, IOException {
 		Bootstrap b = getClientBootstrap();
 		ChannelFuture f = b.connect(sa);
-		f.await(); // Wait until done
-
-		if (!f.isSuccess()) {
-			throw new IOException("Failed to connect to peer at "+sa,f.cause());
-		}
-
 		Channel chan = f.channel();
-		// Wrap Consumer as Function — client receive path has no backpressure
-		Function<Message, Predicate<Message>> deliverFn = m -> {
-			receiveAction.accept(m);
-			return null; // always accepted
-		};
-		NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
+		boolean connected=false;
+		try {
+			f.await(); // Wait until done
 
-		NettyConnection client = new NettyConnection(chan,inbound);
+			if (!f.isSuccess()) {
+				throw new IOException("Failed to connect to peer at "+sa,f.cause());
+			}
 
-		// Set connection on inbound handler so received messages can route responses back
-		inbound.setConnection(client);
+			// Wrap Consumer as Function — client receive path has no backpressure
+			Function<Message, Predicate<Message>> deliverFn = m -> {
+				receiveAction.accept(m);
+				return null; // always accepted
+			};
+			NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
 
-		// Pipeline: writability handler triggers drain, inbound handler decodes, outbound handler encodes
-		f.channel().pipeline().addLast(
-			new ChannelInboundHandlerAdapter() {
-				@Override
-				public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-					client.doFlush();
-					ctx.fireChannelWritabilityChanged();
-				}
+			NettyConnection client = new NettyConnection(chan,inbound);
 
-				@Override
-				public void channelInactive(ChannelHandlerContext ctx) {
-					// Clear queue to wake any threads blocked on offer(timeout)
-					client.clearOutbound();
-					ctx.fireChannelInactive();
-				}
-			},
-			inbound,
-			new NettyOutboundHandler()
-		);
+			// Set connection on inbound handler so received messages can route responses back
+			inbound.setConnection(client);
 
-		return client;
+			// Pipeline: writability handler triggers drain, inbound handler decodes, outbound handler encodes
+			chan.pipeline().addLast(
+				new ChannelInboundHandlerAdapter() {
+					@Override
+					public void channelWritabilityChanged(ChannelHandlerContext ctx) {
+						client.doFlush();
+						ctx.fireChannelWritabilityChanged();
+					}
+
+					@Override
+					public void channelInactive(ChannelHandlerContext ctx) {
+						// Clear queue to wake any threads blocked on offer(timeout)
+						client.clearOutbound();
+						ctx.fireChannelInactive();
+					}
+				},
+				inbound,
+				new NettyOutboundHandler()
+			);
+
+			connected=true;
+			return client;
+		} finally {
+			if (!connected) chan.close().syncUninterruptibly();
+		}
 	}
 
 	/** Updates the receive limit, for example after successful peer verification. */
@@ -307,10 +313,15 @@ public class NettyConnection extends AConnection {
 
 	@Override
 	public void close() {
-		if (channel!=null) {
-			channel.close();
+		Channel ch;
+		synchronized (this) {
+			ch=channel;
 			channel=null;
 		}
+		clearOutbound();
+		if (ch==null) return;
+		ChannelFuture closeFuture=ch.close();
+		if (!ch.eventLoop().inEventLoop()) closeFuture.syncUninterruptibly();
  	}
 
 	@Override

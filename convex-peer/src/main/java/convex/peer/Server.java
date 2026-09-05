@@ -186,6 +186,10 @@ public class Server implements Closeable {
 	/** Ensures an owned store is closed and retired exactly once. */
 	private final AtomicBoolean storeClosed=new AtomicBoolean();
 
+	/** Stable identity allows a closed Server to leave the process shutdown registry. */
+	private final Runnable shutdownHook=this::close;
+	private boolean shutdownHookRegistered;
+
 	/**
 	 * Configuration
 	 */
@@ -230,10 +234,14 @@ public class Server implements Closeable {
 		try {
 			Object source=getConfig().get(Keywords.SOURCE);
 			if (Utils.bool(source)) {
+				Convex c=null;
+				boolean synced=false;
 				try {
-					Convex c=Convex.connect(source);
+					c=Convex.connect(source);
 					c.setStore(getStore());
-					return syncPeer(keyPair,c);
+					Peer peer=syncPeer(keyPair,c);
+					synced=true;
+					return peer;
 				} catch (TimeoutException e) {
 					throw new LaunchException("Timeout trying to connect to remote peer");
 				} catch (IllegalArgumentException e) {
@@ -241,6 +249,8 @@ public class Server implements Closeable {
 				} catch (Exception e ) {
 					// something else failed, probably an IOException
 					throw new LaunchException("Failed to sync with remote peer host at: "+source,e);
+				} finally {
+					if (!synced && c!=null) c.close();
 				}
 			} 
 			
@@ -321,9 +331,6 @@ public class Server implements Closeable {
 			}
 			log.info("Retrieved Peer Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
 	
-			// Add the new connection since it seems good
-			getConnectionManager().addConnection(remotePeerKey,convex);
-			
 			SignedData<Order> peerOrder=belF.getOrders().get(remotePeerKey);
 
 			
@@ -362,6 +369,10 @@ public class Server implements Closeable {
 				peer=peer.recalcState(0);
 				log.info("Remote peer did not advertise a state position; locally replayed finalised Order to position {} without a remote state comparison",
 						peer.getStatePosition());
+			}
+			// Ownership transfers to the manager only after the complete sync is valid.
+			if (!getConnectionManager().addConnection(remotePeerKey,convex)) {
+				throw new LaunchException("Connection manager closed during peer sync");
 			}
 			return peer;
 		} catch (ExecutionException | InvalidDataException e) {
@@ -468,6 +479,7 @@ public class Server implements Closeable {
 	public synchronized void launch() throws LaunchException, InterruptedException {
 		if (isRunning) return; // in case of double launch
 		isRunning=true;
+		boolean launched=false;
 		try {
 			// Establish Peer state
 			Peer peer = establishPeer();
@@ -502,7 +514,8 @@ public class Server implements Closeable {
 			isRunning = true;
 
 			// Close server on shutdown, should be before Etch stores in priority
-			Shutdown.addHook(Shutdown.SERVER, this::close);
+			Shutdown.addHook(Shutdown.SERVER,shutdownHook);
+			shutdownHookRegistered=true;
 
 			// Start threaded components
 			manager.start();
@@ -513,10 +526,13 @@ public class Server implements Closeable {
 
 			goLive();
 			log.info( "Peer server started on port "+nio.getPort()+" with peer key: {}",getPeerKey());
+			launched=true;
 		} catch (ConfigException e) {
 			throw new LaunchException("Launch failed due to config problem: "+e,e);
 		} catch (IOException e) {
 			throw new LaunchException("Launch failed due to IO Error: "+e,e);
+		} finally {
+			if (!launched) close(false);
 		}
 	}
 
@@ -878,17 +894,33 @@ public class Server implements Closeable {
 	
 	@Override
 	public void close() {
-		
+		close(true);
+	}
+
+	/** Performs normal shutdown, optionally writing a final peer checkpoint. */
+	private synchronized void close(boolean persist) {
+		removeShutdownHook();
 		if (!isRunning) {
+			isLive=false;
+			manager.close();
+			nio.close();
+			inboundVerifier.close();
 			closeOwnedStore();
+			shutdownFuture.complete(Utils.getCurrentTimestamp());
 			return;
 		}
-		log.debug("Peer shutdown starting for "+getPeerKey());
+		Peer startingPeer=getPeer();
+		AccountKey peerKey=(startingPeer==null)?null:startingPeer.getPeerKey();
+		log.debug("Peer shutdown starting for {}",peerKey);
 		isLive=false;
 		isRunning = false;
 
 		// Close manager, we don't want any management actions during shutdown!
 		manager.close();
+
+		// Stop ingress and cancel connection-bound verification before worker/store shutdown.
+		nio.close();
+		inboundVerifier.close();
 
 		// Shut down propagator, no point sending any more Beliefs
 		propagator.close();
@@ -897,19 +929,12 @@ public class Server implements Closeable {
 		transactionHandler.close();
 		executor.close();
 
-		boolean writersStopped=true;
-		try {
-			writersStopped&=propagator.awaitStopped();
-			writersStopped&=transactionHandler.awaitStopped();
-			writersStopped&=executor.awaitStopped();
-		} catch (InterruptedException e) {
-			writersStopped=false;
-			Thread.currentThread().interrupt();
-		}
+		boolean writersStopped=awaitComponentsStopped(
+			queryHandler,propagator,transactionHandler,executor);
 		
 		Peer peer=getPeer();
 		// persist peer state if necessary
-		if ((peer != null) && !Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))
+		if (persist && (peer != null) && !Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))
 				&&writersStopped) {
 			try {
 				executor.persistPeerData();
@@ -920,15 +945,39 @@ public class Server implements Closeable {
 				log.error("Unable to complete final Peer checkpoint in "+store
 						+"; the store may require operator recovery",e);
 			}
-		} else if ((peer!=null)&&!Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) {
+		} else if (persist && (peer!=null)&&!Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) {
 			log.error("Peer writers did not stop cleanly; skipping the final checkpoint for "
 					+store+" and leaving recovery to the operator");
 		}
 
-		nio.close();
 		closeOwnedStore();
-		log.info("Peer shutdown complete for "+getPeerKey());
+		log.info("Peer shutdown complete for {}",peerKey);
 		shutdownFuture.complete(Utils.getCurrentTimestamp());
+	}
+
+	private void removeShutdownHook() {
+		if (!shutdownHookRegistered) return;
+		Shutdown.removeHook(Shutdown.SERVER,shutdownHook);
+		shutdownHookRegistered=false;
+	}
+
+	/** Joins component threads without allowing an interrupt to skip resource safety. */
+	private boolean awaitComponentsStopped(AThreadedComponent... components) {
+		boolean interrupted=false;
+		boolean stopped=true;
+		for (AThreadedComponent component : components) {
+			while (true) {
+				try {
+					stopped&=component.awaitStopped();
+					break;
+				} catch (InterruptedException e) {
+					interrupted=true;
+					component.close();
+				}
+			}
+		}
+		if (interrupted) Thread.currentThread().interrupt();
+		return stopped;
 	}
 
 	/** Closes a materialised store, deleting its file only when it was temporary. */
@@ -1249,10 +1298,9 @@ public class Server implements Closeable {
 	 * Shut down the Server, as gracefully as possible.
 	 */
 	public void shutdown()  {
-		try {
+		try (Convex convex=Convex.connect(this, getPeerController(),getKeyPair())) {
 			AKeyPair kp= getKeyPair();
 			AccountKey key=kp.getAccountKey();
-			Convex convex=Convex.connect(this, getPeerController(),kp);
 			Result r=convex.transactSync("(set-peer-stake "+key+" 0)");
 			if (r.isError()) {
 				log.warn("Unable to remove Peer stake: "+r);

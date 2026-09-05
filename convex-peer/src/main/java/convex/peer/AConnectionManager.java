@@ -47,14 +47,17 @@ public abstract class AConnectionManager implements Closeable {
 	 */
 	public Convex getConnection(AccountKey peerKey) {
 		if (peerKey == null) return null;
-		Convex c = connections.get(peerKey);
-		if (c == null) return null;
-		if (!c.isConnected()) {
-			connections.remove(peerKey);
-			log.debug("Pruned closed connection to {}", peerKey);
-			return null;
+		while (true) {
+			Convex c = connections.get(peerKey);
+			if (c == null) return null;
+			if (c.isConnected()) return c;
+			if (connections.remove(peerKey,c)) {
+				closeSilently(c);
+				log.debug("Pruned closed connection to {}", peerKey);
+				return null;
+			}
+			// The mapping changed while it was inspected; check its replacement.
 		}
-		return c;
 	}
 
 	/**
@@ -121,10 +124,10 @@ public abstract class AConnectionManager implements Closeable {
 	 * Closes all connections managed by this manager.
 	 */
 	public void closeAllConnections() {
-		for (Convex conn : connections.values()) {
-			closeSilently(conn);
+		for (Map.Entry<AccountKey, Convex> entry : connections.entrySet()) {
+			Convex conn=entry.getValue();
+			if (connections.remove(entry.getKey(),conn)) closeSilently(conn);
 		}
-		connections.clear();
 	}
 
 	/**
@@ -150,9 +153,11 @@ public abstract class AConnectionManager implements Closeable {
 	protected void pruneDeadConnections() {
 		for (Map.Entry<AccountKey, Convex> entry : connections.entrySet()) {
 			Convex c = entry.getValue();
-			if (c == null || !c.isConnected()) {
-				connections.remove(entry.getKey());
-				log.debug("Pruned dead connection to {}", entry.getKey());
+			if (!c.isConnected()) {
+				if (connections.remove(entry.getKey(),c)) {
+					closeSilently(c);
+					log.debug("Pruned dead connection to {}", entry.getKey());
+				}
 			}
 		}
 	}

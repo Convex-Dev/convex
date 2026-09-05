@@ -277,12 +277,10 @@ public class StressPanel extends JPanel {
 			boolean isLocal = localCheckBox.isSelected();
 			Server server = peerConvex.getLocalServer();
 
-			Convex pc;
-			if (isLocal && server != null) {
-				pc = Convex.connect(server, address, kp);
-			} else {
-				pc = Convex.connect(sa, address, kp);
-			}
+			final Convex pc = (isLocal && server != null)
+				? Convex.connect(server, address, kp)
+				: Convex.connect(sa, address, kp);
+			try {
 
 			// Generate client accounts
 			StringBuilder cmdsb=new StringBuilder();
@@ -429,12 +427,6 @@ public class StressPanel extends JPanel {
 				}
 			}
 			
-			for (int i=0; i<clientCount; i++) {
-				clients.get(i).close();
-			}
-
-			Thread.sleep(100); // wait for state update to be reflected
-
 			long totalCount=clientCount*transCount*requestCount;
 			sb.append("Results for " + Text.toFriendlyNumber(totalCount) + " transactions\n");
 			sb.append(values + " values received\n");
@@ -457,6 +449,17 @@ public class StressPanel extends JPanel {
 
 			String report = sb.toString();
 			return report;
+			} finally {
+				for (Convex client : clients) {
+					try {
+						client.close();
+					} catch (Exception e) {
+						log.debug("Unable to close stress-test client",e);
+					}
+				}
+				clients.clear();
+				pc.close();
+			}
 		}
 
 		private void setupClients() throws IOException, TimeoutException {

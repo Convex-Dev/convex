@@ -342,9 +342,10 @@ public class MessageTest {
 		// Received message carries the paired end's connection
 		assertSame(clientEnd.getPaired(), received.get().getConnection());
 
-		// close is a no-op
+		// Closing either end closes the paired in-JVM channel.
 		clientEnd.close();
-		assertFalse(clientEnd.isClosed());
+		assertTrue(clientEnd.isClosed());
+		assertNull(clientEnd.getPaired());
 	}
 
 	@Test public void testLocalConnectionBidirectional() {

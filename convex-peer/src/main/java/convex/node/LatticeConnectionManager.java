@@ -166,6 +166,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Whether the maintenance loop is running. */
 	private volatile boolean running = false;
 
+	/** Whether newly opened or supplied connections may still be admitted. */
+	private volatile boolean accepting = true;
+
 	// ========== Constructor ==========
 
 	/**
@@ -286,6 +289,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public synchronized void start() {
 		if (running) return;
+		accepting = true;
 		running = true;
 		maintenanceThread = Thread.ofVirtual().name("Lattice connection maintenance").start(this::maintenanceLoop);
 		maintenanceSignal.release();
@@ -296,16 +300,24 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * Stops the maintenance thread and closes all connections.
 	 */
 	@Override
-	public void close() {
+	public synchronized void close() {
+		accepting = false;
 		running = false;
 		maintenanceSignal.release();
 
 		if (maintenanceThread != null) {
 			maintenanceThread.interrupt();
-			try {
-				maintenanceThread.join(5000);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
+			if (maintenanceThread != Thread.currentThread()) {
+				boolean interrupted=false;
+				while (maintenanceThread.isAlive()) {
+					try {
+						maintenanceThread.join();
+					} catch (InterruptedException e) {
+						interrupted=true;
+						maintenanceThread.interrupt();
+					}
+				}
+				if (interrupted) Thread.currentThread().interrupt();
 			}
 			maintenanceThread = null;
 		}
@@ -321,10 +333,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	@Override
 	public void closeAllConnections() {
+		List<Convex> active;
 		List<PendingConnection> pending;
 		List<CompletableFuture<Convex>> waiters;
 		List<CompletableFuture<AConnection>> routeWaiters;
 		synchronized (connectionLock) {
+			active = new ArrayList<>(connections.values());
+			connections.clear();
 			pending = new ArrayList<>(pendingConnections.values());
 			pendingConnections.clear();
 			waiters = new ArrayList<>(connectionWaiters.values());
@@ -334,8 +349,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 			// The listener/endpoint owns these physical inbound connections. Closing
 			// this manager revokes only their logical outbound capability.
 			upgradedInboundRoutes.clear();
-			super.closeAllConnections();
 		}
+		for (Convex connection : active) closeSilently(connection);
 		for (PendingConnection pc : pending) {
 			pc.admission.completeExceptionally(new IllegalStateException("Connection manager closed"));
 			closeSilently(pc.connection);
@@ -418,6 +433,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private boolean registerDesiredPeerIntent(
 			AccountKey peerKey,DesiredPeer desired,boolean replace) {
 		synchronized (connectionLock) {
+			if (!accepting) return false;
 			DesiredPeer existing=desiredPeers.get(peerKey);
 			if (existing!=null) {
 				if (replace) {
@@ -447,17 +463,15 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return CompletableFuture.failedFuture(
 				new IllegalArgumentException("Peer key must not be null"));
 		}
-		Convex connected=getConnection(peerKey);
-		if (connected!=null) return CompletableFuture.completedFuture(connected);
-
-		CompletableFuture<Convex> waiter=connectionWaiters.computeIfAbsent(
-			peerKey,k -> new CompletableFuture<>());
-		// Close the admission-before-registration race.
-		connected=getConnection(peerKey);
-		if (connected!=null && connectionWaiters.remove(peerKey,waiter)) {
-			waiter.complete(connected);
+		synchronized (connectionLock) {
+			if (!accepting) {
+				return CompletableFuture.failedFuture(
+					new IllegalStateException("Connection manager is closed"));
+			}
+			Convex connected=getConnection(peerKey);
+			if (connected!=null) return CompletableFuture.completedFuture(connected);
+			return connectionWaiters.computeIfAbsent(peerKey,k -> new CompletableFuture<>());
 		}
-		return waiter;
 	}
 
 	// ========== Authenticated Inbound Route Upgrade ==========
@@ -487,11 +501,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (connection.isClosed()) {
 			throw new IllegalStateException("Closed inbound connection cannot become an outbound route");
 		}
-		if (!desiredPeers.containsKey(peerKey)) {
-			throw new SecurityException("Authenticated peer has no admitted node identity: " + peerKey);
+		synchronized (connectionLock) {
+			if (!accepting) throw new IllegalStateException("Connection manager is closed");
+			if (!desiredPeers.containsKey(peerKey)) {
+				throw new SecurityException("Authenticated peer has no admitted node identity: " + peerKey);
+			}
+			upgradedInboundRoutes.put(peerKey, connection);
 		}
-
-		upgradedInboundRoutes.put(peerKey, connection);
 		CompletableFuture<AConnection> waiter = upgradedRouteWaiters.remove(peerKey);
 		if (waiter != null) waiter.complete(connection);
 		maintenanceSignal.release();
@@ -539,16 +555,15 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return CompletableFuture.failedFuture(
 				new IllegalArgumentException("Peer key must not be null"));
 		}
-		AConnection upgraded = getUpgradedInboundConnection(peerKey);
-		if (upgraded != null) return CompletableFuture.completedFuture(upgraded);
-
-		CompletableFuture<AConnection> waiter = upgradedRouteWaiters.computeIfAbsent(
-			peerKey, key -> new CompletableFuture<>());
-		upgraded = getUpgradedInboundConnection(peerKey);
-		if (upgraded != null && upgradedRouteWaiters.remove(peerKey, waiter)) {
-			waiter.complete(upgraded);
+		synchronized (connectionLock) {
+			if (!accepting) {
+				return CompletableFuture.failedFuture(
+					new IllegalStateException("Connection manager is closed"));
+			}
+			AConnection upgraded = getUpgradedInboundConnection(peerKey);
+			if (upgraded != null) return CompletableFuture.completedFuture(upgraded);
+			return upgradedRouteWaiters.computeIfAbsent(peerKey,key -> new CompletableFuture<>());
 		}
-		return waiter;
 	}
 
 	/**
@@ -574,6 +589,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public CompletableFuture<Convex> addPeer(AccountKey peerKey, Convex convex) {
 		if (peerKey == null || convex == null) {
+			if (convex != null) closeSilently(convex);
 			log.warn("Attempted to add peer with null key or connection");
 			return CompletableFuture.failedFuture(
 				new IllegalArgumentException("Peer key and connection must not be null"));
@@ -583,8 +599,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 		DesiredPeer desired=(addr!=null)
 			? DesiredPeer.create(peerKey,addr) : DesiredPeer.create(peerKey);
 		if (!registerDesiredPeerIntent(peerKey,desired,false)) {
+			closeSilently(convex);
 			return CompletableFuture.failedFuture(new IllegalStateException(
-				"Desired peer limit of "+maxDesiredPeers+" reached"));
+				accepting ? "Desired peer limit of "+maxDesiredPeers+" reached"
+					: "Connection manager is closed"));
 		}
 		CompletableFuture<Convex> admission=beginOutboundAdmission(peerKey, convex);
 		maintenanceSignal.release();
@@ -593,6 +611,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Moves an opened manager-owned client through limbo into the active map. */
 	private CompletableFuture<Convex> beginOutboundAdmission(AccountKey peerKey, Convex convex) {
+		if (!accepting || !convex.isConnected()) {
+			closeSilently(convex);
+			return CompletableFuture.failedFuture(new IllegalStateException(
+				accepting ? "Connection is closed" : "Connection manager is closed"));
+		}
 		AccountKey verifiedKey = convex.getVerifiedPeer();
 		if (verifiedKey != null && !verifiedKey.equals(peerKey)) {
 			SecurityException failure = new SecurityException(
@@ -609,13 +632,15 @@ public class LatticeConnectionManager extends AConnectionManager {
 		restrictOutboundToLimbo(convex);
 		convex.setKeyPair(kp);
 		PendingConnection pending = new PendingConnection(convex);
-		PendingConnection replaced;
+		PendingConnection replaced=null;
+		boolean eligible;
 		synchronized (connectionLock) {
-			if (!desiredPeers.containsKey(peerKey)) {
-				closeSilently(convex);
-				return CompletableFuture.failedFuture(new IllegalStateException("Peer was removed before verification"));
-			}
-			replaced = pendingConnections.put(peerKey, pending);
+			eligible=accepting && desiredPeers.containsKey(peerKey);
+			if (eligible) replaced = pendingConnections.put(peerKey, pending);
+		}
+		if (!eligible) {
+			closeSilently(convex);
+			return CompletableFuture.failedFuture(new IllegalStateException("Peer was removed before verification"));
 		}
 		if (replaced != null && replaced.connection != convex) {
 			replaced.admission.completeExceptionally(new IllegalStateException("Connection replaced while awaiting verification"));
@@ -652,17 +677,21 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Installs a client whose admission policy requires no further challenge. */
 	private CompletableFuture<Convex> installAdmittedOutbound(
 			AccountKey peerKey,Convex convex,boolean trusted) {
-		Convex replaced;
-		PendingConnection pending;
+		Convex replaced=null;
+		PendingConnection pending=null;
+		boolean eligible;
 		synchronized (connectionLock) {
-			if (!desiredPeers.containsKey(peerKey)) {
-				closeSilently(convex);
-				return CompletableFuture.failedFuture(new IllegalStateException("Peer was removed before admission"));
+			eligible=accepting && desiredPeers.containsKey(peerKey);
+			if (eligible) {
+				grantOutboundCapabilities(convex);
+				configureReceiveLimit(convex, trusted);
+				replaced = connections.put(peerKey, convex);
+				pending = pendingConnections.remove(peerKey);
 			}
-			grantOutboundCapabilities(convex);
-			configureReceiveLimit(convex, trusted);
-			replaced = connections.put(peerKey, convex);
-			pending = pendingConnections.remove(peerKey);
+		}
+		if (!eligible) {
+			closeSilently(convex);
+			return CompletableFuture.failedFuture(new IllegalStateException("Peer was removed before admission"));
 		}
 		if (replaced != null && replaced != convex) closeSilently(replaced);
 		if (pending != null && pending.connection != convex) {
@@ -813,6 +842,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		boolean changed=false;
 		synchronized (connectionLock) {
+			if (!accepting) return false;
 			DesiredPeer existing=desiredPeers.get(peerKey);
 			if (existing==null) {
 				if (desiredPeers.size()>=maxDesiredPeers) return false;
@@ -1014,6 +1044,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * for desired peers that are not currently connected.
 	 */
 	void maintainConnections() {
+		if (!accepting) return;
 		pruneDeadConnections();
 		pruneDeadUpgradedInboundConnections();
 		pruneDeadPendingConnections();
@@ -1100,18 +1131,22 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Completes the limbo-to-active transition after the expected key was proved. */
 	private void completeVerifiedAdmission(AccountKey peerKey, PendingConnection pending) {
-		Convex replaced;
+		Convex replaced=null;
+		boolean eligible;
 		synchronized (connectionLock) {
-			if (pendingConnections.get(peerKey) != pending || !desiredPeers.containsKey(peerKey)
-					|| !pending.connection.isConnected()) {
-				rejectPendingAdmission(peerKey, pending,
-					new IllegalStateException("Verified connection is no longer eligible for admission"));
-				return;
+			eligible=accepting && pendingConnections.get(peerKey) == pending
+				&& desiredPeers.containsKey(peerKey) && pending.connection.isConnected();
+			if (eligible) {
+				grantOutboundCapabilities(pending.connection);
+				configureReceiveLimit(pending.connection, true);
+				replaced = connections.put(peerKey, pending.connection);
+				pendingConnections.remove(peerKey, pending);
 			}
-			grantOutboundCapabilities(pending.connection);
-			configureReceiveLimit(pending.connection, true);
-			replaced = connections.put(peerKey, pending.connection);
-			pendingConnections.remove(peerKey, pending);
+		}
+		if (!eligible) {
+			rejectPendingAdmission(peerKey, pending,
+				new IllegalStateException("Verified connection is no longer eligible for admission"));
+			return;
 		}
 		if (replaced != null && replaced != pending.connection) closeSilently(replaced);
 		resetRetryBackoff(peerKey);

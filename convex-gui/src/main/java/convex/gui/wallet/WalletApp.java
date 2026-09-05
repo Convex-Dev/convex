@@ -32,6 +32,7 @@ public class WalletApp extends AbstractGUI {
 	JTabbedPane tabs = new JTabbedPane(JTabbedPane.LEFT);
 
 	protected Convex convex;
+	private final boolean ownsConnection;
 	
 	protected static final int TAB_ICON_SIZE=Toolkit.ICON_SIZE;
 	
@@ -39,8 +40,13 @@ public class WalletApp extends AbstractGUI {
 	 * Create the application.
 	 */
 	public WalletApp(Convex convex) {
+		this(convex,false);
+	}
+
+	public WalletApp(Convex convex,boolean ownsConnection) {
 		super ("Convex Wallet");
 		this.convex=convex;
+		this.ownsConnection=ownsConnection;
 		
 		setLayout(new MigLayout("fill"));
 		
@@ -109,6 +115,15 @@ public class WalletApp extends AbstractGUI {
 		return "Convex Wallet";
 	}
 
+	@Override
+	public void close() {
+		try {
+			if (ownsConnection && convex!=null) convex.close();
+		} finally {
+			super.close();
+		}
+	}
+
 	/**
 	 * Launch the application.
 	 * @param args Command line args
@@ -119,7 +134,7 @@ public class WalletApp extends AbstractGUI {
 		Toolkit.init();
 		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
 		if (convex!=null) {
-			WalletApp app=new WalletApp(convex);
+			WalletApp app=new WalletApp(convex,true);
 			app.run();
 			app.waitForClose();
 		} 

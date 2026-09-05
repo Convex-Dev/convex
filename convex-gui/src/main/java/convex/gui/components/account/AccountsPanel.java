@@ -175,7 +175,7 @@ public class AccountsPanel extends JPanel {
 			long ix=table.getSelectedRow();
 			if (ix<0) return;
 			cv.setAddress(Address.create(ix));
-			new WalletApp(cv).run();
+			new WalletApp(cv,true).run();
 		});
 		btnWallet.setToolTipText("Opens a Wallet interface for this account");
 		actionPanel.add(btnWallet);
