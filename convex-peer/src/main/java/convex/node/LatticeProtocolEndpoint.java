@@ -209,6 +209,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 		acquisitionFailures.keySet().removeIf(message -> message.getConnection()==connection);
 	}
 
+	/** Retires an unresponsive owned socket, allowing an outbound-only peer to reconnect. */
+	void retireConnection(AConnection connection) {
+		connection.close();
+		removeConnection(connection);
+	}
+
 	/** Handles a message synchronously; primarily useful for deterministic tests. */
 	void handle(Message message) {
 		ConnectionContext context=prepare(message);
@@ -234,6 +240,9 @@ final class LatticeProtocolEndpoint implements Closeable {
 			return null;
 		}
 		if (!decodeOrAcquire(message,connection,acquired,stats)) return null;
+		if (connection!=null && connection.isTrusted()) {
+			propagator.getConnectionManager().received(connection.getTrustedKey(),connection);
+		}
 		return new ConnectionContext(connection,stats,acquired);
 	}
 
@@ -617,6 +626,21 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	private CompletableFuture<Result> requestMissing(AConnection connection,Hash[] hashes) {
+		return requestResult(connection,id -> Message.createDataRequest(id,hashes));
+	}
+
+	/** Correlated liveness probe on an authenticated, listener-owned return route. */
+	CompletableFuture<?> probe(AConnection connection) {
+		return requestResult(connection,id -> Message.createPing((CVMLong)id)).thenApply(result -> {
+			if (result.isError() || !(result.getValue() instanceof CVMLong)) {
+				throw new IllegalStateException("Invalid PING response");
+			}
+			return result;
+		});
+	}
+
+	private CompletableFuture<Result> requestResult(AConnection connection,
+			java.util.function.Function<ACell,Message> request) {
 		if (connection==null || connection.isClosed()) {
 			return CompletableFuture.failedFuture(new IOException("Lattice source connection is closed"));
 		}
@@ -631,8 +655,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 			if (byID.isEmpty()) pendingDataRequests.remove(connection,byID);
 		});
 		try {
-			if (connection.isClosed() || !connection.sendMessage(Message.createDataRequest(id,hashes))) {
-				future.completeExceptionally(new IOException("Unable to send lattice DATA_REQUEST"));
+			if (connection.isClosed() || !connection.sendMessage(request.apply(id))) {
+				future.completeExceptionally(new IOException("Unable to send lattice request"));
 			}
 		} catch (Exception e) {
 			future.completeExceptionally(e);

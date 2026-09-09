@@ -9,10 +9,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,11 +102,20 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Hard cap for operator- and discovery-supplied desired peer identities. */
 	private volatile int maxDesiredPeers = LatticePropagatorConfig.DEFAULT_MAX_DESIRED_PEERS;
+	private int ambientPeers=LatticePropagatorConfig.DEFAULT_AMBIENT_PEERS;
+	private int activePeers=LatticePropagatorConfig.DEFAULT_ACTIVE_PEERS;
 
 	// ========== Constants ==========
 
 	/** Interval between maintenance loop iterations (milliseconds). */
-	static final long MAINTENANCE_INTERVAL = 5_000L;
+	static final long MAINTENANCE_INTERVAL = 1_000L;
+	static final long ACTIVE_RETENTION_MS = 120_000L;
+	/** Normal root propagation is the heartbeat; only probe after sustained silence. */
+	static final long QUIET_PROBE_MS = 120_000L;
+	static final long PROBE_TIMEOUT_MS = 30_000L;
+	/** New, unverified sockets have a separate, short admission deadline. */
+	static final long ADMISSION_TIMEOUT_MS = 5_000L;
+	static final int MAX_CONCURRENT_DIALS = 4;
 
 	/** Initial reconnection delay (milliseconds). */
 	static final long INITIAL_BACKOFF_MS = 1_000L;
@@ -111,9 +126,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	// ========== State ==========
 
 	/**
-	 * Desired peers — peers this node wants to stay connected to. The maintenance
-	 * thread connects to any desired peer not in {@link #connections} and
-	 * reconnects peers whose connections have dropped.
+	 * Candidate peers. Maintenance keeps a stable ambient subset, recent active
+	 * communicators and explicit connections live, rather than dialling every entry.
 	 */
 	private final ConcurrentHashMap<AccountKey, DesiredPeer> desiredPeers = new ConcurrentHashMap<>();
 
@@ -141,6 +155,16 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Serialises admission, removal and replacement across pending and active maps. */
 	private final Object connectionLock = new Object();
+
+	/** Local policy state, bounded by desiredPeers and independent of discovery revisions. */
+	private final Map<AccountKey,PeerActivity> activity=new HashMap<>();
+	/** Reservations include socket opening, before identity verification begins. */
+	private final Map<AccountKey,DesiredPeer> dialling=new HashMap<>();
+	private final Map<AccountKey,HealthCheck> health=new HashMap<>();
+	private final LongSupplier clock;
+	private ExecutorService workers=Executors.newVirtualThreadPerTaskExecutor();
+	private Function<AConnection,CompletableFuture<?>> inboundProbe;
+	private Consumer<AConnection> inboundFailure;
 
 	/**
 	 * Store set on peer connections. Determines what data peers can resolve
@@ -177,8 +201,89 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * @param store Store to set on peer connections (security boundary)
 	 */
 	public LatticeConnectionManager(AStore store) {
+		this(store,monotonicClock());
+	}
+
+	private static LongSupplier monotonicClock() {
+		long origin=System.nanoTime();
+		return () -> TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-origin);
+	}
+
+	/** Monotonic clock injection for deterministic maintenance tests. */
+	LatticeConnectionManager(AStore store,LongSupplier clock) {
 		if (store == null) throw new IllegalArgumentException("Store must not be null");
 		this.store = store;
+		this.clock=clock;
+	}
+
+	/** Sets soft live-peer targets; explicit connections and outstanding work may exceed them. */
+	public void setPeerTargets(int ambient,int active) {
+		if (ambient<0 || active<0) throw new IllegalArgumentException("Peer targets must be non-negative");
+		synchronized (connectionLock) {
+			ambientPeers=ambient;
+			activePeers=active;
+		}
+		maintenanceSignal.release();
+	}
+
+	/** Marks useful directed communication, never routine gossip or keepalives. */
+	public void markActive(AccountKey peerKey) {
+		synchronized (connectionLock) {
+			PeerActivity state=activity.get(peerKey);
+			if (state==null) return;
+			state.lastActive=clock.getAsLong();
+		}
+		maintenanceSignal.release();
+	}
+
+	/** Retains a peer for an asynchronous operation, optionally recording application activity. */
+	public <T> CompletableFuture<T> withPeer(AccountKey peerKey,boolean useful,
+			Supplier<CompletableFuture<T>> operation) {
+		PeerActivity state;
+		synchronized (connectionLock) {
+			state=activity.get(peerKey);
+			if (state!=null) {
+				state.requests++;
+				if (useful) state.lastActive=clock.getAsLong();
+			}
+		}
+		try {
+			return operation.get().whenComplete((value,error) -> {
+				synchronized (connectionLock) {
+					if (state!=null) {
+						state.requests--;
+						if (useful && error==null) state.lastActive=clock.getAsLong();
+					}
+				}
+				maintenanceSignal.release();
+			});
+		} catch (RuntimeException | Error e) {
+			synchronized (connectionLock) { if (state!=null) state.requests--; }
+			throw e;
+		}
+	}
+
+	/** Installs the endpoint's correlated PING support for listener-owned routes. */
+	void setInboundProbe(Function<AConnection,CompletableFuture<?>> probe,
+			Consumer<AConnection> failure) {
+		inboundProbe=probe;
+		inboundFailure=failure;
+	}
+
+	/** Records decoded inbound traffic without promoting the peer into the active set. */
+	void received(AccountKey key,Object route) {
+		synchronized (connectionLock) {
+			HealthCheck check=health.get(key);
+			if (check==null) return;
+			// The endpoint reports the physical socket after decoding lattice deltas;
+			// the client observer reports its wrapper for other incoming messages.
+			boolean matches=check.route==route || (route instanceof AConnection physical
+				&& check.route instanceof AConvexConnected peer && peer.usesConnection(physical));
+			if (matches) {
+				check.lastReceived=clock.getAsLong();
+				check.probing=false;
+			}
+		}
 	}
 
 	/**
@@ -289,6 +394,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public synchronized void start() {
 		if (running) return;
+		if (workers.isShutdown()) workers=Executors.newVirtualThreadPerTaskExecutor();
 		accepting = true;
 		running = true;
 		maintenanceThread = Thread.ofVirtual().name("Lattice connection maintenance").start(this::maintenanceLoop);
@@ -323,6 +429,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 
 		closeAllConnections();
+		workers.shutdownNow();
 		log.debug("LatticeConnectionManager closed");
 	}
 
@@ -349,6 +456,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 			// The listener/endpoint owns these physical inbound connections. Closing
 			// this manager revokes only their logical outbound capability.
 			upgradedInboundRoutes.clear();
+			dialling.clear();
+			health.clear();
 		}
 		for (Convex connection : active) closeSilently(connection);
 		for (PendingConnection pc : pending) {
@@ -436,6 +545,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			if (!accepting) return false;
 			DesiredPeer existing=desiredPeers.get(peerKey);
 			if (existing!=null) {
+				activity.get(peerKey).explicit=true;
 				if (replace) {
 					// An operator-supplied address replaces only the dial target. Keep
 					// discovery revision metadata so stale discovery cannot overwrite it.
@@ -446,6 +556,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			}
 			if (desiredPeers.size()>=maxDesiredPeers) return false;
 			desiredPeers.put(peerKey,desired);
+			PeerActivity state=new PeerActivity();
+			state.explicit=true;
+			activity.put(peerKey,state);
 			return true;
 		}
 	}
@@ -507,6 +620,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 				throw new SecurityException("Authenticated peer has no admitted node identity: " + peerKey);
 			}
 			upgradedInboundRoutes.put(peerKey, connection);
+			if (!connections.containsKey(peerKey)) health.put(peerKey,new HealthCheck(connection,clock.getAsLong()));
 		}
 		CompletableFuture<AConnection> waiter = upgradedRouteWaiters.remove(peerKey);
 		if (waiter != null) waiter.complete(connection);
@@ -631,7 +745,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 		restrictOutboundToLimbo(convex);
 		convex.setKeyPair(kp);
-		PendingConnection pending = new PendingConnection(convex);
+		PendingConnection pending = new PendingConnection(convex,clock.getAsLong());
 		PendingConnection replaced=null;
 		boolean eligible;
 		synchronized (connectionLock) {
@@ -686,6 +800,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 				grantOutboundCapabilities(convex);
 				configureReceiveLimit(convex, trusted);
 				replaced = connections.put(peerKey, convex);
+				health.put(peerKey,new HealthCheck(convex,clock.getAsLong()));
 				pending = pendingConnections.remove(peerKey);
 			}
 		}
@@ -731,6 +846,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private void grantOutboundCapabilities(Convex convex) {
 		convex.setStore(store);
 		if (convex instanceof AConvexConnected connected) {
+			connected.setReceiveObserver(() -> received(convex.getVerifiedPeer(),convex));
 			connected.setDataRequestHandler(this::handleDataRequest);
 			connected.setUnsolicitedMessageHandler(message -> {
 				BiConsumer<Convex, Message> handler = peerMessageHandler;
@@ -781,6 +897,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 		CompletableFuture<AConnection> routeWaiter;
 		synchronized (connectionLock) {
 			desiredPeers.remove(peerKey);
+			activity.remove(peerKey);
+			dialling.remove(peerKey);
+			health.remove(peerKey);
 			removed = connections.remove(peerKey);
 			pending = pendingConnections.remove(peerKey);
 			waiter = connectionWaiters.remove(peerKey);
@@ -847,6 +966,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			if (existing==null) {
 				if (desiredPeers.size()>=maxDesiredPeers) return false;
 				desiredPeers.put(peerKey,DesiredPeer.discovered(peerKey,transports,revision));
+				activity.put(peerKey,new PeerActivity());
 				changed=true;
 			} else if (!existing.discovered || revision>existing.revision) {
 				DesiredPeer updated=DesiredPeer.discovered(peerKey,transports,revision);
@@ -965,10 +1085,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (peerKey==null || message==null) return false;
 		Convex peer=getConnection(peerKey);
 		if (peer!=null && peerKey.equals(peer.getVerifiedPeer()) && peer.trySend(message)) {
+			markActive(peerKey);
 			return true;
 		}
 		AConnection route=getUpgradedInboundConnection(peerKey);
-		return route!=null && route.trySendMessage(message);
+		boolean sent=route!=null && route.trySendMessage(message);
+		if (sent) markActive(peerKey);
+		return sent;
 	}
 
 	/** Broadcasts once per remote identity across both physical route forms. */
@@ -1048,41 +1171,227 @@ public class LatticeConnectionManager extends AConnectionManager {
 		pruneDeadConnections();
 		pruneDeadUpgradedInboundConnections();
 		pruneDeadPendingConnections();
-
-		long now = System.currentTimeMillis();
-
-		for (Map.Entry<AccountKey, DesiredPeer> entry : desiredPeers.entrySet()) {
-			AccountKey peerKey = entry.getKey();
-			DesiredPeer desired = entry.getValue();
-
-			synchronized (connectionLock) {
-				if (connections.containsKey(peerKey) || pendingConnections.containsKey(peerKey)
-						|| upgradedInboundRoutes.containsKey(peerKey)) continue;
-			}
-			if (!desired.isRetryDue(now)) continue;
-
-			InetSocketAddress target = resolveTransport(desired);
-			if (target == null) continue;
-
-			try {
-				// Install the untrusted cap as part of connection construction. Applying it
-				// after connect would leave a race in which the remote endpoint could send a
-				// protocol-sized frame before its identity challenge has even started.
-				Convex convex = ConvexRemote.connect(target, untrustedMessageLimit);
-				synchronized (connectionLock) {
-					if (desiredPeers.get(peerKey) != desired) {
-						closeSilently(convex);
-						continue;
-					}
+		long now=clock.getAsLong();
+		checkHealth(now);
+		List<Convex> retired=new ArrayList<>();
+		List<DesiredPeer> attempts=new ArrayList<>();
+		synchronized (connectionLock) {
+			if (!accepting) return;
+			Set<AccountKey> selected=selectPeers(now);
+			for (var entry:connections.entrySet()) {
+				AccountKey key=entry.getKey();
+				Convex peer=entry.getValue();
+				PeerActivity state=activity.get(key);
+				if (selected.contains(key) || (state!=null && state.requests>0)
+						|| (peer instanceof AConvexConnected connected && connected.hasPendingRequests())) continue;
+				if (connections.remove(key,peer)) {
+					health.remove(key);
+					retired.add(peer);
 				}
-				beginOutboundAdmission(peerKey, convex);
-				log.debug("Opened connection to peer {} at {}; awaiting admission", peerKey, target);
-			} catch (Exception e) {
-				recordRetryFailure(desired, now);
-				log.debug("Failed to connect to peer {} (attempt {}): {}",
-					peerKey, desired.getFailCount(), e.getMessage());
+			}
+			// Listener-owned inbound sockets may exceed these soft targets. They
+			// already provide connectivity and must not provoke duplicate outbound dials.
+			ArrayList<AccountKey> ordered=new ArrayList<>(selected);
+			Utils.shuffle(ordered);
+			ordered.sort((a,b) -> Boolean.compare(activity.get(b).explicit,activity.get(a).explicit));
+			for (AccountKey key:ordered) {
+				if (dialling.size()+pendingConnections.size()>=MAX_CONCURRENT_DIALS) break;
+				if (hasRouteOrAttempt(key)) continue;
+				DesiredPeer desired=desiredPeers.get(key);
+				if (desired==null || !desired.isRetryDue(now) || !hasDialTarget(desired)) continue;
+				dialling.put(key,desired);
+				attempts.add(desired);
 			}
 		}
+		for (Convex peer:retired) closeSilently(peer);
+		for (DesiredPeer desired:attempts) startDial(desired);
+	}
+
+	/** Stable healthy incumbents first; random sampling fills vacant ambient slots. Lock held. */
+	private Set<AccountKey> selectPeers(long now) {
+		HashSet<AccountKey> selected=new HashSet<>();
+		ArrayList<AccountKey> recent=new ArrayList<>();
+		ArrayList<AccountKey> ambient=new ArrayList<>();
+		for (var entry:desiredPeers.entrySet()) {
+			AccountKey key=entry.getKey();
+			PeerActivity state=activity.get(key);
+			if (state.explicit) selected.add(key);
+			else if (state.lastActive!=Long.MIN_VALUE && now-state.lastActive<ACTIVE_RETENTION_MS) recent.add(key);
+		}
+		recent.sort((a,b) -> Long.compare(activity.get(b).lastActive,activity.get(a).lastActive));
+		for (int i=0;i<Math.min(activePeers,recent.size());i++) selected.add(recent.get(i));
+		for (var entry:desiredPeers.entrySet()) {
+			AccountKey key=entry.getKey();
+			if (!selected.contains(key) && (hasRouteOrAttempt(key)
+					|| (entry.getValue().isRetryDue(now) && hasDialTarget(entry.getValue())))) ambient.add(key);
+		}
+		Utils.shuffle(ambient);
+		ambient.sort((a,b) -> Integer.compare(routeRank(a),routeRank(b)));
+		for (int i=0;i<Math.min(ambientPeers,ambient.size());i++) selected.add(ambient.get(i));
+		return selected;
+	}
+
+	private int routeRank(AccountKey key) {
+		if (connections.containsKey(key) || upgradedInboundRoutes.containsKey(key)) return 0;
+		return hasRouteOrAttempt(key) ? 1 : 2;
+	}
+
+	private boolean hasRouteOrAttempt(AccountKey key) {
+		return connections.containsKey(key) || upgradedInboundRoutes.containsKey(key)
+			|| pendingConnections.containsKey(key) || dialling.containsKey(key);
+	}
+
+	/** No DNS or socket work on the maintenance thread. */
+	private static boolean hasDialTarget(DesiredPeer peer) {
+		if (peer.transports==null) return false;
+		for (AString uri:peer.transports) {
+			String value=uri.toString();
+			if (value.startsWith("tcp://") || !value.contains("://")) return true;
+		}
+		return false;
+	}
+
+	private void startDial(DesiredPeer desired) {
+		AccountKey key=desired.peerKey;
+		try {
+			openPeer(desired).whenComplete((peer,error) -> {
+				boolean eligible;
+				synchronized (connectionLock) {
+					eligible=accepting && dialling.get(key)==desired && desiredPeers.containsKey(key);
+					if (error!=null || !eligible) dialling.remove(key,desired);
+					if (eligible && error!=null) recordRetryFailure(desiredPeers.get(key),clock.getAsLong());
+				}
+				if (error!=null || !eligible) {
+					if (peer!=null) closeSilently(peer);
+					maintenanceSignal.release();
+					return;
+				}
+				// Retain the reservation until beginOutboundAdmission has installed
+				// either a pending or a live connection, including concurrent callbacks.
+				try { beginOutboundAdmission(key,peer); }
+				finally {
+					synchronized (connectionLock) { dialling.remove(key,desired); }
+					maintenanceSignal.release();
+				}
+			});
+		} catch (RuntimeException e) {
+			synchronized (connectionLock) {
+				if (dialling.remove(key,desired)) recordRetryFailure(desired,clock.getAsLong());
+			}
+			maintenanceSignal.release();
+		}
+	}
+
+	/** Overridable asynchronous transport boundary for deterministic policy tests. */
+	CompletableFuture<Convex> openPeer(DesiredPeer desired) {
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				InetSocketAddress target=resolveTransport(desired);
+				if (target==null) throw new IllegalArgumentException("No supported TCP endpoint");
+				return ConvexRemote.connect(target,untrustedMessageLimit);
+			} catch (Exception e) {
+				throw new java.util.concurrent.CompletionException(e);
+			}
+		},workers);
+	}
+
+	/** Probes are correlated requests, independently of activity used for peer selection. */
+	CompletableFuture<?> probePeer(Object route) {
+		return CompletableFuture.supplyAsync(() -> {
+			if (route instanceof Convex peer) return peer.ping().thenApply(timestamp -> {
+				if (timestamp==null) throw new IllegalStateException("Invalid PING response");
+				return timestamp;
+			});
+			return inboundProbe.apply((AConnection)route);
+		},workers).thenCompose(future -> future);
+	}
+
+	private void checkHealth(long now) {
+		List<Map.Entry<AccountKey,HealthCheck>> probes=new ArrayList<>();
+		List<Map.Entry<AccountKey,HealthCheck>> failures=new ArrayList<>();
+		synchronized (connectionLock) {
+			Map<AccountKey,Object> routes=new HashMap<>(upgradedInboundRoutes);
+			routes.putAll(connections);
+			for (var entry:new ArrayList<>(health.entrySet())) {
+				Object current=routes.get(entry.getKey());
+				if (current==null) failures.add(entry);
+				else if (current!=entry.getValue().route) health.remove(entry.getKey());
+			}
+			for (var entry:routes.entrySet()) {
+				AccountKey key=entry.getKey();
+				Object route=entry.getValue();
+				HealthCheck check=health.computeIfAbsent(key,k -> new HealthCheck(route,now));
+				if (check.probing) {
+					if (now-check.probeStarted>=PROBE_TIMEOUT_MS) {
+						failures.add(Map.entry(key,check));
+					}
+				} else if (now-check.lastReceived>=QUIET_PROBE_MS
+						&& (route instanceof Convex || inboundProbe!=null)) {
+					check.probing=true;
+					check.probeStarted=now;
+					probes.add(Map.entry(key,check));
+				}
+			}
+		}
+		for (var entry:failures) failRoute(entry.getKey(),entry.getValue());
+		for (var entry:probes) {
+			AccountKey key=entry.getKey();
+			HealthCheck check=entry.getValue();
+			long generation=check.probeStarted;
+			try {
+				probePeer(check.route).whenComplete((value,error) -> {
+					synchronized (connectionLock) {
+						if (health.get(key)!=check || !check.probing || check.probeStarted!=generation) return;
+						if (error==null) {
+							check.lastReceived=clock.getAsLong();
+							check.probing=false;
+						}
+					}
+					// A request timeout or send failure alone does not prove the peer
+					// dead. Allow the full grace period for propagation or a late reply.
+					if (error!=null) maintenanceSignal.release();
+				});
+			} catch (RuntimeException e) { maintenanceSignal.release(); }
+		}
+	}
+
+	/** A late failed probe can never retire a replacement connection. */
+	private void failRoute(AccountKey key,HealthCheck check) {
+		boolean close=false;
+		boolean retireInbound=false;
+		synchronized (connectionLock) {
+			if (health.get(key)!=check) return;
+			Object current=connections.get(key);
+			if (current==null) current=upgradedInboundRoutes.get(key);
+			// Traffic may have resumed since maintenance collected the timeout.
+			if (current==check.route && (!check.probing
+					|| clock.getAsLong()-check.probeStarted<PROBE_TIMEOUT_MS)) return;
+			health.remove(key,check);
+			if (current!=null && current!=check.route) return;
+			if (check.route instanceof Convex peer) close=connections.remove(key,peer);
+			else retireInbound=upgradedInboundRoutes.remove(key,check.route);
+			DesiredPeer desired=desiredPeers.get(key);
+			if (desired!=null) recordRetryFailure(desired,clock.getAsLong());
+		}
+		if (close) closeSilently((Convex)check.route);
+		// The endpoint owns socket failure handling. In particular, a silent NAT
+		// return route must disconnect so its remote owner can reconnect it.
+		if (retireInbound && inboundFailure!=null) inboundFailure.accept((AConnection)check.route);
+		maintenanceSignal.release();
+	}
+
+	private static final class PeerActivity {
+		boolean explicit;
+		long lastActive=Long.MIN_VALUE;
+		int requests;
+	}
+
+	private static final class HealthCheck {
+		final Object route;
+		long lastReceived;
+		boolean probing;
+		long probeStarted;
+		HealthCheck(Object route,long now) { this.route=route; lastReceived=now; }
 	}
 
 	/** Revokes upgraded capabilities whose listener-owned socket is no longer valid. */
@@ -1140,6 +1449,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 				grantOutboundCapabilities(pending.connection);
 				configureReceiveLimit(pending.connection, true);
 				replaced = connections.put(peerKey, pending.connection);
+				health.put(peerKey,new HealthCheck(pending.connection,clock.getAsLong()));
 				pendingConnections.remove(peerKey, pending);
 			}
 		}
@@ -1168,7 +1478,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (!removed) return;
 		pending.admission.completeExceptionally(failure);
 		closeSilently(pending.connection);
-		if (desired != null) recordRetryFailure(desired, System.currentTimeMillis());
+		if (desired != null) recordRetryFailure(desired, clock.getAsLong());
+		maintenanceSignal.release();
 		log.debug("Rejected peer {} after failed identity challenge: {}", peerKey, failure.getMessage());
 	}
 
@@ -1176,9 +1487,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private void pruneDeadPendingConnections() {
 		for (Map.Entry<AccountKey, PendingConnection> entry : pendingConnections.entrySet()) {
 			PendingConnection pending = entry.getValue();
-			if (!pending.connection.isConnected()) {
+			if (!pending.connection.isConnected() || clock.getAsLong()-pending.started>=ADMISSION_TIMEOUT_MS) {
 				rejectPendingAdmission(entry.getKey(), pending,
-					new IllegalStateException("Connection closed while awaiting identity verification"));
+					new IllegalStateException("Connection closed or timed out awaiting identity verification"));
 			}
 		}
 	}
@@ -1198,10 +1509,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Manager-owned client and its caller-visible admission result while in limbo. */
 	private static final class PendingConnection {
 		final Convex connection;
+		final long started;
 		final CompletableFuture<Convex> admission = new CompletableFuture<>();
 
-		PendingConnection(Convex connection) {
+		PendingConnection(Convex connection,long started) {
 			this.connection = connection;
+			this.started=started;
 		}
 	}
 
@@ -1228,7 +1541,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 		/** Consecutive dial or admission failures used only for reconnect scheduling. */
 		private int failCount = 0;
-		/** Earliest wall-clock time at which maintenance may retry this peer. */
+		/** Earliest monotonic maintenance time at which this peer may be retried. */
 		private long nextRetryTime = 0;
 
 		private DesiredPeer(AccountKey peerKey,AVector<AString> transports,

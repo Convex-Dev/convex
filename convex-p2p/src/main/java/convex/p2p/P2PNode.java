@@ -433,9 +433,11 @@ public class P2PNode implements Closeable {
 	}
 
 	private CompletableFuture<Void> initialisePeer(Convex peer) {
+		initialisations.keySet().removeIf(p -> !p.isConnected());
 		return initialisations.computeIfAbsent(peer,p -> {
-			CompletableFuture<Void> initialised=pushOwnNodeInfo(p)
-				.thenCompose(ignored -> pullBootstrap(p));
+			CompletableFuture<Void> initialised=propagator.getConnectionManager().withPeer(
+				p.getVerifiedPeer(),false,() -> pushOwnNodeInfo(p)
+					.thenCompose(ignored -> pullBootstrap(p)));
 			initialised.whenComplete((ignored,error) -> {
 				if (error!=null) initialisations.remove(p,initialised);
 			});
@@ -444,15 +446,15 @@ public class P2PNode implements Closeable {
 	}
 
 	private CompletableFuture<Void> pullBootstrap(Convex peer) {
-		return server.pullPath(propagator,peer,P2PLattice.KEY_P2P)
+		return server.pullPath(propagator,peer,true,P2PLattice.KEY_P2P)
 			.thenRun(nodeDirectory::refresh)
-			.thenCompose(ignored -> server.pullPath(propagator,peer,P2PLattice.KEY_ID))
+			.thenCompose(ignored -> server.pullPath(propagator,peer,true,P2PLattice.KEY_ID))
 			.thenCompose(ignored -> pullDesiredSocial(peer));
 	}
 
 	private CompletableFuture<Void> pullDesiredSocial(Convex peer) {
 		CompletableFuture<?>[] pulls=socialPolicy.desiredOwners().stream()
-			.map(did -> server.pullPath(propagator,peer,Social.KEY_SOCIAL,did)
+			.map(did -> server.pullPath(propagator,peer,true,Social.KEY_SOCIAL,did)
 				.thenRun(() -> socialPolicy.cacheCurrentOwner(did)))
 			.toArray(CompletableFuture[]::new);
 		return CompletableFuture.allOf(pulls);

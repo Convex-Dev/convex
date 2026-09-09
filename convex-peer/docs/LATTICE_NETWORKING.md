@@ -195,7 +195,7 @@ failures are surfaced independently to the application that owns the transport.
 
 ## Naming
 
-- **desired**: retained bounded intent to maintain a route to an identity.
+- **desired**: retained bounded candidate or explicit intent for a route to an identity.
 - **pending**: a manager-owned socket exists but admission is incomplete.
 - **assigned**: application policy selected one group for an inbound socket.
 - **trusted**: a live challenge proved possession of the expected transport key.
@@ -203,6 +203,35 @@ failures are surfaced independently to the application that owns the transport.
   outbound route.
 - **owner-authorised**: signed application data passed lattice validation; this
   is independent of every transport term above.
+
+## Live peer selection
+
+`maxDesiredPeers` bounds candidates (default 256). The independent soft targets
+`ambientPeers` and `activePeers` default to 16 each. Maintenance retains healthy
+ambient incumbents, samples replacements, and prioritises the most recently used
+active peers for two minutes. Explicit `connectPeer`/`addPeer` intent survives
+discovery metadata updates and may exceed these targets until `removePeer`.
+Pending socket opens and identity challenges reserve slots, with at most four
+automatic attempts outstanding. Each attempt runs independently of maintenance.
+
+`markActive` records useful directed traffic. `withPeer` protects an asynchronous
+operation from trimming and can optionally record activity. Application pulls and
+authenticated point-message routes use these hooks; background bootstrap, broadcast
+gossip and PING traffic do not earn priority. Inbound and outbound routes to one key
+count once. Inbound physical sockets remain owned by their listener/endpoint, so
+soft targets are not an aggregate socket limit.
+
+Maintenance runs every second, but normal propagation supplies the heartbeat and
+healthy ambient peers are not periodically rotated. Only two minutes without
+decoded incoming traffic triggers a probe, with a further 30-second grace period.
+Any incoming traffic cancels the liveness check; a late or failed probe request
+cannot evict a peer that has resumed propagation or shorten that grace period.
+New identity challenges use a separate five-second admission deadline.
+Known-closed sockets immediately free a slot for another candidate, independently
+of the failed peer's jittered retry backoff. A probe result is tied to its exact
+route and cannot retire a replacement. Failed inbound routes are retired through
+the owning endpoint, allowing NAT leaves to reconnect. Trimming healthy excess
+routes never closes listener-owned sockets.
 
 ## Extension rule
 

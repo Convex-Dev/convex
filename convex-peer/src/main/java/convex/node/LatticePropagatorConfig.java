@@ -45,6 +45,12 @@ public final class LatticePropagatorConfig {
 	/** Maximum desired peers retained by this group. */
 	public static final AString MAX_DESIRED_PEERS=Strings.intern("maxDesiredPeers");
 
+	/** Soft target for healthy background peer relationships. */
+	public static final AString AMBIENT_PEERS=Strings.intern("ambientPeers");
+
+	/** Additional recently used peers to retain, excluding explicit connections. */
+	public static final AString ACTIVE_PEERS=Strings.intern("activePeers");
+
 	/** Maximum number of decoded messages awaiting ordered processing. */
 	public static final AString INBOUND_QUEUE_SIZE=Strings.intern("inboundQueueSize");
 
@@ -65,6 +71,8 @@ public final class LatticePropagatorConfig {
 
 	/** Conservative cap on configured and discovery-supplied peer intent. */
 	public static final int DEFAULT_MAX_DESIRED_PEERS=256;
+	public static final int DEFAULT_AMBIENT_PEERS=16;
+	public static final int DEFAULT_ACTIVE_PEERS=16;
 
 	/** Conservative cap on physical inbound connections tracked by one group. */
 	public static final int DEFAULT_MAX_CONNECTIONS=256;
@@ -168,6 +176,26 @@ public final class LatticePropagatorConfig {
 	/** Returns the desired-peer cap for this group. */
 	public int getMaxDesiredPeers() {
 		return getPositiveInt(MAX_DESIRED_PEERS,DEFAULT_MAX_DESIRED_PEERS);
+	}
+
+	/** Returns the soft ambient-peer target (zero disables ambient dialling). */
+	public int getAmbientPeers() {
+		return getNonNegativeInt(AMBIENT_PEERS,DEFAULT_AMBIENT_PEERS);
+	}
+
+	/** Returns the soft additional active-peer target. */
+	public int getActivePeers() {
+		return getNonNegativeInt(ACTIVE_PEERS,DEFAULT_ACTIVE_PEERS);
+	}
+
+	private int getNonNegativeInt(AString key,int defaultValue) {
+		CVMLong configured=RT.ensureLong(config.get(key));
+		if (configured==null) return defaultValue;
+		long value=configured.longValue();
+		if (value<0 || value>Integer.MAX_VALUE) {
+			throw new IllegalArgumentException(key+" must be between 0 and "+Integer.MAX_VALUE+": "+value);
+		}
+		return (int)value;
 	}
 
 	/** Returns the decoded-message capacity of this group's inbound queue. */

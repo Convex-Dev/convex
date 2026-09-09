@@ -243,6 +243,7 @@ public class LatticePropagator implements Closeable {
 		this.maxDeltaMessageSize=config.getMaxDeltaMessageSize();
 		this.maxDeltaBroadcastSize=config.getMaxDeltaBroadcastSize();
 		connectionManager.setMaxDesiredPeers(config.getMaxDesiredPeers());
+		connectionManager.setPeerTargets(config.getAmbientPeers(),config.getActivePeers());
 		connectionManager.setInboundMessageLimits(
 			config.getMaxMessageSize(),config.getMaxTrustedMessageSize());
 	}
@@ -494,6 +495,7 @@ public class LatticePropagator implements Closeable {
 			// NodeServer is the sole writer of its authoritative store root.
 			this.persistenceEnabled=false;
 			if (endpoint==null) endpoint=new LatticeProtocolEndpoint(this,node,config);
+			connectionManager.setInboundProbe(endpoint::probe,endpoint::retireConnection);
 			endpoint.setTransportKeyPair(transportKeyPair);
 			endpoint.setIngressFilter(ingressFilter);
 			endpoint.setApplicationMessageHandler(applicationMessageHandler);
@@ -1322,10 +1324,18 @@ public class LatticePropagator implements Closeable {
 	 * @return future completing with the acquired value, or {@code null} when absent
 	 */
 	public CompletableFuture<ACell> pullPath(Convex peer, ACell... path) {
+		return pullPath(peer,false,path);
+	}
+
+	/** Background pulls retain outstanding work but do not earn active-peer priority. */
+	public CompletableFuture<ACell> pullPath(Convex peer,boolean background,ACell... path) {
 		if (peer == null) {
 			return CompletableFuture.failedFuture(new IllegalArgumentException("Peer cannot be null"));
 		}
+		return connectionManager.withPeer(peer.getVerifiedPeer(),!background,() -> acquirePath(peer,path));
+	}
 
+	private CompletableFuture<ACell> acquirePath(Convex peer,ACell[] path) {
 		return CompletableFuture.supplyAsync(() -> {
 			try {
 				if (!peer.isConnected()) {

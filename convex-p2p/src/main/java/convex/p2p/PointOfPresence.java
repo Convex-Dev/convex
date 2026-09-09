@@ -173,6 +173,9 @@ final class PointOfPresence {
 			Hash messageID=rawSigned.getHash();
 			if (isSeen(messageID) || !rawSigned.checkSignature()) return false;
 			if (!markSeen(messageID)) return false;
+			if (connection!=null && connection.isTrusted()) {
+				propagator.getConnectionManager().markActive(connection.getTrustedKey());
+			}
 
 			if (ownKey!=null && envelope.destination().equals(ownKey)) {
 				return deliver(envelope);

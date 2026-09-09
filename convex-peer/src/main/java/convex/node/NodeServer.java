@@ -232,8 +232,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @return future containing the authoritative value at {@code path}
 	 */
 	public CompletableFuture<ACell> pullPath(LatticePropagator source,Convex peer,ACell... path) {
+		return pullPath(source,peer,false,path);
+	}
+
+	/** Pulls a path, optionally as background bootstrap rather than application activity. */
+	public CompletableFuture<ACell> pullPath(LatticePropagator source,Convex peer,
+			boolean background,ACell... path) {
 		requireAttached(source);
-		return source.pullPath(peer,path).thenApply(acquired -> {
+		return source.pullPath(peer,background,path).thenApply(acquired -> {
 			ALatticeCursor<ACell> target=cursor.path(path);
 			if (acquired!=null) mergeIncoming(target,acquired);
 			cursor.sync();

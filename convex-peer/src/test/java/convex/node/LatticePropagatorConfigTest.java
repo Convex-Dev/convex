@@ -1,6 +1,7 @@
 package convex.node;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,22 @@ import convex.lattice.generic.MaxLattice;
 
 /** Tests the explicit boundary between node-host and propagation-group limits. */
 public class LatticePropagatorConfigTest {
+
+	@Test
+	public void testSoftPeerTargets() {
+		var defaults=LatticePropagatorConfig.create();
+		assertEquals(16,defaults.getAmbientPeers());
+		assertEquals(16,defaults.getActivePeers());
+		assertEquals(256,defaults.getMaxDesiredPeers());
+		var configured=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.ZERO,
+			LatticePropagatorConfig.ACTIVE_PEERS,CVMLong.create(3)));
+		assertEquals(0,configured.getAmbientPeers());
+		assertEquals(3,configured.getActivePeers());
+		var invalid=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.create(-1)));
+		assertThrows(IllegalArgumentException.class,invalid::getAmbientPeers);
+	}
 
 	@Test
 	public void testHostAndGroupConfigurationAreIndependent() throws Exception {

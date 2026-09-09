@@ -60,6 +60,27 @@ public abstract class AConvexConnected extends Convex {
 	 * results, challenges and explicitly enabled DATA_REQUESTs are ignored.
 	 */
 	private volatile Consumer<Message> unsolicitedMessageHandler;
+	private volatile Runnable receiveObserver;
+
+	/** Observes decoded incoming traffic for a connection owner's liveness policy. */
+	public void setReceiveObserver(Runnable observer) {
+		receiveObserver=observer;
+	}
+
+	/** Tests whether decoded traffic belongs to this client's current physical socket. */
+	public boolean usesConnection(AConnection source) {
+		return source!=null && connection==source;
+	}
+
+	/** Whether a correlated request is still awaiting a reply. */
+	public boolean hasPendingRequests() {
+		return !awaiting.isEmpty();
+	}
+
+	private void observeReceive() {
+		Runnable observer=receiveObserver;
+		if (observer!=null) observer.run();
+	}
 
 	protected AConvexConnected(Address address, AKeyPair keyPair) {
 		super(address, keyPair);
@@ -100,6 +121,7 @@ public abstract class AConvexConnected extends Convex {
 				return Result.error(ErrorCodes.FORMAT, Strings.create("Bad message format: "+e1.getMessage()));
 			}
 			Result r=m.toResult();
+			observeReceive();
 			if (transaction) observeTransactionResult(r);
 			return r;
 		});
@@ -139,6 +161,7 @@ public abstract class AConvexConnected extends Convex {
 				throw e;
 			}
 			MessageType type = m.getType();
+			observeReceive();
 			if (type == MessageType.CHALLENGE) {
 				AKeyPair kp = keyPair;
 				if (kp != null) {
@@ -301,6 +324,7 @@ public abstract class AConvexConnected extends Convex {
 		verifiedPeer = null;
 		dataRequestHandler = null;
 		unsolicitedMessageHandler = null;
+		receiveObserver = null;
 		awaiting.forEach((id,future) -> future.completeExceptionally(
 				new IllegalStateException("Connection closed")));
 		awaiting.clear();

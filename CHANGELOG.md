@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Lattice nodes keep a soft target of 16 ambient peers plus 16 recently active
+  communicators from their desired-peer pool. Explicit connections may exceed
+  the targets. Directed traffic earns retention; normal propagation keeps routes
+  live, with probes only after two minutes of silence and a 30-second grace period.
+  Bounded concurrent dialling avoids blocking peer maintenance.
 - Consensus propagation offers the peer's own Order before the Belief carrying
   other peers' Orders. An update that does not fit one message goes out as DATA
   messages of at most the message limit each, followed by its root, so a Block

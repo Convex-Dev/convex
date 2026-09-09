@@ -504,6 +504,13 @@ correctly owner-signed `[:p2p :nodes]` records and translates their transport fi
 The connection manager itself never reads that lattice path or parses NodeInfo. Callers
 can await admission without polling. Explicit and discovered desired peers share the
 configurable `maxDesiredPeers` cap (256 by default).
+That cap bounds candidates, not live connections. The soft live targets are 16
+ambient peers plus up to 16 recently active communicators (`ambientPeers` and
+`activePeers` in `LatticePropagatorConfig`). Explicit connections may exceed them.
+Maintenance retains healthy incumbents, prioritises directed application traffic,
+and fills failed slots from other candidates while the failed peer backs off.
+See [live peer selection](LATTICE_NETWORKING.md#live-peer-selection) for activity,
+liveness and pending-attempt rules.
 It also keeps authenticated inbound connections in a separate upgraded-route map.
 Ordinary inbound sockets never appear in broadcasts; an upgraded route is selected
 only when no live manager-owned outbound client already serves the same peer key.
