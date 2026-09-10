@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
@@ -472,6 +473,15 @@ public class LatticeCursorTest {
 
 	@Test
 	public void testConcurrentRootSyncCallbacksAreSerialised() throws Exception {
+		assertRootSyncCallbacksAreSerialised(false);
+	}
+
+	@Test
+	public void testPerCallPublicationSharesRootSyncOrdering() throws Exception {
+		assertRootSyncCallbacksAreSerialised(true);
+	}
+
+	private void assertRootSyncCallbacksAreSerialised(boolean perCallPublication) throws Exception {
 		SetLattice<CVMLong> lattice = SetLattice.create();
 		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(
 			lattice, Sets.of(CVMLong.ONE));
@@ -488,7 +498,7 @@ public class LatticeCursorTest {
 		AtomicReference<ASet<CVMLong>> secondSnapshot = new AtomicReference<>();
 		AtomicReference<Throwable> failure = new AtomicReference<>();
 
-		root.onSync(snapshot -> {
+		Function<ASet<CVMLong>,ASet<CVMLong>> callback = snapshot -> {
 			int call = callCount.incrementAndGet();
 			int active = activeCallbacks.incrementAndGet();
 			maxActiveCallbacks.updateAndGet(previous -> Math.max(previous, active));
@@ -512,7 +522,8 @@ public class LatticeCursorTest {
 				activeCallbacks.decrementAndGet();
 			}
 			return snapshot;
-		});
+		};
+		root.onSync(callback);
 
 		Runnable sync = () -> {
 			try {
@@ -532,7 +543,15 @@ public class LatticeCursorTest {
 
 		Thread second = new Thread(() -> {
 			secondStarted.countDown();
-			sync.run();
+			if (perCallPublication) {
+				try {
+					root.sync(callback);
+				} catch (Throwable t) {
+					failure.compareAndSet(null,t);
+				}
+			} else {
+				sync.run();
+			}
 		}, "root-sync-second");
 		second.start();
 		assertTrue(secondStarted.await(5, TimeUnit.SECONDS), "Second sync caller did not start");

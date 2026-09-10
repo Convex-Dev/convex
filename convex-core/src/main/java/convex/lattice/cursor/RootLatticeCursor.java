@@ -61,9 +61,22 @@ public class RootLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 
 	@Override
 	public V sync() {
+		return sync(null);
+	}
+
+	/**
+	 * Publishes using a per-call callback, sharing the normal sync ordering and
+	 * CAS-or-merge write-back. This lets a host select publication policy for an
+	 * explicit persistence operation without replacing the configured callback.
+	 * The callback runs once, outside retryable atomic update functions.
+	 *
+	 * @param callback Publication callback, or null to use the configured callback
+	 * @return Exact published value; concurrent writes may remain pending locally
+	 */
+	public V sync(Function<V, V> callback) {
 		syncLock.lock();
 		try {
-			Function<V, V> callback = syncCallback;
+			if (callback == null) callback = syncCallback;
 			if (callback == null) return get();
 
 			V current = get();

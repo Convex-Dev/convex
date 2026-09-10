@@ -163,7 +163,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		try {
 			ACell restored=store.getRootData();
 			if (restored!=null) {
-				cursor.set((V)restored);
+				// Pre-launch local edits take precedence over replicated/persisted ties.
+				cursor.merge((V)restored);
 				log.info("Restored authoritative lattice value from node store");
 			}
 		} catch (IOException e) {
@@ -171,10 +172,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	private void seedPropagationViews() throws IOException {
-		ACell announced=publishAuthoritativeRoot(cursor.get(),false);
-		cursor.set((V)announced);
+		ACell announced=syncSnapshot(null,false);
 		for (LatticePropagator propagator:List.copyOf(propagators)) {
 			runIsolated(propagator,"initial view materialisation",
 				() -> propagator.processSnapshot(announced));
@@ -486,18 +485,33 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	private V publishApplicationRoot(V value) {
+		return publishApplicationRoot(value,true);
+	}
+
+	private V publishApplicationRoot(V value,boolean notify) {
 		try {
 			@SuppressWarnings("unchecked")
-			V announced=(V)publishAuthoritativeRoot(value,true);
+			V announced=(V)publishAuthoritativeRoot(value,notify);
 			return announced;
 		} catch (IOException e) {
 			throw new StoreException("NodeServer sync failed: persistence error",e);
 		}
 	}
 
-	/** Serialises the sole authoritative root write. Root-cursor sync callbacks are
-	 * themselves ordered, while this lock also excludes explicit persistence and
-	 * checkpoint operations. */
+	/** Publishes an optional snapshot candidate through the same ordered sync as
+	 * application publication. Current local state is always the own argument. */
+	private V syncSnapshot(V candidate,boolean notify) throws IOException {
+		try {
+			return cursor.sync(current -> publishApplicationRoot(
+				(candidate==null) ? current : lattice.merge(mergeContext,current,candidate),notify));
+		} catch (StoreException e) {
+			if (e.getCause() instanceof IOException cause) throw cause;
+			throw e;
+		}
+	}
+
+	/** Called within the root cursor's ordered sync. The persistence lock also
+	 * excludes checkpoints from cell announcement and the root-pointer write. */
 	@SuppressWarnings("unchecked")
 	private ACell publishAuthoritativeRoot(ACell value,boolean notify) throws IOException {
 		ACell announced;
@@ -587,15 +601,17 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Publishes and durably flushes an authoritative snapshot without notifying
-	 * propagation groups.
+	 * Merges a snapshot into the current local root, publishes and durably flushes
+	 * the result without notifying propagation groups. Current local state wins
+	 * ties; an older supplied snapshot cannot replace the established root.
 	 *
-	 * @param value authoritative snapshot to persist; {@code null} is ignored
+	 * @param value snapshot candidate to persist; {@code null} is ignored
 	 * @throws IOException if publication or the durability barrier fails
 	 */
+	@SuppressWarnings("unchecked")
 	public void persistSnapshot(ACell value) throws IOException {
 		if (!config.isPersist() || value==null) return;
-		publishAuthoritativeRoot(value,false);
+		syncSnapshot((V)value,false);
 		checkpoint();
 	}
 
@@ -715,7 +731,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		IOException nodeFailure=null;
 		ACell finalRoot=cursor.get();
 		try {
-			finalRoot=publishAuthoritativeRoot(finalRoot,true);
+			finalRoot=syncSnapshot(null,true);
 		} catch (IOException e) {
 			nodeFailure=new IOException("Unable to publish final authoritative lattice root",e);
 		}

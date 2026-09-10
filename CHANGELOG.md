@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Lattice nodes preserve local edits on timestamp ties when values return through
+  propagation groups or are restored at launch. Explicit snapshot persistence
+  now merges with current state and installs store-backed references instead of
+  allowing an older snapshot to replace the retained root.
 - Peer: the transaction-size intake policy now rejects a transaction only when
   its origin account cannot cover the mandatory size fee at the current Juice
   price. Size fees are separate from the maximum execution allowance and may

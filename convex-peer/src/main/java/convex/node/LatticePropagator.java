@@ -1131,7 +1131,10 @@ public class LatticePropagator implements Closeable {
 	 *
 	 * <p>Callable directly for standalone use and deterministic tests. Attached
 	 * nodes normally schedule it on this group's worker using
-	 * {@link #triggerBroadcast(ACell)}. Calls are serialised by {@link #writeLock}.</p>
+	 * {@link #triggerBroadcast(ACell)}. Attached-node snapshots take precedence
+	 * over this group's working view on ties, so an older replicated-back value
+	 * cannot displace a local edit. Standalone input keeps working-view precedence.
+	 * Calls are serialised by {@link #writeLock}.</p>
 	 *
 	 * @param value snapshot to process; must not be {@code null}
 	 * @return announced store-backed value
@@ -1140,10 +1143,13 @@ public class LatticePropagator implements Closeable {
 	public ACell processSnapshot(ACell value) throws IOException {
 		CompletableFuture<ACell> announceFuture;
 		synchronized (writeLock) {
-			// Reconcile the group's established filtered view with the latest
-			// authoritative node snapshot before applying outbound projection.
+			// Keep group pre-merges, but the node's published local state wins ties.
+			// Standalone snapshots are ordinary input, not node publications.
 			if ((workingCursor != null) && (lattice != null)) {
-				value = lattice.merge(mergeContext, workingCursor.get(), value);
+				ACell working=workingCursor.get();
+				value = (node==null)
+					?lattice.merge(mergeContext,working,value)
+					:lattice.merge(mergeContext,value,working);
 			}
 
 			// Filtering is outbound-only: pending inbound state participates in the
