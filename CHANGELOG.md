@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Multi child transactions for another account use the same control rule as
+  `eval-as`: the signer must be the account's controller, resolved through a
+  trust monitor when the controller is a scoped actor. Previously only an exact
+  controller address was accepted.
 - Lattice nodes keep a soft target of 16 ambient peers plus 16 recently active
   communicators from their desired-peer pool. Explicit connections may exceed
   the targets. Directed traffic earns retention; normal propagation keeps routes

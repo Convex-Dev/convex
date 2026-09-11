@@ -240,6 +240,30 @@ public class TransactionTest extends ACVMTest {
 		assertCVMEquals(Vectors.of(VILLAIN),log.get(1).get(3));
 	}
 
+	@Test
+	public void testMultiTrustMonitorControl() {
+		// The signer may act for a child origin whose controller is a trust monitor
+		// that grants it :control, by the same rule as eval-as
+		Context ctx=step("(deploy '(do (defn check-trusted? ^{:callable true} [s a o] (and (= s *scope*) (= a :control)))))");
+		Address monitor=(Address) ctx.getResult();
+		Transfer t=Transfer.create(VILLAIN, 1, HERO, 1000);
+
+		// Scoped to HERO: HERO's signature covers a child for VILLAIN
+		State trusted=stepAs(VILLAIN,ctx,"(set-controller ["+monitor+" "+HERO+"])").getState();
+		long before=trusted.getAccount(VILLAIN).getBalance();
+		ResultContext rc=trusted.applyTransaction(Multi.create(HERO, 1, Multi.MODE_ALL, t));
+		assertFalse(rc.context.isError());
+		assertEquals(before-1000,rc.context.getState().getAccount(VILLAIN).getBalance());
+
+		// Scoped to VILLAIN only: HERO is denied
+		State untrusted=stepAs(VILLAIN,ctx,"(set-controller ["+monitor+" "+VILLAIN+"])").getState();
+		ResultContext denied=untrusted.applyTransaction(Multi.create(HERO, 1, Multi.MODE_ANY, t));
+		assertFalse(denied.context.isError());
+		AVector<Result> rs=denied.context.getResult();
+		assertEquals(ErrorCodes.TRUST,rs.get(0).getErrorCode());
+		assertEquals(before,denied.context.getState().getAccount(VILLAIN).getBalance());
+	}
+
 	private ATransaction nestMulti(ATransaction inner, int levels) {
 		ATransaction t=inner;
 		for (int i=0; i<levels; i++) t=Multi.create(HERO, 1, Multi.MODE_ANY, t);

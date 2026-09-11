@@ -3,7 +3,6 @@ package convex.core.cvm.transactions;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cvm.ARecordGeneric;
-import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
@@ -19,14 +18,25 @@ import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
- * The Multi class enables multiple child transactions to be grouped into a single 
+ * The Multi class enables multiple child transactions to be grouped into a single
  * wrapper transaction with useful joint execution semantics.
- * 
- * Important notes:
- * - Child transactions must either have the same origin address, or be
- *   for accounts controlled by the top level origin Address
- * - Sequence numbers on child transactions are ignored
- * - All transactions currently share the same juice limit / memory allowance
+ *
+ * A Multi is several transactions nested under one signing transaction: the Multi's
+ * signature authorises every child, and each child executes as a transaction for its
+ * own origin, as if that origin had submitted it. Consequently:
+ * - The signer must be each child's origin or control it, by the same rule as eval-as:
+ *   the account's controller, resolved through a trust monitor if the controller is a
+ *   scoped actor.
+ * - Children carry no signature, so their sequence numbers are ignored and a child
+ *   origin's sequence number is not advanced. The Multi's own sequence number
+ *   protects the bundle against replay.
+ * - The signer's balance bounds juice for the whole bundle and the signer pays all
+ *   fees, including memory. A controller therefore sponsors the accounts it acts for,
+ *   and *origin* inside a child is not necessarily the payer.
+ * - Children apply in order, each seeing the effects of the previous, and the mode
+ *   defines the atomicity of the bundle. Log entries of all children accumulate in
+ *   the enclosing result.
+ * - Each level of Multi nesting counts against the execution depth limit.
  */
 public class Multi extends ATransaction {
 
@@ -147,17 +157,16 @@ public class Multi extends ATransaction {
 	}
 
 	private Context applySubTransaction(Context ctx, ATransaction t) {
+		// Each child starts clean of any exceptional result from the previous child
+		ctx=ctx.fork();
+
 		Address torigin=t.origin;
 		if (!this.origin.equals(torigin)) {
-			// different origin account, so need to check control right
-			AccountStatus as=ctx.getAccountStatus(torigin);
-			if (as==null) return ctx.withError(ErrorCodes.NOBODY,"Child transaction origin account does not exist");
-			ACell cont=as.getController();
-			if ((cont==null)||!this.origin.equals(cont)) {
-				return ctx.withError(ErrorCodes.TRUST,"Account control not available");
-			}
+			// The signer must control the child origin, by the same rule as eval-as
+			ctx=ctx.checkControl(torigin);
+			if (ctx.isExceptional()) return ctx;
 		}
-		
+
 		// TODO: possible signed sub-transaction for submission via another account? EIP-3009 style?
 
 		// Child shares the enclosing transaction context, juice accounting and log
