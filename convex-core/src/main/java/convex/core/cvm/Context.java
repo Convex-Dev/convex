@@ -2244,6 +2244,27 @@ public class Context {
 	}
 
 	/**
+	 * Forks this context to execute a child transaction as the given origin account.
+	 *
+	 * Unlike {@link #forkWithAddress(Address)}, the transaction context, juice accounting,
+	 * depth and log are retained, so the child's execution is accounted against the
+	 * enclosing transaction and its log entries are kept. Local bindings, caller, offer
+	 * and scope are reset as at the start of a transaction.
+	 *
+	 * @param newOrigin Origin address for the child transaction
+	 * @return Forked Context, or an exceptional Context with a :NOBODY error if the account does not exist
+	 */
+	public Context forkWithOrigin(Address newOrigin) {
+		if (newOrigin==null) throw new IllegalArgumentException("Null origin!");
+		State state=getState();
+		if (state.getAccount(newOrigin)==null) {
+			return withError(ErrorCodes.NOBODY,"Account does not exist: "+newOrigin);
+		}
+		TransactionContext tctx=getTransactionContext().withOrigin(newOrigin);
+		return create(state,tctx,juice,juiceLimit,EMPTY_BINDINGS,NO_RESULT,depth,newOrigin,null,newOrigin,ZERO_OFFER,log,NO_COMPILER_STATE);
+	}
+
+	/**
 	 * Forks this context, creating a new copy of all local state but clears any exceptional value
 	 * @return A new forked Context
 	 */

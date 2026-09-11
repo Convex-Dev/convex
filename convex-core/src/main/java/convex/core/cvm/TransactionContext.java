@@ -4,6 +4,7 @@ import convex.core.cpos.Block;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -37,6 +38,25 @@ public final class TransactionContext {
 
 	public Address getOrigin() {
 		return origin;
+	}
+
+	/**
+	 * Returns a copy of this transaction context with a different origin, as used for a
+	 * child transaction executed on behalf of a controlled account.
+	 *
+	 * @param newOrigin Origin address for the copy
+	 * @return Transaction context with the given origin, or this instance if unchanged
+	 */
+	public TransactionContext withOrigin(Address newOrigin) {
+		if (Cells.equals(origin, newOrigin)) return this;
+		TransactionContext ctx=new TransactionContext();
+		ctx.signedTx=signedTx;
+		ctx.block=block;
+		ctx.origin=newOrigin;
+		ctx.initialState=initialState;
+		ctx.blockNumber=blockNumber;
+		ctx.txNumber=txNumber;
+		return ctx;
 	}
 
 	public AVector<CVMLong> getLocation() {

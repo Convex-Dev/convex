@@ -30,6 +30,7 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Multi;
 import convex.core.cvm.transactions.Transactions;
 import convex.core.cvm.transactions.Transfer;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Format;
@@ -196,8 +197,50 @@ public class TransactionTest extends ACVMTest {
 	
 		doTransactionTests(m1);
 	}
-	
-	@Test 
+
+	@Test
+	public void testMultiRetainsChildLogsAndJuice() {
+		// Regression: each child was forked into a fresh context, so the enclosing log
+		// was replaced by the last child's log and juice restarted at zero per child
+		Invoke t1=Invoke.create(HERO, 1, "(log 1)");
+		Invoke t2=Invoke.create(HERO, 1, "(log 2)");
+		ResultContext rc=INITIAL.applyTransaction(Multi.create(HERO, 1,Multi.MODE_ALL,t1,t2));
+		Context rctx=rc.context;
+		assertFalse(rctx.isError());
+
+		AVector<AVector<ACell>> log=rctx.getLog();
+		assertEquals(2,log.count());
+		assertEquals(HERO,log.get(0).get(0));
+		assertCVMEquals(Vectors.of(1L),log.get(0).get(3));
+		assertEquals(HERO,log.get(1).get(0));
+		assertCVMEquals(Vectors.of(2L),log.get(1).get(3));
+
+		long j1=INITIAL.applyTransaction(Multi.create(HERO, 1,Multi.MODE_ALL,t1)).juiceUsed;
+		long j2=INITIAL.applyTransaction(Multi.create(HERO, 1,Multi.MODE_ALL,t2)).juiceUsed;
+		assertTrue(j1>0);
+		assertEquals(j1+j2,rc.juiceUsed);
+	}
+
+	@Test
+	public void testMultiControlledAccountOrigin() {
+		// A child for a controlled account runs with that account as origin and
+		// address, and its log entries are attributed to it
+		State s=apply(Invoke.create(VILLAIN, 1, "(set-controller "+HERO+")"));
+		Invoke t1=Invoke.create(HERO, 1, "(log *origin*)");
+		Invoke t2=Invoke.create(VILLAIN, 1, "(log *origin*)");
+		ResultContext rc=s.applyTransaction(Multi.create(HERO, 1,Multi.MODE_ALL,t1,t2));
+		Context rctx=rc.context;
+		assertFalse(rctx.isError());
+
+		AVector<AVector<ACell>> log=rctx.getLog();
+		assertEquals(2,log.count());
+		assertEquals(HERO,log.get(0).get(0));
+		assertCVMEquals(Vectors.of(HERO),log.get(0).get(3));
+		assertEquals(VILLAIN,log.get(1).get(0));
+		assertCVMEquals(Vectors.of(VILLAIN),log.get(1).get(3));
+	}
+
+	@Test
 	public void testCall() {
 		State s=state();
 		Call t1=Call.create(HERO, 1, HERO, Symbols.FOO, Vectors.empty());

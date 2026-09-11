@@ -159,8 +159,10 @@ public class Multi extends ATransaction {
 		}
 		
 		// TODO: possible signed sub-transaction for submission via another account? EIP-3009 style?
-		
-		Context childContext=ctx.forkWithAddress(torigin);
+
+		// Child shares the enclosing transaction context, juice accounting and log
+		Context childContext=ctx.forkWithOrigin(torigin);
+		if (childContext.isExceptional()) return childContext;
 		childContext = t.apply(childContext);
 		ctx=ctx.handleStateResults(childContext,false);
 		return ctx;

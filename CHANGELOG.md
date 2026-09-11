@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Multi transactions keep the log entries of every child and account execution
+  juice across all children against the enclosing transaction. Each child
+  previously started from a fresh context, so only the last child's log and
+  juice survived and children ran outside the enclosing block's transaction
+  context.
 - Lattice nodes preserve local edits on timestamp ties when values return through
   propagation groups or are restored at launch. Explicit snapshot persistence
   now merges with current state and installs store-backed references instead of
