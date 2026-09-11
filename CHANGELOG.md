@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   previously started from a fresh context, so only the last child's log and
   juice survived and children ran outside the enclosing block's transaction
   context.
+- Each level of Multi transaction nesting now counts against the execution
+  depth limit, so a nested child beyond the limit fails with a `:DEPTH` error.
+  Nesting was previously unbounded and a deeply nested Multi overflowed the
+  stack during block application.
 - Lattice nodes preserve local edits on timestamp ties when values return through
   propagation groups or are restored at launch. Explicit snapshot persistence
   now merges with current state and installs store-backed references instead of

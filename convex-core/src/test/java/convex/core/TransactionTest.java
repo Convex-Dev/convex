@@ -240,6 +240,55 @@ public class TransactionTest extends ACVMTest {
 		assertCVMEquals(Vectors.of(VILLAIN),log.get(1).get(3));
 	}
 
+	private ATransaction nestMulti(ATransaction inner, int levels) {
+		ATransaction t=inner;
+		for (int i=0; i<levels; i++) t=Multi.create(HERO, 1, Multi.MODE_ANY, t);
+		return t;
+	}
+
+	/** Follows single-child Multi results inward, returning the first error and its level */
+	private static Result innermostError(Context rctx, int[] levelOut) {
+		ACell r=rctx.getResult();
+		int level=0;
+		while (true) {
+			AVector<?> rs=(AVector<?>) r;
+			assertEquals(1,rs.count());
+			Result inner=(Result) rs.get(0);
+			level++;
+			if (inner.isError()||!(inner.getValue() instanceof AVector)) {
+				levelOut[0]=level;
+				return inner;
+			}
+			r=inner.getValue();
+		}
+	}
+
+	@Test
+	public void testMultiNestingDepthBounded() {
+		// Regression: nesting was never counted against the depth limit, so a few
+		// thousand levels overflowed the stack during block application
+		Transfer transfer=Transfer.create(HERO, 1, VILLAIN, 1);
+		long before=INITIAL.getAccount(VILLAIN).getBalance();
+
+		// Nesting up to the limit executes the innermost transaction
+		ResultContext ok=INITIAL.applyTransaction(nestMulti(transfer,Constants.MAX_DEPTH));
+		assertFalse(ok.context.isError());
+		assertEquals(before+1,ok.context.getState().getAccount(VILLAIN).getBalance());
+
+		// One level beyond fails with a DEPTH error at the innermost fork
+		int[] level=new int[1];
+		ResultContext limit=INITIAL.applyTransaction(nestMulti(transfer,Constants.MAX_DEPTH+1));
+		assertFalse(limit.context.isError()); // MODE_ANY reports the child outcome
+		assertEquals(ErrorCodes.DEPTH,innermostError(limit.context,level).getErrorCode());
+		assertEquals(Constants.MAX_DEPTH+1,level[0]);
+		assertEquals(before,limit.context.getState().getAccount(VILLAIN).getBalance());
+
+		// Far deeper nesting is bounded the same way rather than overflowing the stack
+		ResultContext deep=INITIAL.applyTransaction(nestMulti(transfer,3000));
+		assertEquals(ErrorCodes.DEPTH,innermostError(deep.context,level).getErrorCode());
+		assertEquals(Constants.MAX_DEPTH+1,level[0]);
+	}
+
 	@Test
 	public void testCall() {
 		State s=state();
