@@ -40,6 +40,12 @@ Convex DB provides a standard JDBC driver for SQL access.
 jdbc:convex:database=<database-name>
 ```
 
+The `jdbc:convex:` driver is local and in-process: there is no network protocol
+between the JDBC client and the database, so the URL takes no host or port. To
+reach a database in another process, run the
+[PostgreSQL Protocol Server](#postgresql-protocol-server) there and connect with
+a PostgreSQL client or driver.
+
 ### Basic Usage
 
 ```java
