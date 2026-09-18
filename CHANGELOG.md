@@ -95,6 +95,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   periodically as the Block vector grows. Other peers then only learned of the
   proposal from the 2 s status poll, stalling roughly one transaction in fifteen
   for 5-7 s on local networks (#706).
+- Convex DB: the PostgreSQL server mangled `::int4`, `::int8` and any other cast
+  whose type name begins with `int`, leaving the rest of the name in the query
+  (`id::int4` became `id4`). Supported casts are now matched as whole type
+  names, in any case. A `~` inside a string literal or quoted identifier no
+  longer makes the whole query return an empty result.
 
 ## [0.8.16] - 2026-09-02
 
