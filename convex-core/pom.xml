@@ -13,7 +13,7 @@
 		<!-- All Bouncycastle modules move together. 1.85.2 is a bcprov-only patch:
 		     bcpkix and bcutil have no such release, so taking it would run a
 		     mismatched set in the signing path. Wait for a coordinated release. -->
-		<bc.version>1.85</bc.version>
+		<bc.version>1.86</bc.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<!-- Tests run on the module path, patched into convex.core. JUnit lives in the
 		     unnamed module and instantiates helpers in convex.test reflectively, but
@@ -129,7 +129,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>build-helper-maven-plugin</artifactId>
-				<version>3.6.1</version>
+				<version>3.6.2</version>
 				<executions>
 					<execution>
 						<id>add-source</id>
