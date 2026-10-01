@@ -29,6 +29,18 @@ import convex.test.Samples;
 public class ResultTest {
 
 	@Test
+	public void testPeekResultIDAtBufferOffsets() throws BadFormatException {
+		CVMLong id=CVMLong.create(42);
+		Blob encoded=Result.create(id,CVMLong.ONE).getEncoding();
+		assertEquals(id,Result.peekResultID(encoded,0));
+		int length=(int)encoded.count();
+		byte[] buffer=new byte[length+7];
+		encoded.getBytes(buffer,7);
+		assertEquals(id,Result.peekResultID(Blob.wrap(buffer,7,length),0));
+		assertEquals(id,Result.peekResultID(Blob.wrap(buffer,3,length+4),4));
+	}
+
+	@Test
 	public void testBasicResult() {
 		Result r1=Result.create(RT.cvm(0L),Vectors.of(1,2,3).toVector());
 		assertNull(r1.getTrace());

@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- NIO clients correctly match replies to requests when result encodings start
+  at a non-zero buffer offset, avoiding spurious decoding errors and timeouts.
 - Multi transactions keep the log entries of every child and account execution
   juice across all children against the enclosing transaction. Each child
   previously started from a fresh context, so only the last child's log and
