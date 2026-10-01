@@ -8,15 +8,22 @@ import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.RSAKeyGenParameterSpec;
+import java.time.Instant;
 import java.util.Calendar;
 import java.util.Date;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
+import org.bouncycastle.asn1.x509.KeyPurposeId;
+import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -30,6 +37,26 @@ import convex.core.crypto.bc.BCProvider;
 
 
 public class CertUtils {
+
+	/**
+	 * Authorises a TLS public key with a Convex peer's Ed25519 signature.
+	 * The certificate identifies the peer rather than a hostname. The TLS private
+	 * key can be separate from the peer key and is not needed to issue this certificate.
+	 */
+	public static X509Certificate signPeerCertificate(AKeyPair peerKey, PublicKey tlsKey,
+			Instant notBefore, Instant notAfter) throws OperatorCreationException, CertificateException, IOException {
+		if (!notAfter.isAfter(notBefore)) throw new IllegalArgumentException("Invalid certificate validity period");
+		X500Name issuer=new X500Name("CN="+peerKey.getAccountKey().toHexString());
+		BigInteger serial=new BigInteger(159,new SecureRandom()).add(BigInteger.ONE);
+		var builder=new JcaX509v3CertificateBuilder(issuer,serial,Date.from(notBefore),Date.from(notAfter),
+			new X500Name("CN=Convex TLS"),tlsKey);
+		builder.addExtension(Extension.basicConstraints,true,new BasicConstraints(false));
+		builder.addExtension(Extension.keyUsage,true,new KeyUsage(KeyUsage.digitalSignature));
+		builder.addExtension(Extension.extendedKeyUsage,false,new ExtendedKeyUsage(KeyPurposeId.id_kp_serverAuth));
+		ContentSigner signer=new JcaContentSignerBuilder("Ed25519").build(peerKey.getPrivate());
+		// Use the default certificate provider so JSSE sees its native EdDSA key type.
+		return new JcaX509CertificateConverter().getCertificate(builder.build(signer));
+	}
 
 	
 	// See: https://stackoverflow.com/questions/29852290/self-signed-x509-certificate-with-bouncy-castle-in-java

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional TLS peer transport, with a separate TLS listener, `tls://` endpoints
+  for clients and peer discovery, and an injectable message transport factory.
+  Known peers authenticate certificates signed by their expected peer key,
+  independently of hostname or IP; clients without a peer key use standard PKI.
+  Native TCP remains the default; signed peer verification is unchanged.
+
 ### Changed
 
 - Multi child transactions for another account use the same control rule as

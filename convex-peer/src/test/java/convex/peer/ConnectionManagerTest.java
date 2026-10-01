@@ -40,6 +40,7 @@ import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.init.Init;
 import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
@@ -49,6 +50,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.net.Transports;
 import convex.net.impl.netty.NettyServer;
 
 /**
@@ -503,6 +505,34 @@ public class ConnectionManagerTest {
 		assertFalse(manager.addConnection(AKeyPair.createSeeded(217).getAccountKey(),late));
 		assertEquals(1,late.closeCount);
 		server.close();
+	}
+
+	@Test
+	public void testTCPRetainsUnverifiedStatusFallbackForKnownPeer() throws Exception {
+		try (Server server=createPollingServer(AKeyPair.createSeeded(220));
+				NettyServer remote=new NettyServer(0)) {
+			remote.setReceiveAction(message -> {
+				try {
+					message.getPayload(null);
+				} catch (BadFormatException e) {
+					throw new AssertionError(e);
+				}
+				if (message.getType()==MessageType.STATUS) {
+					message.returnMessage(Message.createResult(message.getRequestID(),server.getStatusData(),null));
+				} else {
+					message.returnMessage(Message.createResult(message.getRequestID(),null,ErrorCodes.ARGUMENT));
+				}
+			});
+			remote.launch();
+			ConnectionManager manager=server.getConnectionManager();
+			AccountKey peerKey=server.getPeerKey();
+			try (Convex client=manager.connectToPeer(Transports.endpoint(remote.getHostAddress()),peerKey)
+					.get(5,TimeUnit.SECONDS)) {
+				assertSame(client,manager.getConnection(peerKey));
+				assertTrue(client.isConnected());
+				assertNull(client.getVerifiedPeer(),"Status fallback must not confer protocol trust");
+			}
+		}
 	}
 
 	@Test

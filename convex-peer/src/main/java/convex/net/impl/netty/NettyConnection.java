@@ -8,6 +8,10 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +35,7 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
 public class NettyConnection extends AConnection {
@@ -106,13 +111,6 @@ public class NettyConnection extends AConnection {
 			b.option(ChannelOption.WRITE_BUFFER_WATER_MARK,
 				new WriteBufferWaterMark(32 * 1024, 64 * 1024));
 
-			b.handler(new ChannelInitializer<SocketChannel>() {
-				@Override
-				public void initChannel(SocketChannel ch) throws Exception {
-					// nothing to add, connect will do this
-				}
-			});
-
 			clientBootstrap = b;
 			return clientBootstrap;
 		}
@@ -130,49 +128,80 @@ public class NettyConnection extends AConnection {
 	 */
 	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction,
 			int maxMessageLength) throws InterruptedException, IOException {
-		Bootstrap b = getClientBootstrap();
-		ChannelFuture f = b.connect(sa);
-		Channel chan = f.channel();
+		return connect(sa, receiveAction, maxMessageLength, null);
+	}
+
+	/** Connects using TLS when a context is supplied, waiting for its handshake. */
+	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction,
+			int maxMessageLength, SSLContext sslContext) throws InterruptedException, IOException {
+		return connect(sa,receiveAction,maxMessageLength,sslContext,true);
+	}
+
+	/** Disable hostname checks only when the context authenticates an expected peer key. */
+	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction,
+			int maxMessageLength, SSLContext sslContext, boolean verifyHostname) throws InterruptedException, IOException {
+		Function<Message, Predicate<Message>> deliverFn = m -> {
+			receiveAction.accept(m);
+			return null;
+		};
+		NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
+		NettyConnection client=new NettyConnection(null,inbound);
+		inbound.setConnection(client);
+		SslHandler ssl;
+		if (sslContext==null) {
+			ssl=null;
+		} else {
+			InetSocketAddress address=(InetSocketAddress)sa;
+			SSLEngine engine=sslContext.createSSLEngine(address.getHostString(),address.getPort());
+			engine.setUseClientMode(true);
+			SSLParameters parameters=engine.getSSLParameters();
+			parameters.setEndpointIdentificationAlgorithm(verifyHostname ? "HTTPS" : null);
+			engine.setSSLParameters(parameters);
+			ssl=new SslHandler(engine);
+			ssl.setHandshakeTimeoutMillis(Config.DEFAULT_INTERNAL_TIMEOUT);
+		}
+
+		// A per-connect initializer installs codecs and TLS before any traffic arrives.
+		Bootstrap b=getClientBootstrap().clone().handler(new ChannelInitializer<SocketChannel>() {
+			@Override
+			public void initChannel(SocketChannel ch) {
+				client.channel=ch;
+				if (ssl!=null) ch.pipeline().addLast(ssl);
+				ch.pipeline().addLast(
+					new ChannelInboundHandlerAdapter() {
+						@Override
+						public void channelWritabilityChanged(ChannelHandlerContext ctx) {
+							client.doFlush();
+							ctx.fireChannelWritabilityChanged();
+						}
+
+						@Override
+						public void channelInactive(ChannelHandlerContext ctx) {
+							// Clear queue to wake any threads blocked on offer(timeout)
+							client.clearOutbound();
+							ctx.fireChannelInactive();
+						}
+					},
+					inbound,
+					new NettyOutboundHandler()
+				);
+			}
+		});
+		ChannelFuture f=b.connect(sa);
+		Channel chan=f.channel();
 		boolean connected=false;
 		try {
-			f.await(); // Wait until done
-
+			f.await();
 			if (!f.isSuccess()) {
 				throw new IOException("Failed to connect to peer at "+sa,f.cause());
 			}
-
-			// Wrap Consumer as Function — client receive path has no backpressure
-			Function<Message, Predicate<Message>> deliverFn = m -> {
-				receiveAction.accept(m);
-				return null; // always accepted
-			};
-			NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
-
-			NettyConnection client = new NettyConnection(chan,inbound);
-
-			// Set connection on inbound handler so received messages can route responses back
-			inbound.setConnection(client);
-
-			// Pipeline: writability handler triggers drain, inbound handler decodes, outbound handler encodes
-			chan.pipeline().addLast(
-				new ChannelInboundHandlerAdapter() {
-					@Override
-					public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-						client.doFlush();
-						ctx.fireChannelWritabilityChanged();
-					}
-
-					@Override
-					public void channelInactive(ChannelHandlerContext ctx) {
-						// Clear queue to wake any threads blocked on offer(timeout)
-						client.clearOutbound();
-						ctx.fireChannelInactive();
-					}
-				},
-				inbound,
-				new NettyOutboundHandler()
-			);
-
+			if (ssl!=null) {
+				var handshake=ssl.handshakeFuture();
+				handshake.await();
+				if (!handshake.isSuccess()) {
+					throw new IOException("TLS handshake failed for "+sa,handshake.cause());
+				}
+			}
 			connected=true;
 			return client;
 		} finally {
@@ -181,6 +210,7 @@ public class NettyConnection extends AConnection {
 	}
 
 	/** Updates the receive limit, for example after successful peer verification. */
+	@Override
 	public void setMaxMessageLength(int limit) {
 		inboundHandler.setMaxMessageLength(limit);
 	}

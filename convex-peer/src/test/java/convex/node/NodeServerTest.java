@@ -2610,9 +2610,17 @@ public class NodeServerTest {
 		// TCP URI resolves
 		InetSocketAddress addr = new InetSocketAddress("localhost", 18888);
 		LatticeConnectionManager.DesiredPeer dp = LatticeConnectionManager.DesiredPeer.create(key, addr);
-		InetSocketAddress resolved = LatticeConnectionManager.resolveTransport(dp);
+		java.net.URI resolved = LatticeConnectionManager.resolveTransport(dp);
 		assertNotNull(resolved, "TCP transport should resolve");
 		assertEquals(18888, resolved.getPort());
+
+		// Native listeners may return an IPv6 address: its URI needs brackets.
+		InetSocketAddress ipv6=InetSocketAddress.createUnresolved("::1",18888);
+		assertEquals(java.net.URI.create("tcp://[::1]:18888"),LatticeConnectionManager.resolveTransport(
+			LatticeConnectionManager.DesiredPeer.create(key,ipv6)));
+		java.net.URI tls=java.net.URI.create("tls://localhost:18889");
+		assertEquals(tls,LatticeConnectionManager.resolveTransport(
+			LatticeConnectionManager.DesiredPeer.create(key,tls)));
 
 		// No transports → null
 		LatticeConnectionManager.DesiredPeer empty = LatticeConnectionManager.DesiredPeer.create(key);

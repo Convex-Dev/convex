@@ -85,6 +85,11 @@ class NettyServerConnection extends AConnection {
 	}
 
 	@Override
+	public void setMaxMessageLength(int limit) {
+		inboundHandler.setMaxMessageLength(limit);
+	}
+
+	@Override
 	public boolean isClosed() {
 		Channel ch = channel;
 		return ch == null || !ch.isOpen();

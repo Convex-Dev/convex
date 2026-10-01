@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import javax.net.ssl.SSLContext;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +64,7 @@ import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.net.AServer;
+import convex.net.Transports;
 import convex.net.impl.netty.NettyServer;
 import convex.net.impl.nio.NIOServer;
 
@@ -199,6 +202,7 @@ public class Server implements Closeable {
 	 * Network server (Netty or NIO) that accepts inbound client and peer connections.
 	 */
 	private AServer nio;
+	private NettyServer tls;
 
 	@SuppressWarnings("deprecation")
 	private Server(HashMap<Keyword, Object> config, boolean ownsStore,
@@ -509,6 +513,20 @@ public class Server implements Closeable {
 			nio.setPort(port);
 			nio.launch();
 			port = nio.getPort(); // Get the actual port (may be auto-allocated)
+
+			Object tlsPort=config.get(Config.TLS_PORT);
+			if (tlsPort!=null) {
+				int securePort=Utils.toInt(tlsPort);
+				if (securePort<0 || securePort>65535) throw new ConfigException("Invalid TLS port");
+				tls=NettyServer.create(this);
+				tls.setPort(securePort);
+				Object context=config.get(Config.TLS_CONTEXT);
+				if (context!=null && !(context instanceof SSLContext)) {
+					throw new ConfigException("TLS context must be an SSLContext");
+				}
+				tls.setSSLContext(context==null ? Transports.defaultSSLContext() : (SSLContext)context);
+				tls.launch();
+			}
 
 			// set running status now, so that loops don't immediately terminate
 			isRunning = true;
@@ -850,7 +868,12 @@ public class Server implements Closeable {
 
 	/** Returns the number of active inbound client connections. */
 	public int getInboundConnectionCount() {
-		return nio.getClientConnectionCount();
+		return nio.getClientConnectionCount() + ((tls==null) ? 0 : tls.getClientConnectionCount());
+	}
+
+	/** Actual additional TLS listener port, or null when TLS is disabled. */
+	public Integer getTLSPort() {
+		return (tls==null) ? null : tls.getPort();
 	}
 
 	/**
@@ -904,6 +927,7 @@ public class Server implements Closeable {
 			isLive=false;
 			manager.close();
 			nio.close();
+			if (tls!=null) tls.close();
 			inboundVerifier.close();
 			closeOwnedStore();
 			shutdownFuture.complete(Utils.getCurrentTimestamp());
@@ -920,6 +944,7 @@ public class Server implements Closeable {
 
 		// Stop ingress and cancel connection-bound verification before worker/store shutdown.
 		nio.close();
+		if (tls!=null) tls.close();
 		inboundVerifier.close();
 
 		// Shut down propagator, no point sending any more Beliefs

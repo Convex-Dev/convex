@@ -3,7 +3,6 @@ package convex.api;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
@@ -49,7 +48,7 @@ import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
-import convex.net.IPUtils;
+import convex.net.Transports;
 import convex.peer.Config;
 import convex.peer.Server;
 
@@ -174,11 +173,7 @@ public abstract class Convex implements AutoCloseable {
 		if (host instanceof Convex) return (Convex)host;
 		if (host instanceof Server) return connect((Server)host);
 		
-		InetSocketAddress sa=IPUtils.toInetSocketAddress(host);
-		if (sa==null) {
-			throw new IllegalArgumentException("Unrecognised connect type "+Utils.getClassName(host));
-		}
-		return connect(sa);
+		return ConvexRemote.connect(Transports.endpoint(host));
 	}
 
 	/**

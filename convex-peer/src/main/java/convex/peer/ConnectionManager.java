@@ -2,6 +2,7 @@ package convex.peer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Set;
@@ -14,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.ConcurrentHashMap;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
@@ -35,7 +37,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.IPUtils;
+import convex.net.Transports;
 
 /**
  * Manages outbound peer connections for consensus Belief propagation.
@@ -252,7 +254,8 @@ public class ConnectionManager extends AConnectionManager {
 		// influencing the connection pool
 
 		Set<AArrayBlob> potentialPeers = s.getPeers().keySet();
-		InetSocketAddress target = null;
+		URI target = null;
+		AccountKey targetKey = null;
 		double accStake = 0.0;
 		for (ACell c : potentialPeers) {
 			AccountKey peerKey = RT.ensureAccountKey(c);
@@ -263,22 +266,28 @@ public class ConnectionManager extends AConnectionManager {
 			if (ps == null) continue;
 			AString hostName = ps.getHostname();
 			if (hostName == null) continue;
-			InetSocketAddress maybeAddress = IPUtils.toInetSocketAddress(hostName.toString());
-			if (maybeAddress == null) continue;
+			URI maybeAddress;
+			try {
+				maybeAddress=Transports.endpoint(hostName.toString());
+				Transports.forEndpoint(maybeAddress);
+			} catch (IllegalArgumentException e) {
+				continue;
+			}
 
 			long peerStake = ps.getPeerStake();
 			if (peerStake > CPoSConstants.MINIMUM_EFFECTIVE_STAKE) {
 				double t = random.nextDouble() * (accStake + peerStake);
 				if (t >= accStake) {
 					target = maybeAddress;
+					targetKey = peerKey;
 				}
 				accStake += peerStake;
 			}
 		}
 
 		if (target != null) {
-			InetSocketAddress connectTarget = target;
-			connectToPeer(target).exceptionally(e -> {
+			URI connectTarget = target;
+			connectToPeer(target,targetKey).exceptionally(e -> {
 				log.debug("Failed to connect to Peer at {}: {}", connectTarget, e.getMessage());
 				return null;
 			});
@@ -391,6 +400,16 @@ public class ConnectionManager extends AConnectionManager {
 	 * @return Future completing with the Convex connection, or exceptionally on failure
 	 */
 	public CompletableFuture<Convex> connectToPeer(InetSocketAddress hostAddress) {
+		return connectToPeer(Transports.endpoint(hostAddress));
+	}
+
+	/** Connects to an explicit transport endpoint and performs normal peer verification. */
+	public CompletableFuture<Convex> connectToPeer(URI hostAddress) {
+		return connectToPeer(hostAddress,null);
+	}
+
+	/** Authenticates known TLS peers by key; TCP retains its existing identification policy. */
+	public CompletableFuture<Convex> connectToPeer(URI hostAddress, AccountKey expectedPeer) {
 		CompletableFuture<Convex> result = new CompletableFuture<>();
 		if (closed) {
 			return CompletableFuture.failedFuture(
@@ -399,7 +418,7 @@ public class ConnectionManager extends AConnectionManager {
 
 		Convex opened=null;
 		try {
-			opened = Convex.connect(hostAddress);
+			opened = ConvexRemote.connect(hostAddress,Transports.forEndpoint(hostAddress,expectedPeer));
 			Convex convex=opened;
 			synchronized (this) {
 				if (closed) {
@@ -412,7 +431,10 @@ public class ConnectionManager extends AConnectionManager {
 			convex.setStore(server.getStore());
 			convex.setKeyPair(server.getKeyPair());
 
-			identifyPeer(convex).whenComplete((peerKey, ex) -> {
+			boolean requireExpectedPeer=expectedPeer!=null && "tls".equalsIgnoreCase(hostAddress.getScheme());
+			CompletableFuture<AccountKey> identity=requireExpectedPeer
+				? convex.verifyPeer(expectedPeer,server.getPeer().getNetworkID()) : identifyPeer(convex);
+			identity.whenComplete((peerKey, ex) -> {
 				pendingConnections.remove(convex);
 				if (peerKey == null || ex != null) {
 					convex.close();

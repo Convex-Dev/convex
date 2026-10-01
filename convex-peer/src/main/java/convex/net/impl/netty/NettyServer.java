@@ -6,6 +6,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +34,7 @@ import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.GlobalEventExecutor;
 
 public class NettyServer extends AServer {
@@ -40,6 +44,7 @@ public class NettyServer extends AServer {
 	static volatile EventLoopGroup bossGroup=null;
 
 	private Channel channel;
+	private SSLContext sslContext;
 
 	/**
 	 * Tracks all active inbound client channels. Auto-removes on close.
@@ -94,6 +99,12 @@ public class NettyServer extends AServer {
 		setPort(port);
 	}
 
+	/** Enables TLS on this listener. Configure before launch; null retains TCP. */
+	public void setSSLContext(SSLContext context) {
+		if (channel!=null) throw new IllegalStateException("Listener already launched");
+		sslContext=context;
+	}
+
 
 	public static NettyServer create(Server server) {
 		NettyServer ns=new NettyServer(null);
@@ -142,6 +153,13 @@ public class NettyServer extends AServer {
             		 return;
             	 }
             	 clientChannels.add(ch);
+				 if (sslContext!=null) {
+					 SSLEngine engine=sslContext.createSSLEngine();
+					 engine.setUseClientMode(false);
+					 SslHandler ssl=new SslHandler(engine);
+					 ssl.setHandshakeTimeoutMillis(Config.DEFAULT_INTERNAL_TIMEOUT);
+					 ch.pipeline().addLast(ssl);
+				 }
 
 				 Function<Message, Predicate<Message>> deliverFn =
 					 (deliver != null) ? deliver : wrapReceiveAction();

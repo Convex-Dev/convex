@@ -38,6 +38,12 @@ public class Config {
 	 * serialisable {@code peer.etch} creation policy.
 	 */
 	public static final Keyword ETCH_KEY_RESOLVER=Keyword.intern("etch-key-resolver");
+
+	/** Optional additional native-protocol TLS listener; TCP remains on :port. */
+	public static final Keyword TLS_PORT=Keyword.intern("tls-port");
+
+	/** Optional javax.net.ssl.SSLContext for the TLS listener; defaults to the JVM context. */
+	public static final Keyword TLS_CONTEXT=Keyword.intern("tls-context");
 	
 	/**
 	 * Size of default server socket receive buffer

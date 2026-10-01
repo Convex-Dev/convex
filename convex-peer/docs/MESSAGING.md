@@ -199,6 +199,61 @@ No changes to the network connection model are needed — it already works this
 way. The paired local connection model makes the in-memory case consistent with
 it.
 
+### 3.6 Transport Selection and TLS
+
+`convex.net.Transport` is a factory for the existing `AConnection` abstraction:
+
+```java
+AConnection connect(URI endpoint, Consumer<Message> receiveAction, int maxMessageLength)
+    throws IOException, InterruptedException, TimeoutException;
+```
+
+The factory installs the receive limit before delivery starts and returns a
+ready connection, including any transport handshake. `AConnection` continues
+to own sending, backpressure, trust state and closure; `AConvexConnected` owns
+request correlation and peer verification. Wire connections implement
+`setMaxMessageLength` so verification can change their receive limit.
+
+`Transports` supplies TCP and TLS factories and selects them by URI scheme.
+`Convex.connect` accepts unqualified TCP addresses, `tcp://` and `tls://`.
+`ConvexRemote.connect(uri, transport)` accepts an explicit factory without a
+global registry. Reconnect retains both the factory and the complete URI,
+including hostname, path and query where supported by the transport.
+TCP creates no TLS context or handshake and retains its existing peer
+identification policy, including consensus status fallback without protocol trust.
+
+TLS adds Netty's `SslHandler` before the existing CAD15 length-prefix and CAD3
+message codecs and uses a JDK `SSLContext`. TLS authentication follows the
+identity information available before connecting:
+
+- **Expected peer key known:** `Transports.forEndpoint(uri, expectedPeerKey)`
+  selects a TLS factory requiring the leaf certificate to be signed directly
+  by that key. The URI locates the peer; its hostname and IP do not establish
+  identity. Consensus discovery and lattice dialling use this policy by default.
+- **No expected peer key:** normal certificate-authority trust and endpoint
+  hostname/IP checks apply.
+
+`ConvexRemote.connect(uri, expectedPeerKey)` exposes the same selection to
+applications, and `Transports.tls(expectedPeerKey)` constructs the explicit
+factory. The trusted key must come from the caller or trusted discovery, never
+from the unauthenticated certificate or a status reply. Key verification cannot
+fall back to CA trust, and TLS failures cannot fall back to plaintext.
+
+Peer-key verification validates a one-certificate PKIX path anchored at the
+expected Ed25519 public key, including validity, signature and certificate
+constraints, and checks TLS signing/server usage. It permits a dedicated TLS
+key authorised by the peer's signature. The handshake must prove possession of
+that TLS private key. Public-CA revocation services do not apply to this policy.
+Successful TLS handshakes do not mark a connection protocol-trusted; CAD15's
+signed challenge exchange still gates admission. The optional TLS listener
+shares the existing dispatch and verification paths with the TCP listener.
+
+A future HTTPS factory can accept a message endpoint URI and return an
+`AConnection` backed by message sends. This factory does not solve HTTP session
+semantics: unsolicited messages, reverse challenges, ordered DATA delivery and
+connection lifetime still need to be defined. The existing REST message
+endpoint is not yet a full peer transport.
+
 ## 4. Client Architecture
 
 ### 4.1 Class Hierarchy
@@ -206,7 +261,7 @@ it.
 ```
 Convex (abstract — API contract, shared state)
 ├── AConvexConnected (abstract — awaiting map, result dispatch, connection)
-│   ├── ConvexRemote (network socket via Netty/NIO)
+│   ├── ConvexRemote (Transport factory; TCP via Netty/NIO, TLS via Netty)
 │   └── ConvexLocal (paired LocalConnection to local Server)
 └── ConvexDirect (direct peer calls, no messaging)
 ```

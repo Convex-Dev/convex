@@ -60,6 +60,7 @@ public class PeerConfig {
 	// ========== Peer config keys ==========
 
 	public static final AString PORT = Strings.intern("port");
+	public static final AString TLS_PORT = Strings.intern("tlsPort");
 	public static final AString KEYPAIR = Strings.intern("keypair");
 	public static final AString STORE = Strings.intern("store");
 	public static final AString ETCH = Strings.intern("etch");
@@ -297,6 +298,14 @@ public class PeerConfig {
 		// Peer section
 		AMap<AString, ACell> peer = getSection(PEER);
 		mapLong(peer, PORT, legacy, Keywords.PORT);
+		ACell tlsPort=peer.get(TLS_PORT);
+		if (tlsPort!=null) {
+			CVMLong port=RT.ensureLong(tlsPort);
+			if (port==null || port.longValue()<0 || port.longValue()>65535) {
+				throw new IllegalArgumentException("peer.tlsPort must be between 0 and 65535");
+			}
+			legacy.put(Config.TLS_PORT,(int)port.longValue());
+		}
 		mapString(peer, URL, legacy, Keywords.URL);
 		mapString(peer, STORE, legacy, Keywords.STORE);
 		mapString(peer, SOURCE, legacy, Keywords.SOURCE);

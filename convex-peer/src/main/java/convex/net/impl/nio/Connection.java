@@ -236,6 +236,7 @@ public class Connection extends AConnection {
 		return receiver.getReceivedCount();
 	}
 
+	@Override
 	public void setMaxMessageLength(int limit) {
 		receiver.setMaxMessageLength(limit);
 	}

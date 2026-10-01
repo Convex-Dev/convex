@@ -131,6 +131,15 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * Updates the encoded inbound message limit. Wire transports must enforce this
+	 * before allocating a frame. Unsupported connections fail explicitly.
+	 * @param limit maximum encoded message bytes
+	 */
+	public void setMaxMessageLength(int limit) {
+		throw new UnsupportedOperationException("Connection has no configurable receive limit");
+	}
+
+	/**
 	 * Sends a message over this connection. May block with a bounded timeout
 	 * if the outbound queue is full (e.g. outbound client connections under
 	 * backpressure). Callers that must not block should use

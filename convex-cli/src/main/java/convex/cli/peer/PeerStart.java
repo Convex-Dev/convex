@@ -1,7 +1,7 @@
 package convex.cli.peer;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 
@@ -178,7 +178,7 @@ public class PeerStart extends APeerCommand {
 			RESTServer restServer=null;
 			boolean trayInstalled=false;
 			try {
-				InetSocketAddress remoteSource=peerMixin.getSpecifiedSource();
+				URI remoteSource=peerMixin.getSpecifiedEndpoint();
 
 				config.put(Keywords.KEYPAIR, peerKey);
 				config.put(Keywords.STORE, store);

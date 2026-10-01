@@ -48,11 +48,13 @@ public class API {
 	 * <ul>
 	 * <li>:keypair (required, AKeyPair) - AKeyPair instance.
 	 * <li>:port (optional, Integer) - Integer port number to use for incoming connections. Zero causes random allocation (also the default).
+	 * <li>:tls-port (optional, Integer) - Additional TLS listener port; absent disables TLS, zero allocates a port.
+	 * <li>:tls-context (optional, SSLContext) - TLS listener identity; defaults to the JVM's configured key and trust stores.
 	 * <li>:store (optional, AStore or String filename) - A supplied AStore remains caller-owned;
 	 * stores opened from a filename or created by default are owned by the returned Server.
 	 * <li>:keystore (optional, Keystore or string filename) - Keystore instance. Read only, used for key lookup if necessary.
 	 * <li>:storepass (optional, string) - Integrity password for keystore. If omitted, no integrity check is performed
-	 * <li>:source (optional, String or Socket Address) - URL for Peer to replicate initial State/Belief from.
+	 * <li>:source (optional, String, URI or Socket Address) - Endpoint for Peer to replicate initial State/Belief from.
 	 * <li>:state (optional, State) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional, Boolean) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional, Boolean) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.

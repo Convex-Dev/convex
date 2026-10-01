@@ -396,6 +396,8 @@ public class LatticeConnectionManagerTest {
 
 	private static class StubInbound extends AConnection {
 		boolean closed;
+		// No wire decoding or buffering in this policy-only test double.
+		@Override public void setMaxMessageLength(int limit) {}
 		@Override public boolean sendMessage(Message message) { return !closed; }
 		@Override public boolean trySendMessage(Message message) { return !closed; }
 		@Override public InetSocketAddress getRemoteAddress() { return null; }

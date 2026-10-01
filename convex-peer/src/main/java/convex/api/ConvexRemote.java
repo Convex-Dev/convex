@@ -2,6 +2,8 @@ package convex.api;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
@@ -11,15 +13,15 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.message.Message;
 import convex.core.store.AStore;
-import convex.net.impl.netty.NettyConnection;
-import convex.net.impl.nio.Connection;
-import convex.peer.Config;
+import convex.net.Transport;
+import convex.net.Transports;
 import convex.peer.Server;
 
 /**
@@ -29,6 +31,8 @@ public class ConvexRemote extends AConvexConnected {
 	private volatile int maxInboundMessageLength = (int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
 
 	protected InetSocketAddress remoteAddress;
+	private URI endpoint;
+	private Transport transport;
 
 	protected ConvexRemote(Address address, AKeyPair keyPair) {
 		super(address, keyPair);
@@ -40,12 +44,53 @@ public class ConvexRemote extends AConvexConnected {
 	}
 
 	protected void connectToPeer(InetSocketAddress peerAddress) throws IOException, TimeoutException, InterruptedException {
-		remoteAddress=peerAddress;
-		if (Config.USE_NETTY_CLIENT) {
-			setConnection(NettyConnection.connect(peerAddress, returnMessageHandler, maxInboundMessageLength));
-		} else {
-			setConnection(Connection.connect(peerAddress, returnMessageHandler, maxInboundMessageLength));
-		}
+		endpoint=Transports.endpoint(peerAddress);
+		transport=Transports.TCP;
+		connectToPeer();
+	}
+
+	private void connectToPeer() throws IOException, TimeoutException, InterruptedException {
+		setConnection(transport.connect(endpoint,returnMessageHandler,maxInboundMessageLength));
+		remoteAddress=connection.getRemoteAddress();
+	}
+
+	/** The original endpoint, retained with its scheme and path across reconnects. */
+	public URI getEndpoint() {
+		return endpoint;
+	}
+
+	public static ConvexRemote connect(URI endpoint) throws IOException, TimeoutException, InterruptedException {
+		return connect(endpoint, (int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	/**
+	 * Opens a transport for a known peer. TLS authenticates the expected key instead
+	 * of the hostname; protocol challenge/response remains a separate step.
+	 */
+	public static ConvexRemote connect(URI endpoint, AccountKey expectedPeer)
+			throws IOException, TimeoutException, InterruptedException {
+		return connect(endpoint,Transports.forEndpoint(endpoint,Objects.requireNonNull(expectedPeer)));
+	}
+
+	public static ConvexRemote connect(URI endpoint, int maxInboundMessageLength)
+			throws IOException, TimeoutException, InterruptedException {
+		return connect(endpoint,Transports.forEndpoint(endpoint),maxInboundMessageLength);
+	}
+
+	/** Opens a connection using an explicit transport, also used for future reconnects. */
+	public static ConvexRemote connect(URI endpoint, Transport transport)
+			throws IOException, TimeoutException, InterruptedException {
+		return connect(endpoint,transport,(int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	public static ConvexRemote connect(URI endpoint, Transport transport, int maxInboundMessageLength)
+			throws IOException, TimeoutException, InterruptedException {
+		ConvexRemote convex=new ConvexRemote(null,null);
+		convex.endpoint=Objects.requireNonNull(endpoint);
+		convex.transport=Objects.requireNonNull(transport);
+		convex.setMaxInboundMessageLength(maxInboundMessageLength);
+		convex.connectToPeer();
+		return convex;
 	}
 
 	public static ConvexRemote connect(InetSocketAddress peerAddress) throws IOException, TimeoutException, InterruptedException {
@@ -68,10 +113,11 @@ public class ConvexRemote extends AConvexConnected {
 	}
 
 	public static ConvexRemote connectNetty(InetSocketAddress sa) throws InterruptedException, IOException {
-		ConvexRemote convex=new ConvexRemote(null,null);
-		convex.remoteAddress=sa;
-		convex.setConnection(NettyConnection.connect(sa, convex.returnMessageHandler));
-		return convex;
+		try {
+			return connect(Transports.endpoint(sa),Transports.NETTY);
+		} catch (TimeoutException e) {
+			throw new IOException(e);
+		}
 	}
 
 	/**
@@ -84,12 +130,8 @@ public class ConvexRemote extends AConvexConnected {
 			throw new IllegalArgumentException("Inbound message limit must be between 1 and "
 				+ convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH + ": " + limit);
 		}
+		if (connection!=null) connection.setMaxMessageLength(limit);
 		maxInboundMessageLength = limit;
-		if (connection instanceof NettyConnection netty) {
-			netty.setMaxMessageLength(limit);
-		} else if (connection instanceof Connection nio) {
-			nio.setMaxMessageLength(limit);
-		}
 	}
 
 	public int getMaxInboundMessageLength() {
@@ -97,15 +139,12 @@ public class ConvexRemote extends AConvexConnected {
 	}
 
 	public static ConvexRemote connectNIO(InetSocketAddress sa) throws InterruptedException, IOException, TimeoutException {
-		ConvexRemote convex=new ConvexRemote(null,null);
-		convex.remoteAddress=sa;
-		convex.setConnection(Connection.connect(sa, convex.returnMessageHandler));
-		return convex;
+		return connect(Transports.endpoint(sa),Transports.NIO);
 	}
 
 	public synchronized void reconnect() throws IOException, TimeoutException, InterruptedException {
 		close();
-		connectToPeer(remoteAddress);
+		connectToPeer();
 	}
 
 	@Override
@@ -152,7 +191,7 @@ public class ConvexRemote extends AConvexConnected {
 
 	@Override
 	public String toString() {
-		return "Remote Convex instance at "+getHostAddress();
+		return "Remote Convex instance at "+endpoint;
 	}
 
 	@Override

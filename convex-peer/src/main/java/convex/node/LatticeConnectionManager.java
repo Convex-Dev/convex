@@ -1,6 +1,7 @@
 package convex.node;
 
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,7 +38,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
 import convex.core.message.AConnection;
 import convex.core.util.Utils;
-import convex.net.IPUtils;
+import convex.net.Transports;
 import convex.peer.AConnectionManager;
 
 /**
@@ -712,6 +713,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 		InetSocketAddress addr = convex.getHostAddress();
 		DesiredPeer desired=(addr!=null)
 			? DesiredPeer.create(peerKey,addr) : DesiredPeer.create(peerKey);
+		if (convex instanceof ConvexRemote remote && remote.getEndpoint()!=null) {
+			desired=DesiredPeer.create(peerKey,remote.getEndpoint());
+		}
 		if (!registerDesiredPeerIntent(peerKey,desired,false)) {
 			closeSilently(convex);
 			return CompletableFuture.failedFuture(new IllegalStateException(
@@ -1243,12 +1247,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** No DNS or socket work on the maintenance thread. */
 	private static boolean hasDialTarget(DesiredPeer peer) {
-		if (peer.transports==null) return false;
-		for (AString uri:peer.transports) {
-			String value=uri.toString();
-			if (value.startsWith("tcp://") || !value.contains("://")) return true;
-		}
-		return false;
+		return resolveTransport(peer)!=null;
 	}
 
 	private void startDial(DesiredPeer desired) {
@@ -1286,9 +1285,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	CompletableFuture<Convex> openPeer(DesiredPeer desired) {
 		return CompletableFuture.supplyAsync(() -> {
 			try {
-				InetSocketAddress target=resolveTransport(desired);
-				if (target==null) throw new IllegalArgumentException("No supported TCP endpoint");
-				return ConvexRemote.connect(target,untrustedMessageLimit);
+				URI target=resolveTransport(desired);
+				if (target==null) throw new IllegalArgumentException("No supported transport endpoint");
+				return ConvexRemote.connect(target,Transports.forEndpoint(target,desired.peerKey),untrustedMessageLimit);
 			} catch (Exception e) {
 				throw new java.util.concurrent.CompletionException(e);
 			}
@@ -1405,24 +1404,21 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	// ========== Transport Resolution ==========
 
-	/** Returns the first supported TCP transport in one desired-node entry. */
-	static InetSocketAddress resolveTransport(DesiredPeer desired) {
+	/** Returns the first supported endpoint without resolving DNS or losing its scheme. */
+	static URI resolveTransport(DesiredPeer desired) {
 		AVector<AString> transports = desired.transports;
 		if (transports == null || transports.isEmpty()) return null;
 
 		for (long i = 0; i < transports.count(); i++) {
 			AString uri = (AString) transports.get(i);
 			if (uri == null) continue;
-			String uriStr = uri.toString();
-
-			if (uriStr.startsWith("tcp://")) {
-				uriStr = uriStr.substring(6);
-			} else if (uriStr.contains("://")) {
-				continue;
+			try {
+				URI endpoint=Transports.endpoint(uri.toString());
+				Transports.forEndpoint(endpoint);
+				return endpoint;
+			} catch (IllegalArgumentException e) {
+				// Try the next advertised transport.
 			}
-
-			InetSocketAddress sa = IPUtils.toInetSocketAddress(uriStr);
-			if (sa != null) return sa;
 		}
 		return null;
 	}
@@ -1565,10 +1561,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 		 * @param address TCP dial target
 		 * @return desired-peer intent
 		 */
-		@SuppressWarnings({"unchecked", "rawtypes"})
 		public static DesiredPeer create(AccountKey peerKey, InetSocketAddress address) {
-			String uri = "tcp://" + address.getHostString() + ":" + address.getPort();
-			AVector<AString> transports = (AVector) Vectors.of(Strings.create(uri));
+			return create(peerKey,Transports.endpoint(address));
+		}
+
+		/** Creates operator-supplied intent retaining the endpoint's transport scheme. */
+		public static DesiredPeer create(AccountKey peerKey, URI endpoint) {
+			AVector<AString> transports=Vectors.of(Strings.create(endpoint.toString()));
 			return new DesiredPeer(peerKey,transports,false,System.currentTimeMillis());
 		}
 
