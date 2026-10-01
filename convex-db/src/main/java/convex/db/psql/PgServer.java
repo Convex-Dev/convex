@@ -1,6 +1,7 @@
 package convex.db.psql;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -103,7 +104,22 @@ public class PgServer {
 				.option(ChannelOption.SO_BACKLOG, 128)
 				.option(ChannelOption.SO_REUSEADDR, true)
 				.childOption(ChannelOption.SO_KEEPALIVE, true)
-				.childOption(ChannelOption.TCP_NODELAY, true);
+				.childOption(ChannelOption.TCP_NODELAY, true)
+				// Netty's default allocator on recent versions is the newer
+				// "adaptive" one, whose chunk-release path can throw
+				// NoClassDefFoundError: io/netty/buffer/FreeChunkEvent on
+				// first use under some classloading setups (e.g. a shaded/
+				// relocated jar) — a first-load failure the JVM then
+				// permanently caches, silently abandoning whatever buffer
+				// that worker thread was mid-write on. The practical symptom
+				// is a client hanging forever on an otherwise-ordinary query,
+				// with nothing but that one log line (easy to miss, often on
+				// an unrelated-looking thread) to explain it.
+				// PooledByteBufAllocator is the older, extremely well-tested
+				// allocator used across most production Netty deployments
+				// for years — pin to it explicitly rather than relying on
+				// Netty's own default.
+				.childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
 
 			ChannelFuture f = b.bind(port).sync();
 			serverChannel = f.channel();
