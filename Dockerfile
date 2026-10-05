@@ -6,7 +6,7 @@
 # the exact JDK the pipeline tested. The project targets Java 21 bytecode
 # (maven.compiler.release=21) for library reach, which runs forward-compatibly on
 # this JDK 25. Bump together with CI.
-FROM maven:3.9.15-eclipse-temurin-25 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /build
 
 # Copy POMs first for dependency caching
