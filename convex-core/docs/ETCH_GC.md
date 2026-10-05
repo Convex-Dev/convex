@@ -35,7 +35,10 @@ lifecycle that makes recovery unambiguous.
   closes it. Refs bound to a closed store fail even for migrated values: the binding is
   dead, not the data.
 - **Cutover is hard-gated on verified completeness.** `completeGC()` refuses unless the
-  sweep has finished; `verifyGC()` walks the current root against the target only.
+  sweep has finished, then independently walks the current root against the target
+  only. `verifyGC()` also exposes that check before cutover.
+- **Snapshot and collect can be combined.** `completeGC(backupFile)` retains the
+  original file under a new backup name while returning the collected successor.
 - **Cancel rolls back, never discards.** Writes made during a cycle exist only in the
   target, so `cancelGC()` migrates the target back into the original file.
 - **GC is migration plus cutover.** `EtchUtils.migrate(source, dest)` moves *everything*
@@ -95,8 +98,8 @@ application and concentrates the whole handle swap at `completeGC()`.
 
 ### Start
 
-`startGC()` is synchronised on the store. It refuses if a cycle is in progress or a
-stale target file exists (a stale target may hold data from an interrupted cycle;
+`startGC()` is synchronised on the store. It refuses if a cycle is in progress and
+skips existing target names (a stale target may hold data from an interrupted cycle;
 adopting or deleting it blindly risks loss, so recovery handles it separately). It
 creates the target file with a fresh header, empty index and a copy of the current
 root hash, and only then publishes the volatile `target` field, so no reader sees a
@@ -138,7 +141,10 @@ one level deep. Points that matter:
 - **Per-entry status preservation.** Each entry is transferred at the status it holds
   in the old file, floored at `PERSISTED`. A uniform `PERSISTED` sweep would demote
   `ANNOUNCED` entries and cause a novelty re-broadcast storm after cutover; a uniform
-  `ANNOUNCED` sweep would forge peer commitments.
+  `ANNOUNCED` sweep would forge peer commitments. This currently has a limitation
+  during live collection: pruning a parent already copied at `PERSISTED` can skip
+  children whose old `ANNOUNCED` status has not transferred
+  ([#747](https://github.com/Convex-Dev/convex/issues/747)).
 - **Pruning doubles as deduplication.** A subtree already target-resident at
   sufficient status is skipped, so shared subtrees are copied once without a
   visited-set.
@@ -171,12 +177,13 @@ fragments and orphaned message data.
 
 ### Cutover
 
-`completeGC()` is synchronised and refuses unless `isGCComplete()`; there is no force
-override, because the failure mode of an early cutover is silent data loss. It flushes
-the target, constructs a new `EtchStore` over the target file (fresh caches; the
-target file's store binding is repointed so refs decoded from it bind to the new
-store and outlive the old store's close), writes the completion marker and returns
-the new store.
+`completeGC()` is synchronised and refuses unless `isGCComplete()` and a fresh
+target-only verification succeeds; there is no force override. A missing root is
+an error, distinct from an unset or nil root. It flushes the target and publishes
+the tombstone and completion marker before constructing a new `EtchStore` over the
+target file. The new store has fresh caches; refs decoded from the target bind to
+it and outlive the old store's close. A failed marker publication leaves the cycle
+available for retry or cancellation.
 
 The old store is not retired. It remains a functional view: reads fall back across
 both files and writes route to the successor's file, so code still holding the old
@@ -184,6 +191,41 @@ handle keeps working through a gradual handover. What it forbids is only what wo
 now be wrong: closing the successor's file, cancelling, re-completing, or starting a
 new cycle on the legacy view. The caller closes the old store when nothing depends on
 refs bound to it; from then on those refs throw `StoreException` on uncached reads.
+Close predecessor views before starting another GC on the successor: forwarding
+through multiple generations is not yet implemented
+([#746](https://github.com/Convex-Dev/convex/issues/746)).
+
+### Snapshot and collect
+
+To retain the pre-cycle store as a backup while replacing the live store:
+
+```bash
+convex etch gc -e store.etch --backup store-before-gc.etch
+```
+
+The API equivalent is `completeGC(backupFile)`. The backup is a hard link to the
+original file, created before cutover, so retaining it requires no full-file copy.
+It must be a new filename on the same filesystem, with hard-link support, and
+outside the store's GC filenames. Existing files are never overwritten. The
+collected store keeps the logical live path; the usual deferred adoption applies
+if Windows mappings still prevent renaming.
+
+The snapshot contains the original root and all original entries, including
+unreachable data. Roots and values written during collection belong to the new
+live store. API callers must close the old store before opening the snapshot and
+must finish any persists that began before the cycle. Successful collection
+retains the original file's disk space until the snapshot is removed. Treat the
+backup as read-only; copy it to a different filesystem for an independent backup.
+Once cutover has succeeded and the old store is closed, live-store writes go to
+the collected file and cannot change the snapshot. On Windows, hard links require
+the same NTFS volume; they do not support a backup path on a different drive.
+For an encrypted store, both files retain the source encryption policy and require
+the source key. The collected file gets a new v3 salt; the snapshot keeps the old
+file and its existing salt.
+
+`--backup` cannot be combined with `--output`, which already leaves the source in
+place. A backup left by an interrupted operation is not a confirmed snapshot;
+inspect recovery state before using it (see the crash-recovery follow-up below).
 
 ### Cancel
 
@@ -217,21 +259,26 @@ start: it is either stale (recoverable data) or a cancelled target still pinned 
 memory mappings. Naming off the base file, which is inherited across cutovers, keeps
 generation numbers small rather than growing `f~~~` one character per cycle.
 
-Two on-disk markers make every crash window unambiguous:
+Two on-disk markers record cutover and retirement:
 
 - `<base>.gc-complete` names the **current** store file and is rewritten by every
-  `completeGC()`. One marker, never a chain.
+  `completeGC()`. One marker, never a chain. Metadata is written and forced to a
+  temporary file, then atomically replaced; unsupported atomic replacement fails
+  the operation without truncating the previous marker.
 - `<file>.gc-defunct` is a tombstone on a superseded file, written at cutover
   *before* the marker. It discriminates "retained content verifiably elsewhere:
   delete, never roll back" from an abandoned cycle that must be rolled back. A crash
   between tombstone and marker reads as "cutover did not happen" and the target rolls
   back, losing nothing.
 
-Windows cannot rename or delete a mapped file, and Java offers no explicit unmap for
-`MappedByteBuffer`, so in-process deletions may be deferred. Tombstones make that safe;
-`startGC()` retries deletion of tombstoned files and reuses their names once the
-previous store's buffers have been collected. Migration of Etch mapping to the FFM
-`Arena` would make unmapping deterministic ([#636](https://github.com/Convex-Dev/convex/issues/636)).
+On Windows, mappings can prevent renaming or deleting a file. The FFM
+`MemorySegment` backend closes its arenas and unmaps deterministically when the
+store closes. It is the default for Etch v2/v3 when available on Java 22+.
+Etch v1, Java 21 and explicitly configured `MappedByteBuffer` stores use the
+compatibility backend, whose mappings may remain after close. Deletion and
+adoption can then be deferred; `startGC()` and recovery retry them. A completion
+marker directs opens to the collected file until adoption succeeds. The snapshot's
+hard link preserves the original data through removal of the original name.
 
 `EtchStore.create(file[, config])` runs `EtchUtils.recover` before mapping anything.
 Recovery is idempotent and logs its actions on the `convex.etch.recovery` logger. It
@@ -240,7 +287,8 @@ headers with the caller's configuration) before any marker deletion, rollback or
 adoption, so a wrong key or mismatched policy changes nothing on disk. Then:
 
 - **Completed cutovers are adopted.** The marker-named file is installed as `<file>`
-  and the superseded original deleted. That deletion is the disk reclamation. If
+  and the superseded original name deleted. Without a backup link, that deletion
+  reclaims the disk space; a requested snapshot keeps the old data allocated. If
   renaming fails (pinned mappings), recovery opens the marker-named file directly and
   retries adoption on the next start; it never opens stale data.
 - **Defunct files are deleted, never rolled back.** Rolling them back would resurrect
@@ -250,13 +298,21 @@ adoption, so a wrong key or mismatched policy changes nothing on disk. Then:
   live file, tolerating a torn tail from the crash, and the root advances only if its
   tree then verifies complete.
 
-**Etch v3 differs on unclean crashes.** Recovery accepts only cleanly closed v3 files.
-A process crash leaves a v3 file in the `OPEN` state, and ordinary `EtchStore.create`
-stops before changing the GC layout; the operator must deliberately select the
-maintenance and repair workflow described in [ETCHv3.md](ETCHv3.md). V1 and v2 files
-have no clean-close state and keep the best-effort rollback behaviour above.
+**Etch v3 differs on unclean crashes.** Recovery requires a valid `CLEAN_CLOSED`
+checkpoint, published by a successful sync or close. A subsequent mutation first
+publishes `OPEN`; a crash before the next clean checkpoint makes ordinary
+`EtchStore.create` stop before changing the GC layout. The operator must then
+deliberately select the maintenance and repair workflow described in
+[ETCHv3.md](ETCHv3.md). V1 and v2 files have no clean-close state and keep the
+best-effort rollback behaviour above.
 
-The steady state after a restart is one file `f`. A typical sequence:
+If recovery cannot identify an existing live store, it fails before changing the
+layout, rather than creating an empty store beside recoverable targets. Filesystem
+directory durability and the full crash-boundary matrix remain tracked in
+[#748](https://github.com/Convex-Dev/convex/issues/748).
+
+The steady state after a restart is one live file `f`, plus any requested snapshots.
+A typical sequence:
 
 ```
 running on f      cycle 1: target f~    cutover: marker -> f~, f defunct
@@ -310,7 +366,7 @@ the CPU cost and is a possible later optimisation, not a correctness matter.
 | Write of novel data | 1x | 1x plus one failed target lookup |
 | Write touching an unmigrated tree | 1x | one-off copy of that subtree, within the O(live data) total |
 | Disk | one file | both files, transiently |
-| Extra heap | none | none (INV-1 pruning replaces a visited-set) |
+| Traversal heap | none | sweep stack; cutover verification retains one hash per visited entry |
 
 - **A busy-cycle file is usually larger than the original, by design.** Everything
   persisted after `startGC()` is retained, which under sustained load dwarfs the
@@ -323,10 +379,18 @@ the CPU cost and is a possible later optimisation, not a correctness matter.
 - **Naive rebinding** with `withStore` produces refs whose flags claim data the store
   does not hold: a latent `MissingDataException`, or a false `PERSISTED` claim
   propagated onwards.
-- **Crashes** at any point lose at most the unflushed tail of the target; the
-  original file is only ever appended to by rollback.
+- **Crash durability** depends on filesystem metadata ordering as well as data
+  flushes; the full guarantee and failure-injection coverage are tracked in #748.
+  The original file is only ever appended to by rollback.
 - **Free disk space** must cover the expected collected size before starting.
 - **An empty root** collects to an empty store plus header. Correct, if surprising.
+- **Successive cycles with legacy handles:** close predecessor views before
+  collecting their successor. Forwarding across generations needs the lifecycle
+  decision tracked in [#746](https://github.com/Convex-Dev/convex/issues/746).
+- **Mixed announcement status during live collection:** a copied parent can prune
+  descendants whose higher old status has not transferred. Per-entry status
+  preservation in this case is tracked in
+  [#747](https://github.com/Convex-Dev/convex/issues/747).
 
 The scheme assumes only content-addressed immutable entries, a single root, monotonic
 status and a `PERSISTED`-style whole-tree level, so any `AStore` implementation can
@@ -337,14 +401,14 @@ already store-agnostic.
 
 | Concern | Location |
 |---|---|
-| Lifecycle | `EtchStore.startGC()`, `transferGC()`, `isGCComplete()`, `verifyGC()`, `completeGC()`, `cancelGC()`, `isGCInProgress()`, `getBaseFile()` |
+| Lifecycle | `EtchStore.startGC()`, `transferGC()`, `isGCComplete()`, `verifyGC()`, `completeGC()` / `completeGC(backupFile)`, `cancelGC()`, `isGCInProgress()`, `getBaseFile()` |
 | Tree transfer with INV-1 pruning | `convex.core.store.StoreTransfer.transfer(dest, ref[, status])`; `StoreTransfer.verify(store, rootHash)` |
 | Whole-store migration | `convex.etch.EtchUtils.migrate(source, dest)`; `EtchUtils.verify(etch, rootHash)` |
 | Recovery | `EtchUtils.recover(file[, config])`, called by `EtchStore.create` |
 | Status rules | `Ref.withStatus`, `AStore.isForeign`, `Refs.checkConsistentStores`; pinned by `convex.etch.EtchStatusIntegrityTest` |
 | Index enumeration and validation | `Etch.visitIndex`, `EtchUtils.EtchCellVisitor`, `EtchUtils.FullValidator` |
-| CLI | `convex etch gc [-o file]`, `etch migrate --into <dest> [--set-root]`, `etch recover`, `etch validate [-m N]` in `convex.cli.etch` |
-| Tests and example | `EtchGCLifecycleTest`, `StoreTransferTest`; `convex.core.examples.EtchGCExample` (test tree, not in the suite) runs a full online cycle under concurrent load |
+| CLI | `convex etch gc [--backup file \| --output file]`, `etch migrate --into <dest> [--set-root]`, `etch recover`, `etch validate [-m N]` in `convex.cli.etch` |
+| Tests and example | `EtchGCLifecycleTest`, `EtchGCRecoveryTest`, `EtchConfiguredLifecycleTest`, `StoreTransferTest`, `EtchCLITest`, `EtchEncryptionCLITest`; `convex.core.examples.EtchGCExample` (test tree, not in the suite) runs a full online cycle under concurrent load |
 
 The CLI commands are thin wrappers over the tested machinery; Etch's exclusive file
 lock enforces offline operation. `etch gc` verifies before cutover and fails with the

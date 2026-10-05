@@ -52,6 +52,8 @@ public class EtchConfiguredLifecycleTest {
 		int seed=1000;
 		File base=File.createTempFile("etch-config-gc-"+matrixCase.name(),".etch");
 		base.deleteOnExit();
+		File backup=new File(base.getPath()+".snapshot");
+		backup.deleteOnExit();
 		AVector<ACell> expected=EtchGCLifecycleTest.tree(seed);
 		EtchStore old=EtchStore.create(base,matrixCase.config());
 		EtchStore successor=null;
@@ -60,7 +62,7 @@ public class EtchConfiguredLifecycleTest {
 			old.startGC();
 			old.setRootData(expected);
 			old.transferGC();
-			successor=old.completeGC();
+			successor=old.completeGC(backup);
 			assertEquals(matrixCase.config(),successor.getEtch().getConfig());
 		} finally {
 			if (successor!=null) successor.close();
@@ -71,6 +73,10 @@ public class EtchConfiguredLifecycleTest {
 			assertEquals(expected.getHash(),reopened.getRootHash(),matrixCase.name());
 			assertEquals(expected,reopened.getRootData(),matrixCase.name());
 			assertEquals(matrixCase.config(),reopened.getEtch().getConfig(),matrixCase.name());
+		}
+		try (EtchStore snapshot=EtchStore.create(backup,matrixCase.config())) {
+			assertEquals(EtchGCLifecycleTest.tree(seed-10),snapshot.getRootData());
+			assertEquals(matrixCase.config(),snapshot.getEtch().getConfig());
 		}
 		markRelatedForDeletion(base);
 	}

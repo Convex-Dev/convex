@@ -1,6 +1,7 @@
 package convex.cli.etch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -8,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.file.Files;
 
 import org.junit.jupiter.api.Test;
 
@@ -18,8 +20,57 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
+import convex.etch.EtchStore;
 
 public class EtchCLITest {
+	@Test
+	public void testSnapshotAndCollect() throws IOException {
+		File source=Helpers.createTempFile("gcCliSnapshot", ".etch");
+		File backup=new File(source.getPath()+".backup");
+		backup.deleteOnExit();
+		ACell root=convex.core.data.Strings.create("Snapshot root. ".repeat(20));
+		ACell garbage=convex.core.data.Strings.create("Snapshot garbage. ".repeat(20));
+		try (EtchStore store=EtchStore.create(source)) {
+			store.setRootData(root);
+			convex.core.data.Cells.persist(garbage,store);
+		}
+		CLTester gc=CLTester.run("etch","gc","--etch",source.getPath(),"--backup",backup.getPath());
+		gc.assertExitCode(ExitCodes.SUCCESS);
+		assertTrue(gc.getOutput().contains("Backup file:"));
+		assertFalse(gc.getOutput().contains("Reclaimed:"));
+		try (EtchStore live=EtchStore.create(source); EtchStore snapshot=EtchStore.create(backup)) {
+			assertEquals(root,live.getRootData());
+			assertEquals(root,snapshot.getRootData());
+			assertNull(live.getEtch().read(garbage.getHash()));
+			assertNotNull(snapshot.getEtch().read(garbage.getHash()));
+		}
+		byte[] before=Files.readAllBytes(backup.toPath());
+		CLTester overwrite=CLTester.run("etch","gc","--etch",source.getPath(),"--backup",backup.getPath());
+		assertEquals(ExitCodes.ERROR,overwrite.getResult());
+		org.junit.jupiter.api.Assertions.assertArrayEquals(before,Files.readAllBytes(backup.toPath()));
+		CLTester conflicting=CLTester.run("etch","gc","--etch",source.getPath(),
+				"--backup",backup.getPath(),"--output",source.getPath()+".out");
+		assertEquals(ExitCodes.ERROR,conflicting.getResult());
+	}
+
+	@Test
+	public void testMissingRootRejectedInBothGCModes() throws IOException {
+		File source=Helpers.createTempFile("gcCliMissingRoot", ".etch");
+		Hash missing=convex.core.data.Strings.create("Absent root. ".repeat(20)).getHash();
+		try (EtchStore store=EtchStore.create(source)) {
+			store.getEtch().setRootHash(missing);
+		}
+		CLTester inPlace=CLTester.run("etch","gc","--etch",source.getPath());
+		assertEquals(ExitCodes.ERROR,inPlace.getResult());
+		assertTrue(inPlace.getError().contains("missing data"));
+		File output=new File(source.getPath()+".out");
+		CLTester toOutput=CLTester.run("etch","gc","--etch",source.getPath(),"--output",output.getPath());
+		assertEquals(ExitCodes.ERROR,toOutput.getResult());
+		assertFalse(output.exists());
+		try (EtchStore store=EtchStore.create(source)) {
+			assertEquals(missing,store.getRootHash());
+		}
+	}
 
 	private static final File TEMP_ETCH;
 	private static final ACell NUM=CVMLong.create(123);

@@ -3,7 +3,13 @@ package convex.etch;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -68,8 +74,8 @@ public class EtchUtils {
 	 * <li><b>Completed cutovers</b>: the single {@code .gc-complete} marker —
 	 * rewritten by every completeGC, so multiple successive GCs never chain —
 	 * names the CURRENT store file. It is ADOPTED: installed under the base
-	 * file name, with the superseded original deleted. That deletion is the
-	 * disk reclamation (each cutover was hard-gated on a verifiably complete
+	 * file name, with the superseded original name deleted. Without a retained
+	 * backup link, that reclaims disk space (each cutover was gated on a complete
 	 * sweep, and everything else is garbage by the retention contract).</li>
 	 * <li><b>Defunct files</b> ({@code .gc-defunct} tombstone: superseded
 	 * cutover originals not yet deleted, or cancelled targets pinned by
@@ -171,6 +177,12 @@ public class EtchUtils {
 		}
 		// Where rolled-back data belongs: the live store file
 		File live = (current != null) ? current : file;
+		// No safe rollback destination exists. In particular, an interrupted
+		// marker rewrite must never turn retained targets into a new empty store.
+		if (!live.isFile() || live.length()==0L) {
+			throw new IOException("Etch GC recovery has no live store for " + file
+					+ "; preserve the GC files and restore the completion marker or a backup");
+		}
 
 		// Recovery metadata is unauthenticated. Authenticate every non-empty store
 		// file which recovery may read, delete or replace before the first mutation.
@@ -228,10 +240,10 @@ public class EtchUtils {
 		}
 
 		// Delete the superseded original first. This deletion IS the disk
-		// reclamation: its retained content is verifiably in the current file
+		// reclamation unless a backup link retains it: its live content is in the current file
 		// (the cutover was hard-gated on a complete sweep) and everything else
-		// is garbage by the retention contract. Operators wanting an archive
-		// copy the file BEFORE invoking completeGC
+		// is garbage by the retention contract. An explicitly retained snapshot
+		// has a separate name outside this recovery layout and remains untouched.
 		if (file.exists()) {
 			if (!file.delete()) {
 				debug("Etch GC recovery: cannot delete superseded original {} (pinned by memory mappings"
@@ -351,8 +363,26 @@ public class EtchUtils {
 
 	static void writeMarker(File base, File target) throws IOException {
 		// Line 1 is authoritative (the target file name); any further lines are
-		// informational only (completeGC also records a root hash hint)
-		Files.writeString(markerFile(base).toPath(), target.getName() + "\n");
+		// informational only
+		writeMetadata(markerFile(base).toPath(), target.getName() + "\n");
+	}
+
+	/** Publishes a complete metadata file without truncating the previous one. */
+	static void writeMetadata(Path path, String contents) throws IOException {
+		Path temp = Files.createTempFile(path.toAbsolutePath().getParent(),
+				path.getFileName().toString()+".", ".tmp");
+		try {
+			try (FileChannel channel = FileChannel.open(temp, StandardOpenOption.WRITE)) {
+				ByteBuffer bytes = StandardCharsets.UTF_8.encode(contents);
+				while (bytes.hasRemaining()) channel.write(bytes);
+				channel.force(true);
+			}
+			// Fail safely when atomic replacement is unsupported; never fall back
+			// to truncating a marker that names the only surviving live file.
+			Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+		} finally {
+			Files.deleteIfExists(temp);
+		}
 	}
 
 	/**

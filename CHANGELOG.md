@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `etch gc --backup <file>` combines collection with retaining a pre-GC snapshot,
+  keeping the live store path unchanged. The snapshot uses a hard link and must
+  be a new filename on the same filesystem.
 - Optional TLS peer transport, with a separate TLS listener, `tls://` endpoints
   for clients and peer discovery, and an injectable message transport factory.
   Known peers authenticate certificates signed by their expected peer key,
@@ -43,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Etch GC rejects missing roots and independently verifies the target before
+  cutover. Encrypted in-place collection preserves key configuration during
+  recovery. GC metadata is atomically replaced, and ambiguous recovery without
+  a live store fails instead of opening an empty replacement.
 - NIO clients correctly match replies to requests when result encodings start
   at a non-zero buffer offset, avoiding spurious decoding errors and timeouts.
 - Multi transactions keep the log entries of every child and account execution

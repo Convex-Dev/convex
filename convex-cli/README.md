@@ -395,6 +395,45 @@ a warning when it differs from an existing file.
 The derivation and key-lifetime contract is specified in
 [Etch v3: Caller key material and verification](../convex-core/docs/ETCHv3.md#caller-key-material-and-verification).
 
+## Etch snapshot and collection
+
+Stop the peer or other process using the store before running the CLI maintenance
+commands. To collect the live store and retain its old contents as a snapshot:
+
+```bash
+convex etch gc -e store.etch --backup store-before-gc.etch
+```
+
+The collected store keeps the logical path `store.etch`. The snapshot contains
+the old root and every old entry, including data removed by collection. The
+command reports both paths and the live store's size reduction. The snapshot
+continues to occupy the old file's disk space until removed.
+
+`--backup` requires a new filename on the same filesystem with hard-link support.
+It retains the original file through another filename without copying its data.
+On Windows, use the same NTFS volume, for example:
+
+```powershell
+convex etch gc -e C:\data\store.etch --backup C:\data\store-before-gc.etch
+```
+
+After cutover, writes to the live store go to the new file and do not change the
+snapshot. Windows memory mappings can defer installation of the collected file
+under the live filename; Etch follows the completion marker to the collected
+file and retries installation on a later open. The backup remains available.
+
+Existing backups are never overwritten. `--backup` and `--output` are mutually
+exclusive: `--output collected.etch` already leaves the source in place. Treat
+snapshots as read-only; copy one to another volume for an independent backup.
+A backup left by a failed or interrupted command is not a confirmed snapshot.
+
+For encrypted stores, supply the normal source key options, such as
+`--etch-key-file <key-file>`. Both the snapshot and collected store retain the
+source encryption policy and require the source key to open.
+
+See [Etch GC](../convex-core/docs/ETCH_GC.md#snapshot-and-collect) for API usage,
+Windows mapping behaviour and recovery, or run `convex etch gc --help` for options.
+
 ## Global Options
 
 These options work with most commands:

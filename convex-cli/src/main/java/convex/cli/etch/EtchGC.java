@@ -7,6 +7,7 @@ import java.util.List;
 import convex.cli.CLIError;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
+import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
 import convex.core.text.Text;
 import convex.core.util.FileUtils;
@@ -31,11 +32,22 @@ public class EtchGC extends AEtchCommand {
 			description="Collect into this new file instead of in-place. The source store is not modified.")
 	private String outputFilename;
 
+	@Option(names="--backup", paramLabel="<file>",
+			description="Retain the pre-GC store as a backup snapshot when collecting in-place. "
+					+ "Requires a new filename on the same filesystem (hard links must be supported).")
+	private File backupFile;
+
 	@Override
 	public void execute() {
+		if ((backupFile!=null)&&(outputFilename!=null)) {
+			throw new CLIError("--backup cannot be combined with --output; --output already retains the source.");
+		}
 		EtchStore store=store();
 		try {
-			if (store.getRootRef()==null) {
+			if (backupFile!=null) backupFile=store.validateGCBackup(backupFile);
+			Ref<ACell> root=store.getRootRef();
+			if (root==null) throw new MissingDataException(store,store.getRootHash());
+			if (root.getValue()==null) {
 				informWarning("Store has no root data: the collected store will be empty.");
 			}
 			if (outputFilename!=null) {
@@ -46,7 +58,7 @@ public class EtchGC extends AEtchCommand {
 		} catch (MissingDataException e) {
 			throw new CLIError("Source store is missing data reachable from its root ("
 					+ e.getMissingHash() + "). The store may be corrupt or truncated; "
-					+ "run 'etch validate' to check. No data has been modified.", e);
+					+ "run 'etch validate' to check. GC has not replaced the source store.", e);
 		} catch (IOException e) {
 			throw new CLIError("IO error during Etch GC: "+e.getMessage(), e);
 		} finally {
@@ -61,27 +73,25 @@ public class EtchGC extends AEtchCommand {
 
 		store.startGC();
 		store.transferGC();
-		List<Hash> missing=store.verifyGC();
-		if (!missing.isEmpty()) {
-			// verifyGC empty is guaranteed after a successful sweep: reaching here
-			// means something is deeply wrong, and the original file is untouched
-			throw new CLIError("GC verification failed: "+missing.size()
-					+" value(s) missing from the collected store. The original file is untouched;"
-					+ " run 'etch validate' to check it for corruption.");
-		}
-		EtchStore collected=store.completeGC();
+		// completeGC independently verifies the target before committing.
+		EtchStore collected=store.completeGC(backupFile);
 		long after=collected.getEtch().getDataLength();
 		store.close();     // deletes the superseded original (or defers if pinned)
 		collected.close();
 
 		// Try to install the collected file under the original name now; if
 		// files are pinned by this process, the next open completes it
-		File open=EtchUtils.recover(baseFile);
+		File open=EtchUtils.recover(baseFile,store.getEtch().getConfig());
 
 		println("Etch GC complete");
 		println("Size before:  "+Text.toFriendlyNumber(before)+" bytes");
 		println("Size after:   "+Text.toFriendlyNumber(after)+" bytes");
-		println("Reclaimed:    "+Text.toFriendlyDecimal(100.0*(before-after)/Math.max(1, before))+"%");
+		println((backupFile==null ? "Reclaimed:    " : "Compacted:    ")
+				+Text.toFriendlyDecimal(100.0*(before-after)/Math.max(1, before))+"%");
+		if (backupFile!=null) {
+			println("Backup file:  "+backupFile.getCanonicalPath());
+			println("The backup retains the old file's disk space until removed.");
+		}
 		if (open.getCanonicalFile().equals(baseFile.getCanonicalFile())) {
 			println("Store file:   "+baseFile.getCanonicalPath());
 		} else {

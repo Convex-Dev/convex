@@ -4,6 +4,8 @@ import convex.core.data.RefDirect;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.function.Consumer;
 
@@ -12,6 +14,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.StoreException;
 import convex.core.store.ACachedStore;
 import convex.core.util.FileUtils;
@@ -27,7 +30,7 @@ import convex.core.util.Utils;
  * Objects are keyed by cryptographic hash. That solves naming. Objects are
  * immutable. That solves cache invalidation.
  *
- * Garbage collection is left as an exercise for the reader.
+ * Garbage collection copies retained data into a fresh Etch file.
  */
 public class EtchStore extends ACachedStore {
 
@@ -153,7 +156,8 @@ public class EtchStore extends ACachedStore {
 				break;
 			}
 			File tomb = new File(temp.getPath() + ".gc-defunct");
-			if (tomb.exists() && temp.delete()) {
+			if (!temp.getCanonicalFile().equals(etch.getFile().getCanonicalFile())
+					&& tomb.exists() && temp.delete()) {
 				tomb.delete();
 				break; // reclaimed a defunct file's name (and its disk space)
 			}
@@ -192,8 +196,10 @@ public class EtchStore extends ACachedStore {
 		if (!sweepRunning.compareAndSet(false, true))
 			throw new IllegalStateException("GC transfer already running for store: " + this);
 		try {
+			Hash rootHash = getRootHash();
 			Ref<ACell> rootRef = getRootRef();
-			if ((rootRef != null) && (rootRef.getValue() != null)) {
+			if (rootRef == null) throw new MissingDataException(this, rootHash);
+			if (rootRef.getValue() != null) {
 				sweep(t, rootRef);
 			}
 			// Sticky completion: see sweepComplete field notes. Only claim it if
@@ -375,16 +381,37 @@ public class EtchStore extends ACachedStore {
 	 * closed. All transferred values are retrievable by hash from the
 	 * successor; refs bound to this store stop resolving once it is closed.
 	 *
-	 * Hard requirement: the transfer sweep must have completed
-	 * (isGCComplete()) — the failure mode of an early cutover is silent data
-	 * loss, so there is no force override.
+	 * Requires a completed sweep and a fresh target-only verification of the
+	 * current root. There is no force override. Close predecessor views before
+	 * collecting the successor; legacy writes do not follow further generations.
 	 *
 	 * @return the successor EtchStore, running on the (former) target file
 	 * @throws IOException in case of IO error
+	 * @throws MissingDataException if the current root tree is absent from the target
 	 * @throws IllegalStateException if no active cycle, cancelling, already
 	 *         completed, or the sweep has not completed
 	 */
 	public synchronized EtchStore completeGC() throws IOException {
+		return completeGC(null);
+	}
+
+	/**
+	 * Completes GC, optionally retaining the original file as a backup snapshot.
+	 * The backup is a hard link: no data copy is needed, and it survives deletion
+	 * of the original name. It must be a new path on the same filesystem, outside
+	 * the store's GC filenames. Close this legacy store before opening the backup;
+	 * its root is the pre-cycle root, not a root updated during collection.
+	 * Any persists begun before startGC must finish before the legacy store closes.
+	 * Retaining a backup keeps the old disk space allocated. On Windows, hard links
+	 * require the same NTFS volume. This overload has the same verification and
+	 * predecessor-lifetime requirements as {@link #completeGC()}.
+	 *
+	 * @param backupFile backup path, or null to discard the original as usual
+	 * @return the successor store
+	 * @throws IOException if verification, backup creation or cutover fails
+	 * @throws MissingDataException if the current root tree is absent from the target
+	 */
+	public synchronized EtchStore completeGC(File backupFile) throws IOException {
 		Etch t = target;
 		if (completed)
 			throw new IllegalStateException("GC already completed for store: " + this);
@@ -392,22 +419,17 @@ public class EtchStore extends ACachedStore {
 			throw new IllegalStateException("No active GC cycle for store: " + this);
 		if (!sweepComplete)
 			throw new IllegalStateException("GC transfer not complete for store: " + this);
+		java.util.List<Hash> missing = EtchUtils.verify(t, t.getRootHash());
+		if (!missing.isEmpty()) throw new MissingDataException(this, missing.get(0));
 
 		// Everything must be durable in the target before we commit to it
 		t.flush();
-
-		// From here the target file belongs to the successor: this store must
-		// never close, cancel or re-complete over it. In-flight and future
-		// writes via this store still route to the target file — benign, the
-		// successor reads the same file
-		completed = true;
-
-		// The successor rebinds the target Etch to itself: refs decoded from
-		// that file (including via this store's reads) bind to the successor —
-		// deliberately, since they outlive this store's close. It inherits the
-		// logical base file so its own GC targets stay bounded (base~N)
-		EtchStore newStore = new EtchStore(t);
-		newStore.baseFile = this.baseFile;
+		Path backup = null;
+		if (backupFile != null) {
+			backup = validateGCBackup(backupFile).toPath();
+			etch.flush();
+			Files.createLink(backup, etch.getFile().toPath());
+		}
 
 		// Tombstone the superseded old file FIRST: its retained content is
 		// verifiably in the successor, so recovery may delete it but must never
@@ -415,18 +437,48 @@ public class EtchStore extends ACachedStore {
 		// before the marker: a crash between the two reads as "cutover didn't
 		// happen" (marker still names this file; the target rolls back), which
 		// loses nothing
-		java.nio.file.Files.writeString(
-				new File(etch.getFile().getCanonicalPath() + ".gc-defunct").toPath(),
-				"superseded by " + t.getFile().getName() + "\n");
+		Path tomb = new File(etch.getFile().getCanonicalPath() + ".gc-defunct").toPath();
+		try {
+			EtchUtils.writeMetadata(tomb, "superseded by " + t.getFile().getName() + "\n");
+			EtchUtils.writeMarker(baseFile, t.getFile());
+		} catch (IOException e) {
+			// The atomic marker replacement failed: this store still owns both
+			// files and can retry or cancel. Do not leave a mutable backup behind.
+			try { Files.deleteIfExists(tomb); } catch (IOException cleanup) { e.addSuppressed(cleanup); }
+			if (backup != null) {
+				try { Files.deleteIfExists(backup); } catch (IOException cleanup) { e.addSuppressed(cleanup); }
+			}
+			throw e;
+		}
 
-		// Single completion marker, always on the BASE file, rewritten by every
-		// cutover: it names the CURRENT store file for startup adoption. No
-		// marker chains: sequences of in-process GCs (with old files deleted on
-		// close and their names reused) keep exactly one marker pointing at the
-		// live file
-		EtchUtils.writeMarker(baseFile, t.getFile());
+		// Publish ownership only after the on-disk cutover succeeds. The target
+		// is rebound to the successor, whose refs outlive this store's close.
+		EtchStore newStore = new EtchStore(t);
+		newStore.baseFile = this.baseFile;
+		completed = true;
 
 		return newStore;
+	}
+
+	/**
+	 * Checks a proposed backup path without creating or modifying any file.
+	 * @param backupFile proposed backup file
+	 * @return canonical backup file
+	 * @throws IOException if the path is occupied or conflicts with GC files
+	 */
+	public File validateGCBackup(File backupFile) throws IOException {
+		File backup = backupFile.getCanonicalFile();
+		File base = baseFile.getCanonicalFile();
+		String name = backup.getName();
+		if (base.getParentFile().equals(backup.getParentFile())
+				&& (name.equals(base.getName()) || name.startsWith(base.getName()+"~")
+						|| name.startsWith(base.getName()+".gc-"))) {
+			throw new IOException("Backup path conflicts with Etch GC files: " + backup);
+		}
+		if (Files.exists(backupFile.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+			throw new IOException("Backup file already exists: " + backupFile);
+		}
+		return backup;
 	}
 
 	/**
@@ -781,7 +833,8 @@ public class EtchStore extends ACachedStore {
 			// Cutover done and this legacy view is now closed: the old file's
 			// retained content is verifiably in the successor (completeGC is
 			// hard-gated on a complete sweep) and everything else is garbage by
-			// the retention contract. Deleting it IS the disk reclamation. If
+			// the retention contract. Removing this name reclaims disk space
+			// unless a requested backup still retains the file through a hard link. If
 			// mappings pin the file (Windows), deletion is retried on JVM exit
 			// and by startup recovery, guided by the .gc-defunct tombstone
 			// completeGC already wrote
