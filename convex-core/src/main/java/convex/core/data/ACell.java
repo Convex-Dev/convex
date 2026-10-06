@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.util.ArrayDeque;
+
 import convex.core.Constants;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -387,10 +389,37 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public final long getMemorySize() {
 		long ms=memorySize;
 		if (ms>=0) return ms;
-		ms=calcMemorySize();
-		this.memorySize=ms;
-		return ms;
+
+		// Cache children before calculating each parent. This keeps both memory
+		// sizing and the subsequent embedding checks safe for deeply nested data.
+		// Allocate a stack only when an uncached child itself has children.
+		ArrayDeque<MemorySizeFrame> stack=null;
+		ACell cell=this;
+		int nextRef=0;
+		while (true) {
+			if (nextRef<cell.getRefCount()) {
+				ACell child=cell.getRef(nextRef++).getValue();
+				if ((child==null)||(child.memorySize>=0)) continue;
+				if (child.getRefCount()==0) {
+					child.memorySize=child.calcMemorySize();
+					continue;
+				}
+				if (stack==null) stack=new ArrayDeque<>();
+				stack.push(new MemorySizeFrame(cell,nextRef));
+				cell=child;
+				nextRef=0;
+			} else {
+				// Retain specialised calculations for individual cell types.
+				cell.memorySize=cell.calcMemorySize();
+				if ((stack==null)||stack.isEmpty()) return memorySize;
+				MemorySizeFrame parent=stack.pop();
+				cell=parent.cell();
+				nextRef=parent.nextRef();
+			}
+		}
 	}
+
+	private record MemorySizeFrame(ACell cell, int nextRef) {}
 	
 	/**
 	 * Gets the Memory Size of a Cell, computing it if required.

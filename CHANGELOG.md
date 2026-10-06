@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Memory accounting handles deeply nested data without overflowing the Java
+  stack, allowing oversized Multi nesting to reach the existing `:DEPTH` check.
 - Etch GC rejects missing roots and independently verifies the target before
   cutover. Encrypted in-place collection preserves key configuration during
   recovery. GC metadata is atomically replaced, and ambiguous recovery without
