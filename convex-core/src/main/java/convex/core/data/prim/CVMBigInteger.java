@@ -256,7 +256,7 @@ public final class CVMBigInteger extends AInteger {
 	
 	@Override
 	protected long calcMemorySize() {	
-		return blob().getMemorySize();
+		return getMemorySizeRecursive(blob());
 	}
 	
 	@Override

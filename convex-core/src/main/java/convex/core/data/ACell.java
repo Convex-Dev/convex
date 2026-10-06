@@ -1,6 +1,6 @@
 package convex.core.data;
 
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 
 import convex.core.Constants;
 import convex.core.data.type.AType;
@@ -254,6 +254,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * Requires any child Refs to be either direct or of persisted in store at minimum, 
 	 * or you might get a MissingDataException
+	 *
+	 * Implementations sizing other cells must use {@link #getMemorySizeRecursive(ACell)}
+	 * so a stack overflow unwinds to the outermost memory-size calculation.
 	 * 
 	 * @return Memory Size of this Cell
 	 */
@@ -263,7 +266,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {
 			Ref<?> childRef=getRef(i);
-			long childSize=childRef.getMemorySize();
+			long childSize=getMemorySizeRecursive(childRef.getValue());
 			result=Utils.memoryAdd(result,childSize);
 		}
 		
@@ -389,37 +392,60 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public final long getMemorySize() {
 		long ms=memorySize;
 		if (ms>=0) return ms;
+		return getMemorySizeUncached();
+	}
 
-		// Cache children before calculating each parent. This keeps both memory
-		// sizing and the subsequent embedding checks safe for deeply nested data.
-		// Allocate a stack only when an uncached child itself has children.
-		ArrayDeque<MemorySizeFrame> stack=null;
-		ACell cell=this;
-		int nextRef=0;
-		while (true) {
-			if (nextRef<cell.getRefCount()) {
-				ACell child=cell.getRef(nextRef++).getValue();
-				if ((child==null)||(child.memorySize>=0)) continue;
-				if (child.getRefCount()==0) {
-					child.memorySize=child.calcMemorySize();
-					continue;
-				}
-				if (stack==null) stack=new ArrayDeque<>();
-				stack.push(new MemorySizeFrame(cell,nextRef));
-				cell=child;
-				nextRef=0;
-			} else {
-				// Retain specialised calculations for individual cell types.
-				cell.memorySize=cell.calcMemorySize();
-				if ((stack==null)||stack.isEmpty()) return memorySize;
-				MemorySizeFrame parent=stack.pop();
-				cell=parent.cell();
-				nextRef=parent.nextRef();
-			}
+	private long getMemorySizeUncached() {
+		try {
+			return memorySize=calcMemorySize();
+		} catch (StackOverflowError e) {
+			// The recursive path has fully unwound. Completed child caches remain
+			// valid; finish the rest with one list and no per-cell frame objects.
+			return getMemorySizeIterative();
 		}
 	}
 
-	private record MemorySizeFrame(ACell cell, int nextRef) {}
+	/**
+	 * Internal recursive path, without an overflow handler at each level.
+	 * Only completed calculations are cached. Call {@link #getMemorySize()} at
+	 * external entry points to provide overflow recovery.
+	 *
+	 * @param cell Cell to size, or null
+	 * @return Memory size of the cell
+	 */
+	protected static long getMemorySizeRecursive(ACell cell) {
+		if (cell==null) return 0;
+		long ms=cell.memorySize;
+		if (ms>=0) return ms;
+		return cell.memorySize=cell.calcMemorySize();
+	}
+
+	private long getMemorySizeIterative() {
+		ArrayList<ACell> stack=new ArrayList<>();
+		stack.add(this);
+		while (!stack.isEmpty()) {
+			ACell cell=stack.removeLast();
+			if (cell==null) {
+				// A null marker means all children of the preceding cell are sized.
+				cell=stack.removeLast();
+				if (cell.memorySize<0) cell.memorySize=cell.calcMemorySize();
+			} else if (cell.memorySize<0) {
+				int n=cell.getRefCount();
+				if (n==0) {
+					cell.memorySize=cell.calcMemorySize();
+					continue;
+				}
+				stack.add(cell);
+				stack.add(null);
+				// Reverse push order preserves the recursive visitation order.
+				for (int i=n-1; i>=0; i--) {
+					ACell child=cell.getRef(i).getValue();
+					if ((child!=null)&&(child.memorySize<0)) stack.add(child);
+				}
+			}
+		}
+		return memorySize;
+	}
 	
 	/**
 	 * Gets the Memory Size of a Cell, computing it if required.

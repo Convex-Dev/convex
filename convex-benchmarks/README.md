@@ -14,6 +14,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `OpBenchmark` | Execution of low-level CVM ops |
 | `BigBlockBenchmark` | Applying a large block of signed transactions to state |
 | `MapBenchmark` | Immutable map update operations |
+| `MemorySizeBenchmark` | Memory accounting for cached cells and newly changed state paths |
 | `ListDataBenchmark` | Immutable list append operations |
 | `EncodingBenchmark` | Data encoding and decoding |
 | `ReaderBenchmark` | Convex Lisp reader parsing performance |
@@ -42,6 +43,17 @@ Run a specific benchmark:
 java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
   convex.benchmarks.EtchBenchmark
 ```
+
+Profile memory-accounting allocations as well as elapsed time:
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  org.openjdk.jmh.Main MemorySizeBenchmark -prof gc
+```
+
+The sizing-only cases reuse cells and reset their memory-size caches; the update
+cases include constructing the changed values. Compare allocation per operation
+to distinguish traversal overhead from those necessary value allocations.
 
 ### With Profiling (Java Flight Recorder)
 

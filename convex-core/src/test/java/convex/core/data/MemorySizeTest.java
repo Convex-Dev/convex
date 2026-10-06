@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -8,6 +9,37 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 
 public class MemorySizeTest {
+
+	@Test
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public void testOverflowUnwindsToRoot() {
+		boolean[] calculatingRoot={false};
+		int[] attempts={0};
+		ACell child=new VectorLeaf<ACell>(new Ref[0]) {
+			@Override
+			protected long calcMemorySize() {
+				if (++attempts[0]==1) throw new StackOverflowError();
+				// Recovery must run after the enclosing recursive calculation exits.
+				assertFalse(calculatingRoot[0]);
+				return super.calcMemorySize();
+			}
+		};
+		ACell root=new VectorLeaf<ACell>(new Ref[] {child.getRef()}) {
+			@Override
+			protected long calcMemorySize() {
+				calculatingRoot[0]=true;
+				try {
+					return super.calcMemorySize();
+				} finally {
+					calculatingRoot[0]=false;
+				}
+			}
+		};
+		assertEquals(0,root.getMemorySize());
+		assertEquals(2,attempts[0]);
+		assertEquals(0,root.getMemorySize());
+		assertEquals(2,attempts[0]);
+	}
 
 	@Test
 	public void testDeepMemorySize() {
@@ -33,6 +65,25 @@ public class MemorySizeTest {
 		long expected=2L*(leaf.getEncodingLength()+Constants.MEMORY_OVERHEAD);
 		assertEquals(expected,root.getMemorySize());
 		assertTrue(root.isEmbedded());
+	}
+
+	@Test
+	public void testMultipleDeepBranches() {
+		Blob leaf=Blob.wrap(new byte[256]);
+		long leafSize=leaf.getEncodingLength()+Constants.MEMORY_OVERHEAD;
+		ACell first=leaf;
+		ACell second=leaf;
+		int depth=20000;
+		for (int i=0; i<depth; i++) {
+			first=Vectors.create(first,leaf,leaf,leaf,leaf);
+			second=Vectors.create(second,leaf,leaf,leaf,leaf);
+		}
+		ACell root=Vectors.create(first,second,first,null);
+		long vectorSize=2+5*Ref.INDIRECT_ENCODING_LENGTH+Constants.MEMORY_OVERHEAD;
+		long branchSize=(1+4L*depth)*leafSize+depth*vectorSize;
+		assertEquals(3*branchSize,root.getMemorySize());
+		assertEquals(branchSize,first.memorySize);
+		assertEquals(branchSize,second.memorySize);
 	}
 
 	@Test
