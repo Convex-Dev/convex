@@ -9,7 +9,7 @@ Convex is a lattice-based decentralised network and execution platform built as 
 
 ## Build System
 
-Maven multi-module project using the checked-in Maven 3.9.12 wrapper. Builds on
+Maven multi-module project using the checked-in Maven 3.10.0 wrapper. Builds on
 Java 21+ (CI verifies JDK 21 and 25; release and Docker use JDK 25); artifacts
 target Java 21 bytecode.
 
