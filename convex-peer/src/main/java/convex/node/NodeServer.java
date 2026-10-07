@@ -65,7 +65,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final NodeConfig config;
 	private final RootLatticeCursor<V> cursor;
 	private final RootComponent<V> rootComponent;
-	private final List<LatticePropagator> propagators=new ArrayList<>();
+	/** Immutable snapshots let publication proceed independently of group removal. */
+	private volatile List<LatticePropagator> propagators=List.of();
 	private final Set<LatticePropagator> attachedPropagators=ConcurrentHashMap.newKeySet();
 
 	/** Serialises all authoritative cell announcement, root-pointer and flush work. */
@@ -174,7 +175,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private void seedPropagationViews() throws IOException {
 		ACell announced=syncSnapshot(null,false);
-		for (LatticePropagator propagator:List.copyOf(propagators)) {
+		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"initial view materialisation",
 				() -> propagator.processSnapshot(announced));
 		}
@@ -182,7 +183,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	private void startPropagationServices() {
-		for (LatticePropagator propagator:List.copyOf(propagators)) {
+		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"launch",propagator::start);
 		}
 	}
@@ -190,7 +191,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private void abortFailedLaunch(Throwable failure) {
 		lifecycleState=LifecycleState.STOPPING;
 		stopMaintenance();
-		for (LatticePropagator propagator:List.copyOf(propagators)) {
+		for (LatticePropagator propagator:propagators) {
 			try {
 				propagator.close();
 			} catch (Throwable cleanupFailure) {
@@ -216,6 +217,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public CompletableFuture<V> pull(LatticePropagator source,Convex peer) {
 		requireAttached(source);
 		return source.pull(peer).thenApply(acquired -> {
+			requireAttached(source);
 			mergePulledValue(acquired);
 			cursor.sync();
 			return cursor.get();
@@ -239,6 +241,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			boolean background,ACell... path) {
 		requireAttached(source);
 		return source.pullPath(peer,background,path).thenApply(acquired -> {
+			requireAttached(source);
 			ALatticeCursor<ACell> target=cursor.path(path);
 			if (acquired!=null) mergeIncoming(target,acquired);
 			cursor.sync();
@@ -291,6 +294,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		requireAttached(source);
 		try {
 			for (ACell acquired:source.pullAll().get(30,TimeUnit.SECONDS)) {
+				requireAttached(source);
 				mergePulledValue(acquired);
 			}
 			cursor.sync();
@@ -437,7 +441,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	@Deprecated
 	public LatticePropagator getPropagator() {
-		return propagators.isEmpty() ? null : propagators.get(0);
+		List<LatticePropagator> snapshot=propagators;
+		return snapshot.isEmpty() ? null : snapshot.get(0);
 	}
 
 	/**
@@ -446,7 +451,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @return attached groups in attachment order
 	 */
 	public List<LatticePropagator> getPropagators() {
-		return List.copyOf(propagators);
+		return propagators;
 	}
 
 	/**
@@ -467,8 +472,44 @@ public class NodeServer<V extends ACell> implements Closeable {
 			throw new IllegalArgumentException("Propagator is already attached to this node");
 		}
 		propagator.attach(this);
-		propagators.add(propagator);
+		List<LatticePropagator> updated=new ArrayList<>(propagators);
+		updated.add(propagator);
+		propagators=List.copyOf(updated);
 		attachedPropagators.add(propagator);
+	}
+
+	/**
+	 * Removes and shuts down one propagation group without stopping the node.
+	 *
+	 * <p>Stops future node notifications and explicit pulls through this group,
+	 * drains its accepted work and closes its routes, including assigned inbound
+	 * sockets. Work already accepted may still merge while shutdown drains it;
+	 * outstanding pulls that complete after removal are rejected before merge.
+	 * Other groups and the authoritative value are unaffected. The caller retains
+	 * ownership of all stores; this operation neither closes nor erases them.</p>
+	 *
+	 * <p>Unregister the group from its application-owned listeners first with
+	 * {@link LatticeListener#unregisterPropagator(LatticePropagator)}. A removed
+	 * group is excluded from subsequent node launches. Shutdown failures are
+	 * isolated and available through {@link LatticePropagator#getStatus()}.</p>
+	 *
+	 * <p>This blocking lifecycle operation must be called from application
+	 * management code, outside group message handlers and publication callbacks.</p>
+	 *
+	 * @param propagator group to remove
+	 * @return {@code true} if removed, or {@code false} if it was not attached
+	 */
+	public synchronized boolean removePropagator(LatticePropagator propagator) {
+		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
+		if (lifecycleState==LifecycleState.STARTING || lifecycleState==LifecycleState.STOPPING) {
+			throw new IllegalStateException("Cannot remove a group during node launch or shutdown");
+		}
+		if (!attachedPropagators.remove(propagator)) return false;
+		List<LatticePropagator> updated=new ArrayList<>(propagators);
+		updated.remove(propagator);
+		propagators=List.copyOf(updated);
+		runIsolated(propagator,"removal",propagator::close);
+		return true;
 	}
 
 	private void requireAttached(LatticePropagator propagator) {
@@ -528,7 +569,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	private void notifyPropagators(ACell value) {
-		for (LatticePropagator propagator:List.copyOf(propagators)) {
+		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"update notification",
 				() -> propagator.triggerBroadcast(value));
 		}
@@ -711,7 +752,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// Attachment transfers lifecycle ownership even before launch. This matters
 			// when an application has already supplied manager-owned peer connections.
 			lifecycleState=LifecycleState.STOPPING;
-			for (LatticePropagator propagator:List.copyOf(propagators)) {
+			for (LatticePropagator propagator:propagators) {
 				runIsolated(propagator,"pre-launch shutdown",propagator::close);
 			}
 			lifecycleState=LifecycleState.STOPPED;
@@ -724,7 +765,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		lifecycleState=LifecycleState.STOPPING;
 		stopMaintenance();
 
-		for (LatticePropagator propagator:List.copyOf(propagators)) {
+		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"ingress drain",propagator::stopIngress);
 		}
 
@@ -737,7 +778,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		ACell snapshot=finalRoot;
-		for (LatticePropagator propagator:List.copyOf(propagators)) {
+		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"shutdown",() -> propagator.triggerAndClose(snapshot));
 		}
 

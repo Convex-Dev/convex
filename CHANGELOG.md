@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Lattice nodes can remove and shut down individual propagation groups while
+  other groups remain live. Shared listeners can unregister a group and close
+  only its assigned connections; caller-owned stores remain open.
 - `etch gc --backup <file>` combines collection with retaining a pre-GC snapshot,
   keeping the live store path unchanged. The snapshot uses a hard link and must
   be a new filename on the same filesystem.

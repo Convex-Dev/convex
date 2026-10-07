@@ -145,7 +145,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 
 	/** Assigns a physical inbound connection permanently to this endpoint. */
 	void attachInbound(AConnection connection) {
-		if (connection!=null) inboundConnections.add(connection);
+		if (connection==null) throw new IllegalArgumentException("Connection must not be null");
+		synchronized (inboundConnections) {
+			if (!acceptingInbound) throw new IllegalStateException("Propagation group is not accepting connections");
+			if (connection.isClosed()) throw new IllegalStateException("Inbound connection is closed");
+			inboundConnections.add(connection);
+		}
 	}
 
 	/** Returns whether this policy group owns the physical inbound connection. */
@@ -159,7 +164,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 	 */
 	Predicate<Message> deliver(Message message) {
 		if (!acceptingInbound) return inboundRejected;
-		if (inboundQueue.offer(message)) return null;
+		if (inboundQueue.offer(message)) {
+			// Shutdown may have drained the queue between the admission check and
+			// this offer. Do not retain a late message in an endpoint with no worker.
+			if (!acceptingInbound && inboundQueue.remove(message)) return inboundRejected;
+			return null;
+		}
 		return inboundRetry;
 	}
 
@@ -864,7 +874,9 @@ final class LatticeProtocolEndpoint implements Closeable {
 
 	@Override
 	public synchronized void close() throws IOException {
-		acceptingInbound=false;
+		synchronized (inboundConnections) {
+			acceptingInbound=false;
+		}
 		inboundRunning=false;
 		inboundVerifier.close();
 		IOException failure=null;
@@ -912,7 +924,15 @@ final class LatticeProtocolEndpoint implements Closeable {
 				maintenanceThread=null;
 			}
 		}
-		for (AConnection connection:Set.copyOf(inboundConnections)) removeConnection(connection);
+		for (AConnection connection:Set.copyOf(inboundConnections)) {
+			try {
+				connection.close();
+			} catch (RuntimeException | StackOverflowError e) {
+				failure=append(failure,new IOException("Unable to close propagation inbound connection",e));
+			} finally {
+				removeConnection(connection);
+			}
+		}
 		connectionStats.clear();
 		if (failure!=null) throw failure;
 	}

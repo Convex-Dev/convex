@@ -1408,11 +1408,11 @@ public class NodeServerTest {
 			assertEquals(NodeServer.LifecycleState.STOPPED, node.getLifecycleState());
 			assertThrows(IllegalStateException.class,
 				() -> node.setMergeContext(LatticeContext.EMPTY),
-				"identity and topology remain frozen across relaunches");
+				"merge-context configuration remains frozen across relaunches");
 
 			node.launch();
 			assertEquals(NodeServer.LifecycleState.RUNNING, node.getLifecycleState(),
-				"a stopped node may relaunch with its original immutable topology");
+				"a stopped node may relaunch with its retained groups");
 		} finally {
 			testStore.release();
 			try {

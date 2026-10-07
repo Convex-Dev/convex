@@ -193,6 +193,42 @@ the remaining cleanup steps.
 Failures of the authoritative store are surfaced by `NodeServer`. Listener
 failures are surfaced independently to the application that owns the transport.
 
+### Removing a group while the node runs
+
+Remove a group from every application-owned listener, then remove it from the
+node:
+
+```java
+transport.unregisterPropagator(group); // repeat for each listener serving it
+node.removePropagator(group);
+```
+
+`unregisterPropagator` revokes future assignment to that group and closes its
+already assigned sockets on this listener. The listener, its other connections
+and the group itself remain live. A selector that still returns the unregistered
+group is rejected; update the application's routing policy to select remaining
+groups or deny new connections. Existing sockets are never reassigned.
+
+`removePropagator` removes the group from node notifications and explicit pull
+APIs, drains accepted protocol and publication work, and closes inbound sockets
+and outbound routes. Accepted work may still merge into the node during the
+drain. The node and other groups keep running, and a later node launch does not
+restart the removed group. Outstanding pulls that finish after removal are
+rejected before merge. Both removal methods return `false` when the group
+is already absent. Node removal also works before first launch or after shutdown.
+
+Removal is a blocking lifecycle operation: call it from application management
+code, outside the group's message handlers and publication callbacks. Shutdown
+failures remain isolated and observable through the group's `getStatus()` and
+`nextFailure()` APIs. Caller-owned stores remain open and retain their contents;
+removal does not erase local data or revoke copies already held by remote peers.
+
+Calling `group.close()` directly stops its resources but leaves it attached to
+the node; use `node.removePropagator(group)` for permanent removal from that
+node's lifecycle. Adding groups, registering them with listeners and configuring
+filters still precede first launch/attachment as described above; these removal
+operations do not introduce runtime group creation or subscription negotiation.
+
 ## Naming
 
 - **desired**: retained bounded candidate or explicit intent for a route to an identity.

@@ -955,11 +955,14 @@ public class LatticePropagator implements Closeable {
 			return;
 		}
 
-		running = false;
+		synchronized (triggerQueue) {
+			// Seal ordinary offers before the final drain. A notification already
+			// holding a node snapshot must not enqueue after shutdown has finished.
+			running = false;
+			if (finalValue != null) triggerQueue.offer(finalValue);
+		}
 
-		if (finalValue != null) {
-			triggerQueue.offer(finalValue); // wakes thread via notify
-		} else if (propagationThread != null) {
+		if (finalValue == null && propagationThread != null) {
 			propagationThread.interrupt(); // wake thread from poll wait
 		}
 
@@ -1008,7 +1011,10 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Stops the propagator gracefully. Equivalent to {@code triggerAndClose(null)}.
+	 * Drains ingress and publication work and closes this group's inbound sockets
+	 * and outbound routes. Stores remain caller-owned. To also remove the group
+	 * from its node's lifecycle and notifications, use
+	 * {@link NodeServer#removePropagator(LatticePropagator)}.
 	 */
 	@Override
 	public void close() {
@@ -1046,9 +1052,11 @@ public class LatticePropagator implements Closeable {
 	 * @param value lattice value to process; {@code null} is ignored
 	 */
 	public void triggerBroadcast(ACell value) {
-		if (!running) return;
 		if (value == null) return;
-		triggerQueue.offer(value);
+		synchronized (triggerQueue) {
+			if (!running) return;
+			triggerQueue.offer(value);
+		}
 	}
 
 	// ========== Propagation Loop ==========

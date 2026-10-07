@@ -3,6 +3,7 @@ package convex.node;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -46,6 +47,8 @@ public final class LatticeListener implements Closeable {
 		ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<AConnection,LatticePropagator> assignments=
 		new ConcurrentHashMap<>();
+	/** Serialises initial assignment with revocation; established traffic does not lock. */
+	private final Object assignmentLock=new Object();
 	private Function<AConnection,LatticePropagator> selector;
 	private AServer server;
 	private Integer port;
@@ -73,6 +76,38 @@ public final class LatticeListener implements Closeable {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
 		requireNotLaunched("registerPropagator");
 		allowedPropagators.add(propagator);
+	}
+
+	/**
+	 * Revokes a group's eligibility and closes its assigned sockets on this listener.
+	 * May be called while running. Other groups, listeners and the propagator itself
+	 * remain live. Already accepted protocol work may complete in the group.
+	 *
+	 * @param propagator group to unregister
+	 * @return {@code true} if registered, or {@code false} if already absent
+	 */
+	public boolean unregisterPropagator(LatticePropagator propagator) {
+		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
+		ArrayList<AConnection> connections=new ArrayList<>();
+		synchronized (assignmentLock) {
+			if (!allowedPropagators.remove(propagator)) return false;
+			assignments.forEach((connection,owner) -> {
+				if (owner==propagator) connections.add(connection);
+			});
+		}
+		// Closing a socket may call back into this listener. Never hold the assignment
+		// lock while waiting for transport cleanup or invoking group observers.
+		for (AConnection connection:connections) {
+			try {
+				connection.close();
+			} catch (RuntimeException | StackOverflowError e) {
+				propagator.recordFailure("listener unregistration",e);
+				log.warn("Unable to close unregistered group's inbound connection",e);
+			} finally {
+				removeConnection(connection);
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -131,18 +166,25 @@ public final class LatticeListener implements Closeable {
 			Selection selection=select(connection);
 			propagator=selection.propagator();
 			if (propagator==null) return reject(message,selection.rejection());
-			LatticePropagator previous=assignments.putIfAbsent(connection,propagator);
-			if (previous!=null) propagator=previous;
-			else {
-				try {
-					propagator.attachInboundConnection(connection);
-				} catch (VirtualMachineError e) {
-					if (!(e instanceof StackOverflowError)) throw e;
-					return containFailure(connection,propagator,e);
-				} catch (Throwable e) {
-					return containFailure(connection,propagator,e);
+			boolean revoked;
+			try {
+				synchronized (assignmentLock) {
+					// Selection is application code and runs outside the lock. Recheck
+					// registration in case it raced with unregistration.
+					revoked=!allowedPropagators.contains(propagator);
+					if (!revoked) {
+						LatticePropagator previous=assignments.putIfAbsent(connection,propagator);
+						if (previous!=null) propagator=previous;
+						else propagator.attachInboundConnection(connection);
+					}
 				}
+			} catch (VirtualMachineError e) {
+				if (!(e instanceof StackOverflowError)) throw e;
+				return containFailure(connection,propagator,e);
+			} catch (Throwable e) {
+				return containFailure(connection,propagator,e);
 			}
+			if (revoked) return reject(message,"Inbound propagation policy selected an unavailable group");
 		}
 		try {
 			return propagator.deliverIncomingMessage(message);

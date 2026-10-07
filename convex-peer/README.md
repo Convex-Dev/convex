@@ -180,12 +180,17 @@ module layers node discovery, social selection and PoP routing on them.
   backpressure to the connection.
 - **Propagators** - Each `LatticePropagator` owns a store and a
   `LatticeFilter` which projects values before they are announced or broadcast,
-  so data outside that group's policy never enters its serving store. Contained
-  failures are available through `getStatus()` and `nextFailure()`.
+  restricting the published view. Inbound acquisition can still populate that
+  store with cells outside the publication filter. Contained failures are
+  available through `getStatus()` and `nextFailure()`.
 - **Inbound policy** - `LatticeListener.setSelector` assigns each inbound
   connection to exactly one propagator, which determines both the query view
   and the store used for acquisition. No default policy is installed: inbound
   lattice traffic is denied until the operator sets one.
+- **Group removal** - Unregister a group from each listener with
+  `unregisterPropagator`, then call `NodeServer.removePropagator` to drain and
+  close it while the node and other groups remain live. Stores stay caller-owned.
+  See [group removal](docs/LATTICE_NETWORKING.md#removing-a-group-while-the-node-runs).
 
 ## Documentation
 
