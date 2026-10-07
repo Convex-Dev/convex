@@ -7,6 +7,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 import convex.core.data.ACell;
@@ -45,6 +46,9 @@ public class EtchStore extends ACachedStore {
 	 * readers see a consistent instance.
 	 */
 	private volatile Etch target;
+
+	/** Parallel persists share this lock; GC start drains them before publishing a target. */
+	private final ReentrantReadWriteLock gcStartLock = new ReentrantReadWriteLock();
 
 	/**
 	 * True while a GC cycle is being cancelled: writes are redirected back to
@@ -125,12 +129,31 @@ public class EtchStore extends ACachedStore {
 	/**
 	 * Starts a GC cycle. Creates a new target Etch file: subsequent writes are
 	 * directed to the target, while reads check the target first and fall back
-	 * to the old file. See convex-core/docs/ETCH_GC.md.
+	 * to the old file. Waits for in-flight persists before publishing the target,
+	 * so copying sees stable source statuses. See convex-core/docs/ETCH_GC.md.
 	 *
 	 * @throws IOException If an IO exception occurs
-	 * @throws IllegalStateException if a GC cycle is already in progress
+	 * @throws IllegalStateException if a GC cycle is already in progress/completed,
+	 *         or called from a persistence callback
 	 */
-	public synchronized void startGC() throws IOException {
+	public void startGC() throws IOException {
+		if (gcStartLock.getReadHoldCount() != 0) {
+			throw new IllegalStateException("Cannot start GC from a persistence callback");
+		}
+		gcStartLock.writeLock().lock();
+		try {
+			// Check before taking the store monitor: cancellation holds that monitor
+			// while reverse migration calls storeRef (which takes the shared lock).
+			if ((target != null) || completed) {
+				throw new IllegalStateException("GC already active or completed for store: " + this);
+			}
+			startGCExclusive();
+		} finally {
+			gcStartLock.writeLock().unlock();
+		}
+	}
+
+	private synchronized void startGCExclusive() throws IOException {
 		if (completed)
 			// this store is a legacy view over the successor's file: a new cycle
 			// here would make no sense — GC the successor instead
@@ -233,20 +256,12 @@ public class EtchStore extends ACachedStore {
 				f.expanded = true;
 				Hash h = f.ref.getHash();
 
-				// Preserve the status earned in the old file (e.g. ANNOUNCED —
-				// losing it would trigger novelty re-broadcast after cutover;
-				// raising it would forge peer commitments). PERSISTED is the floor
-				// for anything reachable from a persisted root; store-local levels
-				// above MAX_STATUS are capped
-				Ref<ACell> oldRef = etch.read(h);
-				f.status = (oldRef == null) ? Ref.PERSISTED
-						: Math.max(Ref.PERSISTED, Math.min(oldRef.getStatus(), Ref.MAX_STATUS));
-
-				// INV-1 prune: subtree already fully present in the target. This
-				// also dedups shared subtrees without a visited-set: DFS completes
-				// one occurrence before a sibling occurrence expands
+				// Every GC copy preserves old per-entry status in storeRef, including
+				// live persists before this sweep. A target-resident persisted tree
+				// therefore proves both presence (INV-1) and status transfer. This
+				// also dedups shared subtrees without a visited-set.
 				Ref<ACell> tgtRef = t.read(h);
-				if ((tgtRef != null) && (tgtRef.getStatus() >= f.status)) {
+				if ((tgtRef != null) && (tgtRef.getStatus() >= Ref.PERSISTED)) {
 					stack.pop();
 					continue;
 				}
@@ -259,14 +274,15 @@ public class EtchStore extends ACachedStore {
 				// Children are in the target: this persist recurses one level at
 				// most (each child check prunes), so the write is cheap and the
 				// entry lands adjacent to its children (DFS locality)
-				storeTopRef(f.ref, f.status, null);
+				// The copy preserves this entry's old status independently; asking
+				// for ANNOUNCED here would also promote its children.
+				storeTopRef(f.ref, Ref.PERSISTED, null);
 			}
 		}
 	}
 
 	private static final class SweepFrame {
 		final Ref<ACell> ref;
-		int status;
 		boolean expanded;
 
 		SweepFrame(Ref<ACell> ref) {
@@ -666,12 +682,20 @@ public class EtchStore extends ACachedStore {
 
 	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
 			boolean topLevel) throws IOException {
-		// Snapshot the write target ONCE per top-level call and thread it through
-		// the recursion: a persist spanning startGC() then completes consistently
-		// against the old file (linearising as before the cycle). Splitting one
-		// persist across files would let a parent land in the GC target claiming
-		// PERSISTED while its children exist only in the old file, silently
-		// breaking the INV-1 pruning guarantee (see ETCH_GC.md)
+		gcStartLock.readLock().lock();
+		try {
+			return storeRefToCurrentFile(ref, requiredStatus, noveltyHandler, topLevel);
+		} finally {
+			gcStartLock.readLock().unlock();
+		}
+	}
+
+	private <T extends ACell> Ref<T> storeRefToCurrentFile(Ref<T> ref, int requiredStatus,
+			Consumer<Ref<ACell>> noveltyHandler, boolean topLevel) throws IOException {
+		// The shared GC-start lock lets persists run concurrently but prevents
+		// source status upgrades from outliving cycle start. Snapshot the write
+		// file once for the entire descent: splitting a tree across files would
+		// break the target's subtree-presence guarantee.
 		Etch we = getWriteEtch();
 		if (we == etch) {
 			// fast path: not writing to a GC target
@@ -735,12 +759,29 @@ public class EtchStore extends ACachedStore {
 			return ref;
 		}
 
+		int writeStatus = requiredStatus;
+		if ((writeEtch != etch) && (topLevel || !embedded)) {
+			// GC moves entries within this logical store. The old file's recorded
+			// status is evidence; status carried by an incoming ref is not. Do this
+			// on every copy, so a later parent prune cannot hide a demoted child.
+			if (hash == null) hash = ref.getHash();
+			Ref<T> oldRef = etch.read(hash);
+			if (oldRef != null) {
+				writeStatus = Math.max(writeStatus, Math.min(oldRef.getStatus(), Ref.MAX_STATUS));
+			}
+		}
+		// Retaining a PERSISTED/ANNOUNCED entry also requires its tree in the
+		// target, even for a STORED-only request. Its old ANNOUNCED status must
+		// not promote children: preserve their own old statuses independently.
+		final int childStatus = (writeStatus >= Ref.PERSISTED)
+				? Math.max(requiredStatus, Ref.PERSISTED) : requiredStatus;
+
 		// beyond STORED level, need to recursively persist child refs if they exist
-		if ((requiredStatus > Ref.STORED) && (cell.getRefCount() > 0)) {
+		if ((childStatus > Ref.STORED) && (cell.getRefCount() > 0)) {
 			// TODO: probably slow to rebuild these all the time!
 			IRefFunction func = r -> {
 				try {
-					return storeRef((Ref<ACell>) r, requiredStatus, noveltyHandler, false, writeEtch);
+					return storeRef((Ref<ACell>) r, childStatus, noveltyHandler, false, writeEtch);
 				} catch (IOException e) {
 					// OK because overall function throws IOException
 					throw Utils.sneakyThrow(e);
@@ -764,9 +805,9 @@ public class EtchStore extends ACachedStore {
 			// Do actual write to store
 			final Hash fHash = (hash != null) ? hash : ref.getHash();
 
-			// record exactly the status this write has proven for this store:
-			// carried status (possibly from another store) is not evidence here
-			ref = ref.withStatus(requiredStatus);
+			// Record the requested status plus any status retained from our own
+			// old GC file, after proving the required target-tree presence.
+			ref = ref.withStatus(writeStatus);
 			ref = writeEtch.write(fHash, ref);
 
 			// Ensure we have a soft Ref pointing to this store. Embedded top-level

@@ -98,19 +98,24 @@ application and concentrates the whole handle swap at `completeGC()`.
 
 ### Start
 
-`startGC()` is synchronised on the store. It refuses if a cycle is in progress and
+Target creation in `startGC()` is synchronised on the store. It refuses if a cycle is in progress and
 skips existing target names (a stale target may hold data from an interrupted cycle;
 adopting or deleting it blindly risks loss, so recovery handles it separately). It
 creates the target file with a fresh header, empty index and a copy of the current
 root hash, and only then publishes the volatile `target` field, so no reader sees a
 half-initialised target.
 
-**Cycle-boundary linearisation.** Each top-level persist snapshots its write target
-once and threads it through its whole recursive descent. A persist in flight when
-`startGC()` runs therefore completes entirely against the old file and linearises as
-before the cycle. Reading the target per write could split one tree across two files,
-leaving a parent in the target claiming `PERSISTED` whose children exist only in the
-old file: a silent INV-1 violation the sweep would then trust.
+**Cycle-boundary linearisation.** Top-level persists share a read lock; `startGC()`
+takes it exclusively before taking the store monitor and publishing the target.
+Persists already writing to the old file therefore finish before copying can
+begin, including their status upgrades. Calling `startGC()` from a persistence
+callback is rejected rather than trying to upgrade that shared lock. Root writes
+already serialise with cycle start through the store monitor.
+
+Each persist snapshots its write target once and threads it through its whole
+recursive descent. Reading the target per write could split one tree across two
+files, leaving a parent in the target claiming `PERSISTED` whose children exist
+only in the old file: a silent INV-1 violation the sweep would then trust.
 
 ### Read and write paths during a cycle
 
@@ -123,9 +128,14 @@ Writes (`storeRef` / `storeTopRef`): all physical writes go to `getWriteEtch()`,
 target while collecting. The existence check that normally lets a persist early-return
 reads the **target file only**: neither the old file nor the shared cache can prove
 target residency. A target hit at sufficient status returns; anything else takes the
-normal recursive write path, which copies the cell and, at `PERSISTED` and above, its
-children into the target. Outside a cycle the hot path costs one volatile load and an
-untaken branch.
+recursive copy path. Before writing an entry, that path reads its recorded status
+from the old file and retains the higher of that status (capped at `MAX_STATUS`)
+and the requested status. It never trusts status carried by an incoming ref.
+Retaining `PERSISTED` or higher first ensures the entry's children are persisted
+in the target, even for a `STORED` request. A retained announcement applies only
+to that entry: children preserve their own old statuses, and are announced only
+if the caller explicitly requests it. Outside a cycle persists take the shared
+lifecycle lock but perform no extra index read.
 
 Root updates need no special casing: `setRootData` persists at `PERSISTED` through the
 same path, so every root set during a cycle has its full tree in the target. The old
@@ -139,12 +149,13 @@ through the store's own target-then-old read path, so per-entry recursion is at 
 one level deep. Points that matter:
 
 - **Per-entry status preservation.** Each entry is transferred at the status it holds
-  in the old file, floored at `PERSISTED`. A uniform `PERSISTED` sweep would demote
+  in the old file, floored at `PERSISTED`. Recording every entry as `PERSISTED` would demote
   `ANNOUNCED` entries and cause a novelty re-broadcast storm after cutover; a uniform
-  `ANNOUNCED` sweep would forge peer commitments. This currently has a limitation
-  during live collection: pruning a parent already copied at `PERSISTED` can skip
-  children whose old `ANNOUNCED` status has not transferred
-  ([#747](https://github.com/Convex-Dev/convex/issues/747)).
+  `ANNOUNCED` sweep would forge peer commitments. The sweep requests `PERSISTED`
+  and the GC write path retains each entry's own old status. Live writes use the
+  same path, so a copied parent proves both subtree presence and status transfer
+  before it can be pruned. This also covers old descendants reached only through
+  a newly assembled root.
 - **Pruning doubles as deduplication.** A subtree already target-resident at
   sufficient status is skipped, so shared subtrees are copied once without a
   visited-set.
@@ -363,7 +374,7 @@ the CPU cost and is a possible later optimisation, not a correctness matter.
 | Cache-hit read | 1x | 1x |
 | Read of migrated or new data | 1x | 1x |
 | Read of unmigrated data | 1x | 2x |
-| Write of novel data | 1x | 1x plus one failed target lookup |
+| Write of novel data | 1x | target lookup plus an old-file status lookup |
 | Write touching an unmigrated tree | 1x | one-off copy of that subtree, within the O(live data) total |
 | Disk | one file | both files, transiently |
 | Traversal heap | none | sweep stack; cutover verification retains one hash per visited entry |
@@ -387,10 +398,6 @@ the CPU cost and is a possible later optimisation, not a correctness matter.
 - **Successive cycles with legacy handles:** close predecessor views before
   collecting their successor. Forwarding across generations needs the lifecycle
   decision tracked in [#746](https://github.com/Convex-Dev/convex/issues/746).
-- **Mixed announcement status during live collection:** a copied parent can prune
-  descendants whose higher old status has not transferred. Per-entry status
-  preservation in this case is tracked in
-  [#747](https://github.com/Convex-Dev/convex/issues/747).
 
 The scheme assumes only content-addressed immutable entries, a single root, monotonic
 status and a `PERSISTED`-style whole-tree level, so any `AStore` implementation can

@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Etch GC preserves each retained entry's announcement status when live writes
+  copy a subtree before the sweep, avoiding status loss through subtree pruning.
 - Deeply nested data no longer fails memory accounting with a Java stack
   overflow, allowing oversized Multi nesting to reach the existing `:DEPTH`
   check. Ordinary calculations retain the allocation-free recursive traversal.
