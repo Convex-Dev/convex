@@ -74,6 +74,17 @@ public class EtchCacheBenchmark {
 	}
 
 	@Benchmark
+	public Ref<ACell> storeRefHit() {
+		return store.refForHash(hashes[cursor++ & (workingSet-1)]);
+	}
+
+	/** Use reference=soft to measure the already-persisted common case. */
+	@Benchmark
+	public Ref<ACell> persistHit() throws IOException {
+		return store.storeTopRef(values[cursor++ & (workingSet-1)].getRef(),Ref.PERSISTED,null);
+	}
+
+	@Benchmark
 	public ACell decodeHit() throws BadFormatException {
 		return store.decode(encodings[cursor++ & (workingSet-1)]);
 	}

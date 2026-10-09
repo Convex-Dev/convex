@@ -16,8 +16,12 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -469,6 +473,7 @@ public class EtchGCLifecycleTest {
 		// touch the successor -----
 		store.close();
 		AString v5 = nonEmbedded(250);
+		assertRetiredFileDeleted(store.getEtch());
 		Cells.persist(v5, newStore);
 		assertEquals(v5, newStore.refForHash(v5.getHash()).getValue());
 		assertNull(newStore.refForHash(t1.getHash())); // garbage now gone for good
@@ -487,6 +492,7 @@ public class EtchGCLifecycleTest {
 		AString v6 = nonEmbedded(260);
 		Cells.persist(v6, finalStore);
 		newStore.close(); // deletes f~ (or defers via its .gc-defunct tombstone)
+		assertRetiredFileDeleted(newStore.getEtch());
 		finalStore.close();
 		new File(f.getCanonicalPath() + ".gc-defunct").deleteOnExit();
 		new File(f.getCanonicalPath() + "~.gc-defunct").deleteOnExit();
@@ -529,5 +535,126 @@ public class EtchGCLifecycleTest {
 		assertEquals(t3.getHash(), afterDuplicateClose.getRootHash());
 		assertEquals(t3, afterDuplicateClose.getRootData());
 		afterDuplicateClose.close();
+	}
+
+	@Test
+	@Timeout(30)
+	public void testLegacyPersistsOverlapSuccessorStartAndCancel() throws Exception {
+		AVector<ACell> original=tree(15000);
+		AVector<ACell> duringCancel=tree(16000);
+		AVector<ACell> latest=tree(17000);
+		try (EtchStore a=EtchStore.createTemp();
+				ExecutorService workers=Executors.newFixedThreadPool(3)) {
+			a.setRootData(original);
+			a.startGC();
+			a.transferGC();
+			try (EtchStore b=a.completeGC()) {
+				CountDownLatch writing=new CountDownLatch(1);
+				CountDownLatch finishWrite=new CountDownLatch(1);
+				AtomicBoolean first=new AtomicBoolean(true);
+				Future<?> writer=workers.submit(()->{
+					a.storeTopRef(original.getRef(),Ref.ANNOUNCED,r->{
+						if (first.compareAndSet(true,false)) {
+							assertThrows(IllegalStateException.class,b::startGC);
+							assertThrows(IllegalStateException.class,()->b.setRootData(latest));
+							writing.countDown();
+							await(finishWrite);
+						}
+					});
+					return null;
+				});
+				await(writing);
+				CountDownLatch starting=new CountDownLatch(1);
+				Future<?> start=workers.submit(()->{
+					starting.countDown();
+					b.startGC();
+					return null;
+				});
+				try { await(starting); } finally { finishWrite.countDown(); }
+				writer.get(10,TimeUnit.SECONDS);
+				start.get(10,TimeUnit.SECONDS);
+				b.transferGC();
+				assertAllInEtch(b.getTargetEtch(),treeHashes(original),Ref.ANNOUNCED);
+
+				CountDownLatch targetWrite=new CountDownLatch(1);
+				CountDownLatch finishTargetWrite=new CountDownLatch(1);
+				first.set(true);
+				Future<?> targetWriter=workers.submit(()->{
+					a.storeTopRef(duringCancel.getRef(),Ref.PERSISTED,r->{
+						if (first.compareAndSet(true,false)) {
+							targetWrite.countDown();
+							await(finishTargetWrite);
+						}
+					});
+					return null;
+				});
+				await(targetWrite);
+				Future<?> cancel=workers.submit(()->{
+					// The paused A writer must be counted by B. An interrupted wait
+					// provides a deterministic checkpoint after write redirection.
+					Thread.currentThread().interrupt();
+					try { assertThrows(IOException.class,b::cancelGC); }
+					finally { Thread.interrupted(); }
+					return null;
+				});
+				try {
+					cancel.get(10,TimeUnit.SECONDS);
+					assertThrows(IOException.class,()->a.setRootData(latest));
+					ACell redirected=nonEmbedded(16500);
+					Cells.persist(redirected,a);
+					assertNotNull(b.getEtch().read(redirected.getHash()));
+				} finally { finishTargetWrite.countDown(); }
+				targetWriter.get(10,TimeUnit.SECONDS);
+				b.cancelGC(); // retry preserves every target write and releases root updates
+				a.setRootData(latest);
+				assertEquals(latest,b.getRootData());
+				assertAllInEtch(b.getEtch(),treeHashes(duringCancel),Ref.PERSISTED);
+				assertAllInEtch(b.getEtch(),treeHashes(original),Ref.ANNOUNCED);
+			}
+		}
+	}
+
+	private static void await(CountDownLatch signal) {
+		try { assertTrue(signal.await(10,TimeUnit.SECONDS),"Timed out waiting for GC test signal"); }
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new AssertionError(e);
+		}
+	}
+
+	@Test
+	public void testCurrentClosePreservesOlderReadViews() throws IOException {
+		EtchConfig config=EtchConfig.create().withRefCacheSize(1).withL2Enabled(false);
+		try (EtchStore a=EtchStore.createTemp(config)) {
+			a.setRootData(tree(18000));
+			a.startGC();
+			a.transferGC();
+			try (EtchStore b=a.completeGC()) {
+				b.startGC();
+				AVector<ACell> lastRoot=tree(19000);
+				a.setRootData(lastRoot);
+				Etch target=b.getTargetEtch();
+				b.close(); // writes stop, but A still owns readable refs into the target
+				assertEquals(lastRoot,a.readStoreRef(lastRoot.getHash()).getValue());
+				assertEquals(lastRoot.getHash(),a.getRootHash());
+				assertThrows(IOException.class,()->a.setRootData(lastRoot));
+				assertThrows(IOException.class,()->Cells.persist(nonEmbedded(19100),a));
+				a.close();
+				assertThrows(IOException.class,()->target.read(lastRoot.getHash()));
+			}
+			// The abandoned target remains recoverable once every handle has closed.
+			try (EtchStore reopened=EtchStore.create(a.getBaseFile(),config)) {
+				assertEquals(tree(19000),reopened.getRootData());
+			}
+		}
+	}
+
+	/** FFM retirement is synchronous once no older view needs the file. */
+	static void assertRetiredFileDeleted(Etch etch) {
+		if ("MemorySegment".equals(etch.getMappingImplementation())) {
+			assertFalse(etch.getFile().exists(),"Retired FFM file must be deleted on close");
+			assertFalse(new File(etch.getFile().getPath()+".gc-defunct").exists(),
+					"Successful retirement must remove the tombstone");
+		}
 	}
 }

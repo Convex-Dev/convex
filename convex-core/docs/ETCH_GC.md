@@ -38,6 +38,9 @@ lifecycle that makes recovery unambiguous.
   the target file; the old store stays a functional legacy view until the caller
   closes it. Refs bound to a closed store fail even for migrated values: the binding is
   dead, not the data.
+- **Generations share one coordinator.** `EtchGC` owns write routing, root locking,
+  writer draining and file retirement. Starting GC on a successor also redirects
+  writes through every open predecessor to the new target.
 - **Cutover is hard-gated on verified completeness.** `completeGC()` refuses unless the
   sweep has finished, then independently walks the current root against the target
   only. `verifyGC()` also exposes that check before cutover.
@@ -97,26 +100,33 @@ IDLE ─────────────▶ COLLECTING ───────
                         └── cancelGC() ──▶ roll target back into old ──▶ IDLE (nothing lost)
 ```
 
-Throughout a cycle every ref the collecting store hands out stays bound to that
-store object, including refs for values physically written to the target file. The
-target is internal until cutover, which is what keeps cancellation invisible to the
-application and concentrates the whole handle swap at `completeGC()`.
+Every ref returned by a handle stays bound to that handle, including reads from
+another generation's physical file. `Etch.read` accepts the requesting view for
+decoding, so a closed intermediate handle cannot invalidate an older handle's refs.
+Each handle retains its own caches; cache hits do not consult the coordinator.
+
+The coordinator publishes an immutable routing state at lifecycle boundaries.
+Persists capture it once and reuse it throughout their recursive descent, without
+allocating routing state per operation. Only the current handle may manage GC.
 
 ### Start
 
-Target creation in `startGC()` is synchronised on the store. It refuses if a cycle is in progress and
-skips existing target names (a stale target may hold data from an interrupted cycle;
+Target creation in `startGC()` is synchronised by the shared coordinator. It refuses
+if a cycle is in progress and skips existing target names (a stale target may hold data from an interrupted cycle;
 adopting or deleting it blindly risks loss, so recovery handles it separately). It
 creates the target file with a fresh header, empty index and a copy of the current
-root hash, and only then publishes the volatile `target` field, so no reader sees a
+root hash, and only then publishes the routing state, so no reader sees a
 half-initialised target.
 
-**Cycle-boundary linearisation.** Top-level persists share a read lock; `startGC()`
-takes it exclusively before taking the store monitor and publishing the target.
+**Cycle-boundary linearisation.** Top-level persists through all generations share a
+read lock; `startGC()` takes it exclusively before taking the root lock and
+publishing the target. Cutover and close also drain persists with this lock.
 Persists already writing to the old file therefore finish before copying can
 begin, including their status upgrades. Calling `startGC()` from a persistence
-callback is rejected rather than trying to upgrade that shared lock. Root writes
-already serialise with cycle start through the store monitor.
+callback is rejected rather than trying to upgrade that shared lock. GC lifecycle
+operations, close and root updates from persistence callbacks are rejected to avoid
+lock-upgrade or writer-drain deadlocks. Root writes through every handle serialise
+with cycle transitions through the same root lock.
 
 Each persist snapshots its write target once and threads it through its whole
 recursive descent. Reading the target per write could split one tree across two
@@ -125,23 +135,28 @@ only in the old file: a silent INV-1 violation the sweep would then trust.
 
 ### Read and write paths during a cycle
 
-Reads (`readStoreRef`): cache hit, else target, else old file, else miss. The worst
-case is two index lookups instead of one, and the L1/L2 caches in `ACachedStore` sit in
-front of both files, so hot-path amplification is well below the 2x bound. Reads never
-mutate the target.
+Reads (`readStoreRef`): cache hit, else target, else current file, else miss for the
+current handle. A legacy handle additionally checks retained generations back to
+its own file. It cannot read generations older than itself, so a successor cannot
+resurrect collected garbage. The current handle needs at most two index lookups
+during a cycle; an old handle's cold miss can visit each generation it retains.
+Reads never copy data into the target.
 
-Writes (`storeRef` / `storeTopRef`): all physical writes go to `getWriteEtch()`, the
-target while collecting. The existence check that normally lets a persist early-return
+Writes (`storeRef` / `storeTopRef`): all physical writes use the destination in the
+captured routing state, the target while collecting. The existence check that
+normally lets a persist early-return
 reads the **target file only**: neither the old file nor the shared cache can prove
 target residency. A target hit at sufficient status returns; anything else takes the
 recursive copy path. Before writing an entry, that path reads its recorded status
-from the old file and retains the higher of that status (capped at `MAX_STATUS`)
-and the requested status. It never trusts status carried by an incoming ref.
+from the handle's retained files and retains the higher of that status (capped at
+`MAX_STATUS`) and the requested status. It never trusts status carried by an incoming ref.
 Retaining `PERSISTED` or higher first ensures the entry's children are persisted
 in the target, even for a `STORED` request. A retained announcement applies only
 to that entry: children preserve their own old statuses, and are announced only
-if the caller explicitly requests it. Outside a cycle persists take the shared
-lifecycle lock but perform no extra index read.
+if the caller explicitly requests it. Outside a cycle persists through the current
+handle take the shared lifecycle lock but perform no extra index read. Legacy
+persists check the current file directly because their caches may contain data
+omitted from the current generation.
 
 Root updates need no special casing: `setRootData` persists at `PERSISTED` through the
 same path, so every root set during a cycle has its full tree in the target. The old
@@ -194,23 +209,29 @@ fragments and orphaned message data.
 
 ### Cutover
 
-`completeGC()` is synchronised and refuses unless `isGCComplete()` and a fresh
-target-only verification succeeds; there is no force override. A missing root is
+`completeGC()` holds the shared lifecycle and root locks and refuses unless
+`isGCComplete()` and a fresh target-only verification succeeds; there is no force override. A missing root is
 an error, distinct from an unset or nil root. It flushes the target and publishes
 the tombstone and completion marker before constructing a new `EtchStore` over the
 target file. The new store has fresh caches; refs decoded from the target bind to
 it and outlive the old store's close. A failed marker publication leaves the cycle
 available for retry or cancellation.
 
-The old store is not retired. It remains a functional view: reads fall back across
-both files and writes route to the successor's file, so code still holding the old
-handle keeps working through a gradual handover. What it forbids is only what would
-now be wrong: closing the successor's file, cancelling, re-completing, or starting a
-new cycle on the legacy view. The caller closes the old store when nothing depends on
-refs bound to it; from then on those refs throw `StoreException` on uncached reads.
-Close predecessor views before starting another GC on the successor: forwarding
-through multiple generations is not yet implemented
-([#746](https://github.com/Convex-Dev/convex/issues/746)).
+The old store remains a functional view through successive collections. All open
+handles use the same current write destination and root. The caller closes a handle
+when nothing depends on refs bound to it; from then on those refs throw
+`StoreException` on uncached reads. A legacy handle cannot manage another GC cycle.
+
+An open A can hold refs to values written into B during A's collection, including
+values omitted by B's later collection into C. B's file therefore remains mapped
+while A is open, even if B's handle has closed. Closing A releases any closed
+intermediate generations that no remaining older handle needs. The coordinator
+also prevents their filenames being reused, including on systems that allow
+unlinking an open file. A retained backup remains independent of this retirement.
+
+Closing the current handle stops writes through every generation. Older open
+handles retain read access until they close; any abandoned target is closed when
+the last dependent handle closes and is recovered on the next open.
 
 ### Snapshot and collect
 
@@ -233,8 +254,9 @@ live store. API callers must close the old store before opening the snapshot and
 must finish any persists that began before the cycle. Successful collection
 retains the original file's disk space until the snapshot is removed. Treat the
 backup as read-only; copy it to a different filesystem for an independent backup.
-Once cutover has succeeded and the old store is closed, live-store writes go to
-the collected file and cannot change the snapshot. On Windows, hard links require
+After cutover, live-store writes go to the collected file and cannot change the
+snapshot. Close the source handle and all older handles before opening the snapshot,
+so they release its file lock. On Windows, hard links require
 the same NTFS volume; they do not support a backup path on a different drive.
 For an encrypted store, both files retain the source encryption policy and require
 the source key. The collected file gets a new v3 salt; the snapshot keeps the old
@@ -252,7 +274,7 @@ migration:
 1. Under lock, redirect writes back to the old file. Reads keep the target fallback
    and root reads keep coming from the target, which stays authoritative until the
    copy-back.
-2. Drain in-flight target writes. Because each persist snapshots its write target for
+2. Drain in-flight target writes through every handle. Because each persist snapshots its write target for
    its whole descent, a brief lock is not enough: persists register in a counter while
    writing to the target and re-check the cancelling flag after registering, so a
    drained zero count is conclusive. The reverse migration's index scan requires a
@@ -262,8 +284,13 @@ migration:
    failed cancel can be retried.
 4. Copy the target's root hash back, then drop, close and delete the target.
 
-Application-visible refs were bound to the collecting store throughout, so
-cancellation is invisible beyond the transient 2x read cost while step 2 runs.
+If cancellation fails or is interrupted, ordinary persists continue into the
+source. Root updates are rejected until `cancelGC()` succeeds on retry, because
+the target's root remains authoritative for copy-back and crash recovery.
+
+Application-visible refs remain bound to the handle that supplied them throughout
+cancellation. Current-handle reads retain the two-file bound while step 2 runs;
+legacy reads may also search their retained generations.
 Closing a store mid-cycle without cancelling abandons the cycle; startup recovery
 reconciles it.
 
@@ -291,6 +318,11 @@ Two on-disk markers record cutover and retirement:
 On Windows, mappings can prevent renaming or deleting a file. The FFM
 `MemorySegment` backend closes its arenas and unmaps deterministically when the
 store closes. It is the default for Etch v2/v3 when available on Java 22+.
+With FFM, closing a completed legacy view with no older dependent handle removes
+its original filename and `.gc-defunct` tombstone immediately when filesystem deletion succeeds; the
+successor remains usable. The lifecycle tests check this before reopening or
+adopting the collected file, both with and without a retained snapshot. If an older
+handle still needs the file, its close triggers retirement instead.
 Etch v1, Java 21 and explicitly configured `MappedByteBuffer` stores use the
 compatibility backend, whose mappings may remain after close. Deletion and
 adoption can then be deferred; `startGC()` and recovery retry them. A completion
@@ -385,6 +417,11 @@ the CPU cost and is a possible later optimisation, not a correctness matter.
 | Disk | one file | both files, transiently |
 | Traversal heap | none | sweep stack; cutover verification retains one hash per visited entry |
 
+These lookup bounds describe the current handle. Keeping legacy handles open
+retains their original and intermediate files, and cold legacy reads may search
+those generations. Write routing remains constant-time and allocates no state
+per operation, regardless of how many older handles remain open.
+
 - **A busy-cycle file is usually larger than the original, by design.** Everything
   persisted after `startGC()` is retained, which under sustained load dwarfs the
   collected garbage. The true reclamation figure comes from a quiescent cycle.
@@ -401,9 +438,7 @@ the CPU cost and is a possible later optimisation, not a correctness matter.
   The original file is only ever appended to by rollback.
 - **Free disk space** must cover the expected collected size before starting.
 - **An empty root** collects to an empty store plus header. Correct, if surprising.
-- **Successive cycles with legacy handles:** close predecessor views before
-  collecting their successor. Forwarding across generations needs the lifecycle
-  decision tracked in [#746](https://github.com/Convex-Dev/convex/issues/746).
+
 
 The scheme assumes only content-addressed immutable entries, a single root, monotonic
 status and a `PERSISTED`-style whole-tree level, so any `AStore` implementation can
@@ -414,7 +449,8 @@ already store-agnostic.
 
 | Concern | Location |
 |---|---|
-| Lifecycle | `EtchStore.startGC()`, `transferGC()`, `isGCComplete()`, `verifyGC()`, `completeGC()` / `completeGC(backupFile)`, `cancelGC()`, `isGCInProgress()`, `getBaseFile()` |
+| Shared routing, synchronisation and file lifetime | `convex.etch.EtchGC` |
+| Lifecycle API | `EtchStore.startGC()`, `transferGC()`, `isGCComplete()`, `verifyGC()`, `completeGC()` / `completeGC(backupFile)`, `cancelGC()`, `isGCInProgress()`, `getBaseFile()` |
 | Tree transfer with INV-1 pruning | `convex.core.store.StoreTransfer.transfer(dest, ref[, status])`; `StoreTransfer.verify(store, rootHash)` |
 | Whole-store migration | `convex.etch.EtchUtils.migrate(source, dest)`; `EtchUtils.verify(etch, rootHash)` |
 | Recovery | `EtchUtils.recover(file[, config])`, called by `EtchStore.create` |

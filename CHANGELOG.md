@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Etch GC keeps writes and root updates through older open handles in the current
+  generation across successive collections. Legacy reads remain valid until their
+  handle closes, retaining intermediate files while older handles need them.
 - Etch cache promotion no longer adopts another store's reference or persistence
   status, which could cause a persist request to return without writing locally.
 - Etch GC preserves an explicitly disabled L2 cache in the collected store.
