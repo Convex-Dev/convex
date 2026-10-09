@@ -59,6 +59,7 @@ ACell result = ctx.getResult();  // Returns 6
   - [Network upgrades](docs/UPGRADE.md) — protocol versions, migrations, test state policy
   - [CNS implementation notes](docs/CNS.md) — registry layout and the planned v1 registry migration
   - [Etch v3](docs/ETCHv3.md) — header, durability and encryption overlay
+  - [Etch configuration](docs/ETCH_CONFIG.md) — file and cache options, defaults and configuration maps
   - [Etch garbage collection](docs/ETCH_GC.md) — online collection, backup snapshots, cutover and recovery
   - [Lattice regions](docs/LATTICE_REGIONS.md) — the root lattice catalogue
   - [Lattice cursors](docs/LATTICE_CURSOR_DESIGN.md) — fork/sync, navigation, write boundaries

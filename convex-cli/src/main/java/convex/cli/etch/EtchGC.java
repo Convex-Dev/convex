@@ -81,7 +81,7 @@ public class EtchGC extends AEtchCommand {
 
 		// Try to install the collected file under the original name now; if
 		// files are pinned by this process, the next open completes it
-		File open=EtchUtils.recover(baseFile,store.getEtch().getConfig());
+		File open=EtchUtils.recover(baseFile,store.getConfig());
 
 		println("Etch GC complete");
 		println("Size before:  "+Text.toFriendlyNumber(before)+" bytes");
@@ -110,7 +110,7 @@ public class EtchGC extends AEtchCommand {
 		long before=store.getEtch().getDataLength();
 
 		EtchStore dest=EtchStore.create(outFile,
-				destinationConfig(store.getEtch().getConfig(),true));
+				destinationConfig(store.getConfig(),true));
 		try {
 			ACell root=store.getRootData();
 			if (root!=null) {

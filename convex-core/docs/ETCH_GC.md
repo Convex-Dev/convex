@@ -14,6 +14,10 @@ lifecycle that makes recovery unambiguous.
 
 ## Key points
 
+- **Configuration survives cutover.** The successor inherits the resolved
+  [Etch configuration](ETCH_CONFIG.md), including L1 cache capacity and L2
+  enablement. Its caches are fresh and bound to the successor; runtime settings
+  are not written to the file header and must be supplied again on reopen.
 - **INV-1: an entry present in the *target* file with status ≥ `PERSISTED` has its
   entire reachable tree in the target.** It holds because the target starts empty and
   every `PERSISTED`-level write descends children first. It replaces mark state
@@ -55,7 +59,8 @@ that binding; `EtchStatusIntegrityTest` pins them with regression tests.
 
 - **S1: status is store-relative.** A `RefSoft`'s status is a claim about its bound
   store. A `RefDirect` carries no binding; its status claims persistence "somewhere in
-  this process" and is coherent only under single-store usage.
+  this process" and is coherent only under single-store usage. Etch's cache accepts
+  direct refs only at `UNKNOWN` status, except for the store-independent null ref.
 - **S2: store entry flags are authoritative for that store.** The flags byte records
   only what has been achieved *in that store*: `STORED` means this entry is present,
   `PERSISTED` means the whole subtree is present, `ANNOUNCED` adds a peer-level
@@ -71,7 +76,8 @@ that binding; `EtchStatusIntegrityTest` pins them with regression tests.
 - **S4: tree coherence.** All `RefSoft`s in one cell tree bind to the same store
   (`Refs.checkConsistentStores` checks this). A store never returns, attaches or
   caches a ref bound to a foreign store; `AStore.isForeign` is the guard and the
-  Etch cache rejects foreign refs as a backstop.
+  `RefCache` checks ownership on every insertion. L2 promotion reuses decoded cells
+  without adopting an attached foreign ref or its persistence claims.
 
 The read contract follows from S1: `null` is proven absence, `MissingDataException`
 means the store looked and the value is not there, and unchecked `StoreException`

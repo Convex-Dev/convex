@@ -204,10 +204,11 @@ public abstract class AStore implements Closeable {
 	}
 
 	/**
-	 * checks in-memory cache for a stored Ref. Returns store-native Ref if found, null otherwise. Does not access underlying storage.
+	 * Checks the in-memory cache without accessing underlying storage. Returns a
+	 * store-native ref or an unpersisted direct ref, or null on a cache miss.
 	 * @param <T> Type of Cell
 	 * @param h Hash to check
-	 * @return Stored Ref, or null if not found (may still be in persistent store)
+	 * @return Cached Ref, or null if not found (may still be in persistent store)
 	 */
 	public abstract <T extends ACell> Ref<T> checkCache(Hash h);
 

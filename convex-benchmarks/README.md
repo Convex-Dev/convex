@@ -19,6 +19,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `EncodingBenchmark` | Data encoding and decoding |
 | `ReaderBenchmark` | Convex Lisp reader parsing performance |
 | `EtchBenchmark` | Etch database read/write throughput |
+| `EtchCacheBenchmark` | L1 lookup and decode-hit latency for direct and soft refs |
 | `EtchConcurrentBenchmark` | Fixed-work concurrent Etch throughput and reopen verification |
 | `HashBenchmark` | Cryptographic hashing operations |
 | `SignatureBenchmark` | Ed25519 signature generation and verification |
@@ -54,6 +55,18 @@ java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
 The sizing-only cases reuse cells and reset their memory-size caches; the update
 cases include constructing the changed values. Compare allocation per operation
 to distinguish traversal overhead from those necessary value allocations.
+
+Measure Etch L1 hits and allocation with both unpersisted direct refs and stored
+soft refs:
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  org.openjdk.jmh.Main EtchCacheBenchmark -prof gc
+```
+
+These cases hold the value in memory and exercise `checkCache` and `decode`,
+including their hit counters. They measure L1 hit overhead, not disk access or
+contention between threads.
 
 ### With Profiling (Java Flight Recorder)
 

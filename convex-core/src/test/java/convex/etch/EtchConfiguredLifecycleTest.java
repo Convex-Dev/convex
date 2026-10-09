@@ -55,7 +55,10 @@ public class EtchConfiguredLifecycleTest {
 		File backup=new File(base.getPath()+".snapshot");
 		backup.deleteOnExit();
 		AVector<ACell> expected=EtchGCLifecycleTest.tree(seed);
-		EtchStore old=EtchStore.create(base,matrixCase.config());
+		EtchConfig config=matrixCase.config().withRefCacheSize(37).withL2Enabled(false);
+		EtchStore old=EtchStore.create(base,config);
+		assertEquals(37,old.getRefCacheSize());
+		assertFalse(old.isL2Enabled());
 		EtchStore successor=null;
 		try {
 			old.setRootData(EtchGCLifecycleTest.tree(seed-10));
@@ -63,20 +66,27 @@ public class EtchConfiguredLifecycleTest {
 			old.setRootData(expected);
 			old.transferGC();
 			successor=old.completeGC(backup);
-			assertEquals(matrixCase.config(),successor.getEtch().getConfig());
+			assertEquals(config,successor.getConfig());
+			assertEquals(config,successor.getEtch().getConfig());
+			assertEquals(37,successor.getRefCacheSize());
+			assertFalse(successor.isL2Enabled());
 		} finally {
 			if (successor!=null) successor.close();
 			old.close();
 		}
 
-		try (EtchStore reopened=EtchStore.create(base,matrixCase.config())) {
+		try (EtchStore reopened=EtchStore.create(base,config)) {
 			assertEquals(expected.getHash(),reopened.getRootHash(),matrixCase.name());
 			assertEquals(expected,reopened.getRootData(),matrixCase.name());
-			assertEquals(matrixCase.config(),reopened.getEtch().getConfig(),matrixCase.name());
+			assertEquals(config,reopened.getConfig(),matrixCase.name());
+			assertEquals(37,reopened.getRefCacheSize());
+			assertFalse(reopened.isL2Enabled());
 		}
-		try (EtchStore snapshot=EtchStore.create(backup,matrixCase.config())) {
+		try (EtchStore snapshot=EtchStore.create(backup,config)) {
 			assertEquals(EtchGCLifecycleTest.tree(seed-10),snapshot.getRootData());
-			assertEquals(matrixCase.config(),snapshot.getEtch().getConfig());
+			assertEquals(config,snapshot.getConfig());
+			assertEquals(37,snapshot.getRefCacheSize());
+			assertFalse(snapshot.isL2Enabled());
 		}
 		markRelatedForDeletion(base);
 	}

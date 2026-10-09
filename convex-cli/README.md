@@ -356,6 +356,21 @@ convex peer start \
 The peer's Etch store location is configured with the `peer.store` key in the
 JSON5 configuration file (see below), not a command-line option.
 
+### Etch runtime configuration
+
+The `peer.etch` object also accepts store cache options:
+
+```json5
+{ peer: { store: "data/peer.etch", etch: { refCacheSize: 50000, enableL2: false } } }
+```
+
+Defaults are 10,000 L1 reference-cache slots and L2 enabled. Cache settings apply
+when opening either a new or existing store and survive GC cutover. They are
+runtime settings, so keep supplying the configuration on subsequent launches.
+Options are validated and resolved at setup; reads and writes perform no
+configuration-map lookups. See [Etch configuration](../convex-core/docs/ETCH_CONFIG.md)
+for all supported options and defaults.
+
 ### Encrypted Etch v3 stores
 
 Etch encryption is opt-in. Configure it in the peer JSON5 file; the default
@@ -389,8 +404,9 @@ the CLI falls back to `--peer-key`; opening an encrypted store fails if neither
 identifies a key. For a new encrypted store without an explicit hint, the full
 public key of the configured peer is recorded automatically. Existing stores
 always retain the version, cipher, index and hint recorded in their header. A
-different `peer.etch` policy applies only when creating a new store and produces
-a warning when it differs from an existing file.
+different `peer.etch` file-format or encryption policy applies only when creating
+a new store and produces a warning when it differs from an existing file.
+Runtime cache and chain settings continue to apply to existing stores.
 
 The derivation and key-lifetime contract is specified in
 [Etch v3: Caller key material and verification](../convex-core/docs/ETCHv3.md#caller-key-material-and-verification).

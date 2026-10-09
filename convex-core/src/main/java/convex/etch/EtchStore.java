@@ -113,17 +113,34 @@ public class EtchStore extends ACachedStore {
 	 */
 	private volatile File baseFile;
 
+	/** Resolved file and cache settings, inherited by every GC successor. */
+	private final EtchConfig config;
+
 
 	public EtchStore(Etch etch) {
-		this(etch, true);
+		this(etch, etch.getConfig());
 	}
 
+	/**
+	 * Compatibility constructor overriding the configured L2 policy. New callers
+	 * can specify all settings through {@link EtchConfig} and {@link #create(File, EtchConfig)}.
+	 */
 	public EtchStore(Etch etch, boolean enableL2) {
-		super(enableL2);
+		this(etch, etch.getConfig().withL2Enabled(enableL2));
+	}
+
+	private EtchStore(Etch etch, EtchConfig config) {
+		super(config.getRefCacheSize(),config.isL2Enabled());
+		this.config = config;
 		this.etch = etch;
 		this.target = null;
 		this.baseFile = etch.getFile();
 		etch.setStore(this);
+	}
+
+	/** Returns the resolved configuration used by this store, including its caches. */
+	public EtchConfig getConfig() {
+		return config;
 	}
 
 	/**
@@ -192,7 +209,7 @@ public class EtchStore extends ACachedStore {
 		// a target without its store binding and root hash
 		// Preserve the store format and encryption policy while generating a new
 		// v3 file salt for the independent target file.
-		Etch t = Etch.create(temp,etch.getConfig());
+		Etch t = Etch.create(temp,config);
 		t.setStore(this);
 		t.setRootHash(etch.getRootHash());
 		sweepComplete = false;
@@ -754,7 +771,8 @@ public class EtchStore extends ACachedStore {
 		if (requiredStatus < Ref.STORED) {
 			// no write: only cache, and only refs belonging to this store
 			if ((topLevel || !embedded) && !isForeign(ref)) {
-				addToCache(ref);
+				// Direct refs cannot prove residency, even if persisted elsewhere.
+				addToCache(ref.isDirect() ? ref.withStatus(Ref.UNKNOWN) : ref);
 			}
 			return ref;
 		}
@@ -810,12 +828,9 @@ public class EtchStore extends ACachedStore {
 			ref = ref.withStatus(writeStatus);
 			ref = writeEtch.write(fHash, ref);
 
-			// Ensure we have a soft Ref pointing to this store. Embedded top-level
-			// cells normally keep their direct Ref, but a foreign-bound Ref must be
-			// rebound: sound because the entry was just written here
-			if (!embedded || isForeign(ref)) {
-				ref = ref.toSoft(this);
-			}
+			// All stored cache refs identify their store, including embedded roots.
+			// Rebinding is sound here because the entry was just written locally.
+			ref = ref.toSoft(this);
 
 			cell.attachRef(ref); // make sure we are using current ref within cell
 			addToCache(ref); // cache for subsequent writes
@@ -834,11 +849,7 @@ public class EtchStore extends ACachedStore {
 	}
 
 	protected <T extends ACell> void addToCache(Ref<T> ref) {
-		// Guarantee: refs served from the cache are always for this store.
-		// Defensive check: callers must enforce this before caching
-		if (isForeign(ref)) {
-			throw new IllegalArgumentException("Attempt to cache foreign Ref in store: " + this);
-		}
+		// RefCache enforces ownership on every insertion path.
 		refCache.putCell(ref);
 	}
 

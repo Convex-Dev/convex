@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Etch configuration maps support per-store `refCacheSize` and `enableL2` options,
+  with defaults of 10,000 L1 slots and L2 enabled. Resolved settings are available
+  through `EtchConfig.getMap()` and `EtchStore.getConfig()` and survive GC cutover.
 - Lattice nodes can remove and shut down individual propagation groups while
   other groups remain live. Shared listeners can unregister a group and close
   only its assigned connections; caller-owned stores remain open.
@@ -49,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Etch cache promotion no longer adopts another store's reference or persistence
+  status, which could cause a persist request to return without writing locally.
+- Etch GC preserves an explicitly disabled L2 cache in the collected store.
 - Etch GC preserves each retained entry's announcement status when live writes
   copy a subtree before the sweep, avoiding status loss through subtree pruning.
 - Deeply nested data no longer fails memory accounting with a Java stack

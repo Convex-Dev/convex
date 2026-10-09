@@ -222,12 +222,12 @@ public class RefTest {
 		
 		Ref<ABlob> rb=Cells.persist(bigBlob, Samples.TEST_STORE).getRef();
 		
-		// TODO: Check Soft Refs
+		assertSame(Samples.TEST_STORE, ((RefSoft<?>) rb).getStore());
 		
 		RefTreeStats rs2=Refs.getRefTreeStats(rb);
 		assertEquals(19,rs2.total);
 		assertEquals(19,rs2.persisted);
-		assertEquals(1,rs2.direct);
+		assertEquals(0,rs2.direct); // stored embedded root also has a store-bound soft ref
 		assertEquals(1,rs2.embedded);
 	}
 	

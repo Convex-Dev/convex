@@ -3,6 +3,7 @@ package convex.etch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -21,6 +22,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.JSON;
 
 public class EtchConfigTest {
 	@Test
@@ -30,6 +32,11 @@ public class EtchConfigTest {
 		assertEquals(EtchFileMapperFactory.defaultMapping(EtchConstants.CURRENT_VERSION),
 				config.getMappingMode());
 		assertTrue(config.isBuildChains());
+		assertEquals(10000,config.getRefCacheSize());
+		assertTrue(config.isL2Enabled());
+		assertEquals(config,EtchConfig.fromMap(config.getMap()));
+		assertEquals(config,EtchConfig.parse("{}"));
+		assertEquals(config,EtchConfig.fromMap(null));
 	}
 
 	@Test
@@ -37,17 +44,30 @@ public class EtchConfigTest {
 		AMap<AString,ACell> source=Maps.of(
 				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_2),
 				EtchConfig.MAPPING,Strings.create("mapped-byte-buffer"),
-				EtchConfig.BUILD_CHAINS,CVMBool.FALSE);
+				EtchConfig.BUILD_CHAINS,CVMBool.FALSE,
+				EtchConfig.REF_CACHE_SIZE,CVMLong.create(17),
+				EtchConfig.ENABLE_L2,CVMBool.FALSE);
 
 		EtchConfig config=EtchConfig.fromMap(source);
 		assertEquals(EtchConstants.VERSION_2,config.getVersion());
 		assertEquals(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,config.getMappingMode());
 		assertFalse(config.isBuildChains());
+		assertEquals(17,config.getRefCacheSize());
+		assertFalse(config.isL2Enabled());
+		assertEquals(source.get(EtchConfig.REF_CACHE_SIZE),config.getMap().get(EtchConfig.REF_CACHE_SIZE));
+		EtchConfig restored=EtchConfig.parse(JSON.toString(config.getMap()));
+		assertEquals(config,restored);
+		assertEquals(config.hashCode(),restored.hashCode());
+		assertNotEquals(config,config.withRefCacheSize(18));
+		assertNotEquals(config,config.withL2Enabled(true));
 		assertNotNull(config.toString());
 	}
 
 	@Test
 	public void testStrictMapValidation() {
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.parse("[]"));
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.parse("42"));
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.parse("null"));
 		assertThrows(IllegalArgumentException.class,() -> EtchConfig.fromMap(
 				Maps.of(Strings.create("unknown"),CVMLong.ONE)));
 		assertThrows(IllegalArgumentException.class,() -> EtchConfig.fromMap(
@@ -61,6 +81,16 @@ public class EtchConfigTest {
 				EtchConfig.PUBLIC_KEY_HINT,Strings.create("1234"))));
 		assertThrows(IllegalArgumentException.class,() -> EtchConfig.create(
 				EtchConstants.VERSION_1,EtchConfig.MappingMode.MEMORY_SEGMENT,true));
+		for (ACell value:new ACell[] {null,CVMLong.ZERO,CVMLong.create(-1),
+				CVMLong.create(1L+Integer.MAX_VALUE),CVMBool.TRUE,Strings.create("10000")}) {
+			assertThrows(IllegalArgumentException.class,()->EtchConfig.fromMap(
+					Maps.of(EtchConfig.REF_CACHE_SIZE,value)));
+		}
+		for (ACell value:new ACell[] {null,CVMLong.ONE,Strings.create("false")}) {
+			assertThrows(IllegalArgumentException.class,()->EtchConfig.fromMap(
+					Maps.of(EtchConfig.ENABLE_L2,value)));
+		}
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.create().withRefCacheSize(0));
 	}
 
 	@Test
@@ -100,6 +130,13 @@ public class EtchConfigTest {
 		assertTrue(config.toString().contains("keyFunction=present"));
 		assertEquals(config,EtchConfig.createV3(config.getMappingMode(),true,
 				EtchConfig.CipherMode.AES_256_CTR,true,null,hint->new byte[32]));
+		config=config.withRefCacheSize(31).withL2Enabled(false)
+				.withPublicKeyHint(AccountKey.dummy("1234")).withKeyFunction(hint->secret.clone());
+		EtchConfig restored=EtchConfig.parse(JSON.toString(config.getMap()),config.getKeyFunction());
+		assertEquals(config,restored);
+		assertEquals(31,restored.getRefCacheSize());
+		assertFalse(restored.isL2Enabled());
+		assertEquals(8,restored.getMap().count(),"Only public configuration fields are serialised");
 	}
 
 	@Test
@@ -161,7 +198,7 @@ public class EtchConfigTest {
 		File file=File.createTempFile("etch-config", ".etch");
 		file.deleteOnExit();
 		EtchConfig configured=EtchConfig.create(EtchConstants.VERSION_1,
-				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,false);
+				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,false).withRefCacheSize(23).withL2Enabled(false);
 
 		Etch etch=Etch.create(file,configured);
 		assertEquals(configured,etch.getConfig());
@@ -172,6 +209,8 @@ public class EtchConfigTest {
 		assertEquals(EtchConstants.VERSION_1,reopened.getConfig().getVersion());
 		assertEquals(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,reopened.getConfig().getMappingMode());
 		assertTrue(reopened.getConfig().isBuildChains(),"Non-persisted options use defaults on legacy reopen");
+		assertEquals(10000,reopened.getConfig().getRefCacheSize());
+		assertTrue(reopened.getConfig().isL2Enabled());
 		reopened.close();
 	}
 
@@ -185,11 +224,15 @@ public class EtchConfigTest {
 
 		// The requested v3 policy applies only when creating a new file. The v1
 		// header wins on reopen, including its mandatory mapper compatibility.
-		EtchConfig creationPolicy=EtchConfig.create(EtchConstants.VERSION_3);
+		EtchConfig creationPolicy=EtchConfig.create(EtchConstants.VERSION_3)
+				.withRefCacheSize(19).withL2Enabled(false);
 		try (EtchStore reopened=new EtchStore(Etch.create(file,creationPolicy))) {
 			assertEquals(EtchConstants.VERSION_1,reopened.getEtch().getVersion());
 			assertEquals(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
 					reopened.getEtch().getConfig().getMappingMode());
+			assertEquals(19,reopened.getRefCacheSize());
+			assertFalse(reopened.isL2Enabled());
+			assertEquals(reopened.getEtch().getConfig(),reopened.getConfig());
 		}
 	}
 

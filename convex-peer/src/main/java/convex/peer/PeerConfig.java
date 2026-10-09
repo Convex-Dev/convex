@@ -165,8 +165,9 @@ public class PeerConfig {
 	}
 
 	/**
-	 * Compiles the optional Etch creation policy. The resulting value is immutable
-	 * and existing files continue to derive their format from their own headers.
+	 * Compiles the optional Etch file and runtime cache configuration. The result
+	 * is immutable; existing files derive their format from their own headers,
+	 * while caller-supplied cache and chain settings still apply.
 	 *
 	 * @return compiled Etch configuration, or {@code null} when omitted
 	 */
@@ -175,7 +176,7 @@ public class PeerConfig {
 	}
 
 	/**
-	 * Compiles the optional Etch creation policy with a runtime key resolver.
+	 * Compiles the optional Etch configuration with a runtime key resolver.
 	 * The resolver is invoked only for encrypted v3 creation or opening.
 	 *
 	 * @param keyFunction function resolving the header public-key hint
