@@ -17,7 +17,7 @@ import convex.test.generators.CollectionGen;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestRT {
+public class RTPropertyTest {
 
 	@SuppressWarnings("exports")
 	@Property

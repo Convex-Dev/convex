@@ -56,8 +56,15 @@ public class Order extends ARecordGeneric {
 	@SuppressWarnings("unchecked")
 	private Order(AVector<ACell> values) {
 		super(CVMTag.ORDER,FORMAT,values);
+		// These fields contain only embedded longs. A branch here is generic
+		// CAD3 data sharing our tag, not an Order, and must not be dereferenced.
+		if (!values.getRef(IX_TIMESTAMP).isEmbedded() || !values.getRef(IX_CONSENSUS).isEmbedded()) {
+			throw new IllegalArgumentException("Order metadata must be embedded");
+		}
 		this.timestamp = RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
-		this.consensusPoints = RT.toLongArray((AVector<ACell>)values.get(IX_CONSENSUS));
+		AVector<ACell> points=(AVector<ACell>)values.get(IX_CONSENSUS);
+		if (!Cells.isCompletelyEncoded(points)) throw new IllegalArgumentException("Consensus points must be longs");
+		this.consensusPoints = RT.toLongArray(points);
 	}
 
 	/**

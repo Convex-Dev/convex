@@ -99,7 +99,9 @@ public class CVMEncoder extends CAD3Encoder {
 		Ref<ACell> r2 = readRef(ds);
 
 		try {
-			if (tag == CVMTag.OP_CODED) {
+			// CVM op codes are always embedded. A branch code is generic CAD3 data
+			// and may not be available until multi-cell child resolution completes.
+			if ((tag == CVMTag.OP_CODED) && r1.isEmbedded()) {
 				ACell code = r1.getValue();
 				if (code instanceof AByteFlag) {
 					byte opCode = ((AByteFlag) code).getTag();
@@ -124,7 +126,7 @@ public class CVMEncoder extends CAD3Encoder {
 		}
 
 		// Unknown or failed CVM coded tag — generic CodedValue
-		return CodedValue.create(tag & 0xFF, r1.getValue(), r2.getValue());
+		return CodedValue.createFromRefs(tag, r1, r2);
 	}
 
 	@Override

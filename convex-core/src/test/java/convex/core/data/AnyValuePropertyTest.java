@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 
-import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 
 import com.pholser.junit.quickcheck.From;
@@ -21,7 +20,7 @@ import convex.test.Samples;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestAnyValue {
+public class AnyValuePropertyTest {
 
 	@Property
 	public void printFormats(@From(ValueGen.class) ACell o) {

@@ -18,7 +18,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestMessages {
+public class MessagesPropertyTest {
 
 	@Property
 	public void messageLengthVLQ(Integer a) throws BadFormatException {
@@ -42,6 +42,7 @@ public class GenTestMessages {
 		
 		Blob enc=m.getMessageData();
 		Message m2=Message.create(enc);
+		assertEquals(a,m2.getPayload(null)); // Explicit storeless decode of the complete message
 		assertEquals(mtype,m2.getType());
 		
 		assertEquals(a,m2.getPayload());

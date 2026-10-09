@@ -51,7 +51,7 @@ import convex.test.generators.VectorGen;
  * values and check that RT / core functions behave as expected.
  */
 @RunWith(JUnitQuickcheck.class)
-public class GenTestCore {
+public class CorePropertyTest {
 	
 	private void doDataStructureTests(ADataStructure<ACell> a) {
 		long n=RT.count(a);

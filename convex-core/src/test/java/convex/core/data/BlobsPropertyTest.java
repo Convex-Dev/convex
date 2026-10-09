@@ -14,7 +14,7 @@ import convex.core.util.Utils;
 import convex.test.generators.BlobGen;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestBlobs {
+public class BlobsPropertyTest {
 
 	@Property
 	public void testToLong(@From(BlobGen.class) ABlob blob) {

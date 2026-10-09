@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CAD3 decoding preserves unresolved children of generic coded values and
+  records sharing the Order tag, allowing complete multi-cell messages to
+  resolve their children before use. Partial CAD3 reader literals now report
+  a parse error.
 - Etch GC keeps writes and root updates through older open handles in the current
   generation across successive collections. Legacy reads remain valid until their
   handle closes, retaining intermediate files while older handles need them.

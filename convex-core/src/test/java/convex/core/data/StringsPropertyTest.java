@@ -15,7 +15,7 @@ import convex.test.generators.CharGen;
 import convex.test.generators.StringGen;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestStrings {
+public class StringsPropertyTest {
 	@Property
 	public void testStringProperties(@From(StringGen.class) AString a) {
 		AString roundTrip=Strings.create(a.toString());

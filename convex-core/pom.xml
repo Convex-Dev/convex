@@ -182,6 +182,13 @@
 	</build>
 
 	<dependencies>
+		<!-- Run the existing quickcheck runners on the JUnit 6 Platform in Maven and IDEs. -->
+		<dependency>
+			<groupId>org.junit.vintage</groupId>
+			<artifactId>junit-vintage-engine</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk18on</artifactId>
