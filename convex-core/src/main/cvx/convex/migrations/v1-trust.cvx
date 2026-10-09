@@ -6,11 +6,10 @@
 ;; these fixes at protocol version 1.
 ;;
 ;; Fixes #623:
-;; - `trusted?` now fails closed against defective trust monitors. A monitor MUST
-;;   return true/false (CAD022), but external implementations may throw or return a
-;;   non-boolean. The dispatch now wraps the monitor call in `try` (any error -> false)
-;;   and `boolean`-coerces the result, so a defective/malicious monitor can never make
-;;   `trusted?` throw or grant on a non-true value. The `query` reentrancy guard is kept.
+;; - `trusted?` catches monitor errors as false and normalises successful SPI results
+;;   to booleans. CAD022 uses CVM truthiness: only nil and false deny access. Resource
+;;   exhaustion can still abort the check, but cannot grant access. The `query` guard
+;;   rolls back monitor state changes.
 ;; - `remove-upgradability!` now also undefines the generated `change-control`, which
 ;;   referenced the now-undefined `upgradable-root` (`(call actor (change-control x))`
 ;;   would throw :UNDECLARED). Docstring signature corrected to `[actor]`.
@@ -23,7 +22,7 @@
   ^{:doc {:description ["Returns true if `subject` is trusted by `trust-monitor`, false otherwise."
                         "A trust monitor is an (optionally scoped) address, pointing to either:"
                         "- A user account (that can only trust itself)"
-                        "- An actor implementing `(check-trusted? subject action object)` which returns true or false."
+                        "- An actor implementing `(check-trusted? subject action object)`: nil and false deny access; all other values grant access."
                         "`action` and `object` are arbitrary values specific to the trust monitor."
                         "`subject` should usually be an address, although this is specific to the trust monitor as well."]
           :examples    [{:code "(trusted? my-blacklist *caller*)"}]
@@ -40,9 +39,9 @@
    (cond
      ;; General case: call into check-trusted? function if it exists
      (callable? monitor 'check-trusted?)
-       ;; SECURITY: query protects against reentrancy. A monitor MUST return true/false
-       ;; (CAD022), but a defective implementation may throw or return a non-boolean, so
-       ;; fail closed: any error or non-true result yields false rather than escaping.
+       ;; SECURITY: query rolls back monitor state changes; catch errors as denial.
+       ;; Normalise at this public boundary so SPI implementations may return truthy
+       ;; values without a redundant boolean conversion (CAD022).
        (boolean (try (query (call monitor
                                   (check-trusted? subject action object)))
                      false))

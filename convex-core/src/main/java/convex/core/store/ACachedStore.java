@@ -17,7 +17,8 @@ import convex.core.util.SoftCache;
  * <p>Two-tier cache:</p>
  * <ul>
  *   <li>L1: small fixed-size array probe ({@link RefCache}). Strong refs to {@link Ref}
- *       wrappers, holding {@link convex.core.data.RefSoft} to cells. Fast hit path.</li>
+ *       wrappers: direct refs for unpersisted cells, store-owned
+ *       {@link convex.core.data.RefSoft} for stored cells. Fast hit path.</li>
  *   <li>L2: optional {@link SoftCache} keyed by content hash. Soft refs to cells, unbounded
  *       by entry count, cleared by GC under heap pressure. Catches L1 collision-evictions and
  *       avoids redundant subtree decoding.</li>
@@ -28,7 +29,10 @@ import convex.core.util.SoftCache;
  */
 public abstract class ACachedStore extends AStore {
 
-	protected final RefCache refCache=RefCache.create(10000);
+	/** Default number of L1 reference-cache slots. */
+	public static final int DEFAULT_REF_CACHE_SIZE=10000;
+
+	protected final RefCache refCache;
 
 	/**
 	 * Optional L2 cache. May be null (disabled). Maps content hash to the decoded cell;
@@ -50,6 +54,11 @@ public abstract class ACachedStore extends AStore {
 	}
 
 	protected ACachedStore(boolean enableL2) {
+		this(DEFAULT_REF_CACHE_SIZE,enableL2);
+	}
+
+	protected ACachedStore(int refCacheSize, boolean enableL2) {
+		this.refCache = RefCache.create(this, refCacheSize);
 		this.softCache = enableL2 ? new SoftCache<>() : null;
 	}
 
@@ -75,7 +84,7 @@ public abstract class ACachedStore extends AStore {
 			ACell hit = softCache.get(hash);
 			if (hit != null) {
 				l2Hits.increment();
-				refCache.putCell(hit); // promote to L1
+				refCache.putDecoded(hit); // promote without importing foreign status
 				return (T) hit;
 			}
 		}
@@ -83,7 +92,7 @@ public abstract class ACachedStore extends AStore {
 		// Miss: full decode
 		ACell decoded = encoder.decode(encoding);
 		decodes.increment();
-		refCache.putCell(decoded);
+		refCache.putDecoded(decoded);
 		if (softCache != null) {
 			softCache.put(hash, decoded);
 		}
@@ -102,8 +111,7 @@ public abstract class ACachedStore extends AStore {
 			ACell cell = softCache.get(h);
 			if (cell != null) {
 				l2Hits.increment();
-				refCache.putCell(cell); // promote to L1
-				return (Ref<T>) cell.getRef();
+				return (Ref<T>) refCache.putDecoded(cell);
 			}
 		}
 		return null;
@@ -115,6 +123,11 @@ public abstract class ACachedStore extends AStore {
 	 */
 	public boolean isL2Enabled() {
 		return softCache != null;
+	}
+
+	/** Returns the number of slots allocated to the L1 reference cache. */
+	public int getRefCacheSize() {
+		return refCache.getSize();
 	}
 
 	/**

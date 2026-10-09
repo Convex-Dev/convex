@@ -25,6 +25,25 @@ Reserve `./mvnw -B clean install` for final verification and releases. Ordinary
 builds do not generate source/Javadoc jars or load Maven Central publishing;
 `-Prelease` enables those release-only artifacts and services.
 
+### Property tests
+
+Core property tests use the existing `junit-quickcheck` generators and runners,
+executed by the JUnit 6 Vintage engine alongside the Jupiter tests. Classes are
+named `*PropertyTest` so ordinary Maven test runs discover them.
+
+```bash
+./mvnw -B test -pl convex-core -am '-Dtest=*PropertyTest' -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+Quickcheck retains sized generation through `GenerationStatus.size()`, trial
+counts through `@Property(trials=...)`, and its existing shrinkers. Failures
+report the generated arguments and a seed for each parameter. To reproduce a
+failure, temporarily add `@When(seed=...)` from `com.pholser.junit.quickcheck` to
+each generated parameter using the reported seeds, then rerun the property.
+Keep the generator and trial settings unchanged during replay. Add a small
+deterministic regression for a confirmed bug while retaining fresh random
+generation in the property suite.
+
 ## CI Workflows
 
 Four GitHub Actions workflows handle continuous integration:
@@ -115,7 +134,9 @@ As part of the same version-bump commit, also update:
   lockstep, otherwise onboarding goes stale:
   - **`design`** — `convex-java` Maven/Gradle coordinates and `releases/download/<version>/convex.jar`
     URLs under `docs/tutorial/**` (note: release tags have **no** `v` prefix).
-  - **`convex.world`** — the displayed release version in `src/components/Footer.tsx` (the software release, e.g. `v0.8.7` — not to be confused with the on-chain protocol version).
+  - **`convex.world`** — `CONVEX_RELEASE_VERSION` in `src/data/release.ts`, shared by
+    the footer and Downloads page (plain `x.y.z`, with no `v` prefix). Deploy the
+    website update after the GitHub release is available.
 
 ### 5. Rebuild and smoke test the built jar
 

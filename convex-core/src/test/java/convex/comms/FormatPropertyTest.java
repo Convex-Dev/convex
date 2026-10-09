@@ -23,7 +23,7 @@ import convex.test.generators.PrimitiveGen;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestFormat {
+public class FormatPropertyTest {
 
 	@Property
 	public void messageRoundTrip(String str) throws BadFormatException {
@@ -63,7 +63,7 @@ public class GenTestFormat {
 
 			FormatFuzzTest.doMutationTest(b);
 		} catch (BadFormatException e) {
-			System.err.println("Bad format in GenTestFromat: "+b);
+			System.err.println("Bad format in FormatPropertyTest: "+b);
 			throw e;
 		}
 

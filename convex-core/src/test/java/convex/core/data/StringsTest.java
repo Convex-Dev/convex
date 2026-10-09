@@ -176,7 +176,8 @@ public class StringsTest {
 
 	@Test
 	public void testEmbeddedString() {
-		StringShort s = Samples.MAX_EMBEDDED_STRING;
+		// Fresh value: the shared sample may have been persisted by another test.
+		StringShort s = StringShort.create(Samples.MAX_EMBEDDED_STRING.toString());
 		assertTrue(s.isEmbedded());
 		assertTrue(s.getRef().isDirect());
 

@@ -18,7 +18,7 @@ import convex.test.generators.*;
 
 @SuppressWarnings("exports")
 @RunWith(JUnitQuickcheck.class)
-public class GenTestDataStructures {
+public class DataStructuresPropertyTest {
 
 	
 	@Property

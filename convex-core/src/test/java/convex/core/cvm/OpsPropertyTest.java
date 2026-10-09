@@ -17,13 +17,13 @@ import convex.test.generators.FormGen;
 import convex.test.generators.OpGen;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestOps {
+public class OpsPropertyTest {
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
 	public void testOpExecution(@From(OpGen.class) AOp op) {
 		// A context should be able to execute any valid Op without throwing
-		Context c=Context.create(InitTest.STATE);
+		Context c=Context.create(InitTest.UPGRADED);
 		long initialJuice=c.getJuiceUsed();
 		assertEquals(0,initialJuice);
 		c=c.execute(op);
@@ -36,8 +36,9 @@ public class GenTestOps {
 	}
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Property
 	public void testCompile(@From(FormGen.class) ACell form) {
-		Context c=Context.create(InitTest.STATE);
+		Context c=Context.create(InitTest.UPGRADED);
 		c=c.compile(form);
 		if (c.isExceptional()) {
 			// can easily happen, invalid syntax etc

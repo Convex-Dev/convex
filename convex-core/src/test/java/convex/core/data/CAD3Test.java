@@ -69,6 +69,13 @@ public class CAD3Test extends ACVMTest {
 	}
 	
 	@Test public void testDenseRecords() {
+		// A record sharing the Order tag may contain arbitrary child references.
+		ObjectsTest.doAnyValueTests(DenseRecord.create(CVMTag.ORDER,
+				Vectors.of(CVMLong.ZERO, Samples.INT_VECTOR_300, Vectors.empty())));
+		ObjectsTest.doAnyValueTests(DenseRecord.create(CVMTag.ORDER,
+				Vectors.of(CVMLong.ZERO, Vectors.of(Samples.INT_VECTOR_300), Vectors.empty())));
+		ObjectsTest.doAnyValueTests(DenseRecord.create(CVMTag.ORDER,
+				Vectors.of(Samples.INT_VECTOR_300, Vectors.empty(), Vectors.empty())));
 		{ // Small vector DenseRecord
 			AVector<ACell> v=Vectors.of(1,2,3);
 			DenseRecord dr=DenseRecord.create(0xDF,v);
@@ -111,6 +118,14 @@ public class CAD3Test extends ACVMTest {
 		assertEquals(vc,Reader.read("#[c9110100]"));
 		
 		ObjectsTest.doAnyValueTests(vc);
+
+		// Generic coded values must retain unresolved refs until the children in
+		// a multi-cell message are read, even when sharing the CVM opcode tag.
+		for (byte tag : new byte[] {(byte)0xc9, CVMTag.OP_CODED}) {
+			ObjectsTest.doAnyValueTests(CodedValue.create(tag, Samples.INT_VECTOR_300, null));
+			ObjectsTest.doAnyValueTests(CodedValue.create(tag, Samples.INT_VECTOR_300, Samples.INT_VECTOR_256));
+		}
+		ObjectsTest.doAnyValueTests(CodedValue.create(0xc9, CVMLong.ONE, Samples.INT_VECTOR_300));
 	}
 	
 	/**

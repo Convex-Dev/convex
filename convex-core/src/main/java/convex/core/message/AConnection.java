@@ -14,7 +14,7 @@ import convex.core.data.prim.CVMLong;
  * reference to the {@code AConnection} it arrived on, enabling the server to:
  * <ul>
  *   <li>Route result messages back to the originator via {@link #sendMessage(Message)}</li>
- *   <li>Check trust status via {@link #isTrusted()} for Belief priority and backpressure</li>
+ *   <li>Check trust status via {@link #isTrusted()} for Belief admission and backpressure</li>
  *   <li>Close misbehaving connections via {@link #close()}</li>
  * </ul>
  *
@@ -92,6 +92,20 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * Returns a message to the remote end, waiting a bounded time if the
+	 * connection's shared outbound capacity is exhausted. For handler threads that
+	 * report client results and may apply backpressure; never call from an I/O
+	 * thread. A connection that cannot accept the message for its own reasons
+	 * (closed, or its reader is not draining) still refuses at once.
+	 *
+	 * @param msg Message to return
+	 * @return true if the message was accepted for delivery
+	 */
+	public boolean returnMessageBlocking(Message msg) {
+		return returnMessage(msg);
+	}
+
+	/**
 	 * Checks if this connection supports general message sending (as opposed
 	 * to result-only delivery via {@link #returnMessage(Message)}).
 	 *
@@ -103,6 +117,26 @@ public abstract class AConnection {
 	 */
 	public boolean supportsMessage() {
 		return true;
+	}
+
+	/**
+	 * Sets the bounds of this connection's outbound queue, for example to buffer far
+	 * more for a verified peer than for an ordinary client. No effect by default.
+	 *
+	 * @param messageLimit Maximum queued messages
+	 * @param byteLimit Maximum queued encoded bytes
+	 */
+	public void setOutboundLimits(int messageLimit, long byteLimit) {
+		// no outbound queue by default
+	}
+
+	/**
+	 * Updates the encoded inbound message limit. Wire transports must enforce this
+	 * before allocating a frame. Unsupported connections fail explicitly.
+	 * @param limit maximum encoded message bytes
+	 */
+	public void setMaxMessageLength(int limit) {
+		throw new UnsupportedOperationException("Connection has no configurable receive limit");
 	}
 
 	/**
@@ -131,18 +165,6 @@ public abstract class AConnection {
 	 * @return true if message queued successfully, false if it could not be sent without blocking
 	 */
 	public abstract boolean trySendMessage(Message msg);
-
-	/**
-	 * Sends a small, replaceable priority message without blocking. Queue-based
-	 * transports may coalesce an older unsent priority message so the latest
-	 * consensus/control root is not trapped behind bulk propagation data.
-	 *
-	 * @param msg small priority message
-	 * @return true if accepted for delivery
-	 */
-	public boolean trySendPriorityMessage(Message msg) {
-		return trySendMessage(msg);
-	}
 
 	/**
 	 * Returns the remote socket address associated with this connection, or null if

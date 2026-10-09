@@ -5,15 +5,13 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.16</version>
+		<version>0.8.17</version>
 	</parent>
 
 	<properties>
 		<antlr.version>4.13.2</antlr.version>
-		<!-- All Bouncycastle modules move together. 1.85.2 is a bcprov-only patch:
-		     bcpkix and bcutil have no such release, so taking it would run a
-		     mismatched set in the signing path. Wait for a coordinated release. -->
-		<bc.version>1.85</bc.version>
+		<!-- Keep all Bouncy Castle modules on the same coordinated release. -->
+		<bc.version>1.86</bc.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<!-- Tests run on the module path, patched into convex.core. JUnit lives in the
 		     unnamed module and instantiates helpers in convex.test reflectively, but
@@ -129,7 +127,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>build-helper-maven-plugin</artifactId>
-				<version>3.6.1</version>
+				<version>3.6.2</version>
 				<executions>
 					<execution>
 						<id>add-source</id>
@@ -184,6 +182,13 @@
 	</build>
 
 	<dependencies>
+		<!-- Run the existing quickcheck runners on the JUnit 6 Platform in Maven and IDEs. -->
+		<dependency>
+			<groupId>org.junit.vintage</groupId>
+			<artifactId>junit-vintage-engine</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk18on</artifactId>
@@ -245,7 +250,7 @@
 	    <dependency>
 	      <groupId>org.javassist</groupId>
 	      <artifactId>javassist</artifactId>
-	      <version>3.32.0-GA</version>   <!-- clean, modern, no broken systemPath -->
+	      <version>3.33.0-GA</version>   <!-- clean, modern, no broken systemPath -->
 	    </dependency>
 	  </dependencies>
 	</dependencyManagement>

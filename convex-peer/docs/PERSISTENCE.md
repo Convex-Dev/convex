@@ -82,9 +82,12 @@ dirty and flushes it:
 - from `persistSnapshot()`; and
 - during orderly shutdown.
 
-`persistSnapshot(value)` announces and publishes an explicit authoritative
-snapshot without notifying propagators, then completes the durability barrier.
-It is intended for host-controlled persistence, not network ingress.
+`persistSnapshot(value)` merges the supplied snapshot into the current root,
+with current local state first on ties, then announces and publishes the result
+without notifying propagators and completes the durability barrier. It uses the
+same ordered cursor sync and store-backed merge-back as application publication;
+an older supplied snapshot cannot demote the established root. It is intended
+for host-controlled persistence, not network ingress.
 
 When `persist` is false, node publication still announces cells to the store so
 the current cursor has valid store-backed references, but does not retain the
@@ -93,14 +96,36 @@ an existing persistent root.
 
 ## Ordering
 
-All node root writes and checkpoints share one `persistenceLock`. An older root
-cannot land after a newer root merely because an explicit checkpoint and cursor
-sync ran concurrently.
+All publication entry points capture their current root inside the root cursor's
+sync lock. Explicit persistence merges its candidate there before publication.
+Launch and shutdown publication use the same path. A separate `persistenceLock`
+excludes checkpoints from cell announcement and root-pointer writes; serialising
+store writes alone would not prevent a previously captured snapshot arriving late.
+
+The returned persisted cell is installed by identity CAS. If a local write
+intervenes, `merge(currentLocal, persistedSnapshot)` preserves that write. The
+sync result is the exact completed publication, while the live cursor may contain
+additional pending changes. A subsequent quiescent sync installs the complete
+store-backed tree; no special reference-rewriting merge is used.
 
 Each propagator separately serialises its working view and serving-store
-announcement. Consecutive node notifications use a latest-update queue and may
+announcement. Group pre-merging is permitted: NodeServer accepts the aggregate
+with `merge(currentRoot, groupValue)`, just like individual remote input. On the
+return path an attached group uses `merge(publishedRoot, groupWorking)` before
+filtering and announcing to its own store. Thus a replicated-back value cannot
+defeat an already published local edit on a tie. Standalone group input retains
+`merge(groupWorking, input)` precedence. Strictly newer values continue to win
+according to the configured lattice.
+
+Consecutive node notifications use a latest-update queue and may
 coalesce because lattice snapshots are monotonic. Coalescing affects transport
 work, not the ordering or durability of the authoritative node root.
+
+These are the implementation's directional `ALattice` semantics. CAD035/036 in
+the current design checkout still require universal commutativity (and CAD035
+describes value-equality CAS); those specification discrepancies need resolution
+separately from this publication ordering. This pipeline uses identity CAS and
+does not change generic lattice conflict resolution.
 
 The node and a propagator may deliberately share the same thread-safe `AStore`.
 Only the node calls `setRootData` while attached; propagators merely announce
@@ -155,7 +180,7 @@ stack overflow at untrusted decode or policy boundaries is contained and logged.
 Launch order protects serving consistency:
 
 1. configure and freeze the node publication callback;
-2. restore the authoritative root when enabled;
+2. merge the restored root when enabled, retaining pre-launch local edits on ties;
 3. announce and retain the authoritative root;
 4. seed every attached serving view independently;
 5. start propagator workers;

@@ -1,206 +1,177 @@
-# Encoder Architecture Design
+# Encoder Design
 
-## Overview
+How `convex-core` turns cells into CAD3 encodings and back. The byte format itself is
+specified by [CAD003](https://docs.convex.world/docs/cad/encoding); this document
+explains the shape of the Java implementation: why encoding is cell-driven and decoding
+is encoder-driven, how encoding lengths and embedding are computed without rendering
+bytes, how multi-cell messages are assembled and decoded, and where the store comes
+in. Read it before touching `ACell`, `Ref`, `Format`, the encoder hierarchy or
+`Message`.
 
-The encoder hierarchy handles serialisation and deserialisation of all Convex data types.
-The target architecture eliminates thread-local store dependency from the decode chain,
-uses `DecodeState` for efficient position-tracked decoding, and provides allocation-free
-fast paths for the common case (single-cell messages with no branches).
+## Key points
 
-## Design Rationale
+- **Encoding is cell-driven, decoding is encoder-driven.** Every `ACell` writes its own
+  bytes; an `AEncoder` bound to a store reads them back, so decoded refs are bound to
+  the right store with no thread-local state.
+- **Encoding length is arithmetic, never rendered.** For every cell,
+  `encoding length == calcHeaderLength() + Σ getRef(i).getEncodingLength()`. Cells
+  never encode themselves just to measure; `createEncoding()` allocates the exact size
+  and panics if the invariant fails.
+- **Embedding is a property of the child alone.** A cell whose encoding is at most
+  `Format.MAX_EMBEDDED_LENGTH` (140 bytes) is written inline; anything larger is a
+  branch written as a 33-byte hash ref. The judgement is always against 140, never
+  against the parent's remaining budget.
+- **Canonical means CAD3 form, not Java class.** A canonical cell is one whose encoding
+  is its CAD3 representation (`Hash` and `AccountKey` are canonical); non-canonical
+  Java representations (`VectorArray`, `StringSlice`, derived blobs) delegate every
+  encoding question to `getCanonical()`.
+- **Length calculation has useful side effects.** Computing a length settles whether
+  the cell is embedded (cached on the ref flags) and, for fully embedded trees, its
+  memory size (zero), so later persistence and message sizing pay nothing.
+- **Bounded recursion.** `getEncodingLength(limit)` passes the remaining budget down
+  through each child ref and returns zero as soon as it is exceeded, so deep structures
+  cost only as much work as the limit allows.
+- **The encoder knows nothing about message limits.** `Format.encodeMultiCell` builds
+  an encoding of whatever size the value needs; the `maxSize` overload throws when a
+  caller's own limit is exceeded. Choosing limits is the message layer's job.
+- **Storeless decode is allocation-free for the common case.** A single-cell message
+  with no branches decodes with no map, no temporary store and no extra encoder.
 
-### Why Encoder-Owned Decode?
+## Encoding path
 
-The encoder owns the decode path because it needs to bind refs to the correct store.
-Each store creates a store-bound encoder (`new CVMEncoder(this)`), and `readRef` creates
-refs against `this.store` — no thread-local lookup, no implicit state. The encoder's
-virtual `read` methods handle tag-based dispatch, with `CVMEncoder` extending `CAD3Encoder`
-to decode CVM-specific types (transactions, ops, consensus records).
+### Cell responsibilities
 
-### Why DecodeState?
+Each `ACell` subclass implements `encode(byte[] bs, int pos)` (tag plus fields) and
+usually `encodeRaw` (fields only). `getEncoding()` caches the result: the first call
+runs `createEncoding()`, every later call returns the same `Blob`. Data structures write
+their children through `Ref.encode`, which inlines an embedded child and writes a hash
+ref for a branch.
 
-DecodeState is a mutable cursor over `byte[]` that auto-advances on each read operation.
-This replaces the old pattern of manual position tracking (`epos += ref.getEncodingLength()`)
-which was error-prone and verbose. DecodeState extracts the backing byte array from Blob
-at construction, giving direct array access without Blob indirection on every byte read.
+### Encoding length and headers
 
-### Why NullStore for Storeless Decode?
+`ACell.calcHeaderLength()` returns the number of bytes a cell contributes beyond its
+child refs: the tag, VLQ counts, inline primitive fields and any structural bytes.
+`getEncodingLength()` then sums the header with each child's `Ref.getEncodingLength()`,
+which is the child's own encoding length when embedded and 33 otherwise. This is the
+one invariant every cell must satisfy, and `ObjectsTest` checks it for every sample
+value.
 
-Network messages are multi-cell encoded: a top cell followed by VLQ-prefixed child cells
-(branches). 90%+ of messages are single-cell with no branches. To decode these without
-a store (client-side), we need `readRef` to not throw when it encounters Tag.REF — but
-we also don't want to allocate a temporary store for every message.
+Composite cases follow the same rule. A `Syntax` header includes its inline metadata
+map; a `List`, closure or record encodes a vector body under its own tag, so its header
+is the vector's header plus the tag difference. A cell whose canonical form differs from
+its Java representation returns the canonical cell's answer.
 
-Solution: use a NullStore-backed encoder (static singleton, zero allocation). `readRef`
-creates NullStore-backed refs that are temporary placeholders, replaced during
-`resolveRefs` with actual child cell data from the message. If the message has no
-branches (90%+ case), no resolution is needed and the cell is returned immediately.
+`getEncodingLength(int limit)` is the bounded variant. It threads the remaining budget
+through each `Ref.getEncodingLength(limit)` and exits with zero the moment the running
+total passes the limit. The embedding check uses it with `MAX_EMBEDDED_LENGTH`, so
+deciding whether a 10 MB map is embedded looks at a handful of bytes, never the whole
+structure.
 
-This replaces the previous `MessageStore` pattern which allocated a HashMap, a new
-store, and a new encoder instance for every message — even single-cell messages that
-never used any of it.
+### Embedding and refs
 
-### Why Branch Counter?
+A ref's embedded status is cached in its flags (`KNOWN_EMBEDDED_MASK` and
+`NON_EMBEDDED_MASK`), so the question is answered at most once per ref. When a full
+length calculation finds that a cell and every descendant are embedded, the cell's
+memory size is set to zero as well: a fully embedded tree occupies no storage of its
+own because it always travels inside its parent.
 
-`DecodeState.branchCount` tracks how many non-embedded refs (Tag.REF) were encountered
-during decode. This enables the zero-allocation fast path: if `branchCount == 0` and all
-data is consumed, the message is a complete single cell — return immediately without
-allocating a HashMap or calling `resolveRefs`.
+### Canonical and non-canonical cells
 
-### Why PartialMessageException?
+`isCanonical()` answers whether this Java object's encoding is the CAD3 encoding of
+the value. Non-canonical cells exist for performance (`VectorArray` for cheap appends,
+`StringSlice` and `ADerivedBlob` for zero-copy views) and must delegate encoding
+length, ref counts and refs to `getCanonical()`. Typed blobs such as `Hash` and
+`AccountKey` are canonical: they are already in CAD3 form, and `toCanonical()`
+returns the same object.
 
-When storeless decode encounters a branch that cannot be resolved from the message's
-own child cells, the format is correct but the message is partial — it references data
-not included in the encoding. This is not a `BadFormatException` (encoding is valid)
-nor a `MissingDataException` (that's for store lookups). `PartialMessageException`
-signals that a store is required to decode this message.
+## Decoding path
 
-Store-based decode never throws `PartialMessageException` — unresolvable branches
-are left as lazy refs into the store, resolved on demand.
-
-## Target Architecture
-
-### Encoder Hierarchy
+### Encoder hierarchy
 
 ```
-AEncoder<T>                         Abstract base, format-independent
-  ├── DecodeState (inner class)     Mutable cursor: byte[] data, int pos, int limit, int branchCount
-  └── CAD3Encoder                   CAD3 format: data structures, signed data, numerics
+AEncoder<T>                         Format-independent base; owns DecodeState
+  └── CAD3Encoder                   CAD3 types: data structures, signed data, numerics
         └── CVMEncoder              CVM types: ops, transactions, consensus records
 ```
 
-Each store creates a store-bound encoder: `new CVMEncoder(this)`. The storeless
-`CVMEncoder.INSTANCE` singleton handles `Format.read()` calls. Each encoder subclass
-caches a NullStore-backed singleton for storeless multi-cell decode:
+`AEncoder.DecodeState` is a mutable cursor over the backing `byte[]` (position, limit
+and a count of branch refs met so far). Reads advance it, so there is no manual
+position arithmetic in the decoders. Tag dispatch happens in `read(DecodeState)`, with
+`CVMEncoder` overriding the coded-data, dense-record and extension branches to produce
+CVM-specific cells.
 
-- `CAD3Encoder.NULL_STORE_ENCODER` — CAD3 types only
-- `CVMEncoder.NULL_STORE_CVM_ENCODER` — CVM-specific types
+### Store binding
 
-### Encode Path
+Every `AStore` constructs its own `CVMEncoder`, and `readRef` builds hash refs against
+that store. The store is a field on the encoder, set at construction; nothing in the
+decode chain consults a thread-local. The static `CVMEncoder.INSTANCE`, which has no
+store, is the entry point for decoding complete values outside any store.
 
-Encoding is cell-driven. Each `ACell` subclass implements:
-- `encode(byte[] bs, int pos)` — writes tag + fields into byte array
-- `getEncoding()` — cached: creates once via `createEncoding()`, returns same Blob thereafter
+### Storeless decode
 
-No encoder involvement — cells know how to encode themselves.
+A storeless encoder cannot create a store-backed ref, so each encoder class keeps a
+singleton bound to `NullStore`. Refs decoded through it are placeholders that are either
+replaced by child cells carried in the same message or reported as missing with
+`PartialMessageException`. That exception means the bytes are well formed but the
+message is partial: a store is required to decode it. Store-bound decode never throws
+it; unresolved branches simply remain lazy refs into the store.
 
-### Decode Path
+## Multi-cell encoding
 
-Decoding is encoder-driven via DecodeState:
+Network messages carry a top-level cell followed by VLQ-prefixed encodings of its
+branches, so a receiver can rebuild a complete value without a store. This format is
+shared with the lattice node protocol described in
+[CAD036](https://docs.convex.world/docs/cad/lattice_node).
 
-```
-encoder.decode(Blob)
-  └── read(DecodeState ds)           // tag dispatch
-        ├── readNumeric(tag, ds)
-        ├── readBasicObject(tag, ds)
-        ├── readDataStructure(tag, ds)  // readVector, readMap, readSet, readIndex
-        ├── readSignedData(tag, ds)
-        ├── readCodedData(tag, ds)      // CVMEncoder overrides for ops
-        ├── readDenseRecord(tag, ds)    // CVMEncoder overrides for transactions, consensus
-        └── readExtension(tag, ds)      // CVMEncoder overrides for Address, Core defs
-```
+### Encoding
 
-`readRef(ds)` handles branch refs:
+`Format.encodeMultiCell(cell, everything)` writes the top cell and then either every
+reachable branch (`everything` true) or only the novelty the caller has chosen. It has
+no size limit of its own. `encodeMultiCell(cell, everything, maxSize)` throws
+`IllegalArgumentException` before allocating if the result would exceed `maxSize`
+(zero or negative means unlimited). `encodeDataResult` wraps the same logic for
+`Result` payloads.
 
-```java
-readRef(DecodeState ds):
-  Tag.REF  → ds.branchCount++; Ref.forHash(hash, this.store)  // non-embedded branch
-  Tag.NULL → Ref.nil()                                         // null ref
-  other    → this.read(ds); cell.getRef()                      // embedded cell
-```
+Limits belong to callers. `Message.getMessageData()` applies
+`CPoSConstants.MAX_MESSAGE_LENGTH`; transports refuse a message whose encoding fails
+that check rather than sending a truncated one. Anything that must reply within a
+smaller bound decides what to include from `getMemorySize()` first, then encodes once;
+speculatively encoding a large value to see whether it fits is a denial-of-service
+risk, and `Message.createDataMessages` exists to split the remainder into bounded
+follow-up messages.
 
-### Multi-Cell Decode
+### Decoding
 
-Network messages use multi-cell encoding: top cell followed by VLQ-prefixed
-non-embedded child cells (branches).
+`AEncoder.decodeMultiCell(Blob)`:
 
-```
-CAD3Encoder.decodeMultiCell(Blob data):
-  1. Select encoder:
-     - storeless (store==null): nullStoreEncoder() — static NullStore-backed singleton
-     - store-based: this
-  2. Read top cell via readEncoder.read(ds)
-  3. Fast path checks:
-     a. branchCount==0 && pos==limit → return immediately (zero allocations)
-     b. store-based && pos==limit → return immediately (branches resolve lazily)
-  4. Allocate HashMap, read VLQ-prefixed child cells
-  5. resolveRefs: replace branch refs using child map
-     - storeless: throw PartialMessageException if branch not in child map
-     - store-based: leave unresolvable branches as lazy store-backed refs
-```
+1. Choose the reader: the encoder itself when store-bound, the `NullStore` singleton
+   when storeless.
+2. Read the top cell.
+3. If the data is consumed and no branch refs were met, return it. A store-bound
+   decoder also returns here when branches were met, because they resolve lazily.
+4. Otherwise read the child cells into a map keyed by hash and replace branch refs
+   with the decoded children. Storeless decode throws `PartialMessageException` for any
+   branch not in the map.
 
-#### getPayload Strategy (Message.java)
+`Message` exposes two accessors: `getPayload()` returns the cached payload or null and
+never decodes; `getPayload(store)` decodes on demand, storelessly when `store` is null
+(complete messages, client side) or against the store when given (partial messages,
+peer side).
 
-Three `getPayload` methods provide explicit control over decode:
+## Where the code lives
 
-| Method | Behaviour | Use case |
-|--------|-----------|----------|
-| `getPayload()` | Pure accessor, returns cached payload or null | Safe to call anywhere, no side effects |
-| `getPayload(null)` | Storeless decode via `CVMEncoder`, RefDirect tree | Client code, complete messages |
-| `getPayload(store)` | Store-based decode, branches resolved from store | Server code, partial messages |
+| Concern | Location |
+|---|---|
+| Length invariant, embedding, caching | `convex.core.data.ACell`, `convex.core.data.Ref`, `convex.core.data.Format` |
+| Encoder hierarchy | `convex.core.data.AEncoder`, `convex.core.data.CAD3Encoder`, `convex.core.cvm.CVMEncoder` |
+| Storeless decode | `convex.core.store.NullStore`, `convex.core.exceptions.PartialMessageException` |
+| Multi-cell encode | `Format.encodeMultiCell`, `Format.encodeDataResult` |
+| Message limits | `convex.core.message.Message`, `convex.core.cpos.CPoSConstants` |
+| Tests | `EncodingTest`, `ObjectsTest`, `MessageTest`, `FormatFuzzTest`, `AdversarialDataTest` |
 
-#### Allocation Profile
+## Related
 
-| Scenario | Allocations |
-|----------|-------------|
-| Single cell, no branches (90%+ of messages) | DecodeState + decoded cell only |
-| Single cell with branches, store-based | Same — branches resolve lazily from store |
-| Single cell with branches, storeless | Throws PartialMessageException (partial message) |
-| Multi-cell, store-based | + HashMap + child cells |
-| Multi-cell, storeless | + HashMap + child cells (refs replaced via resolveRefs) |
-
-### Store Propagation
-
-```
-encoder.readRef(ds)  →  Ref.forHash(hash, this.store)
-```
-
-No thread-local involved in the decode chain. The encoder's `store` field is set at
-construction time (one per store instance). The `decode()` / `decodeMultiCell()` entry
-points create the DecodeState and the encoder provides all format operations.
-
-### Performance
-
-| Aspect | Old (Format.readRef) | Target (DecodeState) |
-|--------|----------------------|----------------------|
-| Byte access | `Blob.byteAt(i)` | `data[pos]` — direct array |
-| Ref position tracking | `readRef` + `getEncodingLength()` (2 calls) | `readRef(ds)` (1 call, auto-advance) |
-| Encoding attachment | `b.slice(pos, epos)` per cell | None — re-encode on demand |
-| Store lookup | Thread-local get per ref | Field access on encoder |
-| Multi-cell fast path | Always allocates HashMap + MessageStore | Zero allocations for single-cell |
-
-## Migration Status
-
-All phases complete. The encoder hierarchy is the sole decode path.
-
-- ✓ **Phases 1–4**: DecodeState, encoder-based reads, `decodeMultiCell`, NullStore pattern
-- ✓ **Phase 5**: Old static decode infrastructure removed (`Format.readRef`, `Ref.readRaw`,
-  1-arg `Ref.forHash(Hash)`, `RefSoft.createForHash(Hash)`)
-- ✓ **Phase 6**: Thread-local store (`Stores.current()`/`setCurrent()`) removed from
-  convex-core entirely. All decode paths use `encoder.readRef(ds)` with `this.store`.
-
-## File Inventory
-
-### Encoder hierarchy
-- `convex-core/.../data/AEncoder.java` — abstract base + DecodeState inner class
-- `convex-core/.../data/CAD3Encoder.java` — CAD3 format operations + multi-cell decode
-- `convex-core/.../cvm/CVMEncoder.java` — CVM type dispatch
-- `convex-core/.../store/NullStore.java` — singleton store for storeless decode
-- `convex-core/.../exceptions/PartialMessageException.java` — storeless decode failure
-
-### Core data structures (reads on encoder)
-- `readVector` — VectorLeaf, VectorTree
-- `readMap` — MapLeaf, MapTree
-- `readSet` — SetLeaf, SetTree
-- `readIndex` — Index
-- `readBlobTree` — BlobTree
-- `readSignedData` — SignedData
-- `readCodedData` — CodedValue (CAD3), ops (CVMEncoder)
-- `readDenseRecord` — DenseRecord (CAD3), transactions/consensus (CVMEncoder)
-- `readExtension` — ExtensionValue (CAD3), Address/Core (CVMEncoder)
-
-### Legacy static infrastructure (removed)
-- ~~`Format.readRef(Blob, int)`~~ — removed, migrated to `CAD3Encoder.readRef(DecodeState)`
-- ~~`Ref.readRaw(Blob, int)`~~ — removed
-- ~~`Ref.forHash(Hash)` 1-arg~~ — removed, only 2-arg `forHash(Hash, AStore)` remains
-- ~~`Stores.current()`/`setCurrent()`~~ — removed from convex-core
+- [CAD003 Encoding Format](https://docs.convex.world/docs/cad/encoding) — the normative byte format.
+- [CAD036 Lattice Node](https://docs.convex.world/docs/cad/lattice_node) — message framing and value encoding on the lattice protocol.
+- `cad3-encoding` skill under `.claude/skills/` — conventions when changing encoding code.
+- `convex-peer/docs/MESSAGING.md` — how messages move between peers and clients.

@@ -30,6 +30,7 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Multi;
 import convex.core.cvm.transactions.Transactions;
 import convex.core.cvm.transactions.Transfer;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Format;
@@ -196,8 +197,123 @@ public class TransactionTest extends ACVMTest {
 	
 		doTransactionTests(m1);
 	}
-	
-	@Test 
+
+	@Test
+	public void testMultiRetainsChildLogsAndJuice() {
+		// Regression: each child was forked into a fresh context, so the enclosing log
+		// was replaced by the last child's log and juice restarted at zero per child
+		Invoke t1=Invoke.create(HERO, 1, "(log 1)");
+		Invoke t2=Invoke.create(HERO, 1, "(log 2)");
+		ResultContext rc=INITIAL.applyTransaction(Multi.create(HERO, 1,Multi.MODE_ALL,t1,t2));
+		Context rctx=rc.context;
+		assertFalse(rctx.isError());
+
+		AVector<AVector<ACell>> log=rctx.getLog();
+		assertEquals(2,log.count());
+		assertEquals(HERO,log.get(0).get(0));
+		assertCVMEquals(Vectors.of(1L),log.get(0).get(3));
+		assertEquals(HERO,log.get(1).get(0));
+		assertCVMEquals(Vectors.of(2L),log.get(1).get(3));
+
+		long j1=INITIAL.applyTransaction(Multi.create(HERO, 1,Multi.MODE_ALL,t1)).juiceUsed;
+		long j2=INITIAL.applyTransaction(Multi.create(HERO, 1,Multi.MODE_ALL,t2)).juiceUsed;
+		assertTrue(j1>0);
+		assertEquals(j1+j2,rc.juiceUsed);
+	}
+
+	@Test
+	public void testMultiControlledAccountOrigin() {
+		// A child for a controlled account runs with that account as origin and
+		// address, and its log entries are attributed to it
+		State s=apply(Invoke.create(VILLAIN, 1, "(set-controller "+HERO+")"));
+		Invoke t1=Invoke.create(HERO, 1, "(log *origin*)");
+		Invoke t2=Invoke.create(VILLAIN, 1, "(log *origin*)");
+		ResultContext rc=s.applyTransaction(Multi.create(HERO, 1,Multi.MODE_ALL,t1,t2));
+		Context rctx=rc.context;
+		assertFalse(rctx.isError());
+
+		AVector<AVector<ACell>> log=rctx.getLog();
+		assertEquals(2,log.count());
+		assertEquals(HERO,log.get(0).get(0));
+		assertCVMEquals(Vectors.of(HERO),log.get(0).get(3));
+		assertEquals(VILLAIN,log.get(1).get(0));
+		assertCVMEquals(Vectors.of(VILLAIN),log.get(1).get(3));
+	}
+
+	@Test
+	public void testMultiTrustMonitorControl() {
+		// The signer may act for a child origin whose controller is a trust monitor
+		// that grants it :control, by the same rule as eval-as
+		Context ctx=step("(deploy '(do (defn check-trusted? ^{:callable true} [s a o] (and (= s *scope*) (= a :control)))))");
+		Address monitor=(Address) ctx.getResult();
+		Transfer t=Transfer.create(VILLAIN, 1, HERO, 1000);
+
+		// Scoped to HERO: HERO's signature covers a child for VILLAIN
+		State trusted=stepAs(VILLAIN,ctx,"(set-controller ["+monitor+" "+HERO+"])").getState();
+		long before=trusted.getAccount(VILLAIN).getBalance();
+		ResultContext rc=trusted.applyTransaction(Multi.create(HERO, 1, Multi.MODE_ALL, t));
+		assertFalse(rc.context.isError());
+		assertEquals(before-1000,rc.context.getState().getAccount(VILLAIN).getBalance());
+
+		// Scoped to VILLAIN only: HERO is denied
+		State untrusted=stepAs(VILLAIN,ctx,"(set-controller ["+monitor+" "+VILLAIN+"])").getState();
+		ResultContext denied=untrusted.applyTransaction(Multi.create(HERO, 1, Multi.MODE_ANY, t));
+		assertFalse(denied.context.isError());
+		AVector<Result> rs=denied.context.getResult();
+		assertEquals(ErrorCodes.TRUST,rs.get(0).getErrorCode());
+		assertEquals(before,denied.context.getState().getAccount(VILLAIN).getBalance());
+	}
+
+	private ATransaction nestMulti(ATransaction inner, int levels) {
+		ATransaction t=inner;
+		for (int i=0; i<levels; i++) t=Multi.create(HERO, 1, Multi.MODE_ANY, t);
+		return t;
+	}
+
+	/** Follows single-child Multi results inward, returning the first error and its level */
+	private static Result innermostError(Context rctx, int[] levelOut) {
+		ACell r=rctx.getResult();
+		int level=0;
+		while (true) {
+			AVector<?> rs=(AVector<?>) r;
+			assertEquals(1,rs.count());
+			Result inner=(Result) rs.get(0);
+			level++;
+			if (inner.isError()||!(inner.getValue() instanceof AVector)) {
+				levelOut[0]=level;
+				return inner;
+			}
+			r=inner.getValue();
+		}
+	}
+
+	@Test
+	public void testMultiNestingDepthBounded() {
+		// Regression: nesting was never counted against the depth limit, so a few
+		// thousand levels overflowed the stack during block application
+		Transfer transfer=Transfer.create(HERO, 1, VILLAIN, 1);
+		long before=INITIAL.getAccount(VILLAIN).getBalance();
+
+		// Nesting up to the limit executes the innermost transaction
+		ResultContext ok=INITIAL.applyTransaction(nestMulti(transfer,Constants.MAX_DEPTH));
+		assertFalse(ok.context.isError());
+		assertEquals(before+1,ok.context.getState().getAccount(VILLAIN).getBalance());
+
+		// One level beyond fails with a DEPTH error at the innermost fork
+		int[] level=new int[1];
+		ResultContext limit=INITIAL.applyTransaction(nestMulti(transfer,Constants.MAX_DEPTH+1));
+		assertFalse(limit.context.isError()); // MODE_ANY reports the child outcome
+		assertEquals(ErrorCodes.DEPTH,innermostError(limit.context,level).getErrorCode());
+		assertEquals(Constants.MAX_DEPTH+1,level[0]);
+		assertEquals(before,limit.context.getState().getAccount(VILLAIN).getBalance());
+
+		// Far deeper nesting is bounded the same way rather than overflowing the stack
+		ResultContext deep=INITIAL.applyTransaction(nestMulti(transfer,3000));
+		assertEquals(ErrorCodes.DEPTH,innermostError(deep.context,level).getErrorCode());
+		assertEquals(Constants.MAX_DEPTH+1,level[0]);
+	}
+
+	@Test
 	public void testCall() {
 		State s=state();
 		Call t1=Call.create(HERO, 1, HERO, Symbols.FOO, Vectors.empty());

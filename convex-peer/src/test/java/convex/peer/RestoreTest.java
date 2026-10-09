@@ -34,8 +34,8 @@ import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.etch.Etch;
 import convex.etch.EtchStore;
-import convex.etch.EtchUtils;
-import convex.etch.EtchUtils.FullValidator;
+import convex.etch.EtchVerifier;
+import convex.etch.EtchVerifier.IndexVisitor;
 
 public class RestoreTest {
 	AKeyPair KP=AKeyPair.createSeeded(123456781);
@@ -120,7 +120,7 @@ public class RestoreTest {
 		assertNotNull(state);
 		
 		Etch e=((EtchStore)s2.getStore()).getEtch();
-		FullValidator vd = EtchUtils.getFullValidator();
+		IndexVisitor vd = new EtchVerifier.IndexVisitor();
 		e.visitIndex(vd);
 	}
 }

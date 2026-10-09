@@ -51,26 +51,31 @@ public class NettyServerTest {
 			NettyConnection client=NettyConnection.connect(addr, m->{
 				rec.complete(m);
 			});
-			
-			client.send(Message.createQuery(10, "*address*", Address.create(17)));
-			
-			Message m=rec.join();
-			assertEquals(RT.cvm(10),m.getResultID());
-			
+			try {
+				client.send(Message.createQuery(10, "*address*", Address.create(17)));
+				Message m=rec.join();
+				assertEquals(RT.cvm(10),m.getResultID());
+			} finally {
+				client.close();
+				assertTrue(client.isClosed());
+			}
+
 			{ // Regular client
-				Convex convex=Convex.connect(addr);
-				Result r=convex.query(Keywords.FOO).join();
-				assertFalse(r.isError());
-				AVector<?> v= RT.ensureVector(r.getValue());
-				
-				AVector<?> expected=Vectors.of(MessageTag.QUERY,0,Keywords.FOO,null);
-				assertEquals(expected,v);
+				try (Convex convex=Convex.connect(addr)) {
+					Result r=convex.query(Keywords.FOO).join();
+					assertFalse(r.isError());
+					AVector<?> v= RT.ensureVector(r.getValue());
+
+					AVector<?> expected=Vectors.of(MessageTag.QUERY,0,Keywords.FOO,null);
+					assertEquals(expected,v);
+				}
 			}
 			
 			{ // Netty client
-				Convex convex=ConvexRemote.connectNetty(addr);
-				Result r=convex.query(":hello").join();
-				assertFalse(r.isError());
+				try (Convex convex=ConvexRemote.connectNetty(addr)) {
+					Result r=convex.query(":hello").join();
+					assertFalse(r.isError());
+				}
 			}
 		}
 	}
@@ -99,14 +104,15 @@ public class NettyServerTest {
 			NettyConnection client=NettyConnection.connect(socketAddr, m->{
 				queue.add(m);
 			});
-			
-			Blob blob=Blobs.createRandom(100000).toFlatBlob();
-			
-			Message mq=Message.createQuery(10, blob, Address.create(17));
-			client.send(mq);
-			
-			Message m=queue.poll(1000,TimeUnit.MILLISECONDS);
-			assertEquals(RT.cvm(10),m.getResultID());
+			try {
+				Blob blob=Blobs.createRandom(100000).toFlatBlob();
+				Message mq=Message.createQuery(10, blob, Address.create(17));
+				client.send(mq);
+				Message m=queue.poll(1000,TimeUnit.MILLISECONDS);
+				assertEquals(RT.cvm(10),m.getResultID());
+			} finally {
+				client.close();
+			}
 
 
 		}
@@ -205,7 +211,8 @@ public class NettyServerTest {
 	@Test public void testChannelInactiveFiresDisconnect() {
 		NettyInboundHandler handler = new NettyInboundHandler(msg -> null, null);
 		EmbeddedChannel ch = new EmbeddedChannel(handler);
-		NettyServerConnection conn = new NettyServerConnection(ch, handler);
+		ServerOutboundQueue outbound = new ServerOutboundQueue(1 << 20, 1 << 20);
+		NettyServerConnection conn = new NettyServerConnection(ch, handler, outbound);
 		handler.setConnection(conn);
 
 		CompletableFuture<AConnection> disconnected = new CompletableFuture<>();

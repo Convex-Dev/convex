@@ -15,7 +15,7 @@ import convex.test.generators.HashMapGen;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestMap {
+public class MapPropertyTest {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property

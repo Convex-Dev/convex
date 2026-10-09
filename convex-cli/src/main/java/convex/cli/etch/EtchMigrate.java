@@ -42,7 +42,7 @@ public class EtchMigrate extends AEtchCommand {
 			}
 
 			EtchStore dest=EtchStore.create(destFile,
-					destinationConfig(source.getEtch().getConfig(),false));
+					destinationConfig(source.getConfig(),false));
 			try {
 				long count=EtchUtils.migrate(source, dest);
 				if (setRoot) {

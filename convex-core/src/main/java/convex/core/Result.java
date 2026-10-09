@@ -543,7 +543,7 @@ public final class Result extends ARecordGeneric {
 		rpos+=Format.getVLQCountLength(count);
 		// First element is the ID — always embedded, so decode inline
 		AEncoder.DecodeState ds = new AEncoder.DecodeState(messageData);
-		ds.pos = rpos;
+		ds.pos += rpos;
 		return CVMEncoder.INSTANCE.read(ds);
 	}
 

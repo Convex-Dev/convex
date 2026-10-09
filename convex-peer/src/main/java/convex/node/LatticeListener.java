@@ -3,6 +3,7 @@ package convex.node;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -46,6 +47,8 @@ public final class LatticeListener implements Closeable {
 		ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<AConnection,LatticePropagator> assignments=
 		new ConcurrentHashMap<>();
+	/** Serialises initial assignment with revocation; established traffic does not lock. */
+	private final Object assignmentLock=new Object();
 	private Function<AConnection,LatticePropagator> selector;
 	private AServer server;
 	private Integer port;
@@ -73,6 +76,38 @@ public final class LatticeListener implements Closeable {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
 		requireNotLaunched("registerPropagator");
 		allowedPropagators.add(propagator);
+	}
+
+	/**
+	 * Revokes a group's eligibility and closes its assigned sockets on this listener.
+	 * May be called while running. Other groups, listeners and the propagator itself
+	 * remain live. Already accepted protocol work may complete in the group.
+	 *
+	 * @param propagator group to unregister
+	 * @return {@code true} if registered, or {@code false} if already absent
+	 */
+	public boolean unregisterPropagator(LatticePropagator propagator) {
+		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
+		ArrayList<AConnection> connections=new ArrayList<>();
+		synchronized (assignmentLock) {
+			if (!allowedPropagators.remove(propagator)) return false;
+			assignments.forEach((connection,owner) -> {
+				if (owner==propagator) connections.add(connection);
+			});
+		}
+		// Closing a socket may call back into this listener. Never hold the assignment
+		// lock while waiting for transport cleanup or invoking group observers.
+		for (AConnection connection:connections) {
+			try {
+				connection.close();
+			} catch (RuntimeException | StackOverflowError e) {
+				propagator.recordFailure("listener unregistration",e);
+				log.warn("Unable to close unregistered group's inbound connection",e);
+			} finally {
+				removeConnection(connection);
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -128,20 +163,28 @@ public final class LatticeListener implements Closeable {
 		if (connection==null) return reject(message);
 		LatticePropagator propagator=assignments.get(connection);
 		if (propagator==null) {
-			propagator=select(connection);
-			if (propagator==null) return reject(message);
-			LatticePropagator previous=assignments.putIfAbsent(connection,propagator);
-			if (previous!=null) propagator=previous;
-			else {
-				try {
-					propagator.attachInboundConnection(connection);
-				} catch (VirtualMachineError e) {
-					if (!(e instanceof StackOverflowError)) throw e;
-					return containFailure(connection,propagator,e);
-				} catch (Throwable e) {
-					return containFailure(connection,propagator,e);
+			Selection selection=select(connection);
+			propagator=selection.propagator();
+			if (propagator==null) return reject(message,selection.rejection());
+			boolean revoked;
+			try {
+				synchronized (assignmentLock) {
+					// Selection is application code and runs outside the lock. Recheck
+					// registration in case it raced with unregistration.
+					revoked=!allowedPropagators.contains(propagator);
+					if (!revoked) {
+						LatticePropagator previous=assignments.putIfAbsent(connection,propagator);
+						if (previous!=null) propagator=previous;
+						else propagator.attachInboundConnection(connection);
+					}
 				}
+			} catch (VirtualMachineError e) {
+				if (!(e instanceof StackOverflowError)) throw e;
+				return containFailure(connection,propagator,e);
+			} catch (Throwable e) {
+				return containFailure(connection,propagator,e);
 			}
+			if (revoked) return reject(message,"Inbound propagation policy selected an unavailable group");
 		}
 		try {
 			return propagator.deliverIncomingMessage(message);
@@ -176,6 +219,10 @@ public final class LatticeListener implements Closeable {
 
 	/** Best-effort correlated denial; optimistic pushes are simply rejected. */
 	private Predicate<Message> reject(Message message) {
+		return reject(message,"No propagation policy admits this connection");
+	}
+
+	private Predicate<Message> reject(Message message,String reason) {
 		boolean returned=false;
 		try {
 			// Decode only the bounded top-level protocol envelope so a correlated
@@ -184,7 +231,7 @@ public final class LatticeListener implements Closeable {
 			message.getPayload(null);
 			if (message.getRequestID()!=null) {
 				returned=message.returnResult(Result.error(ErrorCodes.TRUST,
-					Strings.create("No propagation policy admits this connection")));
+					Strings.create(reason)));
 			}
 		} catch (Exception ignored) {
 			// The frame may be malformed or have no usable return path.
@@ -197,24 +244,30 @@ public final class LatticeListener implements Closeable {
 		return null;
 	}
 
-	private LatticePropagator select(AConnection connection) {
+	private record Selection(LatticePropagator propagator,String rejection) {}
+
+	private Selection select(AConnection connection) {
 		Function<AConnection,LatticePropagator> policy=selector;
-		if (policy==null) return null;
+		if (policy==null) return new Selection(null,"No propagation policy is configured");
 		try {
 			LatticePropagator selected=policy.apply(connection);
-			if (selected==null) return null;
+			if (selected==null) return new Selection(null,"No propagation policy admits this connection");
 			if (!allowedPropagators.contains(selected)) {
 				log.warn("Inbound policy selected a propagator not registered with this listener");
-				return null;
+				return new Selection(null,"Inbound propagation policy selected an unavailable group");
 			}
-			return selected;
+			return new Selection(selected,null);
 		} catch (VirtualMachineError e) {
 			if (!(e instanceof StackOverflowError)) throw e;
-			log.warn("Inbound propagation policy overflowed; connection remains unassigned",e);
-			return null;
+			log.warn("Inbound propagation policy overflowed for {}; connection denied",
+				connection.getRemoteAddress());
+			log.debug("Inbound propagation policy overflow",e);
+			return new Selection(null,"Inbound propagation policy exceeded its execution stack");
 		} catch (Throwable e) {
-			log.warn("Inbound propagation policy failed; connection remains unassigned",e);
-			return null;
+			log.warn("Inbound propagation policy failed for {}; connection denied: {}: {}",
+				connection.getRemoteAddress(),e.getClass().getSimpleName(),e.getMessage());
+			log.debug("Inbound propagation policy failure",e);
+			return new Selection(null,"Inbound propagation policy failed");
 		}
 	}
 

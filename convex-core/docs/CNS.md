@@ -1,154 +1,141 @@
-# CNS — internal design notes
+# CNS Implementation Notes
 
-Status: working document, July 2026. Companion to [CAD014](https://docs.convex.world/docs/cad/cns)
-(normative specification) and [UPGRADE.md](UPGRADE.md) (network upgrade mechanism). This document
-records the implementation design, the verified defects, and the proposed CNS changes for the v1
-network upgrade.
+The Convex Name System maps dotted names such as `convex.asset` to addresses and
+values. [CAD014](https://docs.convex.world/docs/cad/cns) is the normative
+specification: user API, record and node model, authority model and root namespaces.
+This document is the implementation companion: where the pieces live, how the
+registry stores its data, why the registry code is consensus-frozen, and the registry
+changes planned for the protocol v1 upgrade.
+
+## Key points
+
+- The standard registry actor is genesis state at `#9` (`*registry*`), with the trust
+  library at `#10`. Editing their sources changes the genesis hash, so every change to
+  `#9` ships as a migration, never as a source edit (see [UPGRADE.md](UPGRADE.md)).
+- Resolution walks the path one segment at a time through the node SPI, so any actor
+  implementing the SPI can host a subtree. Reads run inside `query`, so node code cannot
+  mutate state during resolution.
+- Two capabilities are deliberately separate: record controllers govern records
+  (`:update`); node owners govern namespace structure (`:create`, `:delete`,
+  `:control`). Transferring a name and its subtree therefore takes two operations.
+- The registry has known deviations from CAD014 (record-creation authority, orphaned
+  nodes, no user-level `delete`, unvalidated empty segments). They are fixed by a
+  registry migration bundled into protocol v1, which is not yet written.
+- New root namespaces (`user`, `id`, `app`, `lab`, `peer`) need no protocol upgrade: a
+  new SPI actor plus a governance transaction creating the root entry suffices.
 
 ## Implementation map
 
 | Component | Location | Notes |
-|-----------|----------|-------|
-| Standard registry actor | `convex-core/src/main/cvx/convex/core/registry.cvx` | Deployed at `#9` (`*registry*`) during genesis. **Genesis source — consensus-frozen, see below.** |
-| Trust library | `convex-core/src/main/cvx/convex/core/trust.cvx` | Deployed at `#10`; the registry locates it as `(address (inc (long *address*)))`. Also genesis source. |
-| Genesis CNS tree | `Init.addCNSBaseTree` / `Init.doActorDeploy` / `Init.doCurrencyDeploy` | Creates `convex.*`, `asset.*`, `torus.*`, `currency.*`, the `init` record and the `convex.cns` alias. |
-| Java resolution | `Context.lookupCNS` / `lookupCNSRecord`, `State.lookupCNS` | Actor-calls `resolve` / `read` on `#9`. Used by the REST API, GUI, MCP server — and by the v1 Bootstrap migration itself (resolving `convex.fungible`). |
+|---|---|---|
+| Registry actor | `convex-core/src/main/cvx/convex/core/registry.cvx` | Deployed at `#9` during genesis. Genesis source: consensus-frozen. |
+| Trust library | `convex-core/src/main/cvx/convex/core/trust.cvx` | Deployed at `#10`; the registry locates it as the next address after its own. Genesis source. |
+| Genesis CNS tree | `Init.addCNSBaseTree`, `Init.doActorDeploy`, `Init.doCurrencyDeploy` | Creates `convex.*`, `asset.*`, `torus.*`, `currency.*`, the `init` record and the `convex.cns` alias. |
+| Java resolution | `Context.lookupCNS`, `Context.lookupCNSRecord`, `State.lookupCNS` | Actor-calls `resolve` and `read` on `#9`. Used by the REST API, GUI, MCP server and the v1 bootstrap migration. |
 | CVM resolution | `resolve` core macro, `@` reader syntax, `import` | All route through the registry's `resolve`. |
-| Code generation | `Code.cnsUpdate` | Emits `(#9/create 'name addr controller)` — used by genesis deploys. |
-| Tests | `convex.lib.CNSTest`, `convex.actors.RegistryTest` | `CNSTest.testDelegatedControlTransfer` / `testNodeDeletionOrphans` pin the authority-model semantics, including the open-issue behaviours the v1 upgrade will change. |
-| Purchasable-name stubs | `convex/user.cvx`, `app/names.cvx` | Placeholders only — see "User namespaces" below. |
+| Code generation | `Code.cnsUpdate` | Emits `(#9/create 'name addr controller)` for genesis deploys. |
+| Tests | `convex.lib.CNSTest`, `convex.actors.RegistryTest` | `CNSTest` pins the current authority behaviour, including the deviations the v1 migration changes. |
+| Purchasable-name stubs | `convex/user.cvx`, `app/names.cvx` | Placeholders for the user-namespace track. |
 
 ## Data model
 
 The registry holds two top-level structures:
 
-- `cns-database` — map of `path vector` → (`segment name` → `[value controller metadata child]`).
-  Each key is a **node**; each entry in a node's map is a **record**. The root node is `[]`.
-  A record's `child` field, when non-nil, is a scoped reference to the node holding its children —
-  for nodes hosted by the registry itself, `[#9 path]`.
-- `cns-owners` — map of `path vector` → **node owner** (a trust monitor). Governs namespace
-  structure: creating/deleting entries and transferring node ownership.
+- `cns-database`: map of path vector to a node map of segment name to
+  `[value controller metadata child]`. Each key is a **node**, each entry a **record**;
+  the root node is `[]`. A record's `child`, when non-nil, is a scoped reference to the
+  node holding its children, `[#9 path]` for nodes the registry hosts itself.
+- `cns-owners`: map of path vector to the node owner, a trust monitor governing
+  namespace structure.
 
-Resolution walks the path from the root, one scoped `(call ref (cns-read pname))` per segment, so
-any actor implementing the node SPI can host a subtree. `read`/`resolve` are wrapped in `query` so
-malicious node code cannot mutate state during resolution.
+Resolution issues one scoped `(call ref (cns-read pname))` per segment from the root.
+Subtree nodes are independently owned and may be shared between records, which is why
+node deletion is deliberately non-recursive.
 
-### Authority model (summary — normative version in CAD014)
+## Consensus constraint
 
-Record controllers govern *records* (`:update`); node owners govern *namespace structure*
-(`:create`/`:delete`/`:control`). They are separate capabilities **by design**, supporting
-delegation: a namespace owner hands out names but retains revocation rights. Full transfer of a
-name plus its subtree is two operations: `(*registry*/control 'name new)` for the record and
-`(trust/change-control [#9 path] new)` for the node. Subtree nodes are independently owned and may
-be shared between records, which is why deletion is deliberately non-recursive.
+`registry.cvx` and `trust.cvx` are genesis sources. Editing them changes the genesis
+hash and the replay-from-source state hash, breaking identity with live networks. Per
+[UPGRADE.md](UPGRADE.md), genesis is never modified: any change to account `#9`, down
+to a string typo, ships as a `CodeMigration` in `Migrations.Bootstrap` or a later
+version. Java-side code outside the state transition (`Context.lookupCNS`), lab code,
+tests and docs are unconstrained.
 
-## Consensus constraints
+While protocol v1 is unscheduled its bootstrap migration is still editable, so registry
+fixes can ride in it at no cost. Once v1 activates on any network, further fixes need a
+v2 upgrade.
 
-`registry.cvx` and `trust.cvx` are genesis sources. Editing them changes the genesis hash and the
-replay-from-source state hash, breaking identity with live networks (Protonet is at protocol
-version 0). Per UPGRADE.md, genesis is never modified: **every change to account `#9` — code,
-metadata, even a typo in a string — must ship as a migration** in `Migrations.Bootstrap` (or a
-later version). Java-side changes outside the CVM state transition (e.g. `Context.lookupCNS`) and
-non-genesis sources (lab code, tests, docs) are unconstrained.
+## Known deviations from CAD014
 
-This also sets the deadline structure: adding CNS fixes to the v1 Bootstrap is free while v1 is
-unscheduled. Once v1 activates on any network, further fixes require a v2 upgrade.
+CAD014 lists the deviations under its implementation status. In summary:
 
-## Verified defects (July 2026 review)
+1. **Record-creation authority** is checked against the parent record's controller,
+   while deletion and child-node creation are checked against the node owner. After
+   delegation diverges the two answer to different principals, and a node with no parent
+   record has no principal able to create records at all.
+2. **Orphaned nodes are undeletable.** Deleting a node removes its `cns-owners` entry,
+   so surviving descendants can never be deleted, even by their own owners.
+3. **No user-level `delete`.** Records can only be removed through a raw scoped SPI
+   call.
+4. **Empty segments are accepted**, producing records unreachable by well-formed
+   symbol paths.
+5. Minor: an unused `owner` parameter on `cns-delete-node`, an `:ARGMENT` typo in an
+   error, and inconsistent `:private` metadata (which the CVM does not enforce anyway).
 
-All confirmed empirically against the upgraded test state:
+Intentional and documented in CAD014, not defects: `control` does not transfer node
+ownership; node deletion is non-recursive; segment syntax is node-defined; `convex.cns`
+aliases the root.
 
-1. **Record-creation authority is inconsistent with the model.** `cns-write` authorises *new*
-   records against the **parent record's controller** (`-controller`), while node/record deletion
-   and child-node creation are authorised against the **node owner**. After delegation diverges,
-   record-create and record-delete in the same node answer to different principals. Worse, a node
-   with no corresponding parent record (direct `cns-create-node`, or record deleted) has
-   `-controller` = nil, so *nobody* — including the node owner — can create records in it.
-2. **Orphaned nodes are permanently undeletable.** `cns-delete-node` checks the owner of the
-   *parent* node (`*scope*`). Deleting a node removes its `cns-owners` entry, so surviving
-   descendant nodes can never be deleted by anyone — not even their own owners. The registry pays
-   memory for them forever. (Non-recursive deletion itself is by design; the defect is only the
-   missing self-delete.)
-3. **No user-level `delete`.** Records can only be removed via a raw scoped SPI call.
-4. **Empty path segments are accepted.** `(symbol "etest.")` creates a record named `""` —
-   unreachable by well-formed symbol paths. CAD014 now recommends nodes reject names that do not
-   round-trip through the symbol representation.
-5. **Minor.** `cns-delete-node` declares an unused `owner` parameter; `:ARGMENT` typo in
-   `-controller`'s error (practically unreachable branch); `^{:private? true}` vs `^{:private true}`
-   metadata inconsistency — note `Keywords.PRIVATE_META` (`:private`) is declared but not enforced
-   anywhere in the CVM, so environment privacy is currently aspirational either way.
+## Planned v1 registry migration
 
-Not defects (intentional, now documented in CAD014): `control` not transferring node ownership;
-non-recursive node deletion; segment syntax being node-defined; the `convex.cns` → root alias.
+A `CodeMigration` applied to `#9` alongside the other v1 library migrations under
+`convex-core/src/main/cvx/convex/migrations/`. Pure code redefinition; no data
+migration is needed because every node already has a `cns-owners` entry. Not yet
+implemented. Proposed contents, in decreasing order of confidence:
 
-## Proposed upgrade: `v1-registry.cvx`
+1. **Unify node-content authority on the node owner.** `cns-write` checks
+   `(trust/trusted? (get cns-owners *scope*) *caller* :create pname)` for new records;
+   the parent-controller lookup goes away. Root behaviour is unchanged. This is a
+   permission-semantics change wherever controller and owner have diverged; release
+   notes must say so.
+2. **Allow node self-deletion.** `cns-delete-node` authorises if the caller is trusted
+   by the parent node's owner or by the target node's own owner. Same signature; no
+   recursive deletion.
+3. **Add a user-level `delete`** mirroring `create`'s traversal, re-enabling the
+   disabled delete cases in `CNSTest`.
+4. **Reject empty segments in the user API** (`-check` fails with `:ARGUMENT`); the SPI
+   stays unrestricted so segment policy remains node-defined.
+5. **Metadata hygiene**: standardise on `^:private` in redefined bindings.
 
-A `CodeMigration` applied to `#9`, added to `Migrations.Bootstrap` alongside `v1-core.cvx` /
-`v1-metadata.cvx` / `v1-fungible.cvx`. Pure code redefinition — no data migration required
-(every existing node already has a `cns-owners` entry, created either at genesis or by
-`cns-create-node`).
+Explicitly not proposed: recursive deletion, SPI-level charset rules, record-shape
+changes, or any change to resolution semantics.
 
-Proposed contents, in decreasing order of confidence:
+The migration PR must flip the pinned assertions in `CNSTest` when running against
+`BaseTest.UPGRADED`, add positive tests for `delete` and orphan self-deletion, and
+leave the genesis replay hash untouched. It should land before v1 is scheduled on any
+network.
 
-1. **Unify node-content authority on the node owner** (fixes defect 1). Redefine `cns-write` so
-   the new-record check is `(trust/trusted? (get cns-owners *scope*) *caller* :create pname)`,
-   replacing the `-controller` lookup; `-controller` is removed (also removing the `:ARGMENT`
-   typo). Root behaviour is unchanged (`cns-owners` maps `[]` to the root controller). This is a
-   **permission-semantics change** on networks where record controller and node owner have
-   diverged; believed to be no-one on Protonet, but the release notes must state it.
-2. **Allow node self-deletion** (fixes defect 2). Redefine `cns-delete-node` to authorise if the
-   caller is trusted by the parent node's owner **or** by the target node's own owner
-   (`(get cns-owners (conj *scope* pname))`). Keeps the `[pname owner]` signature for caller
-   compatibility (parameter documented as reserved). This lets owners of orphaned subtrees clean
-   them up; it does not introduce recursive deletion.
-3. **Add a user-level `delete`** (fixes defect 3): resolves the parent node from the path and
-   issues the SPI delete, mirroring `create`'s traversal. Re-enables the commented-out
-   `testDelete` cases in `CNSTest`.
-4. **Reject empty segments in the user API** (fixes defect 4): `-check` fails with `:ARGUMENT`
-   if any segment is empty. SPI intentionally left unrestricted — segment policy stays
-   node-defined per CAD014. *(Optional — decide before scheduling; cheap and non-breaking for any
-   well-formed existing name.)*
-5. **Metadata hygiene**: standardise on `^:private` in redefined bindings. *(Cosmetic; rides along
-   at zero cost.)*
+## User namespaces
 
-Explicitly **not** proposed: recursive deletion (breaks shared subtrees), SPI-level charset
-restrictions (node-defined policy), record-shape changes, any change to resolution semantics.
-
-### Migration mechanics and testing
-
-- The migration is a resource `/convex/migrations/v1-registry.cvx` evaluated in the context of
-  `#9`, exactly like `v1-fungible.cvx` is for the fungible library — except `#9` is a static
-  address, so no CNS self-lookup is needed.
-- Order within Bootstrap: after the core fixes (the registry code uses only stable core functions,
-  so ordering is not semantically critical, but keeping library fixes last matches the existing
-  pattern).
-- Tests: `CNSTest.testDelegatedControlTransfer` and `testNodeDeletionOrphans` currently pin the
-  pre-upgrade behaviours with comments marking the open issues. The migration PR must flip those
-  assertions when running against `BaseTest.UPGRADED`, add positive tests for `delete` and orphan
-  self-deletion, and satisfy the standard gating policy (changes move the post-upgrade state hash,
-  which is expected and correct for migration content; genesis replay hash must be untouched).
-- Per UPGRADE.md's "all known bugs in one upgrade" principle, this should land **before v1 is
-  scheduled on any network**.
-
-## User namespaces (separate track — no protocol upgrade needed)
-
-CAD014 plans `user`, `id`, `app`, `lab` and `peer` root namespaces. These need **no migration**:
-a new actor implementing the node SPI (`cns-read` / `cns-write` / `cns-create-node` /
-`cns-delete-node` / `check-trusted?`) plus purchase logic can be deployed by an ordinary
-governance transaction that then creates the root entry (as `Init.addCNSBaseTree` does at
-genesis). Design questions to settle in CAD014 before implementation: pricing model, whether
-names are transferable assets (CAD019 integration), expiry/renewal, and squatting mitigation.
-The `convex/user.cvx` and `app/names.cvx` stubs are placeholders for this work. Deploy to testnet
-first per the current testnet strategy.
+CAD014 plans `user`, `id`, `app`, `lab` and `peer` root namespaces. These need no
+migration: a new actor implementing the node SPI (`cns-read`, `cns-write`,
+`cns-create-node`, `cns-delete-node`, `check-trusted?`) plus purchase logic is deployed
+by an ordinary governance transaction that then creates the root entry. Open design
+questions belong in CAD014: pricing, whether names are transferable assets
+([CAD019](https://docs.convex.world/docs/cad/assets)), expiry and renewal, squatting.
 
 ## Open questions
 
-- Should `create` auto-creating intermediate nodes assign them the *final record's* controller
-  (current behaviour) rather than the caller? Convenient, but callers may not intend to hand
-  intermediate namespaces to the target controller. Candidate for the same v1 bundle if changed.
-- `create`'s return value is undefined (`nil`); `[#9 path]` would be more useful.
-- Should `:private` environment metadata ever be enforced by the CVM (e.g. blocking cross-account
-  env lookup)? Currently declared (`Keywords.PRIVATE_META`) but unused. If not, drop the
-  annotations from the sources at the next opportunity.
-- Whether `convex.cns` should remain a root alias or point to a dedicated CNS-tooling namespace
-  once alternative roots exist.
+- Should `create` assign auto-created intermediate nodes to the final record's
+  controller (current behaviour) rather than the caller?
+- Should `create` return `[#9 path]` instead of `nil`?
+- Should `:private` environment metadata ever be enforced by the CVM? If not, drop the
+  annotations from the sources.
+- Should `convex.cns` remain a root alias once alternative roots exist?
+
+## Related
+
+- [CAD014 Convex Name System](https://docs.convex.world/docs/cad/cns) — normative specification.
+- [CAD022 Trust Monitors](https://docs.convex.world/docs/cad/trustmon) — the authority primitive the registry uses.
+- [UPGRADE.md](UPGRADE.md) — why registry changes ship as migrations.
+- `cns` skill under `.claude/skills/` — using CNS from the CLI.

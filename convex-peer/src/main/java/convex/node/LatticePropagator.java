@@ -243,6 +243,7 @@ public class LatticePropagator implements Closeable {
 		this.maxDeltaMessageSize=config.getMaxDeltaMessageSize();
 		this.maxDeltaBroadcastSize=config.getMaxDeltaBroadcastSize();
 		connectionManager.setMaxDesiredPeers(config.getMaxDesiredPeers());
+		connectionManager.setPeerTargets(config.getAmbientPeers(),config.getActivePeers());
 		connectionManager.setInboundMessageLimits(
 			config.getMaxMessageSize(),config.getMaxTrustedMessageSize());
 	}
@@ -494,6 +495,7 @@ public class LatticePropagator implements Closeable {
 			// NodeServer is the sole writer of its authoritative store root.
 			this.persistenceEnabled=false;
 			if (endpoint==null) endpoint=new LatticeProtocolEndpoint(this,node,config);
+			connectionManager.setInboundProbe(endpoint::probe,endpoint::retireConnection);
 			endpoint.setTransportKeyPair(transportKeyPair);
 			endpoint.setIngressFilter(ingressFilter);
 			endpoint.setApplicationMessageHandler(applicationMessageHandler);
@@ -953,11 +955,14 @@ public class LatticePropagator implements Closeable {
 			return;
 		}
 
-		running = false;
+		synchronized (triggerQueue) {
+			// Seal ordinary offers before the final drain. A notification already
+			// holding a node snapshot must not enqueue after shutdown has finished.
+			running = false;
+			if (finalValue != null) triggerQueue.offer(finalValue);
+		}
 
-		if (finalValue != null) {
-			triggerQueue.offer(finalValue); // wakes thread via notify
-		} else if (propagationThread != null) {
+		if (finalValue == null && propagationThread != null) {
 			propagationThread.interrupt(); // wake thread from poll wait
 		}
 
@@ -1006,7 +1011,10 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Stops the propagator gracefully. Equivalent to {@code triggerAndClose(null)}.
+	 * Drains ingress and publication work and closes this group's inbound sockets
+	 * and outbound routes. Stores remain caller-owned. To also remove the group
+	 * from its node's lifecycle and notifications, use
+	 * {@link NodeServer#removePropagator(LatticePropagator)}.
 	 */
 	@Override
 	public void close() {
@@ -1044,9 +1052,11 @@ public class LatticePropagator implements Closeable {
 	 * @param value lattice value to process; {@code null} is ignored
 	 */
 	public void triggerBroadcast(ACell value) {
-		if (!running) return;
 		if (value == null) return;
-		triggerQueue.offer(value);
+		synchronized (triggerQueue) {
+			if (!running) return;
+			triggerQueue.offer(value);
+		}
 	}
 
 	// ========== Propagation Loop ==========
@@ -1129,7 +1139,10 @@ public class LatticePropagator implements Closeable {
 	 *
 	 * <p>Callable directly for standalone use and deterministic tests. Attached
 	 * nodes normally schedule it on this group's worker using
-	 * {@link #triggerBroadcast(ACell)}. Calls are serialised by {@link #writeLock}.</p>
+	 * {@link #triggerBroadcast(ACell)}. Attached-node snapshots take precedence
+	 * over this group's working view on ties, so an older replicated-back value
+	 * cannot displace a local edit. Standalone input keeps working-view precedence.
+	 * Calls are serialised by {@link #writeLock}.</p>
 	 *
 	 * @param value snapshot to process; must not be {@code null}
 	 * @return announced store-backed value
@@ -1138,10 +1151,13 @@ public class LatticePropagator implements Closeable {
 	public ACell processSnapshot(ACell value) throws IOException {
 		CompletableFuture<ACell> announceFuture;
 		synchronized (writeLock) {
-			// Reconcile the group's established filtered view with the latest
-			// authoritative node snapshot before applying outbound projection.
+			// Keep group pre-merges, but the node's published local state wins ties.
+			// Standalone snapshots are ordinary input, not node publications.
 			if ((workingCursor != null) && (lattice != null)) {
-				value = lattice.merge(mergeContext, workingCursor.get(), value);
+				ACell working=workingCursor.get();
+				value = (node==null)
+					?lattice.merge(mergeContext,working,value)
+					:lattice.merge(mergeContext,value,working);
 			}
 
 			// Filtering is outbound-only: pending inbound state participates in the
@@ -1151,8 +1167,8 @@ public class LatticePropagator implements Closeable {
 
 			// 1. Announce to store (writes cells, collects novelty for delta)
 			boolean hasPeers=!connectionManager.getPeers().isEmpty();
-			Cells.NoveltyCollector noveltyCollector=hasPeers
-				?new Cells.NoveltyCollector(maxDeltaBroadcastSize):null;
+			NoveltyCollector noveltyCollector=hasPeers
+				?new NoveltyCollector(maxDeltaBroadcastSize):null;
 			value = Cells.announce(value, noveltyCollector, store);
 			if (workingCursor == null) {
 				workingCursor = Cursors.createLattice(lattice, value, mergeContext);
@@ -1228,10 +1244,7 @@ public class LatticePropagator implements Closeable {
 			}
 		}
 
-		var result=connectionManager.broadcastSequence(messages,rootMessage);
-		if (result.dropped()>0) {
-			log.debug("Dropped lattice delta for {} peer(s); root sync will recover",result.dropped());
-		}
+		connectionManager.broadcastSequence(messages);
 		lastBroadcastTime = Utils.getCurrentTimestamp();
 		broadcastCount.incrementAndGet();
 	}
@@ -1325,10 +1338,18 @@ public class LatticePropagator implements Closeable {
 	 * @return future completing with the acquired value, or {@code null} when absent
 	 */
 	public CompletableFuture<ACell> pullPath(Convex peer, ACell... path) {
+		return pullPath(peer,false,path);
+	}
+
+	/** Background pulls retain outstanding work but do not earn active-peer priority. */
+	public CompletableFuture<ACell> pullPath(Convex peer,boolean background,ACell... path) {
 		if (peer == null) {
 			return CompletableFuture.failedFuture(new IllegalArgumentException("Peer cannot be null"));
 		}
+		return connectionManager.withPeer(peer.getVerifiedPeer(),!background,() -> acquirePath(peer,path));
+	}
 
+	private CompletableFuture<ACell> acquirePath(Convex peer,ACell[] path) {
 		return CompletableFuture.supplyAsync(() -> {
 			try {
 				if (!peer.isConnected()) {

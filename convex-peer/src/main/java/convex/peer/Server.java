@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import javax.net.ssl.SSLContext;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +64,7 @@ import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.net.AServer;
+import convex.net.Transports;
 import convex.net.impl.netty.NettyServer;
 import convex.net.impl.nio.NIOServer;
 
@@ -171,7 +174,6 @@ public class Server implements Closeable {
 	 */
 	private final Predicate<Message> txnRetry = transactionHandler::offerTransactionBlocking;
 	private final Predicate<Message> queryRetry = queryHandler::offerQueryBlocking;
-	private final Predicate<Message> beliefRetry = propagator::queueBeliefBlocking;
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -187,6 +189,10 @@ public class Server implements Closeable {
 	/** Ensures an owned store is closed and retired exactly once. */
 	private final AtomicBoolean storeClosed=new AtomicBoolean();
 
+	/** Stable identity allows a closed Server to leave the process shutdown registry. */
+	private final Runnable shutdownHook=this::close;
+	private boolean shutdownHookRegistered;
+
 	/**
 	 * Configuration
 	 */
@@ -196,6 +202,7 @@ public class Server implements Closeable {
 	 * Network server (Netty or NIO) that accepts inbound client and peer connections.
 	 */
 	private AServer nio;
+	private NettyServer tls;
 
 	@SuppressWarnings("deprecation")
 	private Server(HashMap<Keyword, Object> config, boolean ownsStore,
@@ -231,10 +238,14 @@ public class Server implements Closeable {
 		try {
 			Object source=getConfig().get(Keywords.SOURCE);
 			if (Utils.bool(source)) {
+				Convex c=null;
+				boolean synced=false;
 				try {
-					Convex c=Convex.connect(source);
+					c=Convex.connect(source);
 					c.setStore(getStore());
-					return syncPeer(keyPair,c);
+					Peer peer=syncPeer(keyPair,c);
+					synced=true;
+					return peer;
 				} catch (TimeoutException e) {
 					throw new LaunchException("Timeout trying to connect to remote peer");
 				} catch (IllegalArgumentException e) {
@@ -242,6 +253,8 @@ public class Server implements Closeable {
 				} catch (Exception e ) {
 					// something else failed, probably an IOException
 					throw new LaunchException("Failed to sync with remote peer host at: "+source,e);
+				} finally {
+					if (!synced && c!=null) c.close();
 				}
 			} 
 			
@@ -322,9 +335,6 @@ public class Server implements Closeable {
 			}
 			log.info("Retrieved Peer Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
 	
-			// Add the new connection since it seems good
-			getConnectionManager().addConnection(remotePeerKey,convex);
-			
 			SignedData<Order> peerOrder=belF.getOrders().get(remotePeerKey);
 
 			
@@ -363,6 +373,10 @@ public class Server implements Closeable {
 				peer=peer.recalcState(0);
 				log.info("Remote peer did not advertise a state position; locally replayed finalised Order to position {} without a remote state comparison",
 						peer.getStatePosition());
+			}
+			// Ownership transfers to the manager only after the complete sync is valid.
+			if (!getConnectionManager().addConnection(remotePeerKey,convex)) {
+				throw new LaunchException("Connection manager closed during peer sync");
 			}
 			return peer;
 		} catch (ExecutionException | InvalidDataException e) {
@@ -469,6 +483,7 @@ public class Server implements Closeable {
 	public synchronized void launch() throws LaunchException, InterruptedException {
 		if (isRunning) return; // in case of double launch
 		isRunning=true;
+		boolean launched=false;
 		try {
 			// Establish Peer state
 			Peer peer = establishPeer();
@@ -499,11 +514,26 @@ public class Server implements Closeable {
 			nio.launch();
 			port = nio.getPort(); // Get the actual port (may be auto-allocated)
 
+			Object tlsPort=config.get(Config.TLS_PORT);
+			if (tlsPort!=null) {
+				int securePort=Utils.toInt(tlsPort);
+				if (securePort<0 || securePort>65535) throw new ConfigException("Invalid TLS port");
+				tls=NettyServer.create(this);
+				tls.setPort(securePort);
+				Object context=config.get(Config.TLS_CONTEXT);
+				if (context!=null && !(context instanceof SSLContext)) {
+					throw new ConfigException("TLS context must be an SSLContext");
+				}
+				tls.setSSLContext(context==null ? Transports.defaultSSLContext() : (SSLContext)context);
+				tls.launch();
+			}
+
 			// set running status now, so that loops don't immediately terminate
 			isRunning = true;
 
 			// Close server on shutdown, should be before Etch stores in priority
-			Shutdown.addHook(Shutdown.SERVER, this::close);
+			Shutdown.addHook(Shutdown.SERVER,shutdownHook);
+			shutdownHookRegistered=true;
 
 			// Start threaded components
 			manager.start();
@@ -514,10 +544,13 @@ public class Server implements Closeable {
 
 			goLive();
 			log.info( "Peer server started on port "+nio.getPort()+" with peer key: {}",getPeerKey());
+			launched=true;
 		} catch (ConfigException e) {
 			throw new LaunchException("Launch failed due to config problem: "+e,e);
 		} catch (IOException e) {
 			throw new LaunchException("Launch failed due to IO Error: "+e,e);
+		} finally {
+			if (!launched) close(false);
 		}
 	}
 
@@ -528,8 +561,10 @@ public class Server implements Closeable {
 	/**
 	 * Dispatches a decoded inbound message to the appropriate handler.
 	 *
-	 * <p>Client messages (transactions and queries) are offered to bounded queues. Protocol
-	 * messages (beliefs, challenges, status) are handled inline since they are lightweight.
+	 * <p>Client requests are offered to bounded queues and may request connection
+	 * backpressure when full. BELIEF and DATA propagation is offered once to its
+	 * dedicated queue and dropped if full. Lightweight control messages are handled
+	 * inline.
 	 *
 	 * <p>Non-blocking on the fast path: a single {@code queue.offer()} and return. If the
 	 * target queue is full, returns a pre-allocated retry predicate instead of an error —
@@ -539,7 +574,7 @@ public class Server implements Closeable {
 	 * <p>SECURITY: Must anticipate malicious or malformed messages.
 	 *
 	 * @param m Message to process (already decoded)
-	 * @return null if accepted, or a retry Predicate that blocks until delivered or timeout
+	 * @return a retry Predicate for a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> processMessage(Message m) {
 		try {
@@ -553,11 +588,14 @@ public class Server implements Closeable {
 				if (queryHandler.offerQuery(m)) return null;
 				return queryRetry;
 
-			// Belief and DATA preserve wire order on the bounded propagator queue.
+			// Propagation is best-effort. A full queue drops this update rather than
+			// pausing the connection and blocking later protocol messages.
 			case BELIEF:
-				return processBelief(m)?null:beliefRetry;
+				processBelief(m);
+				return null;
 			case DATA:
-				return processData(m)?null:beliefRetry;
+				processData(m);
+				return null;
 			case CHALLENGE:
 				processChallenge(m);
 				return null;
@@ -601,7 +639,7 @@ public class Server implements Closeable {
 		}
 	}
 
-	/** Queues DATA with Beliefs so staging preserves per-connection wire order off the I/O thread. */
+	/** Offers DATA to the propagation queue so it retains wire order off the I/O thread. */
 	private boolean processData(Message message) {
 		AConnection conn=message.getConnection();
 		if (conn!=null && !conn.isTrusted()) {
@@ -609,15 +647,14 @@ public class Server implements Closeable {
 			returnError(message,ErrorCodes.TRUST,Strings.create("DATA requires a verified Peer"));
 			return true;
 		}
-		return propagator.queueBelief(message);
+		return propagator.queuePropagation(message);
 	}
 
 	/** Stages a previously authorised DATA message on the Belief propagator thread. */
 	void stageData(Message message) throws IOException, convex.core.exceptions.BadFormatException {
 		AVector<?> payload=RT.ensureVector(message.getPayload());
-		if (payload==null || payload.count()<2
-				|| payload.count()>CPoSConstants.MISSING_LIMIT+1
-				|| !MessageTag.DATA.equals(payload.get(0))) {
+		// Bounded by the inbound message length only: novelty has no cell-count limit
+		if (payload==null || payload.count()<2 || !MessageTag.DATA.equals(payload.get(0))) {
 			throw new convex.core.exceptions.BadFormatException("Invalid DATA message format");
 		}
 		for (long i=1; i<payload.count(); i++) {
@@ -631,12 +668,12 @@ public class Server implements Closeable {
 
 	/**
 	 * Delivers an inbound message: decodes payload, observes, and dispatches.
-	 * Returns null if accepted, or a blocking retry predicate if the queue was full.
+	 * Returns a blocking retry predicate only for a saturated request queue.
 	 *
 	 * This is the primary entry point for both Netty and ConvexLocal message delivery.
 	 *
 	 * @param m Message to deliver
-	 * @return null if accepted, or a retry Predicate that blocks until delivered or timeout
+	 * @return a retry Predicate for a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> deliverMessage(Message m) {
 		try {
@@ -712,13 +749,12 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Adds an event to the inbound server event queue.
-	 * @param event Signed event to add to inbound event queue
-	 * @return True if Belief was successfully queued, false otherwise
+	 * Adds a complete locally acquired Belief to the merge queue.
+	 * @param acquiredBelief complete Belief already acquired into this server's store
+	 * @return true if queued, false if the bounded queue is full
 	 */
-	public boolean queueBelief(Message event) {
-		boolean offered=propagator.queueBelief(event);
-		return offered;
+	public boolean queueBelief(Belief acquiredBelief) {
+		return propagator.queueBelief(acquiredBelief);
 	}
 	
 	/**
@@ -756,7 +792,16 @@ public class Server implements Closeable {
 	 * @return Status vector
 	 */
 	public AVector<ACell> getStatusData() {
-		Peer peer=getPeer();
+		return getStatusData(getPeer());
+	}
+
+	/**
+	 * Gets the status vector for a Peer, laid out as {@link #getStatusData()} describes.
+	 * Shared with in-process clients that answer STATUS requests without a Server.
+	 * @param peer Peer to report on
+	 * @return Status vector
+	 */
+	public static AVector<ACell> getStatusData(Peer peer) {
 		Belief belief=peer.getBelief();
 		
 		State state=peer.getConsensusState();
@@ -803,11 +848,11 @@ public class Server implements Closeable {
 	protected boolean processBelief(Message m) {
 		AConnection conn=m.getConnection();
 		if (conn==null || conn.isTrusted()) {
-			// Trusted or local (ConvexLocal) — main queue
-			return propagator.queueBelief(m);
+			// Trusted or local (ConvexLocal) — ordered propagation queue
+			return propagator.queuePropagation(m);
 		} else {
 			// Untrusted inbound — best-effort queue, trigger verification
-			propagator.queueUntrustedBelief(m);
+			propagator.queueUntrustedPropagation(m);
 			inboundVerifier.maybeStart(conn);
 			return true;
 		}
@@ -823,7 +868,12 @@ public class Server implements Closeable {
 
 	/** Returns the number of active inbound client connections. */
 	public int getInboundConnectionCount() {
-		return nio.getClientConnectionCount();
+		return nio.getClientConnectionCount() + ((tls==null) ? 0 : tls.getClientConnectionCount());
+	}
+
+	/** Actual additional TLS listener port, or null when TLS is disabled. */
+	public Integer getTLSPort() {
+		return (tls==null) ? null : tls.getPort();
 	}
 
 	/**
@@ -867,17 +917,35 @@ public class Server implements Closeable {
 	
 	@Override
 	public void close() {
-		
+		close(true);
+	}
+
+	/** Performs normal shutdown, optionally writing a final peer checkpoint. */
+	private synchronized void close(boolean persist) {
+		removeShutdownHook();
 		if (!isRunning) {
+			isLive=false;
+			manager.close();
+			nio.close();
+			if (tls!=null) tls.close();
+			inboundVerifier.close();
 			closeOwnedStore();
+			shutdownFuture.complete(Utils.getCurrentTimestamp());
 			return;
 		}
-		log.debug("Peer shutdown starting for "+getPeerKey());
+		Peer startingPeer=getPeer();
+		AccountKey peerKey=(startingPeer==null)?null:startingPeer.getPeerKey();
+		log.debug("Peer shutdown starting for {}",peerKey);
 		isLive=false;
 		isRunning = false;
 
 		// Close manager, we don't want any management actions during shutdown!
 		manager.close();
+
+		// Stop ingress and cancel connection-bound verification before worker/store shutdown.
+		nio.close();
+		if (tls!=null) tls.close();
+		inboundVerifier.close();
 
 		// Shut down propagator, no point sending any more Beliefs
 		propagator.close();
@@ -886,19 +954,12 @@ public class Server implements Closeable {
 		transactionHandler.close();
 		executor.close();
 
-		boolean writersStopped=true;
-		try {
-			writersStopped&=propagator.awaitStopped();
-			writersStopped&=transactionHandler.awaitStopped();
-			writersStopped&=executor.awaitStopped();
-		} catch (InterruptedException e) {
-			writersStopped=false;
-			Thread.currentThread().interrupt();
-		}
+		boolean writersStopped=awaitComponentsStopped(
+			queryHandler,propagator,transactionHandler,executor);
 		
 		Peer peer=getPeer();
 		// persist peer state if necessary
-		if ((peer != null) && !Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))
+		if (persist && (peer != null) && !Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))
 				&&writersStopped) {
 			try {
 				executor.persistPeerData();
@@ -909,15 +970,39 @@ public class Server implements Closeable {
 				log.error("Unable to complete final Peer checkpoint in "+store
 						+"; the store may require operator recovery",e);
 			}
-		} else if ((peer!=null)&&!Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) {
+		} else if (persist && (peer!=null)&&!Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) {
 			log.error("Peer writers did not stop cleanly; skipping the final checkpoint for "
 					+store+" and leaving recovery to the operator");
 		}
 
-		nio.close();
 		closeOwnedStore();
-		log.info("Peer shutdown complete for "+getPeerKey());
+		log.info("Peer shutdown complete for {}",peerKey);
 		shutdownFuture.complete(Utils.getCurrentTimestamp());
+	}
+
+	private void removeShutdownHook() {
+		if (!shutdownHookRegistered) return;
+		Shutdown.removeHook(Shutdown.SERVER,shutdownHook);
+		shutdownHookRegistered=false;
+	}
+
+	/** Joins component threads without allowing an interrupt to skip resource safety. */
+	private boolean awaitComponentsStopped(AThreadedComponent... components) {
+		boolean interrupted=false;
+		boolean stopped=true;
+		for (AThreadedComponent component : components) {
+			while (true) {
+				try {
+					stopped&=component.awaitStopped();
+					break;
+				} catch (InterruptedException e) {
+					interrupted=true;
+					component.close();
+				}
+			}
+		}
+		if (interrupted) Thread.currentThread().interrupt();
+		return stopped;
 	}
 
 	/** Closes a materialised store, deleting its file only when it was temporary. */
@@ -1238,10 +1323,9 @@ public class Server implements Closeable {
 	 * Shut down the Server, as gracefully as possible.
 	 */
 	public void shutdown()  {
-		try {
+		try (Convex convex=Convex.connect(this, getPeerController(),getKeyPair())) {
 			AKeyPair kp= getKeyPair();
 			AccountKey key=kp.getAccountKey();
-			Convex convex=Convex.connect(this, getPeerController(),kp);
 			Result r=convex.transactSync("(set-peer-stake "+key+" 0)");
 			if (r.isError()) {
 				log.warn("Unable to remove Peer stake: "+r);

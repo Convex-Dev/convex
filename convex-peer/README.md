@@ -21,14 +21,14 @@ Peer server implementation and networking layer for the [Convex](https://convex.
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-peer</artifactId>
-    <version>0.8.16</version>
+    <version>0.8.17</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-peer:0.8.16'
+implementation 'world.convex:convex-peer:0.8.17'
 ```
 
 ## Usage
@@ -78,6 +78,70 @@ Result result = convex.querySync("(balance #11)");
 `convex.api.Convex` also supports asynchronous queries (`query(...)` returning
 a future) and signed transactions once an address and key pair are set.
 
+### Optional TLS Transport
+
+Unqualified addresses and `tcp://` use native TCP, the default transport.
+`tls://` carries the same binary messages and framing over TLS:
+
+```java
+Convex convex = Convex.connect("tls://peer.example:18889");
+```
+
+When the expected peer key is known, it is the TLS trust anchor:
+
+```java
+ConvexRemote convex = ConvexRemote.connect(
+    URI.create("tls://203.0.113.10:18889"), expectedPeerKey);
+```
+
+The server certificate must be signed directly by that Ed25519 peer key.
+Hostname and IP matching are unnecessary in this mode; expiry, certificate
+usage and cryptographic checks still apply. The TLS handshake proves possession
+of the certificate's private key, which can be separate from the peer signing
+key. Consensus and lattice connection managers select this policy automatically
+when dialling a known peer. A failed key check never falls back to public-CA or
+hostname authentication.
+
+The CLI accepts the same endpoint with `--host tls://peer.example:18889`,
+including as a peer's initial sync source. An explicit `--port` overrides the
+endpoint's port. Advertised peer URLs retain their transport scheme when dialled.
+
+To add a TLS listener alongside a peer's TCP listener, set `peer.tlsPort` in
+the JSON5 configuration:
+
+```json5
+{ peer: { port: 18888, tlsPort: 18889 } }
+```
+
+The programmatic equivalent is `config.put(Config.TLS_PORT, 18889)` before
+`API.launchPeer(config)`. Port `0` requests an available port; retrieve it with
+`server.getTLSPort()`. Omitting `tlsPort` leaves TLS disabled.
+
+The listener uses the JVM's default `SSLContext`. Configure its certificate and
+private key using the `javax.net.ssl.keyStore`, `javax.net.ssl.keyStoreType`
+(e.g. `PKCS12`) and `javax.net.ssl.keyStorePassword` system properties before
+starting the JVM's TLS services. For known-peer connections, this keystore must
+contain a peer-signed certificate and its matching TLS private key. Applications
+can issue the certificate with
+`CertUtils.signPeerCertificate(peerKey, tlsPublicKey, notBefore, notAfter)`;
+the validity bounds are `Instant` values. Issuance and renewal are operator-owned.
+
+Clients without an expected peer key use the JVM's trusted certificate
+authorities, or a private trust store configured with `javax.net.ssl.trustStore`,
+`javax.net.ssl.trustStoreType` and `javax.net.ssl.trustStorePassword`. In this mode
+the certificate must also match the endpoint's hostname or IP address. This
+includes CLI connections specified only with `--host`. TLS failures never fall
+back to TCP.
+
+Applications can instead supply an `SSLContext` with `Config.TLS_CONTEXT` on
+the server or `ConvexRemote.connect(uri, Transports.tls(context))` on the client.
+`Transports.tls(expectedPeerKey)` explicitly selects peer-key authentication.
+TLS does not bypass protocol admission: signed messages and CAD15
+challenge/response verification retain their existing roles.
+
+The small [transport extension point](docs/MESSAGING.md#36-transport-selection-and-tls)
+allows other message transports later. HTTPS is not yet a built-in transport.
+
 ## Architecture
 
 | Component | Description |
@@ -116,12 +180,17 @@ module layers node discovery, social selection and PoP routing on them.
   backpressure to the connection.
 - **Propagators** - Each `LatticePropagator` owns a store and a
   `LatticeFilter` which projects values before they are announced or broadcast,
-  so data outside that group's policy never enters its serving store. Contained
-  failures are available through `getStatus()` and `nextFailure()`.
+  restricting the published view. Inbound acquisition can still populate that
+  store with cells outside the publication filter. Contained failures are
+  available through `getStatus()` and `nextFailure()`.
 - **Inbound policy** - `LatticeListener.setSelector` assigns each inbound
   connection to exactly one propagator, which determines both the query view
   and the store used for acquisition. No default policy is installed: inbound
   lattice traffic is denied until the operator sets one.
+- **Group removal** - Unregister a group from each listener with
+  `unregisterPropagator`, then call `NodeServer.removePropagator` to drain and
+  close it while the node and other groups remain live. Stores stay caller-owned.
+  See [group removal](docs/LATTICE_NETWORKING.md#removing-a-group-while-the-node-runs).
 
 ## Documentation
 

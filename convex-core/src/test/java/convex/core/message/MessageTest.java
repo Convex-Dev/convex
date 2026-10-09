@@ -232,23 +232,6 @@ public class MessageTest {
 	}
 
 	@Test
-	public void testNoveltyCollectorRetainsBoundedTail() {
-		Cells.NoveltyCollector collector=new Cells.NoveltyCollector(700,2);
-		Blob first=Blobs.createRandom(300);
-		Blob middle=Blobs.createRandom(300);
-		Blob last=Blobs.createRandom(300);
-		collector.accept(first.getRef());
-		collector.accept(middle.getRef());
-		collector.accept(last.getRef());
-
-		List<ACell> retained=collector.getCells();
-		assertTrue(retained.size()<=2);
-		assertSame(last,retained.get(retained.size()-1));
-		assertTrue(collector.getEstimatedBytes()<=700);
-		assertTrue(collector.getOmittedCount()>0);
-	}
-	
-	@Test
 	public void testStatusMessage() throws BadFormatException {
 		Message m=Message.createStatusRequest(2);
 		assertEquals(RT.cvm(2),m.getID());
@@ -359,9 +342,10 @@ public class MessageTest {
 		// Received message carries the paired end's connection
 		assertSame(clientEnd.getPaired(), received.get().getConnection());
 
-		// close is a no-op
+		// Closing either end closes the paired in-JVM channel.
 		clientEnd.close();
-		assertFalse(clientEnd.isClosed());
+		assertTrue(clientEnd.isClosed());
+		assertNull(clientEnd.getPaired());
 	}
 
 	@Test public void testLocalConnectionBidirectional() {

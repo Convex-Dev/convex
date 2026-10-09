@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /**
  * Handles the PostgreSQL wire protocol and executes SQL queries.
@@ -20,6 +21,13 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 	private static final Logger log = LoggerFactory.getLogger(PgProtocolHandler.class);
 	private static final AtomicInteger processIdCounter = new AtomicInteger(1000);
+
+	/** Single-quoted literals and double-quoted identifiers, with doubled-quote escapes */
+	private static final Pattern QUOTED = Pattern.compile("'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"");
+
+	/** The ::type casts removed by rewriteQuery, matched as whole type names */
+	private static final Pattern CAST = Pattern.compile(
+		"(?i)::(?:integer|int4|int8|int|bigint|text|varchar|regclass|oid)\\b");
 
 	private final Supplier<Connection> connectionSupplier;
 	private final String requiredPassword;
@@ -256,8 +264,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		// TODO: Remove hack needed to handle PostgreSQL regex operators (!~, ~, ~*, !~*)
 		// Proper fix: Register custom Calcite operators for POSIX regex matching,
 		// or use Calcite Babel parser which has built-in PostgreSQL dialect support
-		if (sql.contains("!~") || sql.contains("~*") ||
-			(sql.contains("~") && !sql.contains("~=") && !sql.contains("~~"))) {
+		if (hasRegexOperator(sql)) {
 			return null; // Return empty result for regex queries
 		}
 
@@ -320,17 +327,28 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		// TODO: Remove hack needed to handle PostgreSQL cast syntax (::type)
 		// Proper fix: Use Calcite Babel parser with PostgreSQL conformance,
 		// which natively supports :: cast syntax
-		sql = sql.replaceAll("::integer", "");
-		sql = sql.replaceAll("::int", "");
-		sql = sql.replaceAll("::int4", "");
-		sql = sql.replaceAll("::int8", "");
-		sql = sql.replaceAll("::bigint", "");
-		sql = sql.replaceAll("::text", "");
-		sql = sql.replaceAll("::varchar", "");
-		sql = sql.replaceAll("::regclass", "");
-		sql = sql.replaceAll("::oid", "");
+		sql = stripCasts(sql);
 
 		return sql;
+	}
+
+	/**
+	 * Tests whether SQL uses a PostgreSQL regex operator (~, ~*, !~, !~*).
+	 * Quoted literals and identifiers are ignored, so a '~' inside a string
+	 * value does not count as an operator.
+	 */
+	static boolean hasRegexOperator(String sql) {
+		String code = QUOTED.matcher(sql).replaceAll("''");
+		return code.contains("!~") || code.contains("~*") ||
+			(code.contains("~") && !code.contains("~=") && !code.contains("~~"));
+	}
+
+	/**
+	 * Strips the supported PostgreSQL ::type casts. Matches whole type names
+	 * only, so ::int does not consume the prefix of ::int4 or ::interval.
+	 */
+	static String stripCasts(String sql) {
+		return CAST.matcher(sql).replaceAll("");
 	}
 
 	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs) throws SQLException {

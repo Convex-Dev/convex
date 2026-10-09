@@ -18,10 +18,12 @@ import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
+import convex.core.data.RefDirect;
 import convex.core.data.RefSoft;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.RefCache;
 import convex.test.Samples;
 
 /**
@@ -193,10 +195,9 @@ public class EtchStatusIntegrityTest {
 		// B's cache must serve only B-bound refs
 		Ref<ACell> fromB = b.refForHash(rootHash);
 		assertNotNull(fromB);
-		if (fromB instanceof RefSoft) {
-			assertSame(b, ((RefSoft<?>) fromB).getStore(),
-					"Store cache poisoned with a foreign-store ref");
-		}
+		assertTrue(fromB instanceof RefSoft, "Stored embedded roots also identify their store");
+		assertSame(b, ((RefSoft<?>) fromB).getStore(),
+				"Store cache poisoned with a foreign-store ref");
 	}
 
 	/**
@@ -224,6 +225,13 @@ public class EtchStatusIntegrityTest {
 			assertSame(b, ((RefSoft<?>) fromB).getStore(),
 					"Store cache poisoned with a foreign-store ref");
 		}
+
+		// Dropping a soft ref's binding must not smuggle its status into B either.
+		b.storeTopRef(fromA.toDirect(), Ref.UNKNOWN, null);
+		Ref<?> cached=b.checkCache(h);
+		assertTrue(cached.isDirect());
+		assertEquals(Ref.UNKNOWN, cached.getStatus());
+		assertNull(b.getEtch().read(h), "A cache-only request must not write the value");
 	}
 
 	/**
@@ -247,6 +255,24 @@ public class EtchStatusIntegrityTest {
 
 		// Defensive throw at the cache boundary
 		assertThrows(IllegalArgumentException.class, () -> b.addToCache(fromA));
+
+		// Every caller, not just EtchStore.addToCache, goes through the same boundary.
+		RefCache cache=RefCache.create(b, 1);
+		Ref<?> direct=nonEmbedded(182).getRef();
+		cache.putCell(direct);
+		assertSame(direct, cache.getCell(direct.getHash()), "Unpersisted refs need no wrapper");
+		assertThrows(IllegalArgumentException.class, () -> cache.putCell(fromA));
+		assertThrows(IllegalArgumentException.class, () -> cache.putCell(fromA.toDirect()));
+		assertThrows(IllegalArgumentException.class, () -> cache.putCell(RefSoft.createForHash(v.getHash(), null)));
+		assertSame(direct, cache.getCell(direct.getHash()), "Rejected insertions must not evict");
+
+		Ref<?> local=b.storeTopRef(fromA, Ref.PERSISTED, null);
+		cache.putCell(local);
+		assertSame(local, cache.getCell(v.getHash()));
+		cache.putCell(RefSoft.createForHash(v.getHash(), b));
+		assertNull(cache.getCell(v.getHash()), "A soft ref without a live value is a cache miss");
+		cache.putCell(RefDirect.NULL_VALUE);
+		assertSame(RefDirect.NULL_VALUE, cache.getCell(Hash.NULL_HASH));
 	}
 
 	// -----------------------------------------------------------------

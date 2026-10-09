@@ -193,9 +193,45 @@ the remaining cleanup steps.
 Failures of the authoritative store are surfaced by `NodeServer`. Listener
 failures are surfaced independently to the application that owns the transport.
 
+### Removing a group while the node runs
+
+Remove a group from every application-owned listener, then remove it from the
+node:
+
+```java
+transport.unregisterPropagator(group); // repeat for each listener serving it
+node.removePropagator(group);
+```
+
+`unregisterPropagator` revokes future assignment to that group and closes its
+already assigned sockets on this listener. The listener, its other connections
+and the group itself remain live. A selector that still returns the unregistered
+group is rejected; update the application's routing policy to select remaining
+groups or deny new connections. Existing sockets are never reassigned.
+
+`removePropagator` removes the group from node notifications and explicit pull
+APIs, drains accepted protocol and publication work, and closes inbound sockets
+and outbound routes. Accepted work may still merge into the node during the
+drain. The node and other groups keep running, and a later node launch does not
+restart the removed group. Outstanding pulls that finish after removal are
+rejected before merge. Both removal methods return `false` when the group
+is already absent. Node removal also works before first launch or after shutdown.
+
+Removal is a blocking lifecycle operation: call it from application management
+code, outside the group's message handlers and publication callbacks. Shutdown
+failures remain isolated and observable through the group's `getStatus()` and
+`nextFailure()` APIs. Caller-owned stores remain open and retain their contents;
+removal does not erase local data or revoke copies already held by remote peers.
+
+Calling `group.close()` directly stops its resources but leaves it attached to
+the node; use `node.removePropagator(group)` for permanent removal from that
+node's lifecycle. Adding groups, registering them with listeners and configuring
+filters still precede first launch/attachment as described above; these removal
+operations do not introduce runtime group creation or subscription negotiation.
+
 ## Naming
 
-- **desired**: retained bounded intent to maintain a route to an identity.
+- **desired**: retained bounded candidate or explicit intent for a route to an identity.
 - **pending**: a manager-owned socket exists but admission is incomplete.
 - **assigned**: application policy selected one group for an inbound socket.
 - **trusted**: a live challenge proved possession of the expected transport key.
@@ -203,6 +239,35 @@ failures are surfaced independently to the application that owns the transport.
   outbound route.
 - **owner-authorised**: signed application data passed lattice validation; this
   is independent of every transport term above.
+
+## Live peer selection
+
+`maxDesiredPeers` bounds candidates (default 256). The independent soft targets
+`ambientPeers` and `activePeers` default to 16 each. Maintenance retains healthy
+ambient incumbents, samples replacements, and prioritises the most recently used
+active peers for two minutes. Explicit `connectPeer`/`addPeer` intent survives
+discovery metadata updates and may exceed these targets until `removePeer`.
+Pending socket opens and identity challenges reserve slots, with at most four
+automatic attempts outstanding. Each attempt runs independently of maintenance.
+
+`markActive` records useful directed traffic. `withPeer` protects an asynchronous
+operation from trimming and can optionally record activity. Application pulls and
+authenticated point-message routes use these hooks; background bootstrap, broadcast
+gossip and PING traffic do not earn priority. Inbound and outbound routes to one key
+count once. Inbound physical sockets remain owned by their listener/endpoint, so
+soft targets are not an aggregate socket limit.
+
+Maintenance runs every second, but normal propagation supplies the heartbeat and
+healthy ambient peers are not periodically rotated. Only two minutes without
+decoded incoming traffic triggers a probe, with a further 30-second grace period.
+Any incoming traffic cancels the liveness check; a late or failed probe request
+cannot evict a peer that has resumed propagation or shorten that grace period.
+New identity challenges use a separate five-second admission deadline.
+Known-closed sockets immediately free a slot for another candidate, independently
+of the failed peer's jittered retry backoff. A probe result is tied to its exact
+route and cannot retire a replacement. Failed inbound routes are retired through
+the owning endpoint, allowing NAT leaves to reconnect. Trimming healthy excess
+routes never closes listener-owned sockets.
 
 ## Extension rule
 

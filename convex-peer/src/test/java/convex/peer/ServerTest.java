@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -29,8 +30,11 @@ import convex.api.ConvexRemote;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.Juice;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
@@ -52,6 +56,7 @@ import convex.core.data.Refs;
 import convex.core.data.SignedData;
 import convex.core.data.AccountKey;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.ResultException;
@@ -540,57 +545,221 @@ public class ServerTest {
 		// Queue more untrusted beliefs than the queue can hold
 		// They should be silently dropped
 		for (int i = 0; i < Config.UNTRUSTED_BELIEF_QUEUE_SIZE + 5; i++) {
-			propagator.queueUntrustedBelief(
+			propagator.queueUntrustedPropagation(
 				convex.core.message.Message.createBelief(server.getBelief()));
 		}
 		// No exception, no blocking — bounded queue works
 	}
 
 	@Test
-	public void testBeliefDeltaUsesBoundedDataAheadMessages() {
+	public void testLargeUpdateIsDataThenRoot() throws Exception {
 		Belief belief=network.SERVER.getBelief();
-		ArrayList<ACell> novelty=new ArrayList<>();
-		for (int i=0; i<6; i++) novelty.add(Blobs.createRandom(600));
 		int limit=Math.max(1024,belief.getEncodingLength()+100);
+		MemoryStore store=new MemoryStore();
 
-		List<Message> messages=BeliefPropagator.createPartialBeliefMessages(
-			belief,novelty,limit);
-
+		// Novelty that does not fit one delta: DATA messages in order, then the root alone
+		UpdateAccumulator update=new UpdateAccumulator(limit,1<<20,belief.getHash());
+		for (int i=0; i<6; i++) update.add(Blobs.createRandom(600));
+		List<Message> messages=update.toMessages(belief);
 		assertTrue(messages.size()>1);
-		for (Message message:messages) assertTrue(message.getMessageData().count()<=limit);
-		for (int i=0; i<messages.size()-1; i++) {
-			assertEquals(MessageType.DATA,messages.get(i).getType());
+		for (Message m: messages) assertTrue(m.getMessageData().count()<=limit);
+		for (int i=0; i<messages.size()-1; i++) assertEquals(MessageType.DATA,messages.get(i).getType());
+		Message root=messages.get(messages.size()-1);
+		assertEquals(MessageType.BELIEF,root.getType());
+		assertEquals(belief,Message.create(root.getMessageData()).getPayload(store));
+		assertEquals(0,update.getOmittedCount());
+
+		// Novelty that fits: one delta carrying it all, decodable without a store
+		UpdateAccumulator small=new UpdateAccumulator(1<<20,1<<20,belief.getHash());
+		for (int i=0; i<6; i++) small.add(Blobs.createRandom(600));
+		List<Message> delta=small.toMessages(belief);
+		assertEquals(1,delta.size());
+		assertEquals(MessageType.BELIEF,delta.get(0).getType());
+		assertTrue(delta.get(0).getMessageData().count()>root.getMessageData().count());
+		assertEquals(belief,Message.create(delta.get(0).getMessageData()).getPayload(new MemoryStore()));
+
+		// Beyond the byte budget nothing more is carried; the root still goes last
+		UpdateAccumulator budgeted=new UpdateAccumulator(limit,700,belief.getHash());
+		for (int i=0; i<6; i++) budgeted.add(Blobs.createRandom(600));
+		List<Message> partial=budgeted.toMessages(belief);
+		assertTrue(budgeted.getOmittedCount()>0);
+		assertEquals(MessageType.BELIEF,partial.get(partial.size()-1).getType());
+	}
+
+	/**
+	 * A SignedData wrapping a branch Order is only 130 bytes and therefore embedded,
+	 * even though the Order it signs is not. The quick own-Order update must still
+	 * carry that signed Order as its top cell, with or without novelty (#706).
+	 */
+	@Test
+	public void testPartialBeliefMessagesEmbeddedSignedOrder() throws Exception {
+		AKeyPair kp=AKeyPair.createSeeded(1337);
+		Order order=Order.create();
+		for (int i=0; (i<64)&&order.isEmbedded(); i++) {
+			SignedData<ATransaction> tx=kp.signData(Invoke.create(Address.create(11),i,"(def c "+i+")"));
+			order=order.append(kp.signData(Block.create(1000+i,List.of(tx))));
 		}
-		assertEquals(MessageType.BELIEF,messages.get(messages.size()-1).getType());
+		assertFalse(order.isEmbedded());
+		SignedData<Order> signed=kp.signData(order);
+		assertTrue(signed.isEmbedded());
+		int limit=Config.DEFAULT_MAX_BELIEF_DELTA_MESSAGE_SIZE;
+		MemoryStore store=new MemoryStore();
 
-		ArrayList<ACell> boundedNovelty=new ArrayList<>();
-		for (int i=0; i<20; i++) boundedNovelty.add(Blobs.createRandom(600));
-		List<Message> bounded=BeliefPropagator.createPartialBeliefMessages(
-			belief,boundedNovelty,limit,2200);
-		assertTrue(bounded.stream().mapToLong(m -> m.getMessageData().count()).sum()<=2200);
+		// With novelty: the Order travels with its signed wrapper as the top cell
+		UpdateAccumulator update=new UpdateAccumulator(limit,limit,signed.getHash());
+		update.add(order);
+		List<Message> messages=update.toMessages(signed);
+		assertEquals(1,messages.size());
+		ACell payload=messages.get(0).getPayload(store);
+		assertEquals(signed,payload);
+		SignedData<Order> received=Belief.extractOrders(payload).iterator().next();
+		assertEquals(order.getBlockCount(),received.getValue().getBlockCount());
+
+		// Without novelty: the message is still the signed Order, never empty
+		Message rebroadcast=new UpdateAccumulator(limit,limit,signed.getHash()).toMessages(signed).get(0);
+		assertTrue(rebroadcast.getMessageData().count()>0);
+		assertEquals(signed,rebroadcast.getPayload(store));
+	}
+
+	/**
+	 * Every transaction must confirm promptly as the peer's own Order crosses the
+	 * embedding boundary, which happens as its block vector grows (#706).
+	 */
+	@Test
+	public void testSequentialTransactionsConfirmPromptly() throws Exception {
+		Convex client=network.getClient();
+		for (int i=0; i<40; i++) {
+			Result r=client.transact("(def c "+i+")").get(3000,TimeUnit.MILLISECONDS);
+			assertFalse(r.isError(),r.toString());
+		}
 	}
 
 	@Test
-	public void testBeliefDeltaMaterialisationConfig() {
-		assertEquals(16 * 1024 * 1024,Config.getBeliefDeltaBroadcastSize(Map.of()));
-		Map<Keyword,Object> configured=Map.of(
-			Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,1024,
-			Config.MAX_BELIEF_DELTA_BROADCAST_SIZE,4096);
-		assertEquals(4096,Config.getBeliefDeltaBroadcastSize(configured));
-		Map<Keyword,Object> invalid=Map.of(
-			Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,4096,
-			Config.MAX_BELIEF_DELTA_BROADCAST_SIZE,1024);
+	public void testBeliefDeltaMessageSizeConfig() {
+		assertEquals(4 * 1024 * 1024,Config.getBeliefDeltaMessageSize(Map.of()));
+		Map<Keyword,Object> configured=Map.of(Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,4096);
+		assertEquals(4096,Config.getBeliefDeltaMessageSize(configured));
+		Map<Keyword,Object> invalid=Map.of(Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,0);
 		assertThrows(IllegalArgumentException.class,
-			() -> Config.getBeliefDeltaBroadcastSize(invalid));
+			() -> Config.getBeliefDeltaMessageSize(invalid));
 	}
 
 	@Test
-	public void testQuickBeliefUpdateIsOwnOrderRootOnly() throws Exception {
-		Message quick=network.SERVER.getBeliefPropagator().createQuickUpdateMessage();
-		assertNotNull(quick);
-		assertEquals(MessageType.BELIEF,quick.getType());
-		assertTrue(quick.getPayload() instanceof SignedData<?>);
-		assertTrue(quick.getMessageData().count()<=Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
+	public void testConsensusUpdateMessages() throws Exception {
+		BeliefPropagator propagator=network.SERVER.getBeliefPropagator();
+		int limit=Config.getBeliefDeltaMessageSize(network.SERVER.getConfig());
+
+		// Inner layer: our own signed Order, ending in a bounded BELIEF message
+		List<Message> order=propagator.createOrderUpdateMessages();
+		assertFalse(order.isEmpty());
+		Message orderRoot=order.get(order.size()-1);
+		assertEquals(MessageType.BELIEF,orderRoot.getType());
+		assertTrue(orderRoot.getPayload() instanceof SignedData<?>);
+		for (Message m: order) assertTrue(m.getMessageData().count()<=limit);
+
+		// Outer layer: the Belief, omitting what the Order announced
+		List<Message> belief=propagator.createBeliefUpdateMessages();
+		assertFalse(belief.isEmpty());
+		Message beliefRoot=belief.get(belief.size()-1);
+		assertEquals(MessageType.BELIEF,beliefRoot.getType());
+		assertTrue(beliefRoot.getPayload() instanceof Belief);
+		for (Message m: belief) assertTrue(m.getMessageData().count()<=limit);
+	}
+
+	/** Complete local Beliefs are retained independently until the bounded queue fills. */
+	@Test
+	public void testAcquiredBeliefQueueIsBoundedFifo() throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config); // not launched: queue is not drained
+		try {
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			assertTrue(propagator.hasBeliefPollCapacity());
+			Belief first=Belief.create(AKeyPair.createSeeded(101),Order.create());
+			Belief second=Belief.create(AKeyPair.createSeeded(102),Order.create());
+			assertTrue(propagator.queueBelief(first));
+			assertTrue(propagator.queueBelief(second));
+			for (int i=2; i<Config.BELIEF_QUEUE_SIZE; i++) {
+				assertTrue(propagator.queueBelief(Belief.initial()));
+			}
+			assertFalse(propagator.queueBelief(Belief.initial()));
+			assertFalse(propagator.hasBeliefPollCapacity());
+		} finally {
+			server.close();
+		}
+	}
+
+	/** Distinct completed polls are accumulated in one merge cycle, never replaced. */
+	@Test
+	public void testAcquiredBeliefsAreMergedTogether() throws Exception {
+		AKeyPair local=AKeyPair.createSeeded(110);
+		AKeyPair remoteA=AKeyPair.createSeeded(111);
+		AKeyPair remoteB=AKeyPair.createSeeded(112);
+		State genesis=Init.createState(List.of(
+			local.getAccountKey(),remoteA.getAccountKey(),remoteB.getAccountKey()));
+		Peer peer=Peer.createGenesisPeer(local,genesis);
+
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config);
+		try {
+			server.getCVMExecutor().setPeer(peer);
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			propagator.belief=peer.getBelief();
+			assertTrue(propagator.queueBelief(Belief.create(remoteA,Order.create())));
+			assertTrue(propagator.queueBelief(Belief.create(remoteB,Order.create())));
+
+			// Runs exactly one normal propagator cycle and returns immediately because
+			// locally acquired Beliefs are already queued.
+			propagator.loop();
+			assertNotNull(propagator.belief.getOrders().get(remoteA.getAccountKey()));
+			assertNotNull(propagator.belief.getOrders().get(remoteB.getAccountKey()));
+		} finally {
+			server.close();
+		}
+	}
+
+	/** Saturated wire propagation is dropped without producing connection backpressure. */
+	@Test
+	public void testTrustedBeliefQueueDropsWithoutBackpressure() throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config); // not launched: queue is not drained
+		try {
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			assertTrue(propagator.hasBeliefPollCapacity());
+			Message belief=Message.createBelief(network.SERVER.getBelief());
+			for (int i=0; i<Config.BELIEF_QUEUE_SIZE; i++) {
+				assertTrue(propagator.queuePropagation(belief));
+			}
+			assertFalse(propagator.queuePropagation(belief));
+			assertFalse(propagator.hasBeliefPollCapacity());
+			assertNull(server.processMessage(belief));
+
+			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024);
+			assertNull(server.processMessage(data));
+		} finally {
+			server.close();
+		}
+	}
+
+	/**
+	 * Transaction size is charged separately from the execution limit. Intake rejects
+	 * it only when the origin cannot cover its mandatory size fee at the current price.
+	 */
+	@Test
+	public void testLargeTransactionAffordabilityPolicy() throws Exception {
+		Convex client=network.getClient();
+		ACell[] parts=new ACell[300];
+		for (int i=0; i<parts.length; i++) parts[i]=Blobs.createRandom(4000);
+		ATransaction tx=Invoke.create(client.getAddress(),0,Vectors.create(parts));
+		assertTrue(Juice.priceTransaction(tx)>convex.core.Constants.MAX_TRANSACTION_JUICE);
+		long fee=Juice.mul(Juice.priceTransaction(tx),network.SERVER.getState().getJuicePrice().longValue());
+		assertNull(TransactionHandler.checkTransactionAffordability(
+			network.SERVER.getState().withBalance(client.getAddress(),fee),tx));
+		Result error=TransactionHandler.checkTransactionAffordability(
+			network.SERVER.getState().withBalance(client.getAddress(),fee-1),tx);
+		assertEquals(ErrorCodes.JUICE,error.getErrorCode());
 	}
 
 	@Test

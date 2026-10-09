@@ -82,10 +82,12 @@ public class PeerConfigTest {
 
 	@Test
 	public void testEtchV3CreationPolicy() {
-		PeerConfig config=PeerConfig.parse("{peer:{etch:{version:3}}}");
+		PeerConfig config=PeerConfig.parse("{peer:{etch:{version:3,refCacheSize:25000,enableL2:false}}}");
 		EtchConfig etch=config.getEtchConfig();
 		assertEquals(EtchConstants.VERSION_3,etch.getVersion());
 		assertEquals(EtchConfig.CipherMode.NONE,etch.getCipherMode());
+		assertEquals(25000,etch.getRefCacheSize());
+		assertFalse(etch.isL2Enabled());
 		assertEquals(etch,config.toLegacy().get(Keywords.ETCH_CONFIG));
 	}
 

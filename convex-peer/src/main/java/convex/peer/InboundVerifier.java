@@ -1,6 +1,8 @@
 package convex.peer;
 
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -51,9 +53,12 @@ class InboundVerifier {
 	 * by {@link #handleResult(Message)} when the client's RESULT arrives.
 	 * Also serves as CAS guard — at most one verification per connection.
 	 */
-	private record PendingVerification(CVMLong id, CompletableFuture<Message> future) {}
+	private record PendingVerification(
+			CVMLong id,CompletableFuture<Message> future,CompletableFuture<Void> stopped) {}
 
 	private final ConcurrentHashMap<AConnection, PendingVerification> active = new ConcurrentHashMap<>();
+	private final Object lifecycleLock=new Object();
+	private volatile boolean closed;
 
 	InboundVerifier(Server server) {
 		this.server = server;
@@ -69,12 +74,15 @@ class InboundVerifier {
 	void maybeStart(AConnection conn) {
 		if (conn.isTrusted()) return;
 		if (!conn.supportsMessage()) return;
-		if (active.containsKey(conn)) return;
+		if (closed || active.containsKey(conn)) return;
 
 		CVMLong id=conn.nextRequestID();
 		CompletableFuture<Message> resultFuture = new CompletableFuture<>();
-		PendingVerification pending=new PendingVerification(id,resultFuture);
-		if (active.putIfAbsent(conn, pending) != null) return;
+		PendingVerification pending=new PendingVerification(
+			id,resultFuture,new CompletableFuture<>());
+		synchronized (lifecycleLock) {
+			if (closed || active.putIfAbsent(conn, pending) != null) return;
+		}
 
 		try { Thread.startVirtualThread(() -> {
 			try {
@@ -117,10 +125,28 @@ class InboundVerifier {
 				log.debug("Inbound verification failed for {}: {}", conn, e.getMessage());
 			} finally {
 				active.remove(conn);
+				pending.stopped().complete(null);
 			}
 		}); } catch (Exception e) {
 			active.remove(conn);
+			pending.stopped().complete(null);
 		}
+	}
+
+	/** Cancels and joins every in-progress verification. Idempotent. */
+	void close() {
+		List<PendingVerification> pending;
+		synchronized (lifecycleLock) {
+			closed=true;
+			pending=new ArrayList<>(active.values());
+		}
+		for (PendingVerification verification : pending) {
+			verification.future().completeExceptionally(
+				new IllegalStateException("Peer server closed"));
+		}
+		CompletableFuture.allOf(pending.stream()
+			.map(PendingVerification::stopped)
+			.toArray(CompletableFuture[]::new)).join();
 	}
 
 	/** Number of connections successfully verified since startup. */

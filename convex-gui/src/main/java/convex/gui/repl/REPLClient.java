@@ -35,6 +35,7 @@ public class REPLClient extends AbstractGUI {
 	public static long maxBlock = 0;
 
 	protected Convex convex=null;
+	private final boolean ownsConnection;
 
 	/**
 	 * Launch the application.
@@ -49,7 +50,7 @@ public class REPLClient extends AbstractGUI {
 		if (convex==null) {
 			System.exit(1);
 		}
-		REPLClient gui=new REPLClient(convex);
+		REPLClient gui=new REPLClient(convex,true);
 		gui.run();
 		gui.waitForClose();
 		System.exit(0);
@@ -64,6 +65,15 @@ public class REPLClient extends AbstractGUI {
 	 * @param convex Convex client instance
 	 */
 	public REPLClient(Convex convex) {
+		this(convex,false);
+	}
+
+	/**
+	 * Creates a terminal with explicit connection ownership.
+	 * @param convex client used by the terminal
+	 * @param ownsConnection true to close the client with this terminal
+	 */
+	public REPLClient(Convex convex,boolean ownsConnection) {
 		super ("Convex Terminal");
 		setLayout(new BorderLayout());
 		replPanel=new REPLPanel(convex);
@@ -77,6 +87,7 @@ public class REPLClient extends AbstractGUI {
 		this.setPreferredSize(new Dimension(800,600));
 		
 		this.convex=convex;
+		this.ownsConnection=ownsConnection;
 	}
 	
 	@Override
@@ -111,6 +122,15 @@ public class REPLClient extends AbstractGUI {
 	public void setupFrame(JFrame frame) {
 		frame.getContentPane().setLayout(new MigLayout());
 		frame.getContentPane().add(this,"dock center");
+	}
+
+	@Override
+	public void close() {
+		try {
+			if (ownsConnection && convex!=null) convex.close();
+		} finally {
+			super.close();
+		}
 	}
 
 

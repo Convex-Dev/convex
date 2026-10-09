@@ -1,11 +1,11 @@
 package convex.peer;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -15,14 +15,11 @@ import org.slf4j.LoggerFactory;
 import convex.core.cpos.Belief;
 import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.Block;
-import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Index;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -81,18 +78,23 @@ public class BeliefPropagator extends AThreadedComponent {
 	 */
 	public static final int BELIEF_BROADCAST_POLL_TIME=1000;
 	
-	/**
-	 * Queue on which Beliefs messages are received from trusted connections
-	 */
-	// TODO: use config if provided
-	private final BoundedMessageQueue beliefQueue = new BoundedMessageQueue(
-		Config.BELIEF_QUEUE_SIZE,Config.BELIEF_QUEUE_BYTE_LIMIT);
+	/** Complete Beliefs acquired into the local store, awaiting merge. */
+	private final ArrayBlockingQueue<Belief> beliefQueue = new ArrayBlockingQueue<>(
+		Config.BELIEF_QUEUE_SIZE);
 
 	/**
-	 * Small bounded queue for Beliefs from unverified inbound connections.
+	 * Ordered DATA and BELIEF messages received from trusted connections. DATA must
+	 * remain ahead of the root that references it until both reach this thread.
+	 */
+	// TODO: use config if provided
+	private final BoundedMessageQueue propagationQueue = new BoundedMessageQueue(
+		Config.BELIEF_QUEUE_SIZE,Config.BELIEF_QUEUE_BYTE_LIMIT,true);
+
+	/**
+	 * Small bounded queue for propagation from unverified inbound connections.
 	 * Best-effort buffering during the brief verification round-trip.
 	 */
-	private final BoundedMessageQueue untrustedBeliefQueue = new BoundedMessageQueue(
+	private final BoundedMessageQueue untrustedPropagationQueue = new BoundedMessageQueue(
 		Config.UNTRUSTED_BELIEF_QUEUE_SIZE,Config.UNTRUSTED_BELIEF_QUEUE_BYTE_LIMIT);
 
 	
@@ -111,9 +113,12 @@ public class BeliefPropagator extends AThreadedComponent {
 	long lastBroadcastTime=0;
 	
 	/**
-	 * Time of last full belief broadcast
+	 * Time of last Belief update broadcast
 	 */
 	long lastFullBroadcastTime=-1;
+
+	/** True if the Belief changed (any Order) since the last Belief update was sent. */
+	private boolean beliefChanged=false;
 	
 	private long beliefBroadcastCount=0L;
 	
@@ -122,34 +127,48 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 	/**
-	 * Queues a Belief Message for processing
-	 * @param beliefMessage Belief Message to queue
-	 * @return True if Belief is queued successfully
+	 * Queues a complete Belief already acquired into this peer's store. This queue is
+	 * count-bounded only: queueing a local value must neither encode it as a wire
+	 * message nor charge again for data already held by the store.
+	 *
+	 * @param acquiredBelief complete locally acquired Belief
+	 * @return true if queued, false if the bounded queue is full
 	 */
-	public boolean queueBelief(Message beliefMessage) {
-		if (log.isTraceEnabled()) {
-			log.trace("Belief queued "+server.getPort()+" : "+beliefMessage.getHash());
-		}
-		return beliefQueue.offer(beliefMessage);
-	}
-
-	boolean queueBeliefBlocking(Message message) {
-		try {
-			return beliefQueue.offer(message,Config.DEFAULT_INTERNAL_TIMEOUT,TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
+	public boolean queueBelief(Belief acquiredBelief) {
+		return beliefQueue.offer(acquiredBelief);
 	}
 
 	/**
-	 * Queues a Belief from an unverified connection on a best-effort basis.
-	 * Silently drops if the small untrusted queue is full.
-	 * @param beliefMessage Belief Message to queue
-	 * @return True if Belief is queued successfully
+	 * Queues an ordered DATA or BELIEF wire message for processing.
+	 *
+	 * @param message propagation message
+	 * @return true if queued, false if the bounded queue is full
 	 */
-	public boolean queueUntrustedBelief(Message beliefMessage) {
-		return untrustedBeliefQueue.offer(beliefMessage);
+	public boolean queuePropagation(Message message) {
+		return propagationQueue.offer(message);
+	}
+
+	/**
+	 * Queues propagation from an unverified connection on a best-effort basis.
+	 * Silently drops if the small untrusted queue is full.
+	 * @param message propagation message
+	 * @return true if queued, false otherwise
+	 */
+	public boolean queueUntrustedPropagation(Message message) {
+		return untrustedPropagationQueue.offer(message);
+	}
+
+	/**
+	 * Tests whether status polling may add another complete Belief without
+	 * competing with a saturated consensus input queue. This is advisory: either
+	 * queue may fill immediately afterwards, in which case the later offer is
+	 * simply dropped.
+	 *
+	 * @return true if both trusted consensus input queues retain capacity
+	 */
+	boolean hasBeliefPollCapacity() {
+		return (beliefQueue.remainingCapacity()>0)
+			&& (propagationQueue.getFillFraction()<1.0);
 	}
 	
 	Belief belief=null;
@@ -207,45 +226,66 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 
 
-	protected boolean maybeBroadcast(boolean updated) throws InterruptedException {
+	/**
+	 * Broadcasts consensus updates in two layers on each peer's ordered queue.
+	 *
+	 * <p>The inner layer is our own signed Order together with everything a receiver
+	 * needs to use it, normally one new Block; it goes out whenever our Order changed,
+	 * and as a small root-only keepalive every {@link #BELIEF_REBROADCAST_DELAY} when
+	 * it did not. It is our consensus vote, so it is built and offered to every peer
+	 * before any relay work starts. The outer layer is the Belief, built only once
+	 * the Order has been offered; its delta omits whatever the Order update announced
+	 * and so carries only the Orders of other peers, and their Blocks the first time
+	 * this peer relays them. It goes out whenever any Order in the Belief changed and
+	 * as a keepalive every {@link #BELIEF_FULL_BROADCAST_DELAY}. Each message is
+	 * offered non-blockingly; a peer whose queue refuses one misses the rest of that
+	 * update and recovers from later propagation.</p>
+	 *
+	 * @param updated true if our own Order changed this loop
+	 * @return true if an update was offered to at least one peer
+	 */
+	protected boolean maybeBroadcast(boolean updated) {
 		long ts=server.getTimestamp();
-		if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
-			lastBroadcastTime=ts;
-			try {
-				boolean fullDue=(lastFullBroadcastTime<0)
-					||(ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY);
-				boolean attempted=false;
-				if (fullDue) {
-					// Publish our own signed Order first. Full Belief announcement and
-					// delta encoding are best-effort work and must not delay our vote.
-					Message ownOrder=createQuickUpdateMessage();
-					if (ownOrder!=null) attempted=server.manager.broadcastPriority(ownOrder)>0;
-					List<Message> messages=createFullUpdateMessages();
-					lastFullBroadcastTime=ts;
-					if (!messages.isEmpty()) {
-						var result=server.manager.broadcastSequence(messages,null);
-						attempted|=result.peers()>0;
-						if (result.dropped()>0) {
-							log.debug("Dropped full Belief delta for {} peer(s); own Order and polling will recover",
-								result.dropped());
-						}
-					}
-				} else {
-					Message ownOrder=createQuickUpdateMessage();
-					if (ownOrder!=null) attempted=server.manager.broadcastPriority(ownOrder)>0;
-				}
-				if (attempted) {
-					beliefBroadcastCount++;
-					return true;
-				}
-				
-			} catch (Exception e) {
-				if (server.isLive()) {
-					log.warn("Error attempting to create broadcast message",e);
-				}
+		boolean orderDue=updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY);
+		boolean beliefDue=beliefChanged||(lastFullBroadcastTime<0)
+			||(ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY);
+		if (!(orderDue||beliefDue)) return false;
+		boolean offered=false;
+		try {
+			// Own Order first: offered to every peer before the Belief is even built
+			if (orderDue) {
+				List<Message> order=createOrderUpdateMessages();
+				lastBroadcastTime=ts;
+				offered|=offerUpdate(order);
+			}
+			// Belief second: relay anything not announced with our own Order
+			if (beliefDue) {
+				List<Message> beliefUpdate=createBeliefUpdateMessages();
+				lastFullBroadcastTime=ts;
+				beliefChanged=false;
+				offered|=offerUpdate(beliefUpdate);
+			}
+		} catch (Exception e) {
+			if (server.isLive()) {
+				log.warn("Error attempting to create broadcast message",e);
 			}
 		}
-		return false;
+		if (offered) beliefBroadcastCount++;
+		return offered;
+	}
+
+	/**
+	 * Offers an update to every peer in order. A peer that refuses one message receives
+	 * no more of that update; later updates and other peers provide recovery.
+	 *
+	 * @param update Messages ending with the update's root
+	 * @return true if at least one peer accepted the complete update
+	 */
+	private boolean offerUpdate(List<Message> update) {
+		int n=update.size();
+		if (n==0) return false;
+		if (n==1) return server.manager.broadcast(update.get(0))>0;
+		return server.manager.broadcastSequence(update)>0;
 	}
 	
 	@Override public void start() {
@@ -277,6 +317,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		SignedData<Block>[] signedBlocks= server.transactionHandler.maybeGenerateBlocks(); 
 		if (signedBlocks!=null) {
 			belief=belief.proposeBlock(server.getKeyPair(),signedBlocks);
+			beliefChanged=true;
 			published=true;
 			
 			if (log.isDebugEnabled()) {
@@ -321,19 +362,21 @@ public class BeliefPropagator extends AThreadedComponent {
 			Order oldOrder=belief.getOrder(key);
 			Order newOrder=newBelief.getOrder(key);
 			
-			boolean beliefChanged=false;
+			boolean ownChanged=false;
 			if (oldOrder==null) {
-				beliefChanged=newOrder!=null;
+				ownChanged=newOrder!=null;
 			} else {
 				if (newOrder==null) {
-					beliefChanged=true; // old order must have been removed
+					ownChanged=true; // old order must have been removed
 				} else {
-					beliefChanged=!newOrder.consensusEquals(oldOrder);
+					ownChanged=!newOrder.consensusEquals(oldOrder);
 				}
 			}
+			// Any change to the Belief, including other peers' Orders, is worth relaying
+			if (newBelief!=belief) beliefChanged=true;
 			belief=newBelief;
 
-			return beliefChanged;
+			return ownChanged;
 		} catch (MissingDataException e) {
 			// Shouldn't happen if beliefs are correctly persisted
 			// e.printStackTrace();
@@ -346,37 +389,49 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 	/**
-	 * Await incoming Belief for all incoming belief merges / potential update. This merges multiple incoming beliefs into a single Belief
-	 * which compacts the number of incoming orders for the upcoming Belief Merge.
+	 * Awaits propagation messages or complete locally acquired Beliefs and accumulates
+	 * all their usable Orders into one Belief for the upcoming merge.
 	 *
-	 * This method blocks for up to AWAIT_BELIEFS_PAUSE (30ms) waiting for remote
-	 * peer beliefs. On a single-peer network no beliefs ever arrive, so this always
-	 * waits the full duration — adding 30ms of latency per loop iteration even when
-	 * transactions are pending in the transactionQueue.
+	 * This method blocks for up to AWAIT_BELIEFS_PAUSE (30ms) waiting for a wire
+	 * propagation event when no acquired Belief is ready. On a single-peer network
+	 * no remote input arrives, so this waits the full duration each iteration.
 	 *
 	 * @return Incoming Belief, or null if nothing arrived within time window
 	 * @throws InterruptedException
 	 */
 	private Belief awaitBelief() throws InterruptedException {
-		ArrayList<Message> beliefMessages=new ArrayList<>();
+		ArrayList<Message> propagationMessages=new ArrayList<>();
+		ArrayList<Belief> acquiredBeliefs=new ArrayList<>();
 
-		// Pause to accumulate incoming beliefs from remote peers before merging.
-		// On a single-peer network this always times out after AWAIT_BELIEFS_PAUSE ms.
-		LoadMonitor.down();
-		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
-		LoadMonitor.up();
-		if (firstEvent==null) return null; // nothing from trusted peers, don't wake up for untrusted alone
+		// A complete local acquisition is ready immediately. Otherwise wait briefly for
+		// one wire event. Recheck the local queue afterwards so an acquisition that
+		// completed concurrently is included in this cycle.
+		Belief acquired=beliefQueue.poll();
+		Message firstEvent=null;
+		if (acquired==null) {
+			LoadMonitor.down();
+			firstEvent=propagationQueue.poll(AWAIT_BELIEFS_PAUSE,TimeUnit.MILLISECONDS);
+			LoadMonitor.up();
+			acquired=beliefQueue.poll();
+		} else {
+			firstEvent=propagationQueue.poll();
+		}
 
-		// Drain all trusted beliefs
-		beliefMessages.add(firstEvent);
-		beliefQueue.drainTo(beliefMessages);
+		if (acquired!=null) acquiredBeliefs.add(acquired);
+		beliefQueue.drainTo(acquiredBeliefs);
+		if (firstEvent!=null) propagationMessages.add(firstEvent);
+		propagationQueue.drainTo(propagationMessages);
+		if (acquiredBeliefs.isEmpty() && propagationMessages.isEmpty()) {
+			return null; // don't wake up for untrusted propagation alone
+		}
 
-		// Peek at one untrusted belief per cycle (non-blocking, never wait)
-		Message untrusted=untrustedBeliefQueue.poll();
-		if (untrusted!=null) beliefMessages.add(untrusted);
+		// Peek at one untrusted message per cycle (non-blocking, never wait)
+		Message untrusted=untrustedPropagationQueue.poll();
+		if (untrusted!=null) propagationMessages.add(untrusted);
 
 		if (log.isDebugEnabled()) {
-			log.debug("Belief Messages received: "+beliefMessages.size());
+			log.debug("Beliefs acquired: {}, propagation messages received: {}",
+				acquiredBeliefs.size(),propagationMessages.size());
 		}
 
 		// Build a Map of current Orders. We compare incoming Orders to this
@@ -384,7 +439,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		HashMap<AccountKey,SignedData<Order>> newOrders=belief.getOrdersHashMap();
 
 		boolean anyOrderChanged=false;
-		for (Message m: beliefMessages) {
+		for (Message m: propagationMessages) {
 			if (m.getType()==MessageType.DATA) {
 				try {
 					server.stageData(m);
@@ -397,6 +452,10 @@ public class BeliefPropagator extends AThreadedComponent {
 				continue;
 			}
 			boolean changed=mergeBeliefMessage(newOrders,m);
+			if (changed) anyOrderChanged=true;
+		}
+		for (Belief b: acquiredBeliefs) {
+			boolean changed=mergeAcquiredBelief(newOrders,b);
 			if (changed) anyOrderChanged=true;
 		}
 		if (!anyOrderChanged) return null;
@@ -413,58 +472,10 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * @return true if there was any updated order Order, false otherwise
 	 */
 	protected boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> orders, Message m) {
-		boolean changed=false;
-		AccountKey myKey=server.getPeerKey();
-		
 		try {
-			// Add to map of new Beliefs received for each Peer
-			beliefReceivedCount++;			
 			try {
 				ACell payload=m.getPayload(getStore());
-				// log.info("Merging Belief message: "+Cells.getHash(payload));
-				Collection<SignedData<Order>> a = Belief.extractOrders(payload);
-				for (SignedData<Order> so:a ) {
-					AccountKey key=so.getAccountKey();
-					try {
-						
-						// Check if this Order could replace existing Order
-						if (Cells.equals(myKey, key)) continue; // skip own order
-						if (orders.containsKey(key)) {
-							Order newOrder=so.getValue();
-							Order oldOrder=orders.get(key).getValue();
-
-
-							boolean replace=BeliefMerge.compareOrders(oldOrder, newOrder);
-							if (!replace) continue;
-						}
-						
-						// TODO: check if Peer key is valid in current state?
-						
-						// Check signature before we accept Order
-						if (!so.checkSignature()) {
-							log.warn("Bad Order signature");
-							server.getConnectionManager().alertBadMessage(m,"Bad Order Signature!!");
-							break;
-						};
-						
-						
-						// Ensure we can persist newly received Order
-						so=Cells.persist(so, server.getStore());
-						observeOrderUpdate(so);
-						orders.put(key, so);
-						changed=true;
-					} catch (MissingDataException e) {
-						// Something missing in received Belief. This is expected for
-						// Partial Belief update messages
-						server.getConnectionManager().alertMissing(m,e,key);
-					} catch (IOException e) {
-						// This is pretty bad, probably we lost the store?
-						// We certainly can't propagate the newly received order
-						// throw new Error(e);
-						log.warn("IO exception trying to merge Order",e);
-						return changed;
-					}
-				}
+				return mergeBeliefValue(orders,payload,m);
 			} catch (MissingDataException e) {
 				log.debug("Missing data in Belief message "+m.getHash());
 				server.getConnectionManager().alertMissing(m,e,null);
@@ -474,7 +485,69 @@ public class BeliefPropagator extends AThreadedComponent {
 		} catch (ClassCastException e) {
 			// Bad message from Peer
 			server.getConnectionManager().alertBadMessage(m,Utils.getClassName(e)+" merging Belief!!");
-		}  
+		}
+		return false;
+	}
+
+	/** Accumulates one completed poll while preserving the complete-value invariant. */
+	private boolean mergeAcquiredBelief(HashMap<AccountKey, SignedData<Order>> orders, Belief acquired) {
+		try {
+			return mergeBeliefValue(orders,acquired,null);
+		} catch (MissingDataException e) {
+			log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
+		} catch (ClassCastException e) {
+			log.warn("Malformed locally acquired Belief: {}",Utils.getClassName(e));
+		}
+		return false;
+	}
+
+	/**
+	 * Validates and accumulates the signed Orders carried by one local value. The
+	 * source message is present only for a partial wire value, allowing missing data
+	 * to be requested from its sender. A polled Belief has no source message because
+	 * acquisition has already completed it in the local store.
+	 */
+	private boolean mergeBeliefValue(HashMap<AccountKey, SignedData<Order>> orders, ACell value, Message source) {
+		boolean changed=false;
+		AccountKey myKey=server.getPeerKey();
+		beliefReceivedCount++;
+		Collection<SignedData<Order>> incoming=Belief.extractOrders(value);
+		for (SignedData<Order> so: incoming) {
+			AccountKey key=so.getAccountKey();
+			try {
+				// Keep the best candidate for every Peer across the whole merge batch.
+				if (Cells.equals(myKey,key)) continue;
+				if (orders.containsKey(key)) {
+					Order newOrder=so.getValue();
+					Order oldOrder=orders.get(key).getValue();
+					if (!BeliefMerge.compareOrders(oldOrder,newOrder)) continue;
+				}
+
+				// TODO: check if Peer key is valid in current state?
+				if (!so.checkSignature()) {
+					if (source!=null) {
+						server.getConnectionManager().alertBadMessage(source,"Bad Order Signature!!");
+					} else {
+						log.warn("Bad Order signature in locally acquired Belief");
+					}
+					break;
+				}
+
+				so=Cells.persist(so,server.getStore());
+				observeOrderUpdate(so);
+				orders.put(key,so);
+				changed=true;
+			} catch (MissingDataException e) {
+				if (source!=null) {
+					server.getConnectionManager().alertMissing(source,e,key);
+				} else {
+					log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
+				}
+			} catch (IOException e) {
+				log.warn("IO exception trying to merge Order",e);
+				return changed;
+			}
+		}
 		return changed;
 	}
 	
@@ -485,141 +558,60 @@ public class BeliefPropagator extends AThreadedComponent {
 		}
 	}
 	
-	protected Message createFullUpdateMessage() throws IOException {
-		List<Message> messages=createFullUpdateMessages();
-		return messages.isEmpty()?null:messages.get(messages.size()-1);
-	}
-
-	/** Creates a bounded DATA-ahead sequence ending in one Belief announcement. */
-	protected List<Message> createFullUpdateMessages() throws IOException {
-		int broadcastLimit=Config.getBeliefDeltaBroadcastSize(server.getConfig());
-		Cells.NoveltyCollector noveltyCollector=new Cells.NoveltyCollector(broadcastLimit);
-
-		// persist the state of the Peer, announcing the new Belief
-		// (ensure we can handle missing data requests etc.)
-		belief=Cells.announce(belief, noveltyCollector, server.getStore());
-		lastFullBroadcastBelief=belief;
-
-		// Include cells already announced through quick own-Order updates: a receiver
-		// whose priority message was superseded would otherwise never see them in any
-		// delta. Sending them once more is idempotent for receivers that did.
-		ArrayList<ACell> cells=new ArrayList<>(quickNovelty);
-		quickNovelty.clear();
-		cells.addAll(noveltyCollector.getCells());
-
-		return createPartialBeliefMessages(belief,cells,
-			Config.getBeliefDeltaMessageSize(server.getConfig()),broadcastLimit);
-	}
-	
-	protected Message createQuickUpdateMessage() throws IOException {
-		return createOwnOrderMessage();
-	}
+	/**
+	 * Maximum encoded bytes materialised for one update: what a peer's queue can
+	 * absorb. Novelty beyond it stays in the store for receivers to pull.
+	 */
+	static final long MAX_UPDATE_BYTES=Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT;
 
 	/**
-	 * Creates the signed own-Order message used for priority consensus participation.
+	 * Creates the own-Order update: our signed Order and everything reachable from it
+	 * that this peer has not yet announced, normally one new Block with its
+	 * transactions. A Block of any size is carried: when the update does not fit one
+	 * delta, DATA messages precede the Order on each peer's ordered queue. Announcing
+	 * here is honest because every message is offered to every peer and never
+	 * superseded.
 	 *
-	 * <p>The message carries the Order's novel cells inline whenever they fit the
-	 * priority message limit, so receivers can merge the Order immediately. Announcing
-	 * here consumes announce-novelty for the whole Order tree — including new Blocks —
-	 * so a root-only message would leave later full broadcasts without that data and
-	 * force receivers onto status polling for every confirmation round (observed as
-	 * multi-second transaction confirmation on otherwise idle networks). When the
-	 * novelty exceeds the priority limit the root-only fallback still applies, and
-	 * full broadcasts plus polling recover as before.</p>
+	 * @return the update's messages, ending with the Order; empty if this peer has no Order yet
 	 */
-	private Message createOwnOrderMessage() throws IOException {
+	protected List<Message> createOrderUpdateMessages() throws IOException {
 		AccountKey key=server.getPeerKey();
 		Index<AccountKey, SignedData<Order>> orders = belief.getOrders();
 		SignedData<Order> order=orders.get(key);
-		if (order==null) return null;
-		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
-		order=Cells.announce(order,novelty,server.getStore());
-		orders=orders.assoc(key,order);
-		belief=belief.withOrders(orders);
-		if (novelty.getOmittedCount()>0) {
-			// More novelty than the quick path can carry: skip eager delivery. The
-			// collected tail still folds into the next full broadcast; polling
-			// recovers anything the collector had to omit.
-			addQuickNovelty(novelty.getCells());
-			return Message.create(MessageType.BELIEF,order,order.getEncoding());
-		}
-		addQuickNovelty(novelty.getCells());
-		List<Message> messages=createPartialBeliefMessages(order,new ArrayList<>(quickNovelty),
-			Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
-		if (messages.size()==1) return messages.get(0);
-		return Message.create(MessageType.BELIEF,order,order.getEncoding());
+		if (order==null) return List.of();
+		UpdateAccumulator update=newUpdate(order);
+		order=Cells.announce(order,update,server.getStore());
+		belief=belief.withOrders(orders.assoc(key,order));
+		return finishUpdate(update,order,"Own Order");
 	}
 
 	/**
-	 * Cells announced through own-Order quick updates since the last full broadcast.
-	 * A priority message can be superseded before it is sent, yet announcing already
-	 * consumed these cells from every later delta — so quick deltas resend the whole
-	 * window and the next full broadcast folds it into its DATA-ahead sequence.
-	 * Bounded: on overflow eager delivery is abandoned and polling recovers.
+	 * Creates the Belief update: the Belief and everything not yet announced. Built
+	 * only once the own-Order update has been offered, so it carries other peers'
+	 * Orders and, the first time this peer relays them, their Blocks, never our own
+	 * Order's novelty. Shaped like the Order update: one delta when it fits, else
+	 * DATA messages then the Belief.
+	 *
+	 * @return the update's messages, ending with the Belief
 	 */
-	private final ArrayDeque<ACell> quickNovelty=new ArrayDeque<>();
-	private static final int QUICK_NOVELTY_CELL_LIMIT=1024;
-
-	private void addQuickNovelty(List<ACell> cells) {
-		for (ACell cell: cells) {
-			quickNovelty.addLast(cell);
-		}
-		while (quickNovelty.size()>QUICK_NOVELTY_CELL_LIMIT) {
-			quickNovelty.removeFirst();
-		}
-	}
-	
-	/** Creates one bounded Belief delta, or DATA-ahead chunks followed by its root. */
-	static List<Message> createPartialBeliefMessages(ACell payload, List<ACell> novelty,
-			int maxMessageLength) {
-		return createPartialBeliefMessages(payload,novelty,maxMessageLength,
-			(int)CPoSConstants.MAX_MESSAGE_LENGTH);
+	protected List<Message> createBeliefUpdateMessages() throws IOException {
+		UpdateAccumulator update=newUpdate(belief);
+		belief=Cells.announce(belief,update,server.getStore());
+		return finishUpdate(update,belief,"Belief");
 	}
 
-	static List<Message> createPartialBeliefMessages(ACell payload, List<ACell> novelty,
-			int maxMessageLength, int maxBroadcastLength) {
-		if (maxBroadcastLength<maxMessageLength
-				|| maxBroadcastLength>CPoSConstants.MAX_MESSAGE_LENGTH) {
-			throw new IllegalArgumentException("Belief broadcast limit must be between "
-				+maxMessageLength+" and "+CPoSConstants.MAX_MESSAGE_LENGTH+": "+maxBroadcastLength);
-		}
-		int n=novelty.size();
-		if (n==0) {
-			//log.warn("No novelty in Belief");
-			novelty.add(payload);
-		} else if (!payload.equals(novelty.get(n-1))) {
-			//log.warn("Last element not Belief out of "+novelty.size());
-			novelty.add(payload);
-		}
-		novelty.removeIf(ACell::isEmbedded);
-		if (!payload.isEmbedded()
-				&& (novelty.isEmpty() || !payload.equals(novelty.get(novelty.size()-1)))) {
-			novelty.add(payload);
-		}
-		if (Format.getDeltaEncodingLength(novelty)<=maxMessageLength) {
-			Blob data=Format.encodeDelta(novelty,maxMessageLength);
-			return List.of(Message.create(MessageType.BELIEF,payload,data));
-		}
-		Message root=Message.create(MessageType.BELIEF,payload,payload.getEncoding());
-		if (root.getMessageData().count()>maxMessageLength) return List.of();
-		try {
-			long dataBudget=maxBroadcastLength-root.getMessageData().count();
-			ArrayList<Message> messages=(dataBudget>0)
-				?new ArrayList<>(Message.createDataMessages(novelty,maxMessageLength,dataBudget))
-				:new ArrayList<>();
-			messages.add(root);
-			return messages;
-		} catch (IllegalArgumentException e) {
-			// The root still lets the receiver detect divergence and pull a branch
-			// that cannot fit within this application's delta chunk limit.
-			return List.of(root);
-		}
+	private UpdateAccumulator newUpdate(ACell root) {
+		int limit=Config.getBeliefDeltaMessageSize(server.getConfig());
+		return new UpdateAccumulator(limit,MAX_UPDATE_BYTES,root.getHash());
 	}
 
-	private Belief lastFullBroadcastBelief;
-
-	public Belief getLastBroadcastBelief() {
-		return lastFullBroadcastBelief;
+	private List<Message> finishUpdate(UpdateAccumulator update, ACell root, String what) {
+		List<Message> messages=update.toMessages(root);
+		if (update.getOmittedCount()>0) {
+			log.debug("{} novelty exceeds the {} byte update budget; {} cell(s) left to pull",
+				what,MAX_UPDATE_BYTES,update.getOmittedCount());
+		}
+		return messages;
 	}
 
 

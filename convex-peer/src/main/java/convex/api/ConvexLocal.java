@@ -41,8 +41,11 @@ public class ConvexLocal extends AConvexConnected {
 		super(address, keyPair);
 		this.server=server;
 		this.preCompile=true;
+		setConnection(createConnection());
+	}
 
-		// Create persistent paired connection to server
+	/** Creates a fresh paired connection to the local server. */
+	private LocalConnection createConnection() {
 		Predicate<Message> clientHandler = m -> { returnMessageHandler.accept(m); return true; };
 		Predicate<Message> serverHandler = m -> {
 			Predicate<Message> retry = server.deliverMessage(m);
@@ -54,7 +57,7 @@ public class ConvexLocal extends AConvexConnected {
 		LocalConnection clientEnd = (keyPair != null)
 			? LocalConnection.createPair(clientHandler, serverHandler)       // bidirectional: supports CHALLENGE
 			: LocalConnection.createReturnable(clientHandler, serverHandler); // return-only: results only
-		setConnection(clientEnd);
+		return clientEnd;
 	}
 
 	public static ConvexLocal create(Server server) {
@@ -73,7 +76,7 @@ public class ConvexLocal extends AConvexConnected {
 
 	@Override
 	public boolean isConnected() {
-		return server.isLive();
+		return server.isLive() && super.isConnected();
 	}
 
 	@Override
@@ -140,7 +143,7 @@ public class ConvexLocal extends AConvexConnected {
 
 	@Override
 	public void close() {
-		// Nothing to close for local connection
+		super.close();
 	}
 
 	@Override
@@ -189,7 +192,9 @@ public class ConvexLocal extends AConvexConnected {
 	}
 
 	@Override
-	public void reconnect()  {
-		// Always connected
+	public synchronized void reconnect()  {
+		if (isConnected()) return;
+		if (!server.isLive()) throw new IllegalStateException("Local peer is not live");
+		setConnection(createConnection());
 	}
 }

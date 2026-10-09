@@ -221,7 +221,7 @@ public class PeerGUI extends AbstractGUI {
 
 		
 		Server first=peerList.firstElement().getLocalServer();
-		ConvexLocal convex=Convex.connect(first);
+		ConvexLocal convex=peerList.firstElement();
 		
 		// Set up observability
 		
@@ -463,14 +463,23 @@ public class PeerGUI extends AbstractGUI {
 	@Override
 	public void close() {
 		updateRunning=false;
+		if (restServer!=null) {
+			restServer.close();
+			restServer=null;
+			REST_PORT=null;
+		}
 		DefaultListModel<ConvexLocal> peerList = getPeerList();
 		int n = peerList.getSize();
 		for (int i = 0; i < n; i++) {
 			Convex p = peerList.getElementAt(i);
 			try {
-				p.getLocalServer().close();
+				Server server=p.getLocalServer();
+				models.remove(server);
+				server.close();
 			} catch (Exception e) {
 				// ignore
+			} finally {
+				p.close();
 			}
 		}
 		super.close();

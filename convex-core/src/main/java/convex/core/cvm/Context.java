@@ -1315,6 +1315,45 @@ public class Context {
 	}
 
 	/**
+	 * Checks whether the current address may control the target account: it is the target
+	 * itself, the target's controller, or is trusted for :control by the target's controller
+	 * acting as a trust monitor. This is the single rule for acting on behalf of another
+	 * account, shared by eval-as and Multi child transactions. A trust monitor call consumes
+	 * juice.
+	 *
+	 * @param target Address of the account to control
+	 * @return Updated Context if control is permitted, or an exceptional Context with a NOBODY
+	 *         error if the target does not exist or a TRUST error if control is denied
+	 */
+	public Context checkControl(Address target) {
+		Address caller=getAddress();
+		AccountStatus as=this.getAccountStatus(target);
+		if (as==null) return withError(ErrorMessages.nobody(target));
+
+		// can always control own address
+		if (caller.equals(target)) return this;
+
+		ACell controller=as.getController();
+		if (controller==null) return withError(ErrorCodes.TRUST,"Cannot control address with nil controller set: "+target);
+
+		// if we are the precisely specified controller, can control
+		if (caller.equals(controller)) return this;
+
+		// need to check trust monitor
+		Address actorAddress=RT.callableAddress(controller);
+		if (actorAddress==null) return withError(ErrorCodes.TRUST,"Cannot control address because controller is not a valid address or scoped actor");
+		AccountStatus actorAccount=this.getAccountStatus(actorAddress);
+		if (actorAccount==null) return withError(ErrorCodes.TRUST,"Cannot control address because controller does not exist: "+controller);
+
+		Context ctx=actorCall(controller,ZERO_OFFER,Symbols.CHECK_TRUSTED_Q,caller,Keywords.CONTROL,target);
+		if (ctx.isExceptional()) {
+			return ctx.withError(ErrorCodes.TRUST,"Failure trying to obtain :control rights");
+		}
+		if (!RT.bool(ctx.getResult())) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+target);
+		return ctx;
+	}
+
+	/**
 	 * Evaluates a form as another Address.
 	 *
 	 * Causes TRUST error if the Address is not controlled by the current address.
@@ -1324,37 +1363,8 @@ public class Context {
 	 */
 	public Context evalAs(Address target, ACell form) {
 		Address caller=getAddress();
-		AccountStatus as=this.getAccountStatus(target);
-		if (as==null) return withError(ErrorMessages.nobody(target));
-
-		// TODO should probably refactor into a checkControl function or similar
-		ACell controller=as.getController();
-		boolean canControl=false;
-		Context ctx=this;
-		if (caller.equals(target)) {
-			// can always control own address
-			canControl=true;
-		} else if (controller==null) {
-			return withError(ErrorCodes.TRUST,"Cannot control address with nil controller set: "+target);
-		} else if (caller.equals(controller)) {
-			// if we are the precisely specified controller, can control
-			canControl=true;
-		}  else {
-			// need to check trust monitor
-			Address actorAddress=RT.callableAddress(controller);
-			if (actorAddress==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller is not a valid address or scoped actor");
-			AccountStatus actorAccount=this.getAccountStatus(actorAddress);
-			if (actorAccount==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller does not exist: "+controller);
-
-			// (call target amount (receive-coin source amount nil))
-			ctx=ctx.actorCall(controller,ZERO_OFFER,Symbols.CHECK_TRUSTED_Q,caller,Keywords.CONTROL,target);
-			if (ctx.isExceptional()) {
-				return ctx.withError(ErrorCodes.TRUST,"Failure trying to obtain :control rights");
-			}
-			canControl=RT.bool(ctx.getResult());
-		}
-
-		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+target);
+		Context ctx=checkControl(target);
+		if (ctx.isExceptional()) return ctx;
 
 		// SECURITY: eval with a context switch
 		final Context exContext=Context.create(ctx.getState(),getTransactionContext(), ctx.juice,juiceLimit, EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),caller, target,ZERO_OFFER,ctx.log,NO_COMPILER_STATE);
@@ -2241,6 +2251,31 @@ public class Context {
 	 */
 	public Context forkWithAddress(Address newAddress) {
 		return create(getState(),newAddress);
+	}
+
+	/**
+	 * Forks this context to execute a child transaction as the given origin account.
+	 *
+	 * Unlike {@link #forkWithAddress(Address)}, the transaction context, juice accounting
+	 * and log are retained, so the child's execution is accounted against the enclosing
+	 * transaction and its log entries are kept. Depth is incremented as for an actor call,
+	 * so nesting is bounded by the depth limit. Local bindings, caller, offer and scope
+	 * are reset as at the start of a transaction.
+	 *
+	 * @param newOrigin Origin address for the child transaction
+	 * @return Forked Context, or an exceptional Context with a :NOBODY error if the account
+	 *         does not exist or a :DEPTH error if the depth limit would be exceeded
+	 */
+	public Context forkWithOrigin(Address newOrigin) {
+		if (newOrigin==null) throw new IllegalArgumentException("Null origin!");
+		int newDepth=depth+1;
+		if (newDepth>Constants.MAX_DEPTH) return withError(ErrorCodes.DEPTH,"Invalid depth: "+newDepth);
+		State state=getState();
+		if (state.getAccount(newOrigin)==null) {
+			return withError(ErrorCodes.NOBODY,"Account does not exist: "+newOrigin);
+		}
+		TransactionContext tctx=getTransactionContext().withOrigin(newOrigin);
+		return create(state,tctx,juice,juiceLimit,EMPTY_BINDINGS,NO_RESULT,newDepth,newOrigin,null,newOrigin,ZERO_OFFER,log,NO_COMPILER_STATE);
 	}
 
 	/**

@@ -21,6 +21,7 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
+import convex.core.cvm.Juice;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
@@ -253,6 +254,12 @@ public class TransactionHandler extends AThreadedComponent {
 					m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
 					continue;
 				}
+				Result affordability=checkTransactionAffordability(
+					server.getPeer().getConsensusState(),sd.getValue());
+				if (affordability!=null) {
+					m.returnResult(affordability);
+					continue;
+				}
 				// Force full persistence of the SignedData cell tree. If any referenced
 				// cell is not present in the store (dangling Ref from a faulty or partial
 				// message) this throws MissingDataException before we queue the tx.
@@ -336,9 +343,12 @@ public class TransactionHandler extends AThreadedComponent {
 					res=Result.error(ErrorCodes.FATAL, "Failed to produce result").withSource(SourceCodes.PEER);
 				}
 
-				boolean reported = m.returnResult(res);
-				if (!reported) {
-					// ignore?
+				// Waits for shared outbound capacity (backpressure on state updates is
+				// preferable to losing results); refused only if this client's connection
+				// is closed or its reader is not draining, which is normal operation.
+				boolean reported = m.returnResultBlocking(res);
+				if (!reported && log.isDebugEnabled()) {
+					log.debug("Dropped transaction result for connection {}", m.getConnection());
 				}
 				observeTransactionResponse(t,res);
 				interests.remove(h);
@@ -397,20 +407,21 @@ public class TransactionHandler extends AThreadedComponent {
 		if (ntrans==0) return null;
 
 		try {
-			
+			// Blocks are bounded by transaction count only. Their size is the messaging
+			// layer's concern: an Order update of any size is carried in bounded messages.
 			int maxBlockSize=Constants.MAX_TRANSACTIONS_PER_BLOCK;
 			int nblocks=((ntrans-1)/maxBlockSize)+1;
-			
+
 			@SuppressWarnings("unchecked")
 			SignedData<Block>[] signedBlocks=new SignedData[nblocks];
-		
+
 			for (int i=0; i<nblocks; i++) {
 				int start=i*maxBlockSize;
 				int end=Math.min(ntrans, (i+1)*maxBlockSize);
 				Block block = Block.create(timestamp, newTransactions.subList(start, end));
 				SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
 				signedBlock=Cells.persist(signedBlock, server.getStore());
-				signedBlocks[i]=signedBlock;		
+				signedBlocks[i]=signedBlock;
 			}
 			newTransactions.clear();
 			lastBlockPublishedTime=timestamp;
@@ -438,8 +449,31 @@ public class TransactionHandler extends AThreadedComponent {
 		}
 	}
 
+	/**
+	 * Applies the peer's intake policy for the mandatory transaction-size fee. This
+	 * is deliberately not a consensus validity check: the execution allowance has
+	 * its own limit, while a sufficiently funded account may pay a larger size fee.
+	 *
+	 * @param state current consensus state used for intake policy
+	 * @param tx transaction to assess
+	 * @return a peer-sourced error when the origin cannot cover the fee, otherwise null
+	 */
+	static Result checkTransactionAffordability(State state, ATransaction tx) {
+		AccountStatus account=state.getAccount(tx.getOrigin());
+		if (account==null) {
+			return Result.error(ErrorCodes.NOBODY,Strings.NO_SUCH_ACCOUNT).withSource(SourceCodes.PEER);
+		}
+		long sizeFee=Juice.mul(Juice.priceTransaction(tx),state.getJuicePrice().longValue());
+		if (sizeFee>account.getBalance()) {
+			return Result.error(ErrorCodes.JUICE,
+				Strings.create("Insufficient balance for transaction size fee of "+sizeFee))
+				.withSource(SourceCodes.PEER);
+		}
+		return null;
+	}
+
 	Long minBlockTime=null;
-	
+
 	/** 
 	 * Get the minimum time between proposing blocks. Default 10ms. 
 	 * @return

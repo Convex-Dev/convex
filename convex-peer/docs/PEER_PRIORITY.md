@@ -148,7 +148,7 @@ checks this early to avoid spawning virtual threads for return-only connections.
 
 | Component | Status |
 |-----------|--------|
-| `BeliefPropagator.untrustedBeliefQueue` | Small bounded queue (10), non-blocking poll |
+| `BeliefPropagator.untrustedPropagationQueue` | Small bounded queue (10), non-blocking poll |
 | `Server.processBelief()` | Routes by `conn.isTrusted()` — trusted→main, untrusted→low-priority |
 | `InboundVerifier.maybeStart()` | CAS-guarded, virtual thread, sends CHALLENGE |
 | `InboundVerifier.handleResult()` | Routes inbound RESULT to pending verification |
@@ -158,12 +158,12 @@ checks this early to avoid spawning virtual threads for return-only connections.
 ### Flow
 
 1. **Untrusted belief arrives** → `Server.processBelief()` checks `conn.isTrusted()`
-2. **Untrusted** → `propagator.queueUntrustedBelief(m)` (best-effort, bounded queue)
+2. **Untrusted** → `propagator.queueUntrustedPropagation(m)` (best-effort, bounded queue)
 3. **Trigger verification** → `InboundVerifier.maybeStart(conn)` (no-op if already in progress)
 4. **Virtual thread** sends CHALLENGE on `conn`, client auto-responds via `respondToChallenge()`
 5. **Client RESULT** routed through `Server.processMessage()` → `InboundVerifier.handleResult()`
-6. **Verification succeeds** → `conn.setTrustedKey(remoteKey)`, subsequent beliefs go to main queue
-7. **awaitBelief()** drains main queue first, then polls one untrusted belief per cycle (non-blocking)
+6. **Verification succeeds** → `conn.setTrustedKey(remoteKey)`, subsequent beliefs go to the trusted propagation queue
+7. **awaitBelief()** drains trusted propagation and acquired Beliefs, then polls one untrusted belief per cycle (non-blocking)
 
 ### Fast Path Guarantees
 
@@ -174,13 +174,7 @@ checks this early to avoid spawning virtual threads for return-only connections.
 
 ## Remaining Work
 
-### Phase 3: Backpressure Integration
-
-1. Restrict `setAutoRead(false)` to connections where `!isTrusted()`
-2. Verify trusted (outbound peer) connections are never paused
-3. Inbound verified connections: Beliefs exempt from backpressure,
-   other traffic (transactions, queries) still subject to it
-4. Validate verified peer key against consensus state (minimum stake)
+- Validate a verified peer key against consensus state and minimum stake.
 
 ## Summary
 
@@ -188,7 +182,7 @@ checks this early to avoid spawning virtual threads for return-only connections.
 |--------|--------|
 | Outbound trust | `verifyPeer()` sets `verifiedPeer` + `AConnection.trustedKey` — **implemented** |
 | Inbound trust | Server-initiated challenge on first untrusted belief — **implemented** |
-| Belief priority | Trusted → main queue; untrusted → small bounded queue (1 per cycle) — **implemented** |
+| Belief priority | Trusted → propagation queue; untrusted → small bounded queue (1 per cycle) — **implemented** |
 | Backpressure | Applied to all inbound connections for non-Belief traffic |
 | Message routing | `Message` carries `AConnection`; paired `LocalConnection` for in-JVM — see [MESSAGING.md](MESSAGING.md) |
 | Security invariant | Untrusted clients **never** block Belief propagation — **implemented** |

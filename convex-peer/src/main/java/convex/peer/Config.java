@@ -38,6 +38,12 @@ public class Config {
 	 * serialisable {@code peer.etch} creation policy.
 	 */
 	public static final Keyword ETCH_KEY_RESOLVER=Keyword.intern("etch-key-resolver");
+
+	/** Optional additional native-protocol TLS listener; TCP remains on :port. */
+	public static final Keyword TLS_PORT=Keyword.intern("tls-port");
+
+	/** Optional javax.net.ssl.SSLContext for the TLS listener; defaults to the JVM context. */
+	public static final Keyword TLS_CONTEXT=Keyword.intern("tls-context");
 	
 	/**
 	 * Size of default server socket receive buffer
@@ -129,11 +135,17 @@ public class Config {
 	public static final long DEFAULT_INTERNAL_TIMEOUT = 8000;
 
 	/**
-	 * Size of incoming Belief queue
+	 * Entry bound for each trusted consensus input queue: complete acquired Beliefs
+	 * and ordered DATA/BELIEF propagation messages.
 	 */
 	public static final int BELIEF_QUEUE_SIZE = 200;
 
-	/** Maximum encoded bytes retained by the trusted Belief/DATA queue. */
+	/**
+	 * Encoded-byte threshold for the trusted wire propagation queue. The last admitted
+	 * message may exceed it, so every legal frame can enter an otherwise available
+	 * trusted queue. Further propagation is dropped until the queue falls below the
+	 * threshold.
+	 */
 	public static final int BELIEF_QUEUE_BYTE_LIMIT = 16 * 1024 * 1024;
 
 	/**
@@ -158,24 +170,45 @@ public class Config {
 	 */
 	public static final int OUTBOUND_QUEUE_SIZE = 128;
 
-	/** Maximum ordinary encoded bytes queued per outbound Peer connection. */
+	/** Maximum encoded bytes queued per outbound client connection. */
 	public static final int OUTBOUND_QUEUE_BYTE_LIMIT = 16 * 1024 * 1024;
 
-	/** A coalesced priority message must remain a small consensus/control root. */
-	public static final int PRIORITY_OUTBOUND_MESSAGE_LIMIT = 64 * 1024;
+	/**
+	 * Maximum messages queued for one outbound connection to a Peer. Far larger
+	 * than the client bound: a lagging peer is buffered for, not dropped, until
+	 * this much is waiting for it alone.
+	 */
+	public static final int PEER_OUTBOUND_QUEUE_SIZE = 65536;
+
+	/**
+	 * Maximum encoded bytes queued for one outbound connection to a Peer, and the
+	 * pending allowance for replies to a verified Peer that connected inbound. The
+	 * last message admitted may take a queue over this bound. Encoded messages are
+	 * shared between peers, so many lagging peers cost about one such buffer.
+	 */
+	public static final long PEER_OUTBOUND_QUEUE_BYTE_LIMIT = 256L * 1024 * 1024;
+
+	/**
+	 * Maximum encoded bytes of replies held in a server's shared outbound queue,
+	 * not yet handed to Netty. One shared bound absorbs bursts of results across
+	 * all inbound connections; bytes leave it as soon as the writer hands them
+	 * to the transport, so no single connection can pin it.
+	 */
+	public static final int SERVER_OUTBOUND_QUEUE_BYTE_LIMIT = 64 * 1024 * 1024;
+
+	/**
+	 * Bytes handed to Netty for one inbound connection but not yet written, beyond
+	 * which that connection's further replies are refused. Bounds the memory a
+	 * reader that stops draining its socket can pin to roughly this much plus one
+	 * message, without affecting any other connection.
+	 */
+	public static final int SERVER_CONNECTION_PENDING_BYTE_LIMIT = 1024 * 1024;
 
 	/** Peer configuration key for the maximum encoded belief delta chunk size. */
 	public static final Keyword MAX_BELIEF_DELTA_MESSAGE_SIZE = Keyword.intern("max-belief-delta-message-size");
 
-	/** Default belief delta chunk size. Large beliefs are sent as DATA-ahead batches. */
+	/** Default belief delta message size. */
 	public static final int DEFAULT_MAX_BELIEF_DELTA_MESSAGE_SIZE = 4 * 1024 * 1024;
-
-	/** Peer configuration key for total eager Belief delta materialisation. */
-	public static final Keyword MAX_BELIEF_DELTA_BROADCAST_SIZE =
-		Keyword.intern("max-belief-delta-broadcast-size");
-
-	/** Default eager Belief delta working set. */
-	public static final int DEFAULT_MAX_BELIEF_DELTA_BROADCAST_SIZE = 16 * 1024 * 1024;
 
 	/** Gets and validates the application-specific belief delta chunk limit. */
 	public static int getBeliefDeltaMessageSize(Map<Keyword, Object> config) {
@@ -187,21 +220,6 @@ public class Config {
 			throw new IllegalArgumentException(MAX_BELIEF_DELTA_MESSAGE_SIZE
 				+" must be between 1 and "+convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH
 				+": "+value);
-		}
-		return value;
-	}
-
-	/** Gets and validates the total encoded-byte budget for one Belief broadcast. */
-	public static int getBeliefDeltaBroadcastSize(Map<Keyword, Object> config) {
-		int messageLimit=getBeliefDeltaMessageSize(config);
-		Object configured=config.get(MAX_BELIEF_DELTA_BROADCAST_SIZE);
-		int defaultValue=Math.max(messageLimit,DEFAULT_MAX_BELIEF_DELTA_BROADCAST_SIZE);
-		defaultValue=(int)Math.min(defaultValue,convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
-		int value=(configured==null)?defaultValue:Utils.toInt(configured);
-		if (value<messageLimit || value>convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH) {
-			throw new IllegalArgumentException(MAX_BELIEF_DELTA_BROADCAST_SIZE
-				+" must be between "+messageLimit+" and "
-				+convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH+": "+value);
 		}
 		return value;
 	}

@@ -22,7 +22,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.CacheStats;
 import convex.etch.Etch;
 import convex.etch.EtchStore;
-import convex.etch.EtchUtils;
+import convex.etch.EtchVerifier;
 
 /**
  * Runnable example: a full online Etch GC cycle under concurrent load.
@@ -248,7 +248,7 @@ public class EtchGCExample {
 		// ----- Final verification: throws on the first failed condition -----
 
 		// 1: the new file ALONE contains the complete root tree
-		List<Hash> missing = EtchUtils.verify(newStore.getEtch(), newStore.getRootHash());
+		List<Hash> missing = EtchVerifier.findMissing(newStore.getEtch(), newStore.getRootHash());
 		check(missing.isEmpty(), "completeness - new file alone holds the root tree ("
 				+ missing.size() + " missing)");
 
@@ -303,7 +303,7 @@ public class EtchGCExample {
 		log(String.format("SPACE: quiescent GC %,d bytes -> %,d bytes (%.2f%% reclaimed: live set only)",
 				busyLen, finalLen, 100.0 * (busyLen - finalLen) / busyLen));
 
-		check(EtchUtils.verify(finalStore.getEtch(), finalStore.getRootHash()).isEmpty(),
+		check(EtchVerifier.findMissing(finalStore.getEtch(), finalStore.getRootHash()).isEmpty(),
 				"final store completeness (new file only)");
 		check(expected.equals(finalStore.getRootData()),
 				"final store root equals in-memory model");

@@ -157,14 +157,14 @@ up with the option to switch it off.
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-p2p</artifactId>
-    <version>0.8.16</version>
+    <version>0.8.17</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-p2p:0.8.16'
+implementation 'world.convex:convex-p2p:0.8.17'
 ```
 
 ## Usage
@@ -298,6 +298,32 @@ Or run a node standalone:
 ```bash
 java -cp convex.jar convex.p2p.P2PNode [etch-file]
 ```
+
+## Live peer selection
+
+The desired-peer list is a candidate pool (`maxDesiredPeers`, default 256), not
+a target number of concurrent connections. Each propagation group normally keeps
+16 ambient peers plus up to 16 recently active communicators. Configure the soft
+targets with `LatticePropagatorConfig.AMBIENT_PEERS` (`ambientPeers`) and
+`ACTIVE_PEERS` (`activePeers`); either may be zero.
+
+Healthy ambient routes stay stable and vacant slots sample eligible candidates.
+Directed point messages and application-requested pulls earn two minutes of active
+retention; gossip, bootstrap and keepalives do not. Explicit `connect`/`addPeer`
+requests remain preferred until removed and may exceed the targets. Outstanding
+requests are protected from trimming. Authenticated inbound routes count as existing
+connectivity, without imposing a new physical-socket cap on NAT return paths.
+
+Maintenance checks every second, but normal incoming propagation acts as the
+heartbeat: healthy ambient peers have no scheduled rotation. Only after two minutes
+without decoded incoming traffic does it send a correlated PING, allowing a further
+30 seconds of silence before retiring the route. Any incoming traffic cancels the
+liveness check, even if the PING reply is late or the request itself times out early.
+Known-closed routes release their slots immediately; their own retries back off while
+other candidates fill the vacancies. Automatic socket opening and identity admission
+together are limited to four concurrent attempts; new identity challenges retain a
+separate five-second deadline. Physical inbound sockets that remain silent are
+retired by their owning endpoint so an outbound-only node can reconnect.
 
 ## Security
 

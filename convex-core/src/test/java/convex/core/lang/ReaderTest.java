@@ -259,6 +259,15 @@ public class ReaderTest {
 	}
 
 	@Test
+	public void testPartialCAD3Literal() {
+		// A vector referring to absent data is not a complete readable literal.
+		String source="#[800120"+"00".repeat(32)+"]";
+		assertParseException(()->Reader.read(source));
+		assertParseException(()->Reader.readSyntax(source));
+		assertParseException(()->Reader.readAll("["+source+"]"));
+	}
+
+	@Test
 	public void testNumbers() {
 		assertCVMEquals(1L, Reader.read("1"));
 		assertCVMEquals(2.0, Reader.read("2.0"));

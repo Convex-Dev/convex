@@ -5,6 +5,148 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.17] - 2026-10-09
+
+### Added
+
+- `EtchStore.exportCheckpoint` exports an explicit root from a live store into
+  an independent, closed checkpoint while writes and GC continue. A separate
+  `EtchVerifier.verifyPersisted` function lets callers check completeness and
+  persistence status.
+  Exports preserve per-entry announcement status and support partial destination
+  configuration overrides and rekeying. Publication requires hard-link support
+  on the destination filesystem; the source may be on another filesystem.
+- Etch configuration maps support per-store `refCacheSize` and `enableL2` options,
+  with defaults of 10,000 L1 slots and L2 enabled. Resolved settings are available
+  through `EtchConfig.getMap()` and `EtchStore.getConfig()` and survive GC cutover.
+- Lattice nodes can remove and shut down individual propagation groups while
+  other groups remain live. Shared listeners can unregister a group and close
+  only its assigned connections; caller-owned stores remain open.
+- `etch gc --backup <file>` combines collection with retaining a pre-GC snapshot,
+  keeping the live store path unchanged. The snapshot uses a hard link and must
+  be a new filename on the same filesystem.
+- Optional TLS peer transport, with a separate TLS listener, `tls://` endpoints
+  for clients and peer discovery, and an injectable message transport factory.
+  Known peers authenticate certificates signed by their expected peer key,
+  independently of hostname or IP; clients without a peer key use standard PKI.
+  Native TCP remains the default; signed peer verification is unchanged.
+
+### Changed
+
+- Etch verification is consolidated in `EtchVerifier`, including the former
+  `EtchStrictValidator` API. `EtchUtils.verify` and `FullValidator` remain as
+  deprecated delegates. Checkpoint export and verification are independent.
+- Multi child transactions for another account use the same control rule as
+  `eval-as`: the signer must be the account's controller, resolved through a
+  trust monitor when the controller is a scoped actor. Previously only an exact
+  controller address was accepted.
+- Lattice nodes keep a soft target of 16 ambient peers plus 16 recently active
+  communicators from their desired-peer pool. Explicit connections may exceed
+  the targets. Directed traffic earns retention; normal propagation keeps routes
+  live, with probes only after two minutes of silence and a 30-second grace period.
+  Bounded concurrent dialling avoids blocking peer maintenance.
+- Consensus propagation offers the peer's own Order before the Belief carrying
+  other peers' Orders. An update that does not fit one message goes out as DATA
+  messages of at most the message limit each, followed by its root, so a Block
+  of any size is carried without one oversized frame. Every offer is
+  non-blocking; if a slow peer refuses one message, the rest of that update is
+  abandoned for that peer and later or cross-peer propagation recovers it. The
+  priority slot, resend window and queue fallback are removed. The
+  `:max-belief-delta-broadcast-size` peer configuration key is removed.
+- Peer: messages for a lagging peer are buffered per connection up to 256 MB,
+  the last message admitted may exceed it, before anything is dropped, and
+  then only for that peer. Replies to a verified peer that connected inbound
+  get the same allowance. Client connections keep the 16 MB bound. Encoded
+  messages are shared between peers, so many lagging peers cost about one
+  such buffer.
+
+### Fixed
+
+- CAD3 decoding preserves unresolved children of generic coded values and
+  records sharing the Order tag, allowing complete multi-cell messages to
+  resolve their children before use. Partial CAD3 reader literals now report
+  a parse error.
+- Etch GC keeps writes and root updates through older open handles in the current
+  generation across successive collections. Legacy reads remain valid until their
+  handle closes, retaining intermediate files while older handles need them.
+- Etch cache promotion no longer adopts another store's reference or persistence
+  status, which could cause a persist request to return without writing locally.
+- Etch GC preserves an explicitly disabled L2 cache in the collected store.
+- Etch GC preserves each retained entry's announcement status when live writes
+  copy a subtree before the sweep, avoiding status loss through subtree pruning.
+- Deeply nested data no longer fails memory accounting with a Java stack
+  overflow, allowing oversized Multi nesting to reach the existing `:DEPTH`
+  check. Ordinary calculations retain the allocation-free recursive traversal.
+- Etch GC rejects missing roots and independently verifies the target before
+  cutover. Encrypted in-place collection preserves key configuration during
+  recovery. GC metadata is atomically replaced, and ambiguous recovery without
+  a live store fails instead of opening an empty replacement.
+- NIO clients correctly match replies to requests when result encodings start
+  at a non-zero buffer offset, avoiding spurious decoding errors and timeouts.
+- Multi transactions keep the log entries of every child and account execution
+  juice across all children against the enclosing transaction. Each child
+  previously started from a fresh context, so only the last child's log and
+  juice survived and children ran outside the enclosing block's transaction
+  context.
+- Each level of Multi transaction nesting now counts against the execution
+  depth limit, so a nested child beyond the limit fails with a `:DEPTH` error.
+  Nesting was previously unbounded and a deeply nested Multi overflowed the
+  stack during block application.
+- Lattice nodes preserve local edits on timestamp ties when values return through
+  propagation groups or are restored at launch. Explicit snapshot persistence
+  now merges with current state and installs store-backed references instead of
+  allowing an older snapshot to replace the retained root.
+- Peer: the transaction-size intake policy now rejects a transaction only when
+  its origin account cannot cover the mandatory size fee at the current Juice
+  price. Size fees are separate from the maximum execution allowance and may
+  legitimately exceed it for a sufficiently funded account.
+- Peer: the trusted consensus queue admits one message over its byte threshold,
+  so any legal frame can enter when capacity is available. BELIEF and DATA
+  propagation is dropped when this queue is already full instead of pausing the
+  connection and blocking later status or recovery traffic.
+- Peer: status polling now queues each fully acquired Belief directly in a
+  bounded local FIFO. It no longer wraps the value in a wire message, which
+  attempted to encode an entire large Belief into one 50 MB frame, and distinct
+  polled Beliefs are retained until the propagator compares their signed Orders.
+  Polling is periodic rather than being triggered by an old consensus timestamp,
+  skips acquisition for an unchanged hash or saturated consensus input, and
+  retires a connection only after a minute of persistent STATUS timeouts.
+- `ConvexDirect`: `message`, `messageRaw`, `acquire` and `requestStatus` returned
+  null, so a direct client could only query and transact, and anything sent to
+  it through the message API was silently lost. It now handles every protocol
+  message type synchronously against its in-memory Peer, including Belief
+  merges, data requests and status, and `close` actually disconnects it.
+- Consensus: a Block whose novelty exceeded the former 64 KB message limit was
+  announced to other peers as a root-only update, so they could not decode it
+  until the 2 s status poll. Any burst of more than a few hundred transactions
+  therefore cost about 2 s per Block. Such updates now go out as a DATA-ahead
+  sequence on the ordinary queue, and the resend window can no longer truncate a
+  large Block's cells.
+- Messaging: a DATA message carrying more than 16 cells was undecodable by the
+  receiver, because the Vector holding the cells became a tree whose chunk
+  leaves were not in the message. DATA-ahead chunks were silently dropped as
+  unrecognised messages. The chunk leaves now travel with the message.
+- Peer server: replies to client connections were dropped whenever a
+  connection's Netty write buffer was momentarily full, so a client submitting
+  thousands of transactions over one connection saw bursts of `:TIMEOUT`
+  results and 20 s stalls. Replies now go through one server-wide queue bounded
+  by the bytes it holds (64 MB), drained by a single writer, so bursts are
+  absorbed instead of lost. When that bound is full, transaction and query
+  results wait for space (backpressure on the reporting thread) rather than
+  being dropped; replies to trusted peers are served first and never wait. A
+  connection that stops reading can pin at most 1 MB of unwritten replies and
+  then loses only its own, logged at debug.
+- Consensus: a peer's quick own-Order update was sent without its signed Order
+  whenever that signed Order was small enough to be embedded, which happens
+  periodically as the Block vector grows. Other peers then only learned of the
+  proposal from the 2 s status poll, stalling roughly one transaction in fifteen
+  for 5-7 s on local networks (#706).
+- Convex DB: the PostgreSQL server mangled `::int4`, `::int8` and any other cast
+  whose type name begins with `int`, leaving the rest of the name in the query
+  (`id::int4` became `id4`). Supported casts are now matched as whole type
+  names, in any case. A `~` inside a string literal or quoted identifier no
+  longer makes the whole query return an empty result.
+
 ## [0.8.16] - 2026-09-02
 
 ### Added

@@ -60,6 +60,7 @@ public class PeerConfig {
 	// ========== Peer config keys ==========
 
 	public static final AString PORT = Strings.intern("port");
+	public static final AString TLS_PORT = Strings.intern("tlsPort");
 	public static final AString KEYPAIR = Strings.intern("keypair");
 	public static final AString STORE = Strings.intern("store");
 	public static final AString ETCH = Strings.intern("etch");
@@ -164,8 +165,9 @@ public class PeerConfig {
 	}
 
 	/**
-	 * Compiles the optional Etch creation policy. The resulting value is immutable
-	 * and existing files continue to derive their format from their own headers.
+	 * Compiles the optional Etch file and runtime cache configuration. The result
+	 * is immutable; existing files derive their format from their own headers,
+	 * while caller-supplied cache and chain settings still apply.
 	 *
 	 * @return compiled Etch configuration, or {@code null} when omitted
 	 */
@@ -174,7 +176,7 @@ public class PeerConfig {
 	}
 
 	/**
-	 * Compiles the optional Etch creation policy with a runtime key resolver.
+	 * Compiles the optional Etch configuration with a runtime key resolver.
 	 * The resolver is invoked only for encrypted v3 creation or opening.
 	 *
 	 * @param keyFunction function resolving the header public-key hint
@@ -297,6 +299,14 @@ public class PeerConfig {
 		// Peer section
 		AMap<AString, ACell> peer = getSection(PEER);
 		mapLong(peer, PORT, legacy, Keywords.PORT);
+		ACell tlsPort=peer.get(TLS_PORT);
+		if (tlsPort!=null) {
+			CVMLong port=RT.ensureLong(tlsPort);
+			if (port==null || port.longValue()<0 || port.longValue()>65535) {
+				throw new IllegalArgumentException("peer.tlsPort must be between 0 and 65535");
+			}
+			legacy.put(Config.TLS_PORT,(int)port.longValue());
+		}
 		mapString(peer, URL, legacy, Keywords.URL);
 		mapString(peer, STORE, legacy, Keywords.STORE);
 		mapString(peer, SOURCE, legacy, Keywords.SOURCE);

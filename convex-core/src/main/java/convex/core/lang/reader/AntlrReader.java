@@ -41,6 +41,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ParseException;
+import convex.core.exceptions.PartialMessageException;
 import convex.core.lang.RT;
 import convex.core.lang.reader.antlr.ConvexBaseListener;
 import convex.core.lang.reader.antlr.ConvexLexer;
@@ -326,7 +327,7 @@ public class AntlrReader {
 			try {
 				ACell cell=encoder.decodeMultiCell(enc);
 				push (cell);
-			} catch (BadFormatException e) {
+			} catch (BadFormatException | PartialMessageException e) {
 				throw parseError(ctx,"invalid CAD3 encoding: "+e.getMessage());
 			}
 		}

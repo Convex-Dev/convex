@@ -3,6 +3,7 @@ package convex.lib;
 import static convex.test.Assertions.assertArgumentError;
 import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,6 +16,7 @@ import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 
@@ -66,6 +68,13 @@ public class TrustActorTest extends ACVMTest {
 		// rule
 		assertTrue(evalB(ctx,"(trust/trusted? (mon/rule (fn [s a o] true)) #3)"));
 		assertFalse(evalB(ctx,"(trust/trusted? (mon/rule (fn [s a o] false)) #3)"));
+
+		// Composed SPI calls retain truthiness and the public result is a literal boolean.
+		ctx=exec(ctx,"(def truthy (deploy '(defn ^:callable check-trusted? [s a o] 0)))");
+		assertEquals(CVMBool.TRUE,eval(ctx,"(trust/trusted? (mon/all truthy (mon/rule (fn [s a o] []))) #3)"));
+		assertEquals(CVMBool.TRUE,eval(ctx,"(trust/trusted? (mon/any nil truthy) #3)"));
+		assertEquals(CVMBool.FALSE,eval(ctx,"(trust/trusted? (mon/all truthy nil) #3)"));
+		assertEquals(CVMBool.FALSE,eval(ctx,"(trust/trusted? (mon/delegate truthy truthy nil) #3)"));
 		
 	}
 	

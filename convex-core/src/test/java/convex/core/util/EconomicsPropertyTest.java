@@ -11,7 +11,7 @@ import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestEconomics {
+public class EconomicsPropertyTest {
 
 	@Property
 	public void testPools(Long a, Long b, Long c) {

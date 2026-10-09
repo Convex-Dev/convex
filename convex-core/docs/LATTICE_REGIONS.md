@@ -1,8 +1,25 @@
 # Lattice Regions
 
-The global lattice root is defined by `Lattice.ROOT` (`KeyedLattice`). Each top-level keyword names a **region** with its own lattice type and merge semantics. Regions are independent — a node can participate in any subset (see Selective Attention below).
+The global lattice root, `Lattice.ROOT`, is a `KeyedLattice` whose top-level keywords
+name independent **regions**, each with its own lattice type and merge semantics. This
+document is the catalogue of the regions `convex-core` registers, the path shape used
+to navigate into each, and how applications add their own. The lattice model itself is
+specified in [CAD024](https://docs.convex.world/docs/cad/data_lattice) and node
+behaviour in [CAD036](https://docs.convex.world/docs/cad/lattice_node).
 
-## Root Structure
+## Key points
+
+- A region is a keyword key on the root lattice; its value type and merge function are
+  fixed by the lattice registered under that key.
+- Regions are independent. A node participates in any subset and propagates only the
+  regions it has registered (selective attention).
+- Owner-scoped regions share one shape: `[:<region> <ownerKey> :value <name>]`, with an
+  `OwnerLattice` enforcing that each owner's slot is signed by that owner.
+- Adding a region is `Lattice.ROOT.addLattice(keyword, lattice)`; the keyword becomes
+  the first path element from the root.
+- `:local` is the one region that is never propagated.
+
+## Root structure
 
 ```
 Lattice.ROOT (KeyedLattice)
@@ -12,72 +29,62 @@ Lattice.ROOT (KeyedLattice)
 ├── :queue → OwnerLattice(MapLattice(TopicLattice))         Message queues
 ├── :p2p   → P2PLattice (KeyedLattice)                      Peer discovery metadata
 │   └── :nodes → OwnerLattice(LWWLattice)                     Signed NodeInfo per peer
-└── :local → OwnerLattice(MapLattice(LWWLattice))           Peer-local state (not propagated)
+└── :local → LocalLattice                                   Peer-local state (not propagated)
 ```
 
-Source: `convex.lattice.Lattice.ROOT`
+Source of truth: `convex.lattice.Lattice.ROOT`.
 
-## Region Details
+## Regions
 
-### :data — Content-Addressable Storage
+| Region | Lattice | Path | Notes |
+|---|---|---|---|
+| `:data` | `DataLattice` (`Index<Hash, ACell>`) | `[:data <hash>]` | Union merge: anything stored by any peer becomes available to all. |
+| `:fs` | `OwnerLattice(MapLattice(DLFSLattice))` | `[:fs <ownerKey> :value <driveName>]` | Per-owner signed namespaces of named drives with DLFS merge ([CAD028](https://docs.convex.world/docs/cad/dlfs)). |
+| `:kv` | `OwnerLattice(MapLattice(KVStoreLattice))` | `[:kv <ownerKey> :value <storeName>]` | Per-owner key-value stores with entry-level merge ([CAD037](https://docs.convex.world/docs/cad/kv_database)). |
+| `:queue` | `OwnerLattice(MapLattice(TopicLattice))` | `[:queue <ownerKey> :value <topicName>]` | Per-owner message topics with partitions and metadata ([CAD040](https://docs.convex.world/docs/cad/lattice_queue)). |
+| `:p2p :nodes` | `OwnerLattice(LWWLattice)` | `[:p2p :nodes <accountKey>]` | Each node publishes `SignedData<NodeInfo>`: transport URIs, relay willingness, served regions, protocol version, timestamp. Latest timestamp wins. |
+| `:local` | `LocalLattice` | `[:local ...]` | Node-private configuration and state; never propagated. |
 
-`DataLattice` — `Index<Hash, ACell>`. Union merge: any data stored by any peer becomes available to all. Used for sharing immutable content by hash.
+The `:p2p` region and its use for discovery are designed in
+`convex-peer/docs/P2P_DESIGN.md`.
 
-### :fs — Decentralised File Systems
-
-`OwnerLattice(MapLattice(DLFSLattice))`. Per-owner signed file system namespaces, each containing named drives with DLFS merge semantics.
-
-Path: `[:fs <ownerKey> :value <driveName>]`
-
-### :kv — Key-Value Databases
-
-`OwnerLattice(MapLattice(KVStoreLattice))`. Per-owner signed key-value stores. Each store is an `Index<AString, AVector<ACell>>` with entry-level merge.
-
-Path: `[:kv <ownerKey> :value <storeName>]`
-
-### :queue — Message Queues
-
-`OwnerLattice(MapLattice(TopicLattice))`. Per-owner signed message topics with partitions and metadata.
-
-Path: `[:queue <ownerKey> :value <topicName>]`
-
-### :p2p — Peer Discovery
-
-`P2PLattice` (`KeyedLattice`) with one sub-region:
-
-- **`:nodes`** — `OwnerLattice(LWWLattice)`. Each node publishes `SignedData<NodeInfo>` containing transport URIs, Point of Presence node keys, relay willingness, supported regions, protocol version, and timestamp. LWW merge ensures the latest metadata wins.
-
-Path: `[:p2p :nodes <accountKey>]`
-
-See [P2P_DESIGN.md § P2P Discovery Lattice](../../convex-peer/docs/P2P_DESIGN.md#4-p2p-discovery-lattice-proposed) for the full design.
-
-### :local — Peer-Local State
-
-`OwnerLattice(MapLattice(LWWLattice))`. Per-owner key-value maps with LWW merge. **Not propagated** to other nodes — used for node-private configuration and state.
-
-## Extending the Root
-
-Applications register new regions via `addLattice`:
+## Extending the root
 
 ```java
-KeyedLattice root = Lattice.ROOT.addLattice(Keywords.intern("myapp"), myAppLattice);
+KeyedLattice root = Lattice.ROOT.addLattice(Keyword.intern("myapp"), myAppLattice);
 ```
 
-The keyword becomes the first path element when navigating from the root. See [LATTICE_APPLICATIONS.md § Register with the root lattice](LATTICE_APPLICATIONS.md#5-register-with-the-root-lattice) for details.
+A node opts in to hosting an application's data by registering its lattice under a
+keyword. Design guidance for the lattice itself, and for the components that sit over
+it, is in [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md).
 
-## Proposed Regions
+Regions that are designed but not registered in `Lattice.ROOT`:
 
-These regions are designed but not yet registered in `Lattice.ROOT`:
+| Region | Path | Lattice | Purpose |
+|---|---|---|---|
+| `:convex` | `[:convex <genesis-hash> :peers]` | `BeliefLattice` (CPoS merge) | Consensus beliefs scoped by network; see `convex-peer/docs/P2P_DESIGN.md`. |
+| `:sql` | `[:sql <ownerKey> :value <tableName>]` | `OwnerLattice(MapLattice(TableStoreLattice))` | Relational data for `convex-db` ([CAD039](https://docs.convex.world/docs/cad/convex_sql)). |
 
-| Region | Path | Lattice Type | Purpose |
-|--------|------|-------------|---------|
-| `:convex` | `[:convex <genesis-hash> :peers]` | `BeliefLattice` (CPoS merge) | Consensus beliefs scoped by network |
-| `:sql` | `[:sql <ownerKey> :value <tableName>]` | `OwnerLattice(MapLattice(TableStoreLattice))` | Relational data (convex-db) |
+## Selective attention
 
-See [P2P_DESIGN.md § Consensus as a Lattice Region](../../convex-peer/docs/P2P_DESIGN.md#3-consensus-as-a-lattice-region-proposed) for the `:convex` design.
+Nodes propagate only the regions they participate in: a data node need not carry
+consensus beliefs, and a consensus peer need not carry file systems. The node registry
+under `:p2p :nodes` advertises which regions each peer serves, so propagation can
+target the right neighbours. `NodeServer` propagators transmit deltas only for paths
+that changed, and a node merges values only for lattice types it has registered.
 
-## Selective Attention
+## Where the code lives
 
-Nodes only propagate regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. The P2P node registry (`:p2p :nodes`) advertises which regions each peer serves, enabling efficient gossip targeting.
+- `convex.lattice.Lattice` — the root definition.
+- `convex.lattice.KeyedLattice`, `OwnerLattice`, `MapLattice`, `LWWLattice`,
+  `DataLattice`, `DLFSLattice`, `KVStoreLattice`, `TopicLattice`, `P2PLattice`,
+  `LocalLattice` — the region lattices.
+- `convex.node.NodeServer` (`convex-peer`) — hosting and propagation.
 
-This is natural in the `NodeServer` model — propagators only transmit deltas for paths that have changed, and nodes only merge values for lattice types they have registered.
+## Related
+
+- [CAD024 Data Lattice](https://docs.convex.world/docs/cad/data_lattice) — lattice model and root structure.
+- [CAD036 Lattice Node](https://docs.convex.world/docs/cad/lattice_node) — node architecture, propagation and standard lattice types.
+- [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md) — building components over a region.
+- [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) — navigating regions with cursors.
+- `convex-peer/docs/P2P_DESIGN.md` — discovery lattice and proposed consensus region.

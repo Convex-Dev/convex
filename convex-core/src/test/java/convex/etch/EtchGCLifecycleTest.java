@@ -16,8 +16,12 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -128,7 +132,12 @@ public class EtchGCLifecycleTest {
 			EtchStore store = EtchStore.create(f);
 			Cells.persist(t1, store);
 			store.setRootData(t0);
-			Cells.announce(t0, null, store); // sweep must preserve ANNOUNCED
+			// Sweep must preserve ANNOUNCED; callbacks cannot upgrade the persist's
+			// shared lifecycle lock to the exclusive GC-start lock.
+			Cells.announce(t0, r -> assertThrows(IllegalStateException.class, store::startGC), store);
+			// Individual entry status need not match descendants. Copying this
+			// parent must retain its own announcement without announcing children.
+			store.getEtch().write(t1.getHash(), t1.getRef().withStatus(Ref.ANNOUNCED));
 			store.flush();
 			store.close();
 		}
@@ -186,6 +195,8 @@ public class EtchGCLifecycleTest {
 		Ref<ACell> out = store.storeTopRef(RefSoft.createForHash(t1.getHash(), store), Ref.PERSISTED, null);
 		assertTrue(out.getStatus() >= Ref.PERSISTED);
 		assertAllInEtch(targetEtch, treeHashes(t1), Ref.PERSISTED);
+		assertEquals(Ref.ANNOUNCED, targetEtch.read(t1.getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, targetEtch.read(t1.get(0).getHash()).getStatus());
 
 		// Repeat persist prunes on target-resident entries: no bytes written
 		long len = targetEtch.getDataLength();
@@ -225,6 +236,8 @@ public class EtchGCLifecycleTest {
 		assertNotNull(reopened.getEtch().read(v2.getHash())); // cycle novelty recovered
 		assertAllInEtch(reopened.getEtch(), treeHashes(t3), Ref.PERSISTED);
 		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED); // pre-cycle data intact
+		assertEquals(Ref.ANNOUNCED, reopened.getEtch().read(t1.getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, reopened.getEtch().read(t1.get(0).getHash()).getStatus());
 		assertAllInEtch(reopened.getEtch(), treeHashes(t0), Ref.ANNOUNCED);
 		reopened.close();
 
@@ -253,6 +266,7 @@ public class EtchGCLifecycleTest {
 			EtchStore store = EtchStore.create(f);
 			Cells.persist(t1, store);
 			store.setRootData(v0);
+			Cells.announce(t1.get(0), null, store);
 			store.flush();
 			store.close();
 		}
@@ -262,6 +276,12 @@ public class EtchGCLifecycleTest {
 		store.startGC();
 		Etch targetEtch = store.getTargetEtch();
 		targetEtch.getFile().deleteOnExit(); // cancel's delete may fail while mapped
+		// Even a low-status touch must preserve this store's previously earned
+		// status and its subtree guarantee when moving the entry to the target.
+		store.storeTopRef(t1.getRef(), Ref.STORED, null);
+		assertEquals(Ref.PERSISTED, targetEtch.read(t1.getHash()).getStatus());
+		assertEquals(Ref.ANNOUNCED, targetEtch.read(t1.get(0).getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, targetEtch.read(t1.get(1).getHash()).getStatus());
 
 		// ----- Cycle activity: novelty, a root update, a STORED-only entry -----
 		AString v2 = nonEmbedded(120);
@@ -269,7 +289,9 @@ public class EtchGCLifecycleTest {
 		AVector<ACell> t3 = tree(130);
 		store.setRootData(t3);
 		AVector<ACell> storedOnly = tree(140);
-		store.storeTopRef(storedOnly.getRef(), Ref.STORED, null);
+		// Incoming flags alone are not evidence of an earned announcement, even
+		// during GC. The assertions below require exactly STORED and no children.
+		store.storeTopRef(storedOnly.getRef().withStatus(Ref.ANNOUNCED), Ref.STORED, null);
 		assertNull(store.getEtch().read(v2.getHash())); // target-only so far
 
 		// A completed sweep does not survive cancellation
@@ -287,6 +309,7 @@ public class EtchGCLifecycleTest {
 		// Novelty and root tree fully in the old file at earned status
 		assertTrue(old.read(v2.getHash()).getStatus() >= Ref.PERSISTED);
 		assertAllInEtch(old, treeHashes(t3), Ref.PERSISTED);
+		assertEquals(Ref.ANNOUNCED, old.read(t1.get(0).getHash()).getStatus());
 		// STORED-only entry migrated at exactly STORED: no subtree claim, and
 		// its children (never written anywhere) stay absent
 		RefSoft<?> so = old.read(storedOnly.getHash());
@@ -308,14 +331,19 @@ public class EtchGCLifecycleTest {
 		// (generational naming). Cancel races live persists: writers before the
 		// flip are drained and their values reverse-migrated; writers after go
 		// straight to the old file. Nothing may be lost -----
-		store.startGC();
-		store.getTargetEtch().getFile().deleteOnExit();
 		int NT = 4, PER = 50;
 		ExecutorService ex = Executors.newFixedThreadPool(NT);
 		List<Future<?>> futures = new ArrayList<>();
+		futures.add(ex.submit(() -> {
+			Cells.announce(t1.get(1), null, store);
+			return null;
+		}));
+		store.startGC(); // must drain any persist already writing to the old file
+		store.getTargetEtch().getFile().deleteOnExit();
 		for (int w = 0; w < NT; w++) {
 			final int base = 200 + w * PER;
 			futures.add(ex.submit(() -> {
+				Cells.announce(t1.get(1), null, store);
 				for (int i = 0; i < PER; i++) {
 					Cells.persist(nonEmbedded(base + i), store);
 				}
@@ -338,6 +366,7 @@ public class EtchGCLifecycleTest {
 					"Value lost during concurrent cancel: " + i);
 		}
 		assertEquals(t3.getHash(), store.getRootHash());
+		assertEquals(Ref.ANNOUNCED, old.read(t1.get(1).getHash()).getStatus());
 		store.close();
 
 		// ----- Reopen: the cancelled state is durable -----
@@ -346,6 +375,9 @@ public class EtchGCLifecycleTest {
 		assertEquals(t3, reopened.getRootData());
 		assertNotNull(reopened.getEtch().read(v2.getHash()));
 		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED);
+		assertEquals(Ref.ANNOUNCED, reopened.getEtch().read(t1.get(0).getHash()).getStatus());
+		assertEquals(Ref.ANNOUNCED, reopened.getEtch().read(t1.get(1).getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, reopened.getEtch().read(t1.getHash()).getStatus());
 		reopened.close();
 	}
 
@@ -359,12 +391,14 @@ public class EtchGCLifecycleTest {
 		File f = File.createTempFile("gc3d-complete", ".etch");
 		f.deleteOnExit();
 
-		AVector<ACell> t1 = tree(210); // will become garbage
+		AVector<ACell> t1 = tree(210); // parent will become garbage; one child is retained
 		AVector<ACell> t0 = tree(201); // pre-cycle root, superseded during the cycle
 		{
 			EtchStore store = EtchStore.create(f);
 			Cells.persist(t1, store);
 			store.setRootData(t0);
+			Cells.announce(t0.get(0), null, store);
+			Cells.announce(t1.get(0), null, store);
 			store.flush();
 			store.close();
 		}
@@ -376,11 +410,21 @@ public class EtchGCLifecycleTest {
 		// Cutover is hard-gated on a completed sweep (no force override)
 		assertThrows(IllegalStateException.class, store::completeGC);
 
+		// #747: a live persist before the sweep must copy each descendant's own
+		// status, even though its PERSISTED parent will let the sweep prune it.
+		store.setRootData(t0);
+		assertEquals(Ref.ANNOUNCED, targetEtch.read(t0.get(0).getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, targetEtch.read(t0.getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, targetEtch.read(t0.get(1).getHash()).getStatus());
+
 		// Cycle activity, then a root update superseding t0
 		AString v2 = nonEmbedded(220);
 		Cells.persist(v2, store);
-		AVector<ACell> t3 = tree(230);
+		AVector<ACell> t3 = tree(230).assoc(0,t0).assoc(1,t0.get(0)).assoc(2,t1.get(0));
 		store.setRootData(t3);
+		// New roots may share copied subtrees and old announced descendants that
+		// the root sweep has never visited. Both must keep their earned status.
+		assertEquals(Ref.ANNOUNCED, targetEtch.read(t1.get(0).getHash()).getStatus());
 
 		store.transferGC();
 		assertTrue(store.isGCComplete());
@@ -399,8 +443,12 @@ public class EtchGCLifecycleTest {
 		assertEquals(t3.getHash(), newStore.getRootHash());
 		assertEquals(t3, newStore.getRootData());
 		assertEquals(v2, newStore.refForHash(v2.getHash()).getValue());
+		assertEquals(Ref.ANNOUNCED, newStore.getEtch().read(t0.get(0).getHash()).getStatus());
+		assertEquals(Ref.ANNOUNCED, newStore.getEtch().read(t1.get(0).getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, newStore.getEtch().read(t3.getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, newStore.getEtch().read(t0.get(1).getHash()).getStatus());
 
-		// GARBAGE IS COLLECTED: t1 was unreachable from the final root
+		// GARBAGE IS COLLECTED: t1's parent was unreachable from the final root
 		assertNull(newStore.refForHash(t1.getHash()));
 
 		// Old store remains a full view: migrated data via the target file,
@@ -425,6 +473,7 @@ public class EtchGCLifecycleTest {
 		// touch the successor -----
 		store.close();
 		AString v5 = nonEmbedded(250);
+		assertRetiredFileDeleted(store.getEtch());
 		Cells.persist(v5, newStore);
 		assertEquals(v5, newStore.refForHash(v5.getHash()).getValue());
 		assertNull(newStore.refForHash(t1.getHash())); // garbage now gone for good
@@ -443,6 +492,7 @@ public class EtchGCLifecycleTest {
 		AString v6 = nonEmbedded(260);
 		Cells.persist(v6, finalStore);
 		newStore.close(); // deletes f~ (or defers via its .gc-defunct tombstone)
+		assertRetiredFileDeleted(newStore.getEtch());
 		finalStore.close();
 		new File(f.getCanonicalPath() + ".gc-defunct").deleteOnExit();
 		new File(f.getCanonicalPath() + "~.gc-defunct").deleteOnExit();
@@ -456,6 +506,10 @@ public class EtchGCLifecycleTest {
 		assertNull(adopted.getEtch().read(v4.getHash()));    // never root-reachable: collected by cycle 2
 		assertNull(adopted.getEtch().read(v5.getHash()));    // ditto
 		assertAllInEtch(adopted.getEtch(), treeHashes(t3), Ref.PERSISTED);
+		assertEquals(Ref.ANNOUNCED, adopted.getEtch().read(t0.get(0).getHash()).getStatus());
+		assertEquals(Ref.ANNOUNCED, adopted.getEtch().read(t1.get(0).getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, adopted.getEtch().read(t3.getHash()).getStatus());
+		assertEquals(Ref.PERSISTED, adopted.getEtch().read(t0.get(1).getHash()).getStatus());
 		// The logical base survives regardless of which physical file is open
 		assertEquals(f.getCanonicalFile(), adopted.getBaseFile().getCanonicalFile());
 
@@ -481,5 +535,126 @@ public class EtchGCLifecycleTest {
 		assertEquals(t3.getHash(), afterDuplicateClose.getRootHash());
 		assertEquals(t3, afterDuplicateClose.getRootData());
 		afterDuplicateClose.close();
+	}
+
+	@Test
+	@Timeout(30)
+	public void testLegacyPersistsOverlapSuccessorStartAndCancel() throws Exception {
+		AVector<ACell> original=tree(15000);
+		AVector<ACell> duringCancel=tree(16000);
+		AVector<ACell> latest=tree(17000);
+		try (EtchStore a=EtchStore.createTemp();
+				ExecutorService workers=Executors.newFixedThreadPool(3)) {
+			a.setRootData(original);
+			a.startGC();
+			a.transferGC();
+			try (EtchStore b=a.completeGC()) {
+				CountDownLatch writing=new CountDownLatch(1);
+				CountDownLatch finishWrite=new CountDownLatch(1);
+				AtomicBoolean first=new AtomicBoolean(true);
+				Future<?> writer=workers.submit(()->{
+					a.storeTopRef(original.getRef(),Ref.ANNOUNCED,r->{
+						if (first.compareAndSet(true,false)) {
+							assertThrows(IllegalStateException.class,b::startGC);
+							assertThrows(IllegalStateException.class,()->b.setRootData(latest));
+							writing.countDown();
+							await(finishWrite);
+						}
+					});
+					return null;
+				});
+				await(writing);
+				CountDownLatch starting=new CountDownLatch(1);
+				Future<?> start=workers.submit(()->{
+					starting.countDown();
+					b.startGC();
+					return null;
+				});
+				try { await(starting); } finally { finishWrite.countDown(); }
+				writer.get(10,TimeUnit.SECONDS);
+				start.get(10,TimeUnit.SECONDS);
+				b.transferGC();
+				assertAllInEtch(b.getTargetEtch(),treeHashes(original),Ref.ANNOUNCED);
+
+				CountDownLatch targetWrite=new CountDownLatch(1);
+				CountDownLatch finishTargetWrite=new CountDownLatch(1);
+				first.set(true);
+				Future<?> targetWriter=workers.submit(()->{
+					a.storeTopRef(duringCancel.getRef(),Ref.PERSISTED,r->{
+						if (first.compareAndSet(true,false)) {
+							targetWrite.countDown();
+							await(finishTargetWrite);
+						}
+					});
+					return null;
+				});
+				await(targetWrite);
+				Future<?> cancel=workers.submit(()->{
+					// The paused A writer must be counted by B. An interrupted wait
+					// provides a deterministic checkpoint after write redirection.
+					Thread.currentThread().interrupt();
+					try { assertThrows(IOException.class,b::cancelGC); }
+					finally { Thread.interrupted(); }
+					return null;
+				});
+				try {
+					cancel.get(10,TimeUnit.SECONDS);
+					assertThrows(IOException.class,()->a.setRootData(latest));
+					ACell redirected=nonEmbedded(16500);
+					Cells.persist(redirected,a);
+					assertNotNull(b.getEtch().read(redirected.getHash()));
+				} finally { finishTargetWrite.countDown(); }
+				targetWriter.get(10,TimeUnit.SECONDS);
+				b.cancelGC(); // retry preserves every target write and releases root updates
+				a.setRootData(latest);
+				assertEquals(latest,b.getRootData());
+				assertAllInEtch(b.getEtch(),treeHashes(duringCancel),Ref.PERSISTED);
+				assertAllInEtch(b.getEtch(),treeHashes(original),Ref.ANNOUNCED);
+			}
+		}
+	}
+
+	private static void await(CountDownLatch signal) {
+		try { assertTrue(signal.await(10,TimeUnit.SECONDS),"Timed out waiting for GC test signal"); }
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new AssertionError(e);
+		}
+	}
+
+	@Test
+	public void testCurrentClosePreservesOlderReadViews() throws IOException {
+		EtchConfig config=EtchConfig.create().withRefCacheSize(1).withL2Enabled(false);
+		try (EtchStore a=EtchStore.createTemp(config)) {
+			a.setRootData(tree(18000));
+			a.startGC();
+			a.transferGC();
+			try (EtchStore b=a.completeGC()) {
+				b.startGC();
+				AVector<ACell> lastRoot=tree(19000);
+				a.setRootData(lastRoot);
+				Etch target=b.getTargetEtch();
+				b.close(); // writes stop, but A still owns readable refs into the target
+				assertEquals(lastRoot,a.readStoreRef(lastRoot.getHash()).getValue());
+				assertEquals(lastRoot.getHash(),a.getRootHash());
+				assertThrows(IOException.class,()->a.setRootData(lastRoot));
+				assertThrows(IOException.class,()->Cells.persist(nonEmbedded(19100),a));
+				a.close();
+				assertThrows(IOException.class,()->target.read(lastRoot.getHash()));
+			}
+			// The abandoned target remains recoverable once every handle has closed.
+			try (EtchStore reopened=EtchStore.create(a.getBaseFile(),config)) {
+				assertEquals(tree(19000),reopened.getRootData());
+			}
+		}
+	}
+
+	/** FFM retirement is synchronous once no older view needs the file. */
+	static void assertRetiredFileDeleted(Etch etch) {
+		if ("MemorySegment".equals(etch.getMappingImplementation())) {
+			assertFalse(etch.getFile().exists(),"Retired FFM file must be deleted on close");
+			assertFalse(new File(etch.getFile().getPath()+".gc-defunct").exists(),
+					"Successful retirement must remove the tombstone");
+		}
 	}
 }

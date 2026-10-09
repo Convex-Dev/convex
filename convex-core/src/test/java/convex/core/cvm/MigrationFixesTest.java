@@ -426,11 +426,28 @@ public class MigrationFixesTest {
 		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(GENESIS, ok));
 		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, ok));
 
-		// A non-boolean (defective) truthy result is coerced to true on the upgraded state
-		String nonbool = "(do (import convex.trust :as trust) "
-				+ "(def m (deploy '(defn ^:callable check-trusted? [s a o] 42))) "
-				+ "(trust/trusted? m *address*))";
-		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, nonbool));
+		// CAD022 permits normal CVM truthiness at the SPI. The public v1 wrapper
+		// must return literal booleans, including for empty values and error-as-data.
+		for (String value : new String[] { "false", "nil", "true", "42", "0", "[]", "{}", "#{}", "\"\"", ":DENIED" }) {
+			CVMBool expected = CVMBool.create(!value.equals("false") && !value.equals("nil"));
+			String code = "(let [m (deploy '(defn ^:callable check-trusted? [s a o] " + value + "))] "
+					+ "(@convex.trust/trusted? m *address* :control nil))";
+			assertEquals(Reader.read(value), eval(GENESIS, code));
+			assertEquals(expected, eval(UPGRADED, code), value);
+		}
+
+		// A successful truthy result must not let the SPI retain query side effects.
+		String mutating = "(let [m (deploy '(do (def changed false) "
+				+ "(defn ^:callable check-trusted? [s a o] (def changed true) 42)))] "
+				+ "[(@convex.trust/trusted? m *address*) (lookup m changed)])";
+		assertEquals(Reader.read("[true false]"), eval(UPGRADED, mutating));
+
+		// Exhausting Juice cannot be converted into a successful grant or boolean.
+		String exhausting = "(let [m (deploy '(defn ^:callable check-trusted? [s a o] (loop [] (recur))))] "
+				+ "(@convex.trust/trusted? m *address*))";
+		Context exhausted = Context.create(UPGRADED, Init.GENESIS_ADDRESS)
+				.withJuiceLimit(20_000).eval(Reader.read(exhausting));
+		assertEquals(convex.core.ErrorCodes.JUICE, exhausted.getErrorCode());
 	}
 
 	@Test

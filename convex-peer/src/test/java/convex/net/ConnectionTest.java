@@ -1,7 +1,9 @@
 package convex.net;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -20,6 +22,18 @@ import convex.net.impl.nio.Connection;
  * Tests for the low level Connection class
  */
 public class ConnectionTest {
+
+	@Test
+	public void testCloseExistingByteChannel() throws IOException {
+		MemoryByteChannel channel=MemoryByteChannel.create(16);
+		Connection connection=Connection.create(channel,message -> {},null);
+
+		connection.close();
+		connection.close();
+
+		assertFalse(channel.isOpen());
+		assertTrue(connection.isClosed());
+	}
 
 	/** The legacy NIO receiver enforces the same pre-allocation frame cap as Netty. */
 	@Test

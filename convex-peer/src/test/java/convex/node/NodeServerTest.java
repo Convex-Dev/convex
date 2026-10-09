@@ -950,7 +950,7 @@ public class NodeServerTest {
 			"the application group should share the authoritative cursor store");
 
 		setNodeServer.getCursor().merge(expected);
-		setNodeServer.getCursor().sync();
+		syncAndAwaitPropagator(setNodeServer);
 		Hash rootHash = expected.getHash();
 
 		try (AStore peerStore = new MemoryStore();
@@ -1408,11 +1408,11 @@ public class NodeServerTest {
 			assertEquals(NodeServer.LifecycleState.STOPPED, node.getLifecycleState());
 			assertThrows(IllegalStateException.class,
 				() -> node.setMergeContext(LatticeContext.EMPTY),
-				"identity and topology remain frozen across relaunches");
+				"merge-context configuration remains frozen across relaunches");
 
 			node.launch();
 			assertEquals(NodeServer.LifecycleState.RUNNING, node.getLifecycleState(),
-				"a stopped node may relaunch with its original immutable topology");
+				"a stopped node may relaunch with its retained groups");
 		} finally {
 			testStore.release();
 			try {
@@ -2518,6 +2518,36 @@ public class NodeServerTest {
 		assertEquals(2,cm.getDesiredPeers().size());
 	}
 
+	@Test
+	public void testRejectedOwnedPeerConnectionIsClosed() {
+		LatticeConnectionManager cm=new LatticeConnectionManager(store);
+		cm.setMaxDesiredPeers(1);
+		cm.addPeer(AKeyPair.createSeeded(301).getAccountKey());
+		ControlledVerificationConvex rejected=new ControlledVerificationConvex();
+
+		CompletableFuture<Convex> admission=cm.addPeer(
+			AKeyPair.createSeeded(302).getAccountKey(),rejected);
+
+		assertTrue(admission.isCompletedExceptionally());
+		assertFalse(rejected.isConnected());
+		assertEquals(1,rejected.closeCount);
+		cm.close();
+	}
+
+	@Test
+	public void testClosedLatticeManagerRejectsLateConnection() {
+		LatticeConnectionManager cm=new LatticeConnectionManager(store);
+		cm.close();
+		ControlledVerificationConvex rejected=new ControlledVerificationConvex();
+
+		CompletableFuture<Convex> admission=cm.addPeer(
+			AKeyPair.createSeeded(303).getAccountKey(),rejected);
+
+		assertTrue(admission.isCompletedExceptionally());
+		assertFalse(rejected.isConnected());
+		assertEquals(1,rejected.closeCount);
+	}
+
 	/**
 	 * Test that a dead connection is detected and pruned, and the desired
 	 * peer entry survives for reconnection.
@@ -2580,9 +2610,17 @@ public class NodeServerTest {
 		// TCP URI resolves
 		InetSocketAddress addr = new InetSocketAddress("localhost", 18888);
 		LatticeConnectionManager.DesiredPeer dp = LatticeConnectionManager.DesiredPeer.create(key, addr);
-		InetSocketAddress resolved = LatticeConnectionManager.resolveTransport(dp);
+		java.net.URI resolved = LatticeConnectionManager.resolveTransport(dp);
 		assertNotNull(resolved, "TCP transport should resolve");
 		assertEquals(18888, resolved.getPort());
+
+		// Native listeners may return an IPv6 address: its URI needs brackets.
+		InetSocketAddress ipv6=InetSocketAddress.createUnresolved("::1",18888);
+		assertEquals(java.net.URI.create("tcp://[::1]:18888"),LatticeConnectionManager.resolveTransport(
+			LatticeConnectionManager.DesiredPeer.create(key,ipv6)));
+		java.net.URI tls=java.net.URI.create("tls://localhost:18889");
+		assertEquals(tls,LatticeConnectionManager.resolveTransport(
+			LatticeConnectionManager.DesiredPeer.create(key,tls)));
 
 		// No transports → null
 		LatticeConnectionManager.DesiredPeer empty = LatticeConnectionManager.DesiredPeer.create(key);
@@ -2748,6 +2786,7 @@ public class NodeServerTest {
 	private static final class ControlledVerificationConvex extends Convex {
 		private final CompletableFuture<AccountKey> verification = new CompletableFuture<>();
 		private volatile boolean connected = true;
+		private int closeCount;
 
 		ControlledVerificationConvex() {
 			super(null, null);
@@ -2815,6 +2854,7 @@ public class NodeServerTest {
 
 		@Override
 		public void close() {
+			closeCount++;
 			connected = false;
 			verifiedPeer = null;
 		}

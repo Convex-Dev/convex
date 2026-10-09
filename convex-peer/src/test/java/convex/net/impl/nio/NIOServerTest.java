@@ -3,6 +3,7 @@ package convex.net.impl.nio;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -35,22 +36,25 @@ public class NIOServerTest {
 			s.launch();
 			InetSocketAddress sa=s.getHostAddress();
 			
-			Convex c=ConvexRemote.connectNIO(sa);
-			assertTrue(c.isConnected());
+			try (Convex c=ConvexRemote.connectNIO(sa)) {
+				assertTrue(c.isConnected());
 			
-			c.query(Keywords.FOO);
+				c.query(Keywords.FOO);
 			
-			CompletableFuture<Result> bm=c.message(Message.createBelief(Belief.initial()));
-			assertFalse(bm.join().isError());
+				CompletableFuture<Result> bm=c.message(Message.createBelief(Belief.initial()));
+				assertFalse(bm.join().isError());
 			
-			c.query(Keywords.BAR);
+				c.query(Keywords.BAR);
 			
-			int EXP=3;
-			for (int i=0; i<EXP; i++) {
-				Message m=recd.poll(10, TimeUnit.SECONDS);
-				assertNotNull(m,"Timed out waiting for message "+(i+1)+" of "+EXP);
+				int EXP=3;
+				for (int i=0; i<EXP; i++) {
+					Message m=recd.poll(10, TimeUnit.SECONDS);
+					assertNotNull(m,"Timed out waiting for message "+(i+1)+" of "+EXP);
+				}
+				assertEquals(0,recd.size());
 			}
-			assertEquals(0,recd.size());
+			s.close();
+			assertNull(s.getHostAddress(),"close must wait until the listener is released");
 		}
 	}
 }

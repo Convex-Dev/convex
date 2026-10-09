@@ -2,9 +2,9 @@ package convex.peer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -12,7 +12,11 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 import convex.api.Convex;
+import convex.api.ConvexRemote;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
@@ -33,7 +37,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.IPUtils;
+import convex.net.Transports;
 
 /**
  * Manages outbound peer connections for consensus Belief propagation.
@@ -65,14 +69,27 @@ public class ConnectionManager extends AConnectionManager {
 	/** Timeout for acquiring a belief after polling. */
 	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 12000;
 
+	/** Grace period before repeated STATUS timeouts retire an active connection. */
+	static final long UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS = 60000;
+
 	protected final Server server;
 
 	private final SecureRandom random = new SecureRandom();
-	private long pollDelay;
+	private long pollDelay = SERVER_POLL_DELAY;
+	private long lastPollTime;
 	private long lastConnectionUpdate = Utils.getCurrentTimestamp();
+
+	/** First STATUS timeout for each connection which has not responded since. */
+	private final ConcurrentHashMap<AccountKey, Long> unresponsiveSince = new ConcurrentHashMap<>();
+
+	/** Manager-owned sockets currently awaiting remote peer identification. */
+	private final Set<Convex> pendingConnections=ConcurrentHashMap.newKeySet();
 
 	/** Background thread for connection maintenance and belief polling. */
 	private Thread thread;
+
+	/** Prevents late asynchronous connection attempts from being admitted after close. */
+	private volatile boolean closed;
 
 	public ConnectionManager(Server server) {
 		this.server = server;
@@ -83,9 +100,12 @@ public class ConnectionManager extends AConnectionManager {
 	/**
 	 * Starts the connection manager's background maintenance thread.
 	 */
-	public void start() {
+	public synchronized void start() {
+		if (closed) throw new IllegalStateException("Connection manager is closed");
+		if (thread != null) return;
 		Object _pollDelay = server.getConfig().get(Keywords.POLL_DELAY);
 		this.pollDelay = (_pollDelay == null) ? SERVER_POLL_DELAY : Utils.toInt(_pollDelay);
+		lastPollTime = server.getTimestamp();
 
 		thread = Thread.ofVirtual().name("Connection Manager thread at " + server.getPort()).start(() -> {
 			while (server.isRunning() && !Thread.currentThread().isInterrupted()) {
@@ -106,16 +126,37 @@ public class ConnectionManager extends AConnectionManager {
 	}
 
 	@Override
-	public void close() {
-		// Broadcast GOODBYE to all outgoing remote peers
+	public synchronized void close() {
+		if (closed) return;
+		closed = true;
+
+		Thread managerThread=thread;
+		thread=null;
+		if (managerThread != null) {
+			managerThread.interrupt();
+			if (managerThread != Thread.currentThread()) {
+				boolean interrupted=false;
+				while (managerThread.isAlive()) {
+					try {
+						managerThread.join();
+					} catch (InterruptedException e) {
+						interrupted=true;
+						managerThread.interrupt();
+					}
+				}
+				if (interrupted) Thread.currentThread().interrupt();
+			}
+		}
+
+		// Broadcast GOODBYE after maintenance has stopped, then close every route.
 		try {
 			Message msg = Message.createGoodBye();
 			broadcast(msg);
 		} finally {
+			for (Convex pending : pendingConnections) closeSilently(pending);
+			pendingConnections.clear();
 			closeAllConnections();
-			if (thread != null) {
-				thread.interrupt();
-			}
+			unresponsiveSince.clear();
 		}
 	}
 
@@ -129,35 +170,27 @@ public class ConnectionManager extends AConnectionManager {
 
 	// ========== Connection Management ==========
 
-	public void addConnection(AccountKey peerKey, Convex convex) {
+	public boolean addConnection(AccountKey peerKey, Convex convex) {
 		if (peerKey == null) throw new IllegalArgumentException("Peer key must not be null");
 		if (convex == null) throw new IllegalArgumentException("Connection must not be null");
-		log.debug("Connected to Peer: {} at {}", peerKey, convex.getHostAddress());
-		connections.put(peerKey, convex);
-	}
-
-	/**
-	 * Broadcasts a Message to all connected Peers in shuffled order.
-	 * Uses non-blocking sends to avoid stalling on one slow peer.
-	 */
-	@Override
-	public void broadcast(Message msg) {
-		Map<AccountKey, Convex> hm = getConnections();
-
-		if (hm.isEmpty()) {
-			log.debug("No connections to broadcast to from {}", server.getPeerKey());
-			return;
-		}
-
-		ArrayList<Map.Entry<AccountKey, Convex>> list = new ArrayList<>(hm.entrySet());
-		Utils.shuffle(list);
-
-		for (Map.Entry<AccountKey, Convex> me : list) {
-			Convex pc = me.getValue();
-			if (pc != null && pc.isConnected()) {
-				pc.trySend(msg);
+		Convex replaced=null;
+		boolean accepted;
+		synchronized (this) {
+			accepted=!closed && convex.isConnected();
+			if (accepted) {
+				log.debug("Connected to Peer: {} at {}", peerKey, convex.getHostAddress());
+				// A peer we chose to connect to is buffered for, not dropped, until it is far behind
+				convex.setOutboundLimits(Config.PEER_OUTBOUND_QUEUE_SIZE, Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT);
+				unresponsiveSince.remove(peerKey);
+				replaced=connections.put(peerKey, convex);
 			}
 		}
+		if (!accepted) {
+			closeSilently(convex);
+			return false;
+		}
+		if (replaced != null && replaced != convex) closeSilently(replaced);
+		return true;
 	}
 
 	// ========== Maintenance ==========
@@ -165,6 +198,7 @@ public class ConnectionManager extends AConnectionManager {
 	protected void maintainConnections() throws InterruptedException {
 		// Prune dead connections first
 		pruneDeadConnections();
+		unresponsiveSince.keySet().removeIf(key -> !connections.containsKey(key));
 
 		State s = server.getPeer().getConsensusState();
 		long now = Utils.getCurrentTimestamp();
@@ -220,7 +254,8 @@ public class ConnectionManager extends AConnectionManager {
 		// influencing the connection pool
 
 		Set<AArrayBlob> potentialPeers = s.getPeers().keySet();
-		InetSocketAddress target = null;
+		URI target = null;
+		AccountKey targetKey = null;
 		double accStake = 0.0;
 		for (ACell c : potentialPeers) {
 			AccountKey peerKey = RT.ensureAccountKey(c);
@@ -231,22 +266,28 @@ public class ConnectionManager extends AConnectionManager {
 			if (ps == null) continue;
 			AString hostName = ps.getHostname();
 			if (hostName == null) continue;
-			InetSocketAddress maybeAddress = IPUtils.toInetSocketAddress(hostName.toString());
-			if (maybeAddress == null) continue;
+			URI maybeAddress;
+			try {
+				maybeAddress=Transports.endpoint(hostName.toString());
+				Transports.forEndpoint(maybeAddress);
+			} catch (IllegalArgumentException e) {
+				continue;
+			}
 
 			long peerStake = ps.getPeerStake();
 			if (peerStake > CPoSConstants.MINIMUM_EFFECTIVE_STAKE) {
 				double t = random.nextDouble() * (accStake + peerStake);
 				if (t >= accStake) {
 					target = maybeAddress;
+					targetKey = peerKey;
 				}
 				accStake += peerStake;
 			}
 		}
 
 		if (target != null) {
-			InetSocketAddress connectTarget = target;
-			connectToPeer(target).exceptionally(e -> {
+			URI connectTarget = target;
+			connectToPeer(target,targetKey).exceptionally(e -> {
 				log.debug("Failed to connect to Peer at {}: {}", connectTarget, e.getMessage());
 				return null;
 			});
@@ -267,21 +308,34 @@ public class ConnectionManager extends AConnectionManager {
 	// ========== Belief Polling ==========
 
 	private void maybePollBelief() throws InterruptedException {
+		long now=server.getTimestamp();
+		if (now-lastPollTime<pollDelay) return;
+		if (!server.getBeliefPropagator().hasBeliefPollCapacity()) return;
+
+		ArrayList<AccountKey> peers = new ArrayList<>(connections.keySet());
+		if (peers.isEmpty()) return;
+
+		AccountKey peerKey = peers.get(random.nextInt(peers.size()));
+		Convex connection = getConnection(peerKey);
+		if (connection==null) return;
+
 		try {
-			long lastConsensus = server.getPeer().getConsensusState().getTimestamp().longValue();
-			if (lastConsensus + pollDelay >= Utils.getCurrentTimestamp()) return;
+			pollBelief(peerKey,connection);
+		} finally {
+			// Space attempts from completion, including slow or failed acquisitions.
+			lastPollTime=server.getTimestamp();
+		}
+	}
 
-			ArrayList<Convex> conns = new ArrayList<>(connections.values());
-			if (conns.isEmpty()) return;
-
-			Convex c = conns.get(random.nextInt(conns.size()));
-			if (!c.isConnected()) return;
-
-			Result result = c.requestStatusSync(POLL_TIMEOUT_MILLIS);
+	/** Polls one outbound peer for anti-entropy and connection health. */
+	void pollBelief(AccountKey peerKey, Convex connection) throws InterruptedException {
+		try {
+			Result result = connection.requestStatusSync(POLL_TIMEOUT_MILLIS);
 			if (result.isError()) {
-				log.warn("Failure requesting status during polling: {}", result);
+				handleStatusFailure(peerKey,connection,result);
 				return;
 			}
+			unresponsiveSince.remove(peerKey);
 
 			AMap<Keyword, ACell> status = API.ensureStatusMap(result.getValue());
 			if (status == null) {
@@ -289,13 +343,49 @@ public class ConnectionManager extends AConnectionManager {
 				return;
 			}
 			Hash h = RT.ensureHash(status.get(Keywords.BELIEF));
+			if (h==null) {
+				log.warn("Status response has no Belief hash: {}",result);
+				return;
+			}
+			if (h.equals(server.getBelief().getHash())) return;
+			if (!server.getBeliefPropagator().hasBeliefPollCapacity()) return;
 
-			Belief sb = (Belief) c.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
-			server.queueBelief(Message.createBelief(sb));
+			ACell acquired = connection.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+			if (!(acquired instanceof Belief belief)) {
+				log.warn("Peer returned non-Belief value for advertised Belief hash {}",h);
+				return;
+			}
+			if (!server.queueBelief(belief)) {
+				log.debug("Discarding acquired Belief because the local queue filled during polling");
+			}
+		} catch (InterruptedException e) {
+			throw e;
 		} catch (Exception t) {
 			if (server.isLive()) {
 				log.info("Belief Polling failed: {}", t.getClass().toString() + " : " + t.getMessage());
 			}
+		}
+	}
+
+	/** Ages out a connection only when connectivity failures persist. */
+	private void handleStatusFailure(AccountKey peerKey, Convex connection, Result result) {
+		ACell code=result.getErrorCode();
+		if (!ErrorCodes.TIMEOUT.equals(code) && !ErrorCodes.CONNECT.equals(code)) {
+			// A LOAD or application error is not evidence that the remote endpoint vanished.
+			unresponsiveSince.remove(peerKey);
+			log.debug("Peer status probe returned {}",result);
+			return;
+		}
+		if (connections.get(peerKey)!=connection) return;
+
+		long now=server.getTimestamp();
+		long since=unresponsiveSince.computeIfAbsent(peerKey,key -> now);
+		long unavailableFor=Math.max(0,now-since);
+		if (unavailableFor>=UNRESPONSIVE_CONNECTION_TIMEOUT_MILLIS) {
+			unresponsiveSince.remove(peerKey);
+			closeConnection(peerKey,connection,"No STATUS response for "+unavailableFor+" ms");
+		} else {
+			log.debug("Peer status probe failed after {} ms unavailable: {}",unavailableFor,result);
 		}
 	}
 
@@ -310,14 +400,42 @@ public class ConnectionManager extends AConnectionManager {
 	 * @return Future completing with the Convex connection, or exceptionally on failure
 	 */
 	public CompletableFuture<Convex> connectToPeer(InetSocketAddress hostAddress) {
-		CompletableFuture<Convex> result = new CompletableFuture<>();
+		return connectToPeer(Transports.endpoint(hostAddress));
+	}
 
+	/** Connects to an explicit transport endpoint and performs normal peer verification. */
+	public CompletableFuture<Convex> connectToPeer(URI hostAddress) {
+		return connectToPeer(hostAddress,null);
+	}
+
+	/** Authenticates known TLS peers by key; TCP retains its existing identification policy. */
+	public CompletableFuture<Convex> connectToPeer(URI hostAddress, AccountKey expectedPeer) {
+		CompletableFuture<Convex> result = new CompletableFuture<>();
+		if (closed) {
+			return CompletableFuture.failedFuture(
+				new IllegalStateException("Connection manager is closed"));
+		}
+
+		Convex opened=null;
 		try {
-			Convex convex = Convex.connect(hostAddress);
+			opened = ConvexRemote.connect(hostAddress,Transports.forEndpoint(hostAddress,expectedPeer));
+			Convex convex=opened;
+			synchronized (this) {
+				if (closed) {
+					convex.close();
+					return CompletableFuture.failedFuture(
+						new IllegalStateException("Connection manager is closed"));
+				}
+				pendingConnections.add(convex);
+			}
 			convex.setStore(server.getStore());
 			convex.setKeyPair(server.getKeyPair());
 
-			identifyPeer(convex).whenComplete((peerKey, ex) -> {
+			boolean requireExpectedPeer=expectedPeer!=null && "tls".equalsIgnoreCase(hostAddress.getScheme());
+			CompletableFuture<AccountKey> identity=requireExpectedPeer
+				? convex.verifyPeer(expectedPeer,server.getPeer().getNetworkID()) : identifyPeer(convex);
+			identity.whenComplete((peerKey, ex) -> {
+				pendingConnections.remove(convex);
 				if (peerKey == null || ex != null) {
 					convex.close();
 					result.completeExceptionally(ex != null ? ex
@@ -325,16 +443,25 @@ public class ConnectionManager extends AConnectionManager {
 					return;
 				}
 
-				Convex existing = getConnection(peerKey);
-				if ((existing != null) && existing.isConnected()) {
-					convex.close();
-					result.complete(existing);
-				} else {
-					addConnection(peerKey, convex);
-					result.complete(convex);
+				Convex existing;
+				synchronized (ConnectionManager.this) {
+					existing=getConnection(peerKey);
+					if (existing == null && !closed && addConnection(peerKey, convex)) {
+						existing=convex;
+					}
 				}
+				if (existing == null) {
+					convex.close();
+					result.completeExceptionally(new IllegalStateException(
+						"Connection manager closed during peer identification"));
+					return;
+				}
+				if (existing != convex) convex.close();
+				result.complete(existing);
 			});
 		} catch (Exception e) {
+			if (opened!=null) pendingConnections.remove(opened);
+			closeSilently(opened);
 			result.completeExceptionally(e);
 		}
 		return result;
@@ -397,20 +524,44 @@ public class ConnectionManager extends AConnectionManager {
 		log.warn(reason);
 	}
 
+	/** Minimum interval between requests for the same missing hash. */
+	static final long MISSING_REQUEST_INTERVAL = 1000;
+
+	/** Recently requested missing hashes with request time, bounding repeat requests. */
+	private final ConcurrentHashMap<Hash, Long> missingRequests = new ConcurrentHashMap<>();
+
 	/**
-	 * Called to signal missing data in a Belief / Order
+	 * Called to signal missing data in a received Belief or Order. Requests the
+	 * missing value, and transitively whatever it needs, from the peer that sent the
+	 * message, since it must hold the data, or failing that from the Order's author.
+	 * The message itself is dropped; the next update from that peer merges once the
+	 * data has arrived. Requests for one hash are rate limited so a merge that keeps
+	 * failing while the acquisition is in flight does not repeat the request.
+	 *
 	 * @param m Message which caused alert
 	 * @param e Missing data exception encountered
-	 * @param peerKey Peer key which triggered missing data
+	 * @param peerKey Peer key which triggered missing data, or null if unknown
 	 */
 	public void alertMissing(Message m, MissingDataException e, AccountKey peerKey) {
 		try {
-			Convex conn = getConnection(peerKey);
-			if (conn == null) return;
+			Hash h = e.getMissingHash();
+			if (h == null) return;
+			AccountKey sender = (m.getConnection() == null) ? null : m.getConnection().getTrustedKey();
+			Convex conn = (sender == null) ? null : getConnection(sender);
+			if ((conn == null) && (peerKey != null)) conn = getConnection(peerKey);
+			if ((conn == null) || !conn.isConnected()) return;
 
-			if (log.isDebugEnabled()) {
-				log.info("Missing data alert {}", e.getMissingHash());
-			}
+			long now = Utils.getCurrentTimestamp();
+			Long last = missingRequests.get(h);
+			if ((last != null) && (now - last < MISSING_REQUEST_INTERVAL)) return;
+			if (missingRequests.size() > 4096) missingRequests.clear();
+			missingRequests.put(h, now);
+
+			log.debug("Requesting missing data {}", h);
+			conn.acquire(h).whenComplete((value, ex) -> {
+				missingRequests.remove(h);
+				if (ex != null) log.debug("Missing data request for {} failed: {}", h, ex.getMessage());
+			});
 		} catch (Exception ex) {
 			log.warn("Unexpected error responding to missing data", ex);
 		}

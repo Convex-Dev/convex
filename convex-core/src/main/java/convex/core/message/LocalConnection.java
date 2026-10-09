@@ -33,7 +33,8 @@ public class LocalConnection extends AConnection {
 
 	private final Predicate<Message> handler;
 	private final boolean acceptsMessages;
-	private LocalConnection paired;
+	private volatile LocalConnection paired;
+	private volatile boolean closed;
 
 	private LocalConnection(Predicate<Message> handler, boolean acceptsMessages) {
 		this.handler = handler;
@@ -109,7 +110,7 @@ public class LocalConnection extends AConnection {
 	@Override
 	public boolean supportsMessage() {
 		LocalConnection p = paired;
-		return p != null && p.acceptsMessages;
+		return !closed && p != null && !p.closed && p.acceptsMessages;
 	}
 
 	/**
@@ -124,7 +125,7 @@ public class LocalConnection extends AConnection {
 	@Override
 	public boolean sendMessage(Message msg) {
 		LocalConnection p = paired;
-		if (p == null || p.handler == null || !p.acceptsMessages) return false;
+		if (closed || p == null || p.closed || p.handler == null || !p.acceptsMessages) return false;
 		return p.handler.test(msg.withConnection(p));
 	}
 
@@ -141,7 +142,7 @@ public class LocalConnection extends AConnection {
 	@Override
 	public boolean returnMessage(Message msg) {
 		LocalConnection p = paired;
-		if (p == null || p.handler == null) return false;
+		if (closed || p == null || p.closed || p.handler == null) return false;
 		return p.handler.test(msg.withConnection(p));
 	}
 
@@ -152,12 +153,25 @@ public class LocalConnection extends AConnection {
 
 	@Override
 	public boolean isClosed() {
-		return false;
+		return closed;
 	}
 
 	@Override
 	public void close() {
-		// nothing to close for in-JVM connection
+		LocalConnection p;
+		synchronized (this) {
+			if (closed) return;
+			closed = true;
+			p = paired;
+			paired = null;
+		}
+		if (p != null) p.closePairedEnd(this);
+	}
+
+	/** Closes this end when its peer closes, without acquiring both end locks. */
+	private synchronized void closePairedEnd(LocalConnection expected) {
+		if (paired == expected) paired = null;
+		closed = true;
 	}
 
 	@Override

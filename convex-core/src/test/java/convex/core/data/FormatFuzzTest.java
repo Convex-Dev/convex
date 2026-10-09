@@ -25,7 +25,6 @@ import convex.test.Samples;
 public class FormatFuzzTest {
 
 	private static final int NUM_FUZZ = 5000;
-	private static Random r = new Random(3244);
 
 	@Test
 	public void fuzzTest() {
@@ -33,11 +32,11 @@ public class FormatFuzzTest {
 
 		for (int i = 0; i < NUM_FUZZ; i++) {
 			long stime = System.currentTimeMillis();
-			r.setSeed(i * 1007);
+			Random r = new Random(i * 1007);
 			Blob b = Blob.createRandom(r, 200);
 			try {
-				doFuzzTest(b);
-				doMutationTest(b);
+				doFuzzTest(b,r);
+				doMutationTest(b,r);
 			} catch (BadFormatException e) {
 				/* OK */
 			} catch (MissingDataException e) {
@@ -69,10 +68,11 @@ public class FormatFuzzTest {
 	}
 	
 	public static void doCellFuzzTests(ACell c)  {
+		Random r = new Random(3244);
 		for (int i = 0; i < 1000; i++) {
 			Blob b=Cells.encode(c);
 			try {
-				doMutationTest(b);
+				doMutationTest(b,r);
 			} catch (Exception e) {
 				throw Utils.sneakyThrow(e);
 			}
@@ -80,13 +80,17 @@ public class FormatFuzzTest {
 	}
 
 	private static void doFuzzTest(Blob b) throws BadFormatException {
+		doFuzzTest(b,new Random(b.hashCode()));
+	}
+
+	private static void doFuzzTest(Blob b, Random r) throws BadFormatException {
 		ACell v;
 		try {
 			v = Samples.TEST_STORE.decode(b);
 		} catch (ArrayIndexOutOfBoundsException e) {
 			// We read past buffer, so basically OK up to that point
 			// Try again with bigger buffer!
-			if (b.count()>0) doFuzzTest(b.append(b).toFlatBlob());
+			if (b.count()>0) doFuzzTest(b.append(b).toFlatBlob(),r);
 			return;
 		}
 		
@@ -110,18 +114,24 @@ public class FormatFuzzTest {
 		// recursive fuzzing on this value
 		// this is good to test small mutations of
 		if (r.nextDouble() < 0.8) {
-			doMutationTest(b2);
+			doMutationTest(b2,r);
 		}
 	}
 
 	public static void doMutationTest(Blob b) {
+		// Replaying a generated value must reproduce its mutations independently
+		// of test execution order and other threads.
+		doMutationTest(b,new Random(b.hashCode()));
+	}
+
+	private static void doMutationTest(Blob b, Random r) {
 		byte[] bs = b.getBytes();
 		bs[r.nextInt(bs.length)] += (byte) r.nextInt(255);
 		Blob fuzzed=Blob.wrap(bs);
 		try {
-			doFuzzTest(fuzzed);
-		} catch (BadFormatException e) {
-			/* OK */
+			doFuzzTest(fuzzed,r);
+		} catch (BadFormatException | MissingDataException e) {
+			// Mutations can produce invalid encodings or references to absent cells.
 		} catch (Exception e) {
 			System.err.println("Fuzz test bad blob: "+fuzzed);
 			throw e;

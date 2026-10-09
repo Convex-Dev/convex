@@ -19,6 +19,7 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.exceptions.BadFormatException;
+import convex.core.store.AStore;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
@@ -636,6 +637,15 @@ public class Etch {
 	 * data length.
 	 */
 	void close() {
+		try { closeChecked(); }
+		catch (IOException e) {
+			LOG.log(System.Logger.Level.WARNING, "Etch close did not complete cleanly for " + fileName
+					+ "; treat the file as dirty (v3 requires explicit recovery open)", e);
+		}
+	}
+
+	/** Closes all resources, reporting finalisation failures to durable exporters. */
+	void closeChecked() throws IOException {
 		synchronized (this) {
 			if (closeStarted)
 				return;
@@ -663,8 +673,7 @@ public class Etch {
 					failure = combineCloseFailure(failure, e);
 				}
 				if (failure != null) {
-					LOG.log(System.Logger.Level.WARNING, "Etch close did not complete cleanly for " + fileName
-							+ "; treat the file as dirty (v3 requires explicit recovery open)", failure);
+					throw new IOException("Etch close failed: " + fileName, failure);
 				}
 			} finally {
 				destroyCiphers(dataCipher,indexCipher);
@@ -810,8 +819,13 @@ public class Etch {
 	 * @throws IOException If an IO error occurs
 	 */
 	public <T extends ACell> RefSoft<T> read(AArrayBlob key) throws IOException {
+		return read(key, store);
+	}
+
+	/** Reads through a particular live view, including retained legacy files. */
+	<T extends ACell> RefSoft<T> read(AArrayBlob key, AStore reader) throws IOException {
 		Counters.etchRead++;
-		RefSoft<T> result = readAtIndex(key, 0, indexStart);
+		RefSoft<T> result = readAtIndex(key, 0, indexStart, reader);
 		if (result == null) {
 			Counters.etchMiss++;
 		}
@@ -843,6 +857,10 @@ public class Etch {
 	 * @throws IOException
 	 */
 	public <T extends ACell> RefSoft<T> read(AArrayBlob key, long pointer) throws IOException {
+		return read(key, pointer, store);
+	}
+
+	<T extends ACell> RefSoft<T> read(AArrayBlob key, long pointer, AStore reader) throws IOException {
 		long recordPosition = rawPointer(pointer);
 		long readPosition = recordPosition;
 		int headerOffset = KEY_SIZE;
@@ -885,7 +903,7 @@ public class Etch {
 		Blob encoding = Blob.wrap(encodingBytes);
 		try {
 			Hash hash = Hash.wrap(key);
-			T cell = store.decode(encoding);
+			T cell = reader.decode(encoding);
 			encoding.attachContentHash(hash);
 
 			if (memorySize > 0) {
@@ -893,7 +911,7 @@ public class Etch {
 				cell.attachMemorySize(memorySize);
 			}
 
-			RefSoft<T> ref = RefSoft.create(store, cell, (int) flagByte);
+			RefSoft<T> ref = RefSoft.create(reader, cell, (int) flagByte);
 			cell.attachRef(ref);
 
 			return ref;
@@ -1035,7 +1053,7 @@ public class Etch {
 	 * @return decoded reference, or {@code null} if not found
 	 * @throws IOException
 	 */
-	private <T extends ACell> RefSoft<T> readAtIndex(AArrayBlob key, int level, long indexPosition) throws IOException {
+	private <T extends ACell> RefSoft<T> readAtIndex(AArrayBlob key, int level, long indexPosition, AStore reader) throws IOException {
 		if (level >= MAX_LEVEL) {
 			throw new Error("Etch index level exceeded for key: " + key);
 		}
@@ -1051,9 +1069,9 @@ public class Etch {
 		} else if (type == POINTER_INDEX) {
 			// recursively check next index node
 			long newIndexPosition = rawPointer(slotValue);
-			return readAtIndex(key, level + 1, newIndexPosition);
+			return readAtIndex(key, level + 1, newIndexPosition, reader);
 		} else if (type == POINTER_PLAIN) {
-			return read(key, slotValue);
+			return read(key, slotValue, reader);
 		} else if (type == POINTER_CHAIN) {
 			// continuation of chain from some previous index, therefore key can't be
 			// present
@@ -1067,7 +1085,7 @@ public class Etch {
 			int i = 0;
 			while (i < isize) {
 				long ptr = slotValue & (~POINTER_TYPE_MASK);
-				RefSoft<T> result = read(key, ptr);
+				RefSoft<T> result = read(key, ptr, reader);
 				if (result != null)
 					return result;
 
@@ -1079,7 +1097,7 @@ public class Etch {
 			}
 			if (readSlot(indexPosition, digit) != startValue) {
 				// chain restructured during our scan: retry at this position
-				return readAtIndex(key, level, indexPosition);
+				return readAtIndex(key, level, indexPosition, reader);
 			}
 			return null;
 		} else {

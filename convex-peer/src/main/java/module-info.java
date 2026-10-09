@@ -14,4 +14,5 @@ module convex.peer {
 	requires io.netty.transport;
 	requires io.netty.buffer;
 	requires io.netty.codec;
+	requires io.netty.handler;
 }

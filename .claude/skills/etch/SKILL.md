@@ -38,11 +38,11 @@ using the store is stopped first — operating on a live store risks corruption.
 
 | Command | Effect |
 |---------|--------|
-| `etch gc` | Garbage collect: retains the root and everything reachable, discards the rest. In-place by default; `-o/--output <file>` collects into a fresh file instead |
+| `etch gc` | Garbage collect the root tree. In-place by default; `--backup <file>` also retains the old store as a snapshot; `-o/--output <file>` collects into a fresh file instead |
 | `etch clear` | Clears the root data. Does *not* collect garbage |
 | `etch migrate --into <dest>` | Copy everything into another store; `--set-root` to set the destination root |
 | `etch repair --into <dest>` | Reconstruct a fresh store from independently validated cells; source unchanged |
-| `etch recover` | Adopt a completed GC cutover and roll forward — for a store interrupted mid-GC |
+| `etch recover` | Adopt a completed GC cutover or roll an abandoned target back into the live store |
 | `etch write -c/--cvx <source>` | Write a CVM value into the store |
 
 To compact safely, prefer `gc -o <new-file>`: it collects into a fresh file and
@@ -50,6 +50,20 @@ leaves the source unmodified (note: status levels above PERSISTED, e.g.
 ANNOUNCED, survive an in-place GC but not `--output`). Use `migrate` to copy
 into another (possibly non-empty) store, or to change the store's format
 version or encryption — see below.
+
+For a combined snapshot and in-place collection, use
+`gc --backup <snapshot-file>`. The collected store keeps the original live path;
+the backup retains the pre-GC root and all old entries, including unreachable
+data. It uses a hard link, so the backup must have a new filename on the same
+filesystem with hard-link support. Existing backups are never overwritten.
+The old disk space remains allocated until the snapshot is removed. Treat the
+snapshot as read-only and use a separate copy for a backup on another filesystem.
+`--backup` and `--output` are mutually exclusive. A backup left by an interrupted
+command is not a confirmed snapshot; inspect the recovery state first.
+On Windows use the same NTFS volume. Live writes after cutover use the collected
+file, so they do not update the snapshot. The FFM backend releases mappings on
+close; `MappedByteBuffer` mappings may defer installation at the live filename.
+Etch follows its completion marker until a later open can finish installation.
 
 `repair` is the offline salvage path for a dirty or damaged source. It holds an
 exclusive source lock, scans through physical EOF, and writes only canonical

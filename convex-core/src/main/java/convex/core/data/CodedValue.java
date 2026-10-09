@@ -16,8 +16,18 @@ public class CodedValue extends ACell {
 	}
 	
 	public static CodedValue create(int tag, ACell code, ACell value) {
-		
-		return new CodedValue((byte)tag,Ref.get(code),Ref.get(value));
+		return createFromRefs((byte)tag,Ref.get(code),Ref.get(value));
+	}
+
+	/**
+	 * Creates a coded value without resolving its child references.
+	 * @param tag Coded value tag
+	 * @param code Code reference
+	 * @param value Payload reference
+	 * @return Coded value
+	 */
+	public static CodedValue createFromRefs(byte tag, Ref<ACell> code, Ref<ACell> value) {
+		return new CodedValue(tag,code,value);
 	}
 	
 	@Override

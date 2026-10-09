@@ -42,6 +42,28 @@ class EtchEncryptionCLITest {
 	Path temporaryDirectory;
 
 	@Test
+	void encryptedInPlaceGCWithBackup() throws Exception {
+		for (CipherMode cipher:new CipherMode[] {CipherMode.AES_256_CTR,CipherMode.CHACHA20}) {
+			Path source=etchFile("encrypted-gc-"+cipher.configName());
+			Path backup=Path.of(source+".snapshot");
+			backup.toFile().deleteOnExit();
+			Path sourceKey=keyFile(cipher.configName()+".key",SOURCE_KEY);
+			EtchConfig sourceConfig=config(cipher,true,SOURCE_KEY);
+			AString root=Strings.create("Encrypted snapshot root ".repeat(20));
+			createStore(source,sourceConfig,root);
+			CLTester tester=CLTester.run("etch","gc","--etch",source.toString(),
+					"--etch-key-file",sourceKey.toString(),"--backup",backup.toString());
+			tester.assertExitCode(ExitCodes.SUCCESS);
+			try (EtchStore live=EtchStore.create(source.toFile(),sourceConfig);
+					EtchStore snapshot=EtchStore.create(backup.toFile(),sourceConfig)) {
+				assertEquals(root,live.getRootData());
+				assertEquals(root,snapshot.getRootData());
+				assertEquals(cipher,snapshot.getEtch().getConfig().getCipherMode());
+			}
+		}
+	}
+
+	@Test
 	void encryptedCommandsAndPreservingOutputs() throws Exception {
 		Path source=etchFile("encrypted-cli-source");
 		Path sourceKey=keyFile("source.key",SOURCE_KEY);

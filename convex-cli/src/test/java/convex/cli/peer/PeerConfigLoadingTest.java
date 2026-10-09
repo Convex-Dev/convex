@@ -72,13 +72,16 @@ class PeerConfigLoadingTest {
 	@Test
 	void peerStartCreatesConfiguredV3StoreAtConfigPath() throws Exception {
 		Path store=storePath("configured-v3");
-		Path config=config(store,"{version:3}");
+		Path config=config(store,"{version:3,refCacheSize:127,enableL2:false}");
 		ParsedCommand parsed=parse("start","--config",config.toString());
 
 		try (AStore opened=parsed.command().openPeerStore(parsed.command().loadPeerConfig())) {
 			EtchStore etch=(EtchStore)opened;
 			assertEquals(store.toFile().getCanonicalFile(),etch.getFile().getCanonicalFile());
 			assertEquals(EtchConstants.VERSION_3,etch.getEtch().getVersion());
+			assertEquals(127,etch.getRefCacheSize());
+			assertFalse(etch.isL2Enabled());
+			assertEquals(etch.getEtch().getConfig(),etch.getConfig());
 		}
 	}
 

@@ -3,21 +3,23 @@ package convex.net.impl.netty;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.data.Vectors;
+import convex.core.message.BoundedMessageQueue;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.Shutdown;
-import convex.core.util.Utils;
 import convex.core.message.AConnection;
 import convex.peer.Config;
 import io.netty.bootstrap.Bootstrap;
@@ -33,6 +35,7 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
 public class NettyConnection extends AConnection {
@@ -46,21 +49,21 @@ public class NettyConnection extends AConnection {
 
 	static volatile Bootstrap clientBootstrap = null;
 
-	private Channel channel;
+	private volatile Channel channel;
 
 	private NettyInboundHandler inboundHandler;
 
 	/**
-	 * Bounded outbound message queue. Application threads put messages here;
-	 * the Netty event loop drains them to the channel when writable.
+	 * Bounded outbound message queue. Application threads put messages here; the
+	 * Netty event loop drains them to the channel while it is writable, so encoded
+	 * messages stay shared on the heap until they are about to enter the socket
+	 * buffer. Client bounds by default; {@link #setOutboundLimits} raises them for a
+	 * connection to a Peer. The last message admitted may take the queue over its
+	 * byte bound, so a large update is never refused merely because the queue is
+	 * nearly full.
 	 */
-	private final ArrayBlockingQueue<Message> outbound =
-		new ArrayBlockingQueue<>(Config.OUTBOUND_QUEUE_SIZE);
-	private final Object outboundCapacity=new Object();
-	private long outboundBytes;
-
-	/** Latest small priority root, coalesced independently of the bulk queue. */
-	private final AtomicReference<Message> priorityOutbound=new AtomicReference<>();
+	private final BoundedMessageQueue outbound = new BoundedMessageQueue(
+		Config.OUTBOUND_QUEUE_SIZE, Config.OUTBOUND_QUEUE_BYTE_LIMIT, true);
 
 	private NettyConnection(Channel channel, NettyInboundHandler inbound) {
 		this.channel = channel;
@@ -108,13 +111,6 @@ public class NettyConnection extends AConnection {
 			b.option(ChannelOption.WRITE_BUFFER_WATER_MARK,
 				new WriteBufferWaterMark(32 * 1024, 64 * 1024));
 
-			b.handler(new ChannelInitializer<SocketChannel>() {
-				@Override
-				public void initChannel(SocketChannel ch) throws Exception {
-					// nothing to add, connect will do this
-				}
-			});
-
 			clientBootstrap = b;
 			return clientBootstrap;
 		}
@@ -132,52 +128,89 @@ public class NettyConnection extends AConnection {
 	 */
 	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction,
 			int maxMessageLength) throws InterruptedException, IOException {
-		Bootstrap b = getClientBootstrap();
-		ChannelFuture f = b.connect(sa);
-		f.await(); // Wait until done
+		return connect(sa, receiveAction, maxMessageLength, null);
+	}
 
-		if (!f.isSuccess()) {
-			throw new IOException("Failed to connect to peer at "+sa,f.cause());
-		}
+	/** Connects using TLS when a context is supplied, waiting for its handshake. */
+	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction,
+			int maxMessageLength, SSLContext sslContext) throws InterruptedException, IOException {
+		return connect(sa,receiveAction,maxMessageLength,sslContext,true);
+	}
 
-		Channel chan = f.channel();
-		// Wrap Consumer as Function — client receive path has no backpressure
+	/** Disable hostname checks only when the context authenticates an expected peer key. */
+	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction,
+			int maxMessageLength, SSLContext sslContext, boolean verifyHostname) throws InterruptedException, IOException {
 		Function<Message, Predicate<Message>> deliverFn = m -> {
 			receiveAction.accept(m);
-			return null; // always accepted
+			return null;
 		};
 		NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
-
-		NettyConnection client = new NettyConnection(chan,inbound);
-
-		// Set connection on inbound handler so received messages can route responses back
+		NettyConnection client=new NettyConnection(null,inbound);
 		inbound.setConnection(client);
+		SslHandler ssl;
+		if (sslContext==null) {
+			ssl=null;
+		} else {
+			InetSocketAddress address=(InetSocketAddress)sa;
+			SSLEngine engine=sslContext.createSSLEngine(address.getHostString(),address.getPort());
+			engine.setUseClientMode(true);
+			SSLParameters parameters=engine.getSSLParameters();
+			parameters.setEndpointIdentificationAlgorithm(verifyHostname ? "HTTPS" : null);
+			engine.setSSLParameters(parameters);
+			ssl=new SslHandler(engine);
+			ssl.setHandshakeTimeoutMillis(Config.DEFAULT_INTERNAL_TIMEOUT);
+		}
 
-		// Pipeline: writability handler triggers drain, inbound handler decodes, outbound handler encodes
-		f.channel().pipeline().addLast(
-			new ChannelInboundHandlerAdapter() {
-				@Override
-				public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-					client.doFlush();
-					ctx.fireChannelWritabilityChanged();
+		// A per-connect initializer installs codecs and TLS before any traffic arrives.
+		Bootstrap b=getClientBootstrap().clone().handler(new ChannelInitializer<SocketChannel>() {
+			@Override
+			public void initChannel(SocketChannel ch) {
+				client.channel=ch;
+				if (ssl!=null) ch.pipeline().addLast(ssl);
+				ch.pipeline().addLast(
+					new ChannelInboundHandlerAdapter() {
+						@Override
+						public void channelWritabilityChanged(ChannelHandlerContext ctx) {
+							client.doFlush();
+							ctx.fireChannelWritabilityChanged();
+						}
+
+						@Override
+						public void channelInactive(ChannelHandlerContext ctx) {
+							// Clear queue to wake any threads blocked on offer(timeout)
+							client.clearOutbound();
+							ctx.fireChannelInactive();
+						}
+					},
+					inbound,
+					new NettyOutboundHandler()
+				);
+			}
+		});
+		ChannelFuture f=b.connect(sa);
+		Channel chan=f.channel();
+		boolean connected=false;
+		try {
+			f.await();
+			if (!f.isSuccess()) {
+				throw new IOException("Failed to connect to peer at "+sa,f.cause());
+			}
+			if (ssl!=null) {
+				var handshake=ssl.handshakeFuture();
+				handshake.await();
+				if (!handshake.isSuccess()) {
+					throw new IOException("TLS handshake failed for "+sa,handshake.cause());
 				}
-
-				@Override
-				public void channelInactive(ChannelHandlerContext ctx) {
-					// Clear queue to wake any threads blocked on offer(timeout)
-					client.clearOutbound();
-					client.priorityOutbound.set(null);
-					ctx.fireChannelInactive();
-				}
-			},
-			inbound,
-			new NettyOutboundHandler()
-		);
-
-		return client;
+			}
+			connected=true;
+			return client;
+		} finally {
+			if (!connected) chan.close().syncUninterruptibly();
+		}
 	}
 
 	/** Updates the receive limit, for example after successful peer verification. */
+	@Override
 	public void setMaxMessageLength(int limit) {
 		inboundHandler.setMaxMessageLength(limit);
 	}
@@ -198,31 +231,15 @@ public class NettyConnection extends AConnection {
 	public boolean sendMessage(Message m) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
-		long length=encodedLength(m);
-		if (length<0) return false;
-		int bytes=Utils.checkedInt(length);
-		boolean reserved=false;
+		if (encodedLength(m)<0) return false;
+		boolean queued;
 		try {
-			reserved=reserveOutbound(bytes,Config.DEFAULT_INTERNAL_TIMEOUT);
-			if (!reserved) return false;
-			if (!ch.isActive()) {
-				releaseOutbound(bytes);
-				return false;
-			}
-			boolean queued = outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT,
-				TimeUnit.MILLISECONDS);
-			if (!queued) releaseOutbound(bytes);
-			if (queued && !ch.isActive() && outbound.remove(m)) {
-				releaseOutbound(bytes);
-				queued=false;
-			}
-			if (queued) flushPending();
-			return queued;
+			queued = outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
-			if (reserved) releaseOutbound(bytes);
 			Thread.currentThread().interrupt();
 			return false;
 		}
+		return queued && afterQueue(ch, m);
 	}
 
 	/**
@@ -232,27 +249,18 @@ public class NettyConnection extends AConnection {
 	public boolean trySendMessage(Message m) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
-		long length=encodedLength(m);
-		if (length<0) return false;
-		int bytes=Utils.checkedInt(length);
-		try {
-			if (!reserveOutbound(bytes,0)) return false;
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
+		if (encodedLength(m)<0) return false;
+		return outbound.offer(m) && afterQueue(ch, m);
+	}
+
+	/** Schedules a drain for a queued message, or withdraws it if the channel died meanwhile. */
+	private boolean afterQueue(Channel ch, Message m) {
 		if (!ch.isActive()) {
-			releaseOutbound(bytes);
+			outbound.remove(m);
 			return false;
 		}
-		boolean queued = outbound.offer(m);
-		if (!queued) releaseOutbound(bytes);
-		if (queued && !ch.isActive() && outbound.remove(m)) {
-			releaseOutbound(bytes);
-			queued=false;
-		}
-		if (queued) flushPending();
-		return queued;
+		flushPending();
+		return true;
 	}
 
 	/**
@@ -266,22 +274,6 @@ public class NettyConnection extends AConnection {
 			log.warn("Not sending {} message: {}",m.getType(),e.getMessage());
 			return -1;
 		}
-	}
-
-	@Override
-	public boolean trySendPriorityMessage(Message m) {
-		Channel ch=channel;
-		if (ch==null || !ch.isActive()) return false;
-		long size=encodedLength(m);
-		if (size<0) return false;
-		if (size>Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT) return trySendMessage(m);
-		priorityOutbound.set(m);
-		if (!ch.isActive()) {
-			priorityOutbound.compareAndSet(m,null);
-			return false;
-		}
-		flushPending();
-		return true;
 	}
 
 	/**
@@ -306,11 +298,7 @@ public class NettyConnection extends AConnection {
 		if (ch == null) return;
 		int count = 0;
 		while (ch.isWritable() && ch.isActive()) {
-			Message m=priorityOutbound.getAndSet(null);
-			if (m==null) {
-				m = outbound.poll();
-				if (m!=null) releaseOutbound(Utils.checkedInt(m.getMessageData().count()));
-			}
+			Message m=outbound.poll();
 			if (m == null) break;
 			ch.write(m);
 			count++;
@@ -320,39 +308,13 @@ public class NettyConnection extends AConnection {
 		}
 	}
 
-	private boolean reserveOutbound(int bytes, long timeoutMillis) throws InterruptedException {
-		long remaining=TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
-		long deadline=System.nanoTime()+remaining;
-		synchronized (outboundCapacity) {
-			while (!hasOutboundCapacity(bytes)) {
-				if (remaining<=0) return false;
-				TimeUnit.NANOSECONDS.timedWait(outboundCapacity,remaining);
-				remaining=deadline-System.nanoTime();
-			}
-			outboundBytes+=bytes;
-			return true;
-		}
-	}
-
-	private boolean hasOutboundCapacity(int bytes) {
-		if (bytes<0) return false;
-		if (outboundBytes==0) return bytes<=convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
-		return outboundBytes+bytes<=Config.OUTBOUND_QUEUE_BYTE_LIMIT;
-	}
-
-	private void releaseOutbound(int bytes) {
-		synchronized (outboundCapacity) {
-			outboundBytes-=bytes;
-			if (outboundBytes<0) outboundBytes=0;
-			outboundCapacity.notifyAll();
-		}
+	@Override
+	public void setOutboundLimits(int messageLimit, long byteLimit) {
+		outbound.setLimits(messageLimit, byteLimit);
 	}
 
 	private void clearOutbound() {
-		Message message;
-		while ((message=outbound.poll())!=null) {
-			releaseOutbound(Utils.checkedInt(message.getMessageData().count()));
-		}
+		outbound.clear();
 	}
 
 	protected ChannelFuture send(Message m) {
@@ -381,10 +343,15 @@ public class NettyConnection extends AConnection {
 
 	@Override
 	public void close() {
-		if (channel!=null) {
-			channel.close();
+		Channel ch;
+		synchronized (this) {
+			ch=channel;
 			channel=null;
 		}
+		clearOutbound();
+		if (ch==null) return;
+		ChannelFuture closeFuture=ch.close();
+		if (!ch.eventLoop().inEventLoop()) closeFuture.syncUninterruptibly();
  	}
 
 	@Override

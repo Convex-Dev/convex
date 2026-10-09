@@ -48,11 +48,13 @@ public class API {
 	 * <ul>
 	 * <li>:keypair (required, AKeyPair) - AKeyPair instance.
 	 * <li>:port (optional, Integer) - Integer port number to use for incoming connections. Zero causes random allocation (also the default).
+	 * <li>:tls-port (optional, Integer) - Additional TLS listener port; absent disables TLS, zero allocates a port.
+	 * <li>:tls-context (optional, SSLContext) - TLS listener identity; defaults to the JVM's configured key and trust stores.
 	 * <li>:store (optional, AStore or String filename) - A supplied AStore remains caller-owned;
 	 * stores opened from a filename or created by default are owned by the returned Server.
 	 * <li>:keystore (optional, Keystore or string filename) - Keystore instance. Read only, used for key lookup if necessary.
 	 * <li>:storepass (optional, string) - Integrity password for keystore. If omitted, no integrity check is performed
-	 * <li>:source (optional, String or Socket Address) - URL for Peer to replicate initial State/Belief from.
+	 * <li>:source (optional, String, URI or Socket Address) - Endpoint for Peer to replicate initial State/Belief from.
 	 * <li>:state (optional, State) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional, Boolean) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional, Boolean) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
@@ -74,6 +76,7 @@ public class API {
 		// These are sanity checks before we have a store
 		Config.ensureFlags(config);
 		Config.checkKeyStore(config);
+		Config.ensurePeerKey(config);
 		
 		Object storeConfig=config.get(Keywords.STORE);
 		boolean ownsStore=Server.isStoreOwned(storeConfig);
@@ -82,7 +85,6 @@ public class API {
 		// Configure the store
 		Config.ensureStore(config);
 
-		Config.ensurePeerKey(config);
 		Config.ensureGenesisState(config);
 
 		Server server = Server.create(config,ownsStore,deleteStoreOnClose);
@@ -142,8 +144,10 @@ public class API {
 	 */
 	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState, int peerPorts[]) throws InterruptedException, ConfigException, LaunchException {
 		int count=keyPairs.size();
+		if (count==0) throw new IllegalArgumentException("At least one peer key pair is required");
 
 		List<Server> serverList = new ArrayList<Server>();
+		boolean launched=false;
 
 		Map<Keyword, Object> config = new HashMap<>();
 
@@ -159,45 +163,52 @@ public class API {
 		// Automatically manage Peer connections
 		config.put(Keywords.AUTO_MANAGE, true);
 
-		for (int i = 0; i < count; i++) {
-			AKeyPair keyPair = keyPairs.get(i);
-			config.put(Keywords.KEYPAIR, keyPair);
-			if (peerPorts != null) {
-				if	(peerPorts.length>i) {
-					config.put(Keywords.PORT, peerPorts[i]);
-				} else {
-					// default to zero (random port) 
-					config.put(Keywords.PORT, 0);
+		try {
+			for (int i = 0; i < count; i++) {
+				AKeyPair keyPair = keyPairs.get(i);
+				config.put(Keywords.KEYPAIR, keyPair);
+				if (peerPorts != null) {
+					if	(peerPorts.length>i) {
+						config.put(Keywords.PORT, peerPorts[i]);
+					} else {
+						// default to zero (random port)
+						config.put(Keywords.PORT, 0);
+					}
 				}
+				Server server = API.launchPeer(config);
+				serverList.add(server);
 			}
-			Server server = API.launchPeer(config);
-			serverList.add(server);
-		}
 
-		Server genesisServer = serverList.get(0);
+			Server genesisServer = serverList.get(0);
 
 		// go through 1..count-1 peers and join them all to the genesis Peer
 		// do this twice to allow for all of the peers to get all of the address in the group of peers
 
-		genesisServer.setHostname("localhost:"+genesisServer.getPort());
+			genesisServer.setHostname("localhost:"+genesisServer.getPort());
 
-		try {
-			for (int i = 1; i < count; i++) {
-				Server server=serverList.get(i);
+			try {
+				for (int i = 1; i < count; i++) {
+					Server server=serverList.get(i);
 
 				// Join each additional Server to the Peer #0
-				ConnectionManager cm=server.getConnectionManager();
-				cm.connectToPeer(genesisServer.getHostAddress()).join();
+					ConnectionManager cm=server.getConnectionManager();
+					cm.connectToPeer(genesisServer.getHostAddress()).join();
 
 				// Join server #0 to this server
-				genesisServer.getConnectionManager().connectToPeer(server.getHostAddress()).join();
-				server.setHostname("localhost:"+server.getPort());
+					genesisServer.getConnectionManager().connectToPeer(server.getHostAddress()).join();
+					server.setHostname("localhost:"+server.getPort());
+				}
+			} catch (Exception e) {
+				throw new LaunchException("Error setting up peer connections",e);
 			}
-		} catch (Exception e) {
-			throw new LaunchException("Error setting up peer connections",e);
-		}
 
-		return serverList;
+			launched=true;
+			return serverList;
+		} finally {
+			if (!launched) {
+				for (int i=serverList.size()-1; i>=0; i--) serverList.get(i).close();
+			}
+		}
 	}
 
 	/**

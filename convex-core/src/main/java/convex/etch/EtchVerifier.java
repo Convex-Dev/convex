@@ -9,6 +9,7 @@ import static convex.etch.EtchConstants.POINTER_TYPE_MASK;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,26 +18,182 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.function.BiConsumer;
 
 import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.Ref;
+import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.StoreException;
 import convex.core.store.MemoryStore;
+import convex.core.store.StoreTransfer;
 import convex.core.util.Utils;
 
 /**
- * Explicit offline validation of an Etch file.
+ * Explicit verification of Etch data, independent of copying and collection.
  *
- * <p>This validator is intentionally separate from normal Etch reads. It walks
- * the selected logical index, independently verifies every indexed record's
- * extent, hash and canonical CAD3 encoding, and checks that the selected root
- * has a complete stored reference tree. No strict checks are added to the
- * normal storage fast path.</p>
+ * <p>{@link #findMissing(Etch, Hash)} checks root completeness;
+ * {@link #verifyPersisted(Etch)} checks an entirely persisted file;
+ * {@link IndexVisitor} checks index structure; {@link #validate(File)} performs
+ * strict offline validation including record hashes and canonical encodings.
+ * These are explicit maintenance operations, never part of normal reads or
+ * checkpoint export.</p>
  */
-public final class EtchStrictValidator {
+public final class EtchVerifier {
 	private static final int DEFAULT_MAX_DIAGNOSTICS=100;
 
-	private EtchStrictValidator() {
+	private EtchVerifier() {
+	}
+
+	/**
+	 * Finds missing hashes in the tree reachable from an explicit root, using
+	 * only this physical file. Neither caches nor other GC generations can
+	 * satisfy a read. Persistence flags are deliberately ignored: GC targets
+	 * may also contain unrelated STORED entries.
+	 *
+	 * <p>Uses the same iterative, duplicate-safe traversal as store-level
+	 * verification, with an uncached private decoding context. Nil, unset and
+	 * empty roots are trivially complete. The caller keeps the file open and
+	 * write-quiescent. Working memory is proportional to the reachable hashes.
+	 * This checks completeness, not content hashes or index integrity.</p>
+	 *
+	 * @return missing hashes, empty if the tree is complete
+	 * @throws IOException if the file cannot be read
+	 */
+	public static List<Hash> findMissing(Etch file, Hash root) throws IOException {
+		Objects.requireNonNull(file,"file");
+		Objects.requireNonNull(root,"root");
+		if (isSpecialRoot(root)) return List.of();
+		try (EtchReadView reader=new EtchReadView(new Etch[] {file},null)) {
+			return StoreTransfer.verify(reader,root);
+		} catch (StoreException e) {
+			if (e.getCause() instanceof IOException io) throw io;
+			throw e;
+		}
+	}
+
+	/**
+	 * Checks that the stored root, every indexed entry and every branch are
+	 * physically present at PERSISTED status or above. Suitable for a checkpoint
+	 * or any other entirely persisted file; an ordinary store may legitimately
+	 * contain STORED entries which this stronger check rejects.
+	 *
+	 * <p>The caller keeps the file open and write-quiescent. This shares the index
+	 * checks in {@link IndexVisitor} and uses bounded working memory, without a
+	 * visited-hash set. It neither mutates nor closes the file. It does not
+	 * recompute content hashes or check canonical encodings; use
+	 * {@link #validate(File)} for strict validation of potentially corrupt files.</p>
+	 *
+	 * @throws IOException if an entry is not persisted or the file cannot be read
+	 * @throws MissingDataException if the root or a branch is missing
+	 */
+	public static void verifyPersisted(Etch file) throws IOException {
+		Objects.requireNonNull(file,"file");
+		Hash root=file.getRootHash();
+		try (EtchReadView reader=new EtchReadView(new Etch[] {file},null)) {
+			if (!isSpecialRoot(root)) requirePersisted(reader,root);
+			file.visitIndex(new IndexVisitor() {
+				@Override public void visitHash(Etch e, Hash hash) {
+					try {
+						Ref<ACell> ref=requirePersisted(reader,hash);
+						Cells.visitBranchRefs(ref.getValue(),br-> {
+							try { requirePersisted(reader,br.getHash()); }
+							catch (IOException ex) { throw Utils.sneakyThrow(ex); }
+						});
+					} catch (IOException ex) { throw Utils.sneakyThrow(ex); }
+				}
+				@Override public void fail(String message) {
+					throw Utils.sneakyThrow(new IOException(message));
+				}
+			});
+		}
+	}
+
+	private static Ref<ACell> requirePersisted(EtchReadView reader, Hash hash) throws IOException {
+		Ref<ACell> ref=reader.read(hash);
+		if (ref==null) throw new MissingDataException(reader,hash);
+		if (ref.getStatus()<Ref.PERSISTED) throw new IOException("Unpersisted Etch entry: "+hash);
+		return ref;
+	}
+
+	/**
+	 * Lightweight index-only visitor for an open, write-quiescent file. Shares
+	 * collision-chain and hash-path checks with strict validation, but does not
+	 * check record encodings, content hashes or reference completeness. Use
+	 * {@link #validate(File)} for safe traversal of potentially corrupt indexes.
+	 */
+	public static class IndexVisitor implements IEtchIndexVisitor {
+		public long visited;
+		public long entries;
+		public long empty;
+		public long values;
+		public long indexPtrs;
+
+		@Override public void visit(Etch e, int level, int[] digits, long indexPointer) throws IOException {
+			if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException("Etch verification interrupted");
+			visited++;
+			int count=e.indexSize(level);
+			entries+=count;
+			long[] slots=new long[count];
+			for (int i=0;i<count;i++) slots[i]=e.readSlot(indexPointer,i);
+			int[] starts=chainStarts(slots,(slot,message)->fail(message+" at slot "+slot));
+			for (int i=0;i<count;i++) {
+				long slot=slots[i];
+				long type=slot&POINTER_TYPE_MASK;
+				if (slot==0L) {
+					empty++;
+				} else if (type==POINTER_INDEX) {
+					indexPtrs++;
+				} else {
+					values++;
+					Hash hash=e.readValueKey(e.rawPointer(slot));
+					int expected=(type==POINTER_CHAIN)?starts[i]:i;
+					int mismatch=pathMismatch(hash,level,digits,expected);
+					if (mismatch>=0) fail("Record hash does not match index path at level "+mismatch+": "+hash);
+					visitHash(e,hash);
+				}
+			}
+		}
+
+		/** Override to perform additional checks for each indexed hash. */
+		public void visitHash(Etch e, Hash hash) { }
+
+		/** Override to collect diagnostics instead of failing immediately. */
+		public void fail(String message) { throw new Error(message); }
+	}
+
+	private static int pathMismatch(Hash hash, int level, int[] path, int expectedDigit) {
+		for (int i=0;i<level;i++) {
+			if (EtchConstants.indexDigit(hash,i)!=path[i]) return i;
+		}
+		return (expectedDigit<0 || EtchConstants.indexDigit(hash,level)!=expectedDigit)?level:-1;
+	}
+
+	/** Maps continuation slots to their start, reporting orphan/broken chains. */
+	private static int[] chainStarts(long[] slots, BiConsumer<Integer,String> problem) {
+		int count=slots.length;
+		int[] starts=new int[count];
+		java.util.Arrays.fill(starts,-1);
+		for (int i=0;i<count;i++) {
+			if ((slots[i]&POINTER_TYPE_MASK)!=POINTER_START) continue;
+			int next=(i+1)%count;
+			if ((slots[next]&POINTER_TYPE_MASK)!=POINTER_CHAIN) {
+				problem.accept(i,"collision start is not followed by a continuation");
+				continue;
+			}
+			int j=next;
+			while ((slots[j]&POINTER_TYPE_MASK)==POINTER_CHAIN && starts[j]<0) {
+				starts[j]=i;
+				j=(j+1)%count;
+			}
+		}
+		for (int i=0;i<count;i++) {
+			if ((slots[i]&POINTER_TYPE_MASK)==POINTER_CHAIN && starts[i]<0) {
+				problem.accept(i,"collision continuation has no start");
+			}
+		}
+		return starts;
 	}
 
 	/** Bounded detail options for a maintenance validation. */
@@ -188,21 +345,18 @@ public final class EtchStrictValidator {
 			indexSlots+=count;
 
 			long[] slots=new long[count];
-			long[] types=new long[count];
-			int[] chainStarts=new int[count];
-			java.util.Arrays.fill(chainStarts,-1);
 			for (int i=0;i<count;i++) {
 				long slot=Utils.readLong(block,i*POINTER_SIZE,POINTER_SIZE);
 				slots[i]=slot;
-				types[i]=slot&POINTER_TYPE_MASK;
 				if (slot==0L) emptySlots++;
 			}
-			validateChains(position,types,chainStarts);
+			int[] chainStarts=chainStarts(slots,(slot,message)->
+					malformed(ProblemKind.CHAIN,position+(long)slot*POINTER_SIZE,message));
 
 			for (int i=0;i<count;i++) {
 				long slot=slots[i];
 				if (slot==0L) continue;
-				long type=types[i];
+				long type=slot&POINTER_TYPE_MASK;
 				long pointer=slot&~POINTER_TYPE_MASK;
 				if (type==POINTER_INDEX) {
 					indexPointers++;
@@ -212,33 +366,6 @@ public final class EtchStrictValidator {
 				} else {
 					int expected=(type==POINTER_CHAIN)?chainStarts[i]:i;
 					validateRecord(pointer,level,path,expected);
-				}
-			}
-		}
-
-		private void validateChains(long position, long[] types, int[] starts) {
-			int count=types.length;
-			for (int i=0;i<count;i++) {
-				long type=types[i];
-				if (type==POINTER_START) {
-					int next=(i+1)%count;
-					if (types[next]!=POINTER_CHAIN) {
-						malformed(ProblemKind.CHAIN,position+(long)i*POINTER_SIZE,
-								"collision start is not followed by a continuation");
-						continue;
-					}
-					int j=next;
-					while ((types[j]==POINTER_CHAIN)&&(starts[j]<0)) {
-						starts[j]=i;
-						j=(j+1)%count;
-						if (j==next) break;
-					}
-				}
-			}
-			for (int i=0;i<count;i++) {
-				if ((types[i]==POINTER_CHAIN)&&(starts[i]<0)) {
-					malformed(ProblemKind.CHAIN,position+(long)i*POINTER_SIZE,
-							"collision continuation has no start");
 				}
 			}
 		}
@@ -279,14 +406,10 @@ public final class EtchStrictValidator {
 				return;
 			}
 			Hash hash=verified.hash();
-			for (int i=0;i<level;i++) {
-				if (EtchConstants.indexDigit(hash,i)!=path[i]) {
-					malformed(ProblemKind.POINTER,position,"record hash does not match index path at level "+i);
-					return;
-				}
-			}
-			if ((expectedDigit<0)||(EtchConstants.indexDigit(hash,level)!=expectedDigit)) {
-				malformed(ProblemKind.POINTER,position,"record hash does not match its index slot at level "+level);
+			int mismatch=pathMismatch(hash,level,path,expectedDigit);
+			if (mismatch>=0) {
+				String location=(mismatch==level)?"its index slot":"index path";
+				malformed(ProblemKind.POINTER,position,"record hash does not match "+location+" at level "+mismatch);
 				return;
 			}
 			if (branches.containsKey(hash)) {

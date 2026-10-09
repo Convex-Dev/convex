@@ -12,7 +12,7 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 import convex.test.generators.VectorGen;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestVectors {
+public class VectorsPropertyTest {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Property

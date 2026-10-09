@@ -3,16 +3,19 @@ package convex.etch;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayDeque;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 
 import convex.core.data.ACell;
-import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.store.AStore;
@@ -68,8 +71,8 @@ public class EtchUtils {
 	 * <li><b>Completed cutovers</b>: the single {@code .gc-complete} marker —
 	 * rewritten by every completeGC, so multiple successive GCs never chain —
 	 * names the CURRENT store file. It is ADOPTED: installed under the base
-	 * file name, with the superseded original deleted. That deletion is the
-	 * disk reclamation (each cutover was hard-gated on a verifiably complete
+	 * file name, with the superseded original name deleted. Without a retained
+	 * backup link, that reclaims disk space (each cutover was gated on a complete
 	 * sweep, and everything else is garbage by the retention contract).</li>
 	 * <li><b>Defunct files</b> ({@code .gc-defunct} tombstone: superseded
 	 * cutover originals not yet deleted, or cancelled targets pinned by
@@ -171,6 +174,12 @@ public class EtchUtils {
 		}
 		// Where rolled-back data belongs: the live store file
 		File live = (current != null) ? current : file;
+		// No safe rollback destination exists. In particular, an interrupted
+		// marker rewrite must never turn retained targets into a new empty store.
+		if (!live.isFile() || live.length()==0L) {
+			throw new IOException("Etch GC recovery has no live store for " + file
+					+ "; preserve the GC files and restore the completion marker or a backup");
+		}
 
 		// Recovery metadata is unauthenticated. Authenticate every non-empty store
 		// file which recovery may read, delete or replace before the first mutation.
@@ -228,10 +237,10 @@ public class EtchUtils {
 		}
 
 		// Delete the superseded original first. This deletion IS the disk
-		// reclamation: its retained content is verifiably in the current file
+		// reclamation unless a backup link retains it: its live content is in the current file
 		// (the cutover was hard-gated on a complete sweep) and everything else
-		// is garbage by the retention contract. Operators wanting an archive
-		// copy the file BEFORE invoking completeGC
+		// is garbage by the retention contract. An explicitly retained snapshot
+		// has a separate name outside this recovery layout and remains untouched.
 		if (file.exists()) {
 			if (!file.delete()) {
 				debug("Etch GC recovery: cannot delete superseded original {} (pinned by memory mappings"
@@ -316,7 +325,7 @@ public class EtchUtils {
 				throw new IOException("Etch GC recovery files use mixed versions "+versions
 						+"; supply an explicit matching Etch version to force cross-version recovery");
 			}
-			warn("Etch GC recovery explicitly allowing mixed file versions {} under configured v{}",
+			debug("Etch GC recovery explicitly allowing mixed file versions {} under configured v{}",
 					versions,config.getVersion());
 		}
 	}
@@ -351,8 +360,26 @@ public class EtchUtils {
 
 	static void writeMarker(File base, File target) throws IOException {
 		// Line 1 is authoritative (the target file name); any further lines are
-		// informational only (completeGC also records a root hash hint)
-		Files.writeString(markerFile(base).toPath(), target.getName() + "\n");
+		// informational only
+		writeMetadata(markerFile(base).toPath(), target.getName() + "\n");
+	}
+
+	/** Publishes a complete metadata file without truncating the previous one. */
+	static void writeMetadata(Path path, String contents) throws IOException {
+		Path temp = Files.createTempFile(path.toAbsolutePath().getParent(),
+				path.getFileName().toString()+".", ".tmp");
+		try {
+			try (FileChannel channel = FileChannel.open(temp, StandardOpenOption.WRITE)) {
+				ByteBuffer bytes = StandardCharsets.UTF_8.encode(contents);
+				while (bytes.hasRemaining()) channel.write(bytes);
+				channel.force(true);
+			}
+			// Fail safely when atomic replacement is unsupported; never fall back
+			// to truncating a marker that names the only surviving live file.
+			Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+		} finally {
+			Files.deleteIfExists(temp);
+		}
 	}
 
 	/**
@@ -408,7 +435,7 @@ public class EtchUtils {
 			try {
 				copied = lenientCopy(srcStore.getEtch(), baseStore, skipped);
 				Hash root = srcStore.getEtch().getRootHash();
-				List<Hash> missing = verify(baseStore.getEtch(), root);
+				List<Hash> missing = EtchVerifier.findMissing(baseStore.getEtch(), root);
 				if (missing.isEmpty()) {
 					baseStore.getEtch().setRootHash(root);
 					baseStore.getEtch().writeDataLength();
@@ -536,121 +563,22 @@ public class EtchUtils {
 		return count[0];
 	}
 	
-	/**
-	 * Verifies that the entire tree reachable from the given hash is present in
-	 * a single Etch file: entry presence is checked against this file ONLY
-	 * (unlike store-level reads, which may fall back to caches or other files).
-	 * Iterative and duplicate-safe; no pruning — a full independent walk.
-	 *
-	 * @param e Etch file to verify against
-	 * @param rootHash Hash of the tree root (unset/nil/empty roots are trivially complete)
-	 * @return List of missing hashes, empty if the tree is fully present
-	 * @throws IOException in case of IO error
-	 */
+	/** @deprecated Use {@link EtchVerifier#findMissing(Etch, Hash)}. */
+	@Deprecated
 	public static List<Hash> verify(Etch e, Hash rootHash) throws IOException {
-		List<Hash> missing = new ArrayList<>();
-		HashSet<Hash> seen = new HashSet<>();
-		ArrayDeque<Hash> stack = new ArrayDeque<>();
-		// unset / nil / empty roots are recognised without a store entry (as in
-		// AStore.getRootRef), so there is nothing to verify
-		if (!(Hash.UNSET_HASH.equals(rootHash) || Hash.NULL_HASH.equals(rootHash)
-				|| Hash.EMPTY_HASH.equals(rootHash))) {
-			stack.push(rootHash);
-		}
-		while (!stack.isEmpty()) {
-			Hash h = stack.pop();
-			if (!seen.add(h)) continue;
-			Ref<ACell> r = e.read(h);
-			if (r == null) {
-				missing.add(h);
-				continue;
-			}
-			Cells.visitBranchRefs(r.getValue(), br -> stack.push(br.getHash()));
-		}
-		return missing;
+		return EtchVerifier.findMissing(e,rootHash);
 	}
 
+	/** @deprecated Use {@link EtchVerifier.IndexVisitor}. */
+	@Deprecated
 	public static FullValidator getFullValidator() {
 		return new FullValidator();
 	}
 
-	/**
-	 * An Etch validator that checks every index entry
-	 */
-	public static class FullValidator implements IEtchIndexVisitor {
-		public long visited=0;
-		public long entries=0;
-		public long empty=0;
-		public long values=0;
-		public long indexPtrs=0;
-		@Override
-		public void visit(Etch e, int level, int[] digits, long indexPointer) throws IOException {
-			visited++;
-			
-			int isize=e.indexSize(level);
-			
-			String ps="";
-			for (int ll=0; ll<level; ll++) {
-				int lsize=e.indexSize(ll);
-				int hd=Integer.bitCount(lsize-1)/4;
-				ps=ps+Utils.toHexString(digits[ll]).substring(8-hd);
-			}
-			
-			entries+=isize;
-			
-			if (isize<=0) fail("Bad index size:"+isize);
-			
-			for (int i=0; i<isize; i++) {
-				long slot=e.readSlot(indexPointer, i);
-				long ptr=e.rawPointer(slot);
-				long type=e.extractType(slot);			
-				if ((ptr|type)!=slot) fail("Inconsistent slot code?!?");
-				
-				if (slot==0) {
-					empty++;
-				} else if (type!=EtchConstants.POINTER_INDEX) {
-					values++;
-					
-					Hash h=e.readValueKey(ptr);
-					String hp=h.toHexString(ps.length());
-					if (!hp.equals(ps)) {
-						fail("Index "+ps+" inconsistent with hash "+h);
-					}
-					
-					visitHash(e,h);
-				} else {
-					indexPtrs++;
-				}
-				
-				if (type==EtchConstants.POINTER_START) {
-					int ipp=(i+1)%isize; // next slot
-					long nextSlot=e.readSlot(indexPointer, ipp);
-					if (e.extractType(nextSlot)!=EtchConstants.POINTER_CHAIN) {
-						fail("Invalid slot after chain start: "+Utils.toHexString(nextSlot));
-					}
-				}
-				
-				if (type==EtchConstants.POINTER_CHAIN) {
-					int imm=(i+isize-1)%isize; // prev slot
-					long prevSlot=e.readSlot(indexPointer, imm);
-					long pt=e.extractType(prevSlot);
-					if (!((pt==EtchConstants.POINTER_CHAIN)||(pt==EtchConstants.POINTER_START))) {
-						fail("Invalid slot before chain entry: "+Utils.toHexString(prevSlot));
-					}
-				}
-			}
-		}
-		
-		public void visitHash(Etch e,Hash h) {
-			// Should be overriden if subclass wants to perform additional validation
-		}
+	/** @deprecated Use {@link EtchVerifier.IndexVisitor}; this checks the index only. */
+	@Deprecated
+	public static class FullValidator extends EtchVerifier.IndexVisitor { }
 
-		public void fail(String msg) {
-			throw new Error(msg);
-		}
-		
-	};
-	
 	public static abstract class EtchCellVisitor implements IEtchIndexVisitor {
 		@Override
 		public void visit(Etch e, int level, int[] digits, long indexPointer) throws IOException {

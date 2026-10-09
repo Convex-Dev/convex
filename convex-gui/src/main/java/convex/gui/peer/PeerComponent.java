@@ -171,7 +171,7 @@ public class PeerComponent extends BaseListComponent {
 		
 		JMenuItem walletButton = new JMenuItem("Open controller Wallet",Toolkit.menuIcon(0xe850));
 		walletButton.addActionListener(e -> {
-			new WalletApp(connectLocalControllerWallet(server)).run();
+			new WalletApp(connectLocalControllerWallet(server),true).run();
 		});
 		popupMenu.add(walletButton);
 		
@@ -260,7 +260,7 @@ public class PeerComponent extends BaseListComponent {
 			}
 			
 			convex.setAddress(addr,kp);
-			new REPLClient(convex).run();
+			new REPLClient(convex,true).run();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

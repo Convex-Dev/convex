@@ -22,8 +22,7 @@ import convex.core.util.Utils;
  * connections keyed by {@link AccountKey}.
  *
  * <p>Provides shared infrastructure: connection map, queries, dead connection
- * pruning, PING-based liveness testing, and broadcast. Subclasses implement
- * peer selection policy and lifecycle.
+ * pruning and broadcast. Subclasses implement peer selection policy and lifecycle.
  *
  * @see ConnectionManager — consensus peer connections (stake-weighted)
  * @see convex.node.LatticeConnectionManager — lattice peer connections (desired-peer set)
@@ -31,9 +30,6 @@ import convex.core.util.Utils;
 public abstract class AConnectionManager implements Closeable {
 
 	private static final Logger log = LoggerFactory.getLogger(AConnectionManager.class.getName());
-
-	/** Timeout for PING liveness checks (milliseconds). */
-	static final long PING_TIMEOUT_MS = 2000;
 
 	/**
 	 * Active outbound connections keyed by peer identity.
@@ -51,14 +47,17 @@ public abstract class AConnectionManager implements Closeable {
 	 */
 	public Convex getConnection(AccountKey peerKey) {
 		if (peerKey == null) return null;
-		Convex c = connections.get(peerKey);
-		if (c == null) return null;
-		if (!c.isConnected()) {
-			connections.remove(peerKey);
-			log.debug("Pruned closed connection to {}", peerKey);
-			return null;
+		while (true) {
+			Convex c = connections.get(peerKey);
+			if (c == null) return null;
+			if (c.isConnected()) return c;
+			if (connections.remove(peerKey,c)) {
+				closeSilently(c);
+				log.debug("Pruned closed connection to {}", peerKey);
+				return null;
+			}
+			// The mapping changed while it was inspected; check its replacement.
 		}
-		return c;
 	}
 
 	/**
@@ -108,21 +107,27 @@ public abstract class AConnectionManager implements Closeable {
 	 */
 	protected void closeConnection(AccountKey peerKey, String reason) {
 		if (peerKey == null) return;
-		Convex conn = connections.remove(peerKey);
-		if (conn != null) {
-			log.info("Removed peer connection to {} Reason={}", peerKey, reason);
-			closeSilently(conn);
-		}
+		Convex conn = connections.get(peerKey);
+		if (conn != null) closeConnection(peerKey,conn,reason);
+	}
+
+	/** Closes a connection only if it is still the expected mapping for its key. */
+	protected boolean closeConnection(AccountKey peerKey, Convex expected, String reason) {
+		if ((peerKey==null)||(expected==null)) return false;
+		if (!connections.remove(peerKey,expected)) return false;
+		log.info("Removed peer connection to {} Reason={}", peerKey, reason);
+		closeSilently(expected);
+		return true;
 	}
 
 	/**
 	 * Closes all connections managed by this manager.
 	 */
 	public void closeAllConnections() {
-		for (Convex conn : connections.values()) {
-			closeSilently(conn);
+		for (Map.Entry<AccountKey, Convex> entry : connections.entrySet()) {
+			Convex conn=entry.getValue();
+			if (connections.remove(entry.getKey(),conn)) closeSilently(conn);
 		}
-		connections.clear();
 	}
 
 	/**
@@ -139,26 +144,6 @@ public abstract class AConnectionManager implements Closeable {
 		}
 	}
 
-	// ========== Liveness ==========
-
-	/**
-	 * Tests whether a connection is alive by sending a PING and waiting for
-	 * a response. Use for active liveness probing — more expensive than
-	 * {@code isConnected()} but detects half-open connections.
-	 *
-	 * @param c Connection to test (may be null)
-	 * @return true if the connection responded to PING within timeout
-	 */
-	protected boolean isAlive(Convex c) {
-		if (c == null || !c.isConnected()) return false;
-		try {
-			c.pingSync(PING_TIMEOUT_MS);
-			return true;
-		} catch (Exception e) {
-			return false;
-		}
-	}
-
 	// ========== Pruning ==========
 
 	/**
@@ -168,9 +153,11 @@ public abstract class AConnectionManager implements Closeable {
 	protected void pruneDeadConnections() {
 		for (Map.Entry<AccountKey, Convex> entry : connections.entrySet()) {
 			Convex c = entry.getValue();
-			if (c == null || !c.isConnected()) {
-				connections.remove(entry.getKey());
-				log.debug("Pruned dead connection to {}", entry.getKey());
+			if (!c.isConnected()) {
+				if (connections.remove(entry.getKey(),c)) {
+					closeSilently(c);
+					log.debug("Pruned dead connection to {}", entry.getKey());
+				}
 			}
 		}
 	}
@@ -178,59 +165,37 @@ public abstract class AConnectionManager implements Closeable {
 	// ========== Broadcast ==========
 
 	/**
-	 * Broadcasts a message to all connected peers using non-blocking sends.
-	 * If a peer's outbound queue is full, it is skipped rather than blocking
-	 * the caller. Beliefs are rebroadcast periodically, so skipping one
-	 * cycle is acceptable.
+	 * Offers a message to every connected peer with a non-blocking send. A peer
+	 * whose outbound queue is full is skipped rather than blocking the caller.
+	 * Successive calls from one thread reach each peer in call order.
 	 *
-	 * @param msg Message to broadcast
+	 * @param message Message to broadcast
+	 * @return number of peers that accepted the message
 	 */
-	public void broadcast(Message msg) {
-		for (Convex peer : connections.values()) {
-			if (peer != null && peer.isConnected()) {
-				peer.trySend(msg);
-			}
-		}
-	}
-
-	/**
-	 * Broadcasts one small replaceable priority root. The default Netty transport
-	 * coalesces this independently of bulk DATA so the latest own Order remains
-	 * eligible for transmission under propagation backpressure.
-	 *
-	 * @return number of connected peers that accepted the priority message
-	 */
-	public int broadcastPriority(Message message) {
-		int accepted=0;
-		for (Convex peer:connections.values()) {
-			if (peer!=null && peer.isConnected() && peer.trySendPriority(message)) accepted++;
+	public int broadcast(Message message) {
+		ArrayList<Convex> peers = new ArrayList<>(connections.values());
+		Utils.shuffle(peers);
+		int accepted = 0;
+		for (Convex peer : peers) {
+			if (peer == null || !peer.isConnected()) continue;
+			if (peer.trySend(message)) accepted++;
 		}
 		return accepted;
 	}
 
-	/** Outcome of a non-blocking per-peer sequence broadcast. */
-	public record BroadcastResult(int peers, int complete, int fallback, int dropped) {}
-
 	/**
 	 * Broadcasts an ordered message sequence independently to every connected peer.
 	 * A full or slow peer queue stops only that peer's sequence; other peers continue.
-	 * When supplied, the fallback is attempted after a partial sequence so a receiver
-	 * can recover through its ordinary pull path.
 	 *
 	 * @param messages ordered messages to send
-	 * @param fallback message to try after a partial send, or null
-	 * @return aggregate enqueue outcome
+	 * @return number of peers that accepted the complete sequence
 	 */
-	public BroadcastResult broadcastSequence(List<Message> messages, Message fallback) {
+	public int broadcastSequence(List<Message> messages) {
 		ArrayList<Convex> peers=new ArrayList<>(connections.values());
 		Utils.shuffle(peers);
-		int attempted=0;
 		int complete=0;
-		int fallbackCount=0;
-		int dropped=0;
 		for (Convex peer:peers) {
 			if (peer==null || !peer.isConnected()) continue;
-			attempted++;
 			boolean sent=true;
 			for (Message message:messages) {
 				if (!peer.trySend(message)) {
@@ -240,12 +205,8 @@ public abstract class AConnectionManager implements Closeable {
 			}
 			if (sent) {
 				complete++;
-			} else if (fallback!=null && peer.trySend(fallback)) {
-				fallbackCount++;
-			} else {
-				dropped++;
 			}
 		}
-		return new BroadcastResult(attempted,complete,fallbackCount,dropped);
+		return complete;
 	}
 }

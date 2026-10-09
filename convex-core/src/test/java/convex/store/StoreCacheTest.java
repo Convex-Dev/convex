@@ -2,6 +2,8 @@ package convex.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,9 +17,14 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.Ref;
+import convex.core.data.RefSoft;
 import convex.core.exceptions.BadFormatException;
+import convex.core.store.AStore;
 import convex.core.store.CacheStats;
+import convex.core.store.MemoryStore;
 import convex.etch.Etch;
+import convex.etch.EtchConfig;
 import convex.etch.EtchStore;
 
 /**
@@ -83,22 +90,42 @@ public class StoreCacheTest {
 	 */
 	@Test
 	public void testSharedInstanceAcrossEviction() throws IOException, BadFormatException {
-		EtchStore store = new EtchStore(Etch.createTempEtch(), true);
-		Blob target = nonEmbedded(new Random(0xABCDL));
+		// One slot makes every eviction deterministic, including after persistence.
+		for (boolean direct:new boolean[] {false, true}) {
+			try (EtchStore store=EtchStore.createTemp(EtchConfig.create().withRefCacheSize(1));
+					AStore other=direct ? new MemoryStore() : EtchStore.createTemp()) {
+				Blob target=nonEmbedded(new Random(0xABCDL));
+				Blob evict=nonEmbedded(new Random(0xBEEFL)).getEncoding();
+				ACell first=store.decode(target.getEncoding());
+				Ref<?> original=store.checkCache(target.getHash());
+				assertTrue(original.isDirect());
+				assertEquals(Ref.UNKNOWN, original.getStatus());
+				assertSame(first.getRef(), original, "Fresh decodes should reuse their direct ref");
 
-		ACell first = store.decode(target.getEncoding());
+				// Attaching another store's higher-status ref changes cell.getRef(),
+				// but must not change the meaning of either cache tier in this store.
+				Ref<?> foreign=other.storeTopRef(first.getRef(), Ref.ANNOUNCED, null);
+				first.attachRef(foreign); // MemoryStore returns a direct ref without attaching it
+				assertSame(foreign, first.getRef());
+				assertSame(original, store.checkCache(target.getHash()));
+				store.decode(evict);
+				Ref<?> promoted=store.checkCache(target.getHash());
+				assertFalse(store.isForeign(promoted));
+				assertTrue(promoted.isDirect());
+				assertEquals(Ref.UNKNOWN, promoted.getStatus());
+				assertSame(first, promoted.getValue());
 
-		// Thrash L1 with unrelated decodes. 2× L1_SIZE distinct cells guarantees the
-		// target's slot is overwritten with very high probability.
-		List<Blob> thrash = generate(L1_SIZE * 2, 0xBEEFL);
-		List<ACell> pinned = new ArrayList<>(thrash.size());
-		for (Blob b : thrash) pinned.add(store.decode(b.getEncoding()));
-
-		ACell second = store.decode(target.getEncoding());
-		assertSame(first, second, "L2 should return same instance after L1 eviction");
-
-		pinned.size();
-		store.close();
+				store.decode(evict);
+				assertSame(first, store.decode(target.getEncoding()), "L2 should reuse the cell");
+				assertEquals(Ref.UNKNOWN, store.checkCache(target.getHash()).getStatus());
+				assertSame(foreign, first.getRef(), "Cache promotion must not mutate the shared cell");
+				assertNull(store.getEtch().read(target.getHash()));
+				Ref<?> persisted=store.storeTopRef(first.getRef(), Ref.PERSISTED, null);
+				assertSame(store, ((RefSoft<?>) persisted).getStore());
+				assertEquals(Ref.PERSISTED, persisted.getStatus());
+				assertNotNull(store.getEtch().read(target.getHash()), "Persistence must actually write here");
+			}
+		}
 	}
 
 	/**
@@ -124,6 +151,14 @@ public class StoreCacheTest {
 		// With L2 off and working set 4× L1, the vast majority must re-decode.
 		assertTrue(pass2.decodes > n / 2,
 				"expected many re-decodes with L2 disabled, got " + pass2);
+		// The compatibility constructor's override must also survive GC cutover.
+		store.startGC();
+		store.transferGC();
+		try (EtchStore successor=store.completeGC()) {
+			assertFalse(successor.isL2Enabled());
+			assertEquals(store.getConfig(),successor.getConfig());
+			assertEquals(L1_SIZE,successor.getRefCacheSize());
+		}
 		store.close();
 	}
 

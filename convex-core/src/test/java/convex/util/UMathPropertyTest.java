@@ -10,7 +10,7 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 import convex.core.util.UMath;
 
 @RunWith(JUnitQuickcheck.class)
-public class GenTestUMath {
+public class UMathPropertyTest {
 
 	
 	@Property
