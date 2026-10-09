@@ -134,7 +134,9 @@ As part of the same version-bump commit, also update:
   lockstep, otherwise onboarding goes stale:
   - **`design`** — `convex-java` Maven/Gradle coordinates and `releases/download/<version>/convex.jar`
     URLs under `docs/tutorial/**` (note: release tags have **no** `v` prefix).
-  - **`convex.world`** — the displayed release version in `src/components/Footer.tsx` (the software release, e.g. `v0.8.7` — not to be confused with the on-chain protocol version).
+  - **`convex.world`** — `CONVEX_RELEASE_VERSION` in `src/data/release.ts`, shared by
+    the footer and Downloads page (plain `x.y.z`, with no `v` prefix). Deploy the
+    website update after the GitHub release is available.
 
 ### 5. Rebuild and smoke test the built jar
 
