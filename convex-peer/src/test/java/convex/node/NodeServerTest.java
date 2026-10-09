@@ -950,7 +950,7 @@ public class NodeServerTest {
 			"the application group should share the authoritative cursor store");
 
 		setNodeServer.getCursor().merge(expected);
-		setNodeServer.getCursor().sync();
+		syncAndAwaitPropagator(setNodeServer);
 		Hash rootHash = expected.getHash();
 
 		try (AStore peerStore = new MemoryStore();
