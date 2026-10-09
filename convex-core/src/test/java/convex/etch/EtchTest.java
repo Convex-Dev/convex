@@ -59,7 +59,7 @@ public class EtchTest {
 		java.io.File file = store.getFile();
 		assertEquals(Hash.UNSET_HASH, store.getRootHash());
 		assertNull(store.getRootData());
-		assertTrue(EtchUtils.verify(etch, store.getRootHash()).isEmpty());
+		assertTrue(EtchVerifier.findMissing(etch, store.getRootHash()).isEmpty());
 
 		// The physical root field remains zero-initialised. UNSET_HASH preserves
 		// this state while store-level reads correctly treat it as no root data.
@@ -225,7 +225,7 @@ public class EtchTest {
 
 		assertNull(etch.read(f[FILL])); // last item still not written
 		
-		EtchUtils.FullValidator vd=EtchUtils.getFullValidator();
+		EtchVerifier.IndexVisitor vd=new EtchVerifier.IndexVisitor();
 		etch.visitIndex(vd);
 		
 		assertEquals(40,vd.visited);
@@ -289,7 +289,7 @@ public class EtchTest {
 			assertEquals(v, r2.getValue());
 		}
 
-		EtchUtils.FullValidator vd=EtchUtils.getFullValidator();
+		EtchVerifier.IndexVisitor vd=new EtchVerifier.IndexVisitor();
 		etch.visitIndex(vd);
 		assertEquals(COUNT,vd.values);
 		assertTrue(vd.visited>1);

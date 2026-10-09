@@ -5,8 +5,12 @@ import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Files;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -119,6 +123,34 @@ public class EtchStore extends ACachedStore {
 	 * @throws IOException if verification, backup creation or cutover fails
 	 */
 	public EtchStore completeGC(File backupFile) throws IOException { return gc.complete(this,backupFile); }
+
+	/**
+	 * Exports an explicit root into a new, independent, closed Etch checkpoint.
+	 * Reads/writes and GC may continue; even closing this handle does not revoke
+	 * an export's acquired read lease. Interruption cancels before publication.
+	 * The child-first copy establishes completeness; a separate full scan is
+	 * available through {@link EtchVerifier#verifyPersisted(Etch)} at the caller's choice.
+	 * The destination filesystem must support hard links for no-replace publication.
+	 * See {@link EtchCheckpoint} for status timing and durability guarantees.
+	 */
+	public File exportCheckpoint(Hash root, File destination) throws IOException {
+		return exportCheckpoint(root,destination,null);
+	}
+
+	/** Exports with explicitly supplied fields overriding this store's effective configuration. */
+	public File exportCheckpoint(Hash root, File destination,
+			AMap<AString,ACell> overrides) throws IOException {
+		return exportCheckpoint(root,destination,overrides,null);
+	}
+
+	/** Exports with partial configuration and an optional replacement key resolver. */
+	public File exportCheckpoint(Hash root, File destination,
+			AMap<AString,ACell> overrides,
+			Function<AccountKey,byte[]> keyResolver) throws IOException {
+		return EtchCheckpoint.export(this,root,destination,config.withOverrides(overrides,keyResolver));
+	}
+
+	EtchReadView lease() throws IOException { return gc.lease(this); }
 
 	/**
 	 * Checks a proposed backup path without creating or modifying any file.

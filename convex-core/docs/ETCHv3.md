@@ -501,14 +501,14 @@ All classes are in `convex.etch` in `convex-core` unless stated.
   `EtchCipherLocator` for offset-to-locator mapping; `EtchKeyDerivation` for the
   master-key and file-key HKDF derivations.
 - `EtchMaintenanceReader` (unsafe open), `EtchRebuilder` (repair, with
-  `Status.COMPLETE`, `ROOT_RECOVERED`, `PARTIAL`), `EtchStrictValidator` (offline
+  `Status.COMPLETE`, `ROOT_RECOVERED`, `PARTIAL`), `EtchVerifier` (offline
   validation), `EtchUtils` (migration and GC recovery).
 - CLI (`convex-cli`, `convex.cli.etch`): `etch info`, `etch validate`,
   `etch migrate --into [--set-root]`, `etch repair --into`, `etch gc`,
   `etch recover`. Key and destination-policy options come from
   `convex.cli.mixins.EtchConfigMixin`.
 - Tests: `EtchV3HeaderTest`, `EtchV3IntegrationTest`, `EtchVersionMatrixTest`,
-  `EtchMaintenanceReaderTest`, `EtchRebuilderTest`, `EtchStrictValidatorTest` and the
+  `EtchMaintenanceReaderTest`, `EtchRebuilderTest`, `EtchVerifierTest` and the
   cipher tests named above.
 
 ## Related

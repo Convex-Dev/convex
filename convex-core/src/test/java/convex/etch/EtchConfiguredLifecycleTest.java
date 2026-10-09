@@ -36,6 +36,53 @@ import convex.core.data.Refs;
 
 /** Tests configuration retention across EtchStore and GC file lifecycles. */
 public class EtchConfiguredLifecycleTest {
+	@ParameterizedTest
+	@MethodSource("gcCases")
+	public void testIndependentCheckpoint(MatrixCase c, boolean collecting) throws IOException {
+		EtchConfig config=c.config().withRefCacheSize(19).withL2Enabled(false);
+		File output=File.createTempFile("etch-checkpoint-matrix",".etch");
+		assertTrue(output.delete());
+		output.deleteOnExit();
+		AVector<ACell> root=EtchGCLifecycleTest.tree(28000);
+		try (EtchStore source=EtchStore.createTemp(config)) {
+			if (collecting) source.startGC();
+			for (int i=0; i<root.count(); i++) {
+				source.storeTopRef(root.getRef(i),i==0?Ref.ANNOUNCED:Ref.STORED,null);
+			}
+			source.storeTopRef(root.getRef().withMinimumStatus(Ref.ANNOUNCED),Ref.STORED,null);
+			if (collecting) source.getTargetEtch().write(root.getHash(),root.getRef().withStatus(Ref.ANNOUNCED));
+			ACell live=EtchGCLifecycleTest.tree(29000);
+			source.setRootData(live);
+			Ref<?> sourceRef=source.refForHash(root.getHash()); // warm source cache
+			assertEquals(output.getCanonicalFile(),source.exportCheckpoint(root.getHash(),output));
+			assertSame(sourceRef,source.checkCache(root.getHash()));
+			assertEquals(config,source.getConfig());
+			assertEquals(live.getHash(),source.getRootHash());
+			try (EtchStore restored=EtchStore.create(output,config)) {
+				assertEquals(root,restored.getRootData());
+				assertEquals(config,restored.getConfig());
+				assertEquals(collecting?Ref.ANNOUNCED:Ref.PERSISTED,restored.getEtch().read(root.getHash()).getStatus());
+				for (int i=0; i<root.count(); i++) {
+					assertEquals(i==0?Ref.ANNOUNCED:Ref.PERSISTED,
+							restored.getEtch().read(root.getRef(i).getHash()).getStatus());
+				}
+				assertNull(restored.getEtch().read(live.getHash()));
+				EtchVerifier.verifyPersisted(restored.getEtch());
+			}
+			if (collecting) source.cancelGC();
+			if (config.getVersion()==EtchConstants.VERSION_3) {
+				source.flush();
+				assertFalse(Arrays.equals(readV3Salt(source.getFile(),config),readV3Salt(output,config)));
+				if (config.getCipherMode()!=EtchConfig.CipherMode.NONE) {
+					EtchConfig wrong=config.withKeyFunction(h->WRONG_SECRET.clone());
+					assertThrows(IOException.class,()->EtchStore.create(output,wrong));
+				}
+			}
+		}
+		try (EtchStore restored=EtchStore.create(output,config)) {
+			assertEquals(root,restored.getRootData());
+		}
+	}
 
 	private static final byte[] SECRET={
 			0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,

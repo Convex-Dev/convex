@@ -19,6 +19,7 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.exceptions.BadFormatException;
+import convex.core.store.AStore;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
@@ -636,6 +637,15 @@ public class Etch {
 	 * data length.
 	 */
 	void close() {
+		try { closeChecked(); }
+		catch (IOException e) {
+			LOG.log(System.Logger.Level.WARNING, "Etch close did not complete cleanly for " + fileName
+					+ "; treat the file as dirty (v3 requires explicit recovery open)", e);
+		}
+	}
+
+	/** Closes all resources, reporting finalisation failures to durable exporters. */
+	void closeChecked() throws IOException {
 		synchronized (this) {
 			if (closeStarted)
 				return;
@@ -663,8 +673,7 @@ public class Etch {
 					failure = combineCloseFailure(failure, e);
 				}
 				if (failure != null) {
-					LOG.log(System.Logger.Level.WARNING, "Etch close did not complete cleanly for " + fileName
-							+ "; treat the file as dirty (v3 requires explicit recovery open)", failure);
+					throw new IOException("Etch close failed: " + fileName, failure);
 				}
 			} finally {
 				destroyCiphers(dataCipher,indexCipher);
@@ -814,7 +823,7 @@ public class Etch {
 	}
 
 	/** Reads through a particular live view, including retained legacy files. */
-	<T extends ACell> RefSoft<T> read(AArrayBlob key, EtchStore reader) throws IOException {
+	<T extends ACell> RefSoft<T> read(AArrayBlob key, AStore reader) throws IOException {
 		Counters.etchRead++;
 		RefSoft<T> result = readAtIndex(key, 0, indexStart, reader);
 		if (result == null) {
@@ -851,7 +860,7 @@ public class Etch {
 		return read(key, pointer, store);
 	}
 
-	private <T extends ACell> RefSoft<T> read(AArrayBlob key, long pointer, EtchStore reader) throws IOException {
+	<T extends ACell> RefSoft<T> read(AArrayBlob key, long pointer, AStore reader) throws IOException {
 		long recordPosition = rawPointer(pointer);
 		long readPosition = recordPosition;
 		int headerOffset = KEY_SIZE;
@@ -1044,7 +1053,7 @@ public class Etch {
 	 * @return decoded reference, or {@code null} if not found
 	 * @throws IOException
 	 */
-	private <T extends ACell> RefSoft<T> readAtIndex(AArrayBlob key, int level, long indexPosition, EtchStore reader) throws IOException {
+	private <T extends ACell> RefSoft<T> readAtIndex(AArrayBlob key, int level, long indexPosition, AStore reader) throws IOException {
 		if (level >= MAX_LEVEL) {
 			throw new Error("Etch index level exceeded for key: " + key);
 		}

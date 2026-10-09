@@ -183,6 +183,17 @@ public final class EtchConfig {
 		return config;
 	}
 
+	/** Compiles only explicitly supplied overrides over this effective policy. */
+	public EtchConfig withOverrides(AMap<AString,ACell> overrides) {
+		return withOverrides(overrides,null);
+	}
+
+	/** As above, optionally replacing the runtime key resolver (null inherits it). */
+	public EtchConfig withOverrides(AMap<AString,ACell> overrides,
+			Function<AccountKey,byte[]> resolver) {
+		return fromMap(overrides==null?config:config.merge(overrides),resolver==null?keyFunction:resolver);
+	}
+
 	/**
 	 * Creates the default compiled configuration for a new Etch file.
 	 */

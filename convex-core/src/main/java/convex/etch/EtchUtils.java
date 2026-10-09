@@ -10,15 +10,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 
 import convex.core.data.ACell;
-import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.store.AStore;
@@ -438,7 +435,7 @@ public class EtchUtils {
 			try {
 				copied = lenientCopy(srcStore.getEtch(), baseStore, skipped);
 				Hash root = srcStore.getEtch().getRootHash();
-				List<Hash> missing = verify(baseStore.getEtch(), root);
+				List<Hash> missing = EtchVerifier.findMissing(baseStore.getEtch(), root);
 				if (missing.isEmpty()) {
 					baseStore.getEtch().setRootHash(root);
 					baseStore.getEtch().writeDataLength();
@@ -566,121 +563,22 @@ public class EtchUtils {
 		return count[0];
 	}
 	
-	/**
-	 * Verifies that the entire tree reachable from the given hash is present in
-	 * a single Etch file: entry presence is checked against this file ONLY
-	 * (unlike store-level reads, which may fall back to caches or other files).
-	 * Iterative and duplicate-safe; no pruning — a full independent walk.
-	 *
-	 * @param e Etch file to verify against
-	 * @param rootHash Hash of the tree root (unset/nil/empty roots are trivially complete)
-	 * @return List of missing hashes, empty if the tree is fully present
-	 * @throws IOException in case of IO error
-	 */
+	/** @deprecated Use {@link EtchVerifier#findMissing(Etch, Hash)}. */
+	@Deprecated
 	public static List<Hash> verify(Etch e, Hash rootHash) throws IOException {
-		List<Hash> missing = new ArrayList<>();
-		HashSet<Hash> seen = new HashSet<>();
-		ArrayDeque<Hash> stack = new ArrayDeque<>();
-		// unset / nil / empty roots are recognised without a store entry (as in
-		// AStore.getRootRef), so there is nothing to verify
-		if (!(Hash.UNSET_HASH.equals(rootHash) || Hash.NULL_HASH.equals(rootHash)
-				|| Hash.EMPTY_HASH.equals(rootHash))) {
-			stack.push(rootHash);
-		}
-		while (!stack.isEmpty()) {
-			Hash h = stack.pop();
-			if (!seen.add(h)) continue;
-			Ref<ACell> r = e.read(h);
-			if (r == null) {
-				missing.add(h);
-				continue;
-			}
-			Cells.visitBranchRefs(r.getValue(), br -> stack.push(br.getHash()));
-		}
-		return missing;
+		return EtchVerifier.findMissing(e,rootHash);
 	}
 
+	/** @deprecated Use {@link EtchVerifier.IndexVisitor}. */
+	@Deprecated
 	public static FullValidator getFullValidator() {
 		return new FullValidator();
 	}
 
-	/**
-	 * An Etch validator that checks every index entry
-	 */
-	public static class FullValidator implements IEtchIndexVisitor {
-		public long visited=0;
-		public long entries=0;
-		public long empty=0;
-		public long values=0;
-		public long indexPtrs=0;
-		@Override
-		public void visit(Etch e, int level, int[] digits, long indexPointer) throws IOException {
-			visited++;
-			
-			int isize=e.indexSize(level);
-			
-			String ps="";
-			for (int ll=0; ll<level; ll++) {
-				int lsize=e.indexSize(ll);
-				int hd=Integer.bitCount(lsize-1)/4;
-				ps=ps+Utils.toHexString(digits[ll]).substring(8-hd);
-			}
-			
-			entries+=isize;
-			
-			if (isize<=0) fail("Bad index size:"+isize);
-			
-			for (int i=0; i<isize; i++) {
-				long slot=e.readSlot(indexPointer, i);
-				long ptr=e.rawPointer(slot);
-				long type=e.extractType(slot);			
-				if ((ptr|type)!=slot) fail("Inconsistent slot code?!?");
-				
-				if (slot==0) {
-					empty++;
-				} else if (type!=EtchConstants.POINTER_INDEX) {
-					values++;
-					
-					Hash h=e.readValueKey(ptr);
-					String hp=h.toHexString(ps.length());
-					if (!hp.equals(ps)) {
-						fail("Index "+ps+" inconsistent with hash "+h);
-					}
-					
-					visitHash(e,h);
-				} else {
-					indexPtrs++;
-				}
-				
-				if (type==EtchConstants.POINTER_START) {
-					int ipp=(i+1)%isize; // next slot
-					long nextSlot=e.readSlot(indexPointer, ipp);
-					if (e.extractType(nextSlot)!=EtchConstants.POINTER_CHAIN) {
-						fail("Invalid slot after chain start: "+Utils.toHexString(nextSlot));
-					}
-				}
-				
-				if (type==EtchConstants.POINTER_CHAIN) {
-					int imm=(i+isize-1)%isize; // prev slot
-					long prevSlot=e.readSlot(indexPointer, imm);
-					long pt=e.extractType(prevSlot);
-					if (!((pt==EtchConstants.POINTER_CHAIN)||(pt==EtchConstants.POINTER_START))) {
-						fail("Invalid slot before chain entry: "+Utils.toHexString(prevSlot));
-					}
-				}
-			}
-		}
-		
-		public void visitHash(Etch e,Hash h) {
-			// Should be overriden if subclass wants to perform additional validation
-		}
+	/** @deprecated Use {@link EtchVerifier.IndexVisitor}; this checks the index only. */
+	@Deprecated
+	public static class FullValidator extends EtchVerifier.IndexVisitor { }
 
-		public void fail(String msg) {
-			throw new Error(msg);
-		}
-		
-	};
-	
 	public static abstract class EtchCellVisitor implements IEtchIndexVisitor {
 		@Override
 		public void visit(Etch e, int level, int[] digits, long indexPointer) throws IOException {

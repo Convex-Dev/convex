@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `EtchStore.exportCheckpoint` exports an explicit root from a live store into
+  an independent, closed checkpoint while writes and GC continue. A separate
+  `EtchVerifier.verifyPersisted` function lets callers check completeness and
+  persistence status.
+  Exports preserve per-entry announcement status and support partial destination
+  configuration overrides and rekeying. Publication requires hard-link support
+  on the destination filesystem; the source may be on another filesystem.
 - Etch configuration maps support per-store `refCacheSize` and `enableL2` options,
   with defaults of 10,000 L1 slots and L2 enabled. Resolved settings are available
   through `EtchConfig.getMap()` and `EtchStore.getConfig()` and survive GC cutover.
@@ -26,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Etch verification is consolidated in `EtchVerifier`, including the former
+  `EtchStrictValidator` API. `EtchUtils.verify` and `FullValidator` remain as
+  deprecated delegates. Checkpoint export and verification are independent.
 - Multi child transactions for another account use the same control rule as
   `eval-as`: the signer must be the account's controller, resolved through a
   trust monitor when the controller is a scoped actor. Previously only an exact

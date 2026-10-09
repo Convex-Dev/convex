@@ -178,7 +178,7 @@ public class EtchRobustnessTest {
 			assertTrue(r.getStatus() >= Ref.ANNOUNCED, "Flags lost across reopen: " + h);
 		}
 
-		EtchUtils.FullValidator vd = EtchUtils.getFullValidator();
+		EtchVerifier.IndexVisitor vd = new EtchVerifier.IndexVisitor();
 		reopened.getEtch().visitIndex(vd);
 		assertTrue(vd.values >= branches.size());
 		reopened.close();
@@ -257,7 +257,7 @@ public class EtchRobustnessTest {
 		}
 
 		// Structural integrity after concurrent writes
-		EtchUtils.FullValidator vd = EtchUtils.getFullValidator();
+		EtchVerifier.IndexVisitor vd = new EtchVerifier.IndexVisitor();
 		store.getEtch().visitIndex(vd);
 		assertTrue(vd.values >= NTHREADS * PER);
 	}

@@ -6,9 +6,9 @@ import java.io.IOException;
 import convex.cli.CLIError;
 import convex.core.text.Text;
 import convex.etch.EtchCorruptionError;
-import convex.etch.EtchStrictValidator;
-import convex.etch.EtchStrictValidator.Problem;
-import convex.etch.EtchStrictValidator.Report;
+import convex.etch.EtchVerifier;
+import convex.etch.EtchVerifier.Problem;
+import convex.etch.EtchVerifier.Report;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -33,8 +33,8 @@ public class EtchValidate extends AEtchCommand {
 		}
 
 		try {
-			Report report=EtchStrictValidator.validate(file,sourceConfig(),
-					new EtchStrictValidator.Options(detailLimit));
+			Report report=EtchVerifier.validate(file,sourceConfig(),
+					new EtchVerifier.Options(detailLimit));
 			for (Problem problem:report.problems()) {
 				String location=(problem.position()<0)?"":" at "+problem.position();
 				cli().inform(problem.kind()+location+": "+problem.message());

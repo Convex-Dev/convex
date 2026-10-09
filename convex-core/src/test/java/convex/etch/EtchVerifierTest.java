@@ -3,15 +3,21 @@ package convex.etch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.List;
+import java.util.HashSet;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.AString;
+import convex.core.data.ACell;
+import convex.core.data.AVector;
+import convex.core.data.Ref;
+import convex.core.exceptions.MissingDataException;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Strings;
@@ -19,8 +25,43 @@ import convex.core.data.Vectors;
 import convex.core.crypto.Hashing;
 import convex.core.store.MemoryStore;
 
-public class EtchStrictValidatorTest {
+public class EtchVerifierTest {
 	private static final byte[] SECRET=sequence(0x20,32);
+
+	@Test
+	public void testVerificationIgnoresWarmCache() throws IOException {
+		try (EtchStore destination=EtchStore.createTemp()) {
+			AVector<ACell> root=EtchGCLifecycleTest.tree(40000);
+			Etch file=destination.getEtch();
+			for (Hash sentinel:List.of(Hash.NULL_HASH,Hash.UNSET_HASH,Hash.EMPTY_HASH)) {
+				assertTrue(EtchVerifier.findMissing(file,sentinel).isEmpty());
+			}
+			assertEquals(List.of(root.getHash()),EtchVerifier.findMissing(file,root.getHash()));
+			EtchVerifier.verifyPersisted(destination.getEtch());
+			destination.getEtch().setRootHash(root.getHash());
+			assertThrows(MissingDataException.class,()->EtchVerifier.verifyPersisted(destination.getEtch()));
+			for (int i=0;i<root.count();i++) destination.storeTopRef(root.getRef(i),Ref.UNKNOWN,null);
+			destination.storeTopRef(root.getRef(),Ref.STORED,null);
+			List<Hash> missing=EtchVerifier.findMissing(file,root.getHash());
+			List<Hash> expected=EtchGCLifecycleTest.treeHashes(root);
+			expected.remove(root.getHash());
+			assertEquals(new HashSet<>(expected),new HashSet<>(missing));
+			assertThrows(IOException.class,()->EtchVerifier.verifyPersisted(destination.getEtch()));
+			// Deliberately forge a persisted parent, leaving its cached children absent.
+			destination.getEtch().write(root.getHash(),root.getRef().withStatus(Ref.PERSISTED));
+			assertEquals(missing,EtchVerifier.findMissing(file,root.getHash()));
+			assertThrows(MissingDataException.class,()->EtchVerifier.verifyPersisted(destination.getEtch()));
+			for (int i=0;i<root.count();i++) destination.storeTopRef(root.getRef(i),Ref.STORED,null);
+			assertTrue(EtchVerifier.findMissing(file,root.getHash()).isEmpty());
+			assertThrows(IOException.class,()->EtchVerifier.verifyPersisted(file));
+			for (int i=0;i<root.count();i++) destination.storeTopRef(root.getRef(i),Ref.PERSISTED,null);
+			EtchVerifier.verifyPersisted(file);
+			// A complete root does not require unrelated STORED records to be persisted.
+			destination.storeTopRef(largeString("orphan").getRef(),Ref.STORED,null);
+			assertTrue(EtchVerifier.findMissing(file,root.getHash()).isEmpty());
+			assertThrows(IOException.class,()->EtchVerifier.verifyPersisted(file));
+		}
+	}
 
 	@Test
 	public void testValidFormatAndCipherMatrix() throws Exception {
@@ -42,7 +83,7 @@ public class EtchStrictValidatorTest {
 			store.flush();
 			store.close();
 
-			EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config);
+			EtchVerifier.Report report=EtchVerifier.validate(file,config);
 			assertTrue(report.isValid(),config+" "+report);
 			assertEquals(0L,report.failureCount(),config.toString());
 			assertTrue(report.records()>=2L,config.toString());
@@ -75,8 +116,8 @@ public class EtchStrictValidatorTest {
 				data.writeByte(original^1);
 			}
 
-			EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config,
-					new EtchStrictValidator.Options(1));
+			EtchVerifier.Report report=EtchVerifier.validate(file,config,
+					new EtchVerifier.Options(1));
 			assertFalse(report.isValid(),config.toString());
 			assertEquals(1L,report.hashMismatches(),config.toString());
 			assertEquals(1L,report.missingRootHashes(),config.toString());
@@ -100,7 +141,7 @@ public class EtchStrictValidatorTest {
 			data.writeShort(0xffff);
 		}
 
-		EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config);
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertFalse(report.isValid());
 		assertEquals(1L,report.malformedEntries());
 		assertEquals(0L,report.hashMismatches());
@@ -124,7 +165,7 @@ public class EtchStrictValidatorTest {
 			data.writeByte(value^1);
 		}
 
-		EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config);
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertFalse(report.isValid());
 		assertEquals(1L,report.hashMismatches());
 	}
@@ -151,7 +192,7 @@ public class EtchStrictValidatorTest {
 			data.writeLong(fileEnd+1024L);
 		}
 
-		EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config);
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertFalse(report.isValid());
 		assertTrue(report.malformedEntries()>0L,report.toString());
 		assertEquals(1L,report.missingRootHashes());
@@ -179,7 +220,7 @@ public class EtchStrictValidatorTest {
 			data.writeLong(fileEnd-1L);
 		}
 
-		EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config);
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertFalse(report.isValid());
 		assertTrue(report.problems().stream().anyMatch(p ->
 				p.message().contains("record header is outside")),report.toString());
@@ -232,10 +273,13 @@ public class EtchStrictValidatorTest {
 			data.writeLong(pointer);
 		}
 
-		EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config);
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertFalse(report.isValid());
 		assertTrue(report.problems().stream().anyMatch(p ->
 				p.message().contains("does not match its index slot")),report.toString());
+		try (EtchStore reopened=new EtchStore(Etch.create(file,config))) {
+			assertThrows(Error.class,()->reopened.getEtch().visitIndex(new EtchVerifier.IndexVisitor()));
+		}
 	}
 
 	@Test
@@ -260,10 +304,14 @@ public class EtchStrictValidatorTest {
 			data.writeLong(EtchConstants.POINTER_START|pointer);
 		}
 
-		EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config);
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertFalse(report.isValid());
 		assertTrue(report.problems().stream().anyMatch(p ->
-				p.kind()==EtchStrictValidator.ProblemKind.CHAIN),report.toString());
+				p.kind()==EtchVerifier.ProblemKind.CHAIN),report.toString());
+		try (EtchStore reopened=new EtchStore(Etch.create(file,config))) {
+			assertThrows(Error.class,()->reopened.getEtch().visitIndex(new EtchVerifier.IndexVisitor()));
+			assertThrows(IOException.class,()->EtchVerifier.verifyPersisted(reopened.getEtch()));
+		}
 	}
 
 	@Test
@@ -289,7 +337,7 @@ public class EtchStrictValidatorTest {
 			data.writeLong(pointer);
 		}
 
-		EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config);
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertFalse(report.isValid());
 		assertTrue(report.problems().stream().anyMatch(p ->
 				p.message().contains("duplicate data pointer")),report.toString());
@@ -321,7 +369,7 @@ public class EtchStrictValidatorTest {
 			data.writeLong(0L);
 		}
 
-		EtchStrictValidator.Report report=EtchStrictValidator.validate(file,config);
+		EtchVerifier.Report report=EtchVerifier.validate(file,config);
 		assertFalse(report.isValid());
 		assertEquals(1L,report.missingRootHashes(),report.problems().toString());
 	}

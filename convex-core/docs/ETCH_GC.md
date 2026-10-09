@@ -370,6 +370,89 @@ running on f~     cycle 2: target f~1   cutover: marker -> f~1, f~ defunct
 restart:          recovery installs the marker-named file as f
 ```
 
+## Online checkpoint export
+
+`EtchStore.exportCheckpoint(rootHash, destination)` exports the supplied root into
+a new, independent Etch file, returning its canonical `File` after copying,
+flush, checked close and publication. The source stays online: writes, root
+changes and successive GC cycles may continue. The explicit hash selects an
+immutable graph, including a historical root still available through this handle;
+it is never replaced with the source's current root. Nil, unset and empty sentinel
+hashes retain their exact root hash. Other embedded roots require a stored entry.
+Missing roots or descendants fail the export.
+
+```java
+Hash root = live.getRootHash();
+File checkpoint = live.exportCheckpoint(root, new File("backup.etch"));
+try (EtchStore restored = EtchStore.create(checkpoint, live.getConfig())) {
+    // Immediately usable while live continues serving the application.
+    EtchVerifier.verifyPersisted(restored.getEtch()); // Separate full scan, if wanted.
+}
+```
+
+`EtchCheckpoint` owns export; `EtchGC` provides a private read lease on the physical
+files visible when export begins. The lease survives caller-initiated close,
+cutover and cancellation without blocking ordinary application writes or holding
+a lifecycle lock across copying. The coordinator delays closing/deleting those
+files until the last lease releases them, and prevents GC from reusing their
+filenames. Cancelled targets receive retirement markers before becoming detached,
+so a crash during a later export cannot make recovery resurrect collected data.
+This does not keep exported data in future live generations; it retains only the
+old files for the duration of the export. Long exports can therefore delay disk
+space reclamation. A hash captured before the call must still be available when
+the lease is acquired.
+
+GC and checkpoints use the same `EtchTreeTransfer` child-first walk and physical
+destination pruning. Checkpoints decode through a private uncached read view,
+without consulting or rebinding application caches. Each destination entry reaches
+`PERSISTED` before inheriting that entry's recorded source `ANNOUNCED` status.
+An announced parent does not announce its children. Source status is observed per
+entry in the leased files during traversal; upgrades after that observation or in
+later GC generations need not appear in the export. This is an exact data-root
+snapshot, not a simultaneous snapshot of all mutable announcement flags.
+
+The overload accepting `AMap<AString,ACell>` merges only supplied fields over
+`live.getConfig().getMap()`, then compiles and validates the result once. The
+four-argument overload also accepts an optional replacement key resolver. Null
+overrides/resolver inherit the source policy; an explicit null map value clears
+the public-key hint. For example, changing encrypted v3 output to v1 also requires
+compatible cipher, index-encryption, hint and mapping settings. Invalid merged
+combinations fail rather than resetting omitted options. Newly created encrypted
+files always receive fresh file salts and derived cryptographic material. Runtime
+cache/mapping settings are not encoded in the file; pass the chosen effective
+configuration when reopening. Export's private working cache disables L2 to keep
+its heap bounded.
+
+The child-first copy establishes completeness as it writes. Export does not run
+an additional verification pass. Callers can independently invoke
+`EtchVerifier.verifyPersisted(etch)` on an open, quiescent checkpoint. This checks
+the index, its stored root, every entry's persisted status and every branch
+against that file alone. Copying uses O(depth) traversal storage plus a fixed L1
+cache; this verification uses bounded index/entry working storage. Other checks
+are available separately; see [Verification](#verification).
+
+The destination must be absent, including an empty file or dangling symlink, and
+must not collide with the source's GC namespace or have its own GC sidecars.
+Export builds a private `.etch-checkpoint-*.partial` file in the destination
+directory. After copying, forcing and closing it, publication creates a hard
+link at the requested name and refuses an occupied name, including a competing
+export. This links the newly built file, **not the live source**. The destination
+filesystem must support hard links (NTFS on Windows); it may differ from the
+source filesystem. No cross-filesystem rename is needed. This also works when
+Windows MBB mappings prevent immediate deletion of the private staging filename.
+Removing staging is best effort; the completed checkpoint needs neither that
+name nor any source or GC sidecar.
+
+Thread interruption cancels copying before publication and remains
+set on return. Missing data and copy, flush, close or publication failures do not
+report success or publish a partial checkpoint. Failure may leave a private
+staging file, which can be removed once its mappings have gone. Publication is
+the commit point: later staging cleanup failure cannot revoke a complete export.
+After a process crash the final name, if published, names a complete, clean file.
+File contents are forced, but survival of its newly created directory entry
+across power loss depends on the filesystem/platform; the API does not promise
+portable directory-entry durability. Interrupted exports have no resume protocol.
+
 ## Store-to-store migration
 
 `EtchUtils.migrate(source, dest)` ensures everything in an Etch source is persisted in
@@ -393,6 +476,34 @@ status. Compared with GC:
 Strictness follows the destination: an Etch destination propagates missing source
 data as `MissingDataException`, while `MemoryStore` is lenient by design (it stores
 what it can and caps the achieved status, matching remote-acquisition semantics).
+
+## Verification
+
+`EtchVerifier` collects the explicit Etch verification operations. They operate
+on the selected physical file, without falling back to live caches or another GC
+generation. Export never invokes them automatically.
+
+| Operation | Guarantee | Usage |
+|---|---|---|
+| `findMissing(etch, rootHash)` | Every branch reachable from this root is physically present; returns missing hashes | GC, recovery and repair; ignores status flags and unrelated entries |
+| `verifyPersisted(etch)` | Stored root, every indexed entry and every branch are at least `PERSISTED`; also checks the index | Checkpoints or other entirely persisted files; throws on failure |
+| `validate(file[, config[, options]])` | Strict index/extent checks, content hashes, canonical CAD3 encodings and root completeness | Offline integrity checks, including the `etch validate` CLI; returns a report |
+| `IndexVisitor` with `etch.visitIndex(visitor)` | Hash paths and collision-chain structure, with entry counts | Lightweight index checks on an open file |
+
+The open-file operations require the caller to keep the file open and
+write-quiescent; they neither mutate nor close it. Strict validation opens a
+read-only maintenance reader under an exclusive lock; encrypted files require
+the key resolver in `config`. Use this operation for potentially corrupt files.
+`findMissing` and `verifyPersisted` do not recompute content hashes or validate
+canonical encodings. Strict validation does not require every record to claim
+`PERSISTED`: an ordinary store can legitimately contain `STORED` records.
+
+The root walk shares `StoreTransfer.verify` through a private uncached reader.
+Index visitors and strict validation share hash-path and collision-chain checks.
+`EtchRecordVerifier` remains the shared internal record checker for strict
+validation and repair. The deprecated `EtchUtils.verify` and `FullValidator`
+entry points delegate to `EtchVerifier`; the previous `EtchStrictValidator` API
+has been renamed to `EtchVerifier`.
 
 ## Copy ordering and locality
 
@@ -450,12 +561,15 @@ already store-agnostic.
 | Concern | Location |
 |---|---|
 | Shared routing, synchronisation and file lifetime | `convex.etch.EtchGC` |
+| Online checkpoint export | `EtchStore.exportCheckpoint`, `EtchCheckpoint`; private file leases and `EtchReadView` |
+| Shared GC/checkpoint child-first walk | `EtchTreeTransfer` |
 | Lifecycle API | `EtchStore.startGC()`, `transferGC()`, `isGCComplete()`, `verifyGC()`, `completeGC()` / `completeGC(backupFile)`, `cancelGC()`, `isGCInProgress()`, `getBaseFile()` |
 | Tree transfer with INV-1 pruning | `convex.core.store.StoreTransfer.transfer(dest, ref[, status])`; `StoreTransfer.verify(store, rootHash)` |
-| Whole-store migration | `convex.etch.EtchUtils.migrate(source, dest)`; `EtchUtils.verify(etch, rootHash)` |
+| Whole-store migration | `convex.etch.EtchUtils.migrate(source, dest)` |
+| Verification | `EtchVerifier.findMissing`, `verifyPersisted`, `validate`, `IndexVisitor` |
 | Recovery | `EtchUtils.recover(file[, config])`, called by `EtchStore.create` |
 | Status rules | `Ref.withStatus`, `AStore.isForeign`, `Refs.checkConsistentStores`; pinned by `convex.etch.EtchStatusIntegrityTest` |
-| Index enumeration and validation | `Etch.visitIndex`, `EtchUtils.EtchCellVisitor`, `EtchUtils.FullValidator` |
+| Index enumeration | `Etch.visitIndex`, `EtchUtils.EtchCellVisitor` |
 | CLI | `convex etch gc [--backup file \| --output file]`, `etch migrate --into <dest> [--set-root]`, `etch recover`, `etch validate [-m N]` in `convex.cli.etch` |
 | Tests and example | `EtchGCLifecycleTest`, `EtchGCRecoveryTest`, `EtchConfiguredLifecycleTest`, `StoreTransferTest`, `EtchCLITest`, `EtchEncryptionCLITest`; `convex.core.examples.EtchGCExample` (test tree, not in the suite) runs a full online cycle under concurrent load |
 

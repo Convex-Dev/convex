@@ -2,11 +2,13 @@ package convex.etch;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -14,7 +16,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 import convex.core.data.ACell;
-import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
@@ -56,6 +57,13 @@ final class EtchGC {
 	private final Object drainSignal=new Object();
 	private final AtomicBoolean sweepRunning=new AtomicBoolean();
 	private volatile boolean sweepComplete;
+	// Accessed only under operations. No lease bookkeeping on read/write hot paths.
+	private final IdentityHashMap<Etch,Pin> pins=new IdentityHashMap<>();
+	private static final class Pin {
+		int readers;
+		boolean retired;
+		boolean delete;
+	}
 
 	EtchGC(EtchStore initial) {
 		state=new State(initial,new EtchStore[] {initial},null,false);
@@ -137,10 +145,64 @@ final class EtchGC {
 
 	private boolean retains(State s, File file) throws IOException {
 		File canonical=file.getCanonicalFile();
+		for (Etch pinned:pins.keySet()) {
+			if (pinned.getFile().getCanonicalFile().equals(canonical)) return true;
+		}
 		for (EtchStore view:s.views) {
 			if (view.getFile().getCanonicalFile().equals(canonical)) return true;
 		}
 		return false;
+	}
+
+	/** Pins the files visible now, independently of the caller's handle lifetime. */
+	EtchReadView lease(EtchStore store) throws IOException {
+		rejectPersistenceCallback();
+		try { operations.lockInterruptibly(); }
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new InterruptedIOException("Interrupted while acquiring Etch read lease");
+		}
+		try {
+			store.checkOpen();
+			State s=state;
+			ArrayList<Etch> files=new ArrayList<>();
+			if (s.target!=null) files.add(s.target);
+			for (EtchStore view:s.views) {
+				files.add(view.getEtch());
+				if (view==store) break;
+			}
+			Etch[] retained=files.toArray(Etch[]::new);
+			for (Etch file:retained) pins.computeIfAbsent(file,k->new Pin()).readers++;
+			return new EtchReadView(retained,()->release(retained));
+		} finally { operations.unlock(); }
+	}
+
+	private void release(Etch[] files) {
+		operations.lock();
+		try {
+			for (Etch file:files) {
+				Pin pin=pins.get(file);
+				if (--pin.readers==0) {
+					pins.remove(file);
+					if (pin.retired) retire(file,pin.delete);
+				}
+			}
+		} finally { operations.unlock(); }
+	}
+
+	private void retire(Etch etch, boolean delete) {
+		Pin pin=pins.get(etch);
+		if (pin!=null) {
+			pin.retired=true;
+			pin.delete|=delete;
+			return;
+		}
+		etch.close();
+		if (delete) {
+			File file=etch.getFile();
+			if (file.delete()) new File(file.getPath()+".gc-defunct").delete();
+			else file.deleteOnExit();
+		}
 	}
 
 	<T extends ACell> Ref<T> persist(EtchStore store, Ref<T> ref, int status,
@@ -253,32 +315,25 @@ final class EtchGC {
 		} finally { sweepRunning.set(false); }
 	}
 
-	@SuppressWarnings("unchecked")
 	private void sweep(EtchStore store, Etch target, Ref<ACell> root) throws IOException {
-		ArrayDeque<SweepFrame> stack=new ArrayDeque<>();
-		stack.push(new SweepFrame(root));
-		while (!stack.isEmpty()) {
-			if (state.target!=target || state.cancelling) throw new IllegalStateException("GC cycle ended during transfer");
-			SweepFrame f=stack.peek();
-			if (!f.expanded) {
-				f.expanded=true;
-				Ref<?> existing=target.read(f.ref.getHash(),store);
-				if (existing!=null && existing.getStatus()>=Ref.PERSISTED) {
-					stack.pop();
-					continue;
-				}
-				Cells.visitBranchRefs(f.ref.getValue(),br->stack.push(new SweepFrame((Ref<ACell>)br)));
-			} else {
-				stack.pop();
-				persist(store,f.ref,Ref.PERSISTED,null,true,target);
+		EtchTreeTransfer.transfer(root.getHash(),new EtchTreeTransfer.Access() {
+			@Override public void check() throws IOException {
+				EtchTreeTransfer.checkInterrupted();
+				if (state.target!=target || state.cancelling) throw new IllegalStateException("GC cycle ended during transfer");
 			}
-		}
-	}
-
-	private static final class SweepFrame {
-		final Ref<ACell> ref;
-		boolean expanded;
-		SweepFrame(Ref<ACell> ref) { this.ref=ref; }
+			@Override public Ref<ACell> read(Hash hash) throws IOException {
+				Ref<ACell> ref=EtchGC.this.read(store,hash);
+				if (ref==null) throw new MissingDataException(store,hash);
+				return ref;
+			}
+			@Override public boolean contains(Hash hash) throws IOException {
+				Ref<?> existing=target.read(hash,store);
+				return existing!=null && existing.getStatus()>=Ref.PERSISTED;
+			}
+			@Override public void write(Ref<ACell> ref) throws IOException {
+				persist(store,ref,Ref.PERSISTED,null,true,target);
+			}
+		});
 	}
 
 	java.util.List<Hash> verify(EtchStore store) throws IOException {
@@ -287,7 +342,7 @@ final class EtchGC {
 		try {
 			requireCurrent(store);
 			if (state.target==null) throw new IllegalStateException("No GC cycle: "+store);
-			return EtchUtils.verify(state.target,getRootHash(store));
+			return EtchVerifier.findMissing(state.target,getRootHash(store));
 		} finally { operations.unlock(); }
 	}
 
@@ -313,16 +368,13 @@ final class EtchGC {
 				source.setRootHash(target.getRootHash());
 				source.writeDataLength();
 				source.flush();
+				// An export may retain the cancelled file beyond further collections.
+				// Mark it before retiring it so a crash never resurrects its garbage.
+				File file=target.getFile();
+				EtchUtils.writeMetadata(new File(file.getPath()+".gc-defunct").toPath(),"rolled back by cancelGC\n");
 				state=new State(store,s.views,null,false);
 				sweepComplete=false;
-				target.close();
-				File file=target.getFile();
-				if (!file.delete()) {
-					file.deleteOnExit();
-					File tomb=new File(file.getPath()+".gc-defunct");
-					Files.writeString(tomb.toPath(),"rolled back by cancelGC\n");
-					tomb.deleteOnExit();
-				}
+				retire(target,true);
 			}
 		} finally { operations.unlock(); }
 	}
@@ -337,7 +389,7 @@ final class EtchGC {
 				State s=state;
 				Etch target=s.target;
 				if (target==null || s.cancelling || !sweepComplete) throw new IllegalStateException("GC transfer not complete: "+store);
-				java.util.List<Hash> missing=EtchUtils.verify(target,target.getRootHash());
+				java.util.List<Hash> missing=EtchVerifier.findMissing(target,target.getRootHash());
 				if (!missing.isEmpty()) throw new MissingDataException(store,missing.get(0));
 				target.flush();
 				Path backup=null;
@@ -399,14 +451,9 @@ final class EtchGC {
 				int retained=s.views.length;
 				while (retained>0 && s.views[retained-1].closed) {
 					EtchStore view=s.views[--retained];
-					view.getEtch().close();
-					if (view!=s.owner) {
-						File file=view.getFile();
-						if (file.delete()) new File(file.getPath()+".gc-defunct").delete();
-						else file.deleteOnExit();
-					}
+					retire(view.getEtch(),view!=s.owner);
 				}
-				if (retained==0 && s.target!=null) s.target.close(); // abandoned cycle: recover on reopen
+				if (retained==0 && s.target!=null) retire(s.target,false); // abandoned cycle: recover on reopen
 				state=new State(s.owner,Arrays.copyOf(s.views,retained),s.target,s.cancelling);
 			}
 		} finally {

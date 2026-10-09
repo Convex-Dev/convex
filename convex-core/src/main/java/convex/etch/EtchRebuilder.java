@@ -128,7 +128,7 @@ public final class EtchRebuilder {
 				state.walkIndex(0,reader.getIndexStart());
 				state.scanBody();
 
-				List<Hash> missing=EtchUtils.verify(destinationStore.getEtch(),reader.getRootHash());
+				List<Hash> missing=EtchVerifier.findMissing(destinationStore.getEtch(),reader.getRootHash());
 				if (missing.isEmpty()) state.publishRoot(reader.getRootHash());
 				destinationStore.flush();
 			} finally {
@@ -333,12 +333,12 @@ public final class EtchRebuilder {
 			EtchStore rebuiltStore=new EtchStore(rebuilt);
 			try {
 				Hash sourceRoot=source.getRootHash();
-				missing=EtchUtils.verify(rebuilt,sourceRoot);
+				missing=EtchVerifier.findMissing(rebuilt,sourceRoot);
 				Hash expectedRoot=missing.isEmpty()?sourceRoot:Hash.UNSET_HASH;
 				if (!expectedRoot.equals(rebuilt.getRootHash())) {
 					throw new IOException("Rebuilt Etch root does not match its recovery result");
 				}
-				EtchUtils.FullValidator validator=EtchUtils.getFullValidator();
+				EtchVerifier.IndexVisitor validator=new EtchVerifier.IndexVisitor();
 				rebuilt.visitIndex(validator);
 				values=validator.values;
 			} finally {

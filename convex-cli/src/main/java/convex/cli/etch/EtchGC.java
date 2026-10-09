@@ -13,6 +13,7 @@ import convex.core.text.Text;
 import convex.core.util.FileUtils;
 import convex.etch.EtchStore;
 import convex.etch.EtchUtils;
+import convex.etch.EtchVerifier;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -117,7 +118,7 @@ public class EtchGC extends AEtchCommand {
 				// Persists the root tree into dest (children resolve via the
 				// source-bound refs) and sets the destination root
 				dest.setRootData(root);
-				List<Hash> missing=EtchUtils.verify(dest.getEtch(), dest.getRootHash());
+				List<Hash> missing=EtchVerifier.findMissing(dest.getEtch(), dest.getRootHash());
 				if (!missing.isEmpty()) {
 					throw new CLIError("GC verification failed: "+missing.size()
 							+" value(s) missing from the output store. The source is untouched;"
