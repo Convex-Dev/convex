@@ -61,16 +61,17 @@ Use `:TRUST` for authorisation failures — that is what callers expect.
 
 ## Fail Closed
 
-A monitor MUST return `true` or `false`, but a defective or malicious one may
-throw or return something else. A checker MUST treat any error or non-`true`
-result as **denial**, and must not let it propagate — an error-propagating
-checker is itself a denial-of-service vector, since an actor holding an
-attacker-supplied monitor would throw on every check.
+The `check-trusted?` SPI uses normal CVM truthiness: `nil` and `false` deny;
+every other value grants. A monitor may return a lookup result directly,
+without converting it to a boolean. In particular, `0`, empty collections,
+empty strings and keywords such as `:DENIED` all grant access. A monitor must
+map any error-as-data or other denial sentinel to `nil` or `false` itself.
 
-`trusted?` implements this from **protocol version 1**: the monitor call is
-wrapped in `query` against re-entrancy, errors are caught as `false`, and the
-result is `boolean`-coerced. Write against that behaviour — it is the target
-semantics, and `MigrationFixesTest` pins it.
+From **protocol version 1**, the public `trusted?` function normalises SPI
+results to literal `true` or `false`. It calls the monitor in `query` to roll
+back state changes and catches monitor errors as `false`. Resource exhaustion
+can still abort the check; it must never grant access. Write against that
+behaviour — it is the target semantics, and `MigrationFixesTest` pins it.
 
 ```clojure
 ;; what trusted? does from v1
@@ -79,7 +80,7 @@ semantics, and `MigrationFixesTest` pins it.
 
 **Before v1 activates**, the genesis `trusted?` in `core/trust.cvx` keeps the
 `query` guard but does *not* catch the error or coerce the result — so a
-defective monitor can throw through it, or grant on a truthy non-boolean. If
+monitor can throw through it or return a non-boolean value to its caller. If
 you are deploying an actor that accepts **caller-supplied** monitors onto a
 network still at version 0, apply the wrapper yourself. For monitors you
 control, the plain call is fine either way. See the `protocol-versions` skill.
@@ -91,14 +92,15 @@ Implement `check-trusted?` as a callable taking exactly three arguments:
 ```clojure
 (defn ^:callable check-trusted?
   [subject action object]
-  (boolean (and (= subject object) (= action :examine-self))))
+  (and (= subject object) (= action :examine-self)))
 ```
 
 Requirements that are not optional:
 
-- **No side effects.** A monitor MUST work correctly inside `query`, because
-  callers wrap it in one to block re-entrancy.
-- **Return a strict boolean** for every possible argument combination.
+- **No reliance on side effects.** A monitor MUST work correctly inside `query`,
+  where state changes are rolled back.
+- **Use CVM truthiness** for every argument combination. Return `nil` or `false`
+  to deny; callers needing literal booleans should use `trusted?`.
 - **Be O(1)** in computation and stack depth, with a small constant. Use
   pre-computed sets and maps for lookups.
 - **Never scan arbitrary data structures.** An unbounded scan inside a monitor
