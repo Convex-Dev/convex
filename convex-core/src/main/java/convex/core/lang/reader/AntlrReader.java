@@ -229,7 +229,13 @@ public class AntlrReader {
 		@Override
 		public void exitCharacter(CharacterContext ctx) {
 			String s=ctx.getStop().getText();
-			CVMChar c=CVMChar.parse(s);
+			CVMChar c;
+			try {
+				c=CVMChar.parse(s);
+			} catch (IllegalArgumentException e) {
+				// A mutated Java source string can contain an unpaired UTF-16 surrogate.
+				throw parseError(ctx,"bad character literal: "+s);
+			}
 			if (c==null) throw parseError(ctx,"bad character literal: "+s);
 			push(c);
 		}

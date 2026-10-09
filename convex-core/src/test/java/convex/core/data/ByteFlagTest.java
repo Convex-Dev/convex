@@ -5,8 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.CVMTag;
 import convex.core.data.prim.AByteFlag;
 import convex.core.data.prim.ByteFlag;
@@ -19,7 +22,7 @@ import convex.test.Samples;
 public class ByteFlagTest {
 
 	@Test 
-	public void testAllByteFlags() throws BadFormatException {
+	public void testAllByteFlags() throws BadFormatException, IOException {
 		for (int i=0; i<16; i++) {
 			doByteFlagTest(i);
 		}
@@ -49,7 +52,7 @@ public class ByteFlagTest {
 
 	}
 
-	private void doByteFlagTest(int i) throws BadFormatException {
+	private void doByteFlagTest(int i) throws BadFormatException, IOException {
 		AByteFlag b=AByteFlag.create(i);
 		byte tag=b.getTag();
 		
@@ -68,8 +71,11 @@ public class ByteFlagTest {
 		}
 		assertSame(b,Reader.read(rd));
 		
-		// should all be singletons!
-		assertSame(b,Samples.TEST_STORE.decode(enc));
+		// The CVM decoder returns singletons. A cache may instead retain an equal
+		// generic CAD3 ByteFlag, including the alternative representation of 0/1.
+		assertSame(b,CVMEncoder.INSTANCE.decode(enc));
+		Cells.persist(ByteFlag.create(i),Samples.TEST_STORE);
+		assertEquals(b,Samples.TEST_STORE.decode(enc));
 		
 		ObjectsTest.doAnyValueTests(b);
 	}

@@ -37,6 +37,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
@@ -241,6 +242,15 @@ public class ReaderTest {
 		assertCVMEquals('\r', Reader.read("\\return"));
 		
 		assertCVMEquals('|', Reader.read("\\|"));
+
+		// A supplementary code point is valid, but either unpaired UTF-16 half
+		// (including after source mutation) must produce a reader error.
+		assertEquals(CVMChar.create(0x1f600),Reader.read("\\"+new String(Character.toChars(0x1f600))));
+		for (String literal : new String[] { "\\\ud800", "\\\udfff", "\\uD800", "\\uDFFF" }) {
+			assertParseException(() -> Reader.read(literal));
+			assertParseException(() -> Reader.readSyntax("^{} "+literal));
+			assertParseException(() -> Reader.readAll("["+literal+"]"));
+		}
 	}
 	
 	@Test
