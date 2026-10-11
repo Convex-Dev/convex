@@ -22,15 +22,16 @@ import convex.lattice.LatticeContext;
  * Owner verification (checking that the signer key is authorised for the
  * owner) is performed during context-aware merge via LatticeContext.verifyOwner().
  * The checkForeign method only validates structure.
+ *
+ * <p>This one-parameter API retains its historical context-dependent behaviour,
+ * including signature-only verification on the context-free merge. New applications
+ * should use {@link OwnerMapLattice}, {@link OwnerIndexLattice} or
+ * {@link OwnerKeyLattice} to bind verification to the lattice instance and enforce
+ * it consistently at signed child paths.</p>
  * 
  * @param <V> Type of the underlying signed value
  */
-public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, SignedData<V>>> {
-
-	/**
-	 * The child lattice for signed values
-	 */
-	protected final SignedLattice<V> signedLattice;
+public class OwnerLattice<V extends ACell> extends AOwnerLattice<ACell,V,AHashMap<ACell, SignedData<V>>> {
 	
 	/**
 	 * Merge function for SignedData values using SignedLattice
@@ -43,7 +44,7 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 	 * @param valueLattice Lattice for the underlying value type V
 	 */
 	public OwnerLattice(ALattice<V> valueLattice) {
-		this.signedLattice = SignedLattice.create(valueLattice);
+		super(valueLattice);
 		this.mergeFunction = (a, b) -> {
 			return signedLattice.merge(a, b);
 		};

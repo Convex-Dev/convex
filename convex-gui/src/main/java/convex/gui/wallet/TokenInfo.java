@@ -77,7 +77,7 @@ public class TokenInfo {
 	public static Address getFungibleAddress(Convex convex) {
 		if (fungibleAddress!=null) return fungibleAddress;
 		try {
-			fungibleAddress=(Address) convex.resolve("convex.fungible").get();
+			fungibleAddress=RT.ensureAddress(convex.resolve("convex.fungible").get());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -88,7 +88,7 @@ public class TokenInfo {
 	public static Address getMultiAddress(Convex convex) {
 		if (multiAddress!=null) return multiAddress;
 		try {
-			multiAddress=(Address) convex.resolve("asset.multi-token").get();
+			multiAddress=RT.ensureAddress(convex.resolve("asset.multi-token").get());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -99,7 +99,7 @@ public class TokenInfo {
 	public static Address getTorusAddress(Convex convex) {
 		if (torusAddress!=null) return torusAddress;
 		try {
-			torusAddress=(Address) convex.resolve("torus.exchange").get();
+			torusAddress=RT.ensureAddress(convex.resolve("torus.exchange").get());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

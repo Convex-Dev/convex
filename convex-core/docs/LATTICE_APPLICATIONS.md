@@ -8,6 +8,371 @@ practical companion for `convex-core`, with `convex-social`, `convex-dlfs` and
 `convex-p2p` as worked examples. Cursor internals are in
 [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
 
+## Proposed application API
+
+**Application lifecycle and subscription design proposal.** The ownership hierarchy
+below is implemented; lifecycle and subscription signatures remain proposals. The
+sections after this proposal describe the existing application API. This design uses CAD024 for merge semantics, CAD035
+for cursor atomicity, CAD036 for hosting, CAD038 for ownership and CAD045 for
+application composition. Changes to their application contracts need corresponding
+CAD updates before implementation is described as normative.
+
+### Responsibilities
+
+An application is a launched composition of components and subscriptions. It need
+not itself be a component at the root, or carry the Java type of the complete root.
+
+| Object | Responsibility |
+|---|---|
+| `RootComponent<V>` | Shared authoritative cursor, schema, storage and host services |
+| `ALatticeApplication` | Launch/close lifecycle, application policy and owned subscriptions |
+| `LatticeSubscription<V>` | Interest in one subtree, a live cursor and optional change observers |
+| `ALatticeComponent<V>` | Lightweight domain API around a cursor at one path |
+
+Keep `RootComponent` as the host abstraction initially. A local root supports the
+same application API as a root hosted by `NodeServer`; the node installs replication
+services. A new host interface is only needed if another implementation requires it.
+`ALatticeApplication` no longer extends `ALatticeComponent`.
+
+Signing establishes responsibility for the entire signed subtree. Its owner is
+responsible for merging and publishing that tree, including coordinating multiple
+writers using the same signing identity. Preserve the existing timestamp and
+own-value tie rules. The API does not introduce a hidden logical clock or require
+non-owner peers to synthesise signed values. Timestamped replicated registers should
+be enclosed by an appropriate signing boundary.
+
+### Owner identity policies
+
+**Implemented:** `AOwnerLattice`, `OwnerMapLattice`, `OwnerIndexLattice` and
+`OwnerKeyLattice`. The existing `OwnerLattice<V>` remains a compatibility API.
+
+**Design decision:** verification rules belong to lattice instances. Different
+paths can compose different rules, including different rules for the same owner
+identity. Navigating to a child or deriving a restricted interest view preserves
+the applicable verification boundaries; neither operation substitutes a global rule.
+
+An owner need not be a public key. A region can map DID strings to `SignedData<V>`
+and bind the rule that authorises a signing key for each DID to its owner lattice.
+Share ownership machinery in `AOwnerLattice`, with concrete types selecting the
+container and key conventions. Both hash-map and index variants support custom
+owner verification. The index variant uses the existing `Index` value type; it
+does not require a new CVM collection type.
+
+```java
+// K is the owner identity type; V is the unsigned payload type.
+public abstract class AOwnerLattice<
+    K extends ACell,
+    V extends ACell,
+    M extends AMap<K, SignedData<V>>>
+    extends ALattice<M> { /* ... */ }
+
+public class OwnerMapLattice<K extends ACell, V extends ACell>
+    extends AOwnerLattice<K, V, AHashMap<K, SignedData<V>>> { /* ... */ }
+
+public class OwnerIndexLattice<K extends ABlobLike<?>, V extends ACell>
+    extends AOwnerLattice<K, V, Index<K, SignedData<V>>> { /* ... */ }
+
+public final class OwnerKeyLattice<V extends ACell>
+    extends OwnerIndexLattice<AccountKey, V> { /* ... */ }
+
+// The predicate is part of this region's ownership policy.
+OwnerMapLattice<AString, MyState> identities = OwnerMapLattice.create(
+    stateLattice,
+    (owner, signingKey) -> didAuthority.isAuthorised(owner, signingKey));
+
+// The same ownership policy with an Index-backed DID namespace.
+OwnerIndexLattice<AString, MyState> indexedIdentities = OwnerIndexLattice.create(
+    stateLattice,
+    (owner, signingKey) -> didAuthority.isAuthorised(owner, signingKey));
+
+// Direct public-key ownership with an Index-backed container.
+OwnerKeyLattice<MyState> keys = OwnerKeyLattice.create(stateLattice);
+```
+
+`AOwnerLattice` shares the keyed merge algorithm, bound verification policy,
+owner-bound signed-child construction and enforcement across merge/write entry
+points. Concrete implementations supply the correctly typed empty container,
+container validation and key validation/resolution. Both `AHashMap`
+and `Index` already support keyed `mergeDifferences`, so each keeps its structural
+merge implementation. The base must not rebuild either collection by enumerating
+all entries. Container validation remains enforced in merge, not only in an optional
+`checkForeign` pre-check.
+
+`OwnerKeyLattice` fixes authorisation to owner-key equality with the signing key;
+there is no custom predicate needed for that case. It validates the 32-byte key
+representation and resolves supported blob/hex inputs to `AccountKey` at typed
+boundaries. Generic parameters alone cannot validate decoded foreign keys.
+An index decoded from the wire can retain plain `Blob` keys even when its Java
+type is `Index<AccountKey, ...>`. Extract such keys as `ACell` and coerce them with
+`OwnerKeyLattice.resolveKey(key)` (which returns `AccountKey`) rather than casting.
+Merge does not rebuild the index solely to change these equivalent Java objects.
+`OwnerMapLattice` and `OwnerIndexLattice` both accept custom predicates without
+requiring a subclass for each DID method. Container choice is independent of
+ownership policy. `OwnerIndexLattice` supports any key type admitted by `Index`
+(`K extends ABlobLike<?>`), which includes `AString` DID keys as well as account
+keys, blobs and keywords. It does not broaden `Index` to arbitrary `ACell` keys;
+those remain supported by the hash-map variant. Key validation and resolution must
+respect the selected owner's representation, including the index's blob-based key
+equality, rather than assuming every indexed owner is a public key.
+
+The predicate has type `BiPredicate<K, AccountKey>` (the factory can accept
+`BiPredicate<? super K, ? super AccountKey>`). It answers whether a key
+may author this owner's subtree, allowing multiple authorised keys without reducing
+every identity to one public key. DID resolution is an implementation detail of the
+supplied authority service. `SignedLattice` still verifies the cryptographic
+signature separately. The lattice supplies the `SignedData` wrapper: callers specify
+`OwnerMapLattice<AString, MyState>`, not `OwnerMapLattice<AString, SignedData<MyState>>`.
+New public-key namespaces can use `OwnerKeyLattice<V>`; hash-map-backed public-key
+namespaces can use `OwnerMapLattice<AccountKey, V>` with a direct-key predicate.
+Mixed hash-map owner namespaces can explicitly use `ACell` as their key type.
+`Index` and `AHashMap` are different stored
+representations: introducing the specialised lattice must not silently change an
+existing region's representation. Java cannot support both one- and two-parameter
+classes named `OwnerLattice`, so the typed hash-map variant is named
+`OwnerMapLattice<K,V>`. Existing `OwnerLattice<V>` factories, subclasses and stored
+representations remain supported.
+
+The bound predicate is authoritative for owner-to-signer matching in this region;
+an application cursor context cannot replace it. Nested ownership boundaries each
+retain their own rules; a child rule does not waive an enclosing rule.
+The context continues to provide the available signing capability and write clock.
+Host admission policy may independently decline to adopt data. A predicate rejection
+or unresolved identity cannot fall back to accepting an arbitrary signer.
+
+The same ownership rule must apply to both merge overloads, merges directly at an
+owner's signed child, and local authoring below the signing boundary. Binding it
+only to the outer map merge would leave path-based entry points inconsistent.
+The owner-bound `SignedLattice` and its write cursor must retain the rule. Authoring
+still requires an available authorised signer; the predicate grants no signing
+capability and need not select a private key.
+
+For stateful DID methods, resolve and refresh authenticated authority information
+outside atomic update retry loops. Verification uses a consistent local authority
+view for one operation; unknown resolution must not cause unbounded network work in
+merge. CAD038 currently describes verification against current authority state.
+Changing that view governs subsequent incoming claims; it does not automatically
+erase previously accepted data or define historical-signature validity.
+
+The compatibility `OwnerLattice<V>` still uses `LatticeContext.withOwnerVerifier`
+on context-aware merge, including its lenient fallback for indirect owners; its
+context-free merge retains signature-only checking. The new typed variants require
+an explicit bound predicate, except `OwnerKeyLattice`, which supplies direct-key
+equality. They do not consult the context verifier. Their signed boundary checks
+authoring with the same bound predicate used by incoming merge; legacy `signAs`
+behaviour remains available to existing callers.
+
+Migrating a hash-map region to `OwnerMapLattice` can preserve its data representation
+while explicitly binding its verifier. Applications are not migrated automatically.
+The long-term design retires context-wide owner verification after these callers
+migrate. CAD038 needs to describe the new instance-bound policy option and reconcile
+its safe-default wording with its documented legacy lenient fallback.
+DID method and account authority details follow CAD043 and CAD004.
+
+### API sketch
+
+These signatures show the proposed public surface; they are not compilable examples
+against the current implementation. Paths use canonical CVM keys, as existing
+`cursor.path(...)` calls do.
+
+```java
+public abstract class ALatticeApplication implements AutoCloseable {
+    public final void launch(RootComponent<?> host);
+    public final void close();
+
+    public final <V extends ACell> LatticeSubscription<V> subscribe(ACell... path);
+    public final void sync();
+    public final CompletionStage<Void> pull();
+    public final void flush() throws IOException;
+
+    protected abstract void onLaunch();
+    protected void onClose();
+    protected LatticeContext writeContext(LatticeContext inherited);
+    protected void onError(Throwable failure);
+}
+
+public interface LatticeSubscription<V extends ACell> extends AutoCloseable {
+    ALatticeCursor<V> cursor();
+    AutoCloseable watch(Consumer<V> observer);
+    void close();
+}
+```
+
+The generic subscription factory follows the existing cursor API: the schema and
+domain factory establish the value type, not inference from a raw path. Domain
+factories should hide this unchecked boundary from ordinary callers. Unknown schema
+paths fail at subscription creation; an absent value at a known path is valid.
+The default `writeContext` inherits host policy; an override supplies the
+application's write policy before binding cursors. The default `onError` reports
+asynchronous failures through logging; applications can override it for supervision.
+
+```java
+public final class MyApplication extends ALatticeApplication {
+    private Feed feed;
+
+    @Override
+    protected void onLaunch() {
+        LatticeSubscription<Index<Blob, ACell>> posts = subscribe(FEED_PATH);
+        feed = Feed.connect(posts.cursor());
+        posts.watch(this::refreshTimeline);
+    }
+}
+
+MyApplication app = new MyApplication();
+app.launch(node.getRootComponent());  // node already launched and configured
+// The same application can launch against a standalone RootComponent.
+```
+
+`Feed.connect` above is a proposed cursor-based component factory. Components that
+need persistence receive a host-backed component context alongside their cursor;
+they do not require a parallel hierarchy of parent components just to find a store.
+The context can be shared across all components of an application. Component
+creation itself opens no connections, starts no workers and installs no observers.
+
+### Launch and close
+
+- Host schema and peer groups are configured before host launch. Application launch
+  attaches to a ready host, binds its policy and runs `onLaunch`. Readiness means
+  locally usable; it does not mean every remote peer has been contacted.
+- Application launch is single-use. If `onLaunch` fails, release registrations made
+  during launch and leave the host and other applications running.
+- `subscribe` is valid during `onLaunch` and while running. It establishes a local
+  view immediately and requests replication through the host's configured services.
+  It does not wait for network acquisition. Local-only hosts create the same view
+  without network activity.
+- Application policy supplies signing and timestamp capabilities once, through an
+  application-local cursor view installed before descendant boundaries are built.
+  It must not mutate the shared host cursor's context. Merge authorisation is bound
+  to the host's lattice instances; an application's signing capability does not
+  replace it.
+- `close` is idempotent. It stops accepting subscriptions, invokes `onClose`, and
+  releases all application registrations even if cleanup fails. It does not close
+  the shared host, store or peer groups. Subscriptions can also close individually.
+- Closing a subscription releases its interest and observers; it does not erase
+  state or revoke already-created cursor views. Components remain ordinary views,
+  and their owner is responsible for ceasing work before application shutdown.
+
+### Interests as restricted lattice views
+
+A keyed lattice is a **typed interest set**: the declared keys select the children
+in which it participates, and each child defines how that selected data merges.
+`KeyedLattice` expresses a finite set; `MapLattice` and `IndexLattice` express a
+family of keys sharing child semantics. Compose these for structured records instead
+of implementing a custom merge for each record.
+
+Runtime subscriptions select from the host's existing lattice tree:
+
+- An empty path selects the whole configured lattice. A non-empty path selects
+  that subtree, including future descendants admitted by its schema.
+- Several subscriptions form the union of their selections. An ancestor interest
+  covers descendant interests for replication, while each handle retains its own
+  observation path. Reference-count overlapping interests across applications.
+- The host schema provides one merge meaning per path. Subscriptions cannot install
+  competing merge functions at the same path. Schema composition must reject
+  conflicting definitions explicitly; subscription creation does not extend schema.
+- Interest is demand for acquisition and continued replication, not permission to
+  read, write or publish. Existing peer-group admission and disclosure policies
+  remain authoritative. Demand is shared only across compatible configured groups.
+- Closing the last interest permits replication work to stop. It neither deletes
+  retained data nor makes it eligible for collection independently of store policy.
+
+This allows a subscription trie to produce a restricted lattice view internally,
+without requiring application writers to construct another lattice or understand
+propagator filters. Start with subtree paths and unions; arbitrary predicates and
+wildcards are not required for the first API.
+
+**Merge selection and projection are different operations.** Current
+`AKeyedLattice.merge` ignores unknown incoming keys but retains unknown keys already
+present in `own`. Preserve that non-destructive merge behaviour. A restricted
+serving or observation view must explicitly project selected data; it cannot assume
+that merging with a keyed lattice removes everything else. Absence in a partial
+view is never a deletion instruction.
+
+Selection must also respect indivisible merge and authentication boundaries. A
+subscription may observe any navigable sub-path, including inside a whole-value LWW
+register or signed tree. Replication acquires and merges the enclosing complete
+value when required, then exposes the requested sub-path. It must not truncate a
+signed value, sign a projection on the owner's behalf, or treat an LWW field as an
+independent register. If group policy prohibits the necessary enclosing value,
+replication cannot satisfy that interest and must report the limitation.
+
+### Observation contract
+
+`subscribe` establishes interest; `watch` optionally observes the resulting state.
+Closing a watch leaves the subscription active. Each watch receives an initial
+snapshot, followed by changed values at its path. Absence is represented by a null
+value, not by a missing initial notification. The immutable CVM value `V` is the
+snapshot; no public snapshot wrapper or revision token is required.
+
+Registration captures the initial value and establishes subsequent delivery without
+a gap in which a committed update can be missed. Notifications cover local atomic writes,
+fork merges into the live tree and accepted remote merges. An ancestor replacement
+also notifies a descendant watch if its value changes. A no-op merge does not.
+
+Delivery is asynchronous, serial per watch and follows local installation order. Pending states
+may coalesce to the latest snapshot, with bounded pending work per watch; callbacks
+are state observation, not a durable event log. Initial delivery precedes subsequent
+delivery. A slow or failing callback does not block state installation or another
+watch; failures are reported through the application's error handler. Watch close
+prevents further callback dispatch, though a callback already running may finish.
+
+Implement observation at the authoritative state-installation boundary, not through
+the inbound-message listener or publication callback alone. Attempted writes during
+a CAS retry generate no events until installation succeeds. Capture the installed
+immutable value for delivery; re-reading the live root while delivering a callback
+could substitute a later state. Any sequencing bookkeeping remains internal to the
+host. Fork-local changes remain private until
+merged into the live tree.
+
+### Atomic operations and synchronisation
+
+Components use the existing cursor atomic operations. Views at overlapping paths
+share the same authoritative state, so concurrent updates retry against the latest
+enclosing value instead of replacing it with an earlier snapshot. Update functions
+must be pure and may run more than once. IDs and externally visible effects must
+not be generated inside a retryable update function.
+One logical write resolves the context timestamp once and reuses it across retries.
+
+Whole-value LWW is an explicit schema choice. A deep update inside such a value
+must atomically read and modify its latest enclosing value, stamp the completed
+write and cross any signing boundaries before installation. Two local components
+changing different fields then preserve both changes. Never implement this as
+`get`, modify, then `set`. Across replicas or detached forks, the selected LWW value
+still wins as a whole; local atomicity does not introduce field-wise merge semantics.
+
+| Operation | Completion contract |
+|---|---|
+| Cursor update | One local state change is atomically visible; publication may still be pending |
+| Fork `sync()` | Merge one working snapshot into its immediate parent; concurrent state follows the declared lattice semantics |
+| Application `sync()` | Persist and publish a host root snapshot, then notify configured replication services; no remote acknowledgement |
+| Application `pull()` | One pull round for a captured set of current interests and configured routes has merged and published its successful responses; failures complete the stage exceptionally, without undoing successful merges |
+| Application `flush()` | Complete the host store's physical durability barrier; call `sync()` first to include pending working state |
+
+`pull()` is a local no-op without replication services. Configured replication with
+no usable route reports unavailability rather than claiming remote synchronisation.
+Ongoing replication operates while an interest is held; `pull()` provides an explicit
+completion signal, not a claim that all peers are globally up to date. Application
+`sync()` may publish other applications' pending writes because the host has one
+authoritative root. A root snapshot already published cannot be rolled back by a
+later propagation failure.
+
+Atomic multi-path operations use one update or fork at a common ancestor. Separate
+component calls are separate atomic operations. A fork is a mergeable batch, not
+serialisable isolation for arbitrary cross-field invariants.
+
+### Implementation scope and verification
+
+The first implementation should add application lifecycle and host-owned interest
+registrations, retain the current cursor/component machinery, then introduce root
+change observation and adapt existing propagation groups to changing interests.
+The current filter hooks alone do not implement acquisition demand or watches.
+No per-component workers, replica roots or peer groups are needed.
+
+Before adoption, verify lifecycle failure cleanup; overlapping interest removal;
+initial snapshot/watch races; callback coalescing and failures; local and remote
+notifications; same-path and overlapping-path atomic updates; concurrent deep LWW
+updates beneath a signing boundary; partial-view handling; and unchanged signer and
+timestamp semantics. Use futures or latches for concurrency tests, never sleeps.
+
 ## Key points
 
 - Design the state tree first, then choose a merge strategy for each leaf and compose

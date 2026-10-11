@@ -27,6 +27,18 @@ public abstract class ARecordGeneric extends ACVMRecord {
 		this.format=format;
 		this.values=values;
 	}
+
+	/**
+	 * Reads a field whose schema requires an embedded value. A branch in such a
+	 * position is a different generic CAD3 shape, not missing CVM data to fetch.
+	 * @param index Field index
+	 * @return Embedded field value
+	 */
+	protected final ACell embeddedField(long index) {
+		Ref<ACell> ref=values.getElementRef(index);
+		if (!ref.isEmbedded()) throw new IllegalArgumentException("Field must be embedded: "+index);
+		return ref.getValue();
+	}
 	
 	@Override
 	public MapEntry<Keyword, ACell> entryAt(long i) {

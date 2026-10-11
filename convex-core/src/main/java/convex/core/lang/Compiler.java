@@ -1,5 +1,7 @@
 package convex.core.lang;
 
+import convex.core.cvm.CVMEncoder;
+
 import java.util.Map;
 
 import convex.core.Constants;
@@ -107,6 +109,7 @@ public class Compiler {
 	@SuppressWarnings("unchecked")
 	public
 	static Context compile(ACell form, Context context) {
+		form=CVMEncoder.specialise(form);
 		if (form==null) return compileConstant(context,null);
 
 		if (form instanceof Symbol) {

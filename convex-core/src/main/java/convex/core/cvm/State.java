@@ -176,7 +176,7 @@ public class State extends ARecordGeneric {
 	public BlockResult applyBlock(SignedData<Block> signedBlock) {
 		Block block=null;
 		try {
-			block=signedBlock.getValue();
+			block=RT.ensureCVM(signedBlock.getValue(),Block.class);
 			Counters.applyBlock++;
 	
 			// First check the Block passes pre-conditions for application
@@ -206,9 +206,9 @@ public class State extends ARecordGeneric {
 	 * @return BlockResult instance if an error occurred, or nil if checks pass
 	 */
 	public BlockResult checkBlock(SignedData<Block> signedBlock) {
-		Block block=signedBlock.getValue();
+		Block block=RT.ensureCVM(signedBlock.getValue(),Block.class);
 		AccountKey peerKey=signedBlock.getAccountKey();
-		PeerStatus ps=getPeers().get(peerKey);
+		PeerStatus ps=getPeer(peerKey);
 		
 		// If no current peer for this block, dump it
 		if (ps==null) return BlockResult.createInvalidBlock(this,block,Strings.MISSING_PEER);
@@ -394,8 +394,8 @@ public class State extends ARecordGeneric {
 		int n = al.size();
 		for (int i = 0; i < n; i++) {
 			AVector<ACell> st = (AVector<ACell>) al.get(i);
-			Address origin = (Address) st.get(0);
-			AOp<?> op = (AOp<?>) st.get(1);
+			Address origin = RT.ensureAddress(st.get(0));
+			AOp<?> op = Ops.ensureOp(st.get(1));
 			Context ctx;
 			
 			// TODO juice limit? juice refund?
@@ -668,7 +668,7 @@ public class State extends ARecordGeneric {
 		HashMap<AccountKey, Double> hm = new HashMap<>(getPeers().size());
 		long timeStamp=this.getTimestamp().longValue();
 		Double totalStake = getPeers().reduceEntries((acc, e) -> {
-			PeerStatus ps=e.getValue();
+			PeerStatus ps=RT.ensureCVM(e.getValue(),PeerStatus.class);
 			double stake = (double) (ps.getTotalStakeShares());
 			
 			long peerTimestamp=ps.getTimestamp();
@@ -733,7 +733,7 @@ public class State extends ARecordGeneric {
 	public AccountStatus getAccount(long ix) {
 		AVector<AccountStatus> accts=getAccounts();
 		if ((ix<0)||(ix>=accts.count())) return null;
-		return accts.get(ix);
+		return RT.ensureCVM(accts.get(ix),AccountStatus.class);
 	}
 
 	/**
@@ -778,8 +778,8 @@ public class State extends ARecordGeneric {
 	 * @return The total value of all funds
 	 */
 	public long computeTotalBalance() {
-		long total = getAccounts().reduce((Long acc,AccountStatus as) -> acc + as.getBalance(), (Long)0L);
-		total += getPeers().reduceValues((Long acc, PeerStatus ps) -> acc + ps.getBalance(), 0L);
+		long total = getAccounts().reduce((Long acc,ACell as) -> acc + RT.ensureCVM(as,AccountStatus.class).getBalance(), (Long)0L);
+		total += getPeers().reduceValues((Long acc,ACell ps) -> acc + RT.ensureCVM(ps,PeerStatus.class).getBalance(), 0L);
 		total += getGlobalFees().longValue();
 		total += getGlobalMemoryValue().longValue();
 		return total;
@@ -798,7 +798,7 @@ public class State extends ARecordGeneric {
 	public long computeSupply() {
 		long supply=Constants.MAX_SUPPLY;
 		for (int i=1; i<Init.NUM_GOVERNANCE_ACCOUNTS; i++) {
-			supply-=getAccounts().get(i).getBalance();
+			supply-=getAccount(i).getBalance();
 		}
 		return supply;
 	}
@@ -809,7 +809,7 @@ public class State extends ARecordGeneric {
 	 * @return The total amount of CVM memory available
 	 */
 	public long computeTotalMemory() {
-		long total = getAccounts().reduce((Long acc,AccountStatus as) -> acc + as.getMemory(), (Long)0L);
+		long total = getAccounts().reduce((Long acc,ACell as) -> acc + RT.ensureCVM(as,AccountStatus.class).getMemory(), (Long)0L);
 		total+=getGlobalMemoryPool().longValue();
 		return total;
 	}
@@ -902,7 +902,7 @@ public class State extends ARecordGeneric {
 	 * @return PeerStatus
 	 */
 	public PeerStatus getPeer(AccountKey peerAddress) {
-		return getPeers().get(peerAddress);
+		return RT.ensureCVM(getPeers().get(peerAddress),PeerStatus.class);
 	}
 
 	/**

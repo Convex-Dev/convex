@@ -1,5 +1,7 @@
 package convex.core.cpos;
 
+import convex.core.lang.RT;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -117,7 +119,7 @@ public class BeliefMerge {
 			
 			SignedData<Order> b=be.getValue();
 			if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
-			Order bc = b.getValue();
+			Order bc = RT.ensureCVM(b.getValue(),Order.class);
 			if (bc.getTimestamp()>getTimestamp()) continue; // ignore future Orders
 			
 			SignedData<Order> a=result.get(key);
@@ -129,7 +131,7 @@ public class BeliefMerge {
 			
 			if (a.equals(b)) continue; // PERF: fast path for no changes
 
-			Order ac = a.getValue();
+			Order ac = RT.ensureCVM(a.getValue(),Order.class);
 
 			boolean shouldReplace=compareOrders(ac,bc);
 			if (shouldReplace) {
@@ -148,7 +150,7 @@ public class BeliefMerge {
 	 * @return True if valid Peer, false otherwise.
 	 */
 	private boolean isValidPeer(ABlob key) {
-		PeerStatus ps=peers.get(key);
+		PeerStatus ps=RT.ensureCVM(peers.get(key),PeerStatus.class);
 		if (ps==null) return false;
 		
 		if (ps.getPeerStake()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return false;
@@ -180,7 +182,7 @@ public class BeliefMerge {
 		
 		if (!CPoSConstants.ENABLE_FORK_RECOVERY) {
 			filteredOrders= accOrders.filterValues(signedOrder -> {
-				Order otherOrder = signedOrder.getValue();
+				Order otherOrder = RT.ensureCVM(signedOrder.getValue(),Order.class);
 				return myOrder.checkConsistent(otherOrder);
 			});
 		}
@@ -285,7 +287,7 @@ public class BeliefMerge {
 			HashMap<AccountKey, Double> peerStakes, HashMap<Order, Double> dest) {
 		return peerOrders.reduceValues((acc, signedOrder) -> {
 			// Get the Order for this peer
-			Order order = signedOrder.getValue();
+			Order order = RT.ensureCVM(signedOrder.getValue(),Order.class);
 			AccountKey cAddress = signedOrder.getAccountKey();
 			Double cStake = peerStakes.get(cAddress);
 			if ((cStake == null) || (cStake == 0.0)) return acc;
@@ -463,14 +465,14 @@ public class BeliefMerge {
 		// First out-of-horizon Block in the reorderable region
 		long firstFuture = -1;
 		for (long i = Math.max(0, floor); i < n; i++) {
-			if (blocks.get(i).getValue().getTimeStamp() > limit) { firstFuture = i; break; }
+			if (RT.ensureCVM(blocks.get(i).getValue(),Block.class).getTimeStamp() > limit) { firstFuture = i; break; }
 		}
 		if (firstFuture < 0) return blocks; // no future Blocks: nothing to do
 
 		// If no in-horizon Block follows it, the future Blocks already form a clean suffix
 		boolean needsReorder = false;
 		for (long i = firstFuture + 1; i < n; i++) {
-			if (blocks.get(i).getValue().getTimeStamp() <= limit) { needsReorder = true; break; }
+			if (RT.ensureCVM(blocks.get(i).getValue(),Block.class).getTimeStamp() <= limit) { needsReorder = true; break; }
 		}
 		if (!needsReorder) return blocks;
 
@@ -478,11 +480,11 @@ public class BeliefMerge {
 		AVector<SignedData<Block>> result = blocks.slice(0, firstFuture);
 		for (long i = firstFuture; i < n; i++) {
 			SignedData<Block> b = blocks.get(i);
-			if (b.getValue().getTimeStamp() <= limit) result = result.conj(b);
+			if (RT.ensureCVM(b.getValue(),Block.class).getTimeStamp() <= limit) result = result.conj(b);
 		}
 		for (long i = firstFuture; i < n; i++) {
 			SignedData<Block> b = blocks.get(i);
-			if (b.getValue().getTimeStamp() > limit) result = result.conj(b);
+			if (RT.ensureCVM(b.getValue(),Block.class).getTimeStamp() > limit) result = result.conj(b);
 		}
 		return result;
 	}
@@ -518,7 +520,7 @@ public class BeliefMerge {
 		// dated beyond the clock allowance.
 		long horizon = n;
 		for (long i = finalisedFloor; i < n; i++) {
-			if (blocks.get(i).getValue().getTimeStamp() > limit) {
+			if (RT.ensureCVM(blocks.get(i).getValue(),Block.class).getTimeStamp() > limit) {
 				horizon = i;
 				break;
 			}
@@ -676,7 +678,7 @@ public class BeliefMerge {
 		Index<AccountKey, SignedData<Order>> orders = initialBelief.getOrders();
 		SignedData<Order> signed = (SignedData<Order>) orders.get(publicKey);
 		if (signed == null) return null;
-		return signed.getValue();
+		return RT.ensureCVM(signed.getValue(),Order.class);
 	}
 	
 	/**

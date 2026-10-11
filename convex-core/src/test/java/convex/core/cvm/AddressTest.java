@@ -15,10 +15,12 @@ import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.BlobsTest;
 import convex.core.data.Cells;
+import convex.core.data.ExtensionValue;
 import convex.core.data.Hash;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
+import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
@@ -42,13 +44,22 @@ public class AddressTest {
 	}
 	
 	@Test
-	public void testEncoding() throws BadFormatException {
+	public void testEncoding() throws BadFormatException, IOException {
 		Address a= Address.create(17);
 		Blob enc=a.getEncoding();
 		assertEquals(Utils.toHexString(CVMTag.ADDRESS)+"11",enc.toHexString());
-		ACell ra=Samples.TEST_STORE.decode(enc);
-		assertTrue(ra instanceof Address);
-		assertEquals(a,ra);
+		try (MemoryStore store=new MemoryStore()) {
+			// A store may retain an equivalent generic CAD3 representation.
+			ExtensionValue generic=ExtensionValue.create(CVMTag.ADDRESS,17);
+			Cells.persist(generic,store);
+			assertSame(generic,store.refForHash(a.getHash()).getValue());
+			assertTrue(store.decode(enc) instanceof Address);
+			assertEquals(a,store.decode(enc));
+			// Test CVM tag dispatch explicitly, bypassing the representation cache.
+			ACell ra=store.getEncoder().decode(enc);
+			assertTrue(ra instanceof Address);
+			assertEquals(a,ra);
+		}
 	}
 	
 	@Test

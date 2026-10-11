@@ -262,7 +262,7 @@ public class ConnectionManager extends AConnectionManager {
 			if (connections.containsKey(peerKey)) continue;
 			if (server.getPeerKey().equals(peerKey)) continue;
 
-			PeerStatus ps = s.getPeers().get(peerKey);
+			PeerStatus ps = s.getPeer(peerKey);
 			if (ps == null) continue;
 			AString hostName = ps.getHostname();
 			if (hostName == null) continue;

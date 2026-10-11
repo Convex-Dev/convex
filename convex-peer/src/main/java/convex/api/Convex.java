@@ -1,5 +1,7 @@
 package convex.api;
 
+import convex.core.cvm.CVMEncoder;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -301,7 +303,7 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected void maybeUpdateSequence(SignedData<ATransaction> signed) {
 		try {
-			ATransaction trans=signed.getValue();
+			ATransaction trans=RT.ensureTransaction(signed.getValue());
 			if (!isAutoSequence()) return;
 			if (!Cells.equals(trans.getOrigin(),address)) return;
 			Long seq=this.sequence;
@@ -353,7 +355,10 @@ public abstract class Convex implements AutoCloseable {
 		return fr.thenCompose(r -> {
 			if (r.isError()) return CompletableFuture.failedFuture(new ResultException(r));
 			ACell a=r.getValue();
-			return CompletableFuture.completedFuture((Address)a);
+			Address created=RT.ensureAddress(a);
+			if (created==null) return CompletableFuture.failedFuture(
+				new IllegalArgumentException("Account creation did not return an Address"));
+			return CompletableFuture.completedFuture(created);
 		});
 	}
 
@@ -433,6 +438,7 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	@SuppressWarnings("unchecked")
 	public SignedData<ATransaction> prepareTransaction(ACell code) throws ResultException,InterruptedException {
+		code=CVMEncoder.specialise(code);
 		ATransaction transaction;
 		if (code instanceof ATransaction) {
 			transaction=(ATransaction)code;
@@ -440,7 +446,7 @@ public abstract class Convex implements AutoCloseable {
 			if (code instanceof SignedData) {
 				SignedData<?> signed=(SignedData<?>) code;
 				ACell val=signed.getValue();
-				if (val instanceof ATransaction) return (SignedData<ATransaction>) signed;
+				if (RT.ensureTransaction(val)!=null) return (SignedData<ATransaction>) signed;
 				code=val;
 			} 
 			if (isPreCompile() ) {
@@ -540,6 +546,7 @@ public abstract class Convex implements AutoCloseable {
 	 * @return A Future for the result of the transaction
 	 */
 	public synchronized CompletableFuture<Result> transact(ACell code) {
+		code=CVMEncoder.specialise(code);
 		if (code instanceof ATransaction) return transact((ATransaction)code);
 		
 		if (isPreCompile()) {

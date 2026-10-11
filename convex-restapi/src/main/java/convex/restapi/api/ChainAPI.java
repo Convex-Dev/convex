@@ -433,7 +433,7 @@ public class ChainAPI extends ABaseAPI {
 	 * @return HashMap containing block information
 	 */
 	private HashMap<String, Object> getBlockData(SignedData<Block> signedBlock) {
-		Block block = signedBlock.getValue();
+		Block block = RT.ensureCVM(signedBlock.getValue(),Block.class);
 		
 		HashMap<String, Object> blockData = new HashMap<>();
 		blockData.put("timestamp", block.getTimeStamp());
@@ -664,7 +664,7 @@ public class ChainAPI extends ABaseAPI {
 			return;
 		}
 
-		AccountStatus as = r.getValue();
+		AccountStatus as = RT.ensureCVM(r.getValue(),AccountStatus.class);
 		if (as == null) {
 			ctx.result("{\"errorCode\": \"NOBODY\",\"value\": \"The Account requested does not exist.\"}");
 			ctx.contentType("application/json");
@@ -710,7 +710,7 @@ public class ChainAPI extends ABaseAPI {
 			return;
 		}
 
-		PeerStatus as = r.getValue();
+		PeerStatus as = RT.ensureCVM(r.getValue(),PeerStatus.class);
 		if (as == null) {
 			throw new NotFoundResponse("Peer does not exist: "+addrParam);
 		}

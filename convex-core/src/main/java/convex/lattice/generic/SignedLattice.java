@@ -1,9 +1,13 @@
 package convex.lattice.generic;
 
+import java.util.Objects;
+import java.util.function.BiPredicate;
+
 import convex.core.cvm.Keywords;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
@@ -24,6 +28,10 @@ import convex.lattice.cursor.SignedCursor;
  * complete; see the class documentation on {@link ALattice} for why a merge must not
  * fail on data it merely cannot author.</p>
  *
+ * <p>An instance-bound owner verifier, when present, checks incoming signers and
+ * authoring independently of legacy context owner verification. The same rule is
+ * retained by the unsigned write cursor below this signing boundary.</p>
+ *
  * @param <V> Type of signed lattice value
  */
 public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
@@ -33,10 +41,17 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 
 	/** Owner identity for values at this position, or null when unknown. */
 	private final ACell owner;
+	private final BiPredicate<ACell,AccountKey> ownerVerifier;
 
 	private SignedLattice(ALattice<V> valueNode, ACell owner) {
+		this(valueNode,owner,null);
+	}
+
+	private SignedLattice(ALattice<V> valueNode, ACell owner,
+			BiPredicate<ACell,AccountKey> ownerVerifier) {
 		this.valueNode=valueNode;
 		this.owner=owner;
+		this.ownerVerifier=ownerVerifier;
 	}
 
 	public static <V extends ACell> SignedLattice<V> create(ALattice<V> childNode) {
@@ -47,13 +62,52 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	 * Returns a view bound to a specific owner identity, whose signer the context
 	 * signing policy is asked for when a value must be authored at this position.
 	 *
-	 * @param owner Owner identity (an AccountKey, or an indirect identity such as an
-	 *              Address or DID resolved by the context's owner verifier)
+	 * @param owner Owner identity. An existing bound verifier is retained; otherwise
+	 *              authoring uses the legacy context owner verifier.
 	 * @return Owner-bound view of this lattice
 	 */
 	public SignedLattice<V> withOwner(ACell owner) {
 		if (Utils.equals(owner,this.owner)) return this;
-		return new SignedLattice<>(valueNode,owner);
+		return new SignedLattice<>(valueNode,owner,ownerVerifier);
+	}
+
+	/**
+	 * Binds an owner and its verification rule to this lattice, independently of
+	 * the context's legacy owner verifier. The rule follows child cursor writes.
+	 *
+	 * @param owner Owner identity
+	 * @param verifier Rule authorising a signer for an owner
+	 * @return Owner-bound signed lattice
+	 */
+	public SignedLattice<V> withOwner(ACell owner, BiPredicate<ACell,AccountKey> verifier) {
+		return new SignedLattice<>(valueNode,Objects.requireNonNull(owner),Objects.requireNonNull(verifier));
+	}
+
+	/** Returns the lattice for the unsigned value. */
+	public ALattice<V> getValueLattice() {
+		return valueNode;
+	}
+
+	/**
+	 * Authors this owner's value with an available authorised signer, or returns
+	 * null. A bound verifier takes precedence over legacy context verification.
+	 */
+	public SignedData<V> sign(LatticeContext context, V value) {
+		return sign(context,owner,value);
+	}
+
+	private SignedData<V> sign(LatticeContext context, ACell requestedOwner, V value) {
+		if (ownerVerifier==null) return context.signAs(requestedOwner,value);
+		// A bound instance's owner cannot be replaced by a per-call merge argument.
+		AccountKey direct=LatticeContext.ownerAccountKey(owner);
+		SignedData<V> signed=context.sign(direct,value);
+		if (signed!=null && ownerVerifier.test(owner,signed.getAccountKey())) return signed;
+		// A custom rule may authorise a delegate even for a direct-key identity.
+		if (direct!=null) {
+			signed=context.sign(null,value);
+			if (signed!=null && ownerVerifier.test(owner,signed.getAccountKey())) return signed;
+		}
+		return null;
 	}
 
 	@Override
@@ -104,13 +158,14 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		// A synthesised value must be signed as this owner. If we cannot author it,
 		// retain the own value: never store, or propagate, a slot signed by a
 		// non-owner, and never abort an otherwise valid merge over it.
-		SignedData<V> signed=context.signAs(owner,m);
+		SignedData<V> signed=sign(context,owner,m);
 		return (signed!=null)?signed:ownValue;
 	}
 
 	@Override
 	public boolean checkForeign(SignedData<V> otherValue) {
 		if (otherValue==null) return false;
+		if (ownerVerifier!=null && !ownerVerifier.test(owner,otherValue.getAccountKey())) return false;
 		return otherValue.checkSignature();
 	}
 
@@ -155,8 +210,7 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	@Override
 	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
 		// Only called when isWriteBoundary(key) is true, i.e. key is :value.
-		ALattice<V> inner = path(key); // valueNode
-		return SignedCursor.create((ALatticeCursor<SignedData<V>>) base,inner,context,owner);
+		return SignedCursor.createBound((ALatticeCursor<SignedData<V>>) base,this,context);
 	}
 
 	/**

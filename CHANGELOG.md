@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Typed ownership lattices for hash maps and indexes, including DID verification bound to each lattice instance and a public-key index specialisation. Existing `OwnerLattice<V>` callers remain supported.
+
 ### Changed
 
 - Index operations on long keys, such as DLFS file names, stay on the fast recursive path; the stack-safe fallback now engages only on an actual stack overflow. ([#727](https://github.com/Convex-Dev/convex/issues/727))
+- Embedded store decodes avoid hashing for cache lookup and automatic cache admission, while reusing already-cached values when their hash is available; non-embedded branches still use the cache on demand.
+- CVM map operations recognise only known maplike records; generic CAD3 records no longer qualify as maps solely through their Java representation.
+
+### Fixed
+
+- Typed CVM access now accepts equivalent generic CAD3 representations of addresses, operations, functions and records, including values retained in store caches. Default store decoding continues to produce CVM representations on cache hits.
 
 ## [0.8.17] - 2026-10-09
 

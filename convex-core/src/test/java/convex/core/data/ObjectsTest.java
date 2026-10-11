@@ -245,8 +245,18 @@ public class ObjectsTest {
 			assertTrue(n<=limit); // should fit in length specified
 			assertEquals(s,a.print(n));
 			
-			assertEquals(s,RT.print(a,n),()->"Expected print of length "+n+" for "+a); // must re-print in same length
-			assertNull(RT.print(a,n-1)); // must fail with one less character in limit
+			assertFalse(a.print(new BlobBuilder(),n-1)); // raw representation must honour its own limit
+			// CVM printing interprets recognised CAD3 tags, independently of the
+			// raw representation's diagnostic print format.
+			ACell cvm=CVMEncoder.specialise(a);
+			BlobBuilder cvmPrint=new BlobBuilder();
+			AString interpreted=cvm.print(cvmPrint,limit)?cvmPrint.getCVMString():null;
+			assertEquals(interpreted,RT.print(a,limit));
+			if (interpreted!=null) {
+				long length=interpreted.count();
+				assertEquals(interpreted,RT.print(a,length));
+				assertNull(RT.print(a,length-1));
+			}
 			return true;
 		} 
 		return false;

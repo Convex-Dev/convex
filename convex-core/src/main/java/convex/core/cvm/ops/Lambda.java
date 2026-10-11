@@ -1,5 +1,6 @@
 package convex.core.cvm.ops;
 
+import convex.core.ErrorCodes;
 import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
@@ -12,6 +13,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
@@ -51,20 +53,23 @@ public class Lambda<T extends ACell> extends ACodedOp<T,ACell,AClosure<T>> {
 
 	@Override
 	public Context execute(Context context) {
-		AClosure<T> fn= value.getValue().withEnvironment(context.getLocalBindings());
+		AClosure<T> template=getFunction();
+		if (template==null) return context.withError(ErrorCodes.FORMAT,"Lambda requires a closure");
+		AClosure<T> fn=template.withEnvironment(context.getLocalBindings());
 		return context.withResult(Juice.LAMBDA,fn);
 	}
 	
 	@Override
 	public boolean print(BlobBuilder sb, long limit)  {
-		return value.getValue().print(sb,limit);
+		AClosure<T> fn=getFunction();
+		return (fn==null) ? printRaw(sb,limit) : fn.print(sb,limit);
 	}
 	
 	@Override 
 	public void validate() throws InvalidDataException {
 		super.validate();
 		
-		ACell fn=value.getValue();
+		ACell fn=getFunction();
 		if (!(fn instanceof AClosure)) {
 			throw new InvalidDataException("Lambda child must be a closure but got: "+Utils.getClassName(fn),this);
 		}
@@ -75,8 +80,9 @@ public class Lambda<T extends ACell> extends ACodedOp<T,ACell,AClosure<T>> {
 		// nothing to do?
 	}
 
+	@SuppressWarnings("unchecked")
 	public AClosure<T> getFunction() {
-		return value.getValue();
+		return RT.ensureCVM(value.getValue(),AClosure.class);
 	}
 
 	@Override

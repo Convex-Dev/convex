@@ -51,8 +51,8 @@ public final class Block extends ARecordGeneric {
 	static final Comparator<SignedData<Block>> TIMESTAMP_COMPARATOR = new Comparator<>() {
 		@Override
 		public int compare(SignedData<Block> a, SignedData<Block> b) {
-			Block ba=a.getValue();
-			Block bb=b.getValue();
+			Block ba=RT.ensureCVM(a.getValue(),Block.class);
+			Block bb=RT.ensureCVM(b.getValue(),Block.class);
 			
 			int sig = Long.compare(ba.getTimeStamp(), bb.getTimeStamp());
 			return sig;
@@ -67,7 +67,7 @@ public final class Block extends ARecordGeneric {
 
 	private Block(AVector<ACell> values) {
 		super(CVMTag.BLOCK,FORMAT,values);
-		this.timestamp=RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
+		this.timestamp=RT.ensureLong(embeddedField(IX_TIMESTAMP)).longValue();
 
 	}
 
@@ -82,7 +82,7 @@ public final class Block extends ARecordGeneric {
 
 	@Override
 	public ACell get(Keyword k) {
-		if (Keywords.TIMESTAMP.equals(k)) return values.get(IX_TIMESTAMP);
+		if (Keywords.TIMESTAMP.equals(k)) return embeddedField(IX_TIMESTAMP);
 		if (Keywords.TRANSACTIONS.equals(k)) return getTransactions();
 		return null;
 	}

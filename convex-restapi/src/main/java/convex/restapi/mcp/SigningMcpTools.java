@@ -431,7 +431,7 @@ class SigningMcpTools {
 				Result r = faucetClient.transactSync(source);
 				if (r.isError()) return api.toolResult(r);
 
-				Address address = (Address)r.getValue();
+				Address address = RT.ensureAddress(r.getValue());
 				AMap<AString, ACell> out = Maps.of(
 					"address", CVMLong.create(address.longValue()),
 					"publicKey", publicKey.toString()

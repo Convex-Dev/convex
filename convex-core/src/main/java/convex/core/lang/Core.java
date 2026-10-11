@@ -1,5 +1,9 @@
 package convex.core.lang;
 
+import convex.core.cvm.Ops;
+
+import convex.core.cvm.CVMEncoder;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -532,6 +536,7 @@ public class Core {
 
 			ACell form = (ACell) args[0];
 			AOp<?> op;
+			form=CVMEncoder.specialise(form);
 			if (form instanceof AOp) {
 				op=(AOp<?>)form;
 			} else {
@@ -586,8 +591,8 @@ public class Core {
 
 			// get operation
 			ACell opo = args[1];
-			if (!(opo instanceof AOp)) return context.withCastError(1,args,Types.OP);
-			AOp<?> op = (AOp<?>) opo;
+			AOp<?> op = Ops.ensureOp(opo);
+			if (op==null) return context.withCastError(1,args,Types.OP);
 
 			return context.schedule(scheduleTimestamp, op);
 		}
@@ -1182,7 +1187,7 @@ public class Core {
 			boolean familySet = false;
 			long total = 0;
 			for (int i = 0; i < n; i++) {
-				ACell a = args[i];
+				ACell a = CVMEncoder.specialise(args[i]);
 				if (a == null) continue; // skip nils
 				ABlob b;
 				boolean ch;
@@ -1223,7 +1228,7 @@ public class Core {
 			// dst determines the result family (like cat's first argument); nil is an
 			// empty Blob, a Character its UTF-8 bytes. A char-like dst (String, Keyword,
 			// Symbol, Character) yields a String, any other BlobLike a Blob.
-			ACell d = args[0];
+			ACell d = CVMEncoder.specialise(args[0]);
 			boolean charFamily;
 			ABlob dst;
 			if (d == null) {
@@ -1248,7 +1253,7 @@ public class Core {
 
 			// src contributes raw bytes, like cat — no cast; nil contributes nothing, a
 			// Character its UTF-8 bytes
-			ACell s = args[2];
+			ACell s = CVMEncoder.specialise(args[2]);
 			ABlob src;
 			if (s == null) {
 				src = Blob.EMPTY;
@@ -1450,10 +1455,8 @@ public class Core {
 		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			ACell a = args[0];
-			if (!(a instanceof AMap)) return context.withCastError(0,args, Types.MAP);
-
-			AMap<ACell, ACell> m = (AMap<ACell,ACell>) a;
+			AMap<ACell, ACell> m = RT.ensureMap(args[0]);
+			if (m==null) return context.withCastError(0,args, Types.MAP);
 			long juice = Juice.BUILD_DATA + m.count() * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
@@ -1469,10 +1472,8 @@ public class Core {
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			ACell a = args[0];
-			if (!(a instanceof AMap)) return context.withCastError(0,args, Types.MAP);
-
-			AMap<ACell, ACell> m = (AMap<ACell, ACell>) a;
+			AMap<ACell, ACell> m = RT.ensureMap(args[0]);
+			if (m==null) return context.withCastError(0,args, Types.MAP);
 			long juice = Juice.BUILD_DATA + m.count() * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
@@ -3112,14 +3113,14 @@ public class Core {
 	public static final CoreFn<CVMBool> MAP_Q = reg(new CorePred(Symbols.MAP_Q,244) {
 		@Override
 		public boolean test(ACell val) {
-			return val instanceof AMap;
+			return RT.ensureMap(val)!=null;
 		}
 	});
 
 	public static final CoreFn<CVMBool> COLL_Q = reg(new CorePred(Symbols.COLL_Q,245) {
 		@Override
 		public boolean test(ACell val) {
-			return val instanceof ADataStructure;
+			return RT.ensureDataStructure(val)!=null;
 		}
 	});
 	
@@ -3137,7 +3138,8 @@ public class Core {
 			// like with clojure
 			if (val == null) return true;
 
-			return (val instanceof ACountable) && ((ACountable<?>) val).isEmpty();
+			ACountable<?> counted=RT.ensureCountable(val);
+			return (counted!=null) && counted.isEmpty();
 		}
 	});
 
@@ -3166,7 +3168,7 @@ public class Core {
 	public static final CoreFn<CVMBool> ADDRESS_Q = reg(new CorePred(Symbols.ADDRESS_Q,250) {
 		@Override
 		public boolean test(ACell val) {
-			return val instanceof Address;
+			return RT.ensureAddress(val)!=null;
 		}
 	});
 
@@ -3221,7 +3223,7 @@ public class Core {
 	public static final CoreFn<CVMBool> FN_Q = reg(new CorePred(Symbols.FN_Q,271) {
 		@Override
 		public boolean test(ACell val) {
-			return val instanceof AFn;
+			return RT.ensureFunction(val)!=null;
 		}
 	});
 

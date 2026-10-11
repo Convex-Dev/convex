@@ -14,6 +14,7 @@ public class Ops {
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AOp<T> ensureOp(ACell a) {
+		a=CVMEncoder.specialise(a);
 		if (a==null) return null;
 		if (a instanceof AOp) return (AOp<T>)a;
 		return null;
@@ -27,8 +28,9 @@ public class Ops {
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AOp<T> castOp(ACell a) {
 		if (a==null) return Constant.nil();
-		if (a instanceof AOp) {
-			return (AOp<T>)a;
+		AOp<T> op=ensureOp(a);
+		if (op!=null) {
+			return op;
 		} else {
 			return (AOp<T>) Constant.create(a);
 		}

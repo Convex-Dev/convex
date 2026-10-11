@@ -1,5 +1,7 @@
 package convex.peer;
 
+import convex.core.lang.RT;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -518,8 +520,8 @@ public class BeliefPropagator extends AThreadedComponent {
 				// Keep the best candidate for every Peer across the whole merge batch.
 				if (Cells.equals(myKey,key)) continue;
 				if (orders.containsKey(key)) {
-					Order newOrder=so.getValue();
-					Order oldOrder=orders.get(key).getValue();
+					Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
+					Order oldOrder=RT.ensureCVM(orders.get(key).getValue(),Order.class);
 					if (!BeliefMerge.compareOrders(oldOrder,newOrder)) continue;
 				}
 

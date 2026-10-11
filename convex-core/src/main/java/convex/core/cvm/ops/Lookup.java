@@ -6,6 +6,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
@@ -64,7 +65,9 @@ public class Lookup<T extends ACell> extends ACodedOp<T,AOp<Address>,Symbol> {
 	public Context execute(Context context) {
 		Context rctx=context;
 		Address namespaceAddress=null;
-		AOp<Address> address=code.getValue();
+		ACell addressValue=code.getValue();
+		AOp<Address> address=Ops.ensureOp(addressValue);
+		if ((addressValue!=null)&&(address==null)) return rctx.withError(ErrorCodes.FORMAT,"Lookup requires an address operation");
 		if (address!=null) {
 			rctx=rctx.execute(address);
 			if (rctx.isExceptional()) return rctx;
@@ -75,18 +78,22 @@ public class Lookup<T extends ACell> extends ACodedOp<T,AOp<Address>,Symbol> {
 		
 		// Do a dynamic lookup, with address if specified or address from current context otherwise
 		namespaceAddress=(address==null)?context.getAddress():namespaceAddress;
-		Symbol symbol=value.getValue();
+		ACell name=value.getValue();
+		if (!(name instanceof Symbol symbol)) return rctx.withError(ErrorCodes.FORMAT,"Lookup requires a symbol");
 		return rctx.lookupDynamic(namespaceAddress,symbol).consumeJuice(Juice.LOOKUP_DYNAMIC);
 	}
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
-		AOp<Address> address=code.getValue();
+		ACell addressValue=code.getValue();
+		AOp<Address> address=Ops.ensureOp(addressValue);
+		if ((addressValue!=null)&&(address==null)) return printRaw(bb,limit);
 		if (address!=null) {
 			if (!address.print(bb,limit)) return false;
 			bb.append('/');
 		}
-		Symbol symbol=value.getValue();
+		ACell name=value.getValue();
+		if (!(name instanceof Symbol symbol)) return printRaw(bb,limit);
 		return symbol.print(bb,limit);
 	}
 
@@ -98,7 +105,7 @@ public class Lookup<T extends ACell> extends ACodedOp<T,AOp<Address>,Symbol> {
 	}
 
 	public AOp<Address> getAddress() {
-		return code.getValue();
+		return Ops.ensureOp(code.getValue());
 	}
 
 	@Override

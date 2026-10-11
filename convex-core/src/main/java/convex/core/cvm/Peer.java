@@ -155,12 +155,12 @@ public class Peer {
 	 */
 	@SuppressWarnings("unchecked")
 	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, ACell> peerData)  {
-		Belief belief=(Belief) peerData.get(Keywords.BELIEF);
+		Belief belief=RT.ensureCVM(peerData.get(Keywords.BELIEF),Belief.class);
 		AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
-		State genesis=(State) peerData.get(Keywords.GENESIS);
-		State state=(State) peerData.get(Keywords.STATE);
+		State genesis=RT.ensureCVM(peerData.get(Keywords.GENESIS),State.class);
+		State state=RT.ensureCVM(peerData.get(Keywords.STATE),State.class);
 		long pos=((CVMLong) peerData.get(Keywords.POSITION)).longValue();
-		Order co=((Order) peerData.get(Keywords.ORDER));
+		Order co=RT.ensureCVM(peerData.get(Keywords.ORDER),Order.class);
 		long hpos=((CVMLong) peerData.get(Keywords.HISTORY)).longValue();
 		long timestamp=((CVMLong) peerData.get(Keywords.TIMESTAMP)).longValue();
 		// This gets inferred from keypair, caller might want to check it is correct though!
@@ -329,6 +329,7 @@ public class Peer {
 	 * @return Query result context
 	 */
 	public ResultContext executeQuery(ACell form, Address address, long maxJuice) {
+		form=CVMEncoder.specialise(form);
 		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		State state=getConsensusState();
 
@@ -338,7 +339,7 @@ public class Peer {
 		
 		if (form instanceof SignedData) {
 			SignedData<?> sc=(SignedData<?>)form;
-			ACell val=sc.getValue();
+			ACell val=CVMEncoder.specialise(sc.getValue());
 			if (val instanceof ATransaction tx) {
 				return executeDetached(tx,maxJuice);
 			}
@@ -649,7 +650,7 @@ public class Peer {
 	private void validateSignatures(AVector<SignedData<Block>> blocks, long start, long end) {
 		java.util.ArrayList<Future<?>> futures = null;
 		for (long b = start; b < end; b++) {
-			AVector<SignedData<ATransaction>> transactions = blocks.get(b).getValue().getTransactions();
+			AVector<SignedData<ATransaction>> transactions = RT.ensureCVM(blocks.get(b).getValue(),Block.class).getTransactions();
 			int count = (int) transactions.count();
 			if (count == 0) continue;
 
@@ -736,7 +737,7 @@ public class Peer {
 		if (hpos<1) return null;
 		if (hpos>blockResults.count()) return null;
 		
-		BlockResult br=blockResults.get(hpos-1);
+		BlockResult br=RT.ensureCVM(blockResults.get(hpos-1),BlockResult.class);
 		return br.getState();
 	}
 
@@ -761,7 +762,7 @@ public class Peer {
 		if (i<historyPosition) return null; // Ancient history
 		long brix=i-historyPosition;
 		if (brix>=blockResults.count()) return null;
-		return blockResults.get(brix);
+		return RT.ensureCVM(blockResults.get(brix),BlockResult.class);
 	}
 	
 

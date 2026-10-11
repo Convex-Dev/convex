@@ -1,5 +1,7 @@
 package convex.peer;
 
+import convex.core.lang.RT;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -170,7 +172,7 @@ public class TransactionHandler extends AThreadedComponent {
 			}
 			Peer p=server.getPeer();
 			State s=p.getConsensusState();
-			PeerStatus ps=s.getPeers().get(p.getPeerKey());
+			PeerStatus ps=s.getPeer(p.getPeerKey());
 			if (ps==null) {
 				return ERR_NOT_REGISTERED;
 			}
@@ -638,7 +640,7 @@ public class TransactionHandler extends AThreadedComponent {
 		for (long i = 0; i < n; i++) {
 			MapEntry<AArrayBlob, PeerStatus> e = peers.entryAt(i);
 			if (Cells.equals(e.getKey(), myKey)) continue;
-			if (e.getValue().getPeerStake() >= CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return true;
+			if (RT.ensureCVM(e.getValue(),PeerStatus.class).getPeerStake() >= CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return true;
 		}
 		return false;
 	}

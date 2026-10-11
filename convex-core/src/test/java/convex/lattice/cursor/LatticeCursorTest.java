@@ -103,13 +103,15 @@ public class LatticeCursorTest {
 				ExecutorService reader = Executors.newSingleThreadExecutor()) {
 			for (long i = 1; i <= 1_000; i++) {
 				CVMLong committed = CVMLong.create(i);
-				writer.submit(() -> fork.<ASet<CVMLong>>path(Keywords.FOO)
+				ASet<CVMLong> written=writer.submit(() -> fork.<ASet<CVMLong>>path(Keywords.FOO)
 						.updateAndGet(values -> values.include(committed))).get();
 
 				ASet<CVMLong> observed = reader.submit(() ->
 						fork.<ASet<CVMLong>>path(Keywords.FOO).get()).get();
+				assertSame(written,observed,"Fresh cursor must read the published set");
 				assertTrue(observed.contains(committed),
-						() -> "Fresh cursor did not observe completed update " + committed);
+						() -> "Published set is missing " + committed + "; count=" + observed.count()
+							+ "; value hash=" + committed.getHash() + "; set=" + observed);
 			}
 		}
 	}

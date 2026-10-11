@@ -930,7 +930,7 @@ public class Context {
 		Context ctx =this.withDepth(savedDepth+1);
 		if (ctx.isExceptional()) return ctx; // depth error, won't have modified depth
 
-		Context rctx=op.execute(ctx);
+		Context rctx=(op==null) ? ctx.withError(ErrorCodes.FORMAT,"Expected an operation") : op.execute(ctx);
 
 		// reset depth after execution.
 		rctx=rctx.withDepth(savedDepth);
@@ -1280,6 +1280,7 @@ public class Context {
 	 * @return Context containing the result of evaluating the specified form
 	 */
 	public Context eval(ACell form) {
+		form=CVMEncoder.specialise(form);
 		Context ctx= this;
 		AOp<?> op;
 	
@@ -1294,8 +1295,8 @@ public class Context {
 			if (ctx.isExceptional()) return ctx;
 			
 			ACell cop=ctx.getResult();
-			if (!(cop instanceof AOp)) return ctx.withCompileError("*lang* did not produce CVM op");
-			op = (AOp<?>)cop;
+			op=Ops.ensureOp(cop);
+			if (op==null) return ctx.withCompileError("*lang* did not produce CVM op");
 			ctx=ctx.withResult(null); // clear result before execution
 		}
 		return ctx.exec(op);
@@ -1483,7 +1484,7 @@ public class Context {
 
 		Address source=getAddress();
 		long sourceIndex=source.longValue();
-		AccountStatus sourceAccount=accounts.get(sourceIndex);
+		AccountStatus sourceAccount=RT.ensureCVM(accounts.get(sourceIndex),AccountStatus.class);
 
 		long currentBalance=sourceAccount.getBalance();
 		if (currentBalance<amount) {
@@ -1499,7 +1500,7 @@ public class Context {
 		if (targetIndex>=accounts.count()) {
 			return this.withError(ErrorCodes.NOBODY,"Target account for transfer "+target+" does not exist");
 		}
-		AccountStatus targetAccount=accounts.get(targetIndex);
+		AccountStatus targetAccount=RT.ensureCVM(accounts.get(targetIndex),AccountStatus.class);
 
 		// Special handling for an actor account other than #0 (burn address)
 		if (targetAccount.isActor()&&(!(target.longValue()==0))) {
@@ -1543,7 +1544,7 @@ public class Context {
 
 		Address source=getAddress();
 		long sourceIndex=source.longValue();
-		AccountStatus sourceAccount=accounts.get(sourceIndex);
+		AccountStatus sourceAccount=RT.ensureCVM(accounts.get(sourceIndex),AccountStatus.class);
 
 		long currentBalance=sourceAccount.getMemory();
 		if (currentBalance<amount) {
@@ -1559,7 +1560,7 @@ public class Context {
 		if (targetIndex>=accounts.count()) {
 			return withError(ErrorCodes.NOBODY,"Cannot transfer memory allowance to non-existent account: "+target);
 		}
-		AccountStatus targetAccount=accounts.get(targetIndex);
+		AccountStatus targetAccount=RT.ensureCVM(accounts.get(targetIndex),AccountStatus.class);
 
 		long newTargetBalance=targetAccount.getMemory()+amount;
 		AccountStatus newTargetAccount=targetAccount.withMemory(newTargetBalance);
@@ -1583,7 +1584,7 @@ public class Context {
 
 		Address source=getAddress();
 		long sourceIndex=source.longValue();
-		AccountStatus sourceAccount=accounts.get(sourceIndex);
+		AccountStatus sourceAccount=RT.ensureCVM(accounts.get(sourceIndex),AccountStatus.class);
 
 		long current=sourceAccount.getMemory();
 		long balance=sourceAccount.getBalance();
@@ -1663,13 +1664,11 @@ public class Context {
 		// SECURITY: set up state for actor call
 		State state=getState();
 		Symbol sym=RT.ensureSymbol(functionName);
-		Address targetAddress;
+		Address targetAddress=RT.ensureAddress(target);
 		ACell scope=null;
 		
 		// Handle target possibilities, may be an Address or Scoped Actor reference
-		if (target instanceof Address) {
-			targetAddress=(Address)target;
-		} else {
+		if (targetAddress==null) {
 			if (!(target instanceof AVector)) {
 				return this.withCastError(target, "call target must be an Address or [Address *scope*] vector");
 			}
@@ -2113,7 +2112,7 @@ public class Context {
 	public Context evictPeer(AccountKey peerKey) {
 		Context ctx=this;
 		Index<AArrayBlob, PeerStatus> peers = ctx.getState().getPeers();
-		PeerStatus ps=peers.get(peerKey);
+		PeerStatus ps=RT.ensureCVM(peers.get(peerKey),PeerStatus.class);
 		if (ps==null) {
 			// no peer to evict
 			return this;
@@ -2142,7 +2141,7 @@ public class Context {
 			MapEntry<Address,CVMLong> staked=stakes.entryAt(i);
 			ctx=ctx.withJuiceLimit(getJuiceLimit()+Juice.TRANSFER);
 			ctx=ctx.consumeJuice(Juice.TRANSFER);
-			Address stakedAddress=staked.getKey();
+			Address stakedAddress=RT.ensureAddress(staked.getKey());
 			ctx=ctx.setDelegatedStake(peerKey, stakedAddress, 0L);
 			if (ctx.isExceptional()) return ctx;
 		}
@@ -2403,9 +2402,9 @@ public class Context {
 					// one lookup via Environment for alias
 					maybeAddress = lookupValue((Symbol)maybeAddress);
 				}
-				if (!(maybeAddress instanceof Address)) return null;
-				addr = (Address)maybeAddress;
-				me = lookupMeta((Address)maybeAddress,sym);
+				addr=RT.ensureAddress(maybeAddress);
+				if (addr==null) return null;
+				me = lookupMeta(addr,sym);
 			} else {
 				return null;
 			}

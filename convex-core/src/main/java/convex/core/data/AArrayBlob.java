@@ -29,6 +29,14 @@ public abstract class AArrayBlob extends ABlob {
 	 * Cached hash of the Blob data. Might be null.
 	 */
 	protected Hash contentHash = null;
+
+	/**
+	 * Returns the cached hash of the raw bytes, without computing it.
+	 * @return Content hash, or null if not already available
+	 */
+	public final Hash cachedContentHash() {
+		return contentHash;
+	}
 	
 	@Override
 	public final Hash getContentHash() {

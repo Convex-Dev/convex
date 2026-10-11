@@ -2,9 +2,10 @@ package convex.core.data.type;
 
 import convex.core.cvm.Address;
 import convex.core.data.ACell;
+import convex.core.lang.RT;
 
 /**
- * Type that represents CVM Byte values
+ * Type that represents CVM addresses, including generic CAD3 representations.
  */
 public final class AddressType extends AStandardType<Address> {
 	/**
@@ -18,7 +19,7 @@ public final class AddressType extends AStandardType<Address> {
 	
 	@Override
 	public boolean check(ACell value) {
-		return value instanceof Address;
+		return RT.ensureAddress(value)!=null;
 	}
 	
 	@Override
@@ -33,7 +34,6 @@ public final class AddressType extends AStandardType<Address> {
 
 	@Override
 	public Address implicitCast(ACell a) {
-		if (a instanceof Address) return (Address)a;
-		return null;
+		return RT.ensureAddress(a);
 	}
 }

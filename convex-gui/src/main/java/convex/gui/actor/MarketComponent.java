@@ -53,7 +53,7 @@ public class MarketComponent extends BaseListComponent {
 		numOutcomes = outcomes.size();
 
 		// oracle data
-		Address oracleAddress = (Address) pmEnv.get(Symbol.create("oracle"));
+		Address oracleAddress = RT.ensureAddress(pmEnv.get(Symbol.create("oracle")));
 		if (oracleAddress == null) throw new Error("No oracle symbol in environment?");
 		Object key = pmEnv.get(Symbol.create("oracle-key"));
 

@@ -67,7 +67,7 @@ public class BlockResult extends ARecordGeneric {
 	 * @return State after Block is executed
 	 */
 	public State getState() {
-		if (state==null) state=(State)values.get(0);
+		if (state==null) state=RT.ensureCVM(values.get(0),State.class);
 		return state;
 	}
 
@@ -97,7 +97,7 @@ public class BlockResult extends ARecordGeneric {
 	public Result getResult(long i) {
 		AVector<Result> results=getResults();
 		if ((i<0)||(i>=results.count())) return null;
-		return results.get(i);
+		return RT.ensureCVM(results.get(i),Result.class);
 	}
 
 	/**

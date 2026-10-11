@@ -18,6 +18,7 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
@@ -286,7 +287,11 @@ public class EtchRobustnessTest {
 
 		Callable<Void> writer = () -> {
 			for (int i = 0; i < N; i++) {
-				etch.write(keys[i], CVMLong.create(i).getRef());
+				// Synthetic index keys are not content hashes. Use fresh blob payloads:
+				// decoding an interned integer would attach this fake hash to a shared
+				// singleton's encoding and corrupt unrelated concurrent tests.
+				Blob payload=Blob.wrap(new byte[] {(byte)(i>>>8),(byte)i});
+				etch.write(keys[i], payload.getRef());
 				published.set(i + 1);
 			}
 			return null;

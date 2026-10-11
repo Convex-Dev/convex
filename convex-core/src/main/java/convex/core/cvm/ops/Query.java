@@ -1,5 +1,6 @@
 package convex.core.cvm.ops;
 
+import convex.core.ErrorCodes;
 import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
@@ -65,7 +66,8 @@ public class Query<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>
 	@Override
 	public Context execute(Context context) {
 		State savedState=context.getState();
-		AVector<AOp<ACell>> ops=value.getValue();
+		AVector<ACell> ops=RT.ensureVector(value.getValue());
+		if (ops==null) return context.withError(ErrorCodes.FORMAT,"Query requires an operations vector");
 		
 		int n = ops.size();
 		if (n == 0) return context.withResult(Juice.QUERY,  null); // need cast to avoid bindings overload
@@ -89,7 +91,8 @@ public class Query<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
-		AVector<AOp<ACell>> ops=value.getValue();
+		AVector<ACell> ops=RT.ensureVector(value.getValue());
+		if (ops==null) return printRaw(bb,limit);
 		bb.append("(query");
 		int len = ops.size();
 		for (int i = 0; i < len; i++) {
