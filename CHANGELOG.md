@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Lattice applications can be constructed from a root lattice and store, inspect their root lattice, and atomically merge incoming state without defining domain components.
 - Typed ownership lattices for hash maps and indexes, including DID verification bound to each lattice instance and a public-key index specialisation. Existing `OwnerLattice<V>` callers remain supported.
 
 ### Changed

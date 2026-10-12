@@ -8,31 +8,88 @@ practical companion for `convex-core`, with `convex-social`, `convex-dlfs` and
 `convex-p2p` as worked examples. Cursor internals are in
 [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
 
-## Proposed application API
+## Application root and components
 
-**Application lifecycle and subscription design proposal.** The ownership hierarchy
-below is implemented; lifecycle and subscription signatures remain proposals. The
-sections after this proposal describe the existing application API. This design uses CAD024 for merge semantics, CAD035
+**Implemented:** `ALatticeApplication<V>` wraps a hosted root cursor, exposes its
+`getLattice()` and atomically merges incoming root values through `merge(value)`.
+It can attach to a `RootComponent<V>` or construct a local root from an
+`ALattice<V>` and an `AStore`. Neither merging nor hosting requires domain
+components to exist.
+
+The global lattice has a keyed map root. The existing `KeyedLattice` represents it
+as `Index<Keyword, ACell>`, an `AMap`. Applications participate at the globally
+defined region paths and meanings, composing the region lattices they understand.
+Unknown incoming regions are ignored by keyed merge; existing unknown regions are
+retained. This is selective participation, not a separate application namespace.
+The generic base also supports other value types for local applications and tests.
+
+There are two complementary kinds of knowledge:
+
+- The supplied root lattice defines region dispatch, navigation, verification and
+  merge semantics for the complete root value.
+- A domain application knows how to construct components for its regions, possibly
+  parameterised by owner, collection name or another path key. Each component can
+  construct further components within its own subtree.
+
+Component factories are optional domain conveniences. The base application does
+not discover merge rules from components, enumerate them during merge, or require
+a component registry. A relay can merge every region in its supplied lattice
+without constructing a single domain component.
+
+```java
+public final class RelayApplication extends ALatticeApplication<Index<Keyword, ACell>> {
+    public RelayApplication(KeyedLattice lattice, AStore store) {
+        super(lattice, store); // local root initially at lattice.zero()
+    }
+
+    public RelayApplication(RootComponent<Index<Keyword, ACell>> host) {
+        super(host);           // shares the host's exact cursor and lattice
+    }
+}
+
+RelayApplication app = new RelayApplication(selectedRegions, store);
+app.merge(incomingRoot); // atomic local merge, including region verification
+app.sync();              // persist and publish through host policy
+```
+
+Local construction does not restore an existing store root. Use
+`RootComponent.open(lattice, store)` and the host constructor to restore one.
+The caller owns the store lifecycle. A hosted application's `getLattice()` returns
+the host cursor's lattice, so component navigation and incoming merges use the same
+definition. There is no second application merge policy that can disagree with it.
+`merge` uses the cursor's effective context, preserves the current root in the
+`own` position, and retries after concurrent updates. It does not publish or flush.
+
+## Proposed lifecycle and subscriptions
+
+**Design proposal.** The root merge API and ownership hierarchy are implemented;
+lifecycle and subscription signatures below remain proposals. The sections after
+this proposal describe the existing component API. This design uses CAD024 for merge semantics, CAD035
 for cursor atomicity, CAD036 for hosting, CAD038 for ownership and CAD045 for
 application composition. Changes to their application contracts need corresponding
 CAD updates before implementation is described as normative.
 
 ### Responsibilities
 
-An application is a launched composition of components and subscriptions. It need
-not itself be a component at the root, or carry the Java type of the complete root.
+An application remains a typed component at the complete root. Its supplied
+lattice is sufficient for root merging; domain subclasses add component factories.
+Lifecycle and subscriptions manage active work and replication demand without
+becoming another source of merge semantics.
 
 | Object | Responsibility |
 |---|---|
 | `RootComponent<V>` | Shared authoritative cursor, schema, storage and host services |
-| `ALatticeApplication` | Launch/close lifecycle, application policy and owned subscriptions |
+| `ALatticeApplication<V>` | Root merge API; optionally domain factories, lifecycle and subscriptions |
 | `LatticeSubscription<V>` | Interest in one subtree, a live cursor and optional change observers |
 | `ALatticeComponent<V>` | Lightweight domain API around a cursor at one path |
 
 Keep `RootComponent` as the host abstraction initially. A local root supports the
 same application API as a root hosted by `NodeServer`; the node installs replication
 services. A new host interface is only needed if another implementation requires it.
-`ALatticeApplication` no longer extends `ALatticeComponent`.
+`ALatticeApplication<V>` continues to extend `ALatticeComponent<V>`.
+Application-selected region definitions configure the host root at construction;
+the host does not need to know the corresponding component classes. Combining
+different applications' region selections in a shared host remains future work.
 
 Signing establishes responsibility for the entire signed subtree. Its owner is
 responsible for merging and publishing that tree, including coordinating multiple
@@ -175,11 +232,18 @@ against the current implementation. Paths use canonical CVM keys, as existing
 `cursor.path(...)` calls do.
 
 ```java
-public abstract class ALatticeApplication implements AutoCloseable {
-    public final void launch(RootComponent<?> host);
+public abstract class ALatticeApplication<V extends ACell>
+        extends ALatticeComponent<V> implements AutoCloseable {
+    protected ALatticeApplication(RootComponent<V> host);
+    protected ALatticeApplication(ALattice<V> lattice, AStore store);
+
+    public final ALattice<V> getLattice();
+    public V merge(V other);
+
+    public final void launch();
     public final void close();
 
-    public final <V extends ACell> LatticeSubscription<V> subscribe(ACell... path);
+    public final <T extends ACell> LatticeSubscription<T> subscribe(ACell... path);
     public final void sync();
     public final CompletionStage<Void> pull();
     public final void flush() throws IOException;
@@ -206,8 +270,12 @@ application's write policy before binding cursors. The default `onError` reports
 asynchronous failures through logging; applications can override it for supervision.
 
 ```java
-public final class MyApplication extends ALatticeApplication {
+public final class MyApplication extends ALatticeApplication<Index<Keyword, ACell>> {
     private Feed feed;
+
+    public MyApplication(RootComponent<Index<Keyword, ACell>> host) {
+        super(host);
+    }
 
     @Override
     protected void onLaunch() {
@@ -217,8 +285,8 @@ public final class MyApplication extends ALatticeApplication {
     }
 }
 
-MyApplication app = new MyApplication();
-app.launch(node.getRootComponent());  // node already launched and configured
+MyApplication app = new MyApplication(node.getRootComponent());
+app.launch();  // node already launched and configured
 // The same application can launch against a standalone RootComponent.
 ```
 
@@ -231,7 +299,7 @@ creation itself opens no connections, starts no workers and installs no observer
 ### Launch and close
 
 - Host schema and peer groups are configured before host launch. Application launch
-  attaches to a ready host, binds its policy and runs `onLaunch`. Readiness means
+  uses its bound, ready host, binds its policy and runs `onLaunch`. Readiness means
   locally usable; it does not mean every remote peer has been contacted.
 - Application launch is single-use. If `onLaunch` fails, release registrations made
   during launch and leave the host and other applications running.
@@ -342,6 +410,7 @@ still wins as a whole; local atomicity does not introduce field-wise merge seman
 | Operation | Completion contract |
 |---|---|
 | Cursor update | One local state change is atomically visible; publication may still be pending |
+| Application `merge(value)` | Atomically merge an incoming root using the supplied lattice and effective cursor context; publication remains separate |
 | Fork `sync()` | Merge one working snapshot into its immediate parent; concurrent state follows the declared lattice semantics |
 | Application `sync()` | Persist and publish a host root snapshot, then notify configured replication services; no remote acknowledgement |
 | Application `pull()` | One pull round for a captured set of current interests and configured routes has merged and published its successful responses; failures complete the stage exceptionally, without undoing successful merges |
@@ -383,10 +452,11 @@ timestamp semantics. Use futures or latches for concurrency tests, never sleeps.
 - One component, one path. An `ALatticeComponent` holds a cursor at exactly one lattice
   path and exposes domain operations; an `ALatticeApplication` composes regions at the
   root; a facade spanning paths contains components rather than being one.
-- Applications never call merge directly. They write through cursors and let the
-  cursor chain handle signing, typing and propagation.
-- Accept a `RootComponent`, not a `NodeServer` or `AStore`. The same application code
-  runs over a local store or a networked node.
+- Applications merge incoming root values with `merge(value)`, which delegates to
+  the root cursor. Domain writes also use cursors for signing, typing and atomicity;
+  components do not call lattice merge functions directly.
+- Accept a `RootComponent` when attaching to a host; local applications may also
+  accept a lattice and store. Domain components remain independent of `NodeServer`.
 - Persist, sync and flush are three different boundaries: persistence writes cells,
   sync merges and publishes, flush is physical durability.
 - Under union merges a removed key resurrects, so tombstone; for durable deletes use a
@@ -398,7 +468,7 @@ timestamp semantics. Use futures or latches for concurrency tests, never sleeps.
 
 ```
 Domain components        DLFSDrive, Social        one component per path
-Application component    ALatticeApplication      region composition
+Application component    ALatticeApplication      root merge and optional region factories
 Root component           RootComponent            persistence and publication
 Cursor and lattice       path(), fork(), merge    state and merge semantics
 Optional host runtime    NodeServer               replication and lifecycle
@@ -437,11 +507,11 @@ IndexLattice<Blob, ACell> FEED_LATTICE = IndexLattice.create(LWWLattice.INSTANCE
 MapLattice<ACell, ACell> FOLLOWS_LATTICE = MapLattice.create(LWWLattice.INSTANCE);
 ```
 
-**Write a custom lattice for structured records.** When a node has named children with
-different strategies, extend `ALattice` and implement `merge` (child by child), `path`
-(the sub-lattice at each key) and `zero` (the correctly typed empty container).
-`path()` is what lets cursors navigate and auto-initialise; without it a child has no
-lattice semantics.
+**Compose structured records from keyed lattices.** Use `KeyedLattice` for named
+children with different strategies in an index, or `StringKeyedLattice` for a
+string-keyed hash map. These provide per-child merge, navigation and the appropriate
+zero value. A custom `ALattice` is needed only for semantics the standard types
+cannot express; it must implement `merge`, `path` and `zero` consistently.
 
 **Wrap with `OwnerLattice`** for self-sovereign data:
 
@@ -459,7 +529,7 @@ KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LAT
 
 ## Building the application layer
 
-**Compose from a generic host.** Application code depends on `RootComponent` only:
+**Compose from a generic host.** Hosted application factories accept `RootComponent`:
 
 ```java
 public final class MyApplication extends ALatticeApplication<Index<Keyword, ACell>> {
@@ -649,11 +719,11 @@ Follow the repository conventions: no sleeps, wait on real signals; no fixed por
 ## Checklist
 
 - [ ] Design the state tree, then choose a merge strategy per leaf.
-- [ ] Compose lattice primitives bottom-up; write a custom `ALattice` with `merge`,
-      `path` and `zero` for structured records.
+- [ ] Compose lattice primitives bottom-up; use keyed lattices for structured
+      records and reserve custom `ALattice` implementations for new merge semantics.
 - [ ] Wrap with `OwnerLattice` for per-user ownership; register under a root keyword.
-- [ ] Derive an `ALatticeApplication`; one `ALatticeComponent` per lattice path;
-      facades contain components.
+- [ ] Supply the root lattice to an `ALatticeApplication`; optionally expose
+      domain component factories at known paths. Root merge requires no components.
 - [ ] Accept `RootComponent` in factories; provide local `open()` and host-neutral
       `connect()`.
 - [ ] Write with `updateAndGet`, navigate with `cursor.path(key)`, return exact types
