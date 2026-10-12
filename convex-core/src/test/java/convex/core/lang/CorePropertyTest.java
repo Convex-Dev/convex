@@ -20,6 +20,8 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
+import convex.core.cvm.Juice;
+import convex.core.cvm.ops.Constant;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AList;
@@ -206,12 +208,31 @@ public class CorePropertyTest {
 			Context c=ctx.fork();
 			c=f.invoke(c, a.toCellArray());
 			
-			if (c.isExceptional()) {
-				
+			if (c.isExceptional()) continue;
+			if (f==Core.SCHEDULE_STAR) {
+				// Scheduling reserves memory, accounted for on transaction completion.
+				// In v0 its direct Juice charge is only for the delay and can be zero.
+				long now=ctx.getTimeStamp().longValue();
+				long scheduledTime=Math.max(now,RT.ensureLong(a.get(0)).longValue());
+				long delayJuice=(scheduledTime-now)/Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT;
+				assertEquals(delayJuice,c.getJuiceUsed()-initialJuice);
+				assertCVMEquals(scheduledTime,c.getResult());
+				assertTrue(c.getState().getMemorySize()>ctx.getState().getMemorySize(),
+					"Scheduling must allocate state to be charged by memory accounting");
 			} else {
 				assertTrue(c.getJuiceUsed()>initialJuice,()->"Juice for core function: "+sym);
 			}
 		}
+	}
+
+	@org.junit.Test
+	public void testScheduleArgsResourceAccounting() throws IOException {
+		// Deterministically cover the successful zero-Juice case found by generation,
+		// as well as a future schedule with a non-zero delay charge.
+		testCoreArgs(Vectors.of(CVMLong.create(-4),Constant.of(CVMLong.ONE)));
+		long now=new CoreGenesisTest().context().getTimeStamp().longValue();
+		testCoreArgs(Vectors.of(CVMLong.create(now+Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT),
+			Constant.of(CVMLong.ONE)));
 	}
 	
 	@Property 
