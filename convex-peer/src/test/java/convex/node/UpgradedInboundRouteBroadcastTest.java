@@ -9,6 +9,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.message.AConnection;
 import convex.core.store.MemoryStore;
@@ -33,6 +35,12 @@ public class UpgradedInboundRouteBroadcastTest {
 		aliceGroup.setTransportKeyPair(aliceKey);
 		bobGroup.setTransportKeyPair(bobKey);
 		var incoming=new CompletableFuture<AConnection>();
+		var firstReceived=new CompletableFuture<ACell>();
+		var secondReceived=new CompletableFuture<ACell>();
+		aliceGroup.setInboundLatticeListener((connection,group,path,value,changed) -> {
+			if (CVMLong.create(1).equals(value)) firstReceived.complete(value);
+			if (CVMLong.create(2).equals(value)) secondReceived.complete(value);
+		});
 		try (var alice=new NodeServer<>(lattice,aliceStore,NodeConfig.port(-1));
 			var bob=new NodeServer<>(lattice,bobStore,NodeConfig.localNetwork());
 			var listener=new LatticeListener(NodeConfig.localNetwork())) {
@@ -54,23 +62,21 @@ public class UpgradedInboundRouteBroadcastTest {
 			assertTrue(bobManager.hasPropagationRoutes());
 			assertTrue(bobManager.getPeers().isEmpty(),"the upgraded route is not an outbound client");
 
-			bob.getCursor().set(CVMLong.create(1));
-			bob.getCursor().sync();
-			assertTrue(reaches(alice,1),"first publication");
-
-			// Well inside one root-sync interval: only a broadcast can deliver this.
-			bob.getCursor().set(CVMLong.create(2));
-			bob.getCursor().sync();
-			assertTrue(reaches(alice,2),"a later publication is broadcast over the upgraded route");
+			assertPublication(bob,bobGroup,firstReceived,1);
+			assertPublication(bob,bobGroup,secondReceived,2);
 		}
 	}
 
-	private static boolean reaches(NodeServer<?> node,long expected) throws InterruptedException {
-		long deadline=System.currentTimeMillis()+5_000L;
-		while (System.currentTimeMillis()<deadline) {
-			if (CVMLong.create(expected).equals(node.getLocalValue())) return true;
-			Thread.sleep(25);
-		}
-		return false;
+	private static void assertPublication(NodeServer<AInteger> bob,LatticePropagator group,
+			CompletableFuture<ACell> received,long expected) throws Exception {
+		var value=CVMLong.create(expected);
+		long broadcasts=group.getBroadcastCount();
+		var announced=group.nextAnnounce();
+		bob.getCursor().set(value);
+		bob.getCursor().sync();
+		assertEquals(value,announced.get(5,TimeUnit.SECONDS));
+		assertTrue(group.getBroadcastCount()>broadcasts,
+			"publication must trigger a delta broadcast, independent of periodic root sync");
+		assertEquals(value,received.get(5,TimeUnit.SECONDS));
 	}
 }
