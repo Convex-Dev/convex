@@ -11,6 +11,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
@@ -27,7 +28,7 @@ import convex.lattice.cursor.ALatticeCursor;
  * AHashMap<Keyword, ACell> post = feed.getPost(key);
  * }</pre>
  */
-public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
+public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements TransactionalComponent<Index<Blob, ACell>,Feed> {
 
 	private final AString author;
 
@@ -69,27 +70,30 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 	/**
 	 * Adds a new entry to the feed under a unique timestamp key.
 	 *
-	 * <p>Keys are millisecond timestamps, so two entries created in the same
-	 * millisecond would otherwise collide and the later one silently overwrite
-	 * the earlier (LWW data loss). On collision the timestamp is bumped until a
+	 * <p>Keys start at the operation's millisecond timestamp, so two entries created
+	 * with the same time would otherwise collide and the later one silently overwrite
+	 * the earlier (LWW data loss). On collision the key is incremented until a
 	 * free key is found — a new entry never replaces an existing one. The check
 	 * runs inside the atomic cursor update, so it holds across Feed instances
-	 * and concurrent posts on the same cursor.
+	 * and concurrent posts on the same cursor. The record's timestamp remains the
+	 * unmodified context time, resolved once for the operation.
 	 *
-	 * @param entryFn Creates the entry record for the (possibly bumped) timestamp
+	 * @param entryFn Creates the entry record for the operation timestamp
 	 * @return The 8-byte timestamp key assigned to the entry
 	 */
 	private Blob addEntry(LongFunction<AHashMap<Keyword, ACell>> entryFn) {
+		long timestamp=cursor.getContext().currentTimestampValue();
+		AHashMap<Keyword,ACell> entry=entryFn.apply(timestamp);
 		Blob[] keyHolder = new Blob[1];
 		cursor.updateAndGet(feed -> {
-			long ts = System.currentTimeMillis();
+			long ts = timestamp;
 			Blob key = SocialPost.createKey(ts);
 			while (feed != null && feed.get(key) != null) {
+				if (ts==Long.MAX_VALUE) throw new IllegalStateException("Post key range exhausted");
 				ts++;
 				key = SocialPost.createKey(ts);
 			}
 			keyHolder[0] = key;
-			AHashMap<Keyword, ACell> entry = entryFn.apply(ts);
 			return feed.assoc(key, entry);
 		});
 		return keyHolder[0];
@@ -106,8 +110,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public void delete(Blob postKey) {
-		long ts = System.currentTimeMillis();
-		CVMLong now = CVMLong.create(ts);
+		CVMLong now = cursor.getContext().currentTimestamp();
 		cursor.updateAndGet(feed -> {
 			if (feed == null) return feed;
 			ACell existing = feed.get(postKey);
@@ -150,6 +153,11 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 	 */
 	public AString getAuthor() {
 		return author;
+	}
+
+	@Override
+	public Feed withCursor(ALatticeCursor<Index<Blob, ACell>> cursor) {
+		return new Feed((SocialUser) parent(),cursor,author);
 	}
 
 }

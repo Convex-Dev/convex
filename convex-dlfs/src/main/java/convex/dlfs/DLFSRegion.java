@@ -8,6 +8,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.generic.OwnerLattice;
 
@@ -19,7 +20,7 @@ import convex.lattice.generic.OwnerLattice;
  * {@link DLFSDriveManager}.</p>
  */
 public final class DLFSRegion extends ALatticeComponent<
-		AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> {
+		AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> implements TransactionalComponent<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>,DLFSRegion> {
 
 	/** Standard owner-signed lattice definition for a DLFS region. */
 	public static final OwnerLattice<AHashMap<AString,AVector<ACell>>> LATTICE=
@@ -50,4 +51,9 @@ public final class DLFSRegion extends ALatticeComponent<
 	public DLFSRegion fork() {
 		return new DLFSRegion(parent(),cursor.fork());
 	}
+	@Override
+	public DLFSRegion withCursor(ALatticeCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
+		return new DLFSRegion(parent(),cursor);
+	}
+
 }

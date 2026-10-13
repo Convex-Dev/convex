@@ -47,11 +47,27 @@ public class RootLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 	}
 
 	/**
+	 * Creates a live view sharing this root's state and lattice, with an independent
+	 * context override. Initially the view inherits this root's context live;
+	 * {@link ALatticeCursor#setContext(LatticeContext)} changes only that view.
+	 * Descendants must be navigated from the view to inherit its context.
+	 *
+	 * <p>Writes and merges are immediately visible through all views. Forks remain
+	 * isolated until synced into their originating view. View sync publishes through
+	 * this root, using the root's context for any publication retry merge.</p>
+	 *
+	 * @return A new live cursor view, with no independent state storage
+	 */
+	public ALatticeCursor<V> view() {
+		return new RootCursorView<>(this);
+	}
+
+	/**
 	 * Sets a callback invoked by {@link #sync()}. The callback receives the
 	 * current value and returns the synced result (e.g. with store-backed refs).
 	 * Callbacks run synchronously on the thread calling {@code sync()} and are
 	 * serialised with callbacks from other concurrent sync callers. Ordinary
-	 * cursor reads and writes remain lock-free while a callback is running.
+	 * cursor reads and writes may proceed while a callback is running.
 	 *
 	 * @param callback Function from current value to synced value, or null to clear
 	 */

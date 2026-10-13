@@ -6,10 +6,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.AString;
@@ -27,6 +29,9 @@ import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.SetLattice;
+import convex.lattice.generic.LWWLattice;
+import convex.lattice.generic.StampingLattice;
+import convex.lattice.cursor.ALatticeCursor;
 
 public class ALatticeApplicationTest {
 
@@ -93,12 +98,119 @@ public class ALatticeApplicationTest {
 
 		first.merge(LATTICE.zero().assoc(ITEMS,Sets.of(1)).assoc(UNKNOWN,CVMLong.TWO));
 		second.merge(LATTICE.zero().assoc(ITEMS,Sets.of(2)));
-		assertSame(host.cursor(),first.cursor());
-		assertSame(first.cursor(),second.cursor());
+		assertNotSame(host.cursor(),first.cursor());
+		assertNotSame(first.cursor(),second.cursor());
+		assertSame(host.cursor().get(),first.cursor().get());
+		assertSame(first.cursor().get(),second.cursor().get());
 		assertEquals(initial.assoc(ITEMS,Sets.of(1,2)),host.cursor().get());
 		assertEquals(0,publications.get());
 		second.sync();
 		assertEquals(1,publications.get());
+	}
+
+	@Test
+	public void testContextInheritanceAndIsolation() {
+		var host=RootComponent.create(LATTICE,new MemoryStore());
+		var first=new Application<>(host);
+		var second=new Application<>(host);
+		var child=first.cursor().path(ITEMS);
+		LatticeContext hostPolicy=LatticeContext.create(CVMLong.ONE,null);
+		LatticeContext appPolicy=LatticeContext.create(CVMLong.TWO,null);
+		host.cursor().setContext(hostPolicy);
+		assertSame(hostPolicy,child.getContext());
+		first.cursor().setContext(appPolicy);
+		assertSame(appPolicy,child.getContext());
+		assertSame(hostPolicy,second.cursor().getContext());
+		assertSame(hostPolicy,host.cursor().getContext());
+		first.cursor().setContext(null);
+		assertSame(hostPolicy,child.getContext());
+		host.cursor().setContext(LatticeContext.EMPTY);
+		assertSame(LatticeContext.EMPTY,child.getContext());
+	}
+
+	@Test
+	public void testIndependentSigningAndStampingThroughExistingChildren() {
+		AKeyPair alice=AKeyPair.createSeeded(6201);
+		AKeyPair bob=AKeyPair.createSeeded(6202);
+		Keyword timestamp=LWWLattice.KEY_TIMESTAMP;
+		ALattice<Index<Keyword,ACell>> record=StampingLattice.create(
+			LWWLattice.create(LATTICE,v -> ((CVMLong)v.get(timestamp)).longValue()),
+			(v,ts) -> v.assoc(timestamp,ts));
+		var owners=OwnerKeyLattice.create(record);
+		var host=RootComponent.create(owners,new MemoryStore());
+		var first=new Application<>(host);
+		var second=new Application<>(host);
+		ALatticeCursor<ASet<CVMLong>> aliceItems=first.cursor().path(alice.getAccountKey(),Keywords.VALUE,ITEMS);
+		ALatticeCursor<ASet<CVMLong>> bobItems=second.cursor().path(bob.getAccountKey(),Keywords.VALUE,ITEMS);
+		first.cursor().setContext(LatticeContext.create(CVMLong.create(100),alice));
+		second.cursor().setContext(LatticeContext.create(CVMLong.create(200),bob));
+		aliceItems.updateAndGet(v -> v.include(CVMLong.ONE));
+		bobItems.updateAndGet(v -> v.include(CVMLong.TWO));
+		var state=host.cursor().get();
+		assertEquals(CVMLong.create(100),state.get(alice.getAccountKey()).getValue().get(timestamp));
+		assertEquals(CVMLong.create(200),state.get(bob.getAccountKey()).getValue().get(timestamp));
+		assertTrue(state.get(alice.getAccountKey()).checkSignature());
+		assertTrue(state.get(bob.getAccountKey()).checkSignature());
+		assertSame(LatticeContext.EMPTY,host.cursor().getContext());
+		assertThrows(IllegalStateException.class,() -> second.cursor()
+			.<ASet<CVMLong>>path(alice.getAccountKey(),Keywords.VALUE,ITEMS).set(Sets.of(3)));
+		assertSame(state,host.cursor().get());
+		first.cursor().setContext(LatticeContext.create(CVMLong.create(300),alice));
+		aliceItems.updateAndGet(v -> v.include(CVMLong.TWO));
+		assertEquals(CVMLong.create(300),host.cursor().get().get(alice.getAccountKey()).getValue().get(timestamp));
+		assertEquals(Sets.of(1,2),aliceItems.get());
+	}
+
+	@Test
+	public void testRootForkMergeUsesApplicationSignerWithoutLendingItToHost() {
+		AKeyPair alice=AKeyPair.createSeeded(6201);
+		OwnerKeyLattice<ASet<CVMLong>> lattice=OwnerKeyLattice.create(SetLattice.create());
+		var host=RootComponent.create(lattice,new MemoryStore());
+		var app=new Application<>(host);
+		app.cursor().setContext(LatticeContext.create(null,alice));
+		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(1))));
+		var fork=app.cursor().fork();
+		fork.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(2))));
+		assertEquals(Sets.of(1),host.cursor().get().get(alice.getAccountKey()).getValue());
+		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(3))));
+		fork.sync();
+		var signed=host.cursor().get().get(alice.getAccountKey());
+		assertEquals(Sets.of(1,2,3),signed.getValue());
+		assertTrue(signed.checkSignature());
+		var incoming=lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(4)));
+		host.cursor().merge(incoming);
+		assertSame(signed,host.cursor().get().get(alice.getAccountKey()),
+			"Host cannot synthesise a signed union using an application's signer");
+		app.merge(incoming);
+		assertEquals(Sets.of(1,2,3,4),host.cursor().get().get(alice.getAccountKey()).getValue());
+	}
+
+	@Test
+	public void testPublicationRetryUsesHostContextAndPreservesOtherApplicationWrite() {
+		AtomicReference<LatticeContext> mergeContext=new AtomicReference<>();
+		ALattice<Index<Keyword,ACell>> lattice=new ADelegatingLattice<>(LATTICE) {
+			@Override
+			public Index<Keyword,ACell> merge(LatticeContext context,
+					Index<Keyword,ACell> own, Index<Keyword,ACell> other) {
+				mergeContext.set(context);
+				return super.merge(context,own,other);
+			}
+		};
+		var host=RootComponent.create(lattice,new MemoryStore());
+		var first=new Application<>(host);
+		var second=new Application<>(host);
+		LatticeContext appPolicy=LatticeContext.create(CVMLong.ONE,null);
+		first.cursor().setContext(appPolicy);
+		first.merge(LATTICE.zero().assoc(ITEMS,Sets.of(1)));
+		assertSame(appPolicy,mergeContext.get());
+		var published=first.cursor().get();
+		host.setPublicationPolicy(value -> {
+			new Items(second).add(CVMLong.TWO);
+			return value;
+		});
+		assertSame(published,first.cursor().sync());
+		assertSame(LatticeContext.EMPTY,mergeContext.get());
+		assertEquals(Sets.of(1,2),new Items(first).cursor().get());
 	}
 
 	@Test
@@ -171,7 +283,7 @@ public class ALatticeApplicationTest {
 			}
 		};
 		var app=new Application<>(lattice,new MemoryStore());
-		Items items=new Items(app);
+		Items items=new Items(new Application<>(app.host()));
 		try (var executor=Executors.newSingleThreadExecutor()) {
 			var future=executor.submit(() -> app.merge(LATTICE.zero().assoc(ITEMS,Sets.of(2))));
 			try {

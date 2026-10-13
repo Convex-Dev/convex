@@ -5,13 +5,15 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.18-SNAPSHOT] - Unreleased
 
 ### Added
 
+- Typed lattice component transactions stage domain operations atomically, with async completion and an opt-in transactional root for exclusive execution and contention fallback. Ordinary roots retain their existing write path.
 - REST `POST /api/v1/simulate` accepts source or binary transactions without signing credentials, returning transaction accounting results under public query limits, including `JUICE` errors for zero-balance accounts.
 - Java clients expose `simulate` and `simulateSync` for transaction accounting and cost estimates; the GUI stress tool labels this mode "Simulate" to distinguish it from ordinary queries.
 - Lattice applications can be constructed from a root lattice and store, inspect their root lattice, and atomically merge incoming state without defining domain components.
+- Applications sharing a lattice host now have independent signing and clock contexts over the same live atomic state. Root cursors also expose lightweight live views.
 - Typed ownership lattices for hash maps and indexes, including DID verification bound to each lattice instance and a public-key index specialisation. Existing `OwnerLattice<V>` callers remain supported.
 
 ### Changed
@@ -28,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replies from an old connection cannot complete requests after reconnecting, and disconnects finish pending client and lattice requests without waiting for a timeout.
 - Request timeout cleanup completes before notifying callers; cancelling client request and lattice response futures releases their underlying pending requests.
 - Duplicate pending transactions are rejected without displacing the original caller; the rejection includes the transaction hash for subsequent result lookup.
+- Concurrent DLFS views preserve disjoint writes and truncation updates to the same file; competing file creation cannot overwrite an existing file.
+- Lattice stamped updates retain one operation timestamp across retries. Social posts and deletion use the application clock, with collision-free post keys independent of the record timestamp.
 - Ordinary queries work with zero-balance accounts and use a balance-independent Juice allowance within the peer's execution limit. Transaction cost estimation remains available by querying an explicit transaction payload.
 - From protocol v1, scheduling charges the 800-Juice base cost in addition to the existing delay cost, including immediate and past-dated requests. Protocol v0 retains its original accounting.
 - Typed CVM access now accepts equivalent generic CAD3 representations of addresses, operations, functions and records, including values retained in store caches. Default store decoding continues to produce CVM representations on cache hits.

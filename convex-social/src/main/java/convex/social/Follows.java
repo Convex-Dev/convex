@@ -11,6 +11,7 @@ import convex.core.data.Keyword;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
@@ -28,7 +29,7 @@ import convex.lattice.cursor.ALatticeCursor;
  * Set<AString> active = follows.getActive();
  * }</pre>
  */
-public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> {
+public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implements TransactionalComponent<AHashMap<ACell, ACell>,Follows> {
 	public static final Keyword KEY_ACCOUNT_KEY=Keyword.intern("account-key");
 
 	Follows(SocialUser parent, ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
@@ -130,6 +131,11 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> {
 				?convex.core.data.Maps.empty():follows;
 			return base.assoc(target,record);
 		});
+	}
+
+	@Override
+	public Follows withCursor(ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
+		return new Follows((SocialUser) parent(),cursor);
 	}
 
 }

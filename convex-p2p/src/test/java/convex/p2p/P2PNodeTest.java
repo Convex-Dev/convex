@@ -3,6 +3,7 @@ package convex.p2p;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -171,8 +172,11 @@ public class P2PNodeTest {
 	public void testDefaultNodeServesApplicationRegions() {
 		node = P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate());
 
-		assertSame(node.getNodeServer().getRootComponent().cursor(),
-			node.getApplication().cursor());
+		var root=node.getNodeServer().getRootComponent().cursor();
+		var application=node.getApplication().cursor();
+		assertNotSame(root,application);
+		assertSame(root.getLattice(),application.getLattice());
+		assertSame(root.get(),application.get());
 		assertNotNull(node.getNodeServer().getLattice().path(Social.KEY_SOCIAL));
 		assertNotNull(node.getNodeServer().getLattice().path(Keywords.P2P, Keywords.NODES));
 	}

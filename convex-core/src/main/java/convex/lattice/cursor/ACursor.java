@@ -2,6 +2,7 @@ package convex.lattice.cursor;
 
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
@@ -265,6 +266,17 @@ public abstract class ACursor<V extends ACell> {
 	 * @return Value after accumulation
 	 */
 	public abstract V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction);
+
+	/**
+	 * Whether this cursor supports exclusive transactions, inherited from its
+	 * state-owning root. Ordinary cursors support optimistic transactions only.
+	 */
+	public boolean supportsExclusiveTransactions() { return false; }
+
+	/** Executes under this cursor's shared root write exclusion, when supported. */
+	protected <T> T exclusive(Supplier<T> action) {
+		throw new UnsupportedOperationException("Cursor does not support exclusive transactions");
+	}
 
 	@Override
 	public String toString() {

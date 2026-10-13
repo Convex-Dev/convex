@@ -5,10 +5,11 @@ import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
 /** Component at one user's {@code [:p2p :nodes owner :value]} lattice path. */
-public final class P2PNodeRecord extends ALatticeComponent<ACell> {
+public final class P2PNodeRecord extends ALatticeComponent<ACell> implements TransactionalComponent<ACell,P2PNodeRecord> {
 
 	private final AccountKey owner;
 
@@ -38,4 +39,9 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> {
 	public P2PNodeRecord fork() {
 		return new P2PNodeRecord(parent(),cursor.fork(),owner);
 	}
+	@Override
+	public P2PNodeRecord withCursor(ALatticeCursor<ACell> cursor) {
+		return new P2PNodeRecord(parent(),cursor,owner);
+	}
+
 }

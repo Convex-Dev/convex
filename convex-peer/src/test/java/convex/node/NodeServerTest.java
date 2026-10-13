@@ -685,11 +685,12 @@ public class NodeServerTest {
 	 * Test peer management via the propagator
 	 */
 	@Test
-	public void testPeerManagement() throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
+	public void testPeerManagement() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
 		propagator(maxNodeServer);
-		maxNodeServer.launch();
+		// Test explicit membership independently of automatic connection maintenance,
+		// which may replace client instances while reconciling desired peer routes.
 
 		LatticePropagator propagator = propagator(maxNodeServer);
 		assertNotNull(propagator);
@@ -706,8 +707,8 @@ public class NodeServerTest {
 		// Add peers with identity keys
 		AccountKey key1 = AKeyPair.generate().getAccountKey();
 		AccountKey key2 = AKeyPair.generate().getAccountKey();
-		propagator.addPeer(key1, peer1);
-		propagator.addPeer(key2, peer2);
+		propagator.addPeer(key1, peer1).get(5,TimeUnit.SECONDS);
+		propagator.addPeer(key2, peer2).get(5,TimeUnit.SECONDS);
 
 		peers = propagator.getPeers();
 		assertEquals(2, peers.size());

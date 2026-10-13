@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +23,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
@@ -91,7 +94,7 @@ public class SocialAppTest {
 		Feed feed = social.user(kp.getAccountKey()).feed();
 
 		// No delay between posts: same-millisecond posts must still get
-		// distinct keys (Feed bumps the timestamp on collision)
+		// distinct keys (Feed increments the key on collision)
 		Blob k1 = feed.post("First");
 		Blob k2 = feed.post("Second");
 		Blob k3 = feed.post("Third");
@@ -119,6 +122,62 @@ public class SocialAppTest {
 		assertEquals("Great post!", SocialPost.getText(reply));
 		assertEquals(parentKey, reply.get(SocialPost.REPLY_TO));
 		assertEquals(DID.forKey(alice.getAccountKey()), reply.get(SocialPost.REPLY_DID));
+	}
+
+	@Test
+	public void testFeedUsesContextTimeWithoutBumpingRecordTimestamps() {
+		AKeyPair key=AKeyPair.createSeeded(7307);
+		Social social=Social.create(LatticeContext.create(CVMLong.create(100),key));
+		Feed feed=social.user(key.getAccountKey()).feed();
+		Blob first=feed.post("first");
+		Blob reply=feed.reply("reply",first,key.getAccountKey());
+		assertEquals(SocialPost.createKey(100),first);
+		assertEquals(SocialPost.createKey(101),reply);
+		assertEquals(CVMLong.create(100),feed.getPost(first).get(SocialPost.TIMESTAMP));
+		assertEquals(CVMLong.create(100),feed.getPost(reply).get(SocialPost.TIMESTAMP));
+		social.cursor().setContext(LatticeContext.create(CVMLong.create(200),key));
+		feed.delete(first);
+		assertEquals(CVMLong.create(200),feed.getPost(first).get(SocialPost.TIMESTAMP));
+		assertEquals(CVMLong.create(200),feed.getPost(first).get(SocialPost.DELETED));
+	}
+
+	@Test
+	public void testPostRetryKeepsItsOriginalClockValue() {
+		AKeyPair key=AKeyPair.createSeeded(7309);
+		AtomicInteger clocks=new AtomicInteger();
+		AtomicReference<Runnable> beforeSign=new AtomicReference<>();
+		Social social=Social.create(new LatticeContext() {
+			@Override public AKeyPair getSigningKey() { return key; }
+			@Override public CVMLong currentTimestamp() { return CVMLong.create(100+clocks.getAndIncrement()); }
+			@Override public <T extends ACell> SignedData<T> sign(AccountKey owner,T value) {
+				Runnable action=beforeSign.getAndSet(null);
+				if (action!=null) action.run();
+				return super.sign(owner,value);
+			}
+		});
+		Feed feed=social.user(key.getAccountKey()).feed();
+		Feed other=social.user(key.getAccountKey()).feed();
+		AtomicReference<Blob> second=new AtomicReference<>();
+		beforeSign.set(() -> second.set(other.post("installed first")));
+		Blob first=feed.post("retried");
+		assertEquals(2,clocks.get(),"Each logical post resolves its clock once");
+		assertEquals(SocialPost.createKey(100),first);
+		assertEquals(SocialPost.createKey(101),second.get());
+		assertEquals(CVMLong.create(100),feed.getPost(first).get(SocialPost.TIMESTAMP));
+		assertEquals(CVMLong.create(101),feed.getPost(second.get()).get(SocialPost.TIMESTAMP));
+		assertEquals(2,feed.count());
+	}
+
+	@Test
+	public void testPostKeyExhaustionDoesNotOverwriteOrWrap() {
+		AKeyPair key=AKeyPair.createSeeded(7308);
+		Social social=Social.create(LatticeContext.create(CVMLong.create(Long.MAX_VALUE),key));
+		Feed feed=social.user(key.getAccountKey()).feed();
+		Blob first=feed.post("last key");
+		var before=social.cursor().get();
+		assertThrows(IllegalStateException.class,() -> feed.post("cannot allocate"));
+		assertSame(before,social.cursor().get());
+		assertEquals("last key",SocialPost.getText(feed.getPost(first)));
 	}
 
 	@Test

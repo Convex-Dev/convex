@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import convex.core.data.ACell;
 import convex.core.store.AStore;
+import convex.lattice.cursor.ALatticeCursor;
 
 /**
  * Base class for an application participating in a lattice root.
@@ -13,6 +14,11 @@ import convex.core.store.AStore;
  * merge, including which regions participate. Merging requires no domain
  * components or component registry. Subclasses may expose lightweight components
  * at paths within that root, while persistence delegates to the host.</p>
+ *
+ * <p>Each application has a live cursor view with an independent context override.
+ * Setting its cursor context affects its descendants, not the host or other
+ * applications. Without an override it inherits the host's context live. All views
+ * share the same atomic state; only an explicit fork creates a working copy.</p>
  *
  * <p>Applications on the global lattice use its keyed map root and compose the
  * region lattices they understand. The base also accepts other lattice value
@@ -31,10 +37,19 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	/**
 	 * Creates an application over an existing lattice host.
 	 *
-	 * @param host Root component providing the application cursor and host policy
+	 * @param host Root component providing shared state, lattice and host policy
 	 */
 	protected ALatticeApplication(RootComponent<V> host) {
-		super(host,requireHost(host).cursor());
+		this(host,requireHost(host).cursor().view());
+	}
+
+	/**
+	 * Binds an application view to an explicit working cursor, retaining its host's
+	 * storage policy. Subclass transaction factories use this constructor and must
+	 * rebuild their child components against this cursor.
+	 */
+	protected ALatticeApplication(RootComponent<V> host,ALatticeCursor<V> cursor) {
+		super(requireHost(host),cursor);
 		this.host=host;
 	}
 

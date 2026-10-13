@@ -13,6 +13,7 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -134,39 +135,62 @@ public class DLFSLocal extends DLFileSystem {
 		return (store==null)?data:Cells.persist(data,store);
 	}
 
+	/**
+	 * Atomically transforms the latest file data across all views of this drive.
+	 * Checkpointing runs before installation, outside cursor retry callbacks. A
+	 * changed root with unchanged file data reuses the prepared blob; only a change
+	 * to this file's data requires recomputation and another checkpoint.
+	 */
+	AVector<ACell> updateFileData(DLPath path, UnaryOperator<ABlob> transform,
+			CVMLong operationTime, boolean checkpoint) throws IOException {
+		ABlob preparedFrom=null;
+		ABlob prepared=null;
+		while (true) {
+			AVector<ACell> root=rootCursor.get();
+			AVector<ACell> node=DLFSNode.resolveValidPath(root,path);
+			ABlob data=(node==null)?null:DLFSNode.getData(node);
+			if (data==null) throw new NoSuchFileException(path.toString());
+			if (data!=preparedFrom) {
+				prepared=transform.apply(data);
+				if (prepared==data) return node;
+				if (checkpoint) prepared=checkpointBlob(prepared);
+				preparedFrom=data;
+			}
+			AVector<ACell> updated=node.assoc(DLFSNode.POS_DATA,prepared)
+				.assoc(DLFSNode.POS_UTIME,operationTime);
+			AVector<ACell> next=DLFSNode.updateNode(root,path,updated,operationTime);
+			if (rootCursor.compareAndSet(root,next)) return updated;
+		}
+	}
+
 	@Override
 	protected synchronized DLPath createDirectory(DLPath dir, FileAttribute<?>[] attrs) throws IOException {
-		AString name=dir.getCVMFileName();
-		if (name==null) throw new FileAlreadyExistsException(DLFS.ROOT_STRING);
-		DLPath parent=dir.getParent();
-		if (parent==null) throw new FileAlreadyExistsException(dir.toString());
-		AVector<ACell> rootNode=rootCursor.get();
-		AVector<ACell> parentNode=DLFSNode.resolveValidPath(rootNode, parent);
-		if (parentNode==null) {
-			throw new NoSuchFileException(parent.toString());
-		}
-		requireAbsent(parentNode,name,dir);
 		CVMLong operationTime=currentTimestamp();
-		updateNode(dir,DLFSNode.createDirectory(operationTime),operationTime);
+		createNode(dir,DLFSNode.createDirectory(operationTime),operationTime);
 		return dir;
 	}
 	
 	@Override
 	public synchronized AVector<ACell> createFile(DLPath path) throws IOException {
-		AString name=path.getCVMFileName();
-		path=path.toAbsolutePath();
-		DLPath parent=path.getParent();
-		if (parent==null) throw new FileAlreadyExistsException(path.toString()); // trying to create root
-		AVector<ACell> rootNode=rootCursor.get();
-		AVector<ACell> parentNode=DLFSNode.resolveValidPath(rootNode, parent);
-		if (parentNode==null) {
-			throw new NoSuchFileException(parent.toString(), null, "Parent directory does not exist");
-		}
-		requireAbsent(parentNode,name,path);
 		CVMLong operationTime=currentTimestamp();
 		AVector<ACell> newNode=DLFSNode.createEmptyFile(operationTime);
-		updateNode(path,newNode,operationTime);
+		createNode(path,newNode,operationTime);
 		return newNode;
+	}
+
+	private void createNode(DLPath path, AVector<ACell> node, CVMLong operationTime) throws IOException {
+		DLPath target=path.toAbsolutePath();
+		DLPath parent=target.getParent();
+		if (parent==null) throw new FileAlreadyExistsException(path.toString());
+		try {
+			rootCursor.updateAndGet(root -> {
+				AVector<ACell> directory=requireDirectory(root,parent);
+				requireAbsentUnchecked(directory,target.getCVMFileName(),target);
+				return DLFSNode.updateNode(root,target,node,operationTime);
+			});
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
 	}
 	
 
