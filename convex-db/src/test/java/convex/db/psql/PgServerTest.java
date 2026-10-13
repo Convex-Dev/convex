@@ -333,9 +333,7 @@ public class PgServerTest {
 
 	/**
 	 * Tests connectivity using the PostgreSQL JDBC driver.
-	 * Disabled: Requires extended query protocol support (Parse/Bind/Execute).
 	 */
-	@org.junit.jupiter.api.Disabled("Requires extended query protocol")
 	@Test
 	public void testPostgresJDBCDriver() throws Exception {
 		// Connect using PostgreSQL JDBC driver
@@ -362,10 +360,31 @@ public class PgServerTest {
 	}
 
 	/**
-	 * Tests aggregation via PostgreSQL JDBC driver.
-	 * Disabled: Requires extended query protocol support (Parse/Bind/Execute).
+	 * The driver asks for the row description once, with Describe, and then executes
+	 * the same statement again without asking. Execute itself must not send one.
 	 */
-	@org.junit.jupiter.api.Disabled("Requires extended query protocol")
+	@Test
+	public void testPostgresJDBCPreparedSelectRepeated() throws Exception {
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url);
+			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE email = ?")) {
+			// More often than the driver's prepare threshold, so that the statement
+			// becomes a named one whose description the driver has cached
+			for (int i = 0; i < 12; i++) {
+				boolean alice = (i % 2 == 0);
+				select.setString(1, alice ? "alice@example.com" : "bob@example.com");
+				try (ResultSet rs = select.executeQuery()) {
+					assertTrue(rs.next());
+					assertEquals(alice ? "Alice" : "Bob", rs.getString("name"));
+					assertFalse(rs.next());
+				}
+			}
+		}
+	}
+
+	/**
+	 * Tests aggregation via PostgreSQL JDBC driver.
+	 */
 	@Test
 	public void testPostgresJDBCAggregation() throws Exception {
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
