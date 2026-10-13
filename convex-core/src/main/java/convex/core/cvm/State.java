@@ -381,9 +381,10 @@ public class State extends ARecordGeneric {
 			for (long i = 0; i < take; i++) {
 				al.add(trans.get(i));
 			}
+			tcount += take;
 			// remove schedule entries taken. Delete key if no more entries remaining
 			trans = trans.slice(take, numScheduled);
-			if (trans.isEmpty()) sched = sched.dissoc(key);
+			sched = trans.isEmpty() ? sched.dissoc(key) : sched.assoc(key, trans);
 		}
 		if (al==null) return this; // nothing to do if no transactions to execute
 

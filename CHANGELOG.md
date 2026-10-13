@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Scheduled execution respects the 100-operation limit across timestamp buckets and retains unprocessed entries, preventing oversized buckets from exhausting peer memory.
+- Variadic subtraction reports a numeric error when an intermediate result exceeds the integer limit, instead of throwing a Java exception.
 - HTTP message requests use independent correlation IDs on the shared peer connection, and rejecting a duplicate client request ID no longer discards the original pending response.
 - Replies from an old connection cannot complete requests after reconnecting, and disconnects finish pending client and lattice requests without waiting for a timeout.
 - Request timeout cleanup completes before notifying callers; cancelling client request and lattice response futures releases their underlying pending requests.
