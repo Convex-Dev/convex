@@ -882,7 +882,7 @@ public class NodeServerTest {
 	 * Test that a LATTICE_QUERY request with an empty path returns a valid lattice value
 	 */
 	@Test
-	public void testLatticeQueryEmptyPath() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
+	public void testLatticeQueryEmptyPath() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
 		allowSingleGroupInbound(maxNodeServer);
@@ -891,10 +891,9 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 		assertTrue(maxNodeServer.isRunning());
 
-		// Set a value and sync so it flows through the propagator pipeline.
-		// Synchronous commit: announce + setRootData run on this thread.
+		// The network query reads the propagator's separately announced view.
 		maxNodeServer.getCursor().set(CVMLong.create(42));
-		maxNodeServer.getCursor().sync();
+		syncAndAwaitPropagator(maxNodeServer);
 		
 		// Get the server address
 		InetSocketAddress serverAddress = address(maxNodeServer);

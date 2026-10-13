@@ -17,7 +17,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
@@ -37,7 +36,7 @@ final class LatticeInboundVerifier {
 	private static final Logger log = LoggerFactory.getLogger(LatticeInboundVerifier.class.getName());
 	private static final long TIMEOUT_MS = 5_000L;
 
-	private record PendingVerification(CVMLong id, LatticePropagator owner,
+	private record PendingVerification(LatticePropagator owner,
 			AccountKey claimedKey,
 			CompletableFuture<Message> future) {}
 
@@ -58,9 +57,8 @@ final class LatticeInboundVerifier {
 				|| claimedKey == null
 				|| !owner.getConnectionManager().isDesiredPeer(claimedKey)) return;
 
-		CVMLong id = connection.nextRequestID();
 		CompletableFuture<Message> resultFuture = new CompletableFuture<>();
-		PendingVerification pending = new PendingVerification(id, owner, claimedKey, resultFuture);
+		PendingVerification pending = new PendingVerification(owner, claimedKey, resultFuture);
 		if (active.putIfAbsent(connection, pending) != null) return;
 
 		try {
@@ -80,9 +78,8 @@ final class LatticeInboundVerifier {
 			AccountKey ownKey = keyPair.getAccountKey();
 			SignedData<ACell> signed = Message.signChallenge(keyPair, token,
 				pending.claimedKey(), Message.LATTICE_PEER_CHALLENGE_CONTEXT);
-			if (!connection.sendMessage(Message.createChallenge(pending.id(), signed))) return;
-
-			Message resultMessage = pending.future().get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+			Message resultMessage = connection.request(Message.createChallenge(null,signed),0,pending.future())
+				.get(TIMEOUT_MS,TimeUnit.MILLISECONDS);
 			try {
 				resultMessage.getPayload(pending.owner().getStore());
 			} catch (BadFormatException e) {
@@ -111,24 +108,9 @@ final class LatticeInboundVerifier {
 			log.debug("Inbound lattice authentication failed for {}: {}",
 				connection.getRemoteAddress(), e.getMessage());
 		} finally {
+			pending.future().cancel(false);
 			active.remove(connection, pending);
 		}
-	}
-
-	/** Routes a correlated RESULT from the owning propagator endpoint. */
-	boolean handleResult(Message message) {
-		if (active.isEmpty()) return false;
-		AConnection connection = message.getConnection();
-		if (connection == null) return false;
-		PendingVerification pending = active.get(connection);
-		if (pending == null) return false;
-		try {
-			if (!pending.id().equals(message.getResultID())) return false;
-		} catch (BadFormatException e) {
-			return false;
-		}
-		pending.future().complete(message);
-		return true;
 	}
 
 	/** Cancels verification state when the propagator observes physical disconnect. */

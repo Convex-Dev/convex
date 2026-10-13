@@ -165,13 +165,17 @@ public class LocalConnection extends AConnection {
 			p = paired;
 			paired = null;
 		}
+		closeRequests();
 		if (p != null) p.closePairedEnd(this);
 	}
 
 	/** Closes this end when its peer closes, without acquiring both end locks. */
-	private synchronized void closePairedEnd(LocalConnection expected) {
-		if (paired == expected) paired = null;
-		closed = true;
+	private void closePairedEnd(LocalConnection expected) {
+		synchronized (this) {
+			if (paired == expected) paired = null;
+			closed = true;
+		}
+		closeRequests();
 	}
 
 	@Override

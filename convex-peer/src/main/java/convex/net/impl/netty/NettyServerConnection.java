@@ -102,6 +102,7 @@ class NettyServerConnection extends AConnection {
 			ch.close();
 			channel = null;
 		}
+		closeRequests();
 	}
 
 	@Override

@@ -70,7 +70,7 @@ public class StressPanel extends JPanel {
 	private JCheckBox syncCheckBox;
 	private JCheckBox distCheckBox;
 	private JCheckBox repeatCheckBox;
-	private JCheckBox queryCheckBox;
+	private JCheckBox simulateCheckBox;
 	private JCheckBox localCheckBox;
 	private JCheckBox preCompileCheckBox;
 
@@ -174,10 +174,11 @@ public class StressPanel extends JPanel {
 		optionPanel.add(repeatCheckBox);
 		repeatCheckBox.setSelected(false);
 		
-		optionPanel.add(new JLabel("Query"));
-		queryCheckBox=new JCheckBox();
-		optionPanel.add(queryCheckBox);
-		queryCheckBox.setSelected(false);
+		optionPanel.add(new JLabel("Simulate"));
+		simulateCheckBox=new JCheckBox();
+		simulateCheckBox.setToolTipText("Simulate transactions without submitting, including balance checks and estimated costs.");
+		optionPanel.add(simulateCheckBox);
+		simulateCheckBox.setSelected(false);
 
 		optionPanel.add(new JLabel("Local (in-JVM)"));
 		localCheckBox=new JCheckBox();
@@ -335,10 +336,10 @@ public class StressPanel extends JPanel {
 				}
 			}
 
-			// Pre-sign transactions (skipped for query mode)
-			boolean isQuery = queryCheckBox.isSelected();
+			// Pre-sign transactions (skipped for simulation mode)
+			boolean isSimulation = simulateCheckBox.isSelected();
 			SignedData<ATransaction>[][] signedTransactions = null;
-			if (!isQuery) {
+			if (!isSimulation) {
 				resultArea.setText("Signing transactions...");
 				@SuppressWarnings("unchecked")
 				SignedData<ATransaction>[][] signed = new SignedData[clientCount][requestCount];
@@ -374,12 +375,12 @@ public class StressPanel extends JPanel {
 					Convex cc = clients.get(idx);
 					for (int i = 0; i < requestCount; i++) {
 						CompletableFuture<Result> fr;
-						if (isQuery) {
+						if (isSimulation) {
 							if (isSyncMode) {
-								Result r = cc.querySync(allTransactions[idx][i]);
+								Result r = cc.simulateSync(allTransactions[idx][i]);
 								fr = CompletableFuture.completedFuture(r);
 							} else {
-								fr = cc.query(allTransactions[idx][i]);
+								fr = cc.simulate(allTransactions[idx][i]);
 							}
 						} else {
 							if (isSyncMode) {

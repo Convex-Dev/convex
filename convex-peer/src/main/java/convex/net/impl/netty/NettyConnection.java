@@ -349,6 +349,7 @@ public class NettyConnection extends AConnection {
 			channel=null;
 		}
 		clearOutbound();
+		closeRequests();
 		if (ch==null) return;
 		ChannelFuture closeFuture=ch.close();
 		if (!ch.eventLoop().inEventLoop()) closeFuture.syncUninterruptibly();

@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.ErrorCodes;
+import convex.core.cvm.ops.Constant;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -18,6 +21,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
+import convex.core.lang.Core;
 import convex.core.lang.Reader;
 
 /**
@@ -52,6 +56,45 @@ public class MigrationFixesTest {
 		assertEquals(0L, GENESIS.getProtocolVersion());
 		assertEquals(Migrations.MAX_VERSION, UPGRADED.getProtocolVersion());
 		StateTest.doStateTests(UPGRADED);
+	}
+
+	@Test
+	public void testScheduleBaseJuiceV1() {
+		for (State state: new State[] {GENESIS,UPGRADED}) {
+			long now=state.getTimestamp().longValue();
+			long base=(state==GENESIS)?0:800;
+			// Past and immediate schedules still incur the base cost in v1.
+			long[] times={Long.MIN_VALUE,now,now+Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT-1,
+					now+Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT,Long.MAX_VALUE};
+			for (long time: times) {
+				long scheduledTime=Math.max(now,time);
+				long expected=base+(scheduledTime-now)/Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT;
+				Context ctx=Context.create(state,InitTest.HERO,expected);
+				ctx=Core.SCHEDULE_STAR.invoke(ctx,new ACell[] {CVMLong.create(time),Constant.of(CVMLong.ONE)});
+				assertFalse(ctx.isExceptional(),()->"Scheduling failed: "+state.getProtocolVersion()+" at "+time);
+				assertEquals(expected,ctx.getJuiceUsed());
+				assertEquals(CVMLong.create(scheduledTime),ctx.getResult());
+				assertNotEquals(state.getSchedule(),ctx.getState().getSchedule());
+				assertEquals(state.getAccounts(),ctx.getState().getAccounts());
+			}
+		}
+	}
+
+	@Test
+	public void testScheduleInsufficientJuiceDoesNotChangeState() {
+		for (State state: new State[] {GENESIS,UPGRADED}) {
+			long now=state.getTimestamp().longValue();
+			long base=(state==GENESIS)?0:800;
+			for (long delay: new long[] {0,Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT}) {
+				long required=base+delay/Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT;
+				if (required==0) continue; // v0 permits immediate scheduling with no Juice.
+				Context ctx=Context.create(state,InitTest.HERO,required-1);
+				ctx=Core.SCHEDULE_STAR.invoke(ctx,new ACell[] {CVMLong.create(now+delay),Constant.of(CVMLong.ONE)});
+				assertEquals(ErrorCodes.JUICE,ctx.getErrorCode());
+				assertEquals(required-1,ctx.getJuiceUsed());
+				assertSame(state,ctx.getState());
+			}
+		}
 	}
 
 	@Test

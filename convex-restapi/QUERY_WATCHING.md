@@ -39,7 +39,9 @@ curl -N -G -H "Accept: text/event-stream" \
 | `address` | No | Account context as `123`, `%23123`, or `0x7b`; defaults to the genesis account |
 | `format` | No | Event data encoding: `json` (default) or `cvx` |
 
-The query has normal detached-query semantics: its state changes are not retained.
+Ordinary query forms use a balance-independent Juice allowance within the server's
+query limits, including for zero-balance accounts. State changes are not retained,
+and execution Juice is reported without estimating transaction costs.
 Successful and exceptional CVM results are both delivered as `result` events.
 
 ## Event shape
