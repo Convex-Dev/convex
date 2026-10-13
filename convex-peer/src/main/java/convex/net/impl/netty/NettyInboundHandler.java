@@ -78,6 +78,14 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	private volatile boolean backpressured = false;
 
 	/**
+	 * Set once decoding has thrown. A framing error leaves the reader mid-message with no
+	 * way to resynchronise, and ByteToMessageDecoder still runs a final decode pass over
+	 * the leftover buffer when the channel closes — without this, the body of a rejected
+	 * frame gets reinterpreted as a stream of frames and delivered as garbage messages.
+	 */
+	private boolean failed = false;
+
+	/**
 	 * Creates a handler for a single inbound channel.
 	 *
 	 * @param deliver  Dispatch function. Returns null if the message was accepted,
@@ -160,6 +168,10 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		// Gate: stop decoding while a message is being retried on a virtual thread.
 		// ByteToMessageDecoder sees no progress and stops its loop.
 		// Remaining bytes stay in the cumulation buffer, preserving order.
+		if (failed) {
+			in.skipBytes(in.readableBytes());
+			return;
+		}
 		if (backpressured) return;
 
 		try {
@@ -256,6 +268,8 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 				});
 			}
 		} catch (Throwable e) {
+			failed = true;
+			in.skipBytes(in.readableBytes());
 			if (e instanceof BadFormatException) {
 				// Malformed input from a remote client is an expected event on a
 				// public port (exceptionCaught closes the channel); debug level so
