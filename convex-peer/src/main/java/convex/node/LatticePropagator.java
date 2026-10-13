@@ -1166,7 +1166,9 @@ public class LatticePropagator implements Closeable {
 			if (value == null) throw new IllegalArgumentException("Lattice filter returned null");
 
 			// 1. Announce to store (writes cells, collects novelty for delta)
-			boolean hasPeers=!connectionManager.getPeers().isEmpty();
+			// An authenticated inbound connection upgraded to an outbound route is a route
+			// like any other; getPeers() alone misses a group whose only peer dialled in.
+			boolean hasPeers=connectionManager.hasPropagationRoutes();
 			NoveltyCollector noveltyCollector=hasPeers
 				?new NoveltyCollector(maxDeltaBroadcastSize):null;
 			value = Cells.announce(value, noveltyCollector, store);
