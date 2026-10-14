@@ -20,6 +20,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.RefSoft;
 import convex.core.data.Sets;
+import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
@@ -42,25 +43,29 @@ public class ALatticeComponentTest {
 		}
 	}
 
-	private static class StoredComponent extends TestComponent {
-
-		private final EtchStore store;
-		private int persistCount;
-
-		StoredComponent(ALatticeCursor<ASet<ACell>> cursor, EtchStore store) {
-			super(cursor);
-			this.store=store;
-		}
-
-		@Override
-		protected <T extends ACell> T persist(T value) throws IOException {
-			persistCount++;
-			return Cells.persist(value,store);
-		}
-	}
-
 	private static ALatticeCursor<ASet<ACell>> createCursor() {
 		return Cursors.createLattice(SetLattice.create(),Sets.empty());
+	}
+
+	@Test
+	public void testSpecialisedComponentCanProvideIndependentPersistence() throws IOException {
+		try (EtchStore independent=EtchStore.createTemp("independent-component")) {
+			var host=RootComponent.<ASet<ACell>>create(SetLattice.create(),new MemoryStore());
+			TestComponent component=new TestComponent(host.cursor()) {
+				@Override protected <T extends ACell> T persist(T value) throws IOException {
+					return Cells.persist(value,independent);
+				}
+			};
+			ABlob value=Blobs.createRandom(new Random(7654),5000);
+			component.add(value);
+			var before=component.cursor().get();
+			var persisted=component.persist();
+			ABlob blob=(ABlob)persisted.getRef(0).getValue();
+			RefSoft<?> ref=assertInstanceOf(RefSoft.class,blob.getRef(0));
+			assertSame(independent,ref.getStore());
+			assertSame(before,host.cursor().get());
+			assertEquals(null,host.store().refForHash(value.getHash()));
+		}
 	}
 
 	@Test
@@ -73,9 +78,9 @@ public class ALatticeComponentTest {
 	}
 
 	@Test
-	public void testPersistenceDelegatesToParentWithoutChangingCursor() throws IOException {
+	public void testDerivedComponentUsesStoreWithoutChangingCursor() throws IOException {
 		try (EtchStore store=EtchStore.createTemp("lattice-component")) {
-			StoredComponent root=new StoredComponent(createCursor(),store);
+			var root=RootComponent.<ASet<ACell>>create(SetLattice.create(),store);
 			TestComponent child=new TestComponent(root,root.cursor().fork());
 			ABlob value=Blobs.createRandom(new Random(1234),5000);
 			child.add(value);
@@ -83,7 +88,6 @@ public class ALatticeComponentTest {
 			ASet<ACell> before=child.cursor().get();
 			ASet<ACell> persisted=child.persist();
 
-			assertEquals(1,root.persistCount);
 			assertSame(before,child.cursor().get());
 			assertEquals(before,persisted);
 			ABlob persistedBlob=(ABlob)persisted.getRef(0).getValue();
@@ -94,7 +98,7 @@ public class ALatticeComponentTest {
 	@Test
 	public void testForkCanPersistWithoutSyncing() throws IOException {
 		try (EtchStore store=EtchStore.createTemp("lattice-component-fork")) {
-			StoredComponent root=new StoredComponent(createCursor(),store);
+			var root=RootComponent.<ASet<ACell>>create(SetLattice.create(),store);
 			TestComponent fork=new TestComponent(root,root.cursor().fork());
 			Blob value=Blob.fromHex("cafebabe");
 			fork.add(value);

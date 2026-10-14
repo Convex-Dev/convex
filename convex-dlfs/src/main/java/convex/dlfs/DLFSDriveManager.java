@@ -71,8 +71,8 @@ public class DLFSDriveManager {
 
 	/**
 	 * Creates a manager with one owner's component-backed drives mounted for
-	 * anonymous requests. Blob persistence delegates through the component's
-	 * physical region, application and root.
+	 * anonymous requests. Blob persistence uses the component's resolved policy
+	 * and cursor host's persistence capability.
 	 *
 	 * @param drives Component representing this owner's drives
 	 */

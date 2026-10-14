@@ -81,6 +81,9 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	public boolean supportsExclusiveTransactions() { return base.supportsExclusiveTransactions(); }
 
 	@Override
+	protected Persistence persistence() { return base.persistence(); }
+
+	@Override
 	protected <T> T exclusive(Supplier<T> action) {
 		return base.exclusive(action);
 	}

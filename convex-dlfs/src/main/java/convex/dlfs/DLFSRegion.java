@@ -49,11 +49,11 @@ public final class DLFSRegion extends ALatticeComponent<
 
 	/** Creates an isolated temporary region component. */
 	public DLFSRegion fork() {
-		return new DLFSRegion(parent(),cursor.fork());
+		return new DLFSRegion(this,cursor.fork());
 	}
 	@Override
 	public DLFSRegion withCursor(ALatticeCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
-		return new DLFSRegion(parent(),cursor);
+		return new DLFSRegion(this,cursor);
 	}
 
 }

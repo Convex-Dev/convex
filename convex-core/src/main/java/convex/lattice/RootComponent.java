@@ -5,6 +5,7 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.Cells;
+import convex.lattice.cursor.ACursor;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.lattice.cursor.Cursors;
@@ -24,20 +25,18 @@ import convex.lattice.cursor.RootLatticeCursor;
  *
  * @param <V> Root lattice value type
  */
-public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
+public final class RootComponent<V extends ACell> extends ALatticeComponent<V> implements ACursor.Persistence {
 
 	private final AStore store;
-	private final RootLatticeCursor<V> rootCursor;
 	private volatile Function<V,V> publicationPolicy;
 	private boolean publicationPolicyFrozen;
 
 	/** Creates a store-backed host around an existing root cursor. */
 	public RootComponent(RootLatticeCursor<V> cursor, AStore store) {
 		super(cursor);
-		if (store==null) throw new IllegalArgumentException("Root store must not be null");
-		this.store=store;
-		this.rootCursor=cursor;
-		rootCursor.onSync(this::publishRoot);
+		this.store=java.util.Objects.requireNonNull(store,"Root store must not be null");
+		cursor.setPersistence(this);
+		cursor.onSync(this::publishRoot);
 	}
 
 	/** Creates a standalone local root at the lattice's zero value. */
@@ -70,15 +69,20 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	/** Returns the host store without implying ownership of its lifecycle. */
-	@Override
 	public AStore store() {
 		return store;
+	}
+
+	/** Host implementation of cursor persistence; does not publish a root. */
+	@Override
+	public <T extends ACell> T persist(T value) throws IOException {
+		return Cells.persist(value,store);
 	}
 
 	/** Returns the hosted root cursor with its exact static type. */
 	@Override
 	public RootLatticeCursor<V> cursor() {
-		return rootCursor;
+		return (RootLatticeCursor<V>) cursor;
 	}
 
 	/**
@@ -118,12 +122,7 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * @throws IOException If the store flush fails
 	 */
 	public void flush() throws IOException {
-		store.flush();
-	}
-
-	@Override
-	protected <T extends ACell> T persist(T value) throws IOException {
-		return Cells.persist(value,store);
+		store().flush();
 	}
 
 	private V publishRoot(V value) {
@@ -133,7 +132,7 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	private V storeRoot(V value) {
 		try {
-			return store.setRootData(value).getValue();
+			return store().setRootData(value).getValue();
 		} catch (IOException e) {
 			throw new StoreException("Root component sync failed: persistence error",e);
 		}

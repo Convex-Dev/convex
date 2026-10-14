@@ -10,6 +10,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.store.AStore;
 import convex.lattice.ALatticeApplication;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
@@ -32,7 +33,7 @@ import convex.lattice.cursor.ALatticeCursor;
  */
 public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 
-	private final DLFSRegion dlfs;
+	private final ACell[] regionPath;
 
 	/**
 	 * Creates an extensible DLFS application over a host.
@@ -45,10 +46,10 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	}
 
 	/** Binds a subclass's private working view and its DLFS region to a cursor. */
-	protected DLFSApplication(RootComponent<V> host,ALatticeCursor<V> cursor,ACell... regionPath) {
-		super(host,cursor);
+	protected DLFSApplication(ALatticeComponent<V> source,ALatticeCursor<V> cursor,ACell... regionPath) {
+		super(source,cursor);
 		if (regionPath==null) throw new IllegalArgumentException("DLFS region path must not be null");
-		this.dlfs=DLFSRegion.connect(this,regionPath);
+		this.regionPath=regionPath.clone();
 	}
 
 	/**
@@ -88,7 +89,7 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 
 	/** Returns the physical multi-owner DLFS region. */
 	public DLFSRegion dlfs() {
-		return dlfs;
+		return DLFSRegion.connect(this,regionPath);
 	}
 
 	/**
@@ -98,7 +99,7 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	 * @return Owner-scoped drives component
 	 */
 	public DLFSDrives drives(AccountKey owner) {
-		return dlfs.drives(owner);
+		return dlfs().drives(owner);
 	}
 
 }

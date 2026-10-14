@@ -73,6 +73,9 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 	public boolean supportsExclusiveTransactions() { return base.supportsExclusiveTransactions(); }
 
 	@Override
+	protected Persistence persistence() { return base.persistence(); }
+
+	@Override
 	protected <T> T exclusive(Supplier<T> action) {
 		return base.exclusive(action);
 	}

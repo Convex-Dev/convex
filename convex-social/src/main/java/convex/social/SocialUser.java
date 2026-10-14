@@ -29,7 +29,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 
 	private final AString ownerDid;
 
-	SocialUser(Social parent, ALatticeCursor<Index<Keyword, ACell>> cursor, AString ownerDid) {
+	SocialUser(ALatticeComponent<?> parent, ALatticeCursor<Index<Keyword, ACell>> cursor, AString ownerDid) {
 		super(parent,cursor);
 		this.ownerDid = ownerDid;
 	}
@@ -61,7 +61,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return isolated working copy for this user
 	 */
 	public SocialUser fork() {
-		return new SocialUser((Social) parent(),cursor.fork(),ownerDid);
+		return new SocialUser(this,cursor.fork(),ownerDid);
 	}
 
 	// TODO: public Profile profile() { ... }
@@ -82,7 +82,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 
 	@Override
 	public SocialUser withCursor(ALatticeCursor<Index<Keyword, ACell>> cursor) {
-		return new SocialUser((Social) parent(),cursor,ownerDid);
+		return new SocialUser(this,cursor,ownerDid);
 	}
 
 }

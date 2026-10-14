@@ -24,6 +24,9 @@ final class RootCursorView<V extends ACell> extends ALatticeCursor<V> {
 	public boolean supportsExclusiveTransactions() { return root.supportsExclusiveTransactions(); }
 
 	@Override
+	protected Persistence persistence() { return root.persistence(); }
+
+	@Override
 	protected <T> T exclusive(Supplier<T> action) {
 		return root.exclusive(action);
 	}

@@ -56,7 +56,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 
 	/** Creates an isolated temporary multi-drive working component. */
 	public DLFSDrives fork() {
-		return new DLFSDrives(parent(),cursor.fork());
+		return new DLFSDrives(this,cursor.fork());
 	}
 
 	/** Opens an existing drive, or returns null if it is absent. */
@@ -198,7 +198,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	}
 	@Override
 	public DLFSDrives withCursor(ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor) {
-		return new DLFSDrives(parent(),cursor);
+		return new DLFSDrives(this,cursor);
 	}
 
 }

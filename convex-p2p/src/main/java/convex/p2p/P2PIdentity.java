@@ -44,11 +44,11 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 
 	/** Creates an isolated working component at the same logical path. */
 	public P2PIdentity fork() {
-		return new P2PIdentity(parent(),cursor.fork(),owner);
+		return new P2PIdentity(this,cursor.fork(),owner);
 	}
 	@Override
 	public P2PIdentity withCursor(ALatticeCursor<ACell> cursor) {
-		return new P2PIdentity(parent(),cursor,owner);
+		return new P2PIdentity(this,cursor,owner);
 	}
 
 }

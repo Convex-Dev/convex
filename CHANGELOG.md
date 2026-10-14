@@ -9,15 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Application checkpoint policies support deferred persistence with component overrides; derived components copy resolved policy independently of signing and publication.
 - Typed lattice component transactions stage domain operations atomically, with async completion and an opt-in transactional root for exclusive execution and contention fallback. Ordinary roots retain their existing write path.
 - REST `POST /api/v1/simulate` accepts source or binary transactions without signing credentials, returning transaction accounting results under public query limits, including `JUICE` errors for zero-balance accounts.
 - Java clients expose `simulate` and `simulateSync` for transaction accounting and cost estimates; the GUI stress tool labels this mode "Simulate" to distinguish it from ordinary queries.
-- Lattice applications can be constructed from a root lattice and store, inspect their root lattice, and atomically merge incoming state without defining domain components.
+- Lattice applications attach to an explicitly created or opened root host, inspect their root lattice, and atomically merge incoming state without defining domain components.
 - Applications sharing a lattice host now have independent signing and clock contexts over the same live atomic state. Root cursors also expose lightweight live views.
 - Typed ownership lattices for hash maps and indexes, including DID verification bound to each lattice instance and a public-key index specialisation. Existing `OwnerLattice<V>` callers remain supported.
 
 ### Changed
 
+- Removed the ambiguous lattice-and-store application constructor; use `RootComponent.open` to restore retained state or `RootComponent.create` to deliberately start fresh.
+- Lattice components retain no component-parent, application-host or store links: checkpoint configuration is copied at construction, and state updates, persistence and sync travel through cursors. `RootComponent` holds the host store; specialised components may explicitly provide independent persistence.
+- Low-level DLFS store-taking overloads are replaced by hosted cursors; filesystem forks retain cursor persistence, while clones are independent in-memory snapshots.
 - Index operations on long keys, such as DLFS file names, stay on the fast recursive path; the stack-safe fallback now engages only on an actual stack overflow. ([#727](https://github.com/Convex-Dev/convex/issues/727))
 - Embedded store decodes avoid hashing for cache lookup and automatic cache admission, while reusing already-cached values when their hash is available; non-embedded branches still use the cache on demand.
 - CVM map operations recognise only known maplike records; generic CAD3 records no longer qualify as maps solely through their Java representation.

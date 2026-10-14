@@ -35,6 +35,10 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 * Creates a fresh component over the supplied cursor, retaining domain metadata
 	 * and persistence policy. All mutable child views must use the supplied cursor;
 	 * never reuse children bound to the original live cursor.
+	 * ALatticeComponent implementations pass this component to the new view's
+	 * constructor to copy resolved checkpoint configuration. Storage is provided
+	 * through the supplied cursor. The new
+	 * view retains no reference to its source component.
 	 */
 	C withCursor(ALatticeCursor<V> cursor);
 

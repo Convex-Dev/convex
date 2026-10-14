@@ -49,6 +49,9 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 	public boolean supportsExclusiveTransactions() { return parent.supportsExclusiveTransactions(); }
 
 	@Override
+	protected Persistence persistence() { return parent.persistence(); }
+
+	@Override
 	protected <T> T exclusive(Supplier<T> action) {
 		return parent.exclusive(action);
 	}

@@ -82,7 +82,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Forked SQLSchema instance
 	 */
 	public SQLSchema fork() {
-		return new SQLSchema(parent(),cursor.fork());
+		return new SQLSchema(this,cursor.fork());
 	}
 
 	// ========== Internal Helpers ==========

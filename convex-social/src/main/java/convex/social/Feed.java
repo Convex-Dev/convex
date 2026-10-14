@@ -32,7 +32,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 
 	private final AString author;
 
-	Feed(SocialUser parent, ALatticeCursor<Index<Blob, ACell>> cursor, AString author) {
+	Feed(ALatticeComponent<?> parent, ALatticeCursor<Index<Blob, ACell>> cursor, AString author) {
 		super(parent,cursor);
 		this.author = author;
 	}
@@ -157,7 +157,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 
 	@Override
 	public Feed withCursor(ALatticeCursor<Index<Blob, ACell>> cursor) {
-		return new Feed((SocialUser) parent(),cursor,author);
+		return new Feed(this,cursor,author);
 	}
 
 }

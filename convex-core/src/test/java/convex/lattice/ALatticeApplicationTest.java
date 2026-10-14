@@ -22,7 +22,6 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.generic.ADelegatingLattice;
 import convex.lattice.generic.CompareLattice;
@@ -41,10 +40,6 @@ public class ALatticeApplicationTest {
 
 	/** No component definitions or factories are needed for root merging. */
 	private static final class Application<V extends ACell> extends ALatticeApplication<V> {
-		Application(ALattice<V> lattice, AStore store) {
-			super(lattice,store);
-		}
-
 		Application(RootComponent<V> host) {
 			super(host);
 		}
@@ -61,18 +56,19 @@ public class ALatticeApplicationTest {
 	}
 
 	@Test
-	public void testLocalMergeAndPublicationWithoutComponents() throws Exception {
+	public void testOpenMergeAndPublicationPreserveRetainedRootWithoutComponents() throws Exception {
 		MemoryStore store=new MemoryStore();
-		Index<Keyword,ACell> retained=LATTICE.zero().assoc(UNKNOWN,CVMLong.ONE);
+		Index<Keyword,ACell> retained=LATTICE.zero()
+			.assoc(ITEMS,Sets.of(2)).assoc(UNKNOWN,CVMLong.ONE);
 		store.setRootData(retained);
-		Application<Index<Keyword,ACell>> app=new Application<>(LATTICE,store);
+		Application<Index<Keyword,ACell>> app=new Application<>(RootComponent.open(LATTICE,store));
 		assertSame(LATTICE,app.getLattice());
-		assertEquals(LATTICE.zero(),app.cursor().get());
+		assertEquals(retained,app.cursor().get());
 
 		Index<Keyword,ACell> incoming=LATTICE.zero()
 			.assoc(ITEMS,Sets.of(1)).assoc(UNKNOWN,CVMLong.TWO);
 		Index<Keyword,ACell> merged=app.merge(incoming);
-		assertEquals(LATTICE.zero().assoc(ITEMS,Sets.of(1)),merged);
+		assertEquals(retained.assoc(ITEMS,Sets.of(1,2)),merged);
 		assertSame(merged,app.cursor().get());
 		assertSame(merged,app.merge(incoming));
 		assertSame(merged,app.merge(null));
@@ -217,7 +213,7 @@ public class ALatticeApplicationTest {
 	public void testArbitraryLatticeKeepsOwnValueOnTie() {
 		var lattice=CompareLattice.create((AString a, AString b)
 			-> Long.compare(a.count(),b.count()));
-		var app=new Application<>(lattice,new MemoryStore());
+		var app=new Application<>(RootComponent.create(lattice,new MemoryStore()));
 		var own=Strings.create("own");
 		assertSame(own,app.merge(own));
 		assertSame(own,app.merge(Strings.create("new")));
@@ -230,7 +226,7 @@ public class ALatticeApplicationTest {
 		AKeyPair bob=AKeyPair.createSeeded(6202);
 		OwnerKeyLattice<ASet<CVMLong>> owners=OwnerKeyLattice.create(SetLattice.create());
 		KeyedLattice lattice=KeyedLattice.create(ITEMS,owners);
-		var app=new Application<>(lattice,new MemoryStore());
+		var app=new Application<>(RootComponent.create(lattice,new MemoryStore()));
 		app.cursor().setContext(LatticeContext.create(null,alice));
 		Index<AccountKey,SignedData<ASet<CVMLong>>> first=owners.zero()
 			.assoc(alice.getAccountKey(),alice.signData(Sets.of(1)));
@@ -254,7 +250,7 @@ public class ALatticeApplicationTest {
 	@Test
 	public void testFailedRegionMergeInstallsNoPartialRoot() {
 		KeyedLattice lattice=LATTICE.addLattice(UNKNOWN,SetLattice.create());
-		var app=new Application<>(lattice,new MemoryStore());
+		var app=new Application<>(RootComponent.create(lattice,new MemoryStore()));
 		var before=app.merge(lattice.zero().assoc(ITEMS,Sets.of(1)));
 		var invalid=lattice.zero().assoc(ITEMS,Sets.of(2)).assoc(UNKNOWN,CVMLong.ONE);
 		assertThrows(ClassCastException.class,() -> app.merge(invalid));
@@ -282,8 +278,9 @@ public class ALatticeApplicationTest {
 				return super.merge(context,own,other);
 			}
 		};
-		var app=new Application<>(lattice,new MemoryStore());
-		Items items=new Items(new Application<>(app.host()));
+		var host=RootComponent.create(lattice,new MemoryStore());
+		var app=new Application<>(host);
+		Items items=new Items(new Application<>(host));
 		try (var executor=Executors.newSingleThreadExecutor()) {
 			var future=executor.submit(() -> app.merge(LATTICE.zero().assoc(ITEMS,Sets.of(2))));
 			try {

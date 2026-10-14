@@ -12,8 +12,8 @@ practical companion for `convex-core`, with `convex-social`, `convex-dlfs` and
 
 **Implemented:** `ALatticeApplication<V>` has a live view of a hosted root cursor, exposes its
 `getLattice()` and atomically merges incoming root values through `merge(value)`.
-It can attach to a `RootComponent<V>` or construct a local root from an
-`ALattice<V>` and an `AStore`. Neither merging nor hosting requires domain
+It attaches to a `RootComponent<V>`, which explicitly creates or opens a local
+root, or hosts a networked root. Neither merging nor hosting requires domain
 components to exist.
 
 The global lattice has a keyed map root. The existing `KeyedLattice` represents it
@@ -38,22 +38,21 @@ without constructing a single domain component.
 
 ```java
 public final class RelayApplication extends ALatticeApplication<Index<Keyword, ACell>> {
-    public RelayApplication(KeyedLattice lattice, AStore store) {
-        super(lattice, store); // local root initially at lattice.zero()
-    }
-
     public RelayApplication(RootComponent<Index<Keyword, ACell>> host) {
         super(host);           // shares the host's atomic state and lattice
     }
 }
 
-RelayApplication app = new RelayApplication(selectedRegions, store);
+var host = RootComponent.open(selectedRegions, store);
+RelayApplication app = new RelayApplication(host);
 app.merge(incomingRoot); // atomic local merge, including region verification
 app.sync();              // persist and publish through host policy
 ```
 
-Local construction does not restore an existing store root. Use
-`RootComponent.open(lattice, store)` and the host constructor to restore one.
+`RootComponent.open(lattice, store)` restores the retained root, or starts at the
+lattice's zero value if the store has none. Use `RootComponent.create(lattice, store)`
+to deliberately start a fresh root; its first publication replaces any retained root.
+Applications accept a host rather than a store, so this choice belongs to host assembly.
 The caller owns the store lifecycle. A hosted application's `getLattice()` returns
 the host cursor's lattice, so component navigation and incoming merges use the same
 definition. There is no second application merge policy that can disagree with it.
@@ -270,7 +269,6 @@ against the current implementation. Paths use canonical CVM keys, as existing
 public abstract class ALatticeApplication<V extends ACell>
         extends ALatticeComponent<V> implements AutoCloseable {
     protected ALatticeApplication(RootComponent<V> host);
-    protected ALatticeApplication(ALattice<V> lattice, AStore store);
 
     public final ALattice<V> getLattice();
     public V merge(V other);
@@ -326,10 +324,10 @@ app.launch();  // node already launched and configured
 ```
 
 `Feed.connect` above is a proposed cursor-based component factory. Components that
-need persistence receive a host-backed component context alongside their cursor;
-they do not require a parallel hierarchy of parent components just to find a store.
-The context can be shared across all components of an application. Component
-creation itself opens no connections, starts no workers and installs no observers.
+need persistence request it through their cursor. They copy resolved checkpoint
+policy from a source component at construction, retaining no component parent,
+host or store link. No separate application-context object is needed. Component
+creation opens no connections, starts no workers and installs no observers.
 
 ### Launch and close
 
@@ -608,10 +606,14 @@ Social        cursor at OwnerLattice level
     Follows   cursor at MapLattice<ACell, ACell>
 ```
 
-The component parent supplies application policy and host store access; the cursor
-parent supplies navigation and synchronisation. They are deliberately separate: a fork
-keeps its component parent while its cursor syncs to the live cursor it was forked
-from. Signing is transparent: `Feed` never sees `SignedData`.
+Hosts, applications and domain components all extend `ALatticeComponent`. Each
+generic component holds one cursor and a resolved checkpoint policy. Only
+`RootComponent` holds the host store. Construction from a source component copies
+checkpoint configuration without retaining
+that component. The cursor is the only connection back to application state: its
+internal links provide navigation, atomic updates and fork merge-back. There is no
+second component-parent hierarchy. Signing is transparent: `Feed` never sees
+`SignedData`.
 
 Constructors must copy caller-supplied path arrays. Long-lived application and region
 components are fine; owner and session views should be held by the service that routes
@@ -712,7 +714,11 @@ For a custom component, implement `TransactionalComponent<Value,MyComponent>`
 and `withCursor(ALatticeCursor<Value>)`, creating a fresh component with the same
 domain metadata and storage policy. Rebuild children against that cursor; do not
 reuse cached live children. Application subclasses can use the protected
-`ALatticeApplication(host, cursor)` constructor to retain host storage policy.
+`ALatticeApplication(source, cursor)` constructor. Fork and rebinding factories pass
+`this` as the source, e.g. `return new MyComponent(this, cursor.fork())`. The base
+constructor copies checkpoint configuration; no manual policy-copying
+helper or back pointer is needed. Rebuilt child components take their defaults from
+the new view; factories must explicitly carry over any child-specific configuration.
 
 `transact` returns `void`; `transactAsync` returns `CompletableFuture<Void>`.
 Completion means committed locally, not persisted, published or acknowledged by
@@ -750,6 +756,71 @@ Incremental writers may persist at intervals to swap direct references for
 store-backed soft references and relieve memory pressure; they must install the
 returned value themselves. Persistence neither selects a retained root nor licenses
 garbage collection.
+
+### Checkpoint policy
+
+An application supplies the checkpoint default for components constructed from it.
+Construction resolves the policy once. Later changes affect that component and new
+views constructed from it, not existing views. Configure an application before
+constructing its domain components, and configure a component before constructing
+its children. Policies belong to component views, not lattice paths; applications
+sharing a host can use different defaults. Policies must be non-null. To copy the
+current policy from another component explicitly, use
+`component.setCheckpointPolicy(source.getCheckpointPolicy())`.
+
+```java
+app.setCheckpointPolicy(CheckpointPolicy.DEFERRED);
+var drives = app.drives(owner);
+drives.setCheckpointPolicy(CheckpointPolicy.INCREMENTAL);
+var draft = drives.drive("home").fork();
+draft.setCheckpointPolicy(CheckpointPolicy.DEFERRED);
+```
+
+`INCREMENTAL` allows domain-specific checkpoints, such as DLFS's existing 16 MiB
+blob interval. It remains the compatibility default. `DEFERRED` keeps new working
+values in memory until explicit persistence or publication. Existing store-backed
+values remain readable in either mode. Components use `checkpoint(value)` at their
+chosen intervals and install its return value; it applies the effective policy
+and routes persistence through the cursor's host capability. No workers are created.
+
+Forks and rebound transaction views copy their source's resolved policy. They do not
+retain the source component or store. Changing policy does not cancel a checkpoint
+already in progress. Unhosted cursors retain working values on optional checkpoints;
+explicit `persist()` and `flush()` fail without a persistence capability.
+
+`RootComponent` installs the cursor's persistence capability alongside its publication
+callback. Cursor paths, signed boundaries and forks route persistence through their
+existing links. A transaction view uses the capability only while its callback is
+active and on the callback thread. Persistence never crosses signing or merge
+boundaries and never moves a cursor. It returns a value which may contain store-backed
+references. `flush()` requests durability through the same capability without
+publishing pending state. These operations are separate from root publication.
+
+An implementer needing independent domain storage may explicitly own a store and
+override `persist(value)` and, where needed, `checkpoint(value)`. The generic
+component does not supply or propagate an independent store. Derived components
+must arrange any such specialised behaviour themselves.
+
+Low-level DLFS adapters also use cursor persistence. The store-taking overloads of
+`DLFS.connect/open` and `DLFSLocal.create` have been removed. Configure a host once
+and pass its cursor (or a path/fork from it):
+
+```java
+var host = RootComponent.create(drivesLattice, store);
+var fs = DLFS.connect(host.cursor(), Strings.create("home"));
+```
+
+DLFS forks retain access to host persistence through their cursor. A filesystem
+`clone()` creates independent in-memory state without a host capability.
+
+Checkpoint policy does not change explicit `persist()`, signing boundaries,
+application publication or `flush()`. Forking below an owner's signing boundary
+defers that enclosing signature until merge-back. A deferred DLFS fork can thus
+perform many atomic edits without signing or storing intermediate values; its
+`sync()` merges and signs, and application `sync()` persists and publishes. An
+incremental fork may store blob branches before merge-back without publishing them.
+With incremental policy, transaction rollback may leave immutable checkpoint cells
+in the store. Deferred large-file edits retain more memory until persisted.
 
 ## Write policy: `LatticeContext`
 

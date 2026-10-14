@@ -32,7 +32,7 @@ import convex.lattice.cursor.ALatticeCursor;
 public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implements TransactionalComponent<AHashMap<ACell, ACell>,Follows> {
 	public static final Keyword KEY_ACCOUNT_KEY=Keyword.intern("account-key");
 
-	Follows(SocialUser parent, ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
+	Follows(ALatticeComponent<?> parent, ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
 		super(parent,cursor);
 	}
 
@@ -135,7 +135,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 
 	@Override
 	public Follows withCursor(ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
-		return new Follows((SocialUser) parent(),cursor);
+		return new Follows(this,cursor);
 	}
 
 }

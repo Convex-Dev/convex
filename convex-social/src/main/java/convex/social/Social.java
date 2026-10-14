@@ -180,8 +180,8 @@ public class Social extends ALatticeComponent<
 
 	/**
 	 * Connects to the {@code :social} region beneath a containing component.
-	 * Component-level policy such as persistence delegates through the supplied
-	 * parent while cursor operations remain scoped to the social path.
+	 * Checkpoint configuration is copied from the supplied component; state and
+	 * persistence operations use the cursor scoped to the social path.
 	 *
 	 * @param parent Containing lattice component
 	 * @param keyPair Key pair for signing updates
@@ -201,7 +201,7 @@ public class Social extends ALatticeComponent<
 
 	/**
 	 * Connects to the {@code :social} region beneath a containing component,
-	 * inheriting its live lattice context and persistence policy.
+	 * inheriting its live cursor context and copying its checkpoint configuration.
 	 *
 	 * @param parent Containing application component
 	 * @return Social region component
@@ -246,12 +246,12 @@ public class Social extends ALatticeComponent<
 	 * @return Forked Social instance
 	 */
 	public Social fork() {
-		return new Social(parent(),cursor.fork());
+		return new Social(this,cursor.fork());
 	}
 
 	@Override
 	public Social withCursor(ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
-		return new Social(parent(),cursor);
+		return new Social(this,cursor);
 	}
 
 }

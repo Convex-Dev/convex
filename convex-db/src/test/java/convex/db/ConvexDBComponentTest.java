@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.Ref;
+import convex.core.store.MemoryStore;
+import java.util.function.Consumer;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -21,28 +24,39 @@ import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLTable;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.RootComponent;
 import convex.lattice.cursor.Cursors;
 
-/** Tests Convex DB integration with the lattice component policy hierarchy. */
+/** Tests Convex DB integration with the lattice component storage configuration. */
 public class ConvexDBComponentTest {
 
 	private static final String DB_NAME="component-test";
 	private static final String TABLE_NAME="items";
 
+	private static class CountingStore extends MemoryStore {
+		int writes;
+		@Override public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref,int status,
+				Consumer<Ref<ACell>> noveltyHandler) {
+			writes++;
+			return super.storeTopRef(ref,status,noveltyHandler);
+		}
+	}
+
 	private static class TestRoot extends
 			ALatticeComponent<AHashMap<AString,Index<Keyword,ACell>>> {
 
-		private int persistCount;
 
 		TestRoot() {
-			super(Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE));
+			this(new CountingStore());
 		}
 
-		@Override
-		protected <T extends ACell> T persist(T value) {
-			persistCount++;
-			return value;
+		private final CountingStore counter;
+		private TestRoot(CountingStore counter) {
+			super(RootComponent.create(ConvexDB.DATABASE_MAP_LATTICE,counter).cursor());
+			this.counter=counter;
 		}
+
+		int persistCount() { return counter.writes; }
 	}
 
 	private static SQLDatabase createDatabase(ConvexDB cdb) {
@@ -52,7 +66,7 @@ public class ConvexDBComponentTest {
 	}
 
 	@Test
-	public void testNestedPersistenceDelegatesWithoutMovingCursors() throws Exception {
+	public void testNestedPersistenceUsesStoreWithoutMovingCursors() throws Exception {
 		TestRoot root=new TestRoot();
 		ConvexDB cdb=ConvexDB.connect(root);
 		SQLDatabase db=createDatabase(cdb);
@@ -62,8 +76,8 @@ public class ConvexDBComponentTest {
 		AVector<ACell> tableBefore=table.cursor().get();
 		AVector<ACell> persisted=table.persist();
 
-		assertEquals(1,root.persistCount);
-		assertSame(tableBefore,persisted);
+		assertEquals(1,root.persistCount());
+		assertEquals(tableBefore,persisted);
 		assertSame(tableBefore,table.cursor().get());
 		assertSame(rootBefore,root.cursor().get());
 	}
@@ -82,7 +96,7 @@ public class ConvexDBComponentTest {
 	}
 
 	@Test
-	public void testDatabaseForkRetainsPolicyParentAndSyncsToOriginal() throws Exception {
+	public void testDatabaseForkRetainsStoreCapabilityAndSyncsToOriginal() throws Exception {
 		TestRoot root=new TestRoot();
 		SQLDatabase original=createDatabase(ConvexDB.connect(root));
 		SQLDatabase fork=original.fork();
@@ -91,7 +105,7 @@ public class ConvexDBComponentTest {
 		AHashMap<AString,Index<Keyword,ACell>> rootBefore=root.cursor().get();
 		fork.tables().getTable(TABLE_NAME).persist();
 
-		assertEquals(1,root.persistCount);
+		assertEquals(1,root.persistCount());
 		assertSame(rootBefore,root.cursor().get());
 		assertEquals(0,original.tables().getRowCount(TABLE_NAME));
 
@@ -101,7 +115,7 @@ public class ConvexDBComponentTest {
 	}
 
 	@Test
-	public void testSchemaForkRetainsPolicyParentAndSyncsToOriginal() throws Exception {
+	public void testSchemaForkRetainsStoreCapabilityAndSyncsToOriginal() throws Exception {
 		TestRoot root=new TestRoot();
 		SQLSchema original=ConvexDB.connect(root).database(DB_NAME).tables();
 		SQLSchema fork=original.fork();
@@ -111,7 +125,7 @@ public class ConvexDBComponentTest {
 		AHashMap<AString,Index<Keyword,ACell>> rootBefore=root.cursor().get();
 		forkTable.persist();
 
-		assertEquals(1,root.persistCount);
+		assertEquals(1,root.persistCount());
 		assertSame(rootBefore,root.cursor().get());
 		assertFalse(original.tableExists(TABLE_NAME));
 

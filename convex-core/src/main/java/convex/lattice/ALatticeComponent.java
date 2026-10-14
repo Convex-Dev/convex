@@ -1,109 +1,73 @@
 package convex.lattice;
 
 import java.io.IOException;
+import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.store.AStore;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
- * Abstract base class for lattice application components that wrap a cursor.
+ * Domain operations over a lattice cursor, with resolved local configuration.
  *
- * <p>A lattice component provides domain-specific access to a section of
- * lattice state. It wraps an {@link ALatticeCursor} and may have a parent
- * component representing its containing application policy. This relationship
- * need not be the cursor's logical parent: a fork, for example, keeps the same
- * containing component while its cursor synchronises to the original cursor.</p>
- *
- * <p>Implementations should create appropriate domain-specific getters
- * and setters rather than exposing raw {@code get()} / {@code set()}
- * on the cursor. This ensures type safety and encapsulates the
- * underlying lattice structure.</p>
+ * <p>Components retain no parent or host component. State changes and sync travel
+ * solely through their cursor. Construction from another component copies its
+ * checkpoint policy; it does not retain that component.</p>
  *
  * @param <V> Value type of the wrapped cursor
  */
 public abstract class ALatticeComponent<V extends ACell> {
 
-	private final ALatticeComponent<?> parent;
 	protected final ALatticeCursor<V> cursor;
+	private volatile CheckpointPolicy checkpointPolicy;
 
-	/**
-	 * Creates a standalone root component with no component parent.
-	 *
-	 * <p>Persistence fails unless the component overrides
-	 * {@link #persist(ACell)} with a concrete storage policy.</p>
-	 *
-	 * @param cursor Cursor wrapped by this component
-	 */
+	/** Creates a component; persistence, when available, is provided through its cursor. */
 	protected ALatticeComponent(ALatticeCursor<V> cursor) {
-		this(null,cursor);
+		this.cursor=Objects.requireNonNull(cursor,"Component cursor must not be null");
+		this.checkpointPolicy=CheckpointPolicy.INCREMENTAL;
 	}
 
 	/**
-	 * Creates a component nested under a parent component.
-	 *
-	 * @param parent Parent component providing containing application policy
-	 * @param cursor Cursor wrapped by this component
+	 * Binds a child, fork or transaction view, copying configuration from source.
+	 * Null source creates a standalone component. Later configuration changes to
+	 * either component do not affect the other; no reference to source is retained.
 	 */
-	protected ALatticeComponent(ALatticeComponent<?> parent, ALatticeCursor<V> cursor) {
-		if (cursor==null) throw new IllegalArgumentException("Component cursor must not be null");
-		this.parent=parent;
-		this.cursor = cursor;
+	protected ALatticeComponent(ALatticeComponent<?> source,ALatticeCursor<V> cursor) {
+		this(cursor);
+		if (source!=null) checkpointPolicy=source.getCheckpointPolicy();
 	}
 
-	/**
-	 * Returns the containing policy component, if this is a nested component.
-	 *
-	 * @return Parent component, or {@code null} for a standalone root
-	 */
-	protected final ALatticeComponent<?> parent() {
-		return parent;
-	}
-
-	/**
-	 * Returns the physical store supplied by the containing host, if any.
-	 *
-	 * <p>This is an internal component resource: application factories should
-	 * continue to accept components rather than stores. Standalone components
-	 * which are not attached to a {@link RootComponent} return {@code null}.</p>
-	 *
-	 * @return Host store, or {@code null} when this component is not store-backed
-	 */
-	protected AStore store() {
-		return (parent==null)?null:parent.store();
-	}
-
-	/**
-	 * Returns the underlying lattice cursor for direct operations.
-	 *
-	 * @return The cursor wrapped by this component
-	 */
+	/** Returns the cursor responsible for all state updates and sync. */
 	public ALatticeCursor<V> cursor() {
 		return cursor;
 	}
 
+	/** Returns the resolved checkpoint policy; never null. */
+	public final CheckpointPolicy getCheckpointPolicy() {
+		return checkpointPolicy;
+	}
+
 	/**
-	 * Persists a value using the policy supplied by the containing component.
-	 *
-	 * <p>The default implementation delegates to the parent component. A component
-	 * with no parent and no concrete storage policy fails rather than pretending
-	 * that the value was persisted. Hosting components may override this method to
-	 * persist into an underlying store.</p>
-	 *
-	 * <p>Persistence does not update or sync this component's cursor. Callers
-	 * that need store-backed references in their working state must install the
-	 * returned value explicitly.</p>
-	 *
-	 * @param <T> Cell type
-	 * @param value Value to persist
-	 * @return Persisted value, potentially containing store-backed references
-	 * @throws IOException If persistence fails
+	 * Configures this component and the default copied by subsequently constructed
+	 * views. Existing views retain their policy. Configure before constructing
+	 * domain components. Explicit persistence and sync are unaffected.
 	 */
+	public final void setCheckpointPolicy(CheckpointPolicy policy) {
+		checkpointPolicy=Objects.requireNonNull(policy,"Checkpoint policy must not be null");
+	}
+
+	/**
+	 * Optionally persists a working value without moving a cursor or publishing it.
+	 * Callers install the returned value to benefit from store-backed references.
+	 * Unhosted components retain working values in memory. Specialised implementations
+	 * may override this hook and persist(value) for independently owned storage.
+	 */
+	protected <T extends ACell> T checkpoint(T value) throws IOException {
+		return (checkpointPolicy==CheckpointPolicy.DEFERRED)?value:cursor.checkpoint(value);
+	}
+
+	/** Persists through the cursor's host capability without updating or syncing state. */
 	protected <T extends ACell> T persist(T value) throws IOException {
-		if (parent==null) {
-			throw new IllegalStateException("No store-backed component available for persistence");
-		}
-		return parent.persist(value);
+		return cursor.persist(value);
 	}
 
 	/**

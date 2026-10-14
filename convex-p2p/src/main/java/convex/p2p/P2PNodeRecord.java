@@ -37,11 +37,11 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> implements Tra
 
 	/** Creates an isolated working component at the same logical path. */
 	public P2PNodeRecord fork() {
-		return new P2PNodeRecord(parent(),cursor.fork(),owner);
+		return new P2PNodeRecord(this,cursor.fork(),owner);
 	}
 	@Override
 	public P2PNodeRecord withCursor(ALatticeCursor<ACell> cursor) {
-		return new P2PNodeRecord(parent(),cursor,owner);
+		return new P2PNodeRecord(this,cursor,owner);
 	}
 
 }

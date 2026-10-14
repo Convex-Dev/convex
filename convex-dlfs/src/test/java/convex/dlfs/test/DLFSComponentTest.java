@@ -256,10 +256,10 @@ public class DLFSComponentTest {
 
 			AKeyPair keyPair=AKeyPair.generate();
 			try (EtchStore store=EtchStore.createTemp("dlfs-files-copy")) {
-				var root=Cursors.createLattice(DLFSRegion.LATTICE);
+				var root=RootComponent.create(DLFSRegion.LATTICE,store).cursor();
 				root.setContext(LatticeContext.create(null,keyPair));
 				var drives=root.path(keyPair.getAccountKey(),Keywords.VALUE);
-				try (var fileSystem=DLFS.connect(drives,Strings.create("large"),store)) {
+				try (var fileSystem=DLFS.connect(drives,Strings.create("large"))) {
 					Path target=fileSystem.getPath("/copy.bin");
 
 					Files.copy(source,target);

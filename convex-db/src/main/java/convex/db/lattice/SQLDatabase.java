@@ -140,7 +140,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Forked SQLDatabase instance
 	 */
 	public SQLDatabase fork() {
-		return new SQLDatabase(parent(),cursor.fork(),dbName,keyPair,ownerKey);
+		return new SQLDatabase(this,cursor.fork(),dbName,keyPair,ownerKey);
 	}
 
 	/**

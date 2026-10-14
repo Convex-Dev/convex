@@ -3,17 +3,16 @@ package convex.lattice;
 import java.io.IOException;
 
 import convex.core.data.ACell;
-import convex.core.store.AStore;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
  * Base class for an application participating in a lattice root.
  *
  * <p>An application component works at the same cursor position as its
- * {@link RootComponent} parent. The supplied lattice defines the complete root
+ * {@link RootComponent} host. The supplied lattice defines the complete root
  * merge, including which regions participate. Merging requires no domain
  * components or component registry. Subclasses may expose lightweight components
- * at paths within that root, while persistence delegates to the host.</p>
+ * at paths within that root, with storage operations routed through the host cursor.</p>
  *
  * <p>Each application has a live cursor view with an independent context override.
  * Setting its cursor context affects its descendants, not the host or other
@@ -32,8 +31,6 @@ import convex.lattice.cursor.ALatticeCursor;
  */
 public abstract class ALatticeApplication<V extends ACell> extends ALatticeComponent<V> {
 
-	private final RootComponent<V> host;
-
 	/**
 	 * Creates an application over an existing lattice host.
 	 *
@@ -44,41 +41,16 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	}
 
 	/**
-	 * Binds an application view to an explicit working cursor, retaining its host's
-	 * storage policy. Subclass transaction factories use this constructor and must
-	 * rebuild their child components against this cursor.
+	 * Binds an application view to a working cursor and copies configuration from
+	 * the source component. Factories pass this application as source when rebinding
+	 * and rebuild children against the new view. No source component is retained.
 	 */
-	protected ALatticeApplication(RootComponent<V> host,ALatticeCursor<V> cursor) {
-		super(requireHost(host),cursor);
-		this.host=host;
-	}
-
-	/**
-	 * Creates a local application at the supplied lattice's zero value.
-	 *
-	 * <p>The caller owns the store. Construction does not restore its retained
-	 * root; {@link #sync()} publishes the new application state. To restore an
-	 * existing root, pass a host created with
-	 * {@link RootComponent#open(ALattice, AStore)} instead.</p>
-	 *
-	 * @param lattice Root merge and navigation semantics
-	 * @param store Store providing persistence and publication
-	 */
-	protected ALatticeApplication(ALattice<V> lattice, AStore store) {
-		this(RootComponent.create(lattice,store));
+	protected ALatticeApplication(ALatticeComponent<V> source,ALatticeCursor<V> cursor) {
+		super(java.util.Objects.requireNonNull(source),cursor);
 	}
 
 	private static <V extends ACell> RootComponent<V> requireHost(RootComponent<V> host) {
 		if (host==null) throw new IllegalArgumentException("Application host must not be null");
-		return host;
-	}
-
-	/**
-	 * Returns the application host for specialised application infrastructure.
-	 *
-	 * @return Hosted root component
-	 */
-	protected final RootComponent<V> host() {
 		return host;
 	}
 
@@ -119,6 +91,6 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * @throws IOException If the store flush fails
 	 */
 	public void flush() throws IOException {
-		host.flush();
+		cursor.flush();
 	}
 }

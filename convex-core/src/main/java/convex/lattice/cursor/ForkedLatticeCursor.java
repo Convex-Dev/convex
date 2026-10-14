@@ -58,6 +58,9 @@ public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 	public boolean supportsExclusiveTransactions() { return localCursor.supportsExclusiveTransactions(); }
 
 	@Override
+	protected Persistence persistence() { return parent.persistence(); }
+
+	@Override
 	protected <T> T exclusive(Supplier<T> action) {
 		return localCursor.exclusive(action);
 	}

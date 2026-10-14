@@ -99,12 +99,12 @@ public class SharedApplicationsTest {
 		SocialWithP2P(RootComponent<Index<Keyword,ACell>> host) {
 			this(host,host.cursor().view().setContext(context(SOCIAL_KEY)));
 		}
-		SocialWithP2P(RootComponent<Index<Keyword,ACell>> host,ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			super(host,cursor);
+		SocialWithP2P(ALatticeComponent<Index<Keyword,ACell>> source,ALatticeCursor<Index<Keyword,ACell>> cursor) {
+			super(source,cursor);
 			social=Social.connect(this);
 		}
 		@Override public SocialWithP2P withCursor(ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			return new SocialWithP2P(host(),cursor);
+			return new SocialWithP2P(this,cursor);
 		}
 	}
 
@@ -113,11 +113,11 @@ public class SharedApplicationsTest {
 		FilesWithP2P(RootComponent<Index<Keyword,ACell>> host) {
 			this(host,host.cursor().view().setContext(context(FILES_KEY)));
 		}
-		FilesWithP2P(RootComponent<Index<Keyword,ACell>> host,ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			super(host,cursor,Keywords.FS);
+		FilesWithP2P(ALatticeComponent<Index<Keyword,ACell>> source,ALatticeCursor<Index<Keyword,ACell>> cursor) {
+			super(source,cursor,Keywords.FS);
 		}
 		@Override public FilesWithP2P withCursor(ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			return new FilesWithP2P(host(),cursor);
+			return new FilesWithP2P(this,cursor);
 		}
 		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner); }
 	}
@@ -193,7 +193,10 @@ public class SharedApplicationsTest {
 			assertEquals(coordinated,root.supportsExclusiveTransactions());
 			assertEquals(coordinated,f.social.social.user(SOCIAL_KEY.getAccountKey()).cursor().supportsExclusiveTransactions());
 			var before=root.get();
+			f.social.setCheckpointPolicy(CheckpointPolicy.DEFERRED);
 			f.social.transact(app -> {
+				assertEquals(CheckpointPolicy.DEFERRED,app.social.getCheckpointPolicy());
+				assertEquals(CheckpointPolicy.INCREMENTAL,f.files.getCheckpointPolicy());
 				var user=app.social.user(SOCIAL_KEY.getAccountKey());
 				user.feed().post("Atomic post and follow");
 				user.follows().follow(FILES_KEY.getAccountKey());

@@ -14,10 +14,17 @@ final class TransactionCursor<V extends ACell> extends ALatticeCursor<V> {
 	private final Thread owner=Thread.currentThread();
 	private boolean open=true;
 	private V value;
+	private final Persistence persistence;
 
-	TransactionCursor(ALattice<V> lattice,V initial,LatticeContext context) {
+	TransactionCursor(ALattice<V> lattice,V initial,LatticeContext context,Persistence persistence) {
 		super(lattice,context,initial);
 		value=initial;
+		this.persistence=persistence;
+	}
+
+	@Override protected Persistence persistence() {
+		checkAccess();
+		return persistence;
 	}
 
 	private void checkAccess() {

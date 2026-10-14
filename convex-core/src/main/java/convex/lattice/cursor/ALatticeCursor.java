@@ -170,7 +170,7 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 			if (!computed || !Utils.equals(observed,input)) {
 				input=observed;
 				V initial=(input==null && lattice!=null)?lattice.zero():input;
-				TransactionCursor<V> draft=new TransactionCursor<>(lattice,initial,getContext());
+				TransactionCursor<V> draft=new TransactionCursor<>(lattice,initial,getContext(),persistence());
 				try {
 					action.accept(draft);
 					V candidate=draft.get();

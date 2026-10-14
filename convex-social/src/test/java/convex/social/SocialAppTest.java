@@ -14,6 +14,9 @@ import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
+import convex.core.data.Ref;
+import convex.core.store.MemoryStore;
+import java.util.function.Consumer;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
@@ -25,6 +28,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.RootComponent;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
@@ -54,19 +58,29 @@ public class SocialAppTest {
 		};
 	}
 
+	private static class CountingStore extends MemoryStore {
+		int writes;
+		@Override public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref,int status,
+				Consumer<Ref<ACell>> noveltyHandler) {
+			writes++;
+			return super.storeTopRef(ref,status,noveltyHandler);
+		}
+	}
+
 	private static class TestRoot extends ALatticeComponent<Index<Keyword, ACell>> {
 
-		private int persistCount;
 
 		TestRoot(KeyedLattice lattice) {
-			super(Cursors.createLattice(lattice));
+			this(lattice,new CountingStore());
 		}
 
-		@Override
-		protected <T extends ACell> T persist(T value) {
-			persistCount++;
-			return value;
+		private final CountingStore counter;
+		private TestRoot(KeyedLattice lattice,CountingStore counter) {
+			super(RootComponent.create(lattice,counter).cursor());
+			this.counter=counter;
 		}
+
+		int persistCount() { return counter.writes; }
 	}
 
 	@Test
@@ -369,20 +383,20 @@ public class SocialAppTest {
 	}
 
 	@Test
-	public void testComponentPersistenceDelegatesToContainingRoot() throws IOException {
+	public void testComponentPersistenceUsesCopiedStore() throws IOException {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
 		TestRoot root=new TestRoot(lattice);
 		Social social=Social.connect(root,kp);
 		Feed feed=social.user(kp.getAccountKey()).feed();
-		feed.post("Persist through component parents");
+		feed.post("Persist through copied store capability");
 
 		Index<Blob, ACell> before=feed.cursor().get();
 		Index<Blob, ACell> persisted=feed.persist();
 
-		assertSame(before,persisted);
+		assertEquals(before,persisted);
 		assertSame(before,feed.cursor().get());
-		assertEquals(1,root.persistCount);
+		assertEquals(1,root.persistCount());
 	}
 
 	@Test
@@ -399,7 +413,7 @@ public class SocialAppTest {
 	}
 
 	@Test
-	public void testForkRetainsComponentPersistenceParent() throws IOException {
+	public void testForkRetainsComponentStoreCapability() throws IOException {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
 		TestRoot root=new TestRoot(lattice);
@@ -410,7 +424,7 @@ public class SocialAppTest {
 
 		forkFeed.persist();
 
-		assertEquals(1,root.persistCount);
+		assertEquals(1,root.persistCount());
 		assertEquals(0,social.user(kp.getAccountKey()).feed().count());
 	}
 

@@ -2,6 +2,7 @@ package convex.dlfs;
 
 import java.io.IOException;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -15,7 +16,8 @@ import convex.lattice.fs.impl.DLFSLocal;
 /**
  * Component for one named DLFS drive.
  *
- * <p>The component supplies its cursor and host store to a local NIO adapter.
+ * <p>The component supplies its cursor to a local NIO adapter. Checkpoints use
+ * the cursor's host persistence capability and the component's resolved policy.
  * {@link #fork()} creates a temporary working component whose changes remain
  * isolated until explicitly synced.</p>
  */
@@ -51,7 +53,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	 * to reach the long-lived drive cursor.
 	 */
 	public DLFSDrive fork() {
-		return new DLFSDrive(parent(),name,cursor.fork());
+		return new DLFSDrive(this,name,cursor.fork());
 	}
 
 	@Override
@@ -64,8 +66,13 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		private final DLFSDrive drive;
 
 		HostedFileSystem(DLFSDrive drive) {
-			super(DLFS.provider(),drive.name(),drive.cursor(),drive.store());
+			super(DLFS.provider(),drive.name(),drive.cursor());
 			this.drive=drive;
+		}
+
+		@Override
+		protected ABlob checkpointBlob(ABlob data) throws IOException {
+			return drive.checkpoint(data);
 		}
 
 		@Override
@@ -75,7 +82,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	}
 	@Override
 	public DLFSDrive withCursor(ALatticeCursor<AVector<ACell>> cursor) {
-		return new DLFSDrive(parent(),name,cursor);
+		return new DLFSDrive(this,name,cursor);
 	}
 
 }

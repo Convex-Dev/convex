@@ -22,6 +22,7 @@ import convex.core.data.Blob;
 import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.RootComponent;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSLattice;
 
@@ -33,7 +34,7 @@ public class DLFSLocalPersistenceTest {
 		var other=new DLFSLocal(DLFS.provider(),"other",cursor);
 		AtomicInteger checkpoints=new AtomicInteger();
 		var fileSystem=new DLFSLocal(DLFS.provider(),"writer",cursor) {
-			@Override ABlob checkpointBlob(ABlob data) throws IOException {
+			@Override protected ABlob checkpointBlob(ABlob data) throws IOException {
 				checkpoints.incrementAndGet();
 				Files.writeString(other.getPath("/sibling.txt"),"concurrent sibling");
 				return data;
@@ -53,7 +54,7 @@ public class DLFSLocalPersistenceTest {
 		var other=new DLFSLocal(DLFS.provider(),"other",cursor);
 		AtomicInteger checkpoints=new AtomicInteger();
 		var fileSystem=new DLFSLocal(DLFS.provider(),"writer",cursor) {
-			@Override ABlob checkpointBlob(ABlob data) throws IOException {
+			@Override protected ABlob checkpointBlob(ABlob data) throws IOException {
 				if (checkpoints.incrementAndGet()==1) {
 					try (var channel=Files.newByteChannel(other.getPath("/file.txt"),StandardOpenOption.WRITE)) {
 						channel.position(3);
@@ -74,7 +75,7 @@ public class DLFSLocalPersistenceTest {
 	public void testCheckpointFailureDoesNotInstallFileUpdate() throws Exception {
 		var cursor=Cursors.createLattice(DLFSLattice.INSTANCE);
 		var fileSystem=new DLFSLocal(DLFS.provider(),"writer",cursor) {
-			@Override ABlob checkpointBlob(ABlob data) throws IOException {
+			@Override protected ABlob checkpointBlob(ABlob data) throws IOException {
 				throw new IOException("checkpoint failed");
 			}
 		};
@@ -106,8 +107,8 @@ public class DLFSLocalPersistenceTest {
 	public void testStoreCheckpointPreservesLogicalValue() throws Exception {
 		ABlob data=testBlob();
 		try (EtchStore store=EtchStore.createTemp("dlfs-checkpoint-contract")) {
-			var cursor=Cursors.createLattice(DLFSLattice.INSTANCE);
-			DLFSLocal fileSystem=DLFSLocal.create(DLFS.provider(),"contract",cursor,store);
+			var cursor=RootComponent.create(DLFSLattice.INSTANCE,store).cursor();
+			DLFSLocal fileSystem=new DLFSLocal(DLFS.provider(),"contract",cursor);
 			Hash rootHash=fileSystem.getRootHash();
 
 			ABlob checkpointed=fileSystem.checkpointBlob(data);

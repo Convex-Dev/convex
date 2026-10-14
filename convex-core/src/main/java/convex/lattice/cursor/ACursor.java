@@ -1,5 +1,6 @@
 package convex.lattice.cursor;
 
+import java.io.IOException;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 import java.util.function.Supplier;
@@ -38,6 +39,41 @@ import convex.lattice.LatticeOps;
  * @see ALatticeCursor for CRDT-style merge that always succeeds
  */
 public abstract class ACursor<V extends ACell> {
+
+	/** Host persistence operations, deliberately exposing no physical store. */
+	public interface Persistence {
+		/** Persists a value without installing or publishing it. */
+		<T extends ACell> T persist(T value) throws IOException;
+		/** Completes a physical durability barrier without publishing state. */
+		void flush() throws IOException;
+	}
+
+	/** Resolves the host capability through existing cursor links, or null. */
+	protected Persistence persistence() { return null; }
+
+	/**
+	 * Persists the supplied value without updating, signing, merging or publishing
+	 * cursor state. The returned value may contain store-backed references.
+	 * Throws when this cursor has no host persistence capability.
+	 */
+	public final <T extends ACell> T persist(T value) throws IOException {
+		Persistence capability=persistence();
+		if (capability==null) throw new IllegalStateException("No host persistence available");
+		return capability.persist(value);
+	}
+
+	/** Optional working-value persistence; an unhosted cursor returns value unchanged. */
+	public final <T extends ACell> T checkpoint(T value) throws IOException {
+		Persistence capability=persistence();
+		return (capability==null)?value:capability.persist(value);
+	}
+
+	/** Requests host durability without merging or publishing pending state. */
+	public final void flush() throws IOException {
+		Persistence capability=persistence();
+		if (capability==null) throw new IllegalStateException("No host persistence available");
+		capability.flush();
+	}
 
 	protected ACursor() {
 	}
