@@ -11,8 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
@@ -31,6 +31,7 @@ import convex.core.cvm.CVMEncoder;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.SignedCursor;
 
 /** Ownership rules survive container choice, navigation, contexts and fork/sync. */
 public class OwnershipHierarchyTest {
@@ -77,7 +78,7 @@ public class OwnershipHierarchyTest {
 		ALatticeCursor<SignedData<AInteger>> slot=root.path(DID);
 		assertNull(slot.merge(bad));
 		assertSame(good,slot.merge(good));
-		ALatticeCursor<AInteger> value=slot.path(Keywords.VALUE);
+		ALatticeCursor<AInteger> value=SignedCursor.forOwner(slot,lattice,DID);
 		M before=root.get();
 		assertThrows(IllegalStateException.class,() -> value.set(CVMLong.TWO));
 		assertSame(before,root.get());
@@ -122,8 +123,8 @@ public class OwnershipHierarchyTest {
 			(owner,key) -> DID.equals(owner) && BOB.getAccountKey().equals(key));
 		var root=Cursors.createLattice(KeyedLattice.create(left,aliceRegion,right,bobRegion));
 		root.setContext(LatticeContext.create(null,ALICE));
-		ALatticeCursor<AInteger> alice=root.path(left,DID,Keywords.VALUE);
-		ALatticeCursor<AInteger> bob=root.path(right,DID,Keywords.VALUE);
+		ALatticeCursor<AInteger> alice=SignedCursor.forOwner(root.path(left,DID),aliceRegion,DID);
+		ALatticeCursor<AInteger> bob=SignedCursor.forOwner(root.path(right,DID),bobRegion,DID);
 		alice.set(CVMLong.ONE);
 		assertThrows(IllegalStateException.class,() -> bob.set(CVMLong.ONE));
 		var before=root.get();
@@ -153,11 +154,11 @@ public class OwnershipHierarchyTest {
 		assertEquals(owner,lattice.resolveKey(encodedKey));
 		var root=Cursors.createLattice(lattice);
 		root.setContext(LatticeContext.create(null,ALICE));
-		root.<AInteger>path(encodedKey,Keywords.VALUE).set(CVMLong.ONE);
+		SignedCursor.forOwner(root.path(encodedKey),lattice,encodedKey).set(CVMLong.ONE);
 		assertEquals(good,root.get());
 		root.setContext(LatticeContext.create(null,BOB));
 		assertThrows(IllegalStateException.class,
-			() -> root.<AInteger>path(owner,Keywords.VALUE).set(CVMLong.TWO));
+			() -> SignedCursor.forOwner(root.path(owner),lattice,owner).set(CVMLong.TWO));
 	}
 
 	@Test
@@ -198,7 +199,7 @@ public class OwnershipHierarchyTest {
 		assertEquals(owner,mergedOwner);
 		assertSame(merged,lattice.merge(merged,decoded));
 		var root=Cursors.createLattice(lattice,decoded,LatticeContext.create(null,ALICE));
-		root.<AInteger>path(ALICE.getAccountKey(),Keywords.VALUE).set(CVMLong.TWO);
+		SignedCursor.forOwner(root.path(ALICE.getAccountKey()),lattice,ALICE.getAccountKey()).set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,root.get().get(ALICE.getAccountKey()).getValue());
 		assertTrue(root.get().get(ALICE.getAccountKey()).checkSignature());
 		// Key blobs still cannot impersonate a different signing key.
@@ -214,8 +215,11 @@ public class OwnershipHierarchyTest {
 		var outer=OwnerKeyLattice.create(inner);
 		var root=Cursors.createLattice(outer);
 		root.setContext(LatticeContext.create(null,BOB));
-		ALatticeCursor<AInteger> value=root.path(ALICE.getAccountKey(),Keywords.VALUE,
-			BOB.getAccountKey(),Keywords.VALUE);
+		// Each owner level wraps its own boundary: outer rule first, then the inner one
+		ALatticeCursor<Index<AccountKey,SignedData<AInteger>>> aliceValue=
+			SignedCursor.forOwner(root.path(ALICE.getAccountKey()),outer,ALICE.getAccountKey());
+		ALatticeCursor<AInteger> value=
+			SignedCursor.forOwner(aliceValue.path(BOB.getAccountKey()),inner,BOB.getAccountKey());
 		assertThrows(IllegalStateException.class,() -> value.set(CVMLong.ONE));
 		assertEquals(outer.zero(),root.get(),"Inner authority must not waive the outer rule");
 		root.setContext(new LatticeContext() {
@@ -239,8 +243,9 @@ public class OwnershipHierarchyTest {
 		root.setContext(LatticeContext.create(null,ALICE));
 		Keyword left=Keyword.intern("left");
 		Keyword right=Keyword.intern("right");
-		ALatticeCursor<AInteger> a=root.path(DID,Keywords.VALUE,left);
-		ALatticeCursor<AInteger> b=root.path(DID,Keywords.VALUE,right);
+		ALatticeCursor<AHashMap<Keyword,AInteger>> record=SignedCursor.forOwner(root.path(DID),lattice,DID);
+		ALatticeCursor<AInteger> a=record.path(left);
+		ALatticeCursor<AInteger> b=record.path(right);
 		CountDownLatch entered=new CountDownLatch(2);
 		try (var executor=Executors.newFixedThreadPool(2)) {
 			var one=executor.submit(() -> concurrentWrite(a,entered));
@@ -276,7 +281,7 @@ public class OwnershipHierarchyTest {
 			(key,signer) -> owner.equals(key) && BOB.getAccountKey().equals(signer));
 		var root=Cursors.createLattice(lattice);
 		root.setContext(LatticeContext.create(null,BOB,(o,k) -> false));
-		root.<AInteger>path(owner,Keywords.VALUE).set(CVMLong.ONE);
+		SignedCursor.forOwner(root.path(owner),lattice,owner).set(CVMLong.ONE);
 		assertEquals(CVMLong.ONE,root.get().get(owner).getValue());
 		assertEquals(root.get(),lattice.merge(null,root.get()));
 
@@ -285,7 +290,7 @@ public class OwnershipHierarchyTest {
 			(key,signer) -> ALICE.getAccountKey().equals(key) && BOB.getAccountKey().equals(signer));
 		var delegatedRoot=Cursors.createLattice(delegated);
 		delegatedRoot.setContext(LatticeContext.create(null,BOB));
-		delegatedRoot.<AInteger>path(ALICE.getAccountKey(),Keywords.VALUE).set(CVMLong.TWO);
+		SignedCursor.forOwner(delegatedRoot.path(ALICE.getAccountKey()),delegated,ALICE.getAccountKey()).set(CVMLong.TWO);
 		assertEquals(BOB.getAccountKey(),delegatedRoot.get().get(ALICE.getAccountKey()).getAccountKey());
 		assertEquals(delegatedRoot.get(),delegated.merge(null,delegatedRoot.get()));
 	}

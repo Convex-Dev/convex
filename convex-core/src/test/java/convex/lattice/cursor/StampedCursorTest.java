@@ -90,7 +90,7 @@ public class StampedCursorTest {
 
 	// The Covia :state stack, composed from three single-concern layers:
 	//   stamping (write)  ->  whole-value LWW (merge)  ->  JSON (structure/nav)
-	static ALattice<ACell> stateLattice(BiFunction<ACell, CVMLong, ACell> stamp) {
+	static StampingLattice<ACell> stateLattice(BiFunction<ACell, CVMLong, ACell> stamp) {
 		return StampingLattice.create(
 			LWWLattice.create(JSONLattice.INSTANCE, StampedCursorTest::tsOf),
 			stamp);
@@ -99,14 +99,14 @@ public class StampedCursorTest {
 	// ===== Deep write below the leaf: structural + re-stamped =====
 
 	@Test public void testDeepWriteStampsWholeLeaf() {
-		ALattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
+		StampingLattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
 		// the write clock lives in the context (ts = 100)
 		LatticeContext ctx = LatticeContext.create(CVMLong.create(100), null);
 		RootLatticeCursor<ACell> root = Cursors.createLattice(state, initial, ctx);
 
-		// navigate below the leaf — a StampedCursor is inserted transparently
-		ALatticeCursor<ACell> c = root.path(USERS, ALICE);
+		// the component owning the stamped leaf wraps it, then navigates below
+		ALatticeCursor<ACell> c = StampedCursor.create(root, state).path(USERS, ALICE);
 		c.set(Strings.create("bob"));
 
 		// deep value landed, structural intermediate ("users") auto-created
@@ -118,13 +118,13 @@ public class StampedCursorTest {
 	}
 
 	@Test public void testLongLivedDerivedPathUsesAdvancedContextTimestamp() {
-		ALattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
+		StampingLattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
 		RootLatticeCursor<ACell> root = Cursors.createLattice(state, initial,
 			LatticeContext.create(CVMLong.create(100), null));
 
 		// Keep this derived cursor across a harness clock advance (#640).
-		ALatticeCursor<ACell> child = root.path(USERS, ALICE);
+		ALatticeCursor<ACell> child = StampedCursor.create(root, state).path(USERS, ALICE);
 		root.setContext(LatticeContext.create(CVMLong.create(200), null));
 		child.set(Strings.create("bob"));
 

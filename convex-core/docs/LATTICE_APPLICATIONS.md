@@ -611,8 +611,11 @@ components additionally carry a store handed down explicitly from their applicat
 because streamed file writes checkpoint blobs before publication. The cursor is the
 only connection back to application state: its internal links provide navigation,
 atomic updates and fork merge-back. There is no second component-parent hierarchy,
-and cursors themselves know nothing of storage. Signing is transparent: `Feed` never
-sees `SignedData`.
+and cursors themselves know nothing of storage. The component that owns an
+owner-keyed or stamped level wraps the boundary itself, with `SignedCursor.forOwner`
+or `StampedCursor.create` and the lattice it declares, so the boundary is visible
+exactly where the domain structure places it and descendants never see it: `Social.user`
+wraps the owner's slot, `Feed` never sees `SignedData`.
 
 Constructors must copy caller-supplied path arrays. Long-lived application and region
 components are fine; owner and session views should be held by the service that routes
@@ -830,15 +833,19 @@ For durable deletes, model the region as a single whole-value LWW leaf built fro
 three single-concern layers:
 
 ```java
-ALattice<ACell> state = StampingLattice.create(
+StampingLattice<ACell> state = StampingLattice.create(
     LWWLattice.create(JSONLattice.INSTANCE, tsFn),   // whole-value merge over JSON navigation
     (v, ts) -> v.assoc(KEY_TIMESTAMP, ts));          // stamp the context timestamp on every write
+
+// the component owning the leaf wraps it before navigating below
+ALatticeCursor<ACell> leaf = StampedCursor.create(cursor.path(KEY_STATE), state);
 ```
 
 `JSONLattice` provides structural navigation below the leaf, `LWWLattice` merges the
 whole value by `:timestamp` so a smaller map with a newer timestamp replaces the old
-one, and `StampingLattice` inserts a `StampedCursor` so every deep write re-stamps the
-leaf. A delete is then a read-modify-write that dissociates the key.
+one, and `StampingLattice` declares the stamp that the owning component's
+`StampedCursor` applies so every deep write re-stamps the leaf. A delete is then a
+read-modify-write that dissociates the key.
 
 ## Testing
 

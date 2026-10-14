@@ -10,12 +10,12 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
-import convex.core.cvm.Keywords;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.OwnerLattice;
 
 /**
@@ -208,12 +208,14 @@ public class Social extends ALatticeComponent<
 	}
 
 	/**
-	 * Gets a user view by navigating through the owner/signing boundary.
+	 * Gets a user view, wrapping the owner's slot in its signing boundary.
 	 *
-	 * <p>The returned {@link SocialUser} wraps a cursor at the per-user
-	 * {@link SocialLattice} level. Writes are automatically signed by the context's
-	 * signing policy, which is asked for a signer authorised for {@code ownerDid} —
-	 * not necessarily its primary account.</p>
+	 * <p>This component owns the owner-keyed level, so it is the one place that
+	 * crosses into a user's signed value. The returned {@link SocialUser} wraps a
+	 * cursor at the per-user {@link SocialLattice} level; writes through it are
+	 * signed with the signer the context policy authorises for {@code ownerDid},
+	 * which need not be its primary account, under exactly the rule
+	 * {@link #SOCIAL_LATTICE} applies to incoming merges.</p>
 	 *
 	 * @param ownerDid the user's canonical base DID
 	 * @return SocialUser for the specified owner
@@ -223,7 +225,7 @@ public class Social extends ALatticeComponent<
 			throw new IllegalArgumentException("Social owner must be a canonical base DID");
 		}
 		ALatticeCursor<Index<Keyword, ACell>> userCursor =
-			cursor.path(ownerDid, Keywords.VALUE);
+			SignedCursor.forOwner(cursor.path(ownerDid),SOCIAL_LATTICE,ownerDid);
 		return new SocialUser(userCursor,ownerDid);
 	}
 

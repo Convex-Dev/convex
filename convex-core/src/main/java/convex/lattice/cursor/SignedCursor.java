@@ -5,6 +5,7 @@ import convex.core.data.ACell;
 import convex.core.data.SignedData;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.generic.AOwnerLattice;
 import convex.lattice.generic.SignedLattice;
 
 /**
@@ -32,8 +33,10 @@ import convex.lattice.generic.SignedLattice;
  * <p>An unbound cursor (no owner known, e.g. the explicit key pair factory) simply
  * signs with the policy's primary signer.</p>
  *
- * <p>Created automatically by {@code ALatticeCursor.path()} when navigating through a
- * signing boundary.</p>
+ * <p>Navigation never inserts this cursor. The component which owns an owner-keyed
+ * level wraps each owner's slot with {@link #forOwner}, so the boundary is visible
+ * exactly where the domain structure places it and its descendants never see
+ * {@code SignedData}.</p>
  *
  * @param <V> Type of the unsigned value
  */
@@ -53,6 +56,30 @@ public class SignedCursor<V extends ACell> extends AUpdateCursor<V, SignedData<V
 		super(base,signingLattice.getValueLattice(),context);
 		this.owner=signingLattice.getOwner();
 		this.signingLattice=signingLattice;
+	}
+
+	/**
+	 * Wraps one owner's slot in an owner-keyed lattice with the signing boundary that
+	 * lattice verifies with. This is how a component crosses into an owner's value:
+	 * {@code SignedCursor.forOwner(cursor.path(owner), OWNERS, owner)}. Authoring then
+	 * uses exactly the bound rule the host applies to incoming merges, and the
+	 * resulting cursor inherits the slot's context live.
+	 *
+	 * @param <V> Type of the unsigned value
+	 * @param slot Cursor at the owner's {@code SignedData} slot
+	 * @param owners Owner-keyed lattice containing the slot
+	 * @param owner Owner identity whose slot this is
+	 * @return Cursor over the owner's unsigned value
+	 * @throws IllegalArgumentException if the owner is not a valid key for the lattice
+	 */
+	public static <V extends ACell> SignedCursor<V> forOwner(ALatticeCursor<SignedData<V>> slot,
+			AOwnerLattice<?,V,?> owners, ACell owner) {
+		SignedLattice<V> rule=owners.ownerLattice(owner);
+		if (rule==null) {
+			throw new IllegalArgumentException("Not a valid owner key for "
+				+owners.getClass().getSimpleName()+": "+owner);
+		}
+		return new SignedCursor<>(slot,rule,null);
 	}
 
 	/** Creates a cursor retaining the supplied signed lattice's ownership rule. */

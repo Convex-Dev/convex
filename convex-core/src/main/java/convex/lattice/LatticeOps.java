@@ -6,6 +6,7 @@ import convex.core.data.ADataStructure;
 import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Maps;
+import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.lang.RT;
@@ -62,7 +63,8 @@ public class LatticeOps {
 	 * @param keys Path of keys to navigate
 	 * @return Updated root data structure
 	 * @throws IllegalStateException if a null intermediate cannot be initialised (no lattice or leaf lattice)
-	 * @throws IllegalArgumentException if a non-null intermediate is not a data structure
+	 * @throws IllegalArgumentException if a non-null intermediate is not a data structure, or is a
+	 *         signed envelope (a signature covers its value, so nothing may be written through it)
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T assocIn(ACell a, ACell value, ALattice<?> baseLattice, ACell... keys) {
@@ -92,6 +94,14 @@ public class LatticeOps {
 					"Cannot write through non-existent path at depth " + i +
 					": lattice zero is null (leaf lattice)");
 			}
+		}
+		if (data instanceof SignedData) {
+			// A signed envelope is a record, so it would otherwise degrade to a plain map
+			// with the signature lost. Writes below an owner's slot go through the
+			// SignedCursor the owning component wraps around it, never through here.
+			throw new IllegalArgumentException(
+				"Cannot write through a signed envelope at depth " + i
+				+ ": wrap the owner's slot with SignedCursor.forOwner");
 		}
 		if (!(data instanceof ADataStructure<?> struct)) {
 			throw new IllegalArgumentException(

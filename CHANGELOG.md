@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the ambiguous lattice-and-store application constructor; use `RootComponent.open` to restore retained state or `RootComponent.create` to deliberately start fresh.
 - Lattice components hold only a cursor, with no component-parent, application-host or store links. Cursors carry no persistence API: `RootComponent` owns the host store, publication and `flush()`, and DLFS components take the store they need for blob checkpoints explicitly.
+- Cursor navigation no longer inserts signing or stamping cursors, and the virtual `:value` path key is gone. The component that owns an owner-keyed or stamped level wraps its cursor with `SignedCursor.forOwner` or `StampedCursor.create`; lattices declare boundaries but construct no cursors, and a plain write through a signed envelope is refused.
 - Index operations on long keys, such as DLFS file names, stay on the fast recursive path; the stack-safe fallback now engages only on an actual stack overflow. ([#727](https://github.com/Convex-Dev/convex/issues/727))
 - Embedded store decodes avoid hashing for cache lookup and automatic cache admission, while reusing already-cached values when their hash is available; non-embedded branches still use the cache on demand.
 - CVM map operations recognise only known maplike records; generic CAD3 records no longer qualify as maps solely through their Java representation.

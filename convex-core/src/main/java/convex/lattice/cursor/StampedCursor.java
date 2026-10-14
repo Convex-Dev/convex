@@ -7,6 +7,7 @@ import convex.core.data.ACell;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.generic.StampingLattice;
 
 /**
  * A cursor that overrides <em>update semantics</em>: every value written through
@@ -33,9 +34,10 @@ import convex.lattice.LatticeContext;
  * lattice and stores it <em>without</em> stamping, so a whole-value LWW winner keeps
  * its own timestamp and is never bumped.</p>
  *
- * <p>Inserted by {@code StampingLattice.createPathCursor} as a transparent write
- * boundary so that a deep write below a whole-value-LWW leaf re-stamps the whole
- * leaf on the way up, letting a whole-value LWW merge pick the freshest.</p>
+ * <p>The component that owns a stamped level wraps it with
+ * {@link #create(ACursor, StampingLattice)} before navigating below, so that a deep
+ * write below a whole-value-LWW leaf re-stamps the whole leaf on the way up, letting
+ * a whole-value LWW merge pick the freshest. Navigation never inserts this cursor.</p>
  *
  * @param <V> Type of the (unchanged) cell at this cursor position
  */
@@ -61,6 +63,21 @@ public class StampedCursor<V extends ACell> extends AUpdateCursor<V, V> {
 	 */
 	public static <V extends ACell> StampedCursor<V> create(ACursor<V> base, ALattice<V> lattice, LatticeContext context, BiFunction<V, CVMLong, V> stamp) {
 		return new StampedCursor<>(base, lattice, context, stamp);
+	}
+
+	/**
+	 * Wraps a cursor at a stamp-on-write layer, inheriting the base cursor's context
+	 * for the write clock and navigating below via the layer's inner lattice. This is
+	 * how a component crosses a stamping boundary:
+	 * {@code StampedCursor.create(cursor.path(key), STAMPING).path(...)}.
+	 *
+	 * @param <V> Value type
+	 * @param base Cursor at the stamped level
+	 * @param stamping The stamp-on-write layer declared for this level
+	 * @return New StampedCursor
+	 */
+	public static <V extends ACell> StampedCursor<V> create(ACursor<V> base, StampingLattice<V> stamping) {
+		return new StampedCursor<>(base, stamping.getInner(), null, stamping.getStampFunction());
 	}
 
 	@Override

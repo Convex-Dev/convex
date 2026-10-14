@@ -21,8 +21,10 @@ class hierarchy and the design choices in `convex.lattice.cursor`.
   are created from `lattice.zero()`; without one, they throw.
 - Update lambdas receive `zero()` instead of null for uninitialised paths; `get()`
   still returns null.
-- A lattice declares its own write boundaries. The cursor inserts a `SignedCursor` or
-  `StampedCursor` where the lattice says so, with no `instanceof` on lattice types.
+- Navigation never inserts write interceptors. The component that owns an owner-keyed
+  or stamped level wraps its cursor with `SignedCursor.forOwner` or
+  `StampedCursor.create`, using the lattice it declares, so authoring uses exactly the
+  rule the host verifies with. Lattices know nothing about cursors.
 - Every write is prepared exactly once per logical write, not once per CAS retry, so
   signing that reaches a wallet or remote signer is not repeated under contention.
 - All operations are lock-free over `AtomicReference`; immutable values make concurrent
@@ -134,12 +136,17 @@ throws `IllegalStateException` if there is none. That is the same rule `OwnerLat
 applies to data arriving on merge, so local state is never written in a form a peer
 would reject.
 
-The cursor learns where boundaries are from three `ALattice` hooks: `isWriteBoundary(key)`
-(a cheap gate checked at every step), `createPathCursor(base, key, ctx)` (builds the
-update cursor when the gate fires) and `consumesPathKey(key)` (whether the key is a
-virtual segment such as `:value`, or transparent as for stamping). `SignedLattice` and
-`StampingLattice` implement them; forking below a boundary stores the view type
-locally and the boundary re-applies `prepareWrite` on `sync()`.
+Boundaries are placed by components, not discovered by navigation. The component that
+owns an owner-keyed level wraps each owner's slot with
+`SignedCursor.forOwner(slot, owners, owner)`, which takes the signed lattice that
+`owners.ownerLattice(owner)` returns, complete with the instance-bound verification
+rule the host applies on merge. The component that owns a stamped level wraps it with
+`StampedCursor.create(base, stamping)`, which reads the layer's inner lattice and stamp
+function. Lattices declare these rules and construct no cursors. A plain path through a
+signed envelope can still read the value, but every write through it is refused:
+`LatticeOps` never writes into `SignedData`, so an unsigned write cannot reach the
+lattice by mistake. Forking below a boundary stores the view type locally and the
+boundary re-applies `prepareWrite` on `sync()`.
 
 ## Examples
 
@@ -176,7 +183,7 @@ work.sync();                                           // signs once, merges int
 | One `path()` or `path()` plus `descend()`? | One. A descended cursor with a null lattice is a path cursor; the lattice hierarchy, not the method, determines capabilities. |
 | `assoc`/`assocIn` or `set(value, path...)`? | `assoc` forms, mirroring `RT.assoc`, avoiding overload ambiguity with `set(V)` and never promoting null silently. |
 | `sync()` or CAS merge? | Both exist; `sync()` is the lattice operation that always succeeds, like a filesystem sync. |
-| Where do signing and stamping live? | In `AUpdateCursor` subclasses inserted at lattice-declared boundaries, so cursor code stays lattice-agnostic. |
+| Where do signing and stamping live? | In `AUpdateCursor` subclasses that the owning component wraps around its cursor. Lattices declare the rule and construct no cursors; navigation inserts nothing. |
 | Collapse multi-key paths? | Yes, to avoid intermediate cursors and merges; break only at write boundaries. |
 | What does the base class know? | Get, atomic update and `path()` at one location, nothing else. Persistence, durability and publication are host concerns attached at the root through its sync callback; no cursor carries a store. |
 | Root-owned services such as the transactional write lock? | One protected `exclusiveLock()` hook on `ALatticeCursor`, resolved through existing parent links and supplied only by `TransactionalRootCursor`. Views and plain cursors never see it, and there is no capability bundle on `ACursor`. |

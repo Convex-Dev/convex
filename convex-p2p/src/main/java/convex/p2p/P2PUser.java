@@ -1,6 +1,5 @@
 package convex.p2p;
 
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -9,6 +8,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.SignedCursor;
 
 /**
  * Convenience facade over a single P2P user's independently located components.
@@ -70,9 +70,12 @@ public class P2PUser {
 		if (userKey == null) throw new IllegalArgumentException("User key must not be null");
 
 		return new P2PUser(
-			new P2PIdentity(rootCursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey),
-			new P2PNodeRecord(rootCursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,
-				userKey,Keywords.VALUE),userKey),userKey);
+			new P2PIdentity(SignedCursor.forOwner(
+				rootCursor.path(P2PLattice.KEY_ID,userKey),P2PLattice.ID_LATTICE,userKey),userKey),
+			new P2PNodeRecord(SignedCursor.forOwner(
+				rootCursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,userKey),
+				P2PLattice.NODES_LATTICE,userKey),userKey),
+			userKey);
 	}
 
 	/**

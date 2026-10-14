@@ -23,6 +23,7 @@ import convex.lattice.LatticeContext;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
+import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.lattice.generic.SetLattice;
 import convex.lattice.generic.SignedLattice;
@@ -33,7 +34,8 @@ import convex.lattice.generic.SignedLattice;
  * <p>Verifies the core design properties:</p>
  * <ul>
  *   <li>SignedCursor transparently signs writes and extracts unsigned reads</li>
- *   <li>Descending through a SignedLattice crosses the signing boundary</li>
+ *   <li>The component owning an owner level wraps each slot with {@code SignedCursor.forOwner};
+ *       plain navigation never crosses the boundary</li>
  *   <li>Writes through the boundary require a signing key; reads never do</li>
  *   <li>Forking below the boundary defers signing until sync</li>
  *   <li>Lattice merge semantics are preserved at every level</li>
@@ -262,7 +264,7 @@ public class SignedCursorTest {
 			Cursors.createLattice(ownerLattice, initial, ctx);
 
 		ALatticeCursor<SignedData<AInteger>> signedCursor = root.path(ALICE);
-		ALatticeCursor<AInteger> innerCursor = signedCursor.path(Keywords.VALUE);
+		ALatticeCursor<AInteger> innerCursor = SignedCursor.forOwner(signedCursor, ownerLattice, ALICE);
 
 		// Read through the boundary always works
 		assertEquals(CVMLong.create(10), innerCursor.get());
@@ -295,7 +297,7 @@ public class SignedCursorTest {
 		RootLatticeCursor<AHashMap<ACell,SignedData<AInteger>>> root=
 			Cursors.createLattice(ownerLattice,initial,wallet);
 
-		root.<SignedData<AInteger>>path(BOB).<AInteger>path(Keywords.VALUE)
+		SignedCursor.forOwner(root.<SignedData<AInteger>>path(BOB), ownerLattice, BOB)
 			.set(CVMLong.create(99));
 
 		SignedData<AInteger> updated=root.get().get(BOB);
@@ -323,7 +325,7 @@ public class SignedCursorTest {
 		// Reads always work
 		assertEquals(CVMLong.create(42), signedCursor.get().getValue());
 
-		ALatticeCursor<AInteger> innerCursor = signedCursor.path(Keywords.VALUE);
+		ALatticeCursor<AInteger> innerCursor = SignedCursor.forOwner(signedCursor, ownerLattice, ALICE);
 		assertEquals(CVMLong.create(42), innerCursor.get());
 
 		// Writes must throw without a signing key
@@ -365,7 +367,7 @@ public class SignedCursorTest {
 			root.path(ALICE);
 
 		ALatticeCursor<AHashMap<Keyword, ASet<AInteger>>> innerCursor =
-			signedLevel.path(Keywords.VALUE);
+			SignedCursor.forOwner(signedLevel, ownerLattice, ALICE);
 
 		ALatticeCursor<AHashMap<Keyword, ASet<AInteger>>> fork = innerCursor.fork();
 		assertTrue(fork.get().get(Keywords.FOO).contains(CVMLong.ONE));
@@ -409,7 +411,7 @@ public class SignedCursorTest {
 			Cursors.createLattice(ownerLattice, initial, noKeyCtx);
 
 		ALatticeCursor<SignedData<AInteger>> signedLevel = root.path(ALICE);
-		ALatticeCursor<AInteger> innerCursor = signedLevel.path(Keywords.VALUE);
+		ALatticeCursor<AInteger> innerCursor = SignedCursor.forOwner(signedLevel, ownerLattice, ALICE);
 
 		// Fork and local writes succeed without a key
 		ALatticeCursor<AInteger> fork = innerCursor.fork();
@@ -505,9 +507,9 @@ public class SignedCursorTest {
 		assertTrue(aliceCursor.get().checkSignature());
 		assertEquals(innerMap, aliceCursor.get().getValue());
 
-		// SignedLattice → descend(:value) → unsigned inner value
+		// SignedLattice → the component owning the owner level wraps the slot
 		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> innerCursor =
-			aliceCursor.path(Keywords.VALUE);
+			SignedCursor.forOwner(aliceCursor, ownerLattice, ALICE);
 		assertEquals(innerMap, innerCursor.get());
 
 		// MapLattice → descend(:foo) → SetLattice level
@@ -791,8 +793,8 @@ public class SignedCursorTest {
 			Cursors.createLattice(ownerLattice, initial, ctx);
 		root.onSync(value -> { syncCount.incrementAndGet(); return value; });
 
-		// Navigate through OwnerLattice → SignedLattice → :value
-		ALatticeCursor<AInteger> innerCursor = root.path(ALICE, Keywords.VALUE);
+		// Navigate to the owner's slot, then wrap it in the signing boundary
+		ALatticeCursor<AInteger> innerCursor = SignedCursor.forOwner(root.path(ALICE), ownerLattice, ALICE);
 
 		// Write and sync from inside the signing boundary
 		innerCursor.set(CVMLong.create(99));
@@ -800,6 +802,31 @@ public class SignedCursorTest {
 
 		assertTrue(syncCount.get() > 0,
 			"sync() from inside signing boundary must reach root onSync callback");
+	}
+
+	/**
+	 * Navigation never crosses a signing boundary on its own. A plain path through
+	 * the envelope can still read the value, but it has no sub-lattice and every
+	 * write through it fails, so an unsigned write cannot reach the lattice by
+	 * mistake. The component that owns the owner level wraps the slot instead.
+	 */
+	@Test
+	public void testPlainPathThroughSignedSlotReadsButCannotWrite() {
+		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.INSTANCE);
+		AHashMap<ACell, SignedData<AInteger>> initial =
+			Maps.of(ALICE, KP_ALICE.signData((AInteger) CVMLong.create(42)));
+		RootLatticeCursor<AHashMap<ACell, SignedData<AInteger>>> root =
+			Cursors.createLattice(ownerLattice, initial, LatticeContext.create(null, KP_ALICE));
+
+		ALatticeCursor<AInteger> unwrapped = root.path(ALICE, Keywords.VALUE);
+		assertEquals(CVMLong.create(42), unwrapped.get());
+
+		AHashMap<ACell, SignedData<AInteger>> before = root.get();
+		assertThrows(IllegalArgumentException.class, () -> unwrapped.set(CVMLong.create(43)));
+		assertSame(before, root.get(), "a failed unsigned write must leave the root untouched");
+		assertThrows(IllegalArgumentException.class,
+			() -> SignedCursor.forOwner(root.path(ALICE), OwnerKeyLattice.create(MaxLattice.INSTANCE), Keywords.VALUE),
+			"an invalid owner key for the lattice is rejected when wrapping");
 	}
 
 	/**

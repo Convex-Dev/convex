@@ -143,6 +143,15 @@ public class OwnerLattice<V extends ACell> extends AOwnerLattice<ACell,V,AHashMa
 		return key;
 	}
 
+	/**
+	 * Legacy behaviour: any key is an owner, bound without an instance verifier so
+	 * authoring falls back to the context's owner verification.
+	 */
+	@Override
+	public SignedLattice<V> ownerLattice(ACell childKey) {
+		return signedLattice.withOwner(childKey);
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
@@ -150,7 +159,7 @@ public class OwnerLattice<V extends ACell> extends AOwnerLattice<ACell,V,AHashMa
 		// Each owner's value is a SignedData<V>, which uses SignedLattice
 		// Return an owner-bound SignedLattice, so a write or a synthesised merge
 		// below this key is authored as that owner or not at all
-		return (ALattice<T>) signedLattice.withOwner(childKey);
+		return (ALattice<T>) ownerLattice(childKey);
 	}
 
 }

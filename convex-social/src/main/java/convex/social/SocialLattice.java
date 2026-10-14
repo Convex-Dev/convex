@@ -62,7 +62,7 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		LWWLattice.KEY_TIMESTAMP,MaxLattice.INSTANCE,
 		KEY_FOLLOWS,FOLLOWS_LATTICE);
 
-	static final ALattice<Index<Keyword,ACell>> FOLLOWING_LATTICE=
+	static final StampingLattice<Index<Keyword,ACell>> FOLLOWING_LATTICE=
 		StampingLattice.create(
 			LWPLattice.create(FOLLOWING_STRUCTURE,SocialLattice::followingTimestamp),
 			SocialLattice::stampFollowing);

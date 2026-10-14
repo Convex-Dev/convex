@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import java.util.concurrent.atomic.AtomicReference;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -30,6 +29,7 @@ import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.impl.DLFSLocal;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
@@ -171,7 +171,7 @@ public class DLFSCursorTest {
 		AString driveName = Strings.create("health-vault");
 		Keyword DLFS_KW = Keyword.intern("dlfs");
 
-		OwnerLattice<?> dlfsUsersLattice = OwnerLattice.create(
+		OwnerLattice<AHashMap<AString, AVector<ACell>>> dlfsUsersLattice = OwnerLattice.create(
 			MapLattice.create(DLFSLattice.INSTANCE));
 		KeyedLattice rootLattice = KeyedLattice.create(DLFS_KW, dlfsUsersLattice);
 
@@ -181,7 +181,7 @@ public class DLFSCursorTest {
 
 		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
 		dlfsCursor.setContext(ctx);
-		ALatticeCursor<?> userCursor = dlfsCursor.path(ak, Keywords.VALUE);
+		ALatticeCursor<?> userCursor = SignedCursor.forOwner(dlfsCursor.path(ak), dlfsUsersLattice, ak);
 		DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 
 		Files.createDirectory(dlfs.getPath("/tmp"));
@@ -209,14 +209,14 @@ public class DLFSCursorTest {
 		AccountKey owner=keyPair.getAccountKey();
 		AString driveName=Strings.create("sync-race");
 		Keyword dlfsKey=Keyword.intern("dlfs");
-		OwnerLattice<?> owners=OwnerLattice.create(MapLattice.create(DLFSLattice.INSTANCE));
+		OwnerLattice<AHashMap<AString,AVector<ACell>>> owners=OwnerLattice.create(MapLattice.create(DLFSLattice.INSTANCE));
 		KeyedLattice rootLattice=KeyedLattice.create(dlfsKey,owners);
 		LatticeContext context=LatticeContext.create(timestamp,keyPair);
 		RootLatticeCursor<Index<Keyword,ACell>> root=Cursors.createLattice(
 			rootLattice,(Index<Keyword,ACell>)Index.EMPTY,context);
 		ALatticeCursor<?> region=root.path(dlfsKey);
 		region.setContext(context);
-		DLFSLocal fileSystem=DLFS.connect(region.path(owner,Keywords.VALUE),driveName);
+		DLFSLocal fileSystem=DLFS.connect(SignedCursor.forOwner(region.path(owner),owners,owner),driveName);
 		Path path=fileSystem.getPath("/recreated");
 		Files.write(path,new byte[] {1});
 		Files.delete(path);
@@ -271,7 +271,7 @@ public class DLFSCursorTest {
 		AString driveName = Strings.create("vault");
 		Keyword DLFS_KW = Keyword.intern("dlfs");
 
-		OwnerLattice<?> dlfsUsersLattice = OwnerLattice.create(
+		OwnerLattice<AHashMap<AString, AVector<ACell>>> dlfsUsersLattice = OwnerLattice.create(
 			MapLattice.create(DLFSLattice.INSTANCE));
 		KeyedLattice rootLattice = KeyedLattice.create(DLFS_KW, dlfsUsersLattice);
 
@@ -281,7 +281,7 @@ public class DLFSCursorTest {
 
 		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
 		dlfsCursor.setContext(ctx);
-		ALatticeCursor<?> userCursor = dlfsCursor.path(ak, Keywords.VALUE);
+		ALatticeCursor<?> userCursor = SignedCursor.forOwner(dlfsCursor.path(ak), dlfsUsersLattice, ak);
 		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 
 		String[] dirs = { "alpha", "beta", "gamma" };

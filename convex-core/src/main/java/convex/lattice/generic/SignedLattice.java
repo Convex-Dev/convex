@@ -12,9 +12,6 @@ import convex.core.data.SignedData;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
-import convex.lattice.cursor.AUpdateCursor;
-import convex.lattice.cursor.SignedCursor;
 
 /**
  * Lattice node representing signed Data.
@@ -186,6 +183,13 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		return null;
 	}
 
+	/**
+	 * The schema below the envelope: {@code :value} selects the unsigned value's
+	 * lattice. This describes the tree for hosts and tools; a cursor reaches the
+	 * value for writing only through the {@code SignedCursor} the owning component
+	 * wraps around the slot, and a plain write through {@code :value} is refused by
+	 * the write engine because nothing may be written into a signed envelope.
+	 */
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
@@ -193,24 +197,6 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 			return (ALattice<T>) valueNode;
 		}
 		return null;
-	}
-
-	/**
-	 * The signing boundary is at {@code :value}: crossing it goes from
-	 * {@code SignedData<V>} to the unsigned {@code V}, so a {@link SignedCursor}
-	 * is inserted to handle sign/verify, consuming the {@code :value} key (the
-	 * default {@link #consumesPathKey}).
-	 */
-	@Override
-	public boolean isWriteBoundary(ACell key) {
-		return Keywords.VALUE.equals(key);
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
-		// Only called when isWriteBoundary(key) is true, i.e. key is :value.
-		return SignedCursor.createBound((ALatticeCursor<SignedData<V>>) base,this,context);
 	}
 
 	/**

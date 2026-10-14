@@ -1,6 +1,5 @@
 package convex.dlfs;
 
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -12,6 +11,7 @@ import convex.lattice.ALatticeComponent;
 import convex.lattice.RootComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.OwnerLattice;
 
 /**
@@ -61,11 +61,16 @@ public final class DLFSRegion extends ALatticeComponent<
 		return new DLFSRegion(cursor,store);
 	}
 
-	/** Gets the signed drive-map component belonging to an owner. */
+	/**
+	 * Gets the drive-map component belonging to an owner. This component owns the
+	 * owner-keyed level, so it wraps the owner's slot in the signing boundary that
+	 * {@link #LATTICE} verifies with; the drive map and drives below never see
+	 * {@code SignedData}.
+	 */
 	public DLFSDrives drives(AccountKey owner) {
 		if (owner==null) throw new IllegalArgumentException("Owner key must not be null");
 		ALatticeCursor<AHashMap<AString,AVector<ACell>>> drivesCursor=
-			cursor.path(owner,Keywords.VALUE);
+			SignedCursor.forOwner(cursor.path(owner),LATTICE,owner);
 		return new DLFSDrives(drivesCursor,store);
 	}
 

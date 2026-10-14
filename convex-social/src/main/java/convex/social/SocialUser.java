@@ -9,6 +9,7 @@ import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.StampedCursor;
 
 /**
  * Cursor wrapper for a single user's social state.
@@ -44,13 +45,17 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	}
 
 	/**
-	 * Gets this user's follow list.
+	 * Gets this user's follow list. The {@code :following} section is a stamped
+	 * layer, so this component wraps it before descending: every follow change
+	 * re-stamps the section with the write clock, which is what lets its
+	 * last-write-wins merge pick the freshest.
 	 *
 	 * @return Follows cursor wrapper
 	 */
 	public Follows follows() {
-		return new Follows(cursor.path(
-			SocialLattice.KEY_FOLLOWING,SocialLattice.KEY_FOLLOWS));
+		ALatticeCursor<Index<Keyword, ACell>> following=StampedCursor.create(
+			cursor.path(SocialLattice.KEY_FOLLOWING),SocialLattice.FOLLOWING_LATTICE);
+		return new Follows(following.path(SocialLattice.KEY_FOLLOWS));
 	}
 
 	/**

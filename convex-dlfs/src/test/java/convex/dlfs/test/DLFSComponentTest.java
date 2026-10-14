@@ -42,6 +42,7 @@ import convex.dlfs.DLFSServer;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
@@ -258,7 +259,7 @@ public class DLFSComponentTest {
 			try (EtchStore store=EtchStore.createTemp("dlfs-files-copy")) {
 				var root=RootComponent.create(DLFSRegion.LATTICE,store).cursor();
 				root.setContext(LatticeContext.create(null,keyPair));
-				var drives=root.path(keyPair.getAccountKey(),Keywords.VALUE);
+				var drives=SignedCursor.forOwner(root.path(keyPair.getAccountKey()),DLFSRegion.LATTICE,keyPair.getAccountKey());
 				try (var fileSystem=DLFS.connect(drives,Strings.create("large"),store)) {
 					Path target=fileSystem.getPath("/copy.bin");
 

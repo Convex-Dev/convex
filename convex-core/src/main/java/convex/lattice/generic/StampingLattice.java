@@ -5,22 +5,21 @@ import java.util.function.BiFunction;
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ACursor;
-import convex.lattice.cursor.ALatticeCursor;
-import convex.lattice.cursor.AUpdateCursor;
-import convex.lattice.cursor.StampedCursor;
 
 /**
  * Stamp-on-write lattice layer.
  *
- * <p>Adds a single concern — <b>write interception</b> — over any inner lattice:
- * navigating below it inserts a transparent {@link StampedCursor} that re-stamps
- * values on write. The timestamp is sourced from the {@link LatticeContext} (the
- * single write clock); the caller-supplied stamp function only says <em>where</em>
- * to inject a given timestamp into the value's shape (the write-side dual of a
- * timestamp extractor). Merge and navigation are delegated entirely to the inner
- * lattice, so this layer knows nothing about how values merge or what they contain.</p>
+ * <p>Marks a level whose values must be stamped with the write clock as they are
+ * written. The timestamp is sourced from the write context (the single write
+ * clock); the caller-supplied stamp function only says <em>where</em> to inject a
+ * given timestamp into the value's shape (the write-side dual of a timestamp
+ * extractor). Merge and navigation are delegated entirely to the inner lattice, so
+ * this layer knows nothing about how values merge or what they contain.</p>
+ *
+ * <p>The lattice declares the boundary; the component which owns this level
+ * enforces it by wrapping its cursor:
+ * {@code StampedCursor.create(cursor.path(key), STAMPING).path(...)}. Lattices do
+ * not construct cursors.</p>
  *
  * <p>Compose with a merge layer and a structure layer to build a durable,
  * navigable region, e.g.
@@ -51,17 +50,8 @@ public class StampingLattice<V extends ACell> extends ADelegatingLattice<V> {
 		return new StampingLattice<>(inner, stampFn);
 	}
 
-	@Override
-	public boolean isWriteBoundary(ACell key) { return true; }
-
-	@Override
-	public boolean consumesPathKey(ACell key) { return false; } // transparent — key navigates below the stamp
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
-		// Present the same value, stamp it on write, navigate below via the inner lattice
-		// (so a merge at the stamped cursor uses the inner merge, e.g. whole-value LWW).
-		return StampedCursor.create((ACursor<V>) base, inner, context, stampFn);
+	/** Returns the function injecting a timestamp into a value at this level. */
+	public BiFunction<V, CVMLong, V> getStampFunction() {
+		return stampFn;
 	}
 }
