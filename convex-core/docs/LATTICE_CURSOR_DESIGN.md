@@ -196,7 +196,7 @@ work.sync();                                              // signs once, merges 
 | Does a cursor carry its lattice? | No. A cursor knows its position's shape, its context and, for a fork, its merge function, all supplied by the owning component. Lattices define domain structure; components encode it; cursors move and update values. |
 | `path()` or `child(key, shape)`? | Both. `path` is plain navigation; `child` declares the one thing a write through an absent child needs, its empty value. Applications walk the root lattice with `resolve(path)` to declare a whole region path. |
 | `assoc`/`assocIn` or `set(value, path...)`? | `assoc` forms, mirroring `RT.assoc`, avoiding overload ambiguity with `set(V)` and never promoting null silently. |
-| `sync()` or CAS merge? | Both exist; `sync()` with a merge function always succeeds, like a filesystem sync. |
+| `sync()` or CAS merge? | Both exist; `sync()` on a fork created with a merge function always succeeds, like a filesystem sync. Root publication absorbs a write that races it only through the merge the host installs with `onSync`; with none installed that race fails rather than overwriting. |
 | Where do signing and stamping live? | In `AUpdateCursor` subclasses that the owning component wraps around its cursor. Lattices declare the rule and construct no cursors; navigation inserts nothing. |
 | Collapse multi-key paths? | Yes, to avoid intermediate cursors and merges; break only where a component declares a level. |
 | What does the base class know? | Get, atomic update, navigation and write policy at one location, nothing else. Persistence, durability and publication are host concerns attached at the root through `onSync`; no cursor carries a store. |
