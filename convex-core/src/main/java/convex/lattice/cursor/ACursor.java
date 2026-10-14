@@ -1,11 +1,14 @@
 package convex.lattice.cursor;
 
+import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeOps;
+import convex.lattice.Shape;
 
 /**
  * A cursor is a mutable reference to a CVM value with atomic update operations.
@@ -20,31 +23,118 @@ import convex.lattice.LatticeOps;
  *   <li><b>Ordering:</b> Operations on a single cursor are sequentially consistent</li>
  * </ul>
  *
- * <h2>Path Navigation</h2>
- * <p>Cursors support navigating into nested data structures via {@link #path(ACell...)}.
- * A path cursor provides a view into a specific location within the parent's value.
- * Modifications through a path cursor atomically update the parent's entire value.</p>
+ * <h2>Navigation</h2>
+ * <p>{@link #path(ACell...)} descends into nested data; writes through the result
+ * atomically update the whole value above. {@link #child(ACell, Shape)} does the same
+ * while declaring the empty value of the child position, so a write can create it
+ * when absent. The component that owns a level declares that shape, usually by
+ * passing its lattice.</p>
+ *
+ * <h2>What a cursor knows</h2>
+ * <p>Nothing about lattices. A location may carry a {@link Shape} (its empty value),
+ * an inherited write-policy {@link LatticeContext}, and, for forks, a merge
+ * function; all are supplied by whoever creates the cursor. Storage, publication
+ * and replication are host concerns attached at the root, not cursor operations.</p>
  *
  * <h2>Cursor Hierarchy</h2>
  * <ul>
- *   <li>{@link ACursor} - Base class with atomic read/write operations</li>
- *   <li>{@link AForkableCursor} - Adds detach/merge for optimistic concurrency (CAS-based)</li>
- *   <li>{@link ALatticeCursor} - Adds fork/sync with lattice merge (always succeeds)</li>
+ *   <li>{@link ACursor} - atomic read/write at one location, navigation, write policy</li>
+ *   <li>{@link AForkableCursor} - fork/sync and CAS merge of working copies</li>
+ *   <li>{@link AView} - read-only views over another cursor</li>
  * </ul>
  *
- * <p>This base class specifies only reads, atomic updates and navigation at a single
- * location. Anything else a cursor may offer (lattice merge, transactions, write
- * interception) is added by a subclass or by composing cursors; storage, durability
- * and publication are not cursor concerns at all.</p>
- *
  * @param <V> Type of value held by this cursor
- * @see AForkableCursor for optimistic concurrency with CAS-based merge
- * @see ALatticeCursor for CRDT-style merge that always succeeds
  */
 public abstract class ACursor<V extends ACell> {
 
+	/**
+	 * Local write-policy override. A {@code null} value means this cursor inherits
+	 * its context from the cursor it was navigated or forked from.
+	 */
+	protected volatile LatticeContext context;
+
 	protected ACursor() {
 	}
+
+	protected ACursor(LatticeContext context) {
+		this.context = context;
+	}
+
+	// ===== Shape =====
+
+	/**
+	 * Returns the empty value of this location, used to create it when a write
+	 * arrives through an absent value and supplied to update functions in place of
+	 * null. Untyped locations have no empty value.
+	 *
+	 * @return Shape of this location, never null
+	 */
+	public Shape<V> shape() {
+		return Shape.none();
+	}
+
+	// ===== Write policy =====
+
+	/**
+	 * Gets the effective write policy for this cursor.
+	 * @return The current context (never null)
+	 */
+	public LatticeContext getContext() {
+		LatticeContext local = context;
+		return (local != null) ? local : inheritedContext();
+	}
+
+	/**
+	 * Gets the context inherited when this cursor has no local override. Derived
+	 * cursors resolve their parent's current context live.
+	 *
+	 * @return Inherited context, never null
+	 */
+	protected LatticeContext inheritedContext() {
+		return LatticeContext.EMPTY;
+	}
+
+	/**
+	 * Sets this cursor's local context override and returns this cursor.
+	 * Passing null clears the override, restoring inheritance from the parent.
+	 * A non-null context is a complete policy replacement. To override one
+	 * capability while delegating all others to the current effective policy,
+	 * use methods such as
+	 * {@link LatticeContext#withTimestamp(convex.core.data.prim.CVMLong)}.
+	 * @param context New local context override, or null to inherit
+	 * @return This cursor with updated context
+	 */
+	public ACursor<V> setContext(LatticeContext context) {
+		this.context = context;
+		return this;
+	}
+
+	// ===== Exclusive transactions =====
+
+	/**
+	 * Returns the lock which serialises writes to this cursor's shared state, or null
+	 * when that state lives in an ordinary optimistic root. Derived cursors resolve
+	 * this through their existing links; {@link TransactionalRootCursor} supplies its
+	 * write lock. This is the only root-owned capability a cursor exposes, and it
+	 * exists solely to support {@link Transactions}.
+	 *
+	 * @return Shared write lock, or null when exclusive transactions are unsupported
+	 */
+	protected Lock exclusiveLock() {
+		return null;
+	}
+
+	/**
+	 * Whether this cursor's shared state supports exclusive transactions. Ordinary
+	 * roots support optimistic transactions only.
+	 *
+	 * @return true if {@link Transactions#transactLocked} is available
+	 */
+	public final boolean supportsExclusiveTransactions() {
+		return exclusiveLock() != null;
+	}
+
+	// ===== Reads =====
 
 	/**
 	 * Returns the current value at this cursor location.
@@ -81,46 +171,40 @@ public abstract class ACursor<V extends ACell> {
 		return RT.getIn(get(), path);
 	}
 
+	// ===== Writes =====
+
 	/**
 	 * Atomically associates a value at a single key within this cursor's value.
 	 *
-	 * <p>Throws if the current value is null — callers must initialise the
-	 * structure first. {@link ALatticeCursor} overrides this to auto-initialise
-	 * from the lattice's zero value.</p>
+	 * <p>An absent current value is created from this location's {@link #shape()};
+	 * with no shape the write throws rather than inventing a container.</p>
 	 *
 	 * @param key Key to write at
 	 * @param value Value to associate
 	 */
 	@SuppressWarnings("unchecked")
 	public void assoc(ACell key, ACell value) {
-		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, null, key));
+		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, shape(), key));
 	}
 
 	/**
 	 * Atomically associates a value at a nested path within this cursor's value.
 	 *
-	 * <p>Throws if any intermediate value is null — callers must initialise the
-	 * structure first. {@link ALatticeCursor} overrides this to auto-initialise
-	 * from the lattice hierarchy.</p>
+	 * <p>An absent current value is created from this location's {@link #shape()}.
+	 * Missing intermediates below it are created only for a structural shape;
+	 * otherwise navigate with {@link #child(ACell, Shape)} so each level declares
+	 * its own empty value.</p>
 	 *
 	 * @param value Value to set at the end of the path
 	 * @param keys Path of keys to navigate
 	 */
 	@SuppressWarnings("unchecked")
 	public void assocIn(ACell value, ACell... keys) {
-		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, null, keys));
+		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, shape(), keys));
 	}
 
 	/**
 	 * Atomically sets the cursor to the new value and returns the old value.
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V old = get();
-	 * set(newValue);
-	 * return old;
-	 * }</pre>
-	 * but executed atomically.</p>
 	 *
 	 * @param newValue New value to set
 	 * @return Previous value before the update
@@ -134,16 +218,6 @@ public abstract class ACursor<V extends ACell> {
 	 * the current value is identical (==) to the expected value. This enables optimistic
 	 * concurrency: read a value, compute a new value, and attempt to write it back,
 	 * failing if another thread modified it in between.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * if (get() == expected) {
-	 *     set(newValue);
-	 *     return true;
-	 * }
-	 * return false;
-	 * }</pre>
-	 * but executed atomically.</p>
 	 *
 	 * @param expected The value expected to be present
 	 * @param newValue The new value to set if expectation holds
@@ -184,15 +258,8 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * <p>The update function is applied to the current value to produce the new value.
 	 * The function may be called multiple times if concurrent updates cause CAS failures,
-	 * so it should be side-effect free.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V old = get();
-	 * set(updateFunction.apply(old));
-	 * return old;
-	 * }</pre>
-	 * but executed atomically.</p>
+	 * so it should be side-effect free. A cursor with a shape passes that shape's empty
+	 * value instead of null for an absent value.</p>
 	 *
 	 * @param updateFunction Function to compute new value from current value
 	 * @return Value before the update was applied
@@ -204,15 +271,8 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * <p>The update function is applied to the current value to produce the new value.
 	 * The function may be called multiple times if concurrent updates cause CAS failures,
-	 * so it should be side-effect free.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V newVal = updateFunction.apply(get());
-	 * set(newVal);
-	 * return newVal;
-	 * }</pre>
-	 * but executed atomically.</p>
+	 * so it should be side-effect free. A cursor with a shape passes that shape's empty
+	 * value instead of null for an absent value.</p>
 	 *
 	 * @param updateFunction Function to compute new value from current value
 	 * @return Value after the update was applied
@@ -233,18 +293,6 @@ public abstract class ACursor<V extends ACell> {
 	/**
 	 * Atomically accumulates a value and returns the old value.
 	 *
-	 * <p>The accumulator function combines the current value with x to produce
-	 * the new value. Useful for reduction operations like adding to a counter
-	 * or appending to a collection.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V old = get();
-	 * set(accumulatorFunction.apply(old, x));
-	 * return old;
-	 * }</pre>
-	 * but executed atomically.</p>
-	 *
 	 * @param x Value to accumulate
 	 * @param accumulatorFunction Function combining current value with x
 	 * @return Value before accumulation
@@ -253,17 +301,6 @@ public abstract class ACursor<V extends ACell> {
 
 	/**
 	 * Atomically accumulates a value and returns the new value.
-	 *
-	 * <p>The accumulator function combines the current value with x to produce
-	 * the new value.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V newVal = accumulatorFunction.apply(get(), x);
-	 * set(newVal);
-	 * return newVal;
-	 * }</pre>
-	 * but executed atomically.</p>
 	 *
 	 * @param x Value to accumulate
 	 * @param accumulatorFunction Function combining current value with x
@@ -278,26 +315,51 @@ public abstract class ACursor<V extends ACell> {
 		return v.toString();
 	}
 
+	// ===== Navigation =====
+
 	/**
-	 * Creates a path cursor navigating into a nested location within this cursor.
+	 * Creates a cursor navigating into a nested location within this cursor, with no
+	 * declared empty value.
 	 *
-	 * <p>A path cursor provides a view into a specific key path within the parent's
-	 * value. Reading from the path cursor returns the nested value; writing to it
-	 * atomically updates the parent's entire value with the nested change.</p>
-	 *
-	 * <p>Path cursors are useful for working with nested data structures without
-	 * manually reading, modifying, and writing back the entire structure.</p>
-	 *
-	 * <pre>{@code
-	 * Root<AMap> root = Root.create(Maps.of("user", Maps.of("name", "Alice")));
-	 * ACursor<AString> nameCursor = root.path(Strings.create("user"), Strings.create("name"));
-	 * nameCursor.set(Strings.create("Bob"));  // Atomically updates root
-	 * }</pre>
+	 * <p>Reading from the path cursor returns the nested value; writing to it
+	 * atomically updates this cursor's entire value with the nested change. A write
+	 * through an absent intermediate fails unless the intermediate's shape is known,
+	 * so components navigate one declared level at a time with {@link #child}.</p>
 	 *
 	 * @param <T> Type of value at the path
 	 * @param path Keys to navigate through nested data structures
 	 * @return A cursor positioned at the nested path
 	 */
 	public abstract <T extends ACell> ACursor<T> path(ACell... path);
+
+	/**
+	 * Creates a cursor at a child key, declaring the child's empty value.
+	 *
+	 * <p>This is how a component that owns a level hands out the level below it:
+	 * {@code cursor.child(KEY_FEED, FEED_LATTICE)}. The child can be created when
+	 * absent, and update functions on it receive the empty value instead of null.
+	 * This cursor's own shape is used to create this level if it is absent.</p>
+	 *
+	 * @param <T> Type of the child value
+	 * @param key Child key
+	 * @param shape Shape of the child position
+	 * @return Cursor at the child
+	 */
+	public <T extends ACell> AForkableCursor<T> child(ACell key, Shape<T> shape) {
+		return new PathCursor<>(this, new ACell[] {key}, shape);
+	}
+
+	/**
+	 * Creates a cursor at a nested path, declaring the empty value at its end. Missing
+	 * intermediates are created only for a structural shape at this cursor.
+	 *
+	 * @param <T> Type of the value at the path
+	 * @param keys Path keys
+	 * @param shape Shape of the end position
+	 * @return Cursor at the path
+	 */
+	public <T extends ACell> AForkableCursor<T> child(ACell[] keys, Shape<T> shape) {
+		return new PathCursor<>(this, keys, shape);
+	}
 
 }

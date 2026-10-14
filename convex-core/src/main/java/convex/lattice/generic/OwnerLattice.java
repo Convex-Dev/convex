@@ -148,7 +148,7 @@ public class OwnerLattice<V extends ACell> extends AOwnerLattice<ACell,V,AHashMa
 	 * authoring falls back to the context's owner verification.
 	 */
 	@Override
-	public SignedLattice<V> ownerLattice(ACell childKey) {
+	public SignedLattice<V> signingFor(ACell childKey) {
 		return signedLattice.withOwner(childKey);
 	}
 
@@ -159,7 +159,7 @@ public class OwnerLattice<V extends ACell> extends AOwnerLattice<ACell,V,AHashMa
 		// Each owner's value is a SignedData<V>, which uses SignedLattice
 		// Return an owner-bound SignedLattice, so a write or a synthesised merge
 		// below this key is authored as that owner or not at all
-		return (ALattice<T>) ownerLattice(childKey);
+		return (ALattice<T>) signingFor(childKey);
 	}
 
 }

@@ -10,7 +10,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
 /**
@@ -26,10 +26,10 @@ public class LatticeKV {
 
 	private static final AString DEFAULT_REPLICA = Strings.create("default");
 
-	private final ALatticeCursor<Index<AString, AVector<ACell>>> cursor;
+	private final AForkableCursor<Index<AString, AVector<ACell>>> cursor;
 	private final AString replicaID;
 
-	public LatticeKV(ALatticeCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
+	public LatticeKV(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
 		this.cursor = cursor;
 		this.replicaID = replicaID;
 	}
@@ -45,8 +45,8 @@ public class LatticeKV {
 	 * Creates a new empty KV store with a specific replica ID for PN-counter operations
 	 */
 	public static LatticeKV create(AString replicaID) {
-		ALatticeCursor<Index<AString, AVector<ACell>>> cursor =
-			Cursors.createLattice(KVStoreLattice.INSTANCE);
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
+			Cursors.root(KVStoreLattice.INSTANCE);
 		return new LatticeKV(cursor, replicaID);
 	}
 
@@ -56,7 +56,7 @@ public class LatticeKV {
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
 	 * @return New LatticeKV instance connected to the cursor
 	 */
-	public static LatticeKV connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+	public static LatticeKV connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
 		return new LatticeKV(cursor, DEFAULT_REPLICA);
 	}
 
@@ -67,14 +67,14 @@ public class LatticeKV {
 	 * @param replicaID Replica ID for PN-counter operations
 	 * @return New LatticeKV instance connected to the cursor
 	 */
-	public static LatticeKV connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
+	public static LatticeKV connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
 		return new LatticeKV(cursor, replicaID);
 	}
 
 	/**
 	 * Returns the underlying lattice cursor for direct lattice operations
 	 */
-	public ALatticeCursor<Index<AString, AVector<ACell>>> cursor() {
+	public AForkableCursor<Index<AString, AVector<ACell>>> cursor() {
 		return cursor;
 	}
 
@@ -82,7 +82,18 @@ public class LatticeKV {
 	 * Creates a forked copy of this store for independent operation
 	 */
 	public LatticeKV fork() {
-		return new LatticeKV(cursor.fork(), replicaID);
+		return fork(replicaID);
+	}
+
+	/**
+	 * Creates a forked copy acting as a different replica, so that PN-counter
+	 * increments made on the fork are attributed to that replica when synced.
+	 *
+	 * @param replicaID Replica ID for PN-counter operations on the fork
+	 * @return Forked store
+	 */
+	public LatticeKV fork(AString replicaID) {
+		return new LatticeKV(cursor.fork(KVStoreLattice.INSTANCE), replicaID);
 	}
 
 	/**

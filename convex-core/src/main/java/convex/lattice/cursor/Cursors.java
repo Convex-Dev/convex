@@ -4,8 +4,8 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
-import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.Shape;
 
 /**
  * Factory methods for creating cursors.
@@ -32,65 +32,78 @@ public class Cursors {
 		return Root.create(value);
 	}
 
-	// ===== Lattice Cursor Factory Methods =====
+	// ===== Roots =====
 
-	/** Creates an opt-in transactional root at the lattice's zero value. */
-	public static <V extends ACell> TransactionalRootCursor<V> createTransactionalLattice(ALattice<V> lattice) {
-		return new TransactionalRootCursor<>(lattice,lattice.zero());
-	}
-
-	/** Creates an opt-in transactional root with an explicit initial value. */
-	public static <V extends ACell> TransactionalRootCursor<V> createTransactionalLattice(ALattice<V> lattice,V initialValue) {
-		return new TransactionalRootCursor<>(lattice,initialValue);
-	}
-
-	/** Creates an opt-in transactional root with an explicit value and context. */
-	public static <V extends ACell> TransactionalRootCursor<V> createTransactionalLattice(
-			ALattice<V> lattice,V initialValue,LatticeContext context) {
-		return new TransactionalRootCursor<>(lattice,initialValue,context);
+	/**
+	 * Creates a root at a shape's empty value, declaring that shape. Components
+	 * usually pass their lattice: {@code Cursors.root(LATTICE)}.
+	 *
+	 * @param <V> Type of cursor value
+	 * @param shape Shape of the root position
+	 * @return New root holding the shape's empty value
+	 */
+	public static <V extends ACell> Root<V> root(Shape<V> shape) {
+		return root(shape, null);
 	}
 
 	/**
-	 * Creates a root lattice cursor with the given lattice and initial value.
+	 * Creates a root at a shape's empty value with a default context.
 	 *
 	 * @param <V> Type of cursor value
-	 * @param lattice The lattice defining merge semantics
-	 * @param initialValue Initial value for the cursor
-	 * @return New lattice cursor instance
+	 * @param shape Shape of the root position
+	 * @param context Default write policy, or null for the empty context
+	 * @return New root holding the shape's empty value
 	 */
-	public static <V extends ACell> RootLatticeCursor<V> createLattice(ALattice<V> lattice, V initialValue) {
-		return new RootLatticeCursor<>(lattice, initialValue);
+	public static <V extends ACell> Root<V> root(Shape<V> shape, LatticeContext context) {
+		if (shape == null) throw new IllegalArgumentException("Shape must not be null");
+		return new Root<>(shape.zero(), shape, context);
 	}
 
 	/**
-	 * Creates a root lattice cursor with the given lattice, initial value, and context.
+	 * Creates a root holding a value, with no shape and the empty context.
 	 *
 	 * @param <V> Type of cursor value
-	 * @param lattice The lattice defining merge semantics
-	 * @param initialValue Initial value for the cursor
-	 * @param context Merge context for lattice operations
-	 * @return New lattice cursor instance
+	 * @param value Initial value
+	 * @return New root
 	 */
-	public static <V extends ACell> RootLatticeCursor<V> createLattice(ALattice<V> lattice, V initialValue, LatticeContext context) {
-		return new RootLatticeCursor<>(lattice, initialValue, context);
+	public static <V extends ACell> Root<V> root(V value) {
+		return new Root<>(value);
 	}
 
 	/**
-	 * Creates a root lattice cursor using the lattice's zero value as initial value.
+	 * Creates a root holding a value, with a declared shape and default context.
+	 * Components usually pass their lattice as the shape:
+	 * {@code Cursors.root(LATTICE.zero(), LATTICE, context)}.
 	 *
 	 * @param <V> Type of cursor value
-	 * @param lattice The lattice defining merge semantics
-	 * @return New lattice cursor instance with zero initial value
+	 * @param value Initial value
+	 * @param shape Shape of the root position, or null for none
+	 * @param context Default write policy, or null for the empty context
+	 * @return New root
 	 */
-	public static <V extends ACell> RootLatticeCursor<V> createLattice(ALattice<V> lattice) {
-		return new RootLatticeCursor<>(lattice, lattice.zero());
+	public static <V extends ACell> Root<V> root(V value, Shape<V> shape, LatticeContext context) {
+		return new Root<>(value, shape, context);
+	}
+
+	/**
+	 * Creates an opt-in transactional root, whose writes coordinate through one lock
+	 * so that {@link Transactions#transactLocked} and contention fallback are available.
+	 *
+	 * @param <V> Type of cursor value
+	 * @param value Initial value
+	 * @param shape Shape of the root position, or null for none
+	 * @param context Default write policy, or null for the empty context
+	 * @return New transactional root
+	 */
+	public static <V extends ACell> TransactionalRootCursor<V> transactionalRoot(V value, Shape<V> shape, LatticeContext context) {
+		return new TransactionalRootCursor<>(value, shape, context);
 	}
 
 	/**
 	 * Creates a cached transformation cursor that combines a TimeCache with a Transformer.
-	 * 
+	 *
 	 * This is useful if you have an expensive transformation that you don't want to run repeatedly and a small delay is acceptable.
-	 * 
+	 *
 	 * @param <S> The type of values from the source cursor
 	 * @param <T> The type of transformed values (must extend ACell)
 	 * @param source The source cursor to transform values from
@@ -101,12 +114,12 @@ public class Cursors {
 	 * @throws NullPointerException if source or transformFunction is null (from Transformer)
 	 */
 	public static <S extends ACell, T extends ACell> TimeCache<T> cachedTransform(
-			ACursor<S> source, 
-			Function<S, T> transformFunction, 
+			ACursor<S> source,
+			Function<S, T> transformFunction,
 			long ttl) {
 		// Create a transformer cursor
 		Transformer<S, T> transformer = new Transformer<>(source, transformFunction);
-		
+
 		// Wrap it with a time cache
 		return new TimeCache<>(transformer, ttl);
 	}

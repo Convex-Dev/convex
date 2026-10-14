@@ -1,10 +1,11 @@
 package convex.lattice.queue;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.MapLattice;
 
@@ -46,12 +47,12 @@ public class LatticeMQ {
 	static final MapLattice<ACell, Index<Keyword, ACell>> TOPIC_MAP =
 		MapLattice.create(TopicLattice.INSTANCE);
 
-	private final ALatticeCursor<?> cursor;
+	private final AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor;
 
 	/**
 	 * Wraps an existing cursor at the topic-map level.
 	 */
-	public LatticeMQ(ALatticeCursor<?> cursor) {
+	public LatticeMQ(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor) {
 		this.cursor = cursor;
 	}
 
@@ -62,7 +63,7 @@ public class LatticeMQ {
 	 * {@code [:queue, <owner>, :value]} and pass it to the constructor instead.</p>
 	 */
 	public static LatticeMQ create() {
-		return new LatticeMQ(Cursors.createLattice(TOPIC_MAP));
+		return new LatticeMQ(Cursors.root(TOPIC_MAP));
 	}
 
 	/**
@@ -82,7 +83,7 @@ public class LatticeMQ {
 	 * @return Topic handle
 	 */
 	public LatticeTopic topic(ACell name) {
-		return new LatticeTopic(cursor.path(name));
+		return new LatticeTopic(cursor.child(name, TopicLattice.INSTANCE));
 	}
 
 	/**
@@ -102,7 +103,7 @@ public class LatticeMQ {
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeMQ fork() {
-		return new LatticeMQ(((ALatticeCursor<ACell>) cursor).fork());
+		return new LatticeMQ(cursor.fork(TOPIC_MAP));
 	}
 
 	/**
@@ -111,13 +112,13 @@ public class LatticeMQ {
 	 */
 	@SuppressWarnings("unchecked")
 	public void sync() {
-		((ALatticeCursor<ACell>) cursor).sync();
+		cursor.sync();
 	}
 
 	/**
 	 * Returns the underlying lattice cursor.
 	 */
-	public ALatticeCursor<?> cursor() {
+	public AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor() {
 		return cursor;
 	}
 }

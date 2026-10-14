@@ -68,7 +68,7 @@ import convex.core.lang.RT;
  *
  * @param <V> Type of values in this lattice
  */
-public abstract class ALattice<V extends ACell> {
+public abstract class ALattice<V extends ACell> implements Shape<V>, Merge<V> {
 	
 	/**
 	 * The lattice merge function: combines another value into the own value,

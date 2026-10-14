@@ -1,51 +1,65 @@
 package convex.lattice;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.Root;
 
 /**
  * Generic store-backed root for a lattice application component hierarchy.
  *
- * <p>A root component owns the host store and the root cursor's sync policy. It is
- * the one generic component with a persistence capability; cursors and domain
- * components have none. Standalone roots publish their current value as the store
- * root on {@link #sync()}. Network infrastructure may configure a replication
- * pipeline before freezing host configuration. Neither operation performs a
- * durability barrier or owns the store lifecycle.</p>
+ * <p>A root component owns the host store, the root lattice and the root cursor's
+ * sync policy. It is the one generic component with a persistence capability;
+ * cursors and domain components have none. Standalone roots publish their current
+ * value as the store root on {@link #sync()}. Network infrastructure may configure
+ * a replication pipeline before freezing host configuration. Neither operation
+ * performs a durability barrier or owns the store lifecycle.</p>
+ *
+ * <p>The root cursor knows nothing about lattices. The host supplies the lattice
+ * for the one place the root needs a merge, a write landing during publication,
+ * and for {@link #merge(ACell) incoming} root values.</p>
  *
  * <p>The same component can wrap a cursor owned by a networked NodeServer or
- * own a standalone local lattice cursor backed by any {@link AStore}.</p>
+ * own a standalone local root backed by any {@link AStore}.</p>
  *
  * @param <V> Root lattice value type
  */
 public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
+	private final ALattice<V> lattice;
 	private final AStore store;
 	private volatile Function<V,V> publicationPolicy;
 	private boolean publicationPolicyFrozen;
 
-	/** Creates a store-backed host around an existing root cursor. */
-	public RootComponent(RootLatticeCursor<V> cursor, AStore store) {
+	/**
+	 * Creates a store-backed host around an existing root cursor.
+	 *
+	 * @param lattice Root lattice, the complete merge for the hosted value
+	 * @param cursor Root cursor holding the hosted value
+	 * @param store Host store
+	 */
+	public RootComponent(ALattice<V> lattice, Root<V> cursor, AStore store) {
 		super(cursor);
-		this.store=java.util.Objects.requireNonNull(store,"Root store must not be null");
-		cursor.onSync(this::publishRoot);
+		this.lattice=Objects.requireNonNull(lattice,"Root lattice must not be null");
+		this.store=Objects.requireNonNull(store,"Root store must not be null");
+		cursor.onSync(this::publishRoot,lattice);
 	}
 
 	/** Creates a standalone local root at the lattice's zero value. */
 	public static <V extends ACell> RootComponent<V> create(ALattice<V> lattice, AStore store) {
-		return new RootComponent<>(Cursors.createLattice(lattice),store);
+		return create(lattice,lattice.zero(),store);
 	}
 
 	/** Creates a standalone local root with an explicit initial value. */
 	public static <V extends ACell> RootComponent<V> create(ALattice<V> lattice, V initialValue, AStore store) {
-		return new RootComponent<>(Cursors.createLattice(lattice,initialValue),store);
+		return new RootComponent<>(lattice,Cursors.root(initialValue,lattice,null),store);
 	}
 
 	/**
@@ -67,9 +81,40 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 		return create(lattice,(value==null)?lattice.zero():value,store);
 	}
 
+	/** Returns the root lattice hosted here. */
+	public ALattice<V> getLattice() {
+		return lattice;
+	}
+
 	/** Returns the host store without implying ownership of its lifecycle. */
 	public AStore store() {
 		return store;
+	}
+
+	/**
+	 * Returns a cursor at a path within the hosted root, with each level's shape
+	 * declared from the root lattice so that writes can create absent regions. Hosts
+	 * use this to merge path-addressed inbound values with the sub-lattice at the
+	 * same path.
+	 *
+	 * @param <T> Value type at the path
+	 * @param path Keys from the root
+	 * @return Cursor at the path
+	 */
+	public <T extends ACell> AForkableCursor<T> resolve(ACell... path) {
+		return resolve(cursor,lattice,path);
+	}
+
+	/**
+	 * Atomically merges an incoming root value into the hosted state with the root
+	 * lattice, under the root cursor's effective context. This changes local state
+	 * only; {@link #sync()} publishes it.
+	 *
+	 * @param other Incoming root value
+	 * @return Root value installed by this merge
+	 */
+	public V merge(V other) {
+		return cursor.merge(lattice,other);
 	}
 
 	/**
@@ -97,8 +142,8 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	/** Returns the hosted root cursor with its exact static type. */
 	@Override
-	public RootLatticeCursor<V> cursor() {
-		return (RootLatticeCursor<V>) cursor;
+	public Root<V> cursor() {
+		return (Root<V>) cursor;
 	}
 
 	/**

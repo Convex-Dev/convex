@@ -80,10 +80,10 @@ reads see the snapshot at fork time, and all writes accumulate locally.
 
 ### Why this works
 
-The transaction uses a `ForkedLatticeCursor` — a separate `AtomicReference` that
-snapshots the database value at fork time. `sync()` calls
-`parent.merge(localValue)` which uses the lattice merge at each level of the
-tree. No locks, no conflict detection — the lattice algebra guarantees
+The transaction uses a forked cursor — a separate `AtomicReference` that
+snapshots the database value at fork time, created with the database lattice as its
+merge function. `sync()` merges the local value into the parent with that lattice,
+which merges at each level of the tree. No locks, no conflict detection — the lattice algebra guarantees
 convergence.
 
 ```java
@@ -118,7 +118,7 @@ Each cursor level has a lattice type that defines merge semantics for replicatio
 | row index | `TableLattice` (`IndexLattice`) | union of PKs, per-row merge |
 | row entry | `RowLattice` | LWW by timestamp |
 
-Merge happens when `sync()` reaches a `ForkedLatticeCursor` (local fork) or
+Merge happens when `sync()` on a fork converges into its parent (local fork) or
 when the NodeServer receives remote state (replication). The lattice guarantees
 convergence regardless of merge order.
 

@@ -6,14 +6,14 @@ import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /** Component at one user's {@code [:p2p :nodes owner :value]} lattice path. */
 public final class P2PNodeRecord extends ALatticeComponent<ACell> implements TransactionalComponent<ACell,P2PNodeRecord> {
 
 	private final AccountKey owner;
 
-	P2PNodeRecord(ALatticeCursor<ACell> cursor, AccountKey owner) {
+	P2PNodeRecord(AForkableCursor<ACell> cursor, AccountKey owner) {
 		super(cursor);
 		this.owner=owner;
 	}
@@ -34,12 +34,12 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> implements Tra
 		cursor.set(nodeInfo);
 	}
 
-	/** Creates an isolated working component at the same logical path. */
+	/** Creates an isolated working component at the same logical path, merging on sync with the node value lattice. */
 	public P2PNodeRecord fork() {
-		return new P2PNodeRecord(cursor.fork(),owner);
+		return new P2PNodeRecord(cursor.fork(P2PLattice.NODES_LATTICE.getValueLattice()),owner);
 	}
 	@Override
-	public P2PNodeRecord withCursor(ALatticeCursor<ACell> cursor) {
+	public P2PNodeRecord withCursor(AForkableCursor<ACell> cursor) {
 		return new P2PNodeRecord(cursor,owner);
 	}
 

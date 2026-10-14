@@ -1,51 +1,36 @@
 package convex.lattice.cursor;
 
+import java.util.Objects;
+
 import convex.core.data.ACell;
+import convex.lattice.LatticeContext;
+import convex.lattice.Merge;
 
 /**
- * Abstract base class for cursors that support forking (detachment) operations.
+ * Abstract base class for cursors that support working copies.
  *
- * <h2>Semantic Model</h2>
- * <p>A forkable cursor extends {@link ACursor} with optimistic concurrency control.
- * The key concept is <b>fork points</b>: when a cursor is detached, it records
- * the current value as its "initial value". This initial value serves as the
- * expected baseline for merge operations.</p>
+ * <h2>Fork points</h2>
+ * <p>A forkable cursor records the value it was created with as its
+ * {@linkplain #getInitialValue() initial value}. A detached copy uses that as the
+ * baseline for a compare-and-set {@link #merge(AForkableCursor)}; a {@link #fork}
+ * uses it as the point from which {@link #sync()} converges with the parent.</p>
  *
- * <h2>Optimistic Concurrency Pattern</h2>
- * <p>The typical workflow follows the read-modify-write pattern:</p>
- * <ol>
- *   <li><b>Fork:</b> {@code AForkableCursor<V> work = parent.detach()}</li>
- *   <li><b>Modify:</b> Make changes to the forked cursor</li>
- *   <li><b>Merge:</b> {@code parent.merge(work)} - succeeds only if parent unchanged</li>
- *   <li><b>Retry:</b> If merge fails, read new value and repeat</li>
- * </ol>
+ * <h2>Two ways back to the parent</h2>
+ * <ul>
+ *   <li><b>{@link #merge(AForkableCursor)}</b> (compare-and-set) succeeds only if the
+ *       parent still holds the value it had at detachment; the caller retries on
+ *       failure.</li>
+ *   <li><b>{@link #sync()}</b> on a fork created with a {@link Merge} converges the
+ *       working copy into the parent with that function, so it always succeeds. The
+ *       component that owns the level supplies the merge, usually its lattice:
+ *       {@code cursor.fork(FEED_LATTICE)}.</li>
+ * </ul>
  *
- * <h2>CAS-Based Merge Semantics</h2>
- * <p>The {@link #merge(AForkableCursor)} method uses Compare-And-Set (CAS) semantics:</p>
- * <pre>{@code
- * // Semantically equivalent to:
- * if (parent.get() == fork.getInitialValue()) {
- *     parent.set(fork.get());
- *     return true;
- * }
- * return false;
- * }</pre>
- *
- * <p>This means concurrent modifications are <b>detected and rejected</b> rather than
- * combined. The caller must handle conflicts explicitly (typically by retrying).</p>
- *
- * <h2>Comparison with Lattice Merge</h2>
- * <table border="1">
- *   <tr><th>Aspect</th><th>AForkableCursor (CAS)</th><th>ALatticeCursor (Lattice)</th></tr>
- *   <tr><td>Conflict handling</td><td>Fails on conflict</td><td>Merges values</td></tr>
- *   <tr><td>Return type</td><td>boolean (success/fail)</td><td>merged value</td></tr>
- *   <tr><td>Use case</td><td>Precise control needed</td><td>Commutative updates</td></tr>
- *   <tr><td>Example</td><td>Counter increment</td><td>Set union</td></tr>
- * </table>
+ * <p>{@link #sync()} on a live (non-forked) cursor propagates to the root, where the
+ * host's publication policy runs. Cursors know nothing about lattices: the merge
+ * function is a parameter, supplied where the fork is made.</p>
  *
  * @param <V> Type of cursor values
- * @see ACursor for base cursor operations
- * @see ALatticeCursor for lattice-aware cursors with guaranteed merge success
  */
 public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 
@@ -53,10 +38,6 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 
 	/**
 	 * Creates a forkable cursor with the specified initial value.
-	 *
-	 * <p>The initial value is recorded as the fork point for CAS-based merge.
-	 * When this cursor is merged back to a parent, the merge succeeds only if
-	 * the parent still holds this initial value.</p>
 	 *
 	 * @param value Initial value (may be null)
 	 */
@@ -66,94 +47,63 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 	}
 
 	/**
-	 * Gets the initial value of this cursor when it was created/forked.
+	 * Creates a forkable cursor with the specified initial value and local context.
 	 *
-	 * <p>This value represents the "fork point" - the snapshot of the parent's
-	 * value at the time this cursor was detached. It is used by {@link #merge}
-	 * to detect concurrent modifications.</p>
+	 * @param value Initial value (may be null)
+	 * @param context Local context override, or null to inherit
+	 */
+	protected AForkableCursor(V value, LatticeContext context) {
+		super(context);
+		this.initialValue = value;
+	}
+
+	@Override
+	public AForkableCursor<V> setContext(LatticeContext context) {
+		super.setContext(context);
+		return this;
+	}
+
+	/**
+	 * Gets the initial value of this cursor when it was created or forked: the
+	 * baseline a compare-and-set merge checks against.
 	 *
-	 * <p>For root cursors, this is the value passed at construction time.
-	 * For detached cursors, this is the parent's value at detachment time.</p>
-	 *
-	 * @return Value of cursor when initialized (possibly null)
+	 * @return Value of cursor when initialised (possibly null)
 	 */
 	public V getInitialValue() {
 		return initialValue;
 	}
 
 	/**
-	 * Merge a detached cursor back into this cursor using CAS semantics.
+	 * Merges a detached cursor back into this cursor using compare-and-set: succeeds
+	 * only if this cursor still holds the detached cursor's initial value.
 	 *
-	 * <p>This operation attempts to atomically update this cursor's value to the
-	 * detached cursor's current value, but only if this cursor's value still
-	 * equals the detached cursor's initial value (fork point).</p>
-	 *
-	 * <h3>Semantic Equivalent</h3>
-	 * <pre>{@code
-	 * V forkPoint = detached.getInitialValue();
-	 * V newValue = detached.get();
-	 * return this.compareAndSet(forkPoint, newValue);
-	 * }</pre>
-	 *
-	 * <h3>Success Conditions</h3>
-	 * <ul>
-	 *   <li>Returns {@code true} if this cursor still held the fork point value</li>
-	 *   <li>Returns {@code false} if this cursor was modified since the fork</li>
-	 * </ul>
-	 *
-	 * <h3>Failure Handling</h3>
-	 * <p>On failure, the caller must decide how to handle the conflict:</p>
-	 * <pre>{@code
-	 * AForkableCursor<V> work = parent.detach();
-	 * work.updateAndGet(v -> computeNewValue(v));
-	 *
-	 * while (!parent.merge(work)) {
-	 *     // Conflict: re-read and recompute
-	 *     work = parent.detach();
-	 *     work.updateAndGet(v -> computeNewValue(v));
-	 * }
-	 * }</pre>
-	 *
-	 * <h3>Comparison with Lattice Sync</h3>
-	 * <p>Unlike {@link ALatticeCursor#sync()}, this method can fail. Use lattice
-	 * cursors when operations are commutative and can be safely combined.</p>
-	 *
-	 * @param detached The detached cursor to merge back (must have been forked from this cursor)
-	 * @return true if merge was successful, false if this cursor changed since fork
-	 * @see #detach() for creating a detached cursor
-	 * @see ALatticeCursor#sync() for lattice merge that always succeeds
+	 * @param detached The detached cursor to merge back (must have been detached from this cursor)
+	 * @return true if merged, false if this cursor changed since detachment
+	 * @see #detach()
+	 * @see #sync() for the always-succeeding alternative on forks with a merge function
 	 */
 	public boolean merge(AForkableCursor<V> detached) {
 		V newValue = detached.get();
 		V detachedValue = detached.getInitialValue();
+		return compareAndSet(detachedValue, newValue);
+	}
 
-		boolean updated = compareAndSet(detachedValue, newValue);
-		return updated;
+	/**
+	 * Merges an external value into this location with the supplied merge function
+	 * and this cursor's effective context, retrying atomically against concurrent
+	 * writes. The current value is the {@code own} operand.
+	 *
+	 * @param merge Merge function for this position, usually its lattice
+	 * @param other Incoming value
+	 * @return Value installed by this merge
+	 */
+	public V merge(Merge<V> merge, V other) {
+		Objects.requireNonNull(merge, "Merge function must not be null");
+		return updateAndGet(current -> merge.merge(getContext(), current, other));
 	}
 
 	/**
 	 * Creates a path cursor navigating into a nested location within this cursor.
-	 *
-	 * <p>Returns an {@link AForkableCursor} that supports the full forkable API
-	 * including {@link #merge}. The path cursor's initial value is the nested
-	 * value at the time of creation.</p>
-	 *
-	 * <p>Operations on the path cursor atomically update the parent's entire value.
-	 * The path cursor inherits the forking capability, so it can be detached and
-	 * merged independently.</p>
-	 *
-	 * <h3>Semantic Behavior</h3>
-	 * <pre>{@code
-	 * // Creating a path cursor
-	 * AForkableCursor<AMap> root = ...;
-	 * AForkableCursor<AInteger> count = root.path(key);
-	 *
-	 * // Reading: equivalent to RT.getIn(root.get(), key)
-	 * count.get();
-	 *
-	 * // Writing: atomically updates root with new nested value
-	 * count.set(newValue);  // root now has updated map
-	 * }</pre>
 	 *
 	 * @param <T> Type of value at the path
 	 * @param path Keys to navigate through nested data structures
@@ -167,22 +117,49 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 	}
 
 	/**
-	 * Creates an independent copy of this cursor for isolated modifications.
-	 *
-	 * <p>The detached cursor starts with a snapshot of the current value and can be
-	 * modified without affecting this cursor. Use {@link #merge(AForkableCursor)}
-	 * to attempt merging changes back (will fail if this cursor changed).</p>
-	 *
-	 * <p>For lattice-aware forking where merge always succeeds, use
-	 * {@link ALatticeCursor#fork()} instead.</p>
+	 * Creates an independent copy of this cursor's value for isolated modifications,
+	 * with no link back. Use {@link #merge(AForkableCursor)} to attempt a
+	 * compare-and-set merge of the result.
 	 *
 	 * @param <T> Type of the detached cursor value
 	 * @return A new independent Root cursor with the current value
-	 * @see #merge(AForkableCursor) for CAS-based merge (can fail)
-	 * @see ALatticeCursor#fork() for lattice-aware fork (merge always succeeds)
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> AForkableCursor<T> detach() {
 		return (AForkableCursor<T>) Root.create(get());
 	}
+
+	/**
+	 * Creates a working copy whose {@link #sync()} converges into this cursor with
+	 * the supplied merge function. The fork captures this cursor's effective context
+	 * for its own writes; a dynamic policy remains dynamic. If this cursor has
+	 * advanced by sync time, the two values are merged using this cursor's current
+	 * effective context.
+	 *
+	 * @param merge Merge function for this position, usually the owning component's lattice
+	 * @return A new forked cursor with local storage
+	 */
+	public ForkedCursor<V> fork(Merge<V> merge) {
+		return new ForkedCursor<>(this, get(), getContext(), merge);
+	}
+
+	/**
+	 * Creates a working copy with write-back semantics: {@link #sync()} overwrites
+	 * this cursor's value with the fork's, whatever happened here in between. Use
+	 * {@link #fork(Merge)} wherever concurrent writers are possible.
+	 *
+	 * @return A new forked cursor with local storage
+	 */
+	public ForkedCursor<V> fork() {
+		return fork(null);
+	}
+
+	/**
+	 * Synchronises this cursor towards its parent. On a fork, converges the working
+	 * copy into the cursor it was forked from. On a live cursor, propagates to the
+	 * root, where the host's publication policy runs.
+	 *
+	 * @return The value at this cursor after synchronisation
+	 */
+	public abstract V sync();
 }

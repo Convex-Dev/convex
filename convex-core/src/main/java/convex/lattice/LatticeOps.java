@@ -13,62 +13,57 @@ import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
- * Utility operations for lattice-aware data manipulation.
+ * Utility operations for shape-aware data manipulation.
  *
- * <p>Provides {@link #assocIn} as a lattice-aware replacement for
- * {@link RT#assocIn}. When writing through a null intermediate, uses
- * {@code lattice.zero()} to create correctly-typed empty containers
- * (e.g. {@link convex.core.data.Index} instead of {@link convex.core.data.AHashMap}).</p>
+ * <p>Provides {@link #assocIn} as a replacement for {@link RT#assocIn} which knows
+ * how to create a missing container: from the {@link Shape} of the position being
+ * written through, or from the key for structural (JSON-like) data. Nothing is
+ * ever silently promoted to a hash map.</p>
  */
 public class LatticeOps {
 
 	/**
-	 * Lattice-aware associative update at a single key.
-	 *
-	 * <p>Convenience shorthand for {@link #assocIn} with a single-element path.</p>
+	 * Shape-aware associative update at a single key.
 	 *
 	 * @param <T> Return type
-	 * @param a Data structure (may be null if lattice provides zero)
+	 * @param a Data structure (may be null if the shape provides an empty value)
 	 * @param key Key to write at
 	 * @param value Value to set at the key
-	 * @param lattice Lattice describing the type (may be null if a is non-null)
+	 * @param shape Shape of {@code a}'s position, or null for none
 	 * @return Updated data structure
 	 */
-	public static <T extends ACell> T assoc(ACell a, ACell key, ACell value, ALattice<?> lattice) {
-		return assocIn(a, value, lattice, key);
+	public static <T extends ACell> T assoc(ACell a, ACell key, ACell value, Shape<?> shape) {
+		return assocIn(a, value, shape, key);
 	}
 
 	/**
-	 * Lattice-aware associative update at a nested path.
+	 * Shape-aware associative update at a nested path.
 	 *
-	 * <p>Two-pass algorithm like {@link RT#assocIn}:</p>
-	 * <ol>
-	 *   <li>Forward pass: descend through data, using {@code lattice.zero()}
-	 *       for null intermediates</li>
-	 *   <li>Backward pass: reconstruct the structure immutably</li>
-	 * </ol>
-	 *
-	 * <p>Rules for null intermediates:</p>
+	 * <p>Rules for a missing container:</p>
 	 * <ul>
-	 *   <li>{@code data==null && lat!=null}: use {@code lat.zero()} to auto-initialise</li>
-	 *   <li>{@code data==null && lat.zero()==null}: throw (leaf lattice, cannot create container)</li>
-	 *   <li>{@code data==null && lat==null}: throw (beyond known lattice hierarchy)</li>
-	 *   <li>{@code data!=null}: use existing structure regardless of lattice</li>
+	 *   <li>At the base, {@code shape.zero()} supplies the correctly typed empty
+	 *       container; a null zero is an error.</li>
+	 *   <li>Below the base, a structural shape builds each missing container from the
+	 *       key written through it; otherwise a missing intermediate is an error,
+	 *       because only the component owning that level knows its type. Navigate
+	 *       with typed children instead.</li>
+	 *   <li>An existing container is used regardless of shape.</li>
 	 * </ul>
 	 *
 	 * @param <T> Return type
-	 * @param a Root data structure (may be null if baseLattice provides zero)
+	 * @param a Root data structure (may be null if the shape provides an empty value)
 	 * @param value Value to set at the end of the path
-	 * @param baseLattice Lattice describing the type hierarchy (may be null if data is non-null at every level)
+	 * @param shape Shape of {@code a}'s position, or null for none
 	 * @param keys Path of keys to navigate
 	 * @return Updated root data structure
-	 * @throws IllegalStateException if a null intermediate cannot be initialised (no lattice or leaf lattice)
+	 * @throws IllegalStateException if a missing container cannot be created
 	 * @throws IllegalArgumentException if a non-null intermediate is not a data structure, or is a
 	 *         signed envelope (a signature covers its value, so nothing may be written through it)
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T assocIn(ACell a, ACell value, ALattice<?> baseLattice, ACell... keys) {
-		return (T) assocIn(a, value, baseLattice, keys, 0);
+	public static <T extends ACell> T assocIn(ACell a, ACell value, Shape<?> shape, ACell... keys) {
+		boolean structural = (shape != null) && shape.isStructural();
+		return (T) assocIn(a, value, shape, structural, keys, 0);
 	}
 
 	/**
@@ -77,22 +72,22 @@ public class LatticeOps {
 	 * unchanged when the child below it didn't change, so a no-op write returns the
 	 * original {@code data} by reference and allocates nothing (no working arrays).
 	 */
-	private static ACell assocIn(ACell data, ACell value, ALattice<?> lat, ACell[] keys, int i) {
+	private static ACell assocIn(ACell data, ACell value, Shape<?> shape, boolean structural, ACell[] keys, int i) {
 		if (i >= keys.length) return value;
 
 		if (data == null) {
-			if (lat == null) throw new IllegalStateException(
-				"Cannot write through non-existent path at depth " + i +
-				": no lattice type information available");
-			if (lat.isStructural()) {
+			if (structural) {
 				// Structural region (e.g. JSON): build the container from the key
-				// that indexes into it, not from a fixed lattice zero().
+				// that indexes into it.
 				data = containerForKey(keys[i]);
-			} else {
-				data = lat.zero();
+			} else if (i == 0) {
+				data = (shape == null) ? null : shape.zero();
 				if (data == null) throw new IllegalStateException(
-					"Cannot write through non-existent path at depth " + i +
-					": lattice zero is null (leaf lattice)");
+					"Cannot write through an absent value: no empty value is known for this position");
+			} else {
+				throw new IllegalStateException(
+					"Cannot write through non-existent path at depth " + i
+					+ ": the intermediate container's type is unknown here; navigate with typed children");
 			}
 		}
 		if (data instanceof SignedData) {
@@ -109,7 +104,7 @@ public class LatticeOps {
 		}
 
 		ACell child = struct.get(keys[i]);
-		ACell newChild = assocIn(child, value, (lat != null) ? lat.path(keys[i]) : null, keys, i + 1);
+		ACell newChild = assocIn(child, value, null, structural, keys, i + 1);
 		return RT.assoc(struct, keys[i], newChild); // returns struct unchanged if newChild == child
 	}
 

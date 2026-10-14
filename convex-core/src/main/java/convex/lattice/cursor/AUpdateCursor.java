@@ -7,8 +7,8 @@ import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
-import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.Shape;
 
 /**
  * Abstract base for cursors that override <em>update semantics</em>: every value
@@ -25,8 +25,9 @@ import convex.lattice.LatticeContext;
  *       re-signs on write.</li>
  * </ul>
  *
- * <p>All eight atomic operations, {@code compareAndSet} and {@code sync} are
- * implemented here in terms of two hooks:</p>
+ * <p>The component that owns the boundary wraps its cursor with one of these;
+ * navigation never inserts them. All eight atomic operations, {@code compareAndSet}
+ * and {@code sync} are implemented here in terms of two hooks:</p>
  * <ul>
  *   <li>{@link #prepareWrite(ACell)} — <b>the</b> point every write funnels through:
  *       it authors the cell to store for a new view value. This is where write-time
@@ -50,34 +51,33 @@ import convex.lattice.LatticeContext;
  * kept as it is, so an unchanged value keeps its existing signature or timestamp and
  * {@link #prepareWrite} is never called. That rule is uniform across subclasses.</p>
  *
- * <p><b>Update vs merge.</b> {@code prepareWrite} governs <em>writes</em>, not
- * convergence. {@link #merge} is deliberately abstract: a merge either <em>selects</em>
- * an existing value (LWW/stamping — store the winner as-is, no re-stamp) or
- * <em>synthesises</em> a new one (signing — merge the unsigned values, then re-sign).
- * Each subclass states which, so the choice is explicit rather than an inherited
- * default that silently does the wrong thing.</p>
- *
  * @param <V> Type of the view value presented by this cursor
  * @param <S> Type of the stored value held by the base cursor
  */
-public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends ALatticeCursor<V> {
+public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AForkableCursor<V> {
 
 	protected final ACursor<S> base;
+	private final Shape<V> shape;
 
-	protected AUpdateCursor(ACursor<S> base, ALattice<V> lattice, LatticeContext context) {
-		super(lattice, context, null);
+	protected AUpdateCursor(ACursor<S> base, Shape<V> shape, LatticeContext context) {
+		super(null, context);
 		this.base = base;
+		this.shape = (shape == null) ? Shape.none() : shape;
+	}
+
+	@Override
+	public Shape<V> shape() {
+		return shape;
 	}
 
 	@Override
 	protected Lock exclusiveLock() {
-		return (base instanceof ALatticeCursor<?> latticeCursor) ? latticeCursor.exclusiveLock() : null;
+		return base.exclusiveLock();
 	}
 
 	@Override
-	protected LatticeContext getInheritedContext() {
-		if (base instanceof ALatticeCursor<?> latticeCursor) return latticeCursor.getContext();
-		return LatticeContext.EMPTY;
+	protected LatticeContext inheritedContext() {
+		return base.getContext();
 	}
 
 	/**
@@ -148,14 +148,13 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 
 	@Override
 	public V sync() {
-		if (base instanceof ALatticeCursor<?> lc) {
-			lc.sync();
-		} else {
-			throw new IllegalStateException(
-				getClass().getSimpleName() + ".sync(): base cursor is not an ALatticeCursor (got " +
-				base.getClass().getSimpleName() + "). Sync cannot propagate.");
+		if (base instanceof AForkableCursor<?> forkable) {
+			forkable.sync();
+			return get();
 		}
-		return get();
+		throw new IllegalStateException(
+			getClass().getSimpleName() + ".sync(): base cursor is not forkable (got " +
+			base.getClass().getSimpleName() + "). Sync cannot propagate.");
 	}
 
 	@Override
@@ -216,15 +215,4 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 		if (!Utils.equals(expected, view(cur))) return false;
 		return base.compareAndSet(cur, new PreparedWrite().apply(cur, newValue));
 	}
-
-	/**
-	 * Converge an external value into the stored cell. Abstract: a subclass either
-	 * <em>selects</em> a winner (store as-is, no re-application of
-	 * {@link #prepareWrite}) or <em>synthesises</em> a new value (re-apply it).
-	 *
-	 * @param other Value to merge
-	 * @return The merged view value
-	 */
-	@Override
-	public abstract V merge(V other);
 }

@@ -5,7 +5,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
 /**
@@ -28,9 +28,9 @@ import convex.lattice.cursor.Cursors;
  */
 public class LatticeQueue {
 
-	private final ALatticeCursor<AVector<ACell>> cursor;
+	private final AForkableCursor<AVector<ACell>> cursor;
 
-	public LatticeQueue(ALatticeCursor<AVector<ACell>> cursor) {
+	public LatticeQueue(AForkableCursor<AVector<ACell>> cursor) {
 		this.cursor = cursor;
 	}
 
@@ -38,14 +38,14 @@ public class LatticeQueue {
 	 * Creates a new empty queue.
 	 */
 	public static LatticeQueue create() {
-		ALatticeCursor<AVector<ACell>> cursor = Cursors.createLattice(QueueLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> cursor = Cursors.root(QueueLattice.INSTANCE);
 		return new LatticeQueue(cursor);
 	}
 
 	/**
 	 * Returns the underlying lattice cursor.
 	 */
-	public ALatticeCursor<AVector<ACell>> cursor() {
+	public AForkableCursor<AVector<ACell>> cursor() {
 		return cursor;
 	}
 
@@ -53,7 +53,7 @@ public class LatticeQueue {
 	 * Creates a forked copy of this queue for independent operation.
 	 */
 	public LatticeQueue fork() {
-		return new LatticeQueue(cursor.fork());
+		return new LatticeQueue(cursor.fork(QueueLattice.INSTANCE));
 	}
 
 	/**

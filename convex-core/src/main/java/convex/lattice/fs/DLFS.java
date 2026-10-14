@@ -8,7 +8,7 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.impl.DLFSLocal;
 
@@ -20,38 +20,38 @@ public class DLFS {
 	public static final int MAX_NAME_LENGTH=255;
 
 	private static final DLFSProvider PROVIDER=new DLFSProvider();
-	
+
 	/**
 	 * URI scheme for DLFS
 	 */
 	public static final String SCHEME = "dlfs";
 
 	public static final String ROOT_STRING = "/";
-	
+
 	public static DLFSProvider provider() {
 		return PROVIDER;
 	}
-	
+
 	/**
-	 * Creates a standalone DLFS drive with its own root lattice cursor.
+	 * Creates a standalone DLFS drive with its own root cursor.
 	 * @return A new local DLFS filesystem
 	 */
 	public static DLFSLocal create() {
-		return new DLFSLocal(PROVIDER,null,Cursors.createLattice(DLFSLattice.INSTANCE));
+		return new DLFSLocal(PROVIDER,null,Cursors.root(DLFSLattice.INSTANCE));
 	}
 
 	/**
-	 * Connects a named drive under a parent lattice cursor, creating its zero value
-	 * if absent. Changes to the drive propagate through to the parent cursor.
+	 * Connects a named drive under a parent cursor, creating its zero value if
+	 * absent. Changes to the drive propagate through to the parent cursor.
 	 *
 	 * <p>File data remains heap-backed. For incremental blob persistence during
-	 * streamed writes use {@link #connect(ALatticeCursor, AString, AStore)}.</p>
+	 * streamed writes use {@link #connect(AForkableCursor, AString, AStore)}.</p>
 	 *
-	 * @param parent Parent lattice cursor (e.g. a signed drives map)
+	 * @param parent Parent cursor (e.g. an owner's drives map)
 	 * @param driveName Name of the drive within the parent
 	 * @return A local DLFS filesystem connected to the parent
 	 */
-	public static DLFSLocal connect(ALatticeCursor<?> parent, AString driveName) {
+	public static DLFSLocal connect(AForkableCursor<?> parent, AString driveName) {
 		return connect(parent,driveName,(AStore)null);
 	}
 
@@ -61,13 +61,13 @@ public class DLFS {
 	 * while the filesystem is in use; it should be the store which publishes the
 	 * containing lattice root.
 	 *
-	 * @param parent Parent lattice cursor
+	 * @param parent Parent cursor
 	 * @param driveName Name of the drive within the parent
 	 * @param store Store for incremental blob persistence, or null for heap-only data
 	 * @return A connected filesystem
 	 */
-	public static DLFSLocal connect(ALatticeCursor<?> parent, AString driveName, AStore store) {
-		ALatticeCursor<AVector<ACell>> cursor=parent.path(driveName);
+	public static DLFSLocal connect(AForkableCursor<?> parent, AString driveName, AStore store) {
+		AForkableCursor<AVector<ACell>> cursor=parent.child(driveName,DLFSLattice.INSTANCE);
 		// Atomic initialisation must not replace another caller's concurrent writes.
 		cursor.updateAndGet(current -> current!=null?current:DLFSLattice.INSTANCE.zero());
 		return (store==null)
@@ -78,14 +78,14 @@ public class DLFS {
 	/**
 	 * Opens an existing named drive without creating it. Intended for registries
 	 * which keep the parent map as their source of truth: unlike
-	 * {@link #connect(ALatticeCursor, AString)}, a concurrent deletion cannot be
+	 * {@link #connect(AForkableCursor, AString)}, a concurrent deletion cannot be
 	 * reversed merely by opening a cached view. File data remains heap-backed.
 	 *
-	 * @param parent Parent lattice cursor containing named drives
+	 * @param parent Parent cursor containing named drives
 	 * @param driveName Existing drive name
 	 * @return Connected filesystem view, or {@code null} if the drive is absent
 	 */
-	public static DLFSLocal open(ALatticeCursor<?> parent, AString driveName) {
+	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName) {
 		return open(parent,driveName,(AStore)null);
 	}
 
@@ -93,13 +93,13 @@ public class DLFS {
 	 * Opens an existing drive with incremental blob persistence in the supplied
 	 * store. The caller retains ownership of the store.
 	 *
-	 * @param parent Parent lattice cursor containing named drives
+	 * @param parent Parent cursor containing named drives
 	 * @param driveName Existing drive name
 	 * @param store Store for incremental blob persistence, or null for heap-only data
 	 * @return Connected filesystem view, or {@code null} if the drive is absent
 	 */
-	public static DLFSLocal open(ALatticeCursor<?> parent, AString driveName, AStore store) {
-		ALatticeCursor<AVector<ACell>> cursor=parent.path(driveName);
+	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName, AStore store) {
+		AForkableCursor<AVector<ACell>> cursor=parent.child(driveName,DLFSLattice.INSTANCE);
 		if (cursor.get()==null) return null;
 		return (store==null)
 			?new DLFSLocal(PROVIDER,driveName.toString(),cursor)

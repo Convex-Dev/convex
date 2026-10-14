@@ -47,7 +47,7 @@ public class LatticeKVTest {
 	@Test
 	public void testInjectedTimestamp() {
 		CVMLong fixed = CVMLong.create(123456789L);
-		var cursor = Cursors.createLattice(KVStoreLattice.INSTANCE);
+		var cursor = Cursors.root(KVStoreLattice.INSTANCE);
 		cursor.setContext(LatticeContext.create(fixed, null));
 		LatticeKV kv = LatticeKV.connect(cursor);
 
@@ -447,8 +447,8 @@ public class LatticeKVTest {
 		LatticeKV root = LatticeKV.create(Strings.create("root"));
 
 		// Create forks with different replica IDs for PN-counter
-		LatticeKV fork1 = new LatticeKV(root.cursor().fork(), Strings.create("replica-1"));
-		LatticeKV fork2 = new LatticeKV(root.cursor().fork(), Strings.create("replica-2"));
+		LatticeKV fork1 = root.fork(Strings.create("replica-1"));
+		LatticeKV fork2 = root.fork(Strings.create("replica-2"));
 
 		// Both increment independently
 		fork1.incrby("counter", 5);

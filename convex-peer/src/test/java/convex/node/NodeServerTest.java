@@ -447,11 +447,11 @@ public class NodeServerTest {
 		c.set(CVMLong.create(5));
 
 		// A correct-type value merges (MaxLattice keeps the larger)
-		assertTrue(maxNodeServer.mergeIncoming(c, CVMLong.create(7)));
+		assertTrue(maxNodeServer.mergeIncoming(c, lattice, CVMLong.create(7)));
 		assertEquals(CVMLong.create(7), c.get());
 
 		// A wrong-type value is rejected; the cursor is unchanged
-		assertFalse(maxNodeServer.mergeIncoming(c, convex.core.data.Blob.wrap(new byte[8])));
+		assertFalse(maxNodeServer.mergeIncoming(c, lattice, convex.core.data.Blob.wrap(new byte[8])));
 		assertEquals(CVMLong.create(7), c.get());
 	}
 
@@ -626,7 +626,7 @@ public class NodeServerTest {
 		var c = maxNodeServer.getCursor();
 		c.set(CVMLong.create(5));
 
-		assertFalse(maxNodeServer.mergeIncoming(c, CVMLong.create(7)),
+		assertFalse(maxNodeServer.mergeIncoming(c, maxNodeServer.getLattice(), CVMLong.create(7)),
 			"a recursive stack overflow must be caught and rejected");
 		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted merge");
 	}
@@ -639,7 +639,7 @@ public class NodeServerTest {
 		c.set(CVMLong.create(5));
 
 		assertThrows(OutOfMemoryError.class,
-			() -> maxNodeServer.mergeIncoming(c, CVMLong.create(7)));
+			() -> maxNodeServer.mergeIncoming(c, maxNodeServer.getLattice(), CVMLong.create(7)));
 		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted fatal merge");
 	}
 
@@ -949,7 +949,7 @@ public class NodeServerTest {
 		assertSame(store, propagator.getStore(),
 			"the application group should share the authoritative cursor store");
 
-		setNodeServer.getCursor().merge(expected);
+		setNodeServer.mergeValue(expected);
 		syncAndAwaitPropagator(setNodeServer);
 		Hash rootHash = expected.getHash();
 
@@ -1839,8 +1839,8 @@ public class NodeServerTest {
 			propagator(target);
 			source.launch();
 			target.launch();
-			source.getCursor().path(regionA).merge(CVMLong.create(111));
-			source.getCursor().path(regionB).merge(CVMLong.create(222));
+			source.mergeAt(CVMLong.create(111),regionA);
+			source.mergeAt(CVMLong.create(222),regionB);
 			syncAndAwaitPropagator(source);
 
 			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
@@ -1864,8 +1864,8 @@ public class NodeServerTest {
 			propagator(target);
 			source.launch();
 			target.launch();
-			source.getCursor().path(regionA).merge(CVMLong.create(111));
-			source.getCursor().path(regionB).merge(CVMLong.create(222));
+			source.mergeAt(CVMLong.create(111),regionA);
+			source.mergeAt(CVMLong.create(222),regionB);
 			syncAndAwaitPropagator(source);
 
 			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
@@ -1890,7 +1890,7 @@ public class NodeServerTest {
 			propagator(target);
 			source.launch();
 			target.launch();
-			source.getCursor().path(region).merge(expected);
+			source.mergeAt(expected,region);
 			syncAndAwaitPropagator(source);
 
 			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
@@ -1921,7 +1921,7 @@ public class NodeServerTest {
 			propagator(target);
 			source.launch();
 			target.launch();
-			source.getCursor().path(region).merge(expected);
+			source.mergeAt(expected,region);
 			syncAndAwaitPropagator(source);
 
 			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
@@ -1984,7 +1984,7 @@ public class NodeServerTest {
 			propagator(target);
 			source.launch();
 			target.launch();
-			source.getCursor().path(region).merge(expected);
+			source.mergeAt(expected,region);
 			syncAndAwaitPropagator(source);
 
 			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
@@ -2033,14 +2033,14 @@ public class NodeServerTest {
 
 				// Within the delta budget: chunks then root
 				ASet<ACell> withinBudget=branchySet(6); // ~24 KB
-				source.getCursor().path(region).merge(withinBudget);
+				source.mergeAt(withinBudget,region);
 				syncAndAwaitPropagator(source);
 				assertEquals(withinBudget,target.pullPath(peer,region).get(5,TimeUnit.SECONDS));
 
 				// Beyond the delta budget: root only, then acquired
 				ASet<ACell> beyondBudget=withinBudget;
 				for (ACell branch : branchySet(6)) beyondBudget=beyondBudget.include(branch); // ~48 KB
-				source.getCursor().path(region).merge(beyondBudget);
+				source.mergeAt(beyondBudget,region);
 				syncAndAwaitPropagator(source);
 				assertEquals(beyondBudget,target.pullPath(peer,region).get(5,TimeUnit.SECONDS));
 				for (ACell branch : beyondBudget) {
@@ -2068,9 +2068,9 @@ public class NodeServerTest {
 			propagator(target);
 			source.launch();
 			target.launch();
-			target.getCursor().path(rejected).merge(CVMLong.create(7));
+			target.mergeAt(CVMLong.create(7),rejected);
 			target.getCursor().sync();
-			source.getCursor().path(rejected).merge(Sets.of(CVMLong.ONE));
+			source.mergeAt(Sets.of(CVMLong.ONE),rejected);
 			syncAndAwaitPropagator(source);
 
 			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
@@ -2094,7 +2094,7 @@ public class NodeServerTest {
 			propagator(target);
 			source.launch();
 			target.launch();
-			source.getCursor().path(outer,inner).merge(CVMLong.create(42));
+			source.mergeAt(CVMLong.create(42),outer,inner);
 			syncAndAwaitPropagator(source);
 
 			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {

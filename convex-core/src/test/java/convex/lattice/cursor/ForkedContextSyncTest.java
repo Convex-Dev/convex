@@ -33,11 +33,11 @@ public class ForkedContextSyncTest {
 	@Test
 	public void syncUsesCurrentParentContextForSynthesisedSignedValue() {
 		SignedLattice<ASet<CVMLong>> lattice = SignedLattice.create(SetLattice.create());
-		RootLatticeCursor<SignedData<ASet<CVMLong>>> root = Cursors.createLattice(
-			lattice, ALICE_KEY.signData(Sets.of(CVMLong.ONE)));
+		Root<SignedData<ASet<CVMLong>>> root = Cursors.root(
+			ALICE_KEY.signData(Sets.of(CVMLong.ONE)), lattice, null);
 		root.setContext(LatticeContext.create(null, ALICE_KEY));
 
-		ALatticeCursor<SignedData<ASet<CVMLong>>> fork = root.fork();
+		AForkableCursor<SignedData<ASet<CVMLong>>> fork = root.fork(lattice);
 		fork.set(ALICE_KEY.signData(Sets.of(CVMLong.ONE, CVMLong.create(2))));
 
 		root.set(ALICE_KEY.signData(Sets.of(CVMLong.ONE, CVMLong.create(3))));
@@ -54,8 +54,8 @@ public class ForkedContextSyncTest {
 		LWWLattice<ACell> lattice = LWWLattice.create(JSONLattice.INSTANCE,
 			ForkedContextSyncTest::timestamp);
 		AHashMap<Keyword, ACell> initial = value(1, "initial");
-		RootLatticeCursor<ACell> root = Cursors.createLattice(lattice, initial);
-		ALatticeCursor<ACell> fork = root.fork();
+		Root<ACell> root = Cursors.root(initial, lattice, null);
+		AForkableCursor<ACell> fork = root.fork(lattice);
 
 		fork.set(value(2, "fork"));
 		AHashMap<Keyword, ACell> parentValue = value(3, "parent");

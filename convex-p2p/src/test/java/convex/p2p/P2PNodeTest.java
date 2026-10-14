@@ -172,10 +172,11 @@ public class P2PNodeTest {
 	public void testDefaultNodeServesApplicationRegions() {
 		node = P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate());
 
-		var root=node.getNodeServer().getRootComponent().cursor();
+		var host=node.getNodeServer().getRootComponent();
+		var root=host.cursor();
 		var application=node.getApplication().cursor();
 		assertNotSame(root,application);
-		assertSame(root.getLattice(),application.getLattice());
+		assertSame(host.getLattice(),node.getApplication().getLattice());
 		assertSame(root.get(),application.get());
 		assertNotNull(node.getNodeServer().getLattice().path(Social.KEY_SOCIAL));
 		assertNotNull(node.getNodeServer().getLattice().path(Keywords.P2P, Keywords.NODES));

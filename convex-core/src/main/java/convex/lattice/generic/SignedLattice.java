@@ -12,6 +12,8 @@ import convex.core.data.SignedData;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.Shape;
+import convex.lattice.Signing;
 
 /**
  * Lattice node representing signed Data.
@@ -31,7 +33,7 @@ import convex.lattice.LatticeContext;
  *
  * @param <V> Type of signed lattice value
  */
-public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
+public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> implements Signing<V> {
 
 
 	protected final ALattice<V> valueNode;
@@ -83,6 +85,12 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	/** Returns the lattice for the unsigned value. */
 	public ALattice<V> getValueLattice() {
 		return valueNode;
+	}
+
+	/** Returns the shape of the unsigned value, for the signing cursor's writes below it. */
+	@Override
+	public Shape<V> getValueShape() {
+		return (valueNode!=null)?valueNode:Shape.none();
 	}
 
 	/**

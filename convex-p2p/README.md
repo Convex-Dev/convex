@@ -82,7 +82,7 @@ leaves the others to their owners, instead of aborting the whole merge.
 
 **The two-argument merge skips the check entirely.** `merge(own, other)` does not verify
 the signer against the owner key — only the context-aware overload does. Every real path
-is safe (`ALatticeCursor.merge` always passes a context, and `LatticeContext.EMPTY` still
+is safe (every cursor merge a component or host performs passes a context, and `LatticeContext.EMPTY` still
 triggers the `AccountKey` fast path), but don't reach for a raw `ALattice.merge(a, b)`
 on these regions.
 

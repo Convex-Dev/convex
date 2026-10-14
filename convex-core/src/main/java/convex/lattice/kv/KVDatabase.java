@@ -10,7 +10,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
 
@@ -123,9 +123,9 @@ public class KVDatabase {
 	 * @param name Database name to connect to
 	 * @return New KVDatabase connected to the cursor chain
 	 */
-	public static KVDatabase connect(ALatticeCursor<?> parent, String name) {
+	public static KVDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		ALatticeCursor<Index<AString, AVector<ACell>>> cursor = parent.path(dbName);
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = parent.child(dbName, KVStoreLattice.INSTANCE);
 		if (cursor.get() == null) {
 			cursor.set(KVStoreLattice.INSTANCE.zero());
 		}
@@ -141,9 +141,9 @@ public class KVDatabase {
 	 * @param replicaID Replica ID for PN-counter operations
 	 * @return New KVDatabase connected to the cursor chain
 	 */
-	public static KVDatabase connect(ALatticeCursor<?> parent, String name, AString replicaID) {
+	public static KVDatabase connect(AForkableCursor<?> parent, String name, AString replicaID) {
 		AString dbName = Strings.create(name);
-		ALatticeCursor<Index<AString, AVector<ACell>>> cursor = parent.path(dbName);
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = parent.child(dbName, KVStoreLattice.INSTANCE);
 		if (cursor.get() == null) {
 			cursor.set(KVStoreLattice.INSTANCE.zero());
 		}
@@ -245,7 +245,7 @@ public class KVDatabase {
 
 			Index<AString, AVector<ACell>> remoteState = (Index<AString, AVector<ACell>>) dbMap.get(dbName);
 			if (remoteState != null) {
-				kv.cursor().merge(remoteState);
+				kv.cursor().merge(KVStoreLattice.INSTANCE, remoteState);
 				merged++;
 			}
 		}

@@ -5,53 +5,62 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.Merge;
+import convex.lattice.Shape;
 
 /**
- * A forked lattice cursor - an independent working copy forked from a parent.
+ * A forked cursor: an independent working copy of a parent cursor's value.
  *
- * <p>Uses a {@link RootLatticeCursor} internally for local storage, adding lattice-aware
- * sync operations on top.</p>
+ * <p>Uses a {@link Root} internally for local storage. Modifications don't affect
+ * the parent until {@link #sync()} is called. A fork captures its resolved context
+ * policy for local writes, so a dynamic policy continues to resolve dynamically.</p>
  *
- * <p>Modifications to a forked cursor don't affect the parent until {@link #sync()}
- * is called. A fork captures its resolved context policy for local writes, so a
- * dynamic policy continues to resolve dynamically. If the parent changed since the
- * fork, sync merges the local fork value with the parent using the parent's current
- * effective context.</p>
+ * <p>The merge function supplied at fork time decides what {@code sync()} does when
+ * the parent has changed since the fork: with one, the two values converge; without
+ * one, the fork's value overwrites the parent (write-back). The component owning the
+ * level supplies the function, usually its lattice.</p>
  *
  * <h3>Concurrent writes during sync</h3>
  * <p>{@link #sync()} is safe to call while other threads are writing to the fork.
  * Sync atomically propagates local changes to the parent, then optimistically
  * updates the local cursor via CAS. If concurrent writes landed between the
- * read and the CAS, the CAS fails and sync falls back to a lattice merge,
+ * read and the CAS, the CAS fails and sync falls back to a merge,
  * preserving both the synced value and the concurrent writes.</p>
  *
  * @param <V> Type of cursor values
  */
-public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
+public class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
-	private final ALatticeCursor<V> parent;
-	private final RootLatticeCursor<V> localCursor;
+	private final AForkableCursor<V> parent;
+	private final Root<V> localCursor;
 	private volatile V forkPoint;
 	private final LatticeContext forkContext;
+	private final Merge<V> merge;
 
 	/**
 	 * Creates a forked cursor from a parent.
 	 *
 	 * @param parent The parent cursor to fork from
-	 * @param lattice The lattice defining merge semantics
 	 * @param currentValue The value at the time of fork
 	 * @param context Resolved context policy captured at fork time
+	 * @param merge Merge used by sync, or null for write-back
 	 */
-	ForkedLatticeCursor(ALatticeCursor<V> parent, ALattice<V> lattice, V currentValue, LatticeContext context) {
-		super(lattice, null, currentValue);
+	ForkedCursor(AForkableCursor<V> parent, V currentValue, LatticeContext context, Merge<V> merge) {
+		super(currentValue);
 		this.parent = parent;
-		this.localCursor = parent.supportsExclusiveTransactions()
-			? new TransactionalRootCursor<>(lattice,currentValue,context)
-			: new RootLatticeCursor<>(lattice,currentValue,context);
+		this.merge = merge;
+		Shape<V> shape = parent.shape();
+		this.localCursor = (parent.exclusiveLock() != null)
+			? new TransactionalRootCursor<>(currentValue, shape, context)
+			: new Root<>(currentValue, shape, context);
 		this.forkPoint = currentValue;
 		this.forkContext = (context != null) ? context : LatticeContext.EMPTY;
+	}
+
+	@Override
+	public Shape<V> shape() {
+		return parent.shape();
 	}
 
 	@Override
@@ -60,7 +69,7 @@ public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 	}
 
 	@Override
-	protected LatticeContext getInheritedContext() {
+	protected LatticeContext inheritedContext() {
 		return forkContext;
 	}
 
@@ -81,10 +90,10 @@ public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 			if (parentValue == forkPoint) {
 				// Fast path: parent unchanged since fork
 				return localVal;
-			} else if (lattice != null) {
-				return lattice.merge(parent.getContext(), localVal, parentValue);
+			} else if (merge != null) {
+				return merge.merge(parent.getContext(), localVal, parentValue);
 			} else {
-				// Null lattice: write-back (overwrite parent)
+				// No merge function: write-back (overwrite parent)
 				return localVal;
 			}
 		});
@@ -104,11 +113,11 @@ public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 		// recent write, (b) strictly newer writes still win via timestamp
 		// comparison, (c) strictly older writes cannot clobber the fork.
 		if (!localCursor.compareAndSet(localVal, synced)) {
-			if (lattice != null) {
+			if (merge != null) {
 				localCursor.updateAndGet(current ->
-					lattice.merge(getContext(), current, synced));
+					merge.merge(getContext(), current, synced));
 			}
-			// Null lattice with concurrent writers: no well-defined merge.
+			// No merge function with concurrent writers: no well-defined merge.
 			// Leave concurrent writes in place — they will propagate to parent
 			// on the next sync. This preserves caller data at the cost of a
 			// brief local/parent divergence.
@@ -117,7 +126,7 @@ public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 		return synced;
 	}
 
-	// ===== Delegate to Root cursor =====
+	// ===== Delegate to local root =====
 
 	@Override
 	public V get() {

@@ -39,8 +39,9 @@ import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDrive;
 import convex.dlfs.DLFSRegion;
+import convex.lattice.ALattice;
 import convex.lattice.generic.KeyedLattice;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -98,27 +99,27 @@ public class SharedApplicationsTest {
 			implements TransactionalComponent<Index<Keyword,ACell>,SocialWithP2P> {
 		final Social social;
 		SocialWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host.cursor().view().setContext(context(SOCIAL_KEY)));
+			this(host.getLattice(),host.cursor().view().setContext(context(SOCIAL_KEY)));
 		}
-		SocialWithP2P(ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			super(cursor);
+		SocialWithP2P(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor) {
+			super(lattice,cursor);
 			social=Social.connect(this);
 		}
-		@Override public SocialWithP2P withCursor(ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			return new SocialWithP2P(cursor);
+		@Override public SocialWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
+			return new SocialWithP2P(getLattice(),cursor);
 		}
 	}
 
 	private static final class FilesWithP2P extends DLFSApplication<Index<Keyword,ACell>>
 			implements TransactionalComponent<Index<Keyword,ACell>,FilesWithP2P> {
 		FilesWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host.cursor().view().setContext(context(FILES_KEY)),host.store());
+			this(host.getLattice(),host.cursor().view().setContext(context(FILES_KEY)),host.store());
 		}
-		FilesWithP2P(ALatticeCursor<Index<Keyword,ACell>> cursor,AStore store) {
-			super(cursor,store,Keywords.FS);
+		FilesWithP2P(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor,AStore store) {
+			super(lattice,cursor,store,Keywords.FS);
 		}
-		@Override public FilesWithP2P withCursor(ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			return new FilesWithP2P(cursor,store());
+		@Override public FilesWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
+			return new FilesWithP2P(getLattice(),cursor,store());
 		}
 		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner); }
 	}

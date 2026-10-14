@@ -21,9 +21,9 @@ import convex.core.util.Shutdown;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.Root;
 
 /**
  * Hosts one authoritative lattice value and its durable root.
@@ -63,7 +63,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final ALattice<V> lattice;
 	private final AStore store;
 	private final NodeConfig config;
-	private final RootLatticeCursor<V> cursor;
+	private final Root<V> cursor;
 	private final RootComponent<V> rootComponent;
 	/** Immutable snapshots let publication proceed independently of group removal. */
 	private volatile List<LatticePropagator> propagators=List.of();
@@ -104,9 +104,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.mergeContext=LatticeContext.EMPTY.withMaxFutureTimestampSkew(
 			this.config.getMaxFutureTimestampSkew());
 		this.cursor=this.config.isTransactionalRoot()
-			? Cursors.createTransactionalLattice(lattice,lattice.zero(),mergeContext)
-			: Cursors.createLattice(lattice,lattice.zero(),mergeContext);
-		this.rootComponent=new RootComponent<>(cursor,store);
+			? Cursors.transactionalRoot(lattice.zero(),lattice,mergeContext)
+			: Cursors.root(lattice.zero(),lattice,mergeContext);
+		this.rootComponent=new RootComponent<>(lattice,cursor,store);
 	}
 
 	/**
@@ -167,7 +167,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			ACell restored=store.getRootData();
 			if (restored!=null) {
 				// Pre-launch local edits take precedence over replicated/persisted ties.
-				cursor.merge((V)restored);
+				cursor.merge(lattice,(V)restored);
 				log.info("Restored authoritative lattice value from node store");
 			}
 		} catch (IOException e) {
@@ -244,10 +244,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 		requireAttached(source);
 		return source.pullPath(peer,background,path).thenApply(acquired -> {
 			requireAttached(source);
-			ALatticeCursor<ACell> target=cursor.path(path);
-			if (acquired!=null) mergeIncoming(target,acquired);
+			ALattice<ACell> target=lattice.path(path);
+			if (target==null) throw new IllegalArgumentException("Path is outside the served lattice");
+			AForkableCursor<ACell> targetCursor=rootComponent.resolve(path);
+			if (acquired!=null) mergeIncoming(targetCursor,target,acquired);
 			cursor.sync();
-			return target.get();
+			return targetCursor.get();
 		});
 	}
 
@@ -338,7 +340,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Merges an application-supplied value into memory. Call {@link ALatticeCursor#sync()}
+	 * Merges an application-supplied value into memory. Call {@link AForkableCursor#sync()}
 	 * when the update should be published and persisted.
 	 *
 	 * @param receivedValue complete foreign lattice value
@@ -346,7 +348,27 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	public V mergeValue(V receivedValue) {
 		if (receivedValue==null || !lattice.checkForeign(receivedValue)) return null;
-		return cursor.merge(receivedValue);
+		return cursor.merge(lattice,receivedValue);
+	}
+
+	/**
+	 * Merges an application-supplied value at a path within the authoritative value,
+	 * using the sub-lattice the served lattice defines at that path. Absent regions
+	 * along the path are created with their declared types. Call
+	 * {@link AForkableCursor#sync()} on the cursor when the update should be
+	 * published and persisted.
+	 *
+	 * @param <T> value type at the path
+	 * @param value value to merge
+	 * @param path path within the served lattice
+	 * @return merged value at the path
+	 * @throws IllegalArgumentException if the path lies outside the served lattice
+	 */
+	public <T extends ACell> T mergeAt(T value, ACell... path) {
+		ALattice<T> target=lattice.path(path);
+		if (target==null) throw new IllegalArgumentException("Path is outside the served lattice");
+		AForkableCursor<T> targetCursor=rootComponent.resolve(path);
+		return targetCursor.merge(target,value);
 	}
 
 	/**
@@ -363,7 +385,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @return authoritative cursor
 	 */
-	public ALatticeCursor<V> getCursor() {
+	public AForkableCursor<V> getCursor() {
 		return cursor;
 	}
 
@@ -610,25 +632,31 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * acquisition or filtering concern crosses this boundary.
 	 */
 	MergeOutcome mergeInbound(ACell[] path,ACell value) {
-		ALatticeCursor<ACell> target;
+		ALattice<ACell> target;
+		AForkableCursor<ACell> targetCursor;
 		try {
-			target=cursor.path(path);
+			target=lattice.path(path);
+			if (target==null) {
+				log.debug("Rejected inbound lattice path outside the served lattice");
+				return MergeOutcome.REJECTED;
+			}
+			targetCursor=rootComponent.resolve(path);
 		} catch (RuntimeException | StackOverflowError e) {
 			log.debug("Rejected invalid inbound lattice path",e);
 			return MergeOutcome.REJECTED;
 		}
-		ACell before=target.get();
-		if (!mergeIncoming(target,value)) return MergeOutcome.REJECTED;
-		ACell after=target.get();
+		ACell before=targetCursor.get();
+		if (!mergeIncoming(targetCursor,target,value)) return MergeOutcome.REJECTED;
+		ACell after=targetCursor.get();
 		boolean changed=before!=after && (before==null || !before.equals(after));
 		if (changed) cursor.sync();
 		return new MergeOutcome(true,changed);
 	}
 
 	@SuppressWarnings("unchecked")
-	<T extends ACell> boolean mergeIncoming(ALatticeCursor<T> target,ACell value) {
+	<T extends ACell> boolean mergeIncoming(AForkableCursor<T> target,ALattice<T> merge,ACell value) {
 		try {
-			target.merge((T)value);
+			target.merge(merge,(T)value);
 			return true;
 		} catch (ClassCastException e) {
 			log.warn("Rejected inbound lattice value of wrong type: {}",

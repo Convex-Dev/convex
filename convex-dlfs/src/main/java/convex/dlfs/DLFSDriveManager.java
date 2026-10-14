@@ -10,7 +10,7 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.fs.DLFS;
 
 /**
@@ -65,7 +65,7 @@ public class DLFSDriveManager {
 	 *
 	 * @param drivesCursor Cursor over a {@code MapLattice<AString, DLFSLattice>}
 	 */
-	public DLFSDriveManager(ALatticeCursor<AHashMap<AString, AVector<ACell>>> drivesCursor) {
+	public DLFSDriveManager(AForkableCursor<AHashMap<AString, AVector<ACell>>> drivesCursor) {
 		this(DLFSDrives.wrap(drivesCursor));
 	}
 

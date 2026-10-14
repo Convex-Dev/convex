@@ -23,9 +23,10 @@ import convex.core.data.AHashMap;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ALatticeCursor;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
+import convex.lattice.cursor.Transactions;
 
 class TransactionalComponentTest {
 
@@ -34,8 +35,8 @@ class TransactionalComponentTest {
 
 	private static final class Counter extends ALatticeComponent<AHashMap<Keyword,ACell>>
 			implements TransactionalComponent<AHashMap<Keyword,ACell>,Counter> {
-		Counter(ALatticeCursor<AHashMap<Keyword,ACell>> cursor) { super(cursor); }
-		@Override public Counter withCursor(ALatticeCursor<AHashMap<Keyword,ACell>> cursor) {
+		Counter(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { super(cursor); }
+		@Override public Counter withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Counter(cursor);
 		}
 		void increment() {
@@ -50,8 +51,8 @@ class TransactionalComponentTest {
 	private static AHashMap<Keyword,ACell> initial() { return Maps.of(COUNT,CVMLong.ZERO); }
 	private static Counter counter() { return counter(false); }
 	private static Counter counter(boolean coordinated) {
-		return new Counter(coordinated?new TransactionalRootCursor<>(null,initial())
-			:new RootLatticeCursor<>(null,initial()));
+		return new Counter(coordinated?new TransactionalRootCursor<>(initial())
+			:new Root<>(initial()));
 	}
 
 	@ParameterizedTest
@@ -125,7 +126,7 @@ class TransactionalComponentTest {
 
 	@Test void identicalConcurrentResultDoesNotCoalesceOperations() {
 		AtomicInteger commits=new AtomicInteger();
-		var root=new RootLatticeCursor<AHashMap<Keyword,ACell>>(null,initial()) {
+		var root=new Root<AHashMap<Keyword,ACell>>(initial()) {
 			@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> next) {
 				if (commits.incrementAndGet()==1) {
 					super.set(next); // another increment computes the same value
@@ -143,7 +144,7 @@ class TransactionalComponentTest {
 
 	@Test void conflictingAttemptsFallBackToExclusiveExecution() {
 		AtomicInteger exclusiveCalls=new AtomicInteger(), commits=new AtomicInteger(), callbacks=new AtomicInteger();
-		var root=new TransactionalRootCursor<AHashMap<Keyword,ACell>>(null,initial()) {
+		var root=new TransactionalRootCursor<AHashMap<Keyword,ACell>>(initial()) {
 			// Count acquisitions of the real root lock; a substitute lock would not exclude writes.
 			@Override protected Lock exclusiveLock() {
 				Lock real=super.exclusiveLock();
@@ -172,7 +173,7 @@ class TransactionalComponentTest {
 	}
 
 	@Test void unrelatedPathChangesReuseTheDraft() throws Exception {
-		var root=new RootLatticeCursor<AHashMap<Keyword,ACell>>(null,
+		var root=new Root<AHashMap<Keyword,ACell>>(
 			Maps.of(COUNT,initial(),OTHER,CVMLong.ZERO));
 		Counter child=new Counter(root.path(COUNT));
 		CountDownLatch read=new CountDownLatch(1), changed=new CountDownLatch(1);
@@ -237,7 +238,7 @@ class TransactionalComponentTest {
 
 	@Test void ordinaryRootRetriesBeyondTheFallbackThreshold() {
 		AtomicInteger commits=new AtomicInteger();
-		var root=new RootLatticeCursor<AHashMap<Keyword,ACell>>(null,initial()) {
+		var root=new Root<AHashMap<Keyword,ACell>>(initial()) {
 			@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> next) {
 				if (commits.incrementAndGet()<=5) return false;
 				return super.compareAndSet(expected,next);
@@ -265,14 +266,14 @@ class TransactionalComponentTest {
 		var before=live.cursor().get();
 		live.transact(draft -> draft.cursor().set(initial()));
 		assertSame(before,live.cursor().get());
-		live.cursor().path(OTHER).transact(draft -> assertNull(draft.get()));
+		Transactions.transact(live.cursor().path(OTHER),draft -> assertNull(draft.get()));
 		assertSame(before,live.cursor().get());
 	}
 
 	@Test void capabilitiesFollowViewsPathsAndForks() {
 		for (boolean coordinated:new boolean[]{false,true}) {
-			var root=coordinated?new TransactionalRootCursor<>(null,initial())
-				:new RootLatticeCursor<>(null,initial());
+			var root=coordinated?new TransactionalRootCursor<>(initial())
+				:new Root<>(initial());
 			assertEquals(coordinated,root.view().supportsExclusiveTransactions());
 			assertEquals(coordinated,root.path(COUNT).supportsExclusiveTransactions());
 			assertEquals(coordinated,root.view().fork().supportsExclusiveTransactions());

@@ -12,7 +12,7 @@ import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Cursor wrapper for a user's post feed.
@@ -32,7 +32,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 
 	private final AString author;
 
-	Feed(ALatticeCursor<Index<Blob, ACell>> cursor, AString author) {
+	Feed(AForkableCursor<Index<Blob, ACell>> cursor, AString author) {
 		super(cursor);
 		this.author = author;
 	}
@@ -156,7 +156,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	}
 
 	@Override
-	public Feed withCursor(ALatticeCursor<Index<Blob, ACell>> cursor) {
+	public Feed withCursor(AForkableCursor<Index<Blob, ACell>> cursor) {
 		return new Feed(cursor,author);
 	}
 

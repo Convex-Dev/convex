@@ -3,14 +3,14 @@ package convex.lattice.cursor;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
-import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.generic.AOwnerLattice;
-import convex.lattice.generic.SignedLattice;
+import convex.lattice.Ownership;
+import convex.lattice.Shape;
+import convex.lattice.Signing;
 
 /**
- * A lattice cursor that sits at the signing boundary, transparently handling
- * sign/verify of lattice values.
+ * A cursor that sits at a signing boundary, transparently handling sign/verify of
+ * values.
  *
  * <p>Unlike {@link StampedCursor} (a same-type update override), a SignedCursor is a
  * genuine <b>view boundary</b>: the stored cell is a fundamentally different envelope
@@ -21,17 +21,13 @@ import convex.lattice.generic.SignedLattice;
  *
  * <h2>Owner binding</h2>
  *
- * <p>A cursor reached by navigating an owner-keyed lattice is bound to that owner. It
- * asks the context for a signer authorised for that owner — which a wallet or key
- * store may satisfy with any accessible identity, primary or not — and throws
- * {@link IllegalStateException} if there is none. A lattice-bound verification rule
- * is retained and applies to both authoring and incoming signed merges, regardless
- * of the context's owner verifier. Legacy factories without a bound rule continue
- * to use {@link LatticeContext#verifyOwner}, including its compatibility behaviour
- * for indirect owners.</p>
- *
- * <p>An unbound cursor (no owner known, e.g. the explicit key pair factory) simply
- * signs with the policy's primary signer.</p>
+ * <p>The {@link Signing} rule a cursor is created with binds it to an owner. It asks
+ * the context for a signer authorised for that owner — which a wallet or key store
+ * may satisfy with any accessible identity, primary or not — and throws
+ * {@link IllegalStateException} if there is none. A rule obtained from an owner
+ * lattice carries that lattice's verification, so authoring and incoming merges
+ * cannot disagree. An unbound rule (no owner known, e.g. the explicit key pair
+ * factory) simply signs with the policy's primary signer.</p>
  *
  * <p>Navigation never inserts this cursor. The component which owns an owner-keyed
  * level wraps each owner's slot with {@link #forOwner}, so the boundary is visible
@@ -42,39 +38,30 @@ import convex.lattice.generic.SignedLattice;
  */
 public class SignedCursor<V extends ACell> extends AUpdateCursor<V, SignedData<V>> {
 
-	/** Owner identity this cursor authors values for, or null when unbound. */
-	private final ACell owner;
-	private final SignedLattice<V> signingLattice;
+	private final Signing<V> signing;
 
-	SignedCursor(ACursor<SignedData<V>> base, ALattice<V> subLattice,
-			LatticeContext context, ACell owner) {
-		this(base,SignedLattice.create(subLattice).withOwner(owner),context);
-	}
-
-	private SignedCursor(ACursor<SignedData<V>> base, SignedLattice<V> signingLattice,
-			LatticeContext context) {
-		super(base,signingLattice.getValueLattice(),context);
-		this.owner=signingLattice.getOwner();
-		this.signingLattice=signingLattice;
+	private SignedCursor(ACursor<SignedData<V>> base, Signing<V> signing, LatticeContext context) {
+		super(base,signing.getValueShape(),context);
+		this.signing=signing;
 	}
 
 	/**
-	 * Wraps one owner's slot in an owner-keyed lattice with the signing boundary that
-	 * lattice verifies with. This is how a component crosses into an owner's value:
+	 * Wraps one owner's slot in an owner-keyed level with the signing rule that level
+	 * verifies with. This is how a component crosses into an owner's value:
 	 * {@code SignedCursor.forOwner(cursor.path(owner), OWNERS, owner)}. Authoring then
 	 * uses exactly the bound rule the host applies to incoming merges, and the
 	 * resulting cursor inherits the slot's context live.
 	 *
 	 * @param <V> Type of the unsigned value
 	 * @param slot Cursor at the owner's {@code SignedData} slot
-	 * @param owners Owner-keyed lattice containing the slot
+	 * @param owners Owner-keyed level containing the slot, usually its owner lattice
 	 * @param owner Owner identity whose slot this is
 	 * @return Cursor over the owner's unsigned value
-	 * @throws IllegalArgumentException if the owner is not a valid key for the lattice
+	 * @throws IllegalArgumentException if the owner is not a valid key for the level
 	 */
-	public static <V extends ACell> SignedCursor<V> forOwner(ALatticeCursor<SignedData<V>> slot,
-			AOwnerLattice<?,V,?> owners, ACell owner) {
-		SignedLattice<V> rule=owners.ownerLattice(owner);
+	public static <V extends ACell> SignedCursor<V> forOwner(ACursor<SignedData<V>> slot,
+			Ownership<V> owners, ACell owner) {
+		Signing<V> rule=owners.signingFor(owner);
 		if (rule==null) {
 			throw new IllegalArgumentException("Not a valid owner key for "
 				+owners.getClass().getSimpleName()+": "+owner);
@@ -82,18 +69,26 @@ public class SignedCursor<V extends ACell> extends AUpdateCursor<V, SignedData<V
 		return new SignedCursor<>(slot,rule,null);
 	}
 
-	/** Creates a cursor retaining the supplied signed lattice's ownership rule. */
-	public static <V extends ACell> SignedCursor<V> createBound(
-			ALatticeCursor<SignedData<V>> base, SignedLattice<V> signingLattice,
-			LatticeContext context) {
-		return new SignedCursor<>(base,signingLattice,context);
+	/**
+	 * Creates a cursor authoring with an explicit signing rule.
+	 *
+	 * @param <V> Type of the unsigned value
+	 * @param base Cursor at the {@code SignedData} slot
+	 * @param signing Signing rule, usually an owner-bound signed lattice
+	 * @param context Local context override, or null to inherit from the base cursor
+	 * @return New SignedCursor
+	 */
+	public static <V extends ACell> SignedCursor<V> create(ACursor<SignedData<V>> base,
+			Signing<V> signing, LatticeContext context) {
+		if (signing==null) throw new IllegalArgumentException("Signing rule must not be null");
+		return new SignedCursor<>(base,signing,context);
 	}
 
 	/**
 	 * Creates a SignedCursor wrapping a cursor to SignedData, with an explicit key pair.
 	 *
-	 * <p>Convenience factory for direct use (e.g. tests). Wraps the key pair
-	 * in a {@link LatticeContext} internally.</p>
+	 * <p>Convenience factory for direct use (e.g. tests). The cursor is bound to no
+	 * owner and signs with the key pair, installed as its local context.</p>
 	 *
 	 * @param <V> Type of the unsigned value
 	 * @param base Cursor pointing to SignedData
@@ -102,39 +97,21 @@ public class SignedCursor<V extends ACell> extends AUpdateCursor<V, SignedData<V
 	 */
 	public static <V extends ACell> SignedCursor<V> create(ACursor<SignedData<V>> base, AKeyPair keyPair) {
 		if (keyPair == null) throw new IllegalArgumentException("SignedCursor requires a key pair");
-		return new SignedCursor<>(base, null, LatticeContext.create(null, keyPair),null);
+		return new SignedCursor<>(base, primarySigner(), LatticeContext.create(null, keyPair));
 	}
 
-	/**
-	 * Creates a SignedCursor wrapping a lattice cursor to SignedData, with
-	 * sub-lattice and context.
-	 *
-	 * @param <V> Type of the unsigned value
-	 * @param base Lattice cursor pointing to SignedData
-	 * @param subLattice Lattice for the unsigned inner value (may be null)
-	 * @param context Local context override, or null to inherit from the base cursor
-	 *                (the effective context must be able to sign for writes)
-	 * @return New SignedCursor
-	 */
-	public static <V extends ACell> SignedCursor<V> create(ALatticeCursor<SignedData<V>> base, ALattice<V> subLattice, LatticeContext context) {
-		return create(base,subLattice,context,null);
+	/** A rule bound to no owner which signs with the effective context's primary signer. */
+	private static <V extends ACell> Signing<V> primarySigner() {
+		return new Signing<V>() {
+			@Override public SignedData<V> sign(LatticeContext context, V value) { return context.sign(value); }
+			@Override public ACell getOwner() { return null; }
+			@Override public Shape<V> getValueShape() { return Shape.none(); }
+		};
 	}
 
-	/**
-	 * Creates a SignedCursor bound to an owner identity, whose authorised signer is
-	 * requested from the context's signing policy.
-	 *
-	 * @param <V> Type of the unsigned value
-	 * @param base Lattice cursor pointing to SignedData
-	 * @param subLattice Lattice for the unsigned inner value (may be null)
-	 * @param context Local context override, or null to inherit from the base cursor
-	 * @param owner Owner identity for values at this position, or null when unbound
-	 * @return New SignedCursor
-	 */
-	public static <V extends ACell> SignedCursor<V> create(
-			ALatticeCursor<SignedData<V>> base, ALattice<V> subLattice,
-			LatticeContext context, ACell owner) {
-		return new SignedCursor<>(base,subLattice,context,owner);
+	/** Returns the owner identity this cursor authors for, or null when unbound. */
+	public ACell getOwner() {
+		return signing.getOwner();
 	}
 
 	@Override
@@ -144,23 +121,12 @@ public class SignedCursor<V extends ACell> extends AUpdateCursor<V, SignedData<V
 
 	@Override
 	protected SignedData<V> prepareWrite(V value) {
-		LatticeContext context=getContext();
-		SignedData<V> signed=signingLattice.sign(context,value);
+		SignedData<V> signed=signing.sign(getContext(),value);
 		if (signed==null) {
+			ACell owner=signing.getOwner();
 			throw new IllegalStateException("SignedCursor requires an available signer"
 				+((owner==null)?"":" authorised for owner "+owner));
 		}
 		return signed;
-	}
-
-	/**
-	 * Merge synthesises a new value: merge the unsigned values via the lattice, then
-	 * sign the result (via {@link #prepareWrite}). The signed envelope must always
-	 * carry a valid signature over its current value, so a merged value is re-signed.
-	 */
-	@Override
-	public V merge(V other) {
-		if (lattice == null) throw new UnsupportedOperationException("Cannot merge without a lattice");
-		return updateAndGet(current -> lattice.merge(getContext(), current, other));
 	}
 }

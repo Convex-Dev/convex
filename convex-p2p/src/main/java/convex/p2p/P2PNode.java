@@ -36,7 +36,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
@@ -534,7 +534,7 @@ public class P2PNode implements Closeable {
 	 *
 	 * @return Root lattice cursor
 	 */
-	public ALatticeCursor<Index<Keyword, ACell>> getCursor() {
+	public AForkableCursor<Index<Keyword, ACell>> getCursor() {
 		return application.cursor();
 	}
 

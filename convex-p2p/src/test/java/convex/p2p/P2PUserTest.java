@@ -22,7 +22,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.etch.EtchStore;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.node.NodeConfig;
 
 /**
@@ -143,9 +143,9 @@ public class P2PUserTest {
 		AccountKey otherKey = otherKP.getAccountKey();
 
 		// Arrive as a merge, the way a value would over the network
-		node.getCursor().path(P2PLattice.KEY_ID).merge(
+		node.getNodeServer().mergeAt(
 			P2PLattice.createSignedIdentity(otherKP,
-				P2PLattice.createIdentity(Strings.create("bob"), null, null, 1000L)));
+				P2PLattice.createIdentity(Strings.create("bob"), null, null, 1000L)),P2PLattice.KEY_ID);
 
 		P2PUser them = node.p2p(otherKey);
 		assertEquals(otherKey, them.getUserKey());
@@ -263,16 +263,16 @@ public class P2PUserTest {
 		node.p2p(KEY).sync();
 
 		// Another user's value arrives by merge, as it would over the network
-		node.getCursor().path(P2PLattice.KEY_ID).merge(
+		node.getNodeServer().mergeAt(
 			P2PLattice.createSignedIdentity(otherKP,
-				P2PLattice.createIdentity(Strings.create("theirs"), null, null, 1000L)));
+				P2PLattice.createIdentity(Strings.create("theirs"), null, null, 1000L)),P2PLattice.KEY_ID);
 
 		// Both are present at the region level...
 		AHashMap<ACell, SignedData<ACell>> region = ownerMap(node.getCursor().get(P2PLattice.KEY_ID));
 		assertEquals(2, region.count());
 
 		// ...but each user's cursor sees only its own
-		ALatticeCursor<ACell> mine = node.p2p(KEY).cursor();
+		AForkableCursor<ACell> mine = node.p2p(KEY).cursor();
 		assertEquals(Strings.create("mine"),
 			((AHashMap<Keyword, ACell>) mine.get()).get(P2PLattice.ID_NAME));
 		assertNull(mine.get(otherKey), "Another user must not be reachable from this cursor");
@@ -290,8 +290,8 @@ public class P2PUserTest {
 			P2PLattice.createIdentity(Strings.create("shared"), null, null, 1000L));
 		node.p2p(KEY).sync();
 
-		ALatticeCursor<ACell> a = node.p2p(KEY).cursor();
-		ALatticeCursor<ACell> b = node.p2p(KEY).cursor();
+		AForkableCursor<ACell> a = node.p2p(KEY).cursor();
+		AForkableCursor<ACell> b = node.p2p(KEY).cursor();
 		assertEquals(a.get(), b.get());
 	}
 }

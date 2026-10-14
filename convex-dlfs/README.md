@@ -260,7 +260,7 @@ roots; those remain application policy. `fork()` on a region, drive collection o
 drive creates a temporary component which keeps the same store and only merges
 logical changes when explicitly synced.
 
-Lower-level embedders that deliberately open a drive from an `ALatticeCursor`
+Lower-level embedders that deliberately open a drive from a cursor
 instead of the component hierarchy must supply the host store explicitly:
 
 ```java

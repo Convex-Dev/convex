@@ -837,7 +837,7 @@ public class NodeServerPersistenceTest {
 	 * Concurrent app writes during sync must not be lost. Thread A calls
 	 * {@code sync()} (announce + setRootData on caller's thread); thread B
 	 * writes a new key to the cursor mid-sync. After both, both writes must
-	 * be visible — the {@code RootLatticeCursor.sync()} CAS-or-merge fallback
+	 * be visible — the {@code Root.sync()} CAS-or-merge fallback
 	 * is what guarantees this.
 	 *
 	 * <p>Thread B writes at a fresh top-level key per iteration via the

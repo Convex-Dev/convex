@@ -12,7 +12,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Cursor wrapper for a user's follow list.
@@ -32,7 +32,7 @@ import convex.lattice.cursor.ALatticeCursor;
 public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implements TransactionalComponent<AHashMap<ACell, ACell>,Follows> {
 	public static final Keyword KEY_ACCOUNT_KEY=Keyword.intern("account-key");
 
-	Follows(ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
+	Follows(AForkableCursor<AHashMap<ACell, ACell>> cursor) {
 		super(cursor);
 	}
 
@@ -134,7 +134,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	}
 
 	@Override
-	public Follows withCursor(ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
+	public Follows withCursor(AForkableCursor<AHashMap<ACell, ACell>> cursor) {
 		return new Follows(cursor);
 	}
 

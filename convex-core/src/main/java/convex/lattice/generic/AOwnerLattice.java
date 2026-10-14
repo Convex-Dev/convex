@@ -10,6 +10,7 @@ import convex.core.data.SignedData;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.Ownership;
 
 /**
  * Shared machinery for maps of owner identities to signed values.
@@ -25,7 +26,7 @@ import convex.lattice.LatticeContext;
  * @param <M> Concrete map type
  */
 public abstract class AOwnerLattice<K extends ACell, V extends ACell,
-		M extends AMap<K, SignedData<V>>> extends ALattice<M> {
+		M extends AMap<K, SignedData<V>>> extends ALattice<M> implements Ownership<V> {
 
 	protected final SignedLattice<V> signedLattice;
 	private final BiPredicate<? super K, ? super AccountKey> ownerVerifier;
@@ -83,7 +84,7 @@ public abstract class AOwnerLattice<K extends ACell, V extends ACell,
 			public SignedData<V> merge(Object key, SignedData<V> own, SignedData<V> other) {
 				if (other==null) return own;
 				if (!(key instanceof ACell cell)) return own;
-				SignedLattice<V> child=ownerLattice(cell);
+				SignedLattice<V> child=signingFor(cell);
 				return (child==null)?own:child.merge(context,own,other);
 			}
 		};
@@ -101,17 +102,28 @@ public abstract class AOwnerLattice<K extends ACell, V extends ACell,
 	 * @param key Owner key, in any representation this lattice resolves
 	 * @return Owner-bound signed lattice, or null if the key is not a valid owner
 	 */
-	public SignedLattice<V> ownerLattice(ACell key) {
+	@Override
+	public SignedLattice<V> signingFor(ACell key) {
 		K owner=ownerKey(key);
 		if (owner==null) return null;
 		return (ownerVerifier==null)?signedLattice.withOwner(owner)
 			:signedLattice.withOwner(owner,this::verifyOwner);
 	}
 
+	/**
+	 * Returns the lattice of the unsigned value inside every owner's envelope: the
+	 * merge a component passes when forking a cursor over one owner's value.
+	 *
+	 * @return Value lattice shared by all owner slots
+	 */
+	public ALattice<V> getValueLattice() {
+		return signedLattice.getValueLattice();
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell key) {
-		return (ALattice<T>)ownerLattice(key);
+		return (ALattice<T>)signingFor(key);
 	}
 
 	@Override

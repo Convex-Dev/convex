@@ -24,6 +24,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.util.Utils;
+import convex.lattice.cursor.AForkableCursor;
 import convex.node.LatticeConnectionManager;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
@@ -131,7 +132,9 @@ final class NodeDirectory {
 		AHashMap<ACell,SignedData<ACell>> entry=
 			convex.lattice.P2PLattice.createSignedEntry(keyPair,info);
 
-		server.getCursor().path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES).merge(entry);
+		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=
+			server.getRootComponent().resolve(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		nodes.merge(P2PLattice.NODES_LATTICE,entry);
 		server.getCursor().sync();
 		refresh();
 		log.debug("Published NodeInfo: transports={}, pops={}, relay={}, type={}, version={}",

@@ -27,9 +27,9 @@ public class ContextInheritanceTest {
 	@Test
 	public void testDerivedPathTracksParentAndSupportsLocalOverride() {
 		MapLattice<Keyword, ASet<CVMLong>> lattice = MapLattice.create(SetLattice.create());
-		RootLatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> root =
-			Cursors.createLattice(lattice, Maps.empty());
-		ALatticeCursor<ASet<CVMLong>> child = root.path(Keywords.FOO);
+		Root<AHashMap<Keyword, ASet<CVMLong>>> root =
+			Cursors.root(Maps.empty(), lattice, null);
+		AForkableCursor<ASet<CVMLong>> child = root.path(Keywords.FOO);
 
 		LatticeContext first = LatticeContext.create(CVMLong.create(1000), null);
 		root.setContext(first);
@@ -48,9 +48,9 @@ public class ContextInheritanceTest {
 	@Test
 	public void testWithMethodOverridesOneLivePolicyCapability() {
 		MapLattice<Keyword, ASet<CVMLong>> lattice = MapLattice.create(SetLattice.create());
-		RootLatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> root =
-			Cursors.createLattice(lattice, Maps.empty());
-		ALatticeCursor<ASet<CVMLong>> child = root.path(Keywords.FOO);
+		Root<AHashMap<Keyword, ASet<CVMLong>>> root =
+			Cursors.root(Maps.empty(), lattice, null);
+		AForkableCursor<ASet<CVMLong>> child = root.path(Keywords.FOO);
 
 		AKeyPair originalKey=AKeyPair.generate();
 		AKeyPair replacementKey=AKeyPair.generate();
@@ -79,7 +79,7 @@ public class ContextInheritanceTest {
 
 	@Test
 	public void testLongLivedStampedViewObservesAdvancedParentClock() {
-		RootLatticeCursor<AInteger> root = Cursors.createLattice(MaxLattice.INSTANCE, null);
+		Root<AInteger> root = Cursors.root(null, MaxLattice.INSTANCE, null);
 		StampedCursor<AInteger> stamped = StampedCursor.create(root, MaxLattice.INSTANCE, null,
 			(value, timestamp) -> timestamp);
 
@@ -94,10 +94,11 @@ public class ContextInheritanceTest {
 
 	@Test
 	public void testForkRetainsEffectiveContextPolicy() {
-		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(SetLattice.create(), Sets.empty());
+		SetLattice<CVMLong> lattice = SetLattice.create();
+		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty(), lattice, null);
 		LatticeContext atFork = LatticeContext.create(CVMLong.create(1000), null);
 		root.setContext(atFork);
-		ALatticeCursor<ASet<CVMLong>> fork = root.fork();
+		AForkableCursor<ASet<CVMLong>> fork = root.fork(lattice);
 
 		root.setContext(LatticeContext.create(CVMLong.create(2000), null));
 		assertSame(atFork, fork.getContext());
@@ -108,7 +109,7 @@ public class ContextInheritanceTest {
 
 	@Test
 	public void testRootClearsToEmptyContext() {
-		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(SetLattice.create(), Sets.empty());
+		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty(), SetLattice.create(), null);
 		root.setContext(LatticeContext.create(CVMLong.create(1000), null));
 		root.setContext(null);
 		assertSame(LatticeContext.EMPTY, root.getContext());

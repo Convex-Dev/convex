@@ -26,9 +26,9 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.impl.DLFSLocal;
 import convex.lattice.generic.KeyedLattice;
@@ -67,7 +67,7 @@ public class DLFSCursorTest {
 	public void testConnectedDLFS() throws Exception {
 		// Create a root lattice cursor simulating a drives map: {driveName -> DLFSNode}
 		MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> root = Cursors.createLattice(drivesLattice);
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> root = Cursors.root(drivesLattice);
 
 		// Connect a named drive to the root
 		AString driveName = Strings.create("test");
@@ -126,12 +126,12 @@ public class DLFSCursorTest {
 	public void testSyncReachesRootCallback() throws Exception {
 		// Simulates what NodeServer does: root cursor with onSync callback
 		MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattice.INSTANCE);
-		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> root =
-			(RootLatticeCursor<AHashMap<AString, AVector<ACell>>>) Cursors.createLattice(drivesLattice);
+		Root<AHashMap<AString, AVector<ACell>>> root =
+			(Root<AHashMap<AString, AVector<ACell>>>) Cursors.root(drivesLattice);
 
 		// Track sync callbacks (like NodeServer's propagator trigger)
 		AtomicReference<ACell> synced = new AtomicReference<>();
-		root.onSync(value -> { synced.set(value); return value; });
+		root.onSync(value -> { synced.set(value); return value; }, drivesLattice);
 
 		// Connect a drive and write
 		AString driveName = Strings.create("vault");
@@ -149,7 +149,7 @@ public class DLFSCursorTest {
 
 		// Verify content survives a round-trip through the synced value
 		AHashMap<AString, AVector<ACell>> syncedMap = (AHashMap<AString, AVector<ACell>>) synced.get();
-		DLFSLocal restored = DLFS.connect(Cursors.createLattice(drivesLattice, syncedMap), driveName);
+		DLFSLocal restored = DLFS.connect(Cursors.root(syncedMap, drivesLattice, null), driveName);
 		assertEquals("sync me!", Files.readString(restored.getPath("/test.txt")),
 			"File content should survive sync round-trip");
 	}
@@ -176,12 +176,12 @@ public class DLFSCursorTest {
 		KeyedLattice rootLattice = KeyedLattice.create(DLFS_KW, dlfsUsersLattice);
 
 		LatticeContext ctx = LatticeContext.create(null, kp);
-		RootLatticeCursor<Index<Keyword, ACell>> rootCursor =
-			Cursors.createLattice(rootLattice, (Index<Keyword, ACell>) Index.EMPTY, ctx);
+		Root<Index<Keyword, ACell>> rootCursor =
+			Cursors.root((Index<Keyword, ACell>) Index.EMPTY, rootLattice, ctx);
 
-		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
+		AForkableCursor<?> dlfsCursor = rootCursor.child(DLFS_KW, dlfsUsersLattice);
 		dlfsCursor.setContext(ctx);
-		ALatticeCursor<?> userCursor = SignedCursor.forOwner(dlfsCursor.path(ak), dlfsUsersLattice, ak);
+		AForkableCursor<?> userCursor = SignedCursor.forOwner(dlfsCursor.path(ak), dlfsUsersLattice, ak);
 		DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 
 		Files.createDirectory(dlfs.getPath("/tmp"));
@@ -212,9 +212,9 @@ public class DLFSCursorTest {
 		OwnerLattice<AHashMap<AString,AVector<ACell>>> owners=OwnerLattice.create(MapLattice.create(DLFSLattice.INSTANCE));
 		KeyedLattice rootLattice=KeyedLattice.create(dlfsKey,owners);
 		LatticeContext context=LatticeContext.create(timestamp,keyPair);
-		RootLatticeCursor<Index<Keyword,ACell>> root=Cursors.createLattice(
-			rootLattice,(Index<Keyword,ACell>)Index.EMPTY,context);
-		ALatticeCursor<?> region=root.path(dlfsKey);
+		Root<Index<Keyword,ACell>> root=Cursors.root(
+			(Index<Keyword,ACell>)Index.EMPTY,rootLattice,context);
+		AForkableCursor<?> region=root.child(dlfsKey,owners);
 		region.setContext(context);
 		DLFSLocal fileSystem=DLFS.connect(SignedCursor.forOwner(region.path(owner),owners,owner),driveName);
 		Path path=fileSystem.getPath("/recreated");
@@ -232,7 +232,7 @@ public class DLFSCursorTest {
 				throw new IllegalStateException("Interrupted while holding root sync snapshot",e);
 			}
 			return snapshot;
-		});
+		},rootLattice);
 
 		AtomicReference<Throwable> failure=new AtomicReference<>();
 		Thread syncThread=Thread.ofVirtual().start(()->{
@@ -276,12 +276,12 @@ public class DLFSCursorTest {
 		KeyedLattice rootLattice = KeyedLattice.create(DLFS_KW, dlfsUsersLattice);
 
 		LatticeContext ctx = LatticeContext.create(null, kp);
-		RootLatticeCursor<Index<Keyword, ACell>> rootCursor =
-			Cursors.createLattice(rootLattice, (Index<Keyword, ACell>) Index.EMPTY, ctx);
+		Root<Index<Keyword, ACell>> rootCursor =
+			Cursors.root((Index<Keyword, ACell>) Index.EMPTY, rootLattice, ctx);
 
-		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
+		AForkableCursor<?> dlfsCursor = rootCursor.child(DLFS_KW, dlfsUsersLattice);
 		dlfsCursor.setContext(ctx);
-		ALatticeCursor<?> userCursor = SignedCursor.forOwner(dlfsCursor.path(ak), dlfsUsersLattice, ak);
+		AForkableCursor<?> userCursor = SignedCursor.forOwner(dlfsCursor.path(ak), dlfsUsersLattice, ak);
 		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 
 		String[] dirs = { "alpha", "beta", "gamma" };

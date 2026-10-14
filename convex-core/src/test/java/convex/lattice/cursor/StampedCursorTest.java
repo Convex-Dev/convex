@@ -103,10 +103,10 @@ public class StampedCursorTest {
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
 		// the write clock lives in the context (ts = 100)
 		LatticeContext ctx = LatticeContext.create(CVMLong.create(100), null);
-		RootLatticeCursor<ACell> root = Cursors.createLattice(state, initial, ctx);
+		Root<ACell> root = Cursors.root(initial, state, ctx);
 
 		// the component owning the stamped leaf wraps it, then navigates below
-		ALatticeCursor<ACell> c = StampedCursor.create(root, state).path(USERS, ALICE);
+		AForkableCursor<ACell> c = StampedCursor.create(root, state).path(USERS, ALICE);
 		c.set(Strings.create("bob"));
 
 		// deep value landed, structural intermediate ("users") auto-created
@@ -120,11 +120,11 @@ public class StampedCursorTest {
 	@Test public void testLongLivedDerivedPathUsesAdvancedContextTimestamp() {
 		StampingLattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
-		RootLatticeCursor<ACell> root = Cursors.createLattice(state, initial,
+		Root<ACell> root = Cursors.root(initial, state,
 			LatticeContext.create(CVMLong.create(100), null));
 
 		// Keep this derived cursor across a harness clock advance (#640).
-		ALatticeCursor<ACell> child = StampedCursor.create(root, state).path(USERS, ALICE);
+		AForkableCursor<ACell> child = StampedCursor.create(root, state).path(USERS, ALICE);
 		root.setContext(LatticeContext.create(CVMLong.create(200), null));
 		child.set(Strings.create("bob"));
 
@@ -157,7 +157,7 @@ public class StampedCursorTest {
 		// stampFn would bump the timestamp to 999 if it were (wrongly) applied to a merge result
 		StampedCursor<ACell> sc = StampedCursor.create(base, lww, LatticeContext.EMPTY, (v, ts) -> stampWith(v, 999));
 
-		sc.merge(newer); // newer (ts 20) is the LWW winner
+		sc.merge(lww, newer); // newer (ts 20) is the LWW winner
 
 		assertEquals(20L, tsOf(sc.get()), "merge must not re-stamp the LWW winner");
 		assertSame(newer, base.get());   // the exact winner value, stored unstamped

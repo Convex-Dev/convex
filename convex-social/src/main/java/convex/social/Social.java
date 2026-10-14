@@ -13,7 +13,7 @@ import convex.core.data.SignedData;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.OwnerLattice;
@@ -21,9 +21,12 @@ import convex.lattice.generic.OwnerLattice;
 /**
  * Cursor-based application layer for the Convex social network.
  *
- * <p>{@code Social} wraps a lattice cursor at the {@code :social} level
- * (an {@link OwnerLattice} mapping canonical DIDs to signed per-user state)
- * and provides domain-specific accessors for users, feeds, and follows.</p>
+ * <p>{@code Social} wraps a cursor at the {@code :social} level (an
+ * {@link OwnerLattice} mapping canonical DIDs to signed per-user state) and
+ * provides domain-specific accessors for users, feeds, and follows. The cursor
+ * knows nothing of the lattice; this component declares {@link #SOCIAL_LATTICE}
+ * as the shape of its level, the merge of its forks and the owner rule it crosses
+ * into a user's signed value with.</p>
  *
  * <h2>Usage</h2>
  * <pre>{@code
@@ -123,7 +126,7 @@ public class Social extends ALatticeComponent<
 		}
 	}
 
-	Social(ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+	Social(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
 		super(cursor);
 	}
 
@@ -144,31 +147,28 @@ public class Social extends ALatticeComponent<
 	 * @return New Social instance
 	 */
 	public static Social create(LatticeContext context) {
-		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor =
-			Cursors.createLattice(SOCIAL_LATTICE);
-		cursor.setContext(context);
-		return new Social(cursor);
+		return new Social(Cursors.root(SOCIAL_LATTICE,context));
 	}
 
 	/**
-	 * Connects to an existing root lattice cursor by navigating to {@code :social}.
+	 * Connects to an existing root cursor by navigating to {@code :social}.
 	 *
 	 * <p>The root cursor is typically held by a {@code NodeServer} for lattice
 	 * push/pull. Writes through this Social instance propagate up to the root.</p>
 	 *
-	 * @param rootCursor Root lattice cursor (e.g. from NodeServer)
+	 * @param rootCursor Root cursor (e.g. from NodeServer)
 	 * @param keyPair Key pair for signing updates
 	 * @return Social instance connected to the root cursor
 	 */
-	public static Social connect(ALatticeCursor<?> rootCursor, AKeyPair keyPair) {
+	public static Social connect(AForkableCursor<?> rootCursor, AKeyPair keyPair) {
 		return connect(rootCursor,LatticeContext.create(
 			null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
 	}
 
 	/** Connects to an existing root cursor using an application context policy. */
-	public static Social connect(ALatticeCursor<?> rootCursor,LatticeContext context) {
-		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
-			rootCursor.path(KEY_SOCIAL);
+	public static Social connect(AForkableCursor<?> rootCursor,LatticeContext context) {
+		AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
+			rootCursor.child(KEY_SOCIAL,SOCIAL_LATTICE);
 		socialCursor.setContext(context);
 		return new Social(socialCursor);
 	}
@@ -202,8 +202,8 @@ public class Social extends ALatticeComponent<
 	 */
 	public static Social connect(ALatticeComponent<?> parent) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
-			parent.cursor().path(KEY_SOCIAL);
+		AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
+			parent.cursor().child(KEY_SOCIAL,SOCIAL_LATTICE);
 		return new Social(socialCursor);
 	}
 
@@ -224,7 +224,7 @@ public class Social extends ALatticeComponent<
 		if (!DID.isCanonicalBase(ownerDid)) {
 			throw new IllegalArgumentException("Social owner must be a canonical base DID");
 		}
-		ALatticeCursor<Index<Keyword, ACell>> userCursor =
+		AForkableCursor<Index<Keyword, ACell>> userCursor =
 			SignedCursor.forOwner(cursor.path(ownerDid),SOCIAL_LATTICE,ownerDid);
 		return new SocialUser(userCursor,ownerDid);
 	}
@@ -237,16 +237,17 @@ public class Social extends ALatticeComponent<
 
 	/**
 	 * Creates a forked copy for independent operation.
-	 * Changes don't affect the parent until {@link #sync()}.
+	 * Changes don't affect the parent until {@link #sync()}, which merges with
+	 * {@link #SOCIAL_LATTICE}.
 	 *
 	 * @return Forked Social instance
 	 */
 	public Social fork() {
-		return new Social(cursor.fork());
+		return new Social(cursor.fork(SOCIAL_LATTICE));
 	}
 
 	@Override
-	public Social withCursor(ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+	public Social withCursor(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
 		return new Social(cursor);
 	}
 

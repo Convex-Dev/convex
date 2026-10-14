@@ -15,7 +15,7 @@ import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.TableStoreLattice;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.RootComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
@@ -107,7 +107,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	// ========== Instance ==========
 
-	private ConvexDB(ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
+	private ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
 		super(cursor);
 	}
 
@@ -117,8 +117,8 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return New ConvexDB instance
 	 */
 	public static ConvexDB create() {
-		ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor =
-			Cursors.createLattice(DATABASE_MAP_LATTICE);
+		AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor =
+			Cursors.root(DATABASE_MAP_LATTICE);
 		return new ConvexDB(cursor);
 	}
 
@@ -131,7 +131,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @param parent Parent lattice cursor at the database-map level
 	 * @return ConvexDB connected to the cursor chain
 	 */
-	public static ConvexDB connect(ALatticeCursor<?> parent) {
+	public static ConvexDB connect(AForkableCursor<?> parent) {
 		return new ConvexDB(parent.path());
 	}
 
@@ -227,7 +227,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * Bypasses DriverManager and the static registry entirely.
 	 *
 	 * <p>This is the preferred API when you already hold a ConvexDB instance
-	 * (e.g. from {@link #connect(ALatticeCursor)}).
+	 * (e.g. from {@link #connect(AForkableCursor)}).
 	 *
 	 * @param dbName Database name within this ConvexDB
 	 * @return JDBC Connection backed by this instance's cursor chain

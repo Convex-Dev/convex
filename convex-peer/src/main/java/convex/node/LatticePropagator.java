@@ -39,8 +39,7 @@ import convex.lattice.cursor.Root;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.ALatticeCursor;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.Root;
 
 /**
  * Isolated connection and publication policy group for one lattice node.
@@ -100,7 +99,7 @@ public class LatticePropagator implements Closeable {
 	 * This propagator's current logical view. It may contain accepted inbound values
 	 * which have not yet appeared in a later projection from the authoritative root.
 	 */
-	private RootLatticeCursor<ACell> workingCursor;
+	private Root<ACell> workingCursor;
 
 	/** Authoritative merge target supplied by the owning node before launch. */
 	private NodeServer<?> node;
@@ -806,7 +805,7 @@ public class LatticePropagator implements Closeable {
 			ACell restored = store.getRootData();
 			if (restored != null) {
 				synchronized (writeLock) {
-					workingCursor = Cursors.createLattice(lattice, restored, mergeContext);
+					workingCursor = Cursors.root(restored, lattice, mergeContext);
 				}
 			}
 			return restored;
@@ -1173,7 +1172,7 @@ public class LatticePropagator implements Closeable {
 				?new NoveltyCollector(maxDeltaBroadcastSize):null;
 			value = Cells.announce(value, noveltyCollector, store);
 			if (workingCursor == null) {
-				workingCursor = Cursors.createLattice(lattice, value, mergeContext);
+				workingCursor = Cursors.root(value, lattice, mergeContext);
 			} else {
 				workingCursor.set(value);
 			}

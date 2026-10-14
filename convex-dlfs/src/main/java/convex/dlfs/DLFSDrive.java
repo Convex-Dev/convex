@@ -8,8 +8,9 @@ import convex.core.data.AVector;
 import convex.core.store.AStore;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.impl.DLFSLocal;
 
@@ -29,7 +30,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	private final AStore store;
 	private final HostedFileSystem fileSystem;
 
-	DLFSDrive(AString name, ALatticeCursor<AVector<ACell>> cursor, AStore store) {
+	DLFSDrive(AString name, AForkableCursor<AVector<ACell>> cursor, AStore store) {
 		super(cursor);
 		this.name=name;
 		this.store=store;
@@ -53,11 +54,11 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 
 	/**
 	 * Creates an isolated temporary drive component. The filesystem still checkpoints
-	 * into the same store, while logical changes require explicit {@link #sync()}
-	 * to reach the long-lived drive cursor.
+	 * into the same store, while logical changes require explicit {@link #sync()},
+	 * which merges with {@link DLFSLattice}, to reach the long-lived drive cursor.
 	 */
 	public DLFSDrive fork() {
-		return new DLFSDrive(name,cursor.fork(),store);
+		return new DLFSDrive(name,cursor.fork(DLFSLattice.INSTANCE),store);
 	}
 
 	@Override
@@ -81,7 +82,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	}
 
 	@Override
-	public DLFSDrive withCursor(ALatticeCursor<AVector<ACell>> cursor) {
+	public DLFSDrive withCursor(AForkableCursor<AVector<ACell>> cursor) {
 		return new DLFSDrive(name,cursor,store);
 	}
 

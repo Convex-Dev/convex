@@ -6,18 +6,24 @@ import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.lattice.LatticeContext;
+import convex.lattice.Shape;
 
 /**
  * Live root view with its own context override and no independent state.
  * Descendants inherit this view's context; publication belongs to the root.
  */
-final class RootCursorView<V extends ACell> extends ALatticeCursor<V> {
+final class RootCursorView<V extends ACell> extends AForkableCursor<V> {
 
-	private final RootLatticeCursor<V> root;
+	private final Root<V> root;
 
-	RootCursorView(RootLatticeCursor<V> root) {
-		super(root.getLattice(),null,null);
+	RootCursorView(Root<V> root) {
+		super(root.get());
 		this.root=root;
+	}
+
+	@Override
+	public Shape<V> shape() {
+		return root.shape();
 	}
 
 	@Override
@@ -26,7 +32,7 @@ final class RootCursorView<V extends ACell> extends ALatticeCursor<V> {
 	}
 
 	@Override
-	protected LatticeContext getInheritedContext() {
+	protected LatticeContext inheritedContext() {
 		return root.getContext();
 	}
 

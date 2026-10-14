@@ -8,7 +8,7 @@ import convex.core.data.Index;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
  * A single SQL table within the lattice table store.
@@ -37,7 +37,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	/** Position of live row count */
 	static final int POS_LIVE_COUNT = 3;
 
-	SQLTable(ALatticeCursor<AVector<ACell>> cursor) {
+	SQLTable(AForkableCursor<AVector<ACell>> cursor) {
 		super(cursor);
 	}
 

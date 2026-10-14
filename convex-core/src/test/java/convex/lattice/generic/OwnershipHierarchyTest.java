@@ -29,7 +29,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.cvm.CVMEncoder;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.SignedCursor;
 
@@ -73,12 +73,12 @@ public class OwnershipHierarchyTest {
 			Ref.get((AInteger)CVMLong.TWO));
 		assertEquals(lattice.zero(),lattice.merge(null,entry(lattice.zero(),DID,forged)));
 
-		ALatticeCursor<M> root=Cursors.createLattice(lattice);
+		AForkableCursor<M> root=Cursors.root(lattice);
 		root.setContext(allowAll);
-		ALatticeCursor<SignedData<AInteger>> slot=root.path(DID);
-		assertNull(slot.merge(bad));
-		assertSame(good,slot.merge(good));
-		ALatticeCursor<AInteger> value=SignedCursor.forOwner(slot,lattice,DID);
+		AForkableCursor<SignedData<AInteger>> slot=root.path(DID);
+		assertNull(slot.merge(lattice.signingFor(DID),bad));
+		assertSame(good,slot.merge(lattice.signingFor(DID),good));
+		AForkableCursor<AInteger> value=SignedCursor.forOwner(slot,lattice,DID);
 		M before=root.get();
 		assertThrows(IllegalStateException.class,() -> value.set(CVMLong.TWO));
 		assertSame(before,root.get());
@@ -87,7 +87,7 @@ public class OwnershipHierarchyTest {
 		value.set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,root.get().get(DID).getValue());
 		assertTrue(root.get().get(DID).checkSignature());
-		ALatticeCursor<AInteger> fork=value.fork();
+		AForkableCursor<AInteger> fork=value.fork(lattice.getValueLattice());
 		fork.set(CVMLong.create(3));
 		assertEquals(CVMLong.TWO,value.get());
 		fork.sync();
@@ -121,10 +121,10 @@ public class OwnershipHierarchyTest {
 		var aliceRegion=OwnerMapLattice.create(MaxLattice.INSTANCE,ALICE_RULE);
 		var bobRegion=OwnerIndexLattice.<AString,AInteger>create(MaxLattice.INSTANCE,
 			(owner,key) -> DID.equals(owner) && BOB.getAccountKey().equals(key));
-		var root=Cursors.createLattice(KeyedLattice.create(left,aliceRegion,right,bobRegion));
+		var root=Cursors.root(KeyedLattice.create(left,aliceRegion,right,bobRegion));
 		root.setContext(LatticeContext.create(null,ALICE));
-		ALatticeCursor<AInteger> alice=SignedCursor.forOwner(root.path(left,DID),aliceRegion,DID);
-		ALatticeCursor<AInteger> bob=SignedCursor.forOwner(root.path(right,DID),bobRegion,DID);
+		AForkableCursor<AInteger> alice=SignedCursor.forOwner(root.child(left,aliceRegion).path(DID),aliceRegion,DID);
+		AForkableCursor<AInteger> bob=SignedCursor.forOwner(root.child(right,bobRegion).path(DID),bobRegion,DID);
 		alice.set(CVMLong.ONE);
 		assertThrows(IllegalStateException.class,() -> bob.set(CVMLong.ONE));
 		var before=root.get();
@@ -152,7 +152,7 @@ public class OwnershipHierarchyTest {
 		// Decoding an account key can yield its ordinary blob representation.
 		Blob encodedKey=Blob.fromHex(owner.toHexString());
 		assertEquals(owner,lattice.resolveKey(encodedKey));
-		var root=Cursors.createLattice(lattice);
+		var root=Cursors.root(lattice);
 		root.setContext(LatticeContext.create(null,ALICE));
 		SignedCursor.forOwner(root.path(encodedKey),lattice,encodedKey).set(CVMLong.ONE);
 		assertEquals(good,root.get());
@@ -174,9 +174,9 @@ public class OwnershipHierarchyTest {
 		assertNull(didIndex.path(CVMLong.ONE));
 		AOwnerLattice raw=didIndex;
 		assertThrows(ClassCastException.class,() -> raw.merge(null,convex.core.data.Maps.of(DID,signed)));
-		ALatticeCursor root=Cursors.createLattice(didIndex);
+		AForkableCursor root=Cursors.root(didIndex);
 		ACell before=root.get();
-		assertThrows(ClassCastException.class,() -> root.merge(Index.of(DID,CVMLong.ONE)));
+		assertThrows(ClassCastException.class,() -> root.merge(didIndex,Index.of(DID,CVMLong.ONE)));
 		assertSame(before,root.get(),"Malformed values must not partially update the root");
 	}
 
@@ -198,7 +198,7 @@ public class OwnershipHierarchyTest {
 		AccountKey mergedOwner=lattice.resolveKey(merged.entryAt(0).getKey());
 		assertEquals(owner,mergedOwner);
 		assertSame(merged,lattice.merge(merged,decoded));
-		var root=Cursors.createLattice(lattice,decoded,LatticeContext.create(null,ALICE));
+		var root=Cursors.root(decoded,lattice,LatticeContext.create(null,ALICE));
 		SignedCursor.forOwner(root.path(ALICE.getAccountKey()),lattice,ALICE.getAccountKey()).set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,root.get().get(ALICE.getAccountKey()).getValue());
 		assertTrue(root.get().get(ALICE.getAccountKey()).checkSignature());
@@ -213,12 +213,12 @@ public class OwnershipHierarchyTest {
 	public void testNestedOwnershipBoundaries() {
 		var inner=OwnerKeyLattice.create(MaxLattice.INSTANCE);
 		var outer=OwnerKeyLattice.create(inner);
-		var root=Cursors.createLattice(outer);
+		var root=Cursors.root(outer);
 		root.setContext(LatticeContext.create(null,BOB));
 		// Each owner level wraps its own boundary: outer rule first, then the inner one
-		ALatticeCursor<Index<AccountKey,SignedData<AInteger>>> aliceValue=
+		AForkableCursor<Index<AccountKey,SignedData<AInteger>>> aliceValue=
 			SignedCursor.forOwner(root.path(ALICE.getAccountKey()),outer,ALICE.getAccountKey());
-		ALatticeCursor<AInteger> value=
+		AForkableCursor<AInteger> value=
 			SignedCursor.forOwner(aliceValue.path(BOB.getAccountKey()),inner,BOB.getAccountKey());
 		assertThrows(IllegalStateException.class,() -> value.set(CVMLong.ONE));
 		assertEquals(outer.zero(),root.get(),"Inner authority must not waive the outer rule");
@@ -239,13 +239,13 @@ public class OwnershipHierarchyTest {
 	@Test
 	public void testConcurrentSignedFieldUpdates() throws Exception {
 		var lattice=OwnerIndexLattice.create(MapLattice.<Keyword,AInteger>create(MaxLattice.INSTANCE),ALICE_RULE);
-		var root=Cursors.createLattice(lattice);
+		var root=Cursors.root(lattice);
 		root.setContext(LatticeContext.create(null,ALICE));
 		Keyword left=Keyword.intern("left");
 		Keyword right=Keyword.intern("right");
-		ALatticeCursor<AHashMap<Keyword,AInteger>> record=SignedCursor.forOwner(root.path(DID),lattice,DID);
-		ALatticeCursor<AInteger> a=record.path(left);
-		ALatticeCursor<AInteger> b=record.path(right);
+		AForkableCursor<AHashMap<Keyword,AInteger>> record=SignedCursor.forOwner(root.path(DID),lattice,DID);
+		AForkableCursor<AInteger> a=record.path(left);
+		AForkableCursor<AInteger> b=record.path(right);
 		CountDownLatch entered=new CountDownLatch(2);
 		try (var executor=Executors.newFixedThreadPool(2)) {
 			var one=executor.submit(() -> concurrentWrite(a,entered));
@@ -258,7 +258,7 @@ public class OwnershipHierarchyTest {
 		assertTrue(root.get().get(DID).checkSignature());
 	}
 
-	private static void concurrentWrite(ALatticeCursor<AInteger> cursor,CountDownLatch entered) {
+	private static void concurrentWrite(AForkableCursor<AInteger> cursor,CountDownLatch entered) {
 		AtomicBoolean first=new AtomicBoolean(true);
 		cursor.updateAndGet(previous -> {
 			if (first.getAndSet(false)) {
@@ -279,7 +279,7 @@ public class OwnershipHierarchyTest {
 		Keyword owner=Keyword.intern("team");
 		OwnerIndexLattice<Keyword,AInteger> lattice=OwnerIndexLattice.create(MaxLattice.INSTANCE,
 			(key,signer) -> owner.equals(key) && BOB.getAccountKey().equals(signer));
-		var root=Cursors.createLattice(lattice);
+		var root=Cursors.root(lattice);
 		root.setContext(LatticeContext.create(null,BOB,(o,k) -> false));
 		SignedCursor.forOwner(root.path(owner),lattice,owner).set(CVMLong.ONE);
 		assertEquals(CVMLong.ONE,root.get().get(owner).getValue());
@@ -288,7 +288,7 @@ public class OwnershipHierarchyTest {
 		// A custom policy can authorise a delegate even for a public-key owner.
 		var delegated=OwnerMapLattice.<AccountKey,AInteger>create(MaxLattice.INSTANCE,
 			(key,signer) -> ALICE.getAccountKey().equals(key) && BOB.getAccountKey().equals(signer));
-		var delegatedRoot=Cursors.createLattice(delegated);
+		var delegatedRoot=Cursors.root(delegated);
 		delegatedRoot.setContext(LatticeContext.create(null,BOB));
 		SignedCursor.forOwner(delegatedRoot.path(ALICE.getAccountKey()),delegated,ALICE.getAccountKey()).set(CVMLong.TWO);
 		assertEquals(BOB.getAccountKey(),delegatedRoot.get().get(ALICE.getAccountKey()).getAccountKey());

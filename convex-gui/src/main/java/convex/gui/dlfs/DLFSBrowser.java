@@ -47,7 +47,7 @@ import convex.gui.state.StateExplorer;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSLattice;
@@ -112,7 +112,7 @@ public class DLFSBrowser extends AbstractGUI {
 	private AccountKey ownerKey;
 
 	/** Cursor into the owner's unsigned drives map (writes re-sign via SignedCursor) */
-	private ALatticeCursor<AHashMap<AString, AVector<ACell>>> drivesCursor;
+	private AForkableCursor<AHashMap<AString, AVector<ACell>>> drivesCursor;
 
 	/** Active drives keyed by name (insertion ordered) */
 	private final Map<String, DLFSLocal> drives = new LinkedHashMap<>();
@@ -293,12 +293,10 @@ public class DLFSBrowser extends AbstractGUI {
 			nodeServer.launch();
 
 			// Navigate to owner's signed entry, wrap in SignedCursor
-			ALatticeCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
+			AForkableCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
 				nodeServer.getCursor();
-			@SuppressWarnings("unchecked")
-			ALatticeCursor<SignedData<AHashMap<AString, AVector<ACell>>>> ownerEntry =
-				(ALatticeCursor<SignedData<AHashMap<AString, AVector<ACell>>>>) (ALatticeCursor<?>) rootCursor.path(ownerKey);
-			drivesCursor = SignedCursor.create(ownerEntry, DRIVES_MAP_LATTICE, ctx);
+			drivesCursor = SignedCursor.forOwner(rootCursor.path(ownerKey), OWNER_LATTICE, ownerKey);
+			drivesCursor.setContext(ctx);
 
 			// Rebuild drives from restored lattice state
 			drives.clear();
@@ -306,7 +304,7 @@ public class DLFSBrowser extends AbstractGUI {
 			if (driveMap != null && !driveMap.isEmpty()) {
 				for (Map.Entry<AString, AVector<ACell>> entry : driveMap.entrySet()) {
 					String name = entry.getKey().toString();
-					ALatticeCursor<AVector<ACell>> driveCursor = drivesCursor.path(entry.getKey());
+					AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.child(entry.getKey(), DLFSLattice.INSTANCE);
 					DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
 					drives.put(name, driveFS);
 				}
@@ -381,7 +379,7 @@ public class DLFSBrowser extends AbstractGUI {
 		if (drives.containsKey(name)) return false;
 
 		AString cvmName = Strings.create(name);
-		ALatticeCursor<AVector<ACell>> driveCursor = drivesCursor.path(cvmName);
+		AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.child(cvmName, DLFSLattice.INSTANCE);
 		driveCursor.set(DLFSNode.createDirectory(CVMLong.ZERO));
 
 		DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
@@ -425,7 +423,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 		// Clear from lattice
 		AString cvmName = Strings.create(name);
-		ALatticeCursor<AVector<ACell>> cursor = drivesCursor.path(cvmName);
+		AForkableCursor<AVector<ACell>> cursor = drivesCursor.child(cvmName, DLFSLattice.INSTANCE);
 		cursor.set(null);
 
 		// Remove from WebDAV

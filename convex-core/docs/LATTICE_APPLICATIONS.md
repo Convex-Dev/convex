@@ -10,8 +10,11 @@ practical companion for `convex-core`, with `convex-social`, `convex-dlfs` and
 
 ## Application root and components
 
-**Implemented:** `ALatticeApplication<V>` has a live view of a hosted root cursor, exposes its
-`getLattice()` and atomically merges incoming root values through `merge(value)`.
+**Implemented:** `ALatticeApplication<V>` has a live view of a hosted root cursor and
+declares the root lattice: it exposes `getLattice()`, atomically merges incoming root
+values through `merge(value)` and hands out typed region cursors through
+`resolve(path)`. Cursors themselves know nothing of lattices; components declare
+the structure of each level they own.
 It attaches to a `RootComponent<V>`, which explicitly creates or opens a local
 root, or hosts a networked root. Neither merging nor hosting requires domain
 components to exist.
@@ -53,9 +56,8 @@ app.sync();              // persist and publish through host policy
 lattice's zero value if the store has none. Use `RootComponent.create(lattice, store)`
 to deliberately start a fresh root; its first publication replaces any retained root.
 Applications accept a host rather than a store, so this choice belongs to host assembly.
-The caller owns the store lifecycle. A hosted application's `getLattice()` returns
-the host cursor's lattice, so component navigation and incoming merges use the same
-definition. There is no second application merge policy that can disagree with it.
+The caller owns the store lifecycle. A hosted application shares the host's lattice,
+so component navigation and incoming merges use the same definition. There is no second application merge policy that can disagree with it.
 `merge` uses the cursor's effective context, preserves the current root in the
 `own` position, and retries after concurrent updates. It does not publish or flush.
 
@@ -91,8 +93,8 @@ already-installed writes in the same root snapshot.
 This separation supplies independent write policies, not an access-control boundary
 between code sharing the host. Verification rules remain bound to the shared
 lattice. Configure that lattice before use; these views do not compose or replace
-region definitions dynamically. The low-level `RootLatticeCursor.view()` operation
-provides the same live-view behaviour without an application wrapper.
+region definitions dynamically. The low-level `Root.view()` operation provides the
+same live-view behaviour without an application wrapper.
 
 ## Proposed lifecycle and subscriptions
 
@@ -287,7 +289,7 @@ public abstract class ALatticeApplication<V extends ACell>
 }
 
 public interface LatticeSubscription<V extends ACell> extends AutoCloseable {
-    ALatticeCursor<V> cursor();
+    AForkableCursor<V> cursor();
     AutoCloseable watch(Consumer<V> observer);
     void close();
 }
@@ -693,12 +695,12 @@ The host selects the concurrency policy at construction:
 
 | Root | `transact` | `transactLocked` | Ordinary writes |
 |---|---|---|---|
-| `RootLatticeCursor` (default) | Optimistic retries | Throws before invoking the callback | Original atomic operations |
+| `Root` (default) | Optimistic retries | Throws before invoking the callback | Original atomic operations |
 | `TransactionalRootCursor` | Three optimistic attempts, then serial fallback | Callback runs once under root exclusion | Commits coordinate through a root lock |
 
 ```java
-RootComponent<V> host = new RootComponent<>(
-    Cursors.createTransactionalLattice(lattice), store);
+RootComponent<V> host = new RootComponent<>(lattice,
+    Cursors.transactionalRoot(lattice.zero(), lattice, context), store);
 
 // Alternatively, when creating a NodeServer:
 NodeConfig config = NodeConfig.create().withTransactionalRoot(true);
@@ -713,12 +715,13 @@ live view. Forks inherit the capability but have independent state and locks.
 it by attempting a write. An ordinary root never acquires a write lock implicitly.
 
 For a custom component, implement `TransactionalComponent<Value,MyComponent>`
-and `withCursor(ALatticeCursor<Value>)`, creating a fresh component with the same
+and `withCursor(AForkableCursor<Value>)`, creating a fresh component with the same
 domain metadata over the supplied cursor. Rebuild children against that cursor; do
 not reuse cached live children. Application subclasses use the protected
-`ALatticeApplication(cursor)` constructor. Fork and rebinding factories are one line,
-e.g. `return new MyComponent(cursor.fork())`; a component which explicitly owns
-configuration, such as a DLFS store, passes it along itself.
+`ALatticeApplication(lattice, cursor)` constructor. Fork and rebinding factories are
+one line, e.g. `return new MyComponent(cursor.fork(LATTICE))`, passing the lattice
+the component declares so the fork converges on sync; a component which explicitly
+owns configuration, such as a DLFS store, passes it along itself.
 
 `transact` returns `void`; `transactAsync` returns `CompletableFuture<Void>`.
 Completion means committed locally, not persisted, published or acknowledged by
@@ -838,7 +841,7 @@ StampingLattice<ACell> state = StampingLattice.create(
     (v, ts) -> v.assoc(KEY_TIMESTAMP, ts));          // stamp the context timestamp on every write
 
 // the component owning the leaf wraps it before navigating below
-ALatticeCursor<ACell> leaf = StampedCursor.create(cursor.path(KEY_STATE), state);
+AForkableCursor<ACell> leaf = StampedCursor.create(cursor.child(KEY_STATE, state), state);
 ```
 
 `JSONLattice` provides structural navigation below the leaf, `LWWLattice` merges the

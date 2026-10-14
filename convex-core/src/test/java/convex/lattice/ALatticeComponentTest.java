@@ -9,23 +9,24 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Blob;
-import convex.core.data.Sets;
 import convex.core.store.MemoryStore;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.SetLattice;
 
 public class ALatticeComponentTest {
 
+	private static final SetLattice<ACell> LATTICE=SetLattice.create();
+
 	/** A component is a cursor plus domain operations; nothing else is inherited. */
 	private static class TestComponent extends ALatticeComponent<ASet<ACell>> {
 
-		TestComponent(ALatticeCursor<ASet<ACell>> cursor) {
+		TestComponent(AForkableCursor<ASet<ACell>> cursor) {
 			super(cursor);
 		}
 
 		TestComponent fork() {
-			return new TestComponent(cursor.fork());
+			return new TestComponent(cursor.fork(LATTICE));
 		}
 
 		void add(ACell value) {
@@ -35,7 +36,7 @@ public class ALatticeComponentTest {
 
 	@Test
 	public void testStandaloneComponentOverCursor() {
-		TestComponent component=new TestComponent(Cursors.createLattice(SetLattice.create(),Sets.empty()));
+		TestComponent component=new TestComponent(Cursors.root(LATTICE));
 		Blob value=Blob.fromHex("cafebabe");
 		component.add(value);
 		assertTrue(component.cursor().get().contains(value));
@@ -44,7 +45,7 @@ public class ALatticeComponentTest {
 	@Test
 	public void testForkSyncsThroughCursorWithoutPublishing() throws Exception {
 		MemoryStore store=new MemoryStore();
-		var host=RootComponent.<ASet<ACell>>create(SetLattice.create(),store);
+		var host=RootComponent.create(LATTICE,store);
 		TestComponent live=new TestComponent(host.cursor());
 		TestComponent fork=live.fork();
 		Blob value=Blob.fromHex("cafebabe");

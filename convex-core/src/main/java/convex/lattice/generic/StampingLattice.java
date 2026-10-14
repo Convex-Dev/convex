@@ -5,6 +5,7 @@ import java.util.function.BiFunction;
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
+import convex.lattice.Stamping;
 
 /**
  * Stamp-on-write lattice layer.
@@ -28,7 +29,7 @@ import convex.lattice.ALattice;
  *
  * @param <V> Type of lattice values
  */
-public class StampingLattice<V extends ACell> extends ADelegatingLattice<V> {
+public class StampingLattice<V extends ACell> extends ADelegatingLattice<V> implements Stamping<V> {
 
 	private final BiFunction<V, CVMLong, V> stampFn;
 
@@ -53,5 +54,10 @@ public class StampingLattice<V extends ACell> extends ADelegatingLattice<V> {
 	/** Returns the function injecting a timestamp into a value at this level. */
 	public BiFunction<V, CVMLong, V> getStampFunction() {
 		return stampFn;
+	}
+
+	@Override
+	public V stamp(V value, CVMLong timestamp) {
+		return stampFn.apply(value, timestamp);
 	}
 }

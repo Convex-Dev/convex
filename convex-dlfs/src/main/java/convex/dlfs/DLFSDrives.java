@@ -16,7 +16,7 @@ import convex.core.store.AStore;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.RootComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
@@ -39,18 +39,18 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	private final AStore store;
 	private final ConcurrentHashMap<AString,DLFSDrive> drives=new ConcurrentHashMap<>();
 
-	DLFSDrives(ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor, AStore store) {
+	DLFSDrives(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor, AStore store) {
 		super(cursor);
 		this.store=store;
 	}
 
 	/** Creates a standalone, in-memory set of drives for one owner. */
 	public static DLFSDrives create() {
-		return new DLFSDrives(Cursors.createLattice(LATTICE),null);
+		return new DLFSDrives(Cursors.root(LATTICE),null);
 	}
 
 	/** Wraps an existing cursor over one owner's drive map; file data stays heap-backed. */
-	public static DLFSDrives wrap(ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor) {
+	public static DLFSDrives wrap(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
 		if (cursor==null) throw new IllegalArgumentException("Drives cursor must not be null");
 		return new DLFSDrives(cursor,null);
 	}
@@ -61,13 +61,13 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	 */
 	public static DLFSDrives connect(RootComponent<?> host, ACell... path) {
 		if (host==null) throw new IllegalArgumentException("Host must not be null");
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=host.cursor().path(path);
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=host.resolve(path);
 		return new DLFSDrives(cursor,host.store());
 	}
 
 	/** Creates an isolated temporary multi-drive working component. */
 	public DLFSDrives fork() {
-		return new DLFSDrives(cursor.fork(),store);
+		return new DLFSDrives(cursor.fork(LATTICE),store);
 	}
 
 	/** Opens an existing drive, or returns null if it is absent. */
@@ -78,7 +78,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return new DLFSDrive(key,cursor.path(key),store);
+			return new DLFSDrive(key,cursor.child(key,DLFSLattice.INSTANCE),store);
 		});
 	}
 
@@ -208,7 +208,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		}
 	}
 	@Override
-	public DLFSDrives withCursor(ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor) {
+	public DLFSDrives withCursor(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
 		return new DLFSDrives(cursor,store);
 	}
 

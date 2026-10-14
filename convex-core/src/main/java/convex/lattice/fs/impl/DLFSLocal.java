@@ -24,7 +24,7 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSCorruptionException;
@@ -40,24 +40,24 @@ import convex.lattice.fs.DLPath;
 public class DLFSLocal extends DLFileSystem {
 
 	// Cursor for filesystem root node. This may be a path into a bigger lattice
-	ALatticeCursor<AVector<ACell>> rootCursor;
+	AForkableCursor<AVector<ACell>> rootCursor;
 	// Store for incremental blob checkpoints during streamed writes, or null for heap-only
 	private final AStore store;
 
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
-		this(dlfsProvider,uriPath,Cursors.createLattice(DLFSLattice.INSTANCE,rootNode),null);
+		this(dlfsProvider,uriPath,Cursors.root(rootNode,DLFSLattice.INSTANCE,null),null);
 	}
 
 	/**
 	 * Creates a DLFSLocal backed by a lattice cursor (which may be a path into a larger lattice).
-	 * File data remains heap-backed; use {@link #create(DLFSProvider, String, ALatticeCursor, AStore)}
+	 * File data remains heap-backed; use {@link #create(DLFSProvider, String, AForkableCursor, AStore)}
 	 * for incremental blob persistence.
 	 *
 	 * @param dlfsProvider Provider for this filesystem
 	 * @param uriPath URI path (may be null)
 	 * @param cursor Lattice cursor pointing to the DLFS tree
 	 */
-	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, ALatticeCursor<AVector<ACell>> cursor) {
+	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AForkableCursor<AVector<ACell>> cursor) {
 		this(dlfsProvider,uriPath,cursor,null);
 	}
 
@@ -66,7 +66,7 @@ public class DLFSLocal extends DLFileSystem {
 	 * store when non-null. Intended for adapters which may also operate detached.
 	 */
 	protected DLFSLocal(DLFSProvider dlfsProvider, String uriPath,
-			ALatticeCursor<AVector<ACell>> cursor, AStore store) {
+			AForkableCursor<AVector<ACell>> cursor, AStore store) {
 		super(dlfsProvider,uriPath);
 		this.rootCursor=cursor;
 		this.store=store;
@@ -83,7 +83,7 @@ public class DLFSLocal extends DLFileSystem {
 	 * @return Store-backed filesystem view
 	 */
 	public static DLFSLocal create(DLFSProvider dlfsProvider, String uriPath,
-			ALatticeCursor<AVector<ACell>> cursor, AStore store) {
+			AForkableCursor<AVector<ACell>> cursor, AStore store) {
 		if (store==null) throw new IllegalArgumentException("DLFS persistence store must not be null");
 		return new DLFSLocal(dlfsProvider,uriPath,cursor,store);
 	}
@@ -104,7 +104,7 @@ public class DLFSLocal extends DLFileSystem {
 	 *
 	 * @return cursor holding this drive's root node
 	 */
-	public ALatticeCursor<AVector<ACell>> getCursor() {
+	public AForkableCursor<AVector<ACell>> getCursor() {
 		return rootCursor;
 	}
 
@@ -348,13 +348,13 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public void merge(AVector<ACell> other) {
-		rootCursor.merge(other);
+		rootCursor.merge(DLFSLattice.INSTANCE,other);
 	}
 
 	/** Creates a forked view sharing this filesystem's store, if any. */
 	@Override
 	public DLFSLocal fork() {
-		ALatticeCursor<AVector<ACell>> cursor=rootCursor.fork();
+		AForkableCursor<AVector<ACell>> cursor=rootCursor.fork(DLFSLattice.INSTANCE);
 		return new DLFSLocal(provider(),uriPath,cursor,store);
 	}
 
@@ -367,8 +367,7 @@ public class DLFSLocal extends DLFileSystem {
 	@Override
 	public DLFSLocal clone() {
 		AVector<ACell> root=rootCursor.get();
-		ALatticeCursor<AVector<ACell>> cursor=Cursors.createLattice(
-			DLFSLattice.INSTANCE,root,rootCursor.getContext());
+		AForkableCursor<AVector<ACell>> cursor=Cursors.root(root,DLFSLattice.INSTANCE,rootCursor.getContext());
 		return new DLFSLocal(provider(),uriPath,cursor,store);
 	}
 

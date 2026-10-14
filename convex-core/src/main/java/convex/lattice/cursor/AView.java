@@ -4,12 +4,13 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
+import convex.lattice.LatticeContext;
 
 /**
  * Abstract base class for cursors that represent a view over another cursor
- * 
+ *
  * Views are generally not mutable
- * 
+ *
  * @param <T> Type of viewed value
  */
 public abstract class AView<T extends ACell> extends ACursor<T> {
@@ -20,7 +21,12 @@ public abstract class AView<T extends ACell> extends ACursor<T> {
 		super();
 		this.source=source;
 	}
-	
+
+	@Override
+	protected LatticeContext inheritedContext() {
+		return source.getContext();
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public <V extends ACell> ACursor<V> path(ACell... path) {

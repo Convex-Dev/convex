@@ -1,16 +1,19 @@
 package convex.lattice;
 
+import java.util.Objects;
+
 import convex.core.data.ACell;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Base class for an application participating in a lattice root.
  *
  * <p>An application component works at the same cursor position as its
- * {@link RootComponent} host. The supplied lattice defines the complete root
- * merge, including which regions participate. Merging requires no domain
- * components or component registry. Subclasses may expose lightweight components
- * at paths within that root.</p>
+ * {@link RootComponent} host and declares the root lattice, which defines the
+ * complete root merge, including which regions participate. Merging requires no
+ * domain components or component registry. Subclasses expose lightweight
+ * components at paths within that root, each declaring the shape of the level it
+ * hands out.</p>
  *
  * <p>Each application has a live cursor view with an independent context override.
  * Setting its cursor context affects its descendants, not the host or other
@@ -29,13 +32,15 @@ import convex.lattice.cursor.ALatticeCursor;
  */
 public abstract class ALatticeApplication<V extends ACell> extends ALatticeComponent<V> {
 
+	private final ALattice<V> lattice;
+
 	/**
-	 * Creates an application over an existing lattice host.
+	 * Creates an application over an existing lattice host, sharing its root lattice.
 	 *
 	 * @param host Root component providing shared state, lattice and host policy
 	 */
 	protected ALatticeApplication(RootComponent<V> host) {
-		this(requireHost(host).cursor().view());
+		this(requireHost(host).getLattice(),host.cursor().view());
 	}
 
 	/**
@@ -43,10 +48,12 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * transaction draft. Rebinding factories rebuild child components against the
 	 * new view rather than reusing children bound to the live cursor.
 	 *
+	 * @param lattice Root lattice: the complete merge for this application's root
 	 * @param cursor Cursor at the complete application root
 	 */
-	protected ALatticeApplication(ALatticeCursor<V> cursor) {
+	protected ALatticeApplication(ALattice<V> lattice, AForkableCursor<V> cursor) {
 		super(cursor);
+		this.lattice=Objects.requireNonNull(lattice,"Application lattice must not be null");
 	}
 
 	private static <V extends ACell> RootComponent<V> requireHost(RootComponent<V> host) {
@@ -60,17 +67,31 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * @return Root merge and navigation semantics
 	 */
 	public final ALattice<V> getLattice() {
-		return cursor.getLattice();
+		return lattice;
+	}
+
+	/**
+	 * Returns a cursor at a path within the application root, with each level's
+	 * shape declared from the root lattice so that writes can create absent regions.
+	 * This is the typed navigation an application offers over its root; owner slots
+	 * below it are crossed by the component owning that level.
+	 *
+	 * @param <T> Value type at the path
+	 * @param path Keys from the application root
+	 * @return Cursor at the path
+	 */
+	public <T extends ACell> AForkableCursor<T> resolve(ACell... path) {
+		return resolve(cursor,lattice,path);
 	}
 
 	/**
 	 * Atomically merges an incoming root value into the live application state.
 	 *
-	 * <p>Delegates to the root cursor with its effective context and the current
-	 * local value in the own position. The lattice handles all region dispatch
-	 * and verification; no components need to have been constructed. Concurrent
-	 * writes are reconciled by retrying against the latest root. If merge throws,
-	 * this operation installs no state.</p>
+	 * <p>Merges with the root lattice under the cursor's effective context, with the
+	 * current local value in the own position. The lattice handles all region
+	 * dispatch and verification; no components need to have been constructed.
+	 * Concurrent writes are reconciled by retrying against the latest root. If merge
+	 * throws, this operation installs no state.</p>
 	 *
 	 * <p>This changes local state only. Call {@link #sync()} to persist and publish
 	 * it through the host.</p>
@@ -79,6 +100,6 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * @return Root value installed by this merge
 	 */
 	public V merge(V other) {
-		return cursor.merge(other);
+		return cursor.merge(lattice,other);
 	}
 }

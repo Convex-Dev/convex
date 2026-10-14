@@ -29,7 +29,7 @@ import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.SetLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.StampingLattice;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.StampedCursor;
 
@@ -37,7 +37,8 @@ public class ALatticeApplicationTest {
 
 	private static final Keyword ITEMS=Keyword.intern("items");
 	private static final Keyword UNKNOWN=Keyword.intern("unknown");
-	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
+	private static final SetLattice<CVMLong> ITEMS_LATTICE=SetLattice.create();
+	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,ITEMS_LATTICE);
 
 	/** No component definitions or factories are needed for root merging. */
 	private static final class Application<V extends ACell> extends ALatticeApplication<V> {
@@ -48,7 +49,7 @@ public class ALatticeApplicationTest {
 
 	private static final class Items extends ALatticeComponent<ASet<CVMLong>> {
 		Items(ALatticeApplication<Index<Keyword,ACell>> application) {
-			super(application.cursor().path(ITEMS));
+			super(application.resolve(ITEMS));
 		}
 
 		void add(CVMLong value) {
@@ -139,12 +140,12 @@ public class ALatticeApplicationTest {
 		var second=new Application<>(host);
 		// A domain component would own these two boundaries: sign the owner's record, then
 		// stamp it on every write below.
-		ALatticeCursor<ASet<CVMLong>> aliceItems=StampedCursor.create(
+		AForkableCursor<ASet<CVMLong>> aliceItems=StampedCursor.create(
 			SignedCursor.forOwner(first.cursor().path(alice.getAccountKey()),owners,alice.getAccountKey()),record)
-			.path(ITEMS);
-		ALatticeCursor<ASet<CVMLong>> bobItems=StampedCursor.create(
+			.child(ITEMS,ITEMS_LATTICE);
+		AForkableCursor<ASet<CVMLong>> bobItems=StampedCursor.create(
 			SignedCursor.forOwner(second.cursor().path(bob.getAccountKey()),owners,bob.getAccountKey()),record)
-			.path(ITEMS);
+			.child(ITEMS,ITEMS_LATTICE);
 		first.cursor().setContext(LatticeContext.create(CVMLong.create(100),alice));
 		second.cursor().setContext(LatticeContext.create(CVMLong.create(200),bob));
 		aliceItems.updateAndGet(v -> v.include(CVMLong.ONE));
@@ -173,8 +174,8 @@ public class ALatticeApplicationTest {
 		var app=new Application<>(host);
 		app.cursor().setContext(LatticeContext.create(null,alice));
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(1))));
-		var fork=app.cursor().fork();
-		fork.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(2))));
+		var fork=app.cursor().fork(lattice);
+		fork.merge(lattice,lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(2))));
 		assertEquals(Sets.of(1),host.cursor().get().get(alice.getAccountKey()).getValue());
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(3))));
 		fork.sync();
@@ -182,7 +183,7 @@ public class ALatticeApplicationTest {
 		assertEquals(Sets.of(1,2,3),signed.getValue());
 		assertTrue(signed.checkSignature());
 		var incoming=lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(4)));
-		host.cursor().merge(incoming);
+		host.merge(incoming);
 		assertSame(signed,host.cursor().get().get(alice.getAccountKey()),
 			"Host cannot synthesise a signed union using an application's signer");
 		app.merge(incoming);

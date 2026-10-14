@@ -272,7 +272,7 @@ public class GenericLatticeTest {
 		// enforced only by the context-aware overload. Contrast with
 		// testOwnerVerificationBlobKeyMismatch, which rejects the identical value.
 		// Callers exposing an OwnerLattice to untrusted data must merge with a context
-		// (an ALatticeCursor always does).
+		// (an AForkableCursor always does).
 		AKeyPair kpOwner = AKeyPair.generate();
 		AKeyPair kpFake = AKeyPair.generate();
 

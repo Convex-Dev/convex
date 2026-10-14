@@ -26,7 +26,7 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerLattice;
@@ -56,7 +56,7 @@ public class SocialAppTest {
 	/** A containing component at the root level, as an application would be. */
 	private static class TestRoot extends ALatticeComponent<Index<Keyword, ACell>> {
 		TestRoot(KeyedLattice lattice) {
-			super(Cursors.createLattice(lattice));
+			super(Cursors.root(lattice));
 		}
 	}
 
@@ -332,7 +332,7 @@ public class SocialAppTest {
 
 		// Simulate a root lattice with :social
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		ALatticeCursor<?> rootCursor = Cursors.createLattice(root);
+		AForkableCursor<?> rootCursor = Cursors.root(root);
 
 		Social social = Social.connect(rootCursor, kp);
 
@@ -349,7 +349,7 @@ public class SocialAppTest {
 		AKeyPair kp = AKeyPair.generate();
 
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		ALatticeCursor<?> rootCursor = Cursors.createLattice(root);
+		AForkableCursor<?> rootCursor = Cursors.root(root);
 
 		Social social = Social.connect(rootCursor, kp);
 		social.user(kp.getAccountKey()).feed().post("Propagated");

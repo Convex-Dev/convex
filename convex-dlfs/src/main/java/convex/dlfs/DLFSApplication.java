@@ -10,17 +10,19 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.store.AStore;
+import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Application-level component for a lattice application providing DLFS.
  *
  * <p>The application works at the complete hosted lattice root and composes a
- * physical {@link DLFSRegion} at a configured path. It is not scoped to one
+ * physical {@link DLFSRegion} at a configured path, navigated with the root
+ * lattice so the region can be created when absent. It is not scoped to one
  * owner: callers select any owner's {@link DLFSDrives} component as needed.
  * Subclasses may attach further application facilities, such as P2P discovery,
  * beneath this same application component.</p>
@@ -47,19 +49,20 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	 * @param regionPath Path from the application root to the physical DLFS region
 	 */
 	protected DLFSApplication(RootComponent<V> host, ACell... regionPath) {
-		this(Objects.requireNonNull(host,"DLFS application host must not be null").cursor().view(),
-			host.store(),regionPath);
+		this(Objects.requireNonNull(host,"DLFS application host must not be null").getLattice(),
+			host.cursor().view(),host.store(),regionPath);
 	}
 
 	/**
 	 * Binds a working view, such as a fork or transaction draft, to a cursor.
 	 *
+	 * @param lattice Root lattice of the complete application root
 	 * @param cursor Cursor at the complete application root
 	 * @param store Store for incremental blob checkpoints, or null for heap-only file data
 	 * @param regionPath Path from the application root to the physical DLFS region
 	 */
-	protected DLFSApplication(ALatticeCursor<V> cursor, AStore store, ACell... regionPath) {
-		super(cursor);
+	protected DLFSApplication(ALattice<V> lattice, AForkableCursor<V> cursor, AStore store, ACell... regionPath) {
+		super(lattice,cursor);
 		if (regionPath==null) throw new IllegalArgumentException("DLFS region path must not be null");
 		this.store=store;
 		this.regionPath=regionPath.clone();
@@ -105,9 +108,9 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 		return store;
 	}
 
-	/** Returns the physical multi-owner DLFS region. */
+	/** Returns the physical multi-owner DLFS region, navigated with the root lattice. */
 	public DLFSRegion dlfs() {
-		return DLFSRegion.connect(cursor,store,regionPath);
+		return DLFSRegion.connect(resolve(regionPath),store);
 	}
 
 	/**

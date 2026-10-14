@@ -8,7 +8,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.StampedCursor;
 
 /**
@@ -16,7 +16,9 @@ import convex.lattice.cursor.StampedCursor;
  *
  * <p>A {@code SocialUser} wraps a cursor at the {@link SocialLattice} level
  * (through the signing boundary). Writes are automatically signed by the
- * {@code SignedCursor} in the cursor chain.</p>
+ * {@code SignedCursor} in the cursor chain. This component owns the per-user
+ * level, so it declares the shape of each section it hands out from
+ * {@link SocialLattice}.</p>
  *
  * <p>Provides domain-specific accessors:</p>
  * <ul>
@@ -30,7 +32,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 
 	private final AString ownerDid;
 
-	SocialUser(ALatticeCursor<Index<Keyword, ACell>> cursor, AString ownerDid) {
+	SocialUser(AForkableCursor<Index<Keyword, ACell>> cursor, AString ownerDid) {
 		super(cursor);
 		this.ownerDid = ownerDid;
 	}
@@ -41,7 +43,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return new Feed(cursor.path(SocialLattice.KEY_FEED),ownerDid);
+		return new Feed(cursor.child(SocialLattice.KEY_FEED,SocialLattice.FEED_LATTICE),ownerDid);
 	}
 
 	/**
@@ -53,20 +55,22 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Follows cursor wrapper
 	 */
 	public Follows follows() {
-		ALatticeCursor<Index<Keyword, ACell>> following=StampedCursor.create(
-			cursor.path(SocialLattice.KEY_FOLLOWING),SocialLattice.FOLLOWING_LATTICE);
-		return new Follows(following.path(SocialLattice.KEY_FOLLOWS));
+		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
+			cursor.child(SocialLattice.KEY_FOLLOWING,SocialLattice.FOLLOWING_LATTICE),
+			SocialLattice.FOLLOWING_LATTICE);
+		return new Follows(following.child(SocialLattice.KEY_FOLLOWS,SocialLattice.FOLLOWS_LATTICE));
 	}
 
 	/**
 	 * Creates an isolated working copy of this user's unsigned social value.
 	 * Multiple feed, profile and follow actions can be applied to the fork and
-	 * {@link #sync() synced} through the owner boundary as one signed value.
+	 * {@link #sync() synced} through the owner boundary as one signed value,
+	 * merged with {@link SocialLattice}.
 	 *
 	 * @return isolated working copy for this user
 	 */
 	public SocialUser fork() {
-		return new SocialUser(cursor.fork(),ownerDid);
+		return new SocialUser(cursor.fork(SocialLattice.INSTANCE),ownerDid);
 	}
 
 	// TODO: public Profile profile() { ... }
@@ -86,7 +90,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	}
 
 	@Override
-	public SocialUser withCursor(ALatticeCursor<Index<Keyword, ACell>> cursor) {
+	public SocialUser withCursor(AForkableCursor<Index<Keyword, ACell>> cursor) {
 		return new SocialUser(cursor,ownerDid);
 	}
 

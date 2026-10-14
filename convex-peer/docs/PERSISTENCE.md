@@ -10,7 +10,7 @@ authority over application state.
 
 A node owns:
 
-- a `RootLatticeCursor` containing the current application value;
+- a `Root` cursor containing the current application value;
 - a `RootComponent` connecting `sync()` to node publication;
 - one authoritative `AStore`; and
 - one serialised root-publication/checkpoint pipeline.

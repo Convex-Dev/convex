@@ -6,8 +6,8 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.Shape;
 
 /**
  * Opt-in root supporting exclusive transactions and optimistic-to-serial fallback.
@@ -21,16 +21,16 @@ import convex.lattice.LatticeContext;
  *
  * @param <V> Root value type
  */
-public class TransactionalRootCursor<V extends ACell> extends RootLatticeCursor<V> {
+public class TransactionalRootCursor<V extends ACell> extends Root<V> {
 
 	private final ReentrantLock writeLock=new ReentrantLock();
 
-	public TransactionalRootCursor(ALattice<V> lattice,V initialValue,LatticeContext context) {
-		super(lattice,initialValue,context);
+	public TransactionalRootCursor(V initialValue) {
+		super(initialValue);
 	}
 
-	public TransactionalRootCursor(ALattice<V> lattice,V initialValue) {
-		this(lattice,initialValue,LatticeContext.EMPTY);
+	public TransactionalRootCursor(V initialValue, Shape<V> shape, LatticeContext context) {
+		super(initialValue,shape,context);
 	}
 
 	@Override

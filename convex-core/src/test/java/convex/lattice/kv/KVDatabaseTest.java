@@ -14,7 +14,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.MapLattice;
 
@@ -204,8 +204,8 @@ public class KVDatabaseTest {
 		// Set up a cursor chain: MapLattice<dbName → KVStore>
 		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
 			MapLattice.create(KVStoreLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.createLattice(dbMapLattice);
+		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
+			Cursors.root(dbMapLattice);
 
 		// Connect a named database
 		KVDatabase db = KVDatabase.connect(root, "mydb");
@@ -253,8 +253,8 @@ public class KVDatabaseTest {
 		// Set up cursor chain
 		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
 			MapLattice.create(KVStoreLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.createLattice(dbMapLattice);
+		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
+			Cursors.root(dbMapLattice);
 
 		// Connect and populate
 		KVDatabase db = KVDatabase.connect(root, "mydb");
@@ -279,8 +279,8 @@ public class KVDatabaseTest {
 	public void testConnectedModeRejectsStandaloneOps() {
 		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
 			MapLattice.create(KVStoreLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.createLattice(dbMapLattice);
+		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
+			Cursors.root(dbMapLattice);
 		KVDatabase db = KVDatabase.connect(root, "mydb");
 
 		assertNull(db.getKeyPair());

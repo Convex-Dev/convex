@@ -6,7 +6,7 @@ import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Represents a single topic in the lattice message queue system.
@@ -41,12 +41,12 @@ public class LatticeTopic {
 
 	public static final Keyword KEY_NUM_PARTITIONS = Keyword.intern("num-partitions");
 
-	private final ALatticeCursor<?> cursor;
+	private final AForkableCursor<Index<Keyword, ACell>> cursor;
 
 	/**
 	 * Wraps an existing cursor at the TopicLattice level.
 	 */
-	LatticeTopic(ALatticeCursor<?> cursor) {
+	LatticeTopic(AForkableCursor<Index<Keyword, ACell>> cursor) {
 		this.cursor = cursor;
 	}
 
@@ -76,7 +76,9 @@ public class LatticeTopic {
 		// Index.EMPTY first, subsequent assoc() calls preserve the Index type.
 		ensureInitialised();
 
-		ALatticeCursor<AVector<ACell>> partCursor = cursor.path(TopicLattice.KEY_PARTITIONS, id);
+		AForkableCursor<AVector<ACell>> partCursor = cursor
+			.child(TopicLattice.KEY_PARTITIONS, TopicLattice.PARTITION_LATTICE)
+			.child(id, QueueLattice.INSTANCE);
 		return new LatticeQueue(partCursor);
 	}
 
@@ -87,7 +89,7 @@ public class LatticeTopic {
 	 */
 	@SuppressWarnings("unchecked")
 	public ACell getMeta(ACell key) {
-		ALatticeCursor<Index<Keyword, ACell>> c = (ALatticeCursor<Index<Keyword, ACell>>) cursor;
+		AForkableCursor<Index<Keyword, ACell>> c = cursor;
 		Index<Keyword, ACell> state = c.get();
 		AHashMap<ACell, ACell> meta = TopicLattice.getMeta(state);
 		return meta.get(key);
@@ -98,7 +100,7 @@ public class LatticeTopic {
 	 */
 	@SuppressWarnings("unchecked")
 	public void setMeta(ACell key, ACell value) {
-		ALatticeCursor<Index<Keyword, ACell>> c = (ALatticeCursor<Index<Keyword, ACell>>) cursor;
+		AForkableCursor<Index<Keyword, ACell>> c = cursor;
 		c.updateAndGet(state -> {
 			if (state == null) state = TopicLattice.INSTANCE.zero();
 			AHashMap<ACell, ACell> meta = TopicLattice.getMeta(state);
@@ -154,7 +156,7 @@ public class LatticeTopic {
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeTopic fork() {
-		return new LatticeTopic(((ALatticeCursor<ACell>) cursor).fork());
+		return new LatticeTopic(cursor.fork(TopicLattice.INSTANCE));
 	}
 
 	/**
@@ -162,13 +164,13 @@ public class LatticeTopic {
 	 */
 	@SuppressWarnings("unchecked")
 	public void sync() {
-		((ALatticeCursor<ACell>) cursor).sync();
+		cursor.sync();
 	}
 
 	/**
 	 * Returns the underlying lattice cursor.
 	 */
-	public ALatticeCursor<?> cursor() {
+	public AForkableCursor<Index<Keyword, ACell>> cursor() {
 		return cursor;
 	}
 
@@ -178,7 +180,7 @@ public class LatticeTopic {
 	 */
 	@SuppressWarnings("unchecked")
 	private void ensureInitialised() {
-		ALatticeCursor<Index<Keyword, ACell>> c = (ALatticeCursor<Index<Keyword, ACell>>) cursor;
+		AForkableCursor<Index<Keyword, ACell>> c = cursor;
 		c.updateAndGet(state -> {
 			if (state == null) return TopicLattice.INSTANCE.zero();
 			return state;

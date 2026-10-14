@@ -92,7 +92,7 @@ import convex.social.Social;
  * its context-aware merge. The two-argument {@code merge(own, other)} does not check the
  * signer against the owner key at all, and would accept an impersonated slot.
  *
- * <p>This is safe on every real path — {@code ALatticeCursor.merge} always calls
+ * <p>This is safe on every real path — every cursor merge a component or host performs calls
  * {@code lattice.merge(getContext(), ..)}, and even {@code LatticeContext.EMPTY} triggers
  * the {@code AccountKey} equality fast path — so inbound network values merged by
  * {@code NodeServer} are owner-checked by default. But code that reaches for a raw

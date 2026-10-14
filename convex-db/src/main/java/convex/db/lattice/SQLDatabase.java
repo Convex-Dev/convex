@@ -12,7 +12,7 @@ import convex.core.data.Strings;
 import convex.db.ConvexDB;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.OwnerLattice;
 
@@ -55,7 +55,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
 
-	private SQLDatabase(ALatticeCursor<Index<Keyword, ACell>> cursor,
+	private SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor,
 			AString dbName, AKeyPair keyPair, ACell ownerKey) {
 		super(cursor);
 		this.dbName = dbName;
@@ -85,8 +85,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return New SQLDatabase instance
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
-		ALatticeCursor<Index<Keyword, ACell>> cursor =
-			Cursors.createLattice(ConvexDB.DATABASE_LATTICE);
+		AForkableCursor<Index<Keyword, ACell>> cursor =
+			Cursors.root(ConvexDB.DATABASE_LATTICE);
 		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey);
 	}
 
@@ -98,9 +98,9 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @param name Database name to connect to
 	 * @return New SQLDatabase connected to the cursor chain
 	 */
-	public static SQLDatabase connect(ALatticeCursor<?> parent, String name) {
+	public static SQLDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		ALatticeCursor<Index<Keyword, ACell>> cursor = parent.path(dbName);
+		AForkableCursor<Index<Keyword, ACell>> cursor = parent.child(dbName, ConvexDB.DATABASE_LATTICE);
 		if (cursor.get() == null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
@@ -118,7 +118,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	public static SQLDatabase connect(ConvexDB parent,String name) {
 		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
 		AString dbName=Strings.create(name);
-		ALatticeCursor<Index<Keyword,ACell>> cursor=parent.cursor().path(dbName);
+		AForkableCursor<Index<Keyword,ACell>> cursor=parent.cursor().child(dbName,ConvexDB.DATABASE_LATTICE);
 		if (cursor.get()==null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
@@ -134,7 +134,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Forked SQLDatabase instance
 	 */
 	public SQLDatabase fork() {
-		return new SQLDatabase(cursor.fork(),dbName,keyPair,ownerKey);
+		return new SQLDatabase(cursor.fork(ConvexDB.DATABASE_LATTICE),dbName,keyPair,ownerKey);
 	}
 
 	/**
@@ -143,7 +143,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return new SQLSchema(cursor.path(ConvexDB.KEY_TABLES));
+		return new SQLSchema(cursor.child(ConvexDB.KEY_TABLES,TableStoreLattice.INSTANCE));
 	}
 
 	/**
@@ -234,7 +234,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 			@SuppressWarnings("unchecked")
 			Index<Keyword, ACell> remoteState = (Index<Keyword, ACell>) dbMap.get(dbName);
 			if (remoteState != null) {
-				cursor.merge(remoteState);
+				cursor.merge(ConvexDB.DATABASE_LATTICE, remoteState);
 				merged++;
 			}
 		}

@@ -12,7 +12,7 @@ import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
 /**
@@ -46,7 +46,7 @@ import convex.lattice.cursor.Cursors;
  */
 public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
-	public SQLSchema(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+	public SQLSchema(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
 		super(cursor);
 	}
 
@@ -56,8 +56,8 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return New SQLSchema instance
 	 */
 	public static SQLSchema create() {
-		ALatticeCursor<Index<AString, AVector<ACell>>> cursor =
-			Cursors.createLattice(TableStoreLattice.INSTANCE);
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
+			Cursors.root(TableStoreLattice.INSTANCE);
 		return new SQLSchema(cursor);
 	}
 
@@ -67,7 +67,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
 	 * @return New SQLSchema instance connected to the cursor
 	 */
-	public static SQLSchema connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+	public static SQLSchema connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
 		return new SQLSchema(cursor);
 	}
 
@@ -77,7 +77,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Forked SQLSchema instance
 	 */
 	public SQLSchema fork() {
-		return new SQLSchema(cursor.fork());
+		return new SQLSchema(cursor.fork(TableStoreLattice.INSTANCE));
 	}
 
 	// ========== Internal Helpers ==========
@@ -90,7 +90,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Gets a cursor-backed table by name, returning null if not found.
 	 */
 	public SQLTable getTable(AString name) {
-		ALatticeCursor<AVector<ACell>> tableCursor = cursor.path(name);
+		AForkableCursor<AVector<ACell>> tableCursor = cursor.child(name, SQLTableLattice.INSTANCE);
 		if (tableCursor.get() == null) return null;
 		return new SQLTable(tableCursor);
 	}
@@ -195,7 +195,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		}
 
 		// Set state on the table's cursor path
-		ALatticeCursor<AVector<ACell>> tableCursor = cursor.path(name);
+		AForkableCursor<AVector<ACell>> tableCursor = cursor.child(name, SQLTableLattice.INSTANCE);
 		tableCursor.set(SQLTable.createState((AVector<AVector<ACell>>) schema, now()));
 		return true;
 	}
@@ -207,7 +207,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	public boolean dropTable(AString name) {
 		if (getLiveTable(name) == null) return false;
-		ALatticeCursor<AVector<ACell>> tableCursor = cursor.path(name);
+		AForkableCursor<AVector<ACell>> tableCursor = cursor.child(name, SQLTableLattice.INSTANCE);
 		tableCursor.set(SQLTable.createTombstoneState(now()));
 		return true;
 	}

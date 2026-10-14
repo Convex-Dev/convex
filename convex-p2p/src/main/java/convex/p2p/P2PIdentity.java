@@ -8,14 +8,14 @@ import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /** Component at one user's {@code [:id owner :value]} lattice path. */
 public final class P2PIdentity extends ALatticeComponent<ACell> implements TransactionalComponent<ACell,P2PIdentity> {
 
 	private final AccountKey owner;
 
-	P2PIdentity(ALatticeCursor<ACell> cursor, AccountKey owner) {
+	P2PIdentity(AForkableCursor<ACell> cursor, AccountKey owner) {
 		super(cursor);
 		this.owner=owner;
 	}
@@ -41,12 +41,12 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 		setIdentity(P2PLattice.createIdentity(name,nodes,null,timestamp));
 	}
 
-	/** Creates an isolated working component at the same logical path. */
+	/** Creates an isolated working component at the same logical path, merging on sync with the identity value lattice. */
 	public P2PIdentity fork() {
-		return new P2PIdentity(cursor.fork(),owner);
+		return new P2PIdentity(cursor.fork(P2PLattice.ID_LATTICE.getValueLattice()),owner);
 	}
 	@Override
-	public P2PIdentity withCursor(ALatticeCursor<ACell> cursor) {
+	public P2PIdentity withCursor(AForkableCursor<ACell> cursor) {
 		return new P2PIdentity(cursor,owner);
 	}
 

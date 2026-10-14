@@ -1,77 +1,98 @@
 package convex.lattice.cursor;
 
+import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
-import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeOps;
+import convex.lattice.Shape;
 
 /**
  * A cursor that navigates to a path within a base cursor's value.
  *
- * <p>PathCursor provides a view into a nested location within a data structure.
- * Updates to the PathCursor are reflected in the base cursor atomically.</p>
+ * <p>Reads resolve the nested value; updates are reflected in the base cursor
+ * atomically, rebuilding the value above with {@link LatticeOps#assocIn}. The base
+ * cursor's {@link ACursor#shape() shape} creates the base value when a write
+ * arrives through an absent one, and this cursor's own shape supplies update
+ * functions with an empty value instead of null. Context and the transactional
+ * write lock are inherited from the base live.</p>
  *
- * <p>When a {@code baseLattice} is provided, writes through null intermediates
- * use {@link LatticeOps#assocIn} to create correctly-typed containers via
- * {@code lattice.zero()} instead of defaulting to {@link convex.core.data.Maps#empty()}.
- * Additionally, update lambdas receive {@code valueLattice.zero()} instead of null
- * for non-existent values, so callers don't need manual null guards.</p>
+ * <p>A path cursor with no shape is plain structural navigation: a write through an
+ * absent intermediate fails rather than inventing a container. Components navigate
+ * one declared level at a time with {@link ACursor#child(ACell, Shape)}.</p>
  *
  * @param <V> Type of cursor values at the path location
  */
 public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 
-	ACursor<ACell> base;
-	ACell[] path;
-	ALattice<?> baseLattice;
-	ALattice<?> valueLattice; // lattice at the path endpoint, for zero() substitution
+	private final ACursor<ACell> base;
+	private final ACell[] path;
+	private final Shape<V> shape;
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public PathCursor(ACursor<?> base, ACell... path) {
-		super((V) base.get(path));
+	public PathCursor(ACursor<?> base, ACell[] path, Shape<V> shape) {
+		super((V) RT.getIn(base.get(), path));
 		this.base=(ACursor)base;
 		this.path=path.clone();
-		this.baseLattice=null;
-		this.valueLattice=null;
+		this.shape=(shape==null)?Shape.none():shape;
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	PathCursor(ACursor<?> base, ACell[] path, ALattice<?> baseLattice) {
-		super((V) base.get(path));
-		this.base=(ACursor)base;
-		this.path=path.clone();
-		this.baseLattice=baseLattice;
-		this.valueLattice=(baseLattice != null && path.length > 0) ? baseLattice.path(path) : baseLattice;
+	public PathCursor(ACursor<?> base, ACell... path) {
+		this(base,path,null);
 	}
 
 	public static <T extends ACell, V extends ACell> PathCursor<T> create(ACursor<V> base, ACell[] path) {
 		return new PathCursor<>(base,path);
 	}
 
-	/**
-	 * AssocIn through the path. Always uses LatticeOps.assocIn which will
-	 * throw if a null intermediate has no lattice type information. Callers
-	 * must either provide a lattice or ensure the base value is non-null.
-	 */
-	private ACell assocIn(ACell bv, ACell newValue) {
-		return LatticeOps.assocIn(bv, newValue, baseLattice, path);
+	@Override
+	public Shape<V> shape() {
+		return shape;
+	}
+
+	@Override
+	protected LatticeContext inheritedContext() {
+		return base.getContext();
+	}
+
+	@Override
+	protected Lock exclusiveLock() {
+		return base.exclusiveLock();
 	}
 
 	/**
-	 * Returns the value at the path, substituting valueLattice.zero() for null
-	 * when a value lattice is available. Used by update lambdas so callers
-	 * don't need null guards for auto-initialised lattice paths.
+	 * Propagates towards the root through the base cursor: a forked base converges
+	 * with its parent, a live base reaches root publication.
 	 */
-	@SuppressWarnings("unchecked")
+	@Override
+	public V sync() {
+		if (base instanceof AForkableCursor<?> forkable) {
+			forkable.sync();
+			return get();
+		}
+		throw new IllegalStateException("Cannot sync through a non-forkable base cursor: "
+			+ base.getClass().getSimpleName());
+	}
+
+	/**
+	 * AssocIn through the path. The base's shape creates an absent base value;
+	 * missing intermediates below it are created only for a structural shape.
+	 */
+	private ACell assocIn(ACell bv, ACell newValue) {
+		return LatticeOps.assocIn(bv, newValue, base.shape(), path);
+	}
+
+	/**
+	 * Returns the value at the path, substituting this cursor's empty value for null
+	 * so update functions need no null guards for a declared position.
+	 */
 	private V getValueForUpdate(ACell bv) {
 		V value = RT.getIn(bv, path);
-		if (value == null && valueLattice != null) {
-			return (V) valueLattice.zero();
-		}
+		if (value == null) return shape.zero();
 		return value;
 	}
 
@@ -96,9 +117,9 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	/**
 	 * {@inheritDoc}
 	 *
-	 * <p>Implementation note: when a {@code valueLattice} is present, the update function receives
-	 * {@code valueLattice.zero()} instead of null for non-existent values. This means
-	 * {@code get()} may return null while the update function sees an empty container.
+	 * <p>The update function receives this cursor's empty value instead of null for an
+	 * absent value, so {@code get()} may return null while the update function sees an
+	 * empty container.</p>
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
@@ -114,9 +135,9 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	/**
 	 * {@inheritDoc}
 	 *
-	 * <p>Implementation note: when a {@code valueLattice} is present, the update function receives
-	 * {@code valueLattice.zero()} instead of null for non-existent values. This means
-	 * {@code get()} may return null while the update function sees an empty container.
+	 * <p>The update function receives this cursor's empty value instead of null for an
+	 * absent value, so {@code get()} may return null while the update function sees an
+	 * empty container.</p>
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
