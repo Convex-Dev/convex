@@ -1,6 +1,7 @@
 package convex.dlfs;
 
 import java.io.IOException;
+import java.util.Objects;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
@@ -10,7 +11,6 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.store.AStore;
 import convex.lattice.ALatticeApplication;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
@@ -25,14 +25,19 @@ import convex.lattice.cursor.ALatticeCursor;
  * Subclasses may attach further application facilities, such as P2P discovery,
  * beneath this same application component.</p>
  *
- * <p>The application owns neither its host nor store lifecycle. {@link #sync()}
- * publishes the complete application root through host policy, while
- * {@link #flush()} is the separate durability boundary.</p>
+ * <p>DLFS is the one application whose components need a store before
+ * publication: streamed file writes checkpoint blob branches so large files do
+ * not accumulate on the heap. The application therefore takes the host's store
+ * and hands it down to regions, drive maps and drives explicitly. It owns neither
+ * the host nor the store lifecycle; {@link #sync()} publishes the complete
+ * application root through host policy and durability is the host's
+ * {@link RootComponent#flush()}.</p>
  *
  * @param <V> Complete application root value type
  */
 public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 
+	private final AStore store;
 	private final ACell[] regionPath;
 
 	/**
@@ -42,13 +47,21 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	 * @param regionPath Path from the application root to the physical DLFS region
 	 */
 	protected DLFSApplication(RootComponent<V> host, ACell... regionPath) {
-		this(host,host.cursor().view(),regionPath);
+		this(Objects.requireNonNull(host,"DLFS application host must not be null").cursor().view(),
+			host.store(),regionPath);
 	}
 
-	/** Binds a subclass's private working view and its DLFS region to a cursor. */
-	protected DLFSApplication(ALatticeComponent<V> source,ALatticeCursor<V> cursor,ACell... regionPath) {
-		super(source,cursor);
+	/**
+	 * Binds a working view, such as a fork or transaction draft, to a cursor.
+	 *
+	 * @param cursor Cursor at the complete application root
+	 * @param store Store for incremental blob checkpoints, or null for heap-only file data
+	 * @param regionPath Path from the application root to the physical DLFS region
+	 */
+	protected DLFSApplication(ALatticeCursor<V> cursor, AStore store, ACell... regionPath) {
+		super(cursor);
 		if (regionPath==null) throw new IllegalArgumentException("DLFS region path must not be null");
+		this.store=store;
 		this.regionPath=regionPath.clone();
 	}
 
@@ -87,9 +100,14 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 		return new DLFSApplication<>(host,regionPath);
 	}
 
+	/** Returns the store used for blob checkpoints, or null when file data is heap-only. */
+	protected AStore store() {
+		return store;
+	}
+
 	/** Returns the physical multi-owner DLFS region. */
 	public DLFSRegion dlfs() {
-		return DLFSRegion.connect(this,regionPath);
+		return DLFSRegion.connect(cursor,store,regionPath);
 	}
 
 	/**

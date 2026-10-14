@@ -37,7 +37,10 @@ ACursor<V>
     ├── PathCursor<V>                     navigation for non-lattice cursors
     └── ALatticeCursor<V>                 lattice-aware cursor
         ├── RootLatticeCursor<V>          root of a lattice tree
+        │   └── TransactionalRootCursor<V>  root with a write lock for exclusive transactions
+        ├── RootCursorView<V>             live view of a root with its own context override
         ├── ForkedLatticeCursor<V>        independent working copy
+        ├── TransactionCursor<V>          private draft confined to one transact callback
         ├── DescendedCursor<V>            navigated into a sub-path
         └── AUpdateCursor<V,S>            prepare-on-write funnel
             ├── StampedCursor<V>          same type: stamp timestamp on write
@@ -175,6 +178,8 @@ work.sync();                                           // signs once, merges int
 | `sync()` or CAS merge? | Both exist; `sync()` is the lattice operation that always succeeds, like a filesystem sync. |
 | Where do signing and stamping live? | In `AUpdateCursor` subclasses inserted at lattice-declared boundaries, so cursor code stays lattice-agnostic. |
 | Collapse multi-key paths? | Yes, to avoid intermediate cursors and merges; break only at write boundaries. |
+| What does the base class know? | Get, atomic update and `path()` at one location, nothing else. Persistence, durability and publication are host concerns attached at the root through its sync callback; no cursor carries a store. |
+| Root-owned services such as the transactional write lock? | One protected `exclusiveLock()` hook on `ALatticeCursor`, resolved through existing parent links and supplied only by `TransactionalRootCursor`. Views and plain cursors never see it, and there is no capability bundle on `ACursor`. |
 
 ## Where the code lives
 

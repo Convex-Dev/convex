@@ -11,7 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -143,9 +144,17 @@ class TransactionalComponentTest {
 	@Test void conflictingAttemptsFallBackToExclusiveExecution() {
 		AtomicInteger exclusiveCalls=new AtomicInteger(), commits=new AtomicInteger(), callbacks=new AtomicInteger();
 		var root=new TransactionalRootCursor<AHashMap<Keyword,ACell>>(null,initial()) {
-			@Override protected <T> T exclusive(Supplier<T> action) {
-				exclusiveCalls.incrementAndGet();
-				return super.exclusive(action);
+			// Count acquisitions of the real root lock; a substitute lock would not exclude writes.
+			@Override protected Lock exclusiveLock() {
+				Lock real=super.exclusiveLock();
+				return new Lock() {
+					@Override public void lock() { exclusiveCalls.incrementAndGet(); real.lock(); }
+					@Override public void unlock() { real.unlock(); }
+					@Override public void lockInterruptibly() throws InterruptedException { real.lockInterruptibly(); }
+					@Override public boolean tryLock() { return real.tryLock(); }
+					@Override public boolean tryLock(long time,TimeUnit unit) throws InterruptedException { return real.tryLock(time,unit); }
+					@Override public Condition newCondition() { return real.newCondition(); }
+				};
 			}
 			@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> next) {
 				if (commits.incrementAndGet()<=3) {

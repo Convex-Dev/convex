@@ -279,7 +279,6 @@ public abstract class ALatticeApplication<V extends ACell>
     public final <T extends ACell> LatticeSubscription<T> subscribe(ACell... path);
     public final void sync();
     public final CompletionStage<Void> pull();
-    public final void flush() throws IOException;
 
     protected abstract void onLaunch();
     protected void onClose();
@@ -323,11 +322,11 @@ app.launch();  // node already launched and configured
 // The same application can launch against a standalone RootComponent.
 ```
 
-`Feed.connect` above is a proposed cursor-based component factory. Components that
-need persistence request it through their cursor. They copy resolved checkpoint
-policy from a source component at construction, retaining no component parent,
-host or store link. No separate application-context object is needed. Component
-creation opens no connections, starts no workers and installs no observers.
+`Feed.connect` above is a proposed cursor-based component factory. A component holds
+one cursor and nothing else: no component parent, host or store link. The one
+component family that needs a store before publication, DLFS, is handed the host
+store explicitly by its application. Component creation opens no connections,
+starts no workers and installs no observers.
 
 ### Launch and close
 
@@ -447,7 +446,7 @@ still wins as a whole; local atomicity does not introduce field-wise merge seman
 | Fork `sync()` | Merge one working snapshot into its immediate parent; concurrent state follows the declared lattice semantics |
 | Application `sync()` | Persist and publish a host root snapshot, then notify configured replication services; no remote acknowledgement |
 | Application `pull()` | One pull round for a captured set of current interests and configured routes has merged and published its successful responses; failures complete the stage exceptionally, without undoing successful merges |
-| Application `flush()` | Complete the host store's physical durability barrier; call `sync()` first to include pending working state |
+| Host `flush()` | Complete the host store's physical durability barrier; call `sync()` first to include pending working state |
 
 `pull()` is a local no-op without replication services. Configured replication with
 no usable route reports unavailability rather than claiming remote synchronisation.
@@ -606,14 +605,14 @@ Social        cursor at OwnerLattice level
     Follows   cursor at MapLattice<ACell, ACell>
 ```
 
-Hosts, applications and domain components all extend `ALatticeComponent`. Each
-generic component holds one cursor and a resolved checkpoint policy. Only
-`RootComponent` holds the host store. Construction from a source component copies
-checkpoint configuration without retaining
-that component. The cursor is the only connection back to application state: its
-internal links provide navigation, atomic updates and fork merge-back. There is no
-second component-parent hierarchy. Signing is transparent: `Feed` never sees
-`SignedData`.
+Hosts, applications and domain components all extend `ALatticeComponent`. A
+component holds exactly one cursor. Only `RootComponent` holds the host store; DLFS
+components additionally carry a store handed down explicitly from their application,
+because streamed file writes checkpoint blobs before publication. The cursor is the
+only connection back to application state: its internal links provide navigation,
+atomic updates and fork merge-back. There is no second component-parent hierarchy,
+and cursors themselves know nothing of storage. Signing is transparent: `Feed` never
+sees `SignedData`.
 
 Constructors must copy caller-supplied path arrays. Long-lived application and region
 components are fine; owner and session views should be held by the service that routes
@@ -712,13 +711,11 @@ it by attempting a write. An ordinary root never acquires a write lock implicitl
 
 For a custom component, implement `TransactionalComponent<Value,MyComponent>`
 and `withCursor(ALatticeCursor<Value>)`, creating a fresh component with the same
-domain metadata and storage policy. Rebuild children against that cursor; do not
-reuse cached live children. Application subclasses can use the protected
-`ALatticeApplication(source, cursor)` constructor. Fork and rebinding factories pass
-`this` as the source, e.g. `return new MyComponent(this, cursor.fork())`. The base
-constructor copies checkpoint configuration; no manual policy-copying
-helper or back pointer is needed. Rebuilt child components take their defaults from
-the new view; factories must explicitly carry over any child-specific configuration.
+domain metadata over the supplied cursor. Rebuild children against that cursor; do
+not reuse cached live children. Application subclasses use the protected
+`ALatticeApplication(cursor)` constructor. Fork and rebinding factories are one line,
+e.g. `return new MyComponent(cursor.fork())`; a component which explicitly owns
+configuration, such as a DLFS store, passes it along itself.
 
 `transact` returns `void`; `transactAsync` returns `CompletableFuture<Void>`.
 Completion means committed locally, not persisted, published or acknowledged by
@@ -740,7 +737,7 @@ forked.user(myKey).feed().post("Post 1");
 forked.user(myKey).feed().post("Post 2");
 forked.sync();   // merge into the live component
 app.sync();      // publish the hosted root
-app.flush();     // optional physical durability barrier
+host.flush();    // optional physical durability barrier, a host operation
 ```
 
 Domain components expose `fork()` with their exact type when batching is a use case;
@@ -748,79 +745,37 @@ Domain components expose `fork()` with their exact type when batching is a use c
 
 | Operation | Meaning | Moves a cursor? |
 |---|---|---|
-| `component.persist()` | Write reachable cells through the host store; return the store-backed value | No |
+| `host.persist()` | Write the current root's reachable cells to the host store; return the store-backed value | No |
 | `component.sync()` | Merge through the cursor parent; at the root, run publication policy | Yes, where merge selects a value |
-| `application.flush()` | The store's physical durability barrier | No |
+| `host.flush()` | The store's physical durability barrier | No |
 
-Incremental writers may persist at intervals to swap direct references for
-store-backed soft references and relieve memory pressure; they must install the
-returned value themselves. Persistence neither selects a retained root nor licenses
-garbage collection.
+Incremental writers with their own store, such as DLFS drives, checkpoint at
+intervals to swap direct references for store-backed soft references and relieve
+memory pressure; they install the returned value themselves. Persistence neither
+selects a retained root nor licenses garbage collection.
 
-### Checkpoint policy
+### Persistence
 
-An application supplies the checkpoint default for components constructed from it.
-Construction resolves the policy once. Later changes affect that component and new
-views constructed from it, not existing views. Configure an application before
-constructing its domain components, and configure a component before constructing
-its children. Policies belong to component views, not lattice paths; applications
-sharing a host can use different defaults. Policies must be non-null. To copy the
-current policy from another component explicitly, use
-`component.setCheckpointPolicy(source.getCheckpointPolicy())`.
+Persistence lives in two places and nowhere else:
 
-```java
-app.setCheckpointPolicy(CheckpointPolicy.DEFERRED);
-var drives = app.drives(owner);
-drives.setCheckpointPolicy(CheckpointPolicy.INCREMENTAL);
-var draft = drives.drive("home").fork();
-draft.setCheckpointPolicy(CheckpointPolicy.DEFERRED);
-```
+- `RootComponent` owns the host store. It publishes the root on `sync()`, can
+  `persist(value)` reachable cells without publishing, and provides `flush()`, the
+  physical durability barrier. Applications and domain components reach publication
+  only through their cursor's `sync()`.
+- DLFS components carry a store explicitly, because streamed file writes checkpoint
+  blob branches every 16 MiB before anything is published. `DLFSApplication` takes
+  the host store at construction and hands it to regions, drive maps and drives;
+  forks and transaction views keep the same store. The low-level `DLFS.connect` and
+  `DLFS.open` factories accept an optional store for the same purpose. A drive
+  without a store keeps file data on the heap until the root is published.
 
-`INCREMENTAL` allows domain-specific checkpoints, such as DLFS's existing 16 MiB
-blob interval. It remains the compatibility default. `DEFERRED` keeps new working
-values in memory until explicit persistence or publication. Existing store-backed
-values remain readable in either mode. Components use `checkpoint(value)` at their
-chosen intervals and install its return value; it applies the effective policy
-and routes persistence through the cursor's host capability. No workers are created.
-
-Forks and rebound transaction views copy their source's resolved policy. They do not
-retain the source component or store. Changing policy does not cancel a checkpoint
-already in progress. Unhosted cursors retain working values on optional checkpoints;
-explicit `persist()` and `flush()` fail without a persistence capability.
-
-`RootComponent` installs the cursor's persistence capability alongside its publication
-callback. Cursor paths, signed boundaries and forks route persistence through their
-existing links. A transaction view uses the capability only while its callback is
-active and on the callback thread. Persistence never crosses signing or merge
-boundaries and never moves a cursor. It returns a value which may contain store-backed
-references. `flush()` requests durability through the same capability without
-publishing pending state. These operations are separate from root publication.
-
-An implementer needing independent domain storage may explicitly own a store and
-override `persist(value)` and, where needed, `checkpoint(value)`. The generic
-component does not supply or propagate an independent store. Derived components
-must arrange any such specialised behaviour themselves.
-
-Low-level DLFS adapters also use cursor persistence. The store-taking overloads of
-`DLFS.connect/open` and `DLFSLocal.create` have been removed. Configure a host once
-and pass its cursor (or a path/fork from it):
-
-```java
-var host = RootComponent.create(drivesLattice, store);
-var fs = DLFS.connect(host.cursor(), Strings.create("home"));
-```
-
-DLFS forks retain access to host persistence through their cursor. A filesystem
-`clone()` creates independent in-memory state without a host capability.
-
-Checkpoint policy does not change explicit `persist()`, signing boundaries,
-application publication or `flush()`. Forking below an owner's signing boundary
-defers that enclosing signature until merge-back. A deferred DLFS fork can thus
-perform many atomic edits without signing or storing intermediate values; its
-`sync()` merges and signs, and application `sync()` persists and publishes. An
-incremental fork may store blob branches before merge-back without publishing them.
-With incremental policy, transaction rollback may leave immutable checkpoint cells
-in the store. Deferred large-file edits retain more memory until persisted.
+Cursors have no persistence API. A cursor is a reference to an immutable value with
+atomic updates and navigation; storage, durability and publication are host concerns
+attached at the root through its sync callback. With incremental checkpoints, a
+transaction rollback or an abandoned fork may leave immutable cells in the store;
+they are unreferenced and reclaimable, never a logical state change. Forking below
+an owner's signing boundary still defers that signature until merge-back, so a DLFS
+fork can make many edits, checkpointing blobs as it goes, and sign once on `sync()`.
 
 ## Write policy: `LatticeContext`
 

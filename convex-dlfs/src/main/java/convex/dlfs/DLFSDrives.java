@@ -12,7 +12,9 @@ import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.AStore;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.RootComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
@@ -20,7 +22,12 @@ import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.generic.MapLattice;
 
-/** Component representing all named drives belonging to one owner. */
+/**
+ * Component representing all named drives belonging to one owner.
+ *
+ * <p>The optional store is handed to each drive for incremental blob checkpoints
+ * during streamed writes; it is not used for anything else.</p>
+ */
 public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVector<ACell>>> implements TransactionalComponent<AHashMap<AString, AVector<ACell>>,DLFSDrives> {
 	/** State of a drive registry entry. */
 	public enum DriveStatus { LIVE, DELETED, UNTRACKED }
@@ -29,34 +36,38 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	public static final MapLattice<AString, AVector<ACell>> LATTICE=
 		MapLattice.create(DLFSLattice.INSTANCE);
 
+	private final AStore store;
 	private final ConcurrentHashMap<AString,DLFSDrive> drives=new ConcurrentHashMap<>();
 
-	DLFSDrives(ALatticeComponent<?> parent,
-			ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor) {
-		super(parent,cursor);
+	DLFSDrives(ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor, AStore store) {
+		super(cursor);
+		this.store=store;
 	}
 
 	/** Creates a standalone, in-memory set of drives for one owner. */
 	public static DLFSDrives create() {
-		return new DLFSDrives(null,Cursors.createLattice(LATTICE));
+		return new DLFSDrives(Cursors.createLattice(LATTICE),null);
 	}
 
-	/** Wraps an existing cursor over one owner's drive map. */
+	/** Wraps an existing cursor over one owner's drive map; file data stays heap-backed. */
 	public static DLFSDrives wrap(ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor) {
 		if (cursor==null) throw new IllegalArgumentException("Drives cursor must not be null");
-		return new DLFSDrives(null,cursor);
+		return new DLFSDrives(cursor,null);
 	}
 
-	/** Connects one owner's drives at an arbitrary path below a parent component. */
-	public static DLFSDrives connect(ALatticeComponent<?> parent, ACell... path) {
-		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=parent.cursor().path(path);
-		return new DLFSDrives(parent,cursor);
+	/**
+	 * Connects one owner's drives at a path below a host root, checkpointing streamed
+	 * blob data into the host store.
+	 */
+	public static DLFSDrives connect(RootComponent<?> host, ACell... path) {
+		if (host==null) throw new IllegalArgumentException("Host must not be null");
+		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=host.cursor().path(path);
+		return new DLFSDrives(cursor,host.store());
 	}
 
 	/** Creates an isolated temporary multi-drive working component. */
 	public DLFSDrives fork() {
-		return new DLFSDrives(this,cursor.fork());
+		return new DLFSDrives(cursor.fork(),store);
 	}
 
 	/** Opens an existing drive, or returns null if it is absent. */
@@ -67,7 +78,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return new DLFSDrive(this,key,cursor.path(key));
+			return new DLFSDrive(key,cursor.path(key),store);
 		});
 	}
 
@@ -198,7 +209,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	}
 	@Override
 	public DLFSDrives withCursor(ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor) {
-		return new DLFSDrives(this,cursor);
+		return new DLFSDrives(cursor,store);
 	}
 
 }

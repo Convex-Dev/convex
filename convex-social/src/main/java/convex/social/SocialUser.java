@@ -29,8 +29,8 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 
 	private final AString ownerDid;
 
-	SocialUser(ALatticeComponent<?> parent, ALatticeCursor<Index<Keyword, ACell>> cursor, AString ownerDid) {
-		super(parent,cursor);
+	SocialUser(ALatticeCursor<Index<Keyword, ACell>> cursor, AString ownerDid) {
+		super(cursor);
 		this.ownerDid = ownerDid;
 	}
 
@@ -40,7 +40,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return new Feed(this,cursor.path(SocialLattice.KEY_FEED),ownerDid);
+		return new Feed(cursor.path(SocialLattice.KEY_FEED),ownerDid);
 	}
 
 	/**
@@ -49,7 +49,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Follows cursor wrapper
 	 */
 	public Follows follows() {
-		return new Follows(this,cursor.path(
+		return new Follows(cursor.path(
 			SocialLattice.KEY_FOLLOWING,SocialLattice.KEY_FOLLOWS));
 	}
 
@@ -61,7 +61,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return isolated working copy for this user
 	 */
 	public SocialUser fork() {
-		return new SocialUser(this,cursor.fork(),ownerDid);
+		return new SocialUser(cursor.fork(),ownerDid);
 	}
 
 	// TODO: public Profile profile() { ... }
@@ -82,7 +82,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 
 	@Override
 	public SocialUser withCursor(ALatticeCursor<Index<Keyword, ACell>> cursor) {
-		return new SocialUser(this,cursor,ownerDid);
+		return new SocialUser(cursor,ownerDid);
 	}
 
 }

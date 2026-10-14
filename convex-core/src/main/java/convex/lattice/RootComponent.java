@@ -5,7 +5,6 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.Cells;
-import convex.lattice.cursor.ACursor;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.lattice.cursor.Cursors;
@@ -14,18 +13,19 @@ import convex.lattice.cursor.RootLatticeCursor;
 /**
  * Generic store-backed root for a lattice application component hierarchy.
  *
- * <p>A root component supplies store-only persistence to its descendants and
- * hosts the root cursor's sync policy. Standalone roots publish their current
- * value as the store root on {@link #sync()}. Network infrastructure may configure
- * a replication pipeline before freezing host configuration. Neither operation
- * performs a durability barrier or owns the store lifecycle.</p>
+ * <p>A root component owns the host store and the root cursor's sync policy. It is
+ * the one generic component with a persistence capability; cursors and domain
+ * components have none. Standalone roots publish their current value as the store
+ * root on {@link #sync()}. Network infrastructure may configure a replication
+ * pipeline before freezing host configuration. Neither operation performs a
+ * durability barrier or owns the store lifecycle.</p>
  *
  * <p>The same component can wrap a cursor owned by a networked NodeServer or
  * own a standalone local lattice cursor backed by any {@link AStore}.</p>
  *
  * @param <V> Root lattice value type
  */
-public final class RootComponent<V extends ACell> extends ALatticeComponent<V> implements ACursor.Persistence {
+public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	private final AStore store;
 	private volatile Function<V,V> publicationPolicy;
@@ -35,7 +35,6 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> i
 	public RootComponent(RootLatticeCursor<V> cursor, AStore store) {
 		super(cursor);
 		this.store=java.util.Objects.requireNonNull(store,"Root store must not be null");
-		cursor.setPersistence(this);
 		cursor.onSync(this::publishRoot);
 	}
 
@@ -73,10 +72,27 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> i
 		return store;
 	}
 
-	/** Host implementation of cursor persistence; does not publish a root. */
-	@Override
+	/**
+	 * Persists a value through the host store without installing, publishing or
+	 * moving any cursor. The returned value may contain store-backed references.
+	 *
+	 * @param <T> Cell type
+	 * @param value Value to persist
+	 * @return Persisted value
+	 * @throws IOException If persistence fails
+	 */
 	public <T extends ACell> T persist(T value) throws IOException {
 		return Cells.persist(value,store);
+	}
+
+	/**
+	 * Persists the current root value without changing the cursor or publishing.
+	 *
+	 * @return Persisted current root value
+	 * @throws IOException If persistence fails
+	 */
+	public V persist() throws IOException {
+		return persist(cursor.get());
 	}
 
 	/** Returns the hosted root cursor with its exact static type. */

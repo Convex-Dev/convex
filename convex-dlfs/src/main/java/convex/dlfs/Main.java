@@ -165,7 +165,7 @@ public final class Main {
 			}
 			closeNode(transport,node);
 			try {
-				application.flush();
+				store.flush();
 			} catch (Exception e) {
 				System.err.println("Failed to flush DLFS store: "+e.getMessage());
 			}

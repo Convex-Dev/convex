@@ -47,12 +47,7 @@ import convex.lattice.cursor.Cursors;
 public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
 	public SQLSchema(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
-		this(null,cursor);
-	}
-
-	SQLSchema(ALatticeComponent<?> parent,
-			ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
-		super(parent,cursor);
+		super(cursor);
 	}
 
 	/**
@@ -82,7 +77,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Forked SQLSchema instance
 	 */
 	public SQLSchema fork() {
-		return new SQLSchema(this,cursor.fork());
+		return new SQLSchema(cursor.fork());
 	}
 
 	// ========== Internal Helpers ==========
@@ -97,7 +92,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	public SQLTable getTable(AString name) {
 		ALatticeCursor<AVector<ACell>> tableCursor = cursor.path(name);
 		if (tableCursor.get() == null) return null;
-		return new SQLTable(this,tableCursor);
+		return new SQLTable(tableCursor);
 	}
 
 	/** Convenience overload. */

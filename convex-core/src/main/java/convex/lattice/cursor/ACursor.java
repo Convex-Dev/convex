@@ -1,9 +1,7 @@
 package convex.lattice.cursor;
 
-import java.io.IOException;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
-import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
@@ -34,46 +32,16 @@ import convex.lattice.LatticeOps;
  *   <li>{@link ALatticeCursor} - Adds fork/sync with lattice merge (always succeeds)</li>
  * </ul>
  *
+ * <p>This base class specifies only reads, atomic updates and navigation at a single
+ * location. Anything else a cursor may offer (lattice merge, transactions, write
+ * interception) is added by a subclass or by composing cursors; storage, durability
+ * and publication are not cursor concerns at all.</p>
+ *
  * @param <V> Type of value held by this cursor
  * @see AForkableCursor for optimistic concurrency with CAS-based merge
  * @see ALatticeCursor for CRDT-style merge that always succeeds
  */
 public abstract class ACursor<V extends ACell> {
-
-	/** Host persistence operations, deliberately exposing no physical store. */
-	public interface Persistence {
-		/** Persists a value without installing or publishing it. */
-		<T extends ACell> T persist(T value) throws IOException;
-		/** Completes a physical durability barrier without publishing state. */
-		void flush() throws IOException;
-	}
-
-	/** Resolves the host capability through existing cursor links, or null. */
-	protected Persistence persistence() { return null; }
-
-	/**
-	 * Persists the supplied value without updating, signing, merging or publishing
-	 * cursor state. The returned value may contain store-backed references.
-	 * Throws when this cursor has no host persistence capability.
-	 */
-	public final <T extends ACell> T persist(T value) throws IOException {
-		Persistence capability=persistence();
-		if (capability==null) throw new IllegalStateException("No host persistence available");
-		return capability.persist(value);
-	}
-
-	/** Optional working-value persistence; an unhosted cursor returns value unchanged. */
-	public final <T extends ACell> T checkpoint(T value) throws IOException {
-		Persistence capability=persistence();
-		return (capability==null)?value:capability.persist(value);
-	}
-
-	/** Requests host durability without merging or publishing pending state. */
-	public final void flush() throws IOException {
-		Persistence capability=persistence();
-		if (capability==null) throw new IllegalStateException("No host persistence available");
-		capability.flush();
-	}
 
 	protected ACursor() {
 	}
@@ -303,17 +271,6 @@ public abstract class ACursor<V extends ACell> {
 	 */
 	public abstract V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction);
 
-	/**
-	 * Whether this cursor supports exclusive transactions, inherited from its
-	 * state-owning root. Ordinary cursors support optimistic transactions only.
-	 */
-	public boolean supportsExclusiveTransactions() { return false; }
-
-	/** Executes under this cursor's shared root write exclusion, when supported. */
-	protected <T> T exclusive(Supplier<T> action) {
-		throw new UnsupportedOperationException("Cursor does not support exclusive transactions");
-	}
-
 	@Override
 	public String toString() {
 		V v=get();
@@ -342,25 +299,5 @@ public abstract class ACursor<V extends ACell> {
 	 * @return A cursor positioned at the nested path
 	 */
 	public abstract <T extends ACell> ACursor<T> path(ACell... path);
-
-	/**
-	 * Creates an independent copy of this cursor for isolated modifications.
-	 *
-	 * <p>The detached cursor starts with a snapshot of the current value and can be
-	 * modified without affecting this cursor. Use {@link AForkableCursor#merge(AForkableCursor)}
-	 * to attempt merging changes back (will fail if this cursor changed).</p>
-	 *
-	 * <p>For lattice-aware forking where merge always succeeds, use
-	 * {@link ALatticeCursor#fork()} instead.</p>
-	 *
-	 * @param <T> Type of the detached cursor value
-	 * @return A new independent Root cursor with the current value
-	 * @see AForkableCursor#merge(AForkableCursor) for CAS-based merge (can fail)
-	 * @see ALatticeCursor#fork() for lattice-aware fork (merge always succeeds)
-	 */
-	@SuppressWarnings("unchecked")
-	public <T extends ACell> AForkableCursor<T> detach() {
-		return (AForkableCursor<T>) Root.create(get());
-	}
 
 }

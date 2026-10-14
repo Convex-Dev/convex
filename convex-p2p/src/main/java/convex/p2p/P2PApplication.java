@@ -6,7 +6,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeApplication;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.RootComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
@@ -24,10 +23,9 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		super(host);
 	}
 
-	/** Binds a subclass's private working view to the supplied cursor. */
-	protected P2PApplication(ALatticeComponent<Index<Keyword,ACell>> source,
-			ALatticeCursor<Index<Keyword,ACell>> cursor) {
-		super(source,cursor);
+	/** Binds a working view, such as a fork or transaction draft, to the supplied cursor. */
+	protected P2PApplication(ALatticeCursor<Index<Keyword,ACell>> cursor) {
+		super(cursor);
 	}
 
 	/** Connects a P2P application to a hosted lattice root. */
@@ -37,20 +35,19 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	/** Returns the component representing one P2P user's owned regions. */
 	public P2PUser p2p(AccountKey userKey) {
-		return P2PUser.create(this,userKey);
+		return P2PUser.create(cursor,userKey);
 	}
 
 	/** Returns the component at one user's identity path. */
 	public P2PIdentity identity(AccountKey userKey) {
 		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		return new P2PIdentity(this,
-			cursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey);
+		return new P2PIdentity(cursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey);
 	}
 
 	/** Returns the component at one user's node-record path. */
 	public P2PNodeRecord node(AccountKey userKey) {
 		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		return new P2PNodeRecord(this,
+		return new P2PNodeRecord(
 			cursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,userKey,Keywords.VALUE),
 			userKey);
 	}

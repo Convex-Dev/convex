@@ -2,6 +2,7 @@ package convex.lattice.cursor;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 
 import convex.core.data.ACell;
@@ -123,6 +124,29 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 	}
 
 	/**
+	 * Returns the lock which serialises writes to this cursor's shared state, or null
+	 * when that state lives in an ordinary optimistic root. Chained cursors resolve
+	 * this through their existing parent links; {@link TransactionalRootCursor}
+	 * supplies its write lock. This is the only root-owned capability a lattice
+	 * cursor exposes, and it exists solely to support {@link #transact}.
+	 *
+	 * @return Shared write lock, or null when exclusive transactions are unsupported
+	 */
+	protected Lock exclusiveLock() {
+		return null;
+	}
+
+	/**
+	 * Whether this cursor's shared state supports exclusive transactions. Ordinary
+	 * roots support optimistic transactions only.
+	 *
+	 * @return true if {@link #transactLocked} is available
+	 */
+	public final boolean supportsExclusiveTransactions() {
+		return exclusiveLock()!=null;
+	}
+
+	/**
 	 * Runs an isolated subtree transaction. Ordinary roots retry optimistically.
 	 * Transactional roots fall back to exclusive access after three failed commit
 	 * attempts. An equal input reuses the
@@ -135,26 +159,29 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 	public final void transact(Consumer<? super ALatticeCursor<V>> action) {
 		Objects.requireNonNull(action);
 		Transaction attempt=new Transaction(action);
-		boolean coordinated=supportsExclusiveTransactions();
+		Lock lock=exclusiveLock();
 		for (int failures=0;;failures++) {
 			if (attempt.commit()) return;
-			if (coordinated && failures==2) break;
+			if (lock!=null && failures==2) break;
 		}
-		exclusive(() -> {
-			if (!attempt.commit()) throw new IllegalStateException("Re-entrant write during transaction commit");
-			return null;
-		});
+		commitExclusively(attempt,lock);
 	}
 
 	/** Runs one isolated callback while excluding all other writes to the shared root. */
 	public final void transactLocked(Consumer<? super ALatticeCursor<V>> action) {
 		Objects.requireNonNull(action);
-		exclusive(() -> {
-			if (!new Transaction(action).commit()) {
-				throw new IllegalStateException("Re-entrant write during transaction commit");
-			}
-			return null;
-		});
+		Lock lock=exclusiveLock();
+		if (lock==null) throw new UnsupportedOperationException("Cursor does not support exclusive transactions");
+		commitExclusively(new Transaction(action),lock);
+	}
+
+	private void commitExclusively(Transaction attempt, Lock lock) {
+		lock.lock();
+		try {
+			if (!attempt.commit()) throw new IllegalStateException("Re-entrant write during transaction commit");
+		} finally {
+			lock.unlock();
+		}
 	}
 
 	private final class Transaction {
@@ -170,7 +197,7 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 			if (!computed || !Utils.equals(observed,input)) {
 				input=observed;
 				V initial=(input==null && lattice!=null)?lattice.zero():input;
-				TransactionCursor<V> draft=new TransactionCursor<>(lattice,initial,getContext(),persistence());
+				TransactionCursor<V> draft=new TransactionCursor<>(lattice,initial,getContext());
 				try {
 					action.accept(draft);
 					V candidate=draft.get();

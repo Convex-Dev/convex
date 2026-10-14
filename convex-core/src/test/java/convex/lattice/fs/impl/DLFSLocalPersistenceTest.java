@@ -22,7 +22,6 @@ import convex.core.data.Blob;
 import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.RootComponent;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSLattice;
 
@@ -107,8 +106,8 @@ public class DLFSLocalPersistenceTest {
 	public void testStoreCheckpointPreservesLogicalValue() throws Exception {
 		ABlob data=testBlob();
 		try (EtchStore store=EtchStore.createTemp("dlfs-checkpoint-contract")) {
-			var cursor=RootComponent.create(DLFSLattice.INSTANCE,store).cursor();
-			DLFSLocal fileSystem=new DLFSLocal(DLFS.provider(),"contract",cursor);
+			var cursor=Cursors.createLattice(DLFSLattice.INSTANCE);
+			DLFSLocal fileSystem=DLFSLocal.create(DLFS.provider(),"contract",cursor,store);
 			Hash rootHash=fileSystem.getRootHash();
 
 			ABlob checkpointed=fileSystem.checkpointBlob(data);

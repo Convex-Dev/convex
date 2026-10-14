@@ -1,7 +1,8 @@
 package convex.lattice.cursor;
 
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BinaryOperator;
-import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -14,17 +15,12 @@ final class TransactionCursor<V extends ACell> extends ALatticeCursor<V> {
 	private final Thread owner=Thread.currentThread();
 	private boolean open=true;
 	private V value;
-	private final Persistence persistence;
+	/** Private state is single-threaded; nested locked transactions trivially exclude nothing. */
+	private final Lock lock=new ReentrantLock();
 
-	TransactionCursor(ALattice<V> lattice,V initial,LatticeContext context,Persistence persistence) {
+	TransactionCursor(ALattice<V> lattice,V initial,LatticeContext context) {
 		super(lattice,context,initial);
 		value=initial;
-		this.persistence=persistence;
-	}
-
-	@Override protected Persistence persistence() {
-		checkAccess();
-		return persistence;
 	}
 
 	private void checkAccess() {
@@ -64,10 +60,9 @@ final class TransactionCursor<V extends ACell> extends ALatticeCursor<V> {
 	@Override public V accumulateAndGet(V other,BinaryOperator<V> action) {
 		return updateAndGet(current -> action.apply(current,other));
 	}
-	@Override public boolean supportsExclusiveTransactions() { return true; }
-	@Override protected <T> T exclusive(Supplier<T> action) {
+	@Override protected Lock exclusiveLock() {
 		checkAccess();
-		return action.get();
+		return lock;
 	}
 
 	@Override public V sync() {

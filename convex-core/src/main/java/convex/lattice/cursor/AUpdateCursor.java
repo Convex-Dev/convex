@@ -1,9 +1,9 @@
 package convex.lattice.cursor;
 
+import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
@@ -70,14 +70,8 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 	}
 
 	@Override
-	public boolean supportsExclusiveTransactions() { return base.supportsExclusiveTransactions(); }
-
-	@Override
-	protected Persistence persistence() { return base.persistence(); }
-
-	@Override
-	protected <T> T exclusive(Supplier<T> action) {
-		return base.exclusive(action);
+	protected Lock exclusiveLock() {
+		return (base instanceof ALatticeCursor<?> latticeCursor) ? latticeCursor.exclusiveLock() : null;
 	}
 
 	@Override

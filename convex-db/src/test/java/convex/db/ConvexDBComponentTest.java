@@ -4,59 +4,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
-import convex.core.data.Ref;
-import convex.core.store.MemoryStore;
-import java.util.function.Consumer;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
-import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.MemoryStore;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLTable;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.RootComponent;
-import convex.lattice.cursor.Cursors;
 
-/** Tests Convex DB integration with the lattice component storage configuration. */
+/** Tests Convex DB components over a hosted root: state and forks travel through cursors. */
 public class ConvexDBComponentTest {
 
 	private static final String DB_NAME="component-test";
 	private static final String TABLE_NAME="items";
 
-	private static class CountingStore extends MemoryStore {
-		int writes;
-		@Override public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref,int status,
-				Consumer<Ref<ACell>> noveltyHandler) {
-			writes++;
-			return super.storeTopRef(ref,status,noveltyHandler);
-		}
-	}
-
-	private static class TestRoot extends
-			ALatticeComponent<AHashMap<AString,Index<Keyword,ACell>>> {
-
-
-		TestRoot() {
-			this(new CountingStore());
-		}
-
-		private final CountingStore counter;
-		private TestRoot(CountingStore counter) {
-			super(RootComponent.create(ConvexDB.DATABASE_MAP_LATTICE,counter).cursor());
-			this.counter=counter;
-		}
-
-		int persistCount() { return counter.writes; }
+	private static RootComponent<AHashMap<AString,Index<Keyword,ACell>>> host() {
+		return RootComponent.create(ConvexDB.DATABASE_MAP_LATTICE,new MemoryStore());
 	}
 
 	private static SQLDatabase createDatabase(ConvexDB cdb) {
@@ -66,47 +37,25 @@ public class ConvexDBComponentTest {
 	}
 
 	@Test
-	public void testNestedPersistenceUsesStoreWithoutMovingCursors() throws Exception {
-		TestRoot root=new TestRoot();
+	public void testHostedComponentsShareRootState() {
+		RootComponent<AHashMap<AString,Index<Keyword,ACell>>> root=host();
 		ConvexDB cdb=ConvexDB.connect(root);
 		SQLDatabase db=createDatabase(cdb);
 		SQLTable table=db.tables().getTable(TABLE_NAME);
 
-		AHashMap<AString,Index<Keyword,ACell>> rootBefore=root.cursor().get();
-		AVector<ACell> tableBefore=table.cursor().get();
-		AVector<ACell> persisted=table.persist();
-
-		assertEquals(1,root.persistCount());
-		assertEquals(tableBefore,persisted);
-		assertSame(tableBefore,table.cursor().get());
-		assertSame(rootBefore,root.cursor().get());
+		assertNotNull(table);
+		assertSame(root.cursor().get(),cdb.cursor().get());
+		assertEquals(1,root.cursor().get().count());
+		assertTrue(ConvexDB.connect(root).database(DB_NAME).tables().tableExists(TABLE_NAME));
 	}
 
 	@Test
-	public void testStandaloneComponentsRemainWithoutPersistencePolicy() {
-		ConvexDB cdb=ConvexDB.create();
-		SQLTable cdbTable=createDatabase(cdb).tables().getTable(TABLE_NAME);
-		assertThrows(IllegalStateException.class,cdbTable::persist);
-		assertTrue(cdb.database(DB_NAME).tables().tableExists(TABLE_NAME));
-
-		SQLDatabase standalone=SQLDatabase.create(DB_NAME,AKeyPair.generate());
-		assertTrue(standalone.tables().createTable(TABLE_NAME,new String[] {"id"}));
-		assertThrows(IllegalStateException.class,
-			standalone.tables().getTable(TABLE_NAME)::persist);
-	}
-
-	@Test
-	public void testDatabaseForkRetainsStoreCapabilityAndSyncsToOriginal() throws Exception {
-		TestRoot root=new TestRoot();
+	public void testDatabaseForkSyncsToOriginal() {
+		RootComponent<AHashMap<AString,Index<Keyword,ACell>>> root=host();
 		SQLDatabase original=createDatabase(ConvexDB.connect(root));
 		SQLDatabase fork=original.fork();
 
 		assertTrue(fork.tables().insert(TABLE_NAME,1,"forked"));
-		AHashMap<AString,Index<Keyword,ACell>> rootBefore=root.cursor().get();
-		fork.tables().getTable(TABLE_NAME).persist();
-
-		assertEquals(1,root.persistCount());
-		assertSame(rootBefore,root.cursor().get());
 		assertEquals(0,original.tables().getRowCount(TABLE_NAME));
 
 		fork.sync();
@@ -115,18 +64,13 @@ public class ConvexDBComponentTest {
 	}
 
 	@Test
-	public void testSchemaForkRetainsStoreCapabilityAndSyncsToOriginal() throws Exception {
-		TestRoot root=new TestRoot();
+	public void testSchemaForkSyncsToOriginal() {
+		RootComponent<AHashMap<AString,Index<Keyword,ACell>>> root=host();
 		SQLSchema original=ConvexDB.connect(root).database(DB_NAME).tables();
 		SQLSchema fork=original.fork();
 
 		assertTrue(fork.createTable(TABLE_NAME,new String[] {"id"}));
-		SQLTable forkTable=fork.getTable(TABLE_NAME);
-		AHashMap<AString,Index<Keyword,ACell>> rootBefore=root.cursor().get();
-		forkTable.persist();
-
-		assertEquals(1,root.persistCount());
-		assertSame(rootBefore,root.cursor().get());
+		assertNotNull(fork.getTable(TABLE_NAME));
 		assertFalse(original.tableExists(TABLE_NAME));
 
 		fork.sync();

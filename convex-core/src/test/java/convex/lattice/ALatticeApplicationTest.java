@@ -47,7 +47,7 @@ public class ALatticeApplicationTest {
 
 	private static final class Items extends ALatticeComponent<ASet<CVMLong>> {
 		Items(ALatticeApplication<Index<Keyword,ACell>> application) {
-			super(application,application.cursor().path(ITEMS));
+			super(application.cursor().path(ITEMS));
 		}
 
 		void add(CVMLong value) {

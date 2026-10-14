@@ -1,8 +1,8 @@
 package convex.lattice.cursor;
 
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BinaryOperator;
-import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -34,12 +34,8 @@ public class TransactionalRootCursor<V extends ACell> extends RootLatticeCursor<
 	}
 
 	@Override
-	public boolean supportsExclusiveTransactions() { return true; }
-
-	@Override
-	protected <T> T exclusive(Supplier<T> action) {
-		writeLock.lock();
-		try { return action.get(); } finally { writeLock.unlock(); }
+	protected Lock exclusiveLock() {
+		return writeLock;
 	}
 
 	@Override

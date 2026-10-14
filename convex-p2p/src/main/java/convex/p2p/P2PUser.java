@@ -1,7 +1,5 @@
 package convex.p2p;
 
-import java.io.IOException;
-
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -72,27 +70,21 @@ public class P2PUser {
 		if (userKey == null) throw new IllegalArgumentException("User key must not be null");
 
 		return new P2PUser(
-			new P2PIdentity(null,rootCursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey),
-			new P2PNodeRecord(null,rootCursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,
+			new P2PIdentity(rootCursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey),
+			new P2PNodeRecord(rootCursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,
 				userKey,Keywords.VALUE),userKey),userKey);
 	}
 
 	/**
-	 * Creates a user facade beneath a containing application component.
-	 * Persistence and other containing policy delegate through the parent.
+	 * Creates a user facade over a containing application component's cursor.
 	 *
-	 * @param parent Containing application component
+	 * @param parent Containing application component at the P2P root level
 	 * @param userKey P2P user key
-	 * @return Hosted P2P user facade
+	 * @return P2P user facade
 	 */
 	public static P2PUser create(ALatticeComponent<?> parent, AccountKey userKey) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		ALatticeCursor<?> rootCursor=parent.cursor();
-		return new P2PUser(
-			new P2PIdentity(parent,rootCursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey),
-			new P2PNodeRecord(parent,rootCursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,
-				userKey,Keywords.VALUE),userKey),userKey);
+		return create(parent.cursor(),userKey);
 	}
 
 	/** Returns the path-specific identity component. */
@@ -170,11 +162,6 @@ public class P2PUser {
 	/** Synchronises identity changes to this facade's live parent path. */
 	public void sync() {
 		identity.sync();
-	}
-
-	/** Persists the current identity value without moving either cursor. */
-	public ACell persist() throws IOException {
-		return identity.persist();
 	}
 
 	/**

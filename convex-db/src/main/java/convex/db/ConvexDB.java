@@ -108,13 +108,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	// ========== Instance ==========
 
 	private ConvexDB(ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-		this(null,cursor);
-	}
-
-	private ConvexDB(
-			ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent,
-			ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-		super(parent,cursor);
+		super(cursor);
 	}
 
 	/**
@@ -144,18 +138,18 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	/**
 	 * Connects to a containing component at the database-map level.
 	 *
-	 * <p>This is the preferred hosted form. Component policy such as persistence
-	 * delegates through the supplied parent, while cursor writes remain at the
-	 * same database-map position. A {@link RootComponent} obtained from a
-	 * {@link NodeServer} can be supplied directly.</p>
+	 * <p>This is the preferred hosted form: cursor writes share the containing
+	 * component's atomic state and context at the same database-map position. A
+	 * {@link RootComponent} obtained from a {@link NodeServer} can be supplied
+	 * directly.</p>
 	 *
 	 * @param parent Containing database-map component
-	 * @return ConvexDB connected to the component hierarchy
+	 * @return ConvexDB connected to the containing component's cursor
 	 */
 	public static ConvexDB connect(
 			ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		return new ConvexDB(parent,parent.cursor());
+		return new ConvexDB(parent.cursor());
 	}
 
 	/**

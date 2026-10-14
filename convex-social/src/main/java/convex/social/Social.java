@@ -127,11 +127,6 @@ public class Social extends ALatticeComponent<
 		super(cursor);
 	}
 
-	Social(ALatticeComponent<?> parent,
-			ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
-		super(parent,cursor);
-	}
-
 	/**
 	 * Creates a standalone Social instance with its own cursor.
 	 *
@@ -179,13 +174,12 @@ public class Social extends ALatticeComponent<
 	}
 
 	/**
-	 * Connects to the {@code :social} region beneath a containing component.
-	 * Checkpoint configuration is copied from the supplied component; state and
-	 * persistence operations use the cursor scoped to the social path.
+	 * Connects to the {@code :social} region beneath a containing component,
+	 * navigating from its cursor with a signing policy for this instance.
 	 *
 	 * @param parent Containing lattice component
 	 * @param keyPair Key pair for signing updates
-	 * @return Social instance connected beneath the parent component
+	 * @return Social instance connected beneath the containing component
 	 */
 	public static Social connect(ALatticeComponent<?> parent, AKeyPair keyPair) {
 		return connect(parent,LatticeContext.create(
@@ -201,7 +195,7 @@ public class Social extends ALatticeComponent<
 
 	/**
 	 * Connects to the {@code :social} region beneath a containing component,
-	 * inheriting its live cursor context and copying its checkpoint configuration.
+	 * inheriting its live cursor context.
 	 *
 	 * @param parent Containing application component
 	 * @return Social region component
@@ -210,7 +204,7 @@ public class Social extends ALatticeComponent<
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
 		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
 			parent.cursor().path(KEY_SOCIAL);
-		return new Social(parent,socialCursor);
+		return new Social(socialCursor);
 	}
 
 	/**
@@ -230,7 +224,7 @@ public class Social extends ALatticeComponent<
 		}
 		ALatticeCursor<Index<Keyword, ACell>> userCursor =
 			cursor.path(ownerDid, Keywords.VALUE);
-		return new SocialUser(this,userCursor,ownerDid);
+		return new SocialUser(userCursor,ownerDid);
 	}
 
 	/** Convenience migration overload mapping an Ed25519 key to its {@code did:key}. */
@@ -246,12 +240,12 @@ public class Social extends ALatticeComponent<
 	 * @return Forked Social instance
 	 */
 	public Social fork() {
-		return new Social(this,cursor.fork());
+		return new Social(cursor.fork());
 	}
 
 	@Override
 	public Social withCursor(ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
-		return new Social(this,cursor);
+		return new Social(cursor);
 	}
 
 }

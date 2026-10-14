@@ -23,6 +23,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.AStore;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFS;
@@ -40,22 +41,51 @@ public class DLFSLocal extends DLFileSystem {
 
 	// Cursor for filesystem root node. This may be a path into a bigger lattice
 	ALatticeCursor<AVector<ACell>> rootCursor;
+	// Store for incremental blob checkpoints during streamed writes, or null for heap-only
+	private final AStore store;
 
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
-		super(dlfsProvider,uriPath);
-		this.rootCursor=Cursors.createLattice(DLFSLattice.INSTANCE,rootNode);
+		this(dlfsProvider,uriPath,Cursors.createLattice(DLFSLattice.INSTANCE,rootNode),null);
 	}
 
 	/**
 	 * Creates a DLFSLocal backed by a lattice cursor (which may be a path into a larger lattice).
+	 * File data remains heap-backed; use {@link #create(DLFSProvider, String, ALatticeCursor, AStore)}
+	 * for incremental blob persistence.
 	 *
 	 * @param dlfsProvider Provider for this filesystem
 	 * @param uriPath URI path (may be null)
 	 * @param cursor Lattice cursor pointing to the DLFS tree
 	 */
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, ALatticeCursor<AVector<ACell>> cursor) {
+		this(dlfsProvider,uriPath,cursor,null);
+	}
+
+	/**
+	 * Creates a cursor-backed view which checkpoints blob branches into the supplied
+	 * store when non-null. Intended for adapters which may also operate detached.
+	 */
+	protected DLFSLocal(DLFSProvider dlfsProvider, String uriPath,
+			ALatticeCursor<AVector<ACell>> cursor, AStore store) {
 		super(dlfsProvider,uriPath);
 		this.rootCursor=cursor;
+		this.store=store;
+	}
+
+	/**
+	 * Creates a cursor-backed view with incremental blob persistence in the
+	 * supplied store. The caller retains ownership of the store.
+	 *
+	 * @param dlfsProvider DLFS provider
+	 * @param uriPath URI path (may be null)
+	 * @param cursor Cursor pointing to the DLFS tree
+	 * @param store Store used for streamed blob persistence
+	 * @return Store-backed filesystem view
+	 */
+	public static DLFSLocal create(DLFSProvider dlfsProvider, String uriPath,
+			ALatticeCursor<AVector<ACell>> cursor, AStore store) {
+		if (store==null) throw new IllegalArgumentException("DLFS persistence store must not be null");
+		return new DLFSLocal(dlfsProvider,uriPath,cursor,store);
 	}
 
 	public static DLFSLocal create(DLFSProvider provider) {
@@ -97,11 +127,12 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	/**
-	 * Checkpoints immutable blob branches through this filesystem's cursor host, if any.
-	 * Component adapters may override this to apply their checkpoint policy.
+	 * Checkpoints immutable blob branches into this filesystem's store, if any. Part
+	 * of the channel write protocol; subclasses may override it to apply their own
+	 * persistence policy.
 	 */
 	protected ABlob checkpointBlob(ABlob data) throws IOException {
-		return rootCursor.checkpoint(data);
+		return (store==null)?data:Cells.persist(data,store);
 	}
 
 	/**
@@ -320,10 +351,11 @@ public class DLFSLocal extends DLFileSystem {
 		rootCursor.merge(other);
 	}
 
+	/** Creates a forked view sharing this filesystem's store, if any. */
 	@Override
 	public DLFSLocal fork() {
 		ALatticeCursor<AVector<ACell>> cursor=rootCursor.fork();
-		return new DLFSLocal(provider(),uriPath,cursor);
+		return new DLFSLocal(provider(),uriPath,cursor,store);
 	}
 
 	@Override
@@ -331,13 +363,13 @@ public class DLFSLocal extends DLFileSystem {
 		rootCursor.sync();
 	}
 
-	/** Creates independent in-memory state without a host publication or persistence capability. */
+	/** Creates an independent snapshot of the current state, checkpointing into the same store, if any. */
 	@Override
 	public DLFSLocal clone() {
 		AVector<ACell> root=rootCursor.get();
 		ALatticeCursor<AVector<ACell>> cursor=Cursors.createLattice(
 			DLFSLattice.INSTANCE,root,rootCursor.getContext());
-		return new DLFSLocal(provider(),uriPath,cursor);
+		return new DLFSLocal(provider(),uriPath,cursor,store);
 	}
 
 	private static void requireAbsent(AVector<ACell> parent, AString name, DLPath path) throws IOException {

@@ -57,13 +57,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 
 	private SQLDatabase(ALatticeCursor<Index<Keyword, ACell>> cursor,
 			AString dbName, AKeyPair keyPair, ACell ownerKey) {
-		this(null,cursor,dbName,keyPair,ownerKey);
-	}
-
-	private SQLDatabase(ALatticeComponent<?> parent,
-			ALatticeCursor<Index<Keyword, ACell>> cursor,
-			AString dbName, AKeyPair keyPair, ACell ownerKey) {
-		super(parent,cursor);
+		super(cursor);
 		this.dbName = dbName;
 		this.keyPair = keyPair;
 		this.ownerKey = ownerKey;
@@ -114,12 +108,12 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Connects to a database nested beneath a ConvexDB component.
-	 * Component policy delegates through the ConvexDB parent.
+	 * Connects to a database nested beneath a ConvexDB component, navigating from
+	 * its cursor.
 	 *
 	 * @param parent Containing ConvexDB component
 	 * @param name Database name to connect to
-	 * @return New SQLDatabase in the component hierarchy
+	 * @return New SQLDatabase over the containing component's cursor chain
 	 */
 	public static SQLDatabase connect(ConvexDB parent,String name) {
 		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
@@ -128,7 +122,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		if (cursor.get()==null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
-		return new SQLDatabase(parent,cursor,dbName,null,null);
+		return new SQLDatabase(cursor,dbName,null,null);
 	}
 
 	/**
@@ -140,7 +134,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Forked SQLDatabase instance
 	 */
 	public SQLDatabase fork() {
-		return new SQLDatabase(this,cursor.fork(),dbName,keyPair,ownerKey);
+		return new SQLDatabase(cursor.fork(),dbName,keyPair,ownerKey);
 	}
 
 	/**
@@ -149,7 +143,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return new SQLSchema(this,cursor.path(ConvexDB.KEY_TABLES));
+		return new SQLSchema(cursor.path(ConvexDB.KEY_TABLES));
 	}
 
 	/**

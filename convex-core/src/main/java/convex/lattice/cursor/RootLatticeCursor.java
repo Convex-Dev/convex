@@ -23,15 +23,6 @@ public class RootLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 	private final AtomicReference<V> value;
 	private final ReentrantLock syncLock = new ReentrantLock();
 	private volatile Function<V, V> syncCallback;
-	private volatile Persistence persistence;
-
-	/** Installs the host capability during root configuration; null disables it. */
-	public void setPersistence(Persistence persistence) {
-		this.persistence=persistence;
-	}
-
-	@Override
-	protected Persistence persistence() { return persistence; }
 
 	/**
 	 * Creates a root lattice cursor.

@@ -1,7 +1,5 @@
 package convex.lattice;
 
-import java.io.IOException;
-
 import convex.core.data.ACell;
 import convex.lattice.cursor.ALatticeCursor;
 
@@ -12,7 +10,7 @@ import convex.lattice.cursor.ALatticeCursor;
  * {@link RootComponent} host. The supplied lattice defines the complete root
  * merge, including which regions participate. Merging requires no domain
  * components or component registry. Subclasses may expose lightweight components
- * at paths within that root, with storage operations routed through the host cursor.</p>
+ * at paths within that root.</p>
  *
  * <p>Each application has a live cursor view with an independent context override.
  * Setting its cursor context affects its descendants, not the host or other
@@ -24,8 +22,8 @@ import convex.lattice.cursor.ALatticeCursor;
  * types for local applications and tests.</p>
  *
  * <p>The application does not own the root, store or replication lifecycle.
- * Calling {@link #sync()} invokes the host's root publication policy;
- * {@link #flush()} remains a distinct durability boundary.</p>
+ * Calling {@link #sync()} invokes the host's root publication policy; physical
+ * durability is the host's {@link RootComponent#flush()}.</p>
  *
  * @param <V> Complete application root value type
  */
@@ -37,16 +35,18 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * @param host Root component providing shared state, lattice and host policy
 	 */
 	protected ALatticeApplication(RootComponent<V> host) {
-		this(host,requireHost(host).cursor().view());
+		this(requireHost(host).cursor().view());
 	}
 
 	/**
-	 * Binds an application view to a working cursor and copies configuration from
-	 * the source component. Factories pass this application as source when rebinding
-	 * and rebuild children against the new view. No source component is retained.
+	 * Binds an application view to a working cursor, such as a fork or a
+	 * transaction draft. Rebinding factories rebuild child components against the
+	 * new view rather than reusing children bound to the live cursor.
+	 *
+	 * @param cursor Cursor at the complete application root
 	 */
-	protected ALatticeApplication(ALatticeComponent<V> source,ALatticeCursor<V> cursor) {
-		super(java.util.Objects.requireNonNull(source),cursor);
+	protected ALatticeApplication(ALatticeCursor<V> cursor) {
+		super(cursor);
 	}
 
 	private static <V extends ACell> RootComponent<V> requireHost(RootComponent<V> host) {
@@ -73,24 +73,12 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * this operation installs no state.</p>
 	 *
 	 * <p>This changes local state only. Call {@link #sync()} to persist and publish
-	 * it through the host, and {@link #flush()} for physical durability.</p>
+	 * it through the host.</p>
 	 *
 	 * @param other Incoming root value
 	 * @return Root value installed by this merge
 	 */
 	public V merge(V other) {
 		return cursor.merge(other);
-	}
-
-	/**
-	 * Requests the host store's physical durability barrier.
-	 *
-	 * <p>Call {@link #sync()} first when working state must become the selected,
-	 * published root. Flush deliberately does not move or merge any cursor.</p>
-	 *
-	 * @throws IOException If the store flush fails
-	 */
-	public void flush() throws IOException {
-		cursor.flush();
 	}
 }

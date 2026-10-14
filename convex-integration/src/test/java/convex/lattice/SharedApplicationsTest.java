@@ -34,6 +34,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDrive;
@@ -97,27 +98,27 @@ public class SharedApplicationsTest {
 			implements TransactionalComponent<Index<Keyword,ACell>,SocialWithP2P> {
 		final Social social;
 		SocialWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host,host.cursor().view().setContext(context(SOCIAL_KEY)));
+			this(host.cursor().view().setContext(context(SOCIAL_KEY)));
 		}
-		SocialWithP2P(ALatticeComponent<Index<Keyword,ACell>> source,ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			super(source,cursor);
+		SocialWithP2P(ALatticeCursor<Index<Keyword,ACell>> cursor) {
+			super(cursor);
 			social=Social.connect(this);
 		}
 		@Override public SocialWithP2P withCursor(ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			return new SocialWithP2P(this,cursor);
+			return new SocialWithP2P(cursor);
 		}
 	}
 
 	private static final class FilesWithP2P extends DLFSApplication<Index<Keyword,ACell>>
 			implements TransactionalComponent<Index<Keyword,ACell>,FilesWithP2P> {
 		FilesWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host,host.cursor().view().setContext(context(FILES_KEY)));
+			this(host.cursor().view().setContext(context(FILES_KEY)),host.store());
 		}
-		FilesWithP2P(ALatticeComponent<Index<Keyword,ACell>> source,ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			super(source,cursor,Keywords.FS);
+		FilesWithP2P(ALatticeCursor<Index<Keyword,ACell>> cursor,AStore store) {
+			super(cursor,store,Keywords.FS);
 		}
 		@Override public FilesWithP2P withCursor(ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			return new FilesWithP2P(this,cursor);
+			return new FilesWithP2P(cursor,store());
 		}
 		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner); }
 	}
@@ -193,10 +194,7 @@ public class SharedApplicationsTest {
 			assertEquals(coordinated,root.supportsExclusiveTransactions());
 			assertEquals(coordinated,f.social.social.user(SOCIAL_KEY.getAccountKey()).cursor().supportsExclusiveTransactions());
 			var before=root.get();
-			f.social.setCheckpointPolicy(CheckpointPolicy.DEFERRED);
 			f.social.transact(app -> {
-				assertEquals(CheckpointPolicy.DEFERRED,app.social.getCheckpointPolicy());
-				assertEquals(CheckpointPolicy.INCREMENTAL,f.files.getCheckpointPolicy());
 				var user=app.social.user(SOCIAL_KEY.getAccountKey());
 				user.feed().post("Atomic post and follow");
 				user.follows().follow(FILES_KEY.getAccountKey());

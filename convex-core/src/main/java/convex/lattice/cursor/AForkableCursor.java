@@ -165,4 +165,24 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 		if (path.length == 0) return (AForkableCursor<T>) this;
 		return PathCursor.create(this, path);
 	}
+
+	/**
+	 * Creates an independent copy of this cursor for isolated modifications.
+	 *
+	 * <p>The detached cursor starts with a snapshot of the current value and can be
+	 * modified without affecting this cursor. Use {@link #merge(AForkableCursor)}
+	 * to attempt merging changes back (will fail if this cursor changed).</p>
+	 *
+	 * <p>For lattice-aware forking where merge always succeeds, use
+	 * {@link ALatticeCursor#fork()} instead.</p>
+	 *
+	 * @param <T> Type of the detached cursor value
+	 * @return A new independent Root cursor with the current value
+	 * @see #merge(AForkableCursor) for CAS-based merge (can fail)
+	 * @see ALatticeCursor#fork() for lattice-aware fork (merge always succeeds)
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> AForkableCursor<T> detach() {
+		return (AForkableCursor<T>) Root.create(get());
+	}
 }

@@ -91,7 +91,7 @@ public class DLFSComponentTest {
 
 		CompositeDLFSApplication(RootComponent<Index<Keyword,ACell>> host) {
 			super(host,KEY_DOCUMENTS);
-			this.archive=DLFSRegion.connect(this,KEY_ARCHIVE);
+			this.archive=DLFSRegion.connect(cursor,store(),KEY_ARCHIVE);
 		}
 	}
 
@@ -135,7 +135,7 @@ public class DLFSComponentTest {
 				.getPath("/hello.txt"),"local application");
 
 			application.sync();
-			application.flush();
+			store.flush();
 			assertEquals(application.cursor().get(),store.getRootData());
 		}
 
@@ -259,7 +259,7 @@ public class DLFSComponentTest {
 				var root=RootComponent.create(DLFSRegion.LATTICE,store).cursor();
 				root.setContext(LatticeContext.create(null,keyPair));
 				var drives=root.path(keyPair.getAccountKey(),Keywords.VALUE);
-				try (var fileSystem=DLFS.connect(drives,Strings.create("large"))) {
+				try (var fileSystem=DLFS.connect(drives,Strings.create("large"),store)) {
 					Path target=fileSystem.getPath("/copy.bin");
 
 					Files.copy(source,target);

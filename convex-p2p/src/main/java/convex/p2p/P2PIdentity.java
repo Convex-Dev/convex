@@ -15,9 +15,8 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 
 	private final AccountKey owner;
 
-	P2PIdentity(ALatticeComponent<?> parent, ALatticeCursor<ACell> cursor,
-			AccountKey owner) {
-		super(parent,cursor);
+	P2PIdentity(ALatticeCursor<ACell> cursor, AccountKey owner) {
+		super(cursor);
 		this.owner=owner;
 	}
 
@@ -44,11 +43,11 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 
 	/** Creates an isolated working component at the same logical path. */
 	public P2PIdentity fork() {
-		return new P2PIdentity(this,cursor.fork(),owner);
+		return new P2PIdentity(cursor.fork(),owner);
 	}
 	@Override
 	public P2PIdentity withCursor(ALatticeCursor<ACell> cursor) {
-		return new P2PIdentity(this,cursor,owner);
+		return new P2PIdentity(cursor,owner);
 	}
 
 }

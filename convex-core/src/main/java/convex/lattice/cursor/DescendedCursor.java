@@ -1,8 +1,8 @@
 package convex.lattice.cursor;
 
+import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
-import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
@@ -46,14 +46,8 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 	}
 
 	@Override
-	public boolean supportsExclusiveTransactions() { return parent.supportsExclusiveTransactions(); }
-
-	@Override
-	protected Persistence persistence() { return parent.persistence(); }
-
-	@Override
-	protected <T> T exclusive(Supplier<T> action) {
-		return parent.exclusive(action);
+	protected Lock exclusiveLock() {
+		return parent.exclusiveLock();
 	}
 
 	@Override
