@@ -1,4 +1,4 @@
-package convex.lattice.app;
+package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -6,8 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeHost;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Blob;

@@ -12,7 +12,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
-import convex.core.store.MemoryStore;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.lattice.generic.SetLattice;
@@ -22,7 +21,7 @@ class LatticeApplicationTest {
 	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
 
 	@Test void privateApplicationAcceptsPathsButWaitsForPublication() {
-		var host=LatticeHost.create(new MemoryStore());
+		var host=LatticeHost.create();
 		var app=new LatticeApplication<>(LATTICE,host);
 		host.configureApplications(List.of(app));
 		host.mergeAt(Sets.of(1),ITEMS);
@@ -36,8 +35,8 @@ class LatticeApplicationTest {
 		var owner=AKeyPair.createSeeded(9183);
 		var stranger=AKeyPair.createSeeded(9184);
 		var lattice=KeyedLattice.create(ITEMS,OwnerLattice.create(SetLattice.create()));
-		var root=LatticeHost.create(new MemoryStore());
-		root.configureApplications(List.of(convex.lattice.LatticeApplication.live(lattice,root)));
+		var root=LatticeHost.create();
+		root.configureApplications(List.of(LatticeApplication.live(lattice,root)));
 		var values=Sets.of(CVMLong.ONE);
 		root.mergeAt(stranger.signData(values),ITEMS,owner.getAccountKey());
 		assertNull(RT.getIn(root.cursor().get(),ITEMS,owner.getAccountKey()));

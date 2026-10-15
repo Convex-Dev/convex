@@ -1,4 +1,4 @@
-package convex.lattice.app;
+package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -13,9 +13,6 @@ import org.junit.jupiter.api.Test;
 
 import convex.lattice.cursor.PublishingCursor;
 
-import convex.lattice.ALattice;
-import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeContext;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Index;

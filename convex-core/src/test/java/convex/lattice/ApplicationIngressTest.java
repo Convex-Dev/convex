@@ -1,4 +1,4 @@
-package convex.lattice.app;
+package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -7,10 +7,6 @@ import java.util.ArrayList;
 
 import org.junit.jupiter.api.Test;
 
-import convex.lattice.ALatticeApplication;
-import convex.lattice.LatticeContext;
-import convex.lattice.LatticeHost;
-import convex.lattice.SignedComponent;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;

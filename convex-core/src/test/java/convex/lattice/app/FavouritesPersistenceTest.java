@@ -1,7 +1,7 @@
 package convex.lattice.app;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static convex.lattice.app.SignedComponentTest.*;
+import static convex.lattice.app.FavouritesExample.*;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -15,7 +15,7 @@ import convex.etch.EtchStore;
 import convex.lattice.LatticeHost;
 
 /** Store-backed variant of the in-memory favourites application. */
-class SignedPersistenceTest {
+class FavouritesPersistenceTest {
 	@Test void aliceAndBobPublishTheirEditTimesAndReopen(@TempDir Path directory) throws Exception {
 		var file=directory.resolve("favourites.etch").toFile();
 		try (var store=EtchStore.create(file)) {

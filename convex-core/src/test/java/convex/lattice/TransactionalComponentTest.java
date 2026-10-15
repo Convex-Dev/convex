@@ -1,4 +1,4 @@
-package convex.lattice.app;
+package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -18,8 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import convex.lattice.ALatticeComponent;
-import convex.lattice.TransactionalComponent;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Keyword;

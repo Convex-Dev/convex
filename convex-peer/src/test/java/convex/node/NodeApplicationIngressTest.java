@@ -1,4 +1,4 @@
-package convex.node.app;
+package convex.node;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,10 +28,6 @@ import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.SetLattice;
-import convex.node.LatticeListener;
-import convex.node.LatticePropagator;
-import convex.node.NodeConfig;
-import convex.node.NodeServer;
 
 class NodeApplicationIngressTest {
 	private static final Keyword ITEMS=Keyword.intern("items");

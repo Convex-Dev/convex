@@ -70,11 +70,12 @@ compare-and-set, and stops. The signed component is the archetype: unsigned work
 state, a signed destination, one signature at publication however many edits
 preceded it.
 
-**An application is the component at the root.** It declares the root lattice,
-admits incoming values by merging them under that lattice and the ownership rules,
-hands out typed cursors for its regions, and decides when to publish. Applications
-participate selectively: a keyed root merges the regions it knows and ignores the
-rest, so nodes with different region sets still interoperate.
+**Application policy chooses composition and lifecycle.** A root application can
+admit incoming values once, using a composed lattice and its ownership rules.
+Domain applications can then observe that accepted root through live path views,
+or reconcile staged components with it on their own schedule. They need not each
+receive the incoming value. Selective incoming handlers remain useful when an
+application needs its own admission or owner-specific reconciliation policy.
 
 **The host is the authoritative local root.** It owns the store, the publication
 policy that runs on its sync, and the durability barrier. It knows no lattice or path structure: all incoming values are delegated to
@@ -89,14 +90,16 @@ networked one.
   stamping or signing happens inside that update at the boundary the component
   wrapped.
 - **Publication is explicit and layered.** A component's sync publishes one snapshot
-  into its destination and stops there. An application's sync first checkpoints its
-  owned signed components, then publishes its snapshot into the host. The host's
+  into its destination and stops there. An application chooses which component
+  boundaries to sync and in what order. It need not hold a whole-root snapshot. The host's
   sync persists the root and notifies replication. Flush is the physical durability
   barrier. Persist, sync and flush are three different things, and nothing is
   published, persisted or sent without the owner of that state asking.
 - **An incoming value** arrives at the node, reaches the host, and is offered to
-  each application's merge, which verifies envelopes, merges under its lattice and
-  discards what it does not accept. Receipt never implies republication.
+  the configured incoming handlers. A single live root application can verify and
+  merge it into the host; existing live views then observe the result. Staged
+  components remain private until their lifecycle reconciles them. Receipt never
+  invokes their sync or automatically publishes their private edits.
 - **Batching** is a fork: edit privately, publish once, and let conflicts resolve by
   merge rather than by failure. Transactions are the stricter form for one atomic
   multi-step change, committed by compare-and-set and retried.
@@ -329,7 +332,7 @@ app.sync();              // merge working state back to the host
 host.sync();             // optional host policy; otherwise a no-op without a store
 ```
 
-The executable [signed favourites example](../src/test/java/convex/lattice/app/SignedComponentTest.java)
+The executable [signed favourites example](../src/test/java/convex/lattice/app/FavouritesApplicationTest.java)
 assembles a storeless `LatticeHost.create()` directly with a `FavouritesApp`. The application supplies
 the controllable clock and `FavouritesUser` signing components. Each user exposes
 a lightweight `Favourites` component through `user.favourites()`, with atomic
@@ -340,7 +343,7 @@ the host, which supplies incoming
 delegation and persistence without domain-specific wrappers. The tests exercise
 Alice and Bob locally, Charlie on another in-memory host, signed whole-record LWW
 merges and explicit publication. A separate
-[persistence variant](../src/test/java/convex/lattice/app/SignedPersistenceTest.java)
+[persistence variant](../src/test/java/convex/lattice/app/FavouritesPersistenceTest.java)
 tests publication to Etch and reopening the same application.
 
 A host's store is optional. `LatticeHost.create()` starts an empty keyed root with
@@ -379,23 +382,25 @@ value in the `own` position and does not publish or flush.
 
 ### Incoming delegation
 
-After constructing applications against a restored host, configure the host's
-application list once:
+Configure incoming handling once, before launching a node. For a shared root with
+one admission policy, one live application is enough:
 
 ```java
-root.configureApplications(List.of(social, files));
-root.merge(incomingRoot); // delegates; no additional host merge
-social.sync();           // publishes accepted application state into root
-files.sync();
-root.sync();             // persists and propagates the published root
+var incoming = LatticeApplication.live(rootLattice, host);
+host.configureApplications(List.of(incoming));
+host.merge(incomingRoot); // verifies and merges into the shared root once
 ```
 
-The root retains an immutable application list. It delivers incoming values to each
-application's merge and retains only what they publish. An application can route
-signed subtrees to a signed component, which verifies the envelope before merging
-its payload into unsigned working state. Discarded input stays discarded. Enclosing
-signed envelopes must be verified before values extracted from them are routed
-anywhere.
+Domain components can use live paths in this root or fork their own paths. There
+is no requirement to register each domain application as an incoming handler.
+Observing accepted root changes and choosing when to publish private work are
+application policy. The Social + P2P + DLFS example uses this arrangement.
+
+The host also supports multiple explicitly configured incoming handlers when
+independent admission policies are needed. Such a handler can route a signed
+subtree to a signed component, which verifies its envelope before merging its
+payload into unsigned working state. Discarded input stays discarded. Enclosing
+signed envelopes must be verified before extracting and routing interior values.
 
 Delivery is not a transaction across applications: if a later application fails,
 earlier merges remain, and lattice delivery is safe to retry. The returned root may
@@ -442,57 +447,66 @@ and installs a standard live `LatticeApplication`. At launch it merges retained
 state through that application, preserving pre-launch local edits. Custom applications
 use the explicit assembly above; there is no application-factory launch overload.
 
-### Sharing a host
+### Sharing a host through component paths
 
-The base host constructor creates private working state for each application,
-initially sharing the host's immutable value:
+Choose the publication boundary for each part of an application. A live domain
+view shares its path in the host. A fork stages just that component's subtree:
 
 ```java
-RelayApplication first = new RelayApplication(host);
-RelayApplication second = new RelayApplication(host);
-first.merge(incomingRoot);
-first.sync();   // merge into host; second still has its previous working value
-second.sync();  // reconcile second's work with the host
-host.sync();    // host persistence and propagation
+var liveSocial = Social.connect(host, socialContext);
+var social = liveSocial.fork();
+var liveFiles = DLFSRegion.connect(host.cursor(), host.store(), Keywords.FS);
+liveFiles.setContext(filesContext);
+var files = liveFiles.fork();
+var peer = P2PUser.create(host.cursor(), ownerKey, p2pContext);
+
+social.user(ownerKey).feed().post("A staged post");
+peer.node().setNodeInfo(nodeInfo); // immediately updates its shared P2P path
+social.sync();                   // publishes only :social, preserving :fs and :p2p
+files.sync();                    // publishes only :fs, preserving :social and :p2p
+host.sync();                     // persistence and propagation are separate
 ```
 
-Lightweight children share paths in their enclosing working cursor. They need no
-fork for ordinary atomic updates, and their sync is a no-op. Each component resolves
-its context at construction; existing children retain that configuration when an
-enclosing component changes its policy.
+Social and Files can be grouped into ordinary application classes that choose
+when to call these operations. They need no common private root, combined
+publication lattice, multi-region projection, or special sibling-preservation
+merge. P2P views obtained independently by both applications see the same state.
+The application objects retain cursors and domain components, not parent links.
 
-An independent component knows only its working storage, destination cursor and own
-lattice and policy. The destination can be any cursor supplied by the parent,
-including a projection inside a custom application tree. No parent component, root
-host or global path is required. Publication updates that cursor and stops; the
-provider of the cursor controls publication above that point.
+An independent component knows only its working storage, destination cursor and
+own lattice and policy. Its destination can be a path inside any application tree.
+Publication updates that cursor and stops; the cursor provider controls what
+happens above that boundary. Components supply construction of missing containers;
+raw path cursors themselves do not construct them.
 
-Publication captures one working snapshot. If the destination is unchanged since the
-last publication, the snapshot is installed directly. Otherwise it is merged with
-the destination using the component's lattice and context, with local edits as the
-`own` side, so an intentional equal-timestamp edit replaces its predecessor while an
-unchanged working value adopts the destination. A successful publication stops at
-its destination; it does not persist or publish the host. Sync returns the snapshot
-it published; edits made during publication remain pending in working state for the
-next sync.
+Publication captures one working snapshot. If the destination is unchanged since
+the last publication, the snapshot is installed directly. Otherwise it is merged
+with the destination, with local edits as `own`. Equal-timestamp local edits retain
+that precedence; an unchanged working value adopts the destination. Edits made
+during publication remain pending for the next sync. A live view needs no sync to
+observe root changes; a staged component reconciles with them when its policy calls
+sync. That operation both reconciles and publishes, rather than being a read-only
+refresh.
 
-The component's publication merge is overridable. It receives immutable snapshots
-of the baseline, the local edit and the destination, and must not modify live
-components. Applications with independently published children apply those rules at
-the child boundaries rather than treating an old whole-root snapshot as an edit to
-every branch; for a signed child, delegate to that child's publication merge, which
-reuses an existing envelope when possible and signs a combined payload when
-necessary. Missing signing authority fails the attempt instead of silently dropping
-a branch. Two applications may independently author the same subtree: each merges
-against the latest published state before its publication can succeed, and the root
-needs no signing capability of its own.
+A signed merge needs no signing capability when its result equals either input's
+payload: it reuses that envelope. A result different from both payloads requires an
+authorised signer. The shared example lets the root accept an expanded remote
+signed feed, then lets the owner component combine that accepted state with its
+private posts and sign the new result. A signer-free root cannot replace explicit
+owner reconciliation for arbitrary divergent signed inputs; applications needing
+that behaviour must route the conflicting envelopes to the owning component.
 
-An application can instead be constructed over supplied working storage: the host's
-live cursor for immediate shared visibility, or a transaction draft when rebinding.
-A live application's sync runs its preparation hook but does not publish the host;
-call the host's sync explicitly. Construct applications with private working state
-only after the host has restored its retained root. Host merges never borrow
-application signers.
+Sequential syncs of separate paths are not atomic together. For a consistent read
+of several published paths, capture the immutable host root once and extract each
+path from that value. This does not include unpublished state in independent forks.
+An operation requiring atomic changes across paths must explicitly use a common
+ancestor transaction boundary.
+
+The existing `ALatticeApplication(lattice, host)` constructor stages the whole
+root. Use it only when that entire publication boundary is intended; it is not the
+composition mechanism for several applications interested in different regions.
+For shared applications, stage their domain paths instead. The examples demonstrate
+this with the existing component machinery, without changing cursor semantics.
 
 These policies are not an access-control boundary between code sharing a process.
 Verification remains bound to the lattice instances, configured before use.
@@ -524,22 +538,24 @@ a completed publication stands even if later local reconciliation fails. Untrust
 envelopes enter through verified merge; publication reconciles only values the
 application has already admitted.
 
-Applications choose their owned components and checkpoint order explicitly:
+Applications choose their components and publication order explicitly:
 
 ```java
-@Override protected void beforeSync() {
+public void sync() {
     socialOwner.sync();
     nodeOwner.sync();
 }
 ```
 
-Application sync runs this preparation hook before publishing the application
-snapshot. There is no component registry, parent-component link, scheduler or hidden
-worker. If preparation throws, that call does not publish the application; earlier
-child checkpoints remain in working state for retry. This is not an atomic
-transaction across independently editable child roots. Syncing a child or a raw
-cursor does not run the application hook; sync the application for the complete
-preparation.
+There is no component registry, parent-component link, scheduler or hidden worker.
+This is not an atomic transaction across independently editable component roots:
+a completed publication stands if a later one fails. The notebook example publishes
+its signed component directly to the host path, without an enclosing whole-root
+fork or a second signed reconciliation hook.
+
+An application deliberately using the whole-root staging constructor can still
+use `beforeSync()` to prepare children before publishing that enclosing snapshot.
+That is an explicit additional boundary, not required application scaffolding.
 
 ## Component transactions
 
@@ -1094,32 +1110,29 @@ Keep motivating scenarios small and explicit: construct, edit, merge, publish an
 assert the visible state at each boundary. Keep detailed contention and transport
 machinery in dedicated regression tests.
 
-Two worked examples anchor the suite.
+The [favourites application](../src/test/java/convex/lattice/app/FavouritesExample.java)
+provides the shared domain model for in-memory LWW and separate persistence tests.
 [`ApplicationPublicationTest`](../src/test/java/convex/lattice/app/ApplicationPublicationTest.java)
-shows independent applications publishing the same signed subtree through a shared
-host, with no signer at the host itself. The cross-module
+shows lightweight notes inside an explicitly staged, signed notebook. Application
+sync publishes the notebook directly to its host path, with no duplicate root fork.
+[`TaskBoardApplicationTest`](../src/test/java/convex/lattice/app/TaskBoardApplicationTest.java)
+uses domain operations in transactions, including an asynchronous completion that
+publishes the application.
+
+The [reading-list network example](../../convex-peer/src/test/java/convex/node/app/ReadingListApplicationTest.java)
+assembles applications before node launch and delivers published recommendations
+over a real connection. The cross-module
 [SharedApplicationsTest](../../convex-integration/src/test/java/convex/lattice/SharedApplicationsTest.java)
-shows Social + P2P and DLFS + P2P sharing one node, with the same P2P region
-definitions, independent user signing contexts and one deliberately shared
-node-record signer, over real loopback connections. Region assembly and group
-removal are explicit there; it does not implement automatic subscription
-registration, schema composition or application shutdown.
+assembles Social + P2P and DLFS + P2P on the same host, with one incoming root
+application, Etch root and serving stores, and a real loopback propagator. Social
+and Files stage their own paths; P2P stays live. It verifies remote root observation,
+owner-signed reconciliation of pending edits, sibling preservation and reopening
+persisted data.
 
-- **Standalone**: exercise components over an in-memory root with a fixed context.
-- **Connected**: assert that writes propagate to the root cursor.
-- **Fork and sync**: changes in a fork are invisible until sync, then merged.
-- **Multi-user**: different owners' data is independent.
-- **Adversarial**: forgeries are rejected at the owner lattice's merge.
-
-```java
-Social forked = social.fork();
-forked.user(key).feed().post("In fork");
-assertEquals(0, social.user(key).feed().count());
-forked.sync();
-assertEquals(1, social.user(key).feed().count());
-```
-
-Follow the repository conventions: no sleeps, wait on real signals; no fixed ports.
+Class contracts, CAS interleavings, signing counts and transaction fallback tests
+remain in `convex.lattice`; transport and launch failure tests remain in
+`convex.node`. Cross-domain concurrency regressions are kept separately in
+`SharedApplicationInternalsTest`.
 
 ## Checklist
 

@@ -1,0 +1,257 @@
+package convex.lattice;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.junit.jupiter.api.Test;
+
+import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
+import convex.core.data.ASet;
+import convex.core.data.AccountKey;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.Sets;
+import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
+import convex.lattice.cursor.Root;
+import convex.lattice.generic.KeyedLattice;
+import convex.lattice.generic.CompareLattice;
+import convex.lattice.generic.LWWLattice;
+import convex.lattice.generic.OwnerKeyLattice;
+import convex.lattice.generic.SetLattice;
+import convex.lattice.generic.SignedLattice;
+
+public class ApplicationPublicationTest {
+
+	private static final AKeyPair KEY=AKeyPair.createSeeded(7320);
+	private static final Keyword OWNED=Keyword.intern("owned");
+	private static final Keyword REGISTER=Keyword.intern("register");
+	private static final Keyword IGNORED=Keyword.intern("ignored");
+	private static final SignedLattice<ASet<CVMLong>> SIGNED=
+		OwnerKeyLattice.create(SetLattice.<CVMLong>create()).signingFor(KEY.getAccountKey());
+	// All edits deliberately have the same timestamp.
+	private static final LWWLattice<CVMLong> LWW=LWWLattice.create(v -> 100);
+	private static final KeyedLattice LATTICE=KeyedLattice.create(OWNED,SIGNED)
+		.addLattice(REGISTER,LWW).addLattice(IGNORED,LWW);
+
+	private static Index<Keyword,ACell> initial() {
+		return LATTICE.zero().assoc(OWNED,KEY.signData(Sets.of(0))).assoc(REGISTER,CVMLong.ZERO);
+	}
+
+	private static final class InterleavingRoot extends Root<Index<Keyword,ACell>> {
+		Runnable beforeCAS;
+		InterleavingRoot() { super(initial()); }
+		@Override public boolean compareAndSet(Index<Keyword,ACell> expected,Index<Keyword,ACell> value) {
+			Runnable action=beforeCAS;
+			beforeCAS=null;
+			if (action!=null) action.run();
+			return super.compareAndSet(expected,value);
+		}
+	}
+
+	private static final class Application extends ALatticeApplication<Index<Keyword,ACell>> {
+		final SignedComponent<ASet<CVMLong>> owner;
+		final AtomicInteger signatures=new AtomicInteger();
+		Runnable onSign=() -> {};
+
+		Application(LatticeHost<Index<Keyword,ACell>> host) {
+			super(LATTICE,host);
+			owner=new SignedComponent<>(SIGNED,resolve(OWNED));
+			owner.setContext(new LatticeContext() {
+				@Override public AKeyPair getSigningKey() { return KEY; }
+				@Override public <T extends ACell> SignedData<T> sign(AccountKey key,T value) {
+					signatures.incrementAndGet();
+					onSign.run();
+					return super.sign(key,value);
+				}
+			});
+		}
+
+		void add(long value) { owner.cursor().updateAndGet(v -> v.include(CVMLong.create(value))); }
+		void editRegister(long value) { this.<CVMLong>resolve(REGISTER).set(CVMLong.create(value)); }
+
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+			if (incoming!=null) owner.merge(signed(incoming));
+			// This application deliberately ignores all other incoming subtrees.
+			return cursor.get();
+		}
+		@Override protected void beforeSync() { owner.sync(); }
+
+		@Override protected Index<Keyword,ACell> mergePublication(ALattice<Index<Keyword,ACell>> lattice,
+				Index<Keyword,ACell> baseline,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			var result=other.assoc(OWNED,owner.mergePublication(signed(baseline),signed(own),signed(other)));
+			CVMLong local=(CVMLong)own.get(REGISTER);
+			CVMLong base=(CVMLong)baseline.get(REGISTER);
+			CVMLong remote=(CVMLong)other.get(REGISTER);
+			return result.assoc(REGISTER,Utils.equals(local,base)?remote:LWW.merge(local,remote));
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static SignedData<ASet<CVMLong>> signed(Index<Keyword,ACell> root) {
+		return (SignedData<ASet<CVMLong>>)root.get(OWNED);
+	}
+
+	@Test
+	public void testSequentialApplicationsCombineTheSameSignedSubtree() {
+		var host=LatticeHost.create(initial(),null);
+		var first=new Application(host);
+		var second=new Application(host);
+		first.add(1);
+		second.add(2);
+		first.sync();
+		second.sync();
+		assertEquals(Sets.of(0,1,2),signed(host.cursor().get()).getValue());
+		assertTrue(SIGNED.checkForeign(signed(host.cursor().get())));
+		assertEquals(1,first.signatures.get());
+		assertEquals(2,second.signatures.get());
+		assertEquals(Sets.of(0,2),second.owner.cursor().get(),"Snapshot reconciliation must not mutate the live owner");
+		second.sync();
+		assertEquals(Sets.of(0,1,2),second.owner.cursor().get());
+		assertEquals(2,second.signatures.get(),"An unchanged subsequent publication must not sign");
+		assertNull(host.getContext().getSigningKey());
+	}
+
+	@Test
+	public void testCASRaceCombinesOwnersAndReusesSignatureForUnrelatedRetry() {
+		var root=new InterleavingRoot();
+		var host=new LatticeHost<>(root,null);
+		var first=new Application(host);
+		var second=new Application(host);
+		first.add(1);
+		second.add(2);
+		root.beforeCAS=() -> {
+			first.sync();
+			root.beforeCAS=() -> root.set(root.get().assoc(IGNORED,CVMLong.ONE));
+		};
+		second.sync();
+		assertEquals(Sets.of(0,1,2),signed(root.get()).getValue());
+		assertTrue(signed(root.get()).checkSignature());
+		assertEquals(CVMLong.ONE,root.get().get(IGNORED));
+		assertEquals(2,second.signatures.get(),"Only the changed signed payload requires re-signing");
+	}
+
+	@Test
+	public void testEqualTimestampLocalEditWinsAndUnchangedSiblingDoesNotRevert() {
+		var host=LatticeHost.create(initial(),null);
+		var first=new Application(host);
+		var second=new Application(host);
+		first.editRegister(1);
+		first.sync();
+		second.add(2);
+		second.sync();
+		assertEquals(CVMLong.ONE,host.cursor().get().get(REGISTER),"Unchanged sibling must adopt published state");
+		first.editRegister(3);
+		first.sync();
+		second.editRegister(2);
+		second.sync();
+		assertEquals(CVMLong.TWO,host.cursor().get().get(REGISTER),"Intentional local edit is own on equal timestamps");
+	}
+
+	@Test
+	public void testEditsDuringPublicationStayPending() throws Exception {
+		var host=LatticeHost.create(initial(),null);
+		var first=new Application(host);
+		var second=new Application(host);
+		first.add(1);
+		second.add(2);
+		first.sync();
+		CountDownLatch signing=new CountDownLatch(1);
+		CountDownLatch resume=new CountDownLatch(1);
+		second.onSign=() -> {
+			if (second.signatures.get()==2) {
+				signing.countDown();
+				try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
+				catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
+			}
+		};
+		try (var executor=Executors.newSingleThreadExecutor()) {
+			var publication=executor.submit(second::sync);
+			try {
+				assertTrue(signing.await(10,TimeUnit.SECONDS));
+				second.add(3);
+				// A concurrent child checkpoint also advances the application working
+				// root, exercising write-back reconciliation after the host CAS.
+				second.owner.sync();
+			} finally { resume.countDown(); }
+			publication.get(10,TimeUnit.SECONDS);
+		}
+		assertEquals(Sets.of(0,1,2),signed(host.cursor().get()).getValue());
+		assertEquals(Sets.of(0,1,2,3),signed(second.cursor().get()).getValue());
+		second.sync();
+		assertEquals(Sets.of(0,1,2,3),signed(host.cursor().get()).getValue());
+		assertTrue(signed(host.cursor().get()).checkSignature());
+	}
+
+	@Test
+	public void testHostPersistenceCannotRemergeOverAnApplicationPublication() {
+		var maximum=CompareLattice.<CVMLong>create((a,b) -> a.compareTo(b));
+		var host=LatticeHost.create(CVMLong.create(5),null);
+		var app=new ALatticeApplication<CVMLong>(maximum,host) {};
+		host.configureApplications(List.of(app));
+		app.cursor().set(CVMLong.ONE);
+		host.setPublicationPolicy(snapshot -> {
+			app.sync();
+			return snapshot;
+		});
+		host.sync();
+		assertEquals(CVMLong.ONE,host.cursor().get(),"Host persistence must retain the newer application result");
+	}
+
+	@Test
+	public void testFailedConflictSigningCanRetryWithoutDroppingEitherBranch() {
+		var host=LatticeHost.create(initial(),null);
+		var first=new Application(host);
+		var second=new Application(host);
+		first.add(1);
+		second.add(2);
+		second.owner.sync();
+		var signer=second.owner.getContext();
+		second.owner.setContext(LatticeContext.EMPTY);
+		first.sync();
+		assertThrows(IllegalStateException.class,second::sync);
+		assertEquals(Sets.of(0,1),signed(host.cursor().get()).getValue());
+		assertEquals(Sets.of(0,2),signed(second.cursor().get()).getValue());
+		second.owner.setContext(signer);
+		second.sync();
+		assertEquals(Sets.of(0,1,2),signed(host.cursor().get()).getValue());
+	}
+
+	@Test
+	public void testApplicationMaySupplyItsOwnLattice() {
+		var host=LatticeHost.create(initial(),null);
+		var selected=KeyedLattice.create(REGISTER,LWW);
+		var app=new ALatticeApplication<Index<Keyword,ACell>>(selected,host) {};
+		host.configureApplications(List.of(app));
+		host.merge(LATTICE.zero().assoc(REGISTER,CVMLong.ONE).assoc(IGNORED,CVMLong.TWO));
+		app.sync();
+		assertSame(selected,app.getLattice());
+		assertEquals(CVMLong.ZERO,host.cursor().get().get(REGISTER),"Incoming equal-time value loses to existing own");
+		assertNull(host.cursor().get().get(IGNORED));
+		app.<CVMLong>resolve(REGISTER).set(CVMLong.ONE);
+		app.sync();
+		assertEquals(CVMLong.ONE,host.cursor().get().get(REGISTER),"A local equal-time edit replaces its predecessor");
+	}
+
+	@Test
+	public void testRootRetainsOnlyWhatApplicationsAcceptAndPublish() {
+		var host=LatticeHost.create(initial(),null);
+		var app=new Application(host);
+		host.configureApplications(List.of(app));
+		var incoming=LATTICE.zero().assoc(OWNED,KEY.signData(Sets.of(1))).assoc(IGNORED,CVMLong.ONE);
+		host.merge(incoming);
+		assertEquals(initial(),host.cursor().get());
+		assertEquals(Sets.of(0,1),app.owner.cursor().get());
+		assertEquals(0,app.signatures.get());
+		app.sync();
+		assertEquals(Sets.of(0,1),signed(host.cursor().get()).getValue());
+		assertNull(host.cursor().get().get(IGNORED),"The host must not accept discarded incoming state itself");
+	}
+}
