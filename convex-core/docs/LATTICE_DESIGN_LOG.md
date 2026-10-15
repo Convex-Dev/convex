@@ -249,20 +249,122 @@ how strongly CAD045 *Signing Boundary* can state the guarantee.
 **Status:** Decision needed.
 
 `ALatticeComponent` holds a cursor that knows no lattice; `AComponent` was the name
-used in discussion. Deferred to keep the Stage B diff reviewable.
+used in discussion. Deferred to keep the Stage B diff reviewable. `RootComponent`
+has since been renamed `LatticeHost` (`971790597`, see entry 14); the component base
+class is still open.
 
 ## 13. In flight: application-private working state
 
-**Status:** Uncommitted work observed in the working tree on 14 October 2026; not
-reviewed here.
+**Status:** Implemented on the branch; described in LATTICE_APPLICATIONS under
+*Batched signing and application preparation*.
 
 `ALatticeComponent` gains a constructor taking a lattice and a publication
 destination, with private working state that publishes one snapshot into the
-destination on sync, a `beforeSync()` hook on `ALatticeApplication`, a new
-`SignedComponent`, and a `ComponentPublicationTest`. If adopted
-this touches CAD045 *Connecting to Node Infrastructure* and CAD024 *Cursor Sync
-Guarantees* (which sync reaches which boundary). The author should describe the
-intent here before the CAD session.
+destination on sync, and `SignedComponent` keeps unsigned working state over a
+signed destination, signing once at publication. The `beforeSync()` hook on
+`ALatticeApplication` has since been demoted to an optional preparation step; the
+examples publish their components in order from an ordinary `sync()`. This touches
+CAD045 *Connecting to Node Infrastructure* and CAD024 *Cursor Sync Guarantees*
+(which sync reaches which boundary).
+
+## 14. The host carries no lattice; its store is optional
+
+**Status:** Implemented (`971790597`). Store optional: agreed (15 October 2026).
+
+`RootComponent` became `LatticeHost`. The host holds the published root value, an
+optional store, the publication policy that runs on its sync, and an immutable list
+of applications that receive incoming values. It has no lattice: it never merges on
+its own, an unconfigured host ignores incoming values, and its sync is a plain
+compare-and-set that leaves a racing write pending for the next sync (this is what
+superseded entry 6). Without a store, persist returns its input and flush is a
+no-op; a networked node still requires a store.
+
+CAD text affected:
+
+- CAD045 *Connecting to Node Infrastructure* and *Reference Implementation*: the root
+  component holds the lattice and the store; a node is constructed from a lattice and
+  a store.
+- CAD036 (*Lattice Node*): how the node restores and merges, to check.
+
+Proposed wording: the host is the authoritative local root: a published value, an
+optional store and a publication policy. Merge semantics belong to the applications
+and components it hosts; the host delegates every incoming value and merges nothing
+itself.
+
+## 15. Shared regions: components must be robust to external change
+
+**Status:** Agreed in principle (15 October 2026); document wording pending.
+
+The shared-applications example stages each domain at its own path (a Social fork, a
+DLFS region fork, a live P2P view) behind one live admission handler, and the
+document now says whole-root staging is "not the composition mechanism" for several
+applications. Decision: multiple applications may share regions, including whole-root
+staging by more than one. The requirement is that they merge atomically on sync and
+allow for the destination having changed under them. This is a general property of
+every component in the hierarchy: there is usually one instance, but each must be
+robust to external change. A signer-free component holding a signed slot reconciles
+by the lattice's own rule, which selects an envelope; that is the lattice's
+semantics, not a prohibition on sharing.
+
+CAD text affected:
+
+- CAD045 *Fork and Sync*: "Sync always succeeds when a lattice is present" (still true
+  for component forks, now stated for components rather than cursors).
+- CAD045 *Application Architecture*: one application per region is not assumed.
+- CAD024 *Cursor Sync Guarantees*: the guarantee moves to the component boundary.
+
+Proposed wording: a component's sync reconciles its working snapshot with its
+destination under its lattice and publishes the result; a component must assume its
+destination can change between syncs; any number of components may publish into the
+same region.
+
+## 16. The node is replication only
+
+**Status:** Agreed in principle (15 October 2026); implementation to review.
+
+Decision: `NodeServer` replicates whatever it is given to its propagation sets.
+Update and merge semantics belong to the host and the application/component tree.
+Three things on the branch still put merge semantics in the node layer:
+
+- The lattice-taking node constructor creates a host, installs a standard live
+  `LatticeApplication` as a relay, and restores the retained root at launch by
+  merging it through that application. This gives a second restore semantics beside
+  `LatticeHost.open`, which adopts the retained value.
+- The node carries a merge context which it pushes into the host and the relay
+  application.
+- Each propagator takes a lattice and pre-merges its own working view with node
+  snapshots before announcing.
+
+Under the decision, the node takes an assembled host and attaches propagation
+groups; restoration is host assembly; propagators announce the host's published root
+through their filter without a merge of their own. The application-factory launch
+overload and the node's lattice accessor are already gone (`971790597`).
+
+CAD text affected:
+
+- CAD036 (*Lattice Node*): the node is constructed with a lattice and merges incoming
+  values.
+- CAD045 *Connecting to Node Infrastructure*.
+
+Proposed wording: a node hosts an already-assembled host and attaches propagation
+groups; it hands incoming values to the host and announces the host's published
+root; it holds no lattice and performs no merge.
+
+## 17. What "application" names
+
+**Status:** Open.
+
+Two things are now called application: the admission handler configured on the host
+(an `ALatticeApplication`: root lattice, incoming merge, typed navigation, optional
+private working state) and a grouping of domain components forked at their own
+paths, which in the shared example extends nothing. Entry 15 removes the pressure to
+choose between them by allowing shared regions, so what remains is naming and the
+architecture table row "root merge and optional region factories". Options: the
+application is the admission handler and domain groupings are assembly code; or keep
+the application base class as the developer-facing concept and call the host-side
+list the admission policy.
+
+CAD text affected: CAD045 *Application Architecture* layer table.
 
 ## Not affected
 
@@ -273,7 +375,7 @@ The owner lattices still verify signer against owner on every context-aware merg
 
 | CAD | Sections | Entries |
 |---|---|---|
-| CAD024 Data Lattice | *Cursors*, *Signed Lattice*, *Cursor Sync Guarantees*, implementation note on cursor types | 1, 3, 5, 6, 13 |
+| CAD024 Data Lattice | *Cursors*, *Signed Lattice*, *Cursor Sync Guarantees*, implementation note on cursor types | 1, 3, 5, 6, 13, 15 |
 | CAD035 Lattice Cursors | *Path Cursor*, *Forkable Cursor*, *Cursor Hierarchy*, *Lattice-Aware Cursors*, *Lattice Context*, *Reference Implementation*, Java example | 2, 3, 4, 5, 6, 7, 8, 10 |
-| CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13 |
-| CAD036 Lattice Node | pull-path merge description, to check | 9 |
+| CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 17 |
+| CAD036 Lattice Node | pull-path merge description, node construction and restore | 9, 14, 16 |
