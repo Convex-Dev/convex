@@ -52,7 +52,7 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
-		this(dlfsProvider,uriPath,Cursors.root(rootNode, DLFSLattice.INSTANCE),null);
+		this(dlfsProvider,uriPath,Cursors.root(rootNode),null);
 	}
 
 	/**
@@ -361,10 +361,24 @@ public class DLFSLocal extends DLFileSystem {
 	/** Creates a forked view sharing this filesystem's store, if any. */
 	@Override
 	public DLFSLocal fork() {
-		AForkableCursor<AVector<ACell>> cursor=ALatticeComponent.working(DLFSLattice.INSTANCE,rootCursor,getContext()).cursor();
-		DLFSLocal result=new DLFSLocal(provider(),uriPath,cursor,store);
-		result.setContext(getContext());
-		return result;
+		var working=ALatticeComponent.working(DLFSLattice.INSTANCE,rootCursor,getContext());
+		return new WorkingFileSystem(provider(),uriPath,working,store);
+	}
+
+	/** NIO adapter whose policy belongs to its publication component. */
+	private static final class WorkingFileSystem extends DLFSLocal {
+		private final ALatticeComponent<AVector<ACell>> working;
+
+		WorkingFileSystem(DLFSProvider provider,String uriPath,
+				ALatticeComponent<AVector<ACell>> working,AStore store) {
+			super(provider,uriPath,working.cursor(),store);
+			this.working=working;
+		}
+
+		@Override public LatticeContext getContext() { return working.getContext(); }
+		@Override public void setContext(LatticeContext context) {
+			working.setContext(java.util.Objects.requireNonNull(context));
+		}
 	}
 
 	@Override
@@ -376,7 +390,7 @@ public class DLFSLocal extends DLFileSystem {
 	@Override
 	public DLFSLocal clone() {
 		AVector<ACell> root=rootCursor.get();
-		AForkableCursor<AVector<ACell>> cursor=Cursors.root(root, DLFSLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> cursor=Cursors.root(root);
 		DLFSLocal result=new DLFSLocal(provider(),uriPath,cursor,store);
 		result.setContext(getContext());
 		return result;

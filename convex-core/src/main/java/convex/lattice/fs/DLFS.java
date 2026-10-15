@@ -37,7 +37,7 @@ public class DLFS {
 	 * @return A new local DLFS filesystem
 	 */
 	public static DLFSLocal create() {
-		return new DLFSLocal(PROVIDER,null,Cursors.root(DLFSLattice.INSTANCE));
+		return new DLFSLocal(PROVIDER,null,Cursors.root(DLFSLattice.INSTANCE.zero()));
 	}
 
 	/**
@@ -67,7 +67,7 @@ public class DLFS {
 	 * @return A connected filesystem
 	 */
 	public static DLFSLocal connect(AForkableCursor<?> parent, AString driveName, AStore store) {
-		AForkableCursor<AVector<ACell>> cursor=parent.child(driveName,DLFSLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> cursor=convex.lattice.ALatticeComponent.resolve(parent,convex.lattice.generic.MapLattice.create(DLFSLattice.INSTANCE),driveName);
 		// Atomic initialisation must not replace another caller's concurrent writes.
 		cursor.updateAndGet(current -> current!=null?current:DLFSLattice.INSTANCE.zero());
 		return (store==null)
@@ -99,7 +99,7 @@ public class DLFS {
 	 * @return Connected filesystem view, or {@code null} if the drive is absent
 	 */
 	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName, AStore store) {
-		AForkableCursor<AVector<ACell>> cursor=parent.child(driveName,DLFSLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> cursor=convex.lattice.ALatticeComponent.resolve(parent,convex.lattice.generic.MapLattice.create(DLFSLattice.INSTANCE),driveName);
 		if (cursor.get()==null) return null;
 		return (store==null)
 			?new DLFSLocal(PROVIDER,driveName.toString(),cursor)

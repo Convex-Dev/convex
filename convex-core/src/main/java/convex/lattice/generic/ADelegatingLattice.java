@@ -11,13 +11,11 @@ import convex.lattice.LatticeContext;
  * <ul>
  *   <li><b>merge</b> — {@code merge}, {@code merge(context,…)}</li>
  *   <li><b>navigation / structure</b> — {@code path}, {@code zero},
- *       {@code resolveKey}, {@code isStructural}, {@code checkForeign}</li>
+ *       {@code resolveKey}, {@code checkForeign}</li>
  * </ul>
  *
  * <p>A concrete layer overrides only the group it owns and inherits the rest as
- * transparent delegation, so concerns compose without becoming entangled. A layer
- * which also needs to intercept writes, such as stamping, exposes what a cursor
- * wrapper needs (see {@link StampingLattice}) rather than constructing cursors:
+ * transparent delegation. Components supply write-time behaviour such as stamping;
  * lattices know nothing about cursors. When {@code inner} is {@code null} the
  * delegations fall back to terminal defaults (no navigation), so a merge layer can
  * still be a terminal register by overriding merge alone.</p>
@@ -57,9 +55,6 @@ public abstract class ADelegatingLattice<V extends ACell> extends ALattice<V> {
 
 	@Override
 	public boolean checkForeign(V value) { return (inner != null) ? inner.checkForeign(value) : true; }
-
-	@Override
-	public boolean isStructural() { return (inner != null) && inner.isStructural(); }
 
 	@Override
 	public ACell resolveKey(ACell key) { return (inner != null) ? inner.resolveKey(key) : super.resolveKey(key); }

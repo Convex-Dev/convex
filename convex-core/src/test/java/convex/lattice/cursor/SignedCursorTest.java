@@ -57,8 +57,8 @@ public class SignedCursorTest {
 			}
 		};
 		SignedLattice<AInteger> signedLattice=SignedLattice.create(MaxLattice.INSTANCE);
-		Root<SignedData<AInteger>> base=Cursors.root(KP_ALICE.signData((AInteger)CVMLong.ONE), signedLattice);
-		SignedCursor<AInteger> cursor=SignedCursor.create(base,signedLattice.getValueShape(),v -> signedLattice.sign(counting,v));
+		Root<SignedData<AInteger>> base=Cursors.root(KP_ALICE.signData((AInteger)CVMLong.ONE));
+		SignedCursor<AInteger> cursor=SignedCursor.create(base,v -> signedLattice.sign(counting,v));
 
 		// Displace the base value on the first attempt only, forcing exactly one CAS retry
 		AtomicInteger attempts=new AtomicInteger();
@@ -84,8 +84,8 @@ public class SignedCursorTest {
 		};
 		SignedData<AInteger> initial=KP_ALICE.signData((AInteger)CVMLong.ONE);
 		SignedLattice<AInteger> signedLattice=SignedLattice.create(MaxLattice.INSTANCE);
-		Root<SignedData<AInteger>> base=Cursors.root(initial, signedLattice);
-		SignedCursor<AInteger> cursor=SignedCursor.create(base,signedLattice.getValueShape(),v -> signedLattice.sign(counting,v));
+		Root<SignedData<AInteger>> base=Cursors.root(initial);
+		SignedCursor<AInteger> cursor=SignedCursor.create(base,v -> signedLattice.sign(counting,v));
 
 		cursor.set(CVMLong.create(1));
 
@@ -238,7 +238,7 @@ public class SignedCursorTest {
 
 		LatticeContext ctx = LatticeContext.create(null, KP_ALICE);
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		AForkableCursor<SignedData<AInteger>> aliceCursor = root.path(ALICE);
 		SignedData<AInteger> sd = aliceCursor.get();
@@ -260,7 +260,7 @@ public class SignedCursorTest {
 
 		LatticeContext ctx = LatticeContext.create(null, KP_ALICE);
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		AForkableCursor<SignedData<AInteger>> signedCursor = root.path(ALICE);
 		AForkableCursor<AInteger> innerCursor = convex.lattice.ComponentTestSupport.signed(signedCursor, ownerLattice, ALICE, ctx);
@@ -294,7 +294,7 @@ public class SignedCursorTest {
 			}
 		};
 		Root<AHashMap<ACell,SignedData<AInteger>>> root=
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		convex.lattice.ComponentTestSupport.signed(root.<SignedData<AInteger>>path(BOB), ownerLattice, BOB, wallet)
 			.set(CVMLong.create(99));
@@ -317,7 +317,7 @@ public class SignedCursorTest {
 
 		LatticeContext noKeyCtx = LatticeContext.EMPTY;
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		AForkableCursor<SignedData<AInteger>> signedCursor = root.path(ALICE);
 
@@ -360,7 +360,7 @@ public class SignedCursorTest {
 
 		LatticeContext ctx = LatticeContext.create(null, KP_ALICE);
 		Root<AHashMap<ACell, SignedData<AHashMap<Keyword, ASet<AInteger>>>>> root =
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		AForkableCursor<SignedData<AHashMap<Keyword, ASet<AInteger>>>> signedLevel =
 			root.path(ALICE);
@@ -407,7 +407,7 @@ public class SignedCursorTest {
 
 		LatticeContext noKeyCtx = LatticeContext.EMPTY;
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		AForkableCursor<SignedData<AInteger>> signedLevel = root.path(ALICE);
 		AForkableCursor<AInteger> innerCursor = convex.lattice.ComponentTestSupport.signed(signedLevel, ownerLattice, ALICE, noKeyCtx);
@@ -443,7 +443,7 @@ public class SignedCursorTest {
 		);
 
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		AForkableCursor<SignedData<AInteger>> aliceCursor = root.path(ALICE);
 		AForkableCursor<SignedData<AInteger>> bobCursor = root.path(BOB);
@@ -493,7 +493,7 @@ public class SignedCursorTest {
 
 		LatticeContext ctx = LatticeContext.create(null, KP_ALICE);
 		Root<Index<Keyword, ACell>> root =
-			Cursors.root(rootState, keyedLattice);
+			Cursors.root(rootState);
 
 		// KeyedLattice → path(:data) → OwnerLattice level
 		AForkableCursor<AHashMap<ACell, SignedData<AHashMap<Keyword, ASet<CVMLong>>>>> ownerCursor =
@@ -528,7 +528,7 @@ public class SignedCursorTest {
 	public void testOwnerLatticeMerge() {
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.INSTANCE);
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(ownerLattice);
+			Cursors.root(ownerLattice.zero());
 
 		// Add Alice
 		convex.lattice.ComponentTestSupport.merge(root,ownerLattice,Maps.of(ALICE, KP_ALICE.signData((AInteger) CVMLong.create(10))));
@@ -608,7 +608,7 @@ public class SignedCursorTest {
 
 		LatticeContext ctx = LatticeContext.create(null, KP_ALICE);
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		AForkableCursor<SignedData<AInteger>> aliceCursor = root.path(ALICE);
 		convex.lattice.ComponentTestSupport.merge(aliceCursor,ownerLattice.signingFor(ALICE), KP_ALICE.signData((AInteger) CVMLong.create(50)));
@@ -629,7 +629,7 @@ public class SignedCursorTest {
 
 		LatticeContext ctx = LatticeContext.create(null, KP_ALICE);
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork = convex.lattice.ComponentTestSupport.fork(root,ownerLattice);
 
@@ -651,7 +651,7 @@ public class SignedCursorTest {
 	public void testConcurrentForksMultipleOwners() {
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.INSTANCE);
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(ownerLattice);
+			Cursors.root(ownerLattice.zero());
 
 		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork1 = convex.lattice.ComponentTestSupport.fork(root,ownerLattice);
 		fork1.updateAndGet(map -> {
@@ -684,7 +684,7 @@ public class SignedCursorTest {
 	@Test
 	public void testIncrementalSync() {
 		SetLattice<CVMLong> setLattice = SetLattice.create();
-		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty(), setLattice);
+		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
 		AForkableCursor<ASet<CVMLong>> fork = convex.lattice.ComponentTestSupport.fork(root,setLattice);
 
@@ -726,7 +726,7 @@ public class SignedCursorTest {
 		MapLattice<Keyword, ASet<CVMLong>> mapLattice = MapLattice.create(setLattice);
 
 		Root<AHashMap<Keyword, ASet<CVMLong>>> root =
-			Cursors.root(Maps.of(Keywords.FOO, Sets.of(CVMLong.ONE)), mapLattice);
+			Cursors.root(Maps.of(Keywords.FOO, Sets.of(CVMLong.ONE)));
 
 		AForkableCursor<ASet<CVMLong>> fooCursor = root.path(Keywords.FOO);
 
@@ -751,7 +751,7 @@ public class SignedCursorTest {
 		SetLattice<CVMLong> setLattice = SetLattice.create();
 		MapLattice<Keyword, ASet<CVMLong>> mapLattice = MapLattice.create(setLattice);
 
-		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(Maps.of(Keywords.FOO, Sets.of(CVMLong.ONE), Keywords.BAR, Sets.empty()), mapLattice);
+		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(Maps.of(Keywords.FOO, Sets.of(CVMLong.ONE), Keywords.BAR, Sets.empty()));
 
 		AForkableCursor<ASet<CVMLong>> fooCursor = root.path(Keywords.FOO);
 		AForkableCursor<ASet<CVMLong>> fork = convex.lattice.ComponentTestSupport.fork(fooCursor,setLattice);
@@ -787,8 +787,8 @@ public class SignedCursorTest {
 
 		java.util.concurrent.atomic.AtomicInteger syncCount = new java.util.concurrent.atomic.AtomicInteger();
 		LatticeContext ctx = LatticeContext.create(null, KP_ALICE);
-		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(initial, ownerLattice);
+		PublishingCursor<AHashMap<ACell, SignedData<AInteger>>> root =
+			PublishingCursor.create(initial);
 		root.onSync(value -> { syncCount.incrementAndGet(); return value; }, ownerLattice::merge);
 
 		// Navigate to the owner's slot, then wrap it in the signing boundary
@@ -814,7 +814,7 @@ public class SignedCursorTest {
 		AHashMap<ACell, SignedData<AInteger>> initial =
 			Maps.of(ALICE, KP_ALICE.signData((AInteger) CVMLong.create(42)));
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
-			Cursors.root(initial, ownerLattice);
+			Cursors.root(initial);
 
 		AForkableCursor<AInteger> unwrapped = root.path(ALICE, Keywords.VALUE);
 		assertEquals(CVMLong.create(42), unwrapped.get());

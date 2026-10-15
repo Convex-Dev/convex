@@ -132,7 +132,7 @@ public class SharedApplicationsTest {
 		@Override protected Index<Keyword,ACell> mergePublication(ALattice<Index<Keyword,ACell>> lattice,
 				Index<Keyword,ACell> baseline,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 			// Prepare immutable snapshot changes using ordinary typed path navigation.
-			var result=new Root<>(other, lattice);
+			var result=new Root<>(other);
 			if (socialState!=null) reconcile(result,socialState,baseline,own,other,
 				Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
 			if (fileState!=null) reconcile(result,fileState,baseline,own,other,Keywords.FS,FILES_KEY.getAccountKey());
@@ -234,7 +234,7 @@ public class SharedApplicationsTest {
 			implements TransactionalComponent<Index<Keyword,ACell>,SocialWithP2P> {
 		final Social social;
 		SocialWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host.getLattice(),host.cursor().view(),context(SOCIAL_KEY));
+			this(host.getLattice(),host.cursor(),context(SOCIAL_KEY));
 		}
 		SocialWithP2P(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor,LatticeContext context) {
 			super(lattice,cursor);
@@ -249,7 +249,7 @@ public class SharedApplicationsTest {
 	private static final class FilesWithP2P extends DLFSApplication<Index<Keyword,ACell>>
 			implements TransactionalComponent<Index<Keyword,ACell>,FilesWithP2P> {
 		FilesWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host.getLattice(),host.cursor().view(),host.store());
+			this(host.getLattice(),host.cursor(),host.store());
 			setContext(context(FILES_KEY));
 		}
 		FilesWithP2P(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor,AStore store) {

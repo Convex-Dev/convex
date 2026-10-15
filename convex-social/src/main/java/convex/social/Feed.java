@@ -86,6 +86,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 		AHashMap<Keyword,ACell> entry=entryFn.apply(timestamp);
 		Blob[] keyHolder = new Blob[1];
 		cursor.updateAndGet(feed -> {
+			if (feed==null) feed=SocialLattice.FEED_LATTICE.zero();
 			long ts = timestamp;
 			Blob key = SocialPost.createKey(ts);
 			while (feed != null && feed.get(key) != null) {

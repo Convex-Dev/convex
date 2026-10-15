@@ -32,15 +32,15 @@ class TransactionalRootCursorTest {
 			writer("getAndUpdate",r -> r.getAndUpdate(v -> CVMLong.TWO)),
 			writer("accumulateAndGet",r -> r.accumulateAndGet(CVMLong.TWO,(a,b) -> b)),
 			writer("getAndAccumulate",r -> r.getAndAccumulate(CVMLong.TWO,(a,b) -> b)),
-			writer("view write",r -> r.view().set(CVMLong.TWO)),
+			writer("publication view write",r -> new PublishingCursor<>(r).set(CVMLong.TWO)),
 			writer("incoming merge",r -> convex.lattice.ComponentTestSupport.merge(r,MaxLattice.INSTANCE,CVMLong.TWO)),
-			writer("publication write-back",r -> r.sync(v -> CVMLong.TWO)));
+			writer("publication write-back",r -> new PublishingCursor<>(r).sync(v -> CVMLong.TWO)));
 	}
 
 	@ParameterizedTest(name="{0}")
 	@MethodSource("writers")
 	void everyWriterHonoursRootExclusion(String name,Consumer<Root<AInteger>> action) throws Exception {
-		var root=new TransactionalRootCursor<AInteger>(CVMLong.ZERO, MaxLattice.INSTANCE);
+		var root=new TransactionalRootCursor<AInteger>(CVMLong.ZERO);
 		CountDownLatch inCallback=new CountDownLatch(1), writerStarted=new CountDownLatch(1);
 		AtomicBoolean callbackRunning=new AtomicBoolean();
 		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
@@ -50,7 +50,7 @@ class TransactionalRootCursorTest {
 				action.accept(root);
 				assertFalse(callbackRunning.get(),name+" completed during the exclusive callback");
 			});
-			Transactions.transactLocked(root.view(),draft -> {
+			Transactions.transactLocked(root,draft -> {
 				callbackRunning.set(true);
 				try {
 					inCallback.countDown();

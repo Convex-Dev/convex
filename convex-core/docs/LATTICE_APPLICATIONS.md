@@ -155,10 +155,10 @@ Preparation, including signing, always occurs outside retryable atomic callbacks
 Only sync is specialised on the private working root; ordinary updates retain
 their usual atomic implementation and acquire no publication lock.
 
-The explicit `ALatticeApplication(lattice, cursor)` constructor retains the supplied
-cursor's policy. Pass `host.cursor().view()` for immediate shared visibility, or a
+The explicit `ALatticeApplication(lattice, cursor)` constructor uses the supplied
+working storage and sync boundary. Pass `host.cursor()` for immediate shared visibility, or a
 transaction draft when rebinding. Existing `P2PApplication` and `DLFSApplication`
-adapters retain this live policy. In particular, a NodeServer adapter is constructed
+adapters retain this live behaviour. In particular, a NodeServer adapter is constructed
 before node launch restores the retained root; taking its working snapshot at that
 point would be premature. Construct independent working applications after host
 restoration. Host merges never borrow application signers.
@@ -736,7 +736,7 @@ only connection back to application state: its internal links provide navigation
 atomic updates and fork merge-back. There is no second component-parent hierarchy,
 and cursors themselves know nothing of storage. The component that owns an
 owner-keyed or stamped level wraps the boundary itself, with `SignedCursor.create`
-or `StampedCursor.create` and the lattice it declares, so the boundary is visible
+or `StampedCursor.create` and explicit authoring functions, so the boundary is visible
 exactly where the domain structure places it and descendants never see it: `Social.user`
 wraps the owner's slot, `Feed` never sees `SignedData`.
 
@@ -745,13 +745,15 @@ components are fine; owner and session views should be held by the service that 
 them or recreated on demand, never accumulated in an unbounded cache.
 
 **Write through cursors.** Use `updateAndGet` for read-modify-write; the lambda
-receives `lattice.zero()` for an uninitialised path, so no null guard is needed:
+receives the actual value, including `null` for an uninitialised path. The component
+supplies its own initial value within that same atomic update:
 
 ```java
 public void putPost(Blob key, String text) {
     long ts = getContext().currentTimestampValue();
     AHashMap<Keyword, ACell> post = SocialPost.createPost(text, ts);
-    cursor.updateAndGet(feed -> feed.assoc(key, post));
+    cursor.updateAndGet(feed -> (feed == null ? SocialLattice.FEED_LATTICE.zero() : feed)
+        .assoc(key, post));
 }
 ```
 
@@ -843,8 +845,11 @@ not reuse cached live children. Application subclasses use the protected
 explicit about policy: `withCursor` retains the resolved component context as well
 as domain metadata. A simple leaf can use `configured(new MyComponent(cursor))`;
 a constructor that creates children must receive policy before constructing them.
-Domain forks use `forkCursor(LATTICE)` to obtain component-owned publication state.
-A component owning configuration, such as a DLFS store, passes that along itself.
+Domain forks construct their domain component with `super(LATTICE, destination)`,
+then copy the resolved context and domain metadata. The returned component owns
+publication: its current context and `mergePublication` override govern sync. No
+anonymous component is hidden behind its cursor. A component owning configuration,
+such as a DLFS store, passes that along itself.
 
 `transact` returns `void`; `transactAsync` returns `CompletableFuture<Void>`.
 Completion means committed locally, not persisted, published or acknowledged by
@@ -914,9 +919,35 @@ Cursors provide atomic access, navigation and isolated drafts. They carry no
 for admission and reconciliation. Raw cursor `fork()` is explicit overwrite-on-sync;
 component forks use the component publication boundary instead.
 
-For immediate authoring, `SignedCursor.create(slot, shape, signer)` accepts a bound
-function returning `SignedData`; `StampedCursor.create(base, stamping, clock)` accepts
-an explicit clock. The component binds its owner rule and policy before constructing
+Cursors carry no lattice or shape and never construct missing containers. A plain
+`path(...)` write requires existing intermediate containers; update callbacks receive
+`null` for absent values. Components initialise standalone roots explicitly with
+`Cursors.root(lattice.zero())`.
+
+For child views, `ProjectionCursor.create(source, read, write)` applies component-supplied
+functions within the source's atomic update. The write function can build missing
+containers without a separate initialisation write. Both functions must be pure and
+preserve unrelated state; failed updates commit nothing. `ALatticeComponent.resolve`
+is a convenience which supplies these functions from the component's lattice, one
+level at a time. Creating or reading such a view has no state-changing effects.
+
+```java
+var child = ProjectionCursor.create(source,
+    parent -> parent == null ? null : parent.get(KEY_CHILD),
+    (parent, value) -> {
+        ACell previous = parent == null ? null : parent.get(KEY_CHILD);
+        if (Utils.equals(previous, value)) return parent;
+        return (parent == null ? PARENT_LATTICE.zero() : parent)
+            .assoc(KEY_CHILD, value);
+    });
+```
+
+The lattice classes retain their merge, verification and authoring methods directly;
+there are no separate `Merge`, `Ownership`, `Signing`, `Stamping` or `Shape` interfaces.
+
+For immediate authoring, `SignedCursor.create(slot, signer)` accepts a bound
+function returning `SignedData`; `StampedCursor.create(base, clock, stamp)` accepts
+an explicit clock and timestamp injection function. The component binds its owner rule and policy before constructing
 these wrappers. Batched signing belongs to `SignedComponent.sync()`.
 
 ## Write policy: `LatticeContext`
@@ -971,23 +1002,25 @@ Additive merges union keys, so a removed key returns when an older replica merge
 back. Under `IndexLattice`, `MapLattice` or `SetLattice`, delete by tombstone: set a
 `:deleted` field and bump `:timestamp` so the deletion wins.
 
-For durable deletes, model the region as a single whole-value LWW leaf built from
-three single-concern layers:
+For durable deletes, model the region as a whole-value LWW leaf and let the
+component timestamp local writes:
 
 ```java
-StampingLattice<ACell> state = StampingLattice.create(
-    LWWLattice.create(JSONLattice.INSTANCE, tsFn),   // whole-value merge over JSON navigation
-    (v, ts) -> v.assoc(KEY_TIMESTAMP, ts));          // stamp the context timestamp on every write
+ALattice<ACell> state = LWWLattice.create(JSONLattice.INSTANCE, tsFn);
 
-// the component owning the leaf wraps it before navigating below
-AForkableCursor<ACell> leaf = StampedCursor.create(cursor.child(KEY_STATE, state), state, getContext()::currentTimestamp);
+// The component owning the leaf supplies the stamp function.
+AForkableCursor<ACell> storage = resolve(cursor, applicationLattice, KEY_STATE);
+AForkableCursor<ACell> leaf = StampedCursor.create(storage,
+    getContext()::currentTimestamp,
+    (value, timestamp) -> RT.ensureMap(value).assoc(KEY_TIMESTAMP, timestamp));
 ```
 
-`JSONLattice` provides structural navigation below the leaf, `LWWLattice` merges the
-whole value by `:timestamp` so a smaller map with a newer timestamp replaces the old
-one, and `StampingLattice` declares the stamp that the owning component's
-`StampedCursor` applies so every deep write re-stamps the leaf. A delete is then a
-read-modify-write that dissociates the key.
+`JSONLattice` provides recursive path/key navigation below the leaf. `LWWLattice`
+merges the whole value by timestamp, so a smaller map with a newer timestamp
+replaces the old one. The component's `StampedCursor` timestamps each changed
+local write. A delete is a read-modify-write that dissociates a key. Missing maps
+or vectors must be constructed explicitly by the component's write function;
+JSON navigation does not infer container types from keys.
 
 ## Testing
 
@@ -1056,7 +1089,7 @@ Follow the repository conventions: no sleeps, wait on real signals; no fixed por
 
 - `convex.lattice.ALatticeApplication`, `ALatticeComponent`, `RootComponent` — the
   component layer.
-- `convex.lattice.LatticeContext`, `OwnerLattice`, `SignedLattice`, `StampingLattice`,
+- `convex.lattice.LatticeContext`, `OwnerLattice`, `SignedLattice`,
   `JSONLattice`, `LWWLattice`, `IndexLattice`, `MapLattice`, `SetLattice` — lattices
   and write policy.
 - `convex.node.NodeServer` (`convex-peer`) — the host runtime.

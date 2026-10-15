@@ -43,7 +43,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return configured(new Feed(cursor.child(SocialLattice.KEY_FEED,SocialLattice.FEED_LATTICE),ownerDid));
+		return configured(new Feed(resolve(cursor,SocialLattice.INSTANCE,SocialLattice.KEY_FEED),ownerDid));
 	}
 
 	/**
@@ -56,9 +56,9 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 */
 	public Follows follows() {
 		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
-			cursor.child(SocialLattice.KEY_FOLLOWING,SocialLattice.FOLLOWING_LATTICE),
-			SocialLattice.FOLLOWING_LATTICE,getContext()::currentTimestamp);
-		return configured(new Follows(following.child(SocialLattice.KEY_FOLLOWS,SocialLattice.FOLLOWS_LATTICE)));
+			resolve(cursor,SocialLattice.INSTANCE,SocialLattice.KEY_FOLLOWING),
+			getContext()::currentTimestamp,(value,time) -> value.assoc(convex.lattice.generic.LWWLattice.KEY_TIMESTAMP,time));
+		return configured(new Follows(resolve(following,SocialLattice.FOLLOWING_LATTICE,SocialLattice.KEY_FOLLOWS)));
 	}
 
 	/**
@@ -70,7 +70,12 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return isolated working copy for this user
 	 */
 	public SocialUser fork() {
-		return configured(new SocialUser(forkCursor(SocialLattice.INSTANCE),ownerDid));
+		return configured(new SocialUser(this));
+	}
+
+	private SocialUser(SocialUser source) {
+		super(SocialLattice.INSTANCE,source.cursor);
+		this.ownerDid=source.ownerDid;
 	}
 
 	// TODO: public Profile profile() { ... }

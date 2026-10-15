@@ -3,9 +3,7 @@ package convex.lattice.cursor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.function.BiFunction;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -18,19 +16,19 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.JSONLattice;
 import convex.lattice.generic.LWWLattice;
-import convex.lattice.generic.StampingLattice;
 
 /**
  * End-to-end test of the Covia {@code :state} composition: a whole-value-LWW leaf
- * ({@code LWWLattice.create(JSONLattice.INSTANCE, ts, stamp)}) that
+ * with a component-supplied stamping function that
  *
  * <ul>
  *   <li>merges whole-value by timestamp so deletions survive merge-back;</li>
- *   <li>navigates as JSON below the leaf (structural deep writes);</li>
+ *   <li>uses component-supplied construction below the leaf;</li>
  *   <li>re-stamps the whole leaf on every deep write via an inserted
  *       {@link StampedCursor}.</li>
  * </ul>
@@ -39,8 +37,7 @@ public class StampedCursorTest {
 
 	@Test public void testRawForkAdoptsPreparedDestinationValue() {
 		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO));
-		var stamped=StampedCursor.create(root,null,() -> CVMLong.create(100),
-			(value,time) -> stampWith(value,time.longValue()));
+		var stamped=StampedCursor.create(root,() -> CVMLong.create(100),(value,time) -> stampWith(value,time.longValue()));
 		var fork=stamped.fork();
 		fork.set(Maps.of(A,CVMLong.ONE));
 		ACell published=fork.sync();
@@ -58,7 +55,7 @@ public class StampedCursorTest {
 				return CVMLong.create(clocks.incrementAndGet());
 			}
 		};
-		StampedCursor<ACell> cursor=StampedCursor.create(root,null,context::currentTimestamp,(value,time) -> {
+		StampedCursor<ACell> cursor=StampedCursor.create(root,context::currentTimestamp,(value,time) -> {
 			// Force the first candidate to lose its CAS to a different field update.
 			if (preparations.incrementAndGet()==1) root.set(Maps.of(A,CVMLong.ZERO,B,CVMLong.ONE));
 			return stampWith(value,time.longValue());
@@ -100,28 +97,36 @@ public class StampedCursorTest {
 		return v;
 	}
 
-	// The Covia :state stack, composed from three single-concern layers:
-	//   stamping (write)  ->  whole-value LWW (merge)  ->  JSON (structure/nav)
-	static StampingLattice<ACell> stateLattice(BiFunction<ACell, CVMLong, ACell> stamp) {
-		return StampingLattice.create(
-			LWWLattice.create(JSONLattice.INSTANCE, StampedCursorTest::tsOf),
-			stamp);
+	static ALattice<ACell> stateLattice() {
+		return LWWLattice.create(JSONLattice.INSTANCE, StampedCursorTest::tsOf);
+	}
+
+	/** The component explicitly chooses maps at both levels. */
+	static AForkableCursor<ACell> userView(AForkableCursor<ACell> source) {
+		return ProjectionCursor.create(source,
+			value -> RT.getIn(value, USERS, ALICE),
+			(value, child) -> {
+				if (Utils.equals(RT.getIn(value, USERS, ALICE), child)) return value;
+				AHashMap<ACell, ACell> parent = value == null ? Maps.empty() : RT.ensureMap(value);
+				ACell currentUsers = parent.get(USERS);
+				AHashMap<ACell, ACell> users = currentUsers == null ? Maps.empty() : RT.ensureMap(currentUsers);
+				return parent.assoc(USERS, users.assoc(ALICE, child));
+			});
 	}
 
 	// ===== Deep write below the leaf: structural + re-stamped =====
 
 	@Test public void testDeepWriteStampsWholeLeaf() {
-		StampingLattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
 		// the write clock lives in the context (ts = 100)
 		LatticeContext ctx = LatticeContext.create(CVMLong.create(100), null);
-		Root<ACell> root = Cursors.root(initial, state);
+		Root<ACell> root = Cursors.root(initial);
 
 		// the component owning the stamped leaf wraps it, then navigates below
-		AForkableCursor<ACell> c = StampedCursor.create(root, state,ctx::currentTimestamp).path(USERS, ALICE);
+		AForkableCursor<ACell> c = userView(StampedCursor.create(root,ctx::currentTimestamp,(v, ts) -> stampWith(v, ts.longValue())));
 		c.set(Strings.create("bob"));
 
-		// deep value landed, structural intermediate ("users") auto-created
+		// The component write function constructs the missing users map atomically.
 		assertEquals(Strings.create("bob"), RT.getIn(root.get(), USERS, ALICE));
 		// the whole :state leaf was re-stamped from the context timestamp
 		assertEquals(100L, tsOf(root.get()), "deep write must re-stamp the whole :state leaf from context");
@@ -130,13 +135,12 @@ public class StampedCursorTest {
 	}
 
 	@Test public void testLongLivedDerivedPathUsesAdvancedContextTimestamp() {
-		StampingLattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
-		Root<ACell> root = Cursors.root(initial, state);
+		Root<ACell> root = Cursors.root(initial);
 
 		// Keep this derived cursor across a harness clock advance (#640).
 		var clock=new java.util.concurrent.atomic.AtomicReference<>(CVMLong.create(100));
-		AForkableCursor<ACell> child = StampedCursor.create(root, state,clock::get).path(USERS, ALICE);
+		AForkableCursor<ACell> child = userView(StampedCursor.create(root,clock::get,(v, ts) -> stampWith(v, ts.longValue())));
 		clock.set(CVMLong.create(200));
 		child.set(Strings.create("bob"));
 
@@ -148,7 +152,7 @@ public class StampedCursorTest {
 	// ===== Whole-value LWW merge: deletions are durable =====
 
 	@Test public void testWholeValueMergeDeletionDurable() {
-		ALattice<ACell> state = stateLattice((v, ts) -> v);
+		ALattice<ACell> state = stateLattice();
 		ACell older = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(10), A, CVMLong.ONE, B, CVMLong.create(2));
 		ACell newer = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(20), A, CVMLong.ONE); // "b" deleted
 
@@ -167,7 +171,7 @@ public class StampedCursorTest {
 		Root<ACell> base = Root.create(older);
 		ALattice<ACell> lww = LWWLattice.create(JSONLattice.INSTANCE, StampedCursorTest::tsOf);
 		// stampFn would bump the timestamp to 999 if it were (wrongly) applied to a merge result
-		StampedCursor<ACell> sc = StampedCursor.create(base, lww, LatticeContext.EMPTY::currentTimestamp, (v, ts) -> stampWith(v, 999));
+		StampedCursor<ACell> sc = StampedCursor.create(base,LatticeContext.EMPTY::currentTimestamp,(v, ts) -> stampWith(v, 999));
 
 		base.updateAndGet(own -> lww.merge(own,newer)); // newer (ts 20) is the LWW winner
 
@@ -178,8 +182,7 @@ public class StampedCursorTest {
 	// ===== Navigation delegates to the inner JSON lattice =====
 
 	@Test public void testNavigationDelegatesToInner() {
-		ALattice<ACell> state = stateLattice((v, ts) -> v);
-		assertTrue(state.isStructural());
+		ALattice<ACell> state = stateLattice();
 		assertSame(JSONLattice.INSTANCE, state.path(USERS));
 		assertSame(JSONLattice.INSTANCE.zero(), state.zero()); // both null (structural)
 	}

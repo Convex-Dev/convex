@@ -89,13 +89,12 @@ public final class Transactions {
 			V observed=cursor.get();
 			if (!computed || !Utils.equals(observed,input)) {
 				input=observed;
-				V initial=(input==null)?cursor.shape().zero():input;
-				TransactionCursor<V> draft=new TransactionCursor<>(initial,cursor.shape());
+				TransactionCursor<V> draft=new TransactionCursor<>(input);
 				try {
 					action.accept(draft);
 					V candidate=draft.get();
-					// Merely reading an absent position must not materialise its empty value.
-					result=Utils.equals(initial,candidate)?input:candidate;
+					// Preserve the original immutable value for a no-op.
+					result=Utils.equals(input,candidate)?input:candidate;
 					computed=true;
 				} finally {
 					draft.close();

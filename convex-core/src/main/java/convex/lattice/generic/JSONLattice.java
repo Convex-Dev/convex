@@ -9,10 +9,8 @@ import convex.lattice.LatticeContext;
  *
  * <p>This lattice describes <em>structure only</em>. It is recursive
  * ({@link #path(ACell)} returns itself, so navigation continues at every depth)
- * and marks itself {@link #isStructural() structural}, so the cursor write path
- * ({@code LatticeOps.assocIn}) builds missing intermediates by key shape
- * (integer → vector, string → map, keyword/blob → index) rather than from a
- * fixed {@link #zero()}.</p>
+ * but does not prescribe container types. Components must explicitly construct
+ * any missing maps or vectors in their write functions.</p>
  *
  * <p>It deliberately defines <strong>no merge</strong>: {@link #merge} throws.
  * A JSON region is an opaque whole value for convergence purposes — merge must
@@ -40,13 +38,8 @@ public class JSONLattice extends ALattice<ACell> {
 	}
 
 	@Override
-	public boolean isStructural() {
-		return true;
-	}
-
-	@Override
 	public ACell zero() {
-		// No fixed container — the write path builds containers from the key shape.
+		// No fixed container: construction belongs to the component.
 		return null;
 	}
 

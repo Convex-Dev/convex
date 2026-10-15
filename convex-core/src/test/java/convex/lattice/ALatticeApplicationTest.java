@@ -30,7 +30,6 @@ import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.SetLattice;
 import convex.lattice.generic.LWWLattice;
-import convex.lattice.generic.StampingLattice;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.StampedCursor;
@@ -46,7 +45,7 @@ public class ALatticeApplicationTest {
 	private static final class Application<V extends ACell> extends ALatticeApplication<V> {
 		Application(RootComponent<V> host) {
 			// Explicit live policy, also used by the existing NodeServer adapters.
-			super(host.getLattice(),host.cursor().view());
+			super(host.getLattice(),host.cursor());
 		}
 	}
 
@@ -112,7 +111,7 @@ public class ALatticeApplicationTest {
 		}
 
 		void add(CVMLong value) {
-			cursor.updateAndGet(items -> items.include(value));
+			cursor.updateAndGet(items -> (items==null?ITEMS_LATTICE.zero():items).include(value));
 		}
 	}
 
@@ -174,8 +173,8 @@ public class ALatticeApplicationTest {
 
 		first.merge(LATTICE.zero().assoc(ITEMS,Sets.of(1)).assoc(UNKNOWN,CVMLong.TWO));
 		second.merge(LATTICE.zero().assoc(ITEMS,Sets.of(2)));
-		assertNotSame(host.cursor(),first.cursor());
-		assertNotSame(first.cursor(),second.cursor());
+		assertSame(host.cursor(),first.cursor());
+		assertSame(first.cursor(),second.cursor());
 		assertSame(host.cursor().get(),first.cursor().get());
 		assertSame(first.cursor().get(),second.cursor().get());
 		assertEquals(initial.assoc(ITEMS,Sets.of(1,2)),host.cursor().get());
@@ -202,9 +201,7 @@ public class ALatticeApplicationTest {
 		AKeyPair alice=AKeyPair.createSeeded(6201);
 		AKeyPair bob=AKeyPair.createSeeded(6202);
 		Keyword timestamp=LWWLattice.KEY_TIMESTAMP;
-		StampingLattice<Index<Keyword,ACell>> record=StampingLattice.create(
-			LWWLattice.create(LATTICE,v -> ((CVMLong)v.get(timestamp)).longValue()),
-			(v,ts) -> v.assoc(timestamp,ts));
+		var record=LWWLattice.create(LATTICE,v -> ((CVMLong)v.get(timestamp)).longValue());
 		var owners=OwnerKeyLattice.create(record);
 		var host=RootComponent.create(owners,new MemoryStore());
 		var first=new Application<>(host);
@@ -213,26 +210,20 @@ public class ALatticeApplicationTest {
 		second.setContext(LatticeContext.create(CVMLong.create(200),bob));
 		// A domain component would own these two boundaries: sign the owner's record, then
 		// stamp it on every write below.
-		AForkableCursor<ASet<CVMLong>> aliceItems=StampedCursor.create(
-			ComponentTestSupport.signed(first.cursor().path(alice.getAccountKey()), owners, alice.getAccountKey(), first.getContext()),record,first.getContext()::currentTimestamp)
-			.child(ITEMS,ITEMS_LATTICE);
-		AForkableCursor<ASet<CVMLong>> bobItems=StampedCursor.create(
-			ComponentTestSupport.signed(second.cursor().path(bob.getAccountKey()), owners, bob.getAccountKey(), second.getContext()),record,second.getContext()::currentTimestamp)
-			.child(ITEMS,ITEMS_LATTICE);
-		aliceItems.updateAndGet(v -> v.include(CVMLong.ONE));
-		bobItems.updateAndGet(v -> v.include(CVMLong.TWO));
+		AForkableCursor<ASet<CVMLong>> aliceItems=convex.lattice.ALatticeComponent.resolve(StampedCursor.create(ComponentTestSupport.signed(first.cursor().path(alice.getAccountKey()), owners, alice.getAccountKey(), first.getContext()),first.getContext()::currentTimestamp,(v,ts) -> v.assoc(timestamp,ts)),record,ITEMS);
+		AForkableCursor<ASet<CVMLong>> bobItems=convex.lattice.ALatticeComponent.resolve(StampedCursor.create(ComponentTestSupport.signed(second.cursor().path(bob.getAccountKey()), owners, bob.getAccountKey(), second.getContext()),second.getContext()::currentTimestamp,(v,ts) -> v.assoc(timestamp,ts)),record,ITEMS);
+		aliceItems.updateAndGet(v -> (v==null?ITEMS_LATTICE.zero():v).include(CVMLong.ONE));
+		bobItems.updateAndGet(v -> (v==null?ITEMS_LATTICE.zero():v).include(CVMLong.TWO));
 		var state=host.cursor().get();
 		assertEquals(CVMLong.create(100),state.get(alice.getAccountKey()).getValue().get(timestamp));
 		assertEquals(CVMLong.create(200),state.get(bob.getAccountKey()).getValue().get(timestamp));
 		assertTrue(state.get(alice.getAccountKey()).checkSignature());
 		assertTrue(state.get(bob.getAccountKey()).checkSignature());
 		assertSame(LatticeContext.EMPTY,host.getContext());
-		assertThrows(IllegalStateException.class,() -> StampedCursor.create(
-			ComponentTestSupport.signed(second.cursor().path(alice.getAccountKey()), owners, alice.getAccountKey(), second.getContext()),record,second.getContext()::currentTimestamp)
-			.<ASet<CVMLong>>path(ITEMS).set(Sets.of(3)));
+		assertThrows(IllegalStateException.class,() -> convex.lattice.ALatticeComponent.<ASet<CVMLong>>resolve(StampedCursor.create(ComponentTestSupport.signed(second.cursor().path(alice.getAccountKey()), owners, alice.getAccountKey(), second.getContext()),second.getContext()::currentTimestamp,(v,ts) -> v.assoc(timestamp,ts)),record,ITEMS).set(Sets.of(3)));
 		assertSame(state,host.cursor().get());
 		first.setContext(LatticeContext.create(CVMLong.create(300),alice));
-		aliceItems.updateAndGet(v -> v.include(CVMLong.TWO));
+		aliceItems.updateAndGet(v -> (v==null?ITEMS_LATTICE.zero():v).include(CVMLong.TWO));
 		assertEquals(CVMLong.create(100),host.cursor().get().get(alice.getAccountKey()).getValue().get(timestamp));
 		assertEquals(Sets.of(1,2),aliceItems.get());
 	}

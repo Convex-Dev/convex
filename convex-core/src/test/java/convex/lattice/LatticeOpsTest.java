@@ -13,7 +13,6 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
@@ -25,9 +24,8 @@ import convex.lattice.generic.MapLattice;
 
 /**
  * Tests for {@link LatticeOps#assocIn}: the write engine creates an absent base from
- * the {@link Shape} it is given and never invents a container below it, except for
- * structural (JSON-like) shapes. Typed intermediates come from the component that
- * owns each level, which declares them with {@code child(key, shape)}.
+ * the {@link ALattice} it is given and never invents a container below it. Typed intermediates come from the component that
+ * owns each level, which declares them with {@code ALatticeComponent.resolve}.
  */
 public class LatticeOpsTest {
 
@@ -63,9 +61,9 @@ public class LatticeOpsTest {
 	}
 
 	/**
-	 * The engine knows only the shape of the base. An absent intermediate below it has
+	 * The engine knows only the lattice of the base. An absent intermediate below it has
 	 * no declared type here, so a deep write through it fails rather than guessing;
-	 * the owning component declares each level with {@code child(key, shape)} and the
+	 * the owning component declares each level with {@code ALatticeComponent.resolve} and the
 	 * same write then creates every container with its correct type.
 	 */
 	@SuppressWarnings("unchecked")
@@ -78,8 +76,8 @@ public class LatticeOpsTest {
 		assertThrows(IllegalStateException.class,
 			() -> LatticeOps.assocIn(null, CVMLong.create(99), outer, KEY_A, KEY_B));
 
-		Root<Index<Keyword, ACell>> root = Cursors.root((Index<Keyword, ACell>) null, outer);
-		root.child(KEY_A, inner).child(KEY_B, LWWLattice.INSTANCE).set(CVMLong.create(99));
+		Root<Index<Keyword, ACell>> root = Cursors.root((Index<Keyword, ACell>) null);
+		ALatticeComponent.resolve(root,outer,KEY_A,KEY_B).set(CVMLong.create(99));
 
 		Index<Keyword, ACell> outerIdx = root.get();
 		assertNotNull(outerIdx);
@@ -89,19 +87,17 @@ public class LatticeOpsTest {
 		assertEquals(CVMLong.create(99), innerIdx.get(KEY_B));
 	}
 
-	/** A structural shape builds each missing container from the key written through it. */
+	/** A navigable JSON lattice does not specify missing container types. */
 	@Test
-	public void testStructuralShapeCreatesIntermediatesByKey() {
-		ACell result = LatticeOps.assocIn(null, CVMLong.create(3), JSONLattice.INSTANCE,
-			Strings.create("a"), Strings.create("b"));
-
-		assertTrue(result instanceof AHashMap, "String keys create hash maps");
-		assertEquals(CVMLong.create(3), RT.getIn(result, Strings.create("a"), Strings.create("b")));
+	public void testJSONRequiresExplicitContainers() {
+		assertThrows(IllegalStateException.class,
+			() -> LatticeOps.assocIn(null, CVMLong.create(3), JSONLattice.INSTANCE,
+				Strings.create("a"), Strings.create("b")));
 	}
 
 	@Test
-	public void testNullShapeAndNullDataThrows() {
-		// No shape + null root -> should throw
+	public void testNullLatticeAndNullDataThrows() {
+		// No lattice + null root -> should throw
 		assertThrows(IllegalStateException.class, () -> {
 			LatticeOps.assocIn(null, CVMLong.create(1), null, KEY_A);
 		});
@@ -109,8 +105,8 @@ public class LatticeOpsTest {
 
 	@SuppressWarnings("unchecked")
 	@Test
-	public void testNullShapeWithNonNullDataSucceeds() {
-		// Existing non-null structure -> no shape needed
+	public void testNullLatticeWithNonNullDataSucceeds() {
+		// Existing non-null structure -> no lattice needed
 		Index<Keyword, ACell> existing = Index.<Keyword, ACell>none().assoc(KEY_A, CVMLong.create(1));
 
 		ACell result = LatticeOps.assocIn(existing, CVMLong.create(2), null, KEY_A);
@@ -121,7 +117,7 @@ public class LatticeOpsTest {
 
 	@SuppressWarnings("unchecked")
 	@Test
-	public void testExistingDataNotChangedByShape() {
+	public void testExistingDataNotChangedByLattice() {
 		// Even with a MapLattice, existing Index data stays Index
 		Index<Keyword, ACell> existing = Index.<Keyword, ACell>none().assoc(KEY_A, CVMLong.create(1));
 		MapLattice<Keyword, ACell> ml = MapLattice.create(LWWLattice.INSTANCE);
@@ -133,7 +129,7 @@ public class LatticeOpsTest {
 	}
 
 	@Test
-	public void testLeafShapeZeroNullThrows() {
+	public void testLeafLatticeZeroNullThrows() {
 		// LWWLattice.zero() returns null -> can't create container through it
 		assertThrows(IllegalStateException.class, () -> {
 			LatticeOps.assocIn(null, CVMLong.create(1), LWWLattice.INSTANCE, KEY_A);
@@ -142,7 +138,7 @@ public class LatticeOpsTest {
 
 	@Test
 	public void testMissingIntermediateWithNullDataThrows() {
-		// The base is created from the shape, but :a's shape is not known to the engine
+		// The base is created from the lattice, but :a's lattice is not known to the engine
 		KeyedLattice kl = KeyedLattice.create("a", LWWLattice.INSTANCE);
 
 		assertThrows(IllegalStateException.class, () -> {

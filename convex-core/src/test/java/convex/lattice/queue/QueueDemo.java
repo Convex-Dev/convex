@@ -54,7 +54,7 @@ public class QueueDemo {
 		store = EtchStore.createTemp("queue-demo");
 		System.out.println("Created EtchStore at: " + store.getFileName());
 
-		root = Cursors.root(Lattice.ROOT);
+		root = Cursors.root(Lattice.ROOT.zero());
 		System.out.println("Created lattice root cursor (hierarchy: :queue -> owner -> :value -> topic -> partition)");
 
 		// Create a standalone LatticeMQ for all demo operations

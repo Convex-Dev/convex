@@ -116,7 +116,7 @@ public class SignedComponentTest {
 				return super.compareAndSet(expected,value);
 			}
 		};
-		var destination=root.child(slot,SIGNED);
+		var destination=root.<SignedData<ASet<CVMLong>>>path(slot);
 		var component=new SignedComponent<>(SIGNED,destination);
 		AtomicInteger signatures=new AtomicInteger();
 		component.setContext(context(signatures::incrementAndGet));

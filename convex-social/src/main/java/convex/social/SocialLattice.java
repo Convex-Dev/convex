@@ -17,7 +17,6 @@ import convex.lattice.generic.LWPLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
-import convex.lattice.generic.StampingLattice;
 
 /**
  * Lattice for a single user's social network state.
@@ -51,9 +50,7 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		IndexLattice.create(LWWLattice.INSTANCE);
 
 	private static final ALattice<ACell> FOLLOW_RECORD_LATTICE =
-		StampingLattice.create(
-			LWWLattice.create(JSONLattice.INSTANCE,SocialLattice::recordTimestamp),
-			SocialLattice::stampRecord);
+		LWWLattice.create(JSONLattice.INSTANCE,SocialLattice::recordTimestamp);
 
 	static final MapLattice<ACell, ACell> FOLLOWS_LATTICE =
 		new DIDFollowMapLattice(FOLLOW_RECORD_LATTICE);
@@ -62,10 +59,8 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		LWWLattice.KEY_TIMESTAMP,MaxLattice.INSTANCE,
 		KEY_FOLLOWS,FOLLOWS_LATTICE);
 
-	static final StampingLattice<Index<Keyword,ACell>> FOLLOWING_LATTICE=
-		StampingLattice.create(
-			LWPLattice.create(FOLLOWING_STRUCTURE,SocialLattice::followingTimestamp),
-			SocialLattice::stampFollowing);
+	static final ALattice<Index<Keyword,ACell>> FOLLOWING_LATTICE=
+		LWPLattice.create(FOLLOWING_STRUCTURE,SocialLattice::followingTimestamp);
 
 	private SocialLattice() {
 		// Singleton
@@ -195,24 +190,11 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		return (timestamp instanceof CVMLong l)?l.longValue():0;
 	}
 
-	private static Index<Keyword,ACell> stampFollowing(
-			Index<Keyword,ACell> following,CVMLong timestamp) {
-		if (following==null) following=getFollowing(null);
-		return following.assoc(LWWLattice.KEY_TIMESTAMP,timestamp);
-	}
-
 	@SuppressWarnings("unchecked")
 	private static long recordTimestamp(ACell value) {
 		if (!(value instanceof AHashMap<?,?> map)) return 0;
 		ACell timestamp=((AHashMap<Keyword,ACell>)map).get(LWWLattice.KEY_TIMESTAMP);
 		return (timestamp instanceof CVMLong l)?l.longValue():0;
-	}
-
-	@SuppressWarnings("unchecked")
-	private static ACell stampRecord(ACell value,CVMLong timestamp) {
-		AHashMap<Keyword,ACell> record=(value instanceof AHashMap<?,?> map)
-			?(AHashMap<Keyword,ACell>)map:Maps.empty();
-		return record.assoc(LWWLattice.KEY_TIMESTAMP,timestamp);
 	}
 
 	/** Map boundary which drops malformed target DIDs and follow records. */

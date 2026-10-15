@@ -37,7 +37,7 @@ public class LatticeQueue extends convex.lattice.ALatticeComponent<AVector<ACell
 	 * Creates a new empty queue.
 	 */
 	public static LatticeQueue create() {
-		AForkableCursor<AVector<ACell>> cursor = Cursors.root(QueueLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> cursor = Cursors.root(QueueLattice.INSTANCE.zero());
 		return new LatticeQueue(cursor);
 	}
 
@@ -52,7 +52,11 @@ public class LatticeQueue extends convex.lattice.ALatticeComponent<AVector<ACell
 	 * Creates a forked copy of this queue for independent operation.
 	 */
 	public LatticeQueue fork() {
-		return configured(new LatticeQueue(forkCursor(QueueLattice.INSTANCE)));
+		return configured(new LatticeQueue(this));
+	}
+
+	private LatticeQueue(LatticeQueue source) {
+		super(QueueLattice.INSTANCE,source.cursor);
 	}
 
 	/**

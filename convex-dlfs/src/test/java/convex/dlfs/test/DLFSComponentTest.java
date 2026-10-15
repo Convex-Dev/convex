@@ -56,7 +56,7 @@ public class DLFSComponentTest {
 
 	@Test
 	public void testFilesystemAdapterUsesExplicitComponentClock() throws Exception {
-		var drives=convex.dlfs.DLFSDrives.wrap(Cursors.root(convex.dlfs.DLFSDrives.LATTICE));
+		var drives=convex.dlfs.DLFSDrives.wrap(Cursors.root(convex.dlfs.DLFSDrives.LATTICE.zero()));
 		try (var drive=drives.createDrive("clock")) {
 			var fileSystem=(convex.lattice.fs.impl.DLFSLocal)drive.fileSystem();
 			var policy=LatticeContext.create(CVMLong.create(123),null);

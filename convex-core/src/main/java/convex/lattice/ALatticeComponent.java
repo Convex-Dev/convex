@@ -7,12 +7,16 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
+import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
+import convex.lattice.generic.AOwnerLattice;
+import convex.lattice.generic.SignedLattice;
 
 /**
  * Domain operations over a cursor at one path.
@@ -21,8 +25,8 @@ import convex.lattice.cursor.TransactionalRootCursor;
  * publication boundary also retain a destination cursor and publication baseline.
  * State changes and sync travel through cursors; there is no component parent link.
  * The cursor knows nothing about lattices: the component declares the structure of
- * the level it owns, typically by passing its lattice as the {@link Shape} of child
- * cursors, and binding the authoring functions of signing and stamping views.
+ * the level it owns, supplying read/write functions for child views and binding
+ * the authoring functions of signing and stamping views.
  * Merge and publication policy remain in components.</p>
  *
  * <p>Persistence belongs to the host ({@link RootComponent}) and to components which
@@ -57,22 +61,14 @@ public abstract class ALatticeComponent<V extends ACell> {
 		return component;
 	}
 
-	/**
-	 * Working cursor for a domain component's isolated copy. This independent
-	 * publication boundary resolves its policy now, like any other child component.
-	 */
-	protected final AForkableCursor<V> forkCursor(ALattice<V> lattice) {
-		return working(lattice,cursor,getContext()).cursor();
-	}
-
 	/** Immediate signing boundary with an explicitly bound authoring function. */
 	protected final <T extends ACell> SignedCursor<T> signedCursor(
 			ACursor<SignedData<T>> slot,
-			Ownership<T> owners, ACell owner) {
-		Signing<T> rule=owners.signingFor(owner);
+			AOwnerLattice<?,T,?> owners, ACell owner) {
+		SignedLattice<T> rule=owners.signingFor(owner);
 		if (rule==null) throw new IllegalArgumentException("Invalid owner: "+owner);
 		LatticeContext policy=getContext();
-		return SignedCursor.create(slot,rule.getValueShape(),v -> rule.sign(policy,v));
+		return SignedCursor.create(slot,v -> rule.sign(policy,v));
 	}
 
 	/** Creates a component over a cursor. */
@@ -135,10 +131,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 			// Only sync is specialised. Ordinary atomic updates keep their existing
 			// root implementation, with no publication lock on the write path.
 			working=destination.supportsExclusiveTransactions()
-				?new TransactionalRootCursor<>(baseline,lattice) {
+				?new TransactionalRootCursor<>(baseline) {
 					@Override public V sync() { return Publication.this.sync(); }
 				}
-				:new Root<>(baseline,lattice) {
+				:new Root<>(baseline) {
 					@Override public V sync() { return Publication.this.sync(); }
 				};
 		}
@@ -206,8 +202,9 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/**
 	 * Synchronises this component's cursor through its immediate cursor boundary.
 	 *
-	 * <p>For a forked cursor this merges local changes into the cursor it was forked
-	 * from; it does not necessarily publish the complete application root. Call
+	 * <p>A component working copy reconciles local changes with its destination; a
+	 * raw cursor fork overwrites its destination. Neither necessarily publishes
+	 * the complete application root. Call
 	 * the containing {@link ALatticeApplication application's} {@code sync()} when
 	 * the merged state should cross the host publication boundary.</p>
 	 *
@@ -221,11 +218,11 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Navigates from a cursor along a path, declaring the shape of each level from
-	 * the corresponding node of a lattice, so that a write through the result can
-	 * create absent intermediates with their correct types. A level the lattice does
-	 * not describe is navigated untyped. Owner boundaries are not crossed here: an
-	 * owner's slot is wrapped by the component owning that level, with
+	 * Builds child views with component-supplied read/write functions. Each write
+	 * function uses the corresponding lattice to construct an absent container
+	 * within the atomic update. Reads and view construction never mutate state.
+	 * A missing container at an unknown level causes the write to fail. Owner
+	 * boundaries are not crossed here: an owner's slot is wrapped by its component with
 	 * an explicitly bound signing function.
 	 *
 	 * @param <T> Value type at the end of the path
@@ -234,15 +231,20 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * @param path Keys to navigate
 	 * @return Cursor at the path
 	 */
-	@SuppressWarnings({"unchecked","rawtypes"})
-	protected static <T extends ACell> AForkableCursor<T> resolve(AForkableCursor<?> cursor,
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AForkableCursor<T> resolve(AForkableCursor<?> cursor,
 			ALattice<?> lattice, ACell... path) {
-		AForkableCursor c=cursor;
-		ALattice lat=lattice;
+		AForkableCursor<ACell> c=(AForkableCursor<ACell>)cursor;
+		ALattice<?> lat=lattice;
 		for (ACell key: path) {
+			final ALattice<?> parentLattice=lat;
+			final ACell[] step={key};
+			c=ProjectionCursor.create(c,
+				value -> RT.getIn(value,step),
+				(value,child) -> Utils.equals(RT.getIn(value,step),child)
+					?value:LatticeOps.assocIn(value,child,parentLattice,step));
 			lat=(lat==null)?null:lat.path(key);
-			c=(lat==null)?c.path(key):c.child(key,lat);
 		}
-		return c;
+		return (AForkableCursor<T>)c;
 	}
 }

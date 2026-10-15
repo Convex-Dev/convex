@@ -39,8 +39,8 @@ public class CursorTest {
 		Root<AInteger> root=Cursors.of(13);
 		
 		AInteger result=root.updateAndGet(v->{
-			// We can detach the root since get() works in atomic update
- 			ACursor<AInteger> tx=root.detach();
+			// A private cursor starts from this atomic attempt's input.
+			ACursor<AInteger> tx=Root.create(v);
 			v=tx.updateAndGet(vv->vv.inc());
 			v=tx.updateAndGet(vv->vv.inc());
 			return v;
@@ -175,11 +175,12 @@ public class CursorTest {
 		assertCVMEquals(5, pc.get());
 	}
 
-	@Test public void testDetachedPath() {
+	@Test public void testSnapshotCAS() {
 		AMap<Symbol,AInteger> INITIAL=Maps.of(Symbols.FOO,1);
 		Root<AInteger> root=Cursors.of(INITIAL);
 		AForkableCursor<AInteger> path=root.path(Symbols.FOO);
-		AForkableCursor<AInteger> det=path.detach();
+		AInteger baseline=path.get();
+		AForkableCursor<AInteger> det=Root.create(baseline);
 
 		// modify detached path
 		assertCVMEquals(1,det.get());
@@ -194,7 +195,7 @@ public class CursorTest {
 		// Check and merge (CAS-based)
 		AInteger NOW=det.get();
 		assertNotEquals(NOW,CVMLong.ONE); // should have changed
-		boolean merged=path.merge(det);
+		boolean merged=path.compareAndSet(baseline,det.get());
 		assertTrue(merged);
 
 		// Check update propagated to root

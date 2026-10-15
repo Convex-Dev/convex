@@ -9,10 +9,10 @@ import convex.lattice.cursor.SignedCursor;
 public final class ComponentTestSupport {
 	private ComponentTestSupport() {}
 	public static <V extends ACell> SignedCursor<V> signed(AForkableCursor<SignedData<V>> slot,
-			Ownership<V> owners, ACell owner, java.util.function.Supplier<LatticeContext> context) {
-		Signing<V> rule=owners.signingFor(owner);
+			convex.lattice.generic.AOwnerLattice<?,V,?> owners, ACell owner, java.util.function.Supplier<LatticeContext> context) {
+		convex.lattice.generic.SignedLattice<V> rule=owners.signingFor(owner);
 		if (rule==null) throw new IllegalArgumentException("Invalid owner: "+owner);
-		return SignedCursor.create(slot,rule.getValueShape(),v -> rule.sign(context.get(),v));
+		return SignedCursor.create(slot,v -> rule.sign(context.get(),v));
 	}
 	public static <V extends ACell> AForkableCursor<V> fork(AForkableCursor<V> cursor, ALattice<V> lattice) {
 		return ALatticeComponent.working(lattice,cursor,LatticeContext.EMPTY).cursor();
@@ -21,9 +21,9 @@ public final class ComponentTestSupport {
 		return cursor.updateAndGet(own -> lattice.merge(LatticeContext.EMPTY,own,other));
 	}
 	public static <V extends ACell> SignedCursor<V> signed(AForkableCursor<SignedData<V>> slot,
-			Ownership<V> owners, ACell owner, LatticeContext context) {
-		Signing<V> rule=owners.signingFor(owner);
+			convex.lattice.generic.AOwnerLattice<?,V,?> owners, ACell owner, LatticeContext context) {
+		convex.lattice.generic.SignedLattice<V> rule=owners.signingFor(owner);
 		if (rule==null) throw new IllegalArgumentException("Invalid owner: "+owner);
-		return SignedCursor.create(slot,rule.getValueShape(),v -> rule.sign(context,v));
+		return SignedCursor.create(slot,v -> rule.sign(context,v));
 	}
 }

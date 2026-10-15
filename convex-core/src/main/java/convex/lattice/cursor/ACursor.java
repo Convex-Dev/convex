@@ -7,30 +7,16 @@ import java.util.function.UnaryOperator;
 import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.lattice.LatticeOps;
-import convex.lattice.Shape;
 
 /**
  * Atomic read/write access to one immutable CVM value.
- * Paths update nested values atomically through their base cursor. An optional
- * {@link Shape} supplies missing containers. Cursors carry no lattice policy,
+ * Paths update existing nested containers atomically through their base cursor.
+ * Components construct missing containers. Cursors carry no lattice policy,
  * signing context or clock; components own those concerns.
  *
  * @param <V> Value type
  */
 public abstract class ACursor<V extends ACell> {
-
-	// ===== Shape =====
-
-	/**
-	 * Returns the empty value of this location, used to create it when a write
-	 * arrives through an absent value and supplied to update functions in place of
-	 * null. Untyped locations have no empty value.
-	 *
-	 * @return Shape of this location, never null
-	 */
-	public Shape<V> shape() {
-		return Shape.none();
-	}
 
 	// ===== Exclusive transactions =====
 
@@ -99,31 +85,28 @@ public abstract class ACursor<V extends ACell> {
 	/**
 	 * Atomically associates a value at a single key within this cursor's value.
 	 *
-	 * <p>An absent current value is created from this location's {@link #shape()};
-	 * with no shape the write throws rather than inventing a container.</p>
+	 * <p>The current value must be an existing container.</p>
 	 *
 	 * @param key Key to write at
 	 * @param value Value to associate
 	 */
 	@SuppressWarnings("unchecked")
 	public void assoc(ACell key, ACell value) {
-		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, shape(), key));
+		getAndUpdate(bv -> (V) LatticeOps.assocExisting(bv, value, key));
 	}
 
 	/**
 	 * Atomically associates a value at a nested path within this cursor's value.
 	 *
-	 * <p>An absent current value is created from this location's {@link #shape()}.
-	 * Missing intermediates below it are created only for a structural shape;
-	 * otherwise navigate with {@link #child(ACell, Shape)} so each level declares
-	 * its own empty value.</p>
+	 * <p>All intermediate containers must already exist. Components which need to
+	 * create them can supply an explicit update function or a {@link ProjectionCursor}.</p>
 	 *
 	 * @param value Value to set at the end of the path
 	 * @param keys Path of keys to navigate
 	 */
 	@SuppressWarnings("unchecked")
 	public void assocIn(ACell value, ACell... keys) {
-		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, shape(), keys));
+		getAndUpdate(bv -> (V) LatticeOps.assocExisting(bv, value, keys));
 	}
 
 	/**
@@ -181,8 +164,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * <p>The update function is applied to the current value to produce the new value.
 	 * The function may be called multiple times if concurrent updates cause CAS failures,
-	 * so it should be side-effect free. A cursor with a shape passes that shape's empty
-	 * value instead of null for an absent value.</p>
+	 * so it should be side-effect free. An absent value is passed as null.</p>
 	 *
 	 * @param updateFunction Function to compute new value from current value
 	 * @return Value before the update was applied
@@ -194,8 +176,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * <p>The update function is applied to the current value to produce the new value.
 	 * The function may be called multiple times if concurrent updates cause CAS failures,
-	 * so it should be side-effect free. A cursor with a shape passes that shape's empty
-	 * value instead of null for an absent value.</p>
+	 * so it should be side-effect free. An absent value is passed as null.</p>
 	 *
 	 * @param updateFunction Function to compute new value from current value
 	 * @return Value after the update was applied
@@ -241,48 +222,16 @@ public abstract class ACursor<V extends ACell> {
 	// ===== Navigation =====
 
 	/**
-	 * Creates a cursor navigating into a nested location within this cursor, with no
-	 * declared empty value.
+	 * Creates a cursor navigating into a nested location within this cursor.
 	 *
 	 * <p>Reading from the path cursor returns the nested value; writing to it
 	 * atomically updates this cursor's entire value with the nested change. A write
-	 * through an absent intermediate fails unless the intermediate's shape is known,
-	 * so components navigate one declared level at a time with {@link #child}.</p>
+	 * through an absent intermediate fails; components supply any construction logic.</p>
 	 *
 	 * @param <T> Type of value at the path
 	 * @param path Keys to navigate through nested data structures
 	 * @return A cursor positioned at the nested path
 	 */
 	public abstract <T extends ACell> ACursor<T> path(ACell... path);
-
-	/**
-	 * Creates a cursor at a child key, declaring the child's empty value.
-	 *
-	 * <p>This is how a component that owns a level hands out the level below it:
-	 * {@code cursor.child(KEY_FEED, FEED_LATTICE)}. The child can be created when
-	 * absent, and update functions on it receive the empty value instead of null.
-	 * This cursor's own shape is used to create this level if it is absent.</p>
-	 *
-	 * @param <T> Type of the child value
-	 * @param key Child key
-	 * @param shape Shape of the child position
-	 * @return Cursor at the child
-	 */
-	public <T extends ACell> AForkableCursor<T> child(ACell key, Shape<T> shape) {
-		return new PathCursor<>(this, new ACell[] {key}, shape);
-	}
-
-	/**
-	 * Creates a cursor at a nested path, declaring the empty value at its end. Missing
-	 * intermediates are created only for a structural shape at this cursor.
-	 *
-	 * @param <T> Type of the value at the path
-	 * @param keys Path keys
-	 * @param shape Shape of the end position
-	 * @return Cursor at the path
-	 */
-	public <T extends ACell> AForkableCursor<T> child(ACell[] keys, Shape<T> shape) {
-		return new PathCursor<>(this, keys, shape);
-	}
 
 }

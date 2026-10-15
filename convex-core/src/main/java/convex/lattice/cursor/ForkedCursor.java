@@ -5,7 +5,6 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.lattice.Shape;
 
 /**
  * An isolated value with explicit overwrite-on-sync semantics.
@@ -19,7 +18,6 @@ public class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	private final AForkableCursor<V> parent;
 	private final Root<V> localCursor;
-	private volatile V forkPoint;
 
 	/**
 	 * Creates a forked cursor from a parent.
@@ -28,19 +26,12 @@ public class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	 * @param currentValue The value at the time of fork
 	 */
 	ForkedCursor(AForkableCursor<V> parent, V currentValue) {
-		super(currentValue);
 		this.parent = parent;
-		Shape<V> shape = parent.shape();
 		this.localCursor = (parent.exclusiveLock() != null)
-			? new TransactionalRootCursor<>(currentValue, shape)
-			: new Root<>(currentValue, shape);
-		this.forkPoint = currentValue;
+			? new TransactionalRootCursor<>(currentValue)
+			: new Root<>(currentValue);
 	}
 
-	@Override
-	public Shape<V> shape() {
-		return parent.shape();
-	}
 
 	@Override
 	protected Lock exclusiveLock() {
@@ -52,7 +43,6 @@ public class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	public V sync() {
 		V snapshot=localCursor.get();
 		V published=parent.updateAndGet(ignored -> snapshot);
-		forkPoint=published;
 		// A destination view may prepare the value (e.g. stamp it). Adopt that
 		// result only while the local snapshot is unchanged; newer edits stay pending.
 		localCursor.compareAndSet(snapshot,published);
@@ -101,12 +91,4 @@ public class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 		return localCursor.accumulateAndGet(x, accumulatorFunction);
 	}
 
-	/**
-	 * Gets the value at the time this cursor was forked.
-	 *
-	 * @return The fork point value
-	 */
-	public V getForkPoint() {
-		return forkPoint;
-	}
 }

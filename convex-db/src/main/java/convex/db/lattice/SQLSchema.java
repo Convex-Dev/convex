@@ -57,7 +57,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 */
 	public static SQLSchema create() {
 		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
-			Cursors.root(TableStoreLattice.INSTANCE);
+			Cursors.root(TableStoreLattice.INSTANCE.zero());
 		return new SQLSchema(cursor);
 	}
 
@@ -77,7 +77,11 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Forked SQLSchema instance
 	 */
 	public SQLSchema fork() {
-		return configured(new SQLSchema(forkCursor(TableStoreLattice.INSTANCE)));
+		return configured(new SQLSchema(this));
+	}
+
+	private SQLSchema(SQLSchema source) {
+		super(TableStoreLattice.INSTANCE,source.cursor);
 	}
 
 	// ========== Internal Helpers ==========
@@ -90,7 +94,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Gets a cursor-backed table by name, returning null if not found.
 	 */
 	public SQLTable getTable(AString name) {
-		AForkableCursor<AVector<ACell>> tableCursor = cursor.child(name, SQLTableLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> tableCursor = resolve(cursor,TableStoreLattice.INSTANCE,name);
 		if (tableCursor.get() == null) return null;
 		return configured(new SQLTable(tableCursor));
 	}
@@ -195,7 +199,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		}
 
 		// Set state on the table's cursor path
-		AForkableCursor<AVector<ACell>> tableCursor = cursor.child(name, SQLTableLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> tableCursor = resolve(cursor,TableStoreLattice.INSTANCE,name);
 		tableCursor.set(SQLTable.createState((AVector<AVector<ACell>>) schema, now()));
 		return true;
 	}
@@ -207,7 +211,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	public boolean dropTable(AString name) {
 		if (getLiveTable(name) == null) return false;
-		AForkableCursor<AVector<ACell>> tableCursor = cursor.child(name, SQLTableLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> tableCursor = resolve(cursor,TableStoreLattice.INSTANCE,name);
 		tableCursor.set(SQLTable.createTombstoneState(now()));
 		return true;
 	}

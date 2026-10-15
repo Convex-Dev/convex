@@ -47,7 +47,7 @@ public class LatticeKVTest {
 	@Test
 	public void testInjectedTimestamp() {
 		CVMLong fixed = CVMLong.create(123456789L);
-		var cursor = Cursors.root(KVStoreLattice.INSTANCE);
+		var cursor = Cursors.root(KVStoreLattice.INSTANCE.zero());
 
 		LatticeKV kv = LatticeKV.connect(cursor);
 		kv.setContext(LatticeContext.create(fixed,null));

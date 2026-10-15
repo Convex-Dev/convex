@@ -29,7 +29,7 @@ public class DLFSLocalPersistenceTest {
 
 	@Test
 	public void testCheckpointReusedAfterUnrelatedRootChange() throws Exception {
-		var cursor=Cursors.root(DLFSLattice.INSTANCE);
+		var cursor=Cursors.root(DLFSLattice.INSTANCE.zero());
 		var other=new DLFSLocal(DLFS.provider(),"other",cursor);
 		AtomicInteger checkpoints=new AtomicInteger();
 		var fileSystem=new DLFSLocal(DLFS.provider(),"writer",cursor) {
@@ -49,7 +49,7 @@ public class DLFSLocalPersistenceTest {
 
 	@Test
 	public void testCheckpointRecomputedAfterSameFileChange() throws Exception {
-		var cursor=Cursors.root(DLFSLattice.INSTANCE);
+		var cursor=Cursors.root(DLFSLattice.INSTANCE.zero());
 		var other=new DLFSLocal(DLFS.provider(),"other",cursor);
 		AtomicInteger checkpoints=new AtomicInteger();
 		var fileSystem=new DLFSLocal(DLFS.provider(),"writer",cursor) {
@@ -72,7 +72,7 @@ public class DLFSLocalPersistenceTest {
 
 	@Test
 	public void testCheckpointFailureDoesNotInstallFileUpdate() throws Exception {
-		var cursor=Cursors.root(DLFSLattice.INSTANCE);
+		var cursor=Cursors.root(DLFSLattice.INSTANCE.zero());
 		var fileSystem=new DLFSLocal(DLFS.provider(),"writer",cursor) {
 			@Override protected ABlob checkpointBlob(ABlob data) throws IOException {
 				throw new IOException("checkpoint failed");
@@ -106,7 +106,7 @@ public class DLFSLocalPersistenceTest {
 	public void testStoreCheckpointPreservesLogicalValue() throws Exception {
 		ABlob data=testBlob();
 		try (EtchStore store=EtchStore.createTemp("dlfs-checkpoint-contract")) {
-			var cursor=Cursors.root(DLFSLattice.INSTANCE);
+			var cursor=Cursors.root(DLFSLattice.INSTANCE.zero());
 			DLFSLocal fileSystem=DLFSLocal.create(DLFS.provider(),"contract",cursor,store);
 			Hash rootHash=fileSystem.getRootHash();
 

@@ -12,6 +12,7 @@ import convex.core.store.AStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
+import convex.lattice.cursor.PublishingCursor;
 
 /**
  * Generic store-backed root for a lattice application component hierarchy.
@@ -44,20 +45,24 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	private volatile boolean applicationsConfigured;
 
 	/**
-	 * Creates a store-backed host around an existing root cursor.
+	 * Creates a store-backed host around existing atomic storage.
+	 *
+	 * <p>Use {@link #cursor()} for components whose sync should reach this host.
+	 * The supplied storage remains usable for atomic reads and writes, but its
+	 * own sync has no publication callback.</p>
 	 *
 	 * @param lattice Root lattice, the complete merge for the hosted value
 	 * @param cursor Root cursor holding the hosted value
 	 * @param store Host store
 	 */
 	public RootComponent(ALattice<V> lattice, Root<V> cursor, AStore store) {
-		super(cursor);
+		super(new PublishingCursor<>(cursor));
 		this.lattice=Objects.requireNonNull(lattice,"Root lattice must not be null");
 		this.store=Objects.requireNonNull(store,"Root store must not be null");
 		applications=List.of();
 		// Configured applications own acceptance. A racing application publication
 		// must not be undone or expanded by the host's different merge strategy.
-		cursor.onSync(this::publishRoot,(current,published) -> applicationsConfigured
+		cursor().onSync(this::publishRoot,(current,published) -> applicationsConfigured
 			?current:lattice.merge(getContext(),current,published));
 	}
 
@@ -68,7 +73,7 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	/** Creates a standalone local root with an explicit initial value. */
 	public static <V extends ACell> RootComponent<V> create(ALattice<V> lattice, V initialValue, AStore store) {
-		return new RootComponent<>(lattice,Cursors.root(initialValue,lattice),store);
+		return new RootComponent<>(lattice,Cursors.root(initialValue),store);
 	}
 
 	/**
@@ -172,8 +177,8 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	/** Returns the hosted root cursor with its exact static type. */
 	@Override
-	public Root<V> cursor() {
-		return (Root<V>) cursor;
+	public PublishingCursor<V> cursor() {
+		return (PublishingCursor<V>) cursor;
 	}
 
 	/**

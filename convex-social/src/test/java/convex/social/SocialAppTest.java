@@ -56,7 +56,7 @@ public class SocialAppTest {
 	/** A containing component at the root level, as an application would be. */
 	private static class TestRoot extends ALatticeComponent<Index<Keyword, ACell>> {
 		TestRoot(KeyedLattice lattice) {
-			super(Cursors.root(lattice));
+			super(Cursors.root(lattice.zero()));
 		}
 	}
 
@@ -300,6 +300,34 @@ public class SocialAppTest {
 	}
 
 	@Test
+	public void testForkPublicationUsesItsCurrentSigningContext() {
+		AKeyPair key=AKeyPair.createSeeded(7421);
+		Social live=Social.create(LatticeContext.create(CVMLong.create(100),key));
+		live.user(key.getAccountKey()).feed().post("Baseline");
+		Social fork=live.fork();
+		AtomicInteger signatures=new AtomicInteger();
+		fork.setContext(new LatticeContext() {
+			@Override public CVMLong getTimestamp() { return CVMLong.create(200); }
+			@Override public AKeyPair getSigningKey() { return key; }
+			@Override public <T extends ACell> SignedData<T> sign(AccountKey account,T value) {
+				signatures.incrementAndGet();
+				return super.sign(account,value);
+			}
+		});
+		fork.user(key.getAccountKey()).feed().post("Local edit");
+		live.setContext(LatticeContext.create(CVMLong.create(300),key));
+		live.user(key.getAccountKey()).feed().post("Concurrent destination edit");
+		signatures.set(0);
+
+		fork.sync();
+
+		assertEquals(1,signatures.get(),"Publication must use the fork's current signer");
+		assertEquals(3,live.user(key.getAccountKey()).feed().count());
+		assertEquals(live.cursor().get(),fork.cursor().get());
+		assertTrue(live.cursor().get().get(DID.forKey(key.getAccountKey())).checkSignature());
+	}
+
+	@Test
 	@SuppressWarnings("unchecked")
 	public void testUserForkBatchedValueSurvivesEncodingRoundTrip() throws Exception {
 		AKeyPair alice=AKeyPair.generate();
@@ -332,7 +360,7 @@ public class SocialAppTest {
 
 		// Simulate a root lattice with :social
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		AForkableCursor<?> rootCursor = Cursors.root(root);
+		AForkableCursor<?> rootCursor = Cursors.root(root.zero());
 
 		Social social = Social.connect(rootCursor, kp);
 
@@ -349,7 +377,7 @@ public class SocialAppTest {
 		AKeyPair kp = AKeyPair.generate();
 
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		AForkableCursor<?> rootCursor = Cursors.root(root);
+		AForkableCursor<?> rootCursor = Cursors.root(root.zero());
 
 		Social social = Social.connect(rootCursor, kp);
 		social.user(kp.getAccountKey()).feed().post("Propagated");

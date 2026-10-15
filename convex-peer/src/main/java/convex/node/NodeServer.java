@@ -63,7 +63,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final ALattice<V> lattice;
 	private final AStore store;
 	private final NodeConfig config;
-	private final Root<V> cursor;
+	private final convex.lattice.cursor.PublishingCursor<V> cursor;
 	private final RootComponent<V> rootComponent;
 	/** Immutable snapshots let publication proceed independently of group removal. */
 	private volatile List<LatticePropagator> propagators=List.of();
@@ -103,10 +103,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.config=(config==null) ? NodeConfig.create() : config;
 		this.mergeContext=LatticeContext.EMPTY.withMaxFutureTimestampSkew(
 			this.config.getMaxFutureTimestampSkew());
-		this.cursor=this.config.isTransactionalRoot()
-			? Cursors.transactionalRoot(lattice.zero(), lattice)
-			: Cursors.root(lattice.zero(), lattice);
-		this.rootComponent=new RootComponent<>(lattice,cursor,store);
+		Root<V> storage=this.config.isTransactionalRoot()
+			? Cursors.transactionalRoot(lattice.zero())
+			: Cursors.root(lattice.zero());
+		this.rootComponent=new RootComponent<>(lattice,storage,store);
+		this.cursor=rootComponent.cursor();
 		rootComponent.setContext(mergeContext);
 	}
 

@@ -48,7 +48,7 @@ public class ApplicationPublicationTest {
 
 	private static final class InterleavingRoot extends Root<Index<Keyword,ACell>> {
 		Runnable beforeCAS;
-		InterleavingRoot() { super(initial(),LATTICE); }
+		InterleavingRoot() { super(initial()); }
 		@Override public boolean compareAndSet(Index<Keyword,ACell> expected,Index<Keyword,ACell> value) {
 			Runnable action=beforeCAS;
 			beforeCAS=null;

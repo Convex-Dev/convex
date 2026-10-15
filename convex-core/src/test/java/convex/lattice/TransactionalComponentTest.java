@@ -274,9 +274,10 @@ class TransactionalComponentTest {
 		for (boolean coordinated:new boolean[]{false,true}) {
 			var root=coordinated?new TransactionalRootCursor<>(initial())
 				:new Root<>(initial());
-			assertEquals(coordinated,root.view().supportsExclusiveTransactions());
+			var publication=new convex.lattice.cursor.PublishingCursor<>(root);
+			assertEquals(coordinated,publication.supportsExclusiveTransactions());
 			assertEquals(coordinated,root.path(COUNT).supportsExclusiveTransactions());
-			assertEquals(coordinated,root.view().fork().supportsExclusiveTransactions());
+			assertEquals(coordinated,publication.fork().supportsExclusiveTransactions());
 		}
 	}
 

@@ -8,21 +8,14 @@ import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.lattice.LatticeOps;
-import convex.lattice.Shape;
 
 /**
  * A cursor that navigates to a path within a base cursor's value.
  *
- * <p>Reads resolve the nested value; updates are reflected in the base cursor
- * atomically, rebuilding the value above with {@link LatticeOps#assocIn}. The base
- * cursor's {@link ACursor#shape() shape} creates the base value when a write
- * arrives through an absent one, and this cursor's own shape supplies update
- * functions with an empty value instead of null. The transactional write lock is
- * obtained from the base cursor.</p>
- *
- * <p>A path cursor with no shape is plain structural navigation: a write through an
- * absent intermediate fails rather than inventing a container. Components navigate
- * one declared level at a time with {@link ACursor#child(ACell, Shape)}.</p>
+ * <p>Reads resolve the nested value; updates rebuild existing ancestors atomically.
+ * A write through a missing container fails. Update functions receive the actual
+ * value, including null; components supply any defaults or construction logic.
+ * The transactional write lock is obtained from the base cursor.</p>
  *
  * @param <V> Type of cursor values at the path location
  */
@@ -30,27 +23,15 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 
 	private final ACursor<ACell> base;
 	private final ACell[] path;
-	private final Shape<V> shape;
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public PathCursor(ACursor<?> base, ACell[] path, Shape<V> shape) {
-		super((V) RT.getIn(base.get(), path));
+	public PathCursor(ACursor<?> base, ACell... path) {
 		this.base=(ACursor)base;
 		this.path=path.clone();
-		this.shape=(shape==null)?Shape.none():shape;
-	}
-
-	public PathCursor(ACursor<?> base, ACell... path) {
-		this(base,path,null);
 	}
 
 	public static <T extends ACell, V extends ACell> PathCursor<T> create(ACursor<V> base, ACell[] path) {
 		return new PathCursor<>(base,path);
-	}
-
-	@Override
-	public Shape<V> shape() {
-		return shape;
 	}
 
 
@@ -60,8 +41,9 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	}
 
 	/**
-	 * Propagates towards the root through the base cursor: a forked base converges
-	 * with its parent, a live base reaches root publication.
+	 * Propagates towards the root through the base cursor: a raw fork overwrites
+	 * its destination, component working state reconciles with its destination,
+	 * and a live base reaches root publication.
 	 */
 	@Override
 	public V sync() {
@@ -74,21 +56,17 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	}
 
 	/**
-	 * AssocIn through the path. The base's shape creates an absent base value;
-	 * missing intermediates below it are created only for a structural shape.
+	 * Associates through existing containers only.
 	 */
 	private ACell assocIn(ACell bv, ACell newValue) {
-		return LatticeOps.assocIn(bv, newValue, base.shape(), path);
+		return LatticeOps.assocExisting(bv, newValue, path);
 	}
 
 	/**
-	 * Returns the value at the path, substituting this cursor's empty value for null
-	 * so update functions need no null guards for a declared position.
+	 * Returns the actual value at the path, including null.
 	 */
 	private V getValueForUpdate(ACell bv) {
-		V value = RT.getIn(bv, path);
-		if (value == null) return shape.zero();
-		return value;
+		return RT.getIn(bv, path);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -109,13 +87,6 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 		return (V) RT.getIn(oldBase, path);
 	}
 
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The update function receives this cursor's empty value instead of null for an
-	 * absent value, so {@code get()} may return null while the update function sees an
-	 * empty container.</p>
-	 */
 	@SuppressWarnings("unchecked")
 	@Override
 	public V getAndUpdate(UnaryOperator<V> updateFunction) {
@@ -127,13 +98,6 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 		return (V) RT.getIn(oldBase, path);
 	}
 
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The update function receives this cursor's empty value instead of null for an
-	 * absent value, so {@code get()} may return null while the update function sees an
-	 * empty container.</p>
-	 */
 	@SuppressWarnings("unchecked")
 	@Override
 	public V updateAndGet(UnaryOperator<V> updateFunction) {

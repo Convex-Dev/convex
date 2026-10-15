@@ -10,7 +10,6 @@ import convex.core.data.SignedData;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.Ownership;
 
 /**
  * Shared machinery for maps of owner identities to signed values.
@@ -26,7 +25,7 @@ import convex.lattice.Ownership;
  * @param <M> Concrete map type
  */
 public abstract class AOwnerLattice<K extends ACell, V extends ACell,
-		M extends AMap<K, SignedData<V>>> extends ALattice<M> implements Ownership<V> {
+		M extends AMap<K, SignedData<V>>> extends ALattice<M> {
 
 	protected final SignedLattice<V> signedLattice;
 	private final BiPredicate<? super K, ? super AccountKey> ownerVerifier;
@@ -101,7 +100,6 @@ public abstract class AOwnerLattice<K extends ACell, V extends ACell,
 	 * @param key Owner key, in any representation this lattice resolves
 	 * @return Owner-bound signed lattice, or null if the key is not a valid owner
 	 */
-	@Override
 	public SignedLattice<V> signingFor(ACell key) {
 		K owner=ownerKey(key);
 		if (owner==null) return null;

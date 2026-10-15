@@ -1,232 +1,155 @@
 # Lattice Cursor Design
 
-Cursors are mutable references to immutable CVM values with atomic updates. They give
-applications a fork-and-sync model over lattice data: fork a working copy, make several
-updates, then sync back through a lattice merge, with signing and timestamping applied
-by the cursor the owning component wraps around the boundary. The cursor model is
-specified in [CAD035](https://docs.convex.world/docs/cad/cursors); this document
-explains the class hierarchy and the design choices in `convex.lattice.cursor`.
+Cursors provide atomic access to immutable CVM values. Components own lattice
+structure, merge policy, signing policy and publication. Cursors carry no lattice,
+shape, context or store, and do not construct missing containers.
 
-Component-owned working state and batched signing are described in
-[LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md). They use existing cursor
-operations. Independent component boundaries specialise only their private root's
-`sync()` to run component-owned CAS reconciliation; ordinary atomic updates are
-unchanged. Hosts still use `Root.onSync` for persistence and propagation.
-CAD035 still describes the earlier lattice-aware hierarchy and needs updating
-before this branch's design is normative.
-
-## Key points
-
-- Cursors know nothing about lattices. A cursor is a location with atomic update,
-  navigation and an inherited write-policy context. Everything a lattice would supply
-  arrives as a parameter from the component that owns the level: the `Shape` of a
-  child position, the `Merge` of a fork, the `Signing` or `Stamping` rule of a
-  boundary. Every `ALattice` implements `Shape` and `Merge`, so a component passes
-  its declared lattice wherever a cursor asks for one.
-- `path(keys...)` is plain navigation. `child(key, shape)` is navigation that declares
-  the empty value of the child position, so a write can create it when absent and an
-  update function receives `shape.zero()` instead of null. Components navigate one
-  declared level at a time; `ALatticeApplication.resolve(path)` walks the root
-  lattice to do this for a whole region path.
-- Writes never promote `null` to a map silently. The base shape creates an absent
-  base value; a missing intermediate below it is created only for a structural shape
-  (JSON-like data) and otherwise throws.
-- `fork(merge)` takes the merge function at fork time, so `sync()` converges with the
-  parent however it has moved. `fork()` without one is write-back and overwrites a
-  parent that changed in between; use it only where no concurrent writer exists.
-  `AForkableCursor.merge(detached)` is a CAS that can fail.
-- Navigation never inserts write interceptors. The component that owns an owner-keyed
-  or stamped level wraps its cursor with `SignedCursor.forOwner` or
-  `StampedCursor.create`, passing the lattice it declares, so authoring uses exactly
-  the rule the host verifies with. A plain write through a signed envelope is refused.
-- Every write is prepared exactly once per logical write, not once per CAS retry, so
-  signing that reaches a wallet or remote signer is not repeated under contention.
-- Hosts attach at the root: `Root.onSync(publish, merge)` installs the publication
-  callback and the merge used when a write lands during publication. No cursor
-  carries a store or a lattice.
-- Ordinary root updates use `AtomicReference`; sync callbacks are serialised per
-  root, while transactional roots additionally coordinate writes. Immutable values
-  make concurrent reads safe. Sync follows the supplied merge's conflict rules,
-  including directional ties and signing constraints.
+This document describes the current implementation. CAD035 describes an earlier
+lattice-aware hierarchy and needs updating before this branch's design is normative.
+See [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md) for application assembly,
+component-owned working state and batched signing.
 
 ## Class hierarchy
 
+```text
+ACursor<V>                                get / atomic update / path
+└── AForkableCursor<V>                    fork / sync
+    ├── Root<V>                           atomic value holder
+    │   └── TransactionalRootCursor<V>    opt-in coordinated writes
+    ├── PublishingCursor<V>               optional host publication over supplied storage
+    ├── PathCursor<V>                     navigation through existing containers
+    ├── ProjectionCursor<S,V>             caller-supplied read/write functions
+    ├── ForkedCursor<V>                   private copy; explicit overwrite on sync
+    ├── TransactionCursor<V>              draft confined to a transaction callback
+    └── AUpdateCursor<V,S>                prepare-on-write machinery
+        ├── StampedCursor<V>              explicit clock and stamp function
+        └── SignedCursor<V>               explicit signing function
+AView<T>                                  read-only cursor views
+Transactions                              optimistic and locked subtree transactions
 ```
-ACursor<V>                                 get / atomic update / path / child / context
-└── AForkableCursor<V>                     fork(merge) / sync / detach / CAS merge
-    ├── Root<V>                            atomic value holder; host seam onSync(publish, merge)
-    │   └── TransactionalRootCursor<V>     root with a write lock for exclusive transactions
-    ├── RootCursorView<V>                  live view of a root with its own context override
-    ├── PathCursor<V>                      navigated into a sub-path, optionally with a shape
-    ├── ForkedCursor<V>                    independent working copy with its merge function
-    ├── TransactionCursor<V>               private draft confined to one transaction callback
-    └── AUpdateCursor<V,S>                 prepare-on-write funnel
-        ├── StampedCursor<V>               same type: stamp timestamp on write
-        └── SignedCursor<V>                SignedData<V> to V: sign on write
-AView<T>                                   read-only views (TimeCache, Transformer)
-Transactions                               optimistic and locked subtree transactions
-```
 
-The interfaces a cursor accepts live in `convex.lattice` beside `LatticeContext`:
-`Shape<V>` (`zero()`, `isStructural()`), `Merge<V>` (`merge(context, own, other)`),
-`Signing<V>` (sign for an owner), `Ownership<V>` (the signing rule for one owner's slot)
-and `Stamping<V>` (inject a timestamp). The cursor package imports nothing else from the
-lattice packages.
+There are no `Merge`, `Ownership`, `Signing`, `Stamping` or `Shape` interfaces.
+Lattice classes retain their domain methods directly. Specialised cursors accept
+ordinary Java functions supplied by their owning components.
 
-## Operations
+## Atomic operations and paths
 
-| Operation | Level | Description |
-|---|---|---|
-| `get()`, `set(v)`, `compareAndSet`, `updateAndGet(fn)` | `ACursor` | Atomic value access |
-| `assoc(key, v)`, `assocIn(v, keys...)` | `ACursor` | Nested writes, creating the base from its shape |
-| `path(keys...)` | `ACursor` | Navigate with canonical keys, no shape |
-| `child(key, shape)` | `ACursor` | Navigate one level, declaring the child's empty value |
-| `shape()`, `getContext()`, `setContext(ctx)` | `ACursor` | Position shape and write policy |
-| `fork(merge)`, `fork()`, `sync()` | `AForkableCursor` | Working copy; converge into the parent |
-| `merge(merge, v)` | `AForkableCursor` | Merge an external value into this position |
-| `onSync(publish, merge)`, `sync(callback)`, `view()` | `Root` | Host publication seam and live views |
-| `Transactions.transact(cursor, fn)`, `transactLocked` | `Transactions` | Atomic subtree transactions over a draft cursor |
+`get`, `set`, `getAndSet`, `compareAndSet`, `getAndUpdate`, `updateAndGet`,
+`getAndAccumulate` and `accumulateAndGet` operate on one immutable value. Update
+callbacks may retry and must be side-effect free. They receive the actual current
+value, including `null`; no empty value is substituted.
 
-### Writes
+`path(keys...)` creates a view without changing state. Reads use `RT.getIn`; writes
+use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. All
+intermediate containers must already exist. An absent final value can be replaced,
+but writing through an absent container throws. `assoc` and `assocIn` follow the same
+rule. A plain path write through a signed envelope is refused.
 
-`LatticeOps.assocIn` is the shared engine for nested writes and decides how to create a
-missing container at each depth:
+Root CAS uses reference identity. Path, projection and signing views compare the
+view by value equality, then make one CAS attempt against the observed underlying
+value. A concurrent source change can therefore make their CAS fail even when it
+changed an unrelated field. Atomic update operations retry as needed.
 
-- **At the base**: `shape.zero()` supplies the correctly typed empty container, for
-  example an `Index` rather than a hash map; a shape with no zero throws.
-- **Below the base, structural shape** (`isStructural()`, such as `JSONLattice`): the
-  container is chosen from the key shape (integer to vector, string to map, keyword or
-  blob to index), which lets deep writes work below a whole-value leaf without a
-  declared type hierarchy.
-- **Below the base, otherwise**: throw. Only the component owning that level knows its
-  type, so it navigates with `child` and the level creates itself.
-- **Signed envelope** anywhere on the path: throw. A signature covers its value, so
-  nothing is written through it except by the owning component's `SignedCursor`.
+Multi-key paths use one `PathCursor`. External key conversion remains a lattice or
+component concern; cursors accept canonical CVM keys.
 
-Writes are copy-on-change: a level whose child did not change is returned by reference,
-so a no-op write allocates nothing.
+## Component-supplied construction
 
-### Navigation
-
-A `PathCursor` reads through `getIn` and writes through `assocIn` on its base. Multiple
-keys collapse into one cursor, so a navigation such as `[:fs owner]` costs one `getIn`
-per read rather than a chain of cursors. Context and the transactional write lock are
-inherited from the base live.
-
-| Operation | With a shape (`child`) | Without one (`path`) |
-|---|---|---|
-| Update function argument | `shape.zero()` in place of null | null |
-| Creating this level when absent | From the base's shape | From the base's shape |
-| Creating levels below | Structural shapes only | Structural shapes only |
-
-External keys (JSON strings, hex, decimal) are canonicalised by the lattice, not the
-cursor: `cursor.path(lattice.resolvePath(keys))`.
-
-## Forks and sync
-
-A `ForkedCursor` holds a local `Root` plus the parent, the fork point and the merge
-function it was created with. `sync()` is `parent.updateAndGet`: if the parent still
-holds the fork point the fork's value is installed directly; otherwise the two values
-are merged with the fork's local edits in the `own` position, so a local edit wins a
-timestamp tie against a concurrent parent advance. The fork then adopts the synced
-value by CAS and, if a concurrent write landed on the fork meanwhile, merges it with the
-fork's current state as `own`. Forks stay usable after sync for incremental work.
-
-`sync()` on a live cursor propagates to the root, where the host's publication callback
-runs under the root's sync lock. A fork's sync never reaches that callback: the host
-calls `root.sync()` explicitly when the merged state should be published.
-
-## Write interception
-
-Some levels must transform a value on the way in: sign it, or stamp it with the
-context timestamp. `AUpdateCursor<V, S>` wraps a base cursor holding the stored type
-`S`, presents the view type `V`, and implements every atomic operation and `sync()`
-through two hooks:
-
-- `prepareWrite(V) -> S` authors the stored cell; it may consult the `LatticeContext`
-  and may throw to enforce a precondition.
-- `view(S) -> V` reads a stored cell back; identity unless the boundary changes type.
-
-Two rules hold for every subclass. A write that leaves the view unchanged keeps the
-current cell, so an unchanged value keeps its signature or timestamp. And preparation
-happens once per logical write: the retry loop re-invokes the update function under
-contention, but a fixed value is prepared exactly once and a computed value is
-re-prepared only if a retry genuinely produces a different one.
-
-| Cursor | Stored type | `prepareWrite` | `view` | `merge(merge, v)` |
-|---|---|---|---|---|
-| `StampedCursor<V>` | `V` | inject timestamp | identity | install the merge result unstamped |
-| `SignedCursor<V>` | `SignedData<V>` | sign as the bound owner | `getValue` | merge the unsigned values, re-sign |
-
-`SignedCursor` is the enforcement point for authorship. A write asks its `Signing` rule
-for a signer authorised for the bound owner and throws `IllegalStateException` if there
-is none. The rule comes from the owner lattice's `Ownership.signingFor(owner)`, which
-is the same rule the lattice applies to data arriving on merge, so local state is never
-written in a form a peer would reject.
-
-Boundaries are placed by components, not discovered by navigation. The component that
-owns an owner-keyed level wraps each owner's slot with
-`SignedCursor.forOwner(slot, owners, owner)`; the component that owns a stamped level
-wraps it with `StampedCursor.create(base, stamping)`. Lattices declare these rules and
-construct no cursors. Forking below a boundary stores the view type locally and the
-boundary re-applies `prepareWrite` on `sync()`.
-
-## Examples
+A component can use `ProjectionCursor.create(source, read, write)` to expose a child
+without requiring existing containers. The cursor only executes the supplied
+functions; the component's write function chooses what to construct:
 
 ```java
-// Fork, modify, sync
-SetLattice<ACell> lattice = SetLattice.create();
-Root<ASet<ACell>> root = Cursors.root(lattice);           // at the lattice's zero value
-AForkableCursor<ASet<ACell>> fork = root.fork(lattice);
-fork.updateAndGet(s -> s.include(item1));
-fork.updateAndGet(s -> s.include(item2));
-fork.sync();                                              // root now contains both items
-
-// Concurrent forks converge via the merge function
-AForkableCursor<ASet<ACell>> f1 = root.fork(lattice), f2 = root.fork(lattice);
-f1.updateAndGet(s -> s.include(a));
-f2.updateAndGet(s -> s.include(b));
-f1.sync(); f2.sync();                                     // root has a and b (set union)
-
-// A component crosses an owner boundary, then batches with deferred signing
-AForkableCursor<AHashMap<AString,AVector<ACell>>> drives = SignedCursor.forOwner(
-    app.resolve(Keywords.FS).path(ownerKey),              // region by the root lattice, owner slot
-    DLFSRegion.LATTICE, ownerKey);                        // the owner rule the host verifies with
-AForkableCursor<AVector<ACell>> drive = drives.child(driveName, DLFSLattice.INSTANCE);
-AForkableCursor<AVector<ACell>> work = drive.fork(DLFSLattice.INSTANCE);
-work.updateAndGet(state -> addFile(state, "a.txt"));     // local, unsigned
-work.updateAndGet(state -> addFile(state, "b.txt"));
-work.sync();                                              // signs once, merges into parent
+var child = ProjectionCursor.create(source,
+    parent -> parent == null ? null : parent.get(KEY_CHILD),
+    (parent, value) -> {
+        ACell previous = parent == null ? null : parent.get(KEY_CHILD);
+        if (Utils.equals(previous, value)) return parent;
+        return (parent == null ? PARENT_LATTICE.zero() : parent)
+            .assoc(KEY_CHILD, value);
+    });
 ```
 
-## Design decisions
+The functions must be pure, preserve unrelated source state, and obey the view
+contract: reading a written value returns that value, and writing the current view
+back leaves the source unchanged by value equality. Construction and the child edit
+commit in the same atomic source update. Exceptions commit nothing. Obtaining a view
+or reading it has no state-changing effects.
 
-| Question | Decision |
-|---|---|
-| Does a cursor carry its lattice? | No. A cursor knows its position's shape, its context and, for a fork, its merge function, all supplied by the owning component. Lattices define domain structure; components encode it; cursors move and update values. |
-| `path()` or `child(key, shape)`? | Both. `path` is plain navigation; `child` declares the one thing a write through an absent child needs, its empty value. Applications walk the root lattice with `resolve(path)` to declare a whole region path. |
-| `assoc`/`assocIn` or `set(value, path...)`? | `assoc` forms, mirroring `RT.assoc`, avoiding overload ambiguity with `set(V)` and never promoting null silently. |
-| `sync()` or CAS merge? | Both exist; `sync()` on a fork created with a merge function always succeeds, like a filesystem sync. Root publication absorbs a write that races it only through the merge the host installs with `onSync`; with none installed that race fails rather than overwriting. |
-| Where do signing and stamping live? | In `AUpdateCursor` subclasses that the owning component wraps around its cursor. Lattices declare the rule and construct no cursors; navigation inserts nothing. |
-| Collapse multi-key paths? | Yes, to avoid intermediate cursors and merges; break only where a component declares a level. |
-| What does the base class know? | Get, atomic update, navigation and write policy at one location, nothing else. Persistence, durability and publication are host concerns attached at the root through `onSync`; no cursor carries a store. |
-| Root-owned services such as the transactional write lock? | One protected `exclusiveLock()` hook on `ACursor`, resolved through existing parent links and supplied only by `TransactionalRootCursor`. Views and plain cursors never see it, and there is no capability bundle on `ACursor`. |
-| Where do transactions live? | `Transactions` runs a callback against a private draft cursor and commits by CAS, with locked fallback on a transactional root. Typed domain transactions build on it in `TransactionalComponent`. |
+`ALatticeComponent.resolve(cursor, lattice, path...)` supplies such functions one
+level at a time using the component's lattice. Its write functions use
+`LatticeOps.assocIn` to construct an absent container from the lattice's zero.
+Unknown missing container types fail; keys never determine container types.
+JSON components supply their own map or vector construction functions. No-op writes do not materialise ancestors.
+Owner envelopes still require an explicit signing boundary.
 
-## Where the code lives
+Standalone components initialise their roots explicitly:
 
-- `convex.lattice.cursor` — every class in the hierarchy above, plus `Cursors`
-  factories and `TimeCache`/`Transformer` views.
-- `convex.lattice.Shape`, `Merge`, `Signing`, `Ownership`, `Stamping` — the interfaces
-  cursors accept, implemented by `ALattice` and the generic lattices.
-- `convex.lattice.LatticeOps` — the nested-write engine.
-- `convex.lattice.LatticeContext` — signing, timestamps and owner verification.
-- `convex.lattice.ALatticeComponent`, `ALatticeApplication`, `RootComponent` — the
-  components that declare structure to cursors and host the root.
+```java
+Root<ASet<ACell>> root = Cursors.root(lattice.zero());
+root.updateAndGet(values -> values.include(item));
+```
 
-## Related
+## Forks, transactions and publication
 
-- [CAD035 Lattice Cursors](https://docs.convex.world/docs/cad/cursors) — cursor model and guarantees.
-- [CAD024 Data Lattice](https://docs.convex.world/docs/cad/data_lattice) — merge properties and merge context.
-- [CAD038 Lattice Authorisation](https://docs.convex.world/docs/cad/lattice_auth) — signer authorisation at the merge boundary.
-- [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md) — building components over cursors.
+A raw `fork()` holds an independent root and a destination cursor. Its `sync()`
+overwrites that destination with the local snapshot; it performs no lattice merge.
+A prepared destination value is adopted locally by CAS only if the local snapshot
+has not changed meanwhile. Newer local edits remain pending. For an independent
+snapshot use `Root.create(cursor.get())`; atomic multi-step edits use `Transactions`.
+Cursors retain no creation-time baseline.
+
+Use component working state for CAS-or-merge publication. The component retains
+its destination and baseline, reconciles with its own lattice and context, and
+publishes through cursor operations. Generic cursors know nothing of that policy.
+
+Live view `sync()` follows its source towards its publication boundary. A host
+wraps storage with `PublishingCursor` and installs a callback and a plain binary
+reconciliation function using `onSync(publish, merge)`. Only the wrapper allocates
+a sync lock. Callbacks are serialised; writes delegate directly to storage, including
+its optional transaction lock. `Root.sync()` simply returns the current value.
+`RootComponent.cursor()` supplies the host wrapper; use it when descendants need
+to reach host publication. No cursor starts a worker or timer.
+
+`Transactions` runs a synchronous callback against a private draft and commits by
+CAS, preserving each operation under contention. `TransactionalRootCursor` opts
+into a shared write lock for explicit locked execution and contention fallback.
+Derived views forward that lock through their existing source links. Typed domain
+transactions use `TransactionalComponent.withCursor` to retain component policy.
+
+## Signing and stamping composition
+
+Components can opt into authoring every changed write through a wrapper:
+
+```java
+var rule = owners.signingFor(owner);
+var unsigned = SignedCursor.create(slot, value -> rule.sign(context, value));
+var edits = StampedCursor.create(storage, context::currentTimestamp, lattice::stamp);
+```
+
+`AUpdateCursor` applies authoring to all atomic operations. Unchanged views preserve
+the existing stored value. Prepared signatures are reused while retries request the
+same value; a genuinely different payload must be signed again. `StampedCursor`
+resolves its clock once per changed operation, reusing that timestamp across retries.
+Writes through descendant views pass through the same authoring boundary atomically.
+
+`SignedCursor` unwraps `SignedData` on reads and uses the bound function on writes.
+A null signing result fails the write. The component binds the owner lattice's rule
+so local authoring uses the same authorisation as incoming verification.
+
+`StampedCursor` preserves the value type and injects the supplied timestamp. It
+cannot distinguish local edits from incoming state: the component retains the
+underlying cursor when incoming merges must preserve their original timestamps.
+Neither wrapper merges values or controls publication timing. Use `SignedComponent`
+for unsigned working state that is signed only when published.
+
+## Code and specifications
+
+- `convex.lattice.cursor`: atomic storage, paths, function-based views, drafts and wrappers.
+- `convex.lattice.LatticeOps`: strict path updates and explicit component construction helpers.
+- `convex.lattice.ALatticeComponent`, `ALatticeApplication`, `RootComponent`: structure,
+  merge policy and publication lifecycle.
+- `convex.lattice.LatticeContext`: component signing capabilities and write policy.
+- [CAD035 Lattice Cursors](https://docs.convex.world/docs/cad/cursors): earlier cursor model.
+- [CAD024 Data Lattice](https://docs.convex.world/docs/cad/data_lattice): lattice specification.
+- [CAD038 Lattice Authorisation](https://docs.convex.world/docs/cad/lattice_auth): authorisation.

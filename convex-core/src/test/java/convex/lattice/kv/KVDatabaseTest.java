@@ -205,7 +205,7 @@ public class KVDatabaseTest {
 		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
 			MapLattice.create(KVStoreLattice.INSTANCE);
 		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.root(dbMapLattice);
+			Cursors.root(dbMapLattice.zero());
 
 		// Connect a named database
 		KVDatabase db = KVDatabase.connect(root, "mydb");
@@ -254,7 +254,7 @@ public class KVDatabaseTest {
 		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
 			MapLattice.create(KVStoreLattice.INSTANCE);
 		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.root(dbMapLattice);
+			Cursors.root(dbMapLattice.zero());
 
 		// Connect and populate
 		KVDatabase db = KVDatabase.connect(root, "mydb");
@@ -280,7 +280,7 @@ public class KVDatabaseTest {
 		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
 			MapLattice.create(KVStoreLattice.INSTANCE);
 		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.root(dbMapLattice);
+			Cursors.root(dbMapLattice.zero());
 		KVDatabase db = KVDatabase.connect(root, "mydb");
 
 		assertNull(db.getKeyPair());

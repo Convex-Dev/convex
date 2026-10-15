@@ -6,7 +6,6 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.lattice.Shape;
 
 /**
  * Opt-in root supporting exclusive transactions and optimistic-to-serial fallback.
@@ -28,9 +27,6 @@ public class TransactionalRootCursor<V extends ACell> extends Root<V> {
 		super(initialValue);
 	}
 
-	public TransactionalRootCursor(V initialValue, Shape<V> shape) {
-		super(initialValue,shape);
-	}
 
 	@Override
 	protected Lock exclusiveLock() {

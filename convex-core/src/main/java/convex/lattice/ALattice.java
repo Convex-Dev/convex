@@ -68,7 +68,7 @@ import convex.core.lang.RT;
  *
  * @param <V> Type of values in this lattice
  */
-public abstract class ALattice<V extends ACell> implements Shape<V>, Merge<V> {
+public abstract class ALattice<V extends ACell> {
 	
 	/**
 	 * The lattice merge function: combines another value into the own value,
@@ -83,7 +83,7 @@ public abstract class ALattice<V extends ACell> implements Shape<V>, Merge<V> {
 	 *
 	 * <p>The argument order is part of the contract. At an external boundary,
 	 * {@code ownValue} is normally the current local value and {@code otherValue}
-	 * the received candidate. Internal cursor reconciliation may instead use the
+	 * the received candidate. Internal component reconciliation may instead use the
 	 * own position for a local edit that must win an otherwise unresolved tie.
 	 * Do not exchange the arguments unless this lattice is known to be
 	 * commutative.</p>
@@ -128,21 +128,6 @@ public abstract class ALattice<V extends ACell> implements Shape<V>, Merge<V> {
 	 * @return true if the foreign value is an acceptable lattice value
 	 */
 	public abstract boolean checkForeign(V value);
-
-	/**
-	 * Returns true if this is a structural (navigable) region whose container
-	 * types are determined by navigation keys rather than by the lattice.
-	 *
-	 * <p>When true, the cursor write path ({@code LatticeOps.assocIn}) builds
-	 * missing intermediates from the key shape (see
-	 * {@code LatticeOps.containerForKey}) instead of using {@link #zero()}.
-	 * Default is {@code false}.</p>
-	 *
-	 * @return true if this region builds containers from navigation keys
-	 */
-	public boolean isStructural() {
-		return false;
-	}
 
 	/**
 	 * Resolves an external key (e.g. JSON string) to the canonical CVM key

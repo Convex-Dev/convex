@@ -62,22 +62,14 @@ public class LatticeTopic extends convex.lattice.ALatticeComponent<Index<Keyword
 	/**
 	 * Returns a partition by CVM key.
 	 *
-	 * <p>Ensures the topic state is initialised as an {@code Index} before
-	 * descending, so that {@code RT.assocIn} preserves the correct type on
-	 * writeback through the cursor hierarchy.</p>
+	 * <p>The component write functions construct missing topic and partition
+	 * containers atomically on the first edit. Obtaining a view changes no state.</p>
 	 *
 	 * @param id Partition key (typically CVMLong)
 	 * @return Queue for the specified partition
 	 */
 	public LatticeQueue partition(ACell id) {
-		// Ensure topic state is Index before descended cursors write through it.
-		// RT.assocIn creates MapLeaf for null intermediaries; by initialising to
-		// Index.EMPTY first, subsequent assoc() calls preserve the Index type.
-		ensureInitialised();
-
-		AForkableCursor<AVector<ACell>> partCursor = cursor
-			.child(TopicLattice.KEY_PARTITIONS, TopicLattice.PARTITION_LATTICE)
-			.child(id, QueueLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> partCursor = resolve(cursor,TopicLattice.INSTANCE,TopicLattice.KEY_PARTITIONS,id);
 		return configured(new LatticeQueue(partCursor));
 	}
 
@@ -155,7 +147,11 @@ public class LatticeTopic extends convex.lattice.ALatticeComponent<Index<Keyword
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeTopic fork() {
-		return configured(new LatticeTopic(forkCursor(TopicLattice.INSTANCE)));
+		return configured(new LatticeTopic(this));
+	}
+
+	private LatticeTopic(LatticeTopic source) {
+		super(TopicLattice.INSTANCE,source.cursor);
 	}
 
 	/**
@@ -173,16 +169,4 @@ public class LatticeTopic extends convex.lattice.ALatticeComponent<Index<Keyword
 		return cursor;
 	}
 
-	/**
-	 * Ensures the topic cursor is initialised to an Index so that
-	 * descended cursors (which write back via RT.assocIn) preserve the type.
-	 */
-	@SuppressWarnings("unchecked")
-	private void ensureInitialised() {
-		AForkableCursor<Index<Keyword, ACell>> c = cursor;
-		c.updateAndGet(state -> {
-			if (state == null) return TopicLattice.INSTANCE.zero();
-			return state;
-		});
-	}
 }

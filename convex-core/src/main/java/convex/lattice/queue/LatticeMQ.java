@@ -62,7 +62,7 @@ public class LatticeMQ extends convex.lattice.ALatticeComponent<AHashMap<ACell, 
 	 * {@code [:queue, <owner>, :value]} and pass it to the constructor instead.</p>
 	 */
 	public static LatticeMQ create() {
-		return new LatticeMQ(Cursors.root(TOPIC_MAP));
+		return new LatticeMQ(Cursors.root(TOPIC_MAP.zero()));
 	}
 
 	/**
@@ -82,7 +82,7 @@ public class LatticeMQ extends convex.lattice.ALatticeComponent<AHashMap<ACell, 
 	 * @return Topic handle
 	 */
 	public LatticeTopic topic(ACell name) {
-		return configured(new LatticeTopic(cursor.child(name, TopicLattice.INSTANCE)));
+		return configured(new LatticeTopic(resolve(cursor,TOPIC_MAP,name)));
 	}
 
 	/**
@@ -102,7 +102,11 @@ public class LatticeMQ extends convex.lattice.ALatticeComponent<AHashMap<ACell, 
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeMQ fork() {
-		return configured(new LatticeMQ(forkCursor(TOPIC_MAP)));
+		return configured(new LatticeMQ(this));
+	}
+
+	private LatticeMQ(LatticeMQ source) {
+		super(TOPIC_MAP,source.cursor);
 	}
 
 	/**

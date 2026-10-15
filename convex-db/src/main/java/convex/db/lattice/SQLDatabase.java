@@ -86,7 +86,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
 		AForkableCursor<Index<Keyword, ACell>> cursor =
-			Cursors.root(ConvexDB.DATABASE_LATTICE);
+			Cursors.root(ConvexDB.DATABASE_LATTICE.zero());
 		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey);
 	}
 
@@ -100,7 +100,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	public static SQLDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		AForkableCursor<Index<Keyword, ACell>> cursor = parent.child(dbName, ConvexDB.DATABASE_LATTICE);
+		AForkableCursor<Index<Keyword, ACell>> cursor = resolve(parent,ConvexDB.DATABASE_MAP_LATTICE,dbName);
 		if (cursor.get() == null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
@@ -118,7 +118,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	public static SQLDatabase connect(ConvexDB parent,String name) {
 		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
 		AString dbName=Strings.create(name);
-		AForkableCursor<Index<Keyword,ACell>> cursor=parent.cursor().child(dbName,ConvexDB.DATABASE_LATTICE);
+		AForkableCursor<Index<Keyword,ACell>> cursor=resolve(parent.cursor(),ConvexDB.DATABASE_MAP_LATTICE,dbName);
 		if (cursor.get()==null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
@@ -136,7 +136,14 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Forked SQLDatabase instance
 	 */
 	public SQLDatabase fork() {
-		return configured(new SQLDatabase(forkCursor(ConvexDB.DATABASE_LATTICE),dbName,keyPair,ownerKey));
+		return configured(new SQLDatabase(this));
+	}
+
+	private SQLDatabase(SQLDatabase source) {
+		super(ConvexDB.DATABASE_LATTICE,source.cursor);
+		this.dbName=source.dbName;
+		this.keyPair=source.keyPair;
+		this.ownerKey=source.ownerKey;
 	}
 
 	/**
@@ -145,7 +152,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return configured(new SQLSchema(cursor.child(ConvexDB.KEY_TABLES,TableStoreLattice.INSTANCE)));
+		return configured(new SQLSchema(resolve(cursor,ConvexDB.DATABASE_LATTICE,ConvexDB.KEY_TABLES)));
 	}
 
 	/**

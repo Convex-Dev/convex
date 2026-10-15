@@ -45,7 +45,7 @@ public class LatticeKV extends convex.lattice.ALatticeComponent<Index<AString, A
 	 */
 	public static LatticeKV create(AString replicaID) {
 		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
-			Cursors.root(KVStoreLattice.INSTANCE);
+			Cursors.root(KVStoreLattice.INSTANCE.zero());
 		return new LatticeKV(cursor, replicaID);
 	}
 
@@ -92,7 +92,12 @@ public class LatticeKV extends convex.lattice.ALatticeComponent<Index<AString, A
 	 * @return Forked store
 	 */
 	public LatticeKV fork(AString replicaID) {
-		return configured(new LatticeKV(forkCursor(KVStoreLattice.INSTANCE), replicaID));
+		return configured(new LatticeKV(this, replicaID));
+	}
+
+	private LatticeKV(LatticeKV source, AString replicaID) {
+		super(KVStoreLattice.INSTANCE,source.cursor);
+		this.replicaID=replicaID;
 	}
 
 	/**

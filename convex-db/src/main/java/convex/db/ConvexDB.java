@@ -118,7 +118,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 */
 	public static ConvexDB create() {
 		AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor =
-			Cursors.root(DATABASE_MAP_LATTICE);
+			Cursors.root(DATABASE_MAP_LATTICE.zero());
 		return new ConvexDB(cursor);
 	}
 

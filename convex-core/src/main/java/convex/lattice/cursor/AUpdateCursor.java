@@ -7,7 +7,6 @@ import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
-import convex.lattice.Shape;
 
 /**
  * Abstract base for cursors that override <em>update semantics</em>: every value
@@ -55,18 +54,11 @@ import convex.lattice.Shape;
 public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AForkableCursor<V> {
 
 	protected final ACursor<S> base;
-	private final Shape<V> shape;
 
-	protected AUpdateCursor(ACursor<S> base, Shape<V> shape) {
-		super(null);
+	protected AUpdateCursor(ACursor<S> base) {
 		this.base = base;
-		this.shape = (shape == null) ? Shape.none() : shape;
 	}
 
-	@Override
-	public Shape<V> shape() {
-		return shape;
-	}
 
 	@Override
 	protected Lock exclusiveLock() {

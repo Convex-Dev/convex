@@ -1,59 +1,44 @@
 package convex.lattice;
 
-import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
-import convex.core.data.AString;
-import convex.core.data.Index;
-import convex.core.data.Maps;
 import convex.core.data.SignedData;
-import convex.core.data.Vectors;
-import convex.core.data.prim.AInteger;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
- * Utility operations for shape-aware data manipulation.
+ * Utilities for component-supplied lattice construction and strict path updates.
  *
  * <p>Provides {@link #assocIn} as a replacement for {@link RT#assocIn} which knows
- * how to create a missing container: from the {@link Shape} of the position being
- * written through, or from the key for structural (JSON-like) data. Nothing is
- * ever silently promoted to a hash map.</p>
+ * how to create a missing container: from the lattice of the position being
+ * written through. Container types are never inferred from keys. Cursors use only
+ * {@link #assocExisting}; components opt into construction via {@code assocIn}.</p>
  */
 public class LatticeOps {
 
-	/**
-	 * Shape-aware associative update at a single key.
-	 *
-	 * @param <T> Return type
-	 * @param a Data structure (may be null if the shape provides an empty value)
-	 * @param key Key to write at
-	 * @param value Value to set at the key
-	 * @param shape Shape of {@code a}'s position, or null for none
-	 * @return Updated data structure
-	 */
-	public static <T extends ACell> T assoc(ACell a, ACell key, ACell value, Shape<?> shape) {
-		return assocIn(a, value, shape, key);
+	/** Updates an existing path without creating any missing containers. */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T assocExisting(ACell data, ACell value, ACell... keys) {
+		return (T) assocIn(data,value,null,keys,0);
 	}
 
 	/**
-	 * Shape-aware associative update at a nested path.
+	 * Lattice-directed associative update at a nested path.
 	 *
 	 * <p>Rules for a missing container:</p>
 	 * <ul>
-	 *   <li>At the base, {@code shape.zero()} supplies the correctly typed empty
+	 *   <li>At the base, {@code lattice.zero()} supplies the correctly typed empty
 	 *       container; a null zero is an error.</li>
-	 *   <li>Below the base, a structural shape builds each missing container from the
-	 *       key written through it; otherwise a missing intermediate is an error,
-	 *       because only the component owning that level knows its type. Navigate
-	 *       with typed children instead.</li>
-	 *   <li>An existing container is used regardless of shape.</li>
+	 *   <li>Below the base, a missing intermediate is an error,
+	 *       because only the component owning that level knows its type. Use
+	 *       component-supplied child views instead.</li>
+	 *   <li>An existing container is used regardless of the supplied lattice.</li>
 	 * </ul>
 	 *
 	 * @param <T> Return type
-	 * @param a Root data structure (may be null if the shape provides an empty value)
+	 * @param a Root data structure (may be null if the lattice provides an empty value)
 	 * @param value Value to set at the end of the path
-	 * @param shape Shape of {@code a}'s position, or null for none
+	 * @param lattice Lattice of {@code a}'s position, or null for none
 	 * @param keys Path of keys to navigate
 	 * @return Updated root data structure
 	 * @throws IllegalStateException if a missing container cannot be created
@@ -61,9 +46,8 @@ public class LatticeOps {
 	 *         signed envelope (a signature covers its value, so nothing may be written through it)
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T assocIn(ACell a, ACell value, Shape<?> shape, ACell... keys) {
-		boolean structural = (shape != null) && shape.isStructural();
-		return (T) assocIn(a, value, shape, structural, keys, 0);
+	public static <T extends ACell> T assocIn(ACell a, ACell value, ALattice<?> lattice, ACell... keys) {
+		return (T) assocIn(a, value, lattice, keys, 0);
 	}
 
 	/**
@@ -72,22 +56,18 @@ public class LatticeOps {
 	 * unchanged when the child below it didn't change, so a no-op write returns the
 	 * original {@code data} by reference and allocates nothing (no working arrays).
 	 */
-	private static ACell assocIn(ACell data, ACell value, Shape<?> shape, boolean structural, ACell[] keys, int i) {
+	private static ACell assocIn(ACell data, ACell value, ALattice<?> lattice, ACell[] keys, int i) {
 		if (i >= keys.length) return value;
 
 		if (data == null) {
-			if (structural) {
-				// Structural region (e.g. JSON): build the container from the key
-				// that indexes into it.
-				data = containerForKey(keys[i]);
-			} else if (i == 0) {
-				data = (shape == null) ? null : shape.zero();
+			if (i == 0) {
+				data = (lattice == null) ? null : lattice.zero();
 				if (data == null) throw new IllegalStateException(
 					"Cannot write through an absent value: no empty value is known for this position");
 			} else {
 				throw new IllegalStateException(
 					"Cannot write through non-existent path at depth " + i
-					+ ": the intermediate container's type is unknown here; navigate with typed children");
+					+ ": the intermediate container's type is unknown here; supply component construction logic");
 			}
 		}
 		if (data instanceof SignedData) {
@@ -104,31 +84,8 @@ public class LatticeOps {
 		}
 
 		ACell child = struct.get(keys[i]);
-		ACell newChild = assocIn(child, value, null, structural, keys, i + 1);
+		ACell newChild = assocIn(child, value, null, keys, i + 1);
 		return RT.assoc(struct, keys[i], newChild); // returns struct unchanged if newChild == child
 	}
 
-	/**
-	 * Chooses an empty container for a missing intermediate in a structural
-	 * (e.g. JSON) region, based on the shape of the key that indexes into it:
-	 * <ul>
-	 *   <li>integer → {@link Vectors#empty() vector} (array index)</li>
-	 *   <li>string → {@link Maps#empty() hash map} (dynamic JSON object key)</li>
-	 *   <li>keyword / blob / address → {@link Index#EMPTY index} (short internal key)</li>
-	 *   <li>anything else → hash map</li>
-	 * </ul>
-	 *
-	 * <p><b>Vector caveat:</b> Convex vectors cannot be grown via {@code assoc}
-	 * (only existing indices can be replaced), so a freshly-created vector
-	 * intermediate supports navigation but not element creation through this path.</p>
-	 *
-	 * @param key Key that will index into the container
-	 * @return An empty container appropriate for the key shape
-	 */
-	public static ADataStructure<?> containerForKey(ACell key) {
-		if (key instanceof AInteger) return Vectors.empty();
-		if (key instanceof AString) return Maps.empty();      // dynamic JSON string key
-		if (key instanceof ABlobLike) return Index.EMPTY;     // keyword / blob / address
-		return Maps.empty();
-	}
 }

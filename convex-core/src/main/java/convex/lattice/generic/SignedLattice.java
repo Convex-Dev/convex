@@ -12,8 +12,6 @@ import convex.core.data.SignedData;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.Shape;
-import convex.lattice.Signing;
 
 /**
  * Lattice node representing signed Data.
@@ -33,7 +31,7 @@ import convex.lattice.Signing;
  *
  * @param <V> Type of signed lattice value
  */
-public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> implements Signing<V> {
+public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 
 
 	protected final ALattice<V> valueNode;
@@ -72,7 +70,7 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> impl
 
 	/**
 	 * Binds an owner and its verification rule to this lattice, independently of
-	 * the context's legacy owner verifier. The rule follows child cursor writes.
+	 * the context's legacy owner verifier. Components bind this rule when authoring signed updates.
 	 *
 	 * @param owner Owner identity
 	 * @param verifier Rule authorising a signer for an owner
@@ -87,11 +85,6 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> impl
 		return valueNode;
 	}
 
-	/** Returns the shape of the unsigned value, for the signing cursor's writes below it. */
-	@Override
-	public Shape<V> getValueShape() {
-		return (valueNode!=null)?valueNode:Shape.none();
-	}
 
 	/**
 	 * Authors this owner's value with an available authorised signer, or returns

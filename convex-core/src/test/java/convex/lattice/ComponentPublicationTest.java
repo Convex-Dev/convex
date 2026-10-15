@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
+import convex.lattice.cursor.PublishingCursor;
+
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Index;
@@ -46,7 +48,7 @@ public class ComponentPublicationTest {
 
 	@Test
 	public void testChildrenShareWorkingStateAndPublicationStopsAtDestination() {
-		var root=new Root<>(SETS.zero());
+		var root=PublishingCursor.create(SETS.zero());
 		AtomicInteger publications=new AtomicInteger();
 		root.onSync(value -> { publications.incrementAndGet(); return value; }, SETS::merge);
 		var component=new Component<>(SETS,root);
@@ -82,7 +84,7 @@ public class ComponentPublicationTest {
 		Keyword key=Keyword.intern("value");
 		Keyword sibling=Keyword.intern("sibling");
 		var root=new InterleavingRoot<>(Index.<Keyword,ACell>none().assoc(key,Sets.of(1)));
-		var destination=root.child(key,lattice);
+		var destination=root.<ASet<CVMLong>>path(key);
 		var component=new Component<>(lattice,destination);
 		component.cursor().set(Sets.of(1,2));
 		root.beforeCAS=() -> {

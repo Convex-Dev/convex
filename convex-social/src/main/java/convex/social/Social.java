@@ -24,7 +24,7 @@ import convex.lattice.generic.OwnerLattice;
  * {@link OwnerLattice} mapping canonical DIDs to signed per-user state) and
  * provides domain-specific accessors for users, feeds, and follows. The cursor
  * knows nothing of the lattice; this component declares {@link #SOCIAL_LATTICE}
- * as the shape of its level, the merge of its forks and the owner rule it crosses
+ * for construction at its level, the merge of its forks and the owner rule it crosses
  * into a user's signed value with.</p>
  *
  * <h2>Usage</h2>
@@ -146,7 +146,7 @@ public class Social extends ALatticeComponent<
 	 * @return New Social instance
 	 */
 	public static Social create(LatticeContext context) {
-		Social social=new Social(Cursors.root(SOCIAL_LATTICE));
+		Social social=new Social(Cursors.root(SOCIAL_LATTICE.zero()));
 		social.setContext(context);
 		return social;
 	}
@@ -169,7 +169,7 @@ public class Social extends ALatticeComponent<
 	/** Connects to an existing root cursor using an application context policy. */
 	public static Social connect(AForkableCursor<?> rootCursor,LatticeContext context) {
 		AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
-			rootCursor.child(KEY_SOCIAL,SOCIAL_LATTICE);
+			resolve(rootCursor,convex.lattice.generic.KeyedLattice.create(KEY_SOCIAL,SOCIAL_LATTICE),KEY_SOCIAL);
 		Social social=new Social(socialCursor);
 		social.setContext(context);
 		return social;
@@ -205,7 +205,7 @@ public class Social extends ALatticeComponent<
 	public static Social connect(ALatticeComponent<?> parent) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
 		AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
-			parent.cursor().child(KEY_SOCIAL,SOCIAL_LATTICE);
+			resolve(parent.cursor(),convex.lattice.generic.KeyedLattice.create(KEY_SOCIAL,SOCIAL_LATTICE),KEY_SOCIAL);
 		Social social=new Social(socialCursor);
 		social.setContext(parent.getContext());
 		return social;
@@ -229,7 +229,7 @@ public class Social extends ALatticeComponent<
 			throw new IllegalArgumentException("Social owner must be a canonical base DID");
 		}
 		AForkableCursor<Index<Keyword, ACell>> userCursor =
-			signedCursor(cursor.path(ownerDid),SOCIAL_LATTICE,ownerDid);
+			signedCursor(resolve(cursor,SOCIAL_LATTICE,ownerDid),SOCIAL_LATTICE,ownerDid);
 		return configured(new SocialUser(userCursor,ownerDid));
 	}
 
@@ -247,7 +247,11 @@ public class Social extends ALatticeComponent<
 	 * @return Forked Social instance
 	 */
 	public Social fork() {
-		return configured(new Social(forkCursor(SOCIAL_LATTICE)));
+		return configured(new Social(this));
+	}
+
+	private Social(Social source) {
+		super(SOCIAL_LATTICE,source.cursor);
 	}
 
 	@Override

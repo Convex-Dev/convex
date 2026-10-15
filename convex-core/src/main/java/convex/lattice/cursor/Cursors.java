@@ -4,7 +4,6 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
-import convex.lattice.Shape;
 
 /**
  * Factory methods for creating cursors.
@@ -34,20 +33,7 @@ public class Cursors {
 	// ===== Roots =====
 
 	/**
-	 * Creates a root at a shape's empty value, declaring that shape. Components
-	 * usually pass their lattice: {@code Cursors.root(LATTICE)}.
-	 *
-	 * @param <V> Type of cursor value
-	 * @param shape Shape of the root position
-	 * @return New root holding the shape's empty value
-	 */
-	public static <V extends ACell> Root<V> root(Shape<V> shape) {
-		return new Root<>(shape.zero(), shape);
-	}
-
-
-	/**
-	 * Creates a root holding a value, with no declared shape.
+	 * Creates a root holding the supplied value.
 	 *
 	 * @param <V> Type of cursor value
 	 * @param value Initial value
@@ -58,30 +44,15 @@ public class Cursors {
 	}
 
 	/**
-	 * Creates a root holding a value, with a declared shape.
-	 * Components usually pass their lattice as the shape:
-	 * {@code Cursors.root(LATTICE.zero(), LATTICE)}.
-	 *
-	 * @param <V> Type of cursor value
-	 * @param value Initial value
-	 * @param shape Shape of the root position, or null for none
-	 * @return New root
-	 */
-	public static <V extends ACell> Root<V> root(V value, Shape<V> shape) {
-		return new Root<>(value, shape);
-	}
-
-	/**
 	 * Creates an opt-in transactional root, whose writes coordinate through one lock
 	 * so that {@link Transactions#transactLocked} and contention fallback are available.
 	 *
 	 * @param <V> Type of cursor value
 	 * @param value Initial value
-	 * @param shape Shape of the root position, or null for none
 	 * @return New transactional root
 	 */
-	public static <V extends ACell> TransactionalRootCursor<V> transactionalRoot(V value, Shape<V> shape) {
-		return new TransactionalRootCursor<>(value, shape);
+	public static <V extends ACell> TransactionalRootCursor<V> transactionalRoot(V value) {
+		return new TransactionalRootCursor<>(value);
 	}
 
 	/**

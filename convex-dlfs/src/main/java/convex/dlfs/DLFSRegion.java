@@ -61,9 +61,9 @@ public final class DLFSRegion extends ALatticeComponent<
 	}
 
 	/**
-	 * Connects a physical DLFS region at a path below any cursor, declaring the
-	 * region's shape so it can be created when absent. Intermediates along the path
-	 * must already exist, or be navigated with their own shapes by the caller.
+	 * Connects a physical DLFS region at a path below any cursor. Intermediate
+	 * containers must already exist; use the host overload for component-supplied
+	 * construction of missing intermediates.
 	 *
 	 * @param parent Cursor to navigate from
 	 * @param store Store for incremental blob checkpoints, or null for heap-only file data
@@ -76,7 +76,7 @@ public final class DLFSRegion extends ALatticeComponent<
 		AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor=
 			(path.length==0)
 				?(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>>)parent
-				:parent.child(path,LATTICE);
+				:parent.path(path);
 		return new DLFSRegion(cursor,store);
 	}
 
@@ -89,13 +89,18 @@ public final class DLFSRegion extends ALatticeComponent<
 	public DLFSDrives drives(AccountKey owner) {
 		if (owner==null) throw new IllegalArgumentException("Owner key must not be null");
 		AForkableCursor<AHashMap<AString,AVector<ACell>>> drivesCursor=
-			signedCursor(cursor.path(owner),LATTICE,owner);
+			signedCursor(resolve(cursor,LATTICE,owner),LATTICE,owner);
 		return configured(new DLFSDrives(drivesCursor,store));
 	}
 
 	/** Creates an isolated temporary region component, merging on sync with {@link #LATTICE}. */
 	public DLFSRegion fork() {
-		return configured(new DLFSRegion(forkCursor(LATTICE),store));
+		return configured(new DLFSRegion(this));
+	}
+
+	private DLFSRegion(DLFSRegion source) {
+		super(LATTICE,source.cursor);
+		this.store=source.store;
 	}
 
 	@Override

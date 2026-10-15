@@ -36,7 +36,7 @@ public class ALatticeComponentTest {
 
 	@Test
 	public void testStandaloneComponentOverCursor() {
-		TestComponent component=new TestComponent(Cursors.root(LATTICE));
+		TestComponent component=new TestComponent(Cursors.root(LATTICE.zero()));
 		Blob value=Blob.fromHex("cafebabe");
 		component.add(value);
 		assertTrue(component.cursor().get().contains(value));

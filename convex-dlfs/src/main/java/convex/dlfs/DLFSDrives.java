@@ -46,7 +46,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 
 	/** Creates a standalone, in-memory set of drives for one owner. */
 	public static DLFSDrives create() {
-		return new DLFSDrives(Cursors.root(LATTICE),null);
+		return new DLFSDrives(Cursors.root(LATTICE.zero()),null);
 	}
 
 	/** Wraps an existing cursor over one owner's drive map; file data stays heap-backed. */
@@ -67,7 +67,12 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 
 	/** Creates an isolated temporary multi-drive working component. */
 	public DLFSDrives fork() {
-		return configured(new DLFSDrives(forkCursor(LATTICE),store));
+		return configured(new DLFSDrives(this));
+	}
+
+	private DLFSDrives(DLFSDrives source) {
+		super(LATTICE,source.cursor);
+		this.store=source.store;
 	}
 
 	/** Opens an existing drive, or returns null if it is absent. */
@@ -78,7 +83,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return configured(new DLFSDrive(key,cursor.child(key,DLFSLattice.INSTANCE),store));
+			return configured(new DLFSDrive(key,resolve(cursor,LATTICE,key),store));
 		});
 	}
 

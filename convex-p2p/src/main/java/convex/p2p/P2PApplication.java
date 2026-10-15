@@ -29,7 +29,7 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	protected P2PApplication(RootComponent<Index<Keyword,ACell>> host) {
 		// NodeServer restores after this adapter is constructed. Until node lifecycle
 		// policy explicitly stages and refreshes applications, use a live host view.
-		super(host.getLattice(),host.cursor().view());
+		super(host.getLattice(),host.cursor());
 		setContext(host.getContext());
 	}
 
@@ -62,17 +62,15 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	/** Cursor at {@code [:id owner :value]}: the {@code :id} level declared, the owner slot signed. */
 	static AForkableCursor<ACell> identitySlot(AForkableCursor<?> root, AccountKey userKey, convex.lattice.LatticeContext context) {
-		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> ids=root.child(P2PLattice.KEY_ID,P2PLattice.ID_LATTICE);
+		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> ids=resolve(root,P2PLattice.ROOT,P2PLattice.KEY_ID);
 		var rule=P2PLattice.ID_LATTICE.signingFor(userKey);
-		return SignedCursor.create(ids.path(userKey),rule.getValueShape(),v -> rule.sign(context,v));
+		return SignedCursor.create(resolve(ids,P2PLattice.ID_LATTICE,userKey),v -> rule.sign(context,v));
 	}
 
 	/** Cursor at {@code [:p2p :nodes owner :value]}: both levels declared, the owner slot signed. */
 	static AForkableCursor<ACell> nodeSlot(AForkableCursor<?> root, AccountKey userKey, convex.lattice.LatticeContext context) {
-		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=root
-			.child(P2PLattice.KEY_P2P,P2PLattice.P2P_LATTICE)
-			.child(P2PLattice.KEY_NODES,P2PLattice.NODES_LATTICE);
+		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=resolve(root,P2PLattice.ROOT,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		var rule=P2PLattice.NODES_LATTICE.signingFor(userKey);
-		return SignedCursor.create(nodes.path(userKey),rule.getValueShape(),v -> rule.sign(context,v));
+		return SignedCursor.create(resolve(nodes,P2PLattice.NODES_LATTICE,userKey),v -> rule.sign(context,v));
 	}
 }

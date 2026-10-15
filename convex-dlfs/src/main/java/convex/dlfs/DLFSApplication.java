@@ -50,7 +50,7 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	 */
 	protected DLFSApplication(RootComponent<V> host, ACell... regionPath) {
 		this(Objects.requireNonNull(host,"DLFS application host must not be null").getLattice(),
-			host.cursor().view(),host.store(),regionPath);
+			host.cursor(),host.store(),regionPath);
 		setContext(host.getContext());
 	}
 

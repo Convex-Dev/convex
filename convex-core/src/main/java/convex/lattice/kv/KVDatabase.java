@@ -125,7 +125,7 @@ public class KVDatabase {
 	 */
 	public static KVDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = parent.child(dbName, KVStoreLattice.INSTANCE);
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = convex.lattice.ALatticeComponent.resolve(parent,convex.lattice.generic.MapLattice.create(KVStoreLattice.INSTANCE),dbName);
 		if (cursor.get() == null) {
 			cursor.set(KVStoreLattice.INSTANCE.zero());
 		}
@@ -143,7 +143,7 @@ public class KVDatabase {
 	 */
 	public static KVDatabase connect(AForkableCursor<?> parent, String name, AString replicaID) {
 		AString dbName = Strings.create(name);
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = parent.child(dbName, KVStoreLattice.INSTANCE);
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = convex.lattice.ALatticeComponent.resolve(parent,convex.lattice.generic.MapLattice.create(KVStoreLattice.INSTANCE),dbName);
 		if (cursor.get() == null) {
 			cursor.set(KVStoreLattice.INSTANCE.zero());
 		}

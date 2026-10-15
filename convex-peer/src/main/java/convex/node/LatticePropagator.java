@@ -804,7 +804,7 @@ public class LatticePropagator implements Closeable {
 			ACell restored = store.getRootData();
 			if (restored != null) {
 				synchronized (writeLock) {
-					workingCursor = Cursors.root(restored, lattice);
+					workingCursor = Cursors.root(restored);
 				}
 			}
 			return restored;
@@ -1171,7 +1171,7 @@ public class LatticePropagator implements Closeable {
 				?new NoveltyCollector(maxDeltaBroadcastSize):null;
 			value = Cells.announce(value, noveltyCollector, store);
 			if (workingCursor == null) {
-				workingCursor = Cursors.root(value, lattice);
+				workingCursor = Cursors.root(value);
 			} else {
 				workingCursor.set(value);
 			}

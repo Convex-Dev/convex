@@ -16,6 +16,25 @@ Status values: **Implemented** (on the branch, passing the full build),
 **Decision needed** (implemented one way, alternative still open), **Agreed**,
 **CAD updated**.
 
+## Current API note
+
+The entries below record earlier design steps and may name APIs superseded by the
+current branch. See [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) and
+[LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md) for the current API:
+
+- Cursors carry no lattice, context or container-construction policy. Components
+  supply read/write functions and explicit signing/stamping functions.
+- Ordinary roots hold only current atomic state. `PublishingCursor` wraps host
+  storage with serialised publication; the old `Root.onSync` and `Root.view`
+  methods are removed.
+- `detach`/cursor `merge` and creation-time snapshots are removed. Transactions
+  retain their attempt input; component publication retains its own baseline.
+- Domain forks own their publication boundary directly. There is no hidden
+  component with a separate context behind a domain fork's cursor.
+- `StampingLattice` is removed. `StampedCursor` takes the component's stamp function.
+
+These are application API changes; encoding and CVM execution are unchanged.
+
 ## 1. Components place write boundaries; lattices construct no cursors
 
 **Status:** Implemented (`0847c923c`).

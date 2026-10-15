@@ -296,7 +296,7 @@ public class DLFSBrowser extends AbstractGUI {
 			AForkableCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
 				nodeServer.getCursor();
 			var rule=OWNER_LATTICE.signingFor(ownerKey);
-			drivesCursor = SignedCursor.create(rootCursor.path(ownerKey),rule.getValueShape(),v -> rule.sign(ctx,v));
+			drivesCursor = SignedCursor.create(rootCursor.path(ownerKey),v -> rule.sign(ctx,v));
 
 			// Rebuild drives from restored lattice state
 			drives.clear();
@@ -304,7 +304,7 @@ public class DLFSBrowser extends AbstractGUI {
 			if (driveMap != null && !driveMap.isEmpty()) {
 				for (Map.Entry<AString, AVector<ACell>> entry : driveMap.entrySet()) {
 					String name = entry.getKey().toString();
-					AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.child(entry.getKey(), DLFSLattice.INSTANCE);
+					AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.path(entry.getKey());
 					DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
 					drives.put(name, driveFS);
 				}
@@ -379,8 +379,10 @@ public class DLFSBrowser extends AbstractGUI {
 		if (drives.containsKey(name)) return false;
 
 		AString cvmName = Strings.create(name);
-		AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.child(cvmName, DLFSLattice.INSTANCE);
-		driveCursor.set(DLFSNode.createDirectory(CVMLong.ZERO));
+		AVector<ACell> initial=DLFSNode.createDirectory(CVMLong.ZERO);
+		drivesCursor.updateAndGet(current -> (current==null?DRIVES_MAP_LATTICE.zero():current)
+			.assoc(cvmName,initial));
+		AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.path(cvmName);
 
 		DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
 		drives.put(name, driveFS);
@@ -423,7 +425,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 		// Clear from lattice
 		AString cvmName = Strings.create(name);
-		AForkableCursor<AVector<ACell>> cursor = drivesCursor.child(cvmName, DLFSLattice.INSTANCE);
+		AForkableCursor<AVector<ACell>> cursor = drivesCursor.path(cvmName);
 		cursor.set(null);
 
 		// Remove from WebDAV
