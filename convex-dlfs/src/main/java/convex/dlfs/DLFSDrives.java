@@ -19,6 +19,7 @@ import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFSLattice;
+import convex.lattice.fs.DLFSLocation;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.generic.MapLattice;
 
@@ -37,11 +38,17 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		MapLattice.create(DLFSLattice.INSTANCE);
 
 	private final AStore store;
+	private final DLFSLocation location;
 	private final ConcurrentHashMap<AString,DLFSDrive> drives=new ConcurrentHashMap<>();
 
 	DLFSDrives(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor, AStore store) {
+		this(cursor,store,DLFSLocation.at(cursor));
+	}
+
+	DLFSDrives(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,AStore store,DLFSLocation location) {
 		super(cursor);
 		this.store=store;
+		this.location=location;
 	}
 
 	/** Creates a standalone, in-memory set of drives for one owner. */
@@ -62,7 +69,9 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	public static DLFSDrives connect(RootComponent<?> host, ACell... path) {
 		if (host==null) throw new IllegalArgumentException("Host must not be null");
 		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=host.resolve(path);
-		return new DLFSDrives(cursor,host.store());
+		DLFSDrives component=new DLFSDrives(cursor,host.store(),DLFSLocation.at(host.cursor(),path));
+		component.setContext(host.getContext());
+		return component;
 	}
 
 	/** Creates an isolated temporary multi-drive working component. */
@@ -73,6 +82,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	private DLFSDrives(DLFSDrives source) {
 		super(LATTICE,source.cursor);
 		this.store=source.store;
+		this.location=DLFSLocation.at(cursor);
 	}
 
 	/** Opens an existing drive, or returns null if it is absent. */
@@ -83,29 +93,70 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return configured(new DLFSDrive(key,resolve(cursor,LATTICE,key),store));
+			return configured(new DLFSDrive(key,resolve(cursor,LATTICE,key),store,location.child(key)));
 		});
 	}
 
 	/** Creates a drive subject to an atomic owner-specific count limit. */
 	public DLFSDrive createDrive(String driveName, long maximumDrives) {
 		if (!DLFSPathValidator.isValidDriveName(driveName) || maximumDrives<1) return null;
+		return acquireDrive(driveName,maximumDrives,false);
+	}
+
+	/**
+	 * Opens an existing drive or atomically creates it without a count limit.
+	 * See {@link #getOrCreateDrive(String, long)} for failure and concurrency semantics.
+	 */
+	public DLFSDrive getOrCreateDrive(String driveName) {
+		return getOrCreateDrive(driveName,Long.MAX_VALUE);
+	}
+
+	/**
+	 * Opens an existing live drive without changing its contents or timestamp, or
+	 * atomically creates it subject to an owner-specific live-drive limit. Concurrent
+	 * creators sharing the same working state open the winning drive. Independent
+	 * forks enforce the limit locally; it is not a quota across replicas.
+	 *
+	 * <p>Returns null for an invalid name, a malformed entry, or exhausted capacity.
+	 * A non-positive limit prevents creation but still permits opening an existing
+	 * drive. Deleted entries may be recreated and do not consume capacity.</p>
+	 *
+	 * <p>Creation uses this component's clock and signing policy. No publication is
+	 * triggered. A concurrent deletion may cause this call to return null, or may
+	 * delete the drive after it is returned; the returned view is not a lifetime
+	 * guarantee. Deletion does not trigger another creation attempt.</p>
+	 *
+	 * @param driveName Name within this owner's drive map
+	 * @param maximumDrives Maximum live drives allowed when creating
+	 * @return Connected drive view, or null if unavailable
+	 */
+	public DLFSDrive getOrCreateDrive(String driveName, long maximumDrives) {
+		if (!DLFSPathValidator.isValidDriveName(driveName)) return null;
+		DLFSDrive existing=drive(driveName);
+		if (existing!=null) return existing;
+		return acquireDrive(driveName,maximumDrives,true);
+	}
+
+	private DLFSDrive acquireDrive(String driveName, long maximumDrives, boolean openExisting) {
 		AString name=Strings.create(driveName);
 		CVMLong operationTime=mutationTimestamp();
 		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
+			if (!canCreate(registry,name,maximumDrives)) return registry;
 			if (registry==null) registry=Maps.empty();
-			AVector<ACell> existing=registry.get(name);
-			DriveStatus status=status(existing);
-			if (status==DriveStatus.LIVE) return registry;
-			if (existing!=null && status!=DriveStatus.DELETED) return registry;
-			if (liveCount(registry)>=maximumDrives) return registry;
 			return registry.assoc(name,DLFSNode.createDirectory(operationTime));
 		});
 		AVector<ACell> old=(previous==null)?null:previous.get(name);
-		if (status(old)==DriveStatus.LIVE
-				|| (old!=null && status(old)!=DriveStatus.DELETED)
-				|| (previous!=null && liveCount(previous)>=maximumDrives)) return null;
+		if (status(old)==DriveStatus.LIVE) return openExisting ? drive(driveName) : null;
+		if (!canCreate(previous,name,maximumDrives)) return null;
 		return drive(driveName);
+	}
+
+	private static boolean canCreate(AHashMap<AString,AVector<ACell>> registry,
+			AString name, long maximumDrives) {
+		if (maximumDrives<1) return false;
+		AVector<ACell> existing=(registry==null)?null:registry.get(name);
+		if (existing!=null && status(existing)!=DriveStatus.DELETED) return false;
+		return registry==null || maximumDrives==Long.MAX_VALUE || liveCount(registry)<maximumDrives;
 	}
 
 	/** Creates a drive without an application-specific count limit. */
@@ -133,7 +184,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	public boolean renameDrive(String oldName, String newName) {
 		if (!DLFSPathValidator.isValidDriveName(oldName)
 				|| !DLFSPathValidator.isValidDriveName(newName)) return false;
-		if (oldName.equals(newName)) return drive(oldName)!=null;
+		if (oldName.equals(newName)) return driveStatus(oldName)==DriveStatus.LIVE;
 		AString oldKey=Strings.create(oldName);
 		AString newKey=Strings.create(newName);
 		CVMLong operationTime=mutationTimestamp();
@@ -144,7 +195,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 			AVector<ACell> target=registry.get(newKey);
 			DriveStatus targetStatus=status(target);
 			if (targetStatus==DriveStatus.LIVE || (target!=null && targetStatus!=DriveStatus.DELETED)) return registry;
-			AVector<ACell> movedRoot=root.assoc(DLFSNode.POS_UTIME,operationTime);
+			AVector<ACell> movedRoot=DLFSNode.withMTime(root,DLFSNode.getMTime(root)).assoc(DLFSNode.POS_UTIME,operationTime);
 			AVector<ACell> tombstone=DLFSNode.createEmptyFile(operationTime);
 			return registry.assoc(newKey,movedRoot).assoc(oldKey,tombstone);
 		});

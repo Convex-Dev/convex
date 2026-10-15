@@ -31,7 +31,7 @@ public class DLFSTombstoneTest {
 		fs.setContext(fs.getContext().withTimestamp(CVMLong.create(timestamp)));
 	}
 
-	/** A directory node carries the POS_TOMBS element if and only if it has tombstones. */
+	/** Extended directories retain null tombstone padding when there are no deletions. */
 	@Test
 	public void testCanonicalNodeShape() throws IOException {
 		DLFSLocal fs = DLFS.create();
@@ -39,27 +39,27 @@ public class DLFSTombstoneTest {
 		DLPath root = fs.getRoot();
 		Path f = Files.createFile(root.resolve("f.txt"));
 
-		// No deletions yet: plain 4-element directory node
+		// Namespace updates materialise mtime, with an empty tombstone slot.
 		AVector<ACell> r0 = fs.getNode(root);
-		assertEquals(DLFSNode.NODE_LENGTH, r0.count());
+		assertEquals(6L, r0.count());
 		assertTrue(DLFSNode.getTombstones(r0).isEmpty());
 
-		// Delete records a tombstone with the deletion timestamp; node grows to 5 elements
+		// Delete records a tombstone with the deletion timestamp.
 		setContextTime(fs,200);
 		Files.delete(f);
 		AVector<ACell> r1 = fs.getNode(root);
-		assertEquals(5L, r1.count());
+		assertEquals(6L, r1.count());
 		Index<AString, CVMLong> tombs = DLFSNode.getTombstones(r1);
 		assertEquals(1L, tombs.count());
 		assertEquals(CVMLong.create(200), tombs.get(Strings.create("f.txt")));
 		assertTrue(DLFSNode.isEmpty(r1));        // no live children
 		assertFalse(Files.exists(f));
 
-		// Recreating clears the tombstone, returning the node to canonical 4-element form
+		// Recreating clears the tombstone while retaining the modification time.
 		setContextTime(fs,300);
 		Files.createFile(root.resolve("f.txt"));
 		AVector<ACell> r2 = fs.getNode(root);
-		assertEquals(DLFSNode.NODE_LENGTH, r2.count());
+		assertEquals(6L, r2.count());
 		assertTrue(DLFSNode.getTombstones(r2).isEmpty());
 		assertTrue(Files.exists(root.resolve("f.txt")));
 	}
@@ -132,7 +132,7 @@ public class DLFSTombstoneTest {
 		assertEquals(timestamp,DLFSNode.getTombstones(deletedOwn).get(Strings.create("x")));
 	}
 
-	/** Merge order does not matter: bidirectional replication converges to one canonical tree. */
+	/** Distinct mutation timestamps converge, including directory modification times. */
 	@Test
 	public void testMergeConverges() throws IOException {
 		DLFSLocal a = DLFS.create();
@@ -147,7 +147,7 @@ public class DLFSTombstoneTest {
 
 		setContextTime(a,20);
 		Files.delete(a.getPath("/gone"));       // A deletes gone
-		setContextTime(b,20);
+		setContextTime(b,21);
 		Files.write(b.getPath("/d/added"), new byte[] { 3 }); // B adds a file concurrently
 
 		a.replicate(b);

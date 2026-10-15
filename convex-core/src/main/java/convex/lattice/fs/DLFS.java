@@ -70,9 +70,7 @@ public class DLFS {
 		AForkableCursor<AVector<ACell>> cursor=convex.lattice.ALatticeComponent.resolve(parent,convex.lattice.generic.MapLattice.create(DLFSLattice.INSTANCE),driveName);
 		// Atomic initialisation must not replace another caller's concurrent writes.
 		cursor.updateAndGet(current -> current!=null?current:DLFSLattice.INSTANCE.zero());
-		return (store==null)
-			?new DLFSLocal(PROVIDER,driveName.toString(),cursor)
-			:DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store);
+		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store,DLFSLocation.at(parent,driveName));
 	}
 
 	/**
@@ -101,9 +99,7 @@ public class DLFS {
 	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName, AStore store) {
 		AForkableCursor<AVector<ACell>> cursor=convex.lattice.ALatticeComponent.resolve(parent,convex.lattice.generic.MapLattice.create(DLFSLattice.INSTANCE),driveName);
 		if (cursor.get()==null) return null;
-		return (store==null)
-			?new DLFSLocal(PROVIDER,driveName.toString(),cursor)
-			:DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store);
+		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store,DLFSLocation.at(parent,driveName));
 	}
 
 	public static DLFSLocal createLocal() {

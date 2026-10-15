@@ -12,6 +12,7 @@ import java.nio.file.PathMatcher;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.UserPrincipalLookupService;
 import java.util.Collections;
 import java.util.Set;
@@ -57,6 +58,11 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	@Override
 	public DLFSProvider provider() {
 		return provider;
+	}
+
+	/** Whether both views address the same working drive, rather than equal snapshots. */
+	public boolean isSameDrive(DLFileSystem other) {
+		return this==other;
 	}
 
 	@Override
@@ -183,6 +189,11 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 		return DLFSFileAttributes.create(node);
 	}
 
+	/** Sets independent NIO file times using the filesystem's mutation policy. */
+	public void setTimes(DLPath path,FileTime modified,FileTime accessed,FileTime created) throws IOException {
+		throw new UnsupportedOperationException("File timestamps cannot be edited by this implementation");
+	}
+
 	/**
 	 * Gets DLFS node for the given path
 	 * @param path Path for which to obtain DLFSNode
@@ -228,6 +239,12 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	public void copy(DLPath source, DLPath target, boolean recursive, boolean replaceExisting) throws IOException {
 		if (replaceExisting) throw new UnsupportedOperationException("Replacing an existing DLFS target is not supported");
 		copy(source,target,recursive);
+	}
+
+	/** Copies with optional preservation of independent file timestamps. */
+	public void copy(DLPath source,DLPath target,boolean recursive,boolean replaceExisting,boolean copyAttributes) throws IOException {
+		if (copyAttributes) throw new UnsupportedOperationException("Copying file attributes is not supported");
+		copy(source,target,recursive,replaceExisting);
 	}
 
 	/**

@@ -98,11 +98,10 @@ public final class Main {
 			node.getRootComponent(),regionPath);
 		DLFSDrives localDrives=application.drives(keyPair.getAccountKey());
 		String driveName=config.getDriveName();
-		if (!localDrives.driveNames().contains(driveName)
-				&&(localDrives.createDrive(driveName)==null)) {
+		if (localDrives.getOrCreateDrive(driveName)==null) {
 			closeNode(transport,node);
 			store.close();
-			throw new IllegalStateException("Could not create drive: "+driveName);
+			throw new IllegalStateException("Could not open or create drive: "+driveName);
 		}
 		DLFSDriveManager drives=DLFSDriveManager.createRouter();
 		for (DLFSConfig.DriveMount mount:config.getDriveMounts()) {

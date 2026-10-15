@@ -11,6 +11,7 @@ import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSLattice;
+import convex.lattice.fs.DLFSLocation;
 import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.impl.DLFSLocal;
 
@@ -28,12 +29,14 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 
 	private final AString name;
 	private final AStore store;
+	private final DLFSLocation location;
 	private final HostedFileSystem fileSystem;
 
-	DLFSDrive(AString name, AForkableCursor<AVector<ACell>> cursor, AStore store) {
+	DLFSDrive(AString name, AForkableCursor<AVector<ACell>> cursor, AStore store, DLFSLocation location) {
 		super(cursor);
 		this.name=name;
 		this.store=store;
+		this.location=location;
 		this.fileSystem=new HostedFileSystem(this);
 	}
 
@@ -41,6 +44,9 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	public String name() {
 		return name.toString();
 	}
+
+	/** This component's working root and logical region/owner/drive path. */
+	public DLFSLocation location() { return location; }
 
 	/** Returns the NIO filesystem view backed by this component's cursor. */
 	public DLFileSystem fileSystem() {
@@ -65,6 +71,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		super(DLFSLattice.INSTANCE,source.cursor);
 		this.name=source.name;
 		this.store=source.store;
+		this.location=DLFSLocation.at(cursor);
 		this.fileSystem=new HostedFileSystem(this);
 	}
 
@@ -78,7 +85,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		private final DLFSDrive drive;
 
 		HostedFileSystem(DLFSDrive drive) {
-			super(DLFS.provider(),drive.name(),drive.cursor(),drive.store);
+			super(DLFS.provider(),drive.name(),drive.cursor(),drive.store,drive.location);
 			this.drive=drive;
 		}
 
@@ -93,7 +100,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 
 	@Override
 	public DLFSDrive withCursor(AForkableCursor<AVector<ACell>> cursor) {
-		return configured(new DLFSDrive(name,cursor,store));
+		return configured(new DLFSDrive(name,cursor,store,DLFSLocation.at(cursor)));
 	}
 
 }

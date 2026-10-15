@@ -16,7 +16,6 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
-import java.nio.file.ProviderMismatchException;
 import java.nio.file.StandardCopyOption;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -95,7 +94,7 @@ public class DLFSMoveCopyTest {
 		assertSame(DLFSNode.getData(original),DLFSNode.getData(fs.getNode(target)));
 		assertEquals(CVMLong.create(200),DLFSNode.getUTime(fs.getNode(target)));
 		assertEquals(Strings.create("metadata"),DLFSNode.getMetadata(fs.getNode(target)));
-		assertEquals(200L,Files.getLastModifiedTime(target).toMillis());
+		assertEquals(100L,Files.getLastModifiedTime(target).toMillis(),"rename preserves content modification time");
 		assertEquals(CVMLong.create(200),DLFSNode.getUTime(fs.getNode((DLPath)sourceDir)));
 		assertEquals(CVMLong.create(200),DLFSNode.getUTime(fs.getNode((DLPath)targetDir)));
 		assertEquals(CVMLong.create(200),DLFSNode.getUTime(fs.getNode(fs.getRoot())));
@@ -270,11 +269,11 @@ public class DLFSMoveCopyTest {
 		assertThrows(NoSuchFileException.class,()->Files.copy(fs.getPath("/missing"),fs.getPath("/new")));
 		assertThrows(NoSuchFileException.class,()->Files.copy(fs.getPath("/source"),fs.getPath("/missing/new")));
 		assertThrows(UnsupportedOperationException.class,
-			()->Files.copy(fs.getPath("/source"),fs.getPath("/new"),StandardCopyOption.COPY_ATTRIBUTES));
+			()->Files.copy(fs.getPath("/source"),fs.getPath("/new"),StandardCopyOption.ATOMIC_MOVE));
 	}
 
 	@Test
-	public void testSamePathIsNoOpAndCrossDriveRejected() throws IOException {
+	public void testSamePathIsNoOpAndCrossDriveTransfer() throws IOException {
 		DLFSLocal fs=DLFS.create();
 		DLPath path=(DLPath)Files.write(fs.getPath("/file"),new byte[] {1});
 		AVector<ACell> root=fs.getNode(fs.getRoot());
@@ -284,8 +283,11 @@ public class DLFSMoveCopyTest {
 		assertSame(root,fs.getNode(fs.getRoot()));
 
 		DLFSLocal other=DLFS.create();
-		assertThrows(ProviderMismatchException.class,()->Files.move(path,other.getPath("/file")));
-		assertThrows(ProviderMismatchException.class,()->Files.copy(path,other.getPath("/file")));
+		Files.copy(path,other.getPath("/copy"));
+		Files.move(path,other.getPath("/file"));
+		assertArrayEquals(new byte[] {1},Files.readAllBytes(other.getPath("/copy")));
+		assertArrayEquals(new byte[] {1},Files.readAllBytes(other.getPath("/file")));
+		assertFalse(Files.exists(path));
 	}
 
 	@Test

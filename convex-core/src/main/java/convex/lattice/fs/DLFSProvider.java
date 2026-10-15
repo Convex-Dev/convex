@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.AccessMode;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.CopyOption;
 import java.nio.file.DirectoryStream;
 import java.nio.file.DirectoryStream.Filter;
@@ -16,11 +17,14 @@ import java.nio.file.Path;
 import java.nio.file.ProviderMismatchException;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.BasicFileAttributeView;
+import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileAttributeView;
 import java.nio.file.spi.FileSystemProvider;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
@@ -113,52 +117,67 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public void copy(Path source, Path target, CopyOption... options) throws IOException {
-		DLPath src=DLFS.checkPath(source);
-		DLPath dst=DLFS.checkPath(target);
+		DLPath src=checkProviderPath(source);
+		DLPath dst=checkProviderPath(target);
 		DLFileSystem fs=src.getFileSystem();
-		if (dst.getFileSystem()!=fs) {
-			throw new ProviderMismatchException("DLFS copy requires paths on the same drive");
-		}
 		Objects.requireNonNull(options,"Copy options");
 		boolean recursive=false;
 		boolean replaceExisting=false;
+		boolean copyAttributes=false;
 		for (CopyOption option:options) {
 			Objects.requireNonNull(option,"Copy option");
 			if (option==DLFSOption.RECURSIVE) {
 				recursive=true;
 			} else if (option==StandardCopyOption.REPLACE_EXISTING) {
 				replaceExisting=true;
+			} else if (option==StandardCopyOption.COPY_ATTRIBUTES) {
+				copyAttributes=true;
+			} else if (option==LinkOption.NOFOLLOW_LINKS) {
+				// DLFS has no symbolic links.
 			} else {
 				throw new UnsupportedOperationException("Unsupported DLFS copy option: "+option);
 			}
 		}
-		fs.copy(src,dst,recursive,replaceExisting);
+		fs.copy(src,dst,recursive,replaceExisting,copyAttributes);
 	}
 
 	@Override
 	public void move(Path source, Path target, CopyOption... options) throws IOException {
-		DLPath src=DLFS.checkPath(source);
-		DLPath dst=DLFS.checkPath(target);
+		DLPath src=checkProviderPath(source);
+		DLPath dst=checkProviderPath(target);
 		DLFileSystem fs=src.getFileSystem();
-		if (dst.getFileSystem()!=fs) {
-			throw new ProviderMismatchException("DLFS move requires paths on the same drive");
-		}
 		Objects.requireNonNull(options,"Move options");
 		boolean replaceExisting=false;
 		for (CopyOption option:options) {
 			Objects.requireNonNull(option,"Move option");
 			if (option==StandardCopyOption.REPLACE_EXISTING) {
 				replaceExisting=true;
-			} else if (option!=StandardCopyOption.ATOMIC_MOVE && option!=DLFSOption.RECURSIVE) {
+			} else if (option==StandardCopyOption.ATOMIC_MOVE) {
+				if (!fs.isSameDrive(dst.getFileSystem())) {
+					throw new AtomicMoveNotSupportedException(src.toString(),dst.toString(),"Independent DLFS drives");
+				}
+			} else if (option!=DLFSOption.RECURSIVE) {
 				throw new UnsupportedOperationException("Unsupported DLFS move option: "+option);
 			}
 		}
 		fs.move(src,dst,replaceExisting);
 	}
 
+	private DLPath checkProviderPath(Path path) {
+		DLPath result=DLFS.checkPath(Objects.requireNonNull(path));
+		if (result.getFileSystem().provider()!=this) throw new ProviderMismatchException("Different DLFS provider");
+		return result;
+	}
+
 	@Override
 	public boolean isSameFile(Path path, Path path2) throws IOException {
-		return path.toAbsolutePath().equals(path2.toAbsolutePath());
+		DLPath first=checkProviderPath(path);
+		if (!(path2 instanceof DLPath second) || second.getFileSystem().provider()!=this) return false;
+		if (first.equals(second)) return true;
+		first.getFileSystem().checkAccess(first);
+		second.getFileSystem().checkAccess(second);
+		return first.getFileSystem().isSameDrive(second.getFileSystem())
+			&& first.toAbsolutePath().normalize().toString().equals(second.toAbsolutePath().normalize().toString());
 	}
 
 	@Override
@@ -180,16 +199,33 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public <V extends FileAttributeView> V getFileAttributeView(Path path, Class<V> type, LinkOption... options) {
-		// We don't currently have an updatable file attribute view. OK for now?
+		DLPath file=checkProviderPath(path).toAbsolutePath().normalize();
+		checkLinkOptions(options);
+		Objects.requireNonNull(type);
+		if (type==BasicFileAttributeView.class) return type.cast(new BasicFileAttributeView() {
+			@Override public String name() { return "basic"; }
+			@Override public BasicFileAttributes readAttributes() throws IOException {
+				return file.getFileSystem().getFileAttributes(file);
+			}
+			@Override public void setTimes(FileTime modified,FileTime accessed,FileTime created) throws IOException {
+				file.getFileSystem().setTimes(file,modified,accessed,created);
+			}
+		});
 		return null;
+	}
+
+	private static void checkLinkOptions(LinkOption[] options) {
+		for (LinkOption option:Objects.requireNonNull(options)) Objects.requireNonNull(option);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public <A extends BasicFileAttributes> A readAttributes(Path path, Class<A> type, LinkOption... options)
 			throws IOException {
+		Objects.requireNonNull(type);
+		checkLinkOptions(options);
 		if (type==BasicFileAttributes.class) {
-			DLPath dlp=DLFS.checkPath(path);
+			DLPath dlp=checkProviderPath(path).toAbsolutePath().normalize();
 			return (A) dlp.getFileSystem().getFileAttributes(dlp);
 		} else {
 			throw new UnsupportedOperationException("No support of attributes type: "+type);
@@ -198,12 +234,52 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public Map<String, Object> readAttributes(Path path, String attributes, LinkOption... options) throws IOException {
-		throw new UnsupportedOperationException("String-based DLFS attributes are not implemented");
+		String names=basicAttributeNames(attributes);
+		BasicFileAttributes a=readAttributes(path,BasicFileAttributes.class,options);
+		Map<String,Object> result=new LinkedHashMap<>();
+		for (String name:names.split(",",-1)) {
+			if (name.equals("*")) {
+				for (String key:BASIC_ATTRIBUTE_NAMES) result.put(key,basicAttribute(a,key));
+			} else result.put(name,basicAttribute(a,name));
+		}
+		return result;
+	}
+
+	private static final String[] BASIC_ATTRIBUTE_NAMES={"lastModifiedTime","lastAccessTime","creationTime",
+		"size","isRegularFile","isDirectory","isSymbolicLink","isOther","fileKey"};
+
+	private static Object basicAttribute(BasicFileAttributes a,String name) {
+		return switch (name) {
+		case "lastModifiedTime" -> a.lastModifiedTime();
+		case "lastAccessTime" -> a.lastAccessTime();
+		case "creationTime" -> a.creationTime();
+		case "size" -> a.size();
+		case "isRegularFile" -> a.isRegularFile();
+		case "isDirectory" -> a.isDirectory();
+		case "isSymbolicLink" -> a.isSymbolicLink();
+		case "isOther" -> a.isOther();
+		case "fileKey" -> a.fileKey();
+		default -> throw new IllegalArgumentException("Unknown basic attribute: "+name);
+		};
 	}
 
 	@Override
 	public void setAttribute(Path path, String attribute, Object value, LinkOption... options) throws IOException {
-		throw new UnsupportedOperationException("DLFS attributes are read-only");
+		String name=basicAttributeNames(attribute);
+		BasicFileAttributeView view=getFileAttributeView(path,BasicFileAttributeView.class,options);
+		switch (name) {
+		case "lastModifiedTime" -> view.setTimes((FileTime)Objects.requireNonNull(value),null,null);
+		case "lastAccessTime" -> view.setTimes(null,(FileTime)Objects.requireNonNull(value),null);
+		case "creationTime" -> view.setTimes(null,null,(FileTime)Objects.requireNonNull(value));
+		default -> throw new IllegalArgumentException("Attribute is unknown or read-only: "+name);
+		}
+	}
+
+	private static String basicAttributeNames(String attributes) {
+		int colon=attributes.indexOf(':');
+		if (colon<0) return attributes;
+		if (!attributes.substring(0,colon).equals("basic")) throw new UnsupportedOperationException("Unsupported attribute view: "+attributes);
+		return attributes.substring(colon+1);
 	}
 
 }

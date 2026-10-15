@@ -256,6 +256,66 @@ Two modes:
 
 Child entries are included when `Depth: 1` is requested.
 
+## Node Format and NIO Timestamps
+
+The CAD028 node vector is:
+
+```text
+[entries data metadata utime tombstones? mtime? ...future-fields]
+```
+
+| Slot | Meaning |
+|------|---------|
+| 0 | Directory `Index<String,Node>`, or nil for a file |
+| 1 | File Blob, or nil for a directory |
+| 2 | Opaque application metadata |
+| 3 | Required Long mutation/merge clock (`utime`) |
+| 4 | Optional non-empty directory `Index<String,Long>` of deletion times; nil padding if later fields exist |
+| 5 | Optional Long content modification time in epoch milliseconds (`mtime`); absent/nil falls back to `utime` |
+| 6+ | Unknown extension fields, accepted and preserved |
+
+Exactly one of entries and data is non-null. Legacy four- and five-field nodes
+remain readable without rewriting. Local edits materialise `mtime` when needed;
+merge does not synthesise an extension. Older readers which reject extra fields
+must upgrade before receiving extended nodes. Empty tombstone indexes remain
+invalid; an unused slot is omitted or padded with nil.
+
+When effective `mtime` equals `utime`, writers may store nil in the `mtime` slot
+or omit it as an optional size optimisation. Truncation is safe only when no
+unknown trailing fields exist: retain five fields if tombstones are present,
+otherwise remove the unused tombstone padding too and retain four. These forms
+have the same timestamp meaning but different encodings and hashes; this is a
+writer choice, not automatic normalisation during reading or merging. Before a
+later metadata-only edit advances `utime`, the old effective `mtime` must still
+be materialised so it remains unchanged.
+
+Content writes and truncation set both times to the supplied operation time.
+Metadata edits and renames preserve `mtime` while updating `utime`. Directory
+`mtime` tracks immediate entry creation, removal and replacement, not edits to a
+descendant's contents; ancestor `utime` still propagates. Setting NIO modification
+time changes `mtime` to the requested value and stamps `utime` with operation time.
+Merge ordering uses only `utime`. Directory metadata, `mtime` and future extension
+fields come from the node selected by that ordering, with own-value preference on
+ties; they are not independently merged.
+
+No access, creation or status-change time is stored. NIO reports access time as
+`mtime` and creation time as the epoch. Unsupported time setters cause no writes.
+`COPY_ATTRIBUTES` and moves preserve `mtime`; ordinary copies use destination
+operation time. Recursive DLFS copies share unchanged descendant nodes, including
+their timestamps, and stamp only the new top-level entry.
+
+Same-drive moves perform one atomic cursor update, including when paths come from
+different component views of that working drive. Components retain the working
+root and region/owner/drive path in `DLFSLocation`; forks have distinct identities.
+Opaque cursor projections cannot infer aliases: lower-level adapters must retain
+and pass the same logical location when constructing views.
+
+Cross-drive moves publish a snapshot at the destination before conditionally
+deleting that same source value. If the source changes meanwhile, both versions
+remain and the move reports an error. Such moves cannot honour `ATOMIC_MOVE`.
+Different NIO providers use Java's generic copy/move path. Copies of directories
+are shallow unless `DLFSOption.RECURSIVE` is supplied between DLFS drives.
+
 ## Merge Semantics
 
 ### Deterministic Merge
@@ -269,8 +329,8 @@ deterministically as `max(getUTime(a), getUTime(b))` — no external timestamp n
   recursively merge it; metadata follows the containing node's timestamp ordering, with
   `a` preferred on a tie. A metadata-only mutation must therefore update the node timestamp.
 - **Tombstones**: A directory node keeps deletions in a separate tombstone index
-  (deleted child name → deletion timestamp), held as an optional 5th node element that
-  is present only when non-empty (the default node stays 4 elements). Live entries and
+  (deleted child name → deletion timestamp), held as an optional 5th node element.
+  An empty slot is omitted, or null padding before extension fields. Live entries and
   tombstones are merged independently, then reconciled: a tombstone whose timestamp is
   newer than a live child deletes it; a newer creation resurrects the name.
 - **Directional ties**: equal-timestamp conflicts prefer `a`, the current local (`own`)
@@ -303,11 +363,11 @@ DLFS itself guarantees only whole-slot last-write-wins behaviour.
 
 | Timestamp | Source | Used For |
 |-----------|--------|----------|
-| **Mutation timestamp** | `DLFSLocal.getCursor().getContext().currentTimestamp()` | Creating new files, directories, tombstones |
+| **Mutation timestamp** | `DLFSLocal.getContext().currentTimestamp()` | Creating new files, directories, tombstones |
 | **Merge timestamp** | `max(getUTime(a), getUTime(b))` | Conflict resolution during merge |
 
 These are deliberately separate. The application supplies mutation time through the
-cursor's `LatticeContext`; neither `DLFileSystem` nor `DLFSLocal` stores or updates a
+component's `LatticeContext` exposed by the NIO adapter; neither `DLFileSystem` nor `DLFSLocal` updates a
 separate clock. DLFS consumes the context timestamp exactly and never derives a later
 mutation time from stored nodes or tombstones. The application owns the clock and its
 refresh cadence. An empty context uses `LatticeContext.currentTimestamp()`'s standalone

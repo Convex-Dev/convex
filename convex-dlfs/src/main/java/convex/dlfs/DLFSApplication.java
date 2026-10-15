@@ -111,7 +111,7 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 
 	/** Returns the physical multi-owner DLFS region, navigated with the root lattice. */
 	public DLFSRegion dlfs() {
-		return configured(DLFSRegion.connect(resolve(regionPath),store));
+		return configured(DLFSRegion.connect(cursor,getLattice(),store,regionPath));
 	}
 
 	/**

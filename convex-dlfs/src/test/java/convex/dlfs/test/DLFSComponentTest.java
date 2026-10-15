@@ -18,6 +18,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 
 import org.junit.jupiter.api.Test;
 
@@ -43,7 +44,6 @@ import convex.dlfs.DLFSServer;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
@@ -72,6 +72,22 @@ public class DLFSComponentTest {
 	private static final Keyword KEY_ARCHIVE=Keyword.intern("archive");
 
 	@Test
+	public void testSeparateOwnerViewsRecogniseTheSameDrive() throws Exception {
+		var key=AKeyPair.generate();
+		var app=DLFSApplication.open(new MemoryStore(),key);
+		var first=app.drives(key.getAccountKey()).getOrCreateDrive("home");
+		var second=app.drives(key.getAccountKey()).getOrCreateDrive("home");
+		assertNotSame(first,second);
+		assertEquals(java.util.List.of(Keywords.FS,key.getAccountKey(),Strings.create("home")),first.location().path());
+		var source=first.fileSystem().getPath("/source");
+		Files.writeString(source,"same working drive");
+		assertTrue(Files.isSameFile(source,second.fileSystem().getPath("/source")));
+		Files.move(source,second.fileSystem().getPath("/target"),StandardCopyOption.ATOMIC_MOVE);
+		assertEquals("same working drive",Files.readString(first.fileSystem().getPath("/target")));
+		assertFalse(first.fileSystem().isSameDrive(first.fork().fileSystem()));
+	}
+
+	@Test
 	public void testCompleteNodeHostedServerStack() throws Exception {
 		AKeyPair keyPair=AKeyPair.generate();
 		try (EtchStore store=EtchStore.createTemp("dlfs-complete-stack");
@@ -81,7 +97,7 @@ public class DLFSComponentTest {
 			node.launch();
 
 			DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(
-				node.getRootComponent(),convex.core.cvm.Keywords.FS);
+				node.getRootComponent(),Keywords.FS);
 			DLFSDriveManager drives=new DLFSDriveManager(
 				application.drives(keyPair.getAccountKey()));
 			assertTrue(drives.createDrive(null,"home"));
@@ -224,7 +240,12 @@ public class DLFSComponentTest {
 			var root=RootComponent.create(DLFSRegion.LATTICE,store);
 			root.setContext(LatticeContext.create(null,keyPair));
 			DLFSRegion region=DLFSRegion.connect(root);
-			DLFSDrive drive=region.drives(keyPair.getAccountKey()).createDrive("large");
+			DLFSDrive drive=region.drives(keyPair.getAccountKey()).getOrCreateDrive("large");
+			assertTrue(root.cursor().get().get(keyPair.getAccountKey()).checkSignature());
+			var before=root.cursor().get();
+			var reopened=region.drives(keyPair.getAccountKey()).getOrCreateDrive("large",0);
+			assertSame(before,root.cursor().get(),"opening must preserve the signed envelope");
+			assertSame(region.getContext(),reopened.getContext());
 			Path path=drive.fileSystem().getPath("/stream.bin");
 			byte[] megabyte=new byte[1024*1024];
 			for (int i=0; i<megabyte.length; i++) megabyte[i]=(byte)i;
@@ -247,6 +268,7 @@ public class DLFSComponentTest {
 			assertEquals(megabyte[0],data.byteAt(16L*megabyte.length));
 			assertEquals(megabyte[megabyte.length-1],data.byteAt(data.count()-1));
 			assertEquals(DLFileSystem.BLOB_PERSIST_INTERVAL,16*megabyte.length);
+			assertEquals(Files.size(path),Files.size(reopened.fileSystem().getPath("/stream.bin")));
 		}
 	}
 

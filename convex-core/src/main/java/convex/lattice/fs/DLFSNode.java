@@ -25,7 +25,7 @@ import convex.core.util.Utils;
 public class DLFSNode {
 	
 	// node structure contents
-	/** Minimum node length. A directory node may carry an optional 5th element (POS_TOMBS). */
+	/** Legacy prefix length. Later fields are optional; unknown trailing fields are preserved. */
 	public static final long NODE_LENGTH = 4;
 	public static final int POS_DIR = 0; // Directory entries as index of live child nodes
 	public static final int POS_DATA = 1; // File data as a Blob
@@ -33,9 +33,12 @@ public class DLFSNode {
 	public static final int POS_UTIME = 3;
 	/**
 	 * Optional directory tombstone index: maps deleted child name to deletion timestamp.
-	 * Present (node length 5) if and only if non-empty; absent (node length 4) otherwise.
+	 * Non-empty when populated. Absent in legacy nodes without deletions, or null
+	 * padding when later extension fields are present.
 	 */
 	public static final int POS_TOMBS = 4;
+	/** Optional content modification time in milliseconds, independent of merge ordering. */
+	public static final int POS_MTIME = 5;
 
 	static final Index<AString,AVector<ACell>> EMPTY_CONTENTS = Index.none();
 	static final Index<AString,AVector<ACell>> NIL_CONTENTS = null;
@@ -91,7 +94,7 @@ public class DLFSNode {
 	 * Child nodes are validated lazily as paths or merge differences reach them.
 	 */
 	public static boolean isValidNodeShallow(AVector<ACell> node) {
-		if (node == null || (node.count() != NODE_LENGTH && node.count() != NODE_LENGTH + 1)) return false;
+		if (node == null || node.count() < NODE_LENGTH) return false;
 		ACell dirs = node.get(POS_DIR);
 		ACell data = node.get(POS_DATA);
 		boolean directory = dirs instanceof Index;
@@ -102,7 +105,13 @@ public class DLFSNode {
 		if (!(node.get(POS_UTIME) instanceof CVMLong)) return false;
 		if (node.count() > POS_TOMBS) {
 			ACell tombs = node.get(POS_TOMBS);
-			if (!directory || !(tombs instanceof Index<?, ?> index) || index.isEmpty()) return false;
+			if (tombs==null) {
+				if (node.count()==NODE_LENGTH+1) return false; // padding only before extensions
+			} else if (!directory || !(tombs instanceof Index<?, ?> index) || index.isEmpty()) return false;
+		}
+		if (node.count()>POS_MTIME) {
+			ACell time=node.get(POS_MTIME);
+			if (time!=null && !(time instanceof CVMLong)) return false;
 		}
 		return true;
 	}
@@ -141,7 +150,7 @@ public class DLFSNode {
 					pending.push(childNode);
 				}
 			}
-			if (node.count()>POS_TOMBS) {
+			if (node.count()>POS_TOMBS && node.get(POS_TOMBS)!=null) {
 				Index<?,?> tombs=(Index<?,?>)node.get(POS_TOMBS);
 				long n=tombs.count();
 				for (long i=0;i<n;i++) {
@@ -304,6 +313,15 @@ public class DLFSNode {
  	 * @return Updated root node, or null if update failed (parent(s) not a directory)
 	 */
 	public static AVector<ACell> updateNode(AVector<ACell> rootNode, DLPath path,AVector<ACell> newNode, CVMLong utime) {
+		return updateNode(rootNode,path,newNode,utime,false);
+	}
+
+	/** Inserts or replaces a directory entry, updating its parent's modification time. */
+	public static AVector<ACell> updateEntry(AVector<ACell> rootNode,DLPath path,AVector<ACell> newNode,CVMLong utime) {
+		return updateNode(rootNode,path,newNode,utime,true);
+	}
+
+	private static AVector<ACell> updateNode(AVector<ACell> rootNode,DLPath path,AVector<ACell> newNode,CVMLong utime,boolean replaceEntry) {
 		int n=path.getNameCount();
 		if (n==0) return newNode;
 
@@ -312,6 +330,7 @@ public class DLFSNode {
 		AString name=path.getCVMName(0);
 		Index<AString, AVector<ACell>> entries = getDirectoryEntries(rootNode);
 		if (n==1) {
+			boolean membershipChanged=(entries.get(name)==null)!=(newNode==null);
 			Index<AString, CVMLong> tombs = getTombstones(rootNode);
 			if (newNode==null) {
 				// Internal removal of a live entry (no tombstone recorded)
@@ -321,14 +340,15 @@ public class DLFSNode {
 				entries=entries.assoc(name, newNode);
 				tombs=tombs.dissoc(name);
 			}
-			return withDir(rootNode, entries, tombs, utime);
+			AVector<ACell> updated=withDir(withMTime(rootNode,getMTime(rootNode)), entries, tombs, utime);
+			return membershipChanged || replaceEntry ? withContentTime(updated,utime) : updated;
 		}
 
 		AVector<ACell> childNode=entries.get(name);
-		childNode=updateNode(childNode,path.subpath(1),newNode,utime);
+		childNode=updateNode(childNode,path.subpath(1),newNode,utime,replaceEntry);
 		if (childNode==null) return null; // failed: an ancestor on the path was not a directory
 		entries=entries.assoc(name, childNode);
-		return withDir(rootNode, entries, getTombstones(rootNode), utime);
+		return withDir(withMTime(rootNode,getMTime(rootNode)), entries, getTombstones(rootNode), utime);
 	}
 
 	/**
@@ -350,14 +370,15 @@ public class DLFSNode {
 			if (entries.get(name)==null) return rootNode; // not a live child
 			entries=entries.dissoc(name);
 			Index<AString, CVMLong> tombs = getTombstones(rootNode).assoc(name, utime);
-			return withDir(rootNode, entries, tombs, utime);
+			AVector<ACell> updated=withDir(rootNode, entries, tombs, utime);
+			return withContentTime(updated,utime);
 		}
 		AVector<ACell> childNode=entries.get(name);
 		if (childNode==null) return rootNode; // path does not exist
 		AVector<ACell> newChild=deleteNode(childNode, path.subpath(1), utime);
 		if (newChild==childNode) return rootNode; // nothing changed
 		entries=entries.assoc(name, newChild);
-		return withDir(rootNode, entries, getTombstones(rootNode), utime);
+		return withDir(withMTime(rootNode,getMTime(rootNode)), entries, getTombstones(rootNode), utime);
 	}
 
 	/**
@@ -376,21 +397,43 @@ public class DLFSNode {
 
 	/**
 	 * Rebuilds a directory node with the given live entries, tombstones and timestamp, maintaining
-	 * the canonical invariant that the POS_TOMBS element is present if and only if it is non-empty.
+	 * extension fields. An empty tombstone slot is omitted unless needed as padding.
 	 */
 	static AVector<ACell> withDir(AVector<ACell> node, Index<AString, AVector<ACell>> entries, Index<AString, CVMLong> tombs, CVMLong utime) {
-		AVector<ACell> result=node;
-		result=result.assoc(POS_DIR, entries);
+		AVector<ACell> result=node.assoc(POS_DIR, entries);
 		result=result.assoc(POS_UTIME, utime);
-		boolean has5 = node.count()>POS_TOMBS;
 		if (tombs==null || tombs.isEmpty()) {
-			if (has5) result=result.slice(0, POS_TOMBS); // drop empty tombstone field (5 -> 4)
-		} else if (has5) {
-			result=result.assoc(POS_TOMBS, tombs);
-		} else {
-			result=result.conj(tombs); // append tombstone field (4 -> 5)
+			if (result.count()>POS_MTIME) return result.assoc(POS_TOMBS,null);
+			return result.count()>POS_TOMBS ? result.slice(0,NODE_LENGTH) : result;
 		}
-		return result;
+		return result.count()>POS_TOMBS ? result.assoc(POS_TOMBS,tombs) : result.conj(tombs);
+	}
+
+	/** Removes copied directory children/tombstones without dropping extension fields. */
+	public static AVector<ACell> withoutChildren(AVector<ACell> node) {
+		return withDir(node,EMPTY_CONTENTS,EMPTY_TOMBS,getUTime(node));
+	}
+
+	/** Reads modification time, falling back to legacy update time without rewriting the node. */
+	public static CVMLong getMTime(AVector<ACell> node) {
+		return node.count()>POS_MTIME && node.get(POS_MTIME) instanceof CVMLong time ? time : getUTime(node);
+	}
+
+	/**
+	 * Sets modification time without altering the merge clock or unknown trailing fields.
+	 * A null value restores the fallback to update time. When both times are equal,
+	 * callers may instead omit the mtime slot if no later fields exist, retaining any
+	 * non-empty tombstone index and removing unused tombstone padding.
+	 */
+	public static AVector<ACell> withMTime(AVector<ACell> node,CVMLong modified) {
+		AVector<ACell> result=node;
+		while (result.count()<=POS_MTIME) result=result.conj(null);
+		return result.assoc(POS_MTIME,modified);
+	}
+
+	/** A content edit changes mtime and utime, preserving opaque fields. */
+	public static AVector<ACell> withContentTime(AVector<ACell> node,CVMLong operationTime) {
+		return withMTime(node,operationTime).assoc(POS_UTIME,operationTime);
 	}
 	
 	/**
@@ -442,7 +485,7 @@ public class DLFSNode {
 	public static AVector<ACell> withMetadata(AVector<ACell> node, ACell metadata, CVMLong utime) {
 		if (!isValidNodeShallow(node)) throw new IllegalArgumentException("Invalid DLFS node");
 		if (utime==null) throw new IllegalArgumentException("DLFS metadata timestamp cannot be null");
-		return node.assoc(POS_METADATA, metadata).assoc(POS_UTIME, utime);
+		return withMTime(node,getMTime(node)).assoc(POS_METADATA, metadata).assoc(POS_UTIME, utime);
 	}
 	
 	/**
@@ -611,7 +654,7 @@ public class DLFSNode {
 
 	/**
 	 * Builds a canonical directory node from merged live entries and tombstones, with the
-	 * POS_TOMBS element present if and only if the tombstone index is non-empty.
+	 * empty tombstones omitted or represented by padding before extensions.
 	 */
 	static AVector<ACell> buildDirectory(AVector<ACell> metadataSource, CVMLong utime,
 			Index<AString, AVector<ACell>> entries, Index<AString, CVMLong> tombs) {

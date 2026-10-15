@@ -193,18 +193,27 @@ dependency on `NodeServer`.
 
 ```java
 // Local: restore or create the standard :fs region in any AStore
-DLFSApplication app = DLFSApplication.open(store, myKeyPair);
-DLFSDriveManager myDrives = new DLFSDriveManager(
-    app.drives(myKeyPair.getAccountKey()));
-myDrives.createDrive(null, "home");
-FileSystem home = myDrives.getDrive(null, "home");
+var app = DLFSApplication.open(store, myKeyPair);
+DLFSDrives myDrives = app.drives(myKeyPair.getAccountKey());
+DLFSDrive drive = myDrives.getOrCreateDrive("home");
+if (drive == null) throw new IllegalStateException("Cannot open home drive");
+FileSystem home = drive.fileSystem();
 Files.writeString(home.getPath("/hello.txt"), "Hello");
 app.sync();  // select and persist the current lattice root
-app.flush(); // separate physical durability barrier
+store.flush(); // separate physical durability barrier
 
-DLFSServer server = DLFSServer.create(myDrives);
+// Optional HTTP access uses a manager for identity routing
+DLFSServer server = DLFSServer.create(new DLFSDriveManager(myDrives));
 server.start(0);
 ```
+
+`getOrCreateDrive(name, maximumDrives)` enforces the live-drive limit atomically
+within shared working state. Opening an existing drive preserves its contents and
+timestamps, even when the limit is reached. Invalid names, malformed entries and
+failed creation return null. Concurrent deletion can also make a drive unavailable;
+the operation does not retry creation after deletion. Independent replicas enforce
+their own limits. Use `drive(name)` for lookup only and `createDrive(name)` when an
+existing drive should make creation fail. These operations do not publish the root.
 
 Networked bootstrap supplies the host; the DLFS component API is unchanged:
 
@@ -233,7 +242,9 @@ DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
 DLFSDriveManager routes = DLFSDriveManager.createRouter()
     .mountAnonymous(ownerDrives)
     .mount(DID.forKey(myKeyPair.getAccountKey()).toString(), ownerDrives);
-routes.createDrive(null, "home");
+if (ownerDrives.getOrCreateDrive("home") == null) {
+    throw new IllegalStateException("Cannot open home drive");
+}
 networkedApp.sync();
 
 DLFSServer networkedServer = DLFSServer.createWithAudience(routes, myKeyPair);
@@ -284,6 +295,20 @@ curl -X PROPFIND http://localhost:8080/dlfs/
 ```
 
 ## Design
+
+DLFS supports NIO copy and move between drives, and ordinary `Files.copy` /
+`Files.move` with other providers. Aliased views obtained from the same component
+root recognise the same working drive; atomic moves are supported within that
+drive. Cross-drive moves copy first and remove the source only if it still matches
+the copied snapshot. A concurrent source edit leaves both versions and reports an
+error. `ATOMIC_MOVE` across independent drives is rejected.
+
+Nodes have an optional content modification time (`mtime`) independent of their
+application-controlled merge clock. NIO `COPY_ATTRIBUTES` and moves preserve
+`mtime`; ordinary copies use the destination operation time. Reads do not update
+state. Access time is reported as `mtime`, creation time as the epoch, and setters
+for these unsupported times are ignored. See the node format and compatibility
+details in the design document.
 
 See [docs/DLFS_DESIGN.md](docs/DLFS_DESIGN.md) for the architecture, and
 [docs/DLFS_AUTH.md](docs/DLFS_AUTH.md) for the authentication model.

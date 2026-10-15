@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- DLFS supports a separate optional content modification time, basic NIO attribute updates and preservation of unknown future node fields. Legacy nodes remain readable; older readers must upgrade before receiving extended nodes.
+- DLFS owner components provide atomic `getOrCreateDrive`, with optional live-drive limits, so applications can open or initialise a drive safely under concurrent creation.
 - Typed lattice component transactions stage domain operations atomically, with async completion and an opt-in transactional root for exclusive execution and contention fallback. Ordinary roots retain their existing write path.
 - REST `POST /api/v1/simulate` accepts source or binary transactions without signing credentials, returning transaction accounting results under public query limits, including `JUICE` errors for zero-balance accounts.
 - Java clients expose `simulate` and `simulateSync` for transaction accounting and cost estimates; the GUI stress tool labels this mode "Simulate" to distinguish it from ordinary queries.
@@ -35,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- DLFS copies and moves work across drives and with other NIO providers; separate views of the same working drive support atomic rename and same-file detection.
+- Directly hosted DLFS drive collections inherit the host's component context, including its mutation clock.
 - CVM booleans and equal generic byte flags use consistent Java hash codes, preserving lookups and duplicate detection in Java hash maps and sets across representations and decoding.
 - PostgreSQL JDBC queries no longer fail on a duplicate column description during extended-query execution.
 - PostgreSQL prepared statements decode binary numeric parameters by their declared type, including the full unsigned OID range, and reject invalid fixed-width parameter lengths.

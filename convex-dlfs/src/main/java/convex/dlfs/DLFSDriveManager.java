@@ -153,16 +153,12 @@ public class DLFSDriveManager {
 	public synchronized boolean createDrive(String identity, String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
-		if (componentDrives!=null) return createCursorDrive(componentDrives,driveName);
+		if (componentDrives!=null) return componentDrives.createDrive(driveName,MAX_DRIVES_PER_IDENTITY)!=null;
 		if (!ephemeralFallback) return false;
 		String key = driveKey(identity, driveName);
 		if (listDrives(identity).size() >= MAX_DRIVES_PER_IDENTITY) return false;
 		FileSystem existing = drives.putIfAbsent(key, DLFS.createLocal());
 		return existing == null;
-	}
-
-	private boolean createCursorDrive(DLFSDrives componentDrives, String driveName) {
-		return componentDrives.createDrive(driveName,MAX_DRIVES_PER_IDENTITY)!=null;
 	}
 
 	/**
@@ -175,13 +171,9 @@ public class DLFSDriveManager {
 	public synchronized boolean deleteDrive(String identity, String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
-		if (componentDrives!=null) return deleteCursorDrive(componentDrives,driveName);
+		if (componentDrives!=null) return componentDrives.deleteDrive(driveName);
 		if (!ephemeralFallback) return false;
 		return drives.remove(driveKey(identity, driveName)) != null;
-	}
-
-	private boolean deleteCursorDrive(DLFSDrives componentDrives, String driveName) {
-		return componentDrives.deleteDrive(driveName);
 	}
 
 	/**
@@ -216,7 +208,7 @@ public class DLFSDriveManager {
 	public synchronized boolean renameDrive(String identity, String oldName, String newName) {
 		if (!DLFSPathValidator.isValidDriveName(oldName) || !DLFSPathValidator.isValidDriveName(newName)) return false;
 		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
-		if (componentDrives!=null) return renameCursorDrive(componentDrives,oldName,newName);
+		if (componentDrives!=null) return componentDrives.renameDrive(oldName,newName);
 		if (!ephemeralFallback) return false;
 		if (oldName.equals(newName)) return getDrive(identity, oldName) != null;
 		String oldKey = driveKey(identity, oldName);
@@ -230,10 +222,6 @@ public class DLFSDriveManager {
 			return false;
 		}
 		return true;
-	}
-
-	private boolean renameCursorDrive(DLFSDrives componentDrives, String oldName, String newName) {
-		return componentDrives.renameDrive(oldName,newName);
 	}
 
 	/**
