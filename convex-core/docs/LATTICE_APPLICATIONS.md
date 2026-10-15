@@ -8,6 +8,102 @@ practical companion for `convex-core`, with `convex-social`, `convex-dlfs` and
 `convex-p2p` as worked examples. Cursor internals are in
 [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
 
+## The design from first principles
+
+**The problem.** Many nodes hold copies of shared data and update them
+independently, with no central authority ordering writes. Any node must be able to
+combine any two versions of the data into one, deterministically, so that all copies
+converge whatever the order or repetition of exchange. Users own parts of that data,
+and nobody else may forge changes to them.
+
+**State is an immutable value.** The whole data tree is one immutable CVM value:
+maps, indexes, vectors, sets and signed envelopes. Changing state means producing a
+new value and swapping a reference to it. Nothing is ever mutated in place.
+
+**A lattice is the combining rule.** For each position in the tree, a lattice says
+how two versions of the value there combine: a merge that is associative, idempotent
+and commutative, with one documented exception, that on an exact tie the value
+already held locally is kept. Those properties are what make convergence independent
+of order. A lattice also knows the empty value at its position and the rule for each
+child key, so the lattice for a whole tree is composed bottom-up from a few
+primitives: a register where the newer timestamp wins, collections that take the
+union of keys and merge each entry by its own rule, records with named children, and
+owner namespaces. Design the data tree first, choose a rule for each leaf, and
+compose. A custom merge is written only for semantics the primitives cannot express.
+Lattices are pure functions over values and know nothing about cursors, components
+or storage.
+
+**Ownership is a lattice rule.** Self-sovereign data lives in regions keyed by owner
+identity, each slot holding a signed envelope. The merge rule at that level verifies
+that the signer is authorised for the owner, by key equality or by a predicate bound
+to that lattice instance, and silently drops anything else. The same rule applies
+when the local node authors a value: a write into an owner's slot must be signed by
+an authorised key or it fails, so local state never contains something peers would
+reject. Authorisation belongs to the schema at that path, and a child rule never
+waives an enclosing one.
+
+**Policy is separate from mechanism.** A write needs a clock and a signer. The
+context supplies both: one timestamp per logical write, used exactly and never
+ratcheted against stored values, and the signing capability this process has,
+possibly a wallet holding several identities. Reusing a timestamp is a deliberate
+tie, which the local value wins. Policy is held by the component doing the work, not
+by the data and not by the storage.
+
+**Cursors are the mutable layer, and only that.** A cursor is a reference to one
+immutable value with atomic update, compare-and-set, navigation into sub-positions
+whose writes rebuild the enclosing value atomically, and private drafts for
+multi-step transactions. A cursor knows nothing about lattices, ownership, policy or
+persistence. It gives atomicity and navigation; meaning comes from whoever holds it.
+
+**Components give positions their meaning.** A component holds one cursor at one
+path together with everything the cursor does not know: the lattice at that level,
+the policy, and the domain operations such as post, follow or create drive. One
+component per level of the data model. Each creates the components for the level
+below, declaring the child's lattice and placing any boundary, signing or
+timestamping, exactly where the data model puts it. Boundaries are never discovered
+by navigation. There are two kinds of component. A lightweight view shares its
+parent's state, so its writes are visible immediately and it has nothing to publish.
+A publication boundary owns private working state plus a destination: its sync takes
+one snapshot, reconciles it with whatever the destination now holds using the
+lattice, with local edits as the preferred side, installs the result by
+compare-and-set, and stops. The signed component is the archetype: unsigned working
+state, a signed destination, one signature at publication however many edits
+preceded it.
+
+**An application is the component at the root.** It declares the root lattice,
+admits incoming values by merging them under that lattice and the ownership rules,
+hands out typed cursors for its regions, and decides when to publish. Applications
+participate selectively: a keyed root merges the regions it knows and ignores the
+rest, so nodes with different region sets still interoperate.
+
+**The host is the authoritative local root.** It owns the store, the publication
+policy that runs on its sync, and the durability barrier. It knows the root lattice
+so that it can merge on its own when no application is configured, and otherwise
+delegates admission of incoming values to its applications. A node adds networking
+around the same host: it receives values from peers, hands them to the host, and
+sends root snapshots out. Application code is identical against a local host and a
+networked one.
+
+### How state moves
+
+- **A local write** goes domain operation, component, cursor atomic update. Any
+  stamping or signing happens inside that update at the boundary the component
+  wrapped.
+- **Publication is explicit and layered.** A component's sync publishes one snapshot
+  into its destination and stops there. An application's sync first checkpoints its
+  owned signed components, then publishes its snapshot into the host. The host's
+  sync persists the root and notifies replication. Flush is the physical durability
+  barrier. Persist, sync and flush are three different things, and nothing is
+  published, persisted or sent without the owner of that state asking.
+- **An incoming value** arrives at the node, reaches the host, and is offered to
+  each application's merge, which verifies envelopes, merges under its lattice and
+  discards what it does not accept. Receipt never implies republication.
+- **Batching** is a fork: edit privately, publish once, and let conflicts resolve by
+  merge rather than by failure. Transactions are the stricter form for one atomic
+  multi-step change, committed by compare-and-set and retried.
+- **Deletion** under a union merge needs a tombstone, or a whole-value register
+  with a timestamp, because an older replica would otherwise resurrect the key.
+
 **Branch prototype:** component-owned working state and publication below are an
 intentional revision of CAD035/CAD045. Those CADs still describe lattice-aware
 cursors and automatic cursor signing boundaries; they need corresponding updates
