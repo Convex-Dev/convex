@@ -641,11 +641,12 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 * fails. Types without a decoding here, and parameters the client declared no type
 	 * for, are bound as bytes as before.
 	 */
-	private static void bindBinaryParameter(PreparedStatement pstmt, int index, byte[] value, int oid) throws SQLException {
+	static void bindBinaryParameter(PreparedStatement pstmt, int index, byte[] value, int oid) throws SQLException {
 		java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(value);
 		switch (oid) {
 			case PgType.INT2 -> { requireLength(value, 2, "int2"); pstmt.setLong(index, buf.getShort()); }
-			case PgType.INT4, PgType.OID -> { requireLength(value, 4, "int4"); pstmt.setLong(index, buf.getInt()); }
+			case PgType.INT4 -> { requireLength(value, 4, "int4"); pstmt.setLong(index, buf.getInt()); }
+			case PgType.OID -> { requireLength(value, 4, "oid"); pstmt.setLong(index, Integer.toUnsignedLong(buf.getInt())); }
 			case PgType.INT8 -> { requireLength(value, 8, "int8"); pstmt.setLong(index, buf.getLong()); }
 			case PgType.FLOAT4 -> { requireLength(value, 4, "float4"); pstmt.setDouble(index, buf.getFloat()); }
 			case PgType.FLOAT8 -> { requireLength(value, 8, "float8"); pstmt.setDouble(index, buf.getDouble()); }

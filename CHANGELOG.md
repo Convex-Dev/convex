@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- PostgreSQL prepared statements decode binary numeric parameters by their declared type, including the full unsigned OID range, and reject invalid fixed-width parameter lengths.
 - Typed CVM access now accepts equivalent generic CAD3 representations of addresses, operations, functions and records, including values retained in store caches. Default store decoding continues to produce CVM representations on cache hits.
 
 ## [0.8.17] - 2026-10-09
