@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- PostgreSQL JDBC queries no longer fail on a duplicate column description during extended-query execution.
 - PostgreSQL prepared statements decode binary numeric parameters by their declared type, including the full unsigned OID range, and reject invalid fixed-width parameter lengths.
 - Scheduled execution respects the 100-operation limit across timestamp buckets and retains unprocessed entries, preventing oversized buckets from exhausting peer memory.
 - Variadic subtraction reports a numeric error when an intermediate result exceeds the integer limit, instead of throwing a Java exception.

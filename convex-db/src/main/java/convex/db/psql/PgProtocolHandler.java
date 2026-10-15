@@ -211,6 +211,15 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	private void executeQuery(ChannelHandlerContext ctx, String sql) throws SQLException {
+		executeQuery(ctx, sql, true);
+	}
+
+	/**
+	 * @param describeRows Whether a result set is preceded by its RowDescription. True for
+	 *        the simple query protocol. False for Execute in the extended protocol, which
+	 *        never sends one: there the client asks for it with Describe.
+	 */
+	private void executeQuery(ChannelHandlerContext ctx, String sql, boolean describeRows) throws SQLException {
 		sql = rewriteQuery(sql);
 
 		// Null means return empty result (e.g., for system catalog queries)
@@ -224,7 +233,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 			if (hasResultSet) {
 				try (ResultSet rs = stmt.getResultSet()) {
-					sendResultSet(ctx, rs);
+					sendResultSet(ctx, rs, describeRows);
 				}
 			} else {
 				int updateCount = stmt.getUpdateCount();
@@ -351,12 +360,14 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		return CAST.matcher(sql).replaceAll("");
 	}
 
-	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs) throws SQLException {
+	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs, boolean describeRows) throws SQLException {
 		ResultSetMetaData meta = rs.getMetaData();
 		int columnCount = meta.getColumnCount();
 
 		// Send row description
-		write(ctx, RowDescription.fromMetaData(meta));
+		if (describeRows) {
+			write(ctx, RowDescription.fromMetaData(meta));
+		}
 
 		// Send data rows
 		long rowCount = 0;
@@ -567,7 +578,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 		// If no parameters, execute directly
 		if (paramValues == null || paramValues.length == 0) {
-			executeQuery(ctx, sql);
+			executeQuery(ctx, sql, false);
 			return;
 		}
 
@@ -579,7 +590,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			lowerSql.contains("pg_namespace") || lowerSql.contains("pg_attribute") ||
 			lowerSql.contains("pg_tables")) {
 			String substituted = substituteParameters(sql, paramValues, paramFormats);
-			executeQuery(ctx, substituted);
+			executeQuery(ctx, substituted, false);
 			return;
 		}
 
@@ -613,7 +624,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			boolean hasResultSet = pstmt.execute();
 			if (hasResultSet) {
 				try (ResultSet rs = pstmt.getResultSet()) {
-					sendResultSet(ctx, rs);
+					sendResultSet(ctx, rs, false);
 				}
 			} else {
 				int updateCount = pstmt.getUpdateCount();

@@ -332,10 +332,6 @@ public class PgServerTest {
 	}
 
 	/**
-	 * Tests connectivity using the PostgreSQL JDBC driver.
-	 * Disabled: Requires extended query protocol support (Parse/Bind/Execute).
-	 */
-	/**
 	 * The PostgreSQL JDBC driver sends numeric parameters in binary format (setLong as
 	 * the 8 bytes of an int8). They must reach the statement as numbers.
 	 */
@@ -422,7 +418,9 @@ public class PgServerTest {
 		assertEquals(convex.core.data.prim.CVMDouble.create(0.25), db.tables().selectByKey("readings", convex.core.data.prim.CVMLong.create(2)).get(1));
 	}
 
-	@org.junit.jupiter.api.Disabled("Requires extended query protocol")
+	/**
+	 * Tests connectivity using the PostgreSQL JDBC driver.
+	 */
 	@Test
 	public void testPostgresJDBCDriver() throws Exception {
 		// Connect using PostgreSQL JDBC driver
@@ -449,10 +447,52 @@ public class PgServerTest {
 	}
 
 	/**
-	 * Tests aggregation via PostgreSQL JDBC driver.
-	 * Disabled: Requires extended query protocol support (Parse/Bind/Execute).
+	 * The driver asks for the row description once, with Describe, and then executes
+	 * the same statement again without asking. Execute itself must not send one.
 	 */
-	@org.junit.jupiter.api.Disabled("Requires extended query protocol")
+	@Test
+	public void testPostgresJDBCPreparedSelectRepeated() throws Exception {
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url);
+			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE email = ?")) {
+			// More often than the driver's prepare threshold, so that the statement
+			// becomes a named one whose description the driver has cached
+			for (int i = 0; i < 12; i++) {
+				boolean alice = (i % 2 == 0);
+				select.setString(1, alice ? "alice@example.com" : "bob@example.com");
+				try (ResultSet rs = select.executeQuery()) {
+					assertTrue(rs.next());
+					assertEquals(alice ? "Alice" : "Bob", rs.getString("name"));
+					assertFalse(rs.next());
+				}
+			}
+		}
+	}
+
+	/**
+	 * Binary numeric parameters and extended-query result rows work together, also
+	 * after the driver starts reusing a named prepared statement.
+	 */
+	@Test
+	public void testPostgresJDBCPreparedNumericSelectRepeated() throws Exception {
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url);
+			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE id = ?")) {
+			for (int i = 0; i < 12; i++) {
+				boolean alice = (i % 2 == 0);
+				select.setLong(1, alice ? 1L : 2L);
+				try (ResultSet rs = select.executeQuery()) {
+					assertTrue(rs.next());
+					assertEquals(alice ? "Alice" : "Bob", rs.getString("name"));
+					assertFalse(rs.next());
+				}
+			}
+		}
+	}
+
+	/**
+	 * Tests aggregation via PostgreSQL JDBC driver.
+	 */
 	@Test
 	public void testPostgresJDBCAggregation() throws Exception {
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
