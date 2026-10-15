@@ -98,9 +98,61 @@ If an application publishes during configured host persistence, the newer
 application result remains pending in the root. The host does not re-merge the
 older persisted snapshot over it using its own lattice.
 
-This is currently a local component API. Routing all NodeServer ingress through
-it and constructing applications after node restoration are the next integration
-step; node transport and launch behaviour have not been changed in this prototype.
+NodeServer routes incoming pushes, whole-root and path pulls, direct merge calls,
+and explicit snapshot candidates through the root component. Delivery does not
+invoke application sync. Host sync and shutdown publish only state already installed
+in the host. An acknowledgement confirms delivery, not publication of private work;
+applications may also ignore a value without reporting an error.
+
+`root.mergeAt(value, path...)` forwards the input unchanged to each application's
+`mergeAt` hook. The host does not use its lattice to infer application interests.
+The base application handles an empty path through `merge(value)` and ignores
+every non-empty path, including paths declared by its lattice. An application
+overrides this hook to choose its interests, validate input and delegate to domain
+components. It can explicitly reuse its whole-root merge policy or merge directly
+into a domain component. It must verify enclosing signed envelopes before accepting
+interior values. There is no generic partial-tree reconstruction. Paths are borrowed
+read-only for the call; a handler retaining a path must copy it.
+
+Without configured applications, the root retains standalone lattice-directed
+merging, including existing path support. This fallback rejects paths through signed
+envelopes; callers must supply the complete envelope at its signed slot.
+
+NodeServer hosts a root component and delegates incoming merges to it; the node
+retains no separate lattice definition or merge context. The lattice-taking
+constructor creates its own root as a convenience. At launch it restores retained
+state through root merge, preserving pre-launch local edits, before calling the
+application factory and starting attached propagation workers:
+
+```java
+var node = new NodeServer<>(MyApplication.LATTICE, store);
+var app = node.launch(MyApplication::new);
+// Later, according to application policy:
+app.sync();
+node.getRootComponent().sync();
+```
+
+Alternatively, pass an already-initialised root:
+
+```java
+var root = RootComponent.open(MyApplication.LATTICE, store);
+var node = new NodeServer<>(root, config);
+var app = node.launch(MyApplication::new);
+```
+
+The supplied root keeps its state, context and cursor policy; NodeServer does not
+restore it again. Restore, transactional-root and default merge-context settings
+in node configuration apply only to roots created by the lattice-taking constructor.
+Applications can instead be constructed and configured on the supplied root before
+calling plain `node.launch()`. Launch installs the node's publication pipeline on
+the root, so its publication policy must not already be frozen.
+
+The factory overload is for first launch only. It returns the typed application,
+does not invoke its sync hook, and adds no application worker or scheduler. Store
+restoration failure aborts launch before constructing the application or publishing
+a replacement root. Transport and propagation configuration remain explicit; launch
+caller-owned listeners afterwards. Existing adapters using live host views retain
+immediate visibility of their edits.
 
 ### Sharing a host
 
@@ -252,6 +304,45 @@ services. A new host interface is only needed if another implementation requires
 Application-selected region definitions configure the host root at construction;
 the host does not need to know the corresponding component classes. Combining
 different applications' region selections in a shared host remains future work.
+
+### Basic hosted setup
+
+**Partially implemented:** `NodeServer.launch(applicationFactory)` handles restoration,
+application construction and incoming delegation for one application. Automatic
+transport assembly remains a design requirement. A basic installation
+should require the caller to supply the application setup, a store and optional
+network settings. Application implementations supply their lattice definitions
+and domain component construction. Standard setup should assemble the host,
+incoming delegation and ordinary propagation machinery internally; callers should
+not need to wire listeners, propagators or publication callbacks for this case.
+
+Setup must restore the retained root before constructing applications with private
+working state, configure their incoming delegation before accepting traffic, and
+start transports last. Shutdown stops incoming traffic, allows application-owned
+shutdown policy to complete, publishes and flushes the host's already-published
+application state, then releases owned resources. Host shutdown must not force
+private application drafts to publish. A caller-supplied store remains caller-owned.
+The returned host remains explicit and accessible; this must not recreate the
+removed application factory which hid a persisted root behind a domain component.
+
+The default local setup creates no network workers. Networking, where requested,
+has an explicit lifecycle owner. Advanced callers can still supply their own
+propagation groups, transport and publication timing without introducing parent
+links or resource ownership into lightweight components.
+
+**Design decision:** applications always initiate their own publication. Incoming
+delivery invokes application merge, without an automatic application sync or
+preparation hook. An application may choose immediate publication in its event
+handling, batch changes, or wait for an explicit user action. These are application
+semantics, not eager/deferred modes imposed by the host.
+
+Application sync publishes into its destination cursor and stops there. Host
+publication can persist and propagate only state already published into that host;
+it must not pull private working state from applications. Standard setup may wire
+host publication policy, but must not infer that receiving a value permits
+publishing an application's pending edits. Ordinary cursor updates never trigger
+enclosing component publication. A successful incoming delivery therefore does
+not imply that the application has published, persisted or rebroadcast the value.
 
 Signing establishes responsibility for the entire signed subtree. Its owner is
 responsible for merging and publishing that tree, including coordinating multiple
@@ -714,8 +805,7 @@ MyApplication app = MyApplication.connect(local);
 
 // Hosted by a node: identical application code
 NodeServer<Index<Keyword, ACell>> node = new NodeServer<>(applicationLattice, store, config);
-node.launch();
-MyApplication networked = MyApplication.connect(node.getRootComponent());
+MyApplication networked = node.launch(MyApplication::connect);
 ```
 
 The caller owns and closes `store` and `node`; components are views and own neither.

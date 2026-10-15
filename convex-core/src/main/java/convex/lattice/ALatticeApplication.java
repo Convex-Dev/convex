@@ -139,4 +139,22 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	public V merge(V other) {
 		return cursor.updateAndGet(own -> lattice.merge(getContext(),own,other));
 	}
+
+	/**
+	 * Delivers an incoming subtree at a path relative to this application's root.
+	 * The default calls {@link #merge} for an empty path and ignores all other
+	 * paths, even when the lattice declares them. Applications override this hook
+	 * to select their interests, verify input and delegate to domain components.
+	 * Knowing a path's type does not imply interest in receiving updates there.
+	 * Overrides must verify enclosing signed envelopes before accepting interior
+	 * data. The path is borrowed read-only for the duration of the call.
+	 * No sync or preparation hook is invoked automatically.
+	 *
+	 * @return Current application working root, not a publication acknowledgement
+	 */
+	@SuppressWarnings("unchecked")
+	public V mergeAt(ACell value, ACell... path) {
+		if (path.length==0) return merge((V)value);
+		return cursor.get();
+	}
 }

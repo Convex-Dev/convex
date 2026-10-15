@@ -447,11 +447,11 @@ public class NodeServerTest {
 		c.set(CVMLong.create(5));
 
 		// A correct-type value merges (MaxLattice keeps the larger)
-		assertTrue(maxNodeServer.mergeIncoming(c, lattice, CVMLong.create(7)));
+		assertTrue(maxNodeServer.mergeIncoming(CVMLong.create(7)));
 		assertEquals(CVMLong.create(7), c.get());
 
 		// A wrong-type value is rejected; the cursor is unchanged
-		assertFalse(maxNodeServer.mergeIncoming(c, lattice, convex.core.data.Blob.wrap(new byte[8])));
+		assertFalse(maxNodeServer.mergeIncoming(convex.core.data.Blob.wrap(new byte[8])));
 		assertEquals(CVMLong.create(7), c.get());
 	}
 
@@ -626,7 +626,7 @@ public class NodeServerTest {
 		var c = maxNodeServer.getCursor();
 		c.set(CVMLong.create(5));
 
-		assertFalse(maxNodeServer.mergeIncoming(c, maxNodeServer.getLattice(), CVMLong.create(7)),
+		assertFalse(maxNodeServer.mergeIncoming(CVMLong.create(7)),
 			"a recursive stack overflow must be caught and rejected");
 		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted merge");
 	}
@@ -639,7 +639,7 @@ public class NodeServerTest {
 		c.set(CVMLong.create(5));
 
 		assertThrows(OutOfMemoryError.class,
-			() -> maxNodeServer.mergeIncoming(c, maxNodeServer.getLattice(), CVMLong.create(7)));
+			() -> maxNodeServer.mergeIncoming(CVMLong.create(7)));
 		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted fatal merge");
 	}
 

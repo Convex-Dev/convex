@@ -8,11 +8,14 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.Cells;
+import convex.core.data.SignedData;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
+import convex.lattice.generic.SignedLattice;
+import convex.lattice.generic.OwnerLattice;
 
 /**
  * Generic store-backed root for a lattice application component hierarchy.
@@ -30,8 +33,8 @@ import convex.lattice.cursor.Root;
  * application publishes during host persistence, its newer result stays pending
  * without being re-merged against the persisted snapshot.</p>
  *
- * <p>The same component can wrap a cursor owned by a networked NodeServer or
- * own a standalone local root backed by any {@link AStore}.</p>
+ * <p>The same component can serve as a standalone local root backed by any
+ * {@link AStore}, or be hosted by a networked NodeServer.</p>
  *
  * @param <V> Root lattice value type
  */
@@ -134,6 +137,42 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 			return cursor.updateAndGet(own -> lattice.merge(getContext(),own,other));
 		}
 		for (ALatticeApplication<V> application:configured) application.merge(other);
+		return cursor.get();
+	}
+
+	/**
+	 * Delivers an incoming subtree to applications at a root-relative path.
+	 * Each application decides whether and how to handle the path; the host's
+	 * lattice does not pre-empt application acceptance. No application sync is
+	 * invoked. Delivery is sequential, with the same partial-failure semantics as
+	 * {@link #merge}. Paths are passed unchanged and must not be mutated by handlers.
+	 * Without configured applications, retains standalone lattice-directed path
+	 * merging, rejecting unknown paths and unsigned envelope interiors.
+	 *
+	 * @return Current published root, which may not include this delivery
+	 */
+	@SuppressWarnings("unchecked")
+	public V mergeAt(ACell value, ACell... path) {
+		List<ALatticeApplication<V>> configured=applications;
+		if (configured==null) {
+			if (path.length==0) return merge((V)value);
+			ALattice<?> target=lattice;
+			for (int i=0;i<path.length;i++) {
+				if (target instanceof SignedLattice<?>) {
+					throw new IllegalArgumentException("Incoming path must include the complete signed envelope");
+				}
+				// Legacy owner maps carry their authorisation rule in the context,
+				// rather than in the SignedLattice returned by path navigation.
+				if (i==path.length-1 && target instanceof OwnerLattice<?> && value instanceof SignedData<?> signed
+						&& !getContext().verifyOwner(path[i],signed.getAccountKey())) return cursor.get();
+				target=target.path(path[i]);
+				if (target==null) throw new IllegalArgumentException("Path is outside the served lattice");
+			}
+			ALattice<ACell> merge=(ALattice<ACell>)target;
+			this.<ACell>resolve(path).updateAndGet(own -> merge.merge(getContext(),own,value));
+			return cursor.get();
+		}
+		for (ALatticeApplication<V> application:configured) application.mergeAt(value,path);
 		return cursor.get();
 	}
 

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- NodeServer can host an initialised root component or construct its own from a lattice, and launch a typed application after root initialisation. Incoming roots and paths delegate to configured applications without forcing publication; applications explicitly opt into handling non-empty paths.
 - DLFS supports a separate optional content modification time, basic NIO attribute updates and preservation of unknown future node fields. Legacy nodes remain readable; older readers must upgrade before receiving extended nodes.
 - DLFS owner components provide atomic `getOrCreateDrive`, with optional live-drive limits, so applications can open or initialise a drive safely under concurrent creation.
 - Typed lattice component transactions stage domain operations atomically, with async completion and an opt-in transactional root for exclusive execution and contention fallback. Ordinary roots retain their existing write path.
@@ -21,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- NodeServer aborts startup if its retained root cannot be read, avoiding publication of a replacement root after failed restoration.
+- Standalone path merges enforce legacy owner authorisation at signed slots and reject incoming paths inside signed envelopes.
 - Component publication now belongs to the component: `sync()` updates only its supplied destination cursor and returns the published snapshot. Lightweight views do not publish enclosing state, and working/host cursors no longer invoke component callbacks. NodeServer callers publish through `getRootComponent().sync()`. DLFS applications require explicit host assembly; service wiring supplies any completion/publication callback.
 - Ordinary cursors no longer retain creation-time values or publication locks. Host publication uses `PublishingCursor`; `Root.view()`, cursor `detach()`/`merge()` and `getForkPoint()` are removed. Domain forks own their publication policy directly, so changing a fork's context also changes its publication context. `StampingLattice` is removed; components supply stamping functions to `StampedCursor`.
 
