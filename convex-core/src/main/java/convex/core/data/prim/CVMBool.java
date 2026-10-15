@@ -9,7 +9,6 @@ import convex.core.data.Strings;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
-import convex.core.util.Bits;
 
 /**
  * Class representing boolean values in the CVM type system.
@@ -17,6 +16,8 @@ import convex.core.util.Bits;
  * This class provides canonical TRUE and FALSE instances that are the only valid
  * boolean values in the CVM. The class is immutable and maintains singleton instances
  * for both boolean values to ensure type safety and memory efficiency.
+ * Java hash codes use ACell's encoding-based calculation, cached once per
+ * singleton, so that equal generic ByteFlag representations have the same hash code.
  * 
  * Key features:
  * - Immutable singleton instances
@@ -31,14 +32,11 @@ import convex.core.util.Bits;
 public final class CVMBool extends AByteFlag implements Comparable<CVMBool> {
 
 	private final boolean value;
+	private final int cachedHashCode;
 	
 	// Canonical instances
 	public static final CVMBool TRUE = Cells.intern(new CVMBool(true));
 	public static final CVMBool FALSE = Cells.intern(new CVMBool(false));
-
-	// Canonical hash codes with salt for security
-	private static final int CANONICAL_TRUE_HASHCODE = Bits.hash32(0xB001C0DE);
-	private static final int CANONICAL_FALSE_HASHCODE = ~CANONICAL_TRUE_HASHCODE;
 
 	// Cached string representations
 	public static final String TRUE_STRING = "true";
@@ -46,6 +44,7 @@ public final class CVMBool extends AByteFlag implements Comparable<CVMBool> {
 	
 	private CVMBool(boolean value) {
 		this.value = value;
+		this.cachedHashCode = super.hashCode();
 	}
 	
 	@Override
@@ -141,7 +140,7 @@ public final class CVMBool extends AByteFlag implements Comparable<CVMBool> {
 	
 	@Override
 	public int hashCode() {
-		return value ? CANONICAL_TRUE_HASHCODE : CANONICAL_FALSE_HASHCODE;
+		return cachedHashCode;
 	}
 	
 	@Override 

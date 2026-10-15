@@ -1,13 +1,19 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.CVMTag;
@@ -50,6 +56,53 @@ public class ByteFlagTest {
 		assertEquals(bt,CVMBool.TRUE);
 		assertEquals(CVMBool.TRUE,bt);
 
+	}
+
+	@ParameterizedTest
+	@ValueSource(ints = {0, 1})
+	public void testBooleanHashCode(int value) throws BadFormatException {
+		CVMBool bool=CVMBool.create(value==1);
+		for (AByteFlag flag : booleanRepresentations(value)) {
+			ACell decoded=CVMEncoder.INSTANCE.decode(flag.getEncoding());
+			assertSame(bool,decoded);
+			assertEquals(flag,decoded);
+			assertEquals(decoded,flag);
+			assertEquals(flag.getEncoding(),decoded.getEncoding());
+			assertEquals(flag.getHash(),decoded.getHash());
+			assertEquals(flag.hashCode(),decoded.hashCode());
+		}
+	}
+
+	@ParameterizedTest
+	@ValueSource(ints = {0, 1})
+	public void testBooleanHashCollections(int value) {
+		AByteFlag[] representations=booleanRepresentations(value);
+		// Check both directions: either representation may be stored or looked up.
+		for (AByteFlag stored : representations) {
+			for (AByteFlag lookup : representations) {
+				HashMap<ACell,String> map=new HashMap<>();
+				map.put(stored,"original");
+				assertEquals("original",map.get(lookup));
+				assertEquals("original",map.put(lookup,"replacement"));
+				assertEquals(1,map.size());
+				assertEquals("replacement",map.remove(stored));
+				assertTrue(map.isEmpty());
+
+				HashSet<ACell> set=new HashSet<>();
+				assertTrue(set.add(stored));
+				assertTrue(set.contains(lookup));
+				assertFalse(set.add(lookup));
+				assertEquals(1,set.size());
+				assertTrue(set.remove(lookup));
+				assertTrue(set.isEmpty());
+			}
+		}
+	}
+
+	private static AByteFlag[] booleanRepresentations(int value) {
+		CVMBool bool=CVMBool.create(value==1);
+		return new AByteFlag[] {bool, ByteFlag.create(value),
+			ByteFlag.forTag(bool.getTag()), new ByteFlag(bool.getTag())};
 	}
 
 	private void doByteFlagTest(int i) throws BadFormatException, IOException {

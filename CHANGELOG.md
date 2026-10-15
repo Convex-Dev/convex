@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CVM booleans and equal generic byte flags use consistent Java hash codes, preserving lookups and duplicate detection in Java hash maps and sets across representations and decoding.
 - Scheduled execution respects the 100-operation limit across timestamp buckets and retains unprocessed entries, preventing oversized buckets from exhausting peer memory.
 - Variadic subtraction reports a numeric error when an intermediate result exceeds the integer limit, instead of throwing a Java exception.
 - HTTP message requests use independent correlation IDs on the shared peer connection, and rejecting a duplicate client request ID no longer discards the original pending response.
