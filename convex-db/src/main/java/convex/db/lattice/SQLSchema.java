@@ -77,7 +77,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Forked SQLSchema instance
 	 */
 	public SQLSchema fork() {
-		return new SQLSchema(cursor.fork(TableStoreLattice.INSTANCE));
+		return configured(new SQLSchema(forkCursor(TableStoreLattice.INSTANCE)));
 	}
 
 	// ========== Internal Helpers ==========
@@ -92,7 +92,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	public SQLTable getTable(AString name) {
 		AForkableCursor<AVector<ACell>> tableCursor = cursor.child(name, SQLTableLattice.INSTANCE);
 		if (tableCursor.get() == null) return null;
-		return new SQLTable(tableCursor);
+		return configured(new SQLTable(tableCursor));
 	}
 
 	/** Convenience overload. */

@@ -67,7 +67,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 
 	/** Creates an isolated temporary multi-drive working component. */
 	public DLFSDrives fork() {
-		return new DLFSDrives(cursor.fork(LATTICE),store);
+		return configured(new DLFSDrives(forkCursor(LATTICE),store));
 	}
 
 	/** Opens an existing drive, or returns null if it is absent. */
@@ -78,7 +78,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return new DLFSDrive(key,cursor.child(key,DLFSLattice.INSTANCE),store);
+			return configured(new DLFSDrive(key,cursor.child(key,DLFSLattice.INSTANCE),store));
 		});
 	}
 
@@ -195,7 +195,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	 * owns the lattice context.
 	 */
 	private CVMLong mutationTimestamp() {
-		return cursor.getContext().currentTimestamp();
+		return getContext().currentTimestamp();
 	}
 
 	private void closeCached(AString name) {
@@ -209,7 +209,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	}
 	@Override
 	public DLFSDrives withCursor(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
-		return new DLFSDrives(cursor,store);
+		return configured(new DLFSDrives(cursor,store));
 	}
 
 }

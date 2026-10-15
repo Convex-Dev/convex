@@ -4,7 +4,6 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
-import convex.lattice.LatticeContext;
 import convex.lattice.Shape;
 
 /**
@@ -43,24 +42,12 @@ public class Cursors {
 	 * @return New root holding the shape's empty value
 	 */
 	public static <V extends ACell> Root<V> root(Shape<V> shape) {
-		return root(shape, null);
+		return new Root<>(shape.zero(), shape);
 	}
 
-	/**
-	 * Creates a root at a shape's empty value with a default context.
-	 *
-	 * @param <V> Type of cursor value
-	 * @param shape Shape of the root position
-	 * @param context Default write policy, or null for the empty context
-	 * @return New root holding the shape's empty value
-	 */
-	public static <V extends ACell> Root<V> root(Shape<V> shape, LatticeContext context) {
-		if (shape == null) throw new IllegalArgumentException("Shape must not be null");
-		return new Root<>(shape.zero(), shape, context);
-	}
 
 	/**
-	 * Creates a root holding a value, with no shape and the empty context.
+	 * Creates a root holding a value, with no declared shape.
 	 *
 	 * @param <V> Type of cursor value
 	 * @param value Initial value
@@ -71,18 +58,17 @@ public class Cursors {
 	}
 
 	/**
-	 * Creates a root holding a value, with a declared shape and default context.
+	 * Creates a root holding a value, with a declared shape.
 	 * Components usually pass their lattice as the shape:
-	 * {@code Cursors.root(LATTICE.zero(), LATTICE, context)}.
+	 * {@code Cursors.root(LATTICE.zero(), LATTICE)}.
 	 *
 	 * @param <V> Type of cursor value
 	 * @param value Initial value
 	 * @param shape Shape of the root position, or null for none
-	 * @param context Default write policy, or null for the empty context
 	 * @return New root
 	 */
-	public static <V extends ACell> Root<V> root(V value, Shape<V> shape, LatticeContext context) {
-		return new Root<>(value, shape, context);
+	public static <V extends ACell> Root<V> root(V value, Shape<V> shape) {
+		return new Root<>(value, shape);
 	}
 
 	/**
@@ -92,11 +78,10 @@ public class Cursors {
 	 * @param <V> Type of cursor value
 	 * @param value Initial value
 	 * @param shape Shape of the root position, or null for none
-	 * @param context Default write policy, or null for the empty context
 	 * @return New transactional root
 	 */
-	public static <V extends ACell> TransactionalRootCursor<V> transactionalRoot(V value, Shape<V> shape, LatticeContext context) {
-		return new TransactionalRootCursor<>(value, shape, context);
+	public static <V extends ACell> TransactionalRootCursor<V> transactionalRoot(V value, Shape<V> shape) {
+		return new TransactionalRootCursor<>(value, shape);
 	}
 
 	/**

@@ -48,7 +48,7 @@ public class ApplicationPublicationTest {
 
 	private static final class InterleavingRoot extends Root<Index<Keyword,ACell>> {
 		Runnable beforeCAS;
-		InterleavingRoot() { super(initial(),LATTICE,LatticeContext.EMPTY); }
+		InterleavingRoot() { super(initial(),LATTICE); }
 		@Override public boolean compareAndSet(Index<Keyword,ACell> expected,Index<Keyword,ACell> value) {
 			Runnable action=beforeCAS;
 			beforeCAS=null;
@@ -65,7 +65,7 @@ public class ApplicationPublicationTest {
 		Application(RootComponent<Index<Keyword,ACell>> host) {
 			super(host);
 			owner=new SignedComponent<>(SIGNED,resolve(OWNED));
-			owner.cursor().setContext(new LatticeContext() {
+			owner.setContext(new LatticeContext() {
 				@Override public AKeyPair getSigningKey() { return KEY; }
 				@Override public <T extends ACell> SignedData<T> sign(AccountKey key,T value) {
 					signatures.incrementAndGet();
@@ -117,7 +117,7 @@ public class ApplicationPublicationTest {
 		second.sync();
 		assertEquals(Sets.of(0,1,2),second.owner.cursor().get());
 		assertEquals(2,second.signatures.get(),"An unchanged subsequent publication must not sign");
-		assertNull(host.cursor().getContext().getSigningKey());
+		assertNull(host.getContext().getSigningKey());
 	}
 
 	@Test
@@ -214,13 +214,13 @@ public class ApplicationPublicationTest {
 		first.add(1);
 		second.add(2);
 		second.owner.sync();
-		var signer=second.owner.cursor().getContext();
-		second.owner.cursor().setContext(LatticeContext.EMPTY);
+		var signer=second.owner.getContext();
+		second.owner.setContext(LatticeContext.EMPTY);
 		first.sync();
 		assertThrows(IllegalStateException.class,second::sync);
 		assertEquals(Sets.of(0,1),signed(host.cursor().get()).getValue());
 		assertEquals(Sets.of(0,2),signed(second.cursor().get()).getValue());
-		second.owner.cursor().setContext(signer);
+		second.owner.setContext(signer);
 		second.sync();
 		assertEquals(Sets.of(0,1,2),signed(host.cursor().get()).getValue());
 	}

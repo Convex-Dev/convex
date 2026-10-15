@@ -31,14 +31,14 @@ import convex.lattice.fs.impl.DLFSLocal;
 
 public class DLFSMoveCopyTest {
 	private static void setContextTime(DLFSLocal fs, long timestamp) {
-		fs.getCursor().setContext(fs.getCursor().getContext().withTimestamp(CVMLong.create(timestamp)));
+		fs.setContext(fs.getContext().withTimestamp(CVMLong.create(timestamp)));
 	}
 
 	@Test
 	public void testLogicalMutationResolvesDynamicTimestampOnce() throws IOException {
 		DLFSLocal fs=DLFS.create();
 		AtomicLong clock=new AtomicLong(100);
-		fs.getCursor().setContext(new LatticeContext() {
+		fs.setContext(new LatticeContext() {
 			@Override public CVMLong currentTimestamp() {
 				return CVMLong.create(clock.incrementAndGet());
 			}

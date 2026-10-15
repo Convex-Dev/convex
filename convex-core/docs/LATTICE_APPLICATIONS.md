@@ -67,7 +67,7 @@ or supplies its own with `super(applicationLattice, host)`. Applications may als
 override `merge` to delegate to components with their own merge strategies and
 discard input they do not accept. Verification must still use the applicable
 owner-bound rules for the paths they publish.
-`merge` uses the cursor's effective context, preserves the current root in the
+`merge` uses the component's explicit context, preserves the current root in the
 `own` position, and retries after concurrent updates. It does not publish or flush.
 
 ### Incoming delegation
@@ -175,7 +175,7 @@ its owner verifier. Domain components can use its working cursor through their
 
 ```java
 var signed = new SignedComponent<>(owners.signingFor(owner), signedSlot);
-signed.cursor().setContext(ownerContext);
+signed.setContext(ownerContext);
 var user = existingUser.withCursor(signed.cursor());
 user.feed().post("First post");
 user.feed().post("Second post");
@@ -344,7 +344,7 @@ classes named `OwnerLattice`, so the typed hash-map variant is named
 representations remain supported.
 
 The bound predicate is authoritative for owner-to-signer matching in this region;
-an application cursor context cannot replace it. Nested ownership boundaries each
+an application component context cannot replace it. Nested ownership boundaries each
 retain their own rules; a child rule does not waive an enclosing rule.
 The context continues to provide the available signing capability and write clock.
 Host admission policy may independently decline to adopt data. A predicate rejection
@@ -461,7 +461,7 @@ starts no workers and installs no observers.
   without network activity.
 - Application policy supplies signing and timestamp capabilities through the
   relevant working cursors, before writes begin.
-  It must not mutate the shared host cursor's context. Merge authorisation is bound
+  It does not install policy on cursors. Merge authorisation is bound
   to the host's lattice instances; an application's signing capability does not
   replace it.
 - `close` is idempotent. It stops accepting subscriptions, invokes `onClose`, and
@@ -562,7 +562,7 @@ still wins as a whole; local atomicity does not introduce field-wise merge seman
 | Operation | Completion contract |
 |---|---|
 | Cursor update | One local state change is atomically visible; publication may still be pending |
-| Application `merge(value)` | Atomically merge an incoming root using the supplied lattice and effective cursor context; publication remains separate |
+| Application `merge(value)` | Atomically merge an incoming root using the supplied lattice and component context; publication remains separate |
 | Fork `sync()` | Merge one working snapshot into its immediate parent; concurrent state follows the declared lattice semantics |
 | Application `sync()` | Run `beforeSync`, then publish one application snapshot through its cursor boundary |
 | Host `sync()` | Persist and publish a host root snapshot, then notify configured replication services; no remote acknowledgement |
@@ -623,7 +623,8 @@ timestamp semantics. Use futures or latches for concurrency tests, never sleeps.
 Domain components        DLFSDrive, Social        one component per path
 Application component    ALatticeApplication      root merge and optional region factories
 Root component           RootComponent            persistence and publication
-Cursor and lattice       path(), fork(), merge    state and merge semantics
+Cursor                   path(), CAS, drafts       atomic state access
+Component and lattice    merge(), sync()           admission and publication
 Optional host runtime    NodeServer               replication and lifecycle
 ```
 
@@ -734,7 +735,7 @@ because streamed file writes checkpoint blobs before publication. The cursor is 
 only connection back to application state: its internal links provide navigation,
 atomic updates and fork merge-back. There is no second component-parent hierarchy,
 and cursors themselves know nothing of storage. The component that owns an
-owner-keyed or stamped level wraps the boundary itself, with `SignedCursor.forOwner`
+owner-keyed or stamped level wraps the boundary itself, with `SignedCursor.create`
 or `StampedCursor.create` and the lattice it declares, so the boundary is visible
 exactly where the domain structure places it and descendants never see it: `Social.user`
 wraps the owner's slot, `Feed` never sees `SignedData`.
@@ -748,7 +749,7 @@ receives `lattice.zero()` for an uninitialised path, so no null guard is needed:
 
 ```java
 public void putPost(Blob key, String text) {
-    long ts = cursor.getContext().currentTimestampValue();
+    long ts = getContext().currentTimestampValue();
     AHashMap<Keyword, ACell> post = SocialPost.createPost(text, ts);
     cursor.updateAndGet(feed -> feed.assoc(key, post));
 }
@@ -820,7 +821,7 @@ The host selects the concurrency policy at construction:
 
 ```java
 RootComponent<V> host = new RootComponent<>(lattice,
-    Cursors.transactionalRoot(lattice.zero(), lattice, context), store);
+    Cursors.transactionalRoot(lattice.zero(), lattice), store);
 
 // Alternatively, when creating a NodeServer:
 NodeConfig config = NodeConfig.create().withTransactionalRoot(true);
@@ -839,9 +840,11 @@ and `withCursor(AForkableCursor<Value>)`, creating a fresh component with the sa
 domain metadata over the supplied cursor. Rebuild children against that cursor; do
 not reuse cached live children. Application subclasses use the protected
 `ALatticeApplication(lattice, cursor)` constructor. Fork and rebinding factories are
-one line, e.g. `return new MyComponent(cursor.fork(LATTICE))`, passing the lattice
-the component declares so the fork converges on sync; a component which explicitly
-owns configuration, such as a DLFS store, passes it along itself.
+explicit about policy: `withCursor` retains the resolved component context as well
+as domain metadata. A simple leaf can use `configured(new MyComponent(cursor))`;
+a constructor that creates children must receive policy before constructing them.
+Domain forks use `forkCursor(LATTICE)` to obtain component-owned publication state.
+A component owning configuration, such as a DLFS store, passes that along itself.
 
 `transact` returns `void`; `transactAsync` returns `CompletableFuture<Void>`.
 Completion means committed locally, not persisted, published or acknowledged by
@@ -904,20 +907,35 @@ they are unreferenced and reclaimable, never a logical state change. Forking bel
 an owner's signing boundary still defers that signature until merge-back, so a DLFS
 fork can make many edits, checkpointing blobs as it goes, and sign once on `sync()`.
 
+## Cursor boundary
+
+Cursors provide atomic access, navigation and isolated drafts. They carry no
+`LatticeContext` and perform no lattice merges. Use component `merge` and `sync`
+for admission and reconciliation. Raw cursor `fork()` is explicit overwrite-on-sync;
+component forks use the component publication boundary instead.
+
+For immediate authoring, `SignedCursor.create(slot, shape, signer)` accepts a bound
+function returning `SignedData`; `StampedCursor.create(base, stamping, clock)` accepts
+an explicit clock. The component binds its owner rule and policy before constructing
+these wrappers. Batched signing belongs to `SignedComponent.sync()`.
+
 ## Write policy: `LatticeContext`
 
 The context supplies signing capabilities and the write clock; typed ownership
 lattices bind owner verification rules to the lattice instance. Install a context
-on the application's cursor for application-local policy, or the host root cursor
-for shared defaults. Descendants inherit their parent's context live. A fixed
+on the application component for application-local policy, or the root component
+for construction defaults. Child components resolve policy when constructed; later
+parent policy replacement does not alter existing children. Cursors have no context
+fields, accessors or inheritance. Transaction views retain the component policy
+through `withCursor(...)`. A fixed
 context suits deterministic tests; an application policy
 resolves dynamically from a clock, wallet or key store and must be thread-safe if
 shared. The `with...` methods (`withTimestamp`, `withSigningKey`, `withOwnerVerifier`,
 `withMaxFutureTimestampSkew`) override one capability and delegate the rest.
 
 ```java
-cursor.setContext(LatticeContext.create(null, myKeyPair));                  // runtime clock
-cursor.setContext(LatticeContext.create(CVMLong.create(1000), myKeyPair));  // fixed clock
+component.setContext(LatticeContext.create(null, myKeyPair));                  // runtime clock
+component.setContext(LatticeContext.create(CVMLong.create(1000), myKeyPair));  // fixed clock
 ```
 
 **Time.** `currentTimestamp()` is resolved once per logical write, even under retry,
@@ -962,7 +980,7 @@ StampingLattice<ACell> state = StampingLattice.create(
     (v, ts) -> v.assoc(KEY_TIMESTAMP, ts));          // stamp the context timestamp on every write
 
 // the component owning the leaf wraps it before navigating below
-AForkableCursor<ACell> leaf = StampedCursor.create(cursor.child(KEY_STATE, state), state);
+AForkableCursor<ACell> leaf = StampedCursor.create(cursor.child(KEY_STATE, state), state, getContext()::currentTimestamp);
 ```
 
 `JSONLattice` provides structural navigation below the leaf, `LWWLattice` merges the

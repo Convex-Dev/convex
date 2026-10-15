@@ -30,6 +30,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.RefSoft;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.core.crypto.AKeyPair;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
@@ -52,6 +53,20 @@ import convex.node.NodeConfig;
 import convex.node.NodeServer;
 
 public class DLFSComponentTest {
+
+	@Test
+	public void testFilesystemAdapterUsesExplicitComponentClock() throws Exception {
+		var drives=convex.dlfs.DLFSDrives.wrap(Cursors.root(convex.dlfs.DLFSDrives.LATTICE));
+		try (var drive=drives.createDrive("clock")) {
+			var fileSystem=(convex.lattice.fs.impl.DLFSLocal)drive.fileSystem();
+			var policy=LatticeContext.create(CVMLong.create(123),null);
+			fileSystem.setContext(policy);
+			assertSame(policy,drive.getContext());
+			Path path=fileSystem.getPath("/fixed.txt");
+			Files.writeString(path,"fixed clock");
+			assertEquals(CVMLong.create(123),DLFSNode.getUTime(fileSystem.getNode((DLPath)path)));
+		}
+	}
 
 	private static final Keyword KEY_DOCUMENTS=Keyword.intern("documents");
 	private static final Keyword KEY_ARCHIVE=Keyword.intern("archive");
@@ -92,7 +107,7 @@ public class DLFSComponentTest {
 
 		CompositeDLFSApplication(RootComponent<Index<Keyword,ACell>> host) {
 			super(host,KEY_DOCUMENTS);
-			this.archive=DLFSRegion.connect(cursor,store(),KEY_ARCHIVE);
+			this.archive=configured(DLFSRegion.connect(cursor,store(),KEY_ARCHIVE));
 		}
 	}
 
@@ -177,7 +192,7 @@ public class DLFSComponentTest {
 			KEY_ARCHIVE,DLFSRegion.LATTICE);
 		MemoryStore store=new MemoryStore();
 		RootComponent<Index<Keyword,ACell>> root=RootComponent.create(lattice,store);
-		root.cursor().setContext(LatticeContext.create(null,keyPair));
+		root.setContext(LatticeContext.create(null,keyPair));
 		CompositeDLFSApplication application=new CompositeDLFSApplication(root);
 
 		assertNotNull(application.drives(keyPair.getAccountKey()).createDrive("live"));
@@ -207,7 +222,7 @@ public class DLFSComponentTest {
 		AKeyPair keyPair=AKeyPair.generate();
 		try (EtchStore store=EtchStore.createTemp("dlfs-stream-persist")) {
 			var root=RootComponent.create(DLFSRegion.LATTICE,store);
-			root.cursor().setContext(LatticeContext.create(null,keyPair));
+			root.setContext(LatticeContext.create(null,keyPair));
 			DLFSRegion region=DLFSRegion.connect(root);
 			DLFSDrive drive=region.drives(keyPair.getAccountKey()).createDrive("large");
 			Path path=drive.fileSystem().getPath("/stream.bin");
@@ -257,9 +272,9 @@ public class DLFSComponentTest {
 
 			AKeyPair keyPair=AKeyPair.generate();
 			try (EtchStore store=EtchStore.createTemp("dlfs-files-copy")) {
-				var root=RootComponent.create(DLFSRegion.LATTICE,store).cursor();
+				var root=RootComponent.create(DLFSRegion.LATTICE,store);
 				root.setContext(LatticeContext.create(null,keyPair));
-				var drives=SignedCursor.forOwner(root.path(keyPair.getAccountKey()),DLFSRegion.LATTICE,keyPair.getAccountKey());
+				var drives=DLFSRegion.connect(root).drives(keyPair.getAccountKey()).cursor();
 				try (var fileSystem=DLFS.connect(drives,Strings.create("large"),store)) {
 					Path target=fileSystem.getPath("/copy.bin");
 

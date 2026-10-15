@@ -6,7 +6,6 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.lattice.LatticeContext;
 import convex.lattice.Shape;
 
 /**
@@ -29,8 +28,8 @@ public class TransactionalRootCursor<V extends ACell> extends Root<V> {
 		super(initialValue);
 	}
 
-	public TransactionalRootCursor(V initialValue, Shape<V> shape, LatticeContext context) {
-		super(initialValue,shape,context);
+	public TransactionalRootCursor(V initialValue, Shape<V> shape) {
+		super(initialValue,shape);
 	}
 
 	@Override

@@ -37,6 +37,18 @@ import convex.lattice.generic.StampingLattice;
  */
 public class StampedCursorTest {
 
+	@Test public void testRawForkAdoptsPreparedDestinationValue() {
+		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO));
+		var stamped=StampedCursor.create(root,null,() -> CVMLong.create(100),
+			(value,time) -> stampWith(value,time.longValue()));
+		var fork=stamped.fork();
+		fork.set(Maps.of(A,CVMLong.ONE));
+		ACell published=fork.sync();
+		assertSame(root.get(),published);
+		assertSame(published,fork.get());
+		assertEquals(100,tsOf(published));
+	}
+
 	@Test public void testChangedRetryKeepsOneOperationTimestamp() {
 		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO,B,CVMLong.ZERO));
 		AtomicInteger clocks=new AtomicInteger();
@@ -46,7 +58,7 @@ public class StampedCursorTest {
 				return CVMLong.create(clocks.incrementAndGet());
 			}
 		};
-		StampedCursor<ACell> cursor=StampedCursor.create(root,null,context,(value,time) -> {
+		StampedCursor<ACell> cursor=StampedCursor.create(root,null,context::currentTimestamp,(value,time) -> {
 			// Force the first candidate to lose its CAS to a different field update.
 			if (preparations.incrementAndGet()==1) root.set(Maps.of(A,CVMLong.ZERO,B,CVMLong.ONE));
 			return stampWith(value,time.longValue());
@@ -103,10 +115,10 @@ public class StampedCursorTest {
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
 		// the write clock lives in the context (ts = 100)
 		LatticeContext ctx = LatticeContext.create(CVMLong.create(100), null);
-		Root<ACell> root = Cursors.root(initial, state, ctx);
+		Root<ACell> root = Cursors.root(initial, state);
 
 		// the component owning the stamped leaf wraps it, then navigates below
-		AForkableCursor<ACell> c = StampedCursor.create(root, state).path(USERS, ALICE);
+		AForkableCursor<ACell> c = StampedCursor.create(root, state,ctx::currentTimestamp).path(USERS, ALICE);
 		c.set(Strings.create("bob"));
 
 		// deep value landed, structural intermediate ("users") auto-created
@@ -120,12 +132,12 @@ public class StampedCursorTest {
 	@Test public void testLongLivedDerivedPathUsesAdvancedContextTimestamp() {
 		StampingLattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
-		Root<ACell> root = Cursors.root(initial, state,
-			LatticeContext.create(CVMLong.create(100), null));
+		Root<ACell> root = Cursors.root(initial, state);
 
 		// Keep this derived cursor across a harness clock advance (#640).
-		AForkableCursor<ACell> child = StampedCursor.create(root, state).path(USERS, ALICE);
-		root.setContext(LatticeContext.create(CVMLong.create(200), null));
+		var clock=new java.util.concurrent.atomic.AtomicReference<>(CVMLong.create(100));
+		AForkableCursor<ACell> child = StampedCursor.create(root, state,clock::get).path(USERS, ALICE);
+		clock.set(CVMLong.create(200));
 		child.set(Strings.create("bob"));
 
 		assertEquals(Strings.create("bob"), RT.getIn(root.get(), USERS, ALICE));
@@ -155,9 +167,9 @@ public class StampedCursorTest {
 		Root<ACell> base = Root.create(older);
 		ALattice<ACell> lww = LWWLattice.create(JSONLattice.INSTANCE, StampedCursorTest::tsOf);
 		// stampFn would bump the timestamp to 999 if it were (wrongly) applied to a merge result
-		StampedCursor<ACell> sc = StampedCursor.create(base, lww, LatticeContext.EMPTY, (v, ts) -> stampWith(v, 999));
+		StampedCursor<ACell> sc = StampedCursor.create(base, lww, LatticeContext.EMPTY::currentTimestamp, (v, ts) -> stampWith(v, 999));
 
-		sc.merge(lww, newer); // newer (ts 20) is the LWW winner
+		base.updateAndGet(own -> lww.merge(own,newer)); // newer (ts 20) is the LWW winner
 
 		assertEquals(20L, tsOf(sc.get()), "merge must not re-stamp the LWW winner");
 		assertSame(newer, base.get());   // the exact winner value, stored unstamped

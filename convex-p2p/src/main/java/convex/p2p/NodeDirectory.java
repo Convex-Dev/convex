@@ -126,7 +126,7 @@ final class NodeDirectory {
 		AString type=Strings.create("Convex Lattice Node");
 		String currentVersion=Utils.getVersion();
 		AString version=Strings.create(currentVersion==null ? "unknown" : currentVersion);
-		long timestamp=server.getCursor().getContext().currentTimestampValue();
+		long timestamp=server.getMergeContext().currentTimestampValue();
 		AHashMap<Keyword,ACell> info=convex.lattice.P2PLattice.createNodeInfo(
 			transports,type,version,null,pointsOfPresence,relay,timestamp);
 		AHashMap<ACell,SignedData<ACell>> entry=
@@ -134,7 +134,7 @@ final class NodeDirectory {
 
 		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=
 			server.getRootComponent().resolve(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		nodes.merge(P2PLattice.NODES_LATTICE,entry);
+		nodes.updateAndGet(own -> P2PLattice.NODES_LATTICE.merge(server.getMergeContext(),own,entry));
 		server.getCursor().sync();
 		refresh();
 		log.debug("Published NodeInfo: transports={}, pops={}, relay={}, type={}, version={}",

@@ -29,7 +29,7 @@ import convex.lattice.cursor.AForkableCursor;
  * <p>The P2P application owns the owner-keyed {@code :id} and {@code :nodes} levels, so
  * it wraps each user's slot in a {@code SignedCursor} bound to that owner. That cursor
  * projects the unsigned value on read and signs on write through its
- * {@code LatticeContext}, which is asked for a signer authorised for the owner.
+ * explicit authoring function, bound by the component to an authorised signer.
  * Applications read and write plain values and never touch {@code SignedData}.
  * {@link #sync()} pushes the result up to the root (and, on a launched node, into
  * persistence and propagation).
@@ -58,21 +58,28 @@ public class P2PUser {
 	/**
 	 * Creates a user view over a P2P root cursor.
 	 *
-	 * <p>Both cursors inherit the root cursor's {@code LatticeContext} live, so writes
-	 * request {@code userKey} from that policy when signed.
+	 * <p>The no-policy overload creates a read view. Use the explicit-policy overload
+	 * or a containing component to supply signing capabilities.
 	 *
 	 * @param rootCursor Cursor at the {@link P2PLattice#ROOT} level
 	 * @param userKey The P2P user's account key
 	 * @return A view of that user's owned area
 	 */
 	public static P2PUser create(AForkableCursor<?> rootCursor, AccountKey userKey) {
+		return create(rootCursor,userKey,convex.lattice.LatticeContext.EMPTY);
+	}
+
+	public static P2PUser create(AForkableCursor<?> rootCursor, AccountKey userKey, convex.lattice.LatticeContext context) {
 		if (rootCursor == null) throw new IllegalArgumentException("Root cursor must not be null");
 		if (userKey == null) throw new IllegalArgumentException("User key must not be null");
 
-		return new P2PUser(
-			new P2PIdentity(P2PApplication.identitySlot(rootCursor,userKey),userKey),
-			new P2PNodeRecord(P2PApplication.nodeSlot(rootCursor,userKey),userKey),
+		P2PUser user=new P2PUser(
+			new P2PIdentity(P2PApplication.identitySlot(rootCursor,userKey,context),userKey),
+			new P2PNodeRecord(P2PApplication.nodeSlot(rootCursor,userKey,context),userKey),
 			userKey);
+		user.identity.setContext(context);
+		user.node.setContext(context);
+		return user;
 	}
 
 	/**
@@ -84,7 +91,7 @@ public class P2PUser {
 	 */
 	public static P2PUser create(ALatticeComponent<?> parent, AccountKey userKey) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		return create(parent.cursor(),userKey);
+		return create(parent.cursor(),userKey,parent.getContext());
 	}
 
 	/** Returns the path-specific identity component. */

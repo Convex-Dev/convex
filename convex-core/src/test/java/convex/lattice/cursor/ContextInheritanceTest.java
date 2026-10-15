@@ -1,117 +1,35 @@
 package convex.lattice.cursor;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-
-import java.util.concurrent.atomic.AtomicReference;
-
+import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
-
-import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
-import convex.core.data.AHashMap;
-import convex.core.data.ASet;
-import convex.core.data.Keyword;
-import convex.core.data.Maps;
-import convex.core.data.Sets;
-import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeContext;
-import convex.lattice.generic.MapLattice;
-import convex.lattice.generic.MaxLattice;
-import convex.lattice.generic.SetLattice;
 
-/** Tests context-policy inheritance for cursor views and forks. */
+/** Policy is resolved explicitly by components and never transported by cursors. */
 public class ContextInheritanceTest {
-
-	@Test
-	public void testDerivedPathTracksParentAndSupportsLocalOverride() {
-		MapLattice<Keyword, ASet<CVMLong>> lattice = MapLattice.create(SetLattice.create());
-		Root<AHashMap<Keyword, ASet<CVMLong>>> root =
-			Cursors.root(Maps.empty(), lattice, null);
-		AForkableCursor<ASet<CVMLong>> child = root.path(Keywords.FOO);
-
-		LatticeContext first = LatticeContext.create(CVMLong.create(1000), null);
-		root.setContext(first);
-		assertSame(first, child.getContext());
-
-		LatticeContext override = LatticeContext.create(CVMLong.create(2000), null);
-		child.setContext(override);
-		LatticeContext laterParent = LatticeContext.create(CVMLong.create(3000), null);
-		root.setContext(laterParent);
-		assertSame(override, child.getContext());
-
-		child.setContext(null);
-		assertSame(laterParent, child.getContext());
+	private static class Component extends ALatticeComponent<CVMLong> {
+		Component(AForkableCursor<CVMLong> cursor) { super(cursor); }
+		Component view() { return configured(new Component(cursor)); }
 	}
-
-	@Test
-	public void testWithMethodOverridesOneLivePolicyCapability() {
-		MapLattice<Keyword, ASet<CVMLong>> lattice = MapLattice.create(SetLattice.create());
-		Root<AHashMap<Keyword, ASet<CVMLong>>> root =
-			Cursors.root(Maps.empty(), lattice, null);
-		AForkableCursor<ASet<CVMLong>> child = root.path(Keywords.FOO);
-
-		AKeyPair originalKey=AKeyPair.generate();
-		AKeyPair replacementKey=AKeyPair.generate();
-		AtomicReference<AKeyPair> activeKey=new AtomicReference<>(originalKey);
-		LatticeContext dynamic=new LatticeContext() {
-			@Override public AKeyPair getSigningKey() {
-				return activeKey.get();
+	@Test public void childrenResolvePolicyWithoutLiveInheritance() {
+		var parent=new Component(Root.create(CVMLong.ZERO));
+		var first=LatticeContext.create(CVMLong.ONE,null);
+		parent.setContext(first);
+		var child=parent.view();
+		parent.setContext(LatticeContext.create(CVMLong.TWO,null));
+		assertSame(first,child.getContext());
+		assertSame(parent.getContext(),parent.view().getContext());
+		child.cursor().set(CVMLong.TWO);
+		assertEquals(CVMLong.TWO,parent.cursor().get());
+	}
+	@Test public void cursorsExposeNoAmbientPolicy() {
+		for (var type:new Class<?>[] {ACursor.class,Root.class,PathCursor.class,SignedCursor.class,StampedCursor.class}) {
+			for (var field:type.getDeclaredFields()) assertNotEquals(LatticeContext.class,field.getType());
+			for (var method:type.getMethods()) {
+				assertNotEquals("getContext",method.getName());
+				assertNotEquals("setContext",method.getName());
 			}
-		};
-		root.setContext(dynamic);
-
-		LatticeContext override=child.getContext().withTimestamp(CVMLong.create(1500));
-		child.setContext(override);
-		activeKey.set(replacementKey);
-
-		LatticeContext laterParent=LatticeContext.create(CVMLong.create(2000),originalKey);
-		root.setContext(laterParent);
-
-		assertSame(override,child.getContext());
-		assertEquals(CVMLong.create(1500), child.getContext().getTimestamp());
-		assertSame(replacementKey,child.getContext().getSigningKey());
-
-		child.setContext(null);
-		assertSame(laterParent, child.getContext());
-	}
-
-	@Test
-	public void testLongLivedStampedViewObservesAdvancedParentClock() {
-		Root<AInteger> root = Cursors.root(null, MaxLattice.INSTANCE, null);
-		StampedCursor<AInteger> stamped = StampedCursor.create(root, MaxLattice.INSTANCE, null,
-			(value, timestamp) -> timestamp);
-
-		root.setContext(LatticeContext.create(CVMLong.create(1000), null));
-		stamped.set(CVMLong.ONE);
-		assertEquals(CVMLong.create(1000), root.get());
-
-		root.setContext(LatticeContext.create(CVMLong.create(2000), null));
-		stamped.set(CVMLong.ONE);
-		assertEquals(CVMLong.create(2000), root.get());
-	}
-
-	@Test
-	public void testForkRetainsEffectiveContextPolicy() {
-		SetLattice<CVMLong> lattice = SetLattice.create();
-		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty(), lattice, null);
-		LatticeContext atFork = LatticeContext.create(CVMLong.create(1000), null);
-		root.setContext(atFork);
-		AForkableCursor<ASet<CVMLong>> fork = root.fork(lattice);
-
-		root.setContext(LatticeContext.create(CVMLong.create(2000), null));
-		assertSame(atFork, fork.getContext());
-
-		fork.setContext(null);
-		assertSame(atFork, fork.getContext());
-	}
-
-	@Test
-	public void testRootClearsToEmptyContext() {
-		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty(), SetLattice.create(), null);
-		root.setContext(LatticeContext.create(CVMLong.create(1000), null));
-		root.setContext(null);
-		assertSame(LatticeContext.EMPTY, root.getContext());
+		}
 	}
 }

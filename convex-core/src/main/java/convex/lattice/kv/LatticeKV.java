@@ -22,15 +22,14 @@ import convex.lattice.cursor.Cursors;
  * Built with lattice merge replication: use {@link #fork()} and {@link #sync()}
  * for conflict-free distributed operation.
  */
-public class LatticeKV {
+public class LatticeKV extends convex.lattice.ALatticeComponent<Index<AString, AVector<ACell>>> {
 
 	private static final AString DEFAULT_REPLICA = Strings.create("default");
 
-	private final AForkableCursor<Index<AString, AVector<ACell>>> cursor;
 	private final AString replicaID;
 
 	public LatticeKV(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
-		this.cursor = cursor;
+		super(cursor);
 		this.replicaID = replicaID;
 	}
 
@@ -93,7 +92,7 @@ public class LatticeKV {
 	 * @return Forked store
 	 */
 	public LatticeKV fork(AString replicaID) {
-		return new LatticeKV(cursor.fork(KVStoreLattice.INSTANCE), replicaID);
+		return configured(new LatticeKV(forkCursor(KVStoreLattice.INSTANCE), replicaID));
 	}
 
 	/**
@@ -105,14 +104,14 @@ public class LatticeKV {
 
 	// ========== Internal Helpers ==========
 
-	// #561: resolve time through the cursor policy. The default policy uses runtime
+	// #561: resolve time through the component policy. The default policy uses runtime
 	// time; applications and tests may supply a fixed or otherwise dynamic clock.
 	private CVMLong now() {
-		return cursor.getContext().currentTimestamp();
+		return getContext().currentTimestamp();
 	}
 
 	private long nowMs() {
-		return cursor.getContext().currentTimestampValue();
+		return getContext().currentTimestampValue();
 	}
 
 	private AString key(String key) {

@@ -97,7 +97,7 @@ import convex.social.Social;
  * the {@code AccountKey} equality fast path — so inbound network values merged by
  * {@code NodeServer} are owner-checked by default. But code that reaches for a raw
  * {@code ALattice.merge(a, b)} on these regions loses the guarantee silently. Merge
- * through a cursor, or pass a context explicitly.
+ * through a component, or pass a context explicitly.
  *
  * <p>Helpers for building and reading {@code NodeInfo} records live in
  * {@link convex.lattice.P2PLattice} ({@code createNodeInfo}, {@code createSignedEntry},

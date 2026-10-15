@@ -58,7 +58,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	 * which merges with {@link DLFSLattice}, to reach the long-lived drive cursor.
 	 */
 	public DLFSDrive fork() {
-		return new DLFSDrive(name,cursor.fork(DLFSLattice.INSTANCE),store);
+		return configured(new DLFSDrive(name,forkCursor(DLFSLattice.INSTANCE),store));
 	}
 
 	@Override
@@ -75,6 +75,9 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 			this.drive=drive;
 		}
 
+		@Override public convex.lattice.LatticeContext getContext() { return drive.getContext(); }
+		@Override public void setContext(convex.lattice.LatticeContext context) { drive.setContext(context); }
+
 		@Override
 		public DLFSLocal fork() {
 			return drive.fork().fileSystem;
@@ -83,7 +86,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 
 	@Override
 	public DLFSDrive withCursor(AForkableCursor<AVector<ACell>> cursor) {
-		return new DLFSDrive(name,cursor,store);
+		return configured(new DLFSDrive(name,cursor,store));
 	}
 
 }

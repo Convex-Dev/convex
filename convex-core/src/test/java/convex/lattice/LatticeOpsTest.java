@@ -78,7 +78,7 @@ public class LatticeOpsTest {
 		assertThrows(IllegalStateException.class,
 			() -> LatticeOps.assocIn(null, CVMLong.create(99), outer, KEY_A, KEY_B));
 
-		Root<Index<Keyword, ACell>> root = Cursors.root((Index<Keyword, ACell>) null, outer, null);
+		Root<Index<Keyword, ACell>> root = Cursors.root((Index<Keyword, ACell>) null, outer);
 		root.child(KEY_A, inner).child(KEY_B, LWWLattice.INSTANCE).set(CVMLong.create(99));
 
 		Index<Keyword, ACell> outerIdx = root.get();

@@ -37,17 +37,16 @@ import convex.lattice.cursor.AForkableCursor;
  * topic.offer(Strings.create("user-42"), Strings.create("login"));
  * }</pre>
  */
-public class LatticeTopic {
+public class LatticeTopic extends convex.lattice.ALatticeComponent<Index<Keyword, ACell>> {
 
 	public static final Keyword KEY_NUM_PARTITIONS = Keyword.intern("num-partitions");
 
-	private final AForkableCursor<Index<Keyword, ACell>> cursor;
 
 	/**
 	 * Wraps an existing cursor at the TopicLattice level.
 	 */
 	LatticeTopic(AForkableCursor<Index<Keyword, ACell>> cursor) {
-		this.cursor = cursor;
+		super(cursor);
 	}
 
 	/**
@@ -79,7 +78,7 @@ public class LatticeTopic {
 		AForkableCursor<AVector<ACell>> partCursor = cursor
 			.child(TopicLattice.KEY_PARTITIONS, TopicLattice.PARTITION_LATTICE)
 			.child(id, QueueLattice.INSTANCE);
-		return new LatticeQueue(partCursor);
+		return configured(new LatticeQueue(partCursor));
 	}
 
 	// ===== Metadata =====
@@ -156,7 +155,7 @@ public class LatticeTopic {
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeTopic fork() {
-		return new LatticeTopic(cursor.fork(TopicLattice.INSTANCE));
+		return configured(new LatticeTopic(forkCursor(TopicLattice.INSTANCE)));
 	}
 
 	/**

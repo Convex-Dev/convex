@@ -45,7 +45,7 @@ public class SignedComponentTest {
 		var lattice=OwnerKeyLattice.create(LWWLattice.<CVMLong>create(v -> 100)).signingFor(KEY.getAccountKey());
 		var destination=new Root<>(KEY.signData(CVMLong.ZERO));
 		var component=new SignedComponent<>(lattice,destination);
-		component.cursor().setContext(context(() -> {}));
+		component.setContext(context(() -> {}));
 		component.cursor().set(CVMLong.ONE);
 		destination.set(KEY.signData(CVMLong.TWO));
 		component.sync();
@@ -60,7 +60,7 @@ public class SignedComponentTest {
 		var destination=new Root<SignedData<ASet<CVMLong>>>();
 		var component=new SignedComponent<>(SIGNED,destination);
 		AtomicInteger signatures=new AtomicInteger();
-		component.cursor().setContext(context(signatures::incrementAndGet));
+		component.setContext(context(signatures::incrementAndGet));
 		component.cursor().set(Sets.of(1));
 		component.merge(AKeyPair.createSeeded(7311).signData(Sets.of(3)));
 		assertEquals(Sets.of(1),component.cursor().get());
@@ -79,7 +79,7 @@ public class SignedComponentTest {
 		var destination=new Root<SignedData<ASet<CVMLong>>>();
 		var component=new SignedComponent<>(SIGNED,destination);
 		AtomicInteger signatures=new AtomicInteger();
-		component.cursor().setContext(context(signatures::incrementAndGet));
+		component.setContext(context(signatures::incrementAndGet));
 		component.cursor().set(Sets.of(1));
 		component.cursor().updateAndGet(v -> v.include(CVMLong.TWO));
 		assertNull(destination.get());
@@ -90,7 +90,7 @@ public class SignedComponentTest {
 		assertEquals(1,signatures.get());
 		component.sync();
 		assertEquals(1,signatures.get());
-		assertNull(destination.getContext().getSigningKey());
+		assertTrue(destination.get().checkSignature());
 	}
 
 	@Test
@@ -98,7 +98,7 @@ public class SignedComponentTest {
 		var destination=new Root<SignedData<ASet<CVMLong>>>();
 		var rejecting=SIGNED.withOwner(KEY.getAccountKey(),(owner,signer) -> false);
 		var component=new SignedComponent<>(rejecting,destination);
-		component.cursor().setContext(context(() -> {}));
+		component.setContext(context(() -> {}));
 		component.cursor().set(Sets.of(1));
 		assertThrows(IllegalStateException.class,component::sync);
 		assertNull(destination.get());
@@ -119,7 +119,7 @@ public class SignedComponentTest {
 		var destination=root.child(slot,SIGNED);
 		var component=new SignedComponent<>(SIGNED,destination);
 		AtomicInteger signatures=new AtomicInteger();
-		component.cursor().setContext(context(signatures::incrementAndGet));
+		component.setContext(context(signatures::incrementAndGet));
 		component.cursor().set(Sets.of(1));
 		component.sync();
 		assertEquals(1,signatures.get());
@@ -135,7 +135,7 @@ public class SignedComponentTest {
 		component.cursor().set(Sets.of(1));
 		assertThrows(IllegalStateException.class,component::sync);
 		assertNull(destination.get());
-		component.cursor().setContext(context(() -> {}));
+		component.setContext(context(() -> {}));
 		component.sync();
 		assertEquals(Sets.of(1),destination.get().getValue());
 	}
@@ -145,7 +145,7 @@ public class SignedComponentTest {
 		var destination=new Root<SignedData<ASet<CVMLong>>>();
 		var component=new SignedComponent<>(SIGNED,destination);
 		AtomicInteger signatures=new AtomicInteger();
-		component.cursor().setContext(context(() -> {
+		component.setContext(context(() -> {
 			if (signatures.incrementAndGet()==1) destination.set(KEY.signData(Sets.of(2)));
 		}));
 		component.cursor().set(Sets.of(1));
@@ -163,7 +163,7 @@ public class SignedComponentTest {
 		CountDownLatch signing=new CountDownLatch(1);
 		CountDownLatch resume=new CountDownLatch(1);
 		AtomicInteger signatures=new AtomicInteger();
-		component.cursor().setContext(context(() -> {
+		component.setContext(context(() -> {
 			if (signatures.incrementAndGet()==1) {
 				signing.countDown();
 				try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }

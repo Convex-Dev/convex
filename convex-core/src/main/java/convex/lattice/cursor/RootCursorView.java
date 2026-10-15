@@ -5,12 +5,10 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.lattice.LatticeContext;
 import convex.lattice.Shape;
 
 /**
- * Live root view with its own context override and no independent state.
- * Descendants inherit this view's context; publication belongs to the root.
+ * Live root view sharing state, shape and publication, with no independent policy.
  */
 final class RootCursorView<V extends ACell> extends AForkableCursor<V> {
 
@@ -31,10 +29,6 @@ final class RootCursorView<V extends ACell> extends AForkableCursor<V> {
 		return root.exclusiveLock();
 	}
 
-	@Override
-	protected LatticeContext inheritedContext() {
-		return root.getContext();
-	}
 
 	@Override
 	public V sync() {

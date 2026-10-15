@@ -7,7 +7,6 @@ import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
-import convex.lattice.LatticeContext;
 import convex.lattice.Shape;
 
 /**
@@ -31,8 +30,7 @@ import convex.lattice.Shape;
  * <ul>
  *   <li>{@link #prepareWrite(ACell)} — <b>the</b> point every write funnels through:
  *       it authors the cell to store for a new view value. This is where write-time
- *       preconditions are enforced (it may consult {@link #getContext()} and may
- *       throw).</li>
+ *       preconditions are enforced by the supplied authoring function, which may throw).</li>
  *   <li>{@link #view(ACell)} — how a stored cell reads back as a view value. Identity
  *       by default (the stored type <em>is</em> the view type); only a type-changing
  *       boundary overrides it.</li>
@@ -59,8 +57,8 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AF
 	protected final ACursor<S> base;
 	private final Shape<V> shape;
 
-	protected AUpdateCursor(ACursor<S> base, Shape<V> shape, LatticeContext context) {
-		super(null, context);
+	protected AUpdateCursor(ACursor<S> base, Shape<V> shape) {
+		super(null);
 		this.base = base;
 		this.shape = (shape == null) ? Shape.none() : shape;
 	}
@@ -75,10 +73,6 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AF
 		return base.exclusiveLock();
 	}
 
-	@Override
-	protected LatticeContext inheritedContext() {
-		return base.getContext();
-	}
 
 	/**
 	 * The prepare-on-write function: authors the cell to store for a new, non-null

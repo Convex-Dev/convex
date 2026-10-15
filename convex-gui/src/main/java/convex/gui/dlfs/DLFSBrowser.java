@@ -295,8 +295,8 @@ public class DLFSBrowser extends AbstractGUI {
 			// Navigate to owner's signed entry, wrap in SignedCursor
 			AForkableCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
 				nodeServer.getCursor();
-			drivesCursor = SignedCursor.forOwner(rootCursor.path(ownerKey), OWNER_LATTICE, ownerKey);
-			drivesCursor.setContext(ctx);
+			var rule=OWNER_LATTICE.signingFor(ownerKey);
+			drivesCursor = SignedCursor.create(rootCursor.path(ownerKey),rule.getValueShape(),v -> rule.sign(ctx,v));
 
 			// Rebuild drives from restored lattice state
 			drives.clear();

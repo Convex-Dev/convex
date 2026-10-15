@@ -7,7 +7,6 @@ import java.util.function.UnaryOperator;
 import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeOps;
 import convex.lattice.Shape;
 
@@ -18,8 +17,8 @@ import convex.lattice.Shape;
  * atomically, rebuilding the value above with {@link LatticeOps#assocIn}. The base
  * cursor's {@link ACursor#shape() shape} creates the base value when a write
  * arrives through an absent one, and this cursor's own shape supplies update
- * functions with an empty value instead of null. Context and the transactional
- * write lock are inherited from the base live.</p>
+ * functions with an empty value instead of null. The transactional write lock is
+ * obtained from the base cursor.</p>
  *
  * <p>A path cursor with no shape is plain structural navigation: a write through an
  * absent intermediate fails rather than inventing a container. Components navigate
@@ -54,10 +53,6 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 		return shape;
 	}
 
-	@Override
-	protected LatticeContext inheritedContext() {
-		return base.getContext();
-	}
 
 	@Override
 	protected Lock exclusiveLock() {

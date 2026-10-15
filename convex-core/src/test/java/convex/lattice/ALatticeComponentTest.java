@@ -26,7 +26,7 @@ public class ALatticeComponentTest {
 		}
 
 		TestComponent fork() {
-			return new TestComponent(cursor.fork(LATTICE));
+			return new TestComponent(convex.lattice.ComponentTestSupport.fork(cursor,LATTICE));
 		}
 
 		void add(ACell value) {

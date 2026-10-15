@@ -14,11 +14,11 @@ import convex.core.util.Utils;
 /**
  * Application policy available to lattice merge and write operations.
  *
- * <p>A context is normally installed once on an application or root cursor and
- * inherited by descendants. Implementations may return fixed values (useful for
+ * <p>A context is normally installed on a component and explicitly supplied to newly
+ * constructed children and rebound views. Implementations may return fixed values (useful for
  * deterministic tests) or resolve policies dynamically, for example from an
  * application clock, wallet or key store. Dynamic implementations used by shared
- * cursors must be thread-safe.</p>
+ * components must be thread-safe.</p>
  *
  * <p>The small {@code with...} methods return delegated policy overrides: each
  * replaces one capability outright and delegates every other to this context, so a

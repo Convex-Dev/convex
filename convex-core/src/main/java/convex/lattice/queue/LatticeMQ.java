@@ -38,7 +38,7 @@ import convex.lattice.generic.MapLattice;
  * mq.partition("user-events", 0).offer(Strings.create("event data"));
  * }</pre>
  */
-public class LatticeMQ {
+public class LatticeMQ extends convex.lattice.ALatticeComponent<AHashMap<ACell, Index<Keyword, ACell>>> {
 
 	/**
 	 * The lattice definition for the topic map level:
@@ -47,13 +47,12 @@ public class LatticeMQ {
 	static final MapLattice<ACell, Index<Keyword, ACell>> TOPIC_MAP =
 		MapLattice.create(TopicLattice.INSTANCE);
 
-	private final AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor;
 
 	/**
 	 * Wraps an existing cursor at the topic-map level.
 	 */
 	public LatticeMQ(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor) {
-		this.cursor = cursor;
+		super(cursor);
 	}
 
 	/**
@@ -83,7 +82,7 @@ public class LatticeMQ {
 	 * @return Topic handle
 	 */
 	public LatticeTopic topic(ACell name) {
-		return new LatticeTopic(cursor.child(name, TopicLattice.INSTANCE));
+		return configured(new LatticeTopic(cursor.child(name, TopicLattice.INSTANCE)));
 	}
 
 	/**
@@ -103,7 +102,7 @@ public class LatticeMQ {
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeMQ fork() {
-		return new LatticeMQ(cursor.fork(TOPIC_MAP));
+		return configured(new LatticeMQ(forkCursor(TOPIC_MAP)));
 	}
 
 	/**

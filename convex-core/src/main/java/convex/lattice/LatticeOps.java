@@ -96,7 +96,7 @@ public class LatticeOps {
 			// SignedCursor the owning component wraps around it, never through here.
 			throw new IllegalArgumentException(
 				"Cannot write through a signed envelope at depth " + i
-				+ ": wrap the owner's slot with SignedCursor.forOwner");
+				+ ": wrap the owner's slot with SignedCursor.create");
 		}
 		if (!(data instanceof ADataStructure<?> struct)) {
 			throw new IllegalArgumentException(

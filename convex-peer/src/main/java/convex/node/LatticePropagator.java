@@ -527,7 +527,6 @@ public class LatticePropagator implements Closeable {
 	public void setMergeContext(LatticeContext context) {
 		requireUnattachedPolicy("Merge context");
 		this.mergeContext=(context==null) ? LatticeContext.EMPTY : context;
-		if (workingCursor!=null) workingCursor.setContext(this.mergeContext);
 	}
 
 	/**
@@ -805,7 +804,7 @@ public class LatticePropagator implements Closeable {
 			ACell restored = store.getRootData();
 			if (restored != null) {
 				synchronized (writeLock) {
-					workingCursor = Cursors.root(restored, lattice, mergeContext);
+					workingCursor = Cursors.root(restored, lattice);
 				}
 			}
 			return restored;
@@ -1172,7 +1171,7 @@ public class LatticePropagator implements Closeable {
 				?new NoveltyCollector(maxDeltaBroadcastSize):null;
 			value = Cells.announce(value, noveltyCollector, store);
 			if (workingCursor == null) {
-				workingCursor = Cursors.root(value, lattice, mergeContext);
+				workingCursor = Cursors.root(value, lattice);
 			} else {
 				workingCursor.set(value);
 			}

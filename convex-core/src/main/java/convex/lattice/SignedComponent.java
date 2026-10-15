@@ -29,7 +29,7 @@ public final class SignedComponent<V extends ACell> extends ALatticeComponent<V>
 	 * Creates unsigned working state over a signed destination. The lattice should
 	 * be the owner-bound instance from the destination's lattice definition, such as
 	 * {@code owners.signingFor(owner)}. Signing policy is resolved from the
-	 * destination initially and can be overridden on this component's cursor.
+	 * component's explicit policy, configured before publication.
 	 */
 	public SignedComponent(SignedLattice<V> lattice, AForkableCursor<SignedData<V>> destination) {
 		super(lattice.getValueLattice(),destination,
@@ -54,7 +54,7 @@ public final class SignedComponent<V extends ACell> extends ALatticeComponent<V>
 	 */
 	public V merge(SignedData<V> incoming) {
 		if (incoming==null || !lattice.checkForeign(incoming)) return cursor.get();
-		return cursor.merge(lattice.getValueLattice(),incoming.getValue());
+		return cursor.updateAndGet(own -> lattice.getValueLattice().merge(getContext(),own,incoming.getValue()));
 	}
 
 	/**
@@ -70,11 +70,11 @@ public final class SignedComponent<V extends ACell> extends ALatticeComponent<V>
 		V remote=value(other);
 		if (Utils.equals(local,base)) return other;
 		if (Utils.equals(remote,base) || Utils.equals(local,remote)) return own;
-		V merged=lattice.getValueLattice().merge(cursor.getContext(),local,remote);
+		V merged=lattice.getValueLattice().merge(getContext(),local,remote);
 		if (Utils.equals(merged,local)) return own;
 		if (Utils.equals(merged,remote)) return other;
 		if (merged==null) return null;
-		SignedData<V> signed=lattice.sign(cursor.getContext(),merged);
+		SignedData<V> signed=lattice.sign(getContext(),merged);
 		if (signed==null) throw new IllegalStateException(
 			"No authorised signer available for component owner "+lattice.getOwner());
 		return signed;

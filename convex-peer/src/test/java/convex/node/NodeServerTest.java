@@ -115,7 +115,7 @@ public class NodeServerTest {
 			NodeServer<V> node) {
 		LatticePropagator result=new LatticePropagator(
 			node.getStore(),node.getLattice(),value -> value,node.getConfig());
-		result.setMergeContext(node.getCursor().getContext());
+		result.setMergeContext(node.getMergeContext());
 		return result;
 	}
 
@@ -1978,7 +1978,7 @@ public class NodeServerTest {
 				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
 			LatticePropagator sourcePropagator=new LatticePropagator(
 				source.getStore(),lattice,value -> value,smallReplyLimits());
-			sourcePropagator.setMergeContext(source.getCursor().getContext());
+			sourcePropagator.setMergeContext(source.getMergeContext());
 			source.addPropagator(sourcePropagator);
 			selectInboundPropagator(source,connection -> sourcePropagator);
 			propagator(target);
@@ -2013,7 +2013,7 @@ public class NodeServerTest {
 				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
 			LatticePropagator sourcePropagator=new LatticePropagator(
 				source.getStore(),lattice,value -> value,smallReplyLimits());
-			sourcePropagator.setMergeContext(source.getCursor().getContext());
+			sourcePropagator.setMergeContext(source.getMergeContext());
 			sourcePropagator.setTransportKeyPair(sourceKey);
 			source.addPropagator(sourcePropagator);
 			// Test hook: every inbound connection to the source is treated as verified

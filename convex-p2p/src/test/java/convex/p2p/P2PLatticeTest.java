@@ -88,7 +88,7 @@ public class P2PLatticeTest {
 			Strings.create("alice"), Vectors.of(KEY), null, 1000L);
 
 		Root<Index<Keyword, ACell>> cursor = Cursors.root(P2PLattice.ROOT);
-		cursor.child(P2PLattice.KEY_ID, P2PLattice.ID_LATTICE).merge(P2PLattice.ID_LATTICE, P2PLattice.createSignedIdentity(KP, identity));
+		cursor.child(P2PLattice.KEY_ID, P2PLattice.ID_LATTICE).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP, identity)));
 
 		AHashMap<ACell, SignedData<ACell>> merged = ownerMap(cursor.get(P2PLattice.KEY_ID));
 
@@ -105,16 +105,16 @@ public class P2PLatticeTest {
 	public void testIdentityLWWByTimestamp() {
 		Root<Index<Keyword, ACell>> cursor = Cursors.root(P2PLattice.ROOT);
 
-		cursor.child(P2PLattice.KEY_ID, P2PLattice.ID_LATTICE).merge(P2PLattice.ID_LATTICE, P2PLattice.createSignedIdentity(KP,
-			P2PLattice.createIdentity(Strings.create("old"), null, null, 1000L)));
+		cursor.child(P2PLattice.KEY_ID, P2PLattice.ID_LATTICE).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP,
+			P2PLattice.createIdentity(Strings.create("old"), null, null, 1000L))));
 
 		// Newer timestamp wins
-		cursor.child(P2PLattice.KEY_ID, P2PLattice.ID_LATTICE).merge(P2PLattice.ID_LATTICE, P2PLattice.createSignedIdentity(KP,
-			P2PLattice.createIdentity(Strings.create("new"), null, null, 2000L)));
+		cursor.child(P2PLattice.KEY_ID, P2PLattice.ID_LATTICE).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP,
+			P2PLattice.createIdentity(Strings.create("new"), null, null, 2000L))));
 
 		// Older timestamp is ignored
-		cursor.child(P2PLattice.KEY_ID, P2PLattice.ID_LATTICE).merge(P2PLattice.ID_LATTICE, P2PLattice.createSignedIdentity(KP,
-			P2PLattice.createIdentity(Strings.create("stale"), null, null, 500L)));
+		cursor.child(P2PLattice.KEY_ID, P2PLattice.ID_LATTICE).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP,
+			P2PLattice.createIdentity(Strings.create("stale"), null, null, 500L))));
 
 		AHashMap<ACell, SignedData<ACell>> merged = ownerMap(cursor.get(P2PLattice.KEY_ID));
 		assertEquals(Strings.create("new"),

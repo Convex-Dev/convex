@@ -57,7 +57,7 @@ public class ResolvePathTest {
 
 	static Root<ACell> mapRoot() {
 		ACell data = Maps.of(X, Maps.of(Y, LEAF)); // canonical keyword-keyed structure
-		return Cursors.root(data, LATTICE, LatticeContext.EMPTY);
+		return Cursors.root(data, LATTICE);
 	}
 
 	/** Resolution canonicalises: the resolved path reaches the leaf, raw external keys miss. */
@@ -96,7 +96,7 @@ public class ResolvePathTest {
 	/** Degeneration: with an identity resolver (JSONLattice), resolution changes nothing. */
 	@Test public void testResolveReducesToIdentity() {
 		ACell data = Maps.of(A, Maps.of(B, LEAF)); // string-keyed
-		Root<ACell> root = Cursors.root(data, JSONLattice.INSTANCE, LatticeContext.EMPTY);
+		Root<ACell> root = Cursors.root(data, JSONLattice.INSTANCE);
 		ACell[] keys = new ACell[]{A, B};
 		assertSame(keys, JSONLattice.INSTANCE.resolvePath(keys)); // identity resolver — no copy
 		assertEquals(LEAF, root.path(JSONLattice.INSTANCE.resolvePath(keys)).get());

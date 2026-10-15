@@ -126,7 +126,7 @@ public class SocialAppTest {
 		assertEquals(SocialPost.createKey(101),reply);
 		assertEquals(CVMLong.create(100),feed.getPost(first).get(SocialPost.TIMESTAMP));
 		assertEquals(CVMLong.create(100),feed.getPost(reply).get(SocialPost.TIMESTAMP));
-		social.cursor().setContext(LatticeContext.create(CVMLong.create(200),key));
+		feed.setContext(LatticeContext.create(CVMLong.create(200),key));
 		feed.delete(first);
 		assertEquals(CVMLong.create(200),feed.getPost(first).get(SocialPost.TIMESTAMP));
 		assertEquals(CVMLong.create(200),feed.getPost(first).get(SocialPost.DELETED));
@@ -364,7 +364,7 @@ public class SocialAppTest {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
 		TestRoot root=new TestRoot(lattice);
-		root.cursor().setContext(LatticeContext.create(null,kp));
+		root.setContext(LatticeContext.create(null,kp));
 		Social social=Social.connect(root);
 
 		social.user(kp.getAccountKey()).feed().post("Inherited context");

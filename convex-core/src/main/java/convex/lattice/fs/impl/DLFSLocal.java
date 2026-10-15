@@ -24,6 +24,8 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
+import convex.lattice.ALatticeComponent;
+import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFS;
@@ -43,9 +45,14 @@ public class DLFSLocal extends DLFileSystem {
 	AForkableCursor<AVector<ACell>> rootCursor;
 	// Store for incremental blob checkpoints during streamed writes, or null for heap-only
 	private final AStore store;
+	private volatile LatticeContext context=LatticeContext.EMPTY;
+	public LatticeContext getContext() { return context; }
+	public void setContext(LatticeContext context) {
+		this.context=java.util.Objects.requireNonNull(context);
+	}
 
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
-		this(dlfsProvider,uriPath,Cursors.root(rootNode,DLFSLattice.INSTANCE,null),null);
+		this(dlfsProvider,uriPath,Cursors.root(rootNode, DLFSLattice.INSTANCE),null);
 	}
 
 	/**
@@ -100,7 +107,7 @@ public class DLFSLocal extends DLFileSystem {
 
 	/**
 	 * Returns the underlying cursor. Applications control mutation time by
-	 * supplying the appropriate {@link convex.lattice.LatticeContext} here.
+	 * configuring this filesystem's explicit {@link convex.lattice.LatticeContext}.
 	 *
 	 * @return cursor holding this drive's root node
 	 */
@@ -108,9 +115,9 @@ public class DLFSLocal extends DLFileSystem {
 		return rootCursor;
 	}
 
-	// Time belongs to the driving cursor context. DLFS neither stores nor advances it.
+	// Time comes from the configured policy. DLFS never advances it implicitly.
 	CVMLong currentTimestamp() {
-		return rootCursor.getContext().currentTimestamp();
+		return getContext().currentTimestamp();
 	}
 
 	@Override
@@ -348,14 +355,16 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public void merge(AVector<ACell> other) {
-		rootCursor.merge(DLFSLattice.INSTANCE,other);
+		rootCursor.updateAndGet(own -> DLFSLattice.INSTANCE.merge(getContext(),own,other));
 	}
 
 	/** Creates a forked view sharing this filesystem's store, if any. */
 	@Override
 	public DLFSLocal fork() {
-		AForkableCursor<AVector<ACell>> cursor=rootCursor.fork(DLFSLattice.INSTANCE);
-		return new DLFSLocal(provider(),uriPath,cursor,store);
+		AForkableCursor<AVector<ACell>> cursor=ALatticeComponent.working(DLFSLattice.INSTANCE,rootCursor,getContext()).cursor();
+		DLFSLocal result=new DLFSLocal(provider(),uriPath,cursor,store);
+		result.setContext(getContext());
+		return result;
 	}
 
 	@Override
@@ -367,8 +376,10 @@ public class DLFSLocal extends DLFileSystem {
 	@Override
 	public DLFSLocal clone() {
 		AVector<ACell> root=rootCursor.get();
-		AForkableCursor<AVector<ACell>> cursor=Cursors.root(root,DLFSLattice.INSTANCE,rootCursor.getContext());
-		return new DLFSLocal(provider(),uriPath,cursor,store);
+		AForkableCursor<AVector<ACell>> cursor=Cursors.root(root, DLFSLattice.INSTANCE);
+		DLFSLocal result=new DLFSLocal(provider(),uriPath,cursor,store);
+		result.setContext(getContext());
+		return result;
 	}
 
 	private static void requireAbsent(AVector<ACell> parent, AString name, DLPath path) throws IOException {

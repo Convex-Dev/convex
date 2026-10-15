@@ -6,8 +6,11 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import convex.core.data.ACell;
+import convex.core.data.SignedData;
 import convex.core.util.Utils;
+import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
 
@@ -19,8 +22,8 @@ import convex.lattice.cursor.TransactionalRootCursor;
  * State changes and sync travel through cursors; there is no component parent link.
  * The cursor knows nothing about lattices: the component declares the structure of
  * the level it owns, typically by passing its lattice as the {@link Shape} of child
- * cursors, the {@link Merge} of forks, and the {@link Signing} or {@link Stamping}
- * rule of a boundary cursor it wraps.</p>
+ * cursors, and binding the authoring functions of signing and stamping views.
+ * Merge and publication policy remain in components.</p>
  *
  * <p>Persistence belongs to the host ({@link RootComponent}) and to components which
  * explicitly own a store for their own data, such as DLFS drives.</p>
@@ -30,6 +33,47 @@ import convex.lattice.cursor.TransactionalRootCursor;
 public abstract class ALatticeComponent<V extends ACell> {
 
 	protected final AForkableCursor<V> cursor;
+	private volatile LatticeContext context=LatticeContext.EMPTY;
+
+	/** Returns this component's write and merge policy. */
+	public final LatticeContext getContext() { return context; }
+
+	/** Replaces policy for this component. Existing children retain their resolved policy. */
+	public final void setContext(LatticeContext context) {
+		this.context=(context==null)?LatticeContext.EMPTY:context;
+	}
+
+	/** Resolves policy for a newly constructed child or rebound view, without retaining a parent. */
+	protected final <C extends ALatticeComponent<?>> C configured(C child) {
+		child.setContext(getContext());
+		return child;
+	}
+
+	/** Creates independent working state with component-owned CAS-or-merge publication. */
+	public static <T extends ACell> ALatticeComponent<T> working(ALattice<T> lattice,
+			AForkableCursor<T> destination, LatticeContext context) {
+		ALatticeComponent<T> component=new ALatticeComponent<T>(lattice,destination) {};
+		component.setContext(context);
+		return component;
+	}
+
+	/**
+	 * Working cursor for a domain component's isolated copy. This independent
+	 * publication boundary resolves its policy now, like any other child component.
+	 */
+	protected final AForkableCursor<V> forkCursor(ALattice<V> lattice) {
+		return working(lattice,cursor,getContext()).cursor();
+	}
+
+	/** Immediate signing boundary with an explicitly bound authoring function. */
+	protected final <T extends ACell> SignedCursor<T> signedCursor(
+			ACursor<SignedData<T>> slot,
+			Ownership<T> owners, ACell owner) {
+		Signing<T> rule=owners.signingFor(owner);
+		if (rule==null) throw new IllegalArgumentException("Invalid owner: "+owner);
+		LatticeContext policy=getContext();
+		return SignedCursor.create(slot,rule.getValueShape(),v -> rule.sign(policy,v));
+	}
 
 	/** Creates a component over a cursor. */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
@@ -40,8 +84,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Creates a component with private working state and a publication destination.
 	 * Children normally share paths in this working state; they need no forks.
 	 * Sync publishes one snapshot into the destination without syncing that
-	 * destination further. Context is resolved at construction and may subsequently
-	 * be overridden on the working cursor. No workers or timers are created.
+	 * destination further. Write and merge policy belongs to this component. No workers or timers are created.
 	 */
 	protected ALatticeComponent(ALattice<V> lattice, AForkableCursor<V> destination) {
 		this(lattice,destination,Function.identity(),(context,value) -> value);
@@ -68,7 +111,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	protected V mergePublication(ALattice<V> lattice,V baseline,V own,V other) {
 		if (Utils.equals(own,baseline)) return other;
 		if (Utils.equals(other,baseline) || Utils.equals(own,other)) return own;
-		return lattice.merge(cursor.getContext(),own,other);
+		return lattice.merge(getContext(),own,other);
 	}
 
 	/** State allocated only for components with an independent publication boundary. */
@@ -89,14 +132,13 @@ public abstract class ALatticeComponent<V extends ACell> {
 			this.read=read;
 			this.prepare=prepare;
 			baseline=read.apply(destination.get());
-			LatticeContext context=destination.getContext();
 			// Only sync is specialised. Ordinary atomic updates keep their existing
 			// root implementation, with no publication lock on the write path.
 			working=destination.supportsExclusiveTransactions()
-				?new TransactionalRootCursor<>(baseline,lattice,context) {
+				?new TransactionalRootCursor<>(baseline,lattice) {
 					@Override public V sync() { return Publication.this.sync(); }
 				}
-				:new Root<>(baseline,lattice,context) {
+				:new Root<>(baseline,lattice) {
 					@Override public V sync() { return Publication.this.sync(); }
 				};
 		}
@@ -136,7 +178,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 					return currentValue;
 				}
 				if (!hasPrepared || !Utils.equals(candidate,preparedValue)) {
-					prepared=prepare.apply(working.getContext(),candidate);
+					prepared=prepare.apply(getContext(),candidate);
 					preparedValue=candidate;
 					hasPrepared=true;
 				}
@@ -184,7 +226,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * create absent intermediates with their correct types. A level the lattice does
 	 * not describe is navigated untyped. Owner boundaries are not crossed here: an
 	 * owner's slot is wrapped by the component owning that level, with
-	 * {@link convex.lattice.cursor.SignedCursor#forOwner}.
+	 * an explicitly bound signing function.
 	 *
 	 * @param <T> Value type at the end of the path
 	 * @param cursor Cursor to navigate from

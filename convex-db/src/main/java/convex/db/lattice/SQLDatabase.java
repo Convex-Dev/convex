@@ -122,7 +122,9 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		if (cursor.get()==null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
-		return new SQLDatabase(cursor,dbName,null,null);
+		SQLDatabase result=new SQLDatabase(cursor,dbName,null,null);
+		result.setContext(parent.getContext());
+		return result;
 	}
 
 	/**
@@ -134,7 +136,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Forked SQLDatabase instance
 	 */
 	public SQLDatabase fork() {
-		return new SQLDatabase(cursor.fork(ConvexDB.DATABASE_LATTICE),dbName,keyPair,ownerKey);
+		return configured(new SQLDatabase(forkCursor(ConvexDB.DATABASE_LATTICE),dbName,keyPair,ownerKey));
 	}
 
 	/**
@@ -143,7 +145,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return new SQLSchema(cursor.child(ConvexDB.KEY_TABLES,TableStoreLattice.INSTANCE));
+		return configured(new SQLSchema(cursor.child(ConvexDB.KEY_TABLES,TableStoreLattice.INSTANCE)));
 	}
 
 	/**
@@ -234,7 +236,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 			@SuppressWarnings("unchecked")
 			Index<Keyword, ACell> remoteState = (Index<Keyword, ACell>) dbMap.get(dbName);
 			if (remoteState != null) {
-				cursor.merge(ConvexDB.DATABASE_LATTICE, remoteState);
+				cursor.updateAndGet(own -> ConvexDB.DATABASE_LATTICE.merge(getContext(),own,remoteState));
 				merged++;
 			}
 		}

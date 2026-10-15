@@ -104,9 +104,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.mergeContext=LatticeContext.EMPTY.withMaxFutureTimestampSkew(
 			this.config.getMaxFutureTimestampSkew());
 		this.cursor=this.config.isTransactionalRoot()
-			? Cursors.transactionalRoot(lattice.zero(),lattice,mergeContext)
-			: Cursors.root(lattice.zero(),lattice,mergeContext);
+			? Cursors.transactionalRoot(lattice.zero(), lattice)
+			: Cursors.root(lattice.zero(), lattice);
 		this.rootComponent=new RootComponent<>(lattice,cursor,store);
+		rootComponent.setContext(mergeContext);
 	}
 
 	/**
@@ -167,7 +168,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			ACell restored=store.getRootData();
 			if (restored!=null) {
 				// Pre-launch local edits take precedence over replicated/persisted ties.
-				cursor.merge(lattice,(V)restored);
+				cursor.updateAndGet(own -> lattice.merge(mergeContext,own,(V)restored));
 				log.info("Restored authoritative lattice value from node store");
 			}
 		} catch (IOException e) {
@@ -348,7 +349,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	public V mergeValue(V receivedValue) {
 		if (receivedValue==null || !lattice.checkForeign(receivedValue)) return null;
-		return cursor.merge(lattice,receivedValue);
+		return cursor.updateAndGet(own -> lattice.merge(mergeContext,own,receivedValue));
 	}
 
 	/**
@@ -368,7 +369,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		ALattice<T> target=lattice.path(path);
 		if (target==null) throw new IllegalArgumentException("Path is outside the served lattice");
 		AForkableCursor<T> targetCursor=rootComponent.resolve(path);
-		return targetCursor.merge(target,value);
+		return targetCursor.updateAndGet(own -> target.merge(mergeContext,own,value));
 	}
 
 	/**
@@ -398,6 +399,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return rootComponent;
 	}
 
+	/** Returns the node's authoritative validation and merge policy. */
+	public LatticeContext getMergeContext() { return mergeContext; }
+
 	/**
 	 * Configures only the authoritative node merge context. Calling applications
 	 * configure each propagator's view context independently before attaching it.
@@ -412,7 +416,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		long effectiveSkew=config.getMap().containsKey(NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW)
 			? configuredSkew : context.getMaxFutureTimestampSkew(configuredSkew);
 		mergeContext=context.withMaxFutureTimestampSkew(effectiveSkew);
-		cursor.setContext(mergeContext);
+		rootComponent.setContext(mergeContext);
 	}
 
 	/**
@@ -656,7 +660,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	@SuppressWarnings("unchecked")
 	<T extends ACell> boolean mergeIncoming(AForkableCursor<T> target,ALattice<T> merge,ACell value) {
 		try {
-			target.merge(merge,(T)value);
+			target.updateAndGet(own -> merge.merge(mergeContext,own,(T)value));
 			return true;
 		} catch (ClassCastException e) {
 			log.warn("Rejected inbound lattice value of wrong type: {}",

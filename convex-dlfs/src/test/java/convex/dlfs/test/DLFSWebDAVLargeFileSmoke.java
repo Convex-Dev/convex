@@ -55,7 +55,7 @@ public final class DLFSWebDAVLargeFileSmoke {
 			if (!(sparse instanceof BlobTree)) throw new AssertionError("Expected a BlobTree source");
 			DLFSLocal local=(DLFSLocal)fs;
 			CVMLong timestamp=CVMLong.create(Utils.getCurrentTimestamp());
-			local.getCursor().setContext(local.getCursor().getContext().withTimestamp(timestamp));
+			local.setContext(local.getContext().withTimestamp(timestamp));
 			AVector<ACell> sourceNode=DLFSNode.createEmptyFile(timestamp)
 				.assoc(DLFSNode.POS_DATA,sparse);
 			fs.updateNode(source,sourceNode);

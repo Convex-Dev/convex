@@ -4,7 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.SignedData;
 
 /**
- * The rule for authoring one signed envelope, as the signing cursor needs it: how to
+ * The rule for authoring one signed envelope, as the owning component needs it: how to
  * sign a value for the owner of this position, who that owner is, and the shape of
  * the unsigned value inside.
  *

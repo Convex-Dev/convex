@@ -7,8 +7,8 @@ import convex.core.data.ACell;
  * owner's slot: the signing rule for that owner, carrying the same verification
  * the level applies to incoming merges.
  *
- * <p>Every owner lattice implements this; a component passes its declared owner
- * lattice to {@code SignedCursor.forOwner} and never constructs a rule itself.</p>
+ * <p>Every owner lattice implements this; a component obtains the bound rule with
+ * {@code signingFor(owner)} and supplies an explicit authoring function to its view.</p>
  *
  * @param <V> Unsigned value type of each owner's slot
  */

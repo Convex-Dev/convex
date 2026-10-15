@@ -22,7 +22,7 @@ import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.SetLattice;
 import convex.lattice.generic.SignedLattice;
 
-/** Tests cursor-controlled argument ordering during fork sync. */
+/** Tests component-controlled policy and argument ordering during fork sync. */
 public class ForkedContextSyncTest {
 
 	private static final AKeyPair ALICE_KEY = AKeyPair.createSeeded(4101);
@@ -31,17 +31,16 @@ public class ForkedContextSyncTest {
 	private static final Keyword TIMESTAMP = Keyword.intern("timestamp");
 
 	@Test
-	public void syncUsesCurrentParentContextForSynthesisedSignedValue() {
+	public void syncUsesPublishingComponentContextForSynthesisedSignedValue() {
 		SignedLattice<ASet<CVMLong>> lattice = SignedLattice.create(SetLattice.create());
-		Root<SignedData<ASet<CVMLong>>> root = Cursors.root(
-			ALICE_KEY.signData(Sets.of(CVMLong.ONE)), lattice, null);
-		root.setContext(LatticeContext.create(null, ALICE_KEY));
+		Root<SignedData<ASet<CVMLong>>> root = Cursors.root(ALICE_KEY.signData(Sets.of(CVMLong.ONE)), lattice);
+		var component=convex.lattice.ALatticeComponent.working(lattice,root,LatticeContext.create(null,ALICE_KEY));
 
-		AForkableCursor<SignedData<ASet<CVMLong>>> fork = root.fork(lattice);
+		AForkableCursor<SignedData<ASet<CVMLong>>> fork = component.cursor();
 		fork.set(ALICE_KEY.signData(Sets.of(CVMLong.ONE, CVMLong.create(2))));
 
 		root.set(ALICE_KEY.signData(Sets.of(CVMLong.ONE, CVMLong.create(3))));
-		root.setContext(LatticeContext.create(null, BOB_KEY));
+		component.setContext(LatticeContext.create(null, BOB_KEY));
 
 		SignedData<ASet<CVMLong>> result = fork.sync();
 		assertEquals(BOB, result.getAccountKey());
@@ -54,8 +53,8 @@ public class ForkedContextSyncTest {
 		LWWLattice<ACell> lattice = LWWLattice.create(JSONLattice.INSTANCE,
 			ForkedContextSyncTest::timestamp);
 		AHashMap<Keyword, ACell> initial = value(1, "initial");
-		Root<ACell> root = Cursors.root(initial, lattice, null);
-		AForkableCursor<ACell> fork = root.fork(lattice);
+		Root<ACell> root = Cursors.root(initial, lattice);
+		AForkableCursor<ACell> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
 
 		fork.set(value(2, "fork"));
 		AHashMap<Keyword, ACell> parentValue = value(3, "parent");

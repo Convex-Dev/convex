@@ -24,7 +24,7 @@ import convex.lattice.cursor.Root;
  * performs a durability barrier or owns the store lifecycle.</p>
  *
  * <p>The root cursor knows nothing about lattices. Incoming state is delegated to
- * applications. By default a generic live relay uses the supplied lattice;
+ * applications. Until configured, this component uses the supplied lattice directly;
  * explicitly configured applications control acceptance and publication. If an
  * application publishes during host persistence, its newer result stays pending
  * without being re-merged against the persisted snapshot.</p>
@@ -54,13 +54,11 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 		super(cursor);
 		this.lattice=Objects.requireNonNull(lattice,"Root lattice must not be null");
 		this.store=Objects.requireNonNull(store,"Root store must not be null");
-		// Compatibility default: a generic relay with explicit live working policy.
-		// Configured applications replace it; the host never also merges their input.
-		applications=List.of(new ALatticeApplication<V>(lattice,cursor.view()) {});
+		applications=List.of();
 		// Configured applications own acceptance. A racing application publication
 		// must not be undone or expanded by the host's different merge strategy.
-		cursor.onSync(this::publishRoot,(context,current,published) -> applicationsConfigured
-			?current:lattice.merge(context,current,published));
+		cursor.onSync(this::publishRoot,(current,published) -> applicationsConfigured
+			?current:lattice.merge(getContext(),current,published));
 	}
 
 	/** Creates a standalone local root at the lattice's zero value. */
@@ -70,7 +68,7 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	/** Creates a standalone local root with an explicit initial value. */
 	public static <V extends ACell> RootComponent<V> create(ALattice<V> lattice, V initialValue, AStore store) {
-		return new RootComponent<>(lattice,Cursors.root(initialValue,lattice,null),store);
+		return new RootComponent<>(lattice,Cursors.root(initialValue,lattice),store);
 	}
 
 	/**
@@ -122,14 +120,17 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * Delivery is not atomic across applications: earlier successful merges remain
 	 * if a later application fails. Retry is safe for lattice merges.
 	 *
-	 * <p>Until applications are explicitly configured, a generic live relay preserves
-	 * the previous immediate root-merge behaviour. With private working applications,
+	 * <p>Until applications are explicitly configured, the supplied lattice
+	 * provides immediate root merging. With private working applications,
 	 * application sync must publish their changes before host sync persists them.</p>
 	 *
 	 * @param other Incoming root value
 	 * @return Current published root, which may not yet include the incoming state
 	 */
 	public V merge(V other) {
+		if (!applicationsConfigured) {
+			return cursor.updateAndGet(own -> lattice.merge(getContext(),own,other));
+		}
 		for (ALatticeApplication<V> application:applications) application.merge(other);
 		return cursor.get();
 	}

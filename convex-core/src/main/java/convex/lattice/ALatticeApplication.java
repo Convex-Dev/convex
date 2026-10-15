@@ -17,7 +17,7 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p>The host constructor creates private working state, with context resolved at
  * construction. Lightweight children share that state. The explicit lattice/cursor
- * constructor instead adopts the supplied cursor's policy, including a live view
+ * constructor adopts the supplied working state, including a live view
  * when immediate visibility is required.</p>
  *
  * <p>Applications on the global lattice use its keyed map root and compose the
@@ -54,6 +54,7 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	protected ALatticeApplication(ALattice<V> lattice,RootComponent<V> host) {
 		super(lattice,requireHost(host).cursor());
 		this.lattice=lattice;
+		setContext(host.getContext());
 	}
 
 	/**
@@ -122,8 +123,8 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * atomic lattice merge. Overrides may instead delegate accepted subtrees to
 	 * their components and discard other input, with no additional host merge.
 	 *
-	 * <p>The default merges with this application's lattice under the cursor's
-	 * effective context, with the current local value in the own position. The lattice handles all region
+	 * <p>The default merges with this application's lattice under the component's
+	 * explicit context, with the current local value in the own position. The lattice handles all region
 	 * dispatch and verification; no components need to have been constructed.
 	 * Concurrent writes are reconciled by retrying against the latest root. If merge
 	 * throws, this default operation installs no state. Overrides delegating to
@@ -136,6 +137,6 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * @return Root value installed by this merge
 	 */
 	public V merge(V other) {
-		return cursor.merge(lattice,other);
+		return cursor.updateAndGet(own -> lattice.merge(getContext(),own,other));
 	}
 }

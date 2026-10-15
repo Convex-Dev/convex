@@ -245,7 +245,7 @@ public class KVDatabase {
 
 			Index<AString, AVector<ACell>> remoteState = (Index<AString, AVector<ACell>>) dbMap.get(dbName);
 			if (remoteState != null) {
-				kv.cursor().merge(KVStoreLattice.INSTANCE, remoteState);
+				kv.cursor().updateAndGet(own -> KVStoreLattice.INSTANCE.merge(kv.getContext(),own,remoteState));
 				merged++;
 			}
 		}

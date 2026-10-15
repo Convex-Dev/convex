@@ -90,7 +90,7 @@ public final class Transactions {
 			if (!computed || !Utils.equals(observed,input)) {
 				input=observed;
 				V initial=(input==null)?cursor.shape().zero():input;
-				TransactionCursor<V> draft=new TransactionCursor<>(initial,cursor.shape(),cursor.getContext());
+				TransactionCursor<V> draft=new TransactionCursor<>(initial,cursor.shape());
 				try {
 					action.accept(draft);
 					V candidate=draft.get();

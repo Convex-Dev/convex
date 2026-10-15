@@ -43,11 +43,11 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 
 	/** Creates an isolated working component at the same logical path, merging on sync with the identity value lattice. */
 	public P2PIdentity fork() {
-		return new P2PIdentity(cursor.fork(P2PLattice.ID_LATTICE.getValueLattice()),owner);
+		return configured(new P2PIdentity(forkCursor(P2PLattice.ID_LATTICE.getValueLattice()),owner));
 	}
 	@Override
 	public P2PIdentity withCursor(AForkableCursor<ACell> cursor) {
-		return new P2PIdentity(cursor,owner);
+		return configured(new P2PIdentity(cursor,owner));
 	}
 
 }

@@ -585,7 +585,7 @@ public class DLFSTest {
 
 	private void setDriveTimes(CVMLong utime, DLFSLocal... drives) {
 		for (DLFSLocal d: drives) {
-			d.getCursor().setContext(d.getCursor().getContext().withTimestamp(utime));
+			d.setContext(d.getContext().withTimestamp(utime));
 		}
 	}
 

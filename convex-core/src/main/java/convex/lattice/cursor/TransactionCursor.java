@@ -6,7 +6,6 @@ import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.lattice.LatticeContext;
 import convex.lattice.Shape;
 
 /** A private working root, confined to one synchronous callback. */
@@ -19,8 +18,8 @@ final class TransactionCursor<V extends ACell> extends AForkableCursor<V> {
 	/** Private state is single-threaded; nested locked transactions trivially exclude nothing. */
 	private final Lock lock=new ReentrantLock();
 
-	TransactionCursor(V initial,Shape<V> shape,LatticeContext context) {
-		super(initial,context);
+	TransactionCursor(V initial,Shape<V> shape) {
+		super(initial);
 		this.value=initial;
 		this.shape=(shape==null)?Shape.none():shape;
 	}

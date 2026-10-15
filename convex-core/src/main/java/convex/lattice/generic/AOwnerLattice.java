@@ -95,9 +95,8 @@ public abstract class AOwnerLattice<K extends ACell, V extends ACell,
 	/**
 	 * Returns the signing boundary for one owner's slot: the signed lattice bound to
 	 * that owner and to this lattice's verification rule. A component crossing into
-	 * the owner's value wraps the slot with it, via
-	 * {@code SignedCursor.forOwner(slot, this, owner)}, so authoring uses exactly the
-	 * rule applied to incoming merges.
+	 * the owner's value binds this rule to its signing policy before wrapping the slot,
+	 * so authoring uses exactly the rule applied to incoming merges.
 	 *
 	 * @param key Owner key, in any representation this lattice resolves
 	 * @return Owner-bound signed lattice, or null if the key is not a valid owner

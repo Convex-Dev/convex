@@ -26,12 +26,11 @@ import convex.lattice.cursor.Cursors;
  *   <li>Single-writer per queue recommended for distributed operation</li>
  * </ul>
  */
-public class LatticeQueue {
+public class LatticeQueue extends convex.lattice.ALatticeComponent<AVector<ACell>> {
 
-	private final AForkableCursor<AVector<ACell>> cursor;
 
 	public LatticeQueue(AForkableCursor<AVector<ACell>> cursor) {
-		this.cursor = cursor;
+		super(cursor);
 	}
 
 	/**
@@ -53,7 +52,7 @@ public class LatticeQueue {
 	 * Creates a forked copy of this queue for independent operation.
 	 */
 	public LatticeQueue fork() {
-		return new LatticeQueue(cursor.fork(QueueLattice.INSTANCE));
+		return configured(new LatticeQueue(forkCursor(QueueLattice.INSTANCE)));
 	}
 
 	/**
@@ -323,9 +322,9 @@ public class LatticeQueue {
 
 	// ===== Internal =====
 
-	// #561: resolve time through the cursor policy. The default policy uses runtime
+	// #561: resolve time through the component policy. The default policy uses runtime
 	// time; applications and tests may supply a fixed or otherwise dynamic clock.
 	private CVMLong now() {
-		return cursor.getContext().currentTimestamp();
+		return getContext().currentTimestamp();
 	}
 }

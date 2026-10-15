@@ -11,7 +11,6 @@ import convex.lattice.ALatticeComponent;
 import convex.lattice.RootComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.OwnerLattice;
 
 /**
@@ -43,7 +42,9 @@ public final class DLFSRegion extends ALatticeComponent<
 	 */
 	public static DLFSRegion connect(RootComponent<?> host, ACell... path) {
 		if (host==null) throw new IllegalArgumentException("Host must not be null");
-		return connect(host.resolve(path),host.store());
+		DLFSRegion region=connect(host.resolve(path),host.store());
+		region.setContext(host.getContext());
+		return region;
 	}
 
 	/**
@@ -88,18 +89,18 @@ public final class DLFSRegion extends ALatticeComponent<
 	public DLFSDrives drives(AccountKey owner) {
 		if (owner==null) throw new IllegalArgumentException("Owner key must not be null");
 		AForkableCursor<AHashMap<AString,AVector<ACell>>> drivesCursor=
-			SignedCursor.forOwner(cursor.path(owner),LATTICE,owner);
-		return new DLFSDrives(drivesCursor,store);
+			signedCursor(cursor.path(owner),LATTICE,owner);
+		return configured(new DLFSDrives(drivesCursor,store));
 	}
 
 	/** Creates an isolated temporary region component, merging on sync with {@link #LATTICE}. */
 	public DLFSRegion fork() {
-		return new DLFSRegion(cursor.fork(LATTICE),store);
+		return configured(new DLFSRegion(forkCursor(LATTICE),store));
 	}
 
 	@Override
 	public DLFSRegion withCursor(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
-		return new DLFSRegion(cursor,store);
+		return configured(new DLFSRegion(cursor,store));
 	}
 
 }

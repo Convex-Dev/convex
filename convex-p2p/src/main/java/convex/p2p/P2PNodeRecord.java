@@ -36,11 +36,11 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> implements Tra
 
 	/** Creates an isolated working component at the same logical path, merging on sync with the node value lattice. */
 	public P2PNodeRecord fork() {
-		return new P2PNodeRecord(cursor.fork(P2PLattice.NODES_LATTICE.getValueLattice()),owner);
+		return configured(new P2PNodeRecord(forkCursor(P2PLattice.NODES_LATTICE.getValueLattice()),owner));
 	}
 	@Override
 	public P2PNodeRecord withCursor(AForkableCursor<ACell> cursor) {
-		return new P2PNodeRecord(cursor,owner);
+		return configured(new P2PNodeRecord(cursor,owner));
 	}
 
 }

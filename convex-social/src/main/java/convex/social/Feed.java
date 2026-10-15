@@ -82,7 +82,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * @return The 8-byte timestamp key assigned to the entry
 	 */
 	private Blob addEntry(LongFunction<AHashMap<Keyword, ACell>> entryFn) {
-		long timestamp=cursor.getContext().currentTimestampValue();
+		long timestamp=getContext().currentTimestampValue();
 		AHashMap<Keyword,ACell> entry=entryFn.apply(timestamp);
 		Blob[] keyHolder = new Blob[1];
 		cursor.updateAndGet(feed -> {
@@ -110,7 +110,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 */
 	@SuppressWarnings("unchecked")
 	public void delete(Blob postKey) {
-		CVMLong now = cursor.getContext().currentTimestamp();
+		CVMLong now = getContext().currentTimestamp();
 		cursor.updateAndGet(feed -> {
 			if (feed == null) return feed;
 			ACell existing = feed.get(postKey);
@@ -157,7 +157,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 
 	@Override
 	public Feed withCursor(AForkableCursor<Index<Blob, ACell>> cursor) {
-		return new Feed(cursor,author);
+		return configured(new Feed(cursor,author));
 	}
 
 }

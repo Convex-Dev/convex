@@ -51,6 +51,7 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	protected DLFSApplication(RootComponent<V> host, ACell... regionPath) {
 		this(Objects.requireNonNull(host,"DLFS application host must not be null").getLattice(),
 			host.cursor().view(),host.store(),regionPath);
+		setContext(host.getContext());
 	}
 
 	/**
@@ -85,7 +86,7 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 			AKeyPair keyPair) throws IOException {
 		if (keyPair==null) throw new IllegalArgumentException("Application key pair must not be null");
 		RootComponent<Index<Keyword,ACell>> root=RootComponent.open(Lattice.ROOT,store);
-		root.cursor().setContext(LatticeContext.create(null,keyPair));
+		root.setContext(LatticeContext.create(null,keyPair));
 		return connect(root,Keywords.FS);
 	}
 
@@ -110,7 +111,7 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 
 	/** Returns the physical multi-owner DLFS region, navigated with the root lattice. */
 	public DLFSRegion dlfs() {
-		return DLFSRegion.connect(resolve(regionPath),store);
+		return configured(DLFSRegion.connect(resolve(regionPath),store));
 	}
 
 	/**

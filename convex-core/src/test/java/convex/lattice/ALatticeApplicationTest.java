@@ -185,23 +185,16 @@ public class ALatticeApplicationTest {
 	}
 
 	@Test
-	public void testContextInheritanceAndIsolation() {
+	public void testContextResolvedAtApplicationConstruction() {
 		var host=RootComponent.create(LATTICE,new MemoryStore());
-		var first=new Application<>(host);
-		var second=new Application<>(host);
-		var child=first.cursor().path(ITEMS);
-		LatticeContext hostPolicy=LatticeContext.create(CVMLong.ONE,null);
-		LatticeContext appPolicy=LatticeContext.create(CVMLong.TWO,null);
-		host.cursor().setContext(hostPolicy);
-		assertSame(hostPolicy,child.getContext());
-		first.cursor().setContext(appPolicy);
-		assertSame(appPolicy,child.getContext());
-		assertSame(hostPolicy,second.cursor().getContext());
-		assertSame(hostPolicy,host.cursor().getContext());
-		first.cursor().setContext(null);
-		assertSame(hostPolicy,child.getContext());
-		host.cursor().setContext(LatticeContext.EMPTY);
-		assertSame(LatticeContext.EMPTY,child.getContext());
+		var hostPolicy=LatticeContext.create(CVMLong.ONE,null);
+		host.setContext(hostPolicy);
+		var first=new WorkingApplication<>(host);
+		host.setContext(LatticeContext.create(CVMLong.TWO,null));
+		assertSame(hostPolicy,first.getContext());
+		assertSame(host.getContext(),new WorkingApplication<>(host).getContext());
+		first.setContext(null);
+		assertSame(LatticeContext.EMPTY,first.getContext());
 	}
 
 	@Test
@@ -216,16 +209,16 @@ public class ALatticeApplicationTest {
 		var host=RootComponent.create(owners,new MemoryStore());
 		var first=new Application<>(host);
 		var second=new Application<>(host);
+		first.setContext(LatticeContext.create(CVMLong.create(100),alice));
+		second.setContext(LatticeContext.create(CVMLong.create(200),bob));
 		// A domain component would own these two boundaries: sign the owner's record, then
 		// stamp it on every write below.
 		AForkableCursor<ASet<CVMLong>> aliceItems=StampedCursor.create(
-			SignedCursor.forOwner(first.cursor().path(alice.getAccountKey()),owners,alice.getAccountKey()),record)
+			ComponentTestSupport.signed(first.cursor().path(alice.getAccountKey()), owners, alice.getAccountKey(), first.getContext()),record,first.getContext()::currentTimestamp)
 			.child(ITEMS,ITEMS_LATTICE);
 		AForkableCursor<ASet<CVMLong>> bobItems=StampedCursor.create(
-			SignedCursor.forOwner(second.cursor().path(bob.getAccountKey()),owners,bob.getAccountKey()),record)
+			ComponentTestSupport.signed(second.cursor().path(bob.getAccountKey()), owners, bob.getAccountKey(), second.getContext()),record,second.getContext()::currentTimestamp)
 			.child(ITEMS,ITEMS_LATTICE);
-		first.cursor().setContext(LatticeContext.create(CVMLong.create(100),alice));
-		second.cursor().setContext(LatticeContext.create(CVMLong.create(200),bob));
 		aliceItems.updateAndGet(v -> v.include(CVMLong.ONE));
 		bobItems.updateAndGet(v -> v.include(CVMLong.TWO));
 		var state=host.cursor().get();
@@ -233,14 +226,14 @@ public class ALatticeApplicationTest {
 		assertEquals(CVMLong.create(200),state.get(bob.getAccountKey()).getValue().get(timestamp));
 		assertTrue(state.get(alice.getAccountKey()).checkSignature());
 		assertTrue(state.get(bob.getAccountKey()).checkSignature());
-		assertSame(LatticeContext.EMPTY,host.cursor().getContext());
+		assertSame(LatticeContext.EMPTY,host.getContext());
 		assertThrows(IllegalStateException.class,() -> StampedCursor.create(
-			SignedCursor.forOwner(second.cursor().path(alice.getAccountKey()),owners,alice.getAccountKey()),record)
+			ComponentTestSupport.signed(second.cursor().path(alice.getAccountKey()), owners, alice.getAccountKey(), second.getContext()),record,second.getContext()::currentTimestamp)
 			.<ASet<CVMLong>>path(ITEMS).set(Sets.of(3)));
 		assertSame(state,host.cursor().get());
-		first.cursor().setContext(LatticeContext.create(CVMLong.create(300),alice));
+		first.setContext(LatticeContext.create(CVMLong.create(300),alice));
 		aliceItems.updateAndGet(v -> v.include(CVMLong.TWO));
-		assertEquals(CVMLong.create(300),host.cursor().get().get(alice.getAccountKey()).getValue().get(timestamp));
+		assertEquals(CVMLong.create(100),host.cursor().get().get(alice.getAccountKey()).getValue().get(timestamp));
 		assertEquals(Sets.of(1,2),aliceItems.get());
 	}
 
@@ -250,10 +243,10 @@ public class ALatticeApplicationTest {
 		OwnerKeyLattice<ASet<CVMLong>> lattice=OwnerKeyLattice.create(SetLattice.create());
 		var host=RootComponent.create(lattice,new MemoryStore());
 		var app=new Application<>(host);
-		app.cursor().setContext(LatticeContext.create(null,alice));
+		app.setContext(LatticeContext.create(null,alice));
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(1))));
-		var fork=app.cursor().fork(lattice);
-		fork.merge(lattice,lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(2))));
+		var fork=ALatticeComponent.working(lattice,app.cursor(),app.getContext()).cursor();
+		fork.updateAndGet(own -> lattice.merge(app.getContext(),own,lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(2)))));
 		assertEquals(Sets.of(1),host.cursor().get().get(alice.getAccountKey()).getValue());
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(3))));
 		fork.sync();
@@ -283,7 +276,7 @@ public class ALatticeApplicationTest {
 		var first=new Application<>(host);
 		var second=new Application<>(host);
 		LatticeContext appPolicy=LatticeContext.create(CVMLong.ONE,null);
-		first.cursor().setContext(appPolicy);
+		first.setContext(appPolicy);
 		first.merge(LATTICE.zero().assoc(ITEMS,Sets.of(1)));
 		assertSame(appPolicy,mergeContext.get());
 		var published=first.cursor().get();
@@ -314,7 +307,7 @@ public class ALatticeApplicationTest {
 		OwnerKeyLattice<ASet<CVMLong>> owners=OwnerKeyLattice.create(SetLattice.create());
 		KeyedLattice lattice=KeyedLattice.create(ITEMS,owners);
 		var app=new Application<>(RootComponent.create(lattice,new MemoryStore()));
-		app.cursor().setContext(LatticeContext.create(null,alice));
+		app.setContext(LatticeContext.create(null,alice));
 		Index<AccountKey,SignedData<ASet<CVMLong>>> first=owners.zero()
 			.assoc(alice.getAccountKey(),alice.signData(Sets.of(1)));
 		app.merge(lattice.zero().assoc(ITEMS,first));

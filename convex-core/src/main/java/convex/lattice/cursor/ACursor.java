@@ -6,59 +6,18 @@ import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeOps;
 import convex.lattice.Shape;
 
 /**
- * A cursor is a mutable reference to a CVM value with atomic update operations.
+ * Atomic read/write access to one immutable CVM value.
+ * Paths update nested values atomically through their base cursor. An optional
+ * {@link Shape} supplies missing containers. Cursors carry no lattice policy,
+ * signing context or clock; components own those concerns.
  *
- * <h2>Semantic Model</h2>
- * <p>A cursor represents a "location" that holds a value. The value can be read,
- * written, and atomically updated. Cursors provide the same atomic guarantees as
- * {@link java.util.concurrent.atomic.AtomicReference}:</p>
- * <ul>
- *   <li><b>Visibility:</b> Writes are visible to subsequent reads</li>
- *   <li><b>Atomicity:</b> Update operations (CAS, updateAndGet, etc.) are atomic</li>
- *   <li><b>Ordering:</b> Operations on a single cursor are sequentially consistent</li>
- * </ul>
- *
- * <h2>Navigation</h2>
- * <p>{@link #path(ACell...)} descends into nested data; writes through the result
- * atomically update the whole value above. {@link #child(ACell, Shape)} does the same
- * while declaring the empty value of the child position, so a write can create it
- * when absent. The component that owns a level declares that shape, usually by
- * passing its lattice.</p>
- *
- * <h2>What a cursor knows</h2>
- * <p>Nothing about lattices. A location may carry a {@link Shape} (its empty value),
- * an inherited write-policy {@link LatticeContext}, and, for forks, a merge
- * function; all are supplied by whoever creates the cursor. Storage, publication
- * and replication are host concerns attached at the root, not cursor operations.</p>
- *
- * <h2>Cursor Hierarchy</h2>
- * <ul>
- *   <li>{@link ACursor} - atomic read/write at one location, navigation, write policy</li>
- *   <li>{@link AForkableCursor} - fork/sync and CAS merge of working copies</li>
- *   <li>{@link AView} - read-only views over another cursor</li>
- * </ul>
- *
- * @param <V> Type of value held by this cursor
+ * @param <V> Value type
  */
 public abstract class ACursor<V extends ACell> {
-
-	/**
-	 * Local write-policy override. A {@code null} value means this cursor inherits
-	 * its context from the cursor it was navigated or forked from.
-	 */
-	protected volatile LatticeContext context;
-
-	protected ACursor() {
-	}
-
-	protected ACursor(LatticeContext context) {
-		this.context = context;
-	}
 
 	// ===== Shape =====
 
@@ -71,42 +30,6 @@ public abstract class ACursor<V extends ACell> {
 	 */
 	public Shape<V> shape() {
 		return Shape.none();
-	}
-
-	// ===== Write policy =====
-
-	/**
-	 * Gets the effective write policy for this cursor.
-	 * @return The current context (never null)
-	 */
-	public LatticeContext getContext() {
-		LatticeContext local = context;
-		return (local != null) ? local : inheritedContext();
-	}
-
-	/**
-	 * Gets the context inherited when this cursor has no local override. Derived
-	 * cursors resolve their parent's current context live.
-	 *
-	 * @return Inherited context, never null
-	 */
-	protected LatticeContext inheritedContext() {
-		return LatticeContext.EMPTY;
-	}
-
-	/**
-	 * Sets this cursor's local context override and returns this cursor.
-	 * Passing null clears the override, restoring inheritance from the parent.
-	 * A non-null context is a complete policy replacement. To override one
-	 * capability while delegating all others to the current effective policy,
-	 * use methods such as
-	 * {@link LatticeContext#withTimestamp(convex.core.data.prim.CVMLong)}.
-	 * @param context New local context override, or null to inherit
-	 * @return This cursor with updated context
-	 */
-	public ACursor<V> setContext(LatticeContext context) {
-		this.context = context;
-		return this;
 	}
 
 	// ===== Exclusive transactions =====

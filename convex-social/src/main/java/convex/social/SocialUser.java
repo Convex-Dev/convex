@@ -43,7 +43,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return new Feed(cursor.child(SocialLattice.KEY_FEED,SocialLattice.FEED_LATTICE),ownerDid);
+		return configured(new Feed(cursor.child(SocialLattice.KEY_FEED,SocialLattice.FEED_LATTICE),ownerDid));
 	}
 
 	/**
@@ -57,8 +57,8 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	public Follows follows() {
 		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
 			cursor.child(SocialLattice.KEY_FOLLOWING,SocialLattice.FOLLOWING_LATTICE),
-			SocialLattice.FOLLOWING_LATTICE);
-		return new Follows(following.child(SocialLattice.KEY_FOLLOWS,SocialLattice.FOLLOWS_LATTICE));
+			SocialLattice.FOLLOWING_LATTICE,getContext()::currentTimestamp);
+		return configured(new Follows(following.child(SocialLattice.KEY_FOLLOWS,SocialLattice.FOLLOWS_LATTICE)));
 	}
 
 	/**
@@ -70,7 +70,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return isolated working copy for this user
 	 */
 	public SocialUser fork() {
-		return new SocialUser(cursor.fork(SocialLattice.INSTANCE),ownerDid);
+		return configured(new SocialUser(forkCursor(SocialLattice.INSTANCE),ownerDid));
 	}
 
 	// TODO: public Profile profile() { ... }
@@ -91,7 +91,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 
 	@Override
 	public SocialUser withCursor(AForkableCursor<Index<Keyword, ACell>> cursor) {
-		return new SocialUser(cursor,ownerDid);
+		return configured(new SocialUser(cursor,ownerDid));
 	}
 
 }

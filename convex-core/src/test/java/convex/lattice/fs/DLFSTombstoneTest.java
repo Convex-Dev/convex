@@ -28,7 +28,7 @@ import convex.lattice.fs.impl.DLFSLocal;
  */
 public class DLFSTombstoneTest {
 	private static void setContextTime(DLFSLocal fs, long timestamp) {
-		fs.getCursor().setContext(fs.getCursor().getContext().withTimestamp(CVMLong.create(timestamp)));
+		fs.setContext(fs.getContext().withTimestamp(CVMLong.create(timestamp)));
 	}
 
 	/** A directory node carries the POS_TOMBS element if and only if it has tombstones. */

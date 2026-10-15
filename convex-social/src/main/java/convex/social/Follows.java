@@ -120,7 +120,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 
 	@SuppressWarnings("unchecked")
 	private void writeField(AString target,Keyword key,ACell value) {
-		CVMLong timestamp=cursor.getContext().currentTimestamp();
+		CVMLong timestamp=getContext().currentTimestamp();
 		cursor.updateAndGet(follows -> {
 			ACell existing=(follows==null)?null:follows.get(target);
 			AHashMap<Keyword,ACell> record=(existing instanceof AHashMap<?,?> map)
@@ -135,7 +135,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 
 	@Override
 	public Follows withCursor(AForkableCursor<AHashMap<ACell, ACell>> cursor) {
-		return new Follows(cursor);
+		return configured(new Follows(cursor));
 	}
 
 }

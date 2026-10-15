@@ -15,7 +15,6 @@ import convex.lattice.TransactionalComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.OwnerLattice;
 
 /**
@@ -147,7 +146,9 @@ public class Social extends ALatticeComponent<
 	 * @return New Social instance
 	 */
 	public static Social create(LatticeContext context) {
-		return new Social(Cursors.root(SOCIAL_LATTICE,context));
+		Social social=new Social(Cursors.root(SOCIAL_LATTICE));
+		social.setContext(context);
+		return social;
 	}
 
 	/**
@@ -169,8 +170,9 @@ public class Social extends ALatticeComponent<
 	public static Social connect(AForkableCursor<?> rootCursor,LatticeContext context) {
 		AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
 			rootCursor.child(KEY_SOCIAL,SOCIAL_LATTICE);
-		socialCursor.setContext(context);
-		return new Social(socialCursor);
+		Social social=new Social(socialCursor);
+		social.setContext(context);
+		return social;
 	}
 
 	/**
@@ -189,13 +191,13 @@ public class Social extends ALatticeComponent<
 	/** Connects beneath a component using an explicit application policy. */
 	public static Social connect(ALatticeComponent<?> parent,LatticeContext context) {
 		Social social=connect(parent);
-		social.cursor.setContext(context);
+		social.setContext(context);
 		return social;
 	}
 
 	/**
 	 * Connects to the {@code :social} region beneath a containing component,
-	 * inheriting its live cursor context.
+	 * resolving its component policy at construction.
 	 *
 	 * @param parent Containing application component
 	 * @return Social region component
@@ -204,7 +206,9 @@ public class Social extends ALatticeComponent<
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
 		AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
 			parent.cursor().child(KEY_SOCIAL,SOCIAL_LATTICE);
-		return new Social(socialCursor);
+		Social social=new Social(socialCursor);
+		social.setContext(parent.getContext());
+		return social;
 	}
 
 	/**
@@ -225,8 +229,8 @@ public class Social extends ALatticeComponent<
 			throw new IllegalArgumentException("Social owner must be a canonical base DID");
 		}
 		AForkableCursor<Index<Keyword, ACell>> userCursor =
-			SignedCursor.forOwner(cursor.path(ownerDid),SOCIAL_LATTICE,ownerDid);
-		return new SocialUser(userCursor,ownerDid);
+			signedCursor(cursor.path(ownerDid),SOCIAL_LATTICE,ownerDid);
+		return configured(new SocialUser(userCursor,ownerDid));
 	}
 
 	/** Convenience migration overload mapping an Ed25519 key to its {@code did:key}. */
@@ -243,12 +247,12 @@ public class Social extends ALatticeComponent<
 	 * @return Forked Social instance
 	 */
 	public Social fork() {
-		return new Social(cursor.fork(SOCIAL_LATTICE));
+		return configured(new Social(forkCursor(SOCIAL_LATTICE)));
 	}
 
 	@Override
 	public Social withCursor(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
-		return new Social(cursor);
+		return configured(new Social(cursor));
 	}
 
 }
