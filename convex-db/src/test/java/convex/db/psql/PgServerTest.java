@@ -332,10 +332,95 @@ public class PgServerTest {
 	}
 
 	/**
-	 * Tests connectivity using the PostgreSQL JDBC driver.
-	 * Disabled: Requires extended query protocol support (Parse/Bind/Execute).
+	 * The PostgreSQL JDBC driver sends numeric parameters in binary format (setLong as
+	 * the 8 bytes of an int8). They must reach the statement as numbers.
 	 */
-	@org.junit.jupiter.api.Disabled("Requires extended query protocol")
+	@Test
+	public void testPreparedStatementWithNumericParameters() throws Exception {
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url)) {
+			try (java.sql.PreparedStatement insert = conn.prepareStatement("INSERT INTO users VALUES (?, ?, ?)")) {
+				insert.setLong(1, 3L);
+				insert.setString(2, "Carol");
+				insert.setString(3, "carol@example.com");
+				assertEquals(1, insert.executeUpdate());
+
+				insert.setInt(1, 4);
+				insert.setString(2, "Dave");
+				insert.setString(3, "dave@example.com");
+				assertEquals(1, insert.executeUpdate());
+
+				insert.setShort(1, (short) 5);
+				insert.setString(2, "Erin");
+				insert.setString(3, "erin@example.com");
+				assertEquals(1, insert.executeUpdate());
+
+				// Past the driver's prepare threshold the statement becomes a named
+				// server-side one; the parameters must still arrive as numbers
+				for (int id = 6; id <= 15; id++) {
+					insert.setLong(1, id);
+					insert.setString(2, "User" + id);
+					insert.setString(3, "user" + id + "@example.com");
+					assertEquals(1, insert.executeUpdate());
+				}
+			}
+			try (java.sql.PreparedStatement update = conn.prepareStatement("UPDATE users SET name = ? WHERE id = ?")) {
+				update.setString(1, "Caroline");
+				update.setLong(2, 3L);
+				assertEquals(1, update.executeUpdate());
+			}
+
+		}
+
+		// Read back through the table API: the rows are stored under numeric keys
+		String[] expected = {"Caroline", "Dave", "Erin"};
+		for (int i = 0; i < expected.length; i++) {
+			assertEquals(expected[i], nameOf(3 + i));
+		}
+		for (int id = 6; id <= 15; id++) {
+			assertEquals("User" + id, nameOf(id));
+		}
+		assertEquals(15, db.tables().selectAll("users").count());
+	}
+
+	private String nameOf(long id) {
+		convex.core.data.AVector<convex.core.data.ACell> row = db.tables().selectByKey("users", convex.core.data.prim.CVMLong.create(id));
+		assertNotNull(row, "row " + id);
+		return row.get(1).toString();
+	}
+
+	/**
+	 * Floating point parameters arrive in binary format too (setDouble as a float8,
+	 * setFloat as a float4).
+	 */
+	@Test
+	public void testPreparedStatementWithFloatingPointParameters() throws Exception {
+		ConvexColumnType[] types = {
+			ConvexColumnType.of(ConvexType.INTEGER),
+			ConvexColumnType.of(ConvexType.DOUBLE)
+		};
+		db.tables().createTable("readings", new String[]{"id", "amount"}, types);
+
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url)) {
+			try (java.sql.PreparedStatement insert = conn.prepareStatement("INSERT INTO readings VALUES (?, ?)")) {
+				insert.setLong(1, 1L);
+				insert.setDouble(2, 2.5);
+				assertEquals(1, insert.executeUpdate());
+
+				insert.setLong(1, 2L);
+				insert.setFloat(2, 0.25f);
+				assertEquals(1, insert.executeUpdate());
+			}
+		}
+
+		assertEquals(convex.core.data.prim.CVMDouble.create(2.5), db.tables().selectByKey("readings", convex.core.data.prim.CVMLong.create(1)).get(1));
+		assertEquals(convex.core.data.prim.CVMDouble.create(0.25), db.tables().selectByKey("readings", convex.core.data.prim.CVMLong.create(2)).get(1));
+	}
+
+	/**
+	 * Tests connectivity using the PostgreSQL JDBC driver.
+	 */
 	@Test
 	public void testPostgresJDBCDriver() throws Exception {
 		// Connect using PostgreSQL JDBC driver
@@ -362,10 +447,52 @@ public class PgServerTest {
 	}
 
 	/**
-	 * Tests aggregation via PostgreSQL JDBC driver.
-	 * Disabled: Requires extended query protocol support (Parse/Bind/Execute).
+	 * The driver asks for the row description once, with Describe, and then executes
+	 * the same statement again without asking. Execute itself must not send one.
 	 */
-	@org.junit.jupiter.api.Disabled("Requires extended query protocol")
+	@Test
+	public void testPostgresJDBCPreparedSelectRepeated() throws Exception {
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url);
+			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE email = ?")) {
+			// More often than the driver's prepare threshold, so that the statement
+			// becomes a named one whose description the driver has cached
+			for (int i = 0; i < 12; i++) {
+				boolean alice = (i % 2 == 0);
+				select.setString(1, alice ? "alice@example.com" : "bob@example.com");
+				try (ResultSet rs = select.executeQuery()) {
+					assertTrue(rs.next());
+					assertEquals(alice ? "Alice" : "Bob", rs.getString("name"));
+					assertFalse(rs.next());
+				}
+			}
+		}
+	}
+
+	/**
+	 * Binary numeric parameters and extended-query result rows work together, also
+	 * after the driver starts reusing a named prepared statement.
+	 */
+	@Test
+	public void testPostgresJDBCPreparedNumericSelectRepeated() throws Exception {
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url);
+			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE id = ?")) {
+			for (int i = 0; i < 12; i++) {
+				boolean alice = (i % 2 == 0);
+				select.setLong(1, alice ? 1L : 2L);
+				try (ResultSet rs = select.executeQuery()) {
+					assertTrue(rs.next());
+					assertEquals(alice ? "Alice" : "Bob", rs.getString("name"));
+					assertFalse(rs.next());
+				}
+			}
+		}
+	}
+
+	/**
+	 * Tests aggregation via PostgreSQL JDBC driver.
+	 */
 	@Test
 	public void testPostgresJDBCAggregation() throws Exception {
 		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
