@@ -94,8 +94,8 @@ public final class Main {
 			}
 		}
 
-		DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(
-			node.getRootComponent(),regionPath);
+		DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(root,
+			node.getHost(),regionPath);
 		DLFSDrives localDrives=application.drives(keyPair.getAccountKey());
 		String driveName=config.getDriveName();
 		if (localDrives.getOrCreateDrive(driveName)==null) {
@@ -105,7 +105,7 @@ public final class Main {
 		}
 		DLFSDriveManager drives=DLFSDriveManager.createRouter(()->{
 			application.sync();
-			node.getRootComponent().sync();
+			node.getHost().sync();
 		});
 		for (DLFSConfig.DriveMount mount:config.getDriveMounts()) {
 			var owner=(mount.owner()==null)?keyPair.getAccountKey():mount.owner();

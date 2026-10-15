@@ -265,7 +265,7 @@ bounds and trust model.
 
 `P2PNode` is the network bootstrap and lifecycle owner. `P2PApplication` is the
 host-neutral lattice application component; it can also be connected directly to a
-standalone `RootComponent` for local use.
+standalone `LatticeHost` for local use.
 
 ### The user area API
 

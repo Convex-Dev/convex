@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -7,6 +7,10 @@ import java.util.ArrayList;
 
 import org.junit.jupiter.api.Test;
 
+import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeContext;
+import convex.lattice.LatticeHost;
+import convex.lattice.SignedComponent;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -20,7 +24,6 @@ import convex.core.lang.RT;
 import convex.core.store.MemoryStore;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerKeyLattice;
-import convex.lattice.generic.OwnerLattice;
 import convex.lattice.generic.SetLattice;
 
 class ApplicationIngressTest {
@@ -32,7 +35,7 @@ class ApplicationIngressTest {
 		int merges;
 		int preparations;
 		boolean ignore;
-		App(KeyedLattice lattice,RootComponent<Index<Keyword,ACell>> host) { super(lattice,host); }
+		App(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host) { super(lattice,host); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
 			return ignore?cursor.get():super.merge(incoming);
@@ -42,7 +45,7 @@ class ApplicationIngressTest {
 
 	/** This application chooses one input path and feeds it through its own root policy. */
 	private static class ItemsApp extends App {
-		ItemsApp(RootComponent<Index<Keyword,ACell>> host) { super(LATTICE,host); }
+		ItemsApp(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
 		@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
 			if (path.length==1 && ITEMS.equals(path[0])) return merge(LATTICE.zero().assoc(ITEMS,value));
 			return super.mergeAt(value,path);
@@ -51,7 +54,7 @@ class ApplicationIngressTest {
 
 	@Test void pathDeliveryHonoursRootOverrideAndDoesNotPublish() throws Exception {
 		var store=new MemoryStore();
-		var root=RootComponent.create(LATTICE,store);
+		var root=LatticeHost.create(LATTICE.zero(),store);
 		var first=new ItemsApp(root);
 		var second=new ItemsApp(root);
 		second.ignore=true;
@@ -72,7 +75,7 @@ class ApplicationIngressTest {
 	}
 
 	@Test void applicationsOwnPathSelectionIndependentlyOfHostSchema() {
-		var root=RootComponent.create(KeyedLattice.create(),new MemoryStore());
+		var root=LatticeHost.create(KeyedLattice.create().zero(),null);
 		var app=new ItemsApp(root);
 		root.configureApplications(List.of(app));
 		root.mergeAt(Sets.of(CVMLong.ONE),UNKNOWN);
@@ -85,7 +88,7 @@ class ApplicationIngressTest {
 	}
 
 	@Test void declaredPathDoesNotImplyApplicationInterest() {
-		var root=RootComponent.create(LATTICE,new MemoryStore());
+		var root=LatticeHost.create(LATTICE.zero(),null);
 		var app=new App(LATTICE,root);
 		root.configureApplications(List.of(app));
 		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
@@ -97,7 +100,7 @@ class ApplicationIngressTest {
 	}
 
 	@Test void customHandlerReceivesInputUnchangedWithoutSchemaInterpretation() {
-		var root=RootComponent.create(KeyedLattice.create(),new MemoryStore());
+		var root=LatticeHost.create(KeyedLattice.create().zero(),null);
 		ACell[] supplied={UNKNOWN,CVMLong.ONE};
 		ACell value=CVMLong.TWO;
 		List<ACell[]> deliveries=new ArrayList<>();
@@ -118,26 +121,12 @@ class ApplicationIngressTest {
 		assertEquals(2,app.merges);
 	}
 
-	@Test void standaloneLegacyOwnerPathRetainsAuthorisation() {
-		var owner=AKeyPair.createSeeded(9183);
-		var stranger=AKeyPair.createSeeded(9184);
-		var root=RootComponent.create(KeyedLattice.create(ITEMS,OwnerLattice.create(SetLattice.create())),new MemoryStore());
-		var values=Sets.of(CVMLong.ONE);
-		root.mergeAt(stranger.signData(values),ITEMS,owner.getAccountKey());
-		assertNull(RT.getIn(root.cursor().get(),ITEMS,owner.getAccountKey()));
-		var signed=owner.signData(values);
-		root.mergeAt(signed,ITEMS,owner.getAccountKey());
-		assertEquals(signed,RT.getIn(root.cursor().get(),ITEMS,owner.getAccountKey()));
-		assertThrows(IllegalArgumentException.class,
-			() -> root.mergeAt(values,ITEMS,owner.getAccountKey(),Keywords.VALUE));
-	}
-
 	@Test void signedPathRequiresEnvelopeAndAuthorisedOwner() {
 		var owner=AKeyPair.createSeeded(9181);
 		var stranger=AKeyPair.createSeeded(9182);
 		var owners=OwnerKeyLattice.create(SetLattice.<ACell>create());
 		var lattice=KeyedLattice.create(ITEMS,owners);
-		var root=RootComponent.create(lattice,new MemoryStore());
+		var root=LatticeHost.create(lattice.zero(),null);
 		class OwnerApp extends App {
 			final SignedComponent<ASet<ACell>> owned;
 			OwnerApp() {
@@ -175,7 +164,7 @@ class ApplicationIngressTest {
 	}
 
 	@Test void sequentialDeliveryPreservesEarlierWorkOnFailure() {
-		var root=RootComponent.create(LATTICE,new MemoryStore());
+		var root=LatticeHost.create(LATTICE.zero(),null);
 		var first=new ItemsApp(root);
 		var failure=new ItemsApp(root) {
 			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {

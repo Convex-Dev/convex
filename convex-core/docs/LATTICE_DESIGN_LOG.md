@@ -117,7 +117,7 @@ shaped), forked cursor, transaction draft and the update cursors.
 
 `child(key, shape)` navigates one level while declaring the child's empty value, so a
 write can create it and an update function receives the zero instead of null.
-`ALatticeApplication.resolve(path)` and `RootComponent.resolve(path)` walk the root
+`ALatticeApplication.resolve(path)` walks the application root
 lattice to declare a whole region path. `LatticeOps.assocIn` takes a shape: the base
 is created from it, intermediates below it only for structural (JSON-like) shapes,
 otherwise the write fails rather than guessing a container type.
@@ -167,10 +167,13 @@ such a fork always succeeds. Whether a merge-less fork exists depends on the dec
 
 ## 6. Root publication seam needs a merge to absorb a racing write
 
-**Status:** Decision needed.
+**Status:** Superseded. Publication now belongs to components. `LatticeHost` has
+no lattice: it persists one snapshot and retains concurrent application writes for
+its next sync. It does not remerge the persisted snapshot over a newer publication.
+The discussion below records the earlier cursor-based proposal.
 
 `Root.onSync(publish, merge)` installs the host's publication callback and the merge
-used when a write lands during publication. `RootComponent` always installs its
+used when a write lands during publication. The earlier root component installed its
 lattice. A root with a publication callback and no merge throws on that race, where
 the old root fell back to its own lattice. Alternative: require the merge whenever a
 callback is installed, so the race can never throw.

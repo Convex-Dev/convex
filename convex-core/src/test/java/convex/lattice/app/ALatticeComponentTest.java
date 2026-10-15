@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.app;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.lattice.ALatticeComponent;
+import convex.lattice.LatticeHost;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Blob;
@@ -47,7 +49,7 @@ public class ALatticeComponentTest {
 	@Test
 	public void testForkPublishesOnlyThroughComponentSync() throws Exception {
 		MemoryStore store=new MemoryStore();
-		var host=RootComponent.create(LATTICE,store);
+		var host=LatticeHost.create(LATTICE.zero(),store);
 		TestComponent live=new TestComponent(host.cursor());
 		TestComponent fork=live.fork();
 		Blob value=Blob.fromHex("cafebabe");

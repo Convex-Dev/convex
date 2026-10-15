@@ -171,14 +171,14 @@ public class P2PNodeTest {
 	public void testDefaultNodeServesApplicationRegions() {
 		node = P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate());
 
-		var host=node.getNodeServer().getRootComponent();
+		var host=node.getNodeServer().getHost();
 		var root=host.cursor();
 		var application=node.getApplication().cursor();
 		assertSame(root,application);
-		assertSame(host.getLattice(),node.getApplication().getLattice());
+		assertNotNull(node.getApplication().getLattice());
 		assertSame(root.get(),application.get());
-		assertNotNull(node.getNodeServer().getLattice().path(Social.KEY_SOCIAL));
-		assertNotNull(node.getNodeServer().getLattice().path(Keywords.P2P, Keywords.NODES));
+		assertNotNull(node.getApplication().getLattice().path(Social.KEY_SOCIAL));
+		assertNotNull(node.getApplication().getLattice().path(Keywords.P2P, Keywords.NODES));
 	}
 
 	/**
@@ -192,7 +192,7 @@ public class P2PNodeTest {
 		node.launch();
 
 		assertTrue(node.isRunning());
-		assertNull(node.getNodeServer().getLattice().path(Social.KEY_SOCIAL));
+		assertNull(node.getApplication().getLattice().path(Social.KEY_SOCIAL));
 
 		// Full P2P capability: identity and node registry both writable
 		assertNotNull(node.p2p().cursor());
@@ -207,6 +207,6 @@ public class P2PNodeTest {
 	private AHashMap<Keyword,ACell> nodeInfo(AccountKey key) {
 		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap<ACell,SignedData<ACell>>)
 			(ACell)node.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		return convex.lattice.P2PLattice.getNodeInfo(nodes,key);
+		return convex.lattice.p2p.P2PLattice.getNodeInfo(nodes,key);
 	}
 }

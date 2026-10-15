@@ -59,7 +59,7 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  * Connection conn = DriverManager.getConnection("jdbc:convex:file:/data/mydb.etch");
  *
  * // Direct from ConvexDB instance (no DriverManager)
- * ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+ * ConvexDB cdb = ConvexDB.connect(server.getHost());
  * Connection conn = cdb.getConnection("mydb");
  * </pre>
  *
@@ -301,7 +301,7 @@ public class ConvexDriver extends Driver {
 				EtchStore store = EtchStore.create(file);
 				var server = ConvexDB.createNodeServer(store);
 				server.launch();
-				ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+				ConvexDB cdb = ConvexDB.connect(server.getHost());
 				return new ManagedInstance(cdb, server, store);
 			} catch (Exception e) {
 				throw new RuntimeException("Failed to open Etch store: " + path, e);

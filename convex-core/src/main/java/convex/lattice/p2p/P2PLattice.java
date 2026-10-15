@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.p2p;
 
 import java.util.HashSet;
 
@@ -15,6 +15,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LocalLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.OwnerLattice;

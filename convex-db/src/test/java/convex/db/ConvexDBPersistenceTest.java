@@ -69,7 +69,7 @@ public class ConvexDBPersistenceTest {
 		}
 		server = ConvexDB.createNodeServer(store);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+		ConvexDB cdb = ConvexDB.connect(server.getHost());
 		cdb.database(DB_NAME); // ensure database path exists
 		cdb.register(DB_NAME);
 		return cdb;

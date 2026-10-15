@@ -14,7 +14,7 @@ import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.TableStoreLattice;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.RootComponent;
+import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
@@ -47,7 +47,7 @@ import convex.node.NodeServer;
  * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
  *     ConvexDB.createNodeServer(store);
  * server.launch();
- * ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+ * ConvexDB cdb = ConvexDB.connect(server.getHost());
  * cdb.register();
  *
  * // JDBC access (after register)
@@ -126,7 +126,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * Connects directly to an existing cursor chain without a containing
 	 * component policy. This form is retained for standalone and compatibility
 	 * use; hosted applications should use {@link #connect(ALatticeComponent)}
-	 * with {@link NodeServer#getRootComponent()}.
+	 * with {@link NodeServer#getHost()}.
 	 *
 	 * @param parent Parent lattice cursor at the database-map level
 	 * @return ConvexDB connected to the cursor chain
@@ -140,7 +140,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 *
 	 * <p>This is the preferred hosted form: cursor writes share the containing
 	 * component's atomic state and context at the same database-map position. A
-	 * {@link RootComponent} obtained from a {@link NodeServer} can be supplied
+	 * {@link LatticeHost} obtained from a {@link NodeServer} can be supplied
 	 * directly.</p>
 	 *
 	 * @param parent Containing database-map component
@@ -165,7 +165,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
 	 *     ConvexDB.createNodeServer(store);
 	 * server.launch();
-	 * ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+	 * ConvexDB cdb = ConvexDB.connect(server.getHost());
 	 * </pre>
 	 *
 	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})

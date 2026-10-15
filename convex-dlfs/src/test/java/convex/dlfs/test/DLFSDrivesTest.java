@@ -23,7 +23,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSDrives;
 import convex.lattice.LatticeContext;
-import convex.lattice.RootComponent;
+import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Root;
 import convex.lattice.fs.DLFSNode;
 
@@ -93,7 +93,7 @@ public class DLFSDrivesTest {
 
 	@Test
 	public void testHostedDrivesInheritClock() {
-		var host=RootComponent.create(DLFSDrives.LATTICE,new MemoryStore());
+		var host=LatticeHost.create(DLFSDrives.LATTICE.zero(),new MemoryStore());
 		var context=LatticeContext.create(CVMLong.create(123),null);
 		host.setContext(context);
 		var drives=DLFSDrives.connect(host);

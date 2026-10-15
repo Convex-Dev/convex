@@ -55,7 +55,7 @@ public class NodeServerGroupLifecycleTest {
 
 			CompletableFuture<ACell> announced=retained.nextAnnounce();
 			node.getCursor().set(CVMLong.create(20));
-			node.getRootComponent().sync();
+			node.getHost().sync();
 			assertEquals(CVMLong.create(20),announced.get(5,TimeUnit.SECONDS));
 			assertEquals(CVMLong.create(20),nodeStore.getRootData());
 			assertEquals(CVMLong.create(10),removed.getLastAnnouncedValue());
@@ -71,7 +71,7 @@ public class NodeServerGroupLifecycleTest {
 			assertTrue(node.getPropagators().isEmpty());
 			assertNull(node.getPropagator());
 			node.getCursor().set(CVMLong.create(30));
-			node.getRootComponent().sync();
+			node.getHost().sync();
 			assertEquals(CVMLong.create(30),nodeStore.getRootData());
 		}
 	}
@@ -139,7 +139,7 @@ public class NodeServerGroupLifecycleTest {
 			node.launch();
 			CompletableFuture<ACell> announced=retained.nextAnnounce();
 			node.getCursor().set(CVMLong.create(42));
-			CompletableFuture<Void> publication=CompletableFuture.runAsync(() -> node.getRootComponent().sync());
+			CompletableFuture<Void> publication=CompletableFuture.runAsync(() -> node.getHost().sync());
 			try {
 				assertTrue(entered.await(5,TimeUnit.SECONDS));
 				assertTrue(node.removePropagator(removed));
@@ -174,7 +174,7 @@ public class NodeServerGroupLifecycleTest {
 			assertEquals(List.of(retained),node.getPropagators());
 			CompletableFuture<ACell> announced=retained.nextAnnounce();
 			node.getCursor().set(CVMLong.create(42));
-			node.getRootComponent().sync();
+			node.getHost().sync();
 			assertEquals(CVMLong.create(42),announced.get(5,TimeUnit.SECONDS));
 		}
 	}

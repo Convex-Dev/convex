@@ -208,7 +208,7 @@ public class LatticePropagatorTest {
 			value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
 		// Synchronous commit persists the authoritative node root; propagation-view
 		// materialisation completes independently on the future above.
-		server2.getRootComponent().sync();
+		server2.getHost().sync();
 		published.get(5,TimeUnit.SECONDS);
 
 		// Pull from server2 into server1
@@ -231,7 +231,7 @@ public class LatticePropagatorTest {
 		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
 			value -> expected.equals(RT.getIn(value,dataKeyword,expectedHash)));
 		server1.getCursor().assoc(dataKeyword, values);
-		server1.getRootComponent().sync();
+		server1.getHost().sync();
 
 		received.get(5,TimeUnit.SECONDS);
 		assertEquals(1L, propagator1.getBroadcastCount(),
@@ -257,7 +257,7 @@ public class LatticePropagatorTest {
 		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
 			value -> expectedValues.equals(RT.getIn(value,dataKeyword)));
 		server1.getCursor().assoc(dataKeyword,values);
-		server1.getRootComponent().sync();
+		server1.getHost().sync();
 
 		received.get(5,TimeUnit.SECONDS);
 		assertEquals(values,RT.getIn(server2.getLocalValue(),dataKeyword));
@@ -307,10 +307,10 @@ public class LatticePropagatorTest {
 				: propagator2.nextAnnounce());
 
 		server1.getCursor().assoc(dataKeyword, values.assoc(first.getHash(), first));
-		server1.getRootComponent().sync();
+		server1.getHost().sync();
 		server1.getCursor().assoc(dataKeyword,
 			values.assoc(first.getHash(), first).assoc(second.getHash(), second));
-		server1.getRootComponent().sync();
+		server1.getHost().sync();
 
 		secondMerge.get(5,TimeUnit.SECONDS);
 		assertTrue(propagator1.getBroadcastCount()>=1,
@@ -461,7 +461,7 @@ public class LatticePropagatorTest {
 				node.getCursor().set(old);
 				node.launch();
 				node.getCursor().set(authoritative);
-				node.getRootComponent().sync();
+				node.getHost().sync();
 				assertSame(authoritative,primaryStore.getRootData());
 			}
 		}
@@ -512,7 +512,7 @@ public class LatticePropagatorTest {
 
 			CompletableFuture<ACell> nextPublicAnnounce = publicView.nextAnnounce();
 			node.getCursor().updateAndGet(value -> value.include(laterVisible));
-			node.getRootComponent().sync();
+			node.getHost().sync();
 			assertEquals(Sets.of(initialVisible, laterVisible),
 				nextPublicAnnounce.get(5, TimeUnit.SECONDS));
 			assertNull(publicStore.refForHash(hidden.getHash()));
@@ -629,7 +629,7 @@ public class LatticePropagatorTest {
 				value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
 			// Synchronous commit persists the authoritative node root; wait for the
 			// source group to expose that exact root before pulling it.
-			server1.getRootComponent().sync();
+			server1.getHost().sync();
 			published.get(5,TimeUnit.SECONDS);
 
 			// Pull from server1 into server2

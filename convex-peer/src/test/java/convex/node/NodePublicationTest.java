@@ -108,7 +108,7 @@ public class NodePublicationTest {
 			node.launch();
 			ASet<CVMLong> old=Sets.of(CVMLong.ONE);
 			node.getCursor().set(old.include(CVMLong.TWO));
-			ACell published=node.getRootComponent().sync();
+			ACell published=node.getHost().sync();
 			node.persistSnapshot(old);
 			assertSame(published,node.getLocalValue());
 			assertSame(published,store.getRootData());
@@ -135,7 +135,7 @@ public class NodePublicationTest {
 			assertTrue(assertSoftBranches(published,store)>0);
 			assertEquals(0,notifications.get());
 
-			assertSame(published,node.getRootComponent().sync());
+			assertSame(published,node.getHost().sync());
 			assertEquals(1,notifications.get(),"explicit persistence must not replace the normal sync policy");
 		}
 	}
@@ -156,7 +156,7 @@ public class NodePublicationTest {
 			assertTrue(assertSoftBranches(view,viewStore)>0);
 
 			CompletableFuture<ACell> announced=group.nextAnnounce();
-			node.getRootComponent().sync();
+			node.getHost().sync();
 			ACell repeated=announced.get(5,TimeUnit.SECONDS);
 			// Embedded roots may be rebuilt; the exact returned tree must be retained,
 			// with actual branch refs rebound to the serving store on every publication.
@@ -220,7 +220,7 @@ public class NodePublicationTest {
 			node.launch();
 			assertEquals(CVMLong.ONE,store.getRootData());
 			assertEquals(CVMLong.TWO,node.getLocalValue());
-			node.getRootComponent().sync();
+			node.getHost().sync();
 			assertEquals(CVMLong.TWO,store.getRootData());
 		}
 	}

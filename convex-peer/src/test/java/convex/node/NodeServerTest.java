@@ -101,6 +101,15 @@ public class NodeServerTest {
 		}
 	}
 
+	private static final class TestNode<V extends ACell> extends NodeServer<V> {
+		final ALattice<V> lattice;
+		TestNode(ALattice<V> lattice,AStore store) { this(lattice,store,null); }
+		TestNode(ALattice<V> lattice,AStore store,NodeConfig config) {
+			super(lattice,store,config);
+			this.lattice=lattice;
+		}
+	}
+
 	/** Attaches the complete identity-view group used by single-policy tests. */
 	private static <V extends ACell> LatticePropagator propagator(NodeServer<V> node) {
 		List<LatticePropagator> existing=node.getPropagators();
@@ -114,7 +123,7 @@ public class NodeServerTest {
 	private static <V extends ACell> LatticePropagator unattachedPropagator(
 			NodeServer<V> node) {
 		LatticePropagator result=new LatticePropagator(
-			node.getStore(),node.getLattice(),value -> value,node.getConfig());
+			node.getStore(),((TestNode<?>)node).lattice,value -> value,node.getConfig());
 		result.setMergeContext(node.getMergeContext());
 		return result;
 	}
@@ -154,7 +163,7 @@ public class NodeServerTest {
 	/** Syncs the authoritative root, then waits for the separately owned view. */
 	private static void syncAndAwaitPropagator(NodeServer<?> node) throws Exception {
 		CompletableFuture<ACell> announced=propagator(node).nextAnnounce();
-		node.getRootComponent().sync();
+		node.getHost().sync();
 		announced.get(5,TimeUnit.SECONDS);
 	}
 
@@ -164,10 +173,10 @@ public class NodeServerTest {
 	@Test
 	public void testCreateMaxLatticeServer() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 
 		assertNotNull(maxNodeServer);
-		assertNotNull(maxNodeServer.getLattice());
+		assertNotNull(maxNodeServer.getHost());
 		assertNotNull(maxNodeServer.getStore());
 		assertNotNull(maxNodeServer.getCursor());
 		assertFalse(maxNodeServer.isRunning());
@@ -179,10 +188,10 @@ public class NodeServerTest {
 	@Test
 	public void testCreateSetLatticeServer() {
 		ALattice<ASet<ACell>> lattice = SetLattice.create();
-		setNodeServer = new NodeServer<>(lattice, store);
+		setNodeServer = new TestNode<>(lattice, store);
 
 		assertNotNull(setNodeServer);
-		assertNotNull(setNodeServer.getLattice());
+		assertNotNull(setNodeServer.getHost());
 		assertNotNull(setNodeServer.getStore());
 		assertNotNull(setNodeServer.getCursor());
 		assertFalse(setNodeServer.isRunning());
@@ -191,12 +200,12 @@ public class NodeServerTest {
 	/** A local host needs no implicit/default propagation policy group. */
 	@Test
 	public void testLaunchWithoutPropagatorsPersistsLocally() throws Exception {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		assertTrue(maxNodeServer.getPropagators().isEmpty());
 
 		maxNodeServer.launch();
 		maxNodeServer.getCursor().set(CVMLong.create(17));
-		maxNodeServer.getRootComponent().sync();
+		maxNodeServer.getHost().sync();
 
 		assertEquals(CVMLong.create(17),store.getRootData());
 		assertTrue(maxNodeServer.isRunning());
@@ -205,7 +214,7 @@ public class NodeServerTest {
 	/** Attachment consumes a complete application policy; it never becomes a node setter. */
 	@Test
 	public void testPropagatorPolicyMustPrecedeAttachment() {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		LatticePropagator group=unattachedPropagator(maxNodeServer);
 		group.setTransportKeyPair(AKeyPair.generate());
 		group.setIngressFilter((path,value) -> value);
@@ -232,7 +241,7 @@ public class NodeServerTest {
 	/** Attachment transfers lifecycle ownership even if the host never launches. */
 	@Test
 	public void testCloseBeforeLaunchClosesAttachedPropagator() throws IOException {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		CloseTrackingPropagator group=new CloseTrackingPropagator(store);
 		maxNodeServer.addPropagator(group);
 
@@ -247,7 +256,7 @@ public class NodeServerTest {
 	/** Every propagation-group callback is optional, isolated fan-out. */
 	@Test
 	public void testPropagatorFailuresCannotBreakAuthoritativeLoop() throws Exception {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		FailingPropagator broken=new FailingPropagator(store);
 		LatticePropagator healthy=new LatticePropagator(
 			store,MaxLattice.create(),value -> value,LatticePropagatorConfig.create());
@@ -264,7 +273,7 @@ public class NodeServerTest {
 		assertTrue(healthy.getStatus().isOperational());
 		CompletableFuture<ACell> announced=healthy.nextAnnounce();
 		maxNodeServer.getCursor().set(CVMLong.create(23));
-		maxNodeServer.getRootComponent().sync();
+		maxNodeServer.getHost().sync();
 
 		assertEquals(CVMLong.create(23),store.getRootData());
 		assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
@@ -339,7 +348,7 @@ public class NodeServerTest {
 	@Test
 	public void testInitialValue() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 
 		AInteger initialValue = maxNodeServer.getLocalValue();
 		assertNotNull(initialValue);
@@ -353,7 +362,7 @@ public class NodeServerTest {
 	@Test
 	public void testValueCursor() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 
 		ACursor<AInteger> cursor = maxNodeServer.getCursor();
 		assertNotNull(cursor);
@@ -378,7 +387,7 @@ public class NodeServerTest {
 	@Test
 	public void testMergeValue() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 
 		// Start with zero
 		assertEquals(CVMLong.ZERO, maxNodeServer.getLocalValue());
@@ -416,7 +425,7 @@ public class NodeServerTest {
 
 		// A node configured with a tight inbound size limit (100 bytes)
 		NodeConfig tight = NodeConfig.create(Maps.of(NodeConfig.MAX_INBOUND_VALUE_SIZE, CVMLong.create(100)));
-		maxNodeServer = new NodeServer<>(lattice, store, tight);
+		maxNodeServer = new TestNode<>(lattice, store, tight);
 
 		// A small (embedded) value is within the limit
 		assertTrue(propagator(maxNodeServer).withinInboundSizeLimit(CVMLong.ONE));
@@ -427,7 +436,7 @@ public class NodeServerTest {
 		assertFalse(propagator(maxNodeServer).withinInboundSizeLimit(big));
 
 		// Under the default (permissive) config, the same large value is accepted
-		NodeServer<AInteger> permissive = new NodeServer<>(lattice, store);
+		NodeServer<AInteger> permissive = new TestNode<>(lattice, store);
 		try {
 			assertTrue(propagator(permissive).withinInboundSizeLimit(big));
 		} finally {
@@ -442,7 +451,7 @@ public class NodeServerTest {
 	@Test
 	public void testWrongTypeMergeRejected() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		var c = maxNodeServer.getCursor();
 		c.set(CVMLong.create(5));
 
@@ -622,7 +631,7 @@ public class NodeServerTest {
 	 */
 	@Test
 	public void testMergeStackOverflowRejectedNotPropagated() {
-		maxNodeServer = new NodeServer<>(new ThrowingLattice(), store, NodeConfig.port(-1));
+		maxNodeServer = new TestNode<>(new ThrowingLattice(), store, NodeConfig.port(-1));
 		var c = maxNodeServer.getCursor();
 		c.set(CVMLong.create(5));
 
@@ -634,7 +643,7 @@ public class NodeServerTest {
 	/** Fatal VM errors must reach the dispatcher's fail-closed boundary. */
 	@Test
 	public void testFatalMergeErrorPropagates() {
-		maxNodeServer = new NodeServer<>(new FatalThrowingLattice(), store, NodeConfig.port(-1));
+		maxNodeServer = new TestNode<>(new FatalThrowingLattice(), store, NodeConfig.port(-1));
 		var c = maxNodeServer.getCursor();
 		c.set(CVMLong.create(5));
 
@@ -649,7 +658,7 @@ public class NodeServerTest {
 	@Test
 	public void testMergeSetValue() {
 		ALattice<ASet<ACell>> lattice = SetLattice.create();
-		setNodeServer = new NodeServer<>(lattice, store);
+		setNodeServer = new TestNode<>(lattice, store);
 
 		// Start with empty set
 		assertTrue(setNodeServer.getLocalValue().isEmpty());
@@ -687,7 +696,7 @@ public class NodeServerTest {
 	@Test
 	public void testPeerManagement() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		propagator(maxNodeServer);
 		// Test explicit membership independently of automatic connection maintenance,
 		// which may replace client instances while reconciling desired peer routes.
@@ -733,7 +742,7 @@ public class NodeServerTest {
 	@Test
 	public void testPullFromPeer() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -760,7 +769,7 @@ public class NodeServerTest {
 	@Test
 	public void testLaunchTwice() throws IOException, InterruptedException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 
 		// First launch should work (even though network server is stubbed)
 		maxNodeServer.launch();
@@ -778,7 +787,7 @@ public class NodeServerTest {
 	@Test
 	public void testClose() throws IOException, InterruptedException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 
 		maxNodeServer.launch();
 		assertTrue(maxNodeServer.isRunning());
@@ -797,7 +806,7 @@ public class NodeServerTest {
 	@Test
 	public void testGetLocalValue() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 
 		// Initial value
 		AInteger value1 = maxNodeServer.getLocalValue();
@@ -817,7 +826,7 @@ public class NodeServerTest {
 	@Test
 	public void testConvexRemoteConnection() throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		
 		// Launch the server
 		maxNodeServer.launch();
@@ -843,7 +852,7 @@ public class NodeServerTest {
 	@Test
 	public void testPingRequest() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		allowSingleGroupInbound(maxNodeServer);
 		
 		// Launch the server
@@ -885,7 +894,7 @@ public class NodeServerTest {
 	@Test
 	public void testLatticeQueryEmptyPath() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		allowSingleGroupInbound(maxNodeServer);
 		
 		// Launch the server
@@ -940,7 +949,7 @@ public class NodeServerTest {
 	public void testPublicSinglePropagatorSharesNodeStore() throws Exception {
 		Blob branch = Blobs.createRandom(400);
 		ASet<ACell> expected = Sets.of(branch);
-		setNodeServer = new NodeServer<>(SetLattice.create(), store);
+		setNodeServer = new TestNode<>(SetLattice.create(), store);
 		allowSingleGroupInbound(setNodeServer);
 		setNodeServer.launch();
 
@@ -978,7 +987,7 @@ public class NodeServerTest {
 	@Test
 	public void testUnscopedDataRequestCannotReadPrimaryStore() throws Exception {
 		Blob privateValue = Cells.persist(Blobs.createRandom(400), store);
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store);
 		maxNodeServer.launch();
 
 		try (ConvexRemote convex = ConvexRemote.connect(address(maxNodeServer))) {
@@ -992,7 +1001,7 @@ public class NodeServerTest {
 	/** Unverified public clients cannot pre-seed the propagator store with DATA. */
 	@Test
 	public void testUnverifiedDataDoesNotPersist() throws Exception {
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store);
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 		Blob unsolicited=Blobs.createRandom(400);
@@ -1016,7 +1025,7 @@ public class NodeServerTest {
 		try (AStore ingressStore=new MemoryStore()) {
 			Blob unsolicited=Blobs.createRandom(400);
 			ASet<ACell> value=Sets.of(unsolicited);
-			try (NodeServer<ASet<ACell>> node=new NodeServer<>(
+			try (NodeServer<ASet<ACell>> node=new TestNode<>(
 					SetLattice.create(),ingressStore)) {
 					LatticePropagator ingress=unattachedPropagator(node);
 					ingress.setIngressFilter((path,received) -> null);
@@ -1049,7 +1058,7 @@ public class NodeServerTest {
 			LatticePropagator publicPropagator = new LatticePropagator(
 				publicStore,MaxLattice.create(),value -> value);
 
-			try (NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), primaryStore)) {
+			try (NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), primaryStore)) {
 				node.addPropagator(primary);
 				node.addPropagator(publicPropagator);
 				selectInboundPropagator(node,connection -> publicPropagator);
@@ -1073,7 +1082,7 @@ public class NodeServerTest {
 	/** An unassigned connection cannot select the primary lattice query view. */
 	@Test
 	public void testUnscopedLatticeQueryCannotReadPrimaryView() throws Exception {
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store);
 		maxNodeServer.launch();
 
 		try (ConvexRemote convex = ConvexRemote.connect(address(maxNodeServer))) {
@@ -1161,7 +1170,7 @@ public class NodeServerTest {
 				primaryStore,SetLattice.create(),value -> value);
 			LatticePropagator ingress = new LatticePropagator(
 				ingressStore,SetLattice.create(),value -> value);
-			try (NodeServer<ASet<ACell>> receiver = new NodeServer<>(
+			try (NodeServer<ASet<ACell>> receiver = new TestNode<>(
 					SetLattice.create(),primaryStore)) {
 				receiver.addPropagator(primary);
 				receiver.addPropagator(ingress);
@@ -1229,7 +1238,7 @@ public class NodeServerTest {
 				primaryStore,SetLattice.create(),value -> value,groupConfig);
 			LatticePropagator ingress = new LatticePropagator(
 				ingressStore,SetLattice.create(),value -> value,groupConfig);
-			receiver = new NodeServer<>(SetLattice.create(), primaryStore, config);
+			receiver = new TestNode<>(SetLattice.create(), primaryStore, config);
 			receiver.addPropagator(primary);
 			receiver.addPropagator(ingress);
 			AKeyPair sourceKey=AKeyPair.generate();
@@ -1321,7 +1330,7 @@ public class NodeServerTest {
 	@Test
 	public void testSetMergeContextConfigurationOnly() throws IOException, InterruptedException {
 		AKeyPair kp = AKeyPair.generate();
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, NodeConfig.port(-1));
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store, NodeConfig.port(-1));
 
 		// Before launch: permitted
 		maxNodeServer.setMergeContext(LatticeContext.create(null, kp));
@@ -1333,18 +1342,18 @@ public class NodeServerTest {
 	}
 
 	@Test
-	public void testRootComponentSyncPersistsBeforeLaunch() throws Exception {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,NodeConfig.port(-1));
+	public void testLatticeHostSyncPersistsBeforeLaunch() throws Exception {
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		maxNodeServer.getCursor().set(CVMLong.create(42));
 
-		maxNodeServer.getRootComponent().sync();
+		maxNodeServer.getHost().sync();
 
 		assertEquals(CVMLong.create(42),store.getRootData());
 	}
 
 	@Test
 	public void testPropagationGroupMayUseIndependentServingStore() {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		try (AStore otherStore=new MemoryStore()) {
 			LatticePropagator publicView=new LatticePropagator(
 				otherStore,MaxLattice.create(),value -> value);
@@ -1362,7 +1371,7 @@ public class NodeServerTest {
 	@Test
 	public void testLifecycleTransitionsFreezeTopologyDeterministically() throws Exception {
 		BlockingRootStore testStore = new BlockingRootStore();
-		NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), testStore, NodeConfig.port(-1));
+		NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), testStore, NodeConfig.port(-1));
 		LatticePropagator primary = new LatticePropagator(
 			testStore,MaxLattice.create(),value -> value,LatticePropagatorConfig.create());
 		node.addPropagator(primary);
@@ -1503,7 +1512,7 @@ public class NodeServerTest {
 		FailingMemoryStore testStore = new FailingMemoryStore();
 		testStore.failOnRootWrite = 1; // generic initial root publication fails
 		NodeConfig cfg = NodeConfig.create();
-		NodeServer<Index<Keyword, ACell>> node = new NodeServer<>(Lattice.ROOT, testStore, cfg);
+		NodeServer<Index<Keyword, ACell>> node = new TestNode<>(Lattice.ROOT, testStore, cfg);
 
 		try {
 			assertThrows(StoreException.class, node::launch);
@@ -1523,9 +1532,9 @@ public class NodeServerTest {
 	/** A dominated pull must re-publish the merged root, never the raw peer value. */
 	@Test
 	public void testPullCannotDemoteAuthoritativeRoot() throws Exception {
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store);
 		try (AStore remoteStore = new MemoryStore();
-				NodeServer<AInteger> remote = new NodeServer<>(MaxLattice.create(), remoteStore)) {
+				NodeServer<AInteger> remote = new TestNode<>(MaxLattice.create(), remoteStore)) {
 			allowSingleGroupInbound(remote);
 			propagator(maxNodeServer);
 			maxNodeServer.launch();
@@ -1609,7 +1618,7 @@ public class NodeServerTest {
 	@Test
 	public void testInboundDispatcherSurvivesStackOverflow() throws Exception {
 		RecordingConnection faulting = new RecordingConnection();
-		try (NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), store)) {
+		try (NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), store)) {
 			LatticePropagator propagator=propagator(node);
 			node.launch();
 			CompletableFuture<ACell> nextAnnounce = propagator.nextAnnounce();
@@ -1629,7 +1638,7 @@ public class NodeServerTest {
 		NodeConfig cfg = NodeConfig.create(Maps.of(
 			NodeConfig.PORT, CVMLong.ZERO,
 			NodeConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.create(100)));
-		NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), store, cfg);
+		NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), store, cfg);
 		BlockingMessage blocking = new BlockingMessage();
 
 		try {
@@ -1665,7 +1674,7 @@ public class NodeServerTest {
 		NodeConfig hostConfig=NodeConfig.port(-1);
 		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS,CVMLong.create(3)));
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, hostConfig);
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store, hostConfig);
 		maxNodeServer.addPropagator(new LatticePropagator(
 			store,MaxLattice.create(),value -> value,groupConfig));
 		allowSingleGroupInbound(maxNodeServer);
@@ -1707,7 +1716,7 @@ public class NodeServerTest {
 	 */
 	@Test
 	public void testConnectionStatsSweep() {
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, NodeConfig.port(-1));
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store, NodeConfig.port(-1));
 		LatticePropagator endpoint=propagator(maxNodeServer);
 
 		RecordingConnection open = new RecordingConnection();
@@ -1751,7 +1760,7 @@ public class NodeServerTest {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		AStore testStore = new MemoryStore();
 
-		NodeServer<AInteger> node = new NodeServer<>(lattice, testStore);
+		NodeServer<AInteger> node = new TestNode<>(lattice, testStore);
 		allowSingleGroupInbound(node);
 
 		try {
@@ -1809,7 +1818,7 @@ public class NodeServerTest {
 	public void testIncomingMergeRunsOffNettyEventLoop() throws Exception {
 		RecordingLattice lattice = new RecordingLattice();
 		try (AStore testStore = new MemoryStore();
-				NodeServer<AInteger> node = new NodeServer<>(lattice, testStore)) {
+				NodeServer<AInteger> node = new TestNode<>(lattice, testStore)) {
 			allowSingleGroupInbound(node);
 			node.launch();
 			CompletableFuture<ACell> announced = propagator(node).nextAnnounce();
@@ -1833,8 +1842,8 @@ public class NodeServerTest {
 		KeyedLattice lattice=KeyedLattice.create(
 				regionA,MaxLattice.create(),regionB,MaxLattice.create());
 
-		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
-				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(lattice,new MemoryStore())) {
 			allowSingleGroupInbound(source);
 			propagator(target);
 			source.launch();
@@ -1858,8 +1867,8 @@ public class NodeServerTest {
 		KeyedLattice lattice=KeyedLattice.create(
 				regionA,MaxLattice.create(),regionB,MaxLattice.create());
 
-		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
-				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(lattice,new MemoryStore())) {
 			allowSingleGroupInbound(source);
 			propagator(target);
 			source.launch();
@@ -1884,8 +1893,8 @@ public class NodeServerTest {
 		Blob branch=Blobs.createRandom(400);
 		ASet<ACell> expected=Sets.of(branch);
 
-		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
-				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(lattice,new MemoryStore())) {
 			allowSingleGroupInbound(source);
 			propagator(target);
 			source.launch();
@@ -1915,8 +1924,8 @@ public class NodeServerTest {
 				Vectors.of(deepIndex(2),CVMLong.ONE),
 				Vectors.of(deepIndex(5),CVMLong.ONE));
 
-		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
-				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(lattice,new MemoryStore())) {
 			allowSingleGroupInbound(source);
 			propagator(target);
 			source.launch();
@@ -1974,8 +1983,8 @@ public class NodeServerTest {
 		KeyedLattice lattice=KeyedLattice.create(region,SetLattice.create());
 		ASet<ACell> expected=branchySet(6); // ~24 KB: beyond both single-message limits
 
-		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
-				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(lattice,new MemoryStore())) {
 			LatticePropagator sourcePropagator=new LatticePropagator(
 				source.getStore(),lattice,value -> value,smallReplyLimits());
 			sourcePropagator.setMergeContext(source.getMergeContext());
@@ -2009,8 +2018,8 @@ public class NodeServerTest {
 		AKeyPair sourceKey=AKeyPair.generate();
 		AKeyPair targetKey=AKeyPair.generate();
 
-		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
-				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(lattice,new MemoryStore())) {
 			LatticePropagator sourcePropagator=new LatticePropagator(
 				source.getStore(),lattice,value -> value,smallReplyLimits());
 			sourcePropagator.setMergeContext(source.getMergeContext());
@@ -2062,14 +2071,14 @@ public class NodeServerTest {
 		KeyedLattice targetLattice=KeyedLattice.create(
 				absent,MaxLattice.create(),rejected,MaxLattice.create());
 
-		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(sourceLattice,new MemoryStore());
-				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(targetLattice,new MemoryStore())) {
+		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(sourceLattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(targetLattice,new MemoryStore())) {
 			allowSingleGroupInbound(source);
 			propagator(target);
 			source.launch();
 			target.launch();
 			target.mergeAt(CVMLong.create(7),rejected);
-			target.getRootComponent().sync();
+			target.getHost().sync();
 			source.mergeAt(Sets.of(CVMLong.ONE),rejected);
 			syncAndAwaitPropagator(source);
 
@@ -2088,8 +2097,8 @@ public class NodeServerTest {
 		KeyedLattice lattice=KeyedLattice.create(
 				outer,KeyedLattice.create(inner,MaxLattice.create()));
 
-		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
-				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(lattice,new MemoryStore())) {
 			allowSingleGroupInbound(source);
 			propagator(target);
 			source.launch();
@@ -2106,7 +2115,7 @@ public class NodeServerTest {
 
 	@Test
 	public void testLatticeQueryRejectsNonVectorPath() throws Exception {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store);
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store);
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -2121,7 +2130,7 @@ public class NodeServerTest {
 
 	@Test
 	public void testLatticeQueryRequiresExplicitPathVector() throws Exception {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store);
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store);
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -2136,7 +2145,7 @@ public class NodeServerTest {
 
 	@Test
 	public void testLatticeValueRejectsNonVectorPath() throws Exception {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store);
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store);
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -2153,7 +2162,7 @@ public class NodeServerTest {
 
 	@Test
 	public void testOptimisticLatticeValuePush() throws Exception {
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store);
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store);
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -2172,7 +2181,7 @@ public class NodeServerTest {
 	/** A correlated lattice update must fail promptly when its merge is rejected. */
 	@Test
 	public void testRejectedLatticeValueReturnsError() throws Exception {
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store);
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -2192,7 +2201,7 @@ public class NodeServerTest {
 	/** A freshly launched node publishes its initial lattice value immediately. */
 	@Test
 	public void testLatticeQueryImmediatelyAfterLaunch() throws Exception {
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store);
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -2212,7 +2221,7 @@ public class NodeServerTest {
 	@Test
 	public void testIncomingNoOpReplayDoesNotPersistAgain() throws Exception {
 		CountingMemoryStore testStore = new CountingMemoryStore();
-		try (NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), testStore)) {
+		try (NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), testStore)) {
 			allowSingleGroupInbound(node);
 			node.launch();
 			int launchWrites = testStore.rootWrites.get();
@@ -2239,7 +2248,7 @@ public class NodeServerTest {
 	@Test
 	public void testInboundPersistenceFailureLeavesPolicyToOperator() throws Exception {
 		FailingMemoryStore testStore = new FailingMemoryStore();
-		NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), testStore);
+		NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), testStore);
 		try {
 			LatticePropagator endpoint=propagator(node);
 			node.launch();
@@ -2277,7 +2286,7 @@ public class NodeServerTest {
 		NodeConfig cfg = NodeConfig.create(Maps.of(
 			NodeConfig.PORT, CVMLong.create(-1)
 		));
-		NodeServer<AInteger> node = new NodeServer<>(lattice, testStore, cfg);
+		NodeServer<AInteger> node = new TestNode<>(lattice, testStore, cfg);
 
 		try {
 			LatticePropagator propagator=propagator(node);
@@ -2289,7 +2298,7 @@ public class NodeServerTest {
 			// responsibility (unlike the incoming message path which syncs internally).
 			// Node commit is synchronous; propagation-group materialisation is not.
 			node.getCursor().set(CVMLong.create(42));
-			node.getRootComponent().sync();
+			node.getHost().sync();
 			assertEquals(CVMLong.create(42),announced.get(5,TimeUnit.SECONDS));
 
 			// Explicit sync should always work — this is the control
@@ -2312,7 +2321,7 @@ public class NodeServerTest {
 	@Test
 	public void testKeyedPeerConnection() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		propagator(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -2360,7 +2369,7 @@ public class NodeServerTest {
 			NodeConfig.MAX_MESSAGE_SIZE, CVMLong.create(4096),
 			NodeConfig.MAX_TRUSTED_MESSAGE_SIZE, CVMLong.create(8 * 1024 * 1024)));
 
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, cfg);
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store, cfg);
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKey);
 		maxNodeServer.addPropagator(serverPropagator);
@@ -2467,7 +2476,7 @@ public class NodeServerTest {
 	@Test
 	public void testDesiredPeerWithoutConnection() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, NodeConfig.port(-1));
+		maxNodeServer = new TestNode<>(lattice, store, NodeConfig.port(-1));
 		propagator(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -2500,7 +2509,7 @@ public class NodeServerTest {
 	public void testDesiredPeerLimit() throws Exception {
 		NodeConfig cfg=NodeConfig.create(Maps.of(
 			NodeConfig.MAX_DESIRED_PEERS,CVMLong.create(2)));
-		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,cfg);
+		maxNodeServer=new TestNode<>(MaxLattice.create(),store,cfg);
 		propagator(maxNodeServer);
 		maxNodeServer.launch();
 		LatticeConnectionManager cm=propagator(maxNodeServer).getConnectionManager();
@@ -2555,7 +2564,7 @@ public class NodeServerTest {
 	@Test
 	public void testDeadConnectionPruning() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		propagator(maxNodeServer);
 		maxNodeServer.launch();
 
@@ -2640,7 +2649,7 @@ public class NodeServerTest {
 		AKeyPair clientKP = AKeyPair.generate();
 
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKP);
 		maxNodeServer.addPropagator(serverPropagator);
@@ -2671,7 +2680,7 @@ public class NodeServerTest {
 		AKeyPair clientKP = AKeyPair.generate();
 
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKP);
 		maxNodeServer.addPropagator(serverPropagator);
@@ -2702,7 +2711,7 @@ public class NodeServerTest {
 		AKeyPair wrongKP = AKeyPair.generate();
 
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKP);
 		maxNodeServer.addPropagator(serverPropagator);
@@ -2733,7 +2742,7 @@ public class NodeServerTest {
 		AKeyPair clientKP = AKeyPair.generate();
 
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		maxNodeServer.setMergeContext(LatticeContext.create(null, applicationKP));
 		// Deliberately no setTransportKeyPair: lattice signing authority must not
 		// leak into the connection-authentication role.
@@ -2763,7 +2772,7 @@ public class NodeServerTest {
 		ACell contextID = Strings.create("test-lattice-v1");
 
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer = new TestNode<>(lattice, store);
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKP);
 		maxNodeServer.addPropagator(serverPropagator);

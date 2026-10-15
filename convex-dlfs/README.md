@@ -154,7 +154,7 @@ NodeServer node = new NodeServer(Lattice.ROOT, store);
 node.setMergeContext(LatticeContext.create(null, keyPair));
 node.launch();
 
-DLFSApplication app = DLFSApplication.connect(node.getRootComponent(), Keywords.FS);
+DLFSApplication app = DLFSApplication.connect(Lattice.ROOT, node.getHost(), Keywords.FS);
 DLFSDriveManager drives = new DLFSDriveManager(
     app.drives(keyPair.getAccountKey()));
 drives.createDrive(null, "home");
@@ -188,14 +188,14 @@ synchronously at the service `sync()` boundary.
 `DLFSApplication` extends the general `ALatticeApplication` component over the
 complete hosted lattice root. It composes a physical, multi-owner `DLFSRegion`
 at any configured path and may be extended with other lattice facilities such
-as P2P discovery. The stack accepts a generic `RootComponent` and has no
+as P2P discovery. The stack accepts a generic `LatticeHost` and has no
 dependency on `NodeServer`.
 
 ```java
 // Local: restore or create the standard :fs region in any AStore
-var root = RootComponent.open(Lattice.ROOT, store);
+var root = LatticeHost.open(store);
 root.setContext(LatticeContext.create(null, myKeyPair));
-var app = DLFSApplication.connect(root, Keywords.FS);
+var app = DLFSApplication.connect(Lattice.ROOT, root, Keywords.FS);
 DLFSDrives myDrives = app.drives(myKeyPair.getAccountKey());
 DLFSDrive drive = myDrives.getOrCreateDrive("home");
 if (drive == null) throw new IllegalStateException("Cannot open home drive");
@@ -242,12 +242,12 @@ transport.setSelector(connection -> group);
 node.launch();
 transport.launch();
 
-DLFSApplication networkedApp = DLFSApplication.connect(
-    node.getRootComponent(), Keyword.intern("documents"));
+DLFSApplication networkedApp = DLFSApplication.connect(Lattice.ROOT,
+    node.getHost(), Keyword.intern("documents"));
 DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
 DLFSDriveManager routes = DLFSDriveManager.createRouter(() -> {
     networkedApp.sync();
-    node.getRootComponent().sync();
+    node.getHost().sync();
 })
     .mountAnonymous(ownerDrives)
     .mount(DID.forKey(myKeyPair.getAccountKey()).toString(), ownerDrives);
@@ -255,13 +255,13 @@ if (ownerDrives.getOrCreateDrive("home") == null) {
     throw new IllegalStateException("Cannot open home drive");
 }
 networkedApp.sync();
-node.getRootComponent().sync();
+node.getHost().sync();
 
 DLFSServer networkedServer = DLFSServer.createWithAudience(routes, myKeyPair);
 networkedServer.start(0);
 ```
 
-The standard assembly is `RootComponent` → `DLFSApplication` → `DLFSRegion`
+The standard assembly is `LatticeHost` → `DLFSApplication` → `DLFSRegion`
 → `DLFSDrives` → `DLFSDrive`. The application is not owner-scoped: it can obtain
 components for multiple owners. Local identity-to-owner and cross-region mappings
 remain `DLFSDriveManager` routing policy; the HTTP server owns no lattice or store

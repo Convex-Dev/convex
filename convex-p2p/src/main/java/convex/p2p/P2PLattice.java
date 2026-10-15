@@ -77,10 +77,10 @@ import convex.social.Social;
  * {@link NodeDirectory} owns publication and discovery at exactly this path; the generic
  * generic propagation layer transports it without interpreting the path.
  *
- * <h2>Relationship to {@code convex.lattice.P2PLattice}</h2>
+ * <h2>Relationship to {@code convex.lattice.p2p.P2PLattice}</h2>
  *
  * <p>Core declares the {@code :p2p} region and wires it into {@code Lattice.ROOT}. This
- * class reuses that same {@link convex.lattice.P2PLattice#LATTICE} instance rather than
+ * class reuses that same {@link convex.lattice.p2p.P2PLattice#LATTICE} instance rather than
  * redeclaring it, so the registry's merge semantics cannot drift between the two roots,
  * and adds the P2P-only {@code :id} and {@code :kad} regions alongside it.
  *
@@ -100,7 +100,7 @@ import convex.social.Social;
  * through a component, or pass a context explicitly.
  *
  * <p>Helpers for building and reading {@code NodeInfo} records live in
- * {@link convex.lattice.P2PLattice} ({@code createNodeInfo}, {@code createSignedEntry},
+ * {@link convex.lattice.p2p.P2PLattice} ({@code createNodeInfo}, {@code createSignedEntry},
  * {@code getNodeInfo}). Identity helpers are below.
  */
 public class P2PLattice {
@@ -141,14 +141,14 @@ public class P2PLattice {
 	 * {@code :nodes}, where each P2P user owns a signed, LWW node record keyed by
 	 * their {@link AccountKey}.
 	 */
-	public static final KeyedLattice P2P_LATTICE = convex.lattice.P2PLattice.LATTICE;
+	public static final KeyedLattice P2P_LATTICE = convex.lattice.p2p.P2PLattice.LATTICE;
 
 	/**
 	 * {@code :nodes} — the node registry lattice inside {@link #P2P_LATTICE}, exposed
 	 * for direct use.
 	 */
 	public static final OwnerLattice<ACell> NODES_LATTICE =
-		convex.lattice.P2PLattice.NODES_LATTICE;
+		convex.lattice.p2p.P2PLattice.NODES_LATTICE;
 
 	/**
 	 * {@code :id} — each P2P user owns a signed, LWW identity record keyed by their

@@ -172,7 +172,7 @@ public class P2PUserTest {
 	public void testNodeCursorWriteAndRead() {
 		P2PUser me = node.p2p(KEY);
 
-		AHashMap<Keyword, ACell> info = convex.lattice.P2PLattice.createNodeInfo(
+		AHashMap<Keyword, ACell> info = convex.lattice.p2p.P2PLattice.createNodeInfo(
 			Vectors.of(Strings.create("tcp://example.com:18888")),
 			Strings.create("Convex Lattice Node"), Strings.create("test"), null, 1000L);
 		me.nodeCursor().set(info);
@@ -180,7 +180,7 @@ public class P2PUserTest {
 
 		AHashMap<ACell, SignedData<ACell>> nodes = ownerMap(
 			node.getCursor().get(P2PLattice.KEY_P2P, P2PLattice.KEY_NODES));
-		AHashMap<Keyword, ACell> read = convex.lattice.P2PLattice.getNodeInfo(nodes, KEY);
+		AHashMap<Keyword, ACell> read = convex.lattice.p2p.P2PLattice.getNodeInfo(nodes, KEY);
 		assertNotNull(read);
 		assertEquals(Strings.create("Convex Lattice Node"), read.get(Keywords.TYPE));
 	}

@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -10,6 +10,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
+import convex.lattice.ALattice;
+import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeContext;
+import convex.lattice.LatticeHost;
+import convex.lattice.SignedComponent;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
@@ -19,7 +24,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
-import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
@@ -62,8 +66,8 @@ public class ApplicationPublicationTest {
 		final AtomicInteger signatures=new AtomicInteger();
 		Runnable onSign=() -> {};
 
-		Application(RootComponent<Index<Keyword,ACell>> host) {
-			super(host);
+		Application(LatticeHost<Index<Keyword,ACell>> host) {
+			super(LATTICE,host);
 			owner=new SignedComponent<>(SIGNED,resolve(OWNED));
 			owner.setContext(new LatticeContext() {
 				@Override public AKeyPair getSigningKey() { return KEY; }
@@ -102,7 +106,7 @@ public class ApplicationPublicationTest {
 
 	@Test
 	public void testSequentialApplicationsCombineTheSameSignedSubtree() {
-		var host=RootComponent.create(LATTICE,initial(),new MemoryStore());
+		var host=LatticeHost.create(initial(),null);
 		var first=new Application(host);
 		var second=new Application(host);
 		first.add(1);
@@ -123,7 +127,7 @@ public class ApplicationPublicationTest {
 	@Test
 	public void testCASRaceCombinesOwnersAndReusesSignatureForUnrelatedRetry() {
 		var root=new InterleavingRoot();
-		var host=new RootComponent<>(LATTICE,root,new MemoryStore());
+		var host=new LatticeHost<>(root,null);
 		var first=new Application(host);
 		var second=new Application(host);
 		first.add(1);
@@ -141,7 +145,7 @@ public class ApplicationPublicationTest {
 
 	@Test
 	public void testEqualTimestampLocalEditWinsAndUnchangedSiblingDoesNotRevert() {
-		var host=RootComponent.create(LATTICE,initial(),new MemoryStore());
+		var host=LatticeHost.create(initial(),null);
 		var first=new Application(host);
 		var second=new Application(host);
 		first.editRegister(1);
@@ -158,7 +162,7 @@ public class ApplicationPublicationTest {
 
 	@Test
 	public void testEditsDuringPublicationStayPending() throws Exception {
-		var host=RootComponent.create(LATTICE,initial(),new MemoryStore());
+		var host=LatticeHost.create(initial(),null);
 		var first=new Application(host);
 		var second=new Application(host);
 		first.add(1);
@@ -194,8 +198,8 @@ public class ApplicationPublicationTest {
 	@Test
 	public void testHostPersistenceCannotRemergeOverAnApplicationPublication() {
 		var maximum=CompareLattice.<CVMLong>create((a,b) -> a.compareTo(b));
-		var host=RootComponent.create(maximum,CVMLong.create(5),new MemoryStore());
-		var app=new ALatticeApplication<CVMLong>(host) {};
+		var host=LatticeHost.create(CVMLong.create(5),null);
+		var app=new ALatticeApplication<CVMLong>(maximum,host) {};
 		host.configureApplications(List.of(app));
 		app.cursor().set(CVMLong.ONE);
 		host.setPublicationPolicy(snapshot -> {
@@ -208,7 +212,7 @@ public class ApplicationPublicationTest {
 
 	@Test
 	public void testFailedConflictSigningCanRetryWithoutDroppingEitherBranch() {
-		var host=RootComponent.create(LATTICE,initial(),new MemoryStore());
+		var host=LatticeHost.create(initial(),null);
 		var first=new Application(host);
 		var second=new Application(host);
 		first.add(1);
@@ -227,7 +231,7 @@ public class ApplicationPublicationTest {
 
 	@Test
 	public void testApplicationMaySupplyItsOwnLattice() {
-		var host=RootComponent.create(LATTICE,initial(),new MemoryStore());
+		var host=LatticeHost.create(initial(),null);
 		var selected=KeyedLattice.create(REGISTER,LWW);
 		var app=new ALatticeApplication<Index<Keyword,ACell>>(selected,host) {};
 		host.configureApplications(List.of(app));
@@ -243,7 +247,7 @@ public class ApplicationPublicationTest {
 
 	@Test
 	public void testRootRetainsOnlyWhatApplicationsAcceptAndPublish() {
-		var host=RootComponent.create(LATTICE,initial(),new MemoryStore());
+		var host=LatticeHost.create(initial(),null);
 		var app=new Application(host);
 		host.configureApplications(List.of(app));
 		var incoming=LATTICE.zero().assoc(OWNED,KEY.signData(Sets.of(1))).assoc(IGNORED,CVMLong.ONE);

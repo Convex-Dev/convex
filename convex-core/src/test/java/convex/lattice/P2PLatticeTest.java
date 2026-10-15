@@ -21,6 +21,7 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.OwnerLattice;
+import convex.lattice.p2p.P2PLattice;
 
 /**
  * Tests for P2PLattice — the {@code :p2p} lattice region for node discovery.

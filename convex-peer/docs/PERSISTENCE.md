@@ -11,17 +11,17 @@ authority over application state.
 A node owns:
 
 - a `Root` cursor containing the current application value;
-- a `RootComponent` connecting `sync()` to node publication;
+- a `LatticeHost` connecting `sync()` to node publication;
 - one authoritative `AStore`; and
 - one serialised root-publication/checkpoint pipeline.
 
-The application mutates the cursor and calls `sync()`:
+The application publishes its working state to the host, then the caller syncs the host:
 
 ```text
-application cursor update
+application working update and application.sync()
           |
           v
-RootComponent.sync()
+LatticeHost.sync()
           |
           v
 NodeServer publication policy
@@ -43,10 +43,10 @@ matters.
 The application decides whether networking exists. `NodeServer` never creates a
 default propagator. A zero-propagator node still:
 
-- hosts and merges its lattice value;
+- delegates incoming values to its configured applications;
 - announces store-backed cells;
 - retains the node root when persistence is enabled;
-- restores the root at launch; and
+- restores a convenience relay at launch (supplied hosts are already initialised); and
 - performs configured durability barriers.
 
 This is the normal shape for a local database or application component that has

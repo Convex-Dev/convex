@@ -18,7 +18,7 @@ import convex.core.store.MemoryStore;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLTable;
-import convex.lattice.RootComponent;
+import convex.lattice.LatticeHost;
 
 /** Tests Convex DB components over a hosted root: state and forks travel through cursors. */
 public class ConvexDBComponentTest {
@@ -26,8 +26,8 @@ public class ConvexDBComponentTest {
 	private static final String DB_NAME="component-test";
 	private static final String TABLE_NAME="items";
 
-	private static RootComponent<AHashMap<AString,Index<Keyword,ACell>>> host() {
-		return RootComponent.create(ConvexDB.DATABASE_MAP_LATTICE,new MemoryStore());
+	private static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host() {
+		return LatticeHost.create(ConvexDB.DATABASE_MAP_LATTICE.zero(),new MemoryStore());
 	}
 
 	private static SQLDatabase createDatabase(ConvexDB cdb) {
@@ -38,7 +38,7 @@ public class ConvexDBComponentTest {
 
 	@Test
 	public void testHostedComponentsShareRootState() {
-		RootComponent<AHashMap<AString,Index<Keyword,ACell>>> root=host();
+		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> root=host();
 		ConvexDB cdb=ConvexDB.connect(root);
 		SQLDatabase db=createDatabase(cdb);
 		SQLTable table=db.tables().getTable(TABLE_NAME);
@@ -51,7 +51,7 @@ public class ConvexDBComponentTest {
 
 	@Test
 	public void testDatabaseForkSyncsToOriginal() {
-		RootComponent<AHashMap<AString,Index<Keyword,ACell>>> root=host();
+		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> root=host();
 		SQLDatabase original=createDatabase(ConvexDB.connect(root));
 		SQLDatabase fork=original.fork();
 
@@ -65,7 +65,7 @@ public class ConvexDBComponentTest {
 
 	@Test
 	public void testSchemaForkSyncsToOriginal() {
-		RootComponent<AHashMap<AString,Index<Keyword,ACell>>> root=host();
+		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> root=host();
 		SQLSchema original=ConvexDB.connect(root).database(DB_NAME).tables();
 		SQLSchema fork=original.fork();
 

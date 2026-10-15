@@ -29,7 +29,7 @@ import convex.lattice.generic.SignedLattice;
  * the authoring functions of signing and stamping views.
  * Merge and publication policy remain in components.</p>
  *
- * <p>Persistence belongs to the host ({@link RootComponent}) and to components which
+ * <p>Persistence belongs to the host ({@link LatticeHost}) and to components which
  * explicitly own a store for their own data, such as DLFS drives.</p>
  *
  * @param <V> Value type of the wrapped cursor

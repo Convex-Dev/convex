@@ -20,16 +20,22 @@ import convex.lattice.generic.SignedLattice;
  * owned components in {@link ALatticeApplication#beforeSync()} before publishing
  * its own working state. This component retains no parent component or store.</p>
  *
+ * <p>Domain components may extend this class to add operations directly over
+ * {@link #cursor()}, inheriting verification, batched signing and publication.
+ * Choose this boundary explicitly when edits should remain unsigned until sync.</p>
+ *
  * @param <V> Unsigned working value
  */
-public final class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
+public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	private final SignedLattice<V> lattice;
 
 	/**
-	 * Creates unsigned working state over a signed destination. The lattice should
-	 * be the owner-bound instance from the destination's lattice definition, such as
-	 * {@code owners.signingFor(owner)}. Signing policy is resolved from the
+	 * Creates private unsigned working state over a signed destination. The lattice
+	 * should be the owner-bound instance from the destination's lattice definition,
+	 * such as {@code owners.signingFor(owner)}. Signing policy is resolved from the
 	 * component's explicit policy, configured before publication.
+	 * For a lightweight view which signs each atomic edit immediately, compose a
+	 * {@link convex.lattice.cursor.SignedCursor} with the destination instead.
 	 */
 	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination) {
 		super(lattice.getValueLattice(),destination,

@@ -107,6 +107,7 @@ public abstract class AStore implements Closeable {
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> getRootRef() throws IOException {
 		Hash h=getRootHash();
+		if (h==null) return null;
 		Ref<T> ref=refForHash(h);
 		
 		// Special roots need no stored entry. UNSET_HASH means the root was never

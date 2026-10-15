@@ -57,6 +57,7 @@ final class NodeDirectory {
 	private static final Logger log=LoggerFactory.getLogger(NodeDirectory.class);
 
 	private final NodeServer<?> server;
+	private final P2PApplication application;
 	private final LatticePropagator propagator;
 	private final LatticeListener transport;
 	private final NodeConfig config;
@@ -68,9 +69,10 @@ final class NodeDirectory {
 	private AVector<AccountKey> pointsOfPresence=Vectors.empty();
 	private boolean relay;
 
-	NodeDirectory(NodeServer<?> server,LatticePropagator propagator,
+	NodeDirectory(NodeServer<?> server,P2PApplication application,LatticePropagator propagator,
 			LatticeListener transport,NodeConfig config,AKeyPair keyPair) {
 		this.server=server;
+		this.application=application;
 		this.propagator=propagator;
 		this.transport=transport;
 		this.config=config;
@@ -92,7 +94,7 @@ final class NodeDirectory {
 	/** Sets the bounded PoP declarations used by the next NodeInfo publication. */
 	void setPointsOfPresence(AVector<AccountKey> pops) {
 		AVector<AccountKey> value=(pops==null) ? Vectors.empty() : pops;
-		if (value.count()>convex.lattice.P2PLattice.MAX_POINTS_OF_PRESENCE) {
+		if (value.count()>convex.lattice.p2p.P2PLattice.MAX_POINTS_OF_PRESENCE) {
 			throw new IllegalArgumentException("Too many Points of Presence: "+value.count());
 		}
 		HashSet<AccountKey> unique=new HashSet<>();
@@ -117,7 +119,7 @@ final class NodeDirectory {
 	 */
 	void publishOwnRecord() {
 		if (keyPair==null) return;
-		if (server.getLattice().path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES)==null) {
+		if (application.getLattice().path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES)==null) {
 			throw new IllegalStateException("P2PNode root does not contain [:p2p :nodes]");
 		}
 
@@ -127,15 +129,15 @@ final class NodeDirectory {
 		String currentVersion=Utils.getVersion();
 		AString version=Strings.create(currentVersion==null ? "unknown" : currentVersion);
 		long timestamp=server.getMergeContext().currentTimestampValue();
-		AHashMap<Keyword,ACell> info=convex.lattice.P2PLattice.createNodeInfo(
+		AHashMap<Keyword,ACell> info=convex.lattice.p2p.P2PLattice.createNodeInfo(
 			transports,type,version,null,pointsOfPresence,relay,timestamp);
 		AHashMap<ACell,SignedData<ACell>> entry=
-			convex.lattice.P2PLattice.createSignedEntry(keyPair,info);
+			convex.lattice.p2p.P2PLattice.createSignedEntry(keyPair,info);
 
 		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=
-			server.getRootComponent().resolve(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+			application.resolve(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		nodes.updateAndGet(own -> P2PLattice.NODES_LATTICE.merge(server.getMergeContext(),own,entry));
-		server.getRootComponent().sync();
+		server.getHost().sync();
 		refresh();
 		log.debug("Published NodeInfo: transports={}, pops={}, relay={}, type={}, version={}",
 			transports,pointsOfPresence,relay,type,version);
@@ -241,7 +243,7 @@ final class NodeDirectory {
 
 		AVector<?> rawPops=RT.ensureVector(info.get(Keywords.POPS));
 		if (rawPops==null) rawPops=Vectors.empty();
-		if (rawPops.count()>convex.lattice.P2PLattice.MAX_POINTS_OF_PRESENCE) return null;
+		if (rawPops.count()>convex.lattice.p2p.P2PLattice.MAX_POINTS_OF_PRESENCE) return null;
 		HashSet<AccountKey> unique=new HashSet<>();
 		AVector<AccountKey> pops=Vectors.empty();
 		for (long i=0; i<rawPops.count(); i++) {

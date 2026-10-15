@@ -131,7 +131,7 @@ public class DlfsStart extends ACommand {
 		NodeConfig config = buildNodeConfig();
 
 		// Create and configure NodeServer
-		NodeServer<?> nodeServer = new NodeServer<>(Lattice.ROOT, store, config);
+		var nodeServer = new NodeServer<>(Lattice.ROOT, store, config);
 		LatticeContext context=LatticeContext.create(null,keyPair);
 		nodeServer.setMergeContext(context);
 		LatticePropagator propagator=new LatticePropagator(
@@ -163,8 +163,8 @@ public class DlfsStart extends ACommand {
 		// Attach the user's drives component at :fs → accountKey → :value.
 		// This traverses OwnerLattice → SignedLattice → MapLattice<DLFSLattice>
 		AccountKey accountKey = keyPair.getAccountKey();
-		DLFSApplication<?> application=DLFSApplication.connect(
-			nodeServer.getRootComponent(),Keywords.FS);
+		DLFSApplication<?> application=DLFSApplication.connect(Lattice.ROOT,
+			nodeServer.getHost(),Keywords.FS);
 		DLFSDrives ownerDrives=application.drives(accountKey);
 		DLFSDriveManager driveManager=DLFSDriveManager.createRouter()
 			.mountAnonymous(ownerDrives)

@@ -35,6 +35,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.etch.EtchStore;
+import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
@@ -108,15 +109,15 @@ public class P2PNode implements Closeable {
 	@SuppressWarnings("unchecked")
 	private P2PNode(NodeServer<Index<Keyword, ACell>> server,
 			LatticePropagator propagator,LatticeListener transport,NodeConfig config,AKeyPair keyPair,
-			DIDKeyAuthorizer didAuthorizer) {
+			DIDKeyAuthorizer didAuthorizer,ALattice<Index<Keyword,ACell>> lattice) {
 		this.server = server;
 		this.propagator=propagator;
 		this.transport=transport;
-		this.application=P2PApplication.connect(server.getRootComponent());
+		this.application=P2PApplication.connect(lattice,server.getHost());
 		this.keyPair = keyPair;
 		this.didAuthorizer=didAuthorizer;
 		this.socialPolicy=new SocialReplicationPolicy(server,didAuthorizer);
-		this.nodeDirectory=new NodeDirectory(server,propagator,transport,config,keyPair);
+		this.nodeDirectory=new NodeDirectory(server,application,propagator,transport,config,keyPair);
 		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,nodeDirectory);
 		propagator.setIngressFilter(socialPolicy::filterIngress);
 		propagator.setPublicationFilter(value -> (Index<Keyword,ACell>)socialPolicy.filterPublication(
@@ -219,7 +220,7 @@ public class P2PNode implements Closeable {
 		propagator.setTransportKeyPair(keyPair);
 		LatticeListener transport=new LatticeListener(effectiveConfig);
 		transport.registerPropagator(propagator);
-		P2PNode node=new P2PNode(server,propagator,transport,effectiveConfig,keyPair,didAuthorizer);
+		P2PNode node=new P2PNode(server,propagator,transport,effectiveConfig,keyPair,didAuthorizer,root);
 		server.addPropagator(propagator);
 		return node;
 	}

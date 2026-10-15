@@ -89,7 +89,7 @@ with `DLFSLattice` as its shape, or a `ForkedCursor` (isolated working copy).
 | `DLFSLocal` | `convex-core/.../lattice/fs/impl/DLFSLocal.java` | Mutable filesystem (Java NIO) |
 | `DLFileSystem` | `convex-core/.../lattice/fs/DLFileSystem.java` | Abstract base with timestamp |
 | `DLFS` | `convex-core/.../lattice/fs/DLFS.java` | Factory methods |
-| `RootComponent` | `convex-core/.../lattice/RootComponent.java` | Generic store-backed application root and persistence policy |
+| `LatticeHost` | `convex-core/.../lattice/LatticeHost.java` | Generic store-backed application root and persistence policy |
 | `ALatticeApplication` | `convex-core/.../lattice/ALatticeApplication.java` | Root-level application composition and durability boundary |
 | `DLFSApplication` | `convex-dlfs/.../dlfs/DLFSApplication.java` | Application component composing DLFS at a configured path |
 | `DLFSRegion` | `convex-dlfs/.../dlfs/DLFSRegion.java` | Physical multi-owner DLFS region at an arbitrary lattice path |
@@ -131,7 +131,7 @@ The developer-facing lattice application stack is independent of HTTP and of the
 particular host implementation:
 
 ```
-RootComponent<V>                  store persistence, root publication, flush
+LatticeHost<V>                  store persistence, root publication, flush
 └── ALatticeApplication<V>        complete-root application composition
     └── DLFSApplication<V>        configured DLFS region path
         └── DLFSRegion            physical multi-owner lattice region
@@ -139,9 +139,9 @@ RootComponent<V>                  store persistence, root publication, flush
                 └── DLFSDrive     named drive plus local NIO view
 ```
 
-A local bootstrap explicitly obtains the root with `RootComponent.open(...)`.
+A local bootstrap explicitly obtains the root with `LatticeHost.open(...)`.
 A networked bootstrap obtains the same root abstraction
-from `NodeServer.getRootComponent()`. No application branch depends on `NodeServer`.
+from `NodeServer.getHost()`. No application branch depends on `NodeServer`.
 `root.sync()` publishes through host policy; component sync stops at its destination.
 `flush()` is the separate
 store durability barrier. `DLFSDriveManager` is outside this ownership tree because
@@ -495,7 +495,7 @@ cursors), operations through either path are automatically consistent.
 
 ### Hosted Components and Network Sync
 
-`RootComponent` is the generic store-backed application boundary in `convex-core`.
+`LatticeHost` is the generic store-backed application boundary in `convex-core`.
 It may be created directly over a local `AStore`, or exposed by `NodeServer` for a
 networked application. A physical `DLFSRegion` can be connected at the root or at
 any nested lattice path without depending on NodeServer:
@@ -507,17 +507,17 @@ NodeServer<Index<Keyword, ACell>> node =
     new NodeServer<>(lattice, store);
 node.launch();
 
-DLFSApplication<Index<Keyword, ACell>> app = DLFSApplication.connect(
-    node.getRootComponent(), Keyword.intern("documents"));
+DLFSApplication<Index<Keyword, ACell>> app = DLFSApplication.connect(Lattice.ROOT,
+    node.getHost(), Keyword.intern("documents"));
 DLFSDrives drives = app.drives(ownerKey);
 DLFSDrive drive = drives.createDrive("home");
 Files.writeString(drive.fileSystem().getPath("/data.txt"), "value");
 app.sync();
-node.getRootComponent().sync();
+node.getHost().sync();
 ```
 
-For a non-networked host, explicitly open `RootComponent.open(Lattice.ROOT, store)`,
-set its context, and connect with `DLFSApplication.connect(root, Keywords.FS)`.
+For a non-networked host, explicitly open `LatticeHost.open(store)`,
+set its context, and connect with `DLFSApplication.connect(Lattice.ROOT, root, Keywords.FS)`.
 There is no hidden-host factory: retain the root and publish with `root.sync()`.
 
 `DLFSDriveManager.mount(identity, drives)` exposes owner components to WebDAV and

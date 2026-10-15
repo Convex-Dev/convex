@@ -103,7 +103,7 @@ Use component working state for CAS-or-merge publication. The component retains
 its destination and baseline, reconciles with its own lattice and context, and
 publishes through cursor operations. Generic cursors know nothing of that policy.
 
-`RootComponent.cursor()` and component working cursors are ordinary storage.
+`LatticeHost.cursor()` and component working cursors are ordinary storage.
 Their `sync()` does not invoke component publication. Call the owning component's
 `sync()` explicitly; it updates only its destination and never syncs that cursor.
 The component which supplied the destination owns the next publication step.
@@ -149,7 +149,7 @@ for unsigned working state that is signed only when published.
 
 - `convex.lattice.cursor`: atomic storage, paths, function-based views, drafts and wrappers.
 - `convex.lattice.LatticeOps`: strict path updates and explicit component construction helpers.
-- `convex.lattice.ALatticeComponent`, `ALatticeApplication`, `RootComponent`: structure,
+- `convex.lattice.ALatticeComponent`, `ALatticeApplication`, `LatticeHost`: structure,
   merge policy and publication lifecycle.
 - `convex.lattice.LatticeContext`: component signing capabilities and write policy.
 - [CAD035 Lattice Cursors](https://docs.convex.world/docs/cad/cursors): earlier cursor model.

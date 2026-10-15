@@ -10,7 +10,7 @@ import convex.core.store.AStore;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.ALattice;
 import convex.lattice.fs.DLFSLocation;
-import convex.lattice.RootComponent;
+import convex.lattice.LatticeHost;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.OwnerLattice;
@@ -47,11 +47,11 @@ public final class DLFSRegion extends ALatticeComponent<
 
 	/**
 	 * Connects a physical DLFS region at a path below a host root, navigated with
-	 * the host's lattice and checkpointing streamed blob data into the host store.
+	 * the supplied lattice and checkpointing streamed blob data into the host store.
 	 */
-	public static DLFSRegion connect(RootComponent<?> host, ACell... path) {
+	public static DLFSRegion connect(LatticeHost<?> host, ALattice<?> lattice, ACell... path) {
 		if (host==null) throw new IllegalArgumentException("Host must not be null");
-		DLFSRegion region=connect(host.cursor(),host.getLattice(),host.store(),path);
+		DLFSRegion region=connect(host.cursor(),lattice,host.store(),path);
 		region.setContext(host.getContext());
 		return region;
 	}

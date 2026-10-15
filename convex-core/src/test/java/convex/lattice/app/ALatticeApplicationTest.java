@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -12,6 +12,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
+import convex.lattice.ALattice;
+import convex.lattice.ALatticeApplication;
+import convex.lattice.ALatticeComponent;
+import convex.lattice.ComponentTestSupport;
+import convex.lattice.LatticeContext;
+import convex.lattice.LatticeHost;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
@@ -43,21 +49,21 @@ public class ALatticeApplicationTest {
 
 	/** No component definitions or factories are needed for root merging. */
 	private static final class Application<V extends ACell> extends ALatticeApplication<V> {
-		Application(RootComponent<V> host) {
+		Application(ALattice<V> lattice,LatticeHost<V> host) {
 			// Explicit live policy, also used by the existing NodeServer adapters.
-			super(host.getLattice(),host.cursor());
+			super(lattice,host.cursor());
 		}
 	}
 
 	private static final class WorkingApplication<V extends ACell> extends ALatticeApplication<V> {
-		WorkingApplication(RootComponent<V> host) { super(host); }
+		WorkingApplication(ALattice<V> lattice,LatticeHost<V> host) { super(lattice,host); }
 	}
 
 	@Test
 	public void testConfiguredRootDelegatesWithoutInstallingIncomingState() {
-		var host=RootComponent.create(LATTICE,new MemoryStore());
-		var first=new WorkingApplication<>(host);
-		var second=new WorkingApplication<>(host);
+		var host=LatticeHost.create(LATTICE.zero(),null);
+		var first=new WorkingApplication<>(LATTICE,host);
+		var second=new WorkingApplication<>(LATTICE,host);
 		var configured=new ArrayList<ALatticeApplication<Index<Keyword,ACell>>>();
 		configured.add(first);
 		configured.add(second);
@@ -75,7 +81,7 @@ public class ALatticeApplicationTest {
 
 	@Test
 	public void testExplicitlyEmptyApplicationsIgnoreIncomingState() {
-		var host=RootComponent.create(LATTICE,new MemoryStore());
+		var host=LatticeHost.create(LATTICE.zero(),null);
 		host.configureApplications(List.of());
 		host.merge(LATTICE.zero().assoc(ITEMS,Sets.of(1)));
 		assertEquals(LATTICE.zero(),host.cursor().get());
@@ -84,9 +90,9 @@ public class ALatticeApplicationTest {
 	@Test
 	public void testApplicationCreatesWorkingStateAndChildrenNeedNoForks() throws Exception {
 		var store=new MemoryStore();
-		var host=RootComponent.create(LATTICE,store);
-		var first=new WorkingApplication<>(host);
-		var second=new WorkingApplication<>(host);
+		var host=LatticeHost.create(LATTICE.zero(),store);
+		var first=new WorkingApplication<>(LATTICE,host);
+		var second=new WorkingApplication<>(LATTICE,host);
 		Items a=new Items(first);
 		Items anotherView=new Items(first);
 		a.add(CVMLong.ONE);
@@ -117,9 +123,9 @@ public class ALatticeApplicationTest {
 
 	@Test
 	public void testPreparationFailureLeavesCheckpointsLocalForRetry() {
-		var host=RootComponent.create(LATTICE,new MemoryStore());
+		var host=LatticeHost.create(LATTICE.zero(),null);
 		AtomicInteger calls=new AtomicInteger();
-		var app=new ALatticeApplication<Index<Keyword,ACell>>(host) {
+		var app=new ALatticeApplication<Index<Keyword,ACell>>(LATTICE,host) {
 			@Override protected void beforeSync() {
 				new Items(this).add(CVMLong.ONE);
 				if (calls.incrementAndGet()==1) throw new IllegalStateException("checkpoint failed");
@@ -140,8 +146,8 @@ public class ALatticeApplicationTest {
 		Index<Keyword,ACell> retained=LATTICE.zero()
 			.assoc(ITEMS,Sets.of(2)).assoc(UNKNOWN,CVMLong.ONE);
 		store.setRootData(retained);
-		var host=RootComponent.open(LATTICE,store);
-		Application<Index<Keyword,ACell>> app=new Application<>(host);
+		var host=LatticeHost.open(LATTICE.zero(),store);
+		Application<Index<Keyword,ACell>> app=new Application<>(LATTICE,host);
 		assertSame(LATTICE,app.getLattice());
 		assertEquals(retained,app.cursor().get());
 
@@ -158,16 +164,16 @@ public class ALatticeApplicationTest {
 		assertEquals(retained,store.getRootData(),"Application sync stops before host persistence");
 		host.sync();
 		assertEquals(merged,store.getRootData());
-		Application<Index<Keyword,ACell>> reopened=new Application<>(RootComponent.open(LATTICE,store));
+		Application<Index<Keyword,ACell>> reopened=new Application<>(LATTICE,LatticeHost.open(LATTICE.zero(),store));
 		assertEquals(merged,reopened.cursor().get());
 	}
 
 	@Test
 	public void testHostedApplicationsShareStateAndPreserveUnknownOwnRegions() {
 		Index<Keyword,ACell> initial=LATTICE.zero().assoc(UNKNOWN,CVMLong.ONE);
-		RootComponent<Index<Keyword,ACell>> host=RootComponent.create(LATTICE,initial,new MemoryStore());
-		Application<Index<Keyword,ACell>> first=new Application<>(host);
-		Application<Index<Keyword,ACell>> second=new Application<>(host);
+		LatticeHost<Index<Keyword,ACell>> host=LatticeHost.create(initial,null);
+		Application<Index<Keyword,ACell>> first=new Application<>(LATTICE,host);
+		Application<Index<Keyword,ACell>> second=new Application<>(LATTICE,host);
 		AtomicInteger publications=new AtomicInteger();
 		host.setPublicationPolicy(value -> {
 			publications.incrementAndGet();
@@ -190,13 +196,13 @@ public class ALatticeApplicationTest {
 
 	@Test
 	public void testContextResolvedAtApplicationConstruction() {
-		var host=RootComponent.create(LATTICE,new MemoryStore());
+		var host=LatticeHost.create(LATTICE.zero(),null);
 		var hostPolicy=LatticeContext.create(CVMLong.ONE,null);
 		host.setContext(hostPolicy);
-		var first=new WorkingApplication<>(host);
+		var first=new WorkingApplication<>(LATTICE,host);
 		host.setContext(LatticeContext.create(CVMLong.TWO,null));
 		assertSame(hostPolicy,first.getContext());
-		assertSame(host.getContext(),new WorkingApplication<>(host).getContext());
+		assertSame(host.getContext(),new WorkingApplication<>(LATTICE,host).getContext());
 		first.setContext(null);
 		assertSame(LatticeContext.EMPTY,first.getContext());
 	}
@@ -208,9 +214,9 @@ public class ALatticeApplicationTest {
 		Keyword timestamp=LWWLattice.KEY_TIMESTAMP;
 		var record=LWWLattice.create(LATTICE,v -> ((CVMLong)v.get(timestamp)).longValue());
 		var owners=OwnerKeyLattice.create(record);
-		var host=RootComponent.create(owners,new MemoryStore());
-		var first=new Application<>(host);
-		var second=new Application<>(host);
+		var host=LatticeHost.create(owners.zero(),null);
+		var first=new Application<>(owners,host);
+		var second=new Application<>(owners,host);
 		first.setContext(LatticeContext.create(CVMLong.create(100),alice));
 		second.setContext(LatticeContext.create(CVMLong.create(200),bob));
 		// A domain component would own these two boundaries: sign the owner's record, then
@@ -237,8 +243,8 @@ public class ALatticeApplicationTest {
 	public void testRootForkMergeUsesApplicationSignerWithoutLendingItToHost() {
 		AKeyPair alice=AKeyPair.createSeeded(6201);
 		OwnerKeyLattice<ASet<CVMLong>> lattice=OwnerKeyLattice.create(SetLattice.create());
-		var host=RootComponent.create(lattice,new MemoryStore());
-		var app=new Application<>(host);
+		var host=LatticeHost.create(lattice.zero(),null);
+		var app=new Application<>(lattice,host);
 		app.setContext(LatticeContext.create(null,alice));
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(1))));
 		var fork=ALatticeComponent.working(lattice,app.cursor(),app.getContext());
@@ -252,13 +258,13 @@ public class ALatticeApplicationTest {
 		var incoming=lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(4)));
 		host.merge(incoming);
 		assertSame(signed,host.cursor().get().get(alice.getAccountKey()),
-			"Host cannot synthesise a signed union using an application's signer");
+			"An unconfigured host does not admit incoming data");
 		app.merge(incoming);
 		assertEquals(Sets.of(1,2,3,4),host.cursor().get().get(alice.getAccountKey()).getValue());
 	}
 
 	@Test
-	public void testPublicationRetryUsesHostContextAndPreservesOtherApplicationWrite() {
+	public void testHostPersistencePreservesOtherApplicationWriteWithoutMerging() {
 		AtomicReference<LatticeContext> mergeContext=new AtomicReference<>();
 		ALattice<Index<Keyword,ACell>> lattice=new ADelegatingLattice<>(LATTICE) {
 			@Override
@@ -268,21 +274,22 @@ public class ALatticeApplicationTest {
 				return super.merge(context,own,other);
 			}
 		};
-		var host=RootComponent.create(lattice,new MemoryStore());
-		var first=new Application<>(host);
-		var second=new Application<>(host);
+		var host=LatticeHost.create(lattice.zero(),null);
+		var first=new Application<>(lattice,host);
+		var second=new Application<>(lattice,host);
 		LatticeContext appPolicy=LatticeContext.create(CVMLong.ONE,null);
 		first.setContext(appPolicy);
 		first.merge(LATTICE.zero().assoc(ITEMS,Sets.of(1)));
 		assertSame(appPolicy,mergeContext.get());
 		var published=first.cursor().get();
+		mergeContext.set(null);
 		host.setPublicationPolicy(value -> {
 			new Items(second).add(CVMLong.TWO);
 			return value;
 		});
 		assertSame(published,first.sync());
 		assertSame(published,host.sync());
-		assertSame(LatticeContext.EMPTY,mergeContext.get());
+		assertNull(mergeContext.get(),"Host persistence must not invoke a lattice merge");
 		assertEquals(Sets.of(1,2),new Items(first).cursor().get());
 	}
 
@@ -290,7 +297,7 @@ public class ALatticeApplicationTest {
 	public void testArbitraryLatticeKeepsOwnValueOnTie() {
 		var lattice=CompareLattice.create((AString a, AString b)
 			-> Long.compare(a.count(),b.count()));
-		var app=new Application<>(RootComponent.create(lattice,new MemoryStore()));
+		var app=new Application<>(lattice,LatticeHost.create(lattice.zero(),null));
 		var own=Strings.create("own");
 		assertSame(own,app.merge(own));
 		assertSame(own,app.merge(Strings.create("new")));
@@ -303,7 +310,7 @@ public class ALatticeApplicationTest {
 		AKeyPair bob=AKeyPair.createSeeded(6202);
 		OwnerKeyLattice<ASet<CVMLong>> owners=OwnerKeyLattice.create(SetLattice.create());
 		KeyedLattice lattice=KeyedLattice.create(ITEMS,owners);
-		var app=new Application<>(RootComponent.create(lattice,new MemoryStore()));
+		var app=new Application<>(lattice,LatticeHost.create(lattice.zero(),null));
 		app.setContext(LatticeContext.create(null,alice));
 		Index<AccountKey,SignedData<ASet<CVMLong>>> first=owners.zero()
 			.assoc(alice.getAccountKey(),alice.signData(Sets.of(1)));
@@ -327,7 +334,7 @@ public class ALatticeApplicationTest {
 	@Test
 	public void testFailedRegionMergeInstallsNoPartialRoot() {
 		KeyedLattice lattice=LATTICE.addLattice(UNKNOWN,SetLattice.create());
-		var app=new Application<>(RootComponent.create(lattice,new MemoryStore()));
+		var app=new Application<>(lattice,LatticeHost.create(lattice.zero(),null));
 		var before=app.merge(lattice.zero().assoc(ITEMS,Sets.of(1)));
 		var invalid=lattice.zero().assoc(ITEMS,Sets.of(2)).assoc(UNKNOWN,CVMLong.ONE);
 		assertThrows(ClassCastException.class,() -> app.merge(invalid));
@@ -355,9 +362,9 @@ public class ALatticeApplicationTest {
 				return super.merge(context,own,other);
 			}
 		};
-		var host=RootComponent.create(lattice,new MemoryStore());
-		var app=new Application<>(host);
-		Items items=new Items(new Application<>(host));
+		var host=LatticeHost.create(lattice.zero(),null);
+		var app=new Application<>(lattice,host);
+		Items items=new Items(new Application<>(lattice,host));
 		try (var executor=Executors.newSingleThreadExecutor()) {
 			var future=executor.submit(() -> app.merge(LATTICE.zero().assoc(ITEMS,Sets.of(2))));
 			try {

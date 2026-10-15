@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
+import convex.lattice.ALatticeComponent;
 import convex.core.data.ACell;
 import convex.core.data.Index;
 import convex.core.data.Keyword;

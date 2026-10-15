@@ -8,7 +8,7 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
-import convex.lattice.RootComponent;
+import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 
@@ -18,7 +18,7 @@ import convex.lattice.cursor.SignedCursor;
  * <p>The application composes domain components over a generic hosted root and
  * has no dependency on {@link convex.node.NodeServer}. A {@link P2PNode} is one
  * possible bootstrap and lifecycle owner; local applications may use the same
- * component over a standalone {@link RootComponent}.</p>
+ * component over a standalone {@link LatticeHost}.</p>
  *
  * <p>This component owns the P2P regions, so it declares their shapes from
  * {@link P2PLattice} when navigating and crosses each owner's slot with the owner
@@ -26,10 +26,10 @@ import convex.lattice.cursor.SignedCursor;
  */
 public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
-	protected P2PApplication(RootComponent<Index<Keyword,ACell>> host) {
+	protected P2PApplication(ALattice<Index<Keyword,ACell>> lattice,LatticeHost<Index<Keyword,ACell>> host) {
 		// NodeServer restores after this adapter is constructed. Until node lifecycle
 		// policy explicitly stages and refreshes applications, use a live host view.
-		super(host.getLattice(),host.cursor());
+		super(lattice,host.cursor());
 		setContext(host.getContext());
 	}
 
@@ -39,8 +39,8 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	}
 
 	/** Connects a P2P application to a hosted lattice root. */
-	public static P2PApplication connect(RootComponent<Index<Keyword,ACell>> host) {
-		return new P2PApplication(host);
+	public static P2PApplication connect(ALattice<Index<Keyword,ACell>> lattice,LatticeHost<Index<Keyword,ACell>> host) {
+		return new P2PApplication(lattice,host);
 	}
 
 	/** Returns the component representing one P2P user's owned regions. */

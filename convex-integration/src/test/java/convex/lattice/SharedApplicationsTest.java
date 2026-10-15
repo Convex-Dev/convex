@@ -94,8 +94,8 @@ public class SharedApplicationsTest {
 		final DLFSDrives files;
 		final P2PNodeRecord node;
 
-		WorkingApplication(RootComponent<Index<Keyword,ACell>> host,boolean socialApp,Runnable signing) {
-			super(host);
+		WorkingApplication(LatticeHost<Index<Keyword,ACell>> host,boolean socialApp,Runnable signing) {
+			super(HOST_ROOT,host);
 			if (socialApp) {
 				socialState=owned(context(SOCIAL_KEY,signing),Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
 				social=Social.connect(this,socialState.getContext()).user(SOCIAL_KEY.getAccountKey()).withCursor(socialState.cursor());
@@ -149,7 +149,7 @@ public class SharedApplicationsTest {
 
 	@Test
 	public void testIndependentSocialApplicationsPublishBothOwnersPosts() {
-		var host=RootComponent.create(HOST_ROOT,new MemoryStore());
+		var host=LatticeHost.create(HOST_ROOT.zero(),new MemoryStore());
 		host.setContext(VERIFY);
 		AtomicInteger signatures=new AtomicInteger();
 		var first=new WorkingApplication(host,true,signatures::incrementAndGet);
@@ -173,7 +173,7 @@ public class SharedApplicationsTest {
 	@Test
 	public void testWorkingApplicationsPublishSocialFilesAndSharedP2PRegion() throws Exception {
 		var store=new MemoryStore();
-		var host=RootComponent.create(HOST_ROOT,store);
+		var host=LatticeHost.create(HOST_ROOT.zero(),store);
 		host.setContext(VERIFY);
 		AtomicInteger signatures=new AtomicInteger();
 		var socialApp=new WorkingApplication(host,true,signatures::incrementAndGet);
@@ -183,7 +183,7 @@ public class SharedApplicationsTest {
 		var drive=filesApp.files.createDrive("home");
 		Files.writeString(drive.fileSystem().getPath("/hello.txt"),"working file");
 		Files.writeString(drive.fileSystem().getPath("/another.txt"),"batched file");
-		var info=convex.lattice.P2PLattice.createNodeInfo(Vectors.empty(),
+		var info=convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.empty(),
 			Strings.create("peer"),Strings.create("test"),Vectors.empty(),100);
 		socialApp.node.setNodeInfo(info);
 		filesApp.node.setNodeInfo(info);
@@ -197,7 +197,7 @@ public class SharedApplicationsTest {
 		assertNull(host.cursor().get().get(Keywords.FS));
 		filesApp.sync();
 		assertNotNull(Social.connect(host).user(SOCIAL_KEY.getAccountKey()).feed().getPost(post));
-		assertEquals("working file",Files.readString(DLFSRegion.connect(host,Keywords.FS)
+		assertEquals("working file",Files.readString(DLFSRegion.connect(host,HOST_ROOT,Keywords.FS)
 			.drives(FILES_KEY.getAccountKey()).drive("home").fileSystem().getPath("/hello.txt")));
 		assertEquals(info,P2PUser.create(host,COMMON_KEY.getAccountKey()).node().getNodeInfo());
 		assertEquals(info,P2PUser.create(host,FILES_KEY.getAccountKey()).node().getNodeInfo());
@@ -233,8 +233,8 @@ public class SharedApplicationsTest {
 	private static final class SocialWithP2P extends P2PApplication
 			implements TransactionalComponent<Index<Keyword,ACell>,SocialWithP2P> {
 		final Social social;
-		SocialWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host.getLattice(),host.cursor(),context(SOCIAL_KEY));
+		SocialWithP2P(LatticeHost<Index<Keyword,ACell>> host) {
+			this(HOST_ROOT,host.cursor(),context(SOCIAL_KEY));
 		}
 		SocialWithP2P(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor,LatticeContext context) {
 			super(lattice,cursor);
@@ -248,8 +248,8 @@ public class SharedApplicationsTest {
 
 	private static final class FilesWithP2P extends DLFSApplication<Index<Keyword,ACell>>
 			implements TransactionalComponent<Index<Keyword,ACell>,FilesWithP2P> {
-		FilesWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host.getLattice(),host.cursor(),host.store());
+		FilesWithP2P(LatticeHost<Index<Keyword,ACell>> host) {
+			this(HOST_ROOT,host.cursor(),host.store());
 			setContext(context(FILES_KEY));
 		}
 		FilesWithP2P(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor,AStore store) {
@@ -285,8 +285,8 @@ public class SharedApplicationsTest {
 		Fixture() { this(false); }
 		Fixture(boolean coordinated) {
 			node=new NodeServer<>(HOST_ROOT,store,NodeConfig.port(-1).withTransactionalRoot(coordinated));
-			social=new SocialWithP2P(node.getRootComponent());
-			files=new FilesWithP2P(node.getRootComponent());
+			social=new SocialWithP2P(node.getHost());
+			files=new FilesWithP2P(node.getHost());
 			node.setMergeContext(VERIFY);
 			socialGroup.setMergeContext(VERIFY);
 			filesGroup.setMergeContext(VERIFY);
@@ -313,7 +313,7 @@ public class SharedApplicationsTest {
 			.setIdentity(Strings.create("social user"),Vectors.empty(),100);
 		f.files.p2p(FILES_KEY.getAccountKey()).identity()
 			.setIdentity(Strings.create("files user"),Vectors.empty(),100);
-		f.social.p2p(COMMON_KEY.getAccountKey()).node().setNodeInfo(convex.lattice.P2PLattice.createNodeInfo(
+		f.social.p2p(COMMON_KEY.getAccountKey()).node().setNodeInfo(convex.lattice.p2p.P2PLattice.createNodeInfo(
 			Vectors.empty(),Strings.create("shared node"),Strings.create("test"),Vectors.empty(),100));
 		return new Data(post,drive);
 	}
@@ -328,7 +328,7 @@ public class SharedApplicationsTest {
 
 	private void testTypedTransactionsAcrossSharedApplicationRegions(boolean coordinated) throws Exception {
 		try (Fixture f=new Fixture(coordinated)) {
-			var root=f.node.getRootComponent().cursor();
+			var root=f.node.getHost().cursor();
 			assertEquals(coordinated,root.supportsExclusiveTransactions());
 			assertEquals(coordinated,f.social.social.user(SOCIAL_KEY.getAccountKey()).cursor().supportsExclusiveTransactions());
 			var before=root.get();
@@ -336,7 +336,7 @@ public class SharedApplicationsTest {
 				var user=app.social.user(SOCIAL_KEY.getAccountKey());
 				user.feed().post("Atomic post and follow");
 				user.follows().follow(FILES_KEY.getAccountKey());
-				app.node(COMMON_KEY.getAccountKey()).setNodeInfo(convex.lattice.P2PLattice.createNodeInfo(
+				app.node(COMMON_KEY.getAccountKey()).setNodeInfo(convex.lattice.p2p.P2PLattice.createNodeInfo(
 					Vectors.empty(),Strings.create("transactional node"),Strings.create("test"),Vectors.empty(),100));
 				assertSame(before,root.get());
 			});
@@ -373,7 +373,7 @@ public class SharedApplicationsTest {
 		try (Fixture f=new Fixture()) {
 			f.node.launch();
 			DLFSDrive drive=f.files.drives(FILES_KEY.getAccountKey()).createDrive("home");
-			var observer=new SocialWithP2P(f.node.getRootComponent());
+			var observer=new SocialWithP2P(f.node.getHost());
 			var otherFeed=observer.social.user(SOCIAL_KEY.getAccountKey()).feed();
 			CountDownLatch signing=new CountDownLatch(1);
 			CountDownLatch resume=new CountDownLatch(1);
@@ -399,7 +399,7 @@ public class SharedApplicationsTest {
 					// Register a new peer in lattice state; opening a connection is a separate effect.
 					var peer=f.files.p2p(COMMON_KEY.getAccountKey()).node();
 					assertNull(observer.p2p(COMMON_KEY.getAccountKey()).node().getNodeInfo());
-					var info=convex.lattice.P2PLattice.createNodeInfo(Vectors.empty(),
+					var info=convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.empty(),
 						Strings.create("new peer"),Strings.create("test"),Vectors.empty(),100);
 					peer.setNodeInfo(info);
 					assertEquals(info,observer.p2p(COMMON_KEY.getAccountKey()).node().getNodeInfo());
@@ -439,7 +439,7 @@ public class SharedApplicationsTest {
 			assertSigned(f,FILES_KEY.getAccountKey(),f.files.drives(FILES_KEY.getAccountKey()).cursor().get(),
 				Keywords.FS,FILES_KEY.getAccountKey());
 			f.files.sync();
-			f.node.getRootComponent().sync();
+			f.node.getHost().sync();
 			assertEquals(f.node.getCursor().get(),f.store.getRootData());
 		}
 	}
@@ -450,7 +450,7 @@ public class SharedApplicationsTest {
 			try (Fixture f=new Fixture()) {
 				DLFSDrive setup=f.files.drives(FILES_KEY.getAccountKey()).createDrive("home");
 				Files.writeString(setup.fileSystem().getPath("/same.txt"),"0000");
-				var other=new FilesWithP2P(f.node.getRootComponent());
+				var other=new FilesWithP2P(f.node.getHost());
 				DLFSDrive second=other.drives(FILES_KEY.getAccountKey()).drive("home");
 				CountDownLatch signing=new CountDownLatch(1);
 				CountDownLatch resume=new CountDownLatch(1);
@@ -490,7 +490,7 @@ public class SharedApplicationsTest {
 	public void testConcurrentFileCreationDoesNotReplaceTheWinner() throws Exception {
 		try (Fixture f=new Fixture()) {
 			DLFSDrive setup=f.files.drives(FILES_KEY.getAccountKey()).createDrive("home");
-			var other=new FilesWithP2P(f.node.getRootComponent());
+			var other=new FilesWithP2P(f.node.getHost());
 			DLFSDrive second=other.drives(FILES_KEY.getAccountKey()).drive("home");
 			CountDownLatch signing=new CountDownLatch(1);
 			CountDownLatch resume=new CountDownLatch(1);
@@ -605,7 +605,7 @@ public class SharedApplicationsTest {
 			assertSame(hostContext,f.node.getMergeContext());
 			assertNull(hostContext.getSigningKey());
 			f.files.sync();
-			f.node.getRootComponent().sync();
+			f.node.getHost().sync();
 			assertEquals(f.node.getCursor().get(),f.store.getRootData());
 		}
 	}
@@ -655,7 +655,7 @@ public class SharedApplicationsTest {
 			filesListener.launch();
 			Data data=populate(f);
 			f.social.sync();
-			f.node.getRootComponent().sync();
+			f.node.getHost().sync();
 			var socialView=awaitView(f.socialGroup,v -> v.get(Social.KEY_SOCIAL)!=null);
 			var filesView=awaitView(f.filesGroup,v -> v.get(Keywords.FS)!=null);
 			assertNull(socialView.get(Keywords.FS));
@@ -663,7 +663,7 @@ public class SharedApplicationsTest {
 			assertEquals(socialView.get(Keywords.P2P),filesView.get(Keywords.P2P));
 			assertEquals(socialView.get(Keywords.ID),filesView.get(Keywords.ID));
 			// Independent receiver sees the partial roots in reverse order, with the same result.
-			var reverse=P2PApplication.connect(RootComponent.create(HOST_ROOT,reverseStore));
+			var reverse=P2PApplication.connect(HOST_ROOT,LatticeHost.create(HOST_ROOT.zero(),reverseStore));
 			reverse.setContext(VERIFY);
 			reverse.merge(filesView);
 			reverse.merge(socialView);
@@ -679,8 +679,8 @@ public class SharedApplicationsTest {
 				assertNull(remote.getCursor().get().get(Keywords.FS),"Social route must not disclose file state");
 				remote.pull(receiver,filesPeer).get(10,TimeUnit.SECONDS);
 				assertEquals(f.node.getCursor().get(),remote.getCursor().get(),"Overlapping P2P values merge once into the root");
-				SocialWithP2P remoteSocial=new SocialWithP2P(remote.getRootComponent());
-				FilesWithP2P remoteFiles=new FilesWithP2P(remote.getRootComponent());
+				SocialWithP2P remoteSocial=new SocialWithP2P(remote.getHost());
+				FilesWithP2P remoteFiles=new FilesWithP2P(remote.getHost());
 				assertNotNull(remoteSocial.social.user(SOCIAL_KEY.getAccountKey()).feed().getPost(data.post()));
 				assertEquals("Shared host, private file",Files.readString(remoteFiles.drives(FILES_KEY.getAccountKey())
 					.drive("home").fileSystem().getPath("/hello.txt")));
@@ -696,7 +696,7 @@ public class SharedApplicationsTest {
 					.setIdentity(Strings.create("files still running"),Vectors.empty(),200);
 				Files.writeString(data.drive().fileSystem().getPath("/later.txt"),"Still available");
 				f.files.sync();
-				f.node.getRootComponent().sync();
+				f.node.getHost().sync();
 				var expected=project(f.node.getCursor().get(),Keywords.FS);
 				awaitView(f.filesGroup,expected::equals);
 				remote.pull(receiver,filesPeer).get(10,TimeUnit.SECONDS);

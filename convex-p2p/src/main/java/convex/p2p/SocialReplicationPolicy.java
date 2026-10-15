@@ -144,7 +144,7 @@ final class SocialReplicationPolicy {
 		boolean changed=false;
 		for (var entry:localSigners.entrySet()) {
 			AString localDid=entry.getKey();
-			Social social=Social.connect(server.getRootComponent(),
+			Social social=Social.connect(server.getHost(),
 				convex.lattice.LatticeContext.create(
 					null,entry.getValue(),authorizer::verifiesOwner));
 			Follows follows=social.user(localDid).follows();
@@ -156,11 +156,11 @@ final class SocialReplicationPolicy {
 		}
 		// Ingress may be a replay which does not otherwise change its target cursor.
 		// Publish the authenticated cache edit explicitly in that case as well.
-		if (changed) server.getRootComponent().sync();
+		if (changed) server.getHost().sync();
 	}
 
 	private boolean hasCachedFollowKey(AString target,AccountKey signer) {
-		Social social=Social.connect(server.getRootComponent());
+		Social social=Social.connect(server.getHost());
 		for (AString local:localUsers) {
 			Follows follows=social.user(local).follows();
 			if (!follows.isFollowing(target)) continue;

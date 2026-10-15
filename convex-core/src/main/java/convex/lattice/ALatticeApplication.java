@@ -9,7 +9,7 @@ import convex.lattice.cursor.AForkableCursor;
  * Base class for an application participating in a lattice root.
  *
  * <p>An application component works at the same cursor position as its
- * {@link RootComponent} host and declares the root lattice, which defines the
+ * {@link LatticeHost} host and declares the root lattice, which defines the
  * complete root merge, including which regions participate. Merging requires no
  * domain components or component registry. Subclasses expose lightweight
  * components at paths within that root, each declaring the shape of the level it
@@ -27,7 +27,7 @@ import convex.lattice.cursor.AForkableCursor;
  * <p>The application does not own the root, store or replication lifecycle.
  * Calling {@link #sync()} first runs application-defined preparation, then publishes
  * into its destination cursor. For private working state this stops at the host;
- * host sync and physical durability ({@link RootComponent#flush()}) are separate.</p>
+ * host sync and physical durability ({@link LatticeHost#flush()}) are separate.</p>
  *
  * @param <V> Complete application root value type
  */
@@ -36,22 +36,11 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	private final ALattice<V> lattice;
 
 	/**
-	 * Creates an application's private working state from an existing lattice host.
-	 * Its children share that working state. Sync merges one snapshot back to the
-	 * host; the host's own sync separately persists and publishes its root.
-	 *
-	 * @param host Root component providing shared state, lattice and host policy
-	 */
-	protected ALatticeApplication(RootComponent<V> host) {
-		this(requireHost(host).getLattice(),host);
-	}
-
-	/**
 	 * Creates private working state with application-specific merge semantics.
 	 * The host delegates incoming values; it does not independently accept values
 	 * this application ignores. The caller must supply compatible value structure.
 	 */
-	protected ALatticeApplication(ALattice<V> lattice,RootComponent<V> host) {
+	protected ALatticeApplication(ALattice<V> lattice,LatticeHost<V> host) {
 		super(lattice,requireHost(host).cursor());
 		this.lattice=lattice;
 		setContext(host.getContext());
@@ -70,13 +59,13 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 		this.lattice=Objects.requireNonNull(lattice,"Application lattice must not be null");
 	}
 
-	private static <V extends ACell> RootComponent<V> requireHost(RootComponent<V> host) {
+	private static <V extends ACell> LatticeHost<V> requireHost(LatticeHost<V> host) {
 		if (host==null) throw new IllegalArgumentException("Application host must not be null");
 		return host;
 	}
 
 	/**
-	 * Returns this application's root lattice, defaulting to the host's definition.
+	 * Returns this application's root lattice.
 	 *
 	 * @return Root merge and navigation semantics
 	 */

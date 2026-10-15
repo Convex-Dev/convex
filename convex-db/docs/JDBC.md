@@ -134,7 +134,7 @@ Code that already holds a `ConvexDB` instance can get a Connection directly,
 bypassing URL parsing and the instances map entirely:
 
 ```java
-ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 ```
 
@@ -175,7 +175,7 @@ EtchStore store = EtchStore.create(new File("/data/market.etch"));
 var server = new NodeServer<>(ConvexDB.DATABASE_MAP_LATTICE, store, config);
 server.launch();
 
-ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 // ... use conn ...
 

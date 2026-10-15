@@ -8,39 +8,39 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.Cells;
-import convex.core.data.SignedData;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
-import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
-import convex.lattice.generic.SignedLattice;
-import convex.lattice.generic.OwnerLattice;
 
 /**
- * Generic store-backed root for a lattice application component hierarchy.
+ * Generic host for lattice application components, with optional persistence.
  *
- * <p>A root component owns the host store, root lattice and publication policy.
+ * <p>A host holds published state, an optional store and publication policy.
  * It is the generic host persistence boundary; specialised domain components may
  * separately own stores for their own data. Standalone roots publish their current
  * value as the store root on {@link #sync()}. Network infrastructure may configure
  * a replication pipeline before freezing host configuration. Neither operation
  * performs a durability barrier or owns the store lifecycle.</p>
  *
- * <p>The root cursor knows nothing about lattices. Incoming state is delegated to
- * applications. Until configured, this component uses the supplied lattice directly;
- * explicitly configured applications control acceptance and publication. If an
- * application publishes during host persistence, its newer result stays pending
- * without being re-merged against the persisted snapshot.</p>
+ * <p>All incoming values are delegated to configured applications. The host knows
+ * no lattice or path structure and never independently merges incoming state.
+ * Without applications, incoming values are ignored. Applications decide when
+ * to publish into the host. Concurrent publications during host persistence stay
+ * pending for the next sync.</p>
  *
- * <p>The same component can serve as a standalone local root backed by any
- * {@link AStore}, or be hosted by a networked NodeServer.</p>
+ * <p>With a null store, the host is purely in memory: persistence and flush are
+ * no-ops, and sync returns the current snapshot unless a publication policy is
+ * configured. The root cursor holds the value directly: no MemoryStore, NullStore,
+ * default store or thread-local store is created or substituted. {@link #store()}
+ * returns null. A store-backed host can also be hosted by a networked NodeServer.</p>
  *
  * @param <V> Root lattice value type
  */
-public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
+public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 
-	private final ALattice<V> lattice;
 	private final AStore store;
 	private final ReentrantLock syncLock=new ReentrantLock();
 	private volatile Function<V,V> publicationPolicy;
@@ -48,74 +48,54 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	private volatile List<ALatticeApplication<V>> applications;
 
 	/**
-	 * Creates a store-backed host around existing atomic storage.
+	 * Creates a host around existing atomic storage, optionally backed by a store.
 	 *
 	 * <p>Use {@link #cursor()} as the destination of hosted components. Their sync
 	 * updates this host's working state; it does not persist or replicate it.
 	 * Call this component's {@link #sync()} for host publication. The cursor
 	 * remains ordinary atomic storage with no publication callbacks.</p>
 	 *
-	 * @param lattice Root lattice, the complete merge for the hosted value
 	 * @param cursor Root cursor holding the hosted value
-	 * @param store Host store
+	 * @param store Host store, or null for purely in-memory operation
 	 */
-	public RootComponent(ALattice<V> lattice, Root<V> cursor, AStore store) {
+	public LatticeHost(Root<V> cursor, AStore store) {
 		super(cursor);
-		this.lattice=Objects.requireNonNull(lattice,"Root lattice must not be null");
-		this.store=Objects.requireNonNull(store,"Root store must not be null");
+		this.store=store;
 	}
 
-	/** Creates a standalone local root at the lattice's zero value. */
-	public static <V extends ACell> RootComponent<V> create(ALattice<V> lattice, AStore store) {
-		return create(lattice,lattice.zero(),store);
+	/** Creates an empty keyed root held directly in memory, with no store allocated. */
+	public static LatticeHost<Index<Keyword,ACell>> create() {
+		return create(null);
 	}
 
-	/** Creates a standalone local root with an explicit initial value. */
-	public static <V extends ACell> RootComponent<V> create(ALattice<V> lattice, V initialValue, AStore store) {
-		return new RootComponent<>(lattice,Cursors.root(initialValue),store);
+	/** Creates a fresh global host with an empty keyed root. Does not restore the store. */
+	public static LatticeHost<Index<Keyword,ACell>> create(AStore store) {
+		return create(Index.none(),store);
+	}
+
+	/** Creates a fresh host with an explicit initial value, including non-map local roots. */
+	public static <V extends ACell> LatticeHost<V> create(V initialValue, AStore store) {
+		return new LatticeHost<>(Cursors.root(initialValue),store);
+	}
+
+	/** Opens the retained global root, or an empty keyed root if none is retained. */
+	public static LatticeHost<Index<Keyword,ACell>> open(AStore store) throws IOException {
+		return open(Index.<Keyword,ACell>none(),store);
 	}
 
 	/**
-	 * Opens a standalone local root from the store's retained root value, or the
-	 * lattice's zero value when the store has no retained root.
-	 *
-	 * <p>The caller statically supplies the lattice corresponding to the store.
-	 * Store values are deliberately not subject to redundant runtime type checks.</p>
-	 *
-	 * @param <V> Root lattice value type
-	 * @param lattice Root lattice definition
-	 * @param store Store holding the retained root
-	 * @return Store-backed root component
-	 * @throws IOException If the retained root cannot be read
+	 * Opens the retained root, using the supplied initial value only when none is
+	 * retained. The caller supplies the value type; no merge or publication occurs.
+	 * The caller owns the store lifecycle. A null store uses the supplied initial value.
 	 */
-	public static <V extends ACell> RootComponent<V> open(ALattice<V> lattice, AStore store) throws IOException {
-		if (store==null) throw new IllegalArgumentException("Root store must not be null");
-		V value=store.getRootData();
-		return create(lattice,(value==null)?lattice.zero():value,store);
+	public static <V extends ACell> LatticeHost<V> open(V initialValue, AStore store) throws IOException {
+		V retained=(store==null)?null:store.getRootData();
+		return create(retained==null?initialValue:retained,store);
 	}
 
-	/** Returns the root lattice hosted here. */
-	public ALattice<V> getLattice() {
-		return lattice;
-	}
-
-	/** Returns the host store without implying ownership of its lifecycle. */
+	/** Returns the host store, or null for in-memory operation. The caller owns its lifecycle. */
 	public AStore store() {
 		return store;
-	}
-
-	/**
-	 * Returns a cursor at a path within the hosted root, with each level's shape
-	 * declared from the root lattice so that writes can create absent regions. Hosts
-	 * use this to merge path-addressed inbound values with the sub-lattice at the
-	 * same path.
-	 *
-	 * @param <T> Value type at the path
-	 * @param path Keys from the root
-	 * @return Cursor at the path
-	 */
-	public <T extends ACell> AForkableCursor<T> resolve(ACell... path) {
-		return resolve(cursor,lattice,path);
 	}
 
 	/**
@@ -124,54 +104,27 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * Delivery is not atomic across applications: earlier successful merges remain
 	 * if a later application fails. Retry is safe for lattice merges.
 	 *
-	 * <p>Until applications are explicitly configured, the supplied lattice
-	 * provides immediate root merging. With private working applications,
-	 * application sync must publish their changes before host sync persists them.</p>
-	 *
 	 * @param other Incoming root value
 	 * @return Current published root, which may not yet include the incoming state
 	 */
 	public V merge(V other) {
 		List<ALatticeApplication<V>> configured=applications;
-		if (configured==null) {
-			return cursor.updateAndGet(own -> lattice.merge(getContext(),own,other));
-		}
+		if (configured==null) return cursor.get();
 		for (ALatticeApplication<V> application:configured) application.merge(other);
 		return cursor.get();
 	}
 
 	/**
 	 * Delivers an incoming subtree to applications at a root-relative path.
-	 * Each application decides whether and how to handle the path; the host's
-	 * lattice does not pre-empt application acceptance. No application sync is
+	 * Each application decides whether and how to handle the path. No application sync is
 	 * invoked. Delivery is sequential, with the same partial-failure semantics as
 	 * {@link #merge}. Paths are passed unchanged and must not be mutated by handlers.
-	 * Without configured applications, retains standalone lattice-directed path
-	 * merging, rejecting unknown paths and unsigned envelope interiors.
 	 *
 	 * @return Current published root, which may not include this delivery
 	 */
-	@SuppressWarnings("unchecked")
 	public V mergeAt(ACell value, ACell... path) {
 		List<ALatticeApplication<V>> configured=applications;
-		if (configured==null) {
-			if (path.length==0) return merge((V)value);
-			ALattice<?> target=lattice;
-			for (int i=0;i<path.length;i++) {
-				if (target instanceof SignedLattice<?>) {
-					throw new IllegalArgumentException("Incoming path must include the complete signed envelope");
-				}
-				// Legacy owner maps carry their authorisation rule in the context,
-				// rather than in the SignedLattice returned by path navigation.
-				if (i==path.length-1 && target instanceof OwnerLattice<?> && value instanceof SignedData<?> signed
-						&& !getContext().verifyOwner(path[i],signed.getAccountKey())) return cursor.get();
-				target=target.path(path[i]);
-				if (target==null) throw new IllegalArgumentException("Path is outside the served lattice");
-			}
-			ALattice<ACell> merge=(ALattice<ACell>)target;
-			this.<ACell>resolve(path).updateAndGet(own -> merge.merge(getContext(),own,value));
-			return cursor.get();
-		}
+		if (configured==null) return cursor.get();
 		for (ALatticeApplication<V> application:configured) application.mergeAt(value,path);
 		return cursor.get();
 	}
@@ -190,6 +143,7 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	/**
 	 * Persists a value through the host store without installing, publishing or
 	 * moving any cursor. The returned value may contain store-backed references.
+	 * Without a store, returns the supplied value unchanged.
 	 *
 	 * @param <T> Cell type
 	 * @param value Value to persist
@@ -197,7 +151,7 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * @throws IOException If persistence fails
 	 */
 	public <T extends ACell> T persist(T value) throws IOException {
-		return Cells.persist(value,store);
+		return (store==null)?value:Cells.persist(value,store);
 	}
 
 	/**
@@ -210,7 +164,7 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 		return persist(cursor.get());
 	}
 
-	/** Persists and publishes one snapshot, returning the exact published value. */
+	/** Publishes one snapshot, persisting it if a store is present. */
 	@Override
 	public V sync() {
 		return sync(this::publishRoot);
@@ -228,9 +182,8 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 		try {
 			V snapshot=cursor.get();
 			V published=publish.apply(snapshot);
-			if (!cursor.compareAndSet(snapshot,published) && applications==null) {
-				cursor.updateAndGet(current -> lattice.merge(getContext(),current,published));
-			}
+			// Persisted references may replace the snapshot; concurrent edits stay pending.
+			cursor.compareAndSet(snapshot,published);
 			return published;
 		} finally {
 			syncLock.unlock();
@@ -245,7 +198,8 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * publication does not invoke this policy. The handler returns the published value to install
 	 * back into the root cursor, usually with store-backed references.</p>
 	 *
-	 * <p>Until a policy is configured, sync publishes to this component's store.
+	 * <p>Until a policy is configured, sync publishes to this component's store,
+	 * or returns the current snapshot if there is no store.
 	 * Host infrastructure may install a replication pipeline during configuration
 	 * and then call {@link #freezePublicationPolicy()} before application work begins.</p>
 	 *
@@ -269,12 +223,12 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	/**
-	 * Flushes the underlying store using its own durability semantics.
+	 * Flushes the underlying store using its own durability semantics; no-op without a store.
 	 *
 	 * @throws IOException If the store flush fails
 	 */
 	public void flush() throws IOException {
-		store().flush();
+		if (store!=null) store.flush();
 	}
 
 	private V publishRoot(V value) {
@@ -283,10 +237,11 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	private V storeRoot(V value) {
+		if (store==null) return value;
 		try {
 			return store().setRootData(value).getValue();
 		} catch (IOException e) {
-			throw new StoreException("Root component sync failed: persistence error",e);
+			throw new StoreException("Lattice host sync failed: persistence error",e);
 		}
 	}
 }

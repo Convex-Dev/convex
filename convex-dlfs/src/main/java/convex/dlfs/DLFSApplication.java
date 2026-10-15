@@ -7,7 +7,7 @@ import convex.core.data.AccountKey;
 import convex.core.store.AStore;
 import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
-import convex.lattice.RootComponent;
+import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -25,8 +25,8 @@ import convex.lattice.cursor.AForkableCursor;
  * not accumulate on the heap. The application therefore takes the host's store
  * and hands it down to regions, drive maps and drives explicitly. It owns neither
  * the host nor the store lifecycle. This adapter is a live view; its edits are
- * already in the host's working state. Explicit {@link RootComponent#sync()}
- * publishes that state, and {@link RootComponent#flush()} provides durability.</p>
+ * already in the host's working state. Explicit {@link LatticeHost#sync()}
+ * publishes that state, and {@link LatticeHost#flush()} provides durability.</p>
  *
  * @param <V> Complete application root value type
  */
@@ -38,12 +38,12 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	/**
 	 * Creates an extensible DLFS application over a host.
 	 *
+	 * @param lattice Application root structure and merge semantics
 	 * @param host Generic lattice application host
 	 * @param regionPath Path from the application root to the physical DLFS region
 	 */
-	protected DLFSApplication(RootComponent<V> host, ACell... regionPath) {
-		this(Objects.requireNonNull(host,"DLFS application host must not be null").getLattice(),
-			host.cursor(),host.store(),regionPath);
+	protected DLFSApplication(ALattice<V> lattice,LatticeHost<V> host, ACell... regionPath) {
+		this(lattice,Objects.requireNonNull(host,"DLFS application host must not be null").cursor(),host.store(),regionPath);
 		setContext(host.getContext());
 	}
 
@@ -67,13 +67,14 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	 * existing hosted lattice root.
 	 *
 	 * @param <V> Complete application root value type
+	 * @param lattice Application root structure and merge semantics
 	 * @param host Generic lattice application host
 	 * @param regionPath Path from the application root to the physical DLFS region
 	 * @return Connected DLFS application
 	 */
-	public static <V extends ACell> DLFSApplication<V> connect(RootComponent<V> host,
+	public static <V extends ACell> DLFSApplication<V> connect(ALattice<V> lattice,LatticeHost<V> host,
 			ACell... regionPath) {
-		return new DLFSApplication<>(host,regionPath);
+		return new DLFSApplication<>(lattice,host,regionPath);
 	}
 
 	/** Returns the store used for blob checkpoints, or null when file data is heap-only. */

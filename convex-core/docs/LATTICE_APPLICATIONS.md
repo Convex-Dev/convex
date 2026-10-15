@@ -77,9 +77,8 @@ participate selectively: a keyed root merges the regions it knows and ignores th
 rest, so nodes with different region sets still interoperate.
 
 **The host is the authoritative local root.** It owns the store, the publication
-policy that runs on its sync, and the durability barrier. It knows the root lattice
-so that it can merge on its own when no application is configured, and otherwise
-delegates admission of incoming values to its applications. A node adds networking
+policy that runs on its sync, and the durability barrier. It knows no lattice or path structure: all incoming values are delegated to
+configured applications, and without applications they are ignored. A node adds networking
 around the same host: it receives values from peers, hands them to the host, and
 sends root snapshots out. Application code is identical against a local host and a
 networked one.
@@ -124,7 +123,7 @@ updates before this design becomes normative. Ownership remains governed by CAD0
 - Applications admit incoming root values by merging them under their lattice.
   Domain writes use cursors for atomicity; publication boundaries use the
   component's lattice to reconcile conflicts.
-- Attach to a host (`RootComponent`), never to a store or a node directly. Explicit
+- Attach to a host (`LatticeHost`), never to a store or a node directly. Explicit
   create and open factories on the host manage retained state. Domain components
   remain independent of the node runtime.
 - Persist, sync and flush are three different boundaries: persistence writes cells,
@@ -139,13 +138,13 @@ updates before this design becomes normative. Ownership remains governed by CAD0
 ```
 Domain components        DLFSDrive, Social        one component per path
 Application component    ALatticeApplication      root merge and optional region factories
-Root component           RootComponent            persistence and publication
+Lattice host             LatticeHost              persistence and publication
 Cursor                   path, CAS, drafts        atomic state access
 Component and lattice    merge, sync              admission and publication
 Optional host runtime    NodeServer               replication and lifecycle
 ```
 
-The root component is the developer-facing host. It always has a store and owns the
+`LatticeHost` is the developer-facing host. It always has a store and owns the
 root publication policy but not the store lifecycle. A node can host the same root
 and installs its replication pipeline during launch; application branches never know
 a node exists.
@@ -207,27 +206,31 @@ public final class MyApplication extends ALatticeApplication<Index<Keyword, ACel
     private final Social social;
     private final DLFSRegion files;
 
-    private MyApplication(RootComponent<Index<Keyword, ACell>> host) {
-        super(host);
+    private MyApplication(LatticeHost<Index<Keyword, ACell>> host) {
+        super(LATTICE, host);
         social = Social.connect(this);
         files = DLFSRegion.connect(resolve(Keyword.intern("documents")), host.store());
     }
-    public static MyApplication connect(RootComponent<Index<Keyword, ACell>> host) {
+    public static MyApplication connect(LatticeHost<Index<Keyword, ACell>> host) {
         return new MyApplication(host);
     }
 }
 
 // Local
-RootComponent<Index<Keyword, ACell>> local = RootComponent.open(applicationLattice, store);
+LatticeHost<Index<Keyword, ACell>> local = LatticeHost.open(store);
 MyApplication app = MyApplication.connect(local);
+local.configureApplications(List.of(app));
 
 // Hosted by a node: identical application code
-NodeServer<Index<Keyword, ACell>> node = new NodeServer<>(applicationLattice, store, config);
-MyApplication networked = node.launch(MyApplication::connect);
+var host = LatticeHost.open(store);
+MyApplication networked = MyApplication.connect(host);
+host.configureApplications(List.of(networked));
+var node = new NodeServer<>(host, config);
+node.launch();
 ```
 
 The caller owns and closes the store and the node; components are views and own
-neither. A node serves from the root component's store so published roots never
+neither. A node serves from the host's store so published roots never
 reference data the primary store lacks. Publication policy is a lifecycle concern: a
 root defaults to local store publication, and network infrastructure installs and
 freezes its policy during launch.
@@ -244,7 +247,7 @@ Social        cursor at the owner lattice level
 
 Hosts, applications and domain components are all components. A lightweight
 component holds a working cursor; a publication boundary also holds a destination.
-Only the root component owns host persistence policy; DLFS components additionally
+Only the host owns host persistence policy; DLFS components additionally
 carry a store handed down explicitly from their application, because streamed file
 writes checkpoint blobs before publication. The cursor is the only connection back
 to application state. There is no second component-parent hierarchy, and cursors
@@ -293,7 +296,7 @@ data format from cursor mechanics. Rules of thumb:
 
 The application component has working state for a hosted root and declares the
 root lattice: it exposes that lattice, merges incoming root values and hands out
-typed region cursors. It attaches to a root component, which explicitly creates or
+typed region cursors. It attaches to a host, which explicitly creates or
 opens a local root, or hosts a networked root. Neither merging nor hosting requires
 domain components to exist.
 
@@ -318,24 +321,57 @@ a component registry. A relay can merge every region in its supplied lattice
 without constructing a single domain component.
 
 ```java
-public final class RelayApplication extends ALatticeApplication<Index<Keyword, ACell>> {
-    public RelayApplication(RootComponent<Index<Keyword, ACell>> host) {
-        super(host);           // private working state, using the host's lattice
-    }
-}
-
-var host = RootComponent.open(selectedRegions, store);
-RelayApplication app = new RelayApplication(host);
-app.merge(incomingRoot); // atomic local merge, including region verification
+var host = LatticeHost.create();
+var app = new LatticeApplication<>(selectedRegions, host);
+host.configureApplications(List.of(app));
+host.merge(incomingRoot); // delegates to the application's private working state
 app.sync();              // merge working state back to the host
-host.sync();             // persist and publish through host policy
+host.sync();             // optional host policy; otherwise a no-op without a store
 ```
 
-Opening a host restores the retained root, or starts at the lattice's empty value
-if the store has none. Creating a host deliberately starts a fresh root; its first
+The executable [signed favourites example](../src/test/java/convex/lattice/app/SignedComponentTest.java)
+assembles a storeless `LatticeHost.create()` directly with a `FavouritesApp`. The application supplies
+the controllable clock and `FavouritesUser` signing components. Each user exposes
+a lightweight `Favourites` component through `user.favourites()`, with atomic
+`add` and `remove` operations. Each edit signs into the application working state
+through a `SignedCursor`. Repeated user lookups create distinct views of that same
+state, without per-user working branches or caches. Only `app.sync()` publishes to
+the host, which supplies incoming
+delegation and persistence without domain-specific wrappers. The tests exercise
+Alice and Bob locally, Charlie on another in-memory host, signed whole-record LWW
+merges and explicit publication. A separate
+[persistence variant](../src/test/java/convex/lattice/app/SignedPersistenceTest.java)
+tests publication to Etch and reopening the same application.
+
+A host's store is optional. `LatticeHost.create()` starts an empty keyed root with
+no store; `LatticeHost.create(initialValue, null)` supports other initial values.
+Without a store, `persist` returns its input unchanged and `flush` does nothing.
+Host `sync()` still invokes a configured publication policy; otherwise it returns
+the current snapshot. The root cursor holds the value directly: there is no
+`MemoryStore`, `NullStore`, default-store lookup or thread-local store fallback;
+`host.store()` returns `null`. `NodeServer`
+requires a host with a cell store for its network and persistence infrastructure.
+
+The [host store tests](../src/test/java/convex/lattice/HostStoresTest.java) cover
+these distinct configurations:
+
+| Host store | Default `sync()` | Restoration with `open` |
+|---|---|---|
+| `null` | Returns the in-memory snapshot | Uses the initial value |
+| Explicit `NullStore` | Passes the snapshot to the discarding store | No retained root |
+| Explicit `MemoryStore` | Selects the root in that store | Restores from that same live store instance |
+| Explicit `EtchStore` | Persists the tree and selects the root | Restores after closing and reopening the file |
+
+`persist()` stores cells without changing either the host cursor or the retained
+store root. `flush()` delegates to an explicitly supplied store's durability
+barrier. The caller owns and closes the store; the host does not own its lifecycle.
+A custom publication policy replaces the default store-root publication step.
+
+Opening a host restores the retained root, or starts at an empty keyed index
+if the store has none. Explicit initial-value overloads support non-map local roots. Creating a host deliberately starts a fresh root; its first
 publication replaces any retained root. Applications accept a host rather than a
 store, so this choice belongs to host assembly, and the caller owns the store
-lifecycle. An application defaults to the host's lattice, or supplies its own.
+lifecycle. Each application supplies its own lattice.
 Applications may also override `merge` to delegate to components with their own
 merge strategies and discard input they do not accept; verification must still use
 the owner-bound rules for the paths they publish. Merging keeps the current local
@@ -363,11 +399,12 @@ anywhere.
 
 Delivery is not a transaction across applications: if a later application fails,
 earlier merges remain, and lattice delivery is safe to retry. The returned root may
-be unchanged until applications sync. An explicitly empty list ignores all incoming
-state. An unconfigured root merges directly with its supplied lattice.
+be unchanged until applications sync. Both an explicitly empty application list and an unconfigured host ignore all incoming
+state. For a relay, configure `LatticeApplication.live(lattice, host)`: this application
+accepts the supplied lattice directly into shared host state.
 
 A node routes incoming pushes, whole-root and path pulls, direct merge calls and
-explicit snapshot candidates through the root component. Delivery does not invoke
+explicit snapshot candidates through the host. Delivery does not invoke
 application sync; host sync and shutdown publish only state already installed in the
 host. An acknowledgement confirms delivery, not publication of private work, and an
 application may ignore a value without reporting an error.
@@ -377,38 +414,33 @@ does not use its lattice to infer application interests. The base application
 treats an empty path as a whole-root merge and ignores every non-empty path; an
 application overrides this to choose its interests, validate input and delegate to
 domain components, verifying enclosing signed envelopes before accepting interior
-values. Without configured applications the root merges path values with its own
-lattice and rejects paths that pass through a signed envelope: callers must supply
-the complete envelope at its slot.
+values. The standard `LatticeApplication` explicitly accepts paths declared by its lattice,
+rejecting paths through signed envelopes: callers must supply the complete envelope
+at its slot. The host never interprets paths.
 
-A node hosts a root component and delegates incoming merges to it; the node keeps no
-separate lattice definition or merge context. The lattice-taking constructor creates
-its own root as a convenience. At launch it restores retained state through root
-merge, preserving pre-launch local edits, then calls the application factory and
-starts attached propagation:
+A node wraps a `LatticeHost` and delegates incoming merges to it. Assemble custom
+applications before starting the node:
 
 ```java
-var node = new NodeServer<>(MyApplication.LATTICE, store);
-var app = node.launch(MyApplication::new);
+var host = LatticeHost.open(store);
+var app = new MyApplication(host);
+host.configureApplications(List.of(app));
+var node = new NodeServer<>(host, config);
+node.launch();
 // Later, according to application policy:
 app.sync();
-node.getRootComponent().sync();
+host.sync();
 ```
 
-Alternatively, pass an already-initialised root:
+The supplied host is already initialised; the node never reloads it. Launch installs
+the node's publication pipeline, so host publication policy must not already be
+frozen. Node startup does not invoke application sync. Transport and propagation
+configuration remain explicit.
 
-```java
-var root = RootComponent.open(MyApplication.LATTICE, store);
-var node = new NodeServer<>(root, config);
-var app = node.launch(MyApplication::new);
-```
-
-A supplied root keeps its state and policy; the node does not restore it again.
-Applications can instead be constructed and configured on the supplied root before
-a plain launch. Launch installs the node's publication pipeline on the root, so its
-publication policy must not already be frozen. The factory overload is for first
-launch only: it returns the typed application and does not invoke its sync hook.
-Transport and propagation configuration remain explicit.
+For simple relay usage, `new NodeServer<>(lattice, store, config)` creates a host
+and installs a standard live `LatticeApplication`. At launch it merges retained
+state through that application, preserving pre-launch local edits. Custom applications
+use the explicit assembly above; there is no application-factory launch overload.
 
 ### Sharing a host
 
@@ -467,8 +499,12 @@ Verification remains bound to the lattice instances, configured before use.
 
 ### Batched signing and application preparation
 
-A signed component (`SignedComponent`) owns an unsigned working cursor and a signed
-destination. Bind it to the owner-bound signed lattice at that host path, so it
+For immediate signed edits, a lightweight component wraps its destination with
+`SignedCursor.create(slot, key)`. It needs no private working state or separate sync.
+
+Deferred signing is an explicit choice: `SignedComponent` owns a private unsigned
+working cursor and a signed destination. Bind it to the owner-bound signed lattice
+at that host path, so it
 carries the owner verifier. Domain components use its working cursor through their
 rebinding factories and update normally, without signing each edit:
 
@@ -603,7 +639,7 @@ selects a retained root nor licenses garbage collection.
 
 Persistence lives in two places and nowhere else:
 
-- The root component owns the host store. It publishes the root on sync, can
+- The host owns the host store. It publishes the root on sync, can
   persist reachable cells without publishing, and provides flush, the physical
   durability barrier. Working applications publish into this host before its own
   explicit sync persists or propagates their state.
@@ -636,7 +672,7 @@ cursor mechanics are described in [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESI
 
 The context supplies signing capabilities and the write clock; typed ownership
 lattices bind owner verification rules to the lattice instance. Install a context on
-the application component for application-local policy, or on the root component for
+the application component for application-local policy, or on the host for
 construction defaults. Child components resolve policy when constructed; later
 parent policy replacement does not alter existing children. Cursors have no context.
 Transaction views retain the component policy when rebound. A fixed context suits
@@ -792,12 +828,12 @@ source of merge semantics.
 
 | Object | Responsibility |
 |---|---|
-| Root component | Shared authoritative cursor, schema, storage and host services |
+| Lattice host | Shared authoritative cursor, schema, storage and host services |
 | Application component | Root merge API; optionally domain factories, lifecycle and subscriptions |
 | Subscription | Interest in one subtree, a live cursor and optional change observers |
 | Domain component | Lightweight domain API around a cursor at one path |
 
-The root component remains the host abstraction. A local root supports the same
+The host remains the host abstraction. A local root supports the same
 application API as a root hosted by a node; the node installs replication services.
 A new host interface is only needed if another implementation requires it.
 Application-selected region definitions configure the host root at construction;
@@ -855,7 +891,7 @@ against the current implementation. Paths use canonical CVM keys.
 ```java
 public abstract class ALatticeApplication<V extends ACell>
         extends ALatticeComponent<V> implements AutoCloseable {
-    protected ALatticeApplication(RootComponent<V> host);
+    protected ALatticeApplication(ALattice<V> lattice, LatticeHost<V> host);
 
     public final ALattice<V> getLattice();
     public V merge(V other);
@@ -891,8 +927,8 @@ handler reports asynchronous failures through logging.
 public final class MyApplication extends ALatticeApplication<Index<Keyword, ACell>> {
     private Feed feed;
 
-    public MyApplication(RootComponent<Index<Keyword, ACell>> host) {
-        super(host);
+    public MyApplication(LatticeHost<Index<Keyword, ACell>> host) {
+        super(LATTICE, host);
     }
 
     @Override
@@ -903,9 +939,9 @@ public final class MyApplication extends ALatticeApplication<Index<Keyword, ACel
     }
 }
 
-MyApplication app = new MyApplication(node.getRootComponent());
+MyApplication app = new MyApplication(node.getHost());
 app.launch();  // node already launched and configured
-// The same application can launch against a standalone RootComponent.
+// The same application can launch against a standalone LatticeHost.
 ```
 
 The feed factory above is a proposed cursor-based component factory. A lightweight
@@ -926,7 +962,7 @@ starts no workers and installs no observers.
   does not wait for network acquisition. Local-only hosts create the same view
   without network activity.
 - Application policy supplies signing and timestamp capabilities before writes
-  begin. Merge authorisation is bound to the host's lattice instances; an
+  begin. Merge authorisation is bound to the application's lattice instances; an
   application's signing capability does not replace it.
 - Close is idempotent. It stops accepting subscriptions, invokes the close hook, and
   releases all application registrations even if cleanup fails. It does not close
@@ -1093,7 +1129,7 @@ Follow the repository conventions: no sleeps, wait on real signals; no fixed por
 - [ ] Wrap with an owner lattice for per-user ownership; register under a root keyword.
 - [ ] Supply the root lattice to an application component; optionally expose
       domain component factories at known paths. Root merge requires no components.
-- [ ] Accept a root component in factories; provide a local open and a host-neutral
+- [ ] Accept a host in factories; provide a local open and a host-neutral
       connect.
 - [ ] Write with read-modify-write updates, declare child levels with their lattice,
       return exact types from fork.
@@ -1103,7 +1139,7 @@ Follow the repository conventions: no sleeps, wait on real signals; no fixed por
 
 ## Where the code lives
 
-- `convex.lattice.ALatticeApplication`, `ALatticeComponent`, `RootComponent`,
+- `convex.lattice.ALatticeApplication`, `ALatticeComponent`, `LatticeHost`,
   `SignedComponent` — the component layer.
 - `convex.lattice.LatticeContext`, `OwnerLattice`, `SignedLattice`,
   `JSONLattice`, `LWWLattice`, `IndexLattice`, `MapLattice`, `SetLattice` — lattices

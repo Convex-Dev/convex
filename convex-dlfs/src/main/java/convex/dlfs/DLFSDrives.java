@@ -14,7 +14,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.RootComponent;
+import convex.lattice.LatticeHost;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -63,13 +63,13 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	}
 
 	/**
-	 * Connects one owner's drives at a path below a host root, checkpointing streamed
+	 * Connects one owner's drives at the host root, checkpointing streamed
 	 * blob data into the host store.
 	 */
-	public static DLFSDrives connect(RootComponent<?> host, ACell... path) {
+	public static DLFSDrives connect(LatticeHost<?> host) {
 		if (host==null) throw new IllegalArgumentException("Host must not be null");
-		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=host.resolve(path);
-		DLFSDrives component=new DLFSDrives(cursor,host.store(),DLFSLocation.at(host.cursor(),path));
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=resolve(host.cursor(),LATTICE);
+		DLFSDrives component=new DLFSDrives(cursor,host.store(),DLFSLocation.at(host.cursor()));
 		component.setContext(host.getContext());
 		return component;
 	}
