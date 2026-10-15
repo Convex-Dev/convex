@@ -30,6 +30,17 @@ public class BigIntegerTest {
 	
 	protected Object temp = null;
 
+	@Test public void testSignumBeforeAndAfterMaterialisingBigInteger() {
+		for (byte[] bytes:new byte[][] { {}, {0}, {0,(byte)128}, {1}, {(byte)128},
+				{0,(byte)128,0,0,0,0,0,0,0} }) {
+			CVMBigInteger value=CVMBigInteger.wrap(bytes);
+			int sign=bytes.length==0?0:new BigInteger(bytes).signum();
+			assertEquals(CVMLong.forSignum(sign),value.signum());
+			value.big();
+			assertEquals(CVMLong.forSignum(sign),value.signum());
+		}
+	}
+
 	@Test public void testBigIntegerAssumptions() {
 		assertThrows(java.lang.NumberFormatException.class,()->{
 			// Double check assumption that this throws

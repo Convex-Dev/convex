@@ -142,7 +142,12 @@ public final class CVMBigInteger extends AInteger {
 	@Override
 	public CVMLong signum() {
 		if (data!=null) return CVMLong.forSignum(data.signum());
-		return CVMLong.forSignum(blob.byteAt(0));
+		long length=blob.count();
+		if (length==0) return CVMLong.ZERO;
+		byte first=blob.byteAt(0);
+		if (first<0) return CVMLong.MINUS_ONE;
+		// A trimmed positive integer may need a leading zero sign byte.
+		return (first!=0 || length>1)?CVMLong.ONE:CVMLong.ZERO;
 	}
 	
 	@Override

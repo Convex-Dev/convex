@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Big-integer sign queries handle empty zero representations and positive values with a leading sign byte consistently before and after Java value materialisation.
 - DLFS copies and moves work across drives and with other NIO providers; separate views of the same working drive support atomic rename and same-file detection.
 - Directly hosted DLFS drive collections inherit the host's component context, including its mutation clock.
 - CVM booleans and equal generic byte flags use consistent Java hash codes, preserving lookups and duplicate detection in Java hash maps and sets across representations and decoding.
