@@ -27,7 +27,9 @@ import convex.lattice.cursor.SignedCursor;
 public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	protected P2PApplication(RootComponent<Index<Keyword,ACell>> host) {
-		super(host);
+		// NodeServer restores after this adapter is constructed. Until node lifecycle
+		// policy explicitly stages and refreshes applications, use a live host view.
+		super(host.getLattice(),host.cursor().view());
 	}
 
 	/** Binds a working view, such as a fork or transaction draft, to the supplied cursor. */

@@ -24,6 +24,8 @@ import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -36,12 +38,16 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.core.lang.RT;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDrive;
+import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.ALattice;
 import convex.lattice.generic.KeyedLattice;
+import convex.lattice.generic.SignedLattice;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Root;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -50,8 +56,10 @@ import convex.node.NodeServer;
 import convex.p2p.P2PApplication;
 import convex.p2p.P2PLattice;
 import convex.p2p.P2PUser;
+import convex.p2p.P2PNodeRecord;
 import convex.social.Social;
 import convex.social.SocialPost;
+import convex.social.SocialUser;
 
 /**
  * Two compound applications, Social + P2P and DLFS + P2P, share one host.
@@ -76,6 +84,131 @@ public class SharedApplicationsTest {
 		.addLattice(Keywords.FS,DLFSRegion.LATTICE);
 	private static final LatticeContext VERIFY=LatticeContext.EMPTY.withOwnerVerifier(
 		(owner,signer) -> owner.equals(DID.forKey(signer)));
+
+	/** Applications choose working-state policy; ordinary domain views need no fork. */
+	private static final class WorkingApplication extends ALatticeApplication<Index<Keyword,ACell>> {
+		final SignedComponent<Index<Keyword,ACell>> socialState;
+		final SignedComponent<AHashMap<AString,AVector<ACell>>> fileState;
+		final SignedComponent<ACell> nodeState;
+		final SocialUser social;
+		final DLFSDrives files;
+		final P2PNodeRecord node;
+
+		WorkingApplication(RootComponent<Index<Keyword,ACell>> host,boolean socialApp,Runnable signing) {
+			super(host);
+			if (socialApp) {
+				socialState=owned(context(SOCIAL_KEY,signing),Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
+				social=Social.connect(this).user(SOCIAL_KEY.getAccountKey()).withCursor(socialState.cursor());
+				files=null;
+				fileState=null;
+			} else {
+				fileState=owned(context(FILES_KEY,signing),Keywords.FS,FILES_KEY.getAccountKey());
+				files=DLFSRegion.connect(resolve(Keywords.FS),host.store()).drives(FILES_KEY.getAccountKey())
+					.withCursor(fileState.cursor());
+				social=null;
+				socialState=null;
+			}
+			AccountKey nodeOwner=(socialApp?COMMON_KEY:FILES_KEY).getAccountKey();
+			nodeState=owned(context(socialApp?SOCIAL_KEY:FILES_KEY,signing),Keywords.P2P,Keywords.NODES,nodeOwner);
+			node=P2PUser.create(this,nodeOwner).node().withCursor(nodeState.cursor());
+		}
+
+		@SuppressWarnings("unchecked")
+		private <T extends ACell> SignedComponent<T> owned(LatticeContext context,ACell... path) {
+			ALattice<?> lattice=getLattice();
+			for (ACell key:path) lattice=lattice.path(key);
+			var component=new SignedComponent<>((SignedLattice<T>)lattice,this.<SignedData<T>>resolve(path));
+			component.cursor().setContext(context);
+			return component;
+		}
+
+		@Override protected void beforeSync() {
+			if (socialState!=null) socialState.sync();
+			if (fileState!=null) fileState.sync();
+			nodeState.sync();
+		}
+
+		@Override protected Index<Keyword,ACell> mergePublication(ALattice<Index<Keyword,ACell>> lattice,
+				Index<Keyword,ACell> baseline,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			// Prepare immutable snapshot changes using ordinary typed path navigation.
+			var result=new Root<>(other,lattice,LatticeContext.EMPTY);
+			if (socialState!=null) reconcile(result,socialState,baseline,own,other,
+				Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
+			if (fileState!=null) reconcile(result,fileState,baseline,own,other,Keywords.FS,FILES_KEY.getAccountKey());
+			reconcile(result,nodeState,baseline,own,other,Keywords.P2P,Keywords.NODES,node.owner());
+			return result.get();
+		}
+
+		private <T extends ACell> void reconcile(Root<Index<Keyword,ACell>> result,SignedComponent<T> component,
+				Index<Keyword,ACell> baseline,Index<Keyword,ACell> own,Index<Keyword,ACell> other,ACell... path) {
+			SignedData<T> value=component.mergePublication(RT.getIn(baseline,path),RT.getIn(own,path),RT.getIn(other,path));
+			if (value!=null) ALatticeComponent.<SignedData<T>>resolve(result,getLattice(),path).set(value);
+		}
+	}
+
+	@Test
+	public void testIndependentSocialApplicationsPublishBothOwnersPosts() {
+		var host=RootComponent.create(HOST_ROOT,new MemoryStore());
+		host.cursor().setContext(VERIFY);
+		AtomicInteger signatures=new AtomicInteger();
+		var first=new WorkingApplication(host,true,signatures::incrementAndGet);
+		var second=new WorkingApplication(host,true,signatures::incrementAndGet);
+		// Distinct post keys are application policy; both applications author the
+		// same signed owner subtree through separate working states.
+		second.socialState.cursor().setContext(second.socialState.cursor().getContext().withTimestamp(CVMLong.create(200)));
+		Blob a=first.social.feed().post("First application");
+		Blob b=second.social.feed().post("Second application");
+		first.sync();
+		second.sync();
+		var published=Social.connect(host).user(SOCIAL_KEY.getAccountKey()).feed();
+		assertNotNull(published.getPost(a));
+		assertNotNull(published.getPost(b));
+		assertEquals(2,published.count());
+		assertEquals(3,signatures.get(),"Two initial envelopes plus one combined signature");
+		assertNull(host.cursor().getContext().getSigningKey());
+	}
+
+	@Test
+	public void testWorkingApplicationsPublishSocialFilesAndSharedP2PRegion() throws Exception {
+		var store=new MemoryStore();
+		var host=RootComponent.create(HOST_ROOT,store);
+		host.cursor().setContext(VERIFY);
+		AtomicInteger signatures=new AtomicInteger();
+		var socialApp=new WorkingApplication(host,true,signatures::incrementAndGet);
+		var filesApp=new WorkingApplication(host,false,signatures::incrementAndGet);
+		Blob post=socialApp.social.feed().post("Private application working state");
+		socialApp.social.follows().follow(FILES_KEY.getAccountKey());
+		var drive=filesApp.files.createDrive("home");
+		Files.writeString(drive.fileSystem().getPath("/hello.txt"),"working file");
+		Files.writeString(drive.fileSystem().getPath("/another.txt"),"batched file");
+		var info=convex.lattice.P2PLattice.createNodeInfo(Vectors.empty(),
+			Strings.create("peer"),Strings.create("test"),Vectors.empty(),100);
+		socialApp.node.setNodeInfo(info);
+		filesApp.node.setNodeInfo(info);
+		assertEquals(HOST_ROOT.zero(),host.cursor().get());
+		assertNotNull(socialApp.social.withCursor(socialApp.socialState.cursor()).feed().getPost(post),
+			"Lightweight views share the owner's unsigned working state");
+		assertEquals(0,signatures.get(),"Domain edits must not sign before application sync");
+		assertEquals(HOST_ROOT.zero(),socialApp.cursor().get());
+		socialApp.sync();
+		assertEquals(2,signatures.get(),"One signature per changed owner subtree");
+		assertNull(host.cursor().get().get(Keywords.FS));
+		filesApp.sync();
+		assertNotNull(Social.connect(host).user(SOCIAL_KEY.getAccountKey()).feed().getPost(post));
+		assertEquals("working file",Files.readString(DLFSRegion.connect(host,Keywords.FS)
+			.drives(FILES_KEY.getAccountKey()).drive("home").fileSystem().getPath("/hello.txt")));
+		assertEquals(info,P2PUser.create(host,COMMON_KEY.getAccountKey()).node().getNodeInfo());
+		assertEquals(info,P2PUser.create(host,FILES_KEY.getAccountKey()).node().getNodeInfo());
+		assertEquals(4,signatures.get(),"Root publication needs no additional signatures");
+		socialApp.sync();
+		filesApp.sync();
+		assertEquals(4,signatures.get(),"Unchanged checkpoints do not sign");
+		assertNull(host.cursor().getContext().getSigningKey());
+		assertNull(socialApp.cursor().getContext().getSigningKey());
+		assertNull(store.getRootData());
+		host.sync();
+		assertEquals(host.cursor().get(),store.getRootData());
+	}
 
 	/** Each application has its own user key and deliberately shares one node owner. */
 	private static LatticeContext context(AKeyPair primary) {

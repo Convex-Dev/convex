@@ -2,6 +2,7 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -76,7 +77,7 @@ public class RootComponentTest {
 	}
 
 	@Test
-	public void testApplicationSharesHostedRoot() throws Exception {
+	public void testApplicationPublishesWorkingStateBeforeHostPersistence() throws Exception {
 		MemoryStore store=new MemoryStore();
 		RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
 		SetApplication application=new SetApplication(root);
@@ -84,7 +85,11 @@ public class RootComponentTest {
 
 		assertSame(root.getLattice(),application.getLattice());
 		application.cursor().updateAndGet(values->values.include(blob));
+		assertTrue(root.cursor().get().isEmpty());
 		application.sync();
+		assertEquals(application.cursor().get(),root.cursor().get());
+		assertNull(store.getRootData());
+		root.sync();
 
 		assertEquals(application.cursor().get(),store.getRootData());
 	}

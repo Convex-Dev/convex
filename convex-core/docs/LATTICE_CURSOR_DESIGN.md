@@ -7,6 +7,14 @@ by the cursor the owning component wraps around the boundary. The cursor model i
 specified in [CAD035](https://docs.convex.world/docs/cad/cursors); this document
 explains the class hierarchy and the design choices in `convex.lattice.cursor`.
 
+Component-owned working state and batched signing are described in
+[LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md). They use existing cursor
+operations. Independent component boundaries specialise only their private root's
+`sync()` to run component-owned CAS reconciliation; ordinary atomic updates are
+unchanged. Hosts still use `Root.onSync` for persistence and propagation.
+CAD035 still describes the earlier lattice-aware hierarchy and needs updating
+before this branch's design is normative.
+
 ## Key points
 
 - Cursors know nothing about lattices. A cursor is a location with atomic update,
@@ -36,8 +44,10 @@ explains the class hierarchy and the design choices in `convex.lattice.cursor`.
 - Hosts attach at the root: `Root.onSync(publish, merge)` installs the publication
   callback and the merge used when a write lands during publication. No cursor
   carries a store or a lattice.
-- All operations are lock-free over `AtomicReference`; immutable values make concurrent
-  reads safe and merge associativity makes sync order irrelevant.
+- Ordinary root updates use `AtomicReference`; sync callbacks are serialised per
+  root, while transactional roots additionally coordinate writes. Immutable values
+  make concurrent reads safe. Sync follows the supplied merge's conflict rules,
+  including directional ties and signing constraints.
 
 ## Class hierarchy
 

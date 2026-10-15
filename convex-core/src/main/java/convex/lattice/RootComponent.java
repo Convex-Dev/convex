@@ -1,6 +1,7 @@
 package convex.lattice;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -22,9 +23,11 @@ import convex.lattice.cursor.Root;
  * a replication pipeline before freezing host configuration. Neither operation
  * performs a durability barrier or owns the store lifecycle.</p>
  *
- * <p>The root cursor knows nothing about lattices. The host supplies the lattice
- * for the one place the root needs a merge, a write landing during publication,
- * and for {@link #merge(ACell) incoming} root values.</p>
+ * <p>The root cursor knows nothing about lattices. Incoming state is delegated to
+ * applications. By default a generic live relay uses the supplied lattice;
+ * explicitly configured applications control acceptance and publication. If an
+ * application publishes during host persistence, its newer result stays pending
+ * without being re-merged against the persisted snapshot.</p>
  *
  * <p>The same component can wrap a cursor owned by a networked NodeServer or
  * own a standalone local root backed by any {@link AStore}.</p>
@@ -37,6 +40,8 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	private final AStore store;
 	private volatile Function<V,V> publicationPolicy;
 	private boolean publicationPolicyFrozen;
+	private volatile List<ALatticeApplication<V>> applications;
+	private volatile boolean applicationsConfigured;
 
 	/**
 	 * Creates a store-backed host around an existing root cursor.
@@ -49,7 +54,13 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 		super(cursor);
 		this.lattice=Objects.requireNonNull(lattice,"Root lattice must not be null");
 		this.store=Objects.requireNonNull(store,"Root store must not be null");
-		cursor.onSync(this::publishRoot,lattice);
+		// Compatibility default: a generic relay with explicit live working policy.
+		// Configured applications replace it; the host never also merges their input.
+		applications=List.of(new ALatticeApplication<V>(lattice,cursor.view()) {});
+		// Configured applications own acceptance. A racing application publication
+		// must not be undone or expanded by the host's different merge strategy.
+		cursor.onSync(this::publishRoot,(context,current,published) -> applicationsConfigured
+			?current:lattice.merge(context,current,published));
 	}
 
 	/** Creates a standalone local root at the lattice's zero value. */
@@ -106,15 +117,33 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	/**
-	 * Atomically merges an incoming root value into the hosted state with the root
-	 * lattice, under the root cursor's effective context. This changes local state
-	 * only; {@link #sync()} publishes it.
+	 * Delegates incoming state to the configured applications, without a second
+	 * host merge. Each application controls its working state and publication.
+	 * Delivery is not atomic across applications: earlier successful merges remain
+	 * if a later application fails. Retry is safe for lattice merges.
+	 *
+	 * <p>Until applications are explicitly configured, a generic live relay preserves
+	 * the previous immediate root-merge behaviour. With private working applications,
+	 * application sync must publish their changes before host sync persists them.</p>
 	 *
 	 * @param other Incoming root value
-	 * @return Root value installed by this merge
+	 * @return Current published root, which may not yet include the incoming state
 	 */
 	public V merge(V other) {
-		return cursor.merge(lattice,other);
+		for (ALatticeApplication<V> application:applications) application.merge(other);
+		return cursor.get();
+	}
+
+	/**
+	 * Configures incoming delegation once, before delivering incoming state. The
+	 * caller constructs applications against this restored host. An empty list
+	 * explicitly ignores incoming values. Configuration retains an immutable list;
+	 * applications do not register their children with the root.
+	 */
+	public synchronized void configureApplications(List<? extends ALatticeApplication<V>> applications) {
+		if (applicationsConfigured) throw new IllegalStateException("Applications already configured");
+		this.applications=List.copyOf(applications);
+		applicationsConfigured=true;
 	}
 
 	/**

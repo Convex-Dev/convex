@@ -2,6 +2,8 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -43,8 +45,65 @@ public class ALatticeApplicationTest {
 	/** No component definitions or factories are needed for root merging. */
 	private static final class Application<V extends ACell> extends ALatticeApplication<V> {
 		Application(RootComponent<V> host) {
-			super(host);
+			// Explicit live policy, also used by the existing NodeServer adapters.
+			super(host.getLattice(),host.cursor().view());
 		}
+	}
+
+	private static final class WorkingApplication<V extends ACell> extends ALatticeApplication<V> {
+		WorkingApplication(RootComponent<V> host) { super(host); }
+	}
+
+	@Test
+	public void testConfiguredRootDelegatesWithoutInstallingIncomingState() {
+		var host=RootComponent.create(LATTICE,new MemoryStore());
+		var first=new WorkingApplication<>(host);
+		var second=new WorkingApplication<>(host);
+		var configured=new ArrayList<ALatticeApplication<Index<Keyword,ACell>>>();
+		configured.add(first);
+		configured.add(second);
+		host.configureApplications(configured);
+		configured.clear();
+		var incoming=LATTICE.zero().assoc(ITEMS,Sets.of(1));
+		assertEquals(LATTICE.zero(),host.merge(incoming));
+		assertEquals(incoming,first.cursor().get());
+		assertEquals(incoming,second.cursor().get());
+		assertEquals(LATTICE.zero(),host.cursor().get());
+		assertThrows(IllegalStateException.class,() -> host.configureApplications(List.of()));
+		first.sync();
+		assertEquals(incoming,host.cursor().get());
+	}
+
+	@Test
+	public void testExplicitlyEmptyApplicationsIgnoreIncomingState() {
+		var host=RootComponent.create(LATTICE,new MemoryStore());
+		host.configureApplications(List.of());
+		host.merge(LATTICE.zero().assoc(ITEMS,Sets.of(1)));
+		assertEquals(LATTICE.zero(),host.cursor().get());
+	}
+
+	@Test
+	public void testApplicationCreatesWorkingStateAndChildrenNeedNoForks() throws Exception {
+		var store=new MemoryStore();
+		var host=RootComponent.create(LATTICE,store);
+		var first=new WorkingApplication<>(host);
+		var second=new WorkingApplication<>(host);
+		Items a=new Items(first);
+		Items anotherView=new Items(first);
+		a.add(CVMLong.ONE);
+		assertEquals(Sets.of(1),anotherView.cursor().get());
+		assertEquals(LATTICE.zero(),host.cursor().get());
+		assertNull(new Items(second).cursor().get());
+		new Items(second).add(CVMLong.TWO);
+		first.sync();
+		second.sync();
+		assertEquals(Sets.of(1,2),host.cursor().get().get(ITEMS));
+		assertEquals(Sets.of(1),a.cursor().get(),"Other publications are adopted at this application's sync boundary");
+		first.sync();
+		assertEquals(Sets.of(1,2),a.cursor().get());
+		assertNull(store.getRootData(),"Application publication must stop at the host boundary");
+		host.sync();
+		assertEquals(host.cursor().get(),store.getRootData());
 	}
 
 	private static final class Items extends ALatticeComponent<ASet<CVMLong>> {
@@ -55,6 +114,25 @@ public class ALatticeApplicationTest {
 		void add(CVMLong value) {
 			cursor.updateAndGet(items -> items.include(value));
 		}
+	}
+
+	@Test
+	public void testPreparationFailureLeavesCheckpointsLocalForRetry() {
+		var host=RootComponent.create(LATTICE,new MemoryStore());
+		AtomicInteger calls=new AtomicInteger();
+		var app=new ALatticeApplication<Index<Keyword,ACell>>(host) {
+			@Override protected void beforeSync() {
+				new Items(this).add(CVMLong.ONE);
+				if (calls.incrementAndGet()==1) throw new IllegalStateException("checkpoint failed");
+				new Items(this).add(CVMLong.TWO);
+			}
+		};
+		assertThrows(IllegalStateException.class,app::sync);
+		assertEquals(LATTICE.zero(),host.cursor().get());
+		assertEquals(Sets.of(1),app.cursor().get().get(ITEMS));
+		app.sync();
+		assertEquals(Sets.of(1,2),host.cursor().get().get(ITEMS));
+		assertEquals(2,calls.get());
 	}
 
 	@Test

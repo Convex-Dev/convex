@@ -15,18 +15,19 @@ import convex.lattice.cursor.AForkableCursor;
  * components at paths within that root, each declaring the shape of the level it
  * hands out.</p>
  *
- * <p>Each application has a live cursor view with an independent context override.
- * Setting its cursor context affects its descendants, not the host or other
- * applications. Without an override it inherits the host's context live. All views
- * share the same atomic state; only an explicit fork creates a working copy.</p>
+ * <p>The host constructor creates private working state, with context resolved at
+ * construction. Lightweight children share that state. The explicit lattice/cursor
+ * constructor instead adopts the supplied cursor's policy, including a live view
+ * when immediate visibility is required.</p>
  *
  * <p>Applications on the global lattice use its keyed map root and compose the
  * region lattices they understand. The base also accepts other lattice value
  * types for local applications and tests.</p>
  *
  * <p>The application does not own the root, store or replication lifecycle.
- * Calling {@link #sync()} invokes the host's root publication policy; physical
- * durability is the host's {@link RootComponent#flush()}.</p>
+ * Calling {@link #sync()} first runs application-defined preparation, then publishes
+ * through its cursor boundary. For private working state this stops at the host;
+ * host sync and physical durability ({@link RootComponent#flush()}) are separate.</p>
  *
  * @param <V> Complete application root value type
  */
@@ -35,12 +36,24 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	private final ALattice<V> lattice;
 
 	/**
-	 * Creates an application over an existing lattice host, sharing its root lattice.
+	 * Creates an application's private working state from an existing lattice host.
+	 * Its children share that working state. Sync merges one snapshot back to the
+	 * host; the host's own sync separately persists and publishes its root.
 	 *
 	 * @param host Root component providing shared state, lattice and host policy
 	 */
 	protected ALatticeApplication(RootComponent<V> host) {
-		this(requireHost(host).getLattice(),host.cursor().view());
+		this(requireHost(host).getLattice(),host);
+	}
+
+	/**
+	 * Creates private working state with application-specific merge semantics.
+	 * The host delegates incoming values; it does not independently accept values
+	 * this application ignores. The caller must supply compatible value structure.
+	 */
+	protected ALatticeApplication(ALattice<V> lattice,RootComponent<V> host) {
+		super(lattice,requireHost(host).cursor());
+		this.lattice=lattice;
 	}
 
 	/**
@@ -62,12 +75,32 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	}
 
 	/**
-	 * Returns the root lattice used by both the application and its host.
+	 * Returns this application's root lattice, defaulting to the host's definition.
 	 *
 	 * @return Root merge and navigation semantics
 	 */
 	public final ALattice<V> getLattice() {
 		return lattice;
+	}
+
+	/**
+	 * Application-defined preparation for publication, normally checkpointing owned
+	 * signing components into this application's working cursor. No generic registry
+	 * is maintained. Failure prevents this call from publishing the application;
+	 * child checkpoints already completed remain in its working state for retry.
+	 * The hook may be called concurrently and must use thread-safe component APIs.
+	 * Call application {@code sync()} to run this lifecycle: syncing an individual
+	 * child or the exposed cursor does not invoke this hook. This hook does not make
+	 * checkpoints of multiple independently editable children one atomic transaction.
+	 */
+	protected void beforeSync() {
+	}
+
+	/** Runs application preparation, then publishes through its cursor boundary. */
+	@Override
+	public void sync() {
+		beforeSync();
+		super.sync();
 	}
 
 	/**
@@ -85,16 +118,19 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	}
 
 	/**
-	 * Atomically merges an incoming root value into the live application state.
+	 * Merges an incoming root value into the application state. The default is an
+	 * atomic lattice merge. Overrides may instead delegate accepted subtrees to
+	 * their components and discard other input, with no additional host merge.
 	 *
-	 * <p>Merges with the root lattice under the cursor's effective context, with the
-	 * current local value in the own position. The lattice handles all region
+	 * <p>The default merges with this application's lattice under the cursor's
+	 * effective context, with the current local value in the own position. The lattice handles all region
 	 * dispatch and verification; no components need to have been constructed.
 	 * Concurrent writes are reconciled by retrying against the latest root. If merge
-	 * throws, this operation installs no state.</p>
+	 * throws, this default operation installs no state. Overrides delegating to
+	 * independently editable children need not be atomic across those children.</p>
 	 *
-	 * <p>This changes local state only. Call {@link #sync()} to persist and publish
-	 * it through the host.</p>
+	 * <p>This changes local state only. Call {@link #sync()} to publish to the
+	 * destination, then sync the host when persistence or propagation is required.</p>
 	 *
 	 * @param other Incoming root value
 	 * @return Root value installed by this merge
