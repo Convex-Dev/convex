@@ -14,9 +14,6 @@ public final class ComponentTestSupport {
 		if (rule==null) throw new IllegalArgumentException("Invalid owner: "+owner);
 		return SignedCursor.create(slot,v -> rule.sign(context.get(),v));
 	}
-	public static <V extends ACell> AForkableCursor<V> fork(AForkableCursor<V> cursor, ALattice<V> lattice) {
-		return ALatticeComponent.working(lattice,cursor,LatticeContext.EMPTY).cursor();
-	}
 	public static <V extends ACell> V merge(AForkableCursor<V> cursor, ALattice<V> lattice, V other) {
 		return cursor.updateAndGet(own -> lattice.merge(LatticeContext.EMPTY,own,other));
 	}

@@ -485,11 +485,13 @@ public class DLFSLocal extends DLFileSystem {
 		@Override public void setContext(LatticeContext context) {
 			working.setContext(java.util.Objects.requireNonNull(context));
 		}
+
+		@Override public void sync() { working.sync(); }
 	}
 
 	@Override
 	public void sync() {
-		rootCursor.sync();
+		// A live view is already updated. Only independent working views publish.
 	}
 
 	/** Creates an independent snapshot of the current state, checkpointing into the same store, if any. */

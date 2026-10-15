@@ -73,7 +73,7 @@ public class UpgradedInboundRouteBroadcastTest {
 		long broadcasts=group.getBroadcastCount();
 		var announced=group.nextAnnounce();
 		bob.getCursor().set(value);
-		bob.getCursor().sync();
+		bob.getRootComponent().sync();
 		assertEquals(value,announced.get(5,TimeUnit.SECONDS));
 		assertTrue(group.getBroadcastCount()>broadcasts,
 			"publication must trigger a delta broadcast, independent of periodic root sync");

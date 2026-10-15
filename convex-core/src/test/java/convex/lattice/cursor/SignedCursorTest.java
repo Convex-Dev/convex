@@ -368,7 +368,9 @@ public class SignedCursorTest {
 		AForkableCursor<AHashMap<Keyword, ASet<AInteger>>> innerCursor =
 			convex.lattice.ComponentTestSupport.signed(signedLevel, ownerLattice, ALICE, ctx);
 
-		AForkableCursor<AHashMap<Keyword, ASet<AInteger>>> fork = convex.lattice.ComponentTestSupport.fork(innerCursor,mapLattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(mapLattice,innerCursor,convex.lattice.LatticeContext.EMPTY);
+
+		AForkableCursor<AHashMap<Keyword, ASet<AInteger>>> fork=forkComponent.cursor();
 		assertTrue(fork.get().get(Keywords.FOO).contains(CVMLong.ONE));
 
 		// Local writes — no signing
@@ -381,7 +383,7 @@ public class SignedCursorTest {
 		assertEquals(aliceData, root.get().get(ALICE).getValue());
 
 		// Sync signs once and merges to root
-		fork.sync();
+		forkComponent.sync();
 
 		SignedData<?> updatedSigned = root.get().get(ALICE);
 		assertTrue(updatedSigned.checkSignature(), "Synced data should be properly signed");
@@ -413,12 +415,13 @@ public class SignedCursorTest {
 		AForkableCursor<AInteger> innerCursor = convex.lattice.ComponentTestSupport.signed(signedLevel, ownerLattice, ALICE, noKeyCtx);
 
 		// Fork and local writes succeed without a key
-		AForkableCursor<AInteger> fork = convex.lattice.ComponentTestSupport.fork(innerCursor,MaxLattice.INSTANCE);
+		var forkComponent=convex.lattice.ALatticeComponent.working(MaxLattice.INSTANCE,innerCursor,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AInteger> fork=forkComponent.cursor();
 		fork.set(CVMLong.create(100));
 		assertEquals(CVMLong.create(100), fork.get());
 
 		// Sync must throw — no key to sign with
-		assertThrows(IllegalStateException.class, () -> fork.sync(),
+		assertThrows(IllegalStateException.class, () -> forkComponent.sync(),
 			"Sync through signed boundary without key should throw");
 	}
 
@@ -631,14 +634,16 @@ public class SignedCursorTest {
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
 			Cursors.root(initial);
 
-		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork = convex.lattice.ComponentTestSupport.fork(root,ownerLattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(ownerLattice,root,convex.lattice.LatticeContext.EMPTY);
+
+		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork=forkComponent.cursor();
 
 		// Add Bob on fork — root unchanged
 		fork.updateAndGet(map -> map.assoc(BOB, KP_BOB.signData((AInteger) CVMLong.create(99))));
 		assertNull(root.get().get(BOB));
 
 		// Sync merges Bob into root
-		fork.sync();
+		forkComponent.sync();
 		assertEquals(CVMLong.create(10), root.get().get(ALICE).getValue());
 		assertEquals(CVMLong.create(99), root.get().get(BOB).getValue());
 	}
@@ -653,20 +658,24 @@ public class SignedCursorTest {
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
 			Cursors.root(ownerLattice.zero());
 
-		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork1 = convex.lattice.ComponentTestSupport.fork(root,ownerLattice);
+		var fork1Component=convex.lattice.ALatticeComponent.working(ownerLattice,root,convex.lattice.LatticeContext.EMPTY);
+
+		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork1=fork1Component.cursor();
 		fork1.updateAndGet(map -> {
 			if (map == null) map = Maps.empty();
 			return map.assoc(ALICE, KP_ALICE.signData((AInteger) CVMLong.create(10)));
 		});
 
-		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork2 = convex.lattice.ComponentTestSupport.fork(root,ownerLattice);
+		var fork2Component=convex.lattice.ALatticeComponent.working(ownerLattice,root,convex.lattice.LatticeContext.EMPTY);
+
+		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork2=fork2Component.cursor();
 		fork2.updateAndGet(map -> {
 			if (map == null) map = Maps.empty();
 			return map.assoc(BOB, KP_BOB.signData((AInteger) CVMLong.create(20)));
 		});
 
-		fork1.sync();
-		fork2.sync();
+		fork1Component.sync();
+		fork2Component.sync();
 
 		AHashMap<ACell, SignedData<AInteger>> result = root.get();
 		assertEquals(CVMLong.create(10), result.get(ALICE).getValue());
@@ -686,23 +695,25 @@ public class SignedCursorTest {
 		SetLattice<CVMLong> setLattice = SetLattice.create();
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
-		AForkableCursor<ASet<CVMLong>> fork = convex.lattice.ComponentTestSupport.fork(root,setLattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(setLattice,root,convex.lattice.LatticeContext.EMPTY);
+
+		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 
 		// Batch 1
 		fork.updateAndGet(s -> s.include(CVMLong.ONE));
-		fork.sync();
+		forkComponent.sync();
 		assertTrue(root.get().contains(CVMLong.ONE));
 
 		// Batch 2 — incremental, batch 1 still present
 		fork.updateAndGet(s -> s.include(CVMLong.create(2)));
-		fork.sync();
+		forkComponent.sync();
 		assertTrue(root.get().contains(CVMLong.ONE));
 		assertTrue(root.get().contains(CVMLong.create(2)));
 
 		// Batch 3 — concurrent root modification merged with fork
 		root.updateAndGet(s -> s.include(CVMLong.create(100)));
 		fork.updateAndGet(s -> s.include(CVMLong.create(3)));
-		fork.sync();
+		forkComponent.sync();
 
 		ASet<CVMLong> result = root.get();
 		assertTrue(result.contains(CVMLong.ONE));
@@ -754,7 +765,8 @@ public class SignedCursorTest {
 		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(Maps.of(Keywords.FOO, Sets.of(CVMLong.ONE), Keywords.BAR, Sets.empty()));
 
 		AForkableCursor<ASet<CVMLong>> fooCursor = root.path(Keywords.FOO);
-		AForkableCursor<ASet<CVMLong>> fork = convex.lattice.ComponentTestSupport.fork(fooCursor,setLattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(setLattice,fooCursor,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 
 		fork.updateAndGet(s -> s.include(CVMLong.create(2)));
 		fork.updateAndGet(s -> s.include(CVMLong.create(3)));
@@ -763,7 +775,7 @@ public class SignedCursorTest {
 		assertEquals(Sets.of(CVMLong.ONE), ((ASet<?>) root.get().get(Keywords.FOO)));
 
 		// Sync propagates through the path cursor to root
-		fork.sync();
+		forkComponent.sync();
 		ASet<CVMLong> rootFoo = root.get().get(Keywords.FOO);
 		assertTrue(rootFoo.contains(CVMLong.ONE));
 		assertTrue(rootFoo.contains(CVMLong.create(2)));

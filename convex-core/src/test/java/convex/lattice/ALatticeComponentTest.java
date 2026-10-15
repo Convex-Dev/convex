@@ -26,8 +26,10 @@ public class ALatticeComponentTest {
 		}
 
 		TestComponent fork() {
-			return new TestComponent(convex.lattice.ComponentTestSupport.fork(cursor,LATTICE));
+			return new TestComponent(this);
 		}
+
+		private TestComponent(TestComponent source) { super(LATTICE,source.cursor); }
 
 		void add(ACell value) {
 			cursor.updateAndGet(set->set.include(value));
@@ -43,7 +45,7 @@ public class ALatticeComponentTest {
 	}
 
 	@Test
-	public void testForkSyncsThroughCursorWithoutPublishing() throws Exception {
+	public void testForkPublishesOnlyThroughComponentSync() throws Exception {
 		MemoryStore store=new MemoryStore();
 		var host=RootComponent.create(LATTICE,store);
 		TestComponent live=new TestComponent(host.cursor());
@@ -54,6 +56,10 @@ public class ALatticeComponentTest {
 		assertTrue(fork.cursor().get().contains(value));
 		assertFalse(host.cursor().get().contains(value));
 
+		fork.cursor().sync();
+		assertFalse(host.cursor().get().contains(value));
+		new TestComponent(fork.cursor()).sync();
+		assertFalse(host.cursor().get().contains(value));
 		fork.sync();
 		assertTrue(host.cursor().get().contains(value));
 		assertNull(store.getRootData(),"Merging a fork into the live cursor must not publish the root");

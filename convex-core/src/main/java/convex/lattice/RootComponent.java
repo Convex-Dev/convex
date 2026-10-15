@@ -3,6 +3,7 @@ package convex.lattice;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
 import convex.core.data.ACell;
@@ -12,14 +13,13 @@ import convex.core.store.AStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
-import convex.lattice.cursor.PublishingCursor;
 
 /**
  * Generic store-backed root for a lattice application component hierarchy.
  *
- * <p>A root component owns the host store, the root lattice and the root cursor's
- * sync policy. It is the one generic component with a persistence capability;
- * cursors and domain components have none. Standalone roots publish their current
+ * <p>A root component owns the host store, root lattice and publication policy.
+ * It is the generic host persistence boundary; specialised domain components may
+ * separately own stores for their own data. Standalone roots publish their current
  * value as the store root on {@link #sync()}. Network infrastructure may configure
  * a replication pipeline before freezing host configuration. Neither operation
  * performs a durability barrier or owns the store lifecycle.</p>
@@ -39,31 +39,27 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	private final ALattice<V> lattice;
 	private final AStore store;
+	private final ReentrantLock syncLock=new ReentrantLock();
 	private volatile Function<V,V> publicationPolicy;
 	private boolean publicationPolicyFrozen;
 	private volatile List<ALatticeApplication<V>> applications;
-	private volatile boolean applicationsConfigured;
 
 	/**
 	 * Creates a store-backed host around existing atomic storage.
 	 *
-	 * <p>Use {@link #cursor()} for components whose sync should reach this host.
-	 * The supplied storage remains usable for atomic reads and writes, but its
-	 * own sync has no publication callback.</p>
+	 * <p>Use {@link #cursor()} as the destination of hosted components. Their sync
+	 * updates this host's working state; it does not persist or replicate it.
+	 * Call this component's {@link #sync()} for host publication. The cursor
+	 * remains ordinary atomic storage with no publication callbacks.</p>
 	 *
 	 * @param lattice Root lattice, the complete merge for the hosted value
 	 * @param cursor Root cursor holding the hosted value
 	 * @param store Host store
 	 */
 	public RootComponent(ALattice<V> lattice, Root<V> cursor, AStore store) {
-		super(new PublishingCursor<>(cursor));
+		super(cursor);
 		this.lattice=Objects.requireNonNull(lattice,"Root lattice must not be null");
 		this.store=Objects.requireNonNull(store,"Root store must not be null");
-		applications=List.of();
-		// Configured applications own acceptance. A racing application publication
-		// must not be undone or expanded by the host's different merge strategy.
-		cursor().onSync(this::publishRoot,(current,published) -> applicationsConfigured
-			?current:lattice.merge(getContext(),current,published));
 	}
 
 	/** Creates a standalone local root at the lattice's zero value. */
@@ -133,10 +129,11 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * @return Current published root, which may not yet include the incoming state
 	 */
 	public V merge(V other) {
-		if (!applicationsConfigured) {
+		List<ALatticeApplication<V>> configured=applications;
+		if (configured==null) {
 			return cursor.updateAndGet(own -> lattice.merge(getContext(),own,other));
 		}
-		for (ALatticeApplication<V> application:applications) application.merge(other);
+		for (ALatticeApplication<V> application:configured) application.merge(other);
 		return cursor.get();
 	}
 
@@ -147,9 +144,8 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * applications do not register their children with the root.
 	 */
 	public synchronized void configureApplications(List<? extends ALatticeApplication<V>> applications) {
-		if (applicationsConfigured) throw new IllegalStateException("Applications already configured");
+		if (this.applications!=null) throw new IllegalStateException("Applications already configured");
 		this.applications=List.copyOf(applications);
-		applicationsConfigured=true;
 	}
 
 	/**
@@ -175,18 +171,39 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 		return persist(cursor.get());
 	}
 
-	/** Returns the hosted root cursor with its exact static type. */
+	/** Persists and publishes one snapshot, returning the exact published value. */
 	@Override
-	public PublishingCursor<V> cursor() {
-		return (PublishingCursor<V>) cursor;
+	public V sync() {
+		return sync(this::publishRoot);
+	}
+
+	/**
+	 * Publishes through an explicit host operation, serialised with ordinary sync.
+	 * The callback runs once outside atomic update callbacks. Concurrent writes
+	 * remain pending; the returned value is the snapshot actually published.
+	 * This is a host integration point, not a component-to-parent link.
+	 */
+	public V sync(Function<V,V> publish) {
+		Objects.requireNonNull(publish);
+		syncLock.lock();
+		try {
+			V snapshot=cursor.get();
+			V published=publish.apply(snapshot);
+			if (!cursor.compareAndSet(snapshot,published) && applications==null) {
+				cursor.updateAndGet(current -> lattice.merge(getContext(),current,published));
+			}
+			return published;
+		} finally {
+			syncLock.unlock();
+		}
 	}
 
 	/**
 	 * Configures the synchronous root publication policy.
 	 *
-	 * <p>This is a host integration point. Application components call
-	 * {@link #sync()} without knowing whether the root is local, replicated or
-	 * otherwise hosted. The handler must return the exact published value to install
+	 * <p>This is a host integration point. The caller invokes this root's
+	 * {@link #sync()} to persist or replicate its current state. Child component
+	 * publication does not invoke this policy. The handler returns the published value to install
 	 * back into the root cursor, usually with store-backed references.</p>
 	 *
 	 * <p>Until a policy is configured, sync publishes to this component's store.

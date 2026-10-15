@@ -135,7 +135,7 @@ final class NodeDirectory {
 		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=
 			server.getRootComponent().resolve(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		nodes.updateAndGet(own -> P2PLattice.NODES_LATTICE.merge(server.getMergeContext(),own,entry));
-		server.getCursor().sync();
+		server.getRootComponent().sync();
 		refresh();
 		log.debug("Published NodeInfo: transports={}, pops={}, relay={}, type={}, version={}",
 			transports,pointsOfPresence,relay,type,version);

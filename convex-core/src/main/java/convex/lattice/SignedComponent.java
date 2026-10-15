@@ -3,7 +3,7 @@ package convex.lattice;
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
 import convex.core.util.Utils;
-import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ACursor;
 import convex.lattice.generic.SignedLattice;
 
 /**
@@ -31,7 +31,7 @@ public final class SignedComponent<V extends ACell> extends ALatticeComponent<V>
 	 * {@code owners.signingFor(owner)}. Signing policy is resolved from the
 	 * component's explicit policy, configured before publication.
 	 */
-	public SignedComponent(SignedLattice<V> lattice, AForkableCursor<SignedData<V>> destination) {
+	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination) {
 		super(lattice.getValueLattice(),destination,
 			stored -> (stored==null)?null:stored.getValue(),
 			(context,value) -> {

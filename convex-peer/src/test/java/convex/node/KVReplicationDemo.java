@@ -123,7 +123,7 @@ public class KVReplicationDemo {
 				AHashMap<ACell, ACell> replica =
 					(AHashMap<ACell, ACell>)(AHashMap<?,?>) databases.get(i).exportReplica();
 				servers.get(i).mergeAt(replica,Keywords.KV);
-				servers.get(i).getCursor().sync();
+				servers.get(i).getRootComponent().sync();
 			}
 
 			// --- Pull from peers ---

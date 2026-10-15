@@ -83,7 +83,8 @@ public class LatticeCursorTest {
 	public void testForkedCursorOperations() {
 		MaxLattice lattice = MaxLattice.INSTANCE;
 		Root<AInteger> root = Cursors.root(null);
-		AForkableCursor<AInteger> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AInteger> fork=forkComponent.cursor();
 		doIntCursorTest(fork);
 	}
 
@@ -98,7 +99,8 @@ public class LatticeCursorTest {
 		MapLattice<Keyword,ASet<CVMLong>> lattice = MapLattice.create(setLattice);
 		Root<AHashMap<Keyword,ASet<CVMLong>>> root =
 				Cursors.root(Maps.empty());
-		AForkableCursor<AHashMap<Keyword,ASet<CVMLong>>> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword,ASet<CVMLong>>> fork=forkComponent.cursor();
 
 		try (ExecutorService writer = Executors.newSingleThreadExecutor();
 				ExecutorService reader = Executors.newSingleThreadExecutor()) {
@@ -157,7 +159,8 @@ public class LatticeCursorTest {
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
 		// Fork for modifications
-		AForkableCursor<ASet<CVMLong>> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 		assertNotNull(fork);
 		assertEquals(Sets.empty(), fork.get());
 
@@ -176,7 +179,7 @@ public class LatticeCursorTest {
 		assertTrue(forkSet.contains(TWO));
 
 		// Sync back to root
-		ASet<CVMLong> synced = fork.sync();
+		ASet<CVMLong> synced = forkComponent.sync();
 		assertEquals(forkSet, synced);
 
 		// Root should now have both items
@@ -192,8 +195,10 @@ public class LatticeCursorTest {
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
 		// Create two concurrent forks
-		AForkableCursor<ASet<CVMLong>> fork1 = convex.lattice.ComponentTestSupport.fork(root,lattice);
-		AForkableCursor<ASet<CVMLong>> fork2 = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var fork1Component=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ASet<CVMLong>> fork1=fork1Component.cursor();
+		var fork2Component=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ASet<CVMLong>> fork2=fork2Component.cursor();
 
 		// Independent modifications
 		CVMLong A = CVMLong.create(10);
@@ -202,11 +207,11 @@ public class LatticeCursorTest {
 		fork2.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(B));
 
 		// Sync fork1
-		fork1.sync();
+		fork1Component.sync();
 		assertTrue(root.get().contains(A));
 
 		// Sync fork2 - should merge with A
-		fork2.sync();
+		fork2Component.sync();
 		ASet<CVMLong> result = root.get();
 		assertTrue(result.contains(A), "Root should contain A after both syncs");
 		assertTrue(result.contains(B), "Root should contain B after both syncs");
@@ -218,15 +223,17 @@ public class LatticeCursorTest {
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
 		// Outer fork
-		AForkableCursor<ASet<CVMLong>> outer = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var outerComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ASet<CVMLong>> outer=outerComponent.cursor();
 		outer.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
 
 		// Inner fork (nested)
-		AForkableCursor<ASet<CVMLong>> inner = convex.lattice.ComponentTestSupport.fork(outer,lattice);
+		var innerComponent=convex.lattice.ALatticeComponent.working(lattice,outer,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ASet<CVMLong>> inner=innerComponent.cursor();
 		inner.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(2)));
 
 		// Sync inner to outer
-		inner.sync();
+		innerComponent.sync();
 		assertTrue(outer.get().contains(CVMLong.ONE));
 		assertTrue(outer.get().contains(CVMLong.create(2)));
 
@@ -234,7 +241,7 @@ public class LatticeCursorTest {
 		outer.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(3)));
 
 		// Sync outer to root
-		outer.sync();
+		outerComponent.sync();
 		ASet<CVMLong> result = root.get();
 		assertTrue(result.contains(CVMLong.ONE));
 		assertTrue(result.contains(CVMLong.create(2)));
@@ -267,14 +274,15 @@ public class LatticeCursorTest {
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
 		// Fork and add A
-		AForkableCursor<ASet<CVMLong>> fork1 = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var fork1Component=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ASet<CVMLong>> fork1=fork1Component.cursor();
 		fork1.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
 
 		// Meanwhile, add B directly to root
 		root.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(2)));
 
 		// Sync fork1 - it should now have BOTH A and B
-		fork1.sync();
+		fork1Component.sync();
 
 		ASet<CVMLong> forkValue = fork1.get();
 		assertTrue(forkValue.contains(CVMLong.ONE), "Fork should have A");
@@ -298,7 +306,9 @@ public class LatticeCursorTest {
 		AHashMap<Keyword, ACell> original = Maps.of(TS, CVMLong.create(100), V, Strings.create("original"));
 		Root<ACell> root = Cursors.root(original);
 
-		AForkableCursor<ACell> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+
+		AForkableCursor<ACell> fork=forkComponent.cursor();
 
 		// Parent advances concurrently to a DIFFERENT value with the SAME
 		// timestamp — e.g. a propagator merge-back re-applying a snapshot.
@@ -310,7 +320,7 @@ public class LatticeCursorTest {
 		AHashMap<Keyword, ACell> edited = Maps.of(TS, CVMLong.create(100), V, Strings.create("edited"));
 		fork.set(edited);
 
-		fork.sync();
+		forkComponent.sync();
 
 		assertSame(edited, root.get(),
 			"the fork's local edit must win a timestamp tie against a concurrent parent advance");
@@ -359,7 +369,8 @@ public class LatticeCursorTest {
 		// multi-threading, no timing assumptions.
 		SetLattice<CVMLong> lattice = SetLattice.create();
 		HookedRootCursor<ASet<CVMLong>> root = new HookedRootCursor<>(lattice, Sets.empty());
-		AForkableCursor<ASet<CVMLong>> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 
 		// Prime the fork with value A
 		CVMLong A = CVMLong.ONE;
@@ -375,7 +386,7 @@ public class LatticeCursorTest {
 		// Sync. Under the buggy code, this would overwrite the fork's local
 		// state with sync's stale snapshot (containing only A), losing B.
 		// Under the fix, the CAS-then-merge path preserves B.
-		fork.sync();
+		forkComponent.sync();
 
 		ASet<CVMLong> localAfter = fork.get();
 		ASet<CVMLong> rootAfter = root.get();
@@ -396,12 +407,14 @@ public class LatticeCursorTest {
 		SetLattice<CVMLong> lattice = SetLattice.create();
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
-		AForkableCursor<ASet<CVMLong>> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+
+		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 		ASet<CVMLong> newValue = Sets.of(CVMLong.ONE);
 		fork.set(newValue);
 
 		// Sync should just adopt our value (fast path)
-		ASet<CVMLong> synced = fork.sync();
+		ASet<CVMLong> synced = forkComponent.sync();
 		assertSame(newValue, synced);
 		assertSame(newValue, root.get());
 	}
@@ -631,7 +644,7 @@ public class LatticeCursorTest {
 		// (not parent.sync), so it deliberately does NOT propagate the sync
 		// signal up to the root's onSync callback. Persistence layers
 		// (covia.venue.Engine) rely on this — they need to call root.sync()
-		// EXPLICITLY after fork.sync() to fire persistence triggers.
+		// EXPLICITLY after forkComponent.sync() to fire persistence triggers.
 		SetLattice<CVMLong> lattice = SetLattice.create();
 		PublishingCursor<ASet<CVMLong>> root = PublishingCursor.create(Sets.empty());
 
@@ -642,17 +655,18 @@ public class LatticeCursorTest {
 		}, lattice::merge);
 
 		// Fork, write to fork, sync the fork
-		AForkableCursor<ASet<CVMLong>> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 		fork.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
-		fork.sync();
+		forkComponent.sync();
 
 		// Fork's sync must NOT have fired the root's onSync callback
 		assertEquals(0, rootSyncCount.get(),
-			"fork.sync() must NOT propagate to root.onSync — see ForkedCursor.sync()");
+			"forkComponent.sync() must NOT propagate to root.onSync — see ForkedCursor.sync()");
 
-		// But the write IS visible at the root after fork.sync()
+		// But the write IS visible at the root after forkComponent.sync()
 		assertTrue(root.get().contains(CVMLong.ONE),
-			"fork.sync() must make writes visible at root via parent.updateAndGet");
+			"forkComponent.sync() must make writes visible at root via parent.updateAndGet");
 
 		// Calling root.sync() explicitly DOES fire the callback
 		root.sync();
@@ -722,13 +736,15 @@ public class LatticeCursorTest {
 
 	@Test
 	public void testForkIsIndependentOfParentUntilSynced() {
-		// CONTRACT: writes to a fork are invisible at the parent until fork.sync().
+		// CONTRACT: writes to a fork are invisible at the parent until forkComponent.sync().
 		// Persistence layers rely on this asymmetry — a fork can accumulate writes
 		// without triggering persistence on every individual write.
 		SetLattice<CVMLong> lattice = SetLattice.create();
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
-		AForkableCursor<ASet<CVMLong>> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+
+		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 
 		// Write to fork
 		fork.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
@@ -738,9 +754,9 @@ public class LatticeCursorTest {
 			"fork writes must be invisible at parent until sync");
 
 		// After sync, parent sees it
-		fork.sync();
+		forkComponent.sync();
 		assertTrue(root.get().contains(CVMLong.ONE),
-			"after fork.sync(), parent sees the write");
+			"after forkComponent.sync(), parent sees the write");
 	}
 
 	@Test
@@ -817,7 +833,8 @@ public class LatticeCursorTest {
 		PathCursor<ASet<CVMLong>> pathA = new PathCursor<>(root, Keywords.FOO);
 
 		// Fork the root for isolated modifications
-		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork = convex.lattice.ComponentTestSupport.fork(root,mapLattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork=forkComponent.cursor();
 
 		// Create a PathCursor on the fork to modify :b
 		PathCursor<ASet<CVMLong>> forkPathB = new PathCursor<>(fork, Keywords.BAR);
@@ -858,7 +875,7 @@ public class LatticeCursorTest {
 		assertTrue(forkB.contains(CVMLong.create(20)), "Fork :b should have 20");
 
 		// === Sync fork back to root ===
-		fork.sync();
+		forkComponent.sync();
 
 		// After sync, root should have merged values:
 		// :a = {1, 2, 3} (1 from initial, 2 from pathA, 3 from fork)
@@ -887,15 +904,18 @@ public class LatticeCursorTest {
 		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(Maps.empty());
 
 		// Level 1 fork - add :a => #{1}
-		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1 = convex.lattice.ComponentTestSupport.fork(root,mapLattice);
+		var fork1Component=convex.lattice.ALatticeComponent.working(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1=fork1Component.cursor();
 		fork1.updateAndGet(map -> map.assoc(Keywords.FOO, Sets.of(CVMLong.ONE)));
 
 		// Level 2 fork (from fork1) - add :b => #{2}
-		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2 = convex.lattice.ComponentTestSupport.fork(fork1,mapLattice);
+		var fork2Component=convex.lattice.ALatticeComponent.working(mapLattice,fork1,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2=fork2Component.cursor();
 		fork2.updateAndGet(map -> map.assoc(Keywords.BAR, Sets.of(CVMLong.create(2))));
 
 		// Level 3 fork (from fork2) - modify :a to add 3
-		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork3 = convex.lattice.ComponentTestSupport.fork(fork2,mapLattice);
+		var fork3Component=convex.lattice.ALatticeComponent.working(mapLattice,fork2,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork3=fork3Component.cursor();
 		PathCursor<ASet<CVMLong>> fork3PathA = new PathCursor<>(fork3, Keywords.FOO);
 		fork3PathA.updateAndGet(set -> (set == null) ? Sets.of(CVMLong.create(3)) : set.include(CVMLong.create(3)));
 
@@ -906,9 +926,9 @@ public class LatticeCursorTest {
 		assertEquals(Maps.empty(), root.get());
 
 		// Sync chain: fork3 -> fork2 -> fork1 -> root
-		fork3.sync();
-		fork2.sync();
-		fork1.sync();
+		fork3Component.sync();
+		fork2Component.sync();
+		fork1Component.sync();
 
 		// Verify all modifications made it to root
 		AHashMap<Keyword, ASet<CVMLong>> finalRoot = root.get();
@@ -943,9 +963,12 @@ public class LatticeCursorTest {
 		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(initial);
 
 		// Create 3 concurrent forks, each modifying :a via path
-		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1 = convex.lattice.ComponentTestSupport.fork(root,mapLattice);
-		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2 = convex.lattice.ComponentTestSupport.fork(root,mapLattice);
-		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork3 = convex.lattice.ComponentTestSupport.fork(root,mapLattice);
+		var fork1Component=convex.lattice.ALatticeComponent.working(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1=fork1Component.cursor();
+		var fork2Component=convex.lattice.ALatticeComponent.working(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2=fork2Component.cursor();
+		var fork3Component=convex.lattice.ALatticeComponent.working(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork3=fork3Component.cursor();
 
 		PathCursor<ASet<CVMLong>> path1 = new PathCursor<>(fork1, Keywords.FOO);
 		PathCursor<ASet<CVMLong>> path2 = new PathCursor<>(fork2, Keywords.FOO);
@@ -957,9 +980,9 @@ public class LatticeCursorTest {
 		path3.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(3)).include(CVMLong.create(4)));
 
 		// Sync all forks in arbitrary order
-		fork2.sync();
-		fork1.sync();
-		fork3.sync();
+		fork2Component.sync();
+		fork1Component.sync();
+		fork3Component.sync();
 
 		// All values should be merged: {1, 2, 3, 4}
 		ASet<CVMLong> result = (ASet<CVMLong>) root.get().get(Keywords.FOO);
@@ -986,7 +1009,8 @@ public class LatticeCursorTest {
 		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(initial);
 
 		// Fork and modify :a
-		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1 = convex.lattice.ComponentTestSupport.fork(root,mapLattice);
+		var fork1Component=convex.lattice.ALatticeComponent.working(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1=fork1Component.cursor();
 		PathCursor<ASet<CVMLong>> fork1PathA = new PathCursor<>(fork1, Keywords.FOO);
 		fork1PathA.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(1)));
 
@@ -995,10 +1019,11 @@ public class LatticeCursorTest {
 		rootPathB.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(10)));
 
 		// Sync fork1
-		fork1.sync();
+		fork1Component.sync();
 
 		// Create another fork and modify :a again
-		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2 = convex.lattice.ComponentTestSupport.fork(root,mapLattice);
+		var fork2Component=convex.lattice.ALatticeComponent.working(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2=fork2Component.cursor();
 		PathCursor<ASet<CVMLong>> fork2PathA = new PathCursor<>(fork2, Keywords.FOO);
 		fork2PathA.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(2)));
 
@@ -1006,7 +1031,7 @@ public class LatticeCursorTest {
 		rootPathB.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(20)));
 
 		// Sync fork2
-		fork2.sync();
+		fork2Component.sync();
 
 		// Final state should have:
 		// :a = {1, 2}
@@ -1042,8 +1067,10 @@ public class LatticeCursorTest {
 		// Descend to :foo and :bar via path(), fork each
 		AForkableCursor<AInteger> fooCursor = root.path(Keywords.FOO);
 		AForkableCursor<AInteger> barCursor = root.path(Keywords.BAR);
-		AForkableCursor<AInteger> fooFork = convex.lattice.ComponentTestSupport.fork(fooCursor,MaxLattice.INSTANCE);
-		AForkableCursor<AInteger> barFork = convex.lattice.ComponentTestSupport.fork(barCursor,MaxLattice.INSTANCE);
+		var fooForkComponent=convex.lattice.ALatticeComponent.working(MaxLattice.INSTANCE,fooCursor,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AInteger> fooFork=fooForkComponent.cursor();
+		var barForkComponent=convex.lattice.ALatticeComponent.working(MaxLattice.INSTANCE,barCursor,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AInteger> barFork=barForkComponent.cursor();
 
 		// Modify each fork independently
 		fooFork.set(CVMLong.create(5));
@@ -1053,8 +1080,8 @@ public class LatticeCursorTest {
 		root.updateAndGet(m -> m.assoc(Keywords.BAZ, CVMLong.create(200)));
 
 		// Sync both forks
-		fooFork.sync();
-		barFork.sync();
+		fooForkComponent.sync();
+		barForkComponent.sync();
 
 		// All three keys should reflect their respective updates
 		AHashMap<Keyword, AInteger> result = root.get();
@@ -1098,7 +1125,8 @@ public class LatticeCursorTest {
 		AForkableCursor<AHashMap<Keyword, AInteger>> bazCursor = root.path(Keywords.BAZ);
 
 		// Fork and modify :foo within the inner map
-		AForkableCursor<AHashMap<Keyword, AInteger>> fork = convex.lattice.ComponentTestSupport.fork(bazCursor,innerLattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(innerLattice,bazCursor,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AHashMap<Keyword, AInteger>> fork=forkComponent.cursor();
 		fork.updateAndGet(m -> m.assoc(Keywords.FOO, CVMLong.create(99)));
 
 		// Meanwhile, modify :bar in the inner map via a separate path
@@ -1106,7 +1134,7 @@ public class LatticeCursorTest {
 		barCursor.set(CVMLong.create(77));
 
 		// Sync the fork — lattice merge should combine both changes
-		fork.sync();
+		forkComponent.sync();
 
 		// Both :foo and :bar should reflect their updates
 		AHashMap<Keyword, AInteger> result = (AHashMap<Keyword, AInteger>) root.get().get(Keywords.BAZ);

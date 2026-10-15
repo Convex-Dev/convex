@@ -439,6 +439,7 @@ public class SharedApplicationsTest {
 			assertSigned(f,FILES_KEY.getAccountKey(),f.files.drives(FILES_KEY.getAccountKey()).cursor().get(),
 				Keywords.FS,FILES_KEY.getAccountKey());
 			f.files.sync();
+			f.node.getRootComponent().sync();
 			assertEquals(f.node.getCursor().get(),f.store.getRootData());
 		}
 	}
@@ -604,6 +605,7 @@ public class SharedApplicationsTest {
 			assertSame(hostContext,f.node.getMergeContext());
 			assertNull(hostContext.getSigningKey());
 			f.files.sync();
+			f.node.getRootComponent().sync();
 			assertEquals(f.node.getCursor().get(),f.store.getRootData());
 		}
 	}
@@ -653,6 +655,7 @@ public class SharedApplicationsTest {
 			filesListener.launch();
 			Data data=populate(f);
 			f.social.sync();
+			f.node.getRootComponent().sync();
 			var socialView=awaitView(f.socialGroup,v -> v.get(Social.KEY_SOCIAL)!=null);
 			var filesView=awaitView(f.filesGroup,v -> v.get(Keywords.FS)!=null);
 			assertNull(socialView.get(Keywords.FS));
@@ -693,6 +696,7 @@ public class SharedApplicationsTest {
 					.setIdentity(Strings.create("files still running"),Vectors.empty(),200);
 				Files.writeString(data.drive().fileSystem().getPath("/later.txt"),"Still available");
 				f.files.sync();
+				f.node.getRootComponent().sync();
 				var expected=project(f.node.getCursor().get(),Keywords.FS);
 				awaitView(f.filesGroup,expected::equals);
 				remote.pull(receiver,filesPeer).get(10,TimeUnit.SECONDS);

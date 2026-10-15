@@ -71,6 +71,8 @@ public class RootComponentTest {
 		ABlob blob=Blobs.createRandom(new Random(5678),5000);
 		root.cursor().updateAndGet(values->values.include(blob));
 
+		root.cursor().sync();
+		assertNull(store.getRootData(),"Syncing storage must not invoke host publication");
 		root.sync();
 
 		assertEquals(root.cursor().get(),store.getRootData());

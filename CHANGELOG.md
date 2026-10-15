@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Component publication now belongs to the component: `sync()` updates only its supplied destination cursor and returns the published snapshot. Lightweight views do not publish enclosing state, and working/host cursors no longer invoke component callbacks. NodeServer callers publish through `getRootComponent().sync()`. DLFS applications require explicit host assembly; service wiring supplies any completion/publication callback.
 - Ordinary cursors no longer retain creation-time values or publication locks. Host publication uses `PublishingCursor`; `Root.view()`, cursor `detach()`/`merge()` and `getForkPoint()` are removed. Domain forks own their publication policy directly, so changing a fork's context also changes its publication context. `StampingLattice` is removed; components supply stamping functions to `StampedCursor`.
 
 - Removed lattice capability interfaces and cursor shapes. Cursors require existing containers and expose actual null values; components construct missing state atomically through explicit update functions or read/write views.

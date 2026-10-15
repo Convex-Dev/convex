@@ -140,7 +140,8 @@ public class ALatticeApplicationTest {
 		Index<Keyword,ACell> retained=LATTICE.zero()
 			.assoc(ITEMS,Sets.of(2)).assoc(UNKNOWN,CVMLong.ONE);
 		store.setRootData(retained);
-		Application<Index<Keyword,ACell>> app=new Application<>(RootComponent.open(LATTICE,store));
+		var host=RootComponent.open(LATTICE,store);
+		Application<Index<Keyword,ACell>> app=new Application<>(host);
 		assertSame(LATTICE,app.getLattice());
 		assertEquals(retained,app.cursor().get());
 
@@ -154,6 +155,8 @@ public class ALatticeApplicationTest {
 		assertEquals(retained,store.getRootData(),"Merge must not publish the store root");
 
 		app.sync();
+		assertEquals(retained,store.getRootData(),"Application sync stops before host persistence");
+		host.sync();
 		assertEquals(merged,store.getRootData());
 		Application<Index<Keyword,ACell>> reopened=new Application<>(RootComponent.open(LATTICE,store));
 		assertEquals(merged,reopened.cursor().get());
@@ -180,6 +183,8 @@ public class ALatticeApplicationTest {
 		assertEquals(initial.assoc(ITEMS,Sets.of(1,2)),host.cursor().get());
 		assertEquals(0,publications.get());
 		second.sync();
+		assertEquals(0,publications.get());
+		host.sync();
 		assertEquals(1,publications.get());
 	}
 
@@ -236,8 +241,8 @@ public class ALatticeApplicationTest {
 		var app=new Application<>(host);
 		app.setContext(LatticeContext.create(null,alice));
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(1))));
-		var fork=ALatticeComponent.working(lattice,app.cursor(),app.getContext()).cursor();
-		fork.updateAndGet(own -> lattice.merge(app.getContext(),own,lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(2)))));
+		var fork=ALatticeComponent.working(lattice,app.cursor(),app.getContext());
+		fork.cursor().updateAndGet(own -> lattice.merge(app.getContext(),own,lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(2)))));
 		assertEquals(Sets.of(1),host.cursor().get().get(alice.getAccountKey()).getValue());
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(3))));
 		fork.sync();
@@ -275,7 +280,8 @@ public class ALatticeApplicationTest {
 			new Items(second).add(CVMLong.TWO);
 			return value;
 		});
-		assertSame(published,first.cursor().sync());
+		assertSame(published,first.sync());
+		assertSame(published,host.sync());
 		assertSame(LatticeContext.EMPTY,mergeContext.get());
 		assertEquals(Sets.of(1,2),new Items(first).cursor().get());
 	}

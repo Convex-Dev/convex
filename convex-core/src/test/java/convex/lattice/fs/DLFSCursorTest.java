@@ -125,7 +125,7 @@ public class DLFSCursorTest {
 	}
 
 	@Test
-	public void testSyncReachesRootCallback() throws Exception {
+	public void testLiveViewSyncDoesNotPublishHost() throws Exception {
 		// Simulates what NodeServer does: root cursor with onSync callback
 		MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattice.INSTANCE);
 		PublishingCursor<AHashMap<AString, AVector<ACell>>> root =
@@ -145,6 +145,8 @@ public class DLFSCursorTest {
 
 		// Sync from the drive level
 		dlfs.sync();
+		assertNull(synced.get(),"A live filesystem view must not publish its containing root");
+		root.sync();
 
 		// After sync: callback should have the full root value including file content
 		assertNotNull(synced.get(), "onSync should fire after sync()");

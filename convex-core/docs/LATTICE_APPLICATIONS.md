@@ -92,8 +92,7 @@ Verify enclosing signed envelopes before routing values extracted from them.
 Delivery is not a transaction across applications. If a later application fails,
 earlier merges remain; callers may retry lattice delivery. The returned root may
 still be unchanged until application sync. An explicitly empty list ignores all
-incoming state. For compatibility, an unconfigured root has a generic live relay
-application that preserves immediate root merging.
+incoming state. An unconfigured root merges directly with its supplied lattice.
 
 If an application publishes during configured host persistence, the newer
 application result remains pending in the root. The host does not re-merge the
@@ -119,9 +118,15 @@ host.sync();    // host persistence and propagation
 ```
 
 Lightweight children share paths in their enclosing working cursor. They need no
-fork for ordinary atomic updates. Context defaults are resolved when an independent
-working boundary is constructed; subsequent overrides on that cursor reach its
-live descendants, without changing the host or other independent boundaries.
+fork for ordinary atomic updates, and their sync is a no-op. Each component resolves
+its context at construction; existing children retain that configuration when an
+enclosing component changes its policy.
+
+An independent component knows only its working storage, destination cursor,
+baseline and own lattice/policy. The destination can be any `ACursor` supplied by
+the parent, including a projection inside a custom application tree. No parent
+component, root host or global path is required. Publication updates that cursor
+and stops; the provider of the cursor controls publication above that point.
 
 Publication captures one working snapshot. If the destination still equals the
 last publication baseline, it installs the snapshot directly. Otherwise it merges
@@ -152,16 +157,19 @@ destination becomes baseline. This avoids signing again when only an unrelated
 branch changed. The same snapshot merge reconciles concurrent local edits back
 into working state after publication; such edits remain pending for the next sync.
 Preparation, including signing, always occurs outside retryable atomic callbacks.
-Only sync is specialised on the private working root; ordinary updates retain
-their usual atomic implementation and acquire no publication lock.
+Publication belongs to the component, not its working cursor. Working roots have
+no component callbacks or back pointers. Ordinary updates retain their usual
+atomic implementation and acquire no publication lock. Component `sync()` returns
+the snapshot it published; concurrent edits may remain pending in working state.
 
 The explicit `ALatticeApplication(lattice, cursor)` constructor uses the supplied
-working storage and sync boundary. Pass `host.cursor()` for immediate shared visibility, or a
+working storage. Pass `host.cursor()` for immediate shared visibility, or a
 transaction draft when rebinding. Existing `P2PApplication` and `DLFSApplication`
 adapters retain this live behaviour. In particular, a NodeServer adapter is constructed
 before node launch restores the retained root; taking its working snapshot at that
 point would be premature. Construct independent working applications after host
-restoration. Host merges never borrow application signers.
+restoration. A live application's sync runs preparation but does not publish the
+host: call `host.sync()` explicitly. Host merges never borrow application signers.
 
 These policies are not an access-control boundary between code sharing a process.
 Verification remains bound to the lattice instances, configured before use.
@@ -397,7 +405,7 @@ public abstract class ALatticeApplication<V extends ACell>
     public final void close();
 
     public final <T extends ACell> LatticeSubscription<T> subscribe(ACell... path);
-    public final void sync();
+    public V sync();
     public final CompletionStage<Void> pull();
 
     protected abstract void onLaunch();
@@ -797,7 +805,8 @@ same private state, and the final value is installed atomically through the live
 cursor's signing and stamping boundaries. An exception discards the staged state.
 Nested transactions on that view remain part of the outer transaction. Views and
 descendants must not escape the callback; state access after completion or from
-another thread is rejected. `sync()` on a transaction view is rejected as well.
+another thread is rejected. Raw cursor `sync()` on a transaction draft is rejected;
+a lightweight component's `sync()` has no publication work and leaves the draft local.
 
 Callbacks may repeat and must restrict their mutations to the supplied view.
 External effects belong after synchronous completion or in a future continuation.
@@ -860,8 +869,8 @@ callback stops. Publication and durability remain explicit operations.
 
 ## Fork and sync
 
-A fork is an independent working copy; `sync()` merges it back through its cursor
-parent with lattice semantics. Concurrent state is merged rather than treated as
+A component fork is an independent working copy; `sync()` merges it into the supplied
+destination cursor with lattice semantics. Concurrent state is merged rather than treated as
 a transaction conflict; verification, signing or storage can still fail. This is
 separate from publication and durability:
 
@@ -881,7 +890,8 @@ Domain components expose `fork()` with their exact type when batching is a use c
 | Operation | Meaning | Moves a cursor? |
 |---|---|---|
 | `host.persist()` | Write the current root's reachable cells to the host store; return the store-backed value | No |
-| `component.sync()` | Merge through the cursor parent; at the root, run publication policy | Yes, where merge selects a value |
+| `component.sync()` | Publish into its destination; a lightweight view has no publication work | Yes, for an independent working boundary |
+| `host.sync()` | Run host persistence/replication policy on one snapshot | May install persisted references; concurrent edits remain pending |
 | `host.flush()` | The store's physical durability barrier | No |
 
 Incremental writers with their own store, such as DLFS drives, checkpoint at
@@ -905,8 +915,8 @@ Persistence lives in two places and nowhere else:
   without a store keeps file data on the heap until the root is published.
 
 Cursors have no persistence API. A cursor is a reference to an immutable value with
-atomic updates and navigation; storage, durability and publication are host concerns
-attached at the root through its sync callback. With incremental checkpoints, a
+atomic updates and navigation. Components own publication; the host additionally
+owns its persistence and durability policy. With incremental checkpoints, a
 transaction rollback or an abandoned fork may leave immutable cells in the store;
 they are unreferenced and reclaimable, never a logical state change. Forking below
 an owner's signing boundary still defers that signature until merge-back, so a DLFS

@@ -193,17 +193,23 @@ dependency on `NodeServer`.
 
 ```java
 // Local: restore or create the standard :fs region in any AStore
-var app = DLFSApplication.open(store, myKeyPair);
+var root = RootComponent.open(Lattice.ROOT, store);
+root.setContext(LatticeContext.create(null, myKeyPair));
+var app = DLFSApplication.connect(root, Keywords.FS);
 DLFSDrives myDrives = app.drives(myKeyPair.getAccountKey());
 DLFSDrive drive = myDrives.getOrCreateDrive("home");
 if (drive == null) throw new IllegalStateException("Cannot open home drive");
 FileSystem home = drive.fileSystem();
 Files.writeString(home.getPath("/hello.txt"), "Hello");
-app.sync();  // select and persist the current lattice root
+app.sync();   // complete this application's preparation/publication
+root.sync();  // persist and publish the host root
 store.flush(); // separate physical durability barrier
 
 // Optional HTTP access uses a manager for identity routing
-DLFSServer server = DLFSServer.create(new DLFSDriveManager(myDrives));
+DLFSServer server = DLFSServer.create(new DLFSDriveManager(myDrives, () -> {
+    app.sync();
+    root.sync();
+}));
 server.start(0);
 ```
 
@@ -239,23 +245,42 @@ transport.launch();
 DLFSApplication networkedApp = DLFSApplication.connect(
     node.getRootComponent(), Keyword.intern("documents"));
 DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
-DLFSDriveManager routes = DLFSDriveManager.createRouter()
+DLFSDriveManager routes = DLFSDriveManager.createRouter(() -> {
+    networkedApp.sync();
+    node.getRootComponent().sync();
+})
     .mountAnonymous(ownerDrives)
     .mount(DID.forKey(myKeyPair.getAccountKey()).toString(), ownerDrives);
 if (ownerDrives.getOrCreateDrive("home") == null) {
     throw new IllegalStateException("Cannot open home drive");
 }
 networkedApp.sync();
+node.getRootComponent().sync();
 
 DLFSServer networkedServer = DLFSServer.createWithAudience(routes, myKeyPair);
 networkedServer.start(0);
 ```
 
-The component hierarchy is `RootComponent` → `DLFSApplication` → `DLFSRegion`
+The standard assembly is `RootComponent` → `DLFSApplication` → `DLFSRegion`
 → `DLFSDrives` → `DLFSDrive`. The application is not owner-scoped: it can obtain
 components for multiple owners. Local identity-to-owner and cross-region mappings
 remain `DLFSDriveManager` routing policy; the HTTP server owns no lattice or store
 lifecycle.
+
+A custom application can embed `DLFSRegion` anywhere its lattice declares a DLFS
+subtree, without a `DLFSApplication` adapter. For example, inside an application
+whose lattice defines `:projects → project name → :documents`:
+
+```java
+DLFSRegion files = DLFSRegion.connect(app.cursor(), app.getLattice(), store,
+    Keyword.intern("projects"), Strings.create("example"), Keyword.intern("documents"));
+files.setContext(app.getContext());
+```
+
+This is a lightweight view of the application's working state. Use `files.fork()`
+when the subsystem needs its own publication boundary: syncing that fork updates
+only the application's subtree. The application and root publish separately.
+Pass `null` for the store when incremental blob checkpointing is unnecessary.
 
 The application does not own or close its root or store. Owner components are cheap
 views and are not retained globally; long-lived services keep the `DLFSDrives`

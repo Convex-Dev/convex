@@ -161,9 +161,9 @@ public class LatticeDemo {
 				}
 
 				// Update node 1's lattice with the new data and sync.
-				// cursor.sync() announces the value and triggers broadcast to all peers.
+				// root component sync announces the value and triggers broadcast to all peers.
 				node1.getCursor().assoc(dataKeyword, dataIndex);
-				node1.getCursor().sync();
+				node1.getRootComponent().sync();
 
 				if ((merge + 1) % 10 == 0) {
 					System.out.println("Completed " + (merge + 1) + " merges (" + ((merge + 1) * MODS) + " total modifications)");

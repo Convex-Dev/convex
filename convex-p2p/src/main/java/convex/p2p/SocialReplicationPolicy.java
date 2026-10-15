@@ -156,7 +156,7 @@ final class SocialReplicationPolicy {
 		}
 		// Ingress may be a replay which does not otherwise change its target cursor.
 		// Publish the authenticated cache edit explicitly in that case as well.
-		if (changed) server.getCursor().sync();
+		if (changed) server.getRootComponent().sync();
 	}
 
 	private boolean hasCachedFollowKey(AString target,AccountKey signer) {

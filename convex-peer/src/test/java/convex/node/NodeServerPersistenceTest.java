@@ -216,7 +216,7 @@ public class NodeServerPersistenceTest {
 		ACell expected=primary.getCursor().get();
 		CompletableFuture<ACell> announced=nextAnnouncement(
 			propagationGroup(primary),expected,16);
-		primary.getCursor().sync();
+		primary.getRootComponent().sync();
 		announced.get(5,TimeUnit.SECONDS);
 
 		pullBackupFromPrimary();
@@ -501,7 +501,7 @@ public class NodeServerPersistenceTest {
 	}
 
 	/**
-	 * Test that cursor.sync() triggers propagator persist (without relying on close).
+	 * Test that root component sync triggers propagator persist (without relying on close).
 	 * This is the pattern the venue uses: write → sync → propagator persists.
 	 */
 	@Test
@@ -513,7 +513,7 @@ public class NodeServerPersistenceTest {
 
 		// Sync cursor — synchronous publication on the primary completes announce
 		// + setRootData on this thread before returning.
-		primary.getCursor().sync();
+		primary.getRootComponent().sync();
 
 		// Store should have the data without needing close()
 		ACell rootData = primaryStore.getRootData();
@@ -535,7 +535,7 @@ public class NodeServerPersistenceTest {
 		primary.launch();
 
 		writeDataValue(primary, 77);
-		primary.getCursor().sync();
+		primary.getRootComponent().sync();
 
 		// Verify persisted
 		ACell rootData = primaryStore.getRootData();
@@ -566,14 +566,14 @@ public class NodeServerPersistenceTest {
 		primary.launch();
 		writeNonEmbeddedRoot(primary);
 
-		ACell first = primary.getCursor().sync();
+		ACell first = primary.getRootComponent().sync();
 		assertSame(first, primary.getCursor().get(),
 			"root cursor should install the value returned by synchronous persistence");
 		assertSame(first, primaryStore.getRootData(),
 			"cursor and store should expose the same canonical root object");
 		assertStoreBackedRoot(first);
 
-		ACell second = primary.getCursor().sync();
+		ACell second = primary.getRootComponent().sync();
 		assertSame(first, second, "an unchanged sync should reuse the canonical root identity");
 		assertSame(first, primary.getCursor().get());
 		assertSame(first, primaryStore.getRootData());
@@ -611,7 +611,7 @@ public class NodeServerPersistenceTest {
 		AtomicReference<Throwable> failure = new AtomicReference<>();
 		Thread syncThread = new Thread(() -> {
 			try {
-				primary.getCursor().sync();
+				primary.getRootComponent().sync();
 			} catch (Throwable e) {
 				failure.set(e);
 			}
@@ -629,7 +629,7 @@ public class NodeServerPersistenceTest {
 		assertEquals(CVMLong.create(999), readDataValue(primary, 999),
 			"concurrent write must survive the raced sync");
 
-		ACell converged = primary.getCursor().sync();
+		ACell converged = primary.getRootComponent().sync();
 		assertSame(converged, primary.getCursor().get());
 		assertSame(converged, primaryStore.getRootData(),
 			"quiescent sync should converge cursor and store root identities");
@@ -638,7 +638,7 @@ public class NodeServerPersistenceTest {
 
 	/**
 	 * Synchronous publication must surface store errors to the caller. If
-	 * setRootData throws, cursor.sync() must throw rather than falsely confirming
+	 * setRootData throws, root component sync must throw rather than falsely confirming
 	 * root publication.
 	 */
 	@Test
@@ -652,7 +652,7 @@ public class NodeServerPersistenceTest {
 
 		// sync() must propagate, not swallow
 		StoreException ex = assertThrows(StoreException.class,
-			() -> primary.getCursor().sync(),
+			() -> primary.getRootComponent().sync(),
 			"sync() must throw when setRootData fails");
 		assertTrue(ex.getCause() instanceof IOException,
 			"Cause must be the original IOException, was: " + ex.getCause());
@@ -678,7 +678,7 @@ public class NodeServerPersistenceTest {
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
 		writeDataValue(primary,102);
-		primary.getCursor().sync();
+		primary.getRootComponent().sync();
 
 		assertTrue(primary.checkpoint());
 		assertFalse(primary.checkpoint(),"a clean store must not be flushed again");
@@ -690,7 +690,7 @@ public class NodeServerPersistenceTest {
 		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary,103);
-		primary.getCursor().sync();
+		primary.getRootComponent().sync();
 		AtomicInteger attempts=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(()->{
 			if (attempts.incrementAndGet()==1) throw new IOException("simulated checkpoint failure");
@@ -717,7 +717,7 @@ public class NodeServerPersistenceTest {
 			checkpointed.countDown();
 		});
 		writeDataValue(primary,104);
-		primary.getCursor().sync();
+		primary.getRootComponent().sync();
 
 		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint signal not received");
 		assertEquals(1,flushes.get());
@@ -737,7 +737,7 @@ public class NodeServerPersistenceTest {
 		});
 		sharedPrimaryStore.setFlushCompleteHook(checkpointed::countDown);
 		writeDataValue(primary,107);
-		primary.getCursor().sync();
+		primary.getRootComponent().sync();
 
 		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint retry not received");
 		assertEquals(2,attempts.get());
@@ -755,7 +755,7 @@ public class NodeServerPersistenceTest {
 		CountDownLatch checkpointed=new CountDownLatch(1);
 		sharedPrimaryStore.setFlushCompleteHook(checkpointed::countDown);
 		writeDataValue(primary,108);
-		primary.getCursor().sync();
+		primary.getRootComponent().sync();
 
 		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"custom primary was not checkpointed");
 	}
@@ -799,7 +799,7 @@ public class NodeServerPersistenceTest {
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
 		writeDataValue(primary,100);
 
-		ACell synced=primary.getCursor().sync();
+		ACell synced=primary.getRootComponent().sync();
 
 		assertEquals(0,flushes.get(),"sync must not force a physical durability barrier");
 		assertSame(synced,primaryStore.getRootData(),"sync must publish the root to the primary store");
@@ -814,7 +814,7 @@ public class NodeServerPersistenceTest {
 			throw new IOException("simulated flush failure");
 		});
 
-		ACell synced=primary.getCursor().sync();
+		ACell synced=primary.getRootComponent().sync();
 
 		assertSame(synced,primaryStore.getRootData(),"sync must still publish with a failing flush hook");
 		assertTrue(primary.isRunning());
@@ -868,7 +868,7 @@ public class NodeServerPersistenceTest {
 			});
 			b.start();
 			ready.countDown();
-			primary.getCursor().sync();
+			primary.getRootComponent().sync();
 			b.join();
 
 			// B's write must survive the CAS-or-merge fallback inside sync()

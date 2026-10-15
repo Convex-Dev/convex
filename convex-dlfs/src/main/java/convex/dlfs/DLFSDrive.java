@@ -91,6 +91,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 
 		@Override public convex.lattice.LatticeContext getContext() { return drive.getContext(); }
 		@Override public void setContext(convex.lattice.LatticeContext context) { drive.setContext(context); }
+		@Override public void sync() { drive.sync(); }
 
 		@Override
 		public DLFSLocal fork() {

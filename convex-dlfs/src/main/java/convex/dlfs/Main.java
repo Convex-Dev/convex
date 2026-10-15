@@ -103,7 +103,10 @@ public final class Main {
 			store.close();
 			throw new IllegalStateException("Could not open or create drive: "+driveName);
 		}
-		DLFSDriveManager drives=DLFSDriveManager.createRouter();
+		DLFSDriveManager drives=DLFSDriveManager.createRouter(()->{
+			application.sync();
+			node.getRootComponent().sync();
+		});
 		for (DLFSConfig.DriveMount mount:config.getDriveMounts()) {
 			var owner=(mount.owner()==null)?keyPair.getAccountKey():mount.owner();
 			DLFSDrives ownerDrives=application.drives(owner);
@@ -118,7 +121,7 @@ public final class Main {
 			}
 		}
 		try {
-			application.sync();
+			drives.sync();
 		} catch (RuntimeException e) {
 			closeNode(transport,node);
 			store.close();
@@ -158,7 +161,7 @@ public final class Main {
 			if (!closing.compareAndSet(false,true)) return;
 			server.close();
 			try {
-				application.sync();
+				drives.sync();
 			} catch (Exception e) {
 				System.err.println("Failed to publish DLFS state: "+e.getMessage());
 			}

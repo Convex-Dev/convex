@@ -55,6 +55,44 @@ import convex.node.NodeServer;
 public class DLFSComponentTest {
 
 	@Test
+	public void testEmbeddedSubsystemPublishesOneBoundaryAtATime() throws Exception {
+		var project=Strings.create("example");
+		var projects=Keyword.intern("projects");
+		var workspace=KeyedLattice.create(KEY_DOCUMENTS,DLFSRegion.LATTICE);
+		var lattice=KeyedLattice.create(projects,convex.lattice.generic.MapLattice.create(workspace));
+		var store=new MemoryStore();
+		var root=RootComponent.create(lattice,store);
+		var app=new convex.lattice.ALatticeApplication<Index<Keyword,ACell>>(root) {};
+		var key=AKeyPair.generate();
+		var attached=DLFSRegion.connect(app.cursor(),lattice,null,projects,project,KEY_DOCUMENTS);
+		var destination=attached.cursor();
+		attached.setContext(LatticeContext.create(CVMLong.create(123),key));
+		var files=attached.fork();
+		var liveDrive=files.drives(key.getAccountKey()).getOrCreateDrive("home");
+		var draft=liveDrive.fork();
+		Files.writeString(draft.fileSystem().getPath("/draft.txt"),"embedded subsystem");
+		assertFalse(Files.exists(liveDrive.fileSystem().getPath("/draft.txt")));
+		draft.fileSystem().sync();
+		assertEquals("embedded subsystem",Files.readString(liveDrive.fileSystem().getPath("/draft.txt")));
+		assertEquals(lattice.zero(),app.cursor().get());
+		liveDrive.sync();
+		files.cursor().sync();
+		assertEquals(lattice.zero(),app.cursor().get(),"child and cursor sync cannot publish their enclosing component");
+		files.sync();
+		assertNotNull(destination.get());
+		assertEquals(lattice.zero(),root.cursor().get());
+		app.sync();
+		assertEquals(app.cursor().get(),root.cursor().get());
+		org.junit.jupiter.api.Assertions.assertNull(store.getRootData());
+		root.sync();
+		assertEquals(root.cursor().get(),store.getRootData());
+		var restored=DLFSRegion.connect(root.cursor(),lattice,store,projects,project,KEY_DOCUMENTS);
+		restored.setContext(files.getContext());
+		assertEquals("embedded subsystem",Files.readString(restored.drives(key.getAccountKey())
+			.drive("home").fileSystem().getPath("/draft.txt")));
+	}
+
+	@Test
 	public void testFilesystemAdapterUsesExplicitComponentClock() throws Exception {
 		var drives=convex.dlfs.DLFSDrives.wrap(Cursors.root(convex.dlfs.DLFSDrives.LATTICE.zero()));
 		try (var drive=drives.createDrive("clock")) {
@@ -74,7 +112,9 @@ public class DLFSComponentTest {
 	@Test
 	public void testSeparateOwnerViewsRecogniseTheSameDrive() throws Exception {
 		var key=AKeyPair.generate();
-		var app=DLFSApplication.open(new MemoryStore(),key);
+		var host=RootComponent.open(convex.lattice.Lattice.ROOT,new MemoryStore());
+		host.setContext(LatticeContext.create(null,key));
+		var app=DLFSApplication.connect(host,Keywords.FS);
 		var first=app.drives(key.getAccountKey()).getOrCreateDrive("home");
 		var second=app.drives(key.getAccountKey()).getOrCreateDrive("home");
 		assertNotSame(first,second);
@@ -99,7 +139,10 @@ public class DLFSComponentTest {
 			DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(
 				node.getRootComponent(),Keywords.FS);
 			DLFSDriveManager drives=new DLFSDriveManager(
-				application.drives(keyPair.getAccountKey()));
+				application.drives(keyPair.getAccountKey()),()->{
+					application.sync();
+					node.getRootComponent().sync();
+				});
 			assertTrue(drives.createDrive(null,"home"));
 			Files.writeString(drives.getDrive(null,"home").getPath("/hello.txt"),"hello");
 			application.sync();
@@ -112,6 +155,12 @@ public class DLFSComponentTest {
 					request,HttpResponse.BodyHandlers.ofString());
 				assertEquals(200,response.statusCode());
 				assertEquals("hello",response.body());
+				var update=HttpRequest.newBuilder(request.uri())
+					.PUT(HttpRequest.BodyPublishers.ofString("published by service policy")).build();
+				var updated=HttpClient.newHttpClient().send(update,HttpResponse.BodyHandlers.ofString());
+				assertTrue(updated.statusCode()>=200 && updated.statusCode()<300,updated.body());
+				assertEquals(node.getLocalValue(),store.getRootData(),"HTTP completion must run the configured host publication");
+				assertEquals("published by service policy",Files.readString(drives.getDrive(null,"home").getPath("/hello.txt")));
 			}
 		}
 	}
@@ -142,6 +191,7 @@ public class DLFSComponentTest {
 
 			Files.writeString(drive.fileSystem().getPath("/hello.txt"),"component path");
 			application.sync();
+			server.getRootComponent().sync();
 
 			assertEquals("component path",Files.readString(drive.fileSystem().getPath("/hello.txt")));
 			assertNotNull(server.getCursor().get().get(KEY_DOCUMENTS));
@@ -157,8 +207,10 @@ public class DLFSComponentTest {
 		EtchStore store=EtchStore.createTemp("dlfs-application");
 		File storeFile=store.getFile();
 		try (store) {
+			var host=RootComponent.open(convex.lattice.Lattice.ROOT,store);
+			host.setContext(LatticeContext.create(null,keyPair));
 			DLFSApplication<Index<Keyword,ACell>> application=
-				DLFSApplication.open(store,keyPair);
+				DLFSApplication.connect(host,Keywords.FS);
 			DLFSDriveManager driveManager=new DLFSDriveManager(
 				application.drives(keyPair.getAccountKey()));
 			assertNotNull(application.dlfs());
@@ -167,13 +219,16 @@ public class DLFSComponentTest {
 				.getPath("/hello.txt"),"local application");
 
 			application.sync();
+			host.sync();
 			store.flush();
 			assertEquals(application.cursor().get(),store.getRootData());
 		}
 
 		try (EtchStore reopened=EtchStore.create(storeFile)) {
+			var host=RootComponent.open(convex.lattice.Lattice.ROOT,reopened);
+			host.setContext(LatticeContext.create(null,keyPair));
 			DLFSApplication<Index<Keyword,ACell>> application=
-				DLFSApplication.open(reopened,keyPair);
+				DLFSApplication.connect(host,Keywords.FS);
 			DLFSDriveManager driveManager=new DLFSDriveManager(
 				application.drives(keyPair.getAccountKey()));
 			assertEquals(java.util.List.of("home"),driveManager.listDrives(null));
@@ -187,8 +242,10 @@ public class DLFSComponentTest {
 		AKeyPair hostKey=AKeyPair.generate();
 		AccountKey otherOwner=AKeyPair.generate().getAccountKey();
 		try (EtchStore store=EtchStore.createTemp("dlfs-multi-owner-application")) {
+			var host=RootComponent.open(convex.lattice.Lattice.ROOT,store);
+			host.setContext(LatticeContext.create(null,hostKey));
 			DLFSApplication<Index<Keyword,ACell>> application=
-				DLFSApplication.open(store,hostKey);
+				DLFSApplication.connect(host,Keywords.FS);
 			Index<Keyword,ACell> before=application.cursor().get();
 
 			assertNotSame(application.drives(hostKey.getAccountKey()),
@@ -214,6 +271,7 @@ public class DLFSComponentTest {
 		assertNotNull(application.drives(keyPair.getAccountKey()).createDrive("live"));
 		assertNotNull(application.archive.drives(keyPair.getAccountKey()).createDrive("history"));
 		application.sync();
+		root.sync();
 
 		Index<Keyword,ACell> stored=store.getRootData();
 		assertNotNull(stored.get(KEY_DOCUMENTS));

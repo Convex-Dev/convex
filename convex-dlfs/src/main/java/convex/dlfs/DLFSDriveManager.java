@@ -35,9 +35,15 @@ public class DLFSDriveManager {
 	private final ConcurrentHashMap<String, FileSystem> drives = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<Object,DLFSDrives> componentRoutes=new ConcurrentHashMap<>();
 	private final boolean ephemeralFallback;
+	private final Runnable afterSync;
 
 	private DLFSDriveManager(boolean ephemeralFallback) {
+		this(ephemeralFallback,() -> {});
+	}
+
+	private DLFSDriveManager(boolean ephemeralFallback,Runnable afterSync) {
 		this.ephemeralFallback=ephemeralFallback;
+		this.afterSync=java.util.Objects.requireNonNull(afterSync);
 	}
 
 	/**
@@ -48,6 +54,15 @@ public class DLFSDriveManager {
 	 */
 	public static DLFSDriveManager createRouter() {
 		return new DLFSDriveManager(false);
+	}
+
+	/**
+	 * Creates a service router with an explicit completion policy. The service
+	 * owner may publish enclosing applications/hosts here after local sync, or
+	 * schedule that work itself. Components retain no link to this policy.
+	 */
+	public static DLFSDriveManager createRouter(Runnable afterSync) {
+		return new DLFSDriveManager(false,afterSync);
 	}
 
 	/**
@@ -77,7 +92,12 @@ public class DLFSDriveManager {
 	 * @param drives Component representing this owner's drives
 	 */
 	public DLFSDriveManager(DLFSDrives drives) {
-		this(false);
+		this(drives,() -> {});
+	}
+
+	/** Mounts one owner with a caller-defined service completion policy. */
+	public DLFSDriveManager(DLFSDrives drives,Runnable afterSync) {
+		this(false,afterSync);
 		mount(null,drives);
 	}
 
@@ -225,21 +245,30 @@ public class DLFSDriveManager {
 	}
 
 	/**
-	 * Synchronises every mounted component to its parent or hosted root. Detached
-	 * identities have no persistence boundary and do nothing.
+	 * Synchronises every mounted component to its immediate destination, then runs
+	 * the service's completion policy. The default policy does nothing.
 	 */
 	public void sync() {
 		for (DLFSDrives mounted:new HashSet<>(componentRoutes.values())) mounted.sync();
+		afterSync.run();
 	}
 
 	/**
-	 * Synchronises only the component mounted for one identity.
+	 * Synchronises the component mounted for one identity, then runs the service's
+	 * completion policy.
 	 *
 	 * @param identity External identity, or null for anonymous requests
 	 */
 	public void sync(String identity) {
 		DLFSDrives mounted=componentRoutes.get(identityKey(identity));
 		if (mounted!=null) mounted.sync();
+		afterSync.run();
+	}
+
+	/** Completes a file mutation through its local boundary and the service policy. */
+	public void syncDrive(FileSystem fileSystem) {
+		if (fileSystem instanceof convex.lattice.fs.DLFileSystem dlfs) dlfs.sync();
+		afterSync.run();
 	}
 
 	/**

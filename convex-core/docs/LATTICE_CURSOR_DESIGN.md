@@ -103,13 +103,15 @@ Use component working state for CAS-or-merge publication. The component retains
 its destination and baseline, reconciles with its own lattice and context, and
 publishes through cursor operations. Generic cursors know nothing of that policy.
 
-Live view `sync()` follows its source towards its publication boundary. A host
-wraps storage with `PublishingCursor` and installs a callback and a plain binary
-reconciliation function using `onSync(publish, merge)`. Only the wrapper allocates
-a sync lock. Callbacks are serialised; writes delegate directly to storage, including
-its optional transaction lock. `Root.sync()` simply returns the current value.
-`RootComponent.cursor()` supplies the host wrapper; use it when descendants need
-to reach host publication. No cursor starts a worker or timer.
+`RootComponent.cursor()` and component working cursors are ordinary storage.
+Their `sync()` does not invoke component publication. Call the owning component's
+`sync()` explicitly; it updates only its destination and never syncs that cursor.
+The component which supplied the destination owns the next publication step.
+Lightweight components have no independent publication work.
+
+Raw cursor views still support caller-owned fork write-back. `PublishingCursor`
+remains an optional standalone callback adapter for direct cursor clients; the
+component hierarchy and NodeServer do not use it. No cursor starts a worker or timer.
 
 `Transactions` runs a synchronous callback against a private draft and commits by
 CAS, preserving each operation under contention. `TransactionalRootCursor` opts

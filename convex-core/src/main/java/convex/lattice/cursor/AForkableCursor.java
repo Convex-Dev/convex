@@ -39,8 +39,9 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 
 	/**
 	 * Synchronises this cursor towards its parent. On a raw fork, writes the working
-	 * copy into the cursor it was forked from. On a live cursor, propagates to the
-	 * root, where the host's publication policy runs.
+	 * copy into the cursor it was forked from. Views delegate to their source;
+	 * ordinary roots return their current value. Component publication, signing
+	 * and host persistence belong to component sync, not this operation.
 	 *
 	 * @return The value at this cursor after synchronisation
 	 */

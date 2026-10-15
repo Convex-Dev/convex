@@ -154,19 +154,5 @@ public class LatticeTopic extends convex.lattice.ALatticeComponent<Index<Keyword
 		super(TopicLattice.INSTANCE,source.cursor);
 	}
 
-	/**
-	 * Syncs this forked topic back to its parent, merging all partition changes.
-	 */
-	@SuppressWarnings("unchecked")
-	public void sync() {
-		cursor.sync();
-	}
-
-	/**
-	 * Returns the underlying lattice cursor.
-	 */
-	public AForkableCursor<Index<Keyword, ACell>> cursor() {
-		return cursor;
-	}
 
 }

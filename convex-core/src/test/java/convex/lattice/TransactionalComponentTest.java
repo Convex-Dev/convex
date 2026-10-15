@@ -233,6 +233,8 @@ class TransactionalComponentTest {
 		assertEquals(0,live.count());
 		assertEquals(1,fork.count());
 		fork.sync();
+		assertEquals(0,live.count(),"A view does not publish a caller-owned raw cursor fork");
+		fork.cursor().sync();
 		assertEquals(1,live.count());
 	}
 

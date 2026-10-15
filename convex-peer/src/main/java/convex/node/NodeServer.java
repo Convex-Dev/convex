@@ -50,7 +50,7 @@ import convex.lattice.cursor.Root;
  * <p><b>Failure isolation.</b> Authoritative root publication is the mandatory
  * part of a root sync. Propagator initialisation, notification, worker and
  * shutdown failures are contained and logged independently; one propagation
- * policy group cannot fail a cursor sync, the server maintenance loop or another
+ * policy group cannot fail a root component sync, the server maintenance loop or another
  * group. Only failures of the authoritative store are surfaced by this class;
  * transport failures remain visible to their application owner.</p>
  *
@@ -63,7 +63,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final ALattice<V> lattice;
 	private final AStore store;
 	private final NodeConfig config;
-	private final convex.lattice.cursor.PublishingCursor<V> cursor;
+	private final AForkableCursor<V> cursor;
 	private final RootComponent<V> rootComponent;
 	/** Immutable snapshots let publication proceed independently of group removal. */
 	private volatile List<LatticePropagator> propagators=List.of();
@@ -223,7 +223,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return source.pull(peer).thenApply(acquired -> {
 			requireAttached(source);
 			mergePulledValue(acquired);
-			cursor.sync();
+			rootComponent.sync();
 			return cursor.get();
 		});
 	}
@@ -250,7 +250,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			if (target==null) throw new IllegalArgumentException("Path is outside the served lattice");
 			AForkableCursor<ACell> targetCursor=rootComponent.resolve(path);
 			if (acquired!=null) mergeIncoming(targetCursor,target,acquired);
-			cursor.sync();
+			rootComponent.sync();
 			return targetCursor.get();
 		});
 	}
@@ -303,7 +303,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 				requireAttached(source);
 				mergePulledValue(acquired);
 			}
-			cursor.sync();
+			rootComponent.sync();
 			return true;
 		} catch (Exception e) {
 			log.warn("Pull through propagation group failed",e);
@@ -342,7 +342,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Merges an application-supplied value into memory. Call {@link AForkableCursor#sync()}
+	 * Merges an application-supplied value into memory. Call {@link RootComponent#sync()}
 	 * when the update should be published and persisted.
 	 *
 	 * @param receivedValue complete foreign lattice value
@@ -357,7 +357,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Merges an application-supplied value at a path within the authoritative value,
 	 * using the sub-lattice the served lattice defines at that path. Absent regions
 	 * along the path are created with their declared types. Call
-	 * {@link AForkableCursor#sync()} on the cursor when the update should be
+	 * {@link RootComponent#sync()} on {@link #getRootComponent()} when the update should be
 	 * published and persisted.
 	 *
 	 * @param <T> value type at the path
@@ -572,7 +572,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * application publication. Current local state is always the own argument. */
 	private V syncSnapshot(V candidate,boolean notify) throws IOException {
 		try {
-			return cursor.sync(current -> publishApplicationRoot(
+			return rootComponent.sync(current -> publishApplicationRoot(
 				(candidate==null) ? current : lattice.merge(mergeContext,current,candidate),notify));
 		} catch (StoreException e) {
 			if (e.getCause() instanceof IOException cause) throw cause;
@@ -580,7 +580,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 	}
 
-	/** Called within the root cursor's ordered sync. The persistence lock also
+	/** Called within the root component's ordered sync. The persistence lock also
 	 * excludes checkpoints from cell announcement and the root-pointer write. */
 	@SuppressWarnings("unchecked")
 	private ACell publishAuthoritativeRoot(ACell value,boolean notify) throws IOException {
@@ -654,7 +654,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (!mergeIncoming(targetCursor,target,value)) return MergeOutcome.REJECTED;
 		ACell after=targetCursor.get();
 		boolean changed=before!=after && (before==null || !before.equals(after));
-		if (changed) cursor.sync();
+		if (changed) rootComponent.sync();
 		return new MergeOutcome(true,changed);
 	}
 

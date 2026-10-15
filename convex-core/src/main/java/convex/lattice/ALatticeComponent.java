@@ -23,7 +23,7 @@ import convex.lattice.generic.SignedLattice;
  *
  * <p>Lightweight components share a working cursor. Components with an independent
  * publication boundary also retain a destination cursor and publication baseline.
- * State changes and sync travel through cursors; there is no component parent link.
+ * Publication uses ordinary cursor updates; there is no component parent link.
  * The cursor knows nothing about lattices: the component declares the structure of
  * the level it owns, supplying read/write functions for child views and binding
  * the authoring functions of signing and stamping views.
@@ -38,6 +38,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 
 	protected final AForkableCursor<V> cursor;
 	private volatile LatticeContext context=LatticeContext.EMPTY;
+	private final Publication<?> publication;
 
 	/** Returns this component's write and merge policy. */
 	public final LatticeContext getContext() { return context; }
@@ -55,7 +56,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 
 	/** Creates independent working state with component-owned CAS-or-merge publication. */
 	public static <T extends ACell> ALatticeComponent<T> working(ALattice<T> lattice,
-			AForkableCursor<T> destination, LatticeContext context) {
+			ACursor<T> destination, LatticeContext context) {
 		ALatticeComponent<T> component=new ALatticeComponent<T>(lattice,destination) {};
 		component.setContext(context);
 		return component;
@@ -74,6 +75,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** Creates a component over a cursor. */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
 		this.cursor=Objects.requireNonNull(cursor,"Component cursor must not be null");
+		publication=null;
 	}
 
 	/**
@@ -82,14 +84,14 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Sync publishes one snapshot into the destination without syncing that
 	 * destination further. Write and merge policy belongs to this component. No workers or timers are created.
 	 */
-	protected ALatticeComponent(ALattice<V> lattice, AForkableCursor<V> destination) {
+	protected ALatticeComponent(ALattice<V> lattice, ACursor<V> destination) {
 		this(lattice,destination,Function.identity(),(context,value) -> value);
 	}
 
-	/** Internal support for a publication boundary with a different stored type. */
-	<P extends ACell> ALatticeComponent(ALattice<V> lattice, AForkableCursor<P> destination,
+	/** Creates a publication boundary whose destination has a different stored type. */
+	protected <P extends ACell> ALatticeComponent(ALattice<V> lattice, ACursor<P> destination,
 			Function<P,V> read, BiFunction<LatticeContext,V,P> prepare) {
-		var publication=new Publication<>(lattice,destination,read,prepare);
+		publication=new Publication<>(lattice,destination,read,prepare);
 		cursor=publication.working;
 	}
 
@@ -113,7 +115,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** State allocated only for components with an independent publication boundary. */
 	private final class Publication<P extends ACell> {
 		private final ALattice<V> lattice;
-		private final AForkableCursor<P> destination;
+		private final ACursor<P> destination;
 		private final Function<P,V> read;
 		private final BiFunction<LatticeContext,V,P> prepare;
 		private final Root<V> working;
@@ -121,22 +123,16 @@ public abstract class ALatticeComponent<V extends ACell> {
 		// Accessed only under syncLock, which orders publications and write-back.
 		private V baseline;
 
-		Publication(ALattice<V> lattice, AForkableCursor<P> destination,
+		Publication(ALattice<V> lattice, ACursor<P> destination,
 				Function<P,V> read, BiFunction<LatticeContext,V,P> prepare) {
 			this.lattice=Objects.requireNonNull(lattice,"Publication lattice must not be null");
 			this.destination=Objects.requireNonNull(destination,"Publication destination must not be null");
 			this.read=read;
 			this.prepare=prepare;
 			baseline=read.apply(destination.get());
-			// Only sync is specialised. Ordinary atomic updates keep their existing
-			// root implementation, with no publication lock on the write path.
+			// Working storage has no publication callbacks or component back pointers.
 			working=destination.supportsExclusiveTransactions()
-				?new TransactionalRootCursor<>(baseline) {
-					@Override public V sync() { return Publication.this.sync(); }
-				}
-				:new Root<>(baseline) {
-					@Override public V sync() { return Publication.this.sync(); }
-				};
+				?new TransactionalRootCursor<>(baseline):new Root<>(baseline);
 		}
 
 		private V sync() {
@@ -194,27 +190,26 @@ public abstract class ALatticeComponent<V extends ACell> {
 		}
 	}
 
-	/** Returns the cursor responsible for all state updates and sync. */
+	/** Returns atomic working storage. Updating or syncing it does not publish this component. */
 	public AForkableCursor<V> cursor() {
 		return cursor;
 	}
 
 	/**
-	 * Synchronises this component's cursor through its immediate cursor boundary.
+	 * Publishes one working snapshot into this component's destination using
+	 * CAS-or-merge. Publication stops at that cursor: its sync is never invoked.
+	 * A lightweight view has no independent boundary and simply returns its value;
+	 * its edits are already visible in the containing working state.
 	 *
-	 * <p>A component working copy reconciles local changes with its destination; a
-	 * raw cursor fork overwrites its destination. Neither necessarily publishes
-	 * the complete application root. Call
-	 * the containing {@link ALatticeApplication application's} {@code sync()} when
-	 * the merged state should cross the host publication boundary.</p>
+	 * <p>Call the enclosing application's sync to run its preparation and publication,
+	 * and the host's sync for persistence or replication. A raw cursor fork supplied
+	 * to a view remains caller-owned and is not implicitly synced by the component.</p>
 	 *
-	 * <p>Working-state publication stops at its destination. Only a live path into
-	 * the host reaches host persistence directly. Application preparation hooks run
-	 * through the application's {@code sync()}, not a descendant's cursor sync.
-	 * Physical durability remains the host's separate {@link RootComponent#flush()}.</p>
+	 * @return Published snapshot, or current value for a lightweight view. Later
+	 *         concurrent edits may remain pending in working storage.
 	 */
-	public void sync() {
-		cursor.sync();
+	public V sync() {
+		return publication==null?cursor.get():publication.sync();
 	}
 
 	/**

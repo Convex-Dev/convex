@@ -70,12 +70,6 @@ public class LatticeKV extends convex.lattice.ALatticeComponent<Index<AString, A
 		return new LatticeKV(cursor, replicaID);
 	}
 
-	/**
-	 * Returns the underlying lattice cursor for direct lattice operations
-	 */
-	public AForkableCursor<Index<AString, AVector<ACell>>> cursor() {
-		return cursor;
-	}
 
 	/**
 	 * Creates a forked copy of this store for independent operation
@@ -98,13 +92,6 @@ public class LatticeKV extends convex.lattice.ALatticeComponent<Index<AString, A
 	private LatticeKV(LatticeKV source, AString replicaID) {
 		super(KVStoreLattice.INSTANCE,source.cursor);
 		this.replicaID=replicaID;
-	}
-
-	/**
-	 * Syncs this forked store back to its parent, merging changes
-	 */
-	public void sync() {
-		cursor.sync();
 	}
 
 	// ========== Internal Helpers ==========

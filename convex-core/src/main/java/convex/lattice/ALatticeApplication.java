@@ -26,7 +26,7 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p>The application does not own the root, store or replication lifecycle.
  * Calling {@link #sync()} first runs application-defined preparation, then publishes
- * through its cursor boundary. For private working state this stops at the host;
+ * into its destination cursor. For private working state this stops at the host;
  * host sync and physical durability ({@link RootComponent#flush()}) are separate.</p>
  *
  * @param <V> Complete application root value type
@@ -97,11 +97,11 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	protected void beforeSync() {
 	}
 
-	/** Runs application preparation, then publishes through its cursor boundary. */
+	/** Runs application preparation, then publishes only this component's working boundary. */
 	@Override
-	public void sync() {
+	public V sync() {
 		beforeSync();
-		super.sync();
+		return super.sync();
 	}
 
 	/**

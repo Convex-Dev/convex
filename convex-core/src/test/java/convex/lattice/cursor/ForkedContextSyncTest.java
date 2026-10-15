@@ -42,7 +42,7 @@ public class ForkedContextSyncTest {
 		root.set(ALICE_KEY.signData(Sets.of(CVMLong.ONE, CVMLong.create(3))));
 		component.setContext(LatticeContext.create(null, BOB_KEY));
 
-		SignedData<ASet<CVMLong>> result = fork.sync();
+		SignedData<ASet<CVMLong>> result = component.sync();
 		assertEquals(BOB, result.getAccountKey());
 		assertEquals(Sets.of(CVMLong.ONE, CVMLong.create(2), CVMLong.create(3)), result.getValue());
 		assertEquals(result, root.get());
@@ -54,13 +54,14 @@ public class ForkedContextSyncTest {
 			ForkedContextSyncTest::timestamp);
 		AHashMap<Keyword, ACell> initial = value(1, "initial");
 		Root<ACell> root = Cursors.root(initial);
-		AForkableCursor<ACell> fork = convex.lattice.ComponentTestSupport.fork(root,lattice);
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ACell> fork=forkComponent.cursor();
 
 		fork.set(value(2, "fork"));
 		AHashMap<Keyword, ACell> parentValue = value(3, "parent");
 		root.set(parentValue);
 
-		assertSame(parentValue, fork.sync());
+		assertSame(parentValue, forkComponent.sync());
 		assertSame(parentValue, root.get());
 	}
 

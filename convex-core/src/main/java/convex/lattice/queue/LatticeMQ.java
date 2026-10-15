@@ -109,19 +109,4 @@ public class LatticeMQ extends convex.lattice.ALatticeComponent<AHashMap<ACell, 
 		super(TOPIC_MAP,source.cursor);
 	}
 
-	/**
-	 * Syncs this forked MQ system back to its parent, merging all changes
-	 * across all topics and partitions.
-	 */
-	@SuppressWarnings("unchecked")
-	public void sync() {
-		cursor.sync();
-	}
-
-	/**
-	 * Returns the underlying lattice cursor.
-	 */
-	public AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor() {
-		return cursor;
-	}
 }

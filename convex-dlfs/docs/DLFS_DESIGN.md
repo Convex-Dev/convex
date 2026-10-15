@@ -139,10 +139,11 @@ RootComponent<V>                  store persistence, root publication, flush
                 └── DLFSDrive     named drive plus local NIO view
 ```
 
-A local bootstrap obtains the root with `RootComponent.open(...)` (usually through
-`DLFSApplication.open(...)`). A networked bootstrap obtains the same root abstraction
+A local bootstrap explicitly obtains the root with `RootComponent.open(...)`.
+A networked bootstrap obtains the same root abstraction
 from `NodeServer.getRootComponent()`. No application branch depends on `NodeServer`.
-`sync()` publishes logical state through the host policy; `flush()` is the separate
+`root.sync()` publishes through host policy; component sync stops at its destination.
+`flush()` is the separate
 store durability barrier. `DLFSDriveManager` is outside this ownership tree because
 it is service routing policy and may map identities across several regions or roots.
 
@@ -512,15 +513,20 @@ DLFSDrives drives = app.drives(ownerKey);
 DLFSDrive drive = drives.createDrive("home");
 Files.writeString(drive.fileSystem().getPath("/data.txt"), "value");
 app.sync();
+node.getRootComponent().sync();
 ```
 
-For a non-networked host, `DLFSApplication.open(store, keyPair)` restores the
-standard root and connects its DLFS region at `:fs`.
+For a non-networked host, explicitly open `RootComponent.open(Lattice.ROOT, store)`,
+set its context, and connect with `DLFSApplication.connect(root, Keywords.FS)`.
+There is no hidden-host factory: retain the root and publish with `root.sync()`.
 
 `DLFSDriveManager.mount(identity, drives)` exposes owner components to WebDAV and
 MCP and remains the place for local mappings that span owners, physical regions
 or hosted roots. `DLFSServer` owns transport only and never owns the application,
-host or store lifecycle.
+host or store lifecycle. Supply a completion callback when creating the manager
+to choose publication after successful mutations, for example
+`new DLFSDriveManager(drives, () -> { app.sync(); root.sync(); })`.
+The callback belongs to service wiring; domain components know only their cursors.
 The component hierarchy exposes its root `AStore` internally to each drive's
 `DLFSLocal` adapter, while `sync()` remains the explicit publication and replication
 boundary. Streamed blob writes install store-backed references every 16 MiB without

@@ -154,7 +154,7 @@ public class NodeServerTest {
 	/** Syncs the authoritative root, then waits for the separately owned view. */
 	private static void syncAndAwaitPropagator(NodeServer<?> node) throws Exception {
 		CompletableFuture<ACell> announced=propagator(node).nextAnnounce();
-		node.getCursor().sync();
+		node.getRootComponent().sync();
 		announced.get(5,TimeUnit.SECONDS);
 	}
 
@@ -196,7 +196,7 @@ public class NodeServerTest {
 
 		maxNodeServer.launch();
 		maxNodeServer.getCursor().set(CVMLong.create(17));
-		maxNodeServer.getCursor().sync();
+		maxNodeServer.getRootComponent().sync();
 
 		assertEquals(CVMLong.create(17),store.getRootData());
 		assertTrue(maxNodeServer.isRunning());
@@ -264,7 +264,7 @@ public class NodeServerTest {
 		assertTrue(healthy.getStatus().isOperational());
 		CompletableFuture<ACell> announced=healthy.nextAnnounce();
 		maxNodeServer.getCursor().set(CVMLong.create(23));
-		maxNodeServer.getCursor().sync();
+		maxNodeServer.getRootComponent().sync();
 
 		assertEquals(CVMLong.create(23),store.getRootData());
 		assertEquals(CVMLong.create(23),announced.get(5,TimeUnit.SECONDS));
@@ -2069,7 +2069,7 @@ public class NodeServerTest {
 			source.launch();
 			target.launch();
 			target.mergeAt(CVMLong.create(7),rejected);
-			target.getCursor().sync();
+			target.getRootComponent().sync();
 			source.mergeAt(Sets.of(CVMLong.ONE),rejected);
 			syncAndAwaitPropagator(source);
 
@@ -2289,7 +2289,7 @@ public class NodeServerTest {
 			// responsibility (unlike the incoming message path which syncs internally).
 			// Node commit is synchronous; propagation-group materialisation is not.
 			node.getCursor().set(CVMLong.create(42));
-			node.getCursor().sync();
+			node.getRootComponent().sync();
 			assertEquals(CVMLong.create(42),announced.get(5,TimeUnit.SECONDS));
 
 			// Explicit sync should always work — this is the control

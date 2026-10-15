@@ -277,7 +277,7 @@ public class DLFSDriveManagerTest {
 		AtomicReference<ACell> synced=new AtomicReference<>();
 		cursor.onSync(value->{ synced.set(value); return value; }, lattice::merge);
 		var component=convex.dlfs.DLFSDrives.wrap(cursor);
-		DLFSDriveManager manager=new DLFSDriveManager(component);
+		DLFSDriveManager manager=new DLFSDriveManager(component,cursor::sync);
 
 		assertTrue(manager.createDrive(null, "home"));
 		assertNull(synced.get(), "in-memory registry mutation must not perform I/O implicitly");

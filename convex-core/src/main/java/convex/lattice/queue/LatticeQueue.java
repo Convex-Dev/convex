@@ -41,12 +41,6 @@ public class LatticeQueue extends convex.lattice.ALatticeComponent<AVector<ACell
 		return new LatticeQueue(cursor);
 	}
 
-	/**
-	 * Returns the underlying lattice cursor.
-	 */
-	public AForkableCursor<AVector<ACell>> cursor() {
-		return cursor;
-	}
 
 	/**
 	 * Creates a forked copy of this queue for independent operation.
@@ -57,13 +51,6 @@ public class LatticeQueue extends convex.lattice.ALatticeComponent<AVector<ACell
 
 	private LatticeQueue(LatticeQueue source) {
 		super(QueueLattice.INSTANCE,source.cursor);
-	}
-
-	/**
-	 * Syncs this forked queue back to its parent, merging changes.
-	 */
-	public void sync() {
-		cursor.sync();
 	}
 
 	// ===== Producer Operations =====
