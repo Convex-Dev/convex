@@ -298,13 +298,16 @@ itself.
 The shared-applications example stages each domain at its own path (a Social fork, a
 DLFS region fork, a live P2P view) behind one live admission handler, and the
 document now says whole-root staging is "not the composition mechanism" for several
-applications. Decision: multiple applications may share regions, including whole-root
-staging by more than one. The requirement is that they merge atomically on sync and
-allow for the destination having changed under them. This is a general property of
-every component in the hierarchy: there is usually one instance, but each must be
-robust to external change. A signer-free component holding a signed slot reconciles
-by the lattice's own rule, which selects an envelope; that is the lattice's
-semantics, not a prohibition on sharing.
+applications. Decision: multiple applications may share regions. The requirement is
+that they merge atomically on sync and allow for the destination having changed
+under them. This is a general property of every component in the hierarchy: there is
+usually one instance, but each must be robust to external change.
+
+Inferences from that decision, not yet confirmed: whole-root staging by more than one
+application is then permitted rather than discouraged; and a signer-free component
+holding a signed slot reconciles by the lattice's own rule, which selects an
+envelope, so the signer-free limitation is the lattice's semantics rather than a
+prohibition on sharing.
 
 CAD text affected:
 
@@ -332,13 +335,16 @@ Three things on the branch still put merge semantics in the node layer:
   `LatticeHost.open`, which adopts the retained value.
 - The node carries a merge context which it pushes into the host and the relay
   application.
-- Each propagator takes a lattice and pre-merges its own working view with node
-  snapshots before announcing.
+- A propagator constructed with a lattice keeps its own working view and pre-merges
+  it with node snapshots before announcing, with tie precedence for the node's
+  published state. A lattice-free propagator constructor also exists.
 
-Under the decision, the node takes an assembled host and attaches propagation
-groups; restoration is host assembly; propagators announce the host's published root
-through their filter without a merge of their own. The application-factory launch
-overload and the node's lattice accessor are already gone (`971790597`).
+Open: whether "replicate whatever it is given" covers only `NodeServer`, or also the
+propagator's working view and pre-merge. If the former, the lattice-taking node
+constructor and the node's merge context are the remaining items; if the latter,
+propagators would announce the host's published root through their filter with no
+merge of their own, and restoration becomes host assembly. The application-factory
+launch overload and the node's lattice accessor are already gone (`971790597`).
 
 CAD text affected:
 
