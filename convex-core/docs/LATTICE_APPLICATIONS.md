@@ -58,39 +58,48 @@ from whoever holds it.
 **Components give positions their meaning.** A component holds one cursor at one
 path together with everything the cursor does not know: the lattice at that level,
 the policy, and the domain operations such as post, follow or create drive. One
-component per level of the data model. Each creates the components for the level
-below, declaring the child's lattice and placing any signing or timestamping
-boundary exactly where the data model puts it. Boundaries are never discovered by
-navigation.
+component per level of the data model. What a component is follows from a small set
+of decisions made when it is constructed:
 
-There are two kinds of component. A **live** component shares its parent's state:
-its writes are visible immediately and it has nothing to publish. A **staged**
-component owns a private working copy plus a destination. Its sync takes one
-snapshot of the copy, reconciles it with whatever the destination now holds using
-the lattice, with local edits as the preferred side, installs the result by
-compare-and-set, and stops. The signed component is the archetype: an unsigned
-working copy, a signed destination, one signature at publication however many edits
-preceded it.
+| Decision | Choices |
+|---|---|
+| Position | A path cursor handed down by the component that owns the level above. An application's position is the host root, handed to it by the host. |
+| Navigation | A component creates its children one level below its own cursor, declaring each child's lattice so that a missing container is created with the right type. An application resolves whole region paths from the root with its root lattice. Boundaries are placed by the owning component, never discovered by navigation. |
+| Publication | **Live**: writes go straight through the cursor and there is nothing to publish. **Staged**: a private working copy and a destination; sync reconciles the copy with whatever the destination now holds and publishes the result. A fork is a staged component constructed at the same position. |
+| Boundary | For a level the component owns: none, stamp each write, sign each write, or sign once at publication. Signing once needs a staged component, and is the main reason to stage. |
+| Reconciliation | The lattice merge at that position, with local edits winning ties. A component may refine it, as the signed component does to reuse existing envelopes. |
+| Policy | The context, clock and signers, resolved when the component is constructed. Later changes to the parent's policy do not reach it. |
+| Incoming values | Whether the component is configured on the host to receive incoming values, and how it merges or routes what it accepts. Only a component at the root can be configured directly. |
+| Transactions | Whether it offers atomic multi-step operations, by supplying a factory that rebuilds it over a draft cursor. |
+| Store | Whether it carries a store for checkpoints before publication, as file components do. |
 
-**Components must be robust to external change.** There is usually one component
-instance at a position, but nothing enforces that. The value at any position can
-change under a component at any time: another component publishing into the same
-region, an incoming merge, or a fork syncing. Every component therefore reconciles
-on sync rather than overwriting, and the result is safe whatever happened in
-between. Components sharing a region must agree on its lattice; two different rules
-at one path do not converge. That is why region definitions are catalogued once and
-reused.
+A lattice is needed by two of these decisions, declaring children and reconciling on
+sync. A live component with no children needs none. The signed component is the
+archetype of the staged choice: an unsigned working copy, a signed destination, one
+signature at publication however many edits preceded it.
 
-**An application assembles components over a host.** It declares the lattice for
-the regions it understands, composed from region lattices. It may be configured on
-the host to receive incoming values, which it merges under that lattice and its
-ownership rules. It decides when its work is published. The typed base
-(`ALatticeApplication`) carries a root lattice and receives incoming values; it may
-be live in the host's root or staged over it. Plain code that groups domain
-components forked at their own paths is an application in the same sense. Several
-applications may share a host and may share regions; each reconciles with whatever
-the host now holds, as any component does. A keyed root merges the regions it knows
-and ignores the rest, so nodes with different region sets still interoperate.
+**Components must be robust to external change.** Whatever it chose above, a
+component must allow for the value at its position changing under it at any time:
+another component publishing into the same region, an incoming merge, or a fork
+syncing. A live component achieves this with read-modify-write atomic updates; a
+staged one by merging on sync. Neither overwrites. Components sharing a region must
+agree on its lattice; two different rules at one path do not converge. That is why
+region definitions are catalogued once and reused.
+
+**An application is the component at the host root.** It owns the root lattice,
+composed from the region lattices it understands, and the navigation from the root
+to those regions; it creates domain components by handing them path cursors. It may
+be configured on the host to receive incoming values, which it merges under its
+lattice and ownership rules, and it decides when its work is published. The typed
+base (`ALatticeApplication`) provides the root lattice, region navigation and
+incoming values; it may be live in the host's root or staged over it. Plain code
+that navigates from the root and groups domain components is doing the same job and
+counts as an application. A host may hold several applications. Conceptually they
+are separate apps that synchronise with each other through the root: each publishes
+into it and observes the others' published state there, immediately when live and on
+sync when staged. They may share regions provided they share each region's lattice.
+A keyed root merges the regions it knows and ignores the rest, so nodes with
+different region sets still interoperate.
 
 **The host is the authoritative local root.** It holds the published root value, an
 optional store, the publication policy that runs on its sync, and the durability
@@ -141,8 +150,9 @@ Ownership remains governed by CAD038.
   the right container type.
 - Wrap per-user data in an owner lattice so each owner's slot is signed by that
   owner and forgeries are rejected on merge.
-- One component, one path. A facade spanning several paths contains components
-  rather than being one.
+- One component, one path. A domain component receives the cursor for its level and
+  creates its children one level below; only the application navigates from the
+  root. A facade spanning several paths contains components rather than being one.
 - Any number of components may publish into the same region. Each reconciles with
   the destination as it now is; none assumes it is the only writer. Components
   sharing a region must share its lattice.
@@ -159,7 +169,7 @@ Ownership remains governed by CAD038.
 
 ```
 Domain components        DLFSDrive, Social        one component per path
-Application component    ALatticeApplication      root lattice, incoming values, publication
+Application component    ALatticeApplication      root lattice, region navigation, incoming values
 Lattice host             LatticeHost              published root, optional store, publication policy
 Cursor                   path, CAS, drafts        atomic state access
 Optional host runtime    NodeServer               replication only
@@ -317,10 +327,12 @@ data format from cursor mechanics. Rules of thumb:
 ## Application root and host
 
 The application component declares the root lattice: it exposes that lattice,
-merges incoming root values and hands out typed region cursors. It works either live
-in the host's root or staged over it. It attaches to a host, which creates or opens a
-local root or hosts a networked one. Neither merging nor hosting requires domain
-components to exist.
+merges incoming root values and hands out typed region cursors. It receives the
+host's root cursor and navigates below it with the root lattice; the domain
+components it creates receive the cursor for their level and never navigate back up.
+It works either live in the host's root or staged over it. It attaches to a host,
+which creates or opens a local root or hosts a networked one. Neither merging nor
+hosting requires domain components to exist.
 
 The global lattice has a keyed map root, an `Index<Keyword, ACell>`. Applications
 participate at the globally defined region paths, composing the region lattices they
@@ -437,11 +449,13 @@ application.
 
 ### Sharing a host
 
-Several applications and components may publish into the same host, and into the
-same regions. Each chooses its boundary: a live view shares its path in the host and
-has nothing to publish; a staged component publishes its subtree on sync. Either way
-the component allows for the destination having changed under it, so sync reconciles
-before it installs:
+A host may hold several applications. They are separate apps that synchronise with
+each other through the root: each publishes into it and observes the others'
+published state there. Several applications and components may therefore publish
+into the same host, and into the same regions. Each chooses its boundary: a live view
+shares its path in the host and has nothing to publish; a staged component publishes
+its subtree on sync. Either way the component allows for the destination having
+changed under it, so sync reconciles before it installs:
 
 ```java
 var liveSocial = Social.connect(host, socialContext);
@@ -1048,6 +1062,8 @@ Worked examples:
       domain component factories at known paths. Root merge requires no components.
 - [ ] Accept a host in factories; provide a local open and a host-neutral
       connect. Assemble host and applications first, then the node.
+- [ ] Hand each domain component the cursor for its level; keep region paths in the
+      application.
 - [ ] Assume the destination can change under any component; reconcile on sync,
       never overwrite. Share a region only with the same lattice.
 - [ ] Write with read-modify-write updates, declare child levels with their lattice,
