@@ -336,6 +336,7 @@ public class RT {
 		for (int i = 1; i < n; i++) {
 			ANumeric b = RT.ensureNumber(args[i]);
 			result = result.sub(b);
+			if (result == null) return null;
 		}
 		return result;
 	}

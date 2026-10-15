@@ -157,8 +157,11 @@ public class TransactionHandler extends AThreadedComponent {
 	 * @param signedTransactionHash
 	 * @param m
 	 */
-	private void registerInterest(Hash signedTransactionHash, Message m) {
-		interests.put(signedTransactionHash, m);
+	private boolean registerInterest(Hash signedTransactionHash, Message m) {
+		if (interests.putIfAbsent(signedTransactionHash,m)==null) return true;
+		m.returnResult(Result.error(ErrorCodes.STATE,"Transaction already pending; recover its result by transaction hash")
+				.withSource(SourceCodes.PEER).withInfo(Keywords.TX,signedTransactionHash));
+		return false;
 	}
 	
 	private static final Result ERR_NOT_LIVE=Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
@@ -276,7 +279,7 @@ public class TransactionHandler extends AThreadedComponent {
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 				continue;
 			}
-			registerInterest(sd.getHash(), m);
+			if (!registerInterest(sd.getHash(), m)) continue;
 			transactionQueue.put(sd);
 			observeTransactionRequest(sd);
 			this.clientTransactionCount++;
@@ -322,7 +325,7 @@ public class TransactionHandler extends AThreadedComponent {
 		}
 	}
 	
-	private void reportTransactions(Block block, BlockResult br, long blockNum) {
+	void reportTransactions(Block block, BlockResult br, long blockNum) {
 		// TODO: consider culling old interests after some time period
 		int nTrans = block.length();
 		HashMap<Keyword,ACell> extInfo=new HashMap<>(5);
@@ -353,7 +356,7 @@ public class TransactionHandler extends AThreadedComponent {
 					log.debug("Dropped transaction result for connection {}", m.getConnection());
 				}
 				observeTransactionResponse(t,res);
-				interests.remove(h);
+				interests.remove(h,m);
 			}
 		}
 	}

@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
@@ -51,34 +53,33 @@ class LatestUpdateQueueTest {
 
 	@Test
 	void takeIgnoresSpuriousNotification() throws Exception {
-		LatestUpdateQueue<Integer> queue=new LatestUpdateQueue<>();
-		CountDownLatch started=new CountDownLatch(1);
-		AtomicReference<Integer> result=new AtomicReference<>();
-
-		Thread consumer=Thread.ofPlatform().start(()-> {
-			started.countDown();
+		CountDownLatch firstWait=new CountDownLatch(1);
+		CountDownLatch notifiedWait=new CountDownLatch(1);
+		AtomicBoolean notified=new AtomicBoolean();
+		LatestUpdateQueue<Integer> queue=new LatestUpdateQueue<>() {
+			@Override
+			void awaitUpdate() throws InterruptedException {
+				if (notified.get()) notifiedWait.countDown();
+				else firstWait.countDown();
+				super.awaitUpdate();
+			}
+		};
+		try (var executor=Executors.newSingleThreadExecutor()) {
+			var result=executor.submit(queue::take);
 			try {
-				result.set(queue.take());
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
+				assertTrue(firstWait.await(10,TimeUnit.SECONDS));
+				synchronized (queue) {
+					notified.set(true);
+					queue.notifyAll();
+				}
+				assertTrue(notifiedWait.await(10,TimeUnit.SECONDS));
+				assertFalse(result.isDone(),"A notification without an item must not complete take");
+				queue.offer(13);
+				assertEquals(13,result.get(10,TimeUnit.SECONDS));
+			} finally {
+				result.cancel(true);
 			}
-		});
-
-		try {
-			assertTrue(started.await(1,TimeUnit.SECONDS));
-			awaitWaiting(consumer);
-			synchronized (queue) {
-				queue.notifyAll();
-			}
-			awaitWaiting(consumer);
-			assertNull(result.get());
-		} finally {
-			queue.offer(13);
-			consumer.join(Duration.ofSeconds(1));
 		}
-
-		assertFalse(consumer.isAlive());
-		assertEquals(13,result.get());
 	}
 
 	@Test
@@ -99,12 +100,4 @@ class LatestUpdateQueueTest {
 		assertFalse(producer.isAlive());
 	}
 
-	private static void awaitWaiting(Thread thread) throws InterruptedException {
-		long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(1);
-		while (thread.isAlive()&&(thread.getState()!=Thread.State.WAITING)&&(System.nanoTime()<deadline)) {
-			Thread.sleep(1);
-		}
-		assertTrue(thread.isAlive(),"Consumer returned without an offered value");
-		assertEquals(Thread.State.WAITING,thread.getState());
-	}
 }

@@ -7,6 +7,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.RootComponent;
+import convex.lattice.cursor.ALatticeCursor;
 
 /**
  * Root-level application component for the P2P lattice regions.
@@ -20,6 +21,12 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	protected P2PApplication(RootComponent<Index<Keyword,ACell>> host) {
 		super(host);
+	}
+
+	/** Binds a subclass's private working view to the supplied cursor. */
+	protected P2PApplication(RootComponent<Index<Keyword,ACell>> host,
+			ALatticeCursor<Index<Keyword,ACell>> cursor) {
+		super(host,cursor);
 	}
 
 	/** Connects a P2P application to a hosted lattice root. */

@@ -1,6 +1,7 @@
 package convex.lattice.cursor;
 
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMLong;
@@ -66,6 +67,12 @@ public class StampedCursor<V extends ACell> extends AUpdateCursor<V, V> {
 	protected V prepareWrite(V value) {
 		// An unchanged write never reaches here, so the stamp isn't bumped for no reason
 		return stamp.apply(value, getContext().currentTimestamp());
+	}
+
+	@Override
+	protected Function<V,V> prepareWriteOperation() {
+		CVMLong timestamp=getContext().currentTimestamp();
+		return value -> stamp.apply(value,timestamp);
 	}
 
 	// view inherited (identity) — the read view is never changed

@@ -61,6 +61,7 @@ public class RESTAPITest extends ARESTTest {
 		AMap<AString,ACell> paths = RT.ensureMap(spec.get(Strings.create("paths")));
 		assertNotNull(paths,"Spec should contain a paths object");
 		assertFalse(paths.isEmpty(),"Spec paths should not be empty");
+		assertNotNull(paths.getIn("/api/v1/simulate","post"),"Spec should expose transaction simulation");
 	}
 	
 	@Test public void testTxPrepareSubmit() throws IOException, InterruptedException, BadFormatException {

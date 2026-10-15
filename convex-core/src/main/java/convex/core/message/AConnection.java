@@ -1,10 +1,16 @@
 package convex.core.message;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 
 /**
  * Abstract base class for connections between Convex network participants.
@@ -36,6 +42,167 @@ public abstract class AConnection {
 	/** Published across network, verification and dispatcher threads. */
 	private volatile AccountKey trustedKey=null;
 	private final AtomicLong requestCounter=new AtomicLong();
+	/** Allocated on first request, never replaced during this connection's lifetime. */
+	private volatile ConcurrentHashMap<ACell,RequestFuture> awaiting;
+	private volatile boolean requestsClosed;
+
+	/** Allocates an ID, registers before sending, and awaits a reply. Timeout is in milliseconds; zero disables it. */
+	public final CompletableFuture<Message> request(Message message,long timeout) {
+		return request(message,timeout,null);
+	}
+
+	/**
+	 * As {@link #request(Message, long)}, using a caller-owned future so its owner can
+	 * cancel the operation even before a worker starts. The supplied future is a
+	 * control signal, not the public reply: observe the returned future, which
+	 * guarantees cleanup before notifying its callers. The signal must be fresh.
+	 */
+	public final CompletableFuture<Message> request(Message message,long timeout,CompletableFuture<Message> future) {
+		try {
+			Message request=message.withID(nextRequestID());
+			if (request==null) throw new IllegalArgumentException("Message type does not support request IDs");
+			return sendRequest(request,timeout,future);
+		} catch (Exception e) {
+			if (future==null) return CompletableFuture.failedFuture(e);
+			future.completeExceptionally(e);
+			return future;
+		}
+	}
+
+	/**
+	 * Sends with the supplied ID unchanged, for raw-message API compatibility.
+	 * Rejects outstanding duplicates. Callers must not reuse an ID while a late
+	 * reply to its previous use is possible; use {@link #request(Message, long)} for fresh IDs.
+	 */
+	public final CompletableFuture<Message> sendRequest(Message message,long timeout) {
+		return sendRequest(message,timeout,null);
+	}
+
+	private CompletableFuture<Message> sendRequest(Message message,long timeout,CompletableFuture<Message> future) {
+		RequestFuture reply=null;
+		try {
+			if (future!=null && future.isDone()) return future;
+			if (requestsClosed || isClosed()) throw new IllegalStateException("Connection closed");
+			ACell id=message.getRequestID();
+			if (id==null) throw new IllegalArgumentException("Non-null request ID required");
+			var pending=awaiting;
+			if (pending==null) {
+				synchronized (this) {
+					pending=awaiting;
+					if (pending==null) awaiting=pending=new ConcurrentHashMap<>();
+				}
+			}
+			reply=new RequestFuture(pending,id,future);
+			if (pending.putIfAbsent(id,reply)!=null) {
+				throw new IllegalStateException("Duplicate outstanding request ID: "+id);
+			}
+			if (future!=null) reply.listenToControl();
+			// Close publishes requestsClosed BEFORE draining. If this insertion missed
+			// that drain, this recheck completes it. No registration lock is needed.
+			if (requestsClosed) throw new IllegalStateException("Connection closed");
+			if (timeout>0) reply.orTimeout(timeout,TimeUnit.MILLISECONDS);
+			if (!reply.isDone() && !sendMessage(message)) {
+				throw new RejectedExecutionException("Unable to send request");
+			}
+		} catch (Exception e) {
+			if (reply!=null) reply.completeExceptionally(e);
+			else {
+				if (future==null) return CompletableFuture.failedFuture(e);
+				future.completeExceptionally(e);
+				return future;
+			}
+		}
+		return reply;
+	}
+
+	/** The registered future is also the reply: unlink before CompletableFuture invokes callers. */
+	private static final class RequestFuture extends CompletableFuture<Message> {
+		private volatile ConcurrentHashMap<ACell,RequestFuture> pending;
+		private final ACell id;
+		private volatile CompletableFuture<Message> control;
+
+		RequestFuture(ConcurrentHashMap<ACell,RequestFuture> pending,ACell id,CompletableFuture<Message> control) {
+			this.pending=pending;
+			this.id=id;
+			this.control=control;
+		}
+
+		// Only authentication workers use an external control signal. Ordinary
+		// requests allocate no control future or completion stage.
+		void listenToControl() {
+			CompletableFuture<Message> signal=control;
+			if (signal==null) return; // A concurrent close already completed us.
+			signal.whenComplete((message,error) -> {
+				if (control==null) return; // Ignore our own notification of the signal.
+				if (error==null) complete(message);
+				else completeExceptionally(error);
+			});
+		}
+
+		private CompletableFuture<Message> unlink() {
+			var registered=pending;
+			if (registered!=null) registered.remove(id,this);
+			pending=null;
+			var signal=control;
+			control=null;
+			return signal;
+		}
+
+		@Override public boolean complete(Message message) {
+			var signal=unlink();
+			if (signal!=null) signal.complete(message);
+			return super.complete(message);
+		}
+
+		@Override public boolean completeExceptionally(Throwable error) {
+			java.util.Objects.requireNonNull(error);
+			var signal=unlink();
+			if (signal!=null) signal.cancel(false);
+			return super.completeExceptionally(error);
+		}
+
+		@Override public boolean cancel(boolean interrupt) {
+			var signal=unlink();
+			if (signal!=null) signal.cancel(interrupt);
+			return super.cancel(interrupt);
+		}
+	}
+
+	/** Matches a reply only against the physical connection it arrived on. Does not decode its payload. */
+	public final boolean completeRequest(Message message) throws BadFormatException {
+		if (message.getConnection()!=this) return false;
+		var pending=awaiting;
+		if (pending==null) return false;
+		ACell id=message.getResultID();
+		if (id==null) return false;
+		var future=pending.remove(id);
+		if (future==null) return false;
+		future.pending=null; // Already removed; do not repeat the map lookup on completion.
+		future.complete(message);
+		return true;
+	}
+
+	/** Whether this connection has requests awaiting replies. Does not allocate a map. */
+	public final boolean hasPendingRequests() {
+		var pending=awaiting;
+		return pending!=null && !pending.isEmpty();
+	}
+
+	/**
+	 * Permanently ends request tracking. Transports must call this on explicit close
+	 * AND remote disconnect, outside transport locks: completion can invoke user code.
+	 */
+	public final void closeRequests() {
+		requestsClosed=true;
+		var pending=awaiting;
+		if (pending==null) return;
+		pending.forEach((id,future) -> {
+			if (pending.remove(id,future)) {
+				future.pending=null;
+				future.completeExceptionally(new IllegalStateException("Connection closed"));
+			}
+		});
+	}
 
 	/**
 	 * Allocates the next request ID originating from this connection.

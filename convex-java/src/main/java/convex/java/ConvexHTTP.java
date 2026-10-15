@@ -174,12 +174,18 @@ public class ConvexHTTP extends convex.api.Convex {
 	public CompletableFuture<Result> query(ACell form, Address address) {
 		String queryPath=getAPIPath()+"/query";
 		AMap<Keyword,ACell> query=Maps.of(Keywords.SOURCE,form,Keywords.ADDRESS,address);
+		// Printed transaction records become ordinary maps when read back. Keep
+		// their type and all referenced cells for transaction-cost simulations.
+		boolean binary=RT.ensureTransaction(form)!=null || form instanceof SignedData<?>;
+		HttpRequest.BodyPublisher requestBody=binary
+				? HttpRequest.BodyPublishers.ofByteArray(Format.encodeMultiCell(query,true).getBytes())
+				: HttpRequest.BodyPublishers.ofString(RT.toString(query));
 		// System.out.println("Query to "+queryPath);
 		HttpRequest request = HttpRequest.newBuilder()
 				.uri(URI.create(queryPath))
 				.header("Accept", ContentTypes.CVX)
-				.header("Content-Type", ContentTypes.CVX)
-				.POST(HttpRequest.BodyPublishers.ofString(RT.toString(query)))
+				.header("Content-Type", binary ? ContentTypes.CVX_RAW : ContentTypes.CVX)
+				.POST(requestBody)
 				.build();
 		
 		CompletableFuture<HttpResponse<String>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());

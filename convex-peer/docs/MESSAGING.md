@@ -260,7 +260,7 @@ endpoint is not yet a full peer transport.
 
 ```
 Convex (abstract — API contract, shared state)
-├── AConvexConnected (abstract — awaiting map, result dispatch, connection)
+├── AConvexConnected (abstract — result decoding, dispatch, connection)
 │   ├── ConvexRemote (Transport factory; TCP via Netty/NIO, TLS via Netty)
 │   └── ConvexLocal (paired LocalConnection to local Server)
 └── ConvexDirect (direct peer calls, no messaging)
@@ -273,17 +273,48 @@ that communicate via an `AConnection`:
 
 - **Connection field** — `protected AConnection connection`, managed by
   `setConnection()` / `close()`
-- **Awaiting map** — `ConcurrentHashMap<ACell, CompletableFuture<Message>>`
-  keyed by request ID. Registers a future before sending, completes it when the
-  result arrives.
-- **Result correlation** — incoming result messages are matched by ID to
-  awaiting futures via `returnMessageHandler`.
+- **Result correlation** — `returnMessageHandler` delegates matching to the
+  physical connection, then decodes the result with the client's store and
+  applies transaction bookkeeping.
 - **Protocol handling** — incoming protocol messages (e.g. server-initiated
   CHALLENGE) are handled automatically (auto-response with the client's
   keypair).
-- **`message(Message)`** — core dispatch implementing the register-before-send
-  pattern. Fire-and-forget messages (no request ID) are sent directly and return
+- **`message(Message)`** — delegates requests to the connection with their IDs
+  unchanged. Fire-and-forget messages (no request ID) are sent directly and return
   `Result.SENT_MESSAGE`.
+
+The request counter and awaiting map belong to each **physical connection end**.
+`AConnection.request(message, timeout)` allocates a fresh ID, registers its future
+before sending, and returns a future for the raw reply `Message`. Clients,
+lattice data acquisition, liveness probes and authentication challenges share
+this mechanism. Their decoding, stores and authentication policies remain with
+the callers.
+
+The map is allocated lazily on first use and retained, even when empty, until
+the connection is discarded. Completion, timeout, cancellation and send failure
+remove only the matching registration. Explicit close and remote disconnect
+terminate pending requests; transports call `closeRequests()` outside transport
+locks because completing futures can invoke user code. A registration racing
+with closure rechecks the closed flag after insertion, so it cannot miss cleanup.
+
+The registered future is also the returned reply future. It removes its own
+registration before publishing completion, timeout or cancellation, so a blocked
+caller callback cannot retain the registration. There is no separate cleanup
+future or completion stage on ordinary requests. Only authentication workers
+using a preallocated control signal require a bridge to that signal.
+Client result conversion and lattice response conversion use
+`FutureUtils` to forward cancellation upstream before notifying callers. These
+stages own their source; arbitrary caller-added `thenApply`/`thenCompose` stages
+still have normal Java cancellation semantics and do not propagate cancellation.
+An added `orTimeout` on the returned owned future also releases its request.
+In contrast, `get(timeout)` only stops that wait: cancel explicitly to abandon it.
+Neither cancellation nor expiry implies that a submitted transaction did not run.
+
+`sendRequest(message, timeout)` preserves caller-supplied numeric IDs for the raw
+Java APIs. Outstanding duplicates are rejected; completed IDs remain reusable
+for compatibility. Callers must avoid reuse while a late reply is possible,
+including collisions with automatically allocated IDs on the same connection.
+Normal request APIs allocate their own IDs. No reservation history is retained.
 
 ### 4.3 `ConvexRemote` — Network Client
 

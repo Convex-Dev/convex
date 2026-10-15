@@ -82,7 +82,7 @@ public class RootComponentTest {
 		SetApplication application=new SetApplication(root);
 		ABlob blob=Blobs.createRandom(new Random(9012),5000);
 
-		assertSame(root.cursor(),application.cursor());
+		assertSame(root.cursor().getLattice(),application.cursor().getLattice());
 		application.cursor().updateAndGet(values->values.include(blob));
 		application.sync();
 

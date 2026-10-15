@@ -414,11 +414,13 @@ public class Connection extends AConnection {
 	}
 
 	@Override
-	public synchronized void close() {
+	public void close() {
 		try {
 			channel.close();
 		} catch (IOException e) {
 			// Best effort: close is idempotent and has no useful recovery path.
+		} finally {
+			closeRequests();
 		}
 	}
 	
@@ -555,6 +557,10 @@ public class Connection extends AConnection {
 	/** Cancels a selector registration and closes its owned channel. */
 	private static void closeKey(SelectionKey key) {
 		key.cancel();
+		if (key.attachment() instanceof Connection connection) {
+			connection.close();
+			return;
+		}
 		try {
 			key.channel().close();
 		} catch (IOException e) {

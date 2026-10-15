@@ -56,6 +56,9 @@ public class NodeConfig {
 	/** Whether to restore state from store on startup (Boolean, default true). */
 	public static final AString RESTORE = Strings.intern("restore");
 
+	/** Enable coordinated root writes, exclusive transactions and serial fallback (default false). */
+	public static final AString TRANSACTIONAL_ROOT = Strings.intern("transactionalRoot");
+
 	/** Interval between periodic persistence runs in milliseconds (Long, default 30000). */
 	public static final AString PERSIST_INTERVAL = Strings.intern("persistInterval");
 
@@ -165,6 +168,16 @@ public class NodeConfig {
 	// ========== Instance ==========
 
 	private final AMap<AString, ACell> config;
+
+	/** Whether the host should create a transactional root cursor. */
+	public boolean isTransactionalRoot() {
+		return RT.bool(config.get(TRANSACTIONAL_ROOT));
+	}
+
+	/** Selects the root coordination policy before the host is constructed. */
+	public NodeConfig withTransactionalRoot(boolean enabled) {
+		return new NodeConfig(config.assoc(TRANSACTIONAL_ROOT,CVMBool.create(enabled)));
+	}
 
 	private NodeConfig(AMap<AString, ACell> config) {
 		this.config = (config == null) ? Maps.empty() : config;

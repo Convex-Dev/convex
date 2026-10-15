@@ -613,8 +613,8 @@ public class Server implements Closeable {
 			case COMMAND:
 				return null;
 			case RESULT:
-				// Check if this is a response to a server-initiated verification
-				if (inboundVerifier.handleResult(m)) return null;
+				// Correlate replies to requests initiated by this physical connection.
+				if (m.getConnection()!=null && m.getConnection().completeRequest(m)) return null;
 				returnError(m,ErrorCodes.UNEXPECTED,Strings.UNEXPECTED_RESULT);
 				return null;
 			default:

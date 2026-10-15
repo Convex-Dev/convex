@@ -6,6 +6,7 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFileSystem;
@@ -18,7 +19,7 @@ import convex.lattice.fs.impl.DLFSLocal;
  * {@link #fork()} creates a temporary working component whose changes remain
  * isolated until explicitly synced.</p>
  */
-public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implements AutoCloseable {
+public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implements AutoCloseable, TransactionalComponent<AVector<ACell>,DLFSDrive> {
 
 	private final AString name;
 	private final HostedFileSystem fileSystem;
@@ -72,4 +73,9 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 			return drive.fork().fileSystem;
 		}
 	}
+	@Override
+	public DLFSDrive withCursor(ALatticeCursor<AVector<ACell>> cursor) {
+		return new DLFSDrive(parent(),name,cursor);
+	}
+
 }

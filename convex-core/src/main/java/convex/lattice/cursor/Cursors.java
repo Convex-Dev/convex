@@ -34,6 +34,22 @@ public class Cursors {
 
 	// ===== Lattice Cursor Factory Methods =====
 
+	/** Creates an opt-in transactional root at the lattice's zero value. */
+	public static <V extends ACell> TransactionalRootCursor<V> createTransactionalLattice(ALattice<V> lattice) {
+		return new TransactionalRootCursor<>(lattice,lattice.zero());
+	}
+
+	/** Creates an opt-in transactional root with an explicit initial value. */
+	public static <V extends ACell> TransactionalRootCursor<V> createTransactionalLattice(ALattice<V> lattice,V initialValue) {
+		return new TransactionalRootCursor<>(lattice,initialValue);
+	}
+
+	/** Creates an opt-in transactional root with an explicit value and context. */
+	public static <V extends ACell> TransactionalRootCursor<V> createTransactionalLattice(
+			ALattice<V> lattice,V initialValue,LatticeContext context) {
+		return new TransactionalRootCursor<>(lattice,initialValue,context);
+	}
+
 	/**
 	 * Creates a root lattice cursor with the given lattice and initial value.
 	 *

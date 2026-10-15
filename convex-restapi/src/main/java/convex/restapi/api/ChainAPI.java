@@ -69,6 +69,7 @@ import convex.restapi.model.FaucetRequest;
 import convex.restapi.model.QueryAccountResponse;
 import convex.restapi.model.QueryRequest;
 import convex.restapi.model.ResultResponse;
+import convex.restapi.model.SimulateRequest;
 import convex.restapi.model.TransactRequest;
 import convex.restapi.model.TransactionPrepareRequest;
 import convex.restapi.model.TransactionPrepareResponse;
@@ -111,6 +112,7 @@ public class ChainAPI extends ABaseAPI {
 		String prefix = ROUTE;
 
 		routes.post(prefix + "query", this::query);
+		routes.post(prefix + "simulate", this::simulate);
 
 		routes.post(prefix + "transaction/prepare", this::transactionPrepare);
 		routes.post(prefix + "transaction/submit", this::transactionSubmit);
@@ -561,9 +563,14 @@ public class ChainAPI extends ABaseAPI {
 			if (!GenericMessagePolicy.allows(type)) {
 				throw new ForbiddenResponse("Message type not permitted over HTTP: "+type);
 			}
-			CompletableFuture<Result> cf = convex.message(message);
+			// HTTP callers have independent ID spaces but share this peer connection.
+			// Allocate a connection-local ID and restore the caller's ID in the response.
+			ACell callerID=message.getRequestID();
+			CompletableFuture<Result> cf = callerID==null
+					? convex.message(message) : convex.request(message);
 
 			Result r = cf.get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			if (callerID!=null) r=r.withID(callerID);
 			setResult(ctx, r);
 		} catch (BadRequestResponse e) {
 			throw e;
@@ -970,6 +977,58 @@ public class ChainAPI extends ABaseAPI {
 		setContent(ctx,r);
 	}
 
+	@OpenApi(path = ROUTE+"simulate",
+			methods = HttpMethod.POST,
+			operationId = "simulate",
+			tags = {"Transactions"},
+			summary = "Simulate a transaction without signing or committing state",
+			requestBody = @OpenApiRequestBody(
+					description = "JSON requires address and source; optional sequence defaults to the account's next sequence. Binary CAD3 accepts an unsigned or signed transaction. No seed or signature is required or checked. Simulation includes transaction Juice, balance and memory accounting, so a zero-balance account fails with JUICE. Sequence validity is not checked. Public query Juice and concurrency limits apply; costs reflect the current peer snapshot.",
+					content = {
+						@OpenApiContent(from = SimulateRequest.class, type = "application/json",
+							exampleObjects = {
+								@OpenApiExampleProperty(name = "address", value = "12"),
+								@OpenApiExampleProperty(name = "source", value = "(* 2 3)")}),
+						@OpenApiContent(type = "application/cvx-raw")}),
+			responses = {
+				@OpenApiResponse(status = "200", description = "Simulation result, possibly a CVM error. No state, balance or sequence changes are committed.",
+					content = {@OpenApiContent(from = ResultResponse.class, type = "application/json")}),
+				@OpenApiResponse(status = "400", description = "Invalid simulation request"),
+				@OpenApiResponse(status = "503", description = "Public query capacity unavailable")})
+	public void simulate(Context ctx) {
+		ATransaction transaction;
+		if (ContentTypes.CVX_RAW.equals(ctx.req().getContentType())) {
+			ACell payload = getRawBody(ctx,server.getStore());
+			if (payload instanceof SignedData<?> signed) payload = signed.getValue();
+			transaction = RT.ensureTransaction(payload);
+			if (transaction == null) throw new BadRequestResponse("Simulation requires a transaction payload");
+		} else {
+			AMap<AString,ACell> req = readJSONBody(ctx);
+			Address address = Address.parse(req.get(Strings.ADDRESS));
+			if (address == null) throw new BadRequestResponse("Simulation requires a valid address");
+			AString source = RT.ensureString(req.get(Strings.SOURCE));
+			if (source == null) throw new BadRequestResponse("Source code must be a string");
+			ACell code = readCode(source.toString());
+			ACell sequenceValue = req.get(Strings.create("sequence"));
+			long sequence;
+			if (sequenceValue != null) {
+				if (!(sequenceValue instanceof CVMLong value) || value.longValue() < 0) {
+					throw new BadRequestResponse("Sequence must be a non-negative long integer");
+				}
+				sequence = value.longValue();
+			} else {
+				AccountStatus account = server.getPeer().getConsensusState().getAccount(address);
+				// A missing account is reported by transaction accounting as NOBODY.
+				if (account != null && account.getSequence() == Long.MAX_VALUE) {
+					throw new BadRequestResponse("Account has no next sequence number");
+				}
+				sequence = account == null ? 0 : account.getSequence() + 1;
+			}
+			transaction = Invoke.create(address,sequence,code);
+		}
+		setContent(ctx,restServer.getPublicQueryService().execute(transaction,transaction.getOrigin()));
+	}
+
 	/**
 	 * Read code on best efforts basis, expecting a String
 	 * @param srcValue Source value to read
@@ -1074,9 +1133,9 @@ public class ChainAPI extends ABaseAPI {
 		methods = HttpMethod.POST,
 		operationId = "query",
 		tags= {"Transactions"},
-		summary="Query as Convex account",
+		summary="Query or simulate without committing state",
 		requestBody = @OpenApiRequestBody(
-				description = "Query request",
+				description = "Ordinary source forms use a balance-independent Juice allowance, including for zero-balance accounts, bounded by the server's query limits. Results report execution Juice, not transaction cost estimates. To simulate transaction accounting, send a binary CAD3 map (application/cvx-raw) with a transaction payload as :source. Simulation uses the transaction's origin, retains balance and memory checks, and estimates costs against the current peer snapshot. Neither mode commits state or charges coins. Simulation does not validate signatures or sequence numbers.",
 				content= {@OpenApiContent(
 						from=QueryRequest.class,
 						type = "application/json", 
@@ -1088,11 +1147,12 @@ public class ChainAPI extends ABaseAPI {
 							mimeType = "application/cvx",
 							from=String.class,
 							example="{\n  :address #12 \n  :source (* 2 3)\n}"
-						)
+						),
+						@OpenApiContent(type = "application/cvx-raw")
 				}),
 		responses = {
 				@OpenApiResponse(status = "200", 
-						description = "Query executed. Result could be a CVM error, but query itself was valid", 
+						description = "Query or transaction simulation completed. The result may contain a CVM error.",
 						content = {
 							@OpenApiContent(
 									from=ResultResponse.class,
@@ -1122,8 +1182,9 @@ public class ChainAPI extends ABaseAPI {
 			ACell form;
 			String type=ctx.req().getContentType();
 			
-			if (ContentTypes.CVX.equals(type)) {
-				ACell body=getCVXBody(ctx);
+			if (ContentTypes.CVX.equals(type)||ContentTypes.CVX_RAW.equals(type)) {
+				ACell body=ContentTypes.CVX_RAW.equals(type)
+						? getRawBody(ctx,server.getStore()) : getCVXBody(ctx);
 				if (!(body instanceof AMap)) {
 					throw new BadRequestResponse("query body is not a map.");
 				}

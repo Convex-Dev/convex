@@ -1,7 +1,9 @@
 package convex.lattice.cursor;
 
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
@@ -68,6 +70,14 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 	}
 
 	@Override
+	public boolean supportsExclusiveTransactions() { return base.supportsExclusiveTransactions(); }
+
+	@Override
+	protected <T> T exclusive(Supplier<T> action) {
+		return base.exclusive(action);
+	}
+
+	@Override
 	protected LatticeContext getInheritedContext() {
 		if (base instanceof ALatticeCursor<?> latticeCursor) return latticeCursor.getContext();
 		return LatticeContext.EMPTY;
@@ -87,6 +97,17 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 	 * @return Stored cell to write
 	 */
 	protected abstract S prepareWrite(V value);
+
+	/**
+	 * Creates the authoring function for one atomic operation, on its first actual
+	 * non-null change. Reused when retries produce different values, so subclasses
+	 * can capture operation-scoped inputs without resolving them for no-op writes.
+	 *
+	 * @return Operation-local authoring function
+	 */
+	protected Function<V,S> prepareWriteOperation() {
+		return this::prepareWrite;
+	}
 
 	/**
 	 * Reads the view value from a stored cell. Identity by default — the stored type
@@ -109,6 +130,7 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 		private V value;
 		private S stored;
 		private boolean present;
+		private Function<V,S> prepare;
 
 		/** Applies a write of {@code newValue} over the current stored cell. */
 		S apply(S current, V newValue) {
@@ -116,7 +138,12 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 			if (Utils.equals(newValue, view(current))) return current;
 			if (present && Utils.equals(newValue, value)) return stored;
 			value = newValue;
-			stored = (newValue == null) ? null : prepareWrite(newValue);
+			if (newValue==null) {
+				stored=null;
+			} else {
+				if (prepare==null) prepare=prepareWriteOperation();
+				stored=prepare.apply(newValue);
+			}
 			present = true;
 			return stored;
 		}

@@ -133,6 +133,7 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		} finally {
 			AConnection conn = connection;
 			if (conn != null) {
+				conn.closeRequests();
 				try {
 					onDisconnect.accept(conn);
 				} catch (Exception e) {
