@@ -39,6 +39,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
+import convex.core.util.FutureUtils;
 import convex.lattice.cursor.Root;
 import convex.peer.Config;
 
@@ -74,8 +75,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private final Set<AConnection> inboundConnections=ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<AConnection,ConnectionStats> connectionStats=
 		new ConcurrentHashMap<>();
-	private final ConcurrentHashMap<AConnection,ConcurrentHashMap<ACell,CompletableFuture<Result>>>
-		pendingDataRequests=new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<AConnection,Set<Acquiror>> activeAcquirors=
 		new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<Message,LatticePropagator> acquiredMessages=
@@ -208,11 +207,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 		inboundVerifier.forget(connection);
 		connectionStats.remove(connection);
 		propagator.getConnectionManager().removeUpgradedInboundConnection(connection);
-		ConcurrentHashMap<ACell,CompletableFuture<Result>> pending=pendingDataRequests.remove(connection);
-		if (pending!=null) {
-			IOException closed=new IOException("Lattice source connection closed during acquisition");
-			pending.values().forEach(future -> future.completeExceptionally(closed));
-		}
 		Set<Acquiror> acquisitions=activeAcquirors.get(connection);
 		if (acquisitions!=null) acquisitions.forEach(Acquiror::close);
 		acquiredMessages.keySet().removeIf(message -> message.getConnection()==connection);
@@ -286,8 +280,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 			throws BadFormatException,IOException {
 		MessageType type=message.getType();
 		if (type==MessageType.RESULT) {
-			if (inboundVerifier.handleResult(message)) return;
-			if (completeDataRequest(message,context.connection())) return;
+			if (context.connection()!=null && context.connection().completeRequest(message)) return;
 		}
 		switch (type) {
 			case PING -> processPing(message);
@@ -636,12 +629,14 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	private CompletableFuture<Result> requestMissing(AConnection connection,Hash[] hashes) {
-		return requestResult(connection,id -> Message.createDataRequest(id,hashes));
+		return requestResult(connection,Message.createDataRequest(null,hashes));
 	}
 
 	/** Correlated liveness probe on an authenticated, listener-owned return route. */
 	CompletableFuture<?> probe(AConnection connection) {
-		return requestResult(connection,id -> Message.createPing((CVMLong)id)).thenApply(result -> {
+		if (connection==null) return CompletableFuture.failedFuture(new IOException("Lattice source connection is closed"));
+		return FutureUtils.map(connection.request(Message.createPing(null),Config.DEFAULT_INTERNAL_TIMEOUT),message -> {
+			Result result=message.toResult();
 			if (result.isError() || !(result.getValue() instanceof CVMLong)) {
 				throw new IllegalStateException("Invalid PING response");
 			}
@@ -649,46 +644,9 @@ final class LatticeProtocolEndpoint implements Closeable {
 		});
 	}
 
-	private CompletableFuture<Result> requestResult(AConnection connection,
-			java.util.function.Function<ACell,Message> request) {
-		if (connection==null || connection.isClosed()) {
-			return CompletableFuture.failedFuture(new IOException("Lattice source connection is closed"));
-		}
-		ACell id=connection.nextRequestID();
-		CompletableFuture<Result> future=new CompletableFuture<>();
-		ConcurrentHashMap<ACell,CompletableFuture<Result>> byID=
-			pendingDataRequests.computeIfAbsent(connection,c -> new ConcurrentHashMap<>());
-		byID.put(id,future);
-		future.orTimeout(Config.DEFAULT_INTERNAL_TIMEOUT,TimeUnit.MILLISECONDS);
-		future.whenComplete((result,error) -> {
-			byID.remove(id);
-			if (byID.isEmpty()) pendingDataRequests.remove(connection,byID);
-		});
-		try {
-			if (connection.isClosed() || !connection.sendMessage(request.apply(id))) {
-				future.completeExceptionally(new IOException("Unable to send lattice request"));
-			}
-		} catch (Exception e) {
-			future.completeExceptionally(e);
-		}
-		return future;
-	}
-
-	private boolean completeDataRequest(Message message,AConnection connection) {
-		if (connection==null) return false;
-		ConcurrentHashMap<ACell,CompletableFuture<Result>> byID=pendingDataRequests.get(connection);
-		if (byID==null) return false;
-		try {
-			ACell id=message.getResultID();
-			if (id==null) return false;
-			CompletableFuture<Result> future=byID.remove(id);
-			if (byID.isEmpty()) pendingDataRequests.remove(connection,byID);
-			if (future==null) return false;
-			future.complete(message.toResult());
-			return true;
-		} catch (Exception e) {
-			return false;
-		}
+	private CompletableFuture<Result> requestResult(AConnection connection,Message request) {
+		if (connection==null) return CompletableFuture.failedFuture(new IOException("Lattice source connection is closed"));
+		return FutureUtils.map(connection.request(request,Config.DEFAULT_INTERNAL_TIMEOUT),Message::toResult);
 	}
 
 	private static Throwable unwrapCompletion(Throwable error) {
@@ -773,7 +731,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 	void sweepClosedConnections() {
 		HashSet<AConnection> candidates=new HashSet<>(connectionStats.keySet());
 		candidates.addAll(inboundConnections);
-		candidates.addAll(pendingDataRequests.keySet());
 		candidates.addAll(activeAcquirors.keySet());
 		for (AConnection connection:candidates) if (connection.isClosed()) removeConnection(connection);
 	}

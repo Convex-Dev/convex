@@ -38,11 +38,16 @@ public class LatestUpdateQueue<E> implements BlockingQueue<E> {
 	@Override
 	public synchronized E take() throws InterruptedException {
 		while (item==null) {
-			wait();
+			awaitUpdate();
 		}
 		E result=item;
 		item=null;
 		return result;
+	}
+
+	/** Wait boundary, called with this queue's monitor held. */
+	void awaitUpdate() throws InterruptedException {
+		wait();
 	}
 
 	@Override

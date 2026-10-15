@@ -8,31 +8,123 @@ practical companion for `convex-core`, with `convex-social`, `convex-dlfs` and
 `convex-p2p` as worked examples. Cursor internals are in
 [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
 
-## Proposed application API
+## Application root and components
 
-**Application lifecycle and subscription design proposal.** The ownership hierarchy
-below is implemented; lifecycle and subscription signatures remain proposals. The
-sections after this proposal describe the existing application API. This design uses CAD024 for merge semantics, CAD035
+**Implemented:** `ALatticeApplication<V>` has a live view of a hosted root cursor, exposes its
+`getLattice()` and atomically merges incoming root values through `merge(value)`.
+It can attach to a `RootComponent<V>` or construct a local root from an
+`ALattice<V>` and an `AStore`. Neither merging nor hosting requires domain
+components to exist.
+
+The global lattice has a keyed map root. The existing `KeyedLattice` represents it
+as `Index<Keyword, ACell>`, an `AMap`. Applications participate at the globally
+defined region paths and meanings, composing the region lattices they understand.
+Unknown incoming regions are ignored by keyed merge; existing unknown regions are
+retained. This is selective participation, not a separate application namespace.
+The generic base also supports other value types for local applications and tests.
+
+There are two complementary kinds of knowledge:
+
+- The supplied root lattice defines region dispatch, navigation, verification and
+  merge semantics for the complete root value.
+- A domain application knows how to construct components for its regions, possibly
+  parameterised by owner, collection name or another path key. Each component can
+  construct further components within its own subtree.
+
+Component factories are optional domain conveniences. The base application does
+not discover merge rules from components, enumerate them during merge, or require
+a component registry. A relay can merge every region in its supplied lattice
+without constructing a single domain component.
+
+```java
+public final class RelayApplication extends ALatticeApplication<Index<Keyword, ACell>> {
+    public RelayApplication(KeyedLattice lattice, AStore store) {
+        super(lattice, store); // local root initially at lattice.zero()
+    }
+
+    public RelayApplication(RootComponent<Index<Keyword, ACell>> host) {
+        super(host);           // shares the host's atomic state and lattice
+    }
+}
+
+RelayApplication app = new RelayApplication(selectedRegions, store);
+app.merge(incomingRoot); // atomic local merge, including region verification
+app.sync();              // persist and publish through host policy
+```
+
+Local construction does not restore an existing store root. Use
+`RootComponent.open(lattice, store)` and the host constructor to restore one.
+The caller owns the store lifecycle. A hosted application's `getLattice()` returns
+the host cursor's lattice, so component navigation and incoming merges use the same
+definition. There is no second application merge policy that can disagree with it.
+`merge` uses the cursor's effective context, preserves the current root in the
+`own` position, and retries after concurrent updates. It does not publish or flush.
+
+### Sharing a host
+
+Each application gets a separate live root cursor view. The views share one atomic
+state and the same lattice definition, but have independent context overrides:
+
+```java
+RelayApplication first = new RelayApplication(host);
+RelayApplication second = new RelayApplication(host);
+first.cursor().setContext(LatticeContext.create(null, firstKey));
+second.cursor().setContext(LatticeContext.create(null, secondKey));
+```
+
+Writes through either application are immediately visible through both views and
+the host. A view does not copy the tree or create another atomic state container.
+Components must navigate from their application's cursor to inherit its context,
+including at signing and stamping boundaries. Existing descendants see subsequent
+context changes. An application with no override inherits the host context live;
+`setContext(null)` restores that inheritance. Use `LatticeContext.EMPTY` to select
+a policy with no signing capability instead of inheriting one from the host.
+
+Application root merges use the application's context. A fork captures its view's
+context for local work, and merges into that view using its current context on
+sync. Host merges use the host context and do not borrow application signers.
+Publication is also a host operation: application sync invokes the shared root's
+publication policy, including the host context for a concurrent merge on write-back.
+The cursor's sync result is the exact published snapshot; newer shared writes may
+remain pending locally. Publishing one application can include other applications'
+already-installed writes in the same root snapshot.
+
+This separation supplies independent write policies, not an access-control boundary
+between code sharing the host. Verification rules remain bound to the shared
+lattice. Configure that lattice before use; these views do not compose or replace
+region definitions dynamically. The low-level `RootLatticeCursor.view()` operation
+provides the same live-view behaviour without an application wrapper.
+
+## Proposed lifecycle and subscriptions
+
+**Design proposal.** The root merge API and ownership hierarchy are implemented;
+lifecycle and subscription signatures below remain proposals. The sections after
+this proposal describe the existing component API. This design uses CAD024 for merge semantics, CAD035
 for cursor atomicity, CAD036 for hosting, CAD038 for ownership and CAD045 for
 application composition. Changes to their application contracts need corresponding
 CAD updates before implementation is described as normative.
 
 ### Responsibilities
 
-An application is a launched composition of components and subscriptions. It need
-not itself be a component at the root, or carry the Java type of the complete root.
+An application remains a typed component at the complete root. Its supplied
+lattice is sufficient for root merging; domain subclasses add component factories.
+Lifecycle and subscriptions manage active work and replication demand without
+becoming another source of merge semantics.
 
 | Object | Responsibility |
 |---|---|
 | `RootComponent<V>` | Shared authoritative cursor, schema, storage and host services |
-| `ALatticeApplication` | Launch/close lifecycle, application policy and owned subscriptions |
+| `ALatticeApplication<V>` | Root merge API; optionally domain factories, lifecycle and subscriptions |
 | `LatticeSubscription<V>` | Interest in one subtree, a live cursor and optional change observers |
 | `ALatticeComponent<V>` | Lightweight domain API around a cursor at one path |
 
 Keep `RootComponent` as the host abstraction initially. A local root supports the
 same application API as a root hosted by `NodeServer`; the node installs replication
 services. A new host interface is only needed if another implementation requires it.
-`ALatticeApplication` no longer extends `ALatticeComponent`.
+`ALatticeApplication<V>` continues to extend `ALatticeComponent<V>`.
+Application-selected region definitions configure the host root at construction;
+the host does not need to know the corresponding component classes. Combining
+different applications' region selections in a shared host remains future work.
 
 Signing establishes responsibility for the entire signed subtree. Its owner is
 responsible for merging and publishing that tree, including coordinating multiple
@@ -175,11 +267,18 @@ against the current implementation. Paths use canonical CVM keys, as existing
 `cursor.path(...)` calls do.
 
 ```java
-public abstract class ALatticeApplication implements AutoCloseable {
-    public final void launch(RootComponent<?> host);
+public abstract class ALatticeApplication<V extends ACell>
+        extends ALatticeComponent<V> implements AutoCloseable {
+    protected ALatticeApplication(RootComponent<V> host);
+    protected ALatticeApplication(ALattice<V> lattice, AStore store);
+
+    public final ALattice<V> getLattice();
+    public V merge(V other);
+
+    public final void launch();
     public final void close();
 
-    public final <V extends ACell> LatticeSubscription<V> subscribe(ACell... path);
+    public final <T extends ACell> LatticeSubscription<T> subscribe(ACell... path);
     public final void sync();
     public final CompletionStage<Void> pull();
     public final void flush() throws IOException;
@@ -206,8 +305,12 @@ application's write policy before binding cursors. The default `onError` reports
 asynchronous failures through logging; applications can override it for supervision.
 
 ```java
-public final class MyApplication extends ALatticeApplication {
+public final class MyApplication extends ALatticeApplication<Index<Keyword, ACell>> {
     private Feed feed;
+
+    public MyApplication(RootComponent<Index<Keyword, ACell>> host) {
+        super(host);
+    }
 
     @Override
     protected void onLaunch() {
@@ -217,8 +320,8 @@ public final class MyApplication extends ALatticeApplication {
     }
 }
 
-MyApplication app = new MyApplication();
-app.launch(node.getRootComponent());  // node already launched and configured
+MyApplication app = new MyApplication(node.getRootComponent());
+app.launch();  // node already launched and configured
 // The same application can launch against a standalone RootComponent.
 ```
 
@@ -231,7 +334,7 @@ creation itself opens no connections, starts no workers and installs no observer
 ### Launch and close
 
 - Host schema and peer groups are configured before host launch. Application launch
-  attaches to a ready host, binds its policy and runs `onLaunch`. Readiness means
+  uses its bound, ready host, binds its policy and runs `onLaunch`. Readiness means
   locally usable; it does not mean every remote peer has been contacted.
 - Application launch is single-use. If `onLaunch` fails, release registrations made
   during launch and leave the host and other applications running.
@@ -239,8 +342,8 @@ creation itself opens no connections, starts no workers and installs no observer
   view immediately and requests replication through the host's configured services.
   It does not wait for network acquisition. Local-only hosts create the same view
   without network activity.
-- Application policy supplies signing and timestamp capabilities once, through an
-  application-local cursor view installed before descendant boundaries are built.
+- Application policy supplies signing and timestamp capabilities through the
+  application's existing live cursor view, before writes begin.
   It must not mutate the shared host cursor's context. Merge authorisation is bound
   to the host's lattice instances; an application's signing capability does not
   replace it.
@@ -342,6 +445,7 @@ still wins as a whole; local atomicity does not introduce field-wise merge seman
 | Operation | Completion contract |
 |---|---|
 | Cursor update | One local state change is atomically visible; publication may still be pending |
+| Application `merge(value)` | Atomically merge an incoming root using the supplied lattice and effective cursor context; publication remains separate |
 | Fork `sync()` | Merge one working snapshot into its immediate parent; concurrent state follows the declared lattice semantics |
 | Application `sync()` | Persist and publish a host root snapshot, then notify configured replication services; no remote acknowledgement |
 | Application `pull()` | One pull round for a captured set of current interests and configured routes has merged and published its successful responses; failures complete the stage exceptionally, without undoing successful merges |
@@ -355,9 +459,9 @@ completion signal, not a claim that all peers are globally up to date. Applicati
 authoritative root. A root snapshot already published cannot be rolled back by a
 later propagation failure.
 
-Atomic multi-path operations use one update or fork at a common ancestor. Separate
-component calls are separate atomic operations. A fork is a mergeable batch, not
-serialisable isolation for arbitrary cross-field invariants.
+Atomic multi-path operations use one update or `transact` at a common ancestor.
+Separate component calls are separate atomic operations. A fork is a mergeable
+batch, not serialisable isolation for arbitrary cross-field invariants.
 
 ### Implementation scope and verification
 
@@ -383,10 +487,11 @@ timestamp semantics. Use futures or latches for concurrency tests, never sleeps.
 - One component, one path. An `ALatticeComponent` holds a cursor at exactly one lattice
   path and exposes domain operations; an `ALatticeApplication` composes regions at the
   root; a facade spanning paths contains components rather than being one.
-- Applications never call merge directly. They write through cursors and let the
-  cursor chain handle signing, typing and propagation.
-- Accept a `RootComponent`, not a `NodeServer` or `AStore`. The same application code
-  runs over a local store or a networked node.
+- Applications merge incoming root values with `merge(value)`, which delegates to
+  the root cursor. Domain writes also use cursors for signing, typing and atomicity;
+  components do not call lattice merge functions directly.
+- Accept a `RootComponent` when attaching to a host; local applications may also
+  accept a lattice and store. Domain components remain independent of `NodeServer`.
 - Persist, sync and flush are three different boundaries: persistence writes cells,
   sync merges and publishes, flush is physical durability.
 - Under union merges a removed key resurrects, so tombstone; for durable deletes use a
@@ -398,7 +503,7 @@ timestamp semantics. Use futures or latches for concurrency tests, never sleeps.
 
 ```
 Domain components        DLFSDrive, Social        one component per path
-Application component    ALatticeApplication      region composition
+Application component    ALatticeApplication      root merge and optional region factories
 Root component           RootComponent            persistence and publication
 Cursor and lattice       path(), fork(), merge    state and merge semantics
 Optional host runtime    NodeServer               replication and lifecycle
@@ -437,11 +542,11 @@ IndexLattice<Blob, ACell> FEED_LATTICE = IndexLattice.create(LWWLattice.INSTANCE
 MapLattice<ACell, ACell> FOLLOWS_LATTICE = MapLattice.create(LWWLattice.INSTANCE);
 ```
 
-**Write a custom lattice for structured records.** When a node has named children with
-different strategies, extend `ALattice` and implement `merge` (child by child), `path`
-(the sub-lattice at each key) and `zero` (the correctly typed empty container).
-`path()` is what lets cursors navigate and auto-initialise; without it a child has no
-lattice semantics.
+**Compose structured records from keyed lattices.** Use `KeyedLattice` for named
+children with different strategies in an index, or `StringKeyedLattice` for a
+string-keyed hash map. These provide per-child merge, navigation and the appropriate
+zero value. A custom `ALattice` is needed only for semantics the standard types
+cannot express; it must implement `merge`, `path` and `zero` consistently.
 
 **Wrap with `OwnerLattice`** for self-sovereign data:
 
@@ -459,7 +564,7 @@ KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LAT
 
 ## Building the application layer
 
-**Compose from a generic host.** Application code depends on `RootComponent` only:
+**Compose from a generic host.** Hosted application factories accept `RootComponent`:
 
 ```java
 public final class MyApplication extends ALatticeApplication<Index<Keyword, ACell>> {
@@ -516,13 +621,16 @@ them or recreated on demand, never accumulated in an unbounded cache.
 receives `lattice.zero()` for an uninitialised path, so no null guard is needed:
 
 ```java
-public Blob post(String text) {
-    long ts = System.currentTimeMillis();
-    Blob key = SocialPost.createKey(ts);
-    cursor.updateAndGet(feed -> feed.assoc(key, SocialPost.createPost(text, ts)));
-    return key;
+public void putPost(Blob key, String text) {
+    long ts = cursor.getContext().currentTimestampValue();
+    AHashMap<Keyword, ACell> post = SocialPost.createPost(text, ts);
+    cursor.updateAndGet(feed -> feed.assoc(key, post));
 }
 ```
+
+This example writes an explicitly selected key. `Feed.post` allocates a free key
+starting at the operation timestamp, advancing the key on collisions without
+changing the post's timestamp. Key allocation is separate from the write clock.
 
 `cursor.assoc(key, value)` and `cursor.assocIn(value, keys...)` cover simple writes and
 auto-initialise intermediates from `zero()`. Reads use `cursor.get()` and
@@ -538,11 +646,87 @@ data format from cursor mechanics. Rules of thumb:
   `AHashMap` for leaf records and dynamic key sets. `Index` resolves `Keyword` and
   `AString` keys identically, which matters for JSON interoperability.
 
+## Component transactions
+
+**Implemented:** `TransactionalComponent<V,C>` adds typed `transact`,
+`transactAsync` and `transactLocked` operations. Social, feed, follow, identity,
+node-record and DLFS region/drive components implement this interface. Existing
+component subclasses can opt in without changing `ALatticeComponent<V>`.
+
+```java
+user.transact(u -> {
+    u.feed().post("Hello");
+    u.follows().follow(otherDid);
+});
+
+user.transactAsync(u -> u.feed().post("Another post"))
+    .thenRun(this::notifyLocalCommit);
+```
+
+The callback receives a private component view. Its child components share the
+same private state, and the final value is installed atomically through the live
+cursor's signing and stamping boundaries. An exception discards the staged state.
+Nested transactions on that view remain part of the outer transaction. Views and
+descendants must not escape the callback; state access after completion or from
+another thread is rejected. `sync()` on a transaction view is rejected as well.
+
+Callbacks may repeat and must restrict their mutations to the supplied view.
+External effects belong after synchronous completion or in a future continuation.
+The transaction protects only its subtree: decisions must not depend on reads from
+captured live components outside that subtree. Put such operations at their common
+ancestor instead. Persistence may write immutable cells while staging; rollback
+does not undo those physical writes or any external effects.
+
+Conflict checks compare immutable values, using identity only as a fast path.
+An equal replacement of the starting value does not require recomputation; an
+unchanged result does not cause a write. However, a concurrent writer installing
+the same proposed result does **not** count as completing this operation. Two
+increments must both take effect. Signed ancestor changes and unrelated sibling
+writes may require another commit attempt without rerunning the domain callback
+when the subscribed value is still equal.
+
+The host selects the concurrency policy at construction:
+
+| Root | `transact` | `transactLocked` | Ordinary writes |
+|---|---|---|---|
+| `RootLatticeCursor` (default) | Optimistic retries | Throws before invoking the callback | Original atomic operations |
+| `TransactionalRootCursor` | Three optimistic attempts, then serial fallback | Callback runs once under root exclusion | Commits coordinate through a root lock |
+
+```java
+RootComponent<V> host = new RootComponent<>(
+    Cursors.createTransactionalLattice(lattice), store);
+
+// Alternatively, when creating a NodeServer:
+NodeConfig config = NodeConfig.create().withTransactionalRoot(true);
+```
+
+The lock belongs to the shared root, covering every application view, ordinary
+cursor write and incoming merge. It excludes writes to unrelated regions too;
+reads continue to observe immutable committed values. Locked callbacks must stay
+short and must not wait for another writer, publish state, or mutate a captured
+live view. Forks inherit the capability but have independent state and locks.
+`cursor.supportsExclusiveTransactions()` exposes the capability without probing
+it by attempting a write. An ordinary root never acquires a write lock implicitly.
+
+For a custom component, implement `TransactionalComponent<Value,MyComponent>`
+and `withCursor(ALatticeCursor<Value>)`, creating a fresh component with the same
+domain metadata and storage policy. Rebuild children against that cursor; do not
+reuse cached live children. Application subclasses can use the protected
+`ALatticeApplication(host, cursor)` constructor to retain host storage policy.
+
+`transact` returns `void`; `transactAsync` returns `CompletableFuture<Void>`.
+Completion means committed locally, not persisted, published or acknowledged by
+peers. Async work uses the shared virtual executor, or a caller-supplied executor
+via `transactAsync(action, executor)`. Components create no workers of their own.
+Cancelling a future neither rolls back a commit nor guarantees that an executing
+callback stops. Publication and durability remain explicit operations.
+
 ## Fork and sync
 
 A fork is an independent working copy; `sync()` merges it back through its cursor
-parent with lattice semantics and always succeeds. This is separate from publication
-and durability:
+parent with lattice semantics. Concurrent state is merged rather than treated as
+a transaction conflict; verification, signing or storage can still fail. This is
+separate from publication and durability:
 
 ```java
 Social forked = social.fork();
@@ -569,9 +753,11 @@ garbage collection.
 
 ## Write policy: `LatticeContext`
 
-The context answers who signs, what time it is and which signers act for which
-owners. Install it once on the application or root cursor and every descendant
-inherits it live. A fixed context suits deterministic tests; an application policy
+The context supplies signing capabilities and the write clock; typed ownership
+lattices bind owner verification rules to the lattice instance. Install a context
+on the application's cursor for application-local policy, or the host root cursor
+for shared defaults. Descendants inherit their parent's context live. A fixed
+context suits deterministic tests; an application policy
 resolves dynamically from a clock, wallet or key store and must be thread-safe if
 shared. The `with...` methods (`withTimestamp`, `withSigningKey`, `withOwnerVerifier`,
 `withMaxFutureTimestampSkew`) override one capability and delegate the rest.
@@ -630,6 +816,28 @@ leaf. A delete is then a read-modify-write that dissociates the key.
 
 ## Testing
 
+The cross-module [SharedApplicationsTest](../../convex-integration/src/test/java/convex/lattice/SharedApplicationsTest.java)
+is a worked example of Social + P2P and DLFS + P2P sharing one `NodeServer`.
+Both applications use the same P2P region definitions, independent user signing
+contexts, and one deliberately shared node-record signer. The tests force a
+concurrent update to that common signed record, then exercise separately filtered
+publication views over real loopback connections. They verify that partial roots
+merge in either order, Social publication excludes file data, and removing the
+Social propagation group leaves DLFS/P2P running without deleting retained state.
+Region assembly and group removal are explicit; this example does not implement
+automatic subscription registration, schema composition or application shutdown.
+
+Domain operations are also exercised directly: `Feed.post` retries while another
+post, a new `P2PNodeRecord` and DLFS file changes reach the shared root. The test
+checks that every change survives with valid owner signatures. A `SocialUser`
+fork batches a post and follow into one signed update. A `DLFSDrive` fork stages
+multiple channel writes before a single `sync`, preserving a concurrently written
+sibling file; abandoning the fork leaves live state unchanged. Ordinary live NIO
+streaming writes are incremental, so use a fork when the complete file must appear
+atomically. These are separate atomic domain operations, not one transaction across
+all three regions. Adding a P2P node record changes lattice state; establishing a
+network connection remains a separate operation.
+
 - **Standalone**: exercise components over an in-memory root with a fixed context.
 - **Connected**: assert that writes propagate to the root cursor.
 - **Fork and sync**: changes in a fork are invisible until `sync()`, then merged.
@@ -649,11 +857,11 @@ Follow the repository conventions: no sleeps, wait on real signals; no fixed por
 ## Checklist
 
 - [ ] Design the state tree, then choose a merge strategy per leaf.
-- [ ] Compose lattice primitives bottom-up; write a custom `ALattice` with `merge`,
-      `path` and `zero` for structured records.
+- [ ] Compose lattice primitives bottom-up; use keyed lattices for structured
+      records and reserve custom `ALattice` implementations for new merge semantics.
 - [ ] Wrap with `OwnerLattice` for per-user ownership; register under a root keyword.
-- [ ] Derive an `ALatticeApplication`; one `ALatticeComponent` per lattice path;
-      facades contain components.
+- [ ] Supply the root lattice to an `ALatticeApplication`; optionally expose
+      domain component factories at known paths. Root merge requires no components.
 - [ ] Accept `RootComponent` in factories; provide local `open()` and host-neutral
       `connect()`.
 - [ ] Write with `updateAndGet`, navigate with `cursor.path(key)`, return exact types

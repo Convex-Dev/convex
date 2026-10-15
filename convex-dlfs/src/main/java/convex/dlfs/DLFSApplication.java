@@ -13,6 +13,7 @@ import convex.lattice.ALatticeApplication;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
+import convex.lattice.cursor.ALatticeCursor;
 
 /**
  * Application-level component for a lattice application providing DLFS.
@@ -40,7 +41,12 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	 * @param regionPath Path from the application root to the physical DLFS region
 	 */
 	protected DLFSApplication(RootComponent<V> host, ACell... regionPath) {
-		super(host);
+		this(host,host.cursor().view(),regionPath);
+	}
+
+	/** Binds a subclass's private working view and its DLFS region to a cursor. */
+	protected DLFSApplication(RootComponent<V> host,ALatticeCursor<V> cursor,ACell... regionPath) {
+		super(host,cursor);
 		if (regionPath==null) throw new IllegalArgumentException("DLFS region path must not be null");
 		this.dlfs=DLFSRegion.connect(this,regionPath);
 	}

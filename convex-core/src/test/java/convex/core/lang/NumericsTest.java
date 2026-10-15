@@ -7,21 +7,29 @@ import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+
+import java.math.BigInteger;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import convex.core.Constants;
 import convex.core.cvm.Context;
+import convex.core.cvm.Migrations;
+import convex.core.cvm.exception.ErrorValue;
+import convex.core.data.ACell;
 import convex.core.data.ObjectsTest;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.init.InitTest;
 
 /**
  * 
@@ -99,6 +107,28 @@ public class NumericsTest extends ACVMTest {
 
 		assertCastError(step("(- nil)"));
 		assertCastError(step("(- 1 [])"));
+	}
+
+	@ParameterizedTest
+	@ValueSource(longs = {0, 1})
+	public void testMinusIntermediateOverflow(long version) {
+		var minimum=CVMBigInteger.wrap(BigInteger.ONE
+			.shiftLeft(Constants.MAX_BIG_INTEGER_LENGTH*8-1).negate());
+		assertNotNull(minimum);
+		var state=Migrations.applyTo(InitTest.STATE,version);
+		ACell[][] cases={
+			{CVMLong.ONE,minimum,CVMLong.ZERO},
+			{minimum,CVMLong.ONE,CVMLong.ZERO},
+			{CVMLong.ONE,CVMLong.ZERO,minimum,CVMLong.ZERO},
+			{CVMLong.ONE,minimum,minimum}
+		};
+		for (ACell[] args:cases) {
+			assertNull(RT.minus(args));
+			var result=Core.MINUS.invoke(Context.create(state,HERO),args);
+			assertEquals(ErrorValue.INVALID_NUMERIC,result.getExceptional());
+		}
+		// The boundary itself remains valid when no intermediate result overflows.
+		assertEquals(minimum,RT.minus(new ACell[] {minimum,CVMLong.ZERO,CVMLong.ZERO}));
 	}
 	
 	@Test

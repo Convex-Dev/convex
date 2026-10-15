@@ -2,6 +2,7 @@ package convex.lattice.cursor;
 
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
@@ -42,6 +43,14 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 		this.parent = parent;
 		this.pathKeys=copyRange(keys,start,end);
 		this.pathCursor = new PathCursor<>(parent, pathKeys, parent.getLattice());
+	}
+
+	@Override
+	public boolean supportsExclusiveTransactions() { return parent.supportsExclusiveTransactions(); }
+
+	@Override
+	protected <T> T exclusive(Supplier<T> action) {
+		return parent.exclusive(action);
 	}
 
 	@Override

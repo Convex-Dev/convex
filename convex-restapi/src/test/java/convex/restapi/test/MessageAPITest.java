@@ -103,10 +103,10 @@ public class MessageAPITest extends ARESTTest {
 
 	@Test
 	public void testTransactViaMessage() throws Exception {
-		Address addr = Init.GENESIS_ADDRESS;
+		Address addr = newAccount();
 		long seq = connect().getSequence(addr) + 1;
 		Invoke tx = Invoke.create(addr, seq, Reader.read("(+ 10 20)"));
-		SignedData<ATransaction> signed = KP.signData((ATransaction) tx);
+		SignedData<ATransaction> signed = CLIENT_KP.signData((ATransaction) tx);
 		Message msg = Message.createTransaction(1, signed);
 		Result r = postMessage(msg);
 		assertSucceeded(r);
@@ -312,7 +312,7 @@ public class MessageAPITest extends ARESTTest {
 
 	@Test
 	public void testTransactBadSignature() throws Exception {
-		Address addr = Init.GENESIS_ADDRESS;
+		Address addr = newAccount();
 		AKeyPair wrongKP = AKeyPair.createSeeded(777);
 		long seq = connect().getSequence(addr) + 1;
 		Invoke tx = Invoke.create(addr, seq, Reader.read("(+ 1 1)"));
@@ -324,9 +324,9 @@ public class MessageAPITest extends ARESTTest {
 
 	@Test
 	public void testTransactBadSequence() throws Exception {
-		Address addr = Init.GENESIS_ADDRESS;
+		Address addr = newAccount();
 		Invoke tx = Invoke.create(addr, 0, Reader.read("(+ 1 1)"));
-		SignedData<ATransaction> signed = KP.signData((ATransaction) tx);
+		SignedData<ATransaction> signed = CLIENT_KP.signData((ATransaction) tx);
 		Message msg = Message.createTransaction(1, signed);
 		Result r = postMessage(msg);
 		assertTrue(r.isError(), "Transaction with bad sequence should fail");

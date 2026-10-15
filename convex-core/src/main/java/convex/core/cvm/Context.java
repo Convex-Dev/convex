@@ -316,15 +316,14 @@ public class Context {
 	}
 
 	/**
-	 * Creates an execution context with the specified actor as origin, and reserving the appropriate
-	 * amount of juice.
-	 *
-	 * Juice reserve is extracted from the actor's current balance.
+	 * Creates an execution context with the specified account as origin and an explicit
+	 * Juice limit. No coins are reserved here; transaction preparation and completion
+	 * handle accounting. Subsequent balance reductions may lower this limit.
 	 *
 	 * @param state Initial State for Context
 	 * @param origin Origin Address for Context
 	 * @param juiceLimit Initial juice requested for Context
-	 * @return Initial execution context with reserved juice.
+	 * @return Initial execution context.
 	 */
 	public static Context create(State state, Address origin,long juiceLimit) {
 		if (origin==null) throw new IllegalArgumentException("Null address!");
@@ -336,6 +335,23 @@ public class Context {
 			return Context.create(state).withError(ErrorCodes.NOBODY);
 		}
 		return create(state,tctx,0,juiceLimit,EMPTY_BINDINGS,NO_RESULT,ZERO_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
+	}
+
+	/**
+	 * Creates an ordinary query context with a balance-independent Juice allowance.
+	 * The account retains its actual balance, even when the query spends coins in
+	 * its temporary state. Do not use this context to apply or settle transactions.
+	 *
+	 * @param state State to query
+	 * @param origin Account in which to execute
+	 * @param maxJuice Non-negative execution ceiling, capped at the transaction maximum
+	 * @return Initial query context
+	 */
+	public static Context createQuery(State state, Address origin, long maxJuice) {
+		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
+		Context ctx=create(state,origin,Math.min(maxJuice,Constants.MAX_TRANSACTION_JUICE));
+		if (ctx.isExceptional()) return ctx;
+		return ctx.withTransactionContext(TransactionContext.createQuery(state,origin));
 	}
 
 
@@ -914,6 +930,7 @@ public class Context {
 	}
 
 	private void reviseJuiceLimit(long newBalance) {
+		if (getTransactionContext().isQuery()) return;
 		long juicePrice=chainState.state.getJuicePrice().longValue();
 		juiceLimit=Math.min(juiceLimit, Juice.calcAvailable(newBalance, juicePrice));
 	}
@@ -1981,6 +1998,8 @@ public class Context {
 		if (time<timestamp) time=timestamp;
 
 		long juiceNeeded=(time-timestamp)/Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT;
+		// v0 charged only for the delay; preserve that accounting for replay.
+		if (getState().getProtocolVersion()>=1) juiceNeeded+=Juice.SCHEDULE;
 		if (!checkJuice(juiceNeeded)) return withJuiceError();
 
 		State s=getState().scheduleOp(time,getAddress(),op);

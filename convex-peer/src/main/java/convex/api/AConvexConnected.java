@@ -1,8 +1,8 @@
 package convex.api;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -14,20 +14,20 @@ import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
-import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
+import convex.core.util.FutureUtils;
 
 /**
  * Abstract base class for connection-oriented Convex client implementations.
  *
  * <p>Provides shared dispatch logic for clients that communicate via a persistent
- * {@link AConnection}: result correlation (awaiting map), register-before-send
- * pattern, and CHALLENGE auto-response. Both network ({@link ConvexRemote}) and
+ * {@link AConnection}: result decoding and CHALLENGE auto-response. Request correlation belongs to
+ * the physical connection. Both network ({@link ConvexRemote}) and
  * local ({@link ConvexLocal}) connections share this infrastructure.</p>
  *
  * <p>{@link ConvexDirect} bypasses messaging entirely and extends {@link Convex}
@@ -41,12 +41,6 @@ public abstract class AConvexConnected extends Convex {
 	 * Current Connection, may be null or a closed connection.
 	 */
 	protected volatile AConnection connection;
-
-	/**
-	 * Map of results awaiting completion. ConcurrentHashMap allows lock-free access
-	 * from both client threads (put/remove) and network I/O threads (get/complete).
-	 */
-	private final ConcurrentHashMap<ACell, CompletableFuture<Message>> awaiting = new ConcurrentHashMap<>();
 
 	/**
 	 * Handler for reverse DATA_REQUEST messages received from the remote endpoint.
@@ -74,7 +68,8 @@ public abstract class AConvexConnected extends Convex {
 
 	/** Whether a correlated request is still awaiting a reply. */
 	public boolean hasPendingRequests() {
-		return !awaiting.isEmpty();
+		AConnection conn=connection;
+		return conn!=null && conn.hasPendingRequests();
 	}
 
 	private void observeReceive() {
@@ -86,66 +81,36 @@ public abstract class AConvexConnected extends Convex {
 		super(address, keyPair);
 	}
 
-	/**
-	 * Registers a future to await a return Message for the given result ID.
-	 * Must be called BEFORE sending the message to prevent a race where the
-	 * response arrives before the future is registered.
-	 *
-	 * @param resultID ID of result message to await
-	 * @param timeout Timeout in milliseconds, or 0 for no timeout
-	 * @param transaction {@code true} if this request submits a transaction
-	 * @return CompletableFuture for the Result
-	 */
-	private CompletableFuture<Result> awaitResult(ACell resultID, long timeout, boolean transaction) {
-		if (resultID==null) throw new IllegalArgumentException("Non-null return ID required");
-
-		CompletableFuture<Message> cf = new CompletableFuture<Message>();
-		if (awaiting.putIfAbsent(resultID, cf)!=null) {
-			throw new IllegalStateException("Duplicate outstanding request ID: "+resultID);
+	/** Interprets a correlated reply using this client's store and transaction policy. */
+	private Result decodeResult(Message message,Throwable error,boolean transaction) {
+		while (error instanceof CompletionException && error.getCause()!=null) error=error.getCause();
+		if (error instanceof IllegalArgumentException) throw new CompletionException(error);
+		if (error instanceof RejectedExecutionException) return Result.FULL_CLIENT_BUFFER;
+		if (error!=null) return Result.fromException(error).withSource(SourceCodes.COMM);
+		try {
+			message.getPayload(getStore());
+		} catch (BadFormatException badFormat) {
+			log.warn("Bad message format in result: {}",badFormat.getMessage());
+			return Result.error(ErrorCodes.FORMAT, Strings.create("Bad message format: "+badFormat.getMessage()));
 		}
-
-		if (timeout>0) {
-			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
-		}
-		CompletableFuture<Result> cr=cf.handle((m,e)->{
-			awaiting.remove(resultID);
-
-			if (e!=null) {
-				return Result.fromException(e);
-			}
-
-			try {
-				m.getPayload(getStore());
-			} catch (BadFormatException e1) {
-				log.warn("Bad message format in result: {}",e1.getMessage());
-				return Result.error(ErrorCodes.FORMAT, Strings.create("Bad message format: "+e1.getMessage()));
-			}
-			Result r=m.toResult();
-			observeReceive();
-			if (transaction) observeTransactionResult(r);
-			return r;
-		});
-		return cr;
+		Result result=message.toResult();
+		observeReceive();
+		if (transaction) observeTransactionResult(result);
+		return result;
 	}
 
 	/**
 	 * Result handler for Messages received back from a connection.
-	 * Completes the awaiting future for result correlation.
+	 * Delegates result correlation to the originating connection.
 	 *
 	 * Also auto-responds to server-initiated CHALLENGE messages and delegates
 	 * explicitly enabled reverse DATA_REQUEST messages.
 	 */
 	protected final Consumer<Message> returnMessageHandler = m-> {
 		try {
-			// Fast path: RESULT messages (the common case)
-			ACell id=m.getResultID();
-			if (id!=null) {
-				CompletableFuture<Message> cf = awaiting.remove(id);
-				if (cf != null) {
-					cf.complete(m);
-					return;
-				}
-			}
+			AConnection source=m.getConnection();
+			if (source==null || source!=connection) return;
+			if (source.completeRequest(m)) return;
 
 			// Built-in reverse messages are embedded and safe to inspect storelessly.
 			// A lattice delta may legitimately reference the node's serving store, so
@@ -262,36 +227,20 @@ public abstract class AConvexConnected extends Convex {
 		if (conn==null) {
 			return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);
 		}
-		Message request=m.withID(conn.nextRequestID());
-		if (request==null) {
-			return CompletableFuture.failedFuture(
-					new IllegalArgumentException("Message type does not support request IDs"));
-		}
-		return send(conn,request);
+		boolean transaction=m.getType()==MessageType.TRANSACT;
+		return FutureUtils.handle(conn.request(m,timeout),(reply,error) -> decodeResult(reply,error,transaction));
 	}
 
 	private CompletableFuture<Result> send(AConnection conn, Message m) {
-		ACell id=m.getRequestID();
 		try {
-			if (id==null) {
-				// Not expecting any return message, so just report sending
-				boolean sent = conn.sendMessage(m);
-				if (!sent) return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
-				return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+			if (m.getRequestID()==null) {
+				boolean sent=conn.sendMessage(m);
+				return CompletableFuture.completedFuture(sent ? Result.SENT_MESSAGE : Result.FULL_CLIENT_BUFFER);
 			}
-
-			// Register future BEFORE send — response handler can find it immediately
-			CompletableFuture<Result> cf = awaitResult(id, timeout, m.getType()==MessageType.TRANSACT);
-			boolean sent = conn.sendMessage(m);
-			if (!sent) {
-				awaiting.remove(id);
-				return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
-			}
-			return cf;
+			boolean transaction=m.getType()==MessageType.TRANSACT;
+			return FutureUtils.handle(conn.sendRequest(m,timeout),(reply,error) -> decodeResult(reply,error,transaction));
 		} catch (Exception e) {
-			if (id!=null) awaiting.remove(id);
-			Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
-			return CompletableFuture.completedFuture(r);
+			return CompletableFuture.completedFuture(Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM));
 		}
 	}
 
@@ -319,14 +268,13 @@ public abstract class AConvexConnected extends Convex {
 		AConnection c = this.connection;
 		if (c != null) {
 			c.close();
+			// Also support external transports written before connection-owned tracking.
+			c.closeRequests();
 		}
 		connection = null;
 		verifiedPeer = null;
 		dataRequestHandler = null;
 		unsolicitedMessageHandler = null;
 		receiveObserver = null;
-		awaiting.forEach((id,future) -> future.completeExceptionally(
-				new IllegalStateException("Connection closed")));
-		awaiting.clear();
 	}
 }

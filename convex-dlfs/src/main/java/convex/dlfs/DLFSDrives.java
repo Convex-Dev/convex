@@ -13,6 +13,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFSLattice;
@@ -20,7 +21,7 @@ import convex.lattice.fs.DLFSNode;
 import convex.lattice.generic.MapLattice;
 
 /** Component representing all named drives belonging to one owner. */
-public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVector<ACell>>> {
+public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVector<ACell>>> implements TransactionalComponent<AHashMap<AString, AVector<ACell>>,DLFSDrives> {
 	/** State of a drive registry entry. */
 	public enum DriveStatus { LIVE, DELETED, UNTRACKED }
 
@@ -195,4 +196,9 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 			// DLFS views own no external resources; the lattice mutation succeeded.
 		}
 	}
+	@Override
+	public DLFSDrives withCursor(ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor) {
+		return new DLFSDrives(parent(),cursor);
+	}
+
 }

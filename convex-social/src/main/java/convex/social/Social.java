@@ -12,6 +12,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.cvm.Keywords;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
@@ -61,7 +62,7 @@ import convex.lattice.generic.OwnerLattice;
  * }</pre>
  */
 public class Social extends ALatticeComponent<
-		AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> {
+		AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> implements TransactionalComponent<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>,Social> {
 
 	/**
 	 * Keyword for the social section in a node's root lattice.
@@ -246,6 +247,11 @@ public class Social extends ALatticeComponent<
 	 */
 	public Social fork() {
 		return new Social(parent(),cursor.fork());
+	}
+
+	@Override
+	public Social withCursor(ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+		return new Social(parent(),cursor);
 	}
 
 }

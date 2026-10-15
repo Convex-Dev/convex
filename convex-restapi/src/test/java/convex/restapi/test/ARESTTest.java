@@ -108,10 +108,9 @@ public abstract class ARESTTest {
 	 *
 	 * <p>A {@code :TIMEOUT} means this client stopped waiting, not that the network
 	 * rejected anything — the transaction may still be in flight and may still land.
-	 * It is a statement about how loaded the host is, so it must not be conflated
-	 * with a transaction that genuinely failed. Asserting on {@code isError()} alone
-	 * conflates the two, and the resulting message sends the reader looking for a
-	 * consensus bug that is not there.</p>
+	 * The cause may be load, a stalled peer or a lost response; the timeout alone
+	 * does not establish which. Asserting on {@code isError()} alone conflates a
+	 * missing response with a confirmed transaction failure.</p>
 	 *
 	 * @param r Result to check
 	 */
@@ -119,9 +118,8 @@ public abstract class ARESTTest {
 		if (ErrorCodes.TIMEOUT.equals(r.getErrorCode())) {
 			// Deliberately does not quote a duration: the client's timeout may have been
 			// overridden, and a wrong number here would misdirect whoever reads this.
-			fail("Timed out waiting for a transaction result. This means the host was too"
-				+" slow, not that the code under test is wrong; the transaction may still"
-				+" be in flight and may still land. Result: "+r);
+			fail("Timed out waiting for a transaction result; the outcome is unknown."
+				+" Investigate peer progress and response delivery. Result: "+r);
 		}
 		assertFalse(r.isError(),()->"Transaction failed: "+r);
 	}

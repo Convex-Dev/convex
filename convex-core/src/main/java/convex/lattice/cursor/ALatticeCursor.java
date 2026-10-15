@@ -1,8 +1,11 @@
 package convex.lattice.cursor;
 
 import java.util.Arrays;
+import java.util.Objects;
+import java.util.function.Consumer;
 
 import convex.core.data.ACell;
+import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeOps;
@@ -117,6 +120,74 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 	 */
 	public ALatticeCursor<V> fork() {
 		return new ForkedLatticeCursor<>(this, lattice, get(), getContext());
+	}
+
+	/**
+	 * Runs an isolated subtree transaction. Ordinary roots retry optimistically.
+	 * Transactional roots fall back to exclusive access after three failed commit
+	 * attempts. An equal input reuses the
+	 * computed result. A no-op completes without another write after validating its input.
+	 * The callback may repeat; external side effects and writes outside the supplied
+	 * view are not permitted. Exceptions discard the private state.
+	 *
+	 * @param action Operations on a private cursor, valid only during the callback
+	 */
+	public final void transact(Consumer<? super ALatticeCursor<V>> action) {
+		Objects.requireNonNull(action);
+		Transaction attempt=new Transaction(action);
+		boolean coordinated=supportsExclusiveTransactions();
+		for (int failures=0;;failures++) {
+			if (attempt.commit()) return;
+			if (coordinated && failures==2) break;
+		}
+		exclusive(() -> {
+			if (!attempt.commit()) throw new IllegalStateException("Re-entrant write during transaction commit");
+			return null;
+		});
+	}
+
+	/** Runs one isolated callback while excluding all other writes to the shared root. */
+	public final void transactLocked(Consumer<? super ALatticeCursor<V>> action) {
+		Objects.requireNonNull(action);
+		exclusive(() -> {
+			if (!new Transaction(action).commit()) {
+				throw new IllegalStateException("Re-entrant write during transaction commit");
+			}
+			return null;
+		});
+	}
+
+	private final class Transaction {
+		private final Consumer<? super ALatticeCursor<V>> action;
+		private boolean computed;
+		private V input;
+		private V result;
+
+		Transaction(Consumer<? super ALatticeCursor<V>> action) { this.action=action; }
+
+		boolean commit() {
+			V observed=get();
+			if (!computed || !Utils.equals(observed,input)) {
+				input=observed;
+				V initial=(input==null && lattice!=null)?lattice.zero():input;
+				TransactionCursor<V> draft=new TransactionCursor<>(lattice,initial,getContext());
+				try {
+					action.accept(draft);
+					V candidate=draft.get();
+					// Merely reading an absent path must not materialise its zero value.
+					result=Utils.equals(initial,candidate)?input:candidate;
+					computed=true;
+				} finally {
+					draft.close();
+				}
+			}
+			// Validate against a fresh observation, including no-ops. Its reference
+			// may differ from the input while denoting exactly the same lattice value.
+			observed=get();
+			if (!Utils.equals(observed,input)) return false;
+			if (Utils.equals(observed,result)) return true;
+			return compareAndSet(observed,result);
+		}
 	}
 
 	/**

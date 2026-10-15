@@ -16,12 +16,23 @@ public final class TransactionContext {
 	public State initialState;
 	public long blockNumber;
 	public long txNumber=0;
+	private boolean query;
 	
 	
 	public static TransactionContext createQuery(State initialState, Address origin) {
 		TransactionContext ctx=create(initialState);
 		ctx.origin=origin;
+		ctx.query=true;
 		return ctx;
+	}
+
+	/**
+	 * Whether execution uses a peer-supplied Juice allowance independent of funds.
+	 * This applies only to ordinary queries, never to transaction simulations.
+	 * @return True for an ordinary query
+	 */
+	public boolean isQuery() {
+		return query;
 	}
 
 	public AccountKey getPeer() {
@@ -56,6 +67,7 @@ public final class TransactionContext {
 		ctx.initialState=initialState;
 		ctx.blockNumber=blockNumber;
 		ctx.txNumber=txNumber;
+		ctx.query=query;
 		return ctx;
 	}
 

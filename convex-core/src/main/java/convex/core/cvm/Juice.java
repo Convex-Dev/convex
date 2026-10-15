@@ -278,7 +278,7 @@ public class Juice {
 	public static final long EXPAND_SEQUENCE = 100;
 
 	/**
-	 * Juice cost to schedule
+	 * Base Juice cost to schedule, charged from protocol v1 in addition to the delay cost.
 	 */
 	public static final long SCHEDULE = 800;
 

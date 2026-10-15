@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.function.BiFunction;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +36,35 @@ import convex.lattice.generic.StampingLattice;
  * </ul>
  */
 public class StampedCursorTest {
+
+	@Test public void testChangedRetryKeepsOneOperationTimestamp() {
+		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO,B,CVMLong.ZERO));
+		AtomicInteger clocks=new AtomicInteger();
+		AtomicInteger preparations=new AtomicInteger();
+		LatticeContext context=new LatticeContext() {
+			@Override public CVMLong currentTimestamp() {
+				return CVMLong.create(clocks.incrementAndGet());
+			}
+		};
+		StampedCursor<ACell> cursor=StampedCursor.create(root,null,context,(value,time) -> {
+			// Force the first candidate to lose its CAS to a different field update.
+			if (preparations.incrementAndGet()==1) root.set(Maps.of(A,CVMLong.ZERO,B,CVMLong.ONE));
+			return stampWith(value,time.longValue());
+		});
+		cursor.updateAndGet(value -> RT.assoc(RT.ensureMap(value),A,CVMLong.ONE));
+		assertEquals(2,preparations.get());
+		assertEquals(1,clocks.get());
+		assertEquals(CVMLong.ONE,RT.getIn(cursor.get(),A));
+		assertEquals(CVMLong.ONE,RT.getIn(cursor.get(),B));
+		assertEquals(1,tsOf(cursor.get()));
+
+		cursor.set(cursor.get());
+		cursor.set(null);
+		assertEquals(1,clocks.get(),"No-op writes and removal do not resolve a timestamp");
+		cursor.set(Maps.of(A,CVMLong.ZERO));
+		assertEquals(2,clocks.get(),"The next operation resolves its own timestamp");
+		assertEquals(2,tsOf(cursor.get()));
+	}
 
 	static final AString USERS = Strings.create("users");
 	static final AString ALICE = Strings.create("alice");

@@ -685,11 +685,12 @@ public class NodeServerTest {
 	 * Test peer management via the propagator
 	 */
 	@Test
-	public void testPeerManagement() throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
+	public void testPeerManagement() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
 		propagator(maxNodeServer);
-		maxNodeServer.launch();
+		// Test explicit membership independently of automatic connection maintenance,
+		// which may replace client instances while reconciling desired peer routes.
 
 		LatticePropagator propagator = propagator(maxNodeServer);
 		assertNotNull(propagator);
@@ -706,8 +707,8 @@ public class NodeServerTest {
 		// Add peers with identity keys
 		AccountKey key1 = AKeyPair.generate().getAccountKey();
 		AccountKey key2 = AKeyPair.generate().getAccountKey();
-		propagator.addPeer(key1, peer1);
-		propagator.addPeer(key2, peer2);
+		propagator.addPeer(key1, peer1).get(5,TimeUnit.SECONDS);
+		propagator.addPeer(key2, peer2).get(5,TimeUnit.SECONDS);
 
 		peers = propagator.getPeers();
 		assertEquals(2, peers.size());
@@ -882,7 +883,7 @@ public class NodeServerTest {
 	 * Test that a LATTICE_QUERY request with an empty path returns a valid lattice value
 	 */
 	@Test
-	public void testLatticeQueryEmptyPath() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
+	public void testLatticeQueryEmptyPath() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
 		allowSingleGroupInbound(maxNodeServer);
@@ -891,10 +892,9 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 		assertTrue(maxNodeServer.isRunning());
 
-		// Set a value and sync so it flows through the propagator pipeline.
-		// Synchronous commit: announce + setRootData run on this thread.
+		// The network query reads the propagator's separately announced view.
 		maxNodeServer.getCursor().set(CVMLong.create(42));
-		maxNodeServer.getCursor().sync();
+		syncAndAwaitPropagator(maxNodeServer);
 		
 		// Get the server address
 		InetSocketAddress serverAddress = address(maxNodeServer);

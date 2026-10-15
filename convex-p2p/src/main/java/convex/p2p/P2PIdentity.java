@@ -7,10 +7,11 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
 /** Component at one user's {@code [:id owner :value]} lattice path. */
-public final class P2PIdentity extends ALatticeComponent<ACell> {
+public final class P2PIdentity extends ALatticeComponent<ACell> implements TransactionalComponent<ACell,P2PIdentity> {
 
 	private final AccountKey owner;
 
@@ -45,4 +46,9 @@ public final class P2PIdentity extends ALatticeComponent<ACell> {
 	public P2PIdentity fork() {
 		return new P2PIdentity(parent(),cursor.fork(),owner);
 	}
+	@Override
+	public P2PIdentity withCursor(ALatticeCursor<ACell> cursor) {
+		return new P2PIdentity(parent(),cursor,owner);
+	}
+
 }

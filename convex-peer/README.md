@@ -78,6 +78,18 @@ Result result = convex.querySync("(balance #11)");
 `convex.api.Convex` also supports asynchronous queries (`query(...)` returning
 a future) and signed transactions once an address and key pair are set.
 
+Ordinary queries work with zero-balance accounts and use a balance-independent
+Juice allowance within the peer's execution limit. This is also the behaviour of
+the GUI's Query mode. Query results report execution Juice without charging coins
+or committing state.
+
+Use `simulate(transaction)` or `simulateSync(transaction)` for transaction
+accounting, including balance and memory checks and estimated costs. Supply the
+transaction's intended origin and sequence; simulation does not advance the client
+sequence or require a key. It does not validate signatures or sequence numbers,
+and the estimate reflects the peer snapshot and execution limit at that time.
+The existing transaction-payload query protocol remains supported for compatibility.
+
 ### Optional TLS Transport
 
 Unqualified addresses and `tcp://` use native TCP, the default transport.

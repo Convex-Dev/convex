@@ -169,7 +169,7 @@ public class AccountChooserPanel extends JPanel {
 			mp.setBorder(null);
 			modeCombo = new JComboBox<String>();
 			modeCombo.setToolTipText("Use Transact to execute transactions (uses Convex Coins).\n\n"
-					+ "Use Query to compute results without changing on-chain state (free).\n\n"
+					+ "Use Query to compute results without changing on-chain state (free, including zero-balance accounts).\n\n"
 					+ "Use Prepare to prepare the transcation without submitting."
 					);
 			modeCombo.addItem("Transact");

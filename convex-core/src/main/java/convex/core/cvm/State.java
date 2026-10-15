@@ -381,9 +381,10 @@ public class State extends ARecordGeneric {
 			for (long i = 0; i < take; i++) {
 				al.add(trans.get(i));
 			}
+			tcount += take;
 			// remove schedule entries taken. Delete key if no more entries remaining
 			trans = trans.slice(take, numScheduled);
-			if (trans.isEmpty()) sched = sched.dissoc(key);
+			sched = trans.isEmpty() ? sched.dissoc(key) : sched.assoc(key, trans);
 		}
 		if (al==null) return this; // nothing to do if no transactions to execute
 
@@ -556,8 +557,8 @@ public class State extends ARecordGeneric {
 
 	/**
 	 * Applies a transaction with an explicit upper bound on execution Juice.
-	 * Primarily useful for detached or repeatedly evaluated queries where the normal
-	 * transaction maximum would permit excessive work.
+	 * Useful for transaction simulations where the normal transaction maximum would
+	 * permit excessive work. Ordinary queries do not use transaction accounting.
 	 *
 	 * @param t Transaction to apply
 	 * @param tctx Transaction context
@@ -595,7 +596,9 @@ public class State extends ARecordGeneric {
 	}
 	
 	/**
-	 * Apply a transaction in a detached transaction context, mainly for test / query
+	 * Applies a transaction in a detached context, mainly for tests and transaction
+	 * simulation. Includes resource accounting but assumes signature and sequence
+	 * validity have already been checked.
 	 * @param t Transaction
 	 * @return ResultContext after transaction is applied
 	 */

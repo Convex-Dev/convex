@@ -337,6 +337,7 @@ public class NIOServer extends AServer {
 			log.debug("Unable to close NIO client channel",e);
 		}
 		if (attachment instanceof Connection connection) {
+			connection.closeRequests();
 			try {
 				getDisconnectAction().accept(connection);
 			} catch (Exception e) {

@@ -20,7 +20,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
@@ -32,7 +31,7 @@ import convex.core.message.Message;
  * <p>When an untrusted connection sends a Belief, the server triggers
  * verification via {@link #maybeStart(AConnection)}. A virtual thread
  * sends a CHALLENGE on the connection, the remote client auto-responds,
- * and the RESULT is routed back via {@link #handleResult(Message)}.
+ * and the connection completes the reply future.
  * On success the connection's trusted key is set.</p>
  *
  * <p>At most one verification runs per connection (CAS guard).
@@ -49,12 +48,11 @@ class InboundVerifier {
 	private final AtomicLong verifiedCount = new AtomicLong();
 
 	/**
-	 * In-progress verifications keyed by connection. The future is completed
-	 * by {@link #handleResult(Message)} when the client's RESULT arrives.
+	 * In-progress verification tasks keyed by connection.
 	 * Also serves as CAS guard — at most one verification per connection.
 	 */
 	private record PendingVerification(
-			CVMLong id,CompletableFuture<Message> future,CompletableFuture<Void> stopped) {}
+			CompletableFuture<Message> future,CompletableFuture<Void> stopped) {}
 
 	private final ConcurrentHashMap<AConnection, PendingVerification> active = new ConcurrentHashMap<>();
 	private final Object lifecycleLock=new Object();
@@ -76,10 +74,9 @@ class InboundVerifier {
 		if (!conn.supportsMessage()) return;
 		if (closed || active.containsKey(conn)) return;
 
-		CVMLong id=conn.nextRequestID();
 		CompletableFuture<Message> resultFuture = new CompletableFuture<>();
 		PendingVerification pending=new PendingVerification(
-			id,resultFuture,new CompletableFuture<>());
+			resultFuture,new CompletableFuture<>());
 		synchronized (lifecycleLock) {
 			if (closed || active.putIfAbsent(conn, pending) != null) return;
 		}
@@ -96,10 +93,8 @@ class InboundVerifier {
 
 				SignedData<ACell> signed = Message.signChallenge(kp, token, null, networkID);
 
-				Message challengeMsg = Message.createChallenge(id, signed);
-				if (!conn.sendMessage(challengeMsg)) return;
-
-				Message resultMsg = resultFuture.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+				Message resultMsg = conn.request(Message.createChallenge(null,signed),0,resultFuture)
+					.get(TIMEOUT_MS,TimeUnit.MILLISECONDS);
 
 				try {
 					resultMsg.getPayload(server.getStore());
@@ -124,11 +119,12 @@ class InboundVerifier {
 			} catch (Exception e) {
 				log.debug("Inbound verification failed for {}: {}", conn, e.getMessage());
 			} finally {
-				active.remove(conn);
+				resultFuture.cancel(false);
+				active.remove(conn,pending);
 				pending.stopped().complete(null);
 			}
 		}); } catch (Exception e) {
-			active.remove(conn);
+			active.remove(conn,pending);
 			pending.stopped().complete(null);
 		}
 	}
@@ -155,26 +151,4 @@ class InboundVerifier {
 	/** Number of verifications currently in progress. */
 	int getPendingCount() { return active.size(); }
 
-	/**
-	 * Routes an inbound RESULT to a pending verification by connection.
-	 * Called from {@link Server#processMessage(Message)}.
-	 * Non-blocking — just a map lookup and future completion.
-	 *
-	 * @param m Inbound RESULT message
-	 * @return true if consumed by a pending verification, false otherwise
-	 */
-	boolean handleResult(Message m) {
-		if (active.isEmpty()) return false;
-		AConnection conn = m.getConnection();
-		if (conn == null) return false;
-		PendingVerification pending = active.get(conn);
-		if (pending == null) return false;
-		try {
-			if (!pending.id().equals(m.getResultID())) return false;
-		} catch (BadFormatException e) {
-			return false;
-		}
-		pending.future().complete(m);
-		return true;
-	}
 }

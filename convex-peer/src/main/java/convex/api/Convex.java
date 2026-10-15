@@ -50,6 +50,7 @@ import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
+import convex.core.util.FutureUtils;
 import convex.net.Transports;
 import convex.peer.Config;
 import convex.peer.Server;
@@ -673,7 +674,9 @@ public abstract class Convex implements AutoCloseable {
 			result=Result.fromException(e);
 			observeTransactionResult(result);
 			return result;
-		} 
+		} finally {
+			cf.cancel(true);
+		}
 	}
 
 	/**
@@ -730,6 +733,9 @@ public abstract class Convex implements AutoCloseable {
 	 * Submits a query to the Convex network, returning a Future once the query has
 	 * been successfully queued.
 	 *
+	 * Ordinary query semantics are described by {@link #query(ACell, Address)}.
+	 * Use {@link #simulate(ATransaction)} for transaction accounting and cost estimates.
+	 *
 	 * @param query Query to execute, as a Form or Op
 	 * @return A Future for the result of the query
 	 */
@@ -741,12 +747,47 @@ public abstract class Convex implements AutoCloseable {
 	 * Submits a query to the Convex network, returning a Future once the query has
 	 * been successfully queued.
 	 *
+	 * Uses the balance-independent query semantics of {@link #query(ACell, Address)}.
+	 * For transaction cost estimates, construct a transaction and use
+	 * {@link #simulate(ATransaction)}.
+	 *
 	 * @param query Query to execute, as String containing one or more forms
 	 * @return A Future for the result of the query
 	 */
 	public CompletableFuture<Result> query(String query) {
 		ACell form = buildCodeForm(query);
 		return query(form, getAddress());
+	}
+
+	/**
+	 * Simulates transaction execution and resource accounting without submitting it.
+	 * Uses the transaction's origin and encoded sequence as supplied, independently
+	 * of this client's selected address. Does not sign, advance the client's sequence,
+	 * or commit state. Balance and memory checks apply, unlike an ordinary query.
+	 *
+	 * The result reflects the peer's current snapshot and execution ceiling; a later
+	 * transaction may execute differently. Signature and sequence validity are not
+	 * checked by this accounting simulation. Uses the existing transaction-query wire
+	 * format for compatibility with peer transports.
+	 *
+	 * @param transaction Transaction whose execution and costs should be simulated
+	 * @return Future containing the simulated result and resource costs
+	 */
+	public CompletableFuture<Result> simulate(ATransaction transaction) {
+		if (transaction==null) throw new IllegalArgumentException("Null transaction");
+		return query(transaction,transaction.getOrigin());
+	}
+
+	/**
+	 * Synchronous counterpart of {@link #simulate(ATransaction)}, using the client's
+	 * configured timeout.
+	 * @param transaction Transaction to simulate
+	 * @return Simulated result and resource costs
+	 * @throws InterruptedException If interrupted while waiting
+	 */
+	public Result simulateSync(ATransaction transaction) throws InterruptedException {
+		if (transaction==null) throw new IllegalArgumentException("Null transaction");
+		return querySync(transaction,transaction.getOrigin());
 	}
 	
 	/**
@@ -823,7 +864,7 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	public CompletableFuture<ACell> resolve(String cnsName) {
 		ACell form = buildCodeForm("(resolve "+cnsName+")");
-		return query(form).thenApply(r->{
+		return FutureUtils.map(query(form),r->{
 			if (r.isError()) throw new RuntimeException("Resolve failed "+r);
 			return r.getValue();
 		});
@@ -872,6 +913,8 @@ public abstract class Convex implements AutoCloseable {
 			return statusFuture.get(timeoutMillis,TimeUnit.MILLISECONDS);
 		} catch (TimeoutException|ExecutionException e) {
 			return Result.fromException(e);
+		} finally {
+			statusFuture.cancel(true);
 		}
 	}
 	
@@ -899,7 +942,7 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	public CompletableFuture<CVMLong> ping() {
 		Message m = Message.createPing((CVMLong)null);
-		return request(m).thenApply(r -> {
+		return FutureUtils.map(request(m),r -> {
 			if (r == null || r.isError()) return null;
 			return RT.ensureLong(r.getValue());
 		});
@@ -914,8 +957,10 @@ public abstract class Convex implements AutoCloseable {
 	 * @throws TimeoutException if the peer does not respond in time
 	 */
 	public CVMLong pingSync(long timeoutMillis) throws ResultException, TimeoutException {
+		CompletableFuture<CVMLong> pingFuture=null;
 		try {
-			CVMLong ts = ping().get(timeoutMillis, TimeUnit.MILLISECONDS);
+			pingFuture=ping();
+			CVMLong ts = pingFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
 			if (ts == null) throw new ResultException(ErrorCodes.UNEXPECTED, "No timestamp in PING response");
 			return ts;
 		} catch (TimeoutException e) {
@@ -924,6 +969,8 @@ public abstract class Convex implements AutoCloseable {
 			throw e;
 		} catch (Exception e) {
 			throw new ResultException(e);
+		} finally {
+			if (pingFuture!=null) pingFuture.cancel(true);
 		}
 	}
 
@@ -976,7 +1023,7 @@ public abstract class Convex implements AutoCloseable {
 
 		SignedData<ACell> signed = Message.signChallenge(kp, token, expectedKey, contextID);
 
-		return sendChallenge(signed).thenApply(result -> {
+		return FutureUtils.map(sendChallenge(signed),result -> {
 			try {
 				AccountKey remoteKey = Message.verifyChallengeResponse(result, token, ownKey, contextID, expectedKey);
 				if (remoteKey == null) return null;
@@ -994,6 +1041,11 @@ public abstract class Convex implements AutoCloseable {
 	 * Submits a query to the Convex network, returning a Future once the query has
 	 * been successfully queued.
 	 *
+	 * Ordinary forms and Ops use a balance-independent Juice allowance, bounded by
+	 * the peer. No state is committed and no coins are charged. Existing transaction
+	 * payload queries remain supported; prefer {@link #simulate(ATransaction)} when
+	 * transaction accounting and cost estimates are required.
+	 *
 	 * @param query   Query to execute, as a Form or Op
 	 * @param address Address to use for the query
 	 * @return A Future for the result of the query
@@ -1003,7 +1055,10 @@ public abstract class Convex implements AutoCloseable {
 	/**
 	 * Executes a query synchronously and waits for the Result
 	 * 
-	 * @param query Query to execute. Map be a form or Op
+	 * See {@link #query(ACell, Address)} for ordinary query semantics; use
+	 * {@link #simulateSync(ATransaction)} for transaction accounting and cost estimates.
+	 *
+	 * @param query Query to execute. May be a form or Op
 	 * @return Result of synchronous query
 	 * @throws InterruptedException In case of interrupt
 	 */
@@ -1014,6 +1069,9 @@ public abstract class Convex implements AutoCloseable {
 	/**
 	 * Executes a query synchronously and waits for the Result
 	 * 
+	 * See {@link #query(ACell, Address)} for ordinary query semantics; use
+	 * {@link #simulateSync(ATransaction)} for transaction accounting and cost estimates.
+	 *
 	 * @param query Query to execute, as a String that contains one or more readable
 	 *              forms. Multiple forms will be wrapped in a `do` block
 	 * @return Result of synchronous query
@@ -1026,6 +1084,9 @@ public abstract class Convex implements AutoCloseable {
 
 	/**
 	 * Executes a query synchronously and waits for the Result
+	 *
+	 * See {@link #query(ACell, Address)} for ordinary query semantics; use
+	 * {@link #simulateSync(ATransaction)} for transaction accounting and cost estimates.
 	 *
 	 * @param address Address to use for the query
 	 * @param query   Query to execute, as a Form or Op
@@ -1134,6 +1195,7 @@ public abstract class Convex implements AutoCloseable {
 	}
 	
 	public Long getBalance(Address address) throws ResultException {
+		Future<Result> future=null;
 		try {
 			ACell code;
 			if (Utils.equals(this.address, address)) {
@@ -1141,7 +1203,7 @@ public abstract class Convex implements AutoCloseable {
 			} else {
 				code=Lists.of(Symbols.BALANCE, address);
 			}
-			Future<Result> future = query(code);
+			future = query(code);
 			Result result = future.get(timeout, TimeUnit.MILLISECONDS);
 			if (result.isError()) {
 				throw new ResultException(result);
@@ -1151,6 +1213,8 @@ public abstract class Convex implements AutoCloseable {
 		} catch (Exception ex) {
 			// Note InterruptedException correctly handled here
 			throw new ResultException(ex);
+		} finally {
+			if (future!=null) future.cancel(true);
 		}
 	}
 

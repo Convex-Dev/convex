@@ -7,6 +7,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
@@ -24,7 +25,7 @@ import convex.lattice.cursor.ALatticeCursor;
  *
  * @see Social#user(AccountKey)
  */
-public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
+public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> implements TransactionalComponent<Index<Keyword, ACell>,SocialUser> {
 
 	private final AString ownerDid;
 
@@ -77,6 +78,11 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 	/** Gets the stable social owner DID. */
 	public AString getOwnerDID() {
 		return ownerDid;
+	}
+
+	@Override
+	public SocialUser withCursor(ALatticeCursor<Index<Keyword, ACell>> cursor) {
+		return new SocialUser((Social) parent(),cursor,ownerDid);
 	}
 
 }

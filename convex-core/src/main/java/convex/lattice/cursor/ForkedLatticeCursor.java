@@ -2,6 +2,7 @@ package convex.lattice.cursor;
 
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.lattice.ALattice;
@@ -10,7 +11,7 @@ import convex.lattice.LatticeContext;
 /**
  * A forked lattice cursor - an independent working copy forked from a parent.
  *
- * <p>Uses a {@link Root} cursor internally for local storage, adding lattice-aware
+ * <p>Uses a {@link RootLatticeCursor} internally for local storage, adding lattice-aware
  * sync operations on top.</p>
  *
  * <p>Modifications to a forked cursor don't affect the parent until {@link #sync()}
@@ -31,7 +32,7 @@ import convex.lattice.LatticeContext;
 public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 
 	private final ALatticeCursor<V> parent;
-	private final Root<V> localCursor;
+	private final RootLatticeCursor<V> localCursor;
 	private volatile V forkPoint;
 	private final LatticeContext forkContext;
 
@@ -46,9 +47,19 @@ public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 	ForkedLatticeCursor(ALatticeCursor<V> parent, ALattice<V> lattice, V currentValue, LatticeContext context) {
 		super(lattice, null, currentValue);
 		this.parent = parent;
-		this.localCursor = Root.create(currentValue);
+		this.localCursor = parent.supportsExclusiveTransactions()
+			? new TransactionalRootCursor<>(lattice,currentValue,context)
+			: new RootLatticeCursor<>(lattice,currentValue,context);
 		this.forkPoint = currentValue;
 		this.forkContext = (context != null) ? context : LatticeContext.EMPTY;
+	}
+
+	@Override
+	public boolean supportsExclusiveTransactions() { return localCursor.supportsExclusiveTransactions(); }
+
+	@Override
+	protected <T> T exclusive(Supplier<T> action) {
+		return localCursor.exclusive(action);
 	}
 
 	@Override

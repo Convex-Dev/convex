@@ -103,7 +103,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.config=(config==null) ? NodeConfig.create() : config;
 		this.mergeContext=LatticeContext.EMPTY.withMaxFutureTimestampSkew(
 			this.config.getMaxFutureTimestampSkew());
-		this.cursor=Cursors.createLattice(lattice,lattice.zero(),mergeContext);
+		this.cursor=this.config.isTransactionalRoot()
+			? Cursors.createTransactionalLattice(lattice,lattice.zero(),mergeContext)
+			: Cursors.createLattice(lattice,lattice.zero(),mergeContext);
 		this.rootComponent=new RootComponent<>(cursor,store);
 	}
 

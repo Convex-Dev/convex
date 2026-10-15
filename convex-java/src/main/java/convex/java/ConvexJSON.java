@@ -193,7 +193,9 @@ public class ConvexJSON {
 	}
 
 	/**
-	 * Query using specific source code
+	 * Evaluates source code without committing state or charging coins. Ordinary
+	 * queries work with zero-balance accounts within the server's Juice limit and
+	 * report execution Juice, not transaction cost estimates.
 	 * @param code Source code in Convex Lisp
 	 * @return Result of query, as parsed JSON Object from query response
 	 */
@@ -378,7 +380,8 @@ public class ConvexJSON {
 	}
 
 	/**
-	 * Query using specific source code
+	 * Asynchronous counterpart of {@link #query(String)}, with the same ordinary
+	 * query semantics. This does not simulate transaction accounting.
 	 * @param code Source code in Convex Lisp
 	 * @return Future to be completed with result of query, as parsed JSON Object from query response
 	 */

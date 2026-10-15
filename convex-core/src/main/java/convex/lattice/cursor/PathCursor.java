@@ -2,6 +2,7 @@ package convex.lattice.cursor;
 
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
@@ -76,6 +77,14 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	}
 
 	@SuppressWarnings("unchecked")
+	@Override
+	public boolean supportsExclusiveTransactions() { return base.supportsExclusiveTransactions(); }
+
+	@Override
+	protected <T> T exclusive(Supplier<T> action) {
+		return base.exclusive(action);
+	}
+
 	@Override
 	public V get() {
 		return (V) RT.getIn(base.get(), path);
