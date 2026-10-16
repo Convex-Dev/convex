@@ -661,10 +661,11 @@ as it goes, and sign once on sync.
 
 ## Cursor boundary
 
-Cursors provide atomic access, navigation and transaction drafts. They carry no
-context, perform no lattice merges, construct no containers, and neither fork nor
-sync: an isolated working copy is a staged component, which reconciles with its
-destination on sync. A plain path write requires its intermediate containers to exist, and
+Cursors provide atomic access, navigation, transaction drafts and forks. They carry
+no context, perform no lattice merges and construct no containers. A fork takes its
+merge function when it is created and reconciles with its destination on sync; a
+staged component owns such a fork and supplies its lattice as the function. A plain
+path write requires its intermediate containers to exist, and
 update callbacks receive `null` for absent values. The component owning a level
 supplies what the cursor lacks: its lattice's empty value when creating a child
 position, and bound signing or stamping functions when wrapping a boundary. Cursor

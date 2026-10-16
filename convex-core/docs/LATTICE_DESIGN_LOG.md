@@ -24,9 +24,10 @@ current branch. See [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) and
 
 - Cursors carry no lattice, context or container-construction policy. Components
   supply read/write functions and explicit signing/stamping functions.
-- Ordinary roots hold only current atomic state. Cursors neither fork nor sync;
-  `LatticeHost.sync()` publishes host storage under its own lock. The old
-  `Root.onSync`, `Root.view`, `PublishingCursor` and `ForkedCursor` are removed.
+- Ordinary roots hold only current atomic state. A fork takes its merge function
+  when created and is the only cursor with a `sync()`; `LatticeHost.sync()` publishes
+  host storage under its own lock. The old `Root.onSync`, `Root.view` and
+  `PublishingCursor` are removed.
 - `detach`/cursor `merge` and creation-time snapshots are removed. Transactions
   retain their attempt input; component publication retains its own baseline.
 - Domain forks own their publication boundary directly. There is no hidden
@@ -140,20 +141,23 @@ write unless its shape is structural.
 
 ## 5. Forks take their merge function at fork time
 
-**Status:** Decided 16 October 2026: cursors neither fork nor sync. Implemented on
-the branch: `AForkableCursor.fork()` and `sync()`, `ForkedCursor` and
-`PublishingCursor` removed; a fork is a component fork, reconciled under its
-lattice.
+**Status:** Implemented (16 October 2026). Forks take their merge function at fork
+time: `AForkableCursor.fork(merge)` returns a `ForkedCursor` whose `sync()` publishes
+by compare-and-set and reconciles through the supplied function when the destination
+has moved. The merge-less `fork()`, cursor-level `sync()` elsewhere and
+`PublishingCursor` are gone; a component with a publication boundary owns such a
+fork and supplies its lattice merge, under its context, as the function.
 
-Two forks exist. A component fork (`Social.fork()`, `LatticeKV.fork()`, a
-`DLFSDrive` fork) is a new component whose working root publishes into the parent's
-cursor as its destination; its `sync()` reconciles under the component's lattice,
-own wins ties, and retries if the destination moved. A bare cursor fork,
-`AForkableCursor.fork()`, returns a `ForkedCursor` whose `sync()` writes the fork's
-snapshot over the parent unconditionally: a parent that changed in between is
-overwritten, with no signal. The javadoc states the hazard. Before Stage B the
-cursor carried its lattice and `fork()` could merge; Stage B moved reconciliation to
-components and left `fork()` with overwrite semantics only.
+Before this decision two forks existed. A component fork (`Social.fork()`,
+`LatticeKV.fork()`, a `DLFSDrive` fork) was a new component whose private working
+root published into the parent's cursor through a publication inner class on the
+component base. A bare cursor fork, `AForkableCursor.fork()`, returned a working copy
+whose `sync()` wrote the fork's snapshot over the parent unconditionally: a parent
+that changed in between was overwritten, with no signal. Before Stage B the cursor
+carried its lattice and `fork()` could merge; Stage B moved reconciliation to
+components and left `fork()` with overwrite semantics only. The decision moves the
+one real mechanism into the cursor layer, parameterised by a function the owner
+supplies, and the component fork becomes a cursor fork the component owns.
 
 Evidence (16 October 2026, from a compiler probe over the whole tree): no main code
 calls the bare form; every `.fork()` in main is a component fork or the unrelated CVM
@@ -177,12 +181,12 @@ CAD text affected:
 - CAD045 *Fork and Sync*: "`cursor.fork()` creates an isolated working copy"; "Sync
   always succeeds when a lattice is present."
 
-Proposed wording: cursors neither fork nor sync. A fork is a component with its own
-working state, reconciled under the component's lattice when it publishes, so sync
-on a fork always succeeds. CAD035 *Forkable Cursor* (initial value, compare-and-set
-merge, lattice-merge sync) and CAD024 *Cursor Sync Guarantees* (`onSync`,
-`ForkedLatticeCursor.sync()`) describe a removed model and move to CAD045 *Fork and
-Sync* at the component level.
+Proposed wording: a fork is created with the merge function of its position and
+sync on such a fork always succeeds; a merge-less fork does not exist. The
+fork-modify-sync pattern survives with the merge supplied at fork time rather than
+carried by the cursor. CAD035 *Forkable Cursor* (initial value, compare-and-set
+merge, lattice-aware sync) and CAD024 *Cursor Sync Guarantees* (`onSync`,
+`ForkedLatticeCursor.sync()`) describe the removed cursor-lattice model.
 
 ## 6. Root publication seam needs a merge to absorb a racing write
 

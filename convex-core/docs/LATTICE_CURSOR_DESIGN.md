@@ -13,9 +13,10 @@ component-owned working state and batched signing.
 
 ```text
 ACursor<V>                                get / atomic update / path
-└── AForkableCursor<V>                    paths are mutable cursors
+└── AForkableCursor<V>                    typed paths; fork(merge)
     ├── Root<V>                           atomic value holder
     │   └── TransactionalRootCursor<V>    opt-in coordinated writes
+    ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
     ├── PathCursor<V>                     navigation through existing containers
     ├── ProjectionCursor<S,V>             caller-supplied read/write functions
     ├── TransactionCursor<V>              draft confined to a transaction callback
@@ -88,21 +89,31 @@ Root<ASet<ACell>> root = Cursors.root(lattice.zero());
 root.updateAndGet(values -> values.include(item));
 ```
 
-## Working copies, transactions and publication
+## Forks, transactions and publication
 
-Cursors neither fork nor sync. An isolated working copy is a component with its
-own working state: the component retains its destination and baseline, reconciles
-with its own lattice and context on sync, and publishes through ordinary cursor
-operations. Generic cursors know nothing of that policy. For a detached snapshot
-use `Root.create(cursor.get())`; atomic multi-step edits use `Transactions`.
-Cursors retain no creation-time baseline.
+`fork(merge)` creates an isolated working copy, a `ForkedCursor`. Its `sync()`
+publishes one working snapshot into the destination by compare-and-set and, when
+the destination has moved in between, reconciles through the supplied function with
+the working snapshot as own; an unchanged copy adopts the destination instead.
+Working edits that land during a sync stay pending for the next one. There is no
+fork without a merge function, and `ForkedCursor` is the only cursor with a `sync()`.
+The fork knows no lattice, context or signing policy: the function closes over
+whatever policy its owner chooses. A destination of a different stored type, such as
+a signed envelope, takes read and prepare functions as well; preparation runs once
+per distinct candidate, outside the compare-and-set, so an unrelated concurrent write
+reuses a prepared signature.
 
-`LatticeHost.cursor()` and component working cursors are ordinary storage. Call
-the owning component's `sync()` to publish; it updates only its destination and
-never publishes that cursor further. The component which supplied the destination
-owns the next publication step, and the host's own `sync()` persists and
-replicates. Lightweight components have no independent publication work. No cursor
-starts a worker or timer.
+A component with an independent publication boundary owns such a fork and supplies
+its lattice merge under its context; `ALatticeComponent.mergePublication` is that
+component's reconciler, and applications override it to delegate signed subtrees.
+For a detached snapshot use `Root.create(cursor.get())`; atomic multi-step edits use
+`Transactions`.
+
+`LatticeHost.cursor()` is ordinary storage. Call the owning component's `sync()` to
+publish; it updates only its destination and never publishes that cursor further.
+The component which supplied the destination owns the next publication step, and
+the host's own `sync()` persists and replicates. Lightweight components have no
+independent publication work. No cursor starts a worker or timer.
 
 `Transactions` runs a synchronous callback against a private draft and commits by
 CAS, preserving each operation under contention. `TransactionalRootCursor` opts

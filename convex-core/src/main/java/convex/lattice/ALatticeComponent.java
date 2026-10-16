@@ -1,7 +1,6 @@
 package convex.lattice;
 
 import java.util.Objects;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -11,10 +10,9 @@ import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.ProjectionCursor;
-import convex.lattice.cursor.Root;
-import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.generic.AOwnerLattice;
 import convex.lattice.generic.SignedLattice;
 
@@ -22,7 +20,9 @@ import convex.lattice.generic.SignedLattice;
  * Domain operations over a cursor at one path.
  *
  * <p>Lightweight components share a working cursor. Components with an independent
- * publication boundary also retain a destination cursor and publication baseline.
+ * publication boundary own a {@link ForkedCursor} of their destination, whose sync
+ * reconciles through functions this component supplies: its lattice merge under its
+ * context, and for a type-changing destination its read and prepare functions.
  * Publication uses ordinary cursor updates; there is no component parent link.
  * The cursor knows nothing about lattices: the component declares the structure of
  * the level it owns, supplying read/write functions for child views and binding
@@ -38,7 +38,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 
 	protected final AForkableCursor<V> cursor;
 	private volatile LatticeContext context=LatticeContext.EMPTY;
-	private final Publication<?> publication;
+	/** Working copy this component owns and publishes, or null for a lightweight view. */
+	private final ForkedCursor<V> owned;
 
 	/** Returns this component's write and merge policy. */
 	public final LatticeContext getContext() { return context; }
@@ -75,7 +76,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** Creates a component over a cursor. */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
 		this.cursor=Objects.requireNonNull(cursor,"Component cursor must not be null");
-		publication=null;
+		owned=null;
 	}
 
 	/**
@@ -88,11 +89,20 @@ public abstract class ALatticeComponent<V extends ACell> {
 		this(lattice,destination,Function.identity(),(context,value) -> value);
 	}
 
-	/** Creates a publication boundary whose destination has a different stored type. */
+	/**
+	 * Creates a publication boundary whose destination has a different stored type.
+	 * The fork receives closures over this component, resolved at publication time:
+	 * {@code prepare} runs under the component's context then, and reconciliation
+	 * goes through {@link #mergePublication}.
+	 */
 	protected <P extends ACell> ALatticeComponent(ALattice<V> lattice, ACursor<P> destination,
 			Function<P,V> read, BiFunction<LatticeContext,V,P> prepare) {
-		publication=new Publication<>(lattice,destination,read,prepare);
-		cursor=publication.working;
+		Objects.requireNonNull(lattice,"Publication lattice must not be null");
+		Objects.requireNonNull(prepare,"Prepare function must not be null");
+		owned=ForkedCursor.create(destination,read,
+			value -> prepare.apply(getContext(),value),
+			(baseline,own,other) -> mergePublication(lattice,baseline,own,other));
+		cursor=owned;
 	}
 
 	/**
@@ -102,9 +112,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * components, including signing a combined payload. Overrides must use only
 	 * the supplied values and must not mutate live working cursors or publish.
 	 *
-	 * <p>Runs outside atomic update callbacks, once per distinct destination value.
-	 * On retry, own is the previous prepared result and baseline is the destination
-	 * it was reconciled against. This permits unchanged signatures to be reused.</p>
+	 * <p>Runs inside the owned fork's sync, outside atomic update callbacks, once per
+	 * distinct destination value. On retry, own is the previous prepared result and
+	 * baseline is the destination it was reconciled against. This permits unchanged
+	 * signatures to be reused.</p>
 	 */
 	protected V mergePublication(ALattice<V> lattice,V baseline,V own,V other) {
 		if (Utils.equals(own,baseline)) return other;
@@ -112,85 +123,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 		return lattice.merge(getContext(),own,other);
 	}
 
-	/** State allocated only for components with an independent publication boundary. */
-	private final class Publication<P extends ACell> {
-		private final ALattice<V> lattice;
-		private final ACursor<P> destination;
-		private final Function<P,V> read;
-		private final BiFunction<LatticeContext,V,P> prepare;
-		private final Root<V> working;
-		private final ReentrantLock syncLock=new ReentrantLock();
-		// Accessed only under syncLock, which orders publications and write-back.
-		private V baseline;
-
-		Publication(ALattice<V> lattice, ACursor<P> destination,
-				Function<P,V> read, BiFunction<LatticeContext,V,P> prepare) {
-			this.lattice=Objects.requireNonNull(lattice,"Publication lattice must not be null");
-			this.destination=Objects.requireNonNull(destination,"Publication destination must not be null");
-			this.read=read;
-			this.prepare=prepare;
-			baseline=read.apply(destination.get());
-			// Working storage has no publication callbacks or component back pointers.
-			working=destination.supportsExclusiveTransactions()
-				?new TransactionalRootCursor<>(baseline):new Root<>(baseline);
-		}
-
-		private V sync() {
-			syncLock.lock();
-			try {
-				V snapshot=working.get();
-				V published=publish(snapshot);
-				V expected=snapshot;
-				V candidate=published;
-				while (!working.compareAndSet(expected,candidate)) {
-					V current=working.get();
-					// New local edits are own. Preparation is outside the CAS, also
-					// when reconciliation needs a signature for pending working state.
-					candidate=mergePublication(lattice,expected,current,candidate);
-					if (Utils.equals(current,candidate)) break;
-					expected=current;
-				}
-				return published;
-			} finally {
-				syncLock.unlock();
-			}
-		}
-
-		private V publish(V snapshot) {
-			P observed=destination.get();
-			V currentValue=read.apply(observed);
-			V candidate=mergePublication(lattice,baseline,snapshot,currentValue);
-			V preparedValue=null;
-			P prepared=null;
-			boolean hasPrepared=false;
-			while (true) {
-				// A no-op can complete at the observation without changing identities.
-				if (Utils.equals(currentValue,candidate)) {
-					baseline=currentValue;
-					return currentValue;
-				}
-				if (!hasPrepared || !Utils.equals(candidate,preparedValue)) {
-					prepared=prepare.apply(getContext(),candidate);
-					preparedValue=candidate;
-					hasPrepared=true;
-				}
-				if (destination.compareAndSet(observed,prepared)) {
-					baseline=candidate;
-					return candidate;
-				}
-				P current=destination.get();
-				V nextValue=read.apply(current);
-				// An unrelated ancestor write or equal replacement needs no new merge.
-				if (!Utils.equals(nextValue,currentValue)) {
-					candidate=mergePublication(lattice,currentValue,candidate,nextValue);
-				}
-				observed=current;
-				currentValue=nextValue;
-			}
-		}
-	}
-
-	/** Returns atomic working storage. Updating or syncing it does not publish this component. */
+	/** Returns atomic working storage. Updating it does not publish this component. */
 	public AForkableCursor<V> cursor() {
 		return cursor;
 	}
@@ -203,13 +136,13 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 *
 	 * <p>Call the enclosing application's sync to run its preparation and publication,
 	 * and the host's sync for persistence or replication. A caller-owned cursor
-	 * supplied to a view is never published by the component.</p>
+	 * supplied to a view, forked or not, is never published by the component.</p>
 	 *
 	 * @return Published snapshot, or current value for a lightweight view. Later
 	 *         concurrent edits may remain pending in working storage.
 	 */
 	public V sync() {
-		return publication==null?cursor.get():publication.sync();
+		return owned==null?cursor.get():owned.sync();
 	}
 
 	/**
