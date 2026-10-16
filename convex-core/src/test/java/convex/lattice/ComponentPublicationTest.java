@@ -11,14 +11,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
-import convex.lattice.cursor.PublishingCursor;
-
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.ADelegatingLattice;
@@ -47,18 +46,20 @@ public class ComponentPublicationTest {
 	}
 
 	@Test
-	public void testChildrenShareWorkingStateAndPublicationStopsAtDestination() {
-		var root=PublishingCursor.create(SETS.zero());
-		AtomicInteger publications=new AtomicInteger();
-		root.onSync(value -> { publications.incrementAndGet(); return value; }, SETS::merge);
-		var component=new Component<>(SETS,root);
-		component.cursor().updateAndGet(v -> v.include(CVMLong.ONE));
-		assertEquals(SETS.zero(),root.get());
-		component.sync();
-		assertEquals(Sets.of(1),root.get());
-		assertEquals(0,publications.get());
-		root.sync();
-		assertEquals(1,publications.get());
+	public void testChildrenShareWorkingStateAndPublicationStopsAtDestination() throws Exception {
+		try (MemoryStore store=new MemoryStore()) {
+			var host=LatticeHost.create(SETS.zero(),store);
+			AtomicInteger publications=new AtomicInteger();
+			host.setPublicationPolicy(value -> { publications.incrementAndGet(); return value; });
+			var component=new Component<>(SETS,host.cursor());
+			component.cursor().updateAndGet(v -> v.include(CVMLong.ONE));
+			assertEquals(SETS.zero(),host.cursor().get());
+			component.sync();
+			assertEquals(Sets.of(1),host.cursor().get());
+			assertEquals(0,publications.get(),"Component publication stops at the host cursor");
+			host.sync();
+			assertEquals(1,publications.get());
+		}
 	}
 
 	@Test

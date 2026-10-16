@@ -35,15 +35,17 @@ import convex.lattice.generic.LWWLattice;
  */
 public class StampedCursorTest {
 
-	@Test public void testRawForkAdoptsPreparedDestinationValue() {
+	@Test public void testWorkingStateAdoptsPreparedDestinationValue() {
 		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO));
 		var stamped=StampedCursor.create(root,() -> CVMLong.create(100),(value,time) -> stampWith(value,time.longValue()));
-		var fork=stamped.fork();
-		fork.set(Maps.of(A,CVMLong.ONE));
-		ACell published=fork.sync();
-		assertSame(root.get(),published);
-		assertSame(published,fork.get());
-		assertEquals(100,tsOf(published));
+		var working=convex.lattice.ALatticeComponent.working(stateLattice(),stamped,LatticeContext.EMPTY);
+		working.cursor().set(Maps.of(A,CVMLong.ONE));
+		working.sync();
+		assertEquals(CVMLong.ONE,RT.getIn(root.get(),A));
+		assertEquals(100,tsOf(root.get()),"The destination view stamps what the component publishes");
+		// An unedited component adopts the prepared destination value on its next sync.
+		working.sync();
+		assertSame(root.get(),working.cursor().get());
 	}
 
 	@Test public void testChangedRetryKeepsOneOperationTimestamp() {

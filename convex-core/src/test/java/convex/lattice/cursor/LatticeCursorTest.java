@@ -41,6 +41,7 @@ import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.LatticeHost;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
@@ -80,7 +81,7 @@ public class LatticeCursorTest {
 	}
 
 	@Test
-	public void testForkedCursorOperations() {
+	public void testWorkingStateCursorOperations() {
 		MaxLattice lattice = MaxLattice.INSTANCE;
 		Root<AInteger> root = Cursors.root(null);
 		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
@@ -327,11 +328,11 @@ public class LatticeCursorTest {
 	}
 
 	/**
-	 * Root cursor with a one-shot hook that runs synchronously at the start of
-	 * {@link #updateAndGet}, before the actual update. Used to deterministically
-	 * inject a concurrent write into the exact window inside
-	 * {@code ForkedCursor.sync()} between its read of {@code localVal}
-	 * and the final set/CAS on the local cursor.
+	 * Root cursor with a one-shot hook that runs synchronously inside
+	 * {@link #compareAndSet}, before the actual update. Used to deterministically
+	 * inject a concurrent write into the exact window inside component publication
+	 * between its read of the working snapshot and the final CAS on the working
+	 * cursor.
 	 */
 	private static class HookedRootCursor<V extends ACell> extends Root<V> {
 		private Runnable oneShotHook;
@@ -421,52 +422,33 @@ public class LatticeCursorTest {
 
 
 
-	@Test
-	public void testRootSyncIsNoop() {
-		SetLattice<CVMLong> lattice = SetLattice.create();
-		ASet<CVMLong> initial = Sets.of(CVMLong.ONE);
-		Root<ASet<CVMLong>> root = Cursors.root(initial);
-
-		// Sync on root should be no-op, just return current value
-		ASet<CVMLong> synced = root.sync();
-		assertSame(initial, synced);
-	}
-
-	// ===== Sync callback / persistence layering tests =====
+	// ===== Host publication layering tests =====
 	//
-	// These tests lock in the contract that downstream persistence layers
-	// (e.g. covia.venue.Engine, NodeServer) depend on. The key invariant
-	// being verified: ForkedCursor.sync() is implemented as
-	// `parent.updateAndGet(...)` and deliberately does NOT propagate sync
-	// notifications up the chain. Persistence consumers must therefore
-	// register their sync hook on the root cursor AND ensure the root's
-	// sync() is called explicitly (the fork's sync alone is not enough).
-	//
-	// See covia/venue/docs/PERSISTENCE.md §5.0 for the design that depends
-	// on this contract.
+	// These tests lock in the contract that persistence layers depend on: cursor
+	// writes and component publication never run the host's publication policy.
+	// Only an explicit host sync does, and it publishes exactly one snapshot.
 
 	@Test
-	public void testRootSyncFiresOnSyncCallback() {
-		SetLattice<CVMLong> lattice = SetLattice.create();
-		PublishingCursor<ASet<CVMLong>> root = PublishingCursor.create(Sets.empty());
+	public void testHostSyncRunsPublicationPolicy() {
+		LatticeHost<ASet<CVMLong>> host = LatticeHost.create(Sets.<CVMLong>empty(), null);
 
-		java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger();
-		java.util.concurrent.atomic.AtomicReference<ASet<CVMLong>> received = new java.util.concurrent.atomic.AtomicReference<>();
-		root.onSync(value -> {
+		AtomicInteger callCount = new AtomicInteger();
+		AtomicReference<ASet<CVMLong>> received = new AtomicReference<>();
+		host.setPublicationPolicy(value -> {
 			callCount.incrementAndGet();
 			received.set(value);
 			return value;
-		}, lattice::merge);
+		});
 
-		// Make a write directly on the root
-		root.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
+		// Make a write directly on the host cursor
+		host.cursor().updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
 
-		// onSync must NOT fire on writes — only on sync()
-		assertEquals(0, callCount.get(), "onSync must not fire on cursor writes");
+		// Publication must NOT run on writes — only on sync()
+		assertEquals(0, callCount.get(), "publication must not run on cursor writes");
 
-		// Now call sync explicitly — onSync should fire exactly once with the current value
-		root.sync();
-		assertEquals(1, callCount.get(), "onSync should fire once on root.sync()");
+		// Now sync explicitly — publication runs exactly once with the current value
+		host.sync();
+		assertEquals(1, callCount.get(), "publication should run once on host.sync()");
 		assertNotNull(received.get());
 		assertTrue(received.get().contains(CVMLong.ONE));
 	}
@@ -482,8 +464,7 @@ public class LatticeCursorTest {
 	}
 
 	private void assertRootSyncCallbacksAreSerialised(boolean perCallPublication) throws Exception {
-		SetLattice<CVMLong> lattice = SetLattice.create();
-		PublishingCursor<ASet<CVMLong>> root = PublishingCursor.create(Sets.of(CVMLong.ONE));
+		LatticeHost<ASet<CVMLong>> root = LatticeHost.create(Sets.of(CVMLong.ONE), null);
 
 		CVMLong concurrentValue = CVMLong.create(2);
 		CountDownLatch firstEntered = new CountDownLatch(1);
@@ -522,7 +503,7 @@ public class LatticeCursorTest {
 			}
 			return snapshot;
 		};
-		root.onSync(callback, lattice::merge);
+		root.setPublicationPolicy(callback);
 
 		Runnable sync = () -> {
 			try {
@@ -536,9 +517,9 @@ public class LatticeCursorTest {
 		first.start();
 		assertTrue(firstEntered.await(5, TimeUnit.SECONDS), "First sync callback did not start");
 
-		// Advance the authoritative root while the first callback is blocked on its
-		// older snapshot. The second caller must wait, then capture this newer root.
-		root.updateAndGet(values -> values.include(concurrentValue));
+		// Advance the host root while the first callback is blocked on its older
+		// snapshot. The second caller must wait, then capture this newer root.
+		root.cursor().updateAndGet(values -> values.include(concurrentValue));
 
 		Thread second = new Thread(() -> {
 			secondStarted.countDown();
@@ -577,7 +558,7 @@ public class LatticeCursorTest {
 		assertTrue(secondSnapshot.get().contains(CVMLong.ONE));
 		assertTrue(secondSnapshot.get().contains(concurrentValue),
 			"Waiting sync caller must capture the root after the preceding sync completes");
-		assertTrue(root.get().contains(concurrentValue), "Concurrent root update must survive both syncs");
+		assertTrue(root.cursor().get().contains(concurrentValue), "Concurrent root update must survive both syncs");
 	}
 
 	/**
@@ -587,23 +568,22 @@ public class LatticeCursorTest {
 	 */
 	@Test
 	public void testConcurrentRootWriteDoesNotChangePublishedSyncResult() {
-		SetLattice<CVMLong> lattice = SetLattice.create();
 		ASet<CVMLong> published = Sets.of(CVMLong.ONE);
 		ASet<CVMLong> concurrent = published.include(CVMLong.TWO);
-		PublishingCursor<ASet<CVMLong>> root = PublishingCursor.create(published);
+		LatticeHost<ASet<CVMLong>> host = LatticeHost.create(published, null);
 
-		root.onSync(snapshot -> {
+		host.setPublicationPolicy(snapshot -> {
 			assertSame(published, snapshot);
-			root.set(concurrent);
+			host.cursor().set(concurrent);
 			return snapshot;
-		}, lattice::merge);
+		});
 
-		ASet<CVMLong> result = root.sync();
+		ASet<CVMLong> result = host.sync();
 
 		assertSame(published, result,
 			"sync must return the exact snapshot completed by its publication callback");
-		assertSame(concurrent, root.get(),
-			"the concurrent local write must remain pending in the authoritative cursor");
+		assertSame(concurrent, host.cursor().get(),
+			"the concurrent local write must remain pending in the host cursor");
 	}
 
 	/**
@@ -613,7 +593,6 @@ public class LatticeCursorTest {
 	 */
 	@Test
 	public void testConcurrentRootWriteRetainsOwnRefIdentity() throws Exception {
-		SetLattice<Blob> lattice = SetLattice.create();
 		Blob source = Blobs.createRandom(400);
 		try (MemoryStore localStore = new MemoryStore();
 				MemoryStore foreignStore = new MemoryStore()) {
@@ -624,54 +603,52 @@ public class LatticeCursorTest {
 			assertEquals(local, foreign);
 			assertNotSame(local, foreign);
 
-			PublishingCursor<ASet<Blob>> root = PublishingCursor.create(Sets.empty());
-			root.onSync(snapshot -> {
-				root.set(local);
+			LatticeHost<ASet<Blob>> host = LatticeHost.create(Sets.<Blob>empty(), null);
+			host.setPublicationPolicy(snapshot -> {
+				host.cursor().set(local);
 				return foreign;
-			}, lattice::merge);
+			});
 
-			ASet<Blob> result = root.sync();
+			ASet<Blob> result = host.sync();
 
 			assertSame(foreign, result, "sync returns the value actually published");
-			assertSame(local, root.get(),
+			assertSame(local, host.cursor().get(),
 				"current local state must be own so an equivalent foreign value cannot replace its refs");
 		}
 	}
 
 	@Test
-	public void testForkedSyncDoesNotFireRootOnSyncCallback() {
-		// CRITICAL CONTRACT: ForkedCursor.sync() uses parent.updateAndGet
-		// (not parent.sync), so it deliberately does NOT propagate the sync
-		// signal up to the root's onSync callback. Persistence layers
-		// (covia.venue.Engine) rely on this — they need to call root.sync()
-		// EXPLICITLY after forkComponent.sync() to fire persistence triggers.
+	public void testComponentSyncDoesNotRunHostPublication() {
+		// CONTRACT: component publication writes into the host cursor by CAS and
+		// never runs the host's publication policy. Persistence layers call
+		// host.sync() explicitly after component syncs to persist.
 		SetLattice<CVMLong> lattice = SetLattice.create();
-		PublishingCursor<ASet<CVMLong>> root = PublishingCursor.create(Sets.empty());
+		LatticeHost<ASet<CVMLong>> host = LatticeHost.create(Sets.<CVMLong>empty(), null);
 
-		java.util.concurrent.atomic.AtomicInteger rootSyncCount = new java.util.concurrent.atomic.AtomicInteger();
-		root.onSync(value -> {
-			rootSyncCount.incrementAndGet();
+		AtomicInteger hostSyncCount = new AtomicInteger();
+		host.setPublicationPolicy(value -> {
+			hostSyncCount.incrementAndGet();
 			return value;
-		}, lattice::merge);
+		});
 
-		// Fork, write to fork, sync the fork
-		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		// Create working state, write to it, sync the component
+		var forkComponent=convex.lattice.ALatticeComponent.working(lattice,host.cursor(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 		fork.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
 		forkComponent.sync();
 
-		// Fork's sync must NOT have fired the root's onSync callback
-		assertEquals(0, rootSyncCount.get(),
-			"forkComponent.sync() must NOT propagate to root.onSync — see ForkedCursor.sync()");
+		// Component sync must NOT have run host publication
+		assertEquals(0, hostSyncCount.get(),
+			"forkComponent.sync() must not run the host's publication policy");
 
-		// But the write IS visible at the root after forkComponent.sync()
-		assertTrue(root.get().contains(CVMLong.ONE),
-			"forkComponent.sync() must make writes visible at root via parent.updateAndGet");
+		// But the write IS visible at the host cursor after forkComponent.sync()
+		assertTrue(host.cursor().get().contains(CVMLong.ONE),
+			"forkComponent.sync() must make writes visible in the host cursor");
 
-		// Calling root.sync() explicitly DOES fire the callback
-		root.sync();
-		assertEquals(1, rootSyncCount.get(),
-			"root.sync() called explicitly fires the callback — this is the persistence trigger");
+		// Calling host.sync() explicitly DOES run publication
+		host.sync();
+		assertEquals(1, hostSyncCount.get(),
+			"host.sync() called explicitly runs publication — this is the persistence trigger");
 	}
 
 	@Test
@@ -708,30 +685,27 @@ public class LatticeCursorTest {
 	}
 
 	@Test
-	public void testPathDerivedCursorAlsoFiresRootOnSyncOnExplicitSync() {
-		// Combination test: path-derived write, then explicit root.sync() — onSync fires.
-		// This is the actual flow covia.venue.Engine.sweep() uses.
-		SetLattice<CVMLong> values = SetLattice.create();
-		MapLattice<AString, ASet<CVMLong>> lattice = MapLattice.create(values);
-		PublishingCursor<AHashMap<AString, ASet<CVMLong>>> root =
-			PublishingCursor.create(Maps.empty());
+	public void testPathDerivedWriteIsPublishedByExplicitHostSync() {
+		// Combination test: path-derived write, then explicit host.sync() — publication runs.
+		LatticeHost<AHashMap<AString, ASet<CVMLong>>> host =
+			LatticeHost.<AHashMap<AString, ASet<CVMLong>>>create(Maps.empty(), null);
 
-		java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger();
-		root.onSync(value -> { callCount.incrementAndGet(); return value; }, lattice::merge);
+		AtomicInteger callCount = new AtomicInteger();
+		host.setPublicationPolicy(value -> { callCount.incrementAndGet(); return value; });
 
 		// Write through a path-derived view
-		AForkableCursor<ASet<CVMLong>> pathCursor = root.path(Strings.create("k"));
+		AForkableCursor<ASet<CVMLong>> pathCursor = host.cursor().path(Strings.create("k"));
 		pathCursor.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
 
-		// Path write should not fire onSync (writes never do)
+		// Path write should not run publication (writes never do)
 		assertEquals(0, callCount.get());
 
-		// Explicit root.sync() fires onSync
-		root.sync();
+		// Explicit host.sync() runs publication
+		host.sync();
 		assertEquals(1, callCount.get());
 
-		// And the write is in the value the callback would have seen
-		assertTrue(root.get().get(Strings.create("k")).contains(CVMLong.ONE));
+		// And the write is in the value the policy saw
+		assertTrue(host.cursor().get().get(Strings.create("k")).contains(CVMLong.ONE));
 	}
 
 	@Test

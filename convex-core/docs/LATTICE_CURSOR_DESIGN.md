@@ -13,13 +13,11 @@ component-owned working state and batched signing.
 
 ```text
 ACursor<V>                                get / atomic update / path
-└── AForkableCursor<V>                    fork / sync
+└── AForkableCursor<V>                    paths are mutable cursors
     ├── Root<V>                           atomic value holder
     │   └── TransactionalRootCursor<V>    opt-in coordinated writes
-    ├── PublishingCursor<V>               optional host publication over supplied storage
     ├── PathCursor<V>                     navigation through existing containers
     ├── ProjectionCursor<S,V>             caller-supplied read/write functions
-    ├── ForkedCursor<V>                   private copy; explicit overwrite on sync
     ├── TransactionCursor<V>              draft confined to a transaction callback
     └── AUpdateCursor<V,S>                prepare-on-write machinery
         ├── StampedCursor<V>              explicit clock and stamp function
@@ -90,28 +88,21 @@ Root<ASet<ACell>> root = Cursors.root(lattice.zero());
 root.updateAndGet(values -> values.include(item));
 ```
 
-## Forks, transactions and publication
+## Working copies, transactions and publication
 
-A raw `fork()` holds an independent root and a destination cursor. Its `sync()`
-overwrites that destination with the local snapshot; it performs no lattice merge.
-A prepared destination value is adopted locally by CAS only if the local snapshot
-has not changed meanwhile. Newer local edits remain pending. For an independent
-snapshot use `Root.create(cursor.get())`; atomic multi-step edits use `Transactions`.
+Cursors neither fork nor sync. An isolated working copy is a component with its
+own working state: the component retains its destination and baseline, reconciles
+with its own lattice and context on sync, and publishes through ordinary cursor
+operations. Generic cursors know nothing of that policy. For a detached snapshot
+use `Root.create(cursor.get())`; atomic multi-step edits use `Transactions`.
 Cursors retain no creation-time baseline.
 
-Use component working state for CAS-or-merge publication. The component retains
-its destination and baseline, reconciles with its own lattice and context, and
-publishes through cursor operations. Generic cursors know nothing of that policy.
-
-`LatticeHost.cursor()` and component working cursors are ordinary storage.
-Their `sync()` does not invoke component publication. Call the owning component's
-`sync()` explicitly; it updates only its destination and never syncs that cursor.
-The component which supplied the destination owns the next publication step.
-Lightweight components have no independent publication work.
-
-Raw cursor views still support caller-owned fork write-back. `PublishingCursor`
-remains an optional standalone callback adapter for direct cursor clients; the
-component hierarchy and NodeServer do not use it. No cursor starts a worker or timer.
+`LatticeHost.cursor()` and component working cursors are ordinary storage. Call
+the owning component's `sync()` to publish; it updates only its destination and
+never publishes that cursor further. The component which supplied the destination
+owns the next publication step, and the host's own `sync()` persists and
+replicates. Lightweight components have no independent publication work. No cursor
+starts a worker or timer.
 
 `Transactions` runs a synchronous callback against a private draft and commits by
 CAS, preserving each operation under contention. `TransactionalRootCursor` opts

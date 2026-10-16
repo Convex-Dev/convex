@@ -72,9 +72,4 @@ public final class ProjectionCursor<S extends ACell,V extends ACell> extends AFo
 	}
 
 	@Override protected Lock exclusiveLock() { return source.exclusiveLock(); }
-
-	@Override public V sync() {
-		source.sync();
-		return get();
-	}
 }

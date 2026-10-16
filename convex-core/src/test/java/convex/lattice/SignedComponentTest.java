@@ -67,7 +67,6 @@ public class SignedComponentTest {
 		component.merge(KEY.signData(Sets.of(2)));
 		component.merge(KEY.signData(Sets.of(2)));
 		assertEquals(Sets.of(1,2),component.cursor().get());
-		component.cursor().sync();
 		new ALatticeComponent<ASet<CVMLong>>(component.cursor()) {}.sync();
 		assertEquals(0,signatures.get());
 		assertNull(destination.get());

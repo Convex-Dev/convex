@@ -27,9 +27,9 @@ import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.LatticeContext;
+import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
-import convex.lattice.cursor.PublishingCursor;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.generic.MapLattice;
@@ -273,12 +273,11 @@ public class DLFSDriveManagerTest {
 	@SuppressWarnings("unchecked")
 	public void testRegistrySyncIsExplicit() {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
-		PublishingCursor<AHashMap<AString, AVector<ACell>>> cursor=
-			PublishingCursor.create(lattice.zero());
+		LatticeHost<AHashMap<AString, AVector<ACell>>> host=LatticeHost.create(lattice.zero(),null);
 		AtomicReference<ACell> synced=new AtomicReference<>();
-		cursor.onSync(value->{ synced.set(value); return value; }, lattice::merge);
-		var component=convex.dlfs.DLFSDrives.wrap(cursor);
-		DLFSDriveManager manager=new DLFSDriveManager(component,cursor::sync);
+		host.setPublicationPolicy(value->{ synced.set(value); return value; });
+		var component=convex.dlfs.DLFSDrives.wrap(host.cursor());
+		DLFSDriveManager manager=new DLFSDriveManager(component,host::sync);
 
 		assertTrue(manager.createDrive(null, "home"));
 		assertNull(synced.get(), "in-memory registry mutation must not perform I/O implicitly");

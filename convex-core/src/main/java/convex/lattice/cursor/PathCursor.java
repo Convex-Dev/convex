@@ -41,21 +41,6 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	}
 
 	/**
-	 * Propagates towards the root through the base cursor: a raw fork overwrites
-	 * its destination, component working state reconciles with its destination,
-	 * and a live base reaches root publication.
-	 */
-	@Override
-	public V sync() {
-		if (base instanceof AForkableCursor<?> forkable) {
-			forkable.sync();
-			return get();
-		}
-		throw new IllegalStateException("Cannot sync through a non-forkable base cursor: "
-			+ base.getClass().getSimpleName());
-	}
-
-	/**
 	 * Associates through existing containers only.
 	 */
 	private ACell assocIn(ACell bv, ACell newValue) {

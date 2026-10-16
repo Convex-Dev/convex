@@ -24,9 +24,9 @@ current branch. See [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) and
 
 - Cursors carry no lattice, context or container-construction policy. Components
   supply read/write functions and explicit signing/stamping functions.
-- Ordinary roots hold only current atomic state. `PublishingCursor` wraps host
-  storage with serialised publication; the old `Root.onSync` and `Root.view`
-  methods are removed.
+- Ordinary roots hold only current atomic state. Cursors neither fork nor sync;
+  `LatticeHost.sync()` publishes host storage under its own lock. The old
+  `Root.onSync`, `Root.view`, `PublishingCursor` and `ForkedCursor` are removed.
 - `detach`/cursor `merge` and creation-time snapshots are removed. Transactions
   retain their attempt input; component publication retains its own baseline.
 - Domain forks own their publication boundary directly. There is no hidden
@@ -140,7 +140,10 @@ write unless its shape is structural.
 
 ## 5. Forks take their merge function at fork time
 
-**Status:** Decision needed.
+**Status:** Decided 16 October 2026: cursors neither fork nor sync. Implemented on
+the branch: `AForkableCursor.fork()` and `sync()`, `ForkedCursor` and
+`PublishingCursor` removed; a fork is a component fork, reconciled under its
+lattice.
 
 Two forks exist. A component fork (`Social.fork()`, `LatticeKV.fork()`, a
 `DLFSDrive` fork) is a new component whose working root publishes into the parent's

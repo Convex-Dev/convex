@@ -115,8 +115,7 @@ public class HostStoresTest {
 			ABlob blob=Blobs.createRandom(new Random(5678),5000);
 			root.cursor().updateAndGet(values->values.include(blob));
 
-			root.cursor().sync();
-			assertNull(store.getRootData(),"Syncing storage must not invoke host publication");
+			assertNull(store.getRootData(),"Writing to the host cursor must not publish");
 			root.sync();
 
 			assertEquals(root.cursor().get(),store.getRootData());
@@ -174,8 +173,6 @@ public class HostStoresTest {
 			var branch=blob.getRef(0);
 			assertEquals(branch.getValue(),store.refForHash(branch.getHash()).getValue());
 			assertEquals(retained,store.getRootData(),"Persist stores cells without selecting the root");
-			fresh.cursor().sync();
-			assertEquals(retained,store.getRootData(),"Cursor sync cannot publish the host");
 			assertEquals(updated,fresh.sync());
 			assertEquals(updated,store.getRootData());
 			fresh.flush();

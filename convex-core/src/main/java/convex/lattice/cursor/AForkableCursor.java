@@ -3,10 +3,11 @@ package convex.lattice.cursor;
 import convex.core.data.ACell;
 
 /**
- * Mutable cursors with isolated copies and explicit write-back.
- * A raw {@link #fork()} overwrites its parent on sync. Atomic drafts are supplied
- * by {@link Transactions}; cursors do not retain historical snapshots.
- * Components provide lattice reconciliation when concurrent changes must merge.
+ * Mutable cursors whose paths are themselves mutable cursors.
+ * Cursors neither fork nor sync: an isolated working copy is a component with its
+ * own working state, which reconciles with its destination under the component's
+ * lattice, and a short atomic edit is a {@link Transactions} draft. A detached
+ * snapshot is simply {@code Root.create(cursor.get())}.
  *
  * @param <V> Value type
  */
@@ -25,25 +26,4 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 		if (path.length == 0) return (AForkableCursor<T>) this;
 		return PathCursor.create(this, path);
 	}
-
-	/**
-	 * Creates a working copy with write-back semantics: {@link #sync()} overwrites
-	 * this cursor's value with the fork's, whatever happened here in between. Use
-	 * component-owned working state wherever concurrent writers are possible.
-	 *
-	 * @return A new forked cursor with local storage
-	 */
-	public ForkedCursor<V> fork() {
-		return new ForkedCursor<>(this, get());
-	}
-
-	/**
-	 * Synchronises this cursor towards its parent. On a raw fork, writes the working
-	 * copy into the cursor it was forked from. Views delegate to their source;
-	 * ordinary roots return their current value. Component publication, signing
-	 * and host persistence belong to component sync, not this operation.
-	 *
-	 * @return The value at this cursor after synchronisation
-	 */
-	public abstract V sync();
 }

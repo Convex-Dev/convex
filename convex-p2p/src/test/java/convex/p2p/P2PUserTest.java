@@ -176,7 +176,7 @@ public class P2PUserTest {
 			Vectors.of(Strings.create("tcp://example.com:18888")),
 			Strings.create("Convex Lattice Node"), Strings.create("test"), null, 1000L);
 		me.nodeCursor().set(info);
-		me.nodeCursor().sync();
+		me.node().sync();
 
 		AHashMap<ACell, SignedData<ACell>> nodes = ownerMap(
 			node.getCursor().get(P2PLattice.KEY_P2P, P2PLattice.KEY_NODES));

@@ -24,8 +24,8 @@ import convex.core.util.Utils;
  * </ul>
  *
  * <p>The component that owns the boundary wraps its cursor with one of these;
- * navigation never inserts them. All eight atomic operations, {@code compareAndSet}
- * and {@code sync} are implemented here in terms of two hooks:</p>
+ * navigation never inserts them. All eight atomic operations and
+ * {@code compareAndSet} are implemented here in terms of two hooks:</p>
  * <ul>
  *   <li>{@link #prepareWrite(ACell)} — <b>the</b> point every write funnels through:
  *       it authors the cell to store for a new view value. This is where write-time
@@ -130,17 +130,6 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AF
 			present = true;
 			return stored;
 		}
-	}
-
-	@Override
-	public V sync() {
-		if (base instanceof AForkableCursor<?> forkable) {
-			forkable.sync();
-			return get();
-		}
-		throw new IllegalStateException(
-			getClass().getSimpleName() + ".sync(): base cursor is not forkable (got " +
-			base.getClass().getSimpleName() + "). Sync cannot propagate.");
 	}
 
 	@Override

@@ -39,12 +39,11 @@ built on Convex immutable data structures with Java NIO compatibility.
                        │
 ┌──────────────────────▼───────────────────────────────────────┐
 │       AForkableCursor<AVector<ACell>> Cursor                   │
-│      (Atomic mutable reference; merges via DLFSLattice)       │
+│      (Atomic mutable reference; no lattice knowledge)         │
 │  - Root: standalone drive                                     │
 │  - PathCursor: child of a drives map, shaped by DLFSLattice   │
-│  - ForkedCursor: isolated fork merging with DLFSLattice       │
-│  - merge(DLFSLattice, other): lattice merge (always succeeds) │
-│  - fork(DLFSLattice) / sync(): isolated working copies        │
+│  - DLFSLocal.merge(other): lattice merge via DLFSLattice      │
+│  - fork(): component working state reconciled on sync()       │
 └──────────────────────┬───────────────────────────────────────┘
                        │
                        │ Pure functions on AVector<ACell>
@@ -75,10 +74,10 @@ and `path()` for the lattice cursor hierarchy.
 
 **DLFSLocal** — Mutable Java NIO filesystem backed by a lattice cursor. All file operations
 (`createFile`, `write`, `delete`, `createDirectory`) go through `cursor.updateAndGet()`
-with pure DLFSNode functions. Merges use `cursor.merge(DLFSLattice.INSTANCE, other)`;
+with pure DLFSNode functions. Merges apply `DLFSLattice` inside `cursor.updateAndGet()`;
 the cursor knows nothing of the lattice, so `DLFSLocal` supplies it for merges and
-forks. The cursor can be a `Root` (standalone drive), a child of a drives map declared
-with `DLFSLattice` as its shape, or a `ForkedCursor` (isolated working copy).
+forks. The cursor can be a `Root` (standalone drive), a path within a drives map, or
+the working state of a forked component (isolated working copy).
 
 ### Key Files
 
@@ -414,8 +413,8 @@ byte[] data = Files.readAllBytes(drive.getPath("readme.txt"));
 
 ### Fork and Sync
 
-`fork()` creates an isolated working copy backed by a `ForkedCursor` whose merge
-function is `DLFSLattice`.
+`fork()` creates an isolated working copy: a component with its own working state
+whose publication reconciles with `DLFSLattice`.
 Changes are invisible to the original until `sync()` merges them back via
 lattice merge:
 
@@ -594,8 +593,8 @@ DLFS follows the lattice application best practices defined in CAD045:
 | **Pure functions** | `DLFSNode` — all merge/navigate/update operations are pure, deterministic, and side-effect-free |
 | **Cursor-backed mutability** | `DLFSLocal` wraps `AForkableCursor<AVector<ACell>>`; all writes via `cursor.updateAndGet()` |
 | **Factory methods** | `DLFS.create()` (standalone), `DLFS.connect(parent, name, store)` (store-backed cursor), component-backed `DLFSDrive.fileSystem()` |
-| **Fork/sync** | `DLFileSystem.fork()` → `ForkedCursor` merging with `DLFSLattice` for isolated batch operations; `sync()` merges back |
-| **Lattice merge** | `DLFSLocal.merge()` delegates to `rootCursor.merge(DLFSLattice.INSTANCE, other)` |
+| **Fork/sync** | `DLFileSystem.fork()` → component working state reconciled with `DLFSLattice` for isolated batch operations; `sync()` merges back |
+| **Lattice merge** | `DLFSLocal.merge()` applies `DLFSLattice.INSTANCE.merge` inside `rootCursor.updateAndGet()` |
 | **Foreign validation** | `DLFSLattice.checkForeign()` validates node structure (vector length, timestamp type) |
 | **OwnerLattice** | ROOT lattice: `:fs → OwnerLattice(MapLattice(DLFSLattice))` — forgery-resistant with `LatticeContext` |
 | **NIO compatibility** | Focused basic-file API; unsupported operations throw explicitly |

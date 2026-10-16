@@ -7,9 +7,9 @@ import java.util.function.UnaryOperator;
 import convex.core.data.ACell;
 
 /**
- * AtomicReference-backed value storage.
- * Publication is an optional {@link PublishingCursor} wrapper; ordinary roots
- * retain only their current value and have no sync lock or callbacks.
+ * AtomicReference-backed value storage. A root retains only its current value and
+ * has no lock or callbacks; publication belongs to the component or host that
+ * owns it.
  *
  * @param <V> Value type
  */
@@ -34,10 +34,6 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 	public static <V extends ACell> Root<V> create(V value) {
 		return new Root<V>(value);
 	}
-
-
-	/** Ordinary storage has no publication work. */
-	@Override public V sync() { return get(); }
 
 
 	// ===== Standard cursor operations =====

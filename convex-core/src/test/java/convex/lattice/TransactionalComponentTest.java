@@ -226,15 +226,15 @@ class TransactionalComponentTest {
 		assertEquals(coordinated?200:0,lockedCallbacks.get());
 	}
 
-	@Test void transactionOnForkDoesNotTouchLiveState() {
+	@Test void transactionOnDetachedDraftDoesNotTouchLiveState() {
 		Counter live=counter(true);
-		Counter fork=live.withCursor(live.cursor().fork());
-		fork.transactLocked(Counter::increment);
+		Counter draft=live.withCursor(new TransactionalRootCursor<>(live.cursor().get()));
+		draft.transactLocked(Counter::increment);
 		assertEquals(0,live.count());
-		assertEquals(1,fork.count());
-		fork.sync();
-		assertEquals(0,live.count(),"A view does not publish a caller-owned raw cursor fork");
-		fork.cursor().sync();
+		assertEquals(1,draft.count());
+		draft.sync();
+		assertEquals(0,live.count(),"A view does not publish a caller-owned detached cursor");
+		live.cursor().set(draft.cursor().get());
 		assertEquals(1,live.count());
 	}
 
@@ -272,14 +272,15 @@ class TransactionalComponentTest {
 		assertSame(before,live.cursor().get());
 	}
 
-	@Test void capabilitiesFollowViewsPathsAndForks() {
+	@Test void capabilitiesFollowPathsAndComponentWorkingState() {
 		for (boolean coordinated:new boolean[]{false,true}) {
 			var root=coordinated?new TransactionalRootCursor<>(initial())
 				:new Root<>(initial());
-			var publication=new convex.lattice.cursor.PublishingCursor<>(root);
-			assertEquals(coordinated,publication.supportsExclusiveTransactions());
 			assertEquals(coordinated,root.path(COUNT).supportsExclusiveTransactions());
-			assertEquals(coordinated,publication.fork().supportsExclusiveTransactions());
+			var working=ALatticeComponent.working(
+				convex.lattice.generic.MapLattice.<Keyword,ACell>create(convex.lattice.generic.JSONLattice.INSTANCE),
+				root,LatticeContext.EMPTY);
+			assertEquals(coordinated,working.cursor().supportsExclusiveTransactions());
 		}
 	}
 

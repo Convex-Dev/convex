@@ -51,8 +51,8 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	}
 
 	/**
-	 * Binds an application view to a working cursor, such as a fork or a
-	 * transaction draft. Rebinding factories rebuild child components against the
+	 * Binds an application view to a working cursor, such as another component's
+	 * working state or a transaction draft. Rebinding factories rebuild child components against the
 	 * new view rather than reusing children bound to the live cursor.
 	 *
 	 * @param lattice Root lattice: the complete merge for this application's root

@@ -62,8 +62,4 @@ final class TransactionCursor<V extends ACell> extends AForkableCursor<V> {
 		checkAccess();
 		return lock;
 	}
-
-	@Override public V sync() {
-		throw new IllegalStateException("Transaction views cannot publish or sync");
-	}
 }

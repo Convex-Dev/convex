@@ -783,35 +783,31 @@ public class SignedCursorTest {
 	}
 
 	// =========================================================================
-	// Sync propagation through signing boundary
+	// Writes through the signing boundary
 	// =========================================================================
 
 	/**
-	 * sync() on a SignedCursor must propagate to the base cursor.
-	 * Verifies the onSync callback fires on the root.
+	 * A write from inside the signing boundary lands, signed, in the root's storage;
+	 * publication of that root is the owning host's business, not the cursor's.
 	 */
 	@Test
-	public void testSyncPropagatesThroughSignedCursor() {
+	public void testWriteThroughSignedCursorLandsInRoot() {
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.INSTANCE);
 
 		SignedData<AInteger> aliceSigned = KP_ALICE.signData((AInteger) CVMLong.create(42));
 		AHashMap<ACell, SignedData<AInteger>> initial = Maps.of(ALICE, aliceSigned);
 
-		java.util.concurrent.atomic.AtomicInteger syncCount = new java.util.concurrent.atomic.AtomicInteger();
 		LatticeContext ctx = LatticeContext.create(null, KP_ALICE);
-		PublishingCursor<AHashMap<ACell, SignedData<AInteger>>> root =
-			PublishingCursor.create(initial);
-		root.onSync(value -> { syncCount.incrementAndGet(); return value; }, ownerLattice::merge);
+		Root<AHashMap<ACell, SignedData<AInteger>>> root = Cursors.root(initial);
 
 		// Navigate to the owner's slot, then wrap it in the signing boundary
 		AForkableCursor<AInteger> innerCursor = convex.lattice.ComponentTestSupport.signed(root.path(ALICE), ownerLattice, ALICE, ctx);
 
-		// Write and sync from inside the signing boundary
 		innerCursor.set(CVMLong.create(99));
-		innerCursor.sync();
 
-		assertTrue(syncCount.get() > 0,
-			"sync() from inside signing boundary must reach root onSync callback");
+		SignedData<AInteger> stored = root.get().get(ALICE);
+		assertEquals(CVMLong.create(99), stored.getValue());
+		assertTrue(stored.checkSignature(), "the write through the boundary is signed at the root");
 	}
 
 	/**
@@ -838,29 +834,5 @@ public class SignedCursorTest {
 			() -> convex.lattice.ComponentTestSupport.signed(root.path(ALICE), OwnerKeyLattice.create(MaxLattice.INSTANCE), Keywords.VALUE, LatticeContext.create(null, KP_ALICE)),
 			"an invalid owner key for the lattice is rejected when wrapping");
 	}
-
-	/**
-	 * sync() throws IllegalStateException if the base cursor is not forkable, so it
-	 * has no parent to propagate to.
-	 */
-	@Test
-	public void testSyncThrowsOnNonForkableBase() {
-		Root<SignedData<CVMLong>> root = Root.create(KP_ALICE.signData(CVMLong.create(1)));
-		ACursor<SignedData<CVMLong>> view = new TimeCache<>(root, 1000);
-		SignedCursor<CVMLong> sc = SignedCursor.create(view, KP_ALICE);
-
-		assertEquals(CVMLong.create(1), sc.get());
-		assertThrows(IllegalStateException.class, () -> sc.sync(),
-			"sync() on a SignedCursor over a read-only view has nowhere to propagate");
-	}
-
-	// =========================================================================
-	// Context propagation
-	// =========================================================================
-
-	/**
-	 * Path cursors inherit their parent's effective context and forks capture it.
-	 * setContext() mutates the cursor's local context override.
-	 */
 
 }

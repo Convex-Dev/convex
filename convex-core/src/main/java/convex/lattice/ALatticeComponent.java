@@ -202,8 +202,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * its edits are already visible in the containing working state.
 	 *
 	 * <p>Call the enclosing application's sync to run its preparation and publication,
-	 * and the host's sync for persistence or replication. A raw cursor fork supplied
-	 * to a view remains caller-owned and is not implicitly synced by the component.</p>
+	 * and the host's sync for persistence or replication. A caller-owned cursor
+	 * supplied to a view is never published by the component.</p>
 	 *
 	 * @return Published snapshot, or current value for a lightweight view. Later
 	 *         concurrent edits may remain pending in working storage.

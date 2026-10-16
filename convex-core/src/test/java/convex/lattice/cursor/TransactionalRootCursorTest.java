@@ -32,9 +32,12 @@ class TransactionalRootCursorTest {
 			writer("getAndUpdate",r -> r.getAndUpdate(v -> CVMLong.TWO)),
 			writer("accumulateAndGet",r -> r.accumulateAndGet(CVMLong.TWO,(a,b) -> b)),
 			writer("getAndAccumulate",r -> r.getAndAccumulate(CVMLong.TWO,(a,b) -> b)),
-			writer("publication view write",r -> new PublishingCursor<>(r).set(CVMLong.TWO)),
 			writer("incoming merge",r -> convex.lattice.ComponentTestSupport.merge(r,MaxLattice.INSTANCE,CVMLong.TWO)),
-			writer("publication write-back",r -> new PublishingCursor<>(r).sync(v -> CVMLong.TWO)));
+			writer("component publication",r -> {
+				var working=convex.lattice.ALatticeComponent.working(MaxLattice.INSTANCE,r,convex.lattice.LatticeContext.EMPTY);
+				working.cursor().set(CVMLong.TWO);
+				working.sync();
+			}));
 	}
 
 	@ParameterizedTest(name="{0}")

@@ -12,8 +12,6 @@ import java.util.concurrent.CountDownLatch;
 
 import org.junit.jupiter.api.Test;
 
-import convex.lattice.cursor.PublishingCursor;
-
 import java.util.concurrent.atomic.AtomicReference;
 
 import convex.core.crypto.AKeyPair;
@@ -28,6 +26,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeContext;
+import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
@@ -126,30 +125,30 @@ public class DLFSCursorTest {
 
 	@Test
 	public void testLiveViewSyncDoesNotPublishHost() throws Exception {
-		// Simulates what NodeServer does: root cursor with onSync callback
+		// Simulates what NodeServer does: a host whose publication policy is observable
 		MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattice.INSTANCE);
-		PublishingCursor<AHashMap<AString, AVector<ACell>>> root =
-			PublishingCursor.create(drivesLattice.zero());
+		LatticeHost<AHashMap<AString, AVector<ACell>>> host =
+			LatticeHost.create(drivesLattice.zero(), null);
 
-		// Track sync callbacks (like NodeServer's propagator trigger)
+		// Track publications (like NodeServer's propagator trigger)
 		AtomicReference<ACell> synced = new AtomicReference<>();
-		root.onSync(value -> { synced.set(value); return value; }, drivesLattice::merge);
+		host.setPublicationPolicy(value -> { synced.set(value); return value; });
 
 		// Connect a drive and write
 		AString driveName = Strings.create("vault");
-		DLFSLocal dlfs = DLFS.connect(root, driveName);
+		DLFSLocal dlfs = DLFS.connect(host.cursor(), driveName);
 		Files.writeString(dlfs.getPath("/test.txt"), "sync me!");
 
-		// Before sync: callback should not have been triggered
-		assertNull(synced.get(), "onSync should not fire until sync() is called");
+		// Before sync: publication should not have run
+		assertNull(synced.get(), "publication should not run until host.sync() is called");
 
 		// Sync from the drive level
 		dlfs.sync();
-		assertNull(synced.get(),"A live filesystem view must not publish its containing root");
-		root.sync();
+		assertNull(synced.get(),"A live filesystem view must not publish its containing host");
+		host.sync();
 
-		// After sync: callback should have the full root value including file content
-		assertNotNull(synced.get(), "onSync should fire after sync()");
+		// After sync: the policy saw the full root value including file content
+		assertNotNull(synced.get(), "publication should run on host.sync()");
 
 		// Verify content survives a round-trip through the synced value
 		AHashMap<AString, AVector<ACell>> syncedMap = (AHashMap<AString, AVector<ACell>>) synced.get();
@@ -216,8 +215,8 @@ public class DLFSCursorTest {
 		OwnerLattice<AHashMap<AString,AVector<ACell>>> owners=OwnerLattice.create(MapLattice.create(DLFSLattice.INSTANCE));
 		KeyedLattice rootLattice=KeyedLattice.create(dlfsKey,owners);
 		LatticeContext context=LatticeContext.create(timestamp,keyPair);
-		PublishingCursor<Index<Keyword,ACell>> root=PublishingCursor.create((Index<Keyword,ACell>)Index.EMPTY);
-		AForkableCursor<?> region=root.path(dlfsKey);
+		LatticeHost<Index<Keyword,ACell>> root=LatticeHost.create((Index<Keyword,ACell>)Index.EMPTY,null);
+		AForkableCursor<?> region=root.cursor().path(dlfsKey);
 		DLFSLocal fileSystem=DLFS.connect(convex.lattice.ComponentTestSupport.signed(convex.lattice.ALatticeComponent.resolve(region,owners,owner), owners, owner, context),driveName);
 		fileSystem.setContext(context);
 		Path path=fileSystem.getPath("/recreated");
@@ -226,7 +225,7 @@ public class DLFSCursorTest {
 
 		CountDownLatch snapshotTaken=new CountDownLatch(1);
 		CountDownLatch continueSync=new CountDownLatch(1);
-		root.onSync(snapshot->{
+		root.setPublicationPolicy(snapshot->{
 			snapshotTaken.countDown();
 			try {
 				continueSync.await();
@@ -235,7 +234,7 @@ public class DLFSCursorTest {
 				throw new IllegalStateException("Interrupted while holding root sync snapshot",e);
 			}
 			return snapshot;
-		}, rootLattice::merge);
+		});
 
 		AtomicReference<Throwable> failure=new AtomicReference<>();
 		Thread syncThread=Thread.ofVirtual().start(()->{
@@ -248,7 +247,7 @@ public class DLFSCursorTest {
 		snapshotTaken.await();
 
 		// The local update clears the equal-time tombstone while sync still holds
-		// the older deleted snapshot. On CAS failure, current/local is the own value.
+		// the older deleted snapshot. The host's CAS fails and the local write stays.
 		Files.write(path,new byte[] {2});
 		continueSync.countDown();
 		syncThread.join();

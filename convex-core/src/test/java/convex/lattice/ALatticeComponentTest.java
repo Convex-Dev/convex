@@ -56,8 +56,6 @@ public class ALatticeComponentTest {
 		assertTrue(fork.cursor().get().contains(value));
 		assertFalse(host.cursor().get().contains(value));
 
-		fork.cursor().sync();
-		assertFalse(host.cursor().get().contains(value));
 		new TestComponent(fork.cursor()).sync();
 		assertFalse(host.cursor().get().contains(value));
 		fork.sync();

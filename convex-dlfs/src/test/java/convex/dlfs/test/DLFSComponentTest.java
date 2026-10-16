@@ -78,8 +78,7 @@ public class DLFSComponentTest {
 		assertEquals("embedded subsystem",Files.readString(liveDrive.fileSystem().getPath("/draft.txt")));
 		assertEquals(lattice.zero(),app.cursor().get());
 		liveDrive.sync();
-		files.cursor().sync();
-		assertEquals(lattice.zero(),app.cursor().get(),"child and cursor sync cannot publish their enclosing component");
+		assertEquals(lattice.zero(),app.cursor().get(),"child sync cannot publish its enclosing component");
 		files.sync();
 		assertNotNull(destination.get());
 		assertEquals(lattice.zero(),root.cursor().get());
