@@ -1,6 +1,7 @@
 package convex.cli.dlfs;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -15,7 +16,10 @@ import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
@@ -33,6 +37,7 @@ import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -130,10 +135,15 @@ public class DlfsStart extends ACommand {
 		// Build NodeConfig
 		NodeConfig config = buildNodeConfig();
 
-		// Create and configure NodeServer
-		var nodeServer = new NodeServer<>(Lattice.ROOT, store, config);
+		// Assemble the relay host, then the node that replicates it
 		LatticeContext context=LatticeContext.create(null,keyPair);
-		nodeServer.setMergeContext(context);
+		NodeServer<Index<Keyword,ACell>> nodeServer;
+		try {
+			nodeServer=new NodeServer<>(RelayHost.open(Lattice.ROOT,store,config,context),config);
+		} catch (IOException e) {
+			store.close();
+			throw new CLIError(ExitCodes.CONFIG, "Failed to open node store: " + e.getMessage(), e);
+		}
 		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(config));
 		propagator.setTransportKeyPair(keyPair);
 		nodeServer.addPropagator(propagator);

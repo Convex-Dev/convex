@@ -59,6 +59,7 @@ import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -285,11 +286,11 @@ public class DLFSBrowser extends AbstractGUI {
 
 			// Local-only mode (port -1): persistence + cursor, no Netty network server
 			NodeConfig localConfig = NodeConfig.create(Maps.of(NodeConfig.PORT, CVMLong.create(-1)));
-			nodeServer = new NodeServer<>(OWNER_LATTICE, etchStore, localConfig);
 
-			// Set merge context with signing key for OwnerLattice verification
+			// The relay host's live application verifies owners and signs with this key;
+			// the node only replicates and persists what the host publishes.
 			LatticeContext ctx = LatticeContext.create(null, keyPair);
-			nodeServer.setMergeContext(ctx);
+			nodeServer = new NodeServer<>(RelayHost.open(OWNER_LATTICE, etchStore, localConfig, ctx), localConfig);
 			nodeServer.launch();
 
 			// Navigate to owner's signed entry, wrap in SignedCursor

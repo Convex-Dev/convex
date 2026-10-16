@@ -56,6 +56,7 @@ import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import convex.p2p.P2PApplication;
 import convex.p2p.P2PLattice;
 import convex.p2p.P2PUser;
@@ -299,11 +300,11 @@ public class SharedApplicationInternalsTest {
 		Fixture(boolean coordinated) {
 			var cursor=coordinated?Cursors.transactionalRoot(HOST_ROOT.zero()):Cursors.root(HOST_ROOT.zero());
 			var host=new LatticeHost<>(cursor,store);
+			host.setContext(VERIFY);
 			social=new SocialWithP2P(host);
 			files=new FilesWithP2P(host);
 			host.configureApplications(List.of(social,files));
 			node=new NodeServer<>(host,NodeConfig.port(-1));
-			node.setMergeContext(VERIFY);
 			socialGroup.setTransportKeyPair(SOCIAL_TRANSPORT);
 			filesGroup.setTransportKeyPair(FILES_TRANSPORT);
 			node.addPropagator(socialGroup);
@@ -575,7 +576,7 @@ public class SharedApplicationInternalsTest {
 	public void testConcurrentUpdatesToCommonSignedRegion() throws Exception {
 		try (Fixture f=new Fixture()) {
 			f.node.launch();
-			LatticeContext hostContext=f.node.getMergeContext();
+			LatticeContext hostContext=f.node.getHost().getContext();
 			Data data=populate(f);
 			var socialNode=f.social.p2p(COMMON_KEY.getAccountKey()).node();
 			var filesNode=f.files.p2p(COMMON_KEY.getAccountKey()).node();
@@ -616,7 +617,7 @@ public class SharedApplicationInternalsTest {
 			assertSame(before,f.node.getCursor().get());
 			assertNotNull(f.social.social.user(SOCIAL_KEY.getAccountKey()).feed().getPost(data.post()));
 			assertEquals("Shared host, private file",Files.readString(data.drive().fileSystem().getPath("/hello.txt")));
-			assertSame(hostContext,f.node.getMergeContext());
+			assertSame(hostContext,f.node.getHost().getContext());
 			assertNull(hostContext.getSigningKey());
 			f.files.sync();
 			f.node.getHost().sync();
@@ -654,12 +655,12 @@ public class SharedApplicationInternalsTest {
 		try (Fixture f=new Fixture();
 				MemoryStore remoteStore=new MemoryStore();
 				MemoryStore reverseStore=new MemoryStore();
-				NodeServer<Index<Keyword,ACell>> remote=new NodeServer<>(HOST_ROOT,remoteStore,NodeConfig.port(-1));
+				NodeServer<Index<Keyword,ACell>> remote=new NodeServer<>(
+					RelayHost.open(HOST_ROOT,remoteStore,NodeConfig.port(-1),VERIFY),NodeConfig.port(-1));
 				LatticeListener socialListener=listener(f.socialGroup);
 				LatticeListener filesListener=listener(f.filesGroup)) {
 			LatticePropagator receiver=new LatticePropagator(remoteStore,LatticePropagatorConfig.create());
 			receiver.setTransportKeyPair(AKeyPair.createSeeded(7306));
-			remote.setMergeContext(VERIFY);
 			remote.addPropagator(receiver);
 			f.node.launch();
 			remote.launch();

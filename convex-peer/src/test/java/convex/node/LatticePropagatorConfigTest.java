@@ -39,7 +39,7 @@ public class LatticePropagatorConfigTest {
 			LatticePropagatorConfig.MAX_TRUSTED_MESSAGE_SIZE,CVMLong.create(16384),
 			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(3)));
 
-		try (NodeServer<?> node=new NodeServer<>(MaxLattice.create(),new MemoryStore(),host)) {
+		try (NodeServer<?> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),new MemoryStore(),host),host)) {
 			LatticePropagator propagator=new LatticePropagator(new MemoryStore(),group);
 			node.addPropagator(propagator);
 

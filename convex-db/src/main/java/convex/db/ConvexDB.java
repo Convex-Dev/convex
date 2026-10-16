@@ -1,5 +1,6 @@
 package convex.db;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +21,7 @@ import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 
 /**
  * Root lattice component for the Convex DB SQL database system.
@@ -169,10 +171,11 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * </pre>
 	 *
 	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
-	 * @return NodeServer configured for SQL database lattice (local-only, no network)
+	 * @return NodeServer replicating a relay host over the SQL database lattice (local-only, no network)
+	 * @throws IOException if the store's retained root cannot be read
 	 */
-	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) {
-		return new NodeServer<>(DATABASE_MAP_LATTICE,store);
+	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) throws IOException {
+		return new NodeServer<>(RelayHost.open(DATABASE_MAP_LATTICE,store,null));
 	}
 
 	/**

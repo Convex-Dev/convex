@@ -52,6 +52,7 @@ import convex.lattice.fs.DLPath;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 
 public class DLFSComponentTest {
 
@@ -133,9 +134,9 @@ public class DLFSComponentTest {
 	public void testCompleteNodeHostedServerStack() throws Exception {
 		AKeyPair keyPair=AKeyPair.generate();
 		try (EtchStore store=EtchStore.createTemp("dlfs-complete-stack");
-				NodeServer<Index<Keyword,ACell>> node=
-					new NodeServer<>(convex.lattice.Lattice.ROOT,store,NodeConfig.port(-1))) {
-			node.setMergeContext(LatticeContext.create(null,keyPair));
+				NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(RelayHost.open(
+					convex.lattice.Lattice.ROOT,store,NodeConfig.port(-1),LatticeContext.create(null,keyPair)),
+					NodeConfig.port(-1))) {
 			node.launch();
 
 			DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(convex.lattice.Lattice.ROOT,
@@ -183,8 +184,8 @@ public class DLFSComponentTest {
 		KeyedLattice lattice=KeyedLattice.create(KEY_DOCUMENTS,DLFSRegion.LATTICE);
 		AKeyPair keyPair=AKeyPair.generate();
 		try (EtchStore store=EtchStore.createTemp("dlfs-components");
-				NodeServer<Index<Keyword,ACell>> server=new NodeServer<>(lattice,store,NodeConfig.port(-1))) {
-			server.setMergeContext(LatticeContext.create(null,keyPair));
+				NodeServer<Index<Keyword,ACell>> server=new NodeServer<>(RelayHost.open(
+					lattice,store,NodeConfig.port(-1),LatticeContext.create(null,keyPair)),NodeConfig.port(-1))) {
 			server.launch();
 			DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(lattice,
 				server.getHost(),KEY_DOCUMENTS);

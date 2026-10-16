@@ -138,9 +138,8 @@ against a local host and a networked one.
 carries no lattice, and a node that only replicates are intentional revisions of
 CAD035, CAD036 and CAD045, which still describe lattice-aware cursors, automatic
 cursor signing boundaries and a node constructed from a lattice. Those CADs need
-corresponding updates before this design becomes normative. The branch keeps a node
-constructor that assembles a relay host for you; it sits outside this model.
-Ownership remains governed by CAD038.
+corresponding updates before this design becomes normative. Ownership remains
+governed by CAD038.
 
 ## Key points
 
@@ -443,9 +442,11 @@ host.sync();
 The supplied host is already initialised, restored by `open`; the node never reloads
 it. Launch installs the node's publication pipeline, so the host's publication
 policy must not already be frozen. Node startup does not invoke application sync.
-Transport and propagation configuration remain explicit. A relay node is the same
-assembly with `LatticeApplication.live(lattice, host)` as the host's one
-application.
+Transport and propagation configuration remain explicit, and a propagation group
+knows no lattice either: it announces whatever the host publishes, through its own
+projection. A relay node is the same assembly with `LatticeApplication.live(lattice,
+host)` as the host's one application; the peer module's `RelayHost` assembles that
+host from a lattice, a store, node configuration and the relay's policy.
 
 ### Sharing a host
 
@@ -1084,7 +1085,8 @@ Worked examples:
 - `convex.lattice.LatticeContext`, `OwnerLattice`, `SignedLattice`,
   `JSONLattice`, `LWWLattice`, `IndexLattice`, `MapLattice`, `SetLattice` — lattices
   and write policy.
-- `convex.node.NodeServer` (`convex-peer`) — the replication runtime.
+- `convex.node.NodeServer`, `LatticePropagator` and `RelayHost` (`convex-peer`) — the
+  replication runtime and relay host assembly.
 - `convex-social` (`Social`, `SocialUser`, `Feed`, `SocialPost`) and `convex-dlfs` —
   worked examples.
 

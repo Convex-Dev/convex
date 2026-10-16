@@ -81,7 +81,7 @@ public class LatticeDemo {
 				// - Takes a store (where to persist data)
 				// - Takes a port number (how other nodes can connect to it)
 				NodeConfig config=NodeConfig.port(0);
-				NodeServer<?> server = new NodeServer<>(lattice,store,config);
+				NodeServer<?> server = new NodeServer<>(RelayHost.open(lattice,store,config),config);
 				LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.create());
 				server.addPropagator(propagator);
 				LatticeListener transport=new LatticeListener(config);

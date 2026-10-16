@@ -41,8 +41,8 @@ public class UpgradedInboundRouteBroadcastTest {
 			if (CVMLong.create(1).equals(value)) firstReceived.complete(value);
 			if (CVMLong.create(2).equals(value)) secondReceived.complete(value);
 		});
-		try (var alice=new NodeServer<>(lattice,aliceStore,NodeConfig.port(-1));
-			var bob=new NodeServer<>(lattice,bobStore,NodeConfig.localNetwork());
+		try (var alice=new NodeServer<>(RelayHost.open(lattice,aliceStore,NodeConfig.port(-1)),NodeConfig.port(-1));
+			var bob=new NodeServer<>(RelayHost.open(lattice,bobStore,NodeConfig.localNetwork()),NodeConfig.localNetwork());
 			var listener=new LatticeListener(NodeConfig.localNetwork())) {
 			alice.addPropagator(aliceGroup);
 			bob.addPropagator(bobGroup);

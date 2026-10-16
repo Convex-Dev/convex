@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Set;
@@ -62,6 +63,7 @@ import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.LatticeHost;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
@@ -101,12 +103,22 @@ public class NodeServerTest {
 		}
 	}
 
+	/** A relay node: the host's live application admits the whole lattice, the node replicates it. */
 	private static final class TestNode<V extends ACell> extends NodeServer<V> {
-		final ALattice<V> lattice;
 		TestNode(ALattice<V> lattice,AStore store) { this(lattice,store,null); }
 		TestNode(ALattice<V> lattice,AStore store,NodeConfig config) {
-			super(lattice,store,config);
-			this.lattice=lattice;
+			this(lattice,store,config,LatticeContext.EMPTY);
+		}
+		TestNode(ALattice<V> lattice,AStore store,NodeConfig config,LatticeContext context) {
+			super(relay(lattice,store,config,context),config);
+		}
+		private static <V extends ACell> LatticeHost<V> relay(ALattice<V> lattice,AStore store,
+				NodeConfig config,LatticeContext context) {
+			try {
+				return RelayHost.open(lattice,store,config,context);
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
 		}
 	}
 
@@ -1313,20 +1325,6 @@ public class NodeServerTest {
 	 * launch() but rejected once the node is running.
 	 */
 	@Test
-	public void testSetMergeContextConfigurationOnly() throws IOException, InterruptedException {
-		AKeyPair kp = AKeyPair.generate();
-		maxNodeServer = new TestNode<>(MaxLattice.create(), store, NodeConfig.port(-1));
-
-		// Before launch: permitted
-		maxNodeServer.setMergeContext(LatticeContext.create(null, kp));
-		maxNodeServer.launch();
-
-		// After launch: rejected
-		assertThrows(IllegalStateException.class,
-			() -> maxNodeServer.setMergeContext(LatticeContext.EMPTY));
-	}
-
-	@Test
 	public void testLatticeHostSyncPersistsBeforeLaunch() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		maxNodeServer.getCursor().set(CVMLong.create(42));
@@ -1358,7 +1356,6 @@ public class NodeServerTest {
 		NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), testStore, NodeConfig.port(-1));
 		LatticePropagator primary = new LatticePropagator(testStore,LatticePropagatorConfig.create());
 		node.addPropagator(primary);
-		node.setMergeContext(LatticeContext.EMPTY);
 
 		assertEquals(NodeServer.LifecycleState.NEW, node.getLifecycleState());
 		assertThrows(UnsupportedOperationException.class, node.getPropagators()::clear,
@@ -1380,7 +1377,7 @@ public class NodeServerTest {
 			CompletableFuture<Throwable> mutationFuture = CompletableFuture.supplyAsync(() -> {
 				mutationStarted.countDown();
 				try {
-					node.setMergeContext(LatticeContext.EMPTY);
+					node.addPropagator(new LatticePropagator(testStore));
 					return null;
 				} catch (Throwable t) {
 					return t;
@@ -1399,8 +1396,8 @@ public class NodeServerTest {
 			node.close();
 			assertEquals(NodeServer.LifecycleState.STOPPED, node.getLifecycleState());
 			assertThrows(IllegalStateException.class,
-				() -> node.setMergeContext(LatticeContext.EMPTY),
-				"merge-context configuration remains frozen across relaunches");
+				() -> node.addPropagator(new LatticePropagator(testStore)),
+				"topology configuration remains frozen across relaunches");
 
 			node.launch();
 			assertEquals(NodeServer.LifecycleState.RUNNING, node.getLifecycleState(),
@@ -1634,7 +1631,7 @@ public class NodeServerTest {
 			assertFalse(node.isRunning());
 			assertEquals(NodeServer.LifecycleState.STOPPED,node.getLifecycleState());
 			assertThrows(IllegalStateException.class,
-				() -> node.setMergeContext(LatticeContext.EMPTY),
+				() -> node.addPropagator(new LatticePropagator(store)),
 				"configuration remains frozen after the first launch");
 			assertThrows(IllegalStateException.class,
 				() -> node.addPropagator(propagator));
@@ -2720,8 +2717,7 @@ public class NodeServerTest {
 		AKeyPair clientKP = AKeyPair.generate();
 
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new TestNode<>(lattice, store);
-		maxNodeServer.setMergeContext(LatticeContext.create(null, applicationKP));
+		maxNodeServer = new TestNode<>(lattice, store, null, LatticeContext.create(null, applicationKP));
 		// Deliberately no setTransportKeyPair: lattice signing authority must not
 		// leak into the connection-authentication role.
 		allowSingleGroupInbound(maxNodeServer);

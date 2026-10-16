@@ -105,6 +105,15 @@ public class NodeServerPersistenceTest {
 	private final ConcurrentHashMap<NodeServer<?>,LatticeListener> transports=
 		new ConcurrentHashMap<>();
 
+	/** A relay node over the root lattice: the host admits everything, the node replicates it. */
+	private static NodeServer<Index<Keyword,ACell>> node(AStore store) throws IOException {
+		return node(store,null);
+	}
+
+	private static NodeServer<Index<Keyword,ACell>> node(AStore store,NodeConfig config) throws IOException {
+		return new NodeServer<>(RelayHost.open(Lattice.ROOT,store,config),config);
+	}
+
 	/** Attaches the explicit identity-view group used by replication tests. */
 	private LatticePropagator addPropagationGroup(NodeServer<?> node) {
 		LatticePropagator propagator=new LatticePropagator(node.getStore(),LatticePropagatorConfig.create());
@@ -281,8 +290,8 @@ public class NodeServerPersistenceTest {
 	@Test
 	public void testPrimaryBackupPersistAndRestore() throws Exception {
 		// Launch primary and backup
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		primary = node(primaryStore);
+		backup = node(backupStore);
 		serveInbound(primary);
 		addPropagationGroup(backup);
 		primary.launch();
@@ -309,7 +318,7 @@ public class NodeServerPersistenceTest {
 		backup = null;
 
 		// Restart primary from same store — should restore
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 		assertEquals(CVMLong.create(42), readDataValue(primary, 42),
 			"Primary should restore value 42 from store");
@@ -317,7 +326,7 @@ public class NodeServerPersistenceTest {
 			"Primary should restore value 99 from store");
 
 		// Restart backup from same store — should restore
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		backup = node(backupStore);
 		backup.launch();
 		assertEquals(CVMLong.create(42), readDataValue(backup, 42),
 			"Backup should restore value 42 from store");
@@ -331,7 +340,7 @@ public class NodeServerPersistenceTest {
 	@Test
 	public void testRestoreDisabled() throws Exception {
 		// Write and persist some data
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 		writeDataValue(primary, 777);
 		primary.close();
@@ -339,7 +348,7 @@ public class NodeServerPersistenceTest {
 
 		// Restart with restore=false
 		NodeConfig noRestore = NodeConfig.create(Maps.of(NodeConfig.RESTORE, CVMBool.FALSE));
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, noRestore);
+		primary = node(primaryStore, noRestore);
 		primary.launch();
 
 		// Value should NOT be restored
@@ -354,7 +363,7 @@ public class NodeServerPersistenceTest {
 	public void testPersistDisabled() throws Exception {
 		// Launch with persist=false
 		NodeConfig noPersist = NodeConfig.create(Maps.of(NodeConfig.PERSIST, CVMBool.FALSE));
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, noPersist);
+		primary = node(primaryStore, noPersist);
 		primary.launch();
 
 		// Write data
@@ -363,7 +372,7 @@ public class NodeServerPersistenceTest {
 		primary = null;
 
 		// Restart with defaults (restore=true)
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 
 		// Value should NOT be there (was never persisted)
@@ -378,7 +387,7 @@ public class NodeServerPersistenceTest {
 	public void testMemoryStoreNoPersistence() throws Exception {
 		primaryStore = new MemoryStore();
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 
 		writeDataValue(primary, 555);
@@ -388,7 +397,7 @@ public class NodeServerPersistenceTest {
 		primary.close();
 		primary = null;
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 		assertNull(readDataValue(primary, 555),
 			"MemoryStore should not persist data across restarts");
@@ -401,7 +410,7 @@ public class NodeServerPersistenceTest {
 	@Test
 	public void testPrimaryRestartThenSync() throws Exception {
 		// Launch primary, write data, close
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 		writeDataValue(primary, 100);
 		writeDataValue(primary, 200);
@@ -409,7 +418,7 @@ public class NodeServerPersistenceTest {
 		primary = null;
 
 		// Restart primary
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		serveInbound(primary);
 		primary.launch();
 
@@ -418,7 +427,7 @@ public class NodeServerPersistenceTest {
 		assertEquals(CVMLong.create(200), readDataValue(primary, 200));
 
 		// Launch backup and sync from restarted primary
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		backup = node(backupStore);
 		addPropagationGroup(backup);
 		backup.launch();
 		pullBackupFromPrimary();
@@ -436,8 +445,8 @@ public class NodeServerPersistenceTest {
 	@Test
 	public void testBackupRestoreAfterBroadcast() throws Exception {
 		// Launch both
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		primary = node(primaryStore);
+		backup = node(backupStore);
 		serveInbound(primary);
 		addPropagationGroup(backup);
 		primary.launch();
@@ -458,7 +467,7 @@ public class NodeServerPersistenceTest {
 		writeDataValue(primary, 400);
 
 		// Restart backup — should restore value 300 from its own store
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		backup = node(backupStore);
 		addPropagationGroup(backup);
 		backup.launch();
 		assertEquals(CVMLong.create(300), readDataValue(backup, 300),
@@ -479,7 +488,7 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testStoreRootDataIsLatticeValue() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 
 		writeDataValue(primary, 12345);
@@ -504,7 +513,7 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testSyncTriggersPersist() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 
 		writeDataValue(primary, 42);
@@ -529,7 +538,7 @@ public class NodeServerPersistenceTest {
 	@Test
 	public void testSyncPersistLocalOnly() throws Exception {
 		// Local-only mode, same as venue: NodeConfig.port(-1)
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 
 		writeDataValue(primary, 77);
@@ -548,7 +557,7 @@ public class NodeServerPersistenceTest {
 		primary.close();
 		primary = null;
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		assertEquals(CVMLong.create(77), readDataValue(primary, 77),
 			"Local-only node should restore data from store");
@@ -560,7 +569,7 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testSyncConvergesToStableStoreBackedIdentity() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		writeNonEmbeddedRoot(primary);
 
@@ -588,7 +597,7 @@ public class NodeServerPersistenceTest {
 		CountDownLatch allowPersistence = new CountDownLatch(1);
 		AtomicInteger rootWrites = new AtomicInteger();
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 
 		sharedPrimaryStore.setRootWriteHook(() -> {
@@ -641,7 +650,7 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testSyncSurfacesPersistenceFailure() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary, 99);
 		sharedPrimaryStore.setRootWriteHook(() -> {
@@ -662,7 +671,7 @@ public class NodeServerPersistenceTest {
 	public void testLaunchCompletesInitialCheckpoint() throws Exception {
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary=node(primaryStore,NodeConfig.port(-1));
 
 		primary.launch();
 
@@ -671,7 +680,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testExplicitCheckpointCoalescesCleanStore() throws Exception {
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
@@ -685,7 +694,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testFailedCheckpointRemainsDirtyForRetry() throws Exception {
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary,103);
 		primary.getHost().sync();
@@ -706,7 +715,7 @@ public class NodeServerPersistenceTest {
 		NodeConfig config=NodeConfig.create(Maps.of(
 				NodeConfig.PORT,CVMLong.create(-1),
 				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
+		primary=node(primaryStore,config);
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
 		AtomicInteger flushes=new AtomicInteger();
@@ -726,7 +735,7 @@ public class NodeServerPersistenceTest {
 		NodeConfig config=NodeConfig.create(Maps.of(
 				NodeConfig.PORT,CVMLong.create(-1),
 				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
+		primary=node(primaryStore,config);
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
 		AtomicInteger attempts=new AtomicInteger();
@@ -746,7 +755,7 @@ public class NodeServerPersistenceTest {
 		NodeConfig config=NodeConfig.create(Maps.of(
 				NodeConfig.PORT,CVMLong.create(-1),
 				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
+		primary=node(primaryStore,config);
 		primary.addPropagator(new LatticePropagator(primaryStore,LatticePropagatorConfig.create()));
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
@@ -759,7 +768,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testCloseCompletesFinalCheckpoint() throws Exception {
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
@@ -774,7 +783,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testCloseSurfacesFinalCheckpointFailureAfterStopping() throws Exception {
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary,106);
 		sharedPrimaryStore.setFlushHook(()->{
@@ -790,7 +799,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testSyncPublishesWithoutDurabilityBarrier() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
@@ -804,7 +813,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testSyncDoesNotInvokeDurabilityBarrier() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary,101);
 		sharedPrimaryStore.setFlushHook(()->{
@@ -819,7 +828,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testExplicitPersistSurfacesDurabilityBarrierFailure() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		sharedPrimaryStore.setFlushHook(()->{
 			throw new IOException("simulated explicit flush failure");
@@ -844,7 +853,7 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testConcurrentWriteDuringSync() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 
 		Keyword stable = Keyword.intern("stable");
@@ -894,7 +903,7 @@ public class NodeServerPersistenceTest {
 		CountDownLatch releaseFirst = new CountDownLatch(1);
 		CountDownLatch secondStarted = new CountDownLatch(1);
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 
 		sharedPrimaryStore.setRootWriteHook(() -> {

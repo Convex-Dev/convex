@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `LatticeHost.create()` supports purely in-memory applications. Hosts accept a null store; persistence and flush become no-ops, while configured publication policies still run.
-- NodeServer can host an initialised root component or construct its own from a lattice, with applications assembled before node launch. Incoming roots and paths delegate to configured applications without forcing publication; applications explicitly opt into handling non-empty paths.
+- NodeServer hosts an assembled `LatticeHost`, with applications configured before node launch. Incoming roots and paths delegate to configured applications without forcing publication; applications explicitly opt into handling non-empty paths. `RelayHost.open` assembles the common relay host: one live application over a whole lattice, with restore, transactional root and timestamp skew taken from node configuration.
 - DLFS supports a separate optional content modification time, basic NIO attribute updates and preservation of unknown future node fields. Legacy nodes remain readable; older readers must upgrade before receiving extended nodes.
 - DLFS owner components provide atomic `getOrCreateDrive`, with optional live-drive limits, so applications can open or initialise a drive safely under concurrent creation.
 - Typed lattice component transactions stage domain operations atomically, with async completion and an opt-in transactional root for exclusive execution and contention fallback. Ordinary roots retain their existing write path.
@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `LatticeHost` no longer requires a lattice: it holds published state, delegates all incoming values to configured applications and persists snapshots. Applications declare their own lattices. `LatticeApplication` supports ordinary or live relay use, and `SignedComponent` can be extended by domain components.
-- Custom node applications are assembled on an initialised host before `NodeServer.launch()`; the application-factory launch overload and NodeServer lattice accessor are removed. The lattice-taking node constructor installs a standard live application.
+- `NodeServer` is replication only and is constructed from an assembled `LatticeHost`. The lattice-taking constructors, the application-factory launch overload, the lattice accessor and the merge-context accessors (`setMergeContext`, `getMergeContext`) are removed; policy belongs to the host and its applications, and the relay case is assembled by `RelayHost`. `ConvexDB.createNodeServer` now declares `IOException`.
 
 - `LatticePropagator` no longer takes a lattice or a merge context and keeps no working view of its own: it announces exactly what the host publishes, through its publication filter, and never writes a store root. The lattice-taking constructors, `setMergeContext`, `setPersistenceEnabled` and `restore()` are removed; construct a group from its serving store and optional configuration and set filters through the setters.
 - Renamed the application host to `LatticeHost`; NodeServer exposes it through `getHost()`. Application constructors and host factories use the new type.

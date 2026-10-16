@@ -37,6 +37,7 @@ import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSDrives;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 
 public class DLFSDriveManagerTest {
 
@@ -293,7 +294,7 @@ public class DLFSDriveManagerTest {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
 		try (EtchStore store=EtchStore.createTemp("dlfs-registry")) {
 			NodeServer<AHashMap<AString, AVector<ACell>>> first=
-				new NodeServer<>(lattice,store,NodeConfig.port(-1));
+				new NodeServer<>(RelayHost.open(lattice,store,NodeConfig.port(-1)),NodeConfig.port(-1));
 			first.launch();
 			try {
 				var drives=DLFSDrives.connect(first.getHost().cursor(),store);
@@ -307,7 +308,7 @@ public class DLFSDriveManagerTest {
 			}
 
 			NodeServer<AHashMap<AString, AVector<ACell>>> restored=
-				new NodeServer<>(lattice,store,NodeConfig.port(-1));
+				new NodeServer<>(RelayHost.open(lattice,store,NodeConfig.port(-1)),NodeConfig.port(-1));
 			restored.launch();
 			try {
 				var drives=DLFSDrives.connect(restored.getHost().cursor(),store);

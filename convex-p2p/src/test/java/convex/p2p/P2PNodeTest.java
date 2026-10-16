@@ -32,6 +32,7 @@ import convex.etch.EtchStore;
 import convex.lattice.LatticeContext;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import convex.social.Social;
 
 /**
@@ -85,8 +86,8 @@ public class P2PNodeTest {
 			NodeConfig.URL,Strings.create("tcp://localhost:18888"),
 			NodeConfig.PORT,CVMLong.create(-1)));
 		try (NodeServer<Index<Keyword,ACell>> raw=
-				new NodeServer<>(P2PLattice.ROOT,store,config)) {
-			raw.setMergeContext(LatticeContext.create(null,keyPair));
+				new NodeServer<>(RelayHost.open(P2PLattice.ROOT,store,config,
+					LatticeContext.create(null,keyPair)),config)) {
 			raw.launch();
 			ACell nodes=raw.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 			assertTrue(nodes==null || (nodes instanceof AHashMap<?,?> map && map.isEmpty()),

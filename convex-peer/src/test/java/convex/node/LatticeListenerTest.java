@@ -36,7 +36,7 @@ public class LatticeListenerTest {
 	public void testConfigurationAndLifecycle() throws Exception {
 		try (AStore store=new MemoryStore();
 				NodeServer<convex.core.data.prim.AInteger> node=
-					new NodeServer<>(MaxLattice.create(),store);
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null));
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
 			LatticePropagator group=new LatticePropagator(store);
 			node.addPropagator(group);
@@ -69,7 +69,7 @@ public class LatticeListenerTest {
 				AStore firstStore=new MemoryStore();
 				AStore secondStore=new MemoryStore();
 				NodeServer<convex.core.data.prim.AInteger> node=
-					new NodeServer<>(MaxLattice.create(),nodeStore);
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),nodeStore,null));
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
 			LatticePropagator first=new LatticePropagator(firstStore);
 			first.setPublicationFilter(ignored -> CVMLong.create(11));
@@ -103,7 +103,7 @@ public class LatticeListenerTest {
 	public void testOneGroupMayUseIndependentListeners() throws Exception {
 		try (AStore nodeStore=new MemoryStore();
 				NodeServer<convex.core.data.prim.AInteger> node=
-					new NodeServer<>(MaxLattice.create(),nodeStore);
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),nodeStore,null));
 				LatticeListener first=new LatticeListener(NodeConfig.port(0));
 				LatticeListener second=new LatticeListener(NodeConfig.port(0))) {
 			LatticePropagator group=new LatticePropagator(nodeStore);
@@ -135,7 +135,7 @@ public class LatticeListenerTest {
 	public void testSelectorFailureDoesNotAffectNodeOrListener() throws Exception {
 		try (AStore store=new MemoryStore();
 				NodeServer<convex.core.data.prim.AInteger> node=
-					new NodeServer<>(MaxLattice.create(),store);
+					new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null));
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
 			LatticePropagator group=new LatticePropagator(store);
 			node.addPropagator(group);
@@ -166,7 +166,7 @@ public class LatticeListenerTest {
 	@Test
 	public void testUnregisterClosesOnlySelectedGroupsConnections() throws Exception {
 		try (AStore store=new MemoryStore();
-				NodeServer<?> node=new NodeServer<>(MaxLattice.create(),store);
+				NodeServer<?> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null));
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
 			LatticePropagator first=new LatticePropagator(store);
 			LatticePropagator second=new LatticePropagator(store);
@@ -211,7 +211,7 @@ public class LatticeListenerTest {
 		CountDownLatch entered=new CountDownLatch(1);
 		CountDownLatch release=new CountDownLatch(1);
 		try (AStore store=new MemoryStore();
-				NodeServer<?> node=new NodeServer<>(MaxLattice.create(),store);
+				NodeServer<?> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null));
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
 			LatticePropagator group=new LatticePropagator(store);
 			node.addPropagator(group);
@@ -245,7 +245,7 @@ public class LatticeListenerTest {
 	@Test
 	public void testRemoveGroupClosesInboundSocketsOnEveryListener() throws Exception {
 		try (AStore store=new MemoryStore();
-				NodeServer<?> node=new NodeServer<>(MaxLattice.create(),store);
+				NodeServer<?> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null));
 				LatticeListener first=new LatticeListener(NodeConfig.port(0));
 				LatticeListener second=new LatticeListener(NodeConfig.port(0))) {
 			LatticePropagator group=new LatticePropagator(store);

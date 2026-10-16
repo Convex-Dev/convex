@@ -62,7 +62,7 @@ public class NodePublicationTest {
 		MapLattice<Keyword,CVMLong> lattice=MapLattice.create(LWWLattice.create(value -> 1L));
 		try (MemoryStore nodeStore=new MemoryStore();
 				MemoryStore viewStore=new MemoryStore();
-				NodeServer<AHashMap<Keyword,CVMLong>> node=new NodeServer<>(lattice,nodeStore)) {
+				NodeServer<AHashMap<Keyword,CVMLong>> node=new NodeServer<>(RelayHost.open(lattice,nodeStore,null))) {
 			CVMLong old=CVMLong.create(101);
 			CVMLong edit=CVMLong.create(102);
 			AHashMap<Keyword,CVMLong> replicatedBack=Maps.of(LOCAL,old,REMOTE,CVMLong.create(103));
@@ -94,7 +94,7 @@ public class NodePublicationTest {
 		LWWLattice<CVMLong> lattice=LWWLattice.create(CVMLong::longValue);
 		try (MemoryStore nodeStore=new MemoryStore();
 				MemoryStore viewStore=new MemoryStore();
-				NodeServer<CVMLong> node=new NodeServer<>(lattice,nodeStore)) {
+				NodeServer<CVMLong> node=new NodeServer<>(RelayHost.open(lattice,nodeStore,null))) {
 			LatticePropagator group=new LatticePropagator(viewStore);
 			node.addPropagator(group);
 			node.getCursor().set(CVMLong.create(10));
@@ -111,7 +111,7 @@ public class NodePublicationTest {
 	@Test
 	public void testOldExplicitSnapshotCannotDemotePublishedRoot() throws Exception {
 		try (MemoryStore store=new MemoryStore();
-				NodeServer<ASet<CVMLong>> node=new NodeServer<>(SetLattice.create(),store)) {
+				NodeServer<ASet<CVMLong>> node=new NodeServer<>(RelayHost.open(SetLattice.<CVMLong>create(),store,null))) {
 			node.launch();
 			ASet<CVMLong> old=Sets.of(CVMLong.ONE);
 			node.getCursor().set(old.include(CVMLong.TWO));
@@ -126,7 +126,7 @@ public class NodePublicationTest {
 	public void testExplicitSnapshotInstallsEtchRefsWithoutNotification() throws Exception {
 		try (EtchStore store=EtchStore.createTemp("node-explicit-refs");
 				MemoryStore viewStore=new MemoryStore();
-				NodeServer<ASet<Blob>> node=new NodeServer<>(SetLattice.create(),store)) {
+				NodeServer<ASet<Blob>> node=new NodeServer<>(RelayHost.open(SetLattice.<Blob>create(),store,null))) {
 			AtomicInteger notifications=new AtomicInteger();
 			LatticePropagator group=new LatticePropagator(viewStore) {
 				@Override public void triggerBroadcast(ACell value) {
@@ -151,7 +151,7 @@ public class NodePublicationTest {
 	public void testAttachedPublicationUsesServingStoreRefs() throws Exception {
 		try (EtchStore nodeStore=EtchStore.createTemp("node-root-refs");
 				EtchStore viewStore=EtchStore.createTemp("node-view-refs");
-				NodeServer<ASet<Blob>> node=new NodeServer<>(SetLattice.create(),nodeStore)) {
+				NodeServer<ASet<Blob>> node=new NodeServer<>(RelayHost.open(SetLattice.<Blob>create(),nodeStore,null))) {
 			LatticePropagator group=new LatticePropagator(viewStore);
 			node.addPropagator(group);
 			node.getCursor().set(Sets.of(Blobs.createRandom(400),Blobs.createRandom(400)));
@@ -178,7 +178,7 @@ public class NodePublicationTest {
 	public void testLocalAndRemoteWritesSurviveExplicitPersistence() throws Exception {
 		MapLattice<Keyword,Blob> lattice=MapLattice.create(LWWLattice.create(value -> 1L));
 		try (HookedEtchStore store=new HookedEtchStore();
-				NodeServer<AHashMap<Keyword,Blob>> node=new NodeServer<>(lattice,store)) {
+				NodeServer<AHashMap<Keyword,Blob>> node=new NodeServer<>(RelayHost.open(lattice,store,null))) {
 			node.launch();
 			Blob old=Blobs.createRandom(400);
 			Blob edit=Blobs.createRandom(400);
@@ -203,13 +203,16 @@ public class NodePublicationTest {
 		}
 	}
 
+	/** The relay host restores the retained root at open; local edits before launch build on it. */
 	@Test
-	public void testRestoreKeepsPreLaunchLocalEditsAndPersistedContributions() throws Exception {
+	public void testRestoredRootKeepsLocalEditsAndPersistedContributions() throws Exception {
 		MapLattice<Keyword,CVMLong> lattice=MapLattice.create(LWWLattice.create(value -> 1L));
 		try (EtchStore store=EtchStore.createTemp("node-local-restore")) {
 			store.setRootData(Maps.of(LOCAL,CVMLong.ONE,REMOTE,CVMLong.create(3)));
-			try (NodeServer<AHashMap<Keyword,CVMLong>> node=new NodeServer<>(lattice,store)) {
-				node.getCursor().set(Maps.of(LOCAL,CVMLong.TWO));
+			try (NodeServer<AHashMap<Keyword,CVMLong>> node=new NodeServer<>(RelayHost.open(lattice,store,null))) {
+				assertEquals(Maps.of(LOCAL,CVMLong.ONE,REMOTE,CVMLong.create(3)),node.getLocalValue(),
+					"the retained root is restored before any local edit");
+				node.getCursor().assoc(LOCAL,CVMLong.TWO);
 				node.launch();
 				assertEquals(Maps.of(LOCAL,CVMLong.TWO,REMOTE,CVMLong.create(3)),node.getLocalValue());
 				assertSame(store.getRootData(),node.getLocalValue());
@@ -221,7 +224,7 @@ public class NodePublicationTest {
 	public void testWriteDuringLaunchPublicationRemainsPending() throws Exception {
 		LWWLattice<CVMLong> lattice=LWWLattice.create(value -> 1L);
 		try (HookedEtchStore store=new HookedEtchStore();
-				NodeServer<CVMLong> node=new NodeServer<>(lattice,store)) {
+				NodeServer<CVMLong> node=new NodeServer<>(RelayHost.open(lattice,store,null))) {
 			node.getCursor().set(CVMLong.ONE);
 			store.beforeRootWrite=() -> node.getCursor().set(CVMLong.TWO);
 			node.launch();
@@ -238,7 +241,7 @@ public class NodePublicationTest {
 			@Override public <T extends ACell> Ref<T> setRootData(T value) throws IOException {
 				throw new IOException("publication failed");
 			}
-		}; NodeServer<ASet<CVMLong>> node=new NodeServer<>(SetLattice.create(),store)) {
+		}; NodeServer<ASet<CVMLong>> node=new NodeServer<>(RelayHost.open(SetLattice.<CVMLong>create(),store,null))) {
 			node.getCursor().set(Sets.of(CVMLong.ONE));
 			IOException failure=assertThrows(IOException.class,() -> node.persistSnapshot(node.getLocalValue()));
 			assertEquals("publication failed",failure.getMessage());

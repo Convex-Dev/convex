@@ -59,7 +59,7 @@ public class KVReplicationDemo {
 				stores.add(store);
 
 				NodeConfig config=NodeConfig.port(0);
-				NodeServer<?> server = new NodeServer<>(Lattice.ROOT,store,config);
+				NodeServer<?> server = new NodeServer<>(RelayHost.open(Lattice.ROOT,store,config),config);
 				LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.create());
 				server.addPropagator(propagator);
 				LatticeListener transport=new LatticeListener(config);

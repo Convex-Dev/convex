@@ -3,6 +3,7 @@ package convex.p2p;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -37,10 +38,12 @@ import convex.core.store.AStore;
 import convex.etch.EtchStore;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import convex.node.LatticeConnectionManager;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
@@ -211,8 +214,14 @@ public class P2PNode implements Closeable {
 			? LatticePropagatorConfig.create() : propagatorConfig;
 		LatticeContext mergeContext=LatticeContext.create(
 			null,keyPair,didAuthorizer::verifiesOwner);
-		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(root,store,effectiveConfig);
-		server.setMergeContext(mergeContext);
+		// The node replicates; the relay host's live application admits incoming values.
+		LatticeHost<Index<Keyword,ACell>> host;
+		try {
+			host=RelayHost.open(root,store,effectiveConfig,mergeContext);
+		} catch (IOException e) {
+			throw new UncheckedIOException("Unable to read the node's retained root",e);
+		}
+		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(host,effectiveConfig);
 		LatticeConnectionManager manager=new LatticeConnectionManager(store);
 		LatticePropagator propagator=new LatticePropagator(store,manager,effectivePropagatorConfig);
 		propagator.setTransportKeyPair(keyPair);

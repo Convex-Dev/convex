@@ -15,6 +15,7 @@ import convex.etch.EtchStore;
 import convex.db.lattice.SQLDatabase;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -53,9 +54,9 @@ public class ReplicationDemo {
 		NodeConfig configLondon=NodeConfig.port(0);
 		NodeConfig configTokyo=NodeConfig.port(0);
 		NodeServer<?> serverLondon = new NodeServer<>(
-				ConvexDB.DATABASE_MAP_LATTICE,storeLondon,configLondon);
+				RelayHost.open(ConvexDB.DATABASE_MAP_LATTICE,storeLondon,configLondon),configLondon);
 		NodeServer<?> serverTokyo  = new NodeServer<>(
-				ConvexDB.DATABASE_MAP_LATTICE,storeTokyo,configTokyo);
+				RelayHost.open(ConvexDB.DATABASE_MAP_LATTICE,storeTokyo,configTokyo),configTokyo);
 		LatticePropagator propagatorLondon=new LatticePropagator(storeLondon,LatticePropagatorConfig.create());
 		LatticePropagator propagatorTokyo=new LatticePropagator(storeTokyo,LatticePropagatorConfig.create());
 		serverLondon.addPropagator(propagatorLondon);

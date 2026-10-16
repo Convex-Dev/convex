@@ -21,6 +21,7 @@ import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -67,10 +68,9 @@ public final class Main {
 		Keyword[] regionPath=config.getRegionPath();
 		KeyedLattice root=createRoot(regionPath);
 		NodeConfig nodeConfig=config.getNodeConfig();
-		NodeServer<Index<Keyword,ACell>> node=
-			new NodeServer<>(root,store,nodeConfig);
 		LatticeContext context=LatticeContext.create(null,keyPair);
-		node.setMergeContext(context);
+		NodeServer<Index<Keyword,ACell>> node=
+			new NodeServer<>(RelayHost.open(root,store,nodeConfig,context),nodeConfig);
 		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(nodeConfig));
 		propagator.setTransportKeyPair(keyPair);
 		node.addPropagator(propagator);

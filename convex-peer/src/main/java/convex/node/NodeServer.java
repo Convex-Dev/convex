@@ -20,25 +20,23 @@ import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
-import convex.lattice.ALattice;
-import convex.lattice.LatticeApplication;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.Root;
 
 /**
- * Hosts one authoritative lattice value and its durable root.
+ * Replicates one host's published root and keeps it durable.
  *
- * <p>{@code NodeServer} delivers incoming values through its {@link LatticeHost},
- * which delegates to configured applications.
- * Applications own acceptance and publication of private working state. The node
- * owns host-root publication, persistence and update notification. It does not own peer sets, connection
- * trust, protocol decoding, missing-cell
- * acquisition, ingress filtering, publication filtering, sockets or transport
- * lifecycle. Those are policies and resources of {@link LatticePropagator} and
- * application-owned transports such as {@link LatticeListener}.</p>
+ * <p>{@code NodeServer} is replication only. It hands incoming values to its
+ * {@link LatticeHost}, which delegates them to the applications configured to
+ * receive them, and it publishes the host's root to its propagation groups. It
+ * holds no lattice, no merge policy and no applications of its own: assemble the
+ * host and its applications first, for example with {@link RelayHost}, then
+ * construct the node from the host. The node owns host-root publication,
+ * persistence and update notification. It does not own peer sets, connection
+ * trust, protocol decoding, missing-cell acquisition, ingress filtering,
+ * publication filtering, sockets or transport lifecycle. Those are policies and
+ * resources of {@link LatticePropagator} and application-owned transports such as
+ * {@link LatticeListener}.</p>
  *
  * <p>The calling application constructs and completely configures each
  * propagator before attaching it with {@link #addPropagator(LatticePropagator)}.
@@ -69,7 +67,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final NodeConfig config;
 	private final AForkableCursor<V> cursor;
 	private final LatticeHost<V> host;
-	private final LatticeApplication<V> relayApplication;
 	/** Immutable snapshots let publication proceed independently of group removal. */
 	private volatile List<LatticePropagator> propagators=List.of();
 	private final Set<LatticePropagator> attachedPropagators=ConcurrentHashMap.newKeySet();
@@ -92,77 +89,31 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private volatile LifecycleState lifecycleState=LifecycleState.NEW;
 
 	/**
-	 * Creates a local lattice host. Propagation policy groups, if any, must be
-	 * supplied separately by the calling application before launch.
-	 * The supplied lattice constructs the root; at launch retained state is
-	 * merged by a standard live application.
+	 * Replicates an already-assembled host. Its state, policy and applications
+	 * remain as supplied; launch does not reload the store. Open or create the host
+	 * and configure its applications first; {@link RelayHost} assembles the common
+	 * case of a host with one live application over a whole lattice. The node
+	 * installs its publication pipeline at launch and owns attached propagation
+	 * resources, not the store.
 	 *
-	 * @param lattice authoritative merge semantics
-	 * @param store authoritative cell store
-	 * @param config authoritative persistence and validation configuration, or {@code null}
-	 */
-	public NodeServer(ALattice<V> lattice,AStore store,NodeConfig config) {
-		this(createRoot(lattice,store,config),config,lattice);
-	}
-
-	/**
-	 * Hosts an already-initialised root. Its state, merge context and cursor policy
-	 * remain as supplied; launch does not reload the store. Use
-	 * {@link LatticeHost#open(AStore)} before constructing applications
-	 * when retained state should be restored. The node installs its publication
-	 * pipeline at launch and owns attached propagation resources, not the store.
-	 *
-	 * <p>The restore, transactional-root and default merge-context settings apply
-	 * only when the lattice-taking constructor creates a root.</p>
-	 *
-	 * @param root initialised host root with a non-null cell store
+	 * @param host assembled host with a non-null cell store
 	 * @param config node persistence configuration, or {@code null} for defaults
 	 */
-	public NodeServer(LatticeHost<V> root,NodeConfig config) {
-		this(root,config,null);
-	}
-
-	/** Hosts an already-initialised root with default node configuration. */
-	public NodeServer(LatticeHost<V> root) {
-		this(root,null);
-	}
-
-	private NodeServer(LatticeHost<V> root,NodeConfig config,ALattice<V> relayLattice) {
-		this.host=Objects.requireNonNull(root,"Root must not be null");
-		this.store=Objects.requireNonNull(root.store(),"NodeServer requires a host cell store");
-		this.cursor=root.cursor();
+	public NodeServer(LatticeHost<V> host,NodeConfig config) {
+		this.host=Objects.requireNonNull(host,"Host must not be null");
+		this.store=Objects.requireNonNull(host.store(),"NodeServer requires a host cell store");
+		this.cursor=host.cursor();
 		this.config=(config==null) ? NodeConfig.create() : config;
-		relayApplication=(relayLattice==null)?null:LatticeApplication.live(relayLattice,host);
-		if (relayApplication!=null) host.configureApplications(List.of(relayApplication));
 	}
 
-	private static <V extends ACell> LatticeHost<V> createRoot(ALattice<V> lattice,
-			AStore store,NodeConfig config) {
-		if (lattice==null) throw new IllegalArgumentException("Lattice must not be null");
-		if (store==null) throw new IllegalArgumentException("Store must not be null");
-		NodeConfig settings=(config==null) ? NodeConfig.create() : config;
-		Root<V> storage=settings.isTransactionalRoot()
-			? Cursors.transactionalRoot(lattice.zero())
-			: Cursors.root(lattice.zero());
-		LatticeHost<V> root=new LatticeHost<>(storage,store);
-		root.setContext(LatticeContext.EMPTY.withMaxFutureTimestampSkew(
-			settings.getMaxFutureTimestampSkew()));
-		return root;
+	/** Replicates an already-assembled host with default node configuration. */
+	public NodeServer(LatticeHost<V> host) {
+		this(host,null);
 	}
 
 	/**
-	 * Creates a lattice host with default persistence and validation configuration.
-	 *
-	 * @param lattice authoritative merge semantics
-	 * @param store authoritative cell store
-	 */
-	public NodeServer(ALattice<V> lattice,AStore store) {
-		this(lattice,store,null);
-	}
-
-	/**
-	 * Restores a node-created root, publishes the authoritative root, starts every
-	 * attached policy group independently, then starts persistence maintenance.
+	 * Publishes the host's current root, starts every attached policy group
+	 * independently, then starts persistence maintenance.
 	 *
 	 * @throws IOException if authoritative store initialisation fails
 	 */
@@ -171,7 +122,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 		lifecycleState=LifecycleState.STARTING;
 		try {
 			configurePublicationPipeline();
-			restorePersistedRoot();
 			seedPropagationViews();
 			startPropagationServices();
 			startMaintenanceService();
@@ -199,17 +149,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 		host.setPublicationPolicy(this::publishApplicationRoot);
 		host.freezePublicationPolicy();
 		rootPublicationConfigured=true;
-	}
-
-	@SuppressWarnings("unchecked")
-	private void restorePersistedRoot() throws IOException {
-		if (relayApplication==null || !config.isRestore() || !store.isPersistent()) return;
-		ACell restored=store.getRootData();
-		if (restored!=null) {
-			// Pre-launch local edits take precedence over replicated/persisted ties.
-			host.merge((V)restored);
-			log.info("Restored authoritative lattice value from node store");
-		}
 	}
 
 	private void seedPropagationViews() throws IOException {
@@ -431,27 +370,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	public LatticeHost<V> getHost() {
 		return host;
-	}
-
-	/** Returns the host's validation and merge policy. */
-	public LatticeContext getMergeContext() { return host.getContext(); }
-
-	/**
-	 * Configures the host's merge context. Existing applications retain
-	 * their construction-time context. Calling applications configure each
-	 * propagator's view context independently before attaching it.
-	 *
-	 * @param context authoritative validation and merge context
-	 */
-	public synchronized void setMergeContext(LatticeContext context) {
-		if (context==null) throw new IllegalArgumentException(
-			"Use LatticeContext.EMPTY instead of null");
-		requireNewLifecycle("setMergeContext");
-		long configuredSkew=config.getMaxFutureTimestampSkew();
-		long effectiveSkew=config.getMap().containsKey(NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW)
-			? configuredSkew : context.getMaxFutureTimestampSkew(configuredSkew);
-		host.setContext(context.withMaxFutureTimestampSkew(effectiveSkew));
-		if (relayApplication!=null) relayApplication.setContext(host.getContext());
 	}
 
 	/**

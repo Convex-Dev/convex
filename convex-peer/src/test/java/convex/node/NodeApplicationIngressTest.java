@@ -80,15 +80,15 @@ class NodeApplicationIngressTest {
 		}
 	}
 
-	@Test void relayRestoreFailureDoesNotReplaceRoot() throws Exception {
+	@Test void relayRestoreFailurePreventsHostAssembly() throws Exception {
 		try (var store=new MemoryStore() {
 			@Override public boolean isPersistent() { return true; }
 			@Override public <T extends ACell> T getRootData() throws IOException {
 				throw new IOException("unreadable retained root");
 			}
-		}; var node=new NodeServer<>(LATTICE,store)) {
-			assertThrows(IOException.class,node::launch);
-			assertFalse(node.isRunning());
+		}) {
+			var failure=assertThrows(IOException.class,() -> RelayHost.open(LATTICE,store,null));
+			assertEquals("unreadable retained root",failure.getMessage());
 			assertNull(store.getRootHash());
 		}
 	}
@@ -106,7 +106,7 @@ class NodeApplicationIngressTest {
 				assertSame(root,node.getHost());
 				assertSame(root.cursor(),node.getCursor());
 				assertSame(store,node.getStore());
-				assertSame(context,node.getMergeContext());
+				assertSame(context,node.getHost().getContext());
 				assertFalse(node.getCursor().supportsExclusiveTransactions());
 				var app=new App(node.getHost());
 			node.getHost().configureApplications(List.of(app));
@@ -139,15 +139,17 @@ class NodeApplicationIngressTest {
 		}
 	}
 
-	@Test void convenienceRootRetainsPrelaunchEditsWhenRestoring() throws Exception {
-		try (var store=EtchStore.createTemp("root-prelaunch");
-				var node=new NodeServer<>(LATTICE,store,NodeConfig.create().withTransactionalRoot(true))) {
+	@Test void relayHostRestoresRetainedRootBeforeLocalEdits() throws Exception {
+		try (var store=EtchStore.createTemp("root-prelaunch")) {
 			store.setRootData(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE)));
-			node.mergeValue(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));
-			assertTrue(node.getCursor().supportsExclusiveTransactions());
-			node.launch();
-			assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),node.getLocalValue().get(ITEMS));
-			assertEquals(node.getLocalValue(),store.getRootData());
+			var config=NodeConfig.create().withTransactionalRoot(true);
+			try (var node=new NodeServer<>(RelayHost.open(LATTICE,store,config),config)) {
+				node.mergeValue(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));
+				assertTrue(node.getCursor().supportsExclusiveTransactions());
+				node.launch();
+				assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),node.getLocalValue().get(ITEMS));
+				assertEquals(node.getLocalValue(),store.getRootData());
+			}
 		}
 	}
 

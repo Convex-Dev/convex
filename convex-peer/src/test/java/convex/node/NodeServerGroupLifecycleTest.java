@@ -34,7 +34,7 @@ public class NodeServerGroupLifecycleTest {
 	public void testRemoveRunningGroupAndRelaunch() throws Exception {
 		try (MemoryStore nodeStore=new MemoryStore();
 				MemoryStore servingStore=new MemoryStore();
-				NodeServer<AInteger> node=new NodeServer<>(MaxLattice.create(),nodeStore)) {
+				NodeServer<AInteger> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),nodeStore,null))) {
 			LatticePropagator removed=group(servingStore);
 			LatticePropagator retained=group(nodeStore);
 			node.addPropagator(removed);
@@ -79,7 +79,7 @@ public class NodeServerGroupLifecycleTest {
 	@Test
 	public void testRemoveBeforeLaunchDoesNotCloseUnattachedGroup() throws Exception {
 		try (MemoryStore store=new MemoryStore();
-				NodeServer<AInteger> node=new NodeServer<>(MaxLattice.create(),store)) {
+				NodeServer<AInteger> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null))) {
 			LatticePropagator attached=group(store);
 			try (LatticePropagator unattached=group(store)) {
 				node.addPropagator(attached);
@@ -97,7 +97,7 @@ public class NodeServerGroupLifecycleTest {
 	@Test
 	public void testRemovalDrainsAcceptedIngress() throws Exception {
 		try (MemoryStore store=new MemoryStore();
-				NodeServer<AInteger> node=new NodeServer<>(MaxLattice.create(),store)) {
+				NodeServer<AInteger> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null))) {
 			LatticePropagator removed=group(store);
 			LatticePropagator retained=group(store);
 			node.addPropagator(removed);
@@ -120,7 +120,7 @@ public class NodeServerGroupLifecycleTest {
 		CountDownLatch entered=new CountDownLatch(1);
 		CountDownLatch release=new CountDownLatch(1);
 		try (MemoryStore store=new MemoryStore();
-				NodeServer<AInteger> node=new NodeServer<>(MaxLattice.create(),store)) {
+				NodeServer<AInteger> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null))) {
 			LatticePropagator removed=new LatticePropagator(store) {
 				@Override public void triggerBroadcast(ACell value) {
 					entered.countDown();
@@ -158,7 +158,7 @@ public class NodeServerGroupLifecycleTest {
 	public void testRemovalFailureIsIsolated() throws Exception {
 		IllegalStateException failure=new IllegalStateException("simulated group shutdown failure");
 		try (MemoryStore store=new MemoryStore();
-				NodeServer<AInteger> node=new NodeServer<>(MaxLattice.create(),store)) {
+				NodeServer<AInteger> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null))) {
 			LatticePropagator broken=new LatticePropagator(store) {
 				@Override public void close() {
 					super.close();
@@ -183,7 +183,7 @@ public class NodeServerGroupLifecycleTest {
 	public void testLatePullCannotMergeAfterRemoval() throws Exception {
 		CompletableFuture<ACell> acquired=new CompletableFuture<>();
 		try (MemoryStore store=new MemoryStore();
-				NodeServer<AInteger> node=new NodeServer<>(MaxLattice.create(),store)) {
+				NodeServer<AInteger> node=new NodeServer<>(RelayHost.open(MaxLattice.create(),store,null))) {
 			LatticePropagator group=new LatticePropagator(store) {
 				@Override public CompletableFuture<ACell> pull(Convex peer) {
 					return acquired;
