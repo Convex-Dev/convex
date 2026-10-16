@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- A staged lattice application whose lattice declares only some of the root's regions no longer overwrites or removes the host's other regions when it publishes; undeclared regions adopt the host's value.
+- A staged component whose keyed lattice declares only some of a container's keys no longer overwrites or removes the other keys when it publishes; undeclared keys adopt the destination. This holds at any level, including an application staged at the host root.
 - Reading an unset store root handles a null root hash, including explicitly supplied `NullStore` instances.
 - Big-integer sign queries handle empty zero representations and positive values with a leading sign byte consistently before and after Java value materialisation.
 - DLFS copies and moves work across drives and with other NIO providers; separate views of the same working drive support atomic rename and same-file detection.

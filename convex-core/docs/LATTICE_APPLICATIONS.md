@@ -67,7 +67,7 @@ of decisions made when it is constructed:
 | Navigation | A component creates its children one level below its own cursor, declaring each child's lattice so that a missing container is created with the right type. An application resolves whole region paths from the root with its root lattice. Boundaries are placed by the owning component, never discovered by navigation. |
 | Publication | **Live**: writes go straight through the cursor and there is nothing to publish. **Staged**: a private working copy and a destination; sync reconciles the copy with whatever the destination now holds and publishes the result. A fork is a staged component constructed at the same position. |
 | Boundary | For a level the component owns: none, stamp each write, sign each write, or sign once at publication. Signing once needs a staged component, and is the main reason to stage. |
-| Reconciliation | The lattice merge at that position, with local edits winning ties, applied only when both the copy and its destination changed since they were last reconciled. An application refines it to leave regions its own components publish to those components. |
+| Reconciliation | The lattice merge at that position, with local edits winning ties, applied only when both the copy and its destination changed since they were last reconciled. A keyed lattice publishes only the keys it declares; the rest adopt the destination. |
 | Policy | The context, clock and signers, resolved when the component is constructed. Later changes to the parent's policy do not reach it. |
 | Incoming values | Whether the component is configured on the host to receive incoming values, and how it merges or routes what it accepts. Only a component at the root can be configured directly. |
 | Transactions | Whether it offers atomic multi-step operations, by supplying a factory that rebuilds it over a draft cursor. |
@@ -137,8 +137,6 @@ against a local host and a networked one.
 **Decisions still open.** This document states the intended design; the
 [design log](LATTICE_DESIGN_LOG.md) records how it got here. Still to decide:
 
-- Whether an application may be staged at the whole root at all, or only live at the
-  root with staged components below it. See *Sharing a host*.
 - Lifecycle and subscriptions: principles agreed, API not implemented. See
   *Lifecycle and subscriptions*.
 - Vocabulary: the component base-class name, and whether "application" names only
@@ -483,24 +481,22 @@ published paths, capture the immutable host root once and read each path from th
 value. An operation that must change several paths atomically uses a transaction at
 their common ancestor.
 
-An application constructed with the staged constructor is staged at the whole root.
-Its sync merges its copy with the host under its lattice: declared regions merge with
-local edits as `own`, and regions its lattice does not declare are never published
-and always adopt the host's value, so it cannot overwrite or remove what another
-application owns. A declared region it did not edit follows the lattice rule rather
-than adopting, which differs only on an exact tie. Regions that the application's own
-staged components publish are not reconciled here: each such component publishes
-through its own fork of the host, beside the staged root, and the root's merge takes
-those regions from the host. Nesting a staged component inside a staged root is the
-shape to avoid.
+Staging is a per-component choice at any level, and the root is not a special case:
+an application staged over the host is a staged component whose position is the root.
+Its sync merges its copy with the destination under its lattice, with local edits as
+`own`. A staged component with a keyed lattice publishes only the keys its lattice
+declares; every other key adopts the destination, so a component that understands
+some of a container's keys cannot overwrite or remove what another component owns
+there. A declared key it did not edit follows the lattice rule rather than adopting,
+which differs only on an exact tie. What a component's own staged children publish is
+theirs: each publishes through its own fork of the host, beside the parent's copy,
+and the parent's merge takes those regions from the host. Nesting a staged component
+inside another component's working copy is the shape to avoid.
 
-**Open decision.** Whether whole-root staging remains a supported shape at all. No
-application in the codebase uses it; the worked examples are live at the root with
-staged regions below. If it stays, the paragraph above is its contract. Either way the
-whole root, a domain region and an owner's slot are the three boundaries, chosen by
-what the application edits: a relay lives at the whole root, a domain grouping forks
-its region, and an owner's batched edits want a signed component, because only there
-can a new payload be signed.
+The whole root, a domain region and an owner's slot are the three usual boundaries,
+chosen by what the component edits: a relay lives at the whole root, a domain
+grouping forks its region, and an owner's batched edits want a signed component,
+because only there can a new payload be signed.
 
 These boundaries are not an access-control boundary between code sharing a process.
 Verification is bound to the lattice instances, configured before use.

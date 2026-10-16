@@ -1,10 +1,12 @@
 package convex.lattice;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -13,6 +15,7 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.ProjectionCursor;
+import convex.lattice.generic.AKeyedLattice;
 import convex.lattice.generic.AOwnerLattice;
 import convex.lattice.generic.SignedLattice;
 
@@ -109,17 +112,29 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Merges a publication snapshot with a destination that changed since the snapshot
 	 * was last reconciled. The fork calls this only when both sides changed; an
 	 * unchanged side is adopted by the fork itself. The local snapshot is own,
-	 * including on timestamp ties. Applications override this to choose which regions
-	 * they publish; a region published by a component of its own is taken from the
-	 * destination. Overrides must use only the supplied values and must not mutate
-	 * live working cursors or publish.
+	 * including on timestamp ties.
+	 *
+	 * <p>A keyed lattice publishes only the keys it declares: every other key adopts
+	 * the destination, so a component that understands some of a container's keys
+	 * never overwrites or removes what another component owns there with the stale
+	 * copy in its working state. This holds at any level, the host root included.
+	 * Overrides must use only the supplied values and must not mutate live working
+	 * cursors or publish.</p>
 	 *
 	 * <p>Runs inside the owned fork's sync, outside atomic update callbacks, once per
 	 * distinct destination value. On retry, own is the previous prepared result, so
 	 * unchanged signatures are reused.</p>
 	 */
+	@SuppressWarnings("unchecked")
 	protected V mergePublication(ALattice<V> lattice,V own,V other) {
-		return lattice.merge(getContext(),own,other);
+		V merged=lattice.merge(getContext(),own,other);
+		if (!(lattice instanceof AKeyedLattice<?,?> keyed) || !(other instanceof AMap<?,?>)) return merged;
+		if (merged==null) return other;
+		AMap<ACell,ACell> result=(AMap<ACell,ACell>)other;
+		for (Map.Entry<ACell,ACell> entry:((AMap<ACell,ACell>)merged).entrySet()) {
+			if (keyed.path(entry.getKey())!=null) result=result.assoc(entry.getKey(),entry.getValue());
+		}
+		return (V)result;
 	}
 
 	/** Returns atomic working storage. Updating it does not publish this component. */

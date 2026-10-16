@@ -22,6 +22,7 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.ADelegatingLattice;
 import convex.lattice.generic.CompareLattice;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.SetLattice;
 
 public class ComponentPublicationTest {
@@ -97,6 +98,26 @@ public class ComponentPublicationTest {
 		assertEquals(Sets.of(1,2),destination.get());
 		assertEquals(CVMLong.ONE,root.get().get(sibling));
 		assertEquals(0,merges.get());
+	}
+
+	/** Staging is the same at every level: a keyed copy publishes only the keys it declares. */
+	@Test
+	public void testPartialKeyedLatticePublishesOnlyDeclaredKeysAtAnyLevel() {
+		Keyword record=Keyword.intern("record");
+		Keyword a=Keyword.intern("a");
+		Keyword b=Keyword.intern("b");
+		KeyedLattice partial=KeyedLattice.create(a,SETS);
+		var root=new Root<Index<Keyword,ACell>>(Index.<Keyword,ACell>none().assoc(record,
+			Index.<Keyword,ACell>none().assoc(a,Sets.of(1)).assoc(b,Sets.of(2))));
+		AForkableCursor<Index<Keyword,ACell>> destination=root.path(record);
+		var component=new Component<>(partial,destination);
+		component.cursor().updateAndGet(v -> v.assoc(a,Sets.of(1,3)));
+		// Another writer advances the key this component does not declare.
+		destination.updateAndGet(v -> v.assoc(b,Sets.of(2,4)));
+		component.sync();
+		assertEquals(Sets.of(1,3),destination.get().get(a),"the declared key merges");
+		assertEquals(Sets.of(2,4),destination.get().get(b),"an undeclared key adopts the destination");
+		assertEquals(destination.get(),component.cursor().get(),"the copy carries the destination's other keys");
 	}
 
 	@Test

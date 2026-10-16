@@ -318,7 +318,10 @@ itself.
 ## 15. Shared regions: components must be robust to external change
 
 **Status:** Agreed (15 October 2026); documented in LATTICE_APPLICATIONS
-(`f4e6a5798`, `6d486afdc`). The inferences below remain unconfirmed.
+(`f4e6a5798`, `6d486afdc`). On 16 October the rule that a staged keyed component
+publishes only the keys it declares moved from the application class to the component
+base: staging is uniform at every level and the root is not a special case. The
+inferences below remain unconfirmed.
 
 The shared-applications example stages each domain at its own path (a Social fork, a
 DLFS region fork, a live P2P view) behind one live admission handler, and the
