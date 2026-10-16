@@ -1,9 +1,13 @@
 package convex.lattice;
 
+import java.util.Map;
 import java.util.Objects;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.generic.AKeyedLattice;
 
 /**
  * Base class for an application participating in a lattice root.
@@ -127,6 +131,30 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 */
 	public V merge(V other) {
 		return cursor.updateAndGet(own -> lattice.merge(getContext(),own,other));
+	}
+
+	/**
+	 * Reconciles a staged publication so that only the regions this application's
+	 * lattice declares are published. Declared regions merge with local edits as
+	 * own; every other region adopts the destination. An application sharing a host
+	 * therefore never overwrites or removes regions it does not understand with the
+	 * stale copies held in its working state, and after publication its working
+	 * state carries the host's current value for those regions. Roots that are not
+	 * keyed maps use the plain lattice merge.
+	 */
+	@Override
+	@SuppressWarnings("unchecked")
+	protected V mergePublication(ALattice<V> lattice,V baseline,V own,V other) {
+		if (Utils.equals(own,baseline)) return other;
+		if (Utils.equals(other,baseline) || Utils.equals(own,other)) return own;
+		V merged=lattice.merge(getContext(),own,other);
+		if (!(lattice instanceof AKeyedLattice<?,?> keyed) || !(other instanceof AMap<?,?>)) return merged;
+		if (merged==null) return other;
+		AMap<ACell,ACell> result=(AMap<ACell,ACell>)other;
+		for (Map.Entry<ACell,ACell> entry:((AMap<ACell,ACell>)merged).entrySet()) {
+			if (keyed.path(entry.getKey())!=null) result=result.assoc(entry.getKey(),entry.getValue());
+		}
+		return (V)result;
 	}
 
 	/**

@@ -505,8 +505,10 @@ their common ancestor.
 
 An application constructed over a host is staged at the whole root: its sync
 reconciles its copy with the host region by region under its lattice, so unchanged
-regions adopt the host's value and edited ones merge. Several such applications may
-share a host. The whole root, a domain region and an owner's slot are three
+regions adopt the host's value and edited ones merge. Regions its lattice does not
+declare are never published; they always adopt the host's value, so a staged
+application cannot overwrite or remove what another application owns. Several such
+applications may share a host. The whole root, a domain region and an owner's slot are three
 legitimate boundaries; choose by what the application edits. A relay stages or lives
 at the whole root, a domain grouping forks its region, and an owner's batched edits
 want a signed component, because only there can a new payload be signed.
