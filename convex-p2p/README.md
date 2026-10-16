@@ -44,7 +44,7 @@ k-buckets being node-local rather than propagated), so it is backed by core's
 `convex.lattice.generic.ReservedLattice`, which discards anything sent there. Discarding
 rather than throwing matters: an unimplemented lattice that throws would abort the whole
 enclosing merge, costing a peer its valid sibling regions and counting against
-`NodeServer`'s per-connection circuit-breaker.
+the propagation group's per-connection circuit-breaker.
 
 ### Independent top-level regions
 

@@ -83,7 +83,8 @@ import convex.social.Social;
  * persistence.</p>
  *
  * <p><b>Layering.</b> {@link NodeServer} is only the schema-independent
- * authoritative lattice host. This class separately owns its TCP transport and
+ * replication layer over the assembled host; the P2P application owns the lattice
+ * and merge policy. This class separately owns its TCP transport and
  * P2P policy: {@link NodeDirectory}
  * publishes and interprets {@code [:p2p :nodes]}, {@link SocialReplicationPolicy}
  * selects social data, and {@link PointOfPresence} handles transient routed

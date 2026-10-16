@@ -43,9 +43,9 @@ import convex.node.NodeServer;
  *
  * <p>It deliberately does not open sockets itself, mark connections trusted or
  * merge lattice values. Socket admission and trust remain propagation-group
- * concerns; authoritative merge remains a NodeServer concern. Conversely, none
- * of those generic replication components knows the registry path or NodeInfo
- * schema.</p>
+ * concerns; merging belongs to the host's applications, reached through
+ * {@link NodeServer}. Conversely, none of those generic replication components
+ * knows the registry path or NodeInfo schema.</p>
  *
  * <p>The in-memory index is bounded by the propagation group's
  * {@link LatticeConnectionManager#getMaxDesiredPeers()} and additive/update-only.
