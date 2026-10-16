@@ -51,53 +51,60 @@ public class NodePublicationTest {
 		}
 	}
 
+	/**
+	 * An older value replicated back from a peer cannot displace a newer local edit.
+	 * The host's application merge keeps its own value on the tie, and the group
+	 * announces exactly what the host published, so the old value never wins on the
+	 * outbound path either.
+	 */
 	@Test
-	public void testLocalEditWinsReplicatedBackGroupTie() throws Exception {
+	public void testReplicatedBackOlderValueDoesNotDisplaceLocalEdit() throws Exception {
 		MapLattice<Keyword,CVMLong> lattice=MapLattice.create(LWWLattice.create(value -> 1L));
 		try (MemoryStore nodeStore=new MemoryStore();
 				MemoryStore viewStore=new MemoryStore();
 				NodeServer<AHashMap<Keyword,CVMLong>> node=new NodeServer<>(lattice,nodeStore)) {
 			CVMLong old=CVMLong.create(101);
 			CVMLong edit=CVMLong.create(102);
-			AHashMap<Keyword,CVMLong> premerged=Maps.of(LOCAL,old,REMOTE,CVMLong.create(103));
-			LatticePropagator group=new LatticePropagator(viewStore,lattice,value -> value);
-			// A group can accumulate values before it submits an aggregate to the node.
-			group.processSnapshot(premerged);
+			AHashMap<Keyword,CVMLong> replicatedBack=Maps.of(LOCAL,old,REMOTE,CVMLong.create(103));
+			LatticePropagator group=new LatticePropagator(viewStore);
 			node.addPropagator(group);
 			node.getCursor().set(Maps.of(LOCAL,old));
 			node.launch();
-			assertEquals(premerged,group.getLastAnnouncedValue());
+			assertEquals(Maps.of(LOCAL,old),group.getLastAnnouncedValue());
 
 			node.getCursor().assoc(LOCAL,edit);
 			CompletableFuture<ACell> announced=group.nextAnnounce();
-			NodeServer.MergeOutcome outcome=node.mergeInbound(new ACell[0],premerged);
+			NodeServer.MergeOutcome outcome=node.mergeInbound(new ACell[0],replicatedBack);
 			assertTrue(outcome.accepted());
-			assertTrue(outcome.changed(),"the group's independent contribution must survive");
-			AHashMap<Keyword,CVMLong> expected=premerged.assoc(LOCAL,edit);
+			assertTrue(outcome.changed(),"the remote contribution must survive");
+			AHashMap<Keyword,CVMLong> expected=replicatedBack.assoc(LOCAL,edit);
 			assertEquals(expected,node.getLocalValue(),"local edit wins against replicated-back input");
 			assertEquals(expected,announced.get(5,TimeUnit.SECONDS),
-				"the group's old value must not win again on the outbound path");
+				"the group announces the host's value; the old value does not win on the outbound path");
 
-			assertFalse(node.mergeInbound(new ACell[0],premerged).changed());
+			assertFalse(node.mergeInbound(new ACell[0],replicatedBack).changed());
 			assertFalse(node.mergeInbound(new ACell[] {LOCAL},old).changed());
 			assertEquals(expected,node.getLocalValue(),"root and path replays both retain the edit");
 		}
 	}
 
+	/** A strictly newer inbound value is accepted by the host and announced unchanged. */
 	@Test
-	public void testAttachedGroupStillAcceptsStrictlyNewerValues() throws Exception {
+	public void testStrictlyNewerInboundValueIsAcceptedAndAnnounced() throws Exception {
 		LWWLattice<CVMLong> lattice=LWWLattice.create(CVMLong::longValue);
 		try (MemoryStore nodeStore=new MemoryStore();
 				MemoryStore viewStore=new MemoryStore();
 				NodeServer<CVMLong> node=new NodeServer<>(lattice,nodeStore)) {
-			LatticePropagator group=new LatticePropagator(viewStore,lattice,value -> value);
-			group.processSnapshot(CVMLong.create(20));
+			LatticePropagator group=new LatticePropagator(viewStore);
 			node.addPropagator(group);
 			node.getCursor().set(CVMLong.create(10));
 			node.launch();
-			assertEquals(CVMLong.create(20),group.getLastAnnouncedValue());
-			node.mergeInbound(new ACell[0],group.getLastAnnouncedValue());
+			assertEquals(CVMLong.create(10),group.getLastAnnouncedValue());
+
+			CompletableFuture<ACell> announced=group.nextAnnounce();
+			assertTrue(node.mergeInbound(new ACell[0],CVMLong.create(20)).changed());
 			assertEquals(CVMLong.create(20),node.getLocalValue());
+			assertEquals(CVMLong.create(20),announced.get(5,TimeUnit.SECONDS));
 		}
 	}
 
@@ -121,7 +128,7 @@ public class NodePublicationTest {
 				MemoryStore viewStore=new MemoryStore();
 				NodeServer<ASet<Blob>> node=new NodeServer<>(SetLattice.create(),store)) {
 			AtomicInteger notifications=new AtomicInteger();
-			LatticePropagator group=new LatticePropagator(viewStore,SetLattice.<Blob>create(),value -> value) {
+			LatticePropagator group=new LatticePropagator(viewStore) {
 				@Override public void triggerBroadcast(ACell value) {
 					notifications.incrementAndGet();
 				}
@@ -145,7 +152,7 @@ public class NodePublicationTest {
 		try (EtchStore nodeStore=EtchStore.createTemp("node-root-refs");
 				EtchStore viewStore=EtchStore.createTemp("node-view-refs");
 				NodeServer<ASet<Blob>> node=new NodeServer<>(SetLattice.create(),nodeStore)) {
-			LatticePropagator group=new LatticePropagator(viewStore,SetLattice.<Blob>create(),value -> value);
+			LatticePropagator group=new LatticePropagator(viewStore);
 			node.addPropagator(group);
 			node.getCursor().set(Sets.of(Blobs.createRandom(400),Blobs.createRandom(400)));
 			node.launch();

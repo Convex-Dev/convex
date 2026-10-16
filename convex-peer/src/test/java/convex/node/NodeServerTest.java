@@ -122,10 +122,7 @@ public class NodeServerTest {
 	/** Creates the identity-view group so a test can configure policy before attachment. */
 	private static <V extends ACell> LatticePropagator unattachedPropagator(
 			NodeServer<V> node) {
-		LatticePropagator result=new LatticePropagator(
-			node.getStore(),((TestNode<?>)node).lattice,value -> value,node.getConfig());
-		result.setMergeContext(node.getMergeContext());
-		return result;
+		return new LatticePropagator(node.getStore(),LatticePropagatorConfig.from(node.getConfig()));
 	}
 
 	/** Explicit public test policy: every network connection uses one configured view. */
@@ -225,8 +222,6 @@ public class NodeServerTest {
 		maxNodeServer.addPropagator(group);
 		assertSame(group,maxNodeServer.getPropagators().get(0));
 		assertThrows(IllegalStateException.class,
-			() -> group.setMergeContext(LatticeContext.EMPTY));
-		assertThrows(IllegalStateException.class,
 			() -> group.setTransportKeyPair(AKeyPair.generate()));
 		assertThrows(IllegalStateException.class,
 			() -> group.setIngressFilter((path,value) -> value));
@@ -258,8 +253,7 @@ public class NodeServerTest {
 	public void testPropagatorFailuresCannotBreakAuthoritativeLoop() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		FailingPropagator broken=new FailingPropagator(store);
-		LatticePropagator healthy=new LatticePropagator(
-			store,MaxLattice.create(),value -> value,LatticePropagatorConfig.create());
+		LatticePropagator healthy=new LatticePropagator(store,LatticePropagatorConfig.create());
 		maxNodeServer.addPropagator(broken);
 		maxNodeServer.addPropagator(healthy);
 		CompletableFuture<LatticePropagator.Failure> failureSignal=broken.nextFailure();
@@ -283,8 +277,7 @@ public class NodeServerTest {
 
 	private static final class FailingPropagator extends LatticePropagator {
 		FailingPropagator(AStore store) {
-			super(store,MaxLattice.create(),value -> value,
-				LatticePropagatorConfig.create());
+			super(store,LatticePropagatorConfig.create());
 		}
 
 		@Override public ACell processSnapshot(ACell value) {
@@ -317,8 +310,7 @@ public class NodeServerTest {
 		}
 
 		private CloseTrackingPropagator(AStore store,CloseTrackingConnectionManager manager) {
-			super(store,manager,MaxLattice.create(),value -> value,
-				LatticePropagatorConfig.create());
+			super(store,manager,LatticePropagatorConfig.create());
 			this.manager=manager;
 		}
 
@@ -546,8 +538,7 @@ public class NodeServerTest {
 			LatticePropagatorConfig.MAX_INBOUND_QUEUE_BYTES,CVMLong.create(2048)));
 		assertThrows(IllegalArgumentException.class,invalidInboundBytes::getMaxInboundQueueBytes);
 		assertThrows(IllegalArgumentException.class,
-			() -> new LatticePropagator(
-				store,MaxLattice.create(),value -> value,invalidTimeout),
+			() -> new LatticePropagator(store,invalidTimeout),
 			"invalid endpoint policy must be rejected while the application configures the group");
 
 		LatticePropagatorConfig aboveProtocolMaximum=LatticePropagatorConfig.create(Maps.of(
@@ -1053,10 +1044,8 @@ public class NodeServerTest {
 				AStore publicStore = new MemoryStore()) {
 			Blob privateValue = Cells.persist(Blobs.createRandom(400), primaryStore);
 			Blob publicValue = Cells.persist(Blobs.createRandom(400), publicStore);
-			LatticePropagator primary = new LatticePropagator(
-				primaryStore,MaxLattice.create(),value -> value);
-			LatticePropagator publicPropagator = new LatticePropagator(
-				publicStore,MaxLattice.create(),value -> value);
+			LatticePropagator primary = new LatticePropagator(primaryStore);
+			LatticePropagator publicPropagator = new LatticePropagator(publicStore);
 
 			try (NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), primaryStore)) {
 				node.addPropagator(primary);
@@ -1166,10 +1155,8 @@ public class NodeServerTest {
 			remoteValue = Cells.persist(remoteValue, sourceStore);
 			sourceStore.blockedHash = missingBranch.getHash();
 
-			LatticePropagator primary = new LatticePropagator(
-				primaryStore,SetLattice.create(),value -> value);
-			LatticePropagator ingress = new LatticePropagator(
-				ingressStore,SetLattice.create(),value -> value);
+			LatticePropagator primary = new LatticePropagator(primaryStore);
+			LatticePropagator ingress = new LatticePropagator(ingressStore);
 			try (NodeServer<ASet<ACell>> receiver = new TestNode<>(
 					SetLattice.create(),primaryStore)) {
 				receiver.addPropagator(primary);
@@ -1234,10 +1221,8 @@ public class NodeServerTest {
 			NodeConfig config=NodeConfig.port(0);
 			LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
 				LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.create(100)));
-			LatticePropagator primary = new LatticePropagator(
-				primaryStore,SetLattice.create(),value -> value,groupConfig);
-			LatticePropagator ingress = new LatticePropagator(
-				ingressStore,SetLattice.create(),value -> value,groupConfig);
+			LatticePropagator primary = new LatticePropagator(primaryStore,groupConfig);
+			LatticePropagator ingress = new LatticePropagator(ingressStore,groupConfig);
 			receiver = new TestNode<>(SetLattice.create(), primaryStore, config);
 			receiver.addPropagator(primary);
 			receiver.addPropagator(ingress);
@@ -1355,8 +1340,7 @@ public class NodeServerTest {
 	public void testPropagationGroupMayUseIndependentServingStore() {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		try (AStore otherStore=new MemoryStore()) {
-			LatticePropagator publicView=new LatticePropagator(
-				otherStore,MaxLattice.create(),value -> value);
+			LatticePropagator publicView=new LatticePropagator(otherStore);
 			maxNodeServer.addPropagator(publicView);
 			assertSame(otherStore,publicView.getStore());
 		}
@@ -1372,8 +1356,7 @@ public class NodeServerTest {
 	public void testLifecycleTransitionsFreezeTopologyDeterministically() throws Exception {
 		BlockingRootStore testStore = new BlockingRootStore();
 		NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), testStore, NodeConfig.port(-1));
-		LatticePropagator primary = new LatticePropagator(
-			testStore,MaxLattice.create(),value -> value,LatticePropagatorConfig.create());
+		LatticePropagator primary = new LatticePropagator(testStore,LatticePropagatorConfig.create());
 		node.addPropagator(primary);
 		node.setMergeContext(LatticeContext.EMPTY);
 
@@ -1675,8 +1658,7 @@ public class NodeServerTest {
 		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS,CVMLong.create(3)));
 		maxNodeServer = new TestNode<>(MaxLattice.create(), store, hostConfig);
-		maxNodeServer.addPropagator(new LatticePropagator(
-			store,MaxLattice.create(),value -> value,groupConfig));
+		maxNodeServer.addPropagator(new LatticePropagator(store,groupConfig));
 		allowSingleGroupInbound(maxNodeServer);
 		LatticePropagator endpoint=propagator(maxNodeServer);
 
@@ -1985,9 +1967,7 @@ public class NodeServerTest {
 
 		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(lattice,new MemoryStore());
 				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(lattice,new MemoryStore())) {
-			LatticePropagator sourcePropagator=new LatticePropagator(
-				source.getStore(),lattice,value -> value,smallReplyLimits());
-			sourcePropagator.setMergeContext(source.getMergeContext());
+			LatticePropagator sourcePropagator=new LatticePropagator(source.getStore(),smallReplyLimits());
 			source.addPropagator(sourcePropagator);
 			selectInboundPropagator(source,connection -> sourcePropagator);
 			propagator(target);
@@ -2020,9 +2000,7 @@ public class NodeServerTest {
 
 		try (NodeServer<Index<Keyword,ACell>> source=new TestNode<>(lattice,new MemoryStore());
 				NodeServer<Index<Keyword,ACell>> target=new TestNode<>(lattice,new MemoryStore())) {
-			LatticePropagator sourcePropagator=new LatticePropagator(
-				source.getStore(),lattice,value -> value,smallReplyLimits());
-			sourcePropagator.setMergeContext(source.getMergeContext());
+			LatticePropagator sourcePropagator=new LatticePropagator(source.getStore(),smallReplyLimits());
 			sourcePropagator.setTransportKeyPair(sourceKey);
 			source.addPropagator(sourcePropagator);
 			// Test hook: every inbound connection to the source is treated as verified

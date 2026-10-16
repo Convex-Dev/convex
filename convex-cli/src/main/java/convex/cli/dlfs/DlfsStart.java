@@ -134,9 +134,7 @@ public class DlfsStart extends ACommand {
 		var nodeServer = new NodeServer<>(Lattice.ROOT, store, config);
 		LatticeContext context=LatticeContext.create(null,keyPair);
 		nodeServer.setMergeContext(context);
-		LatticePropagator propagator=new LatticePropagator(
-			store,Lattice.ROOT,value -> value,LatticePropagatorConfig.from(config));
-		propagator.setMergeContext(context);
+		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(config));
 		propagator.setTransportKeyPair(keyPair);
 		nodeServer.addPropagator(propagator);
 		LatticeListener latticeTransport=new LatticeListener(config);

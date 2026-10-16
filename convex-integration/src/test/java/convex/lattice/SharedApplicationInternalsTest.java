@@ -50,6 +50,7 @@ import convex.lattice.generic.SignedLattice;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.Cursors;
+import convex.node.LatticeFilter;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -269,6 +270,13 @@ public class SharedApplicationInternalsTest {
 	}
 
 	/** Explicit allow-list projection; a selective lattice merge is not projection. */
+	/** A propagation group announcing one projection of the host root. */
+	private static LatticePropagator group(AStore store,LatticeFilter<Index<Keyword,ACell>> projection) {
+		LatticePropagator group=new LatticePropagator(store,LatticePropagatorConfig.create());
+		group.setPublicationFilter(projection);
+		return group;
+	}
+
 	private static Index<Keyword,ACell> project(Index<Keyword,ACell> root,Keyword domain) {
 		Index<Keyword,ACell> result=Index.none();
 		for (Keyword key:new Keyword[]{Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD,domain}) {
@@ -285,10 +293,8 @@ public class SharedApplicationInternalsTest {
 		final NodeServer<Index<Keyword,ACell>> node;
 		final SocialWithP2P social;
 		final FilesWithP2P files;
-		final LatticePropagator socialGroup=new LatticePropagator(socialStore,SOCIAL_ROOT,
-			root -> project(root,Social.KEY_SOCIAL),LatticePropagatorConfig.create());
-		final LatticePropagator filesGroup=new LatticePropagator(filesStore,FILES_ROOT,
-			root -> project(root,Keywords.FS),LatticePropagatorConfig.create());
+		final LatticePropagator socialGroup=group(socialStore,root -> project(root,Social.KEY_SOCIAL));
+		final LatticePropagator filesGroup=group(filesStore,root -> project(root,Keywords.FS));
 		Fixture() { this(false); }
 		Fixture(boolean coordinated) {
 			var cursor=coordinated?Cursors.transactionalRoot(HOST_ROOT.zero()):Cursors.root(HOST_ROOT.zero());
@@ -298,8 +304,6 @@ public class SharedApplicationInternalsTest {
 			host.configureApplications(List.of(social,files));
 			node=new NodeServer<>(host,NodeConfig.port(-1));
 			node.setMergeContext(VERIFY);
-			socialGroup.setMergeContext(VERIFY);
-			filesGroup.setMergeContext(VERIFY);
 			socialGroup.setTransportKeyPair(SOCIAL_TRANSPORT);
 			filesGroup.setTransportKeyPair(FILES_TRANSPORT);
 			node.addPropagator(socialGroup);
@@ -653,10 +657,8 @@ public class SharedApplicationInternalsTest {
 				NodeServer<Index<Keyword,ACell>> remote=new NodeServer<>(HOST_ROOT,remoteStore,NodeConfig.port(-1));
 				LatticeListener socialListener=listener(f.socialGroup);
 				LatticeListener filesListener=listener(f.filesGroup)) {
-			LatticePropagator receiver=new LatticePropagator(remoteStore,HOST_ROOT,
-				value -> value,LatticePropagatorConfig.create());
+			LatticePropagator receiver=new LatticePropagator(remoteStore,LatticePropagatorConfig.create());
 			receiver.setTransportKeyPair(AKeyPair.createSeeded(7306));
-			receiver.setMergeContext(VERIFY);
 			remote.setMergeContext(VERIFY);
 			remote.addPropagator(receiver);
 			f.node.launch();

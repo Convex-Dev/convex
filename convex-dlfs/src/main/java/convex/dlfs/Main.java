@@ -71,9 +71,7 @@ public final class Main {
 			new NodeServer<>(root,store,nodeConfig);
 		LatticeContext context=LatticeContext.create(null,keyPair);
 		node.setMergeContext(context);
-		LatticePropagator propagator=new LatticePropagator(
-			store,root,value -> value,LatticePropagatorConfig.from(nodeConfig));
-		propagator.setMergeContext(context);
+		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(nodeConfig));
 		propagator.setTransportKeyPair(keyPair);
 		node.addPropagator(propagator);
 		LatticeListener transport=new LatticeListener(nodeConfig);

@@ -38,8 +38,7 @@ public class LatticeListenerTest {
 				NodeServer<convex.core.data.prim.AInteger> node=
 					new NodeServer<>(MaxLattice.create(),store);
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
-			LatticePropagator group=new LatticePropagator(
-				store,MaxLattice.create(),value -> value);
+			LatticePropagator group=new LatticePropagator(store);
 			node.addPropagator(group);
 			listener.registerPropagator(group);
 			listener.setSelector(connection -> group);
@@ -72,10 +71,10 @@ public class LatticeListenerTest {
 				NodeServer<convex.core.data.prim.AInteger> node=
 					new NodeServer<>(MaxLattice.create(),nodeStore);
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
-			LatticePropagator first=new LatticePropagator(
-				firstStore,MaxLattice.create(),ignored -> CVMLong.create(11));
-			LatticePropagator second=new LatticePropagator(
-				secondStore,MaxLattice.create(),ignored -> CVMLong.create(22));
+			LatticePropagator first=new LatticePropagator(firstStore);
+			first.setPublicationFilter(ignored -> CVMLong.create(11));
+			LatticePropagator second=new LatticePropagator(secondStore);
+			second.setPublicationFilter(ignored -> CVMLong.create(22));
 			node.addPropagator(first);
 			node.addPropagator(second);
 			listener.registerPropagator(first);
@@ -107,8 +106,7 @@ public class LatticeListenerTest {
 					new NodeServer<>(MaxLattice.create(),nodeStore);
 				LatticeListener first=new LatticeListener(NodeConfig.port(0));
 				LatticeListener second=new LatticeListener(NodeConfig.port(0))) {
-			LatticePropagator group=new LatticePropagator(
-				nodeStore,MaxLattice.create(),value -> value);
+			LatticePropagator group=new LatticePropagator(nodeStore);
 			node.addPropagator(group);
 			first.registerPropagator(group);
 			second.registerPropagator(group);
@@ -139,8 +137,7 @@ public class LatticeListenerTest {
 				NodeServer<convex.core.data.prim.AInteger> node=
 					new NodeServer<>(MaxLattice.create(),store);
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
-			LatticePropagator group=new LatticePropagator(
-				store,MaxLattice.create(),value -> value);
+			LatticePropagator group=new LatticePropagator(store);
 			node.addPropagator(group);
 			listener.registerPropagator(group);
 			listener.setSelector(connection -> {
@@ -171,8 +168,8 @@ public class LatticeListenerTest {
 		try (AStore store=new MemoryStore();
 				NodeServer<?> node=new NodeServer<>(MaxLattice.create(),store);
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
-			LatticePropagator first=new LatticePropagator(store,MaxLattice.create(),value -> value);
-			LatticePropagator second=new LatticePropagator(store,MaxLattice.create(),value -> value);
+			LatticePropagator first=new LatticePropagator(store);
+			LatticePropagator second=new LatticePropagator(store);
 			node.addPropagator(first);
 			node.addPropagator(second);
 			listener.registerPropagator(first);
@@ -216,7 +213,7 @@ public class LatticeListenerTest {
 		try (AStore store=new MemoryStore();
 				NodeServer<?> node=new NodeServer<>(MaxLattice.create(),store);
 				LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
-			LatticePropagator group=new LatticePropagator(store,MaxLattice.create(),value -> value);
+			LatticePropagator group=new LatticePropagator(store);
 			node.addPropagator(group);
 			listener.registerPropagator(group);
 			listener.setSelector(connection -> {
@@ -251,7 +248,7 @@ public class LatticeListenerTest {
 				NodeServer<?> node=new NodeServer<>(MaxLattice.create(),store);
 				LatticeListener first=new LatticeListener(NodeConfig.port(0));
 				LatticeListener second=new LatticeListener(NodeConfig.port(0))) {
-			LatticePropagator group=new LatticePropagator(store,MaxLattice.create(),value -> value);
+			LatticePropagator group=new LatticePropagator(store);
 			node.addPropagator(group);
 			first.registerPropagator(group);
 			second.registerPropagator(group);

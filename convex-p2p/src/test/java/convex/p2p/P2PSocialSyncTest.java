@@ -116,16 +116,17 @@ public class P2PSocialSyncTest {
 		// Bob also publishes an infrastructure-only view from a separate serving
 		// store. A third transiently broken view proves failure containment and
 		// recovery without replacing the real follow-aware propagation group.
-		bobInfrastructureView=new LatticePropagator(new MemoryStore(),P2PLattice.NODE_ROOT,
-			value -> value.dissoc(Social.KEY_SOCIAL),LatticePropagatorConfig.create());
+		bobInfrastructureView=new LatticePropagator(new MemoryStore(),LatticePropagatorConfig.create());
+		bobInfrastructureView.<Index<Keyword,ACell>>setPublicationFilter(
+			value -> value.dissoc(Social.KEY_SOCIAL));
 		AtomicBoolean failBrokenViewOnce=new AtomicBoolean();
-		bobBrokenView=new LatticePropagator(new MemoryStore(),P2PLattice.NODE_ROOT,
-			value -> {
-				if (failBrokenViewOnce.compareAndSet(false,true)) {
-					throw new IllegalStateException("simulated filtered-view failure");
-				}
-				return value.dissoc(Social.KEY_SOCIAL);
-			},LatticePropagatorConfig.create());
+		bobBrokenView=new LatticePropagator(new MemoryStore(),LatticePropagatorConfig.create());
+		bobBrokenView.<Index<Keyword,ACell>>setPublicationFilter(value -> {
+			if (failBrokenViewOnce.compareAndSet(false,true)) {
+				throw new IllegalStateException("simulated filtered-view failure");
+			}
+			return value.dissoc(Social.KEY_SOCIAL);
+		});
 		bobNode.getNodeServer().addPropagator(bobInfrastructureView);
 		bobNode.getNodeServer().addPropagator(bobBrokenView);
 		CompletableFuture<LatticePropagator.Failure> brokenViewFailure=

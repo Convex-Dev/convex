@@ -22,7 +22,7 @@ public class LatticeConnectionHealthTest {
 	@Test
 	public void testProbeCancellationAndInvalidResponseReleaseRequests() throws Exception {
 		var config=LatticePropagatorConfig.create();
-		var group=new LatticePropagator(new MemoryStore(),MaxLattice.create(),value -> value,config);
+		var group=new LatticePropagator(new MemoryStore(),config);
 		var endpoint=new LatticeProtocolEndpoint(group,null,config);
 		var sent=new java.util.ArrayList<Message>();
 		var connection=LocalConnection.createPair(message -> {
@@ -57,8 +57,8 @@ public class LatticeConnectionHealthTest {
 		var aliceStore=new MemoryStore();
 		var bobStore=new MemoryStore();
 		var lattice=MaxLattice.create();
-		var aliceGroup=new LatticePropagator(aliceStore,lattice,value -> value,LatticePropagatorConfig.create());
-		var bobGroup=new LatticePropagator(bobStore,lattice,value -> value,LatticePropagatorConfig.create());
+		var aliceGroup=new LatticePropagator(aliceStore,LatticePropagatorConfig.create());
+		var bobGroup=new LatticePropagator(bobStore,LatticePropagatorConfig.create());
 		aliceGroup.setTransportKeyPair(aliceKey);
 		bobGroup.setTransportKeyPair(bobKey);
 		var incoming=new CompletableFuture<AConnection>();

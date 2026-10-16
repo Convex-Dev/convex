@@ -82,12 +82,8 @@ public class LatticePropagatorTest {
 		AKeyPair nodeKey2=AKeyPair.generate();
 		server1.setMergeContext(LatticeContext.create(null,nodeKey1));
 		server2.setMergeContext(LatticeContext.create(null,nodeKey2));
-		propagator1=new LatticePropagator(store1,lattice,value -> value,
-			LatticePropagatorConfig.create());
-		propagator2=new LatticePropagator(store2,lattice,value -> value,
-			LatticePropagatorConfig.create());
-		propagator1.setMergeContext(LatticeContext.create(null,nodeKey1));
-		propagator2.setMergeContext(LatticeContext.create(null,nodeKey2));
+		propagator1=new LatticePropagator(store1,LatticePropagatorConfig.create());
+		propagator2=new LatticePropagator(store2,LatticePropagatorConfig.create());
 		propagator1.setTransportKeyPair(nodeKey1);
 		propagator2.setTransportKeyPair(nodeKey2);
 		server1.addPropagator(propagator1);
@@ -280,8 +276,7 @@ public class LatticePropagatorTest {
 			LatticeConnectionManager manager=new LatticeConnectionManager(isolatedStore);
 			Convex livePeer=propagator1.getPeers().iterator().next();
 			manager.addPeer(livePeer.getVerifiedPeer(),livePeer).get(5,TimeUnit.SECONDS);
-			LatticePropagator isolated=new LatticePropagator(
-				isolatedStore,manager,lattice,candidate -> candidate);
+			LatticePropagator isolated=new LatticePropagator(isolatedStore,manager);
 			isolated.setMaxDeltaMessageSize(1);
 			CompletableFuture<ACell> announced=isolated.nextAnnounce();
 			ACell published=isolated.processSnapshot(expected);
@@ -392,10 +387,9 @@ public class LatticePropagatorTest {
 	public void testFilterRunsBeforeAnnounce() throws Exception {
 		CVMLong visible = CVMLong.create(101);
 		Blob hidden = Blobs.createRandom(400);
-		SetLattice<ACell> setLattice = SetLattice.create();
 		try (MemoryStore publicStore = new MemoryStore()) {
-			LatticePropagator propagator = new LatticePropagator(publicStore, setLattice,
-				value -> value.exclude(hidden));
+			LatticePropagator propagator = new LatticePropagator(publicStore);
+			propagator.<ASet<ACell>>setPublicationFilter(value -> value.exclude(hidden));
 			ASet<ACell> full = Sets.of(visible, hidden);
 
 			ACell announced = propagator.processSnapshot(full);
@@ -407,46 +401,19 @@ public class LatticePropagatorTest {
 		}
 	}
 
-	/** Snapshot reconciliation is directional: the propagator's current value is own. */
+	/** A propagator replicates what it is given: a later snapshot replaces the announced view. */
 	@Test
-	public void testSnapshotMergePrefersPropagatorOwnValueOnTie() throws Exception {
-		LWWLattice<CVMLong> lww = LWWLattice.create(value -> 1L);
+	public void testSnapshotReplacesAnnouncedView() throws Exception {
 		try (MemoryStore viewStore = new MemoryStore()) {
-			LatticePropagator propagator = new LatticePropagator(viewStore, lww, value -> value);
-			CVMLong own = CVMLong.create(10_001);
-			CVMLong other = CVMLong.create(10_002);
+			LatticePropagator propagator = new LatticePropagator(viewStore);
+			CVMLong first = CVMLong.create(10_001);
+			CVMLong second = CVMLong.create(10_002);
 
-			ACell first = propagator.processSnapshot(own);
-			ACell second = propagator.processSnapshot(other);
-
-			assertSame(own, first);
-			assertSame(first, second,
-				"equal-timestamp input must not replace the propagator's existing own value");
-			assertSame(first, viewStore.getRootData());
-		}
-	}
-
-	/** Equivalent foreign-store values retain the propagator's store-local refs. */
-	@Test
-	@SuppressWarnings("unchecked")
-	public void testSnapshotMergeRetainsPropagatorStoreRefIdentity() throws Exception {
-		SetLattice<Blob> setLattice = SetLattice.create();
-		Blob source = Blobs.createRandom(400);
-		try (MemoryStore viewStore = new MemoryStore();
-				MemoryStore foreignStore = new MemoryStore()) {
-			LatticePropagator propagator = new LatticePropagator(viewStore, setLattice,
-				value -> value);
-			ASet<Blob> localInput = Sets.of(source);
-			ASet<Blob> local = (ASet<Blob>) propagator.processSnapshot(localInput);
-			Blob foreignBlob = foreignStore.decode(source.getEncoding());
-			ASet<Blob> foreign = convex.core.data.Cells.announce(
-				Sets.of(foreignBlob), r -> {}, foreignStore);
-
-			assertEquals(local, foreign);
-			assertNotSame(local, foreign);
-			assertSame(local, propagator.processSnapshot(foreign),
-				"equivalent input from another store must not replace local refs");
-			assertSame(local, viewStore.getRootData());
+			assertSame(first, propagator.processSnapshot(first));
+			assertSame(second, propagator.processSnapshot(second),
+				"the propagator must not merge or reorder what the host published");
+			assertSame(second, propagator.getLastAnnouncedValue());
+			assertNull(viewStore.getRootData(), "a propagator never writes a store root");
 		}
 	}
 
@@ -467,24 +434,6 @@ public class LatticePropagatorTest {
 		}
 	}
 
-	/** A persistent secondary restores its own subset before primary reconciliation. */
-	@Test
-	public void testRestoredWorkingViewSurvivesNextSnapshot() throws Exception {
-		SetLattice<ACell> setLattice = SetLattice.create();
-		CVMLong pending = CVMLong.create(311);
-		CVMLong primary = CVMLong.create(312);
-		try (EtchStore viewStore = EtchStore.createTemp("propagator-view-restore")) {
-			LatticePropagator first = new LatticePropagator(viewStore, setLattice, value -> value);
-			first.processSnapshot(Sets.of(pending));
-			first.checkpoint();
-
-			LatticePropagator restored = new LatticePropagator(viewStore, setLattice, value -> value);
-			assertEquals(Sets.of(pending), restored.restore());
-			assertEquals(Sets.of(pending, primary), restored.processSnapshot(Sets.of(primary)),
-				"restored propagator state must be own during primary reconciliation");
-		}
-	}
-
 	/** Filtering is invariant across launch, normal sync fan-out and orderly close. */
 	@Test
 	public void testNodeLifecycleKeepsSecondaryStoreFiltered() throws Exception {
@@ -496,10 +445,9 @@ public class LatticePropagatorTest {
 				MemoryStore publicStore = new MemoryStore();
 				NodeServer<ASet<ACell>> node = new NodeServer<>(
 					setLattice, primaryStore, NodeConfig.port(-1))) {
-			LatticePropagator primary = new LatticePropagator(primaryStore, setLattice,
-				value -> value);
-			LatticePropagator publicView = new LatticePropagator(publicStore, setLattice,
-				value -> value.exclude(hidden));
+			LatticePropagator primary = new LatticePropagator(primaryStore);
+			LatticePropagator publicView = new LatticePropagator(publicStore);
+			publicView.<ASet<ACell>>setPublicationFilter(value -> value.exclude(hidden));
 			node.addPropagator(primary);
 			node.addPropagator(publicView);
 			node.getCursor().set(Sets.of(initialVisible, hidden));
@@ -589,18 +537,20 @@ public class LatticePropagatorTest {
 	}
 
 	/**
-	 * As above, but with a persistent store: the final value must be durable
-	 * (readable as root data) once triggerAndClose returns.
+	 * As above, but with a persistent store: the final value is announced into the
+	 * serving store before triggerAndClose returns, while the store root stays with
+	 * the node.
 	 */
 	@Test
-	public void testTriggerAndClosePersistsFinalValue() throws IOException {
+	public void testTriggerAndCloseAnnouncesFinalValueWithoutWritingRoot() throws IOException {
 		try (EtchStore store = EtchStore.createTemp("propagator-close")) {
 			LatticePropagator propagator = new LatticePropagator(store);
 			propagator.start();
 			ACell finalValue = CVMLong.create(12345);
 			propagator.triggerAndClose(finalValue);
-			assertEquals(finalValue, store.getRootData(),
-				"Final value must be persisted as root data before triggerAndClose returns");
+			assertEquals(finalValue, propagator.getLastAnnouncedValue(),
+				"Final value must be announced before triggerAndClose returns");
+			assertNull(store.getRootData(), "a propagator never writes the store root");
 		}
 	}
 

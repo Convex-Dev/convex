@@ -62,7 +62,7 @@ class ReadingListApplicationTest {
 			host.configureApplications(List.of(app));
 			var config=NodeConfig.localNetwork();
 			node=new NodeServer<>(host,config);
-			group=new LatticePropagator(store,LATTICE,value -> value);
+			group=new LatticePropagator(store);
 			group.setTransportKeyPair(transportKey);
 			node.addPropagator(group);
 			listener=new LatticeListener(config);

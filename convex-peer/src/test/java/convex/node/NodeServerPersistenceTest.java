@@ -107,9 +107,7 @@ public class NodeServerPersistenceTest {
 
 	/** Attaches the explicit identity-view group used by replication tests. */
 	private LatticePropagator addPropagationGroup(NodeServer<?> node) {
-		LatticePropagator propagator=new LatticePropagator(
-			node.getStore(),Lattice.ROOT,value -> value,
-			LatticePropagatorConfig.create());
+		LatticePropagator propagator=new LatticePropagator(node.getStore(),LatticePropagatorConfig.create());
 		node.addPropagator(propagator);
 		transport(node).registerPropagator(propagator);
 		return propagator;
@@ -749,8 +747,7 @@ public class NodeServerPersistenceTest {
 				NodeConfig.PORT,CVMLong.create(-1),
 				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
 		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
-		primary.addPropagator(new LatticePropagator(
-			primaryStore,Lattice.ROOT,value -> value,LatticePropagatorConfig.create()));
+		primary.addPropagator(new LatticePropagator(primaryStore,LatticePropagatorConfig.create()));
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
 		sharedPrimaryStore.setFlushCompleteHook(checkpointed::countDown);

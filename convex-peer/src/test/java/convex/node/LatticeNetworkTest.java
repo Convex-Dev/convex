@@ -95,8 +95,7 @@ public class LatticeNetworkTest {
 			// runners; peer wiring below uses getHostAddress() (actual port).
 			NodeConfig config=NodeConfig.port(0);
 			NodeServer<?> server = new NodeServer<>(commonLattice, store, config);
-			LatticePropagator propagator=new LatticePropagator(
-				store,commonLattice,value -> value,LatticePropagatorConfig.create());
+			LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.create());
 			server.addPropagator(propagator);
 			LatticeListener transport=new LatticeListener(config);
 			transport.registerPropagator(propagator);

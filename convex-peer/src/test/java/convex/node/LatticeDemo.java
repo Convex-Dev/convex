@@ -82,8 +82,7 @@ public class LatticeDemo {
 				// - Takes a port number (how other nodes can connect to it)
 				NodeConfig config=NodeConfig.port(0);
 				NodeServer<?> server = new NodeServer<>(lattice,store,config);
-				LatticePropagator propagator=new LatticePropagator(
-					store,lattice,value -> value,LatticePropagatorConfig.create());
+				LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.create());
 				server.addPropagator(propagator);
 				LatticeListener transport=new LatticeListener(config);
 				transport.registerPropagator(propagator);

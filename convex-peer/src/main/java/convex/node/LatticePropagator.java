@@ -36,10 +36,6 @@ import convex.core.util.LatestUpdateQueue;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Root;
-import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
-import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.Root;
 
 /**
  * Isolated connection and publication policy group for one lattice node.
@@ -50,16 +46,17 @@ import convex.lattice.cursor.Root;
  * multiple groups may expose different filtered views without sharing queues,
  * connection state or acquisition capability.</p>
  *
- * <p>Complete inbound values are decoded, acquired and projected inside this
- * boundary before being offered to {@link NodeServer}. The node alone performs
- * the authoritative lattice merge and writes its durable store root. Once that
- * commit succeeds the node notifies every propagator independently; failure in
- * one group is contained and cannot prevent another group from seeing the update.</p>
+ * <p>A propagator replicates and merges nothing. Complete inbound values are
+ * decoded, acquired and projected inside this boundary before being offered to
+ * {@link NodeServer}, which hands them to the host and its applications for the
+ * authoritative merge and writes the durable store root. Once that commit
+ * succeeds the node notifies every propagator independently; each announces the
+ * published root through its own projection. Failure in one group is contained
+ * and cannot prevent another group from seeing the update.</p>
  *
  * <p>The group's store is a serving and novelty cache. DATA_REQUEST responses can
- * resolve only cells materialised in this exact store. A standalone propagator
- * may still opt into a local cached root for compatibility, but an attached node
- * always remains the sole authoritative root writer.</p>
+ * resolve only cells materialised in this exact store. The node alone writes an
+ * authoritative root; a propagator never writes a store root of its own.</p>
  */
 public class LatticePropagator implements Closeable {
 
@@ -86,20 +83,8 @@ public class LatticePropagator implements Closeable {
 	/** Limits and timing selected by the calling application for this group. */
 	private final LatticePropagatorConfig config;
 
-	/** Lattice used to reconcile this propagator's own subset with new snapshots. */
-	private ALattice<ACell> lattice;
-
-	/** Context used only to reconcile this group's served view. */
-	private LatticeContext mergeContext = LatticeContext.EMPTY;
-
 	/** Projection applied before any value crosses this propagator's store boundary. */
 	private LatticeFilter<ACell> filter = value -> value;
-
-	/**
-	 * This propagator's current logical view. It may contain accepted inbound values
-	 * which have not yet appeared in a later projection from the authoritative root.
-	 */
-	private Root<ACell> workingCursor;
 
 	/** Authoritative merge target supplied by the owning node before launch. */
 	private NodeServer<?> node;
@@ -132,18 +117,12 @@ public class LatticePropagator implements Closeable {
 	 */
 	private final LatestUpdateQueue<ACell> triggerQueue = new LatestUpdateQueue<>();
 
-	/** Whether a standalone propagator caches its view as the store root. */
-	private volatile boolean persistenceEnabled = true;
-
 	/** Maximum encoded body size for one outbound delta or DATA-ahead chunk. */
 	private volatile int maxDeltaMessageSize = LatticePropagatorConfig.DEFAULT_MAX_MESSAGE_SIZE;
 
 	/** Maximum combined encoded bodies materialised for one eager delta broadcast. */
 	private volatile int maxDeltaBroadcastSize =
 		LatticePropagatorConfig.DEFAULT_MAX_DELTA_BROADCAST_SIZE;
-
-	/** Whether root publication has changed the persistent store since its last checkpoint. */
-	private boolean dirty;
 
 	/**
 	 * Cursor holding the last value announced to this propagator's store.
@@ -153,10 +132,10 @@ public class LatticePropagator implements Closeable {
 	 * responses are served from this cursor, so peers only see data this
 	 * propagator has actually committed. NodeServer exposes this view only to
 	 * connections assigned to this propagator; reverse DATA_REQUEST resolution
-	 * uses the same store.</p>
+	 * uses the same store. Delta novelty is computed against it.</p>
 	 *
 	 * <p>Each propagator owns its own announced cursor. This keeps query and data
-	 * access scoped to one store. Filtering and working-view reconciliation complete
+	 * access scoped to one store. Filtering and store materialisation complete
 	 * before this cursor advances.</p>
 	 */
 	private final Root<ACell> announcedCursor = new Root<>();
@@ -184,23 +163,17 @@ public class LatticePropagator implements Closeable {
 	private long rootSyncCount = 0L;
 
 	/**
-	 * Serialises this group's working view, serving-store materialisation and
-	 * announcement cursor. Attached groups never write the authoritative node root;
-	 * their only store-root writes are disabled at attachment. The lock also keeps
-	 * the optional standalone compatibility root ordered with announcements.
+	 * Serialises this group's serving-store materialisation and announcement
+	 * cursor. A propagator never writes a store root.
 	 */
 	private final Object writeLock = new Object();
 
 	/**
-	 * Creates a propagation group with default limits and no lattice projection.
-	 * The application must supply a lattice through another constructor before
-	 * attaching the group to a node.
+	 * Creates a propagation group with default limits.
 	 *
 	 * @param store serving store for delta tracking and data resolution
 	 * @param connectionManager connection manager for outbound routes
-	 * @deprecated Use a lattice-configured constructor before attachment.
 	 */
-	@Deprecated
 	public LatticePropagator(AStore store, LatticeConnectionManager connectionManager) {
 		this(store,connectionManager,LatticePropagatorConfig.create());
 	}
@@ -220,9 +193,9 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Creates a propagation group with application-supplied limits and no lattice
-	 * projection. Such a standalone compatibility group cannot be attached until
-	 * a lattice is supplied through a lattice-configured constructor.
+	 * Creates a propagation group with application-supplied limits. Identity,
+	 * admission, projection and application hooks are optional policy configured
+	 * through the setters before attachment.
 	 *
 	 * @param store serving store for delta tracking and data resolution
 	 * @param connectionManager connection manager for outbound routes
@@ -248,124 +221,23 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Creates a propagation group with a new connection manager, default limits
-	 * and no lattice projection.
+	 * Creates a propagation group with a new connection manager and default limits.
 	 *
 	 * @param store serving store for delta tracking and peer data resolution
-	 * @deprecated Use a lattice-configured constructor before attachment.
 	 */
-	@Deprecated
 	public LatticePropagator(AStore store) {
 		this(store,new LatticeConnectionManager(store),LatticePropagatorConfig.create());
 	}
 
 	/**
-	 * Creates a propagator which owns a lattice projection and reconciles later
-	 * snapshots with its current view using current/propagator state as {@code own}.
+	 * Creates a propagation group with a new connection manager and
+	 * application-supplied limits.
 	 *
-	 * @param store serving store for this group
-	 * @param lattice merge semantics for the served view
-	 * @param filter publication projection
-	 * @param <V> served lattice value type
-	 */
-	@SuppressWarnings("unchecked")
-	public <V extends ACell> LatticePropagator(AStore store, ALattice<V> lattice,
-			LatticeFilter<V> filter) {
-		this(store,new LatticeConnectionManager(store),lattice,filter,
-			LatticePropagatorConfig.create());
-	}
-
-	/**
-	 * Creates a lattice-configured propagation group with a new connection manager
-	 * and application-supplied limits.
-	 *
-	 * @param store serving store for this group
-	 * @param lattice merge semantics for the served view
-	 * @param filter publication projection
-	 * @param config legacy combined configuration
-	 * @param <V> served lattice value type
-	 * @deprecated Supply {@link LatticePropagatorConfig} explicitly.
-	 */
-	@Deprecated
-	public <V extends ACell> LatticePropagator(AStore store,ALattice<V> lattice,
-			LatticeFilter<V> filter,NodeConfig config) {
-		this(store,new LatticeConnectionManager(store),lattice,filter,legacyConfig(config));
-	}
-
-	/**
-	 * Creates a lattice-configured propagation group with a new connection manager
-	 * and application-supplied limits.
-	 *
-	 * @param store serving store for this group
-	 * @param lattice merge semantics for the served view
-	 * @param filter publication projection
+	 * @param store serving store for delta tracking and peer data resolution
 	 * @param config queue, transport and publication limits
-	 * @param <V> served lattice value type
 	 */
-	public <V extends ACell> LatticePropagator(AStore store,ALattice<V> lattice,
-			LatticeFilter<V> filter,LatticePropagatorConfig config) {
-		this(store,new LatticeConnectionManager(store),lattice,filter,config);
-	}
-
-	/**
-	 * Creates a lattice-configured propagation group with an explicit connection
-	 * manager and default limits.
-	 *
-	 * @param store serving store for this group
-	 * @param connectionManager connection manager for outbound routes
-	 * @param lattice merge semantics for the served view
-	 * @param filter publication projection
-	 * @param <V> served lattice value type
-	 */
-	@SuppressWarnings("unchecked")
-	public <V extends ACell> LatticePropagator(AStore store,
-			LatticeConnectionManager connectionManager, ALattice<V> lattice,
-			LatticeFilter<V> filter) {
-		this(store,connectionManager,lattice,filter,LatticePropagatorConfig.create());
-	}
-
-	/**
-	 * Creates a lattice-configured propagation group with an explicit connection
-	 * manager and limits. Identity, admission and application hooks remain optional
-	 * application policy configured before attachment.
-	 *
-	 * @param store serving store for this group
-	 * @param connectionManager connection manager for outbound routes
-	 * @param lattice merge semantics for the served view
-	 * @param filter publication projection
-	 * @param config legacy combined configuration
-	 * @param <V> served lattice value type
-	 * @deprecated Supply {@link LatticePropagatorConfig} explicitly.
-	 */
-	@Deprecated
-	@SuppressWarnings("unchecked")
-	public <V extends ACell> LatticePropagator(AStore store,
-			LatticeConnectionManager connectionManager,ALattice<V> lattice,
-			LatticeFilter<V> filter,NodeConfig config) {
-		this(store,connectionManager,lattice,filter,legacyConfig(config));
-	}
-
-	/**
-	 * Creates a lattice-configured propagation group with an explicit connection
-	 * manager and limits. Identity, admission and application hooks remain optional
-	 * application policy configured before attachment.
-	 *
-	 * @param store serving store for this group
-	 * @param connectionManager connection manager for outbound routes
-	 * @param lattice merge semantics for the served view
-	 * @param filter publication projection
-	 * @param config queue, transport and publication limits
-	 * @param <V> served lattice value type
-	 */
-	@SuppressWarnings("unchecked")
-	public <V extends ACell> LatticePropagator(AStore store,
-			LatticeConnectionManager connectionManager,ALattice<V> lattice,
-			LatticeFilter<V> filter,LatticePropagatorConfig config) {
-		this(store,connectionManager,config);
-		if (lattice == null) throw new IllegalArgumentException("Lattice must not be null");
-		if (filter == null) throw new IllegalArgumentException("Lattice filter must not be null");
-		this.lattice = (ALattice<ACell>) lattice;
-		this.filter = (LatticeFilter<ACell>) filter;
+	public LatticePropagator(AStore store,LatticePropagatorConfig config) {
+		this(store,new LatticeConnectionManager(store),config);
 	}
 
 	private static LatticePropagatorConfig legacyConfig(NodeConfig config) {
@@ -487,12 +359,7 @@ public class LatticePropagator implements Closeable {
 			if (this.node!=null && this.node!=node) {
 				throw new IllegalStateException("Propagator is already attached to another node");
 			}
-			if (lattice==null) {
-				throw new IllegalStateException("Calling application must configure the propagator lattice");
-			}
 			this.node=node;
-			// NodeServer is the sole writer of its authoritative store root.
-			this.persistenceEnabled=false;
 			if (endpoint==null) endpoint=new LatticeProtocolEndpoint(this,node,config);
 			connectionManager.setInboundProbe(endpoint::probe,endpoint::retireConnection);
 			endpoint.setTransportKeyPair(transportKeyPair);
@@ -503,31 +370,6 @@ public class LatticePropagator implements Closeable {
 	}
 
 	// ========== Configuration ==========
-
-	/**
-	 * Enables or disables root retention for a standalone propagator. Announcement
-	 * still runs when disabled because it provides serving references and novelty.
-	 * Attached groups cannot enable root retention because the node owns that root.
-	 *
-	 * @param enabled {@code true} to retain the served view as this store's root
-	 */
-	public void setPersistenceEnabled(boolean enabled) {
-		if (node!=null && enabled) {
-			throw new IllegalStateException("An attached propagator cannot own the node store root");
-		}
-		this.persistenceEnabled = enabled;
-	}
-
-	/**
-	 * Sets the lattice context used only to reconcile this group's filtered view.
-	 * Authoritative foreign-value validation remains inside the attached NodeServer.
-	 *
-	 * @param context view reconciliation context; {@code null} selects an empty context
-	 */
-	public void setMergeContext(LatticeContext context) {
-		requireUnattachedPolicy("Merge context");
-		this.mergeContext=(context==null) ? LatticeContext.EMPTY : context;
-	}
 
 	/**
 	 * Sets the key used by this group's challenge/response endpoint.
@@ -788,30 +630,6 @@ public class LatticePropagator implements Closeable {
 	 */
 	public Set<Convex> getPeers() {
 		return connectionManager.getPeers();
-	}
-
-	/**
-	 * Restores the last persisted standalone value from this propagator's store.
-	 * The restored value also becomes this propagator's working view, ready for
-	 * directional reconciliation with the next authoritative projection.
-	 *
-	 * @return restored value, or null if no persisted value exists
-	 *         or the store is not persistent
-	 */
-	public ACell restore() {
-		if (!store.isPersistent()) return null;
-		try {
-			ACell restored = store.getRootData();
-			if (restored != null) {
-				synchronized (writeLock) {
-					workingCursor = Cursors.root(restored);
-				}
-			}
-			return restored;
-		} catch (IOException e) {
-			log.warn("Error restoring lattice value from store", e);
-			return null;
-		}
 	}
 
 	/**
@@ -1123,43 +941,30 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Processes a single lattice value through this group's output pipeline:
+	 * Processes one published root through this group's output pipeline:
 	 * <ol>
-	 *   <li>Reconcile and project this policy group's view</li>
-	 *   <li>Announce to its serving store and collect novelty</li>
-	 *   <li>Optionally retain a standalone compatibility root</li>
-	 *   <li>Broadcast a best-effort delta to its routes</li>
+	 *   <li>Project the value through this group's publication filter</li>
+	 *   <li>Announce it to the serving store and collect novelty</li>
+	 *   <li>Broadcast a best-effort delta to the group's routes</li>
 	 * </ol>
 	 *
-	 * <p>Announcement always runs for store-backed references. Attached policy
-	 * groups have root retention disabled because {@link NodeServer} alone owns
-	 * the authoritative durable root. Network encoding and queuing are best effort.</p>
+	 * <p>The value is replicated exactly as given: the host's applications have
+	 * already merged it, and a propagator performs no merge of its own. Announcement
+	 * always runs so that served references are store-backed. Network encoding and
+	 * queuing are best effort.</p>
 	 *
-	 * <p>Callable directly for standalone use and deterministic tests. Attached
-	 * nodes normally schedule it on this group's worker using
-	 * {@link #triggerBroadcast(ACell)}. Attached-node snapshots take precedence
-	 * over this group's working view on ties, so an older replicated-back value
-	 * cannot displace a local edit. Standalone input keeps working-view precedence.
-	 * Calls are serialised by {@link #writeLock}.</p>
+	 * <p>Callable directly for deterministic tests. Attached nodes normally schedule
+	 * it on this group's worker using {@link #triggerBroadcast(ACell)}. Calls are
+	 * serialised by {@link #writeLock}.</p>
 	 *
-	 * @param value snapshot to process; must not be {@code null}
+	 * @param value published root to process; must not be {@code null}
 	 * @return announced store-backed value
-	 * @throws IOException if announcement or standalone root publication fails
+	 * @throws IOException if announcement fails
 	 */
 	public ACell processSnapshot(ACell value) throws IOException {
 		CompletableFuture<ACell> announceFuture;
 		synchronized (writeLock) {
-			// Keep group pre-merges, but the node's published local state wins ties.
-			// Standalone snapshots are ordinary input, not node publications.
-			if ((workingCursor != null) && (lattice != null)) {
-				ACell working=workingCursor.get();
-				value = (node==null)
-					?lattice.merge(mergeContext,working,value)
-					:lattice.merge(mergeContext,value,working);
-			}
-
-			// Filtering is outbound-only: pending inbound state participates in the
-			// reconciliation above, then projection precedes every outbound operation.
+			// Projection precedes every outbound operation.
 			value = filter.filter(value);
 			if (value == null) throw new IllegalArgumentException("Lattice filter returned null");
 
@@ -1170,17 +975,6 @@ public class LatticePropagator implements Closeable {
 			NoveltyCollector noveltyCollector=hasPeers
 				?new NoveltyCollector(maxDeltaBroadcastSize):null;
 			value = Cells.announce(value, noveltyCollector, store);
-			if (workingCursor == null) {
-				workingCursor = Cursors.root(value);
-			} else {
-				workingCursor.set(value);
-			}
-
-			// 2. Set root data for restore (if persist enabled)
-			if (persistenceEnabled) {
-				store.setRootData(value);
-				dirty = true;
-			}
 
 			// The store-backed root becomes externally visible before best-effort network
 			// encoding. A failed delta must therefore still be eligible for periodic
@@ -1189,7 +983,7 @@ public class LatticePropagator implements Closeable {
 			announceFuture = nextAnnounceFuture;
 			nextAnnounceFuture = new CompletableFuture<>();
 
-			// 3. Broadcast to peers. Background triggers are already coalesced by
+			// 2. Broadcast to peers. Background triggers are already coalesced by
 			// LatestUpdateQueue; an explicitly processed snapshot must not be dropped.
 			if (hasPeers) {
 				try {
@@ -1283,25 +1077,6 @@ public class LatticePropagator implements Closeable {
 		// The value may be encoded as an indirect ref; DATA_REQUEST resolution is
 		// safe because announcedCursor advances only after the store is populated.
 		return Message.create(MessageType.LATTICE_VALUE, payload, payload.getEncoding());
-	}
-
-	// ========== Standalone compatibility persistence ==========
-
-	/**
-	 * Completes a durability barrier when this propagator has unpublished
-	 * persistent changes.
-	 *
-	 * @return true if a barrier was completed
-	 * @throws IOException If the barrier fails
-	 */
-	boolean checkpoint() throws IOException {
-		if (!store.isPersistent()) return false;
-		synchronized (writeLock) {
-			if (!dirty) return false;
-			store.flush();
-			dirty = false;
-			return true;
-		}
 	}
 
 	// ========== Pull (Fetch from Peers) ==========

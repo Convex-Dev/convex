@@ -155,7 +155,7 @@ class NodeApplicationIngressTest {
 		var config=NodeConfig.localNetwork();
 		try (var store=new MemoryStore(); var node=new NodeServer<>(LatticeHost.open(store),config);
 				var transport=new LatticeListener(config)) {
-			var group=new LatticePropagator(store,LATTICE,value -> value);
+			var group=new LatticePropagator(store);
 			group.setTransportKeyPair(AKeyPair.createSeeded(9185));
 			node.addPropagator(group);
 			transport.registerPropagator(group);
@@ -204,7 +204,7 @@ class NodeApplicationIngressTest {
 	@Test void pullsDeliverToApplicationWithoutForcingPublication() throws Exception {
 		try (var store=new MemoryStore(); var node=new NodeServer<>(LatticeHost.open(store))) {
 			var incoming=LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE));
-			var group=new LatticePropagator(store,LATTICE,value -> value) {
+			var group=new LatticePropagator(store) {
 				@Override public CompletableFuture<ACell> pull(Convex peer) {
 					return CompletableFuture.completedFuture(incoming);
 				}

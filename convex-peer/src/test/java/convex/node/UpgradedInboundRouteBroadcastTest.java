@@ -30,8 +30,8 @@ public class UpgradedInboundRouteBroadcastTest {
 		var aliceStore=new MemoryStore();
 		var bobStore=new MemoryStore();
 		var lattice=MaxLattice.create();
-		var aliceGroup=new LatticePropagator(aliceStore,lattice,value -> value,LatticePropagatorConfig.create());
-		var bobGroup=new LatticePropagator(bobStore,lattice,value -> value,LatticePropagatorConfig.create());
+		var aliceGroup=new LatticePropagator(aliceStore,LatticePropagatorConfig.create());
+		var bobGroup=new LatticePropagator(bobStore,LatticePropagatorConfig.create());
 		aliceGroup.setTransportKeyPair(aliceKey);
 		bobGroup.setTransportKeyPair(bobKey);
 		var incoming=new CompletableFuture<AConnection>();

@@ -40,8 +40,7 @@ public class LatticePropagatorConfigTest {
 			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(3)));
 
 		try (NodeServer<?> node=new NodeServer<>(MaxLattice.create(),new MemoryStore(),host)) {
-			LatticePropagator propagator=new LatticePropagator(new MemoryStore(),
-				MaxLattice.create(),value -> value,group);
+			LatticePropagator propagator=new LatticePropagator(new MemoryStore(),group);
 			node.addPropagator(propagator);
 
 			assertEquals(4096,node.getConfig().getMaxMessageSize());

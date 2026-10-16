@@ -55,8 +55,6 @@ public final class SharedApplicationsExample {
 		.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
 	static final KeyedLattice FILES_ROOT=P2PLattice.ROOT
 		.addLattice(Keywords.FS,DLFSRegion.LATTICE);
-	/** Everything a node serves. Only replication needs this: a propagator cannot attach without a lattice. */
-	static final KeyedLattice SERVED=SOCIAL_ROOT.addLattice(Keywords.FS,DLFSRegion.LATTICE);
 
 	/** Signs as {@code user} at a fixed logical time, verifying owners by the standard did:key rule. */
 	static LatticeContext policy(AKeyPair user,long time) {
@@ -156,9 +154,9 @@ public final class SharedApplicationsExample {
 
 			var config=NodeConfig.localNetwork();
 			server=new NodeServer<>(host,config);
+			// Replication knows no lattice: it serves whatever the host publishes.
 			servingStore=EtchStore.createTemp("shared-apps-serving");
-			propagation=new LatticePropagator(servingStore,SERVED,value -> value);
-			propagation.setMergeContext(LatticeContext.EMPTY.withOwnerVerifier(DIDKeyAuthorizer.CONVEX::verifiesOwner));
+			propagation=new LatticePropagator(servingStore);
 			propagation.setTransportKeyPair(nodeKey);
 			server.addPropagator(propagation);
 			listener=new LatticeListener(config);

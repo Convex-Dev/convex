@@ -214,9 +214,7 @@ public class P2PNode implements Closeable {
 		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(root,store,effectiveConfig);
 		server.setMergeContext(mergeContext);
 		LatticeConnectionManager manager=new LatticeConnectionManager(store);
-		LatticePropagator propagator=new LatticePropagator(
-			store,manager,root,value -> value,effectivePropagatorConfig);
-		propagator.setMergeContext(mergeContext);
+		LatticePropagator propagator=new LatticePropagator(store,manager,effectivePropagatorConfig);
 		propagator.setTransportKeyPair(keyPair);
 		LatticeListener transport=new LatticeListener(effectiveConfig);
 		transport.registerPropagator(propagator);

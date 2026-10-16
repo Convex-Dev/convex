@@ -56,12 +56,8 @@ public class ReplicationDemo {
 				ConvexDB.DATABASE_MAP_LATTICE,storeLondon,configLondon);
 		NodeServer<?> serverTokyo  = new NodeServer<>(
 				ConvexDB.DATABASE_MAP_LATTICE,storeTokyo,configTokyo);
-		LatticePropagator propagatorLondon=new LatticePropagator(
-			storeLondon,ConvexDB.DATABASE_MAP_LATTICE,value -> value,
-			LatticePropagatorConfig.create());
-		LatticePropagator propagatorTokyo=new LatticePropagator(
-			storeTokyo,ConvexDB.DATABASE_MAP_LATTICE,value -> value,
-			LatticePropagatorConfig.create());
+		LatticePropagator propagatorLondon=new LatticePropagator(storeLondon,LatticePropagatorConfig.create());
+		LatticePropagator propagatorTokyo=new LatticePropagator(storeTokyo,LatticePropagatorConfig.create());
 		serverLondon.addPropagator(propagatorLondon);
 		serverTokyo.addPropagator(propagatorTokyo);
 		LatticeListener transportLondon=new LatticeListener(configLondon);

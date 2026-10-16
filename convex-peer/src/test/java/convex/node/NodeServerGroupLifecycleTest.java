@@ -121,7 +121,7 @@ public class NodeServerGroupLifecycleTest {
 		CountDownLatch release=new CountDownLatch(1);
 		try (MemoryStore store=new MemoryStore();
 				NodeServer<AInteger> node=new NodeServer<>(MaxLattice.create(),store)) {
-			LatticePropagator removed=new LatticePropagator(store,MaxLattice.create(),value -> value) {
+			LatticePropagator removed=new LatticePropagator(store) {
 				@Override public void triggerBroadcast(ACell value) {
 					entered.countDown();
 					try {
@@ -159,7 +159,7 @@ public class NodeServerGroupLifecycleTest {
 		IllegalStateException failure=new IllegalStateException("simulated group shutdown failure");
 		try (MemoryStore store=new MemoryStore();
 				NodeServer<AInteger> node=new NodeServer<>(MaxLattice.create(),store)) {
-			LatticePropagator broken=new LatticePropagator(store,MaxLattice.create(),value -> value) {
+			LatticePropagator broken=new LatticePropagator(store) {
 				@Override public void close() {
 					super.close();
 					throw failure;
@@ -184,7 +184,7 @@ public class NodeServerGroupLifecycleTest {
 		CompletableFuture<ACell> acquired=new CompletableFuture<>();
 		try (MemoryStore store=new MemoryStore();
 				NodeServer<AInteger> node=new NodeServer<>(MaxLattice.create(),store)) {
-			LatticePropagator group=new LatticePropagator(store,MaxLattice.create(),value -> value) {
+			LatticePropagator group=new LatticePropagator(store) {
 				@Override public CompletableFuture<ACell> pull(Convex peer) {
 					return acquired;
 				}
@@ -208,6 +208,6 @@ public class NodeServerGroupLifecycleTest {
 	}
 
 	private static LatticePropagator group(AStore store) {
-		return new LatticePropagator(store,MaxLattice.create(),value -> value);
+		return new LatticePropagator(store);
 	}
 }
