@@ -92,7 +92,7 @@ Convex DB supports standard SQL via Apache Calcite:
 
 ### Transactions
 
-JDBC transaction support uses Convex's lattice cursor fork/sync model:
+JDBC transaction support uses Convex's lattice component fork/sync model:
 
 ```java
 conn.setAutoCommit(false);

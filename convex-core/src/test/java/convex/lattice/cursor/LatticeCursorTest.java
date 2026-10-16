@@ -785,7 +785,7 @@ public class LatticeCursorTest {
 	 * Tests concurrent modifications from multiple sources:
 	 * - Direct root modifications
 	 * - PathCursor modifications
-	 * - Forked cursor modifications with sync
+	 * - Component working-state modifications with sync
 	 *
 	 * Uses a MapLattice<Keyword, SetLattice<CVMLong>> to test that modifications
 	 * to one key don't overwrite modifications to other keys.
@@ -1021,12 +1021,13 @@ public class LatticeCursorTest {
 		assertTrue(finalB.contains(CVMLong.create(20)), ":b should have 20");
 	}
 
-	// ===== Child cursor fork/sync tests =====
+	// ===== Child component fork/sync tests =====
 
 	/**
-	 * Tests that forking descended cursors at different positions and syncing
-	 * each preserves all changes. The sync goes through assocIn on the parent,
-	 * so modifications at one key must not clobber modifications at another.
+	 * Tests that component working state over descended cursors at different
+	 * positions, each synced, preserves all changes. The sync goes through assocIn
+	 * on the parent, so modifications at one key must not clobber modifications at
+	 * another.
 	 */
 	@Test
 	public void testDescendedForkSyncPreservesSiblings() {
@@ -1065,7 +1066,7 @@ public class LatticeCursorTest {
 	}
 
 	/**
-	 * Tests null-lattice descended cursor fork/sync: sync should write back
+	 * Tests component fork/sync over a descended cursor: sync should write back
 	 * only at the descended path, preserving sibling changes in the parent.
 	 *
 	 * Uses a two-level map where the inner map has no sub-lattice. Navigating

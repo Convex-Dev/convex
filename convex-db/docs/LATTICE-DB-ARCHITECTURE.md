@@ -40,9 +40,9 @@ The returned component wraps the descended cursor. This is the same pattern as
 
 The component-parent chain is deliberately separate from the cursor-parent chain.
 Calling `persist()` delegates from `SQLTable` through `SQLSchema`, `SQLDatabase`
-and `ConvexDB` to `LatticeHost` without changing or synchronising any cursor. A fork keeps the
-same containing component parent while its forked cursor synchronises to the live
-cursor it came from.
+and `ConvexDB` to `LatticeHost` without changing or synchronising any cursor. A fork is
+a component with its own working state; its sync reconciles that state into the live
+cursor it came from under the database lattice.
 
 ## Cursor Descent
 
@@ -80,11 +80,11 @@ reads see the snapshot at fork time, and all writes accumulate locally.
 
 ### Why this works
 
-The transaction uses a forked cursor — a separate `AtomicReference` that
-snapshots the database value at fork time, created with the database lattice as its
-merge function. `sync()` merges the local value into the parent with that lattice,
-which merges at each level of the tree. No locks, no conflict detection — the lattice algebra guarantees
-convergence.
+The transaction is a component fork: a `SQLDatabase` with its own working state,
+snapshotting the database value at fork time, whose destination is the live cursor.
+`sync()` merges the working value into the destination with the database lattice,
+which merges at each level of the tree. No locks, no conflict detection: the lattice
+algebra guarantees convergence.
 
 ```java
 ConvexDB cdb = ConvexDB.connect(server.getHost());

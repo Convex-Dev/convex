@@ -177,8 +177,12 @@ CAD text affected:
 - CAD045 *Fork and Sync*: "`cursor.fork()` creates an isolated working copy"; "Sync
   always succeeds when a lattice is present."
 
-Proposed wording: a fork is created with the merge function of its position; sync on
-such a fork always succeeds. Whether a merge-less fork exists depends on the decision.
+Proposed wording: cursors neither fork nor sync. A fork is a component with its own
+working state, reconciled under the component's lattice when it publishes, so sync
+on a fork always succeeds. CAD035 *Forkable Cursor* (initial value, compare-and-set
+merge, lattice-merge sync) and CAD024 *Cursor Sync Guarantees* (`onSync`,
+`ForkedLatticeCursor.sync()`) describe a removed model and move to CAD045 *Fork and
+Sync* at the component level.
 
 ## 6. Root publication seam needs a merge to absorb a racing write
 
