@@ -142,17 +142,29 @@ write unless its shape is structural.
 
 **Status:** Decision needed.
 
-`fork(merge)` records the merge; `sync()` converges with the parent however it has
-moved, with the fork's edits in the own position. `fork()` with no argument still
-exists and means write-back: a parent that changed in between is overwritten. Every
-component passes its lattice, and the javadoc states the hazard.
+Two forks exist. A component fork (`Social.fork()`, `LatticeKV.fork()`, a
+`DLFSDrive` fork) is a new component whose working root publishes into the parent's
+cursor as its destination; its `sync()` reconciles under the component's lattice,
+own wins ties, and retries if the destination moved. A bare cursor fork,
+`AForkableCursor.fork()`, returns a `ForkedCursor` whose `sync()` writes the fork's
+snapshot over the parent unconditionally: a parent that changed in between is
+overwritten, with no signal. The javadoc states the hazard. Before Stage B the
+cursor carried its lattice and `fork()` could merge; Stage B moved reconciliation to
+components and left `fork()` with overwrite semantics only.
 
-Evidence for removing the bare form: `LatticeKVTest.testConcurrentCounterMerge`
-forked two replicas with the bare call and the second sync silently overwrote the
-first, caught only because the test counted. A forgotten argument is the most likely
-way a future component loses data. Alternatives: remove `fork()` and require an
-explicit null or a named write-back constant, or keep it for lattice-free scratch
-roots.
+Evidence (16 October 2026, from a compiler probe over the whole tree): no main code
+calls the bare form; every `.fork()` in main is a component fork or the unrelated CVM
+`Context.fork`. Three tests call it (`TransactionalComponentTest` twice,
+`StampedCursorTest` once) and none depends on overwriting a changed parent: one uses
+a raw fork as scratch under a component view and writes back, one checks the
+exclusive-transaction capability follows a fork, one checks a raw fork adopts the
+stamped value its destination view prepared. That last behaviour lives in
+`ForkedCursor.sync()` today and would need a home if the class went. Decision 15
+sharpens the question: every publisher must assume its destination changed under
+it, and this is the one publish path that does not. Alternatives: remove `fork()`
+and move the three tests to component forks or `Transactions.transact`; keep it
+under a name that says overwrite, so a forgotten lattice cannot pass for a merge; or
+leave it on javadoc alone.
 
 CAD text affected:
 
