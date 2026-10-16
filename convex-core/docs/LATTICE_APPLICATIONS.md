@@ -1049,10 +1049,13 @@ Worked examples:
 - The [reading-list network example](../../convex-peer/src/test/java/convex/node/app/ReadingListApplicationTest.java):
   applications assembled before node launch, recommendations delivered over a real
   connection.
-- [SharedApplicationsTest](../../convex-integration/src/test/java/convex/lattice/SharedApplicationsTest.java):
-  Social + P2P and DLFS + P2P on one host with one live application receiving
-  incoming values; Social and Files stage their own regions, P2P stays live, and
-  the data survives reopening.
+- [SharedApplicationsExample](../../convex-integration/src/test/java/convex/lattice/SharedApplicationsExample.java),
+  runnable from `main`, with its [stories](../../convex-integration/src/test/java/convex/lattice/SharedApplicationsTest.java):
+  a social feed and a file store as two applications live at one host root, each
+  with its own lattice, each staging its own region, both receiving incoming
+  values. A second node pulls the root, pending edits stay private until their
+  owner publishes, the applications never disturb each other's regions, and
+  everything survives reopening the store.
 
 ## Checklist
 

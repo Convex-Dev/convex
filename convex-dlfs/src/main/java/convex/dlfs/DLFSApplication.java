@@ -98,13 +98,23 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 	}
 
 	/**
-	 * Returns the component representing one owner's named drives.
+	 * Returns the region whose drives this application serves. The default is the
+	 * live region in the host root; an application that stages its region overrides
+	 * this to serve drives from the staged copy, so edits stay private until it syncs.
+	 */
+	protected DLFSRegion region() {
+		return dlfs();
+	}
+
+	/**
+	 * Returns the component representing one owner's named drives, from the region
+	 * selected by {@link #region()}.
 	 *
 	 * @param owner Drive owner
 	 * @return Owner-scoped drives component
 	 */
 	public DLFSDrives drives(AccountKey owner) {
-		return dlfs().drives(owner);
+		return region().drives(owner);
 	}
 
 }
