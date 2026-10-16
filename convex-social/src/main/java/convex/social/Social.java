@@ -10,6 +10,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.LatticeContext;
@@ -152,62 +153,50 @@ public class Social extends ALatticeComponent<
 	}
 
 	/**
-	 * Connects to an existing root cursor by navigating to {@code :social}.
+	 * Connects the social component to the cursor at its own level, the owner map
+	 * under {@code :social}. The application that owns the root hands this cursor
+	 * down; the component navigates no further up. Policy starts empty.
 	 *
-	 * <p>The root cursor is typically held by a {@code NodeServer} for lattice
-	 * push/pull. Writes through this Social instance propagate up to the root.</p>
-	 *
-	 * @param rootCursor Root cursor (e.g. from NodeServer)
-	 * @param keyPair Key pair for signing updates
-	 * @return Social instance connected to the root cursor
-	 */
-	public static Social connect(AForkableCursor<?> rootCursor, AKeyPair keyPair) {
-		return connect(rootCursor,LatticeContext.create(
-			null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
-	}
-
-	/** Connects to an existing root cursor using an application context policy. */
-	public static Social connect(AForkableCursor<?> rootCursor,LatticeContext context) {
-		AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
-			resolve(rootCursor,convex.lattice.generic.KeyedLattice.create(KEY_SOCIAL,SOCIAL_LATTICE),KEY_SOCIAL);
-		Social social=new Social(socialCursor);
-		social.setContext(context);
-		return social;
-	}
-
-	/**
-	 * Connects to the {@code :social} region beneath a containing component,
-	 * navigating from its cursor with a signing policy for this instance.
-	 *
-	 * @param parent Containing lattice component
-	 * @param keyPair Key pair for signing updates
-	 * @return Social instance connected beneath the containing component
-	 */
-	public static Social connect(ALatticeComponent<?> parent, AKeyPair keyPair) {
-		return connect(parent,LatticeContext.create(
-			null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
-	}
-
-	/** Connects beneath a component using an explicit application policy. */
-	public static Social connect(ALatticeComponent<?> parent,LatticeContext context) {
-		Social social=connect(parent);
-		social.setContext(context);
-		return social;
-	}
-
-	/**
-	 * Connects to the {@code :social} region beneath a containing component,
-	 * resolving its component policy at construction.
-	 *
-	 * @param parent Containing application component
+	 * @param socialCursor Cursor at the {@code :social} owner map
 	 * @return Social region component
 	 */
-	public static Social connect(ALatticeComponent<?> parent) {
-		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
-			resolve(parent.cursor(),convex.lattice.generic.KeyedLattice.create(KEY_SOCIAL,SOCIAL_LATTICE),KEY_SOCIAL);
-		Social social=new Social(socialCursor);
-		social.setContext(parent.getContext());
+	public static Social connect(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor) {
+		if (socialCursor==null) throw new IllegalArgumentException("Social cursor must not be null");
+		return new Social(socialCursor);
+	}
+
+	/**
+	 * Connects to the {@code :social} region of an application's root, with a signing
+	 * policy for this instance. The application resolves the region with its own root
+	 * lattice.
+	 *
+	 * @param application Application at the root whose lattice includes {@code :social}
+	 * @param keyPair Key pair for signing updates
+	 * @return Social instance connected beneath the application
+	 */
+	public static Social connect(ALatticeApplication<?> application, AKeyPair keyPair) {
+		return connect(application,LatticeContext.create(
+			null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
+	}
+
+	/** Connects to an application's {@code :social} region using an explicit policy. */
+	public static Social connect(ALatticeApplication<?> application,LatticeContext context) {
+		Social social=connect(application);
+		social.setContext(context);
+		return social;
+	}
+
+	/**
+	 * Connects to the {@code :social} region of an application's root, resolving the
+	 * application's policy at construction.
+	 *
+	 * @param application Application at the root whose lattice includes {@code :social}
+	 * @return Social region component
+	 */
+	public static Social connect(ALatticeApplication<?> application) {
+		if (application==null) throw new IllegalArgumentException("Application must not be null");
+		Social social=connect(application.<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>>resolve(KEY_SOCIAL));
+		social.setContext(application.getContext());
 		return social;
 	}
 

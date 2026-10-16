@@ -41,6 +41,7 @@ import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.dlfs.DLFSServer;
+import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
@@ -64,7 +65,7 @@ public class DLFSComponentTest {
 		var root=LatticeHost.create(lattice.zero(),store);
 		var app=new convex.lattice.ALatticeApplication<Index<Keyword,ACell>>(lattice,root) {};
 		var key=AKeyPair.generate();
-		var attached=DLFSRegion.connect(app.cursor(),lattice,null,projects,project,KEY_DOCUMENTS);
+		var attached=DLFSRegion.connect(app.resolve(projects,project,KEY_DOCUMENTS),null);
 		var destination=attached.cursor();
 		attached.setContext(LatticeContext.create(CVMLong.create(123),key));
 		var files=attached.fork();
@@ -86,7 +87,8 @@ public class DLFSComponentTest {
 		org.junit.jupiter.api.Assertions.assertNull(store.getRootData());
 		root.sync();
 		assertEquals(root.cursor().get(),store.getRootData());
-		var restored=DLFSRegion.connect(root.cursor(),lattice,store,projects,project,KEY_DOCUMENTS);
+		var restored=DLFSRegion.connect(
+			LatticeApplication.live(lattice,root).resolve(projects,project,KEY_DOCUMENTS),store);
 		restored.setContext(files.getContext());
 		assertEquals("embedded subsystem",Files.readString(restored.drives(key.getAccountKey())
 			.drive("home").fileSystem().getPath("/draft.txt")));
@@ -172,7 +174,7 @@ public class DLFSComponentTest {
 
 		CompositeDLFSApplication(LatticeHost<Index<Keyword,ACell>> host) {
 			super(KeyedLattice.create(KEY_DOCUMENTS,DLFSRegion.LATTICE).addLattice(KEY_ARCHIVE,DLFSRegion.LATTICE),host,KEY_DOCUMENTS);
-			this.archive=configured(DLFSRegion.connect(cursor,store(),KEY_ARCHIVE));
+			this.archive=configured(DLFSRegion.connect(resolve(KEY_ARCHIVE),store()));
 		}
 	}
 
@@ -297,7 +299,8 @@ public class DLFSComponentTest {
 		try (EtchStore store=EtchStore.createTemp("dlfs-stream-persist")) {
 			var root=LatticeHost.create(DLFSRegion.LATTICE.zero(),store);
 			root.setContext(LatticeContext.create(null,keyPair));
-			DLFSRegion region=DLFSRegion.connect(root,DLFSRegion.LATTICE);
+			DLFSRegion region=DLFSRegion.connect(root.cursor(),store);
+			region.setContext(root.getContext());
 			DLFSDrive drive=region.drives(keyPair.getAccountKey()).getOrCreateDrive("large");
 			assertTrue(root.cursor().get().get(keyPair.getAccountKey()).checkSignature());
 			var before=root.cursor().get();
@@ -354,7 +357,9 @@ public class DLFSComponentTest {
 			try (EtchStore store=EtchStore.createTemp("dlfs-files-copy")) {
 				var root=LatticeHost.create(DLFSRegion.LATTICE.zero(),store);
 				root.setContext(LatticeContext.create(null,keyPair));
-				var drives=DLFSRegion.connect(root,DLFSRegion.LATTICE).drives(keyPair.getAccountKey()).cursor();
+				var region=DLFSRegion.connect(root.cursor(),store);
+				region.setContext(root.getContext());
+				var drives=region.drives(keyPair.getAccountKey()).cursor();
 				try (var fileSystem=DLFS.connect(drives,Strings.create("large"),store)) {
 					Path target=fileSystem.getPath("/copy.bin");
 

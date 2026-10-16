@@ -20,13 +20,13 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
-import convex.lattice.cursor.AForkableCursor;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.etch.EtchStore;
+import convex.lattice.fs.DLFSLocation;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
@@ -36,52 +36,54 @@ import convex.p2p.P2PLattice;
 import convex.p2p.P2PUser;
 import convex.social.Social;
 
-/** Social + P2P and files + P2P publish independently through one durable, networked host. */
+/** Social + P2P and files + P2P are separate applications on one durable, networked host. */
 public class SharedApplicationsTest {
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(7301);
 	private static final AKeyPair BOB=AKeyPair.createSeeded(7302);
 	private static final AKeyPair SOURCE_NODE=AKeyPair.createSeeded(7304);
 	private static final AKeyPair TARGET_NODE=AKeyPair.createSeeded(7305);
-	// One root application accepts incoming state for all three domains.
-	private static final KeyedLattice ROOT=P2PLattice.ROOT
-		.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE)
+	// Each application declares the regions it understands: the shared P2P regions plus its own.
+	private static final KeyedLattice SOCIAL_ROOT=P2PLattice.ROOT
+		.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
+	private static final KeyedLattice FILES_ROOT=P2PLattice.ROOT
 		.addLattice(Keywords.FS,DLFSRegion.LATTICE);
+	// The propagator still needs one lattice covering everything the node serves.
+	private static final KeyedLattice SERVED=SOCIAL_ROOT.addLattice(Keywords.FS,DLFSRegion.LATTICE);
 	private static final LatticeContext VERIFY=LatticeContext.EMPTY.withOwnerVerifier(
 		(owner,signer) -> owner.equals(DID.forKey(signer)));
 
-	/** Social is staged at its own path; P2P is a live shared view. No whole-root fork. */
-	static final class SocialApp {
-		private final AForkableCursor<Index<Keyword,ACell>> root;
-		private final LatticeContext context;
+	/** Live at the root for incoming values and P2P; the social region is staged. */
+	static final class SocialApp extends ALatticeApplication<Index<Keyword,ACell>> {
 		private final Social social;
 
 		SocialApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long timestamp) {
-			root=host.cursor();
-			context=VERIFY.withSigningKey(user).withTimestamp(CVMLong.create(timestamp));
-			social=Social.connect(root,context).fork();
+			super(SOCIAL_ROOT,host.cursor());
+			setContext(VERIFY.withSigningKey(user).withTimestamp(CVMLong.create(timestamp)));
+			social=Social.connect(this).fork();
 		}
 		Social social() { return social; }
-		P2PUser p2p(AccountKey owner) { return P2PUser.create(root,owner,context); }
-		void sync() { social.sync(); }
+		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner); }
+		/** Publishes the staged social region; the live root itself has nothing to publish. */
+		@Override public Index<Keyword,ACell> sync() { social.sync(); return super.sync(); }
 	}
 
-	/** Files have their own publication boundary and share the same live P2P paths. */
-	static final class FilesApp {
-		private final AForkableCursor<Index<Keyword,ACell>> root;
-		private final LatticeContext context;
+	/** Live at the root for incoming values and P2P; the files region is staged. */
+	static final class FilesApp extends ALatticeApplication<Index<Keyword,ACell>> {
+		private final DLFSRegion live;
 		private final DLFSRegion files;
 
 		FilesApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long timestamp) {
-			root=host.cursor();
-			context=VERIFY.withSigningKey(user).withTimestamp(CVMLong.create(timestamp));
-			// Explicit store access is for large-file blob checkpoints, not root publication.
-			var live=DLFSRegion.connect(root,host.store(),Keywords.FS);
-			live.setContext(context);
+			super(FILES_ROOT,host.cursor());
+			setContext(VERIFY.withSigningKey(user).withTimestamp(CVMLong.create(timestamp)));
+			// The store is for large-file blob checkpoints, not root publication.
+			live=DLFSRegion.connect(resolve(Keywords.FS),host.store(),DLFSLocation.at(cursor,Keywords.FS));
+			live.setContext(getContext());
 			files=live.fork();
 		}
+		DLFSRegion live() { return live; }
 		DLFSDrives drives(AccountKey owner) { return files.drives(owner); }
-		P2PUser p2p(AccountKey owner) { return P2PUser.create(root,owner,context); }
-		void sync() { files.sync(); }
+		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner); }
+		@Override public Index<Keyword,ACell> sync() { files.sync(); return super.sync(); }
 	}
 
 	/** Assembly and resource ownership stay outside the domain applications. */
@@ -102,12 +104,13 @@ public class SharedApplicationsTest {
 			host.setContext(VERIFY);
 			social=new SocialApp(host,ALICE,timestamp);
 			files=new FilesApp(host,BOB,timestamp);
-			// Domain applications observe this root; incoming values are merged once.
-			host.configureApplications(List.of(LatticeApplication.live(ROOT,host)));
+			// The host hands every incoming value to both applications. Each merges the
+			// regions its lattice declares into the shared root and leaves the rest alone.
+			host.configureApplications(List.of(social,files));
 
 			var config=NodeConfig.localNetwork(); // Ephemeral port; no background discovery required.
 			node=new NodeServer<>(host,config);
-			propagation=new LatticePropagator(servingStore,ROOT,value -> value);
+			propagation=new LatticePropagator(servingStore,SERVED,value -> value);
 			propagation.setMergeContext(VERIFY);
 			propagation.setTransportKeyPair(transportKey);
 			node.addPropagator(propagation);
@@ -170,8 +173,8 @@ public class SharedApplicationsTest {
 			var localDrive=target.files.drives(BOB.getAccountKey()).createDrive("home");
 			var localFileSystem=localDrive.fileSystem();
 			Files.writeString(localFileSystem.getPath("/local.txt"),"A pending local file");
-			var liveFeed=Social.connect(target.host).user(ALICE.getAccountKey()).feed();
-			var liveFiles=DLFSRegion.connect(target.host,ROOT,Keywords.FS);
+			var liveFeed=Social.connect(target.social).user(ALICE.getAccountKey()).feed();
+			var liveFiles=target.files.live();
 			var livePeer=target.files.p2p(ALICE.getAccountKey()).node();
 			assertNull(liveFeed.getPost(localPost));
 			assertNull(livePeer.getNodeInfo());
@@ -179,6 +182,10 @@ public class SharedApplicationsTest {
 			try (var peer=ConvexRemote.connect(source.listener.getHostAddress())) {
 				target.propagation.addPeer(SOURCE_NODE.getAccountKey(),peer).get(10,TimeUnit.SECONDS);
 				target.node.pull(target.propagation,peer).get(10,TimeUnit.SECONDS);
+				// Each application admitted its own region from the one incoming root;
+				// together they reproduce the source root without a composed receiver.
+				assertNotNull(target.host.cursor().get().get(Social.KEY_SOCIAL),"the social application admitted :social");
+				assertNotNull(target.host.cursor().get().get(Keywords.FS),"the files application admitted :fs");
 				assertEquals(source.host.cursor().get(),target.host.cursor().get());
 
 				// The next envelope contains the first post plus another: its signature is reusable.

@@ -87,6 +87,11 @@ public class SharedApplicationInternalsTest {
 	private static final LatticeContext VERIFY=LatticeContext.EMPTY.withOwnerVerifier(
 		(owner,signer) -> owner.equals(DID.forKey(signer)));
 
+	/** A live view of the whole host root, as a root application holds it. */
+	private static LatticeApplication<Index<Keyword,ACell>> view(LatticeHost<Index<Keyword,ACell>> host) {
+		return LatticeApplication.live(HOST_ROOT,host);
+	}
+
 	/** Applications choose working-state policy; ordinary domain views need no fork. */
 	private static final class WorkingApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		final SignedComponent<Index<Keyword,ACell>> socialState;
@@ -164,7 +169,7 @@ public class SharedApplicationInternalsTest {
 		Blob b=second.social.feed().post("Second application");
 		first.sync();
 		second.sync();
-		var published=Social.connect(host).user(SOCIAL_KEY.getAccountKey()).feed();
+		var published=Social.connect(view(host)).user(SOCIAL_KEY.getAccountKey()).feed();
 		assertNotNull(published.getPost(a));
 		assertNotNull(published.getPost(b));
 		assertEquals(2,published.count());
@@ -198,11 +203,11 @@ public class SharedApplicationInternalsTest {
 		assertEquals(2,signatures.get(),"One signature per changed owner subtree");
 		assertNull(host.cursor().get().get(Keywords.FS));
 		filesApp.sync();
-		assertNotNull(Social.connect(host).user(SOCIAL_KEY.getAccountKey()).feed().getPost(post));
-		assertEquals("working file",Files.readString(DLFSRegion.connect(host,HOST_ROOT,Keywords.FS)
+		assertNotNull(Social.connect(view(host)).user(SOCIAL_KEY.getAccountKey()).feed().getPost(post));
+		assertEquals("working file",Files.readString(DLFSRegion.connect(view(host).resolve(Keywords.FS),host.store())
 			.drives(FILES_KEY.getAccountKey()).drive("home").fileSystem().getPath("/hello.txt")));
-		assertEquals(info,P2PUser.create(host,COMMON_KEY.getAccountKey()).node().getNodeInfo());
-		assertEquals(info,P2PUser.create(host,FILES_KEY.getAccountKey()).node().getNodeInfo());
+		assertEquals(info,P2PUser.create(view(host),COMMON_KEY.getAccountKey()).node().getNodeInfo());
+		assertEquals(info,P2PUser.create(view(host),FILES_KEY.getAccountKey()).node().getNodeInfo());
 		assertEquals(4,signatures.get(),"Root publication needs no additional signatures");
 		socialApp.sync();
 		filesApp.sync();

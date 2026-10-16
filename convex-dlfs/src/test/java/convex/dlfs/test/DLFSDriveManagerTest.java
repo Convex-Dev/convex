@@ -296,7 +296,9 @@ public class DLFSDriveManagerTest {
 				new NodeServer<>(lattice,store,NodeConfig.port(-1));
 			first.launch();
 			try {
-				DLFSDriveManager manager=new DLFSDriveManager(DLFSDrives.connect(first.getHost()));
+				var drives=DLFSDrives.connect(first.getHost().cursor(),store);
+				drives.setContext(first.getHost().getContext());
+				DLFSDriveManager manager=new DLFSDriveManager(drives);
 				assertTrue(manager.createDrive(null, "home"));
 				Files.writeString(manager.getDrive(null, "home").getPath("/hello.txt"), "after restart");
 				manager.sync();
@@ -308,7 +310,9 @@ public class DLFSDriveManagerTest {
 				new NodeServer<>(lattice,store,NodeConfig.port(-1));
 			restored.launch();
 			try {
-				DLFSDriveManager manager=new DLFSDriveManager(DLFSDrives.connect(restored.getHost()));
+				var drives=DLFSDrives.connect(restored.getHost().cursor(),store);
+				drives.setContext(restored.getHost().getContext());
+				DLFSDriveManager manager=new DLFSDriveManager(drives);
 				assertEquals(List.of("home"), manager.listDrives(null));
 				assertEquals("after restart",
 					Files.readString(manager.getDrive(null, "home").getPath("/hello.txt")));

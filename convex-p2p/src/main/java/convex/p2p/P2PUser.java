@@ -6,13 +6,16 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
+import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Convenience facade over a single P2P user's independently located components.
  *
- * <p>Obtained from {@link P2PNode#p2p(AccountKey)}. {@link #cursor()} returns a cursor
+ * <p>Obtained from {@link P2PApplication#p2p(AccountKey)} or
+ * {@link P2PNode#p2p(AccountKey)}. {@link #cursor()} returns a cursor
  * rooted at that user's identity slot — {@code [:id <userKey> :value]} — already through
  * the signing boundary. {@link #identity()} and {@link #node()} expose the two
  * path-specific components. This facade deliberately is not an
@@ -56,42 +59,26 @@ public class P2PUser {
 	}
 
 	/**
-	 * Creates a user view over a P2P root cursor.
+	 * Creates a user facade over an application whose root lattice includes the P2P
+	 * regions. The application navigates to the identity and node-record slots and
+	 * supplies the signing policy; a policy without a signer for this user yields a
+	 * read view.
 	 *
-	 * <p>The no-policy overload creates a read view. Use the explicit-policy overload
-	 * or a containing component to supply signing capabilities.
-	 *
-	 * @param rootCursor Cursor at the {@link P2PLattice#ROOT} level
-	 * @param userKey The P2P user's account key
-	 * @return A view of that user's owned area
-	 */
-	public static P2PUser create(AForkableCursor<?> rootCursor, AccountKey userKey) {
-		return create(rootCursor,userKey,convex.lattice.LatticeContext.EMPTY);
-	}
-
-	public static P2PUser create(AForkableCursor<?> rootCursor, AccountKey userKey, convex.lattice.LatticeContext context) {
-		if (rootCursor == null) throw new IllegalArgumentException("Root cursor must not be null");
-		if (userKey == null) throw new IllegalArgumentException("User key must not be null");
-
-		P2PUser user=new P2PUser(
-			new P2PIdentity(P2PApplication.identitySlot(rootCursor,userKey,context),userKey),
-			new P2PNodeRecord(P2PApplication.nodeSlot(rootCursor,userKey,context),userKey),
-			userKey);
-		user.identity.setContext(context);
-		user.node.setContext(context);
-		return user;
-	}
-
-	/**
-	 * Creates a user facade over a containing application component's cursor.
-	 *
-	 * @param parent Containing application component at the P2P root level
+	 * @param application Application at the root whose lattice declares the P2P regions
 	 * @param userKey P2P user key
 	 * @return P2P user facade
 	 */
-	public static P2PUser create(ALatticeComponent<?> parent, AccountKey userKey) {
-		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		return create(parent.cursor(),userKey,parent.getContext());
+	public static P2PUser create(ALatticeApplication<?> application, AccountKey userKey) {
+		if (application==null) throw new IllegalArgumentException("Application must not be null");
+		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
+		P2PUser user=new P2PUser(
+			new P2PIdentity(P2PApplication.identitySlot(application,userKey),userKey),
+			new P2PNodeRecord(P2PApplication.nodeSlot(application,userKey),userKey),
+			userKey);
+		LatticeContext context=application.getContext();
+		user.identity.setContext(context);
+		user.node.setContext(context);
+		return user;
 	}
 
 	/** Returns the path-specific identity component. */

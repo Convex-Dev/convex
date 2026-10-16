@@ -24,6 +24,7 @@ import convex.social.SocialHelpers;
 final class SocialReplicationPolicy {
 
 	private final NodeServer<Index<Keyword,ACell>> server;
+	private final P2PApplication application;
 	private final DIDKeyAuthorizer authorizer;
 	private final Set<AString> localUsers=ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<AString,AKeyPair> localSigners=
@@ -32,9 +33,10 @@ final class SocialReplicationPolicy {
 	private final ConcurrentHashMap<AString,AccountKey> validatedKeys=
 		new ConcurrentHashMap<>();
 
-	SocialReplicationPolicy(NodeServer<Index<Keyword,ACell>> server,
+	SocialReplicationPolicy(NodeServer<Index<Keyword,ACell>> server,P2PApplication application,
 			DIDKeyAuthorizer authorizer) {
 		this.server=server;
+		this.application=application;
 		this.authorizer=authorizer;
 	}
 
@@ -144,7 +146,7 @@ final class SocialReplicationPolicy {
 		boolean changed=false;
 		for (var entry:localSigners.entrySet()) {
 			AString localDid=entry.getKey();
-			Social social=Social.connect(server.getHost(),
+			Social social=Social.connect(application,
 				convex.lattice.LatticeContext.create(
 					null,entry.getValue(),authorizer::verifiesOwner));
 			Follows follows=social.user(localDid).follows();
@@ -160,7 +162,7 @@ final class SocialReplicationPolicy {
 	}
 
 	private boolean hasCachedFollowKey(AString target,AccountKey signer) {
-		Social social=Social.connect(server.getHost());
+		Social social=Social.connect(application);
 		for (AString local:localUsers) {
 			Follows follows=social.user(local).follows();
 			if (!follows.isFollowing(target)) continue;

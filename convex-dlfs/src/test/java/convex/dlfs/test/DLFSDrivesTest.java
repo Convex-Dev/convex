@@ -96,7 +96,8 @@ public class DLFSDrivesTest {
 		var host=LatticeHost.create(DLFSDrives.LATTICE.zero(),new MemoryStore());
 		var context=LatticeContext.create(CVMLong.create(123),null);
 		host.setContext(context);
-		var drives=DLFSDrives.connect(host);
+		var drives=DLFSDrives.connect(host.cursor(),host.store());
+		drives.setContext(host.getContext());
 		assertSame(context,drives.getContext());
 		var drive=drives.getOrCreateDrive("home");
 		assertSame(context,drive.getContext());

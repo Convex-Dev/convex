@@ -3,12 +3,17 @@ package convex.dlfs;
 import java.util.Objects;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.fs.DLFSLocation;
 
 /**
  * Application-level component for a lattice application providing DLFS.
@@ -82,9 +87,14 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 		return store;
 	}
 
-	/** Returns the physical multi-owner DLFS region, navigated with the root lattice. */
+	/**
+	 * Returns the physical multi-owner DLFS region. The application resolves the
+	 * region path with its root lattice and hands the region its cursor together
+	 * with its logical location, so repeated calls identify the same files.
+	 */
 	public DLFSRegion dlfs() {
-		return configured(DLFSRegion.connect(cursor,getLattice(),store,regionPath));
+		AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> region=resolve(regionPath);
+		return configured(DLFSRegion.connect(region,store,DLFSLocation.at(cursor,regionPath)));
 	}
 
 	/**

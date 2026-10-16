@@ -8,9 +8,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.ALattice;
 import convex.lattice.fs.DLFSLocation;
-import convex.lattice.LatticeHost;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.OwnerLattice;
@@ -46,23 +44,9 @@ public final class DLFSRegion extends ALatticeComponent<
 	}
 
 	/**
-	 * Connects a physical DLFS region at a path below a host root, navigated with
-	 * the supplied lattice and checkpointing streamed blob data into the host store.
-	 */
-	public static DLFSRegion connect(LatticeHost<?> host, ALattice<?> lattice, ACell... path) {
-		if (host==null) throw new IllegalArgumentException("Host must not be null");
-		DLFSRegion region=connect(host.cursor(),lattice,host.store(),path);
-		region.setContext(host.getContext());
-		return region;
-	}
-
-	/** Connects a component-defined region while retaining its logical root/path. */
-	public static DLFSRegion connect(AForkableCursor<?> parent,ALattice<?> lattice,AStore store,ACell... path) {
-		return new DLFSRegion(resolve(parent,lattice,path),store,DLFSLocation.at(parent,path));
-	}
-
-	/**
-	 * Connects a physical DLFS region at the position of a cursor.
+	 * Connects a physical DLFS region at the position of a cursor. The application
+	 * that owns the root resolves the region's path and hands the cursor down; the
+	 * region navigates no further up.
 	 *
 	 * @param cursor Cursor at the region
 	 * @param store Store for incremental blob checkpoints, or null for heap-only file data
@@ -75,23 +59,20 @@ public final class DLFSRegion extends ALatticeComponent<
 	}
 
 	/**
-	 * Connects a physical DLFS region at a path below any cursor. Intermediate
-	 * containers must already exist; use the host overload for component-supplied
-	 * construction of missing intermediates.
+	 * Connects a physical DLFS region at the position of a cursor with an explicit
+	 * logical location. Applications supply the location of a region they resolved,
+	 * so that repeated resolutions of the same path identify the same files.
 	 *
-	 * @param parent Cursor to navigate from
+	 * @param cursor Cursor at the region
 	 * @param store Store for incremental blob checkpoints, or null for heap-only file data
-	 * @param path Path from the cursor to the region
+	 * @param location Logical location of the region within the application root
 	 * @return Region component
 	 */
-	@SuppressWarnings("unchecked")
-	public static DLFSRegion connect(AForkableCursor<?> parent, AStore store, ACell... path) {
-		if (parent==null) throw new IllegalArgumentException("Parent cursor must not be null");
-		AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor=
-			(path.length==0)
-				?(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>>)parent
-				:parent.path(path);
-		return new DLFSRegion(cursor,store,DLFSLocation.at(parent,path));
+	public static DLFSRegion connect(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor,
+			AStore store,DLFSLocation location) {
+		if (cursor==null) throw new IllegalArgumentException("Region cursor must not be null");
+		if (location==null) throw new IllegalArgumentException("Region location must not be null");
+		return new DLFSRegion(cursor,store,location);
 	}
 
 	/**

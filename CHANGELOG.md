@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom node applications are assembled on an initialised host before `NodeServer.launch()`; the application-factory launch overload and NodeServer lattice accessor are removed. The lattice-taking node constructor installs a standard live application.
 
 - Renamed the application host to `LatticeHost`; NodeServer exposes it through `getHost()`. Application constructors and host factories use the new type.
+- Domain components receive the cursor for their level and no longer navigate from a root: the root-cursor factories on `Social`, `DLFSRegion`, `DLFSDrives` and `P2PUser` are removed. Applications resolve region paths with their own lattice (`Social.connect(application)`, `DLFSApplication.dlfs()`, `P2PApplication.p2p()`), and P2P node discovery takes its policy from the P2P application rather than the node.
 - NodeServer aborts startup if its retained root cannot be read, avoiding publication of a replacement root after failed restoration.
 - Standalone path merges enforce legacy owner authorisation at signed slots and reject incoming paths inside signed envelopes.
 - Component publication now belongs to the component: `sync()` updates only its supplied destination cursor and returns the published snapshot. Lightweight views do not publish enclosing state, and working/host cursors no longer invoke component callbacks. NodeServer callers publish through `getHost().sync()`. DLFS applications require explicit host assembly; service wiring supplies any completion/publication callback.
@@ -46,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A staged lattice application whose lattice declares only some of the root's regions no longer overwrites or removes the host's other regions when it publishes; undeclared regions adopt the host's value.
 - Reading an unset store root handles a null root hash, including explicitly supplied `NullStore` instances.
 - Big-integer sign queries handle empty zero representations and positive values with a leading sign byte consistently before and after Java value materialisation.
 - DLFS copies and moves work across drives and with other NIO providers; separate views of the same working drive support atomic rename and same-file detection.

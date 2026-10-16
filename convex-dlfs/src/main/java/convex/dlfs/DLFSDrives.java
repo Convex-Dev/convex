@@ -14,7 +14,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeHost;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -63,15 +62,17 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	}
 
 	/**
-	 * Connects one owner's drives at the host root, checkpointing streamed
-	 * blob data into the host store.
+	 * Connects one owner's drive map at the position of a cursor, checkpointing
+	 * streamed blob data into the supplied store. The owning component hands the
+	 * cursor down; set the context explicitly when the owner's policy should apply.
+	 *
+	 * @param cursor Cursor at the drive map
+	 * @param store Store for incremental blob checkpoints, or null for heap-only file data
+	 * @return Drives component
 	 */
-	public static DLFSDrives connect(LatticeHost<?> host) {
-		if (host==null) throw new IllegalArgumentException("Host must not be null");
-		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=resolve(host.cursor(),LATTICE);
-		DLFSDrives component=new DLFSDrives(cursor,host.store(),DLFSLocation.at(host.cursor()));
-		component.setContext(host.getContext());
-		return component;
+	public static DLFSDrives connect(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,AStore store) {
+		if (cursor==null) throw new IllegalArgumentException("Drives cursor must not be null");
+		return new DLFSDrives(cursor,store);
 	}
 
 	/** Creates an isolated temporary multi-drive working component. */

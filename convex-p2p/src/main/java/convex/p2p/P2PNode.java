@@ -116,7 +116,7 @@ public class P2PNode implements Closeable {
 		this.application=P2PApplication.connect(lattice,server.getHost());
 		this.keyPair = keyPair;
 		this.didAuthorizer=didAuthorizer;
-		this.socialPolicy=new SocialReplicationPolicy(server,didAuthorizer);
+		this.socialPolicy=new SocialReplicationPolicy(server,application,didAuthorizer);
 		this.nodeDirectory=new NodeDirectory(server,application,propagator,transport,config,keyPair);
 		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,nodeDirectory);
 		propagator.setIngressFilter(socialPolicy::filterIngress);

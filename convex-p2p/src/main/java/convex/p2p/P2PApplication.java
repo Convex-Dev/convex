@@ -8,6 +8,7 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
@@ -45,32 +46,40 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	/** Returns the component representing one P2P user's owned regions. */
 	public P2PUser p2p(AccountKey userKey) {
-		return P2PUser.create(cursor,userKey,getContext());
+		return P2PUser.create(this,userKey);
 	}
 
 	/** Returns the component at one user's identity slot, wrapped in its signing boundary. */
 	public P2PIdentity identity(AccountKey userKey) {
 		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		return configured(new P2PIdentity(identitySlot(cursor,userKey,getContext()),userKey));
+		return configured(new P2PIdentity(identitySlot(this,userKey),userKey));
 	}
 
 	/** Returns the component at one user's node-record slot, wrapped in its signing boundary. */
 	public P2PNodeRecord node(AccountKey userKey) {
 		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		return configured(new P2PNodeRecord(nodeSlot(cursor,userKey,getContext()),userKey));
+		return configured(new P2PNodeRecord(nodeSlot(this,userKey),userKey));
 	}
 
-	/** Cursor at {@code [:id owner :value]}: the {@code :id} level declared, the owner slot signed. */
-	static AForkableCursor<ACell> identitySlot(AForkableCursor<?> root, AccountKey userKey, convex.lattice.LatticeContext context) {
-		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> ids=resolve(root,P2PLattice.ROOT,P2PLattice.KEY_ID);
+	/**
+	 * Cursor at {@code [:id owner :value]}. The application navigates to the
+	 * {@code :id} level with its own root lattice; this component owns that level,
+	 * so it wraps the owner's slot in the signing boundary bound to the
+	 * application's policy.
+	 */
+	static AForkableCursor<ACell> identitySlot(ALatticeApplication<?> application, AccountKey userKey) {
+		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> ids=application.resolve(P2PLattice.KEY_ID);
 		var rule=P2PLattice.ID_LATTICE.signingFor(userKey);
+		LatticeContext context=application.getContext();
 		return SignedCursor.create(resolve(ids,P2PLattice.ID_LATTICE,userKey),v -> rule.sign(context,v));
 	}
 
-	/** Cursor at {@code [:p2p :nodes owner :value]}: both levels declared, the owner slot signed. */
-	static AForkableCursor<ACell> nodeSlot(AForkableCursor<?> root, AccountKey userKey, convex.lattice.LatticeContext context) {
-		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=resolve(root,P2PLattice.ROOT,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+	/** Cursor at {@code [:p2p :nodes owner :value]}, navigated and signed the same way. */
+	static AForkableCursor<ACell> nodeSlot(ALatticeApplication<?> application, AccountKey userKey) {
+		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=
+			application.resolve(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		var rule=P2PLattice.NODES_LATTICE.signingFor(userKey);
+		LatticeContext context=application.getContext();
 		return SignedCursor.create(resolve(nodes,P2PLattice.NODES_LATTICE,userKey),v -> rule.sign(context,v));
 	}
 }

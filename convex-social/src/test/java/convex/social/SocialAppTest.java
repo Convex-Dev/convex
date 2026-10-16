@@ -23,10 +23,9 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ALatticeComponent;
+import convex.lattice.ALatticeApplication;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerLattice;
@@ -53,10 +52,10 @@ public class SocialAppTest {
 		};
 	}
 
-	/** A containing component at the root level, as an application would be. */
-	private static class TestRoot extends ALatticeComponent<Index<Keyword, ACell>> {
+	/** An application at the root level over an in-memory root. */
+	private static class TestRoot extends ALatticeApplication<Index<Keyword, ACell>> {
 		TestRoot(KeyedLattice lattice) {
-			super(Cursors.root(lattice.zero()));
+			super(lattice,Cursors.root(lattice.zero()));
 		}
 	}
 
@@ -358,11 +357,11 @@ public class SocialAppTest {
 	public void testConnectToRootCursor() {
 		AKeyPair kp = AKeyPair.generate();
 
-		// Simulate a root lattice with :social
+		// An application at the root declares :social and hands the region its cursor
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		AForkableCursor<?> rootCursor = Cursors.root(root.zero());
+		TestRoot application = new TestRoot(root);
 
-		Social social = Social.connect(rootCursor, kp);
+		Social social = Social.connect(application, kp);
 
 		Feed feed = social.user(kp.getAccountKey()).feed();
 		Blob key = feed.post("Connected post");
@@ -377,13 +376,13 @@ public class SocialAppTest {
 		AKeyPair kp = AKeyPair.generate();
 
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		AForkableCursor<?> rootCursor = Cursors.root(root.zero());
+		TestRoot application = new TestRoot(root);
 
-		Social social = Social.connect(rootCursor, kp);
+		Social social = Social.connect(application, kp);
 		social.user(kp.getAccountKey()).feed().post("Propagated");
 
-		// Root cursor should have the data
-		ACell rootValue = rootCursor.get();
+		// The application's root should have the data
+		ACell rootValue = application.cursor().get();
 		assertNotNull(rootValue, "Root cursor should contain data after post");
 	}
 
