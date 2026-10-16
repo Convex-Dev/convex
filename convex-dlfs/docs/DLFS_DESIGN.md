@@ -504,10 +504,10 @@ any nested lattice path without depending on NodeServer:
 KeyedLattice lattice = KeyedLattice.create(
     Keyword.intern("documents"), DLFSRegion.LATTICE);
 NodeServer<Index<Keyword, ACell>> node =
-    new NodeServer<>(lattice, store);
+    new NodeServer<>(RelayHost.open(lattice, store, null));
 node.launch();
 
-DLFSApplication<Index<Keyword, ACell>> app = DLFSApplication.connect(Lattice.ROOT,
+DLFSApplication<Index<Keyword, ACell>> app = DLFSApplication.connect(lattice,
     node.getHost(), Keyword.intern("documents"));
 DLFSDrives drives = app.drives(ownerKey);
 DLFSDrive drive = drives.createDrive("home");

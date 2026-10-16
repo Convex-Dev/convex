@@ -131,7 +131,6 @@ public final class SharedApplicationsExample {
 		private final NodeServer<Index<Keyword,ACell>> server;
 		private final LatticePropagator propagation;
 		private final LatticeListener listener;
-		private final EtchStore servingStore;
 		private final AKeyPair nodeKey;
 
 		/**
@@ -154,9 +153,8 @@ public final class SharedApplicationsExample {
 
 			var config=NodeConfig.localNetwork();
 			server=new NodeServer<>(host,config);
-			// Replication knows no lattice: it serves whatever the host publishes.
-			servingStore=EtchStore.createTemp("shared-apps-serving");
-			propagation=new LatticePropagator(servingStore);
+			// Replication knows no lattice: it serves whatever the host publishes, from the host's store.
+			propagation=new LatticePropagator(store);
 			propagation.setTransportKeyPair(nodeKey);
 			server.addPropagator(propagation);
 			listener=new LatticeListener(config);
@@ -206,8 +204,7 @@ public final class SharedApplicationsExample {
 			try {
 				listener.close();
 			} finally {
-				try { server.close(); }
-				finally { servingStore.close(); }
+				server.close();
 			}
 		}
 	}

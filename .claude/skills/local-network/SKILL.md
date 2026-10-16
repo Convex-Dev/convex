@@ -110,11 +110,11 @@ For a direct `NodeServer` network test, the minimum composition is explicit:
 ```java
 NodeConfig nodeConfig = NodeConfig.localNetwork();
 LatticePropagatorConfig groupConfig = LatticePropagatorConfig.create();
-NodeServer<V> node = new NodeServer<>(lattice, nodeStore, nodeConfig);
-node.setMergeContext(nodeContext);
-LatticePropagator group = new LatticePropagator(
-    servingStore, lattice, value -> value, groupConfig);
-group.setMergeContext(groupContext);
+// The relay host's live application admits incoming values under nodeContext;
+// the node only replicates what the host publishes.
+NodeServer<V> node = new NodeServer<>(
+    RelayHost.open(lattice, nodeStore, nodeConfig, nodeContext), nodeConfig);
+LatticePropagator group = new LatticePropagator(nodeStore, groupConfig);
 group.setTransportKeyPair(nodeKey);
 node.addPropagator(group);
 LatticeListener transport = new LatticeListener(nodeConfig);

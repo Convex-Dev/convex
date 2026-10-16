@@ -1320,10 +1320,6 @@ public class NodeServerTest {
 		assertNotNull(NodeConfig.validatePublicURL("tcp://peer.example.com", true)); // still missing port
 	}
 
-	/**
-	 * #568: the merge context is configuration-only — setMergeContext is allowed before
-	 * launch() but rejected once the node is running.
-	 */
 	@Test
 	public void testLatticeHostSyncPersistsBeforeLaunch() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));

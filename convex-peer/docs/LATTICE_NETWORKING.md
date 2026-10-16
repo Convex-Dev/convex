@@ -38,13 +38,13 @@ The application must configure every group before attaching it:
 
 ```java
 NodeConfig nodeConfig = NodeConfig.port(0);
-NodeServer<MyValue> node = new NodeServer<>(lattice, nodeStore, nodeConfig);
-node.setMergeContext(nodeContext);
+// The host and its applications own merge policy; the node replicates what the host publishes.
+NodeServer<MyValue> node = new NodeServer<>(
+    RelayHost.open(lattice, nodeStore, nodeConfig, nodeContext), nodeConfig);
 
 LatticePropagatorConfig groupConfig = LatticePropagatorConfig.create();
-LatticePropagator publicGroup = new LatticePropagator(
-    servingStore, lattice, publicProjection, groupConfig);
-publicGroup.setMergeContext(groupContext);
+LatticePropagator publicGroup = new LatticePropagator(servingStore, groupConfig);
+publicGroup.setPublicationFilter(publicProjection);
 publicGroup.setTransportKeyPair(transportKey);
 publicGroup.setIngressFilter(ingressPolicy);
 publicGroup.setApplicationMessageHandler(extensionHandler);

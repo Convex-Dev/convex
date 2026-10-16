@@ -150,8 +150,9 @@ The equivalent programmatic setup is:
 ```java
 EtchStore store = EtchStore.createTemp("convex-dlfs");
 AKeyPair keyPair = AKeyPair.generate();
-NodeServer node = new NodeServer(Lattice.ROOT, store);
-node.setMergeContext(LatticeContext.create(null, keyPair));
+LatticeContext context = LatticeContext.create(null, keyPair);
+NodeServer<Index<Keyword, ACell>> node =
+    new NodeServer<>(RelayHost.open(Lattice.ROOT, store, null, context));
 node.launch();
 
 DLFSApplication app = DLFSApplication.connect(Lattice.ROOT, node.getHost(), Keywords.FS);
@@ -227,13 +228,10 @@ Networked bootstrap supplies the host; the DLFS component API is unchanged:
 KeyedLattice lattice = KeyedLattice.create(
     Keyword.intern("documents"), DLFSRegion.LATTICE);
 NodeConfig nodeConfig = NodeConfig.port(0);
-NodeServer<Index<Keyword, ACell>> node =
-    new NodeServer<>(lattice, store, nodeConfig);
 LatticeContext context = LatticeContext.create(null, myKeyPair);
-node.setMergeContext(context);
-LatticePropagator group = new LatticePropagator(
-    store, lattice, value -> value, LatticePropagatorConfig.create());
-group.setMergeContext(context);
+NodeServer<Index<Keyword, ACell>> node =
+    new NodeServer<>(RelayHost.open(lattice, store, nodeConfig, context), nodeConfig);
+LatticePropagator group = new LatticePropagator(store, LatticePropagatorConfig.create());
 group.setTransportKeyPair(myKeyPair);
 node.addPropagator(group);
 LatticeListener transport = new LatticeListener(nodeConfig);
