@@ -40,9 +40,9 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p>The calling application constructs and completely configures each
  * propagator before attaching it with {@link #addPropagator(LatticePropagator)}.
- * Attaching establishes only the authoritative merge target. It does not copy
- * the node lattice, merge context, transport key or filters into the group. A
- * node with no propagators is a valid local, store-backed lattice host.</p>
+ * Attaching connects the group to this node for publication and inbound
+ * delivery. It does not copy a transport key or filters into the group. A node
+ * with no propagators is a valid local, store-backed node.</p>
  *
  * <p>The calling application separately owns transport composition. It may
  * register one or more attached groups with a shared {@link LatticeListener},
@@ -50,14 +50,14 @@ import convex.lattice.cursor.AForkableCursor;
  * Transports must be closed before this server so no new ingress reaches groups
  * while they drain.</p>
  *
- * <p><b>Failure isolation.</b> Authoritative root publication is the mandatory
- * part of a root sync. Propagator initialisation, notification, worker and
- * shutdown failures are contained and logged independently; one propagation
- * policy group cannot fail a host sync, the server maintenance loop or another
- * group. Only failures of the authoritative store are surfaced by this class;
- * transport failures remain visible to their application owner.</p>
+ * <p><b>Failure isolation.</b> Host-root publication is the mandatory part of a
+ * host sync. Propagator initialisation, notification, worker and shutdown
+ * failures are contained and logged independently; one propagation policy group
+ * cannot fail a host sync, the server maintenance loop or another group. Only
+ * failures of the node store are surfaced by this class; transport failures
+ * remain visible to their application owner.</p>
  *
- * @param <V> authoritative lattice value type
+ * @param <V> host root value type
  */
 public class NodeServer<V extends ACell> implements Closeable {
 
@@ -115,7 +115,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Publishes the host's current root, starts every attached policy group
 	 * independently, then starts persistence maintenance.
 	 *
-	 * @throws IOException if authoritative store initialisation fails
+	 * @throws IOException if node store initialisation fails
 	 */
 	public synchronized void launch() throws IOException,InterruptedException {
 		validateLaunchRequest();
@@ -212,7 +212,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @param source group whose serving store receives acquired cells
 	 * @param peer manager-owned peer client to query through {@code source}
 	 * @param path path within remote and local roots; empty selects the root
-	 * @return future containing the authoritative value at {@code path}
+	 * @return future containing the host value at {@code path}
 	 */
 	public CompletableFuture<ACell> pullPath(LatticePropagator source,Convex peer,ACell... path) {
 		return pullPath(source,peer,false,path);
@@ -238,7 +238,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @deprecated Retain the application-constructed group and use
 	 * {@link #pull(LatticePropagator, Convex)}.
 	 * @param peer manager-owned peer client to query
-	 * @return future containing the authoritative value after merge and sync
+	 * @return future containing the host value after delivery and sync
 	 */
 	@Deprecated
 	public CompletableFuture<V> pull(Convex peer) {
@@ -254,7 +254,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @deprecated Use {@link #pullPath(LatticePropagator, Convex, ACell...)}.
 	 * @param peer manager-owned peer client to query
 	 * @param path path within remote and local roots; empty selects the root
-	 * @return future containing the authoritative value at {@code path}
+	 * @return future containing the host value at {@code path}
 	 */
 	@Deprecated
 	public CompletableFuture<ACell> pullPath(Convex peer,ACell... path) {
@@ -266,7 +266,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Pulls roots from every current manager-owned peer client in an explicit
-	 * propagation group and publishes the combined authoritative value.
+	 * propagation group and publishes the resulting host root.
 	 *
 	 * @param source application-selected attached group
 	 * @return {@code true} if every pull completed successfully
@@ -303,7 +303,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @deprecated Use {@link #pull(Convex)}.
 	 * @param peer manager-owned peer client to query
-	 * @return future containing the authoritative value after merge and sync
+	 * @return future containing the host value after delivery and sync
 	 */
 	@Deprecated
 	public CompletableFuture<V> syncWithPeer(Convex peer) {
@@ -330,8 +330,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Merges an application-supplied value at a path within the authoritative value,
-	 * by delegating to the host and its configured applications. Call
+	 * Merges an application-supplied value at a path within the host root, by
+	 * delegating to the host and its configured applications. Call
 	 * {@link LatticeHost#sync()} on {@link #getHost()} when the update should be
 	 * published and persisted.
 	 *
@@ -346,18 +346,18 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Returns the current authoritative in-memory value.
+	 * Returns the host's current in-memory root value.
 	 *
-	 * @return current authoritative value
+	 * @return current host root value
 	 */
 	public V getLocalValue() {
 		return cursor.get();
 	}
 
 	/**
-	 * Returns the authoritative root cursor.
+	 * Returns the host's root cursor.
 	 *
-	 * @return authoritative cursor
+	 * @return host root cursor
 	 */
 	public AForkableCursor<V> getCursor() {
 		return cursor;
@@ -431,12 +431,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Attaches an already-configured propagation policy group.
 	 *
 	 * <p>This operation deliberately performs no policy configuration. In
-	 * particular it does not supply a lattice, merge context, identity, filters,
-	 * handlers or peer routes. The application must set those directly on the
-	 * propagator before calling this method. Attachment transfers lifecycle
-	 * ownership: the node starts and closes the group with its own resources.</p>
+	 * particular it does not supply an identity, filters, handlers or peer routes.
+	 * The application must set those directly on the propagator before calling
+	 * this method. Attachment transfers lifecycle ownership: the node starts and
+	 * closes the group with its own resources.</p>
 	 *
-	 * @param propagator lattice-configured policy group to attach
+	 * @param propagator configured policy group to attach
 	 */
 	public synchronized void addPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
@@ -458,7 +458,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * drains its accepted work and closes its routes, including assigned inbound
 	 * sockets. Work already accepted may still merge while shutdown drains it;
 	 * outstanding pulls that complete after removal are rejected before merge.
-	 * Other groups and the authoritative value are unaffected. The caller retains
+	 * Other groups and the host root are unaffected. The caller retains
 	 * ownership of all stores; this operation neither closes nor erases them.</p>
 	 *
 	 * <p>Unregister the group from its application-owned listeners first with
@@ -626,7 +626,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Completes a durability barrier for a dirty persistent authoritative store.
+	 * Completes a durability barrier for a dirty persistent node store.
 	 *
 	 * @return {@code true} if the store was flushed
 	 * @throws IOException if the durability barrier fails
@@ -709,10 +709,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Drains each group independently, publishes the
-	 * final authoritative root and completes the node-store durability barrier.
+	 * Drains each group independently, publishes the final host root and
+	 * completes the node-store durability barrier.
 	 *
-	 * @throws IOException if final authoritative publication or persistence fails
+	 * @throws IOException if final publication or persistence fails
 	 */
 	@Override
 	public synchronized void close() throws IOException {
@@ -743,7 +743,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		try {
 			finalRoot=syncSnapshot(true);
 		} catch (IOException e) {
-			nodeFailure=new IOException("Unable to publish final authoritative lattice root",e);
+			nodeFailure=new IOException("Unable to publish final host root",e);
 		}
 
 		ACell snapshot=finalRoot;

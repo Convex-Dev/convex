@@ -162,7 +162,7 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 | `Convex` | Client API (`convex.api`) for queries and transactions against a peer |
 | `ConnectionManager` | Manages peer-to-peer network connections |
 | `BeliefPropagator` | Handles CPoS belief propagation protocol |
-| `NodeServer` | Authoritative lattice host (`convex.node`): merge, persistence and group notifications |
+| `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost`, owning node-root persistence and group notifications |
 | `LatticeListener` | Application-owned inbound TCP transport and connection-to-group router |
 | `LatticePropagator` | Owns one filtered serving view, protocol endpoint and external route set |
 | `LatticeConnectionManager` | Maintains bounded connection intent and authenticated routes for one propagator; discovery schemas live in application modules |
@@ -171,17 +171,20 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 
 Alongside the consensus peer, this module provides a lightweight node server
 for lattice data regions — values that merge like CRDTs rather than passing
-through CPoS consensus. `NodeServer` (in `convex.node`) owns the authoritative
-value and persistence; `LatticePropagator` handles CAD036 messages and routes;
-and the application-owned `LatticeListener` provides the standard inbound TCP
-transport. None interprets application paths or records; the `convex-p2p`
-module layers node discovery, social selection and PoP routing on them.
+through CPoS consensus. `NodeServer` (in `convex.node`) replicates an assembled
+`LatticeHost` and owns node-root persistence, while the host's applications own
+merge semantics; `LatticePropagator` handles CAD036 messages and routes; and the
+application-owned `LatticeListener` provides the standard inbound TCP transport.
+None interprets application paths or records; the `convex-p2p` module layers
+node discovery, social selection and PoP routing on them.
 
-- **Construction** - Create a `NodeServer` with a lattice (defining merge
-  semantics), a store and an optional `NodeConfig`, then call `launch()`.
+- **Construction** - Assemble a `LatticeHost` with its applications
+  (`RelayHost.open` covers the relay case: one live application over a whole
+  lattice), construct the `NodeServer` from it with an optional `NodeConfig`,
+  then call `launch()`.
 - **Transport composition** - Create `LatticeListener` separately, register the
   eligible propagators, install a selector, and close it before `NodeServer`.
-- **Configuration** - `NodeConfig` contains authoritative persistence, standard
+- **Configuration** - `NodeConfig` contains node persistence, standard
   listener and application advertisement settings, but each component consumes
   only its own fields. Each independently
   constructed `LatticePropagatorConfig` controls one group's routes, protocol

@@ -293,7 +293,8 @@ itself.
 
 ## 15. Shared regions: components must be robust to external change
 
-**Status:** Agreed in principle (15 October 2026); document wording pending.
+**Status:** Agreed (15 October 2026); documented in LATTICE_APPLICATIONS
+(`f4e6a5798`, `6d486afdc`). The inferences below remain unconfirmed.
 
 The shared-applications example stages each domain at its own path (a Social fork, a
 DLFS region fork, a live P2P view) behind one live admission handler, and the

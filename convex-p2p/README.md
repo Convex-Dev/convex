@@ -4,7 +4,7 @@
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-p2p/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-p2p)
 
 Rollup package for Convex P2P nodes. Builds on the lattice data structures in
-`convex-core` and the authoritative node, propagator and transport components in
+`convex-core` and the node, propagator and transport components in
 `convex-peer` to provide nodes that discover each other, exchange lattice values
 and converge on shared state — and bundles the application regions those nodes
 serve, so one dependency gives you a complete node.
@@ -109,7 +109,7 @@ decision, and the only place that decision is recorded.
         ├─────────────┴─────────────┴─────────────┤
         │        :p2p    :id    :kad              │   infrastructure floor (always on)
         ├─────────────────────────────────────────┤
-        │ NodeServer — authoritative merge + host │   convex-peer
+        │ NodeServer — replicates the host root   │   convex-peer
         │ Propagator — filtered view + routes      │
         ├─────────────────────────────────────────┤
         │   lattice types, cursors, CAD3, Etch    │   convex-core

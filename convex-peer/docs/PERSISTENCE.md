@@ -1,19 +1,20 @@
 # Lattice node persistence
 
-`NodeServer` is the sole owner of its authoritative lattice root. Propagators
-materialise serving views; they do not decide what the node persists.
+`NodeServer` is the sole writer of the node store's root. The host and its
+applications decide what that root contains; propagators materialise serving
+views of it. Neither the node nor a propagator decides what the root means.
 
 This distinction prevents network policy from becoming an accidental second
 authority over application state.
 
-## Authoritative state
+## Node state
 
-A node owns:
+A node is constructed from an assembled `LatticeHost` and uses:
 
-- a `Root` cursor containing the current application value;
-- a `LatticeHost` connecting `sync()` to node publication;
-- one authoritative `AStore`; and
-- one serialised root-publication/checkpoint pipeline.
+- the host's root cursor, holding the current published value;
+- the host's `sync()`, which launch connects to the node's publication policy;
+- the host's store, which becomes the node store; and
+- one serialised root-publication/checkpoint pipeline of the node's own.
 
 The application publishes its working state to the host, then the caller syncs the host:
 
@@ -28,7 +29,7 @@ NodeServer publication policy
   Cells.announce(value, nodeStore)
   nodeStore.setRootData(value)       when :persist is true
           |
-          +-- return store-backed authoritative value
+          +-- return store-backed published value
           |
           +-- non-blocking notification to each propagator
 ```
@@ -43,10 +44,10 @@ matters.
 The application decides whether networking exists. `NodeServer` never creates a
 default propagator. A zero-propagator node still:
 
-- delegates incoming values to its configured applications;
+- hands incoming values to its host, which delegates them to the configured
+  applications;
 - announces store-backed cells;
-- retains the node root when persistence is enabled;
-- restores a convenience relay at launch (supplied hosts are already initialised); and
+- retains the node root when persistence is enabled; and
 - performs configured durability barriers.
 
 This is the normal shape for a local database or application component that has
@@ -59,16 +60,11 @@ Each `LatticePropagator` owns a serving store. The store is used for:
 - materialising the group's filtered publication view;
 - novelty collection and bounded delta encoding;
 - answering `LATTICE_QUERY` and `DATA_REQUEST`; and
-- acquiring trusted partial values before they reach the authoritative merge.
+- acquiring trusted partial values before they reach the host.
 
-At attachment, root retention in the propagator is disabled. Even when a group
-uses a physically different persistent store, `NodeServer` remains the only
-writer of the authoritative root pointer. Launch seeds the serving store again
-from the restored node value.
-
-A standalone `LatticePropagator` retains compatibility support for its own local
-root, `restore()` and `checkpoint()`. That mode is not the ownership model for an
-attached node.
+A propagator never writes a store root. Even when a group uses a physically
+different persistent store, `NodeServer` remains the only writer of the node root
+pointer, and launch seeds each serving store from the host's current value.
 
 ## Logical publication and durability
 
@@ -82,44 +78,44 @@ dirty and flushes it:
 - from `persistSnapshot()`; and
 - during orderly shutdown.
 
-`persistSnapshot(value)` merges the supplied snapshot into the current root,
-with current local state first on ties, then announces and publishes the result
-without notifying propagators and completes the durability barrier. It uses the
-same ordered cursor sync and store-backed merge-back as application publication;
-an older supplied snapshot cannot demote the established root. It is intended
-for host-controlled persistence, not network ingress.
+`persistSnapshot(value)` hands the supplied snapshot to the host, which delegates
+it to its applications exactly as it would a network value, then publishes the
+already-published host state without notifying propagators and completes the
+durability barrier. The applications' lattices decide what the snapshot changes,
+and an application may keep its result private until its own sync. The method is
+intended for host-controlled persistence, not network ingress.
 
 When `persist` is false, node publication still announces cells to the store so
 the current cursor has valid store-backed references, but does not retain the
-root pointer or schedule durability work. `restore` controls whether launch reads
-an existing persistent root.
+root pointer or schedule durability work. `restore` is honoured when the host is
+assembled: `RelayHost.open` adopts an existing persistent root as the initial
+value. The node itself never reloads the store.
 
 ## Ordering
 
-All publication entry points capture their current root inside the root cursor's
-sync lock. Explicit persistence merges its candidate there before publication.
-Launch and shutdown publication use the same path. A separate `persistenceLock`
-excludes checkpoints from cell announcement and root-pointer writes; serialising
-store writes alone would not prevent a previously captured snapshot arriving late.
+All publication entry points run inside the host's ordered sync, which captures
+the current root, publishes it and installs the store-backed result by identity
+compare-and-set. Launch and shutdown publication use the same path. A separate
+`persistenceLock` excludes checkpoints from cell announcement and root-pointer
+writes; serialising store writes alone would not prevent a previously captured
+snapshot arriving late.
 
-The returned persisted cell is installed by identity CAS. If a local write
-intervenes, `merge(currentLocal, persistedSnapshot)` preserves that write. The
-sync result is the exact completed publication, while the live cursor may contain
-additional pending changes. A subsequent quiescent sync installs the complete
-store-backed tree; no special reference-rewriting merge is used.
+If a local write intervenes during publication, the store-backed result is not
+installed and the racing write stays pending for the next sync. The sync result
+is the exact completed publication, while the live cursor may contain additional
+pending changes. A subsequent quiescent sync installs the complete store-backed
+tree; no special reference-rewriting merge is used.
 
-Each propagator separately serialises its working view and serving-store
-announcement. Group pre-merging is permitted: NodeServer accepts the aggregate
-with `merge(currentRoot, groupValue)`, just like individual remote input. On the
-return path an attached group uses `merge(publishedRoot, groupWorking)` before
-filtering and announcing to its own store. Thus a replicated-back value cannot
-defeat an already published local edit on a tie. Standalone group input retains
-`merge(groupWorking, input)` precedence. Strictly newer values continue to win
-according to the configured lattice.
+Propagators merge nothing. Each group serialises only the announcement of the
+host's published root into its own serving store. A value replicated back from a
+peer therefore reaches the host like any other incoming value, and the receiving
+application's lattice decides whether it displaces a local edit; under the
+standard own-wins rule an older replicated copy cannot defeat an already
+published local edit on a tie, while strictly newer values win.
 
 Consecutive node notifications use a latest-update queue and may
 coalesce because lattice snapshots are monotonic. Coalescing affects transport
-work, not the ordering or durability of the authoritative node root.
+work, not the ordering or durability of the node root.
 
 These are the implementation's directional `ALattice` semantics. CAD035/036 in
 the current design checkout still require universal commutativity (and CAD035
@@ -139,21 +135,22 @@ Inbound protocol work happens in the selected propagation group:
 1. bounded queue admission;
 2. complete-value decode or trusted acquisition into the serving store;
 3. ingress filtering;
-4. `NodeServer.mergeInbound(path, value)`;
-5. authoritative `cursor.sync()` if the merge changed the node; and
+4. `NodeServer.mergeInbound(path, value)`, which hands the value to the host and
+   its applications;
+5. host `sync()` if the merge changed the published root; and
 6. asynchronous notification of every attached group.
 
 An unverified connection cannot acquire partial trees. A complete public value
-can still be merged under zero trust, but only if the configured lattice and
-ingress policy accept it.
+can still be merged under zero trust, but only if the ingress policy and the
+receiving application's lattice accept it.
 
 The response to a correlated update follows step 5. This means the sender learns
-whether authoritative publication succeeded without being coupled to optional
-propagator workers.
+whether host publication succeeded without being coupled to optional propagator
+workers.
 
 ## Failure semantics
 
-Authoritative failures are visible:
+Node-store failures are visible:
 
 - a node-store announce or root-write failure makes `sync()` fail;
 - a launch-time node-store failure aborts launch and unwinds node resources;
@@ -167,7 +164,7 @@ Propagation failures are isolated:
 
 - materialisation, filter, broadcast, connection or application-handler failure
   affects only that group;
-- a failed group cannot fail the authoritative sync or another group;
+- a failed group cannot fail the host sync or another group;
 - endpoint shutdown continues independent cleanup after acquisition or worker
   timeout; and
 - `NodeServer.close()` still reaches `STOPPED` unless its own resource fails.
@@ -179,12 +176,12 @@ stack overflow at untrusted decode or policy boundaries is contained and logged.
 
 Launch order protects serving consistency:
 
-1. configure and freeze the node publication callback;
-2. merge the restored root when enabled, retaining pre-launch local edits on ties;
-3. announce and retain the authoritative root;
-4. seed every attached serving view independently;
-5. start propagator workers;
-6. start persistence maintenance.
+1. install and freeze the node's publication policy on the host;
+2. announce and retain the host's current root (restore, if any, happened when
+   the host was assembled);
+3. seed every attached serving view independently;
+4. start propagator workers;
+5. start persistence maintenance.
 
 The application opens any `LatticeListener` only after node launch has prepared
 the attached propagation endpoints.
@@ -194,22 +191,22 @@ Shutdown order prevents new work racing store closure:
 1. the application closes its transports to stop admission and detach sockets;
 2. `NodeServer.close()` stops node maintenance;
 3. each endpoint stops acquisitions and drains accepted messages;
-4. the node publishes the final authoritative root;
+4. the node publishes the final host root;
 5. each propagator drains and closes independently; and
-6. the authoritative store is flushed.
+6. the node store is flushed.
 
 `NodeServer` does not close application-supplied stores. Store ownership remains
 with the caller that created them.
 
 ## Waiting in tests and applications
 
-Do not sleep or assume that `cursor.sync()` completed propagation. Capture the
+Do not sleep or assume that a host sync completed propagation. Capture the
 appropriate signal before triggering work:
 
 ```java
 CompletableFuture<ACell> served = propagator.nextAnnounce();
-node.getCursor().set(updatedValue);
-node.getCursor().sync();        // authoritative root is now published
+app.sync();                     // the application publishes into the host root
+node.getHost().sync();          // the host root is now published to the node store
 served.get(timeout, unit);      // this group's served view is now materialised
 ```
 

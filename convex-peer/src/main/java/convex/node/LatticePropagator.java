@@ -48,15 +48,15 @@ import convex.lattice.cursor.Root;
  *
  * <p>A propagator replicates and merges nothing. Complete inbound values are
  * decoded, acquired and projected inside this boundary before being offered to
- * {@link NodeServer}, which hands them to the host and its applications for the
- * authoritative merge and writes the durable store root. Once that commit
- * succeeds the node notifies every propagator independently; each announces the
- * published root through its own projection. Failure in one group is contained
- * and cannot prevent another group from seeing the update.</p>
+ * {@link NodeServer}, which hands them to the host and its applications to merge
+ * and then writes the durable node root. Once that commit succeeds the node
+ * notifies every propagator independently; each announces the published root
+ * through its own projection. Failure in one group is contained and cannot
+ * prevent another group from seeing the update.</p>
  *
  * <p>The group's store is a serving and novelty cache. DATA_REQUEST responses can
- * resolve only cells materialised in this exact store. The node alone writes an
- * authoritative root; a propagator never writes a store root of its own.</p>
+ * resolve only cells materialised in this exact store. The node alone writes the
+ * node root; a propagator never writes a store root of its own.</p>
  */
 public class LatticePropagator implements Closeable {
 
@@ -70,8 +70,8 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Serving store for novelty tracking and peer data resolution. Missing data
-	 * requests for an announced value are resolved only from this store. An
-	 * unattached compatibility instance may also retain its own root here.
+	 * requests for an announced value are resolved only from this store. A
+	 * propagator never writes this store's root.
 	 */
 	private final AStore store;
 
@@ -86,7 +86,7 @@ public class LatticePropagator implements Closeable {
 	/** Projection applied before any value crosses this propagator's store boundary. */
 	private LatticeFilter<ACell> filter = value -> value;
 
-	/** Authoritative merge target supplied by the owning node before launch. */
+	/** Owning node, set at attachment; inbound values are handed to it for its host. */
 	private NodeServer<?> node;
 
 	/** Connection-facing endpoint created when this group is attached to a node. */
@@ -1089,9 +1089,9 @@ public class LatticePropagator implements Closeable {
 	 * store-backed value to the caller.</p>
 	 *
 	 * <p>This method deliberately performs no merge, root publication or broadcast.
-	 * Only {@link NodeServer} owns the authoritative root, so it must merge the
-	 * acquired value and sync its cursor before anything is re-propagated. Persisting
-	 * the raw peer value here could demote a root already dominating it.</p>
+	 * The acquired value must go through {@link NodeServer} to the host, whose
+	 * applications merge it, before anything is re-propagated. Persisting the raw
+	 * peer value here could demote a root already dominating it.</p>
 	 *
 	 * @param peer manager-owned peer client to query
 	 * @return future completing with the acquired value
@@ -1181,7 +1181,7 @@ public class LatticePropagator implements Closeable {
 	 *
 	 * <p>Sends LATTICE_QUERY to each connected peer in parallel, acquires their
 	 * values into this propagator's store. The returned values remain unmerged;
-	 * {@link NodeServer} integrates them through its authoritative root cursor.</p>
+	 * {@link NodeServer} hands them to the host and its applications.</p>
 	 *
 	 * @return future containing all acquired values when every pull is complete
 	 */

@@ -96,10 +96,11 @@ DriverManager.getConnection("jdbc:convex:file:/data/market.etch")
     ├── Looks up in open instances map
     │     ├── Found → return new Connection on existing cursor/store
     │     └── Not found:
-    │           ├── EtchStore.create(file)     — opens or creates Etch file
-    │           ├── NodeServer(lattice, store)  — manages cursor + persistence
-    │           ├── server.launch()             — restores from Etch if exists
-    │           ├── ConvexDB.connect(cursor)    — wraps the cursor chain
+    │           ├── EtchStore.create(file)          — opens or creates Etch file
+    │           ├── ConvexDB.createNodeServer(store) — RelayHost.open restores the
+    │           │                                     retained root; the node persists it
+    │           ├── server.launch()
+    │           ├── ConvexDB.connect(server.getHost()) — wraps the cursor chain
     │           └── Store in map, return Connection
     │
     └── Connection wraps Calcite + ConvexSchema backed by the cursor chain

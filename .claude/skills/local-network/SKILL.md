@@ -60,14 +60,17 @@ replication, use `NodeServer`; for the bundled P2P and social regions, use
 `P2PNode`. See `convex-peer/src/test/java/convex/node/LatticeNetworkTest.java`
 and `convex-p2p/src/test/java/convex/p2p/P2PSocialSyncTest.java`.
 
-`NodeServer` is the schema-independent authoritative lattice host. It owns
-merge, node-root persistence, attached-propagator lifecycle and isolated update
-notification, but no socket or transport. It does not publish or interpret
+`NodeServer` is schema-independent and replicates an assembled `LatticeHost`. It
+owns node-root persistence, attached-propagator lifecycle and isolated update
+notification, but no lattice, merge policy, socket or transport: the host's
+applications own merge semantics, and `RelayHost.open` assembles the relay case
+of one live application over a whole lattice. It does not publish or interpret
 `NodeInfo`, inspect `:p2p` / `:social` paths, or implement discovery policy. The
 calling application must construct and configure every `LatticePropagator`
 before attaching it; there is no implicit/default group. A zero-propagator node
-is a valid local persistent host. Each propagator owns its connection manager,
-transport identity, trust, bounded protocol endpoint, filters and serving store.
+is a valid local persistent node. Each propagator owns its connection manager,
+transport identity, trust, bounded protocol endpoint, filters and serving store,
+and merges nothing.
 
 The calling application separately owns any `LatticeListener`: register every
 eligible propagator, install a one-time connection selector, launch the listener
@@ -78,8 +81,8 @@ signed `[:p2p :nodes]` publication, validation, discovery translation and PoP
 metadata. Keep tests for those behaviours in `convex-p2p`, not `convex-peer`.
 `P2PNode` also configures its node key explicitly as both its transport challenge
 identity and its signed `NodeInfo` owner. A generic `NodeServer` does not infer a
-transport key or propagator merge context from `LatticeContext`; direct tests
-must set these on the propagator itself before `addPropagator`. Social user DIDs
+transport key from the host's `LatticeContext`; direct tests must set it on the
+propagator itself before `addPropagator`. Social user DIDs
 and their account keys remain a separate application concern.
 
 For a small lattice network test:
@@ -179,8 +182,8 @@ the node merely to treat the first group as a privileged "primary" group.
 6. Automatic gossip is fire-and-forget. To verify it without sleeping, capture
    `nextAnnounce()` before publishing and re-arm it until the expected application
    state is present. The announce signals that this propagation group has
-   materialised its served view after the authoritative merge and node-root
-   publication. `cursor.sync()` itself guarantees only the authoritative node
+   materialised its served view after the host has merged the value and the
+   node has published the root. A host sync itself guarantees only node
    publication; do not assume it completed group fan-out. Use an explicit
    `receivingServer.pull(group, connection).get(timeout)`
    only when the test is specifically about pull synchronisation. A ping only

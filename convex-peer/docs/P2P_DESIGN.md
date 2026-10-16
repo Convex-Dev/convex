@@ -37,9 +37,9 @@ Each region uses the same algebraic foundations: join-semilattices, SignedData v
 
 ### 2.2 NodeServer
 
-`NodeServer<V>` is the authoritative lattice host. It owns path merges, the
-durable root and isolated notifications to attached policy
-groups. Each group's `LatticeProtocolEndpoint` handles:
+`NodeServer<V>` replicates an assembled `LatticeHost`. It owns the durable node
+root and isolated notifications to attached policy groups; the host's
+applications own path merges. Each group's `LatticeProtocolEndpoint` handles:
 
 - **LATTICE_VALUE** — `[:LV [*path*] value]` is an optimistic push; `[:LV id [*path*] value]` is a confirmed push returning a post-merge Result
 - **LATTICE_QUERY** (`[:LQ id [*path*]]`) — Respond with current value at a lattice path
@@ -303,8 +303,9 @@ its configured lattice.
 └──────┴──────────┴──────────┴────────────┘
 ```
 
-`NodeServer` owns authoritative lattice merge and persistence, while each
-`LatticePropagator` owns one filtered replication policy and its protocol state.
+`NodeServer` owns node-root publication and persistence for an assembled host,
+while each `LatticePropagator` owns one filtered replication policy and its
+protocol state.
 The application composes those groups with shared or independent transport
 adapters; the server neither opens sockets nor dispatches transport messages.
 This is the key difference from the consensus `Server`, which manages its own
@@ -569,13 +570,13 @@ On reconnect, if the current transport repeatedly fails, the next is tried.
 
 ### 9.1 Architecture
 
-`NodeServer` remains the schema-independent authoritative lattice host. The
-calling application constructs its propagation groups and transport hosts, while
-P2P policy stays above all three layers:
+`NodeServer` remains schema-independent: it replicates an assembled host and
+merges nothing itself. The calling application constructs its propagation groups
+and transport hosts, while P2P policy stays above all three layers:
 
 ```
 P2PNode / NodeDirectory (P2P schema, discovery and policy)
-├── NodeServer (authoritative merge, persistence and notifications)
+├── NodeServer (host-root publication, persistence and notifications)
 ├── LatticeListener (application-owned inbound TCP and group routing)
 └── LatticePropagator (application-configured replication policy group)
     ├── LatticeProtocolEndpoint (CAD036 queues, acquisition and trust)

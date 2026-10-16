@@ -6,20 +6,23 @@ defines its own merge and authorisation rules.
 
 The central boundary is simple:
 
-- `NodeServer` hosts one authoritative lattice value.
+- `NodeServer` replicates one assembled `LatticeHost`; the host's applications
+  own the root's merge semantics.
 - The calling application constructs propagation policy groups.
 - The calling application composes inbound transports independently.
-- Each `LatticePropagator` owns its routes, serving view and protocol work.
-- Attaching a propagator supplies a merge destination; it does not configure the
-  propagator.
+- Each `LatticePropagator` owns its routes, serving view and protocol work, and
+  merges nothing.
+- Attaching a propagator connects it to the node for publication and inbound
+  delivery; it does not configure the propagator.
 
-A node with no propagators is a valid local, store-backed lattice host.
+A node with no propagators is a valid local, store-backed node.
 
 ## Ownership
 
 | Component | Owns | Does not own |
 |---|---|---|
-| `NodeServer` | Authoritative lattice cursor, merge context, node store root, persistence barriers, attached-group lifecycle and update fan-out | Sockets, peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
+| `LatticeHost` and its applications | The published root, which applications receive incoming values, and the lattices that merge them | Replication, transport, persistence scheduling |
+| `NodeServer` | Node store root, persistence barriers, attached-group lifecycle and update fan-out for one assembled host | Lattice, merge policy, sockets, peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
 | `LatticeListener` | Application-owned TCP acceptance, physical limits and one immutable connection-to-group assignment | Propagator lifecycle, per-connection protocol state, serving stores, trust or lattice merge |
 | `LatticePropagator` | One propagation policy group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
 | `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, ingress policy, challenge state, statistics and extension handler | Node persistence, peer discovery or application schemas |
@@ -66,11 +69,11 @@ advertisement settings. Passing it to `NodeServer` does not create a listener;
 the application supplies it independently to `LatticeListener`.
 `LatticePropagatorConfig` contains one group's route,
 queue, acquisition and publication limits. `NodeServer.addPropagator` copies
-neither object and does not copy the node lattice, context, key, filters or
-handlers. An application with several groups retains their references and selects
-the intended group explicitly for pulls and connection assignment.
+neither object and does not copy keys, filters or handlers into the group. An
+application with several groups retains their references and selects the
+intended group explicitly for pulls and connection assignment.
 
-The deprecated propagator constructors and
+The deprecated propagator constructor taking `NodeConfig` and
 `LatticePropagatorConfig.from(NodeConfig)` preserve combined-map callers during
 migration. New composition should construct the two configurations separately;
 matching key names do not imply inheritance.
@@ -126,51 +129,51 @@ Once the listener assigns a socket, all work belongs to that group:
    extensions.
 4. The ingress filter admits or projects a complete value.
 5. The endpoint gives only `(path, completeValue)` to `NodeServer`.
-6. `NodeServer` performs the authoritative lattice merge and node-root
-   publication.
+6. `NodeServer` hands the value to its host, whose applications merge it under
+   their own lattices, then publishes the host root to the node store.
 7. The node schedules a non-blocking update for every attached group.
 
 `DATA` only materialises independently addressable cells in the selected serving
 store. It never merges a lattice root. `DATA_REQUEST` is scoped to the same
 store, so one group cannot expose another group's private or filtered cache.
 
-The correlated response to `LATTICE_VALUE` confirms the authoritative node
-merge and logical root publication. It does not wait for every propagation group
-to materialise or broadcast its view.
+The correlated response to `LATTICE_VALUE` confirms delivery to the host and
+logical root publication. It does not wait for every propagation group to
+materialise or broadcast its view.
 
 ## Publication pipeline
 
-Each group receives authoritative node snapshots independently. Its worker:
+Each group receives the host's published snapshots independently and merges
+nothing. Its worker:
 
-1. reconciles the previous group view with the new node snapshot;
-2. applies the publication projection;
-3. announces the result into the group's serving store;
-4. updates the group's queryable announced cursor; and
-5. sends a bounded delta, or later a root sync, to its routes.
+1. applies the publication projection;
+2. announces the result into the group's serving store;
+3. updates the group's queryable announced cursor; and
+4. sends a bounded delta, or later a root sync, to its routes.
 
 The update queue may coalesce consecutive monotonic snapshots. The latest value
 must converge; there is no requirement for one network frame per application
 action. `nextAnnounce()` is the deterministic signal for callers that need to
 wait until a group has materialised its next served view.
 
-Attached groups never write the authoritative node store root. Their stores are
-serving and novelty boundaries. A separate persistent serving store is rebuilt
-from the node's authoritative value during launch.
+A propagator never writes a store root. Its store is a serving and novelty
+boundary; launch seeds each one from the host's current root.
 
 ## Lifecycle and failure isolation
 
 `NodeServer.launch()` performs these phases:
 
-1. freeze the node root-publication policy;
-2. restore and publish the authoritative node root;
-3. offer the initial value to each attached group independently;
+1. install and freeze the node's publication policy on the host;
+2. publish the host's current root (restore, if any, happened when the host was
+   assembled);
+3. offer that value to each attached group independently;
 4. start every group independently;
 5. start node persistence maintenance.
 
 The application opens its transport only after `NodeServer.launch()` has made
-the attached endpoints ready. A transport failure does not change authoritative
-node state; the application decides whether to retry, replace the transport or
-close the complete composition.
+the attached endpoints ready. A transport failure does not change host state;
+the application decides whether to retry, replace the transport or close the
+complete composition.
 
 There is no implicit/default group. A group that fails to materialise, start or
 receive a notification is logged and isolated; it cannot fail node publication
@@ -185,13 +188,13 @@ intermittent failures; `Status.isOperational()` describes lifecycle, while
 
 Shutdown is composed in the opposite order: the application closes every
 transport, then `NodeServer.close()` asks each endpoint to drain, publishes the
-final authoritative root, drains each group and completes the node-store
-durability barrier. Each group cleanup is independent. Endpoint cleanup also
+final host root, drains each group and completes the node-store durability
+barrier. Each group cleanup is independent. Endpoint cleanup also
 continues after a timed-out acquisition so one stuck resource does not suppress
 the remaining cleanup steps.
 
-Failures of the authoritative store are surfaced by `NodeServer`. Listener
-failures are surfaced independently to the application that owns the transport.
+Failures of the node store are surfaced by `NodeServer`. Listener failures are
+surfaced independently to the application that owns the transport.
 
 ### Removing a group while the node runs
 
@@ -211,8 +214,7 @@ groups or deny new connections. Existing sockets are never reassigned.
 
 `removePropagator` removes the group from node notifications and explicit pull
 APIs, drains accepted protocol and publication work, and closes inbound sockets
-and outbound routes. Accepted work may still merge into the node during the
-drain. The node and other groups keep running, and a later node launch does not
+and outbound routes. Accepted work may still reach the host during the drain. The node and other groups keep running, and a later node launch does not
 restart the removed group. Outstanding pulls that finish after removal are
 rejected before merge. Both removal methods return `false` when the group
 is already absent. Node removal also works before first launch or after shutdown.
