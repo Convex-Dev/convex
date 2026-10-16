@@ -67,7 +67,7 @@ of decisions made when it is constructed:
 | Navigation | A component creates its children one level below its own cursor, declaring each child's lattice so that a missing container is created with the right type. An application resolves whole region paths from the root with its root lattice. Boundaries are placed by the owning component, never discovered by navigation. |
 | Publication | **Live**: writes go straight through the cursor and there is nothing to publish. **Staged**: a private working copy and a destination; sync reconciles the copy with whatever the destination now holds and publishes the result. A fork is a staged component constructed at the same position. |
 | Boundary | For a level the component owns: none, stamp each write, sign each write, or sign once at publication. Signing once needs a staged component, and is the main reason to stage. |
-| Reconciliation | The lattice merge at that position, with local edits winning ties. A component may refine it, as the signed component does to reuse existing envelopes. |
+| Reconciliation | The lattice merge at that position, with local edits winning ties, applied only when both the copy and its destination changed since they were last reconciled. An application refines it to leave regions its own components publish to those components. |
 | Policy | The context, clock and signers, resolved when the component is constructed. Later changes to the parent's policy do not reach it. |
 | Incoming values | Whether the component is configured on the host to receive incoming values, and how it merges or routes what it accepts. Only a component at the root can be configured directly. |
 | Transactions | Whether it offers atomic multi-step operations, by supplying a factory that rebuilds it over a draft cursor. |
@@ -134,35 +134,23 @@ against a local host and a networked one.
 - **Deletion** under a union merge needs a tombstone, or a whole-value register
   with a timestamp, because an older replica would otherwise resurrect the key.
 
-**Branch prototype.** Component-owned working copies and publication, a host that
-carries no lattice, and a node that only replicates are intentional revisions of
-CAD035, CAD036 and CAD045, which still describe lattice-aware cursors, automatic
-cursor signing boundaries and a node constructed from a lattice. Those CADs need
-corresponding updates before this design becomes normative. Ownership remains
-governed by CAD038.
+**Decisions still open.** This document states the intended design; the
+[design log](LATTICE_DESIGN_LOG.md) records how it got here. Still to decide:
 
-## Key points
+- Whether an application may be staged at the whole root at all, or only live at the
+  root with staged components below it. See *Sharing a host*.
+- Lifecycle and subscriptions: principles agreed, API not implemented. See
+  *Lifecycle and subscriptions*.
+- Vocabulary: the component base-class name, and whether "application" names only
+  the component at the host root (design log entries 12 and 17).
+- Typed owner slots, so a forgotten signing boundary fails at compile time rather
+  than at run time (entry 11).
 
-- Design the state tree first, then choose a merge rule for each leaf and compose
-  lattices bottom-up. A component declares its lattice when it creates the cursors
-  for the level below it; that declaration lets a write create a missing level with
-  the right container type.
-- Wrap per-user data in an owner lattice so each owner's slot is signed by that
-  owner and forgeries are rejected on merge.
-- One component, one path. A domain component receives the cursor for its level and
-  creates its children one level below; only the application navigates from the
-  root. A facade spanning several paths contains components rather than being one.
-- Any number of components may publish into the same region. Each reconciles with
-  the destination as it now is; none assumes it is the only writer. Components
-  sharing a region must share its lattice.
-- Attach to a host (`LatticeHost`), never to a store or a node directly. The store
-  is optional. Domain components never see the node runtime.
-- Persist, sync and flush are three different boundaries: persistence writes cells,
-  sync reconciles and publishes, flush is physical durability.
-- Include `:timestamp` in records merged by last-writer-wins; tombstone under union
-  merges.
-- The context (`LatticeContext`) is the write policy: who signs, what time it is,
-  and which signers may act for which owners.
+Component-owned working copies, a host that carries no lattice and a node that only
+replicates are intentional revisions of CAD035, CAD036 and CAD045, which still
+describe lattice-aware cursors, automatic cursor signing boundaries and a node
+constructed from a lattice. Those CADs need corresponding updates before this design
+becomes normative. Ownership remains governed by CAD038.
 
 ## Architecture
 
@@ -329,24 +317,11 @@ The application component declares the root lattice: it exposes that lattice,
 merges incoming root values and hands out typed region cursors. It receives the
 host's root cursor and navigates below it with the root lattice; the domain
 components it creates receive the cursor for their level and never navigate back up.
-It works either live in the host's root or staged over it. It attaches to a host,
-which creates or opens a local root or hosts a networked one. Neither merging nor
-hosting requires domain components to exist.
-
-The global lattice has a keyed map root, an `Index<Keyword, ACell>`. Applications
-participate at the globally defined region paths, composing the region lattices they
-understand. Unknown incoming regions are ignored by the keyed merge, and existing
-unknown regions are retained. This is selective participation, not a separate
-namespace. The base also supports other root value types for local applications and
-tests.
-
-Two kinds of knowledge are involved. The root lattice defines region dispatch,
-navigation, verification and merge for the complete root value. A domain application
-knows how to construct components for its regions, perhaps parameterised by owner or
-collection name, and each component can construct further components within its own
-subtree. Component factories are a convenience: the base application does not
-discover merge rules from components or keep a registry of them. A relay can merge
-every region in its lattice without constructing a single domain component.
+The global root is a keyed map, an `Index<Keyword, ACell>`: an application composes
+the region lattices it understands at the globally defined region paths, the keyed
+merge ignores unknown incoming regions and retains unknown existing ones. Root merge
+needs no domain components; a relay merges every region in its lattice without
+constructing one. Component factories are a convenience, not a registry.
 
 ```java
 var host = LatticeHost.create();
@@ -404,24 +379,17 @@ payload into the unsigned working copy. Discarded input stays discarded. Enclosi
 signed envelopes must be verified before interior values are extracted and routed.
 
 Delivery is not a transaction across applications: if a later application fails,
-earlier merges remain, and lattice delivery is safe to retry. The returned root may
-be unchanged until applications sync. An explicitly empty application list and an
-unconfigured host both ignore all incoming state. A relay is a host with one live
-application over the whole lattice it serves.
-
-A node routes incoming pushes, whole-root and path pulls, direct merge calls and
-explicit snapshot candidates through the host. Delivery does not invoke application
-sync; host sync and shutdown publish only state already installed in the host. An
-acknowledgement confirms delivery, not publication of private work, and an
-application may ignore a value without reporting an error.
-
-Path-addressed delivery forwards the value unchanged to each application; the host
-has no lattice from which to infer interests. The base application treats an empty
-path as a whole-root merge and ignores every other path. An application overrides
-this to choose its interests, validate input and delegate to domain components,
-verifying enclosing signed envelopes before accepting interior values. The standard
-`LatticeApplication` accepts the paths its lattice declares and rejects paths through
-signed envelopes: callers supply the complete envelope at its slot.
+earlier merges remain, and lattice delivery is safe to retry. An explicitly empty
+application list and an unconfigured host both ignore all incoming state. A node
+routes incoming pushes, whole-root and path pulls, direct merge calls and snapshot
+candidates through the host; delivery never invokes application sync, and an
+acknowledgement confirms delivery, not publication of private work. Path-addressed
+delivery forwards the value unchanged to each application, which chooses its
+interests: the base treats an empty path as a whole-root merge and ignores every
+other path, and the standard `LatticeApplication` accepts the paths its lattice
+declares and rejects paths through signed envelopes, so callers supply the complete
+envelope at its slot. Overrides verify enclosing signed envelopes before accepting
+interior values.
 
 A node is replication. It hosts an assembled `LatticeHost`, attaches propagation
 groups, hands incoming values to the host and sends the host's published root to
@@ -459,24 +427,35 @@ its subtree on sync. Either way the component allows for the destination having
 changed under it, so sync reconciles before it installs:
 
 ```java
-var liveSocial = Social.connect(host, socialContext);
-var social = liveSocial.fork();
-var liveFiles = DLFSRegion.connect(host.cursor(), host.store(), Keywords.FS);
-liveFiles.setContext(filesContext);
-var files = liveFiles.fork();
-var peer = P2PUser.create(host.cursor(), ownerKey, p2pContext);
+// Each application is live at the host root and stages only the region it edits.
+final class SocialApp extends ALatticeApplication<Index<Keyword, ACell>> {
+    final Social social;
+    SocialApp(LatticeHost<Index<Keyword, ACell>> host) {
+        super(SOCIAL_ROOT, host.cursor());    // live at the root
+        social = Social.connect(this).fork();  // staged copy of :social
+    }
+    P2PUser p2p(AccountKey user) { return P2PUser.create(this, user); } // live in :p2p
+}
 
-social.user(ownerKey).feed().post("A staged post");
-peer.node().setNodeInfo(nodeInfo); // immediately updates its shared P2P path
-social.sync();                   // publishes only :social, preserving :fs and :p2p
-files.sync();                    // publishes only :fs, preserving :social and :p2p
-host.sync();                     // persistence and propagation are separate
+final class FilesApp extends DLFSApplication<Index<Keyword, ACell>> {
+    final DLFSRegion files;
+    FilesApp(LatticeHost<Index<Keyword, ACell>> host) {
+        super(FILES_ROOT, host, Keywords.FS);
+        files = dlfs().fork();                 // staged copy of :fs
+    }
+}
+
+socialApp.social.user(ownerKey).feed().post("A staged post");
+socialApp.p2p(ownerKey).node().setNodeInfo(nodeInfo); // immediately in the shared :p2p region
+socialApp.social.sync();  // publishes :social into the host root, preserving :fs and :p2p
+filesApp.files.sync();    // publishes :fs
+host.sync();              // persistence and propagation are separate
 ```
 
-Social and Files here are applications in the plain sense. Each groups domain
-components with their own boundaries and chooses when to call these operations. They
-need no common private root or combined lattice. P2P views obtained independently by
-both see the same state.
+Social and Files are two applications on one host. Each groups domain components
+with their own boundaries and chooses when to publish. They need no common private
+root or combined lattice. P2P views obtained independently by both see the same
+state. This is the shape of the [shared applications example](../../convex-integration/src/test/java/convex/lattice/SharedApplicationsExample.java).
 
 A staged component knows only its working copy, its destination cursor and its own
 lattice and policy. The destination can be a path inside any application tree.
@@ -484,12 +463,12 @@ Publication updates that cursor and stops; whoever provided the cursor controls 
 happens above it. Components construct missing containers; raw path cursors do not.
 
 Publication captures one snapshot of the working copy. If the destination is
-unchanged since the last publication, the snapshot is installed directly. Otherwise
-it is merged with the destination, with local edits as `own`: equal-timestamp local
-edits keep that precedence, and an unchanged working copy adopts the destination.
-Edits made during publication stay pending for the next sync. A live view needs no
-sync to observe root changes; a staged component sees them when its policy calls
-sync, which reconciles and publishes in one step.
+unchanged since the last publication, the snapshot is installed directly; if the
+working copy is unchanged, it adopts the destination. Only when both changed are they
+merged, with local edits as `own`, so equal-timestamp local edits keep that
+precedence. Edits made during publication stay pending for the next sync. A live view
+needs no sync to observe root changes; a staged component sees them when its policy
+calls sync, which reconciles and publishes in one step.
 
 Reconciliation at a signed slot follows the signed lattice's rule. When the result
 equals either input's payload, that envelope is reused and no signer is needed. A
@@ -504,15 +483,24 @@ published paths, capture the immutable host root once and read each path from th
 value. An operation that must change several paths atomically uses a transaction at
 their common ancestor.
 
-An application constructed over a host is staged at the whole root: its sync
-reconciles its copy with the host region by region under its lattice, so unchanged
-regions adopt the host's value and edited ones merge. Regions its lattice does not
-declare are never published; they always adopt the host's value, so a staged
-application cannot overwrite or remove what another application owns. Several such
-applications may share a host. The whole root, a domain region and an owner's slot are three
-legitimate boundaries; choose by what the application edits. A relay stages or lives
-at the whole root, a domain grouping forks its region, and an owner's batched edits
-want a signed component, because only there can a new payload be signed.
+An application constructed with the staged constructor is staged at the whole root.
+Its sync merges its copy with the host under its lattice: declared regions merge with
+local edits as `own`, and regions its lattice does not declare are never published
+and always adopt the host's value, so it cannot overwrite or remove what another
+application owns. A declared region it did not edit follows the lattice rule rather
+than adopting, which differs only on an exact tie. Regions that the application's own
+staged components publish are not reconciled here: each such component publishes
+through its own fork of the host, beside the staged root, and the root's merge takes
+those regions from the host. Nesting a staged component inside a staged root is the
+shape to avoid.
+
+**Open decision.** Whether whole-root staging remains a supported shape at all. No
+application in the codebase uses it; the worked examples are live at the root with
+staged regions below. If it stays, the paragraph above is its contract. Either way the
+whole root, a domain region and an owner's slot are the three boundaries, chosen by
+what the application edits: a relay lives at the whole root, a domain grouping forks
+its region, and an owner's batched edits want a signed component, because only there
+can a new payload be signed.
 
 These boundaries are not an access-control boundary between code sharing a process.
 Verification is bound to the lattice instances, configured before use.
@@ -553,11 +541,11 @@ public void sync() {
 }
 ```
 
-There is no component registry, parent link, scheduler or hidden worker. This is not
-an atomic transaction across components: a completed publication stands if a later
-one fails. An application staged at the whole root can use `beforeSync()` to publish
-its children into its working copy before publishing the enclosing snapshot. That is
-a boundary the application chooses, not required scaffolding.
+There is no component registry, parent link, scheduler or hidden worker, and no
+atomic transaction across components: a completed publication stands if a later one
+fails. Each signed component publishes through its own fork of the host path it owns.
+An application's `beforeSync()` hook is simply a place to call those syncs before it
+publishes any root-level state of its own.
 
 ## Component transactions
 
@@ -615,11 +603,10 @@ rather than treated as a conflict, though verification, signing or storage can s
 fail. This is separate from publication and durability:
 
 ```java
-Social forked = social.fork();
+Social forked = social.fork();  // social is live in the host root
 forked.user(myKey).feed().post("Post 1");
 forked.user(myKey).feed().post("Post 2");
-forked.sync();   // merge into the enclosing working component
-app.sync();      // checkpoint owners and publish to host
+forked.sync();   // merge the fork's region into the host root
 host.sync();     // persist and propagate the hosted root
 host.flush();    // optional physical durability barrier, a host operation
 ```
@@ -780,146 +767,40 @@ one. The stamped cursor timestamps each changed local write, and a delete is a
 read-modify-write that dissociates a key. Missing maps or vectors below the leaf are
 constructed by the component's write; navigation does not infer container types.
 
-## Proposed lifecycle and subscriptions
+## Lifecycle and subscriptions (open)
 
-**Design proposal.** The root merge API and ownership hierarchy are implemented; the
-lifecycle and subscription signatures below remain proposals. They build on CAD024
-for merge semantics, CAD035 for cursor atomicity, CAD036 for hosting, CAD038 for
-ownership and CAD045 for application composition, and need corresponding CAD updates
-before being described as normative.
+**Not implemented; principles agreed.** Root merge, ownership and publication are
+implemented. Application lifecycle and subscriptions are intended but undecided in
+detail, and need corresponding CAD updates before being described as normative.
 
-### Responsibilities
-
-An application remains a typed component at the complete root. Its lattice is
-sufficient for root merging; domain subclasses add component factories. Lifecycle
-and subscriptions manage active work and replication demand without becoming another
-source of merge semantics.
-
-| Object | Responsibility |
-|---|---|
-| Lattice host | Shared authoritative cursor, optional storage and host services |
-| Application component | Root merge API; optionally domain factories, lifecycle and subscriptions |
-| Subscription | Interest in one subtree, a live cursor and optional change observers |
-| Domain component | Lightweight domain API around a cursor at one path |
-
-The host remains the host abstraction. A local root supports the same application
-API as a root hosted by a node; the node adds replication. Each application supplies
-its own region definitions; the host holds none. Applications sharing a host may
-overlap in regions provided they use the same lattice for each shared region.
-
-### Basic hosted setup
+The intended shape: an application has a lifecycle (launch and close) and obtains
+typed subscriptions from its lattice tree, each a live cursor at one subtree with
+optional change observers. The lattice and domain factory establish a subscription's
+value type; unknown paths fail at creation; an absent value at a known path is valid.
+Component creation opens no connections, starts no workers and installs no observers.
+Launch runs against a locally usable host, not one that has contacted every peer, and
+close releases the application's registrations without closing the shared host, store
+or peer groups.
 
 A basic installation should need only the application setup, a store and optional
-network settings. Standard setup assembles the host, the receiving applications and
-ordinary propagation internally; callers should not wire listeners, propagators or
-publication callbacks for this case.
-
-Setup restores the retained root before constructing staged applications, configures
-which applications receive incoming values before accepting traffic, and starts
-transports last. Shutdown stops incoming traffic, lets application shutdown policy
-complete, publishes and flushes the host's already-published state, then releases
-owned resources. It never forces private application drafts to publish. A
-caller-supplied store remains caller-owned, and the host remains accessible.
-
-The default local setup creates no network workers. Where networking is requested,
-it has an explicit lifecycle owner. Advanced callers can still supply their own
-propagation groups, transport and publication timing.
+network settings: standard setup assembles the host, the receiving applications and
+ordinary propagation, restores the retained root before constructing applications,
+configures receivers before accepting traffic and starts transports last. Shutdown
+stops incoming traffic, publishes and flushes already-published host state and never
+forces private drafts to publish. `RelayHost.open` is the first step in that
+direction.
 
 **Design decision:** applications always initiate their own publication. Incoming
 delivery invokes application merge and nothing else: no automatic sync, no
 preparation hook. An application may publish immediately in its event handling,
-batch changes, or wait for a user action. These are application semantics, not modes
-imposed by the host. Host publication persists and propagates only state already
-published into the host; receiving a value never permits publishing an application's
-pending edits.
+batch changes, or wait for a user action. Host publication persists and propagates
+only state already published into the host; receiving a value never permits
+publishing an application's pending edits.
 
 Signing establishes responsibility for the entire signed subtree. Its owner is
 responsible for merging and publishing that tree, including coordinating several
 writers using the same signing identity. Non-owner peers never synthesise signed
 values, and there is no hidden logical clock.
-
-### API sketch
-
-These signatures show the proposed public surface; they are not compilable examples
-against the current implementation. Paths use canonical CVM keys.
-
-```java
-public abstract class ALatticeApplication<V extends ACell>
-        extends ALatticeComponent<V> implements AutoCloseable {
-    protected ALatticeApplication(ALattice<V> lattice, LatticeHost<V> host);
-
-    public final ALattice<V> getLattice();
-    public V merge(V other);
-
-    public final void launch();
-    public final void close();
-
-    public final <T extends ACell> LatticeSubscription<T> subscribe(ACell... path);
-    public V sync();
-    public final CompletionStage<Void> pull();
-
-    protected abstract void onLaunch();
-    protected void onClose();
-    protected LatticeContext writeContext(LatticeContext inherited);
-    protected void onError(Throwable failure);
-}
-
-public interface LatticeSubscription<V extends ACell> extends AutoCloseable {
-    AForkableCursor<V> cursor();
-    AutoCloseable watch(Consumer<V> observer);
-    void close();
-}
-```
-
-The lattice and domain factory establish a subscription's value type, not inference
-from a raw path. Unknown paths fail at subscription creation; an absent value at a
-known path is valid. The default write context inherits host policy; an override
-supplies the application's write policy before binding cursors. The default error
-handler logs asynchronous failures.
-
-```java
-public final class MyApplication extends ALatticeApplication<Index<Keyword, ACell>> {
-    private Feed feed;
-
-    public MyApplication(LatticeHost<Index<Keyword, ACell>> host) {
-        super(LATTICE, host);
-    }
-
-    @Override
-    protected void onLaunch() {
-        LatticeSubscription<Index<Blob, ACell>> posts = subscribe(FEED_PATH);
-        feed = Feed.connect(posts.cursor());
-        posts.watch(this::refreshTimeline);
-    }
-}
-
-MyApplication app = new MyApplication(node.getHost());
-app.launch();  // node already launched and configured
-// The same application can launch against a standalone LatticeHost.
-```
-
-The feed factory above is a proposed cursor-based component factory. Component
-creation opens no connections, starts no workers and installs no observers.
-
-### Launch and close
-
-- Applications and peer groups are configured before host launch. Application
-  launch binds its policy and runs the launch hook against a ready host. Ready means
-  locally usable, not that every remote peer has been contacted.
-- Application launch is single-use. If the launch hook fails, registrations made
-  during launch are released and the host and other applications keep running.
-- Subscribing is valid during launch and while running. It establishes a local view
-  immediately and requests replication through the host's configured services,
-  without waiting for network acquisition. Local-only hosts create the same view
-  without network activity.
-- Application policy supplies signing and timestamp capabilities before writes
-  begin. Merge authorisation is bound to the application's lattice instances; the
-  application's signing capability does not replace it.
-- Close is idempotent. It stops accepting subscriptions, invokes the close hook and
-  releases all registrations even if cleanup fails. It does not close the shared
-  host, store or peer groups.
-- Closing a subscription releases its interest and observers; it does not erase
-  state or revoke cursor views already created.
 
 ### Interests as restricted lattice views
 
@@ -966,23 +847,16 @@ interest.
 
 ### Observation contract
 
-Subscribing establishes interest; watching optionally observes the resulting state.
-Closing a watch leaves the subscription active. Each watch receives an initial
-snapshot, then changed values at its path. Absence is a null value, not a missing
-notification. The immutable CVM value is the snapshot; no wrapper or revision token
-is needed.
-
-Registration captures the initial value and establishes delivery without a gap in
-which a committed update can be missed. Notifications cover local atomic writes,
-fork merges into the live tree and accepted remote merges. An ancestor replacement
-notifies a descendant watch if its value changes; a no-op merge does not.
-
-Delivery is asynchronous, serial per watch and follows local installation order.
-Pending states may coalesce to the latest snapshot, with bounded pending work per
-watch; callbacks observe state, they are not a durable event log. A slow or failing
-callback blocks neither state installation nor another watch; failures go to the
-application's error handler. Fork-local changes remain private until merged into the
-live tree.
+Subscribing establishes interest; watching optionally observes the resulting state,
+and closing a watch leaves the subscription active. Each watch receives an initial
+snapshot, then changed values at its path, with absence as a null value; the
+immutable CVM value is the snapshot. Registration leaves no gap in which a committed
+update can be missed. Notifications cover local atomic writes, fork merges into the
+live tree and accepted remote merges; an ancestor replacement notifies a descendant
+watch only if its value changes. Delivery is asynchronous, serial per watch and in
+local installation order; pending states may coalesce to the latest snapshot, so
+callbacks observe state and are not a durable event log. A slow or failing callback
+blocks neither state installation nor another watch.
 
 ### Atomic operations and synchronisation
 

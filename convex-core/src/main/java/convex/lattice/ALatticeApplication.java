@@ -77,14 +77,16 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	}
 
 	/**
-	 * Application-defined preparation for publication, normally checkpointing owned
-	 * signing components into this application's working cursor. No generic registry
+	 * Application-defined preparation for publication, normally syncing the
+	 * components that publish through their own forks of the host before this
+	 * application publishes any root-level state of its own. No generic registry
 	 * is maintained. Failure prevents this call from publishing the application;
-	 * child checkpoints already completed remain in its working state for retry.
-	 * The hook may be called concurrently and must use thread-safe component APIs.
-	 * Call application {@code sync()} to run this lifecycle: syncing an individual
-	 * child or the exposed cursor does not invoke this hook. This hook does not make
-	 * checkpoints of multiple independently editable children one atomic transaction.
+	 * component publications already completed stand. The hook may be called
+	 * concurrently and must use thread-safe component APIs. Call application
+	 * {@code sync()} to run this lifecycle: syncing an individual component or the
+	 * exposed cursor does not invoke this hook. This hook does not make the
+	 * publications of several independently editable components one atomic
+	 * transaction.
 	 */
 	protected void beforeSync() {
 	}

@@ -279,7 +279,8 @@ class is still open.
 ## 13. In flight: application-private working state
 
 **Status:** Implemented on the branch; described in LATTICE_APPLICATIONS under
-*Batched signing and application preparation*.
+*Batched signing*. Since 16 October 2026 a signed component publishes through its own
+fork of the host, not into an enclosing application's working copy.
 
 `ALatticeComponent` gains a constructor taking a lattice and a publication
 destination, with private working state that publishes one snapshot into the

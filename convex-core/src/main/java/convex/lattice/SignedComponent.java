@@ -15,9 +15,11 @@ import convex.lattice.generic.SignedLattice;
  * the payload may require another signature. An unchanged publication does not
  * sign. The bound lattice supplies both the merge and the authorisation rule.</p>
  *
- * <p>Sync stops at the destination cursor. An application can checkpoint its
- * owned components in {@link ALatticeApplication#beforeSync()} before publishing
- * its own working state. This component retains no parent component or store.</p>
+ * <p>Sync publishes through this component's own fork of its destination and stops
+ * there. Give it a path in the host, not a path inside another staged component's
+ * working copy; an application syncs its signed components in
+ * {@link ALatticeApplication#beforeSync()} before publishing root-level state of
+ * its own. This component retains no parent component or store.</p>
  *
  * <p>Domain components may extend this class to add operations directly over
  * {@link #cursor()}, inheriting verification, batched signing and publication.
