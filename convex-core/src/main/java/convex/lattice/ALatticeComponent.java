@@ -92,8 +92,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/**
 	 * Creates a publication boundary whose destination has a different stored type.
 	 * The fork receives closures over this component, resolved at publication time:
-	 * {@code prepare} runs under the component's context then, and reconciliation
-	 * goes through {@link #mergePublication}.
+	 * {@code prepare} runs under the component's context then, and the merge goes
+	 * through {@link #mergePublication}.
 	 */
 	protected <P extends ACell> ALatticeComponent(ALattice<V> lattice, ACursor<P> destination,
 			Function<P,V> read, BiFunction<LatticeContext,V,P> prepare) {
@@ -101,25 +101,24 @@ public abstract class ALatticeComponent<V extends ACell> {
 		Objects.requireNonNull(prepare,"Prepare function must not be null");
 		owned=ForkedCursor.create(destination,read,
 			value -> prepare.apply(getContext(),value),
-			(baseline,own,other) -> mergePublication(lattice,baseline,own,other));
+			(own,other) -> mergePublication(lattice,own,other));
 		cursor=owned;
 	}
 
 	/**
-	 * Reconciles a publication snapshot with a changed destination. The local edit
-	 * is own, including on timestamp ties. An unchanged local value adopts the
-	 * destination. Applications may override this to delegate subtrees to their
-	 * components, including signing a combined payload. Overrides must use only
-	 * the supplied values and must not mutate live working cursors or publish.
+	 * Merges a publication snapshot with a destination that changed since the snapshot
+	 * was last reconciled. The fork calls this only when both sides changed; an
+	 * unchanged side is adopted by the fork itself. The local snapshot is own,
+	 * including on timestamp ties. Applications override this to choose which regions
+	 * they publish; a region published by a component of its own is taken from the
+	 * destination. Overrides must use only the supplied values and must not mutate
+	 * live working cursors or publish.
 	 *
 	 * <p>Runs inside the owned fork's sync, outside atomic update callbacks, once per
-	 * distinct destination value. On retry, own is the previous prepared result and
-	 * baseline is the destination it was reconciled against. This permits unchanged
-	 * signatures to be reused.</p>
+	 * distinct destination value. On retry, own is the previous prepared result, so
+	 * unchanged signatures are reused.</p>
 	 */
-	protected V mergePublication(ALattice<V> lattice,V baseline,V own,V other) {
-		if (Utils.equals(own,baseline)) return other;
-		if (Utils.equals(other,baseline) || Utils.equals(own,other)) return own;
+	protected V mergePublication(ALattice<V> lattice,V own,V other) {
 		return lattice.merge(getContext(),own,other);
 	}
 

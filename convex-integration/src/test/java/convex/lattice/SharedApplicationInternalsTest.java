@@ -48,7 +48,6 @@ import convex.lattice.ALattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.SignedLattice;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Root;
 import convex.lattice.cursor.Cursors;
 import convex.node.LatticeFilter;
 import convex.node.LatticeListener;
@@ -106,12 +105,12 @@ public class SharedApplicationInternalsTest {
 		WorkingApplication(LatticeHost<Index<Keyword,ACell>> host,boolean socialApp,Runnable signing) {
 			super(HOST_ROOT,host);
 			if (socialApp) {
-				socialState=owned(context(SOCIAL_KEY,signing),Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
+				socialState=owned(host,context(SOCIAL_KEY,signing),Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
 				social=Social.connect(this,socialState.getContext()).user(SOCIAL_KEY.getAccountKey()).withCursor(socialState.cursor());
 				files=null;
 				fileState=null;
 			} else {
-				fileState=owned(context(FILES_KEY,signing),Keywords.FS,FILES_KEY.getAccountKey());
+				fileState=owned(host,context(FILES_KEY,signing),Keywords.FS,FILES_KEY.getAccountKey());
 				files=DLFSRegion.connect(resolve(Keywords.FS),host.store()).drives(FILES_KEY.getAccountKey())
 					.withCursor(fileState.cursor());
 				files.setContext(fileState.getContext());
@@ -119,15 +118,22 @@ public class SharedApplicationInternalsTest {
 				socialState=null;
 			}
 			AccountKey nodeOwner=(socialApp?COMMON_KEY:FILES_KEY).getAccountKey();
-			nodeState=owned(context(socialApp?SOCIAL_KEY:FILES_KEY,signing),Keywords.P2P,Keywords.NODES,nodeOwner);
+			nodeState=owned(host,context(socialApp?SOCIAL_KEY:FILES_KEY,signing),Keywords.P2P,Keywords.NODES,nodeOwner);
 			node=P2PUser.create(this,nodeOwner).node().withCursor(nodeState.cursor());
 		}
 
+		/**
+		 * Each owned subtree publishes through its own fork of the host, beside this
+		 * application's staged root. Its fork reconciles only that subtree, so the
+		 * root's merge never has to ask which subtrees this application touched.
+		 */
 		@SuppressWarnings("unchecked")
-		private <T extends ACell> SignedComponent<T> owned(LatticeContext context,ACell... path) {
+		private <T extends ACell> SignedComponent<T> owned(LatticeHost<Index<Keyword,ACell>> host,
+				LatticeContext context,ACell... path) {
 			ALattice<?> lattice=getLattice();
 			for (ACell key:path) lattice=lattice.path(key);
-			var component=new SignedComponent<>((SignedLattice<T>)lattice,this.<SignedData<T>>resolve(path));
+			var component=new SignedComponent<>((SignedLattice<T>)lattice,
+				ALatticeComponent.<SignedData<T>>resolve(host.cursor(),getLattice(),path));
 			component.setContext(context);
 			return component;
 		}
@@ -136,23 +142,6 @@ public class SharedApplicationInternalsTest {
 			if (socialState!=null) socialState.sync();
 			if (fileState!=null) fileState.sync();
 			nodeState.sync();
-		}
-
-		@Override protected Index<Keyword,ACell> mergePublication(ALattice<Index<Keyword,ACell>> lattice,
-				Index<Keyword,ACell> baseline,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			// Prepare immutable snapshot changes using ordinary typed path navigation.
-			var result=new Root<>(other);
-			if (socialState!=null) reconcile(result,socialState,baseline,own,other,
-				Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
-			if (fileState!=null) reconcile(result,fileState,baseline,own,other,Keywords.FS,FILES_KEY.getAccountKey());
-			reconcile(result,nodeState,baseline,own,other,Keywords.P2P,Keywords.NODES,node.owner());
-			return result.get();
-		}
-
-		private <T extends ACell> void reconcile(Root<Index<Keyword,ACell>> result,SignedComponent<T> component,
-				Index<Keyword,ACell> baseline,Index<Keyword,ACell> own,Index<Keyword,ACell> other,ACell... path) {
-			SignedData<T> value=component.mergePublication(RT.getIn(baseline,path),RT.getIn(own,path),RT.getIn(other,path));
-			if (value!=null) ALatticeComponent.<SignedData<T>>resolve(result,getLattice(),path).set(value);
 		}
 	}
 
@@ -175,7 +164,7 @@ public class SharedApplicationInternalsTest {
 		assertNotNull(published.getPost(a));
 		assertNotNull(published.getPost(b));
 		assertEquals(2,published.count());
-		assertEquals(3,signatures.get(),"Two initial envelopes plus one combined signature");
+		assertEquals(2,signatures.get(),"The first envelope, then one combined signature");
 		assertNull(host.getContext().getSigningKey());
 	}
 

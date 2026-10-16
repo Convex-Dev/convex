@@ -146,7 +146,11 @@ time: `AForkableCursor.fork(merge)` returns a `ForkedCursor` whose `sync()` publ
 by compare-and-set and reconciles through the supplied function when the destination
 has moved. The merge-less `fork()`, cursor-level `sync()` elsewhere and
 `PublishingCursor` are gone; a component with a publication boundary owns such a
-fork and supplies its lattice merge, under its context, as the function.
+fork and supplies its lattice merge, under its context, as the function. The merge
+function is two-way: the fork alone tracks the value it last reconciled against and
+decides when a merge is needed. A composite application publishes each owned subtree
+through that subtree's own fork of the host rather than reconciling subtrees inside
+the root's merge, so no baseline is ever handed to a merge function.
 
 Before this decision two forks existed. A component fork (`Social.fork()`,
 `LatticeKV.fork()`, a `DLFSDrive` fork) was a new component whose private working

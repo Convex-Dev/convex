@@ -33,14 +33,15 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 
 	/**
 	 * Creates an isolated working copy of this cursor. Its {@link ForkedCursor#sync()}
-	 * publishes the working snapshot here by compare-and-set, applying {@code merge}
-	 * with the working snapshot as own whenever this cursor has moved in between. An
-	 * unchanged working copy adopts this cursor's value instead.
+	 * publishes the working snapshot here by compare-and-set and applies {@code merge},
+	 * with the working snapshot as own, only when both this cursor and the copy have
+	 * changed since they were last reconciled. An unchanged copy adopts this cursor's
+	 * value; an unchanged cursor takes the copy's.
 	 *
 	 * @param merge Merge of own and other, typically a lattice merge under a context
 	 * @return Working copy initialised to this cursor's current value
 	 */
 	public ForkedCursor<V> fork(BinaryOperator<V> merge) {
-		return ForkedCursor.create(this,Reconciler.of(merge));
+		return ForkedCursor.create(this,merge);
 	}
 }

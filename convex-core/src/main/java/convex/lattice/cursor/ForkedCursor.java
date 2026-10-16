@@ -11,16 +11,17 @@ import convex.core.data.ACell;
 import convex.core.util.Utils;
 
 /**
- * An isolated working copy of a destination cursor, reconciled by a plug-in
- * function when it publishes.
+ * An isolated working copy of a destination cursor, merged by a plug-in function
+ * when it publishes.
  *
  * <p>Edits apply to private working storage and are invisible at the destination
- * until {@link #sync()}. Sync publishes one working snapshot by compare-and-set,
- * retrying while the destination moves: each retry reconciles the candidate with
- * the destination's new value through the supplied {@link Reconciler}, with the
- * working edits in the own position. Edits that land in the working copy during a
- * sync stay pending for the next one. Publication stops at the destination and never
- * publishes that cursor further.</p>
+ * until {@link #sync()}. Sync publishes one working snapshot by compare-and-set and
+ * retries while the destination moves. The fork tracks the destination value the
+ * working copy was last reconciled against: an unchanged working copy adopts the
+ * destination, an unchanged destination keeps the working snapshot, and only when
+ * both have changed does the supplied merge run, with the working snapshot as own.
+ * Edits that land in the working copy during a sync stay pending for the next one.
+ * Publication stops at the destination and never publishes that cursor further.</p>
  *
  * <p>The fork knows no lattice, context or signing policy: the functions it is
  * given carry whatever policy their owner closed over. A type-changing destination,
@@ -36,15 +37,15 @@ import convex.core.util.Utils;
 public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	private final Target<V,?> target;
-	private final Reconciler<V> reconciler;
+	private final BinaryOperator<V> merge;
 	private final Root<V> working;
 	private final ReentrantLock syncLock=new ReentrantLock();
 
 	private <P extends ACell> ForkedCursor(ACursor<P> destination,Function<P,V> read,
-			Function<V,P> prepare,Reconciler<V> reconciler) {
+			Function<V,P> prepare,BinaryOperator<V> merge) {
 		Target<V,P> t=new Target<>(destination,read,prepare);
 		this.target=t;
-		this.reconciler=reconciler;
+		this.merge=merge;
 		this.working=destination.supportsExclusiveTransactions()
 			?new TransactionalRootCursor<>(t.baseline):new Root<>(t.baseline);
 	}
@@ -54,11 +55,11 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	 *
 	 * @param <V> Value type
 	 * @param destination Cursor the copy publishes into
-	 * @param reconciler Reconciliation applied when the destination has moved
+	 * @param merge Merge of own and other, applied only when both have changed
 	 * @return Working copy initialised to the destination's current value
 	 */
-	public static <V extends ACell> ForkedCursor<V> create(ACursor<V> destination,Reconciler<V> reconciler) {
-		return create(destination,Function.identity(),Function.identity(),reconciler);
+	public static <V extends ACell> ForkedCursor<V> create(ACursor<V> destination,BinaryOperator<V> merge) {
+		return create(destination,Function.identity(),Function.identity(),merge);
 	}
 
 	/**
@@ -69,24 +70,25 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	 * @param destination Cursor the copy publishes into
 	 * @param read Projection from a stored value to a working value
 	 * @param prepare Authoring of a stored value from a working value, such as signing
-	 * @param reconciler Reconciliation applied when the destination has moved
+	 * @param merge Merge of own and other, applied only when both have changed
 	 * @return Working copy initialised to the destination's current value
 	 */
 	public static <V extends ACell,P extends ACell> ForkedCursor<V> create(ACursor<P> destination,
-			Function<P,V> read,Function<V,P> prepare,Reconciler<V> reconciler) {
+			Function<P,V> read,Function<V,P> prepare,BinaryOperator<V> merge) {
 		return new ForkedCursor<>(
 			Objects.requireNonNull(destination,"Destination must not be null"),
 			Objects.requireNonNull(read,"Read function must not be null"),
 			Objects.requireNonNull(prepare,"Prepare function must not be null"),
-			Objects.requireNonNull(reconciler,"Reconciler must not be null"));
+			Objects.requireNonNull(merge,"Merge function must not be null"));
 	}
 
 	/**
 	 * Publishes the current working snapshot into the destination.
 	 *
-	 * <p>Reconciliation runs outside atomic update callbacks, once per distinct
-	 * destination value. The returned value is exactly what was published; working
-	 * edits made during the sync remain pending.</p>
+	 * <p>The merge runs outside atomic update callbacks, once per distinct
+	 * destination value and only when both sides changed. The returned value is
+	 * exactly what was published; working edits made during the sync remain
+	 * pending.</p>
 	 *
 	 * @return Published value
 	 */
@@ -94,13 +96,13 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 		syncLock.lock();
 		try {
 			V snapshot=working.get();
-			V published=target.publish(snapshot,reconciler);
+			V published=target.publish(snapshot,merge);
 			V expected=snapshot;
 			V candidate=published;
 			while (!working.compareAndSet(expected,candidate)) {
 				V current=working.get();
 				// New working edits are own; the published value is what they reconcile with.
-				candidate=reconciler.reconcile(expected,current,candidate);
+				candidate=reconcile(merge,expected,current,candidate);
 				if (Utils.equals(current,candidate)) break;
 				expected=current;
 			}
@@ -108,6 +110,16 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 		} finally {
 			syncLock.unlock();
 		}
+	}
+
+	/**
+	 * Decides whether a merge is needed. An unchanged own adopts other; an unchanged
+	 * other, or equal values, keep own; otherwise the merge decides.
+	 */
+	private static <V extends ACell> V reconcile(BinaryOperator<V> merge,V baseline,V own,V other) {
+		if (Utils.equals(own,baseline)) return other;
+		if (Utils.equals(other,baseline) || Utils.equals(own,other)) return own;
+		return merge.apply(own,other);
 	}
 
 	/** The destination side of a fork, holding the stored-type functions and the baseline. */
@@ -125,10 +137,10 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 			this.baseline=read.apply(destination.get());
 		}
 
-		V publish(V snapshot,Reconciler<V> reconciler) {
+		V publish(V snapshot,BinaryOperator<V> merge) {
 			P observed=destination.get();
 			V currentValue=read.apply(observed);
-			V candidate=reconciler.reconcile(baseline,snapshot,currentValue);
+			V candidate=reconcile(merge,baseline,snapshot,currentValue);
 			V preparedValue=null;
 			P prepared=null;
 			boolean hasPrepared=false;
@@ -149,9 +161,9 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 				}
 				P current=destination.get();
 				V nextValue=read.apply(current);
-				// An unrelated ancestor write or equal replacement needs no new reconciliation.
+				// An unrelated ancestor write or equal replacement needs no new merge.
 				if (!Utils.equals(nextValue,currentValue)) {
-					candidate=reconciler.reconcile(currentValue,candidate,nextValue);
+					candidate=reconcile(merge,currentValue,candidate,nextValue);
 				}
 				observed=current;
 				currentValue=nextValue;

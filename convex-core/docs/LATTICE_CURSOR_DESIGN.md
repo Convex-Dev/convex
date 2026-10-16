@@ -105,7 +105,9 @@ reuses a prepared signature.
 
 A component with an independent publication boundary owns such a fork and supplies
 its lattice merge under its context; `ALatticeComponent.mergePublication` is that
-component's reconciler, and applications override it to delegate signed subtrees.
+component's merge, called only when both sides changed. An application overrides it
+to take regions that its own components publish from the destination; each such
+component publishes through its own fork of the host.
 For a detached snapshot use `Root.create(cursor.get())`; atomic multi-step edits use
 `Transactions`.
 

@@ -19,7 +19,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
-import convex.core.util.Utils;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.CompareLattice;
@@ -63,7 +62,10 @@ public class ApplicationPublicationTest {
 
 		Application(LatticeHost<Index<Keyword,ACell>> host) {
 			super(LATTICE,host);
-			owner=new SignedComponent<>(SIGNED,resolve(OWNED));
+			// The owned subtree publishes through its own fork of the host, beside this
+			// application's staged root, so each fork reconciles only what it owns.
+			owner=new SignedComponent<>(SIGNED,
+				ALatticeComponent.<SignedData<ASet<CVMLong>>>resolve(host.cursor(),LATTICE,OWNED));
 			owner.setContext(new LatticeContext() {
 				@Override public AKeyPair getSigningKey() { return KEY; }
 				@Override public <T extends ACell> SignedData<T> sign(AccountKey key,T value) {
@@ -84,13 +86,13 @@ public class ApplicationPublicationTest {
 		}
 		@Override protected void beforeSync() { owner.sync(); }
 
+		/** Called only when both this root and the host changed: the owned subtree is
+		 *  the owner component's to publish, so it is taken from the destination. */
 		@Override protected Index<Keyword,ACell> mergePublication(ALattice<Index<Keyword,ACell>> lattice,
-				Index<Keyword,ACell> baseline,Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
-			var result=other.assoc(OWNED,owner.mergePublication(signed(baseline),signed(own),signed(other)));
+				Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 			CVMLong local=(CVMLong)own.get(REGISTER);
-			CVMLong base=(CVMLong)baseline.get(REGISTER);
 			CVMLong remote=(CVMLong)other.get(REGISTER);
-			return result.assoc(REGISTER,Utils.equals(local,base)?remote:LWW.merge(local,remote));
+			return other.assoc(REGISTER,LWW.merge(local,remote));
 		}
 	}
 
@@ -111,11 +113,11 @@ public class ApplicationPublicationTest {
 		assertEquals(Sets.of(0,1,2),signed(host.cursor().get()).getValue());
 		assertTrue(SIGNED.checkForeign(signed(host.cursor().get())));
 		assertEquals(1,first.signatures.get());
-		assertEquals(2,second.signatures.get());
-		assertEquals(Sets.of(0,2),second.owner.cursor().get(),"Snapshot reconciliation must not mutate the live owner");
+		assertEquals(1,second.signatures.get(),"The combined payload is signed once");
+		assertEquals(Sets.of(0,1,2),second.owner.cursor().get(),"A fork adopts what it published");
 		second.sync();
 		assertEquals(Sets.of(0,1,2),second.owner.cursor().get());
-		assertEquals(2,second.signatures.get(),"An unchanged subsequent publication must not sign");
+		assertEquals(1,second.signatures.get(),"An unchanged subsequent publication must not sign");
 		assertNull(host.getContext().getSigningKey());
 	}
 
@@ -166,7 +168,7 @@ public class ApplicationPublicationTest {
 		CountDownLatch signing=new CountDownLatch(1);
 		CountDownLatch resume=new CountDownLatch(1);
 		second.onSign=() -> {
-			if (second.signatures.get()==2) {
+			if (second.signatures.get()==1) {
 				signing.countDown();
 				try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
 				catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
@@ -176,15 +178,14 @@ public class ApplicationPublicationTest {
 			var publication=executor.submit(second::sync);
 			try {
 				assertTrue(signing.await(10,TimeUnit.SECONDS));
+				// A working edit during the owner's publication stays pending and is
+				// reconciled into the working copy after the host CAS.
 				second.add(3);
-				// A concurrent child checkpoint also advances the application working
-				// root, exercising write-back reconciliation after the host CAS.
-				second.owner.sync();
 			} finally { resume.countDown(); }
 			publication.get(10,TimeUnit.SECONDS);
 		}
 		assertEquals(Sets.of(0,1,2),signed(host.cursor().get()).getValue());
-		assertEquals(Sets.of(0,1,2,3),signed(second.cursor().get()).getValue());
+		assertEquals(Sets.of(0,1,2,3),second.owner.cursor().get());
 		second.sync();
 		assertEquals(Sets.of(0,1,2,3),signed(host.cursor().get()).getValue());
 		assertTrue(signed(host.cursor().get()).checkSignature());
@@ -212,13 +213,12 @@ public class ApplicationPublicationTest {
 		var second=new Application(host);
 		first.add(1);
 		second.add(2);
-		second.owner.sync();
 		var signer=second.owner.getContext();
 		second.owner.setContext(LatticeContext.EMPTY);
 		first.sync();
 		assertThrows(IllegalStateException.class,second::sync);
 		assertEquals(Sets.of(0,1),signed(host.cursor().get()).getValue());
-		assertEquals(Sets.of(0,2),signed(second.cursor().get()).getValue());
+		assertEquals(Sets.of(0,2),second.owner.cursor().get(),"A failed publication leaves the working copy intact");
 		second.owner.setContext(signer);
 		second.sync();
 		assertEquals(Sets.of(0,1,2),signed(host.cursor().get()).getValue());

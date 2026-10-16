@@ -2,7 +2,6 @@ package convex.lattice;
 
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
-import convex.core.util.Utils;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.generic.SignedLattice;
 
@@ -61,32 +60,5 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	public V merge(SignedData<V> incoming) {
 		if (incoming==null || !lattice.checkForeign(incoming)) return cursor.get();
 		return cursor.updateAndGet(own -> lattice.getValueLattice().merge(getContext(),own,incoming.getValue()));
-	}
-
-	/**
-	 * Reconciles already-admitted signed snapshots for enclosing application
-	 * publication, without changing this component's working state. Local edits
-	 * are own on ties; unchanged local branches adopt the destination. Existing
-	 * envelopes are reused when selected, otherwise the combined payload is signed
-	 * here. Missing signing authority fails publication rather than losing a branch.
-	 */
-	public SignedData<V> mergePublication(SignedData<V> baseline,SignedData<V> own,SignedData<V> other) {
-		V base=value(baseline);
-		V local=value(own);
-		V remote=value(other);
-		if (Utils.equals(local,base)) return other;
-		if (Utils.equals(remote,base) || Utils.equals(local,remote)) return own;
-		V merged=lattice.getValueLattice().merge(getContext(),local,remote);
-		if (Utils.equals(merged,local)) return own;
-		if (Utils.equals(merged,remote)) return other;
-		if (merged==null) return null;
-		SignedData<V> signed=lattice.sign(getContext(),merged);
-		if (signed==null) throw new IllegalStateException(
-			"No authorised signer available for component owner "+lattice.getOwner());
-		return signed;
-	}
-
-	private static <T extends ACell> T value(SignedData<T> signed) {
-		return (signed==null)?null:signed.getValue();
 	}
 }

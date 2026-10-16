@@ -5,7 +5,6 @@ import java.util.Objects;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.AKeyedLattice;
 
@@ -144,9 +143,7 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 */
 	@Override
 	@SuppressWarnings("unchecked")
-	protected V mergePublication(ALattice<V> lattice,V baseline,V own,V other) {
-		if (Utils.equals(own,baseline)) return other;
-		if (Utils.equals(other,baseline) || Utils.equals(own,other)) return own;
+	protected V mergePublication(ALattice<V> lattice,V own,V other) {
 		V merged=lattice.merge(getContext(),own,other);
 		if (!(lattice instanceof AKeyedLattice<?,?> keyed) || !(other instanceof AMap<?,?>)) return merged;
 		if (merged==null) return other;
