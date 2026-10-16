@@ -323,28 +323,25 @@ same region.
 
 ## 16. The node is replication only
 
-**Status:** Agreed in principle (15 October 2026); implementation to review.
+**Status:** Implemented (`e166b6855` propagators, `c5c6a31a7` node). Decided
+16 October 2026 that the principle covers propagation groups as well.
 
 Decision: `NodeServer` replicates whatever it is given to its propagation sets.
-Update and merge semantics belong to the host and the application/component tree.
-Three things on the branch still put merge semantics in the node layer:
+Update and merge semantics belong to the host and the application/component tree,
+including for propagation groups: a propagator announces the host's published root
+through its publication filter and merges nothing.
 
-- The lattice-taking node constructor creates a host, installs a standard live
-  `LatticeApplication` as a relay, and restores the retained root at launch by
-  merging it through that application. This gives a second restore semantics beside
-  `LatticeHost.open`, which adopts the retained value.
-- The node carries a merge context which it pushes into the host and the relay
-  application.
-- A propagator constructed with a lattice keeps its own working view and pre-merges
-  it with node snapshots before announcing, with tie precedence for the node's
-  published state. A lattice-free propagator constructor also exists.
-
-Open: whether "replicate whatever it is given" covers only `NodeServer`, or also the
-propagator's working view and pre-merge. If the former, the lattice-taking node
-constructor and the node's merge context are the remaining items; if the latter,
-propagators would announce the host's published root through their filter with no
-merge of their own, and restoration becomes host assembly. The application-factory
-launch overload and the node's lattice accessor are already gone (`971790597`).
+Implemented as: `LatticePropagator` has no lattice, merge context, working view or
+store root of its own, and attaching needs no lattice. `NodeServer` is constructed
+from an assembled `LatticeHost` only; the lattice-taking constructors, the
+restore-by-merge at launch and the merge-context accessors are gone.
+`RelayHost.open(lattice, store, config, policy)` in convex-peer assembles the relay
+case, one live application over the whole lattice, with restore, transactional root
+and timestamp skew taken from node configuration. Restore adopts the retained root
+at open, as `LatticeHost.open` does. Incoming completeness is unchanged: the protocol
+endpoint acquires missing cells before the node's merge, and pulls acquire before
+returning. The application-factory launch overload and the node's lattice accessor
+went earlier (`971790597`).
 
 CAD text affected:
 
