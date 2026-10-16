@@ -73,8 +73,7 @@ neither object and does not copy keys, filters or handlers into the group. An
 application with several groups retains their references and selects the
 intended group explicitly for pulls and connection assignment.
 
-The deprecated propagator constructor taking `NodeConfig` and
-`LatticePropagatorConfig.from(NodeConfig)` preserve combined-map callers during
+`LatticePropagatorConfig.from(NodeConfig)` preserves combined-map callers during
 migration. New composition should construct the two configurations separately;
 matching key names do not imply inheritance.
 

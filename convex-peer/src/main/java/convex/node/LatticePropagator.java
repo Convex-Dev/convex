@@ -179,20 +179,6 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Compatibility constructor accepting the former combined configuration.
-	 *
-	 * @param store serving store for delta tracking and data resolution
-	 * @param connectionManager connection manager for outbound routes
-	 * @param config legacy combined configuration
-	 * @deprecated Supply {@link LatticePropagatorConfig} explicitly.
-	 */
-	@Deprecated
-	public LatticePropagator(AStore store,LatticeConnectionManager connectionManager,
-			NodeConfig config) {
-		this(store,connectionManager,legacyConfig(config));
-	}
-
-	/**
 	 * Creates a propagation group with application-supplied limits. Identity,
 	 * admission, projection and application hooks are optional policy configured
 	 * through the setters before attachment.
@@ -238,11 +224,6 @@ public class LatticePropagator implements Closeable {
 	 */
 	public LatticePropagator(AStore store,LatticePropagatorConfig config) {
 		this(store,new LatticeConnectionManager(store),config);
-	}
-
-	private static LatticePropagatorConfig legacyConfig(NodeConfig config) {
-		if (config==null) throw new IllegalArgumentException("Propagation config must not be null");
-		return LatticePropagatorConfig.from(config);
 	}
 
 	/** Observable lifecycle of one propagation policy group. */
