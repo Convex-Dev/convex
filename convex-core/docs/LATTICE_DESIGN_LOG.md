@@ -159,19 +159,15 @@ components and left `fork()` with overwrite semantics only. The decision moves t
 one real mechanism into the cursor layer, parameterised by a function the owner
 supplies, and the component fork becomes a cursor fork the component owns.
 
-Evidence (16 October 2026, from a compiler probe over the whole tree): no main code
-calls the bare form; every `.fork()` in main is a component fork or the unrelated CVM
-`Context.fork`. Three tests call it (`TransactionalComponentTest` twice,
-`StampedCursorTest` once) and none depends on overwriting a changed parent: one uses
-a raw fork as scratch under a component view and writes back, one checks the
-exclusive-transaction capability follows a fork, one checks a raw fork adopts the
-stamped value its destination view prepared. That last behaviour lives in
-`ForkedCursor.sync()` today and would need a home if the class went. Decision 15
-sharpens the question: every publisher must assume its destination changed under
-it, and this is the one publish path that does not. Alternatives: remove `fork()`
-and move the three tests to component forks or `Transactions.transact`; keep it
-under a name that says overwrite, so a forgotten lattice cannot pass for a merge; or
-leave it on javadoc alone.
+Evidence at the time (16 October 2026, from a compiler probe over the whole tree): no
+main code called the bare form; every `.fork()` in main was a component fork or the
+unrelated CVM `Context.fork`. Three tests called it and none depended on overwriting
+a changed parent. Decision 15 sharpened the question: every publisher must assume its
+destination changed under it, and the bare fork was the one publish path that did
+not. Chosen: the fork keeps its name and takes its merge function at fork time, so a
+forgotten lattice cannot pass for a merge; the three tests moved to component working
+state or a detached root. Adopting a value the destination view prepared, such as a
+stamp, is now a property of the fork's own publish loop (`StampedCursorTest`).
 
 CAD text affected:
 
