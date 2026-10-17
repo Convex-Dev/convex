@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A staged component whose keyed lattice declares only some of a container's keys no longer overwrites or removes the other keys when it publishes; undeclared keys adopt the destination. This holds at any level, including an application staged at the host root.
+- Merging a value at one owner's slot of an `OwnerLattice` now verifies the signer for that owner through the context, as merging through the owner map always did, and the context-free merge binds a direct-key owner to its signer. The lattice tree ends at a signed envelope: `SignedLattice.path` no longer continues to the unsigned value, so a path inside an envelope is outside the served lattice. Applications that accept incoming values at declared paths no longer re-apply signing rules along the path; the lattices do.
 - Reading an unset store root handles a null root hash, including explicitly supplied `NullStore` instances.
 - Big-integer sign queries handle empty zero representations and positive values with a leading sign byte consistently before and after Java value materialisation.
 - DLFS copies and moves work across drives and with other NIO providers; separate views of the same working drive support atomic rename and same-file detection.

@@ -3,10 +3,7 @@ package convex.lattice;
 import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.data.SignedData;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.generic.OwnerLattice;
-import convex.lattice.generic.SignedLattice;
 
 /**
  * Base class for an application participating in a lattice root.
@@ -154,33 +151,23 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	}
 
 	/**
-	 * Merges an incoming value at any path the root lattice declares, under this
-	 * application's context. A path may not enter a signed envelope, and a value
-	 * delivered at an owner slot must be signed by a key the context accepts for
-	 * that owner; an unauthorised owner value is ignored. An empty path merges the
-	 * root.
+	 * Merges an incoming value at any path the root lattice declares: the lattice at
+	 * the path merges it under this application's context, exactly as a component
+	 * owning that level would. The signing rules live in the lattices: an owner's slot
+	 * accepts only a value its owner authorised, and the lattice tree ends at a signed
+	 * envelope, so a path inside one is outside the served lattice. An empty path
+	 * merges the root.
 	 *
 	 * @param value Incoming value at the path
 	 * @param path Keys from the application root
 	 * @return Current application working root
-	 * @throws IllegalArgumentException if the path leaves the declared lattice or
-	 *         enters a signed envelope
+	 * @throws IllegalArgumentException if the path leaves the declared lattice
 	 */
 	@SuppressWarnings("unchecked")
 	protected V mergeDeclaredPath(ACell value, ACell... path) {
 		if (path.length==0) return merge((V)value);
-		ALattice<?> target=lattice;
-		for (int i=0;i<path.length;i++) {
-			if (target instanceof SignedLattice<?>) {
-				throw new IllegalArgumentException("Incoming path must include the complete signed envelope");
-			}
-			// Legacy owner maps bind their verification predicate through the context.
-			if (i==path.length-1 && target instanceof OwnerLattice<?> && value instanceof SignedData<?> signed
-					&& !getContext().verifyOwner(path[i],signed.getAccountKey())) return cursor.get();
-			target=target.path(path[i]);
-			if (target==null) throw new IllegalArgumentException("Path is outside the served lattice");
-		}
-		ALattice<ACell> child=(ALattice<ACell>)target;
+		ALattice<ACell> child=lattice.path(path);
+		if (child==null) throw new IllegalArgumentException("Path is outside the served lattice");
 		this.<ACell>resolve(path).updateAndGet(own -> child.merge(getContext(),own,value));
 		return cursor.get();
 	}

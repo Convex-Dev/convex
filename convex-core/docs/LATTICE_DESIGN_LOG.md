@@ -73,6 +73,12 @@ path can still read through the envelope, but `LatticeOps` refuses to write thro
 `SignedData`, because a record's `assoc` would silently degrade it to a map and drop
 the signature.
 
+The lattice schema kept a `:value` branch below `SignedLattice` as a description for
+tools; nothing used it. On 17 October the lattice tree was made to end at the
+envelope, so the merge tree and the schema tree are one tree, and a path inside an
+envelope is outside the served lattice. The owning component navigates the unsigned
+value with the owner lattice's value lattice.
+
 CAD text affected: the CAD035 Java example and the CAD045 *Cursor Chain* diagram both
 navigate `Keywords.VALUE`.
 
@@ -371,10 +377,14 @@ endpoint acquires missing cells before the node's merge, and pulls acquire befor
 returning. The application-factory launch overload and the node's lattice accessor
 went earlier (`971790597`).
 
-On 17 October the P2P node followed. `P2PNode.create` opens the host with
-`RelayHost.openHost`, configures `P2PApplication` on it as the receiver and attaches
-replication; nothing below the root is the node's. The application accepts every
-declared path through the base helper `mergeDeclaredPath`, and the node directory,
+On 17 October the P2P node followed (`3e08a8a35`). `P2PNode.create` opens the host
+with `RelayHost.openHost`, configures `P2PApplication` on it as the receiver and
+attaches replication; nothing below the root is the node's. The application accepts
+every declared path through the base helper `mergeDeclaredPath`, which is the lattice
+at the path merging under the application's context and nothing more: the signing
+rules it used to re-apply along the path now live in the lattices, where an owner's
+slot verifies its signer for its owner through the context and the lattice tree ends
+at a signed envelope. The node directory,
 social selection and bootstrap paths are the application's, read from its lattice. The
 node calls the application at the moments replication knows about, after the transport
 binds, when a peer is admitted and when an inbound value is accepted, and turns what it
@@ -397,15 +407,14 @@ root; it holds no lattice and performs no merge.
 
 **Status:** Open.
 
-Two things are now called application: the admission handler configured on the host
+Two things were called application: the admission handler configured on the host
 (an `ALatticeApplication`: root lattice, incoming merge, typed navigation, optional
 private working state) and a grouping of domain components forked at their own
-paths, which in the shared example extends nothing. Entry 15 removes the pressure to
-choose between them by allowing shared regions, so what remains is naming and the
-architecture table row "root merge and optional region factories". Options: the
-application is the admission handler and domain groupings are assembly code; or keep
-the application base class as the developer-facing concept and call the host-side
-list the admission policy.
+paths. Since 16 October the groupings in the shared example extend the application
+class too, so in code and manual "application" names one thing: the component at the
+host root. What remains is whether the host-side configured list is called
+applications or admission policy, and the architecture table row "root merge and
+optional region factories".
 
 CAD text affected: CAD045 *Application Architecture* layer table.
 

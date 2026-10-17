@@ -3,9 +3,6 @@ package convex.lattice.generic;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 
-import convex.core.cvm.Keywords;
-import convex.core.data.ABlob;
-import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
@@ -120,9 +117,13 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	}
 
 	/**
-	 * Context-aware merge for values owned by a specific identity.
+	 * Context-aware merge for values owned by a specific identity. A foreign value is
+	 * accepted only if its signature verifies and its signer is authorised for the
+	 * owner, so merging at one owner's slot means the same as merging through the
+	 * owner map that contains it.
 	 *
-	 * @param context Context supplying the signing policy
+	 * @param context Context supplying the signing policy and, for a lattice without a
+	 *        bound verifier, the owner verification rule
 	 * @param owner Owner identity for this position, or null when unknown
 	 * @param ownValue Established value, preferred by directional tie-breaks
 	 * @param otherValue Value to merge in, possibly received from an untrusted source
@@ -131,20 +132,18 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	public SignedData<V> merge(LatticeContext context, ACell owner,
 			SignedData<V> ownValue, SignedData<V> otherValue) {
 		if (otherValue==null) return ownValue;
+		LatticeContext policy=(context==null)?LatticeContext.EMPTY:context;
 
-		// If we don't have a value, use other as long as signature is correct
-		if (ownValue==null) {
-			if (checkForeign(otherValue)) return otherValue;
-			return null;
-		}
+		// If we don't have a value, use other as long as it is validly authored for this owner
+		if (ownValue==null) return accepts(policy,owner,otherValue)?otherValue:null;
 
 		// Fast path for identical values (common case after null checks)
 		V a=ownValue.getValue();
 		V b=otherValue.getValue();
 		if (Utils.equals(a,b)) return ownValue;
 
-		// Bail out if other signature is invalid
-		if (!checkForeign(otherValue)) return ownValue;
+		// Bail out if other is not validly authored for this owner
+		if (!accepts(policy,owner,otherValue)) return ownValue;
 
 		// Perform child lattice merge with context
 		V m=valueNode.merge(context, a, b);
@@ -160,6 +159,17 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		return (signed!=null)?signed:ownValue;
 	}
 
+	/**
+	 * Whether a foreign value may be merged at this owner's position. A bound verifier
+	 * is authoritative, as it is for authoring; otherwise the context's owner
+	 * verification applies whenever the owner is known.
+	 */
+	private boolean accepts(LatticeContext context, ACell owner, SignedData<V> otherValue) {
+		if (!checkForeign(otherValue)) return false;
+		if (ownerVerifier!=null || owner==null) return true;
+		return context.verifyOwner(owner,otherValue.getAccountKey());
+	}
+
 	@Override
 	public boolean checkForeign(SignedData<V> otherValue) {
 		if (otherValue==null) return false;
@@ -172,31 +182,20 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		return null;
 	}
 
-	private static final ABlob VALUE_BLOB = Keywords.VALUE.toBlob();
-
+	/** No key resolves below a signed envelope. */
 	@Override
 	public ACell resolveKey(ACell key) {
-		if (key instanceof ABlobLike<?> blobLike) {
-			if (VALUE_BLOB.equals(blobLike.toBlob())) {
-				return Keywords.VALUE;
-			}
-		}
 		return null;
 	}
 
 	/**
-	 * The schema below the envelope: {@code :value} selects the unsigned value's
-	 * lattice. This describes the tree for hosts and tools; a cursor reaches the
-	 * value for writing only through the {@code SignedCursor} the owning component
-	 * wraps around the slot, and a plain write through {@code :value} is refused by
-	 * the write engine because nothing may be written into a signed envelope.
+	 * A signed envelope is a leaf of the lattice tree: no path continues inside it,
+	 * because nothing merges or writes there except as a complete envelope. The owning
+	 * component reaches the value through the {@code SignedCursor} it wraps around the
+	 * slot, with {@link #getValueLattice()} as the merge for its working copy.
 	 */
-	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
-		if (Keywords.VALUE.equals(childKey)) {
-			return (ALattice<T>) valueNode;
-		}
 		return null;
 	}
 

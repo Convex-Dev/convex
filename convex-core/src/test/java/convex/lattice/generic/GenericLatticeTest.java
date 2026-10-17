@@ -267,12 +267,10 @@ public class GenericLatticeTest {
 	}
 
 	@Test
-	public void testOwnerLatticeRawMergeSkipsOwnerVerification() {
-		// The context-free merge(own, other) does NOT call verifyOwner: owner binding is
-		// enforced only by the context-aware overload. Contrast with
-		// testOwnerVerificationBlobKeyMismatch, which rejects the identical value.
-		// Callers exposing an OwnerLattice to untrusted data must merge with a context
-		// (an AForkableCursor always does).
+	public void testOwnerLatticeRawMergeBindsDirectKeyOwner() {
+		// Each owner's slot verifies its signer for its owner, so the context-free
+		// merge(own, other) binds a direct-key owner to its signer exactly as the
+		// context-aware overload does. See testOwnerVerificationBlobKeyMismatch.
 		AKeyPair kpOwner = AKeyPair.generate();
 		AKeyPair kpFake = AKeyPair.generate();
 
@@ -284,11 +282,15 @@ public class GenericLatticeTest {
 			Maps.of(ownerKey, kpFake.signData(CVMLong.create(42)));
 
 		AHashMap<ACell, SignedData<AInteger>> viaRaw = ownerLattice.merge(null, forged);
-		assertNotNull(viaRaw.get(ownerKey), "Context-free merge does not check signer against owner");
+		assertNull(viaRaw.get(ownerKey), "Context-free merge binds signer to a direct-key owner");
 
 		AHashMap<ACell, SignedData<AInteger>> viaContext =
 			ownerLattice.merge(LatticeContext.EMPTY, null, forged);
 		assertNull(viaContext.get(ownerKey), "Context merge rejects the same value");
+
+		AHashMap<ACell, SignedData<AInteger>> genuine =
+			Maps.of(ownerKey, kpOwner.signData(CVMLong.create(42)));
+		assertEquals(CVMLong.create(42), ownerLattice.merge(null, genuine).get(ownerKey).getValue());
 	}
 
 	@Test
