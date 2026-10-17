@@ -26,6 +26,7 @@ import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
+import convex.gui.utils.Async;
 import convex.peer.API;
 import convex.peer.Server;
 
@@ -68,10 +69,8 @@ public class ServerListPanel extends JPanel {
 		JPanel toolBar = new ActionPanel();
 		add(toolBar, BorderLayout.SOUTH);
 
-		ActionButton btnLaunch = new ActionButton("Launch!",0xeb9b,e -> {
-			ConvexLocal convex=manager.getDefaultConvex();
-			manager.launchExtraPeer(convex);
-		});
+		ActionButton btnLaunch = new ActionButton("Launch!",0xeb9b,e ->
+			Async.whileBusy(e, manager.launchExtraPeer(manager.getDefaultConvex())));
 		btnLaunch.setToolTipText("Launch an extra peer when running a local network. Allocates some stake from genesis peer controller account.");
 		if (!Init.GENESIS_PEER_ADDRESS.equals (manager.getDefaultConvex().getAddress())) {
 			// Disable if we are not the genesis peer

@@ -1,8 +1,9 @@
 package convex.gui.components;
 
-import java.awt.Color;
 import java.awt.Component;
+import java.awt.EventQueue;
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -18,6 +19,7 @@ import convex.core.cvm.Address;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.gui.components.account.AddressCombo;
+import convex.gui.utils.Async;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.net.IPUtils;
@@ -64,44 +66,61 @@ public class ConnectPanel extends JPanel {
 		return Init.GENESIS_ADDRESS;
 	}
 
-	public static Convex tryConnect(JComponent parent) {
+	public static CompletableFuture<Convex> tryConnect(JComponent parent) {
 		return tryConnect(parent,"Enter Connection Details");
 	}
-	
-	public static Convex tryConnect(JComponent parent,String prompt) {
+
+	/**
+	 * Asks for connection details, then connects off the EDT. Safe to call from any thread.
+	 * @param parent Parent component for the dialog
+	 * @param prompt Dialog title
+	 * @return Future for the connection, with null if cancelled or the connection failed (failures are shown)
+	 */
+	public static CompletableFuture<Convex> tryConnect(JComponent parent,String prompt) {
+		if (!EventQueue.isDispatchThread()) {
+			return CompletableFuture.supplyAsync(()->tryConnect(parent,prompt), Async.EDT).thenCompose(f->f);
+		}
 		ConnectPanel pan=new ConnectPanel();
-		
-		int result = JOptionPane.showConfirmDialog(parent, pan, 
+
+		int result = JOptionPane.showConfirmDialog(parent, pan,
 	               prompt, JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,SymbolIcon.get(0xea77,Toolkit.ICON_SIZE));
-
-		if (result == JOptionPane.OK_OPTION) {
-			Address addr=pan.addressField.getAddress();
-			lastAddress=addr;
-	    	try {
-	    		String target=pan.hostField.getText();
-	    		InetSocketAddress sa=IPUtils.toInetSocketAddress(target);
-	    		log.info("Attempting connect to: "+sa);
-	    		Convex convex=ConvexRemote.connectNetty(sa);
-	    		convex.setAddress(addr);
-	    		
-	    		HostCombo.registerGoodConnection(target);
-
-	    		// No key yet: the app using the connection finds its signer
-	    		return convex;
-	    	}  catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				e.printStackTrace();
-			} catch (Exception e) {
-				log.info("Failed to connect",e);
-	    		Toast.display(parent, e.getMessage(), Color.RED);
-	    	} 
-	    } else {
+		if (result != JOptionPane.OK_OPTION) {
 	    	log.info("Connect cancelled by user");
-	    }
-		return null;
+	    	return CompletableFuture.completedFuture(null);
+		}
+
+		Address addr=pan.addressField.getAddress();
+		lastAddress=addr;
+		String target=pan.hostField.getText();
+		return Async.background(()->{
+			InetSocketAddress sa=IPUtils.toInetSocketAddress(target);
+			if (sa==null) throw new IllegalArgumentException("Invalid peer address: "+target);
+			log.info("Attempting connect to: "+sa);
+			Convex convex=ConvexRemote.connectNetty(sa);
+			convex.setAddress(addr);
+			return convex;
+		}).handleAsync((convex,e)->{
+			if (e!=null) {
+				Async.showFailure(parent, e);
+				return null;
+			}
+			HostCombo.registerGoodConnection(target);
+			// No key yet: the app using the connection finds its signer
+			return convex;
+		}, Async.EDT);
 	}
 
+	/**
+	 * Shows diagnostic information for a connection, gathered off the EDT
+	 * @param parent Parent component for the dialog
+	 * @param convex Connection
+	 */
 	public static void showConnectionInfo(Component parent,Convex convex) {
+		Async.background(()->connectionInfo(convex))
+			.thenAcceptAsync(info->JOptionPane.showMessageDialog(parent, info), Async.EDT);
+	}
+
+	private static String connectionInfo(Convex convex) {
 		StringBuilder sb=new StringBuilder();
 		if (convex instanceof ConvexRemote) {
 			sb.append("Remote host: " + convex.getHostAddress() + "\n");
@@ -114,8 +133,6 @@ public class ConnectPanel extends JPanel {
 		sb.append("Account:     " + RT.print(convex.getAddress()) + "\n");
 		sb.append("Public Key:  " + RT.toString(convex.getAccountKey()) + "\n");
 		sb.append("Connected:   " + convex.isConnected()+"\n");
-
-		String infoString = sb.toString();
-		JOptionPane.showMessageDialog(parent, infoString);
+		return sb.toString();
 	}
 }

@@ -1,13 +1,13 @@
 package convex.gui.peer;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -36,13 +36,13 @@ import convex.core.data.Keyword;
 import convex.core.init.Init;
 import convex.core.util.ThreadUtils;
 import convex.gui.components.AbstractGUI;
-import convex.gui.components.Toast;
 import convex.gui.components.account.AccountsPanel;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRing;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.models.StateModel;
 import convex.gui.tools.MessageFormatPanel;
+import convex.gui.utils.Async;
 import convex.gui.utils.Toolkit;
 import convex.peer.API;
 import convex.peer.PeerException;
@@ -410,42 +410,46 @@ public class PeerGUI extends AbstractGUI {
 	}
 
 
-	public void launchExtraPeer(ConvexLocal source) {
-		AKeyPair kp=AKeyPair.generate();
-		
-		try {
+	/**
+	 * Launches an extra peer, staked from the source peer's controller account.
+	 * The launch runs off the EDT; the peer joins the list when it is running.
+	 * @param source Connection to an existing peer
+	 * @return Future for the new peer's connection
+	 */
+	public CompletableFuture<ConvexLocal> launchExtraPeer(ConvexLocal source) {
+		return Async.background(()->{
+			AKeyPair kp=AKeyPair.generate();
 			Server base=source.getLocalServer();
 
 			Address a= source.createAccountSync(kp.getAccountKey());
 			long amt=source.getBalance()/10;
 			source.transferSync(a, amt);
-			
+
 			addTempKey(tempKeys,HotWalletEntry.create(kp,"Generated peer key"));
-			
+
 			// Set up Peer in base server
 			ConvexLocal convex=Convex.connect(base, a, kp);
 			AccountKey key=kp.getAccountKey();
 			Result rcr=convex.transactSync("(create-peer "+key+" "+amt/2+")");
 			if (rcr.isError()) {
-				throw new Exception(rcr.toString());
+				throw new IllegalStateException("Unable to create peer: "+rcr);
 			}
-			
+
 			HashMap<Keyword, Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR, kp);
 			config.put(Keywords.CONTROLLER, a);
 			config.put(Keywords.SOURCE, convex);
 			Server server=API.launchPeer(config);
-			server.getCVMExecutor().setPeer(server.syncPeer(kp,convex)); 
+			server.getCVMExecutor().setPeer(server.syncPeer(kp,convex));
 			server.getConnectionManager().connectToPeer(base.getHostAddress());
 			server.setHostname("localhost:"+server.getPort());
 			base.getConnectionManager().connectToPeer(server.getHostAddress());
-			
-			convex=Convex.connect(server, a, kp);
+
+			return Convex.connect(server, a, kp);
+		}).thenApplyAsync(convex->{
 			peerList.addElement(convex);
-		} catch (Exception e) {
-			Toast.display(this, "Error launching extra peer: "+e.getMessage(),Color.RED);
-			e.printStackTrace();
-		}
+			return convex;
+		}, Async.EDT);
 	}
 
 	/**

@@ -254,28 +254,34 @@ public class StressPanel extends JPanel implements AutoCloseable {
 			this.address = address;
 		}
 		
+		/** Runs off the EDT: progress goes through publish, the final text through done() */
 		@Override
 		protected String doInBackground() {
-			String result=null;
 			try {
+				String result=null;
 				boolean running=true;
 				while (running)  {
 					result=doStressRun();
+					publish(result);
 					running=repeatCheckBox.isSelected()&&!isCancelled();
 					if (running) Thread.sleep(((Integer)(repeatTimeSpinner.getValue()))*1000);
 				};
+				return result;
 			} catch (ExecutionException e) {
 				log.info("Stress test worker terminated",e);
-				resultArea.setText("Test Error: "+e);
+				return "Test Error: "+e;
 			} catch (InterruptedException e) {
 				log.debug("Stress test stopped");
+				return "Stress test stopped";
 			} catch (Exception e) {
 				log.warn("Stress test worker terminated unexpectedly",e);
-				resultArea.setText("Test Error: "+e);
-			} finally {
-				btnRun.setEnabled(true);
+				return "Test Error: "+e;
 			}
-			return result;
+		}
+
+		@Override
+		protected void process(List<Object> progress) {
+			resultArea.setText(String.valueOf(progress.get(progress.size()-1)));
 		}
 
 		protected String doStressRun() throws Exception {
@@ -287,7 +293,7 @@ public class StressPanel extends JPanel implements AutoCloseable {
 			errors = 0;
 			values = 0;
 
-			resultArea.setText("Connecting clients...");
+			publish("Connecting clients...");
 			boolean isLocal = localCheckBox.isSelected();
 			Server server = peerConvex.getLocalServer();
 
@@ -315,7 +321,7 @@ public class StressPanel extends JPanel implements AutoCloseable {
 			setupClients();
 
 			// Pre-build transactions
-			resultArea.setText("Building transactions...");
+			publish("Building transactions...");
 			ATransaction[][] allTransactions = new ATransaction[clientCount][requestCount];
 			for (int c = 0; c < clientCount; c++) {
 				Address origin = clients.get(c).getAddress();
@@ -326,7 +332,7 @@ public class StressPanel extends JPanel implements AutoCloseable {
 
 			// Pre-compile Invoke commands if enabled
 			if (preCompileCheckBox.isSelected() && !type.equals("Transfer")) {
-				resultArea.setText("Compiling...");
+				publish("Compiling...");
 				HashMap<ACell, ACell> compileCache = new HashMap<>();
 				for (int c = 0; c < clientCount; c++) {
 					for (int i = 0; i < requestCount; i++) {
@@ -353,7 +359,7 @@ public class StressPanel extends JPanel implements AutoCloseable {
 			boolean isSimulation = simulateCheckBox.isSelected();
 			SignedData<ATransaction>[][] signedTransactions = null;
 			if (!isSimulation) {
-				resultArea.setText("Signing transactions...");
+				publish("Signing transactions...");
 				@SuppressWarnings("unchecked")
 				SignedData<ATransaction>[][] signed = new SignedData[clientCount][requestCount];
 				signedTransactions = signed;
@@ -365,12 +371,12 @@ public class StressPanel extends JPanel implements AutoCloseable {
 				}
 			}
 
-			resultArea.setText("Syncing...");
+			publish("Syncing...");
 			// Make sure we are in consensus
 			pc.transactSync(Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, Strings.create("sync")));
 			long startTime = Utils.getCurrentTimestamp();
 
-			resultArea.setText("Sending transactions...");
+			publish("Sending transactions...");
 
 			// Per-client futures — no synchronisation needed
 			@SuppressWarnings("unchecked")
@@ -426,7 +432,7 @@ public class StressPanel extends JPanel implements AutoCloseable {
 			}
 
 			int futureCount = frs.size();
-			resultArea.setText("Awaiting " + futureCount + " results...");
+			publish("Awaiting " + futureCount + " results...");
 
 			List<Result> results = ThreadUtils.completeAll(frs).get();
 			long endTime = Utils.getCurrentTimestamp();
@@ -545,6 +551,7 @@ public class StressPanel extends JPanel implements AutoCloseable {
 
 		@Override
 		protected void done() {
+			btnRun.setEnabled(true);
 			try {
 				resultArea.setText(get());
 			} catch (Exception e) {

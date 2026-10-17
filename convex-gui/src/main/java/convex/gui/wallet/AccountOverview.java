@@ -1,5 +1,6 @@
 package convex.gui.wallet;
 
+import java.awt.EventQueue;
 import java.awt.Font;
 
 import javax.swing.JLabel;
@@ -11,7 +12,6 @@ import convex.core.cvm.Address;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
-import convex.core.util.Utils;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.Identicon;
 import convex.gui.utils.SymbolIcon;
@@ -80,17 +80,17 @@ public class AccountOverview extends JPanel implements AutoCloseable {
 		}
 		//add(KeyPairCombo.forConvex(convex));
 		 
-		update();
 		updateThread=Thread.ofVirtual().name("account-update").start(this::updateLoop);
 	}
 
+	/** Fetches account details off the EDT: straight away, then every second while showing */
 	private void updateLoop() {
+		boolean first=true;
 		while ((!Thread.currentThread().isInterrupted()) && convex.isConnected()) {
 			try {
+				if (first||isShowing()) update();
+				first=false;
 				Thread.sleep(1000);
-				if (isShowing()) {
-					update();
-				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
@@ -103,37 +103,27 @@ public class AccountOverview extends JPanel implements AutoCloseable {
 		updateThread.interrupt();
 	}
 
-	private void update() {
+	/** Fetches the account's details, then shows them on the EDT */
+	private void update() throws InterruptedException {
+		Address a=convex.getAddress();
+		// TODO: user name update
+		AccountKey key=convex.getAccountKey(a);
+		CVMLong bal;
+		String tip;
 		try {
-			Address a=convex.getAddress();
-			
-			// TODO: user name update
-			
-			String addrString=RT.toString(a);
-			if (addressLabel.getText()!=addrString) {
-				addressLabel.setText(addrString);
-			}
-			
-			AccountKey key=convex.getAccountKey(a);
-			identicon.setKey(key);
-			
-			try {
-				CVMLong bal=CVMLong.create(convex.getBalance());
-				if (!Utils.equals(bal,balance.getBalance())) {
-					balance.setBalance(bal); 
-					if (bal!=null) {
-						balance.setToolTipText("Convex coin balance ("+bal+" coppers)");
-					} else {
-						balance.setToolTipText("Convex coin balance not available");
-					}
-				}
-			} catch (ResultException e) {
-				balance.setBalance(null);
-				balance.setToolTipText("Convex coin balance not available: "+e.getMessage());
-			}
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			
+			bal=CVMLong.create(convex.getBalance());
+			tip="Convex coin balance ("+bal+" coppers)";
+		} catch (ResultException e) {
+			bal=null;
+			tip="Convex coin balance not available: "+e.getMessage();
 		}
+		CVMLong shownBalance=bal;
+		String shownTip=tip;
+		EventQueue.invokeLater(()->{
+			addressLabel.setText(RT.toString(a));
+			identicon.setKey(key);
+			balance.setBalance(shownBalance);
+			balance.setToolTipText(shownTip);
+		});
 	}
 }

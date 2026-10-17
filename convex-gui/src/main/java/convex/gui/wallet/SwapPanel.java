@@ -2,15 +2,18 @@ package convex.gui.wallet;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import convex.api.Convex;
+import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.cvm.Address;
 import convex.core.data.prim.AInteger;
@@ -19,6 +22,7 @@ import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.DecimalAmountField;
+import convex.gui.utils.Async;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.net.IPUtils;
@@ -58,9 +62,19 @@ public class SwapPanel extends AbstractGUI {
 		// Main action buttons
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.add(new ActionButton("Trade!",0xe933,e->{
-			executeTrade();
-			super.closeGUI();
-		})); 
+			CompletableFuture<Result> trade=executeTrade();
+			if (trade==null) {
+				JOptionPane.showMessageDialog(this, "Please specify a valid amount to trade");
+				return;
+			}
+			Async.whileBusy(e, trade.thenAcceptAsync(r->{
+				if (r.isError()) {
+					JOptionPane.showMessageDialog(this, "Trade failed!\n"+r.getErrorCode()+"\n"+r.getValue());
+				} else {
+					super.closeGUI();
+				}
+			}, Async.EDT));
+		}));
 		actionPanel.add(new ActionButton("Close",0xe5c9,e->{
 			super.closeGUI();
 		})); 
@@ -126,59 +140,35 @@ public class SwapPanel extends AbstractGUI {
 	
 
 	protected void refreshRates() {
-		ACell torus=TokenInfo.getTorusAddress(convex);
 		receiveLabel.setDecimals(token2.getDecimals());
 		AInteger amount=amountField.getAmount();
 		if (amount==null) {
 			receiveLabel.setText("-");
 			return;
 		}
-		String qs;
-		if (token1.isConvex()) {
-			System.err.println(amount +" :dec "+token1.getDecimals());
-			qs="("+torus+"/sell-cvx "+token2.getID()+" "+amount+")";
-		} else if (token2.isConvex()) {
-			qs="("+torus+"/sell-quote "+token1.getID()+" "+amount+")";
-		} else {
-			qs="("+torus+"/sell-quote "+token1.getID()+" "+amount+" "+token2.getID()+")";
-		}
-
-		convex.query(qs).thenAccept(r->{
-			System.err.println(qs + " => " + r);
-			ACell val=r.getValue();
-			if (val instanceof AInteger) {
-				receiveLabel.setBalance((AInteger) val);
-			} else {
-				receiveLabel.setBalance((AInteger)null);
-			}
-		});
+		TokenInfo from=token1, to=token2;
+		receiveLabel.showResult(Async.background(()->{
+			ACell torus=TokenInfo.getTorusAddress(convex);
+			if (from.isConvex()) return convex.querySync("("+torus+"/sell-cvx "+to.getID()+" "+amount+")");
+			if (to.isConvex()) return convex.querySync("("+torus+"/sell-quote "+from.getID()+" "+amount+")");
+			return convex.querySync("("+torus+"/sell-quote "+from.getID()+" "+amount+" "+to.getID()+")");
+		}));
 	}
-	
-	protected void executeTrade() {
-		ACell torus=TokenInfo.getTorusAddress(convex);
-		receiveLabel.setDecimals(token2.getDecimals());
+
+	/**
+	 * Starts the trade for the amount entered
+	 * @return Future for the trade result, or null if no valid amount was entered
+	 */
+	protected CompletableFuture<Result> executeTrade() {
 		AInteger amount=amountField.getAmount();
-		String qs;
-		if (token1.isConvex()) {
-			System.err.println(amount +" :dec "+token1.getDecimals());
-			qs="("+torus+"/sell-cvx "+token2.getID()+" "+amount+")";
-		} else if (token2.isConvex()) {
-			qs="("+torus+"/sell-tokens "+token1.getID()+" "+amount+")";
-		} else {
-			qs="("+torus+"/sell "+token1.getID()+" "+amount+" "+token2.getID()+")";
-		}
-		System.out.println(qs);
-
-		convex.transact(qs).thenAccept(r->{
-			ACell val=r.getValue();
-			System.out.println(r);
-			if (val instanceof AInteger) {
-				receiveLabel.setBalance((AInteger) val);
-			} else {
-				receiveLabel.setBalance((AInteger)null);
-			}
+		if (amount==null) return null;
+		TokenInfo from=token1, to=token2;
+		return Async.background(()->{
+			ACell torus=TokenInfo.getTorusAddress(convex);
+			if (from.isConvex()) return convex.transactSync("("+torus+"/sell-cvx "+to.getID()+" "+amount+")");
+			if (to.isConvex()) return convex.transactSync("("+torus+"/sell-tokens "+from.getID()+" "+amount+")");
+			return convex.transactSync("("+torus+"/sell "+from.getID()+" "+amount+" "+to.getID()+")");
 		});
-
 	}
 
 	public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {

@@ -1,6 +1,5 @@
 package convex.gui.components.account;
 
-import java.awt.EventQueue;
 import java.awt.event.ItemEvent;
 
 import javax.swing.JComboBox;
@@ -22,12 +21,12 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.ops.Special;
 import convex.core.data.AccountKey;
-import convex.core.exceptions.ResultException;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.DropdownMenu;
 import convex.gui.keys.KeyAccess;
 import convex.gui.keys.KeyRing;
+import convex.gui.utils.Async;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -120,35 +119,15 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 			popupMenu.add(clearSeqButton);
 			
 			JMenuItem setSeqButton = new JMenuItem("Set sequence...",Toolkit.menuIcon(0xe6d4));
-			setSeqButton.addActionListener(e -> {
-				try {
-					long seq=convex.getSequence();
-					String s = JOptionPane.showInputDialog(this, "Current sequence number is "+seq+", so the next sequence number expected is "+(seq+1), "Enter next sequence number", JOptionPane.QUESTION_MESSAGE);
-					if (s==null) return;
-					
-					long nextSeq=Long.parseLong(s);
-					
-					convex.setNextSequence(nextSeq);
-					System.err.println("Sequence number set: "+convex.getSequence());
-				} catch (NumberFormatException e1) {
-					JOptionPane.showMessageDialog(this, "Invalid sequence number");
-				}catch (ResultException e1) {
-					e1.printStackTrace();
-				} catch (InterruptedException e1) {
-					Thread.currentThread().interrupt();
-				}
-				convex.clearSequence();
-			});
+			setSeqButton.addActionListener(e -> Async.whileBusy(e,
+				Async.background(convex::getSequence).thenAcceptAsync(this::askNextSequence, Async.EDT)));
 			popupMenu.add(setSeqButton);
-			
+
 			JMenuItem reconnectButton = new JMenuItem("Reconnect",Toolkit.menuIcon(0xe157));
-			reconnectButton.addActionListener(e -> {
-				try {
-					convex.reconnect();
-				} catch (Exception ex) {
-					log.info("Reconnect failed",ex);
-				}
-			});
+			reconnectButton.addActionListener(e -> Async.whileBusy(e, Async.background(()->{
+				convex.reconnect();
+				return null;
+			})));
 			popupMenu.add(reconnectButton);
 			
 			JMenuItem connInfoButton = new JMenuItem("Connection Info...",Toolkit.menuIcon(0xe157));
@@ -206,7 +185,7 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 				AWalletEntry we=KeyRing.get().find(ak);
 				setKeyPair(we);
 			}
-		}, EventQueue::invokeLater);
+		}, Async.EDT);
 
 		updateBalance();
 	}
@@ -259,13 +238,19 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 	}
 
 	private void updateBalance(Address a) {
+		balanceLabel.showResult(convex.query(Special.get("*balance*"),a));
+	}
+
+	/** Asks for the next sequence number to use, given the current one. Runs on the EDT. */
+	private void askNextSequence(long seq) {
+		String s = JOptionPane.showInputDialog(this, "Current sequence number is "+seq+", so the next sequence number expected is "+(seq+1), "Enter next sequence number", JOptionPane.QUESTION_MESSAGE);
+		if (s==null) return;
 		try {
-			convex.query(Special.get("*balance*"),a).thenAccept(r-> {
-				balanceLabel.setFromResult(r);
-			});
-		} catch (NullPointerException t) {
-			balanceLabel.setText(t.getClass().getName());
+			convex.setNextSequence(Long.parseLong(s));
+		} catch (NumberFormatException e) {
+			JOptionPane.showMessageDialog(this, "Invalid sequence number");
 		}
+		convex.clearSequence();
 	}
 
 	public String getMode() {

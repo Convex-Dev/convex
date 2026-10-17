@@ -39,7 +39,7 @@ public class REPLClient extends AbstractGUI {
 	public static void main(String[] args) throws IOException, TimeoutException {
 		log.info("Starting Convex Client");
 
-		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
+		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex").join();
 		if (convex==null) {
 			System.exit(1);
 		}

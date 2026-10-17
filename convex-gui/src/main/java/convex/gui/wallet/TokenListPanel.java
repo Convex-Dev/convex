@@ -2,19 +2,17 @@ package convex.gui.wallet;
 
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.EventQueue;
 
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
-import convex.core.data.ACell;
 import convex.core.lang.Reader;
-import convex.core.util.ThreadUtils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.Toast;
+import convex.gui.utils.Async;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -42,19 +40,13 @@ public class TokenListPanel extends JPanel implements AutoCloseable {
 		setLayout(new MigLayout("fill"));
 
 		// Find the network and default tokens off the EDT, in case the peer is slow or fails
-		ThreadUtils.runVirtual("token-init", ()->{
-			try {
-				NetworkState net=NetworkState.of(convex);
-				net.track(TokenInfo.get(convex,null));
-				net.track(TokenInfo.getFungible(convex,"currency.USDF"));
-				net.track(TokenInfo.getFungible(convex,"currency.GBPF"));
-				EventQueue.invokeLater(()->showTokens(net));
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		});
+		Async.background(()->{
+			NetworkState net=NetworkState.of(convex);
+			net.track(TokenInfo.get(convex,null));
+			net.track(TokenInfo.getFungible(convex,"currency.USDF"));
+			net.track(TokenInfo.getFungible(convex,"currency.GBPF"));
+			return net;
+		}).thenAcceptAsync(this::showTokens, Async.EDT);
 
 		// add(new AccountChooserPanel(convex),"dock south");
 		ActionPanel ap=new ActionPanel();
@@ -66,19 +58,16 @@ public class TokenListPanel extends JPanel implements AutoCloseable {
 			}
 			String newID=JOptionPane.showInputDialog(TokenListPanel.this, "Enter Token ID");
 			if (newID==null) return;
-			try {
-				ACell tokenID=newID.isBlank()?null:Reader.read(newID);
-				TokenInfo token=TokenInfo.get(convex,tokenID);
-				if (token==null) {
-					Toast.display(TokenListPanel.this, "Token does not exist: "+tokenID,Color.ORANGE);
-				} else if (net.isTracked(token)) {
-					Toast.display(TokenListPanel.this, "Token already added",Color.ORANGE);
-				} else {
-					net.track(token);
-				}
-			} catch (Exception ex) {
-				Toast.display(TokenListPanel.this, "Error adding token: "+ex.getMessage(),Color.ORANGE);
-			}
+			Async.whileBusy(e, Async.background(()->TokenInfo.get(convex,newID.isBlank()?null:Reader.read(newID)))
+				.thenAcceptAsync(token->{
+					if (token==null) {
+						Toast.display(TokenListPanel.this, "Token does not exist: "+newID,Color.ORANGE);
+					} else if (net.isTracked(token)) {
+						Toast.display(TokenListPanel.this, "Token already added",Color.ORANGE);
+					} else {
+						net.track(token);
+					}
+				}, Async.EDT));
 		},"Add a token to the tracked token list"));
 		ap.add(ActionButton.build("Refresh",0xe5d5,e->{
 			ScrollyList<TokenInfo> l=list;

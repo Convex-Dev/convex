@@ -9,6 +9,7 @@ import convex.api.Convex;
 import convex.core.lang.Reader;
 import convex.gui.components.ActionButton;
 import convex.gui.components.BalanceLabel;
+import convex.gui.utils.Async;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -57,20 +58,14 @@ public class TokenComponent extends JPanel {
 		actions.add(ActionButton.build(0xe933,e->{
 			// Token swap
 			TokenInfo with= network.otherToken(token);
-			if (with==null) {
-				String tok=JOptionPane.showInputDialog(this, "Specify a token to swap with");
-				if (tok==null) return;
-				try {
-					with = TokenInfo.get(convex, Reader.read(tok));
-				} catch (Exception ex) {
-					// continue s.t. with = null
-				}
-			}
-			if (with==null) {
-				JOptionPane.showInputDialog(this, "Can't find token");
+			if (with!=null) {
+				openSwap(with);
 				return;
 			}
-			new SwapPanel(convex,token,with).runNonModal(this);
+			String tok=JOptionPane.showInputDialog(this, "Specify a token to swap with");
+			if (tok==null) return;
+			Async.whileBusy(e, Async.background(()->TokenInfo.get(convex, Reader.read(tok)))
+				.thenAcceptAsync(this::openSwap, Async.EDT));
 		},"Open token swap window for this token"));
 		actions.add(ActionButton.build(0xe5d5,e->{
 			refresh(convex);
@@ -85,21 +80,17 @@ public class TokenComponent extends JPanel {
 		refresh(convex);
 	}
 
-	public void refresh(Convex convex) {
-		try {
-			token.getBalance(convex).thenAccept(bal->{
-				if (bal!=null) {
-					balanceLabel.setBalance(bal);
-				} else {
-					balanceLabel.setBalance(null); 
-				}
-			}).exceptionally(e->{
-				e.printStackTrace();
-				balanceLabel.setBalance(null);
-				return null;
-			});
-		} catch (Exception e) {
-			e.printStackTrace();
+	/** Opens a swap of this token for another, if found */
+	private void openSwap(TokenInfo with) {
+		if (with==null) {
+			JOptionPane.showMessageDialog(this, "Can't find token");
+			return;
 		}
+		new SwapPanel(convex,token,with).runNonModal(this);
+	}
+
+	/** Refreshes the balance shown. Safe from any thread. */
+	public void refresh(Convex convex) {
+		balanceLabel.show(token.getBalance(convex));
 	}
 }

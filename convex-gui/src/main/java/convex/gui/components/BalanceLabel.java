@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.math.BigInteger;
+import java.util.concurrent.CompletableFuture;
 
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
@@ -19,6 +20,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.text.Text;
 import convex.core.util.Utils;
+import convex.gui.utils.Async;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 
@@ -172,5 +174,27 @@ public class BalanceLabel extends BaseTextPane {
 		} else {
 			setText("<bad value>");
 		}
+	}
+
+	/**
+	 * Shows a balance when it arrives, or no balance if it fails. Safe from any thread.
+	 * @param balance Pending balance
+	 */
+	public void show(CompletableFuture<? extends AInteger> balance) {
+		balance.handleAsync((b,e)->{
+			setBalance((e==null)?b:null);
+			return null;
+		}, Async.EDT);
+	}
+
+	/**
+	 * Shows the balance in a query result when it arrives, or the error. Safe from any thread.
+	 * @param result Pending query result
+	 */
+	public void showResult(CompletableFuture<Result> result) {
+		result.handleAsync((r,e)->{
+			setFromResult((e==null)?r:Result.fromException(e));
+			return null;
+		}, Async.EDT);
 	}
 }

@@ -2,7 +2,9 @@ package convex.gui.actor;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.event.ActionEvent;
 import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -32,6 +34,7 @@ import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.Toast;
 import convex.gui.components.account.AccountChooserPanel;
+import convex.gui.utils.Async;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -98,13 +101,13 @@ public class SmartOpComponent extends BaseListComponent {
 		actionPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
 		JButton execButton = new JButton("Execute...");
 		actionPanel.add(execButton);
-		execButton.addActionListener(e -> execute());
+		execButton.addActionListener(this::execute);
 
 		add(actionPanel, BorderLayout.SOUTH);
 
 	}
 
-	private void execute() {
+	private void execute(ActionEvent e) {
 
 		AVector<ACell> args = Vectors.empty();
 		for (int i = 0; i < paramCount; i++) {
@@ -129,27 +132,28 @@ public class SmartOpComponent extends BaseListComponent {
 			Address myAddress=peerConnection.getAddress();
 
 			String mode = execPanel.getMode();
-			Result r=null;
+			CompletableFuture<Result> r;
 			if (mode.equals("Query")) {
-				r=peerConnection.querySync(message);
+				r=Async.background(()->peerConnection.querySync(message));
 			} else if (mode.equals("Transact")) {
 				ATransaction trans = Invoke.create(myAddress,-1, message);
-				r = peerConnection.transactSync(trans);
+				r=Async.background(()->peerConnection.transactSync(trans));
 			} else {
 				throw new Error("Unexpected mode: "+mode);
 			}
-			if (r.isError()) {
-				showError(r.getErrorCode(),r.getValue());
-			} else {
-				showResult(r.getValue());
-			}
-
-		} catch (Throwable e) {
-			log.warn(e.getMessage());
-			Toast.display(parent, "Unexpected Error: "+e.getMessage(), Toast.FAIL);
-
+			Async.whileBusy(e, r.thenAcceptAsync(this::showOutcome, Async.EDT));
+		} catch (Throwable t) {
+			log.warn(t.getMessage());
+			Toast.display(parent, "Unexpected Error: "+t.getMessage(), Toast.FAIL);
 		}
+	}
 
+	private void showOutcome(Result r) {
+		if (r.isError()) {
+			showError(r.getErrorCode(),r.getValue());
+		} else {
+			showResult(r.getValue());
+		}
 	}
 
 	private void showError(Object code, Object msg) {

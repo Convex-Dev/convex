@@ -23,6 +23,7 @@ import convex.gui.peer.PeerGUI;
 import convex.gui.peer.PeerLaunchDialog;
 import convex.gui.repl.REPLClient;
 import convex.gui.tools.HackerTools;
+import convex.gui.utils.Async;
 import convex.gui.utils.Toolkit;
 import convex.gui.wallet.WalletApp;
 import net.miginfocom.swing.MigLayout;
@@ -74,12 +75,12 @@ public class MainGUI extends AbstractGUI {
 	}
 
 	public void launchWallet() {
-	    Convex convex=ConnectPanel.tryConnect(this);
-	    if (convex!=null) {
-	    	WalletApp wallet=new WalletApp(convex);
-	    	wallet.own(convex);
-	    	adopt(wallet).run();
-	    }
+		ConnectPanel.tryConnect(this).thenAcceptAsync(convex->{
+			if (convex==null) return;
+			WalletApp wallet=new WalletApp(convex);
+			wallet.own(convex);
+			adopt(wallet).run();
+		}, Async.EDT);
 	}
 
 
@@ -113,12 +114,12 @@ public class MainGUI extends AbstractGUI {
 	}
 	
 	public void launchTerminalClient() {
-	    Convex convex=ConnectPanel.tryConnect(this);
-	    if (convex!=null) {
-	    	REPLClient client=new REPLClient(convex);
-	    	client.own(convex);
-	    	adopt(client).run();
-	    }
+		ConnectPanel.tryConnect(this).thenAcceptAsync(convex->{
+			if (convex==null) return;
+			REPLClient client=new REPLClient(convex);
+			client.own(convex);
+			adopt(client).run();
+		}, Async.EDT);
 	}
 
 	public HackerTools launchTools() {

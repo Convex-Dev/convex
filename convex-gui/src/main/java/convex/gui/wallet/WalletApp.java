@@ -118,7 +118,7 @@ public class WalletApp extends AbstractGUI {
 	public static void main(String[] args) throws InterruptedException {
 		// call to set up Look and Feel
 		Toolkit.init();
-		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
+		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex").join();
 		if (convex!=null) {
 			WalletApp app=new WalletApp(convex);
 			app.own(convex);

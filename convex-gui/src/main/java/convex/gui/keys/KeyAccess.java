@@ -1,7 +1,6 @@
 package convex.gui.keys;
 
 import java.awt.Component;
-import java.awt.EventQueue;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -16,6 +15,7 @@ import convex.core.cvm.Symbols;
 import convex.core.cvm.ops.Special;
 import convex.core.data.AccountKey;
 import convex.core.lang.RT;
+import convex.gui.utils.Async;
 
 /**
  * Getting key pairs from the key ring for use in the GUI.
@@ -115,6 +115,6 @@ public final class KeyAccess {
 			AKeyPair kp=unlockForUse(parent, entry);
 			if (kp==null) return Signer.none("The key for this account was not unlocked.");
 			return new Signer(kp, null);
-		}, EventQueue::invokeLater);
+		}, Async.EDT);
 	}
 }
