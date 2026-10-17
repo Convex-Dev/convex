@@ -399,11 +399,12 @@ application list and an unconfigured host both ignore all incoming state. A node
 routes incoming pushes, whole-root and path pulls, direct merge calls and snapshot
 candidates through the host; delivery never invokes application sync, and an
 acknowledgement confirms delivery, not publication of private work. A path-addressed
-delivery reaches each application as the partial root holding the value at that
-path, built from the empty containers its lattice declares along the way, so one
-`merge` sees every delivery. A path the lattice does not declare delivers nothing,
-and the lattice tree ends at a signed envelope, so callers supply the complete
-envelope at its slot.
+delivery goes to each application's `mergeAt`. By default the application resolves
+the path with its lattice and merges there with the lattice declared for that level,
+the rule the component owning that level would apply; an application overrides
+`mergeAt` to select or route path deliveries itself. A path the lattice does not
+declare delivers nothing, and the lattice tree ends at a signed envelope, so callers
+supply the complete envelope at its slot.
 
 A node is replication. It hosts an assembled `LatticeHost`, attaches propagation
 groups, hands incoming values to the host and sends the host's published root to

@@ -9,6 +9,7 @@ import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
@@ -22,8 +23,8 @@ import convex.social.SocialHelpers;
 /**
  * Default one-hop social retention policy, owned by the P2P application. It reads
  * the application's lattice to decide which social owners this node wants and offers
- * that decision as a projection of the root: the application merges incoming roots
- * through it, and a node publishes through it.
+ * that decision as a projection: the application merges incoming roots and path
+ * values through it, and a node publishes through it.
  */
 final class SocialReplicationPolicy {
 
@@ -85,6 +86,34 @@ final class SocialReplicationPolicy {
 		if (social==null) return root;
 		ACell filtered=filterOwners(social,desiredOwners());
 		return root.assoc(Social.KEY_SOCIAL,(filtered==null)?Maps.empty():filtered);
+	}
+
+	/**
+	 * Projects a value delivered at a non-empty path to what this node wants: outside
+	 * the social region the value itself; the social owner map reduced to the wanted
+	 * owners' valid slots; a wanted owner's valid slot; otherwise nothing.
+	 */
+	ACell project(ACell[] path,ACell value) {
+		if (!Social.KEY_SOCIAL.equals(path[0])) return value;
+		Set<AString> desired=desiredOwners();
+		if (path.length==1) return filterOwners(value,desired);
+		if (path.length==2 && path[1] instanceof AString did && desired.contains(did)) {
+			return validOwnerSlot(did,value,false)?value:null;
+		}
+		return null;
+	}
+
+	/** Records the validated signer of each wanted owner whose slot a projected delivery at the path carried. */
+	void recordOwners(ACell[] path,ACell projected) {
+		if (path.length==0 && projected instanceof Index<?,?> root) {
+			recordOwners(new ACell[] {Social.KEY_SOCIAL},root.get(Social.KEY_SOCIAL));
+		} else if (path.length==1 && Social.KEY_SOCIAL.equals(path[0]) && projected instanceof AMap<?,?> owners) {
+			for (ACell did:owners.keySet()) {
+				if (did instanceof AString s) cacheCurrentOwner(s);
+			}
+		} else if (path.length==2 && Social.KEY_SOCIAL.equals(path[0]) && path[1] instanceof AString did) {
+			cacheCurrentOwner(did);
+		}
 	}
 
 	@SuppressWarnings("unchecked")

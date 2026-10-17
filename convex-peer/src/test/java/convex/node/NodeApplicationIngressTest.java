@@ -42,6 +42,11 @@ class NodeApplicationIngressTest {
 			if (ignore) return cursor.get();
 			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,incoming));
 		}
+		/** This application feeds its one region's path deliveries through its root rule. */
+		@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
+			if (path.length==1 && ITEMS.equals(path[0])) return merge(LATTICE.zero().assoc(ITEMS,value));
+			return super.mergeAt(value,path);
+		}
 		@Override protected void beforeSync() { preparations++; }
 	}
 

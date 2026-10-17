@@ -247,8 +247,8 @@ CAD text affected: CAD035 *Lattice-Aware Cursors*, "Canonical vs logical keys â€
 
 `NodeServer` built a plain root and merged inbound path values with
 `lattice.path(path)`; `mergeAt(value, path...)` was the public form. The node now
-holds no lattice: a path delivery reaches each application as the partial root
-holding the value at its path, and the application merges it as it merges any root.
+holds no lattice: a path delivery goes to each application's `mergeAt`, whose default
+merges it at its level with the lattice the application declares there.
 
 CAD text affected: none found in CAD024/035/045; CAD036 (*Lattice Node*) should be
 checked for how pull-path merges are described.
@@ -397,12 +397,14 @@ component implementation to delegate to it or not, and nothing assumes it as the
 default. `ALatticeApplication.merge` is therefore abstract: every application states
 how it merges an incoming root, `LatticeApplication` and `DLFSApplication` by
 delegating whole, `P2PApplication` by delegating the root projected to the social
-owners it wants and then recording their validated signers. A path delivery is no
-longer a second hook: `mergeAt` is final and hands `merge` the partial root holding
-the value at its path, built from the lattice's empty containers, so a path the
-lattice does not declare delivers nothing, as an undeclared key in a root does. The
-base helper `mergeDeclaredPath`, the path-ignoring default, the "declared path does
-not imply interest" rule and the bootstrap after-merge steps went with it.
+owners it wants and then recording their validated signers. `mergeAt` is the
+application's hook for a path delivery too; its default resolves the path with the
+lattice and merges there with the lattice declared for that level, the rule the
+component owning that level would apply, and a path the lattice does not declare
+delivers nothing, as an undeclared key in a root does. A first cut had made `mergeAt`
+final and lifted the value into a partial root for `merge`; Mike wanted the hook kept,
+with that default. The base helper `mergeDeclaredPath`, the path-ignoring default, the
+"declared path does not imply interest" rule and the bootstrap after-merge steps went.
 
 CAD text affected:
 

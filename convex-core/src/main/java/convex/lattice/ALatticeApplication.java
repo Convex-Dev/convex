@@ -3,8 +3,6 @@ package convex.lattice;
 import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.data.ADataStructure;
-import convex.core.lang.RT;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -13,10 +11,11 @@ import convex.lattice.cursor.AForkableCursor;
  * <p>An application component works at the same cursor position as its
  * {@link LatticeHost} host and declares the root lattice: the shape of the root,
  * including which regions participate, with a default merge for that shape. The
- * application owns {@link #merge}: it delegates to the lattice merge, for the whole
- * root or for the parts it wants, or applies its own rule. Subclasses expose
- * lightweight components at paths within the root, each declaring the shape of the
- * level it hands out.</p>
+ * application owns the merge of incoming values: {@link #merge} states its rule for
+ * a root, delegating to the lattice merge or not, and {@link #mergeAt} by default
+ * merges a path delivery at its level with the lattice declared there. Subclasses
+ * expose lightweight components at paths within the root, each declaring the shape
+ * of the level it hands out.</p>
  *
  * <p>The host constructor creates private working state, with context resolved at
  * construction. Lightweight children share that state. The explicit lattice/cursor
@@ -131,33 +130,25 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	public abstract V merge(V other);
 
 	/**
-	 * Delivers a value at a path within this application's root as the partial root
-	 * that holds it: the value at its path inside the empty containers the lattice
-	 * declares along the way, handed to {@link #merge} like any other root. One merge
-	 * therefore sees every delivery. A path the lattice does not declare, or cannot
-	 * build containers for, delivers nothing, just as an undeclared key in a root
-	 * value contributes nothing.
+	 * Delivers a value at a path within this application's root. The default resolves
+	 * the position with this application's lattice and merges there with the lattice
+	 * declared for that level, under this application's context: the rule the
+	 * component owning that level would apply. An empty path is the root and goes to
+	 * {@link #merge}. A path the lattice does not declare delivers nothing, and the
+	 * lattice tree ends at a signed envelope, so a complete envelope is supplied at
+	 * its slot. Applications override this to select or route path deliveries
+	 * themselves.
 	 *
 	 * @param value Incoming value at the path
 	 * @param path Keys from the application root
 	 * @return Current application working root, not a publication acknowledgement
 	 */
 	@SuppressWarnings("unchecked")
-	public final V mergeAt(ACell value, ACell... path) {
+	public V mergeAt(ACell value, ACell... path) {
 		if (path.length==0) return merge((V)value);
-		ALattice<?>[] levels=new ALattice<?>[path.length];
-		ALattice<?> level=lattice;
-		for (int i=0; i<path.length; i++) {
-			levels[i]=level;
-			level=level.path(path[i]);
-			if (level==null) return cursor.get();
-		}
-		ACell partial=value;
-		for (int i=path.length-1; i>=0; i--) {
-			if (!(levels[i].zero() instanceof ADataStructure<?> empty)) return cursor.get();
-			partial=RT.assoc((ADataStructure<ACell>)empty,path[i],partial);
-			if (partial==null) return cursor.get();
-		}
-		return merge((V)partial);
+		ALattice<ACell> level=lattice.path(path);
+		if (level==null) return cursor.get();
+		this.<ACell>resolve(path).updateAndGet(own -> level.merge(getContext(),own,value));
+		return cursor.get();
 	}
 }

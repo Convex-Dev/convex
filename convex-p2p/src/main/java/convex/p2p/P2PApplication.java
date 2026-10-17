@@ -8,7 +8,6 @@ import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
@@ -26,10 +25,11 @@ import convex.social.Social;
  * Root-level application component for the P2P lattice regions.
  *
  * <p>This is the application a P2P host hands incoming values to. It owns their
- * merge: an incoming root, projected to what this node wants, is delegated to the
- * lattice merge, which merges every region as declared and verifies each owner's
- * slot. The projection keeps the infrastructure regions whole and reduces the social
- * region to the owners this node wants. The application also owns the P2P policy that
+ * merge: an incoming root or path value, projected to what this node wants, is
+ * merged by the lattice declared for its level, which merges every region as
+ * declared and verifies each owner's slot. The projection keeps the infrastructure
+ * regions whole and reduces the social region to the owners this node wants. The
+ * application also owns the P2P policy that
  * reads the lattice: the node registry as a validated directory, the social owners
  * this node wants, and the paths to pull from a newly admitted peer. It imports
  * nothing from the node package. A {@link P2PNode} assembles it with replication and
@@ -92,11 +92,22 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 		Index<Keyword,ACell> wanted=(socialPolicy==null)?other:socialPolicy.projectRoot(other);
 		Index<Keyword,ACell> result=cursor.updateAndGet(own -> getLattice().merge(getContext(),own,wanted));
-		if (socialPolicy!=null && wanted!=null && wanted.get(Social.KEY_SOCIAL) instanceof AMap<?,?> owners) {
-			for (ACell did:owners.keySet()) {
-				if (did instanceof AString s) socialPolicy.cacheCurrentOwner(s);
-			}
-		}
+		if (socialPolicy!=null) socialPolicy.recordOwners(new ACell[0],wanted);
+		return result;
+	}
+
+	/**
+	 * A path delivery is projected to what this node wants, merged at its level by the
+	 * default rule, and the validated signers of the wanted owners it carried are then
+	 * recorded. A working view has no policy and takes the default.
+	 */
+	@Override
+	public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
+		if (socialPolicy==null || path.length==0) return super.mergeAt(value,path);
+		ACell wanted=socialPolicy.project(path,value);
+		if (wanted==null) return cursor.get();
+		Index<Keyword,ACell> result=super.mergeAt(wanted,path);
+		socialPolicy.recordOwners(path,wanted);
 		return result;
 	}
 

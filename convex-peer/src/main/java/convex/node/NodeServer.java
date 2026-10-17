@@ -331,9 +331,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Delivers a value at a path within the host root to the host's configured
-	 * applications, each of which merges it as the partial root holding the value at
-	 * that path. Call {@link LatticeHost#sync()} on {@link #getHost()} when the update
-	 * should be published and persisted.
+	 * applications; by default each merges it at that level with the lattice it
+	 * declares there. Call {@link LatticeHost#sync()} on {@link #getHost()} when the
+	 * update should be published and persisted.
 	 *
 	 * @param <T> value type at the path
 	 * @param value value to merge

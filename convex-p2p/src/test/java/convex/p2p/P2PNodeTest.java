@@ -63,7 +63,7 @@ public class P2PNodeTest {
 		assertFalse(node.isRunning());
 	}
 
-	/** The host hands incoming values to the P2P application, which merges a path delivery as the partial root holding it. */
+	/** The host hands incoming values to the P2P application, which merges a path delivery at its level. */
 	@Test
 	public void testIncomingRegistryValueReachesApplication() {
 		AKeyPair keyPair=AKeyPair.generate();
