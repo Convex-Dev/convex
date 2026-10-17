@@ -41,6 +41,59 @@ public class BigIntegerTest {
 		}
 	}
 
+	/**
+	 * A decoded big integer is blob-backed until materialised. Regression: a positive
+	 * value with a leading 0x00 sign byte had signum 0, so (signum 9223372036854775808)
+	 * returned 0 in any transaction that arrived encoded.
+	 */
+	@Test public void testSignumOfDecodedBigInteger() throws BadFormatException {
+		Blob enc=CVMBigInteger.wrap(CVMBigInteger.MIN_POSITIVE_BIG).getEncoding();
+		AInteger decoded=(AInteger)Samples.TEST_STORE.decode(enc);
+		assertEquals(CVMLong.ONE,decoded.signum());
+		assertTrue(decoded.isPositive());
+	}
+
+	/**
+	 * An empty blob is zero. Regression: signum threw IndexOutOfBoundsException on a
+	 * fresh instance. CorePropertyTest.testCoreArgs hit this only when the per-JVM hash
+	 * salt ordered #%signum before every core function that materialised its argument.
+	 */
+	@Test public void testCreateFromEmptyBlobIsZero() {
+		assertEquals(CVMLong.ZERO,CVMBigInteger.create(Blob.EMPTY).signum());
+		assertEquals(CVMLong.ZERO,RT.signum(CVMBigInteger.create(Blob.EMPTY)));
+
+		CVMBigInteger zero=CVMBigInteger.create(Blob.EMPTY);
+		assertFalse(zero.isCanonical());
+		assertSame(CVMLong.ZERO,zero.getCanonical());
+		assertEquals(CVMLong.ZERO,zero);
+		assertEquals(BigInteger.ZERO,zero.big());
+	}
+
+	/**
+	 * Regression: trimming re-read the first two bytes on every pass, so any blob of three
+	 * or more bytes starting with a redundant sign byte collapsed to its last byte.
+	 */
+	@Test public void testCreateTrimsRedundantLeadingBytes() {
+		assertCreate("128","000080");
+		assertCreate("-129","ffff7f");
+		assertCreate("32767","007fff");
+		assertCreate("-32513","ff80ff");
+		assertCreate("0","0000");
+		assertCreate("-1","ffff");
+		assertCreate("9223372036854775808","00008000000000000000");
+		assertCreate("2361183241434822606847","007fffffffffffffffff");
+		assertCreate("-2361183241434822606849","ffff7fffffffffffffffff");
+	}
+
+	private static void assertCreate(String expected, String hex) {
+		Blob b=Blob.fromHex(hex);
+		BigInteger value=new BigInteger(expected);
+		CVMBigInteger bi=CVMBigInteger.create(b);
+		assertEquals(Blob.wrap(value.toByteArray()),bi.toBlob(),hex); // minimal two's complement
+		assertEquals(value,bi.big(),hex);
+		assertEquals(value,AInteger.create(b).big(),hex);
+	}
+
 	@Test public void testBigIntegerAssumptions() {
 		assertThrows(java.lang.NumberFormatException.class,()->{
 			// Double check assumption that this throws
