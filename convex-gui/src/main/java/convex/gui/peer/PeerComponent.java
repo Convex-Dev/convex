@@ -37,6 +37,7 @@ import convex.gui.components.CodeLabel;
 import convex.gui.components.DropdownMenu;
 import convex.gui.components.Identicon;
 import convex.gui.etch.EtchWindow;
+import convex.gui.keys.KeyAccess;
 import convex.gui.keys.KeyRing;
 import convex.gui.repl.REPLClient;
 import convex.gui.server.PeerWindow;
@@ -72,8 +73,9 @@ public class PeerComponent extends BaseListComponent implements AutoCloseable {
 		Address controller=server.getPeerController();
 		if (controller!=null) try {
 			AccountKey key=server.getPeer().getConsensusState().getAccount(controller).getAccountKey();
+			// Asks for the controller key's password if locked; without it the window is read-only
 			AWalletEntry we=KeyRing.get().find(key);
-			kp=we.getKeyPair();
+			kp=KeyAccess.unlockForUse(this, we);
 		} catch (Exception e) {
 			log.warn("Error getting controller details",e);
 		}

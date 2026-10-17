@@ -26,7 +26,7 @@ import convex.gui.components.FilePicker;
 import convex.gui.components.HostCombo;
 import convex.gui.components.Toast;
 import convex.gui.components.account.KeyPairCombo;
-import convex.gui.keys.UnlockWalletDialog;
+import convex.gui.keys.KeyAccess;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.net.IPUtils;
@@ -118,15 +118,11 @@ public class PeerLaunchDialog {
 		    		AWalletEntry we=keyField.getWalletEntry();
 		    		if (we==null) throw new IllegalStateException("No key pair selected");
 		    		
-		    		if (we.isLocked()) {
-						boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
-						if (!unlocked) {
-							Toast.display(parent, "Launch cancelled: Locked genesis key", Color.RED);
-							return null;
-						}
+		       		AKeyPair kp=KeyAccess.unlockForUse(parent,we);
+		    		if (kp==null) {
+		    			Toast.display(parent, "Launch cancelled: Locked genesis key", Color.RED);
+		    			return null;
 		    		}
-
-		       		AKeyPair kp=we.getKeyPair();
 		    		return PeerGUI.launchPeerGUI(numPeers, kp);
 		    	} else if (selected==joinPanel) {
 		    		String host=hostField.getText();
@@ -135,15 +131,12 @@ public class PeerLaunchDialog {
 		    		
 		    		AWalletEntry we=peerKeyField.getWalletEntry();
 		    		if (we==null) throw new IllegalArgumentException("No peer key selected");
-		    		if (we.isLocked()) {
-						boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
-						if (!unlocked) {
-							Toast.display(parent, "Launch cancelled: Locked peer key", Color.RED);
-							return null;
-						}
+		    		AKeyPair kp=KeyAccess.unlockForUse(parent,we);
+		    		if (kp==null) {
+		    			Toast.display(parent, "Launch cancelled: Locked peer key", Color.RED);
+		    			return null;
 		    		}
-
-		    		return PeerGUI.launchPeerGUI(sa,we.getKeyPair());
+		    		return PeerGUI.launchPeerGUI(sa,kp);
 		    	} else if (selected==loadPanel) {
 		    		File f=backupPicker.getFile();
 		    		AKeyPair kp=null; // TODO;

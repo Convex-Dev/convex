@@ -25,6 +25,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Migrations;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
+import convex.gui.components.account.AccountChooserPanel;
 import convex.gui.utils.Toolkit;
 
 public class REPLPanelTest {
@@ -57,10 +58,60 @@ public class REPLPanelTest {
 				assertFalse(actual.isError(),actual::toString);
 				assertEquals(CVMLong.ZERO,actual.getValue());
 			} finally {
-				// Stop the account chooser's refresh timer even without showing a window.
-				if (panel.get()!=null) SwingUtilities.invokeAndWait(()->panel.get().removeNotify());
+				// Release the panel's resources (e.g. the balance refresh timer), as its window would.
+				if (panel.get()!=null) closeAll(panel.get());
 			}
 		}
+	}
+
+	/**
+	 * A signer found after the panel was created is shown, and switches the
+	 * panel from Query to Transact mode
+	 */
+	@Test
+	public void testShowSigner() throws Exception {
+		assumeFalse(GraphicsEnvironment.isHeadless());
+		Toolkit.init();
+		AKeyPair key=AKeyPair.generate();
+		try (ConvexDirect client=ConvexDirect.create(key,
+				Migrations.applyAll(Init.createTestState(List.of(key.getAccountKey()))))) {
+			client.setKeyPair(null);
+			AtomicReference<REPLPanel> panel=new AtomicReference<>();
+			try {
+				SwingUtilities.invokeAndWait(()->{
+					REPLPanel repl=new REPLPanel(client);
+					panel.set(repl);
+					AccountChooserPanel chooser=findChooser(repl);
+					assertEquals("Query", chooser.getMode());
+
+					client.setKeyPair(key);
+					repl.showSigner(key);
+					assertEquals("Transact", chooser.getMode());
+					assertEquals(key.getAccountKey(), chooser.keyCombo.getWalletEntry().getPublicKey());
+				});
+			} finally {
+				if (panel.get()!=null) closeAll(panel.get());
+			}
+		}
+	}
+
+	/** Closes every closeable component in a panel, as its window would on close */
+	private static void closeAll(Container parent) throws Exception {
+		for (Component component: parent.getComponents()) {
+			if (component instanceof Container container) closeAll(container);
+			if (component instanceof AutoCloseable closeable) closeable.close();
+		}
+	}
+
+	private static AccountChooserPanel findChooser(Container parent) {
+		for (Component component: parent.getComponents()) {
+			if (component instanceof AccountChooserPanel chooser) return chooser;
+			if (component instanceof Container container) {
+				AccountChooserPanel chooser=findChooser(container);
+				if (chooser!=null) return chooser;
+			}
+		}
+		return null;
 	}
 
 	private JButton findRunButton(Container parent) {

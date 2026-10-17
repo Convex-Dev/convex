@@ -12,13 +12,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.core.crypto.AKeyPair;
-import convex.core.crypto.wallet.AWalletEntry;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
-import convex.gui.keys.KeyRing;
+import convex.gui.keys.KeyAccess;
 import convex.gui.keys.KeyRingPanel;
-import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.Toolkit;
 
 /**
@@ -82,16 +79,14 @@ public class REPLClient extends AbstractGUI {
 	public void afterRun() {
 		super.afterRun();
 		if (convex.getKeyPair()==null) {
-			AWalletEntry we=KeyRing.get().findFor(convex);
-			if (we!=null) {
-				if (we.isLocked()) {
-					UnlockWalletDialog.offerUnlock(this, we);
+			KeyAccess.signerFor(this, convex).thenAccept(signer->{
+				if (signer.keyPair()!=null) {
+					convex.setKeyPair(signer.keyPair());
+					replPanel.showSigner(signer.keyPair());
+				} else {
+					Toolkit.showMessge(this, signer.reason()+"\n\nTerminal opened in Query mode.");
 				}
-				AKeyPair kp=we.getKeyPair();
-				convex.setKeyPair(kp);
-			} else {
-				Toolkit.showMessge(this, "The key for this account is not in your key ring.\n\nTerminal opened in Query mode.");
-			}
+			});
 		}
 	}
 

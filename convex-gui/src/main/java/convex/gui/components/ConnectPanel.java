@@ -14,13 +14,10 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
-import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.gui.components.account.AddressCombo;
-import convex.gui.keys.KeyRing;
-import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.net.IPUtils;
@@ -88,20 +85,8 @@ public class ConnectPanel extends JPanel {
 	    		convex.setAddress(addr);
 	    		
 	    		HostCombo.registerGoodConnection(target);
-	    		
-	    		AWalletEntry we=KeyRing.get().findFor(convex);
-	    		if ((we!=null)) {
-	    			if (!we.isLocked()) {
-	    				convex.setKeyPair(we.getKeyPair());
-	    			} else {
-	    				boolean unlock=UnlockWalletDialog.offerUnlock(parent,we);
-	    				if (unlock) {
-	    					convex.setKeyPair(we.getKeyPair());
-	    				} else {
-	    					JOptionPane.showMessageDialog(parent, "Wallet not unlocked. In read-only mode.");
-	    				}
-	    			}
-	    		}
+
+	    		// No key yet: the app using the connection finds its signer
 	    		return convex;
 	    	}  catch (InterruptedException e) {
 				Thread.currentThread().interrupt();

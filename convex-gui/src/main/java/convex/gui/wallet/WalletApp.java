@@ -7,15 +7,12 @@ import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
 
 import convex.api.Convex;
-import convex.core.crypto.wallet.AWalletEntry;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSPanel;
-import convex.gui.keys.KeyRing;
+import convex.gui.keys.KeyAccess;
 import convex.gui.keys.KeyRingPanel;
-import convex.gui.keys.UnlockWalletDialog;
-import convex.gui.panels.HomePanel;
 import convex.gui.peer.stake.PeerStakePanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
@@ -30,7 +27,6 @@ public class WalletApp extends AbstractGUI {
 	 */
 	JPanel panel = new JPanel();
 
-	HomePanel homePanel = new HomePanel();
 	JTabbedPane tabs = new JTabbedPane(JTabbedPane.LEFT);
 
 	protected Convex convex;
@@ -75,15 +71,13 @@ public class WalletApp extends AbstractGUI {
 	public void afterRun() {
 		super.afterRun();
 		if (convex.getKeyPair()==null) {
-			AWalletEntry we=KeyRing.get().findFor(convex);
-			if (we!=null) {
-				if (we.isLocked()) {
-					UnlockWalletDialog.offerUnlock(homePanel, we);
+			KeyAccess.signerFor(this, convex).thenAccept(signer->{
+				if (signer.keyPair()!=null) {
+					convex.setKeyPair(signer.keyPair());
+				} else {
+					Toolkit.showMessge(this, signer.reason()+"\n\nWallet opened in read-only mode: transactions will fail.");
 				}
-				convex.setKeyPair(we.getKeyPair());
-			} else {
-				Toolkit.showMessge(this, "The key for this account is not in your key ring.\n\nWallet opened in read-only mode: transactions will fail.");
-			}
+			});
 		}
 	}
 

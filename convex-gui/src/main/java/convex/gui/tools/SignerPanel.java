@@ -41,7 +41,7 @@ import convex.gui.components.CodeLabel;
 import convex.gui.components.CodePane;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.components.account.KeyPairCombo;
-import convex.gui.keys.UnlockWalletDialog;
+import convex.gui.keys.KeyAccess;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -288,20 +288,10 @@ public class SignerPanel extends JPanel {
 					return;
 				}
 
-				// Unlock key if needed
-				if (walletEntry.isLocked()) {
-					boolean unlocked = UnlockWalletDialog.offerUnlock(SignerPanel.this, walletEntry);
-					if (!unlocked) {
-						encodedArea.setText("Error: Key is locked and unlock was cancelled");
-						updateInfoLabel(null, null);
-						return;
-					}
-				}
-
-				// Get key pair
-				AKeyPair keyPair = walletEntry.getKeyPair();
+				// Get key pair, unlocking for this use if needed
+				AKeyPair keyPair = KeyAccess.unlockForUse(SignerPanel.this, walletEntry);
 				if (keyPair == null) {
-					encodedArea.setText("Error: Could not get key pair from wallet entry");
+					encodedArea.setText("Error: Key is locked and unlock was cancelled");
 					updateInfoLabel(null, null);
 					return;
 				}

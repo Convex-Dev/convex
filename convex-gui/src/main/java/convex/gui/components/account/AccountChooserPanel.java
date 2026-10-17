@@ -1,5 +1,6 @@
 package convex.gui.components.account;
 
+import java.awt.EventQueue;
 import java.awt.event.ItemEvent;
 
 import javax.swing.JComboBox;
@@ -16,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
+import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.ops.Special;
@@ -24,8 +26,8 @@ import convex.core.exceptions.ResultException;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.DropdownMenu;
+import convex.gui.keys.KeyAccess;
 import convex.gui.keys.KeyRing;
-import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -50,6 +52,9 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 	private final Timer balanceRefreshTimer;
 
     AWalletEntry previousSelection = null;
+
+	/** True while showing a signer found elsewhere, so selecting it doesn't ask again. EDT only. */
+	private boolean showingSigner=false;
 
 
 	public AccountChooserPanel(Convex convex) {
@@ -81,7 +86,7 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 				if (e.getStateChange()==ItemEvent.DESELECTED) {
 					previousSelection=we;
 					return;
-				} else {
+				} else if (!showingSigner) {
 					setKeyPair(we);
 				}
 			});
@@ -190,6 +195,7 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 	
 	public void updateAddress(Address a) {
 		convex.setAddress(a);
+		// Continue on the EDT, since choosing a key may ask for its password
 		convex.query(Special.forSymbol(Symbols.STAR_KEY)).thenAcceptAsync(r-> {
 			if (r.isError()) {
 				// ignore?
@@ -200,8 +206,8 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 				AWalletEntry we=KeyRing.get().find(ak);
 				setKeyPair(we);
 			}
-		});
-		
+		}, EventQueue::invokeLater);
+
 		updateBalance();
 	}
 	
@@ -212,27 +218,36 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 			return;
 		}
 		
-		System.err.println("Setting wallet entry:" +we);
 		if (we==null) {
 			convex.setKeyPair(null);
 		} else {
-			AKeyPair kp;
-			if (we.isLocked()) {
-				boolean unlock=UnlockWalletDialog.offerUnlock(this, we);
-				if (!unlock) {
-					keyCombo.setSelectedItem(previousSelection);
-					return;
-				} else {
-					kp=we.getKeyPair();
-					we.lock();					
-				}
-			} else {
-				kp=we.getKeyPair();
+			AKeyPair kp=KeyAccess.unlockForUse(this, we);
+			if (kp==null) {
+				keyCombo.setSelectedItem(previousSelection);
+				return;
 			}
 			convex.setKeyPair(kp);
 		}
 	}
-	
+
+	/**
+	 * Shows a key pair the connection now signs with, found elsewhere (e.g. when
+	 * the window opened), and switches to Transact mode. Doesn't ask for the key
+	 * again. Call on the EDT.
+	 * @param kp Key pair set on the connection
+	 */
+	public void showSigner(AKeyPair kp) {
+		AWalletEntry we=KeyRing.get().find(kp.getAccountKey());
+		showingSigner=true;
+		try {
+			// Via the model: the combo ignores items not in its list, such as a key outside the key ring
+			keyCombo.getModel().setSelectedItem((we!=null)?we:new HotWalletEntry(kp,null));
+		} finally {
+			showingSigner=false;
+		}
+		modeCombo.setSelectedItem("Transact");
+	}
+
 	public void updateBalance() {
 		updateBalance(getAddress());
 	}

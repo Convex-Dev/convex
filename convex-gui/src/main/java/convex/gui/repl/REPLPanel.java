@@ -260,7 +260,16 @@ public class REPLPanel extends JPanel {
 	protected AKeyPair getKeyPair() {
 		return execPanel.getConvex().getKeyPair();
 	}
-	
+
+	/**
+	 * Shows a signer found for the connection after this panel was created.
+	 * Call on the EDT.
+	 * @param kp Key pair now set on the connection
+	 */
+	public void showSigner(AKeyPair kp) {
+		execPanel.showSigner(kp);
+	}
+
 	protected Address getAddress() {
 		return execPanel.getConvex().getAddress();
 	}

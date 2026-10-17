@@ -141,23 +141,18 @@ public class WalletComponent extends BaseListComponent {
 
 
 	private void showSeed(ActionEvent e) {
-		if (walletEntry.isLocked()) {
-			if (!UnlockWalletDialog.offerUnlock(this,walletEntry)) return;
-		}
-		
-		AKeyPair kp=walletEntry.getKeyPair();
-		if (kp!=null) {
-			JPanel panel=new JPanel();
-			panel.setLayout(new MigLayout("wrap 1","[200]"));
-			panel.add(new Identicon(kp.getAccountKey(),Toolkit.IDENTICON_SIZE_LARGE),"align center");
-			
-			panel.add(Toolkit.withTitledBorder("Ed25519 Private Seed",new CodeLabel(kp.getSeed().toString()))); 
-			panel.add(Toolkit.makeNote("WARNING: keep this private, it can be used to control your account(s)"),"grow");
-			panel.setBorder(Toolkit.createDialogBorder());
-			JOptionPane.showMessageDialog(WalletComponent.this, panel,"Ed25519 Private Seed",JOptionPane.INFORMATION_MESSAGE);
-		} else {
-			JOptionPane.showMessageDialog(WalletComponent.this, "Keypair is locked, cannot access seed","Warning",JOptionPane.WARNING_MESSAGE);
-		}
+		// Viewing the seed doesn't unlock the key for anything else
+		AKeyPair kp=KeyAccess.unlockForUse(this,walletEntry);
+		if (kp==null) return;
+
+		JPanel panel=new JPanel();
+		panel.setLayout(new MigLayout("wrap 1","[200]"));
+		panel.add(new Identicon(kp.getAccountKey(),Toolkit.IDENTICON_SIZE_LARGE),"align center");
+
+		panel.add(Toolkit.withTitledBorder("Ed25519 Private Seed",new CodeLabel(kp.getSeed().toString())));
+		panel.add(Toolkit.makeNote("WARNING: keep this private, it can be used to control your account(s)"),"grow");
+		panel.setBorder(Toolkit.createDialogBorder());
+		JOptionPane.showMessageDialog(WalletComponent.this, panel,"Ed25519 Private Seed",JOptionPane.INFORMATION_MESSAGE);
 	}
 
 

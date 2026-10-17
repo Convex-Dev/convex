@@ -169,8 +169,10 @@ public class PeerGUI extends AbstractGUI {
 				ConvexLocal convex=Convex.connect(server, controller, kp); 
 				
 				if (kp==null) {
-					// Try to find alternative controller key in key ring if available
-					kp=KeyRing.get().findFor(convex).getKeyPair();
+					// Use the controller key from the key ring if present and unlocked.
+					// No prompt here: launching may not be on the EDT.
+					AWalletEntry we=KeyRing.get().findFor(convex);
+					if ((we!=null)&&!we.isLocked()) kp=we.getKeyPair();
 					convex.setKeyPair(kp);
 				}
 				
