@@ -15,15 +15,18 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
-import convex.node.NodeServer;
 import convex.social.Follows;
 import convex.social.Social;
 import convex.social.SocialHelpers;
 
-/** Default one-hop social retention and admission policy for a P2P node. */
+/**
+ * Default one-hop social retention and admission policy, owned by the P2P
+ * application. It reads the application's lattice to decide which social owners
+ * this node wants and offers that decision as ingress and publication filters; a
+ * node plugs those into its propagation group.
+ */
 final class SocialReplicationPolicy {
 
-	private final NodeServer<Index<Keyword,ACell>> server;
 	private final P2PApplication application;
 	private final DIDKeyAuthorizer authorizer;
 	private final Set<AString> localUsers=ConcurrentHashMap.newKeySet();
@@ -33,11 +36,14 @@ final class SocialReplicationPolicy {
 	private final ConcurrentHashMap<AString,AccountKey> validatedKeys=
 		new ConcurrentHashMap<>();
 
-	SocialReplicationPolicy(NodeServer<Index<Keyword,ACell>> server,P2PApplication application,
-			DIDKeyAuthorizer authorizer) {
-		this.server=server;
+	SocialReplicationPolicy(P2PApplication application,DIDKeyAuthorizer authorizer) {
 		this.application=application;
 		this.authorizer=authorizer;
+	}
+
+	/** The DID resolution policy social admission verifies against. */
+	DIDKeyAuthorizer authorizer() {
+		return authorizer;
 	}
 
 	void addLocalUser(AString did,AKeyPair keyPair) {
@@ -60,7 +66,7 @@ final class SocialReplicationPolicy {
 	Set<AString> desiredOwners() {
 		HashSet<AString> desired=new HashSet<>(localUsers);
 		desired.addAll(pins);
-		ACell raw=server.getCursor().get(Social.KEY_SOCIAL);
+		ACell raw=application.cursor().get(Social.KEY_SOCIAL);
 		if (!(raw instanceof AHashMap<?,?> social)) return Set.copyOf(desired);
 		@SuppressWarnings("unchecked")
 		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> typed=
@@ -138,7 +144,7 @@ final class SocialReplicationPolicy {
 
 	/** Persists the validated binding after an explicit desired-owner pull. */
 	void cacheCurrentOwner(AString did) {
-		ACell value=server.getCursor().get(Social.KEY_SOCIAL,did);
+		ACell value=application.cursor().get(Social.KEY_SOCIAL,did);
 		if (value!=null) validOwnerSlot(did,value,true);
 	}
 
@@ -156,9 +162,9 @@ final class SocialReplicationPolicy {
 			follows.cacheValidatedKey(target,signer);
 			changed=true;
 		}
-		// Ingress may be a replay which does not otherwise change its target cursor.
-		// Publish the authenticated cache edit explicitly in that case as well.
-		if (changed) server.getHost().sync();
+		// Ingress may be a replay which does not otherwise change its target cursor, so
+		// the node's post-merge sync would not run: the application publishes its edit.
+		if (changed) application.syncHost();
 	}
 
 	private boolean hasCachedFollowKey(AString target,AccountKey signer) {

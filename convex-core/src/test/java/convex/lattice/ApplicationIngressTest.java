@@ -95,6 +95,25 @@ class ApplicationIngressTest {
 		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
 	}
 
+	/** An application states interest in every declared path by delegating to the base helper. */
+	@Test void declaredPathHelperAcceptsDeclaredPathsOnly() {
+		var root=LatticeHost.create(LATTICE.zero(),null);
+		var app=new App(LATTICE,root) {
+			@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
+				return mergeDeclaredPath(value,path);
+			}
+		};
+		root.configureApplications(List.of(app));
+		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
+		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
+		assertEquals(0,app.merges,"a path merge does not pass through the root merge");
+		assertThrows(IllegalArgumentException.class,() -> root.mergeAt(Sets.of(CVMLong.TWO),UNKNOWN));
+		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
+		root.mergeAt(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));
+		assertEquals(1,app.merges,"an empty path still dispatches through the root merge");
+		assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.cursor().get().get(ITEMS));
+	}
+
 	@Test void customHandlerReceivesInputUnchangedWithoutSchemaInterpretation() {
 		var root=LatticeHost.create(KeyedLattice.create().zero(),null);
 		ACell[] supplied={UNKNOWN,CVMLong.ONE};

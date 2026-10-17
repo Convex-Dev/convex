@@ -957,7 +957,9 @@ Worked examples:
   `JSONLattice`, `LWWLattice`, `IndexLattice`, `MapLattice`, `SetLattice` — lattices
   and write policy.
 - `convex.node.NodeServer`, `LatticePropagator` and `RelayHost` (`convex-peer`) — the
-  replication runtime and relay host assembly.
+  replication runtime and host assembly from node configuration.
+- `convex-p2p` (`P2PNode`, `P2PApplication`) — a node assembled up to the root, with
+  the application owning everything below it.
 - `convex-social` (`Social`, `SocialUser`, `Feed`, `SocialPost`) and `convex-dlfs` —
   worked examples.
 

@@ -53,7 +53,7 @@ public class NodeConfig {
 	/** Whether to persist state to store (Boolean, default true). */
 	public static final AString PERSIST = Strings.intern("persist");
 
-	/** Whether to restore state from store on startup (Boolean, default true). */
+	/** Whether to restore the retained root from the store when the host is opened (Boolean, default true). */
 	public static final AString RESTORE = Strings.intern("restore");
 
 	/** Enable coordinated root writes, exclusive transactions and serial fallback (default false). */
@@ -260,7 +260,7 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Returns whether authoritative state is restored from the node store at launch.
+	 * Returns whether the retained root is restored from the node store when the host is opened.
 	 *
 	 * @return {@code true} when restoration is enabled
 	 */

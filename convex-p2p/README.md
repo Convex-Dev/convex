@@ -263,9 +263,11 @@ ECIES wrapper; relays see only routing metadata and ciphertext. See
 [Points of Presence](docs/POINTS_OF_PRESENCE.md) for the wire format, routing rules,
 bounds and trust model.
 
-`P2PNode` is the network bootstrap and lifecycle owner. `P2PApplication` is the
-host-neutral lattice application component; it can also be connected directly to a
-standalone `LatticeHost` for local use.
+`P2PNode` assembles the node up to the lattice root: the host opened from the store,
+the replicating node server, one propagation group and the transport. `P2PApplication`
+is the application the host hands incoming values to. It owns the P2P policy that
+reads the lattice and imports nothing from the node package, so it can also be
+connected directly to a standalone `LatticeHost` for local use.
 
 ### The user area API
 

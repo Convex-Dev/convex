@@ -371,6 +371,18 @@ endpoint acquires missing cells before the node's merge, and pulls acquire befor
 returning. The application-factory launch overload and the node's lattice accessor
 went earlier (`971790597`).
 
+On 17 October the P2P node followed. `P2PNode.create` opens the host with
+`RelayHost.openHost`, configures `P2PApplication` on it as the receiver and attaches
+replication; nothing below the root is the node's. The application accepts every
+declared path through the base helper `mergeDeclaredPath`, and the node directory,
+social selection and bootstrap paths are the application's, read from its lattice. The
+node calls the application at the moments replication knows about, after the transport
+binds, when a peer is admitted and when an inbound value is accepted, and turns what it
+learns into connection intent, filters, pulls and route authentication. The application
+syncs the host for edits its policy makes during admission, the one place it touches
+publication, because the node's post-merge sync runs only when the merge itself changed
+the root.
+
 CAD text affected:
 
 - CAD036 (*Lattice Node*): the node is constructed with a lattice and merges incoming

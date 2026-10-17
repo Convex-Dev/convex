@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,7 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -27,7 +27,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.message.AConnection;
@@ -36,7 +35,6 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.etch.EtchStore;
-import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
@@ -54,10 +52,11 @@ import convex.social.Social;
  * A Convex peer-to-peer lattice node.
  *
  * <p>This is the main entry point for convex-p2p — a rollup package, so this is the
- * <em>only</em> node server, with no separate social or per-application node. It composes
- * a region set with the authoritative {@link NodeServer} and an application-owned
- * {@link LatticeListener}, giving a node that can query, merge and propagate lattice
- * values with other nodes over the binary protocol.</p>
+ * <em>only</em> node server, with no separate social or per-application node. It
+ * assembles the node up to the lattice root: a host opened from the store as
+ * configured, the replicating {@link NodeServer}, one propagation group and an
+ * application-owned {@link LatticeListener}. From the root down, the
+ * {@link P2PApplication} configured on the host owns the lattice and the P2P policy.</p>
  *
  * <p><b>Regions are configuration.</b> {@link #create(AStore, NodeConfig, AKeyPair)}
  * serves {@link P2PLattice#NODE_ROOT} — the P2P regions plus the bundled application
@@ -82,15 +81,18 @@ import convex.social.Social;
  * connection. Complete social values still pass follow-aware DID admission before
  * persistence.</p>
  *
- * <p><b>Layering.</b> {@link NodeServer} is only the schema-independent
- * replication layer over the assembled host; the P2P application owns the lattice
- * and merge policy. This class separately owns its TCP transport and
- * P2P policy: {@link NodeDirectory}
- * publishes and interprets {@code [:p2p :nodes]}, {@link SocialReplicationPolicy}
- * selects social data, and {@link PointOfPresence} handles transient routed
- * messages. None of those application structures are interpreted by NodeServer.
- * P2PNode explicitly uses its node key as both transport identity and NodeInfo
- * owner; social DIDs and their signing keys remain independent.</p>
+ * <p><b>Layering.</b> {@link NodeServer} is the schema-independent replication layer
+ * over the assembled host and merges nothing. The {@link P2PApplication} is the host's
+ * receiver: it accepts every path its root lattice declares, keeps the validated node
+ * directory, selects social data and lists the paths to pull from a new peer. This
+ * class owns the transport and the moments replication knows about: after the
+ * transport binds it asks the application to publish the node's record, when a peer
+ * is admitted it pulls the application's bootstrap paths, and when an inbound value
+ * is accepted it turns the application's refreshed directory into connection intent
+ * and authenticates a route the application has validated. {@link PointOfPresence}
+ * handles transient routed messages and is not a lattice concern. P2PNode uses its
+ * node key as both transport identity and NodeInfo owner; social DIDs and their
+ * signing keys remain independent.</p>
  */
 public class P2PNode implements Closeable {
 
@@ -100,10 +102,8 @@ public class P2PNode implements Closeable {
 	private final LatticePropagator propagator;
 	private final LatticeListener transport;
 	private final P2PApplication application;
+	private final NodeConfig config;
 	private final AKeyPair keyPair;
-	private final DIDKeyAuthorizer didAuthorizer;
-	private final SocialReplicationPolicy socialPolicy;
-	private final NodeDirectory nodeDirectory;
 	private final PointOfPresence pointOfPresence;
 	private final ConcurrentHashMap<Convex,CompletableFuture<Void>> initialisations=
 		new ConcurrentHashMap<>();
@@ -111,23 +111,24 @@ public class P2PNode implements Closeable {
 	private boolean launchStarted;
 
 	@SuppressWarnings("unchecked")
-	private P2PNode(NodeServer<Index<Keyword, ACell>> server,
-			LatticePropagator propagator,LatticeListener transport,NodeConfig config,AKeyPair keyPair,
-			DIDKeyAuthorizer didAuthorizer,ALattice<Index<Keyword,ACell>> lattice) {
-		this.server = server;
+	private P2PNode(NodeServer<Index<Keyword, ACell>> server,P2PApplication application,
+			LatticePropagator propagator,LatticeListener transport,NodeConfig config,AKeyPair keyPair) {
+		this.server=server;
+		this.application=application;
 		this.propagator=propagator;
 		this.transport=transport;
-		this.application=P2PApplication.connect(lattice,server.getHost());
-		this.keyPair = keyPair;
-		this.didAuthorizer=didAuthorizer;
-		this.socialPolicy=new SocialReplicationPolicy(server,application,didAuthorizer);
-		this.nodeDirectory=new NodeDirectory(server,application,propagator,transport,config,keyPair);
-		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,nodeDirectory);
-		propagator.setIngressFilter(socialPolicy::filterIngress);
-		propagator.setPublicationFilter(value -> (Index<Keyword,ACell>)socialPolicy.filterPublication(
+		this.config=config;
+		this.keyPair=keyPair;
+		NodeDirectory directory=application.directory();
+		directory.setMaxRecords(propagator.getConnectionManager().getMaxDesiredPeers());
+		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,directory);
+		// The application decides what is wanted; the propagation group applies it.
+		SocialReplicationPolicy social=application.policy();
+		propagator.setIngressFilter(social::filterIngress);
+		propagator.setPublicationFilter(value -> (Index<Keyword,ACell>)social.filterPublication(
 			new ACell[0],value));
 		propagator.setApplicationMessageHandler(pointOfPresence::handle);
-		propagator.setInboundLatticeListener(nodeDirectory::onAcceptedInbound);
+		propagator.setInboundLatticeListener(this::onAcceptedInbound);
 	}
 
 	/**
@@ -213,43 +214,45 @@ public class P2PNode implements Closeable {
 		NodeConfig effectiveConfig=(nodeConfig==null) ? NodeConfig.create() : nodeConfig;
 		LatticePropagatorConfig effectivePropagatorConfig=(propagatorConfig==null)
 			? LatticePropagatorConfig.create() : propagatorConfig;
-		LatticeContext mergeContext=LatticeContext.create(
-			null,keyPair,didAuthorizer::verifiesOwner);
-		// The node replicates; the relay host's live application admits incoming values.
+
+		// Assembly up to the root: the host restores as configured and knows no lattice.
 		LatticeHost<Index<Keyword,ACell>> host;
 		try {
-			host=RelayHost.open(root,store,effectiveConfig,mergeContext);
+			host=RelayHost.openHost(root.zero(),store,effectiveConfig);
 		} catch (IOException e) {
 			throw new UncheckedIOException("Unable to read the node's retained root",e);
 		}
-		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(host,effectiveConfig);
+		// From the root down, the P2P application owns the lattice and its policy.
+		LatticeContext policy=RelayHost.applySkew(effectiveConfig,
+			LatticeContext.create(null,keyPair,didAuthorizer::verifiesOwner));
+		host.setContext(policy);
+		P2PApplication application=P2PApplication.connect(root,host,policy,didAuthorizer);
+		host.configureApplications(List.of(application));
+
+		NodeServer<Index<Keyword, ACell>> server=new NodeServer<>(host,effectiveConfig);
 		LatticeConnectionManager manager=new LatticeConnectionManager(store);
 		LatticePropagator propagator=new LatticePropagator(store,manager,effectivePropagatorConfig);
 		propagator.setTransportKeyPair(keyPair);
 		LatticeListener transport=new LatticeListener(effectiveConfig);
 		transport.registerPropagator(propagator);
-		P2PNode node=new P2PNode(server,propagator,transport,effectiveConfig,keyPair,didAuthorizer,root);
+		P2PNode node=new P2PNode(server,application,propagator,transport,effectiveConfig,keyPair);
 		server.addPropagator(propagator);
 		return node;
 	}
 
 	/** Registers and opens this node's local {@code did:key} social user. */
 	public Social social(AKeyPair userKeyPair) {
-		if (userKeyPair==null) throw new IllegalArgumentException("User key pair must not be null");
-		return social(DID.forKey(userKeyPair.getAccountKey()),userKeyPair);
+		return application.social(userKeyPair);
 	}
 
 	/** Registers a local stable DID with one currently authorised signing key. */
 	public Social social(AString did,AKeyPair userKeyPair) {
-		if (userKeyPair==null) throw new IllegalArgumentException("User key pair must not be null");
-		socialPolicy.addLocalUser(did,userKeyPair);
-		return Social.connect(application,LatticeContext.create(
-			null,userKeyPair,didAuthorizer::verifiesOwner));
+		return application.social(did,userKeyPair);
 	}
 
 	/** Retains an additional social DID independently of local follow lists. */
 	public void pinSocial(AString did) {
-		socialPolicy.pin(did);
+		application.pinSocial(did);
 	}
 
 	/**
@@ -315,7 +318,7 @@ public class P2PNode implements Closeable {
 		if (popKeys!=null) {
 			for (AccountKey key:popKeys) pops=pops.conj(key);
 		}
-		nodeDirectory.setPointsOfPresence(pops);
+		application.directory().setPointsOfPresence(pops);
 		return this;
 	}
 
@@ -328,7 +331,7 @@ public class P2PNode implements Closeable {
 	 */
 	public synchronized P2PNode relayMessages() {
 		requireNew("relayMessages");
-		nodeDirectory.setRelay(true);
+		application.directory().setRelay(true);
 		pointOfPresence.setRelay(true);
 		return this;
 	}
@@ -373,7 +376,7 @@ public class P2PNode implements Closeable {
 	 * @throws InterruptedException If the operation is interrupted
 	 */
 	public synchronized void launch() throws IOException, InterruptedException {
-		nodeDirectory.validateLaunchConfiguration();
+		validateLaunchConfiguration();
 		requireNew("launch");
 		launchStarted=true;
 		var manager=propagator.getConnectionManager();
@@ -387,7 +390,9 @@ public class P2PNode implements Closeable {
 		server.launch();
 		try {
 			transport.launch();
-			nodeDirectory.publishOwnRecord();
+			// The transport knows its port now, so the application can publish the node's record.
+			application.directory().publishOwnRecord(config.getAdvertisedURL(transport.getPort()));
+			refreshDiscovery();
 			for (Convex peer:manager.getPeers()) initialisePeer(peer);
 			Integer port = transport.getPort();
 			if (port != null && port >= 0) {
@@ -410,6 +415,41 @@ public class P2PNode implements Closeable {
 	private void requireNew(String operation) {
 		if (launchStarted) {
 			throw new IllegalStateException(operation+" is configuration-only and must precede launch");
+		}
+	}
+
+	/** Validates P2P advertisement settings before any resource is opened. */
+	private void validateLaunchConfiguration() {
+		AString configured=config.getURL();
+		if (configured==null) return;
+		String reason=NodeConfig.validatePublicURL(
+			configured.toString(),config.isAllowPrivateURL());
+		if (reason!=null) {
+			throw new IllegalStateException("Invalid node URL configuration: "+reason);
+		}
+	}
+
+	/**
+	 * Replication accepted an inbound value. The application reads what it means for
+	 * the node registry; this node acts on connections: refreshed discovery becomes
+	 * connection intent, and a validated one-record registry update may authenticate
+	 * the inbound route that carried it.
+	 */
+	private void onAcceptedInbound(AConnection connection,LatticePropagator source,
+			ACell[] path,ACell value,boolean changed) {
+		if (!NodeDirectory.mayAffectRegistry(path)) return;
+		AccountKey claimed=application.directory().claimedOwner(path,value);
+		refreshDiscovery();
+		if (connection!=null && claimed!=null) {
+			source.authenticateInboundRoute(connection,claimed);
+		}
+	}
+
+	/** Turns the application's refreshed directory into this node's connection intent. */
+	private void refreshDiscovery() {
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		for (NodeDirectory.NodeRecord record:application.directory().refresh()) {
+			manager.updateDiscoveredPeer(record.peerKey(),record.transports(),record.timestamp());
 		}
 	}
 
@@ -454,19 +494,17 @@ public class P2PNode implements Closeable {
 		});
 	}
 
+	/** Pulls the application's bootstrap paths from a new peer, in order, refreshing discovery after each. */
 	private CompletableFuture<Void> pullBootstrap(Convex peer) {
-		return server.pullPath(propagator,peer,true,P2PLattice.KEY_P2P)
-			.thenRun(nodeDirectory::refresh)
-			.thenCompose(ignored -> server.pullPath(propagator,peer,true,P2PLattice.KEY_ID))
-			.thenCompose(ignored -> pullDesiredSocial(peer));
-	}
-
-	private CompletableFuture<Void> pullDesiredSocial(Convex peer) {
-		CompletableFuture<?>[] pulls=socialPolicy.desiredOwners().stream()
-			.map(did -> server.pullPath(propagator,peer,true,Social.KEY_SOCIAL,did)
-				.thenRun(() -> socialPolicy.cacheCurrentOwner(did)))
-			.toArray(CompletableFuture[]::new);
-		return CompletableFuture.allOf(pulls);
+		CompletableFuture<Void> chain=CompletableFuture.completedFuture(null);
+		for (P2PApplication.BootstrapStep step:application.bootstrapSteps()) {
+			chain=chain.thenCompose(ignored -> server.pullPath(propagator,peer,true,step.path()))
+				.thenRun(() -> {
+					step.afterMerge().run();
+					refreshDiscovery();
+				});
+		}
+		return chain;
 	}
 
 	/**
@@ -505,29 +543,17 @@ public class P2PNode implements Closeable {
 			.whenInboundConnectionUpgraded(peerKey);
 	}
 
-	@SuppressWarnings({"unchecked", "rawtypes"})
 	private CompletableFuture<Result> pushOwnNodeInfo(Convex peer) {
 		if (keyPair==null) {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("Node has no signing key for its NodeInfo"));
 		}
-
-		ACell nodesValue=server.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		if (!(nodesValue instanceof AHashMap<?,?> rawNodes)) {
+		AHashMap<ACell,SignedData<ACell>> ownEntry=application.directory().ownEntry();
+		if (ownEntry==null) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
 				"Node has no published NodeInfo"));
 		}
-		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap) rawNodes;
-		AccountKey ownKey=keyPair.getAccountKey();
-		SignedData<ACell> signed=nodes.get(ownKey);
-		if (signed==null) {
-			return CompletableFuture.failedFuture(new IllegalStateException(
-				"Node has no published NodeInfo"));
-		}
-
-		AHashMap<ACell,SignedData<ACell>> ownEntry=(AHashMap) Maps.of(ownKey,signed);
-		var payload=Vectors.create(MessageTag.LATTICE_VALUE,
-			Vectors.of(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES),ownEntry);
+		var payload=Vectors.create(MessageTag.LATTICE_VALUE,NodeDirectory.REGISTRY_PATH,ownEntry);
 		Message update=Message.create(MessageType.LATTICE_VALUE,payload);
 		return peer.request(update).thenApply(result -> {
 			if (result==null || result.isError()) {

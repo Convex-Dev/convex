@@ -3,7 +3,10 @@ package convex.lattice;
 import java.util.Objects;
 
 import convex.core.data.ACell;
+import convex.core.data.SignedData;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.generic.OwnerLattice;
+import convex.lattice.generic.SignedLattice;
 
 /**
  * Base class for an application participating in a lattice root.
@@ -135,17 +138,50 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * Delivers an incoming subtree at a path relative to this application's root.
 	 * The default calls {@link #merge} for an empty path and ignores all other
 	 * paths, even when the lattice declares them. Applications override this hook
-	 * to select their interests, verify input and delegate to domain components.
-	 * Knowing a path's type does not imply interest in receiving updates there.
-	 * Overrides must verify enclosing signed envelopes before accepting interior
-	 * data. The path is borrowed read-only for the duration of the call.
-	 * No sync or preparation hook is invoked automatically.
+	 * to select their interests, verify input and delegate to domain components;
+	 * an application interested in every path its lattice declares overrides with
+	 * {@link #mergeDeclaredPath}. Knowing a path's type does not imply interest in
+	 * receiving updates there. Overrides must verify enclosing signed envelopes
+	 * before accepting interior data. The path is borrowed read-only for the
+	 * duration of the call. No sync or preparation hook is invoked automatically.
 	 *
 	 * @return Current application working root, not a publication acknowledgement
 	 */
 	@SuppressWarnings("unchecked")
 	public V mergeAt(ACell value, ACell... path) {
 		if (path.length==0) return merge((V)value);
+		return cursor.get();
+	}
+
+	/**
+	 * Merges an incoming value at any path the root lattice declares, under this
+	 * application's context. A path may not enter a signed envelope, and a value
+	 * delivered at an owner slot must be signed by a key the context accepts for
+	 * that owner; an unauthorised owner value is ignored. An empty path merges the
+	 * root.
+	 *
+	 * @param value Incoming value at the path
+	 * @param path Keys from the application root
+	 * @return Current application working root
+	 * @throws IllegalArgumentException if the path leaves the declared lattice or
+	 *         enters a signed envelope
+	 */
+	@SuppressWarnings("unchecked")
+	protected V mergeDeclaredPath(ACell value, ACell... path) {
+		if (path.length==0) return merge((V)value);
+		ALattice<?> target=lattice;
+		for (int i=0;i<path.length;i++) {
+			if (target instanceof SignedLattice<?>) {
+				throw new IllegalArgumentException("Incoming path must include the complete signed envelope");
+			}
+			// Legacy owner maps bind their verification predicate through the context.
+			if (i==path.length-1 && target instanceof OwnerLattice<?> && value instanceof SignedData<?> signed
+					&& !getContext().verifyOwner(path[i],signed.getAccountKey())) return cursor.get();
+			target=target.path(path[i]);
+			if (target==null) throw new IllegalArgumentException("Path is outside the served lattice");
+		}
+		ALattice<ACell> child=(ALattice<ACell>)target;
+		this.<ACell>resolve(path).updateAndGet(own -> child.merge(getContext(),own,value));
 		return cursor.get();
 	}
 }

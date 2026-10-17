@@ -63,6 +63,21 @@ public class P2PNodeTest {
 		assertFalse(node.isRunning());
 	}
 
+	/** The host hands incoming values to the P2P application, which accepts every declared path. */
+	@Test
+	public void testIncomingRegistryValueReachesApplication() {
+		AKeyPair keyPair=AKeyPair.generate();
+		AKeyPair remote=AKeyPair.generate();
+		node=P2PNode.create(store,NodeConfig.create(),keyPair);
+		AHashMap<Keyword,ACell> info=convex.lattice.p2p.P2PLattice.createNodeInfo(
+			Vectors.empty(),Strings.create("test"),Strings.create("0"),Vectors.empty(),false,
+			System.currentTimeMillis());
+		node.getNodeServer().mergeAt(convex.lattice.p2p.P2PLattice.createSignedEntry(remote,info),
+			P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		assertEquals(info,node.getApplication().node(remote.getAccountKey()).getNodeInfo());
+		assertEquals(info,nodeInfo(remote.getAccountKey()));
+	}
+
 	@Test
 	public void testCreateRequiresStore() {
 		assertThrows(IllegalArgumentException.class,
