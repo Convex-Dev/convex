@@ -19,6 +19,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.store.MemoryStore;
 import convex.lattice.generic.KeyedLattice;
+import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.SetLattice;
 
@@ -176,6 +177,63 @@ class ApplicationIngressTest {
 		assertEquals(LATTICE.zero(),root.cursor().get());
 		app.sync();
 		assertEquals(signed,RT.getIn(root.cursor().get(),ITEMS,owner.getAccountKey()));
+	}
+
+	private static final Keyword A=Keyword.intern("a");
+	private static final Keyword B=Keyword.intern("b");
+	private static final Keyword C=Keyword.intern("c");
+	private static final Keyword D=Keyword.intern("d");
+	private static final KeyedLattice FOUR=KeyedLattice.create(
+		A,MaxLattice.INSTANCE,B,MaxLattice.INSTANCE,C,MaxLattice.INSTANCE,D,MaxLattice.INSTANCE);
+
+	private static Index<Keyword,ACell> four(long a,long b,long c,long d) {
+		return FOUR.zero().assoc(A,CVMLong.create(a)).assoc(B,CVMLong.create(b))
+			.assoc(C,CVMLong.create(c)).assoc(D,CVMLong.create(d));
+	}
+
+	/**
+	 * Knows the whole root, so it can navigate and publish all of it, but takes only
+	 * the regions it is interested in from an incoming root, delegating to the default
+	 * merge at each of those paths and nowhere else.
+	 */
+	private static class SelectiveApp extends App {
+		final List<Keyword> interests;
+		SelectiveApp(LatticeHost<Index<Keyword,ACell>> host,Keyword... interests) {
+			super(FOUR,host);
+			this.interests=List.of(interests);
+		}
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+			merges++;
+			for (Keyword region:interests) {
+				ACell value=incoming.get(region);
+				if (value!=null) mergeDeclaredPath(value,region);
+			}
+			return cursor.get();
+		}
+	}
+
+	@Test void selectiveApplicationsTakeTheirRegionsAndPublishThemToTheRoot() {
+		var initial=four(1,1,1,1);
+		var root=LatticeHost.create(initial,null);
+		var ab=new SelectiveApp(root,A,B);
+		var bc=new SelectiveApp(root,B,C);
+		root.configureApplications(List.of(ab,bc));
+
+		// The host calls each application's merge; each takes only what it wants
+		root.merge(four(2,2,2,2));
+		assertEquals(1,ab.merges);
+		assertEquals(1,bc.merges);
+		assertEquals(four(2,2,1,1),ab.cursor().get(),"AB took A and B into its working state");
+		assertEquals(four(1,2,2,1),bc.cursor().get(),"BC took B and C into its working state");
+		assertEquals(initial,root.cursor().get(),"nothing reaches the root until an application publishes");
+
+		// Each publication carries its regions back; neither disturbs the other's, and D stays
+		ab.sync();
+		assertEquals(four(2,2,1,1),root.cursor().get());
+		bc.sync();
+		assertEquals(four(2,2,2,1),root.cursor().get(),"A, B and C changed; D was wanted by no application");
+		ab.sync();
+		assertEquals(four(2,2,2,1),root.cursor().get(),"republishing AB's stale copy of C and D changes nothing");
 	}
 
 	@Test void sequentialDeliveryPreservesEarlierWorkOnFailure() {
