@@ -1270,6 +1270,20 @@ public abstract class CoreTest extends ACVMTest {
 	}
 
 	@Test
+	public void testNonCanonicalIntegerArgs() {
+		// Products are canonical
+		ACell zero=eval("(* 9223372036854775808 0)");
+		assertTrue(zero instanceof CVMLong);
+		assertEquals(CVMLong.ZERO,zero);
+
+		// A non-canonical big integer argument behaves like the equal long
+		ACell one=CVMBigInteger.wrap(new byte[] {1});
+		assertEquals(CVMLong.create(20),Core.GET.invoke(context(),new ACell[] {eval("[10 20 30]"),one,eval(":missing")}).getResult());
+		ACell b=CVMBigInteger.wrap(new byte[] {98});
+		assertEquals(Vectors.of("a","c"),Core.SPLIT.invoke(context(),new ACell[] {eval("\"abc\""),b}).getResult());
+	}
+
+	@Test
 	public void testNot() {
 		assertFalse(evalB("(not 1)"));
 		assertTrue(evalB("(not false)"));

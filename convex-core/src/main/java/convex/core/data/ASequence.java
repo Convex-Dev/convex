@@ -153,8 +153,8 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	@SuppressWarnings("unchecked")
 	@Override
 	public ACell get(ACell key, ACell notFound) {
-		if (key instanceof CVMLong) {
-			long ix = ((CVMLong) key).longValue();
+		if (AInteger.isLong(key)) {
+			long ix = ((AInteger) key).longValue();
 			if ((ix >= 0) && (ix < count())) return get(ix);
 		}
 		return (T) notFound;

@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
+import convex.core.data.ASequence;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -92,6 +94,56 @@ public class BigIntegerTest {
 		assertEquals(Blob.wrap(value.toByteArray()),bi.toBlob(),hex); // minimal two's complement
 		assertEquals(value,bi.big(),hex);
 		assertEquals(value,AInteger.create(b).big(),hex);
+	}
+
+	/**
+	 * Products are canonical: a big integer times zero is CVMLong zero
+	 */
+	@Test public void testMultiplyIsCanonical() {
+		assertCVMLongZero(CVMBigInteger.MIN_POSITIVE.multiply(CVMLong.ZERO));
+		assertCVMLongZero(CVMLong.ZERO.multiply(CVMBigInteger.MIN_NEGATIVE));
+		assertCVMLongZero(CVMBigInteger.MIN_POSITIVE.multiply(CVMBigInteger.wrap(BigInteger.ZERO)));
+		assertTrue(CVMBigInteger.MIN_POSITIVE.multiply(CVMLong.create(2)).isCanonical());
+	}
+
+	private static void assertCVMLongZero(ANumeric a) {
+		assertTrue(a instanceof CVMLong,()->"Expected CVMLong but was "+a.getClass());
+		assertEquals(CVMLong.ZERO,a);
+	}
+
+	/**
+	 * A non-canonical big integer in long range behaves exactly like the equal CVMLong,
+	 * since peers may hold either form of the same value
+	 */
+	@Test public void testNonCanonicalBehavesAsLong() {
+		ASequence<ACell> v=Reader.read("[10 20 30]");
+		for (CVMBigInteger x: nonCanonical(1)) {
+			assertFalse(x.isCanonical());
+			assertTrue(AInteger.isLong(x));
+			assertEquals(CVMLong.create(20),v.get(x));
+			assertEquals(CVMLong.create(20),v.get(x,CVMLong.MINUS_ONE));
+		}
+		for (CVMBigInteger x: nonCanonical(65)) {
+			assertEquals(CVMChar.create('A'),RT.ensureChar(x));
+		}
+		for (CVMBigInteger x: nonCanonical(0)) {
+			assertEquals(Long.valueOf(0),RT.jvm(x));
+		}
+
+		assertTrue(AInteger.isLong(CVMLong.MAX_VALUE));
+		assertTrue(AInteger.isLong(CVMBigInteger.create(Blob.EMPTY)));
+		assertFalse(AInteger.isLong(CVMBigInteger.MIN_POSITIVE));
+		assertFalse(AInteger.isLong(CVMDouble.ONE));
+		assertFalse(AInteger.isLong(null));
+	}
+
+	/**
+	 * Non-canonical big integers equal to n, held as a Java BigInteger (as arithmetic builds them)
+	 * and as a blob
+	 */
+	private static CVMBigInteger[] nonCanonical(long n) {
+		BigInteger bi=BigInteger.valueOf(n);
+		return new CVMBigInteger[] {CVMBigInteger.wrap(bi),CVMBigInteger.wrap(bi.toByteArray())};
 	}
 
 	@Test public void testBigIntegerAssumptions() {

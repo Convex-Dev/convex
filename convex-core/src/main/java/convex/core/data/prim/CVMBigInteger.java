@@ -374,7 +374,7 @@ public final class CVMBigInteger extends AInteger {
 		} else {
 			bb=((CVMBigInteger)b).getBigInteger();
 		}
-		return wrap(big().multiply(bb));
+		return AInteger.create(big().multiply(bb)); // canonical, e.g. a product with zero is a CVMLong
 	}
 
 	@Override

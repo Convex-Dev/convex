@@ -230,6 +230,19 @@ public abstract class AInteger extends ANumeric {
 	public abstract boolean isLong();
 
 	/**
+	 * Checks if a value is an integer that fits in a 64-bit long, whatever its representation.
+	 * Use instead of a CVMLong instance check, so that a non-canonical big integer behaves
+	 * identically to the equal CVMLong.
+	 *
+	 * @param a Value to check
+	 * @return true if the value is an integer in long range
+	 */
+	public static boolean isLong(ACell a) {
+		if (a instanceof CVMLong) return true; // fast path for the canonical case
+		return (a instanceof AInteger ai) && ai.isLong();
+	}
+
+	/**
 	 * Raise the integer to the given power
 	 * @param power Power to raise integer to
 	 * @return Result, or null if invalid
