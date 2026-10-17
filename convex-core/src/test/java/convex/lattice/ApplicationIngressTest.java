@@ -2,6 +2,7 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,8 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.store.MemoryStore;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.OwnerKeyLattice;
@@ -62,7 +65,8 @@ class ApplicationIngressTest {
 		assertEquals(LATTICE.zero(),second.cursor().get());
 		assertEquals(1,first.pathMerges);
 		assertEquals(1,second.pathMerges);
-		assertEquals(0,first.merges,"a path delivery does not pass through the root merge");
+		assertEquals(1,first.merges,"with no child component on the path, the root merge takes the delivery reduced to its path");
+		assertEquals(0,second.merges);
 		assertEquals(0,first.preparations);
 		assertNull(store.getRootData());
 		first.sync();
@@ -77,53 +81,86 @@ class ApplicationIngressTest {
 		var app=new App(LATTICE,root);
 		root.configureApplications(List.of(app));
 		root.mergeAt(Sets.of(CVMLong.ONE),UNKNOWN);
-		assertEquals(LATTICE.zero(),app.cursor().get(),"a path the application's lattice does not declare delivers nothing");
+		assertEquals(0,app.merges,"a path the application's lattice does not declare delivers nothing");
+		assertEquals(LATTICE.zero(),app.cursor().get());
 		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
+		assertEquals(1,app.merges);
 		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
 		root.mergeAt(LATTICE.zero());
-		assertEquals(1,app.merges,"an empty path is the root itself");
+		assertEquals(2,app.merges,"an empty path is the root itself");
 	}
 
-	/** An application's own component for a path receives the delivery, whatever its merge does. */
-	@Test void pathDeliveryMergesWithTheApplicationsOwnComponentForThePath() {
+	/** With no child component on the path, the delivery reaches this component's merge reduced to its path. */
+	@Test void pathDeliveryWithoutAChildReducesToItsPathAndMergesHere() {
 		var root=LatticeHost.create(LATTICE.zero(),null);
-		int[] routed={0};
+		List<Index<Keyword,ACell>> delivered=new ArrayList<>();
 		var app=new App(LATTICE,root) {
-			@SuppressWarnings("unchecked")
-			@Override public <T extends ACell> ALatticeComponent<T> component(ACell... path) {
-				if (path.length==1 && ITEMS.equals(path[0])) {
-					return (ALatticeComponent<T>)new ALatticeComponent<ASet<ACell>>(resolve(ITEMS)) {
-						@Override public ASet<ACell> merge(ASet<ACell> other) {
-							routed[0]++;
-							return cursor.get(); // this component takes nothing from outside
-						}
-					};
-				}
-				return super.component(path);
+			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+				delivered.add(incoming);
+				return super.merge(incoming);
 			}
 		};
 		root.configureApplications(List.of(app));
 		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
-		assertEquals(1,routed[0]);
-		assertEquals(LATTICE.zero(),app.cursor().get(),"the component's merge decided, not the lattice");
-		assertSame(app,app.component(),"the application is the component at the root");
-		assertNull(app.component(UNKNOWN),"an undeclared path has no component");
-	}
-
-	/** Without a component of its own for a path, the application merges there with the lattice declared for that level. */
-	@Test void pathDeliveryMergesAtItsLevelWithTheLatticeDeclaredThere() {
-		var root=LatticeHost.create(LATTICE.zero(),null);
-		var app=new App(LATTICE,root);
-		root.configureApplications(List.of(app));
-		assertInstanceOf(LatticeComponent.class,app.component(ITEMS),"the default component at a declared path");
-		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
+		assertEquals(List.of(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE))),delivered,"the value at its path, siblings ignored");
 		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
 		root.mergeAt(Sets.of(CVMLong.TWO),ITEMS);
-		assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.cursor().get().get(ITEMS),"the set lattice at the path merges");
-		assertEquals(0,app.merges,"the root merge is not involved");
-		root.mergeAt(Sets.of(CVMLong.create(3)),UNKNOWN);
 		assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.cursor().get().get(ITEMS));
-		assertNull(app.cursor().get().get(UNKNOWN),"a path the lattice does not declare delivers nothing");
+		assertEquals(2,delivered.size());
+		root.mergeAt(Sets.of(CVMLong.create(3)),UNKNOWN);
+		assertEquals(2,delivered.size(),"a path the lattice does not declare delivers nothing");
+	}
+
+	private static final Keyword BOARD=Keyword.intern("board");
+	private static final Keyword PLANNED=Keyword.intern("planned");
+	private static final Keyword DONE=Keyword.intern("done");
+	private static final KeyedLattice BOARD_LATTICE=KeyedLattice.create(PLANNED,SetLattice.create(),DONE,SetLattice.create());
+	private static final KeyedLattice NESTED=KeyedLattice.create(BOARD,BOARD_LATTICE);
+
+	/** A component one level down with its own merge and the shape below it. */
+	private static final class Board extends ALatticeComponent<Index<Keyword,ACell>> {
+		int merges;
+		Board(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
+		@Override public ALattice<Index<Keyword,ACell>> getLattice() { return BOARD_LATTICE; }
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+			merges++;
+			return cursor.updateAndGet(own -> BOARD_LATTICE.merge(getContext(),own,incoming));
+		}
+	}
+
+	/** The walk hands the rest of the path to the child for the first key; the deepest component that resolves merges. */
+	@Test void pathDeliveryWalksToTheDeepestComponentThatResolves() {
+		var root=LatticeHost.create(NESTED.zero(),null);
+		Board[] board=new Board[1];
+		var app=new App(NESTED,root) {
+			@SuppressWarnings("unchecked")
+			@Override protected <T extends ACell> ALatticeComponent<T> child(ACell key) {
+				return BOARD.equals(key)?(ALatticeComponent<T>)board[0]:super.child(key);
+			}
+		};
+		board[0]=new Board(app.resolve(BOARD));
+		root.configureApplications(List.of(app));
+
+		root.mergeAt(Sets.of(CVMLong.ONE),BOARD,PLANNED);
+		assertEquals(1,board[0].merges,"the board took the delivery, reduced to its own level");
+		assertEquals(0,app.merges,"the application's own merge was not involved");
+		assertEquals(1,app.pathMerges);
+		assertEquals(Sets.of(CVMLong.ONE),RT.getIn(app.cursor().get(),BOARD,PLANNED));
+
+		root.mergeAt(BOARD_LATTICE.zero().assoc(DONE,Sets.of(CVMLong.TWO)),BOARD);
+		assertEquals(2,board[0].merges,"a delivery at the board's own level is the board's merge");
+		assertEquals(Sets.of(CVMLong.TWO),RT.getIn(app.cursor().get(),BOARD,DONE));
+
+		root.mergeAt(Sets.of(CVMLong.create(3)),BOARD,UNKNOWN);
+		assertEquals(2,board[0].merges,"a path the board's lattice does not declare delivers nothing");
+		assertNull(RT.getIn(app.cursor().get(),BOARD,UNKNOWN));
+	}
+
+	/** A component that defines neither a merge nor a shape is not a delivery target. */
+	@Test void componentWithoutMergeOrLatticeRefusesDeliveries() {
+		var bare=new ALatticeComponent<Index<Keyword,ACell>>(Root.create(BOARD_LATTICE.zero())) {};
+		assertThrows(UnsupportedOperationException.class,() -> bare.mergeAt(BOARD_LATTICE.zero()));
+		assertThrows(UnsupportedOperationException.class,() -> bare.mergeAt(Sets.of(CVMLong.ONE),PLANNED));
 	}
 
 	@Test void signedPathRequiresEnvelopeAndAuthorisedOwner() {

@@ -1,11 +1,13 @@
 package convex.lattice;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import convex.core.data.ACell;
+import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
@@ -155,6 +157,82 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 */
 	public V merge(V other) {
 		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no merge for incoming values");
+	}
+
+	/**
+	 * Returns the lattice declaring the shape below this component's level, or null if
+	 * this component declares none. A path delivery that no child component takes is
+	 * reduced to its path with these shapes before this component merges it.
+	 *
+	 * @return Lattice for this level, or null
+	 */
+	public ALattice<V> getLattice() {
+		return null;
+	}
+
+	/**
+	 * Resolves this component's child component for one key below its level, or null
+	 * when it has none there. The default has none: a delivery below this level is
+	 * then merged here, reduced to its path. A component with children of its own
+	 * overrides this to hand a delivery on to them.
+	 *
+	 * @param <T> Value type at the key
+	 * @param key Key below this level
+	 * @return Child component, or null
+	 */
+	protected <T extends ACell> ALatticeComponent<T> child(ACell key) {
+		return null;
+	}
+
+	/**
+	 * Delivers a value at a path below this component. The path is walked through the
+	 * components that resolve: the child component for the first key, when there is
+	 * one, takes the rest of the path, and the deepest component that resolves merges
+	 * the value through its own {@link #merge}, reduced to its path: the value inside
+	 * the empty containers that component's lattice declares along the way, every
+	 * sibling ignored. An empty path is this component's own level. A path the lattice
+	 * does not declare delivers nothing, and the lattice tree ends at a signed
+	 * envelope, so a complete envelope is supplied at its slot.
+	 *
+	 * @param value Incoming value at the path
+	 * @param path Keys below this component's level
+	 * @return Current working value of this component, not a publication acknowledgement
+	 * @throws UnsupportedOperationException if no component on the path resolves and
+	 *         this component declares no lattice to reduce the value with
+	 */
+	@SuppressWarnings("unchecked")
+	public V mergeAt(ACell value, ACell... path) {
+		if (path.length==0) return merge((V)value);
+		ALatticeComponent<ACell> child=child(path[0]);
+		if (child!=null) {
+			child.mergeAt(value,Arrays.copyOfRange(path,1,path.length));
+			return cursor.get();
+		}
+		V reduced=reduce(value,path);
+		return (reduced==null)?cursor.get():merge(reduced);
+	}
+
+	/** The value a delivery at a path means at this level: that path alone, in the lattice's empty containers. */
+	@SuppressWarnings("unchecked")
+	private V reduce(ACell value, ACell[] path) {
+		ALattice<?> lattice=getLattice();
+		if (lattice==null) {
+			throw new UnsupportedOperationException(getClass().getSimpleName()+" declares no lattice to place a value at a path below it");
+		}
+		ALattice<?>[] levels=new ALattice<?>[path.length];
+		ALattice<?> level=lattice;
+		for (int i=0; i<path.length; i++) {
+			levels[i]=level;
+			level=level.path(path[i]);
+			if (level==null) return null;
+		}
+		ACell reduced=value;
+		for (int i=path.length-1; i>=0; i--) {
+			if (!(levels[i].zero() instanceof ADataStructure<?> empty)) return null;
+			reduced=RT.assoc((ADataStructure<ACell>)empty,path[i],reduced);
+			if (reduced==null) return null;
+		}
+		return (V)reduced;
 	}
 
 	/**

@@ -399,11 +399,13 @@ application list and an unconfigured host both ignore all incoming state. A node
 routes incoming pushes, whole-root and path pulls, direct merge calls and snapshot
 candidates through the host; delivery never invokes application sync, and an
 acknowledgement confirms delivery, not publication of private work. A path-addressed
-delivery goes to each application's `mergeAt`, which resolves the component at that
-path with `component(path)` and merges with that component's own `merge`, whether it
-delegates to a lattice or does something else. An application hands back its own
-component for the paths it has one for; for any other declared path the default is a
-plain component merging with the lattice declared for that level. A path the lattice
+delivery goes to each application's `mergeAt`, which walks the path through the
+components that resolve: a component with a child component for the first key hands
+the rest of the path to it, and the deepest component that resolves merges the value
+reduced to its path, the value inside the empty containers that component's lattice
+declares along the way with every sibling ignored, through its own `merge`, whether
+that delegates to a lattice or does something else. By default no child resolves, so
+the application's `merge` sees a path delivery as a partial root. A path the lattice
 does not declare delivers nothing, and the lattice tree ends at a signed envelope, so
 callers supply the complete envelope at its slot.
 

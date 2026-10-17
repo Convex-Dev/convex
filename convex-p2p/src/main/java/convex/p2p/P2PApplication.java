@@ -25,11 +25,11 @@ import convex.social.Social;
  * Root-level application component for the P2P lattice regions.
  *
  * <p>This is the application a P2P host hands incoming values to. It owns their
- * merge: an incoming root or path value, projected to what this node wants, is
- * merged by the default component at its level, the lattice declared there, which
- * merges every region as declared and verifies each owner's slot. The projection
- * keeps the infrastructure regions whole and reduces the social region to the owners
- * this node wants. The application also owns the P2P policy that reads the lattice:
+ * merge: an incoming root, or a path value reduced to its path, is projected to what
+ * this node wants and delegated to the lattice merge, which merges every region as
+ * declared and verifies each owner's slot. The projection keeps the infrastructure
+ * regions whole and reduces the social region to the owners this node wants. The
+ * application also owns the P2P policy that reads the lattice:
  * the node registry as a validated directory, the social owners this node wants, and
  * the paths to pull from a newly admitted peer. It imports nothing from the node
  * package. A {@link P2PNode} assembles it with replication and calls it at the
@@ -85,29 +85,15 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	 * Merges an incoming root projected to what this node wants: every region as
 	 * declared, the social region reduced to the owners this node wants. The lattice
 	 * merge does the rest, verifying each owner's slot, and the validated signer of
-	 * each wanted owner whose slot arrived is then recorded. A working view bound to a
-	 * cursor has no policy and so no interest of its own; it delegates whole.
+	 * each wanted owner whose slot arrived is then recorded. A path delivery arrives
+	 * here reduced to its path, so the same projection selects it. A working view
+	 * bound to a cursor has no policy and so no interest of its own; it delegates whole.
 	 */
 	@Override
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 		Index<Keyword,ACell> wanted=(socialPolicy==null)?other:socialPolicy.projectRoot(other);
 		Index<Keyword,ACell> result=cursor.updateAndGet(own -> getLattice().merge(getContext(),own,wanted));
-		if (socialPolicy!=null) socialPolicy.recordOwners(new ACell[0],wanted);
-		return result;
-	}
-
-	/**
-	 * A path delivery is projected to what this node wants, merged at its level by the
-	 * default rule, and the validated signers of the wanted owners it carried are then
-	 * recorded. A working view has no policy and takes the default.
-	 */
-	@Override
-	public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
-		if (socialPolicy==null || path.length==0) return super.mergeAt(value,path);
-		ACell wanted=socialPolicy.project(path,value);
-		if (wanted==null) return cursor.get();
-		Index<Keyword,ACell> result=super.mergeAt(wanted,path);
-		socialPolicy.recordOwners(path,wanted);
+		if (socialPolicy!=null) socialPolicy.recordOwners(wanted);
 		return result;
 	}
 
