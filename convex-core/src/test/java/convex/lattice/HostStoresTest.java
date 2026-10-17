@@ -68,6 +68,9 @@ public class HostStoresTest {
 		SetApplication(LatticeHost<ASet<ACell>> host) {
 			super(SetLattice.create(),host);
 		}
+		@Override public ASet<ACell> merge(ASet<ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		}
 	}
 
 	private static final class FlushStore extends MemoryStore {

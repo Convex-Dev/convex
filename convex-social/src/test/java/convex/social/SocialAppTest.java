@@ -57,6 +57,9 @@ public class SocialAppTest {
 		TestRoot(KeyedLattice lattice) {
 			super(lattice,Cursors.root(lattice.zero()));
 		}
+		@Override public Index<Keyword, ACell> merge(Index<Keyword, ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		}
 	}
 
 	@Test

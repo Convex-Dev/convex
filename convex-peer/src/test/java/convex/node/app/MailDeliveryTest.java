@@ -54,14 +54,15 @@ class MailDeliveryTest {
 	private static final AString CAROL_DID=DID.forKey(CAROL.getAccountKey());
 
 	/**
-	 * The application admits path-addressed mailbox values, as a mail replication policy
-	 * would for the mailboxes a node desires; the base application admits whole roots only.
+	 * The application delegates every incoming value, a pulled mailbox included, to its
+	 * lattice; a mail replication policy would first project it to the mailboxes a node
+	 * desires.
 	 */
 	static final class MailApp extends ALatticeApplication<Index<Keyword,ACell>> {
 		MailApp(LatticeHost<Index<Keyword,ACell>> host) { super(ROOT,host); }
 		Mail mail(AKeyPair user) { return Mail.connect(this,Mail.LATTICE,LatticeContext.create(null,user)); }
-		@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
-			return mergeDeclaredPath(value,path);
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
 		}
 	}
 

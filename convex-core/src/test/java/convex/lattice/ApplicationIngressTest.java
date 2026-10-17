@@ -28,6 +28,7 @@ class ApplicationIngressTest {
 	private static final Keyword UNKNOWN=Keyword.intern("unknown");
 	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
 
+	/** Counts deliveries and delegates each to the lattice merge, unless told to ignore them. */
 	private static class App extends ALatticeApplication<Index<Keyword,ACell>> {
 		int merges;
 		int preparations;
@@ -35,25 +36,17 @@ class ApplicationIngressTest {
 		App(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host) { super(lattice,host); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
-			return ignore?cursor.get():super.merge(incoming);
+			if (ignore) return cursor.get();
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,incoming));
 		}
 		@Override protected void beforeSync() { preparations++; }
-	}
-
-	/** This application chooses one input path and feeds it through its own root policy. */
-	private static class ItemsApp extends App {
-		ItemsApp(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
-		@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
-			if (path.length==1 && ITEMS.equals(path[0])) return merge(LATTICE.zero().assoc(ITEMS,value));
-			return super.mergeAt(value,path);
-		}
 	}
 
 	@Test void pathDeliveryHonoursRootOverrideAndDoesNotPublish() throws Exception {
 		var store=new MemoryStore();
 		var root=LatticeHost.create(LATTICE.zero(),store);
-		var first=new ItemsApp(root);
-		var second=new ItemsApp(root);
+		var first=new App(LATTICE,root);
+		var second=new App(LATTICE,root);
 		second.ignore=true;
 		root.configureApplications(List.of(first,second));
 		var values=Sets.of(CVMLong.ONE);
@@ -73,68 +66,34 @@ class ApplicationIngressTest {
 
 	@Test void applicationsOwnPathSelectionIndependentlyOfHostSchema() {
 		var root=LatticeHost.create(KeyedLattice.create().zero(),null);
-		var app=new ItemsApp(root);
+		var app=new App(LATTICE,root);
 		root.configureApplications(List.of(app));
 		root.mergeAt(Sets.of(CVMLong.ONE),UNKNOWN);
-		assertEquals(0,app.merges);
+		assertEquals(0,app.merges,"a path the application's lattice does not declare delivers nothing");
 		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
 		assertEquals(1,app.merges);
 		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
 		root.mergeAt(LATTICE.zero());
-		assertEquals(2,app.merges,"empty paths dispatch through the root merge override");
+		assertEquals(2,app.merges,"an empty path is the root itself");
 	}
 
-	@Test void declaredPathDoesNotImplyApplicationInterest() {
+	/** A path delivery reaches the application's merge as the partial root holding the value. */
+	@Test void pathDeliveryArrivesAsPartialRoot() {
 		var root=LatticeHost.create(LATTICE.zero(),null);
-		var app=new App(LATTICE,root);
-		root.configureApplications(List.of(app));
-		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
-		assertEquals(0,app.merges);
-		assertEquals(LATTICE.zero(),app.cursor().get());
-		root.mergeAt(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE)));
-		assertEquals(1,app.merges);
-		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
-	}
-
-	/** An application states interest in every declared path by delegating to the base helper. */
-	@Test void declaredPathHelperAcceptsDeclaredPathsOnly() {
-		var root=LatticeHost.create(LATTICE.zero(),null);
+		List<Index<Keyword,ACell>> delivered=new ArrayList<>();
 		var app=new App(LATTICE,root) {
-			@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
-				return mergeDeclaredPath(value,path);
+			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+				delivered.add(incoming);
+				return super.merge(incoming);
 			}
 		};
 		root.configureApplications(List.of(app));
 		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
+		assertEquals(List.of(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE))),delivered);
 		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
-		assertEquals(0,app.merges,"a path merge does not pass through the root merge");
-		assertThrows(IllegalArgumentException.class,() -> root.mergeAt(Sets.of(CVMLong.TWO),UNKNOWN));
+		root.mergeAt(Sets.of(CVMLong.TWO),UNKNOWN);
+		assertEquals(1,delivered.size(),"a path the lattice does not declare delivers nothing");
 		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
-		root.mergeAt(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));
-		assertEquals(1,app.merges,"an empty path still dispatches through the root merge");
-		assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),app.cursor().get().get(ITEMS));
-	}
-
-	@Test void customHandlerReceivesInputUnchangedWithoutSchemaInterpretation() {
-		var root=LatticeHost.create(KeyedLattice.create().zero(),null);
-		ACell[] supplied={UNKNOWN,CVMLong.ONE};
-		ACell value=CVMLong.TWO;
-		List<ACell[]> deliveries=new ArrayList<>();
-		var app=new App(KeyedLattice.create(),root) {
-			@Override public Index<Keyword,ACell> mergeAt(ACell incoming,ACell... path) {
-				assertSame(value,incoming);
-				deliveries.add(path);
-				merges++;
-				return cursor.get();
-			}
-		};
-		root.configureApplications(List.of(app));
-		root.mergeAt(value,supplied);
-		ACell[] empty={};
-		root.mergeAt(value,empty);
-		assertSame(supplied,deliveries.get(0));
-		assertSame(empty,deliveries.get(1));
-		assertEquals(2,app.merges);
 	}
 
 	@Test void signedPathRequiresEnvelopeAndAuthorisedOwner() {
@@ -143,6 +102,7 @@ class ApplicationIngressTest {
 		var owners=OwnerKeyLattice.create(SetLattice.<ACell>create());
 		var lattice=KeyedLattice.create(ITEMS,owners);
 		var root=LatticeHost.create(lattice.zero(),null);
+		/** Routes the owner's slot to a signed component and takes nothing else. */
 		class OwnerApp extends App {
 			final SignedComponent<ASet<ACell>> owned;
 			OwnerApp() {
@@ -150,14 +110,13 @@ class ApplicationIngressTest {
 				owned=new SignedComponent<>(owners.signingFor(owner.getAccountKey()),resolve(ITEMS,owner.getAccountKey()));
 				owned.setContext(LatticeContext.create(null,owner));
 			}
-			@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
-				if (path.length==2 && ITEMS.equals(path[0]) && owner.getAccountKey().equals(path[1])) {
+			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
+				if (RT.getIn(incoming,ITEMS,owner.getAccountKey()) instanceof SignedData<?> slot) {
 					@SuppressWarnings("unchecked")
-					var envelope=(SignedData<ASet<ACell>>)value;
+					var envelope=(SignedData<ASet<ACell>>)slot;
 					owned.merge(envelope);
-					return cursor.get();
 				}
-				return super.mergeAt(value,path);
+				return cursor.get();
 			}
 			@Override protected void beforeSync() { owned.sync(); }
 		}
@@ -165,7 +124,7 @@ class ApplicationIngressTest {
 		root.configureApplications(List.of(app));
 		var values=Sets.of(CVMLong.ONE);
 		root.mergeAt(values,ITEMS,owner.getAccountKey(),Keywords.VALUE);
-		assertNull(app.owned.cursor().get());
+		assertNull(app.owned.cursor().get(),"a path inside the envelope is outside the lattice");
 		root.mergeAt(stranger.signData(values),ITEMS,owner.getAccountKey());
 		assertNull(app.owned.cursor().get());
 		var signed=owner.signData(values);
@@ -193,8 +152,8 @@ class ApplicationIngressTest {
 
 	/**
 	 * Knows the whole root, so it can navigate and publish all of it, but takes only
-	 * the regions it is interested in from an incoming root, delegating to the default
-	 * merge at each of those paths and nowhere else.
+	 * the regions it is interested in from an incoming root: it delegates the root
+	 * projected to those regions to the lattice merge, and nothing else.
 	 */
 	private static class SelectiveApp extends App {
 		final List<Keyword> interests;
@@ -203,12 +162,12 @@ class ApplicationIngressTest {
 			this.interests=List.of(interests);
 		}
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
-			merges++;
+			Index<Keyword,ACell> wanted=FOUR.zero();
 			for (Keyword region:interests) {
 				ACell value=incoming.get(region);
-				if (value!=null) mergeDeclaredPath(value,region);
+				if (value!=null) wanted=wanted.assoc(region,value);
 			}
-			return cursor.get();
+			return super.merge(wanted);
 		}
 	}
 
@@ -238,13 +197,13 @@ class ApplicationIngressTest {
 
 	@Test void sequentialDeliveryPreservesEarlierWorkOnFailure() {
 		var root=LatticeHost.create(LATTICE.zero(),null);
-		var first=new ItemsApp(root);
-		var failure=new ItemsApp(root) {
+		var first=new App(LATTICE,root);
+		var failure=new App(LATTICE,root) {
 			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 				throw new IllegalStateException("application failed");
 			}
 		};
-		var last=new ItemsApp(root);
+		var last=new App(LATTICE,root);
 		root.configureApplications(List.of(first,failure,last));
 		assertThrows(IllegalStateException.class,() -> root.mergeAt(Sets.of(CVMLong.ONE),ITEMS));
 		assertEquals(Sets.of(CVMLong.ONE),first.cursor().get().get(ITEMS));

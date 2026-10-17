@@ -243,12 +243,12 @@ CAD text affected: CAD035 *Lattice-Aware Cursors*, "Canonical vs logical keys â€
 
 ## 9. Hosts merge path-addressed values with the served sub-lattice
 
-**Status:** Implemented (`c1bfed931`).
+**Status:** Implemented (`c1bfed931`); superseded 17 October, see entry 16.
 
-`NodeServer` builds a plain root and merges inbound path values with
-`lattice.path(path)`; `mergeAt(value, path...)` is the public form. A path outside
-the served lattice is rejected before any navigation. `LatticePropagator` keeps a
-plain root for its working view.
+`NodeServer` built a plain root and merged inbound path values with
+`lattice.path(path)`; `mergeAt(value, path...)` was the public form. The node now
+holds no lattice: a path delivery reaches each application as the partial root
+holding the value at its path, and the application merges it as it merges any root.
 
 CAD text affected: none found in CAD024/035/045; CAD036 (*Lattice Node*) should be
 checked for how pull-path merges are described.
@@ -379,12 +379,10 @@ went earlier (`971790597`).
 
 On 17 October the P2P node followed (`3e08a8a35`). `P2PNode.create` opens the host
 with `RelayHost.openHost`, configures `P2PApplication` on it as the receiver and
-attaches replication; nothing below the root is the node's. The application accepts
-every declared path through the base helper `mergeDeclaredPath`, which is the lattice
-at the path merging under the application's context and nothing more: the signing
-rules it used to re-apply along the path now live in the lattices, where an owner's
-slot verifies its signer for its owner through the context and the lattice tree ends
-at a signed envelope. The node directory,
+attaches replication; nothing below the root is the node's. The signing rules the
+application used to re-apply along a path now live in the lattices (`246a20501`),
+where an owner's slot verifies its signer for its owner through the context and the
+lattice tree ends at a signed envelope. The node directory,
 social selection and bootstrap paths are the application's, read from its lattice. The
 node calls the application at the moments replication knows about, after the transport
 binds, when a peer is admitted and when an inbound value is accepted, and turns what it
@@ -392,6 +390,19 @@ learns into connection intent, filters, pulls and route authentication. The appl
 syncs the host for edits its policy makes during admission, the one place it touches
 publication, because the node's post-merge sync runs only when the merge itself changed
 the root.
+
+Later on 17 October the application merge took its intended shape. Mike's statement:
+the lattice is a shape definition plus a default merge function; it is up to the
+component implementation to delegate to it or not, and nothing assumes it as the
+default. `ALatticeApplication.merge` is therefore abstract: every application states
+how it merges an incoming root, `LatticeApplication` and `DLFSApplication` by
+delegating whole, `P2PApplication` by delegating the root projected to the social
+owners it wants and then recording their validated signers. A path delivery is no
+longer a second hook: `mergeAt` is final and hands `merge` the partial root holding
+the value at its path, built from the lattice's empty containers, so a path the
+lattice does not declare delivers nothing, as an undeclared key in a root does. The
+base helper `mergeDeclaredPath`, the path-ignoring default, the "declared path does
+not imply interest" rule and the bootstrap after-merge steps went with it.
 
 CAD text affected:
 

@@ -21,9 +21,9 @@ import convex.social.SocialHelpers;
 
 /**
  * Default one-hop social retention policy, owned by the P2P application. It reads
- * the application's lattice to decide which social owners this node wants. The
- * application applies that decision to incoming values itself; the policy offers it
- * as the publication projection a node plugs into its propagation group.
+ * the application's lattice to decide which social owners this node wants and offers
+ * that decision as a projection of the root: the application merges incoming roots
+ * through it, and a node publishes through it.
  */
 final class SocialReplicationPolicy {
 
@@ -75,27 +75,16 @@ final class SocialReplicationPolicy {
 		return Set.copyOf(desired);
 	}
 
-	/** Projects a published value down to the desired owners' valid slots. */
-	ACell filterPublication(ACell[] path,ACell value) {
-		Set<AString> desired=desiredOwners();
-		if (path.length==0) return filterRoot(value,desired);
-		if (!Social.KEY_SOCIAL.equals(path[0])) return value;
-		if (path.length==1) return filterOwners(value,desired);
-		if (path.length==2 && path[1] instanceof AString did && desired.contains(did)) {
-			return validOwnerSlot(did,value,false)?value:null;
-		}
-		return null;
-	}
-
-	@SuppressWarnings("unchecked")
-	private ACell filterRoot(ACell value,Set<AString> desired) {
-		if (!(value instanceof Index<?,?> rawRoot)) return null;
-		Index<Keyword,ACell> root=(Index<Keyword,ACell>)rawRoot;
+	/**
+	 * Projects a root to what this node wants: every region as it is, the social
+	 * region reduced to the wanted owners' valid slots.
+	 */
+	Index<Keyword,ACell> projectRoot(Index<Keyword,ACell> root) {
+		if (root==null) return null;
 		ACell social=root.get(Social.KEY_SOCIAL);
 		if (social==null) return root;
-		ACell filtered=filterOwners(social,desired);
-		return root.assoc(Social.KEY_SOCIAL,
-			(filtered==null)?Maps.empty():filtered);
+		ACell filtered=filterOwners(social,desiredOwners());
+		return root.assoc(Social.KEY_SOCIAL,(filtered==null)?Maps.empty():filtered);
 	}
 
 	@SuppressWarnings("unchecked")

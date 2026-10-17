@@ -122,6 +122,10 @@ public class SharedApplicationInternalsTest {
 			node=P2PUser.create(this,nodeOwner).node().withCursor(nodeState.cursor());
 		}
 
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		}
+
 		/**
 		 * Each owned subtree publishes through its own fork of the host, beside this
 		 * application's staged root. Its fork reconciles only that subtree, so the

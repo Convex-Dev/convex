@@ -83,8 +83,8 @@ import convex.social.Social;
  *
  * <p><b>Layering.</b> {@link NodeServer} is the schema-independent replication layer
  * over the assembled host and merges nothing. The {@link P2PApplication} is the host's
- * receiver: it accepts every path its root lattice declares, keeps the validated node
- * directory, selects social data and lists the paths to pull from a new peer. This
+ * receiver: it merges incoming values through its lattice, projected to what this node
+ * wants, keeps the validated node directory and lists the paths to pull from a new peer. This
  * class owns the transport and the moments replication knows about: after the
  * transport binds it asks the application to publish the node's record, when a peer
  * is admitted it pulls the application's bootstrap paths, and when an inbound value
@@ -110,7 +110,6 @@ public class P2PNode implements Closeable {
 	/** Freezes P2P application configuration at the same boundary as NodeServer. */
 	private boolean launchStarted;
 
-	@SuppressWarnings("unchecked")
 	private P2PNode(NodeServer<Index<Keyword, ACell>> server,P2PApplication application,
 			LatticePropagator propagator,LatticeListener transport,NodeConfig config,AKeyPair keyPair) {
 		this.server=server;
@@ -122,11 +121,9 @@ public class P2PNode implements Closeable {
 		NodeDirectory directory=application.directory();
 		directory.setMaxRecords(propagator.getConnectionManager().getMaxDesiredPeers());
 		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,directory);
-		// The application takes what it wants from incoming values; the propagation
-		// group projects what it serves by the same policy.
-		SocialReplicationPolicy social=application.policy();
-		propagator.setPublicationFilter(value -> (Index<Keyword,ACell>)social.filterPublication(
-			new ACell[0],value));
+		// The application merges incoming roots through its policy's projection; the
+		// propagation group publishes through the same projection.
+		propagator.setPublicationFilter(application.policy()::projectRoot);
 		propagator.setApplicationMessageHandler(pointOfPresence::handle);
 		propagator.setInboundLatticeListener(this::onAcceptedInbound);
 	}
@@ -497,12 +494,9 @@ public class P2PNode implements Closeable {
 	/** Pulls the application's bootstrap paths from a new peer, in order, refreshing discovery after each. */
 	private CompletableFuture<Void> pullBootstrap(Convex peer) {
 		CompletableFuture<Void> chain=CompletableFuture.completedFuture(null);
-		for (P2PApplication.BootstrapStep step:application.bootstrapSteps()) {
-			chain=chain.thenCompose(ignored -> server.pullPath(propagator,peer,true,step.path()))
-				.thenRun(() -> {
-					step.afterMerge().run();
-					refreshDiscovery();
-				});
+		for (ACell[] path:application.bootstrapPaths()) {
+			chain=chain.thenCompose(ignored -> server.pullPath(propagator,peer,true,path))
+				.thenRun(this::refreshDiscovery);
 		}
 		return chain;
 	}

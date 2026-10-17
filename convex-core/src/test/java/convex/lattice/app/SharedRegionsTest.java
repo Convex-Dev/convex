@@ -31,6 +31,9 @@ class SharedRegionsTest {
 			super(lattice,host);
 			this.region=region;
 		}
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		}
 		void add(long item) {
 			this.<ASet<ACell>>resolve(region).updateAndGet(items ->
 				(items==null?Sets.<ACell>empty():items).include(CVMLong.create(item)));

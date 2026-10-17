@@ -64,7 +64,7 @@ public class DLFSComponentTest {
 		var lattice=KeyedLattice.create(projects,convex.lattice.generic.MapLattice.create(workspace));
 		var store=new MemoryStore();
 		var root=LatticeHost.create(lattice.zero(),store);
-		var app=new convex.lattice.ALatticeApplication<Index<Keyword,ACell>>(lattice,root) {};
+		var app=new convex.lattice.LatticeApplication<>(lattice,root);
 		var key=AKeyPair.generate();
 		var attached=DLFSRegion.connect(app.resolve(projects,project,KEY_DOCUMENTS),null);
 		var destination=attached.cursor();

@@ -195,7 +195,7 @@ public class ApplicationPublicationTest {
 	public void testHostPersistenceCannotRemergeOverAnApplicationPublication() {
 		var maximum=CompareLattice.<CVMLong>create((a,b) -> a.compareTo(b));
 		var host=LatticeHost.create(CVMLong.create(5),null);
-		var app=new ALatticeApplication<CVMLong>(maximum,host) {};
+		var app=new LatticeApplication<>(maximum,host);
 		host.configureApplications(List.of(app));
 		app.cursor().set(CVMLong.ONE);
 		host.setPublicationPolicy(snapshot -> {
@@ -228,7 +228,7 @@ public class ApplicationPublicationTest {
 	public void testApplicationMaySupplyItsOwnLattice() {
 		var host=LatticeHost.create(initial(),null);
 		var selected=KeyedLattice.create(REGISTER,LWW);
-		var app=new ALatticeApplication<Index<Keyword,ACell>>(selected,host) {};
+		var app=new LatticeApplication<>(selected,host);
 		host.configureApplications(List.of(app));
 		host.merge(LATTICE.zero().assoc(REGISTER,CVMLong.ONE).assoc(IGNORED,CVMLong.TWO));
 		app.sync();

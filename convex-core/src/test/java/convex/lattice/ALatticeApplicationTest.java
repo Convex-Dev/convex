@@ -108,6 +108,9 @@ public class ALatticeApplicationTest {
 		var host=LatticeHost.create(LATTICE.zero(),null);
 		AtomicInteger calls=new AtomicInteger();
 		var app=new ALatticeApplication<Index<Keyword,ACell>>(LATTICE,host) {
+			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+				return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			}
 			@Override protected void beforeSync() {
 				new Items(this).add(CVMLong.ONE);
 				if (calls.incrementAndGet()==1) throw new IllegalStateException("checkpoint failed");

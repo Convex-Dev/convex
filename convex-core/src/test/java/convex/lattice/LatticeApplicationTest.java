@@ -43,8 +43,9 @@ class LatticeApplicationTest {
 		var signed=owner.signData(values);
 		root.mergeAt(signed,ITEMS,owner.getAccountKey());
 		assertEquals(signed,RT.getIn(root.cursor().get(),ITEMS,owner.getAccountKey()));
-		assertThrows(IllegalArgumentException.class,
-			() -> root.mergeAt(values,ITEMS,owner.getAccountKey(),Keywords.VALUE));
+		root.mergeAt(Sets.of(CVMLong.TWO),ITEMS,owner.getAccountKey(),Keywords.VALUE);
+		assertEquals(signed,RT.getIn(root.cursor().get(),ITEMS,owner.getAccountKey()),
+			"a path inside the envelope is outside the lattice and delivers nothing");
 	}
 
 }

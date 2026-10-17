@@ -218,11 +218,17 @@ public class MailTest {
 	/** A root application over an in-memory root, as a host would hold it. */
 	private static final class TestRoot extends ALatticeApplication<Index<Keyword,ACell>> {
 		TestRoot(KeyedLattice lattice) { super(lattice,Cursors.root(lattice.zero())); }
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		}
 	}
 
 	/** A root application with private working state over a host, as a node holds it. */
 	private static final class HostedRoot extends ALatticeApplication<Index<Keyword,ACell>> {
 		HostedRoot(KeyedLattice lattice, LatticeHost<Index<Keyword,ACell>> host) { super(lattice,host); }
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		}
 	}
 
 	@Test

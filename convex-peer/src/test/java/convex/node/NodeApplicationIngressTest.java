@@ -39,13 +39,10 @@ class NodeApplicationIngressTest {
 		App(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
-			return ignore?cursor.get():super.merge(incoming);
+			if (ignore) return cursor.get();
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,incoming));
 		}
 		@Override protected void beforeSync() { preparations++; }
-		@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
-			if (path.length==1 && ITEMS.equals(path[0])) return merge(LATTICE.zero().assoc(ITEMS,value));
-			return super.mergeAt(value,path);
-		}
 	}
 
 	@Test void applicationSeesRestoredStateBeforePropagationStarts() throws Exception {

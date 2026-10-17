@@ -330,16 +330,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Merges an application-supplied value at a path within the host root, by
-	 * delegating to the host and its configured applications. Call
-	 * {@link LatticeHost#sync()} on {@link #getHost()} when the update should be
-	 * published and persisted.
+	 * Delivers a value at a path within the host root to the host's configured
+	 * applications, each of which merges it as the partial root holding the value at
+	 * that path. Call {@link LatticeHost#sync()} on {@link #getHost()} when the update
+	 * should be published and persisted.
 	 *
 	 * @param <T> value type at the path
 	 * @param value value to merge
-	 * @param path path within the served lattice
+	 * @param path path within the host root
 	 * @return Current host value at the path; application changes may remain private
-	 * @throws IllegalArgumentException if the default handler cannot accept the path
 	 */
 	public <T extends ACell> T mergeAt(T value, ACell... path) {
 		return RT.getIn(host.mergeAt(value,path),path);

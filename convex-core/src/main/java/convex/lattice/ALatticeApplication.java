@@ -3,17 +3,20 @@ package convex.lattice;
 import java.util.Objects;
 
 import convex.core.data.ACell;
+import convex.core.data.ADataStructure;
+import convex.core.lang.RT;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Base class for an application participating in a lattice root.
  *
  * <p>An application component works at the same cursor position as its
- * {@link LatticeHost} host and declares the root lattice, which defines the
- * complete root merge, including which regions participate. Merging requires no
- * domain components or component registry. Subclasses expose lightweight
- * components at paths within that root, each declaring the shape of the level it
- * hands out.</p>
+ * {@link LatticeHost} host and declares the root lattice: the shape of the root,
+ * including which regions participate, with a default merge for that shape. The
+ * application owns {@link #merge}: it delegates to the lattice merge, for the whole
+ * root or for the parts it wants, or applies its own rule. Subclasses expose
+ * lightweight components at paths within the root, each declaring the shape of the
+ * level it hands out.</p>
  *
  * <p>The host constructor creates private working state, with context resolved at
  * construction. Lightweight children share that state. The explicit lattice/cursor
@@ -36,8 +39,8 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	private final ALattice<V> lattice;
 
 	/**
-	 * Creates private working state with application-specific merge semantics.
-	 * The host delegates incoming values; it does not independently accept values
+	 * Creates private working state over a host. The host delegates incoming values
+	 * to this application's {@link #merge}; it does not independently accept values
 	 * this application ignores. The caller must supply compatible value structure.
 	 */
 	protected ALatticeApplication(ALattice<V> lattice,LatticeHost<V> host) {
@@ -51,7 +54,7 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * working state or a transaction draft. Rebinding factories rebuild child components against the
 	 * new view rather than reusing children bound to the live cursor.
 	 *
-	 * @param lattice Root lattice: the complete merge for this application's root
+	 * @param lattice Root lattice: the shape of this application's root and its default merge
 	 * @param cursor Cursor at the complete application root
 	 */
 	protected ALatticeApplication(ALattice<V> lattice, AForkableCursor<V> cursor) {
@@ -67,7 +70,7 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	/**
 	 * Returns this application's root lattice.
 	 *
-	 * @return Root merge and navigation semantics
+	 * @return Shape of the root, its navigation and its default merge
 	 */
 	public final ALattice<V> getLattice() {
 		return lattice;
@@ -110,65 +113,51 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	}
 
 	/**
-	 * Merges an incoming root value into the application state. The default is an
-	 * atomic lattice merge. Overrides may instead delegate accepted subtrees to
-	 * their components and discard other input, with no additional host merge.
+	 * Merges an incoming root value into this application's working state. The
+	 * lattice offers a default merge for its shape; this application decides whether
+	 * to delegate to it, for the whole root or for the parts it wants, or to apply its
+	 * own rule. Delegating is one atomic update of the working cursor:
 	 *
-	 * <p>The default merges with this application's lattice under the component's
-	 * explicit context, with the current local value in the own position. The lattice handles all region
-	 * dispatch and verification; no components need to have been constructed.
-	 * Concurrent writes are reconciled by retrying against the latest root. If merge
-	 * throws, this default operation installs no state. Overrides delegating to
-	 * independently editable children need not be atomic across those children.</p>
+	 * <pre>
+	 * return cursor.updateAndGet(own -&gt; getLattice().merge(getContext(),own,other));
+	 * </pre>
 	 *
 	 * <p>This changes local state only. Call {@link #sync()} to publish to the
 	 * destination, then sync the host when persistence or propagation is required.</p>
 	 *
 	 * @param other Incoming root value
-	 * @return Root value installed by this merge
+	 * @return Current application working root
 	 */
-	public V merge(V other) {
-		return cursor.updateAndGet(own -> lattice.merge(getContext(),own,other));
-	}
+	public abstract V merge(V other);
 
 	/**
-	 * Delivers an incoming subtree at a path relative to this application's root.
-	 * The default calls {@link #merge} for an empty path and ignores all other
-	 * paths, even when the lattice declares them. Applications override this hook
-	 * to select their interests, verify input and delegate to domain components;
-	 * an application interested in every path its lattice declares overrides with
-	 * {@link #mergeDeclaredPath}. Knowing a path's type does not imply interest in
-	 * receiving updates there. Overrides must verify enclosing signed envelopes
-	 * before accepting interior data. The path is borrowed read-only for the
-	 * duration of the call. No sync or preparation hook is invoked automatically.
-	 *
-	 * @return Current application working root, not a publication acknowledgement
-	 */
-	@SuppressWarnings("unchecked")
-	public V mergeAt(ACell value, ACell... path) {
-		if (path.length==0) return merge((V)value);
-		return cursor.get();
-	}
-
-	/**
-	 * Merges an incoming value at any path the root lattice declares: the lattice at
-	 * the path merges it under this application's context, exactly as a component
-	 * owning that level would. The signing rules live in the lattices: an owner's slot
-	 * accepts only a value its owner authorised, and the lattice tree ends at a signed
-	 * envelope, so a path inside one is outside the served lattice. An empty path
-	 * merges the root.
+	 * Delivers a value at a path within this application's root as the partial root
+	 * that holds it: the value at its path inside the empty containers the lattice
+	 * declares along the way, handed to {@link #merge} like any other root. One merge
+	 * therefore sees every delivery. A path the lattice does not declare, or cannot
+	 * build containers for, delivers nothing, just as an undeclared key in a root
+	 * value contributes nothing.
 	 *
 	 * @param value Incoming value at the path
 	 * @param path Keys from the application root
-	 * @return Current application working root
-	 * @throws IllegalArgumentException if the path leaves the declared lattice
+	 * @return Current application working root, not a publication acknowledgement
 	 */
 	@SuppressWarnings("unchecked")
-	protected V mergeDeclaredPath(ACell value, ACell... path) {
+	public final V mergeAt(ACell value, ACell... path) {
 		if (path.length==0) return merge((V)value);
-		ALattice<ACell> child=lattice.path(path);
-		if (child==null) throw new IllegalArgumentException("Path is outside the served lattice");
-		this.<ACell>resolve(path).updateAndGet(own -> child.merge(getContext(),own,value));
-		return cursor.get();
+		ALattice<?>[] levels=new ALattice<?>[path.length];
+		ALattice<?> level=lattice;
+		for (int i=0; i<path.length; i++) {
+			levels[i]=level;
+			level=level.path(path[i]);
+			if (level==null) return cursor.get();
+		}
+		ACell partial=value;
+		for (int i=path.length-1; i>=0; i--) {
+			if (!(levels[i].zero() instanceof ADataStructure<?> empty)) return cursor.get();
+			partial=RT.assoc((ADataStructure<ACell>)empty,path[i],partial);
+			if (partial==null) return cursor.get();
+		}
+		return merge((V)partial);
 	}
 }

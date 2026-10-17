@@ -51,6 +51,10 @@ final class FavouritesExample {
 			super(LATTICE,host);
 		}
 
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		}
+
 		void setTime(long timestamp) { clock.set(timestamp); }
 
 		FavouritesUser user(AKeyPair user) {

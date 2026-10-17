@@ -37,6 +37,9 @@ class ReadingListApplicationTest {
 
 	static final class ReadingListApp extends ALatticeApplication<Index<Keyword,ACell>> {
 		ReadingListApp(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		}
 		Books books() { return new Books(resolve(BOOKS)); }
 	}
 

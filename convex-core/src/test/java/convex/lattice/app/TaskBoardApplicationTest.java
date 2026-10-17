@@ -33,6 +33,9 @@ class TaskBoardApplicationTest {
 
 	static final class TaskBoardApp extends ALatticeApplication<Index<Keyword,ACell>> {
 		TaskBoardApp(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
+		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		}
 		Board board() { return new Board(resolve(BOARD)); }
 	}
 

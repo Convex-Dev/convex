@@ -238,6 +238,10 @@ public final class MyApplication extends ALatticeApplication<Index<Keyword, ACel
         social = Social.connect(this);
         files = DLFSRegion.connect(resolve(Keyword.intern("documents")), host.store());
     }
+    // This application's rule for an incoming root: the lattice's default merge
+    @Override public Index<Keyword, ACell> merge(Index<Keyword, ACell> incoming) {
+        return cursor.updateAndGet(own -> getLattice().merge(getContext(), own, incoming));
+    }
     public static MyApplication connect(LatticeHost<Index<Keyword, ACell>> host) {
         return new MyApplication(host);
     }
@@ -321,15 +325,18 @@ data format from cursor mechanics. Rules of thumb:
 
 ## Application root and host
 
-The application component declares the root lattice: it exposes that lattice,
-merges incoming root values and hands out typed region cursors. It receives the
-host's root cursor and navigates below it with the root lattice; the domain
-components it creates receive the cursor for their level and never navigate back up.
-The global root is a keyed map, an `Index<Keyword, ACell>`: an application composes
-the region lattices it understands at the globally defined region paths, the keyed
-merge ignores unknown incoming regions and retains unknown existing ones. Root merge
-needs no domain components; a relay merges every region in its lattice without
-constructing one. Component factories are a convenience, not a registry.
+The application component declares the root lattice, the shape of the root with a
+default merge for that shape, and owns the merge of incoming root values: it
+delegates to the lattice merge, for the whole root or for the parts it wants, or
+applies its own rule. Nothing assumes the lattice merge on the application's behalf.
+It receives the host's root cursor and navigates below it with the root lattice; the
+domain components it creates receive the cursor for their level and never navigate
+back up. The global root is a keyed map, an `Index<Keyword, ACell>`: an application
+composes the region lattices it understands at the globally defined region paths,
+and the keyed merge ignores unknown incoming regions and retains unknown existing
+ones. Root merge needs no domain components; a relay merges every region in its
+lattice without constructing one. Component factories are a convenience, not a
+registry.
 
 ```java
 var host = LatticeHost.create();
@@ -391,13 +398,12 @@ earlier merges remain, and lattice delivery is safe to retry. An explicitly empt
 application list and an unconfigured host both ignore all incoming state. A node
 routes incoming pushes, whole-root and path pulls, direct merge calls and snapshot
 candidates through the host; delivery never invokes application sync, and an
-acknowledgement confirms delivery, not publication of private work. Path-addressed
-delivery forwards the value unchanged to each application, which chooses its
-interests: the base treats an empty path as a whole-root merge and ignores every
-other path, and the standard `LatticeApplication` accepts the paths its lattice
-declares and rejects paths through signed envelopes, so callers supply the complete
-envelope at its slot. Overrides verify enclosing signed envelopes before accepting
-interior values.
+acknowledgement confirms delivery, not publication of private work. A path-addressed
+delivery reaches each application as the partial root holding the value at that
+path, built from the empty containers its lattice declares along the way, so one
+`merge` sees every delivery. A path the lattice does not declare delivers nothing,
+and the lattice tree ends at a signed envelope, so callers supply the complete
+envelope at its slot.
 
 A node is replication. It hosts an assembled `LatticeHost`, attaches propagation
 groups, hands incoming values to the host and sends the host's published root to
@@ -883,7 +889,7 @@ whole; local atomicity does not introduce field-wise merge.
 | Operation | Completion contract |
 |---|---|
 | Cursor update | One local state change is atomically visible; publication may still be pending |
-| Application merge | Merge an incoming root using the supplied lattice and component context; publication remains separate |
+| Application merge | The application's own rule for an incoming root, typically the lattice merge under its context; publication remains separate |
 | Fork sync | Merge one working snapshot into its immediate parent; concurrent state follows the declared lattice semantics |
 | Application sync | Publish the application's components in its chosen order, then its own snapshot if it stages one |
 | Host sync | Persist and publish a host root snapshot, then notify configured replication services; no remote acknowledgement |

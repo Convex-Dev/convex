@@ -87,6 +87,12 @@ public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
 		return store;
 	}
 
+	/** Delegates an incoming root to the lattice merge under this application's context. */
+	@Override
+	public V merge(V other) {
+		return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+	}
+
 	/**
 	 * Returns the physical multi-owner DLFS region. The application resolves the
 	 * region path with its root lattice and hands the region its cursor together
