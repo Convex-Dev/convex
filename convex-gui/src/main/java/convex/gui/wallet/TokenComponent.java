@@ -10,6 +10,7 @@ import convex.core.lang.Reader;
 import convex.gui.components.ActionButton;
 import convex.gui.components.BalanceLabel;
 import convex.gui.utils.Async;
+import convex.gui.utils.Refresh;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -75,9 +76,8 @@ public class TokenComponent extends JPanel {
 		},"Remove token from tracked list"));
 		
 		add(actions,"dock east");
-		
-		
-		refresh(convex);
+
+		Refresh.whileShowing(this, 1000, ()->refresh(convex));
 	}
 
 	/** Opens a swap of this token for another, if found */

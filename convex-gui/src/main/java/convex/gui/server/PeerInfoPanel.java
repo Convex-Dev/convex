@@ -1,31 +1,27 @@
 package convex.gui.server;
 
 import java.awt.BorderLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
+import java.awt.EventQueue;
 
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.Timer;
 
 import convex.api.Convex;
 import convex.core.text.Text;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.NonUpdatingCaret;
+import convex.gui.utils.Refresh;
 import convex.gui.utils.Toolkit;
 import convex.peer.AThreadedComponent;
 import convex.peer.ConnectionManager;
 import convex.peer.Server;
 
 @SuppressWarnings("serial")
-public class PeerInfoPanel extends JPanel implements AutoCloseable {
+public class PeerInfoPanel extends JPanel {
 
 	private final CodeLabel textArea;
-	private final Timer timer;
 
 	public PeerInfoPanel(Convex p) {
 		setLayout(new BorderLayout(0, 0));
@@ -50,42 +46,18 @@ public class PeerInfoPanel extends JPanel implements AutoCloseable {
 		JScrollPane jsp1=new JScrollPane(textArea);
 		add(jsp1, BorderLayout.CENTER);
 		
-		// Set up periodic refresh
-		int INTERVAL = 500;
-		timer = new Timer(INTERVAL,new ActionListener() {
-			public void actionPerformed(ActionEvent evt) {
-			   updateState(p);
-		    }    
-		});
-		timer.start();
-		
-		addComponentListener(new ComponentAdapter() {
-		    public void componentHidden(ComponentEvent ce) {
-		        timer.stop();
-		    }
-		    
-		    public void componentShown(ComponentEvent ce) {
-		        timer.start();
-		    }
-		});
+		Refresh.whileShowing(this, 500, ()->updateState(p));
 
 		refreshButton.addActionListener(e -> {
 			updateState(p);
 		});
-
-		updateState(p);
-	}
-
-	/** Stops the periodic refresh. Called when the owning window closes. */
-	@Override
-	public void close() {
-		timer.stop();
 	}
 
 	protected String lpad(Object s) {
 		return Text.leftPad(s.toString(), 30);
 	}
 
+	/** Gathers the peer's status and shows it. Safe from any thread. */
 	private void updateState(Convex p) {
 		StringBuilder sb = new StringBuilder();
 		Server s=p.getLocalServer();
@@ -119,8 +91,9 @@ public class PeerInfoPanel extends JPanel implements AutoCloseable {
 			sb.append("- CVM Executor:         "+load(s.getCVMExecutor())+"\n");
 			sb.append("- Connection Manager:   "+load(s.getConnectionManager())+"\n");
 		}
-		
-		textArea.setText(sb.toString());
+
+		String status=sb.toString();
+		EventQueue.invokeLater(()->textArea.setText(status));
 	}
 	
 

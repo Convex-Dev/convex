@@ -15,11 +15,12 @@ import convex.core.lang.RT;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.Identicon;
 import convex.gui.utils.SymbolIcon;
+import convex.gui.utils.Refresh;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class AccountOverview extends JPanel implements AutoCloseable {
+public class AccountOverview extends JPanel {
 
 	final BalanceLabel balance=new BalanceLabel();
 	final JLabel nameLabel=new JLabel("anonymous");
@@ -27,7 +28,6 @@ public class AccountOverview extends JPanel implements AutoCloseable {
 	Identicon identicon=new Identicon(null,Toolkit.IDENTICON_SIZE*2);
 	
 	private Convex convex;
-	private final Thread updateThread;
 
 	public AccountOverview(Convex convex) {
 		this.convex=convex;
@@ -79,28 +79,8 @@ public class AccountOverview extends JPanel implements AutoCloseable {
 			add(balance);
 		}
 		//add(KeyPairCombo.forConvex(convex));
-		 
-		updateThread=Thread.ofVirtual().name("account-update").start(this::updateLoop);
-	}
 
-	/** Fetches account details off the EDT: straight away, then every second while showing */
-	private void updateLoop() {
-		boolean first=true;
-		while ((!Thread.currentThread().isInterrupted()) && convex.isConnected()) {
-			try {
-				if (first||isShowing()) update();
-				first=false;
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-		}
-	}
-
-	/** Stops the update loop. Called when the owning window closes. */
-	@Override
-	public void close() {
-		updateThread.interrupt();
+		Refresh.whileShowing(this, 1000, this::update);
 	}
 
 	/** Fetches the account's details, then shows them on the EDT */

@@ -13,8 +13,8 @@ import javax.swing.SwingUtilities;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
-import convex.core.util.ThreadUtils;
 import convex.gui.state.StateExplorer;
+import convex.gui.utils.Refresh;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.fs.DLFileSystem;
@@ -31,10 +31,8 @@ import net.miginfocom.swing.MigLayout;
  */
 public class DLFSPanel {
 
-	/** Set to true to stop all background threads */
-	private volatile boolean closed = false;
-
-	protected DLFileSystem fileSystem;
+	/** Drive shown, or null once closed */
+	protected volatile DLFileSystem fileSystem;
 
 	DirectoryTree directoryTree;
 	FileList fileList;
@@ -97,7 +95,8 @@ public class DLFSPanel {
 		viewerButtons.add(infoBtn);
 
 		directoryTree.setSelectionPath(directoryTree.getPathForRow(0));
-		startBackgroundThread(dlfs);
+		lastRootHash = dlfs.getRootHash();
+		Refresh.whileShowing(treeScrollPane, 200, this::checkForChanges);
 	}
 
 	/** Creates (or recreates) the directory tree and file list for a drive */
@@ -156,31 +155,21 @@ public class DLFSPanel {
 		previewPanel.setPath(null);
 
 		directoryTree.setSelectionPath(directoryTree.getPathForRow(0));
-
-		startBackgroundThread(newDrive);
+		lastRootHash = newDrive.getRootHash();
 	}
 
 	/** Last known root hash — used to detect external changes */
 	private volatile Hash lastRootHash;
 
-	private void startBackgroundThread(DLFileSystem dlfs) {
-		lastRootHash = dlfs.getRootHash();
-		ThreadUtils.runVirtual("dlfs-monitor", () -> {
-			try {
-				while (!closed && dlfs.isOpen() && dlfs == fileSystem) {
-					// Check if lattice state changed (e.g. via WebDAV)
-					Hash currentHash = dlfs.getRootHash();
-					if (currentHash != null && !currentHash.equals(lastRootHash)) {
-						lastRootHash = currentHash;
-						SwingUtilities.invokeLater(this::refreshView);
-					}
-
-					Thread.sleep(200);
-				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-		});
+	/** Refreshes the view if the drive changed outside this panel, e.g. via WebDAV */
+	private void checkForChanges() {
+		DLFileSystem dlfs = fileSystem;
+		if (dlfs == null || !dlfs.isOpen()) return;
+		Hash currentHash = dlfs.getRootHash();
+		if (currentHash != null && !currentHash.equals(lastRootHash)) {
+			lastRootHash = currentHash;
+			SwingUtilities.invokeLater(this::refreshView);
+		}
 	}
 
 	public DLFileSystem getFileSystem() {
@@ -267,9 +256,8 @@ public class DLFSPanel {
 		return view;
 	}
 
-	/** Stops background threads. Call on window close. */
+	/** Stops following the drive. Call on window close. */
 	public void close() {
-		closed = true;
 		fileSystem = null;
 	}
 
@@ -278,10 +266,12 @@ public class DLFSPanel {
 	}
 
 	public void refreshView() {
+		DLFileSystem dlfs = fileSystem;
+		if (dlfs == null) return;
 		directoryTree.refreshSelectedNode();
 		fileList.setDirectory(selectedPath);
 		previewPanel.setPath(selectedPath);
-		// Update hash so the background thread doesn't re-trigger
-		lastRootHash = fileSystem.getRootHash();
+		// Update hash so the change check doesn't re-trigger
+		lastRootHash = dlfs.getRootHash();
 	}
 }

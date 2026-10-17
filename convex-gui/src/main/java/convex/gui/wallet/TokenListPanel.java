@@ -1,7 +1,6 @@
 package convex.gui.wallet;
 
 import java.awt.Color;
-import java.awt.Component;
 
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -27,8 +26,6 @@ public class TokenListPanel extends JPanel implements AutoCloseable {
 
 	/** The connection's network, null until found */
 	private volatile NetworkState network;
-
-	private final Thread updateThread;
 
 	private final Object lock=new Object();
 	private boolean closed=false;
@@ -74,8 +71,6 @@ public class TokenListPanel extends JPanel implements AutoCloseable {
 			if (l!=null) l.refreshList();
 		},"Refresh token details and balances"));
 		add(ap,"dock south");
-
-		updateThread=Thread.ofVirtual().name("token-update").start(this::updateLoop);
 	}
 
 	/** Shows the network's tracked tokens. Runs on the EDT. */
@@ -91,36 +86,13 @@ public class TokenListPanel extends JPanel implements AutoCloseable {
 		revalidate();
 	}
 
-	/** Stops the update loop and the token list. Called when the owning window closes. */
+	/** Stops the token list following the network. Called when the owning window closes. */
 	@Override
 	public void close() {
-		updateThread.interrupt();
 		synchronized (lock) {
 			closed=true;
 			// The list may have been shown after the window gathered its components
 			if (list!=null) list.close();
-		}
-	}
-
-	private void updateLoop() {
-		while (!Thread.currentThread().isInterrupted()) {
-			try {
-				ScrollyList<TokenInfo> l=list;
-				if ((l!=null)&&isShowing()) {
-
-					Component[] comps=l.getListComponents();
-					for (Component c: comps) {
-						if ((c instanceof TokenComponent)&&c.isShowing()) {
-							((TokenComponent)c).refresh(convex);
-						}
-					}
-				}
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				return;
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
 		}
 	}
 

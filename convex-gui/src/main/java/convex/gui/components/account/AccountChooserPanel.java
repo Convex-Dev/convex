@@ -8,7 +8,6 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.Timer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +26,7 @@ import convex.gui.components.DropdownMenu;
 import convex.gui.keys.KeyAccess;
 import convex.gui.keys.KeyRing;
 import convex.gui.utils.Async;
+import convex.gui.utils.Refresh;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -34,7 +34,7 @@ import net.miginfocom.swing.MigLayout;
  * Panel allowing the selection of account and query mode for a Convex connection
  */
 @SuppressWarnings("serial")
-public class AccountChooserPanel extends JPanel implements AutoCloseable {
+public class AccountChooserPanel extends JPanel {
 	
 	private static final Logger log = LoggerFactory.getLogger(AccountChooserPanel.class.getName());
 
@@ -48,7 +48,6 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 	protected Convex convex;
 
 	private static final int BALANCE_REFRESH_MS = 5000;
-	private final Timer balanceRefreshTimer;
 
     AWalletEntry previousSelection = null;
 
@@ -97,11 +96,8 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 			balanceLabel = new BalanceLabel();
 			balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
 			mp.add(balanceLabel);
-			updateBalance(getAddress());
-
-			// Periodic refresh so balance stays current when updated outside this panel
-			balanceRefreshTimer = new Timer(BALANCE_REFRESH_MS, e -> updateBalance());
-			balanceRefreshTimer.start();
+			// Keeps the balance current when it changes outside this panel
+			Refresh.whileShowing(balanceLabel, BALANCE_REFRESH_MS, this::updateBalance);
 
 			add(mp,"dock west");
 		}
@@ -231,11 +227,6 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 		updateBalance(getAddress());
 	}
 
-	/** Stops the balance refresh. Called when the owning window closes. */
-	@Override
-	public void close() {
-		balanceRefreshTimer.stop();
-	}
 
 	private void updateBalance(Address a) {
 		balanceLabel.showResult(convex.query(Special.get("*balance*"),a));

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - GUI windows that use a locked key (Wallet, Terminal, peer launch, peer controller wallet, Hacker Tools, Show seed) ask for its password once for that use and leave it locked in the key ring; only the key ring's lock button changes a key's lock state. Opening a Wallet or Terminal asks at most once, and declining gives a single read-only message instead of a second prompt or an error.
+- GUI windows refresh balances and status only while they are showing, so hidden tabs and minimised windows stop querying peers. Peer Manager follows consensus updates as they happen instead of polling ten times a second.
 - Index operations on long keys, such as DLFS file names, stay on the fast recursive path; the stack-safe fallback now engages only on an actual stack overflow. ([#727](https://github.com/Convex-Dev/convex/issues/727))
 - Embedded store decodes avoid hashing for cache lookup and automatic cache admission, while reusing already-cached values when their hash is available; non-embedded branches still use the cache on demand.
 - CVM map operations recognise only known maplike records; generic CAD3 records no longer qualify as maps solely through their Java representation.

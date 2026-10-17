@@ -2,10 +2,7 @@ package convex.gui.peer;
 
 import java.awt.BorderLayout;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
 
-import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
@@ -41,22 +38,6 @@ public class ServerListPanel extends JPanel {
 	PeerGUI manager;
 
 	static final Logger log = LoggerFactory.getLogger(ServerListPanel.class.getName());
-
-	/**
-	 * Gets a list of all locally operating Servers from the current peer list.
-	 *
-	 * @return List of local PeerView objects
-	 */
-	public List<ConvexLocal> getPeerViews() {
-		DefaultListModel<ConvexLocal> peerList = manager.getPeerList();
-		ArrayList<ConvexLocal> al = new ArrayList<>();
-		int n = peerList.getSize();
-		for (int i = 0; i < n; i++) {
-			ConvexLocal p = peerList.getElementAt(i);
-			al.add(p);
-		}
-		return al;
-	}
 
 	/**
 	 * Create the panel.

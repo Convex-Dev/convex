@@ -1,31 +1,36 @@
 package convex.gui.models;
 
+import java.awt.EventQueue;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-// import java.util.logging.Logger;
-
-import javax.swing.SwingUtilities;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Model for state values which may be observer / listened to.
- * 
- * Fires a property changed event for the property "value" whenever it is
- * updated.
- * 
+ * Model for state values which may be observed.
+ *
+ * <p>The value may be set from any thread. Listeners are told of changes on
+ * the EDT, with a property change event for the property "value": a burst of
+ * updates arrives as one event with the latest value, and setting an equal
+ * value fires nothing.
+ *
  * @param <T> Type of State value
  */
 public class StateModel<T> {
-	
-	// private static final Logger log = Logger.getLogger(StateModel.class.getName());
 
-	
 	private final PropertyChangeSupport propertyChangeSupport = new PropertyChangeSupport(this);
 
-	T value;
+	private volatile T value;
+
+	/** Value listeners were last told about. EDT only. */
+	private T notified;
+
+	/** Set while an event is waiting to fire */
+	private final AtomicBoolean pending=new AtomicBoolean();
 
 	public StateModel(T value) {
 		this.value = value;
+		this.notified = value;
 	}
 
 	public StateModel() {
@@ -41,21 +46,24 @@ public class StateModel<T> {
 	}
 
 	/**
-	 * Sets the value for this state model, firing any relevant property change
-	 * listeners.
-	 * 
+	 * Sets the value for this state model, telling listeners on the EDT.
+	 * Safe from any thread.
+	 *
 	 * @param newValue New value for state
 	 */
 	public void setValue(T newValue) {
-		T oldValue = this.value;
 		this.value = newValue;
-		SwingUtilities.invokeLater(new Runnable() {
-			@Override
-			public void run() {
-				// log.info("State update reported");
-				propertyChangeSupport.firePropertyChange(new PropertyChangeEvent(this, "value", oldValue, newValue));
-			}			
-		});
+		if (pending.compareAndSet(false, true)) {
+			EventQueue.invokeLater(this::fireChange);
+		}
+	}
+
+	private void fireChange() {
+		pending.set(false);
+		T oldValue=notified;
+		T newValue=value;
+		notified=newValue;
+		propertyChangeSupport.firePropertyChange(new PropertyChangeEvent(this, "value", oldValue, newValue));
 	}
 
 	public void addPropertyChangeListener(PropertyChangeListener listener) {

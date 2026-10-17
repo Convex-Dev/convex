@@ -22,19 +22,16 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.Result;
-import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
-import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.init.Init;
-import convex.core.util.ThreadUtils;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.account.AccountsPanel;
 import convex.gui.keys.KeyGenPanel;
@@ -59,7 +56,6 @@ public class PeerGUI extends AbstractGUI {
 	
 	public State genesisState;
 	private StateModel<State> latestState = StateModel.create(genesisState);
-	public StateModel<Long> tickState = StateModel.create(0L);
 	
 	protected DefaultListModel<ConvexLocal> peerList = new DefaultListModel<ConvexLocal>();
 
@@ -221,8 +217,7 @@ public class PeerGUI extends AbstractGUI {
 		genesisState=firstServer.getPeer().getGenesisState();
 
 		latestState = StateModel.create(genesisState);
-		tickState = StateModel.create(0L);
-		
+
 
 		
 		serverPanel= new ServerListPanel(this);
@@ -263,55 +258,14 @@ public class PeerGUI extends AbstractGUI {
 		
 		tabs.setSelectedComponent(serverPanel);
 
-		ThreadUtils.runVirtual("peer-gui-update", updateThread);
+		own(new PeerStateUpdates(first, this::showConsensus));
 	}
 
-	private volatile boolean updateRunning = true;
-
-	private long cp = 0;
-
-	private Runnable updateThread = new Runnable() {
-		@Override
-		public void run() {
-			Thread.currentThread().setName("PeerGUI update thread");
-			while (updateRunning) {
-				try {
-					Thread.sleep(100);
-					tickState.setValue(tickState.getValue()+1);
-					
-					java.util.List<ConvexLocal> peerViews = serverPanel.getPeerViews();
-					serverPanel.repaint();
-					State latest = latestState.getValue();
-					for (ConvexLocal s : peerViews) {
-
-						Server serv=s.getLocalServer();
-						if (serv==null) continue;
-
-						Peer p = serv.getPeer();
-						if (p==null) continue;
-
-						Order order=p.getPeerOrder();
-						if (order==null) continue; // not an active peer?
-
-						long pcp = p.getFinalityPoint();
-						if (pcp > cp) {
-							cp = pcp;
-							//String ls="PeerGUI Consensus State update detected at depth "+cp;
-							//System.err.println(ls);
-							latest = p.getConsensusState();
-						}
-					}
-					latestState.setValue(latest); // trigger peer view repaints etc.
-
-				} catch (InterruptedException e) {
-					updateRunning=false;
-					Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
-					log.trace("Update thread interrupted, presumably shutting down");
-				}
-			}
-			log.debug("GUI Peer Manager update thread ending");
-		}
-	};
+	/** Shows the latest consensus state of the primary peer. Runs on the EDT. */
+	private void showConsensus() {
+		Server server=getPrimaryServer();
+		if (server!=null) latestState.setValue(server.getPeer().getConsensusState());
+	}
 
 
 	public DefaultListModel<ConvexLocal> getPeerList() {
@@ -453,11 +407,10 @@ public class PeerGUI extends AbstractGUI {
 	}
 
 	/**
-	 * Shuts down the local network this Peer Manager runs: the update thread,
-	 * the REST server and every peer. Released when the GUI closes.
+	 * Shuts down the local network this Peer Manager runs: the REST server and
+	 * every peer. Released when the GUI closes.
 	 */
 	private void closeNetwork() {
-		updateRunning=false;
 		RESTServer rs=restServer;
 		if (rs!=null) {
 			restServer=null;
