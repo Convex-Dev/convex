@@ -26,7 +26,7 @@ import convex.gui.components.FilePicker;
 import convex.gui.components.HostCombo;
 import convex.gui.components.Toast;
 import convex.gui.components.account.KeyPairCombo;
-import convex.gui.keys.UnlockWalletDialog;
+import convex.gui.keys.KeyAccess;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.net.IPUtils;
@@ -35,7 +35,12 @@ import net.miginfocom.swing.MigLayout;
 
 public class PeerLaunchDialog {
 
-	public static void runLaunchDialog(JComponent parent) {
+	/**
+	 * Prompts for launch details and launches a Peer Manager.
+	 * @param parent Parent component for dialogs
+	 * @return The running Peer Manager, or null if cancelled or the launch failed
+	 */
+	public static PeerGUI runLaunchDialog(JComponent parent) {
 		// Local testnet options
 		
 		JPanel testNetPanel=new JPanel();
@@ -102,6 +107,9 @@ public class PeerLaunchDialog {
 	               JOptionPane.OK_CANCEL_OPTION, 
 	               JOptionPane.QUESTION_MESSAGE,
 	               SymbolIcon.get(0xeb9b,Toolkit.ICON_SIZE));
+		// The dialog has gone, so stop the key pickers following the key ring
+		keyField.close();
+		peerKeyField.close();
 	    if (result == JOptionPane.OK_OPTION) {
 	    	try {
 	    		Component selected=tabs.getSelectedComponent();
@@ -110,16 +118,12 @@ public class PeerLaunchDialog {
 		    		AWalletEntry we=keyField.getWalletEntry();
 		    		if (we==null) throw new IllegalStateException("No key pair selected");
 		    		
-		    		if (we.isLocked()) {
-						boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
-						if (!unlocked) {
-							Toast.display(parent, "Launch cancelled: Locked genesis key", Color.RED);
-							return;
-						}
+		       		AKeyPair kp=KeyAccess.unlockForUse(parent,we);
+		    		if (kp==null) {
+		    			Toast.display(parent, "Launch cancelled: Locked genesis key", Color.RED);
+		    			return null;
 		    		}
-		    		
-		       		AKeyPair kp=we.getKeyPair();
-		    		PeerGUI.launchPeerGUI(numPeers, kp);
+		    		return PeerGUI.launchPeerGUI(numPeers, kp);
 		    	} else if (selected==joinPanel) {
 		    		String host=hostField.getText();
 		    		InetSocketAddress sa=IPUtils.toInetSocketAddress(host);
@@ -127,21 +131,18 @@ public class PeerLaunchDialog {
 		    		
 		    		AWalletEntry we=peerKeyField.getWalletEntry();
 		    		if (we==null) throw new IllegalArgumentException("No peer key selected");
-		    		if (we.isLocked()) {
-						boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
-						if (!unlocked) {
-							Toast.display(parent, "Launch cancelled: Locked peer key", Color.RED);
-							return;
-						}			    		
+		    		AKeyPair kp=KeyAccess.unlockForUse(parent,we);
+		    		if (kp==null) {
+		    			Toast.display(parent, "Launch cancelled: Locked peer key", Color.RED);
+		    			return null;
 		    		}
-		    		
-		    		PeerGUI.launchPeerGUI(sa,we.getKeyPair());
+		    		return PeerGUI.launchPeerGUI(sa,kp);
 		    	} else if (selected==loadPanel) {
 		    		File f=backupPicker.getFile();
 		    		AKeyPair kp=null; // TODO;
 		    		AMap<Keyword,ACell> peerData=FileUtils.loadCAD3(f.toPath(), NullStore.INSTANCE);
 		    		Server server=Server.fromPeerData(kp,peerData);
-		    		PeerGUI.launchPeerGUI(server);
+		    		return PeerGUI.launchPeerGUI(server);
 		    	}
 	    	} catch (InterruptedException e) {
 	    		Thread.currentThread().interrupt();
@@ -150,6 +151,7 @@ public class PeerLaunchDialog {
 	    		JOptionPane.showMessageDialog(parent, "Peer launch failed\n\nReason : "+e.getMessage());
 	    	}
 	    }
+	    return null;
 	}
 
 }

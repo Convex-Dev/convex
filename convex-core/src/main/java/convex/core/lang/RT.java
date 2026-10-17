@@ -1997,8 +1997,8 @@ public class RT {
 		if (o==null) return null;
 		if (o instanceof AString)
 			return (T) o.toString();
-		if (o instanceof CVMLong)
-			return (T) (Long) ((CVMLong) o).longValue();
+		if (AInteger.isLong(o))
+			return (T) (Long) ((AInteger) o).longValue();
 		if (o instanceof CVMBigInteger bi)
 			return (T) bi.big();
 		if (o instanceof CVMDouble)
@@ -2060,8 +2060,8 @@ public class RT {
 	public static CVMChar ensureChar(ACell a) {
 		if (a instanceof CVMChar)
 			return (CVMChar) a;
-		if (a instanceof CVMLong)
-			return CVMChar.create(((CVMLong) a).longValue());
+		if (AInteger.isLong(a))
+			return CVMChar.create(((AInteger) a).longValue());
 		if (a instanceof AString) {
 			AString s = (AString) a;
 			long n = s.count();

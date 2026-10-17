@@ -2,10 +2,7 @@ package convex.gui.peer;
 
 import java.awt.BorderLayout;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
 
-import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
@@ -26,6 +23,7 @@ import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
+import convex.gui.utils.Async;
 import convex.peer.API;
 import convex.peer.Server;
 
@@ -42,22 +40,6 @@ public class ServerListPanel extends JPanel {
 	static final Logger log = LoggerFactory.getLogger(ServerListPanel.class.getName());
 
 	/**
-	 * Gets a list of all locally operating Servers from the current peer list.
-	 *
-	 * @return List of local PeerView objects
-	 */
-	public List<ConvexLocal> getPeerViews() {
-		DefaultListModel<ConvexLocal> peerList = manager.getPeerList();
-		ArrayList<ConvexLocal> al = new ArrayList<>();
-		int n = peerList.getSize();
-		for (int i = 0; i < n; i++) {
-			ConvexLocal p = peerList.getElementAt(i);
-			al.add(p);
-		}
-		return al;
-	}
-
-	/**
 	 * Create the panel.
 	 * @param manager PeerGUI instance
 	 */
@@ -68,10 +50,8 @@ public class ServerListPanel extends JPanel {
 		JPanel toolBar = new ActionPanel();
 		add(toolBar, BorderLayout.SOUTH);
 
-		ActionButton btnLaunch = new ActionButton("Launch!",0xeb9b,e -> {
-			ConvexLocal convex=manager.getDefaultConvex();
-			manager.launchExtraPeer(convex);
-		});
+		ActionButton btnLaunch = new ActionButton("Launch!",0xeb9b,e ->
+			Async.whileBusy(e, manager.launchExtraPeer(manager.getDefaultConvex())));
 		btnLaunch.setToolTipText("Launch an extra peer when running a local network. Allocates some stake from genesis peer controller account.");
 		if (!Init.GENESIS_PEER_ADDRESS.equals (manager.getDefaultConvex().getAddress())) {
 			// Disable if we are not the genesis peer

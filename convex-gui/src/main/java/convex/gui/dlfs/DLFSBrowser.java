@@ -145,6 +145,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 	public DLFSBrowser(File storeFile) {
 		super("DLFS Browser");
+		own(this::shutdown);
 
 		// Launch NodeServer with Etch store
 		openStore(storeFile);
@@ -638,24 +639,12 @@ public class DLFSBrowser extends AbstractGUI {
 
 	@Override
 	public void afterRun() {
-		getFrame().setJMenuBar(menuBar);
+		JFrame frame=getFrame();
+		if (frame!=null) frame.setJMenuBar(menuBar); // null if closed before shown
 		super.afterRun();
 	}
 
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this, "dock center");
-		frame.addWindowListener(new java.awt.event.WindowAdapter() {
-			@Override
-			public void windowClosing(java.awt.event.WindowEvent e) {
-				shutdown();
-			}
-		});
-	}
-
-	/** Idempotent shutdown — safe to call from windowClosing, close(), etc. */
+	/** Stops the browser, WebDAV and the NodeServer (persisting state). Released on close. */
 	private void shutdown() {
 		if (panel != null) {
 			panel.close();
@@ -665,12 +654,6 @@ public class DLFSBrowser extends AbstractGUI {
 			webdavServer = null;
 		}
 		closeNodeServer();
-	}
-
-	@Override
-	public void close() {
-		shutdown();
-		super.close();
 	}
 
 	public static void main(String[] args) {

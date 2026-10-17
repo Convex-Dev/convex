@@ -5,7 +5,6 @@ import java.awt.BorderLayout;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.SwingUtilities;
 
 import convex.api.Convex;
 import convex.core.data.AccountKey;
@@ -13,6 +12,7 @@ import convex.core.data.prim.AInteger;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.DecimalAmountField;
+import convex.gui.utils.Async;
 import convex.gui.utils.SymbolIcon;
 
 @SuppressWarnings("serial")
@@ -53,14 +53,12 @@ public class PeerStakePanel extends JPanel {
 					JOptionPane.showMessageDialog(this,"Input amount not valid. Must be a qantity in Convex Gold, e.g. '1000.01' ");
 					return;
 				}
-				convex.transact("(set-stake "+peerKey+" "+amt+")").thenAcceptAsync(r->{
+				Async.whileBusy(e, Async.background(()->convex.transactSync("(set-stake "+peerKey+" "+amt+")")).thenAcceptAsync(r->{
 					if (r.isError()) {
-						SwingUtilities.invokeLater(()->{
-							JOptionPane.showMessageDialog(this,"Stake setting failed: "+r,"Staking problem",JOptionPane.ERROR_MESSAGE);
-						});
-					} 
+						JOptionPane.showMessageDialog(this,"Stake setting failed: "+r,"Staking problem",JOptionPane.ERROR_MESSAGE);
+					}
 					peerTable.refresh();
-				});
+				}, Async.EDT));
 			}
 		}));
 	}

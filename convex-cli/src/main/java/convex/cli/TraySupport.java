@@ -41,6 +41,7 @@ public final class TraySupport {
 		EventQueue.invokeLater(()->{
 			ConvexLocal convex=ConvexLocal.connect(server);
 			PeerWindow window=new PeerWindow(convex);
+			window.own(convex);
 			window.runNonModal(null);
 		});
 	}

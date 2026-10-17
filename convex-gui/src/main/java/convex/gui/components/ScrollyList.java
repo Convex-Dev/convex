@@ -24,18 +24,22 @@ import net.miginfocom.swing.MigLayout;
  * @param <E> Type of list model elements
  */
 @SuppressWarnings("serial")
-public class ScrollyList<E> extends JScrollPane {
+public class ScrollyList<E> extends JScrollPane implements AutoCloseable {
 	public static final int VIEWPORT_HEIGHT = 660;
-	
+
 	private final Function<E, Component> builder;
 	private final ListModel<E> model;
 	private final ScrollablePanel listPanel = new ScrollablePanel();
 
 	private final MigLayout listLayout;
+
+	/** Listener on the model, removed on close since models may outlive this list */
+	private final ListDataListener modelListener;
 	
 	public void refreshList() {
 		boolean bottom=isAtBottom();
 		EventQueue.invokeLater(()->{;
+			for (Component c: listPanel.getComponents()) discard(c);
 			listPanel.removeAll();
 			int n = model.getSize();
 			for (int i = 0; i < n; i++) {
@@ -106,7 +110,7 @@ public class ScrollyList<E> extends JScrollPane {
 		setViewportView(listPanel);
 		getViewport().setBackground(null);
 
-		model.addListDataListener(new ListDataListener() {
+		modelListener=new ListDataListener() {
 			@Override
 			public void intervalAdded(ListDataEvent e) {
 				int start=e.getIndex0();
@@ -121,7 +125,9 @@ public class ScrollyList<E> extends JScrollPane {
 				int start=e.getIndex0();
 				int last=e.getIndex1();
 				for (int i=start; i<=last; i++) {
-					listPanel.remove(start);;
+					Component c=listPanel.getComponent(start);
+					listPanel.remove(start);
+					discard(c);
 				}
 			}
 
@@ -129,12 +135,30 @@ public class ScrollyList<E> extends JScrollPane {
 			public void contentsChanged(ListDataEvent e) {
 				refreshList();
 			}
-		});
-		
+		};
+		model.addListDataListener(modelListener);
+
 		refreshList();
+	}
+
+	/** Releases a list component that is no longer shown, since its window won't */
+	private static void discard(Component c) {
+		if (c instanceof AutoCloseable closeable) {
+			try {
+				closeable.close();
+			} catch (Exception e) {
+				// release only, nothing useful to do
+			}
+		}
 	}
 
 	public Component[] getListComponents() {
 		return listPanel.getComponents();
+	}
+
+	/** Stops following the model. Called when the owning window closes. */
+	@Override
+	public void close() {
+		model.removeListDataListener(modelListener);
 	}
 }

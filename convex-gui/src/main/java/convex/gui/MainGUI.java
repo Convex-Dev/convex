@@ -2,11 +2,12 @@ package convex.gui;
 
 import java.awt.Color;
 import java.awt.EventQueue;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
@@ -22,12 +23,16 @@ import convex.gui.peer.PeerGUI;
 import convex.gui.peer.PeerLaunchDialog;
 import convex.gui.repl.REPLClient;
 import convex.gui.tools.HackerTools;
+import convex.gui.utils.Async;
 import convex.gui.utils.Toolkit;
 import convex.gui.wallet.WalletApp;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class MainGUI extends AbstractGUI {
+	/** Peer Managers launched from here, in launch order. Used on the EDT. */
+	private final List<PeerGUI> peerManagers=new ArrayList<>();
+
 	public MainGUI() {
 		super ("Convex Desktop");
 		MigLayout layout=new MigLayout("wrap 1","[fill]");
@@ -66,42 +71,59 @@ public class MainGUI extends AbstractGUI {
 	}
 	
 	public void launchDLFS() {
-		new DLFSBrowser().run();
+		adopt(new DLFSBrowser()).run();
 	}
-	
+
 	public void launchWallet() {
-	    Convex convex=ConnectPanel.tryConnect(this);
-	    if (convex!=null) {
-	    new WalletApp(convex,true).run();
-	    }
+		ConnectPanel.tryConnect(this).thenAcceptAsync(convex->{
+			if (convex==null) return;
+			WalletApp wallet=new WalletApp(convex);
+			wallet.own(convex);
+			adopt(wallet).run();
+		}, Async.EDT);
 	}
-	
-	
+
+
 	public void launchTestNet() {
-		PeerLaunchDialog.runLaunchDialog(this);
+		PeerGUI manager=PeerLaunchDialog.runLaunchDialog(this);
+		if (manager!=null) {
+			adopt(manager);
+			peerManagers.add(manager);
+		}
 	}
-	
+
 	public void launchDiscord() {
 		Toolkit.launchBrowser("https://discord.com/invite/xfYGq4CT7v");
 	}
-	
+
+	/**
+	 * Opens the explorer of the most recently launched local network still running
+	 */
 	public void launchExplorer() {
-		if (PeerGUI.REST_PORT==null) {
+		peerManagers.removeIf(AbstractGUI::isClosing);
+		Integer port=null;
+		for (PeerGUI manager: peerManagers) {
+			Integer p=manager.getRestPort();
+			if (p!=null) port=p;
+		}
+		if (port==null) {
 			Toast.display(this, "No local server started!", Color.ORANGE);
 		} else {
-			Toolkit.launchBrowser("http://localhost:"+PeerGUI.REST_PORT+"/explorer");
+			Toolkit.launchBrowser("http://localhost:"+port+"/explorer");
 		}
 	}
 	
 	public void launchTerminalClient() {
-	    Convex convex=ConnectPanel.tryConnect(this);
-	    if (convex!=null) {
-	    new REPLClient(convex,true).run();
-	    }
+		ConnectPanel.tryConnect(this).thenAcceptAsync(convex->{
+			if (convex==null) return;
+			REPLClient client=new REPLClient(convex);
+			client.own(convex);
+			adopt(client).run();
+		}, Async.EDT);
 	}
-	
+
 	public HackerTools launchTools() {
-		HackerTools tools=new HackerTools();
+		HackerTools tools=adopt(new HackerTools());
 		tools.run();
 		return tools;
 	}
@@ -130,6 +152,7 @@ public class MainGUI extends AbstractGUI {
 
 	/**
 	 * Launch the Convex Desktop application and waits until main frame is closed.
+	 * Apps launched from Desktop are closed with it.
 	 * @param args Command line args
 	 */
 	public static void main(String... args) {
@@ -137,12 +160,6 @@ public class MainGUI extends AbstractGUI {
 		gui.run();
 		gui.waitForClose();
 		System.exit(0);
-	}
-
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this,"dock center");
 	}
 
 }

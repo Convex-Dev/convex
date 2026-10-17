@@ -9,6 +9,8 @@ import convex.api.Convex;
 import convex.core.lang.Reader;
 import convex.gui.components.ActionButton;
 import convex.gui.components.BalanceLabel;
+import convex.gui.utils.Async;
+import convex.gui.utils.Refresh;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -22,7 +24,13 @@ public class TokenComponent extends JPanel {
 	static final Font BALANCE_FONT=Toolkit.BIG_FONT;
 	TokenButton tokenButton;
 
-	public TokenComponent(Convex convex, TokenInfo token) {
+	/**
+	 * Creates a component for a tracked token
+	 * @param convex Connection used for balances and actions
+	 * @param network Network the token is tracked on
+	 * @param token Token to show
+	 */
+	public TokenComponent(Convex convex, NetworkState network, TokenInfo token) {
 		this.convex=convex;
 		this.token=token;
 		
@@ -50,50 +58,39 @@ public class TokenComponent extends JPanel {
 
 		actions.add(ActionButton.build(0xe933,e->{
 			// Token swap
-			TokenInfo with= TokenListPanel.getOtherToken(token);
-			if (with==null) {
-				String tok=JOptionPane.showInputDialog(this, "Specify a token to swap with");
-				if (tok==null) return;
-				try {
-					with = TokenInfo.get(convex, Reader.read(tok));
-				} catch (Exception ex) {
-					// continue s.t. with = null
-				}
-			}
-			if (with==null) {
-				JOptionPane.showInputDialog(this, "Can't find token");
+			TokenInfo with= network.otherToken(token);
+			if (with!=null) {
+				openSwap(with);
 				return;
 			}
-			new SwapPanel(convex,token,with).runNonModal(this);
+			String tok=JOptionPane.showInputDialog(this, "Specify a token to swap with");
+			if (tok==null) return;
+			Async.whileBusy(e, Async.background(()->TokenInfo.get(convex, Reader.read(tok)))
+				.thenAcceptAsync(this::openSwap, Async.EDT));
 		},"Open token swap window for this token"));
 		actions.add(ActionButton.build(0xe5d5,e->{
 			refresh(convex);
 		},"Refresh token info")); 
 		actions.add(ActionButton.build(0xe872,e->{
-			TokenListPanel.model.removeElement(token);
+			network.untrack(token);
 		},"Remove token from tracked list"));
 		
 		add(actions,"dock east");
-		
-		
-		refresh(convex);
+
+		Refresh.whileShowing(this, 1000, ()->refresh(convex));
 	}
 
-	public void refresh(Convex convex) {
-		try {
-			token.getBalance(convex).thenAccept(bal->{
-				if (bal!=null) {
-					balanceLabel.setBalance(bal);
-				} else {
-					balanceLabel.setBalance(null); 
-				}
-			}).exceptionally(e->{
-				e.printStackTrace();
-				balanceLabel.setBalance(null);
-				return null;
-			});
-		} catch (Exception e) {
-			e.printStackTrace();
+	/** Opens a swap of this token for another, if found */
+	private void openSwap(TokenInfo with) {
+		if (with==null) {
+			JOptionPane.showMessageDialog(this, "Can't find token");
+			return;
 		}
+		new SwapPanel(convex,token,with).runNonModal(this);
+	}
+
+	/** Refreshes the balance shown. Safe from any thread. */
+	public void refresh(Convex convex) {
+		balanceLabel.show(token.getBalance(convex));
 	}
 }

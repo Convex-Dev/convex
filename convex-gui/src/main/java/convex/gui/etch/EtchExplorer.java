@@ -2,7 +2,6 @@ package convex.gui.etch;
 
 import java.awt.BorderLayout;
 
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -13,7 +12,6 @@ import convex.core.store.Stores;
 import convex.etch.EtchStore;
 import convex.gui.components.AbstractGUI;
 import convex.gui.models.StateModel;
-import net.miginfocom.swing.MigLayout;
 
 /**
  * A Client application for exploring an Etch store
@@ -22,8 +20,6 @@ import net.miginfocom.swing.MigLayout;
 public class EtchExplorer extends AbstractGUI {
 
 	public static final Logger log = LoggerFactory.getLogger(EtchExplorer.class.getName());
-
-	public static long maxBlock = 0;
 
 	/**
 	 * Launch the application.
@@ -44,7 +40,8 @@ public class EtchExplorer extends AbstractGUI {
 	 */
 	JPanel panel = new JPanel();
  
-	private static StateModel<EtchStore> etchState = StateModel.create((EtchStore)Stores.getGlobalStore());
+	/** Store being explored. Declared before the panels that read it. */
+	private final StateModel<EtchStore> etchState = StateModel.create((EtchStore)Stores.getGlobalStore());
 	
 	DatabasePanel homePanel = new DatabasePanel(this);
 	JTabbedPane tabs = new JTabbedPane();
@@ -86,11 +83,5 @@ public class EtchExplorer extends AbstractGUI {
 		EtchStore e=etchState.getValue();
 		e.close();
 		etchState.setValue(newEtch);
-	}
-
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this,"dock center");
 	}
 }

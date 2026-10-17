@@ -9,6 +9,7 @@ import convex.core.data.ACell;
 import convex.core.data.prim.AInteger;
 import convex.core.lang.RT;
 import convex.gui.components.BalanceLabel;
+import convex.gui.utils.Async;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
@@ -43,13 +44,7 @@ public class TokenInfoPanel extends JPanel {
 			descLabel.setText("(Convex Gold: Native coin)");
 			supplyLabel.setDecimals(Coin.DECIMALS);
 			decimalsLabel.setText(Integer.toString(Coin.DECIMALS));
-			convex.query("(coin-supply)").thenAcceptAsync(r->{
-				if (r.isError()) {
-					supplyLabel.setBalance(null);
-				} else {
-					supplyLabel.setBalance(RT.ensureInteger(r.getValue()));
-				}
-			});
+			supplyLabel.showResult(convex.query("(coin-supply)"));
 		} else {
 			convex.query("(get (call *registry* (lookup (address "+id+"))) :name)").thenAcceptAsync(r->{
 				if (r.isError()) {
@@ -57,16 +52,10 @@ public class TokenInfoPanel extends JPanel {
 				} else {
 					descLabel.setText(RT.toString(r.getValue()));
 				}
-			});
-			
-			convex.query("(@convex.asset/total-supply "+id+")").thenAcceptAsync(r->{
-				if (r.isError()) {
-					supplyLabel.setBalance(null);
-				} else {
-					supplyLabel.setBalance(RT.ensureInteger(r.getValue()));
-				}
-			});
-			
+			}, Async.EDT);
+
+			supplyLabel.showResult(convex.query("(@convex.asset/total-supply "+id+")"));
+
 			convex.query("(@convex.fungible/decimals "+id+")").thenAcceptAsync(r->{
 				if (r.isError()) {
 					decimalsLabel.setText("Error - "+r.getErrorCode());
@@ -76,7 +65,7 @@ public class TokenInfoPanel extends JPanel {
 					supplyLabel.setDecimals((int)decs.longValue());
 					decimalsLabel.setText(RT.toString(decs));
 				}
-			});
+			}, Async.EDT);
 		}
 
 	}

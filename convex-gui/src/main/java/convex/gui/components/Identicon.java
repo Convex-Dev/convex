@@ -5,7 +5,6 @@ import java.awt.image.BufferedImage;
 import java.util.WeakHashMap;
 
 import javax.swing.ImageIcon;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
@@ -21,7 +20,6 @@ import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.gui.utils.Toolkit;
-import net.miginfocom.swing.MigLayout;
 
 /**
  * A simple identicon component for visualising hash values.
@@ -118,12 +116,6 @@ public class Identicon extends JLabel {
 				add(new Identicon(Hash.get(CVMLong.create(i).getHash())));
 			}
 			add(new Identicon(null));
-		}
-
-		@Override
-		public void setupFrame(JFrame frame) {
-			frame.getContentPane().setLayout(new MigLayout());
-			frame.getContentPane().add(this,"dock center");
 		}
 	}
 	

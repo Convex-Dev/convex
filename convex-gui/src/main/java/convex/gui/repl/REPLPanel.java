@@ -47,6 +47,7 @@ import convex.gui.components.BaseTextPane;
 import convex.gui.components.CodePane;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.account.AccountChooserPanel;
+import convex.gui.utils.Async;
 import convex.gui.utils.CVXHighlighter;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
@@ -260,9 +261,27 @@ public class REPLPanel extends JPanel {
 	protected AKeyPair getKeyPair() {
 		return execPanel.getConvex().getKeyPair();
 	}
-	
+
+	/**
+	 * Shows a signer found for the connection after this panel was created.
+	 * Call on the EDT.
+	 * @param kp Key pair now set on the connection
+	 */
+	public void showSigner(AKeyPair kp) {
+		execPanel.showSigner(kp);
+	}
+
 	protected Address getAddress() {
 		return execPanel.getConvex().getAddress();
+	}
+
+	/** Shows a prepared transaction if asked to, before it is sent. Runs on the EDT. */
+	private SignedData<ATransaction> showTransaction(SignedData<ATransaction> strans) {
+		if (btnTX.isSelected()) {
+			addOutputWithHighlight(output,strans.toString()+"\n");
+			output.append("TX Hash: "+strans.getHash()+"\n");
+		}
+		return strans;
 	}
 
 	private void sendMessage(String s) {
@@ -290,24 +309,19 @@ public class REPLPanel extends JPanel {
 					Address qaddr=getAddress();
 					future = convex.query(code, qaddr);
 				} else if (mode.equals("Transact")) {
-					future = CompletableFuture.supplyAsync(()->{
-						try {
-							SignedData<ATransaction> strans=convex.prepareTransaction(code);					
-							if (btnTX.isSelected()) {
-								addOutputWithHighlight(output,strans.toString()+"\n");
-								output.append("TX Hash: "+strans.getHash()+"\n");
-							}
-							return strans;
-						} catch(Exception e) {
-							throw Utils.sneakyThrow(e);
-						}
-					}).thenCompose(strans->convex.transact(strans));
-							
-					
+					future = Async.background(()->convex.prepareTransaction(code))
+						.thenApplyAsync(this::showTransaction, Async.EDT)
+						.thenCompose(convex::transact);
 				} else if (mode.equals("Prepare")) {
-					SignedData<ATransaction> strans=convex.prepareTransaction(code);	
-					convex.clearSequence();
-					addOutputWithHighlight(output,strans.toString()+"\n");
+					Async.background(()->convex.prepareTransaction(code)).handleAsync((strans,e)->{
+						convex.clearSequence();
+						if (e!=null) {
+							handleResult(start,Result.fromException(e));
+						} else {
+							addOutputWithHighlight(output,strans.toString()+"\n");
+						}
+						return null;
+					}, Async.EDT);
 					return;
 				} else {
 					throw new Exception("Unrecognosed REPL mode: " + mode);
@@ -322,7 +336,7 @@ public class REPLPanel extends JPanel {
 					handleResult(start,m);
 					Toolkit.scrollToBottom(outputScrollPane);
 					return m;
-				});
+				}, Async.EDT);
 			} catch (ResultException e) {
 				handleResult(start,e.getResult());
 			} catch (ParseException e) {
