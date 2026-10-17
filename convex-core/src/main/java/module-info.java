@@ -64,6 +64,7 @@ module convex.core {
 	exports convex.lattice.fs;
 	exports convex.lattice.fs.impl;
 	exports convex.lattice.kv;
+	exports convex.lattice.mail;
 
 	requires transitive org.antlr.antlr4.runtime;
 	requires org.bouncycastle.pkix;
