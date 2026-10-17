@@ -98,9 +98,9 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	 * @return Mailbox component at {@code [:mail did]}
 	 */
 	public Mailbox mailbox(AString did) {
-		MailEntryLattice entries=lattice.entries(did);
-		if (entries==null) throw new IllegalArgumentException("Mailbox must be a canonical base DID");
-		return configured(new Mailbox(resolve(cursor,lattice,did),entries));
+		MailboxLattice mailbox=lattice.forMailbox(did);
+		if (mailbox==null) throw new IllegalArgumentException("Mailbox must be a canonical base DID");
+		return configured(new Mailbox(resolve(cursor,lattice,did),mailbox));
 	}
 
 	/**

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ECIES;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -22,6 +24,7 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -97,6 +100,32 @@ public class MailTest {
 		alice.send(envelope);
 		assertTrue(alice.outbox().isEmpty());
 		assertEquals(1,inbox.receipts().size());
+	}
+
+	@Test
+	public void testMisfiledReceiptDoesNotConfirmDelivery() {
+		// Alice sends two messages; Bob receipts the first
+		Mail alice=Mail.create(context(ALICE,1000));
+		MailEnvelope first=aliceToBob(1000,"one");
+		MailEnvelope second=aliceToBob(1001,"two");
+		alice.send(first);
+		alice.send(second);
+		Mail bob=Mail.connect(alice.cursor(),Mail.LATTICE,context(BOB,2000));
+		MailReceipt receipt=bob.mailbox(BOB_DID).receive(first).get(0);
+		assertEquals(Set.of(second.hash()),alice.outbox());
+
+		// A peer files Bob's genuine receipt under the second message's key. The register
+		// is bound to its key, so the receipt is invalid there and the message survives
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> attack=
+			Maps.of(BOB_DID,Index.create(second.key(),receipt.signed()));
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>> before=alice.cursor().get();
+		assertSame(before,alice.cursor().updateAndGet(own -> Mail.LATTICE.merge(own,attack)));
+		assertEquals(List.of(second),bob.mailbox(BOB_DID).deposited());
+		assertFalse(bob.mailbox(BOB_DID).isReceived(second));
+		assertEquals(Set.of(second.hash()),alice.outbox());
+
+		// Nor does it take root in an empty mailbox
+		assertEquals(0,Mail.LATTICE.merge(Mail.LATTICE.zero(),attack).get(BOB_DID).count());
 	}
 
 	@Test

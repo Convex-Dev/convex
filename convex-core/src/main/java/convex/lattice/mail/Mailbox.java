@@ -14,7 +14,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.generic.IndexLattice;
 
 /**
  * Component at one mailbox, {@code [:mail did]}: an index of entry registers.
@@ -29,23 +28,20 @@ import convex.lattice.generic.IndexLattice;
 public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACell>>>
 		implements TransactionalComponent<Index<ABlob,SignedData<ACell>>,Mailbox> {
 
-	private final MailEntryLattice entries;
-	private final IndexLattice<ABlob,SignedData<ACell>> lattice;
+	private final MailboxLattice lattice;
 
-	Mailbox(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor, MailEntryLattice entries) {
+	Mailbox(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor, MailboxLattice lattice) {
 		super(cursor);
-		this.entries=entries;
-		this.lattice=IndexLattice.create(entries);
+		this.lattice=lattice;
 	}
 
 	private Mailbox(Mailbox source) {
 		super(source.lattice,source.cursor);
-		this.entries=source.entries;
 		this.lattice=source.lattice;
 	}
 
 	/** The mailbox DID. */
-	public AString did() { return entries.getDID(); }
+	public AString did() { return lattice.getDID(); }
 
 	/** Envelopes not yet receipted, in key order (issued-at, then hash). */
 	public List<MailEnvelope> deposited() {
@@ -151,7 +147,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 			}
 			if (!opened) continue;
 			boolean fromAuthorised=envelope.from()!=null
-				&& entries.getAuthorizer().safeAuthorises(envelope.from(),envelope.signer());
+				&& lattice.getAuthorizer().safeAuthorises(envelope.from(),envelope.signer());
 			messages.add(new MailMessage(envelope.hash(),envelope.to(),envelope.from(),envelope.signer(),
 				fromAuthorised,envelope.issuedAt(),payload,envelope.encrypted()));
 		}
@@ -170,6 +166,6 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 
 	@Override
 	public Mailbox withCursor(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
-		return configured(new Mailbox(cursor,entries));
+		return configured(new Mailbox(cursor,lattice));
 	}
 }

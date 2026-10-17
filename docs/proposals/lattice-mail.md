@@ -386,8 +386,12 @@ public final class MailLattice extends ALattice<AHashMap<ACell, Index<ABlob, Sig
     static MailLattice create(DIDKeyAuthorizer authorizer)   // binds the receipt signer rule
     MailboxLattice forMailbox(AString did)                   // DID-bound mailbox lattice; also returned by path(did)
 
-public final class MailboxLattice extends IndexLattice<ABlob, SignedData<ACell>>
-    // per-key register as specified above; zero() = Index.EMPTY
+public final class MailboxLattice extends ALattice<Index<ABlob, SignedData<ACell>>>
+    // keyed dispatch to the register bound to each key; zero() = Index.EMPTY
+    MailEntryLattice entry(ACell key)                        // key-bound register; also returned by path(key)
+
+public final class MailEntryLattice extends AValueLattice<SignedData<ACell>>
+    // the per-key register as specified above, bound to the mailbox DID and the entry key
     static ABlob key(long issuedAt, Hash envelopeHash)       // t‖hash
 
 public final class Mail extends ALatticeComponent<AHashMap<ACell, Index<ABlob, SignedData<ACell>>>>

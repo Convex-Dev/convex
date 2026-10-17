@@ -12,17 +12,16 @@ import convex.core.data.SignedData;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.generic.IndexLattice;
 
 /**
  * The {@code :mail} region: a map from recipient canonical base DID to that DID's
  * mailbox, an {@code Index} of entry registers keyed by {@code issued-at ‖ hash}.
  *
- * <p>Each mailbox merges with an {@link IndexLattice} over a {@link MailEntryLattice}
- * bound to its DID, so the region's own rule is only the keyed dispatch to the right
- * mailbox and the rejection of keys that are not canonical DIDs. The authoriser bound
- * here decides which signers may issue receipts for each DID; {@link Mail#LATTICE}
- * binds the {@code did:key}-only rule.</p>
+ * <p>Each mailbox merges with the {@link MailboxLattice} bound to its DID, so the
+ * region's own rule is only the keyed dispatch to the right mailbox and the rejection
+ * of keys that are not canonical DIDs. The authoriser bound here decides which signers
+ * may issue receipts for each DID; {@link Mail#LATTICE} binds the {@code did:key}-only
+ * rule.</p>
  */
 public final class MailLattice extends ALattice<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> {
 
@@ -45,16 +44,10 @@ public final class MailLattice extends ALattice<AHashMap<ACell,Index<ABlob,Signe
 
 	public DIDKeyAuthorizer getAuthorizer() { return authorizer; }
 
-	/** The entry register for one mailbox, or null if the key is not a canonical DID. */
-	public MailEntryLattice entries(ACell did) {
-		if (!(did instanceof AString s) || !DID.isCanonicalBase(s)) return null;
-		return MailEntryLattice.create(s,authorizer);
-	}
-
 	/** The lattice of one mailbox, or null if the key is not a canonical DID. */
-	public IndexLattice<ABlob,SignedData<ACell>> forMailbox(ACell did) {
-		MailEntryLattice entries=entries(did);
-		return (entries==null)?null:IndexLattice.create(entries);
+	public MailboxLattice forMailbox(ACell did) {
+		if (!(did instanceof AString s) || !DID.isCanonicalBase(s)) return null;
+		return MailboxLattice.create(s,authorizer);
 	}
 
 	@Override
@@ -74,7 +67,7 @@ public final class MailLattice extends ALattice<AHashMap<ACell,Index<ABlob,Signe
 			public Index<ABlob,SignedData<ACell>> merge(Object key, Index<ABlob,SignedData<ACell>> a,
 					Index<ABlob,SignedData<ACell>> b) {
 				if (b==null) return a;
-				IndexLattice<ABlob,SignedData<ACell>> mailbox=(key instanceof ACell cell)?forMailbox(cell):null;
+				MailboxLattice mailbox=(key instanceof ACell cell)?forMailbox(cell):null;
 				if (mailbox==null || !mailbox.checkForeign(b)) return a;
 				return mailbox.merge(a,b);
 			}

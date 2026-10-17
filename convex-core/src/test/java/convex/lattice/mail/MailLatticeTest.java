@@ -30,7 +30,6 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeTest;
-import convex.lattice.generic.IndexLattice;
 
 /** Merge rules of the mail region: the entry register, the mailbox index and the DID map. */
 public class MailLatticeTest {
@@ -43,7 +42,7 @@ public class MailLatticeTest {
 	static final AString ALICE_DID=DID.forKey(ALICE.getAccountKey());
 	static final AString BOB_DID=DID.forKey(BOB.getAccountKey());
 
-	static final IndexLattice<ABlob,SignedData<ACell>> BOB_MAILBOX=Mail.LATTICE.forMailbox(BOB_DID);
+	static final MailboxLattice BOB_MAILBOX=Mail.LATTICE.forMailbox(BOB_DID);
 
 	static MailEnvelope envelope(AKeyPair signer, AString from, AString to, AKeyPair recipient, long issuedAt, String text) {
 		return MailEnvelope.seal(signer,to,recipient.getAccountKey(),from,issuedAt,
@@ -109,7 +108,7 @@ public class MailLatticeTest {
 		// Bob's DID has two authorised devices under this rule
 		DIDKeyAuthorizer twoDevices=(did,key) -> did.equals(BOB_DID)
 			&& (key.equals(BOB.getAccountKey()) || key.equals(BOB_PHONE.getAccountKey()));
-		IndexLattice<ABlob,SignedData<ACell>> mailbox=MailLattice.create(twoDevices).forMailbox(BOB_DID);
+		MailboxLattice mailbox=MailLattice.create(twoDevices).forMailbox(BOB_DID);
 
 		MailEnvelope e=toBob(1000,"hello");
 		MailReceipt r1=receipt(BOB,BOB_DID,e);
@@ -224,22 +223,65 @@ public class MailLatticeTest {
 	}
 
 	@Test
-	public void testDishonestKeyStillConverges() {
-		// The index passes no key to the register, so a peer may file an envelope under
-		// another envelope's key; the register must still pick one deterministically
+	public void testMisfiledReceiptIsDropped() {
+		// Bob's genuine receipt for one message, filed by a peer under another message's
+		// key. Were it accepted there it would replace that message on every node and
+		// read as its delivery; the key-bound register rejects it
+		MailEnvelope e1=toBob(1000,"one");
+		MailEnvelope e2=toBob(1001,"two");
+		MailReceipt r1=receipt(BOB,BOB_DID,e1);
+		Index<ABlob,SignedData<ACell>> deposited=entries(e2);
+		Index<ABlob,SignedData<ACell>> misfiled=Index.create(e2.key(),r1.signed());
+
+		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),misfiled).count());
+		assertSame(deposited,BOB_MAILBOX.merge(deposited,misfiled));
+		assertEquals(deposited,BOB_MAILBOX.merge(misfiled,deposited));
+
+		// Under its own key the same receipt replaces its own envelope and nothing else
+		Index<ABlob,SignedData<ACell>> both=entries(e1,e2);
+		Index<ABlob,SignedData<ACell>> merged=BOB_MAILBOX.merge(both,entries(r1));
+		assertEquals(2,merged.count());
+		assertEquals(r1.signed(),merged.get(e1.key()));
+		assertEquals(e2.signed(),merged.get(e2.key()));
+	}
+
+	@Test
+	public void testMisfiledEnvelopeIsDropped() {
+		// A valid envelope filed under another envelope's key would otherwise compete on
+		// hash with the entry that belongs there, and could never be receipted
 		MailEnvelope e1=toBob(1000,"one");
 		MailEnvelope e2=toBob(1000,"two");
-		Index<ABlob,SignedData<ACell>> honest=Index.create(e1.key(),e1.signed());
+		Index<ABlob,SignedData<ACell>> honest=entries(e1);
 		Index<ABlob,SignedData<ACell>> misfiled=Index.create(e1.key(),e2.signed());
-		SignedData<ACell> expected=(e1.signed().getHash().compareTo(e2.signed().getHash())<=0)
-			?e1.signed():e2.signed();
-		assertEquals(expected,BOB_MAILBOX.merge(honest,misfiled).get(e1.key()));
-		assertEquals(expected,BOB_MAILBOX.merge(misfiled,honest).get(e1.key()));
 
-		// Bob's receipt under that key still wins in every order
-		Index<ABlob,SignedData<ACell>> received=entries(receipt(BOB,BOB_DID,e1));
-		assertEquals(received,BOB_MAILBOX.merge(BOB_MAILBOX.merge(honest,misfiled),received));
-		assertEquals(received,BOB_MAILBOX.merge(received,misfiled));
+		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),misfiled).count());
+		assertSame(honest,BOB_MAILBOX.merge(honest,misfiled));
+		assertEquals(honest,BOB_MAILBOX.merge(misfiled,honest));
+
+		// A key of the wrong shape has no register at all
+		Index<ABlob,SignedData<ACell>> badKey=Index.create(Blob.fromHex("ff"),e1.signed());
+		assertEquals(0,BOB_MAILBOX.merge(BOB_MAILBOX.zero(),badKey).count());
+	}
+
+	@Test
+	public void testPathBindsKey() {
+		MailEnvelope e1=toBob(1000,"one");
+		MailEnvelope e2=toBob(1001,"two");
+		ALattice<SignedData<ACell>> at1=BOB_MAILBOX.path(e1.key());
+		assertNotNull(at1);
+		assertEquals(e1.key(),((MailEntryLattice)at1).getKey());
+		assertEquals(BOB_DID,((MailEntryLattice)at1).getDID());
+		assertNull(BOB_MAILBOX.path(Blob.fromHex("ff")));
+		assertNull(BOB_MAILBOX.path(BOB_DID));
+
+		// The register at one key accepts only entries that belong there
+		assertEquals(e1.signed(),at1.merge(null,e1.signed()));
+		assertNull(at1.merge(null,e2.signed()));
+		assertNull(at1.merge(null,receipt(BOB,BOB_DID,e2).signed()));
+		assertEquals(e1.key(),BOB_MAILBOX.resolveKey(Strings.create(e1.key().toHexString())));
+		assertNull(BOB_MAILBOX.resolveKey(Strings.create("ff")));
+		assertThrows(IllegalArgumentException.class,
+			() -> MailEntryLattice.create(BOB_DID,Blob.fromHex("ff"),DIDKeyAuthorizer.CONVEX));
 	}
 
 	@Test
