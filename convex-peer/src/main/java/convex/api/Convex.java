@@ -428,7 +428,7 @@ public abstract class Convex implements AutoCloseable {
 	 * sequenced and submitted in call order, so each receives a distinct sequence
 	 * number and reaches the peer in sequence order. Sequence allocation, signing
 	 * and submission happen while holding this client's monitor, which is never
-	 * held while waiting on the network. Cancelling the returned future before the
+	 * held while awaiting a reply. Cancelling the returned future before the
 	 * transaction is submitted withdraws it.
 	 *
 	 * Multiple client instances must not independently submit transactions for the
@@ -529,12 +529,26 @@ public abstract class Convex implements AutoCloseable {
 				if (signed!=null) return action.apply(signed);
 			}
 			CompletableFuture<T> result=new CompletableFuture<>();
-			submitted=submitted.thenCombine(pending,(done,t)->t)
+			CompletableFuture<Void> next=new CompletableFuture<>();
+			submitted.thenCombine(pending,(done,t)->t)
 				.thenComposeAsync(t->submitQueued(t,addr,kp,action,result),ThreadUtils.getVirtualExecutor())
-				.handle((done,e)->{
-					if (e!=null) fail.accept(result,e);
-					return null;
+				.whenComplete((applied,e)->{
+					// Release later transactions before running the caller's continuations,
+					// which may themselves transact on this client
+					next.complete(null);
+					if (e!=null) {
+						fail.accept(result,e);
+					} else {
+						applied.whenComplete((v,ex)->{
+							if (ex==null) {
+								result.complete(v);
+							} else {
+								result.completeExceptionally(ex);
+							}
+						});
+					}
 				});
+			submitted=next;
 			return result;
 		}
 	}
@@ -543,16 +557,17 @@ public abstract class Convex implements AutoCloseable {
 	 * Applies the action to a queued transaction, first looking up the sequence
 	 * of its origin if it is not known.
 	 *
-	 * @return Future completing once the action has been applied
+	 * @return Future for the action's result, available once the action has been applied
 	 */
-	private <T> CompletableFuture<Void> submitQueued(ATransaction t, Address addr, AKeyPair kp,
+	private <T> CompletableFuture<CompletableFuture<T>> submitQueued(ATransaction t, Address addr, AKeyPair kp,
 			Function<SignedData<ATransaction>,CompletableFuture<T>> action, CompletableFuture<T> result) {
 		try {
 			ATransaction tx=withOrigin(t,addr);
-			if (applyNow(tx,kp,null,action,result)) return CompletableFuture.completedFuture(null);
-			return lookupSequenceAsync(tx.getOrigin()).thenAcceptAsync(seq->{
+			CompletableFuture<T> applied=applyNow(tx,kp,null,action,result);
+			if (applied!=null) return CompletableFuture.completedFuture(applied);
+			return lookupSequenceAsync(tx.getOrigin()).thenApplyAsync(seq->{
 				try {
-					applyNow(tx,kp,seq,action,result);
+					return applyNow(tx,kp,seq,action,result);
 				} catch (ResultException e) {
 					throw new CompletionException(e);
 				}
@@ -564,28 +579,23 @@ public abstract class Convex implements AutoCloseable {
 
 	/**
 	 * Sequences and signs a queued transaction and applies the action, unless the
-	 * caller has already cancelled it.
+	 * caller has already cancelled it. Does not complete the caller's future, so
+	 * no continuation runs holding this client's monitor.
 	 *
 	 * @param fetched Sequence of the origin looked up from the network, or null
-	 * @return false if the sequence of the origin must be looked up first
+	 * @return Future for the action's result, the caller's own future if withdrawn,
+	 *         or null if the sequence of the origin must be looked up first
 	 */
-	private synchronized <T> boolean applyNow(ATransaction t, AKeyPair kp, Long fetched,
+	private synchronized <T> CompletableFuture<T> applyNow(ATransaction t, AKeyPair kp, Long fetched,
 			Function<SignedData<ATransaction>,CompletableFuture<T>> action, CompletableFuture<T> result) throws ResultException {
 		if ((fetched!=null)&&(sequence==null)&&Cells.equals(t.getOrigin(),address)) {
 			// Keeps any reservation made while the lookup was outstanding
 			sequence=fetched;
 		}
-		if (result.isDone()) return true; // Cancelled before submission: withdraw
+		if (result.isDone()) return result; // Cancelled before submission: withdraw
 		SignedData<ATransaction> signed=signNow(t,kp,fetched);
-		if (signed==null) return false;
-		action.apply(signed).whenComplete((v,e)->{
-			if (e==null) {
-				result.complete(v);
-			} else {
-				result.completeExceptionally(e);
-			}
-		});
-		return true;
+		if (signed==null) return null;
+		return action.apply(signed);
 	}
 
 	/**

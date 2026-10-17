@@ -255,6 +255,33 @@ public class ConvexSequenceTest {
 	}
 
 	@Test
+	public void testQueuedContinuationRunsWithoutMonitor() throws Exception {
+		HeldConvex convex=new HeldConvex();
+
+		CompletableFuture<Boolean> heldMonitor=convex.transact(transaction(convex))
+				.thenApply(r->Thread.holdsLock(convex));
+		convex.nextLookup().reply().complete(sequence(41));
+
+		assertFalse(heldMonitor.get(WAIT,TimeUnit.MILLISECONDS));
+	}
+
+	@Test
+	public void testQueuedContinuationCanTransactOnSameClient() throws Exception {
+		HeldConvex convex=new HeldConvex();
+
+		CompletableFuture<Result> chained=convex.transact(transaction(convex)).thenApply(r->{
+			try {
+				return convex.transactSync(transaction(convex));
+			} catch (InterruptedException e) {
+				throw new IllegalStateException(e);
+			}
+		});
+		convex.nextLookup().reply().complete(sequence(41));
+
+		assertEquals(CVMLong.create(43),chained.get(WAIT,TimeUnit.MILLISECONDS).getValue());
+	}
+
+	@Test
 	public void testCallerHoldingMonitorSubmitsAtOnce() throws Exception {
 		HeldConvex convex=new HeldConvex();
 
