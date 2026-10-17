@@ -107,6 +107,9 @@ public class PeerLaunchDialog {
 	               JOptionPane.OK_CANCEL_OPTION, 
 	               JOptionPane.QUESTION_MESSAGE,
 	               SymbolIcon.get(0xeb9b,Toolkit.ICON_SIZE));
+		// The dialog has gone, so stop the key pickers following the key ring
+		keyField.close();
+		peerKeyField.close();
 	    if (result == JOptionPane.OK_OPTION) {
 	    	try {
 	    		Component selected=tabs.getSelectedComponent();

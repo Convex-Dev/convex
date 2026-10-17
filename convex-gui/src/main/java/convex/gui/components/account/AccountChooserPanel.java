@@ -24,7 +24,7 @@ import convex.core.exceptions.ResultException;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.DropdownMenu;
-import convex.gui.keys.KeyRingPanel;
+import convex.gui.keys.KeyRing;
 import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
@@ -197,7 +197,7 @@ public class AccountChooserPanel extends JPanel implements AutoCloseable {
 				setKeyPair(null);
 			} else {
 				AccountKey ak=AccountKey.parse(r.getValue()); // might be null, will clear key
-				AWalletEntry we=KeyRingPanel.getKeyRingEntry(ak);
+				AWalletEntry we=KeyRing.get().find(ak);
 				setKeyPair(we);
 			}
 		});

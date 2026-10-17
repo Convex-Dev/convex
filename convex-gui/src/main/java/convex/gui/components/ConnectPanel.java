@@ -19,7 +19,7 @@ import convex.core.cvm.Address;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.gui.components.account.AddressCombo;
-import convex.gui.keys.KeyRingPanel;
+import convex.gui.keys.KeyRing;
 import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
@@ -89,7 +89,7 @@ public class ConnectPanel extends JPanel {
 	    		
 	    		HostCombo.registerGoodConnection(target);
 	    		
-	    		AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
+	    		AWalletEntry we=KeyRing.get().findFor(convex);
 	    		if ((we!=null)) {
 	    			if (!we.isLocked()) {
 	    				convex.setKeyPair(we.getKeyPair());

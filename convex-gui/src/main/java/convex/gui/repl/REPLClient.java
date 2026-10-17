@@ -16,6 +16,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
+import convex.gui.keys.KeyRing;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.Toolkit;
@@ -83,7 +84,7 @@ public class REPLClient extends AbstractGUI {
 	public void afterRun() {
 		super.afterRun();
 		if (convex.getKeyPair()==null) {
-			AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
+			AWalletEntry we=KeyRing.get().findFor(convex);
 			if (we!=null) {
 				if (we.isLocked()) {
 					UnlockWalletDialog.offerUnlock(this, we);

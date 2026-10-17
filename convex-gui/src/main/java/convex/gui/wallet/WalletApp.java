@@ -12,6 +12,7 @@ import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSPanel;
+import convex.gui.keys.KeyRing;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.panels.HomePanel;
@@ -74,7 +75,7 @@ public class WalletApp extends AbstractGUI {
 	public void afterRun() {
 		super.afterRun();
 		if (convex.getKeyPair()==null) {
-			AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
+			AWalletEntry we=KeyRing.get().findFor(convex);
 			if (we!=null) {
 				if (we.isLocked()) {
 					UnlockWalletDialog.offerUnlock(homePanel, we);

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -24,6 +25,7 @@ import convex.api.ConvexLocal;
 import convex.core.Result;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -38,6 +40,7 @@ import convex.gui.components.AbstractGUI;
 import convex.gui.components.Toast;
 import convex.gui.components.account.AccountsPanel;
 import convex.gui.keys.KeyGenPanel;
+import convex.gui.keys.KeyRing;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.models.StateModel;
 import convex.gui.tools.MessageFormatPanel;
@@ -61,6 +64,8 @@ public class PeerGUI extends AbstractGUI {
 	
 	protected DefaultListModel<ConvexLocal> peerList = new DefaultListModel<ConvexLocal>();
 
+	/** Keys this Peer Manager added to the key ring, removed when it closes */
+	private final List<AWalletEntry> tempKeys=new CopyOnWriteArrayList<>();
 
 	/**
 	 * Launch the application.
@@ -99,7 +104,7 @@ public class PeerGUI extends AbstractGUI {
 		Server server=API.launchPeer(config);
 		ConvexLocal convex=ConvexLocal.connect(server);
 		peerList.addElement(convex);
-		PeerGUI manager =  new PeerGUI(peerList,null);
+		PeerGUI manager =  new PeerGUI(peerList,null,List.of());
 		manager.run();
 		return manager;
 	}
@@ -110,7 +115,7 @@ public class PeerGUI extends AbstractGUI {
 		server.launch();
 		ConvexLocal convex=ConvexLocal.connect(server);
 		peerList.addElement(convex);
-		PeerGUI manager =  new PeerGUI(peerList,null);
+		PeerGUI manager =  new PeerGUI(peerList,null,List.of());
 		manager.run();
 		return manager;
 	}
@@ -128,12 +133,19 @@ public class PeerGUI extends AbstractGUI {
 	 * @throws PeerException If peer startup fails
 	 */
 	public static PeerGUI create(int peerCount, AKeyPair genesisKey, Integer restPort) throws PeerException {
-		DefaultListModel<ConvexLocal> peerList=launchAllPeers(peerCount,genesisKey);
-		return new PeerGUI(peerList,restPort);
+		List<AWalletEntry> tempKeys=new ArrayList<>();
+		DefaultListModel<ConvexLocal> peerList=launchAllPeers(peerCount,genesisKey,tempKeys);
+		return new PeerGUI(peerList,restPort,tempKeys);
 	}
-	
 
-	private static DefaultListModel<ConvexLocal> launchAllPeers(int peerCount, AKeyPair genesisKey) throws PeerException {
+	/**
+	 * Adds a temporary key to the key ring, recording it if it was not already present
+	 */
+	private static void addTempKey(List<AWalletEntry> tempKeys, AWalletEntry we) {
+		if (KeyRing.get().add(we)) tempKeys.add(we);
+	}
+
+	private static DefaultListModel<ConvexLocal> launchAllPeers(int peerCount, AKeyPair genesisKey, List<AWalletEntry> tempKeys) throws PeerException {
 		List<AKeyPair> KEYPAIRS=new ArrayList<>();
 		List<AccountKey> PEERKEYS;
 		for (int i=0; i<peerCount; i++) {
@@ -141,7 +153,7 @@ public class PeerGUI extends AbstractGUI {
 		}
 
         HotWalletEntry gwe = HotWalletEntry.create(genesisKey,"Genesis key pair (temp)");
-		KeyRingPanel.addWalletEntry(gwe);
+		addTempKey(tempKeys,gwe);
 
 		AccountKey genPK=genesisKey.getAccountKey();
 		
@@ -159,7 +171,7 @@ public class PeerGUI extends AbstractGUI {
 				
 				if (kp==null) {
 					// Try to find alternative controller key in key ring if available
-					kp=KeyRingPanel.findWalletEntry(convex).getKeyPair();
+					kp=KeyRing.get().findFor(convex).getKeyPair();
 					convex.setKeyPair(kp);
 				}
 				
@@ -167,7 +179,7 @@ public class PeerGUI extends AbstractGUI {
 				
 				// initial wallet list
 		        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair(),"Peer key pair (temp)");
-				KeyRingPanel.addWalletEntry(we);
+				addTempKey(tempKeys,we);
 			}
 			return peerList;
 		} catch (InterruptedException e) {
@@ -199,10 +211,12 @@ public class PeerGUI extends AbstractGUI {
 	 * @param peerCount number of peers to initialise in genesis
 	 * @throws PeerException If peer startup fails
 	 */
-	private PeerGUI(DefaultListModel<ConvexLocal> peerList, Integer restPort) throws PeerException {
+	private PeerGUI(DefaultListModel<ConvexLocal> peerList, Integer restPort, List<AWalletEntry> tempKeys) throws PeerException {
 		super ("Peer Manager");
 		this.peerList=peerList;
+		this.tempKeys.addAll(tempKeys);
 		own(this::closeNetwork);
+		own(this::removeTempKeys);
 
 		// Create key pairs for peers, use genesis key as first keypair
 		Server firstServer=peerList.get(0).getLocalServer();
@@ -423,7 +437,7 @@ public class PeerGUI extends AbstractGUI {
 			long amt=source.getBalance()/10;
 			source.transferSync(a, amt);
 			
-			KeyRingPanel.addWalletEntry(HotWalletEntry.create(kp,"Generated peer key"));
+			addTempKey(tempKeys,HotWalletEntry.create(kp,"Generated peer key"));
 			
 			// Set up Peer in base server
 			ConvexLocal convex=Convex.connect(base, a, kp);
@@ -476,6 +490,17 @@ public class PeerGUI extends AbstractGUI {
 			} finally {
 				p.close();
 			}
+		}
+	}
+
+	/**
+	 * Removes the temporary keys this Peer Manager added to the key ring. Keys
+	 * that were already present are left alone. Released when the GUI closes.
+	 */
+	private void removeTempKeys() {
+		KeyRing keyRing=KeyRing.get();
+		for (AWalletEntry we: tempKeys) {
+			keyRing.remove(we);
 		}
 	}
 

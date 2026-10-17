@@ -116,7 +116,7 @@ public class WalletComponent extends BaseListComponent {
 					}
 				}
 				if (shouldDelete) {
-					KeyRingPanel.getListModel().removeElement(walletEntry);
+					KeyRing.get().remove(walletEntry);
 				}
 			});
 			menu.add(m3);
