@@ -2,7 +2,6 @@ package convex.gui.etch;
 
 import java.awt.BorderLayout;
 
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -13,7 +12,6 @@ import convex.core.store.Stores;
 import convex.etch.EtchStore;
 import convex.gui.components.AbstractGUI;
 import convex.gui.models.StateModel;
-import net.miginfocom.swing.MigLayout;
 
 /**
  * A Client application for exploring an Etch store
@@ -86,11 +84,5 @@ public class EtchExplorer extends AbstractGUI {
 		EtchStore e=etchState.getValue();
 		e.close();
 		etchState.setValue(newEtch);
-	}
-
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this,"dock center");
 	}
 }

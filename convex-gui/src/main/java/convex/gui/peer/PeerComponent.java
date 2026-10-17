@@ -1,5 +1,6 @@
 package convex.gui.peer;
 
+import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -49,9 +50,13 @@ import convex.peer.Server;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class PeerComponent extends BaseListComponent {
+public class PeerComponent extends BaseListComponent implements AutoCloseable {
 
 	public ConvexLocal convex;
+
+	/** Shared peer state model this component listens to, removed on close */
+	private final StateModel<Peer> peerModel;
+	private final PropertyChangeListener peerListener;
 	CodeLabel description;
 	
 	private static final Logger log = LoggerFactory.getLogger(PeerComponent.class.getName());
@@ -61,6 +66,7 @@ public class PeerComponent extends BaseListComponent {
 		Server server=peer.getLocalServer();
 		ConvexLocal newConvex=connectLocalControllerWallet(server);
 		PeerWindow pw = new PeerWindow(newConvex);
+		pw.own(newConvex);
 		pw.run();
 	}
 
@@ -171,7 +177,10 @@ public class PeerComponent extends BaseListComponent {
 		
 		JMenuItem walletButton = new JMenuItem("Open controller Wallet",Toolkit.menuIcon(0xe850));
 		walletButton.addActionListener(e -> {
-			new WalletApp(connectLocalControllerWallet(server),true).run();
+			ConvexLocal walletConvex=connectLocalControllerWallet(server);
+			WalletApp wallet=new WalletApp(walletConvex);
+			wallet.own(walletConvex);
+			wallet.run();
 		});
 		popupMenu.add(walletButton);
 		
@@ -192,16 +201,13 @@ public class PeerComponent extends BaseListComponent {
 		// Block view at bottom
 		
 		JPanel blockView = new BlockViewComponent(convex);
-		StateModel<Peer> model=PeerGUI.getStateModel(convex);
-		if (model!=null) {
-			model.addPropertyChangeListener(e->{
-				blockView.repaint();
-				description.setText(getPeerDescription());
-			});
-			
-			model.addPropertyChangeListener(e->{
-				updateDescription();
-			});
+		peerModel=PeerGUI.getStateModel(convex);
+		peerListener=e->{
+			blockView.repaint();
+			updateDescription();
+		};
+		if (peerModel!=null) {
+			peerModel.addPropertyChangeListener(peerListener);
 		}
 		add(blockView, "dock south");
 
@@ -260,13 +266,21 @@ public class PeerComponent extends BaseListComponent {
 			}
 			
 			convex.setAddress(addr,kp);
-			new REPLClient(convex,true).run();
+			REPLClient client=new REPLClient(convex);
+			client.own(convex);
+			client.run();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
-	
+
+	/** Stops listening to the shared peer state model */
+	@Override
+	public void close() {
+		if (peerModel!=null) peerModel.removePropertyChangeListener(peerListener);
+	}
+
 	public String getPeerDescription() {
 		StringBuilder sb=new StringBuilder();
 		Server server=convex.getLocalServer();

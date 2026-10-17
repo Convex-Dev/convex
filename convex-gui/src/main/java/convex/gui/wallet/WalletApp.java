@@ -19,6 +19,7 @@ import convex.gui.peer.stake.PeerStakePanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFileSystem;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
@@ -32,31 +33,30 @@ public class WalletApp extends AbstractGUI {
 	JTabbedPane tabs = new JTabbedPane(JTabbedPane.LEFT);
 
 	protected Convex convex;
-	private final boolean ownsConnection;
-	
+
 	protected static final int TAB_ICON_SIZE=Toolkit.ICON_SIZE;
-	
+
 	/**
-	 * Create the application.
+	 * Create the application. The caller keeps ownership of the connection,
+	 * and may hand it over with {@link #own(AutoCloseable)}.
+	 * @param convex Connection for this wallet
 	 */
 	public WalletApp(Convex convex) {
-		this(convex,false);
-	}
-
-	public WalletApp(Convex convex,boolean ownsConnection) {
 		super ("Convex Wallet");
 		this.convex=convex;
-		this.ownsConnection=ownsConnection;
-		
+
 		setLayout(new MigLayout("fill"));
-		
+
 		add(new AccountOverview(convex),"dock north");
 
 		addTab("Wallet", 0xe850, new TokenListPanel(convex));
 
 		addTab("Friends",0xf233, new FriendPanel(convex));
-		
-		addTab("Drive", 0xe1db, new DLFSPanel(DLFS.createLocal()).createView());
+
+		DLFileSystem drive=own(DLFS.createLocal());
+		DLFSPanel drivePanel=new DLFSPanel(drive);
+		own(drivePanel::close);
+		addTab("Drive", 0xe1db, drivePanel.createView());
 
 		addTab("Staking", 0xf56e, new PeerStakePanel(convex));
 
@@ -115,15 +115,6 @@ public class WalletApp extends AbstractGUI {
 		return "Convex Wallet";
 	}
 
-	@Override
-	public void close() {
-		try {
-			if (ownsConnection && convex!=null) convex.close();
-		} finally {
-			super.close();
-		}
-	}
-
 	/**
 	 * Launch the application.
 	 * @param args Command line args
@@ -134,7 +125,8 @@ public class WalletApp extends AbstractGUI {
 		Toolkit.init();
 		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
 		if (convex!=null) {
-			WalletApp app=new WalletApp(convex,true);
+			WalletApp app=new WalletApp(convex);
+			app.own(convex);
 			app.run();
 			app.waitForClose();
 		} 

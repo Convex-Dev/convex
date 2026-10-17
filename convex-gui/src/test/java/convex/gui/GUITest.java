@@ -1,12 +1,18 @@
 package convex.gui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.awt.EventQueue;
 import java.awt.GraphicsEnvironment;
 import java.awt.HeadlessException;
+import java.awt.event.WindowEvent;
+
+import javax.swing.JFrame;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -80,7 +86,29 @@ public class GUITest {
 		State s = manager.getLatestState();
 		s.validate();
 	}
-	
+
+	/**
+	 * Closing the Peer Manager window shuts down the local network it runs
+	 */
+	@Test
+	public void testClosingPeerManagerStopsNetwork() throws Exception {
+		GUITest.assumeGUI();
+
+		PeerGUI gui=PeerGUI.create(1,AKeyPair.generate(),0);
+		Server server=gui.getPrimaryServer();
+		assertTrue(server.isLive());
+
+		gui.run();
+		// run() queued the frame's creation first, so the frame exists by the time this runs
+		EventQueue.invokeAndWait(()->{
+			JFrame frame=gui.getFrame();
+			frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
+		});
+		gui.waitForClose();
+
+		assertFalse(server.isLive());
+	}
+
 	/**
 	 * Simple test that DLFSBrowser can be constructed and functionality is working
 	 */

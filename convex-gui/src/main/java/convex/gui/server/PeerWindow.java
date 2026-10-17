@@ -2,7 +2,6 @@ package convex.gui.server;
 
 import java.awt.Dimension;
 
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
@@ -64,17 +63,13 @@ public class PeerWindow extends AbstractGUI {
 		add(pcom, "dock north");
 	}
 
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this,"dock center");
-	}
-
 	public static void main(String[] args) throws Exception {
 		Toolkit.init();
 		Server server = API.launchPeer();
 		ConvexLocal convex = Convex.connect(server, server.getPeerController(), server.getKeyPair());
 		PeerWindow pw = new PeerWindow(convex);
+		pw.own(server);
+		pw.own(convex);
 		pw.runUntilClosed();
 		System.exit(0);
 	}

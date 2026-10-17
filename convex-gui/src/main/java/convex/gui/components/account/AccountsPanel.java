@@ -171,11 +171,13 @@ public class AccountsPanel extends JPanel {
 		actionPanel.add(btnActor);
 		
 		ActionButton btnWallet = new ActionButton("Launch Wallet",0xe89e,e -> {
-			Convex cv=Convex.connect(convex.getLocalServer());
 			long ix=table.getSelectedRow();
 			if (ix<0) return;
+			Convex cv=Convex.connect(convex.getLocalServer());
 			cv.setAddress(Address.create(ix));
-			new WalletApp(cv,true).run();
+			WalletApp wallet=new WalletApp(cv);
+			wallet.own(cv);
+			wallet.run();
 		});
 		btnWallet.setToolTipText("Opens a Wallet interface for this account");
 		actionPanel.add(btnWallet);

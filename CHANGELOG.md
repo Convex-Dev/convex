@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ordinary queries work with zero-balance accounts and use a balance-independent Juice allowance within the peer's execution limit. Transaction cost estimation remains available by querying an explicit transaction payload.
 - From protocol v1, scheduling charges the 800-Juice base cost in addition to the existing delay cost, including immediate and past-dated requests. Protocol v0 retains its original accounting.
 - Typed CVM access now accepts equivalent generic CAD3 representations of addresses, operations, functions and records, including values retained in store caches. Default store decoding continues to produce CVM representations on cache hits.
+- Closing a GUI window now releases what it runs instead of hiding it: Peer Manager stops its local peers and REST server, Wallet and Terminal close their connections, and peer windows opened from the tray stop their background refresh. Closing Convex Desktop closes the apps launched from it first, so the DLFS browser persists its final state.
 
 ## [0.8.17] - 2026-10-09
 

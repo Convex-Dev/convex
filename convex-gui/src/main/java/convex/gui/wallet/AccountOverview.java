@@ -11,7 +11,6 @@ import convex.core.cvm.Address;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
-import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.Identicon;
@@ -20,7 +19,7 @@ import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class AccountOverview extends JPanel {
+public class AccountOverview extends JPanel implements AutoCloseable {
 
 	final BalanceLabel balance=new BalanceLabel();
 	final JLabel nameLabel=new JLabel("anonymous");
@@ -28,6 +27,7 @@ public class AccountOverview extends JPanel {
 	Identicon identicon=new Identicon(null,Toolkit.IDENTICON_SIZE*2);
 	
 	private Convex convex;
+	private final Thread updateThread;
 
 	public AccountOverview(Convex convex) {
 		this.convex=convex;
@@ -81,9 +81,9 @@ public class AccountOverview extends JPanel {
 		//add(KeyPairCombo.forConvex(convex));
 		 
 		update();
-		ThreadUtils.runVirtual("account-update", this::updateLoop);
+		updateThread=Thread.ofVirtual().name("account-update").start(this::updateLoop);
 	}
-	
+
 	private void updateLoop() {
 		while ((!Thread.currentThread().isInterrupted()) && convex.isConnected()) {
 			try {
@@ -95,6 +95,12 @@ public class AccountOverview extends JPanel {
 				Thread.currentThread().interrupt();
 			}
 		}
+	}
+
+	/** Stops the update loop. Called when the owning window closes. */
+	@Override
+	public void close() {
+		updateThread.interrupt();
 	}
 
 	private void update() {

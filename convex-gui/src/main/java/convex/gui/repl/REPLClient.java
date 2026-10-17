@@ -5,7 +5,6 @@ import java.awt.Dimension;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -20,7 +19,6 @@ import convex.gui.components.ConnectPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.Toolkit;
-import net.miginfocom.swing.MigLayout;
 
 /**
  * A Client application for the Convex Network.
@@ -35,7 +33,6 @@ public class REPLClient extends AbstractGUI {
 	public static long maxBlock = 0;
 
 	protected Convex convex=null;
-	private final boolean ownsConnection;
 
 	/**
 	 * Launch the application.
@@ -50,7 +47,8 @@ public class REPLClient extends AbstractGUI {
 		if (convex==null) {
 			System.exit(1);
 		}
-		REPLClient gui=new REPLClient(convex,true);
+		REPLClient gui=new REPLClient(convex);
+		gui.own(convex);
 		gui.run();
 		gui.waitForClose();
 		System.exit(0);
@@ -61,19 +59,11 @@ public class REPLClient extends AbstractGUI {
 	public REPLPanel replPanel;
 
 	/**
-	 * Create the application.
+	 * Create the application. The caller keeps ownership of the connection,
+	 * and may hand it over with {@link #own(AutoCloseable)}.
 	 * @param convex Convex client instance
 	 */
 	public REPLClient(Convex convex) {
-		this(convex,false);
-	}
-
-	/**
-	 * Creates a terminal with explicit connection ownership.
-	 * @param convex client used by the terminal
-	 * @param ownsConnection true to close the client with this terminal
-	 */
-	public REPLClient(Convex convex,boolean ownsConnection) {
 		super ("Convex Terminal");
 		setLayout(new BorderLayout());
 		replPanel=new REPLPanel(convex);
@@ -87,7 +77,6 @@ public class REPLClient extends AbstractGUI {
 		this.setPreferredSize(new Dimension(800,600));
 		
 		this.convex=convex;
-		this.ownsConnection=ownsConnection;
 	}
 	
 	@Override
@@ -117,21 +106,5 @@ public class REPLClient extends AbstractGUI {
 		}
 		System.err.println("Missing tab: " + title);
 	}
-
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this,"dock center");
-	}
-
-	@Override
-	public void close() {
-		try {
-			if (ownsConnection && convex!=null) convex.close();
-		} finally {
-			super.close();
-		}
-	}
-
 
 }

@@ -19,10 +19,12 @@ import convex.gui.components.Toast;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class TokenListPanel extends JPanel {
+public class TokenListPanel extends JPanel implements AutoCloseable {
 	protected ScrollyList<TokenInfo> list;
-	
+
 	protected Convex convex;
+
+	private final Thread updateThread;
 
 	// Static so different lists can use same model
 	static DefaultListModel<TokenInfo> model= new DefaultListModel<TokenInfo>();
@@ -70,8 +72,14 @@ public class TokenListPanel extends JPanel {
 			list.refreshList(); 
 		},"Refresh token details and balances"));
 		add(ap,"dock south");
-		
-		ThreadUtils.runVirtual("token-update", this::updateLoop);
+
+		updateThread=Thread.ofVirtual().name("token-update").start(this::updateLoop);
+	}
+
+	/** Stops the update loop. Called when the owning window closes. */
+	@Override
+	public void close() {
+		updateThread.interrupt();
 	}
 	
 	private static boolean addTokenTracking(TokenInfo tokenInfo) {
@@ -82,7 +90,7 @@ public class TokenListPanel extends JPanel {
 	}
 
 	private void updateLoop() {
-		while (true) {
+		while (!Thread.currentThread().isInterrupted()) {
 			try {
 				if (isShowing()) {
 		

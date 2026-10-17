@@ -33,7 +33,7 @@ import net.miginfocom.swing.MigLayout;
  * Panel allowing the selection of account and query mode for a Convex connection
  */
 @SuppressWarnings("serial")
-public class AccountChooserPanel extends JPanel {
+public class AccountChooserPanel extends JPanel implements AutoCloseable {
 	
 	private static final Logger log = LoggerFactory.getLogger(AccountChooserPanel.class.getName());
 
@@ -47,7 +47,7 @@ public class AccountChooserPanel extends JPanel {
 	protected Convex convex;
 
 	private static final int BALANCE_REFRESH_MS = 5000;
-	private Timer balanceRefreshTimer;
+	private final Timer balanceRefreshTimer;
 
     AWalletEntry previousSelection = null;
 
@@ -237,10 +237,10 @@ public class AccountChooserPanel extends JPanel {
 		updateBalance(getAddress());
 	}
 
+	/** Stops the balance refresh. Called when the owning window closes. */
 	@Override
-	public void removeNotify() {
-		if (balanceRefreshTimer != null) balanceRefreshTimer.stop();
-		super.removeNotify();
+	public void close() {
+		balanceRefreshTimer.stop();
 	}
 
 	private void updateBalance(Address a) {

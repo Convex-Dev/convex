@@ -35,7 +35,12 @@ import net.miginfocom.swing.MigLayout;
 
 public class PeerLaunchDialog {
 
-	public static void runLaunchDialog(JComponent parent) {
+	/**
+	 * Prompts for launch details and launches a Peer Manager.
+	 * @param parent Parent component for dialogs
+	 * @return The running Peer Manager, or null if cancelled or the launch failed
+	 */
+	public static PeerGUI runLaunchDialog(JComponent parent) {
 		// Local testnet options
 		
 		JPanel testNetPanel=new JPanel();
@@ -114,12 +119,12 @@ public class PeerLaunchDialog {
 						boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
 						if (!unlocked) {
 							Toast.display(parent, "Launch cancelled: Locked genesis key", Color.RED);
-							return;
+							return null;
 						}
 		    		}
-		    		
+
 		       		AKeyPair kp=we.getKeyPair();
-		    		PeerGUI.launchPeerGUI(numPeers, kp);
+		    		return PeerGUI.launchPeerGUI(numPeers, kp);
 		    	} else if (selected==joinPanel) {
 		    		String host=hostField.getText();
 		    		InetSocketAddress sa=IPUtils.toInetSocketAddress(host);
@@ -131,17 +136,17 @@ public class PeerLaunchDialog {
 						boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
 						if (!unlocked) {
 							Toast.display(parent, "Launch cancelled: Locked peer key", Color.RED);
-							return;
-						}			    		
+							return null;
+						}
 		    		}
-		    		
-		    		PeerGUI.launchPeerGUI(sa,we.getKeyPair());
+
+		    		return PeerGUI.launchPeerGUI(sa,we.getKeyPair());
 		    	} else if (selected==loadPanel) {
 		    		File f=backupPicker.getFile();
 		    		AKeyPair kp=null; // TODO;
 		    		AMap<Keyword,ACell> peerData=FileUtils.loadCAD3(f.toPath(), NullStore.INSTANCE);
 		    		Server server=Server.fromPeerData(kp,peerData);
-		    		PeerGUI.launchPeerGUI(server);
+		    		return PeerGUI.launchPeerGUI(server);
 		    	}
 	    	} catch (InterruptedException e) {
 	    		Thread.currentThread().interrupt();
@@ -150,6 +155,7 @@ public class PeerLaunchDialog {
 	    		JOptionPane.showMessageDialog(parent, "Peer launch failed\n\nReason : "+e.getMessage());
 	    	}
 	    }
+	    return null;
 	}
 
 }

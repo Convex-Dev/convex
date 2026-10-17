@@ -6,7 +6,6 @@ import java.awt.EventQueue;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
@@ -66,19 +65,22 @@ public class MainGUI extends AbstractGUI {
 	}
 	
 	public void launchDLFS() {
-		new DLFSBrowser().run();
+		adopt(new DLFSBrowser()).run();
 	}
-	
+
 	public void launchWallet() {
 	    Convex convex=ConnectPanel.tryConnect(this);
 	    if (convex!=null) {
-	    new WalletApp(convex,true).run();
+	    	WalletApp wallet=new WalletApp(convex);
+	    	wallet.own(convex);
+	    	adopt(wallet).run();
 	    }
 	}
-	
-	
+
+
 	public void launchTestNet() {
-		PeerLaunchDialog.runLaunchDialog(this);
+		PeerGUI manager=PeerLaunchDialog.runLaunchDialog(this);
+		if (manager!=null) adopt(manager);
 	}
 	
 	public void launchDiscord() {
@@ -96,12 +98,14 @@ public class MainGUI extends AbstractGUI {
 	public void launchTerminalClient() {
 	    Convex convex=ConnectPanel.tryConnect(this);
 	    if (convex!=null) {
-	    new REPLClient(convex,true).run();
+	    	REPLClient client=new REPLClient(convex);
+	    	client.own(convex);
+	    	adopt(client).run();
 	    }
 	}
-	
+
 	public HackerTools launchTools() {
-		HackerTools tools=new HackerTools();
+		HackerTools tools=adopt(new HackerTools());
 		tools.run();
 		return tools;
 	}
@@ -130,6 +134,7 @@ public class MainGUI extends AbstractGUI {
 
 	/**
 	 * Launch the Convex Desktop application and waits until main frame is closed.
+	 * Apps launched from Desktop are closed with it.
 	 * @param args Command line args
 	 */
 	public static void main(String... args) {
@@ -137,12 +142,6 @@ public class MainGUI extends AbstractGUI {
 		gui.run();
 		gui.waitForClose();
 		System.exit(0);
-	}
-
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this,"dock center");
 	}
 
 }

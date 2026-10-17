@@ -22,9 +22,10 @@ import convex.peer.ConnectionManager;
 import convex.peer.Server;
 
 @SuppressWarnings("serial")
-public class PeerInfoPanel extends JPanel {
+public class PeerInfoPanel extends JPanel implements AutoCloseable {
 
 	private final CodeLabel textArea;
+	private final Timer timer;
 
 	public PeerInfoPanel(Convex p) {
 		setLayout(new BorderLayout(0, 0));
@@ -51,7 +52,7 @@ public class PeerInfoPanel extends JPanel {
 		
 		// Set up periodic refresh
 		int INTERVAL = 500;
-		Timer timer = new Timer(INTERVAL,new ActionListener() {
+		timer = new Timer(INTERVAL,new ActionListener() {
 			public void actionPerformed(ActionEvent evt) {
 			   updateState(p);
 		    }    
@@ -73,6 +74,12 @@ public class PeerInfoPanel extends JPanel {
 		});
 
 		updateState(p);
+	}
+
+	/** Stops the periodic refresh. Called when the owning window closes. */
+	@Override
+	public void close() {
+		timer.stop();
 	}
 
 	protected String lpad(Object s) {

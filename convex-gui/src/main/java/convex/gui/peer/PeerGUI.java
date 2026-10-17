@@ -8,11 +8,11 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import javax.swing.DefaultListModel;
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -46,16 +46,12 @@ import convex.peer.API;
 import convex.peer.PeerException;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
-import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class PeerGUI extends AbstractGUI {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerGUI.class.getName());
 
-	protected JFrame frame;
-	
-			
 	public static final int DEFAULT_NUM_PEERS=3;
 	
 	
@@ -206,7 +202,8 @@ public class PeerGUI extends AbstractGUI {
 	private PeerGUI(DefaultListModel<ConvexLocal> peerList, Integer restPort) throws PeerException {
 		super ("Peer Manager");
 		this.peerList=peerList;
-		
+		own(this::closeNetwork);
+
 		// Create key pairs for peers, use genesis key as first keypair
 		Server firstServer=peerList.get(0).getLocalServer();
 		genesisState=firstServer.getPeer().getGenesisState();
@@ -257,7 +254,7 @@ public class PeerGUI extends AbstractGUI {
 		ThreadUtils.runVirtual("peer-gui-update", updateThread);
 	}
 
-	private boolean updateRunning = true;
+	private volatile boolean updateRunning = true;
 
 	private long cp = 0;
 
@@ -308,12 +305,6 @@ public class PeerGUI extends AbstractGUI {
 
 	public DefaultListModel<ConvexLocal> getPeerList() {
 		return peerList;
-	}
-
-	@Override
-	public void finalize() {
-		// terminate the update thread if needed
-		updateRunning = false;
 	}
 
 	public void switchPanel(String title) {
@@ -460,13 +451,17 @@ public class PeerGUI extends AbstractGUI {
 		}
 	}
 
-	@Override
-	public void close() {
+	/**
+	 * Shuts down the local network this Peer Manager runs: the update thread,
+	 * the REST server and every peer. Released when the GUI closes.
+	 */
+	private void closeNetwork() {
 		updateRunning=false;
 		if (restServer!=null) {
+			Integer port=restServer.getPort();
 			restServer.close();
 			restServer=null;
-			REST_PORT=null;
+			if (Objects.equals(REST_PORT, port)) REST_PORT=null;
 		}
 		DefaultListModel<ConvexLocal> peerList = getPeerList();
 		int n = peerList.getSize();
@@ -477,27 +472,16 @@ public class PeerGUI extends AbstractGUI {
 				models.remove(server);
 				server.close();
 			} catch (Exception e) {
-				// ignore
+				log.warn("Error closing peer",e);
 			} finally {
 				p.close();
 			}
 		}
-		super.close();
 	}
 
 	public void addPeer(ConvexLocal cvl) {
 		peerList.addElement(cvl);
 
 	}
-
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this,"dock center");
-	}
-
-
-
-
 
 }
