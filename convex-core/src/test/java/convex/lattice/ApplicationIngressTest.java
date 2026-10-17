@@ -84,11 +84,38 @@ class ApplicationIngressTest {
 		assertEquals(1,app.merges,"an empty path is the root itself");
 	}
 
-	/** By default a path delivery merges at its level with the lattice declared there. */
+	/** An application's own component for a path receives the delivery, whatever its merge does. */
+	@Test void pathDeliveryMergesWithTheApplicationsOwnComponentForThePath() {
+		var root=LatticeHost.create(LATTICE.zero(),null);
+		int[] routed={0};
+		var app=new App(LATTICE,root) {
+			@SuppressWarnings("unchecked")
+			@Override public <T extends ACell> ALatticeComponent<T> component(ACell... path) {
+				if (path.length==1 && ITEMS.equals(path[0])) {
+					return (ALatticeComponent<T>)new ALatticeComponent<ASet<ACell>>(resolve(ITEMS)) {
+						@Override public ASet<ACell> merge(ASet<ACell> other) {
+							routed[0]++;
+							return cursor.get(); // this component takes nothing from outside
+						}
+					};
+				}
+				return super.component(path);
+			}
+		};
+		root.configureApplications(List.of(app));
+		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
+		assertEquals(1,routed[0]);
+		assertEquals(LATTICE.zero(),app.cursor().get(),"the component's merge decided, not the lattice");
+		assertSame(app,app.component(),"the application is the component at the root");
+		assertNull(app.component(UNKNOWN),"an undeclared path has no component");
+	}
+
+	/** Without a component of its own for a path, the application merges there with the lattice declared for that level. */
 	@Test void pathDeliveryMergesAtItsLevelWithTheLatticeDeclaredThere() {
 		var root=LatticeHost.create(LATTICE.zero(),null);
 		var app=new App(LATTICE,root);
 		root.configureApplications(List.of(app));
+		assertInstanceOf(LatticeComponent.class,app.component(ITEMS),"the default component at a declared path");
 		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
 		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
 		root.mergeAt(Sets.of(CVMLong.TWO),ITEMS);

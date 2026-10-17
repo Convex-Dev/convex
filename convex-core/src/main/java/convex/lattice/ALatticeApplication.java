@@ -12,8 +12,8 @@ import convex.lattice.cursor.AForkableCursor;
  * {@link LatticeHost} host and declares the root lattice: the shape of the root,
  * including which regions participate, with a default merge for that shape. The
  * application owns the merge of incoming values: {@link #merge} states its rule for
- * a root, delegating to the lattice merge or not, and {@link #mergeAt} by default
- * merges a path delivery at its level with the lattice declared there. Subclasses
+ * a root, delegating to the lattice merge or not, and {@link #mergeAt} resolves the
+ * component at a path and merges with that component's own behaviour. Subclasses
  * expose lightweight components at paths within the root, each declaring the shape
  * of the level it hands out.</p>
  *
@@ -127,28 +127,44 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	 * @param other Incoming root value
 	 * @return Current application working root
 	 */
+	@Override
 	public abstract V merge(V other);
 
 	/**
-	 * Delivers a value at a path within this application's root. The default resolves
-	 * the position with this application's lattice and merges there with the lattice
-	 * declared for that level, under this application's context: the rule the
-	 * component owning that level would apply. An empty path is the root and goes to
-	 * {@link #merge}. A path the lattice does not declare delivers nothing, and the
-	 * lattice tree ends at a signed envelope, so a complete envelope is supplied at
-	 * its slot. Applications override this to select or route path deliveries
-	 * themselves.
+	 * Returns the component at a path within this application's root: the one whose
+	 * {@link ALatticeComponent#merge} a delivery at that path receives. An empty path
+	 * is this application. The default for any other path is a {@link LatticeComponent}
+	 * over the cursor at the path, merging with the lattice declared for that level
+	 * under this application's context. Applications override this to hand back their
+	 * own component for a path, whatever its merge does.
+	 *
+	 * @param <T> Value type at the path
+	 * @param path Keys from the application root
+	 * @return Component at the path, or null if the lattice declares no such path
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> ALatticeComponent<T> component(ACell... path) {
+		if (path.length==0) return (ALatticeComponent<T>)this;
+		ALattice<T> level=lattice.path(path);
+		if (level==null) return null;
+		return configured(new LatticeComponent<>(level,resolve(path)));
+	}
+
+	/**
+	 * Delivers a value at a path within this application's root to the component at
+	 * that path, from {@link #component}, which merges it with its own behaviour. An
+	 * empty path is the root and goes to {@link #merge}. A path the lattice does not
+	 * declare delivers nothing, and the lattice tree ends at a signed envelope, so a
+	 * complete envelope is supplied at its slot. Applications may override this to
+	 * select or route path deliveries themselves.
 	 *
 	 * @param value Incoming value at the path
 	 * @param path Keys from the application root
 	 * @return Current application working root, not a publication acknowledgement
 	 */
-	@SuppressWarnings("unchecked")
 	public V mergeAt(ACell value, ACell... path) {
-		if (path.length==0) return merge((V)value);
-		ALattice<ACell> level=lattice.path(path);
-		if (level==null) return cursor.get();
-		this.<ACell>resolve(path).updateAndGet(own -> level.merge(getContext(),own,value));
+		ALatticeComponent<ACell> target=component(path);
+		if (target!=null) target.merge(value);
 		return cursor.get();
 	}
 }

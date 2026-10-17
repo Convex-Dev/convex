@@ -30,7 +30,8 @@ import convex.lattice.generic.SignedLattice;
  * The cursor knows nothing about lattices: the component declares the structure of
  * the level it owns, supplying read/write functions for child views and binding
  * the authoring functions of signing and stamping views.
- * Merge and publication policy remain in components.</p>
+ * Merge and publication policy remain in components: {@link #merge} is a component's
+ * own behaviour for an incoming value at its level, delegating to a lattice or not.</p>
  *
  * <p>Persistence belongs to the host ({@link LatticeHost}) and to components which
  * explicitly own a store for their own data, such as DLFS drives.</p>
@@ -140,6 +141,20 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** Returns atomic working storage. Updating it does not publish this component. */
 	public AForkableCursor<V> cursor() {
 		return cursor;
+	}
+
+	/**
+	 * Merges an incoming value at this component's level into its working state. This
+	 * is the component's own behaviour: a lattice offers a default merge for the shape
+	 * it declares, and the component delegates to it, in whole or in part, or applies
+	 * another rule. A component that receives nothing need not define one; the base
+	 * refuses, so a delivery routed to it fails rather than vanishing.
+	 *
+	 * @param other Incoming value at this level
+	 * @return Current working value
+	 */
+	public V merge(V other) {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no merge for incoming values");
 	}
 
 	/**

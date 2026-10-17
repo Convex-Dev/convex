@@ -248,7 +248,8 @@ CAD text affected: CAD035 *Lattice-Aware Cursors*, "Canonical vs logical keys â€
 `NodeServer` built a plain root and merged inbound path values with
 `lattice.path(path)`; `mergeAt(value, path...)` was the public form. The node now
 holds no lattice: a path delivery goes to each application's `mergeAt`, whose default
-merges it at its level with the lattice the application declares there.
+resolves the application's component at the path and merges with that component's
+own behaviour.
 
 CAD text affected: none found in CAD024/035/045; CAD036 (*Lattice Node*) should be
 checked for how pull-path merges are described.
@@ -398,13 +399,18 @@ default. `ALatticeApplication.merge` is therefore abstract: every application st
 how it merges an incoming root, `LatticeApplication` and `DLFSApplication` by
 delegating whole, `P2PApplication` by delegating the root projected to the social
 owners it wants and then recording their validated signers. `mergeAt` is the
-application's hook for a path delivery too; its default resolves the path with the
-lattice and merges there with the lattice declared for that level, the rule the
-component owning that level would apply, and a path the lattice does not declare
-delivers nothing, as an undeclared key in a root does. A first cut had made `mergeAt`
-final and lifted the value into a partial root for `merge`; Mike wanted the hook kept,
-with that default. The base helper `mergeDeclaredPath`, the path-ignoring default, the
-"declared path does not imply interest" rule and the bootstrap after-merge steps went.
+application's hook for a path delivery too; its default resolves the component at the
+path, `component(path)`, and merges with that component's own `merge`, whether it
+delegates to a lattice or does otherwise. Every component now has a `merge` of its own
+(the base refuses, so a delivery routed to a component that defines none fails rather
+than vanishing); the default component for a declared path is a `LatticeComponent`
+merging with the lattice declared there, and a path the lattice does not declare
+delivers nothing, as an undeclared key in a root does. Two first cuts, one making
+`mergeAt` final over a partial root for `merge` and one merging with the lattice at
+the path directly, were corrected by Mike the same day: the hook stays open, and the
+behaviour at a path is the component's. The base helper `mergeDeclaredPath`, the
+path-ignoring default, the "declared path does not imply interest" rule and the
+bootstrap after-merge steps went.
 
 CAD text affected:
 

@@ -116,8 +116,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 
 	/**
 	 * Delivers an incoming subtree to applications at a root-relative path. Each
-	 * application's {@code mergeAt} decides; by default the value merges at that level
-	 * with the lattice the application declares there. No application sync is invoked.
+	 * application's {@code mergeAt} decides; by default its component at that path
+	 * merges the value with its own behaviour. No application sync is invoked.
 	 * Delivery is sequential, with the same partial-failure semantics as
 	 * {@link #merge}. Paths are passed unchanged and must not be mutated by handlers.
 	 *

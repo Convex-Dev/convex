@@ -26,15 +26,15 @@ import convex.social.Social;
  *
  * <p>This is the application a P2P host hands incoming values to. It owns their
  * merge: an incoming root or path value, projected to what this node wants, is
- * merged by the lattice declared for its level, which merges every region as
- * declared and verifies each owner's slot. The projection keeps the infrastructure
- * regions whole and reduces the social region to the owners this node wants. The
- * application also owns the P2P policy that
- * reads the lattice: the node registry as a validated directory, the social owners
- * this node wants, and the paths to pull from a newly admitted peer. It imports
- * nothing from the node package. A {@link P2PNode} assembles it with replication and
- * calls it at the moments replication knows about; a local application may use the
- * same component over a standalone {@link LatticeHost}.</p>
+ * merged by the default component at its level, the lattice declared there, which
+ * merges every region as declared and verifies each owner's slot. The projection
+ * keeps the infrastructure regions whole and reduces the social region to the owners
+ * this node wants. The application also owns the P2P policy that reads the lattice:
+ * the node registry as a validated directory, the social owners this node wants, and
+ * the paths to pull from a newly admitted peer. It imports nothing from the node
+ * package. A {@link P2PNode} assembles it with replication and calls it at the
+ * moments replication knows about; a local application may use the same component
+ * over a standalone {@link LatticeHost}.</p>
  *
  * <p>The application publishes what it writes. When its policy edits local state,
  * such as this node's own record or a follow key validated during admission, it
