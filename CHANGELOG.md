@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Index operations on long keys, such as DLFS file names, stay on the fast recursive path; the stack-safe fallback now engages only on an actual stack overflow. ([#727](https://github.com/Convex-Dev/convex/issues/727))
 - Embedded store decodes avoid hashing for cache lookup and automatic cache admission, while reusing already-cached values when their hash is available; non-embedded branches still use the cache on demand.
 - CVM map operations recognise only known maplike records; generic CAD3 records no longer qualify as maps solely through their Java representation.
+- Java client `transact` calls no longer block while the account's sequence number is looked up or code is pre-compiled: the transaction is queued and submitted in call order, still with distinct sequence numbers. `transactSync(String)` no longer holds the client's lock for the whole round trip, so concurrent calls on one client, such as the REST faucet, overlap. Cancelling a queued transaction before it is submitted withdraws it.
 
 ### Fixed
 
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Casting a blob of more than 8 bytes to an integer keeps its value when the blob starts with redundant sign bytes; for example `(int 0x00008000000000000000)` returned `0` instead of `9223372036854775808`.
 - Multiplying a big integer by zero returns an ordinary integer zero, and integers behave the same whatever their internal representation. Previously `(get [10 20 30] (* 9223372036854775808 0) :none)` returned `:none` instead of `10`, and `split` rejected such a value as a character code, so peers holding the value in different forms could disagree.
 - PostgreSQL JDBC queries no longer fail on a duplicate column description during extended-query execution.
+- Java clients give an auto-sequenced transaction for another account that account's next sequence number, instead of the client's own next number or the account's last one. A transaction refused for a missing key pair no longer consumes a sequence number, and `prepareTransaction` with pre-compile gives up after the client timeout instead of waiting indefinitely.
 - PostgreSQL prepared statements decode binary numeric parameters by their declared type, including the full unsigned OID range, and reject invalid fixed-width parameter lengths.
 - Scheduled execution respects the 100-operation limit across timestamp buckets and retains unprocessed entries, preventing oversized buckets from exhausting peer memory.
 - Variadic subtraction reports a numeric error when an intermediate result exceeds the integer limit, instead of throwing a Java exception.

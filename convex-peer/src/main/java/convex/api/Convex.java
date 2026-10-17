@@ -8,12 +8,15 @@ import java.net.InetSocketAddress;
 import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +26,6 @@ import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AOp;
-import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.State;
 import convex.core.cvm.Symbols;
@@ -51,6 +53,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
 import convex.core.util.FutureUtils;
+import convex.core.util.ThreadUtils;
 import convex.net.Transports;
 import convex.peer.Config;
 import convex.peer.Server;
@@ -105,7 +108,12 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected volatile Long sequence = null;
 
-	
+	/**
+	 * Completes once every transaction queued so far has been submitted. Guarded
+	 * by this client's monitor. See {@link #transact(ATransaction)}.
+	 */
+	private CompletableFuture<Void> submitted = CompletableFuture.completedFuture(null);
+
 	/**
 	 * Fallback counter for connectionless clients such as {@link ConvexDirect} and
 	 * HTTP transports. Persistent binary connections override ID allocation with
@@ -290,19 +298,47 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	public long lookupSequence(Address origin) throws InterruptedException, ResultException {
 		AOp<ACell> code= Special.forSymbol(Symbols.STAR_SEQUENCE);
-		Result r= querySync(code,origin);
+		return sequenceValue(querySync(code,origin));
+	}
+
+	/**
+	 * Looks up the sequence number for an account without waiting for the reply
+	 * @param origin Account for which to check sequence
+	 * @return Future for the sequence number, failing with a ResultException if it could not be obtained
+	 */
+	private CompletableFuture<Long> lookupSequenceAsync(Address origin) {
+		AOp<ACell> code= Special.forSymbol(Symbols.STAR_SEQUENCE);
+		return query(code,origin).thenApply(r->{
+			try {
+				return sequenceValue(r);
+			} catch (ResultException e) {
+				throw new CompletionException(e);
+			}
+		});
+	}
+
+	private static long sequenceValue(Result r) throws ResultException {
 		if (r.isError()) throw new ResultException(r);
 		ACell rv=r.getValue();
 		if (!(rv instanceof CVMLong)) throw new ResultException(ErrorCodes.FORMAT,"Unexpected sequence result type: "+Utils.getClassName(rv));
-		long seq=((CVMLong)rv).longValue();
-		return seq;
+		return ((CVMLong)rv).longValue();
 	}
-	
+
+	/**
+	 * Gets the sequence number of an account if it is available without network
+	 * I/O, e.g. from a local Peer's consensus state.
+	 * @param origin Account to check
+	 * @return Sequence number, or null if it must be looked up from the network
+	 */
+	protected Long localSequence(Address origin) {
+		return null;
+	}
+
 	/**
 	 * Called after a transaction is submitted to update sequence (if possible)
 	 * @param signed Signed transaction
 	 */
-	protected void maybeUpdateSequence(SignedData<ATransaction> signed) {
+	protected synchronized void maybeUpdateSequence(SignedData<ATransaction> signed) {
 		try {
 			ATransaction trans=RT.ensureTransaction(signed.getValue());
 			if (!isAutoSequence()) return;
@@ -371,23 +407,6 @@ public abstract class Convex implements AutoCloseable {
 	public abstract boolean isConnected();
 
 	/**
-	 * Updates the given transaction to have the next sequence number.
-	 *
-	 * @param t Any transaction, for which the correct next sequence number is
-	 *          desired
-	 * @return The updated transaction
-	 * @throws ResultException if an error occurs trying to determine the next sequence number
-	 */
-	private synchronized long getNextSequence(ATransaction t) throws ResultException, InterruptedException {
-		if (sequence != null) {
-			// if already we know the next sequence number to be applied, set it
-			return sequence+1;
-		} else {
-			return getSequence()+1;
-		}
-	}
-	
-	/**
 	 * Pre-compiles code, compiling the given source to a CVM Op.
 	 *
 	 * @param code Code to execute
@@ -399,31 +418,30 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
-	 * Submits a transaction to the Convex network, returning a future once the
-	 * transaction has been successfully queued. Signs the transaction with the
-	 * currently set key pair.
+	 * Submits a transaction to the Convex network, returning a future for its
+	 * result. Signs the transaction with the currently set key pair.
 	 *
-	 * A single client may submit transactions concurrently: sequence allocation is
-	 * serialised so that each transaction receives a distinct sequence number.
+	 * Does not wait on the network: if the sequence number for the transaction's
+	 * origin is not yet known, the transaction is queued while it is looked up.
+	 *
+	 * A single client may submit transactions concurrently. Transactions are
+	 * sequenced and submitted in call order, so each receives a distinct sequence
+	 * number and reaches the peer in sequence order. Sequence allocation, signing
+	 * and submission happen while holding this client's monitor, which is never
+	 * held while waiting on the network. Cancelling the returned future before the
+	 * transaction is submitted withdraws it.
+	 *
 	 * Multiple client instances must not independently submit transactions for the
 	 * same account without coordinating their sequences.
-	 * 
+	 *
 	 * May block briefly if the send buffer is full.
 	 *
 	 * @param transaction Transaction to execute
 	 * @return A Future for the result of the transaction
 	 */
-	public final synchronized CompletableFuture<Result> transact(ATransaction transaction) {
-		SignedData<ATransaction> signed;
+	public final CompletableFuture<Result> transact(ATransaction transaction) {
 		if (transaction==null) throw new IllegalArgumentException("null transaction");
-		try {
-			signed = prepareTransaction(transaction);
-			CompletableFuture<Result> r= transact(signed);
-			return r;
-		} catch (Exception e) {
-			// Note this handles InterruptedException correctly (maintains interrupt)
-			return CompletableFuture.completedFuture(Result.fromException(e));
-		} 
+		return submit(CompletableFuture.completedFuture(transaction));
 	}
 
 	/**
@@ -440,93 +458,205 @@ public abstract class Convex implements AutoCloseable {
 	@SuppressWarnings("unchecked")
 	public SignedData<ATransaction> prepareTransaction(ACell code) throws ResultException,InterruptedException {
 		code=CVMEncoder.specialise(code);
-		ATransaction transaction;
-		if (code instanceof ATransaction) {
-			transaction=(ATransaction)code;
-		} else {
-			if (code instanceof SignedData) {
-				SignedData<?> signed=(SignedData<?>) code;
-				ACell val=signed.getValue();
-				if (RT.ensureTransaction(val)!=null) return (SignedData<ATransaction>) signed;
-				code=val;
-			} 
-			if (isPreCompile() ) {
-				Result compResult=preCompile(code).join();
-				if (compResult.isError()) throw new ResultException(compResult);
-				code=compResult.getValue();
-			}
-			if (address==null) throw new ResultException(Result.error(ErrorCodes.STATE,"No origin address for transaction"));
-			transaction=Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, code);
+		if (code instanceof ATransaction) return prepareTransaction((ATransaction)code);
+		if (code instanceof SignedData) {
+			SignedData<?> signed=(SignedData<?>) code;
+			ACell val=signed.getValue();
+			if (RT.ensureTransaction(val)!=null) return (SignedData<ATransaction>) signed;
+			code=val;
 		}
-		return prepareTransaction(transaction);
+		if (address==null) throw new ResultException(Result.error(ErrorCodes.STATE,"No origin address for transaction"));
+		return prepare(invoke(code));
 	}
-	
+
 	/**
 	 * Prepares a transaction for network submission
 	 * - Sets origin account if needed
 	 * - Sets sequence number (if autosequencing is enabled)
 	 * - Signs transaction with current key pair
 	 *
+	 * Reserves the sequence number in call order with {@link #transact(ATransaction)},
+	 * waiting up to this client's timeout if it must first be looked up.
+	 *
 	 * @param transaction Transaction to prepare
 	 * @return Signed transaction ready to submit
 	 */
-	public synchronized SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws ResultException, InterruptedException {
-		Address origin=transaction.getOrigin();
-		if (origin == null) {
-			origin=address;
-			if (origin==null) {
-				// A transaction without an origin is definitely a problem. :NOBODY error detected at :CLIENT source
-				throw new ResultException(Result.error(ErrorCodes.NOBODY, "No address set for transaction").withSource(SourceCodes.CLIENT));
-			}
-			transaction = transaction.withOrigin(origin);
+	public SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws ResultException, InterruptedException {
+		return prepare(CompletableFuture.completedFuture(transaction));
+	}
+
+	private CompletableFuture<Result> submit(CompletableFuture<ATransaction> pending) {
+		try {
+			return inOrder(pending,signed->transact(signed),(result,e)->result.complete(Result.fromException(e)));
+		} catch (Exception e) {
+			// Note this handles InterruptedException correctly (maintains interrupt)
+			return CompletableFuture.completedFuture(Result.fromException(e));
 		}
-		
-		final long originalSeq=transaction.getSequence(); // zero or negative means autosequence
-		long seq=originalSeq;
-		
-		if (autoSequence||(originalSeq<=0)) {		
-			if (seq <= 0) {		
-				// apply sequence if using expected address
-				if (Cells.equals(origin, address)) {
-					seq = getNextSequence(transaction);
-				}
+	}
+
+	private SignedData<ATransaction> prepare(CompletableFuture<ATransaction> pending) throws ResultException, InterruptedException {
+		return await(inOrder(pending,CompletableFuture::completedFuture,CompletableFuture::completeExceptionally));
+	}
+
+	/**
+	 * Sequences and signs a transaction once every transaction queued before it
+	 * has been submitted, then applies an action to it while holding this
+	 * client's monitor. Runs on the calling thread if nothing is queued and the
+	 * sequence is known, otherwise queues the transaction, looking up its
+	 * sequence without blocking.
+	 *
+	 * @param pending Transaction, possibly still being compiled
+	 * @param action Action to apply to the signed transaction, usually submission
+	 * @param fail Completes the returned future for a failure before the action
+	 * @return Future for the action's result
+	 */
+	private <T> CompletableFuture<T> inOrder(CompletableFuture<ATransaction> pending,
+			Function<SignedData<ATransaction>,CompletableFuture<T>> action,
+			BiConsumer<CompletableFuture<T>,Throwable> fail) throws ResultException, InterruptedException {
+		boolean callerLocked=Thread.holdsLock(this);
+		synchronized (this) {
+			Address addr=address;
+			AKeyPair kp=keyPair;
+			if (callerLocked) {
+				// Queued work cannot run until the caller releases the monitor, so prepare on this thread
+				ATransaction t=withOrigin(await(pending),addr);
+				SignedData<ATransaction> signed=signNow(t,kp,null);
+				if (signed==null) signed=signNow(t,kp,lookupSequence(t.getOrigin()));
+				return action.apply(signed);
 			}
-			
-			
-			if (sequence!=null) {
-				// use auto-sequence value if available
-				seq=sequence+1; 
+			if (submitted.isDone()&&pending.isDone()&&!pending.isCompletedExceptionally()) {
+				SignedData<ATransaction> signed=signNow(withOrigin(pending.join(),addr),kp,null);
+				if (signed!=null) return action.apply(signed);
+			}
+			CompletableFuture<T> result=new CompletableFuture<>();
+			submitted=submitted.thenCombine(pending,(done,t)->t)
+				.thenComposeAsync(t->submitQueued(t,addr,kp,action,result),ThreadUtils.getVirtualExecutor())
+				.handle((done,e)->{
+					if (e!=null) fail.accept(result,e);
+					return null;
+				});
+			return result;
+		}
+	}
+
+	/**
+	 * Applies the action to a queued transaction, first looking up the sequence
+	 * of its origin if it is not known.
+	 *
+	 * @return Future completing once the action has been applied
+	 */
+	private <T> CompletableFuture<Void> submitQueued(ATransaction t, Address addr, AKeyPair kp,
+			Function<SignedData<ATransaction>,CompletableFuture<T>> action, CompletableFuture<T> result) {
+		try {
+			ATransaction tx=withOrigin(t,addr);
+			if (applyNow(tx,kp,null,action,result)) return CompletableFuture.completedFuture(null);
+			return lookupSequenceAsync(tx.getOrigin()).thenAcceptAsync(seq->{
+				try {
+					applyNow(tx,kp,seq,action,result);
+				} catch (ResultException e) {
+					throw new CompletionException(e);
+				}
+			},ThreadUtils.getVirtualExecutor());
+		} catch (ResultException e) {
+			return CompletableFuture.failedFuture(e);
+		}
+	}
+
+	/**
+	 * Sequences and signs a queued transaction and applies the action, unless the
+	 * caller has already cancelled it.
+	 *
+	 * @param fetched Sequence of the origin looked up from the network, or null
+	 * @return false if the sequence of the origin must be looked up first
+	 */
+	private synchronized <T> boolean applyNow(ATransaction t, AKeyPair kp, Long fetched,
+			Function<SignedData<ATransaction>,CompletableFuture<T>> action, CompletableFuture<T> result) throws ResultException {
+		if ((fetched!=null)&&(sequence==null)&&Cells.equals(t.getOrigin(),address)) {
+			// Keeps any reservation made while the lookup was outstanding
+			sequence=fetched;
+		}
+		if (result.isDone()) return true; // Cancelled before submission: withdraw
+		SignedData<ATransaction> signed=signNow(t,kp,fetched);
+		if (signed==null) return false;
+		action.apply(signed).whenComplete((v,e)->{
+			if (e==null) {
+				result.complete(v);
 			} else {
-				// If local, update sequence number based on latest consensus state
-				Server s=getLocalServer();
-				if (s!=null) {
-					State state=s.getPeer().getConsensusState();
-					AccountStatus as=state.getAccount(origin);
-					if (as!=null) {
-						long expected=as.getSequence()+1;
-						if (expected>seq) {
-							seq=expected;
-						}
-					}
+				result.completeExceptionally(e);
+			}
+		});
+		return true;
+	}
+
+	/**
+	 * Sequences and signs a transaction if that needs no network I/O, reserving
+	 * the sequence if the origin is this client's address. Call holding this
+	 * client's monitor.
+	 *
+	 * @param t Transaction with an origin
+	 * @param kp Key pair to sign with
+	 * @param fetched Sequence of the origin looked up from the network, or null
+	 * @return Signed transaction, or null if the sequence of the origin must be looked up first
+	 */
+	private SignedData<ATransaction> signNow(ATransaction t, AKeyPair kp, Long fetched) throws ResultException {
+		if (kp==null) throw new ResultException(Result.error(ErrorCodes.SIGNATURE, "No key pair set"));
+		Address origin=t.getOrigin();
+		boolean own=Cells.equals(origin,address);
+		long seq=t.getSequence(); // zero or negative means autosequence
+		if (autoSequence||(seq<=0)) {
+			Long known=own?sequence:null;
+			if (known!=null) {
+				seq=known+1;
+			} else {
+				Long current=localSequence(origin);
+				if (current==null) current=fetched;
+				if ((current!=null)&&(current+1>seq)) {
+					seq=current+1;
+				} else if (seq<=0) {
+					return null;
 				}
 			}
 		}
-		
-		if (seq<=0) seq=lookupSequence(origin);
-		
-		// Update sequence if any change required
-		if (seq!=originalSeq) {
-			transaction=transaction.withSequence(seq);
-		}
-		
+
 		// Store updated sequence number, ready for next transaction
-		if (Cells.equals(origin, address)) { 
-			this.sequence=seq;
-		}		
-		if (keyPair==null) throw new ResultException(Result.error(ErrorCodes.SIGNATURE, "No key pair set"));
-		
-		SignedData<ATransaction> signed = keyPair.signData(transaction);
-		return signed;
+		if (own) sequence=seq;
+		if (seq!=t.getSequence()) t=t.withSequence(seq);
+		return kp.signData(t);
+	}
+
+	private static ATransaction withOrigin(ATransaction t, Address addr) throws ResultException {
+		if (t.getOrigin()!=null) return t;
+		if (addr==null) {
+			// A transaction without an origin is definitely a problem. :NOBODY error detected at :CLIENT source
+			throw new ResultException(Result.error(ErrorCodes.NOBODY, "No address set for transaction").withSource(SourceCodes.CLIENT));
+		}
+		return t.withOrigin(addr);
+	}
+
+	/**
+	 * Builds an Invoke of code from this client's address, pre-compiling the code
+	 * first if enabled. Does not wait for compilation.
+	 */
+	private CompletableFuture<ATransaction> invoke(ACell code) {
+		Address origin=getAddress();
+		if (!isPreCompile()) return CompletableFuture.completedFuture(Invoke.create(origin, ATransaction.UNKNOWN_SEQUENCE, code));
+		return preCompile(code).thenApply(r->{
+			if (r.isError()) throw new CompletionException(new ResultException(r));
+			return Invoke.create(origin, ATransaction.UNKNOWN_SEQUENCE, r.getValue());
+		});
+	}
+
+	/** Waits up to this client's timeout. On failure, cancels the future and throws its error Result. */
+	private <T> T await(CompletableFuture<T> f) throws ResultException, InterruptedException {
+		try {
+			return f.get(timeout, TimeUnit.MILLISECONDS);
+		} catch (ExecutionException | TimeoutException e) {
+			f.cancel(false); // Withdraws a queued transaction not yet prepared
+			throw new ResultException(Result.fromException(e));
+		} catch (InterruptedException e) {
+			f.cancel(false);
+			throw e;
+		}
 	}
 
 	/**
@@ -546,21 +676,10 @@ public abstract class Convex implements AutoCloseable {
 	 * @param code Code to execute
 	 * @return A Future for the result of the transaction
 	 */
-	public synchronized CompletableFuture<Result> transact(ACell code) {
+	public CompletableFuture<Result> transact(ACell code) {
 		code=CVMEncoder.specialise(code);
 		if (code instanceof ATransaction) return transact((ATransaction)code);
-		
-		if (isPreCompile()) {
-			return preCompile(code).thenCompose(r->{
-				if (r.isError()) return CompletableFuture.completedFuture(r);
-				ACell compiledCode=r.getValue();
-				ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, compiledCode);
-				return transact(trans);
-			});
-		} else {
-			ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, code);
-			return transact(trans);
-		}
+		return submit(invoke(code));
 	}
 
 	private ACell buildCodeForm(String code) {
@@ -581,7 +700,7 @@ public abstract class Convex implements AutoCloseable {
 	 * @return A Future for the result of the transaction
 	 * @throws InterruptedException in case of interrupt while waiting
 	 */
-	public synchronized Result transactSync(String code) throws InterruptedException {
+	public Result transactSync(String code) throws InterruptedException {
 		ACell form=buildCodeForm(code);
 		ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, form);
 		return transactSync(trans);
