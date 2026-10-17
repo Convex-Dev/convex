@@ -21,8 +21,6 @@ public class EtchExplorer extends AbstractGUI {
 
 	public static final Logger log = LoggerFactory.getLogger(EtchExplorer.class.getName());
 
-	public static long maxBlock = 0;
-
 	/**
 	 * Launch the application.
 	 * @param args Command line args
@@ -42,7 +40,8 @@ public class EtchExplorer extends AbstractGUI {
 	 */
 	JPanel panel = new JPanel();
  
-	private static StateModel<EtchStore> etchState = StateModel.create((EtchStore)Stores.getGlobalStore());
+	/** Store being explored. Declared before the panels that read it. */
+	private final StateModel<EtchStore> etchState = StateModel.create((EtchStore)Stores.getGlobalStore());
 	
 	DatabasePanel homePanel = new DatabasePanel(this);
 	JTabbedPane tabs = new JTabbedPane();

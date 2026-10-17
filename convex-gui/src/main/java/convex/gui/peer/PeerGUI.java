@@ -8,7 +8,6 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -197,13 +196,10 @@ public class PeerGUI extends AbstractGUI {
 	MessageFormatPanel messagePanel;
 	JPanel accountsPanel;
 	JTabbedPane tabs;
-	RESTServer restServer;
 
-	/**
-	 * Port of the most recently launched REST Server
-	 */
-	public static Integer REST_PORT=null;
-	
+	/** REST server for this network, null if not running */
+	private volatile RESTServer restServer;
+
 
 	/**
 	 * Create the application.
@@ -237,9 +233,9 @@ public class PeerGUI extends AbstractGUI {
 		// Set up observability
 		
 		try {
-			restServer=RESTServer.create(first);
-			restServer.start(restPort);
-			REST_PORT=restServer.getPort();
+			RESTServer rs=RESTServer.create(first);
+			rs.start(restPort);
+			restServer=rs;
 		} catch (Exception t) {
 			log.warn("Unable to start REST Server: ",t);
 		}
@@ -294,7 +290,6 @@ public class PeerGUI extends AbstractGUI {
 
 						Order order=p.getPeerOrder();
 						if (order==null) continue; // not an active peer?
-						maxBlock = Math.max(maxBlock, order.getBlockCount());
 
 						long pcp = p.getFinalityPoint();
 						if (pcp > cp) {
@@ -375,26 +370,12 @@ public class PeerGUI extends AbstractGUI {
 			return makeConnection(address,keyPair);
 	}
 	
-	private static HashMap<Server,StateModel<Peer>> models=new HashMap<>();
-
-	public static StateModel<Peer> getStateModel(Convex peer) {
-		Server s=peer.getLocalServer();
-		if (s!=null) {
-			StateModel<Peer> model=models.get(s);
-			if	(model!=null) return model;
-			StateModel<Peer> newModel=StateModel.create(s.getPeer());
-			s.addStateUpdateObserver(p->{
-				newModel.setValue(p);
-			});
-			models.put(s, newModel);
-			return newModel;
-		}
-		return null;
-	}
-	
-	private static long maxBlock=0;
-	public static long getMaxBlockCount() {
-		return maxBlock;
+	/**
+	 * @return Port of this network's REST server, or null if it is not running
+	 */
+	public Integer getRestPort() {
+		RESTServer rs=restServer;
+		return (rs==null)?null:rs.getPort();
 	}
 
 	public Server getRandomServer() {
@@ -471,20 +452,17 @@ public class PeerGUI extends AbstractGUI {
 	 */
 	private void closeNetwork() {
 		updateRunning=false;
-		if (restServer!=null) {
-			Integer port=restServer.getPort();
-			restServer.close();
+		RESTServer rs=restServer;
+		if (rs!=null) {
 			restServer=null;
-			if (Objects.equals(REST_PORT, port)) REST_PORT=null;
+			rs.close();
 		}
 		DefaultListModel<ConvexLocal> peerList = getPeerList();
 		int n = peerList.getSize();
 		for (int i = 0; i < n; i++) {
 			Convex p = peerList.getElementAt(i);
 			try {
-				Server server=p.getLocalServer();
-				models.remove(server);
-				server.close();
+				p.getLocalServer().close();
 			} catch (Exception e) {
 				log.warn("Error closing peer",e);
 			} finally {

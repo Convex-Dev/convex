@@ -2,6 +2,8 @@ package convex.gui;
 
 import java.awt.Color;
 import java.awt.EventQueue;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -27,6 +29,9 @@ import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class MainGUI extends AbstractGUI {
+	/** Peer Managers launched from here, in launch order. Used on the EDT. */
+	private final List<PeerGUI> peerManagers=new ArrayList<>();
+
 	public MainGUI() {
 		super ("Convex Desktop");
 		MigLayout layout=new MigLayout("wrap 1","[fill]");
@@ -80,18 +85,30 @@ public class MainGUI extends AbstractGUI {
 
 	public void launchTestNet() {
 		PeerGUI manager=PeerLaunchDialog.runLaunchDialog(this);
-		if (manager!=null) adopt(manager);
+		if (manager!=null) {
+			adopt(manager);
+			peerManagers.add(manager);
+		}
 	}
-	
+
 	public void launchDiscord() {
 		Toolkit.launchBrowser("https://discord.com/invite/xfYGq4CT7v");
 	}
-	
+
+	/**
+	 * Opens the explorer of the most recently launched local network still running
+	 */
 	public void launchExplorer() {
-		if (PeerGUI.REST_PORT==null) {
+		peerManagers.removeIf(AbstractGUI::isClosing);
+		Integer port=null;
+		for (PeerGUI manager: peerManagers) {
+			Integer p=manager.getRestPort();
+			if (p!=null) port=p;
+		}
+		if (port==null) {
 			Toast.display(this, "No local server started!", Color.ORANGE);
 		} else {
-			Toolkit.launchBrowser("http://localhost:"+PeerGUI.REST_PORT+"/explorer");
+			Toolkit.launchBrowser("http://localhost:"+port+"/explorer");
 		}
 	}
 	

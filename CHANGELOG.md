@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Closing a GUI window now releases what it runs instead of hiding it: Peer Manager stops its local peers and REST server, Wallet and Terminal close their connections, and peer windows opened from the tray stop their background refresh. Closing Convex Desktop closes the apps launched from it first, so the DLFS browser persists its final state.
 - Closing a Peer Manager removes the temporary genesis and peer keys it added to the key ring; keys already in the key ring are kept. Key ring changes now reach every window on the UI thread, and choosing a key in one key picker no longer disturbs the others.
 - Wallets open on different networks in the same process no longer share tracked tokens or token library addresses, which could make the second network's balances query the wrong address. Wallets on the same network still share their tracked tokens.
+- The Desktop Explorer button opens the most recently launched local network that is still running, and peer windows opened from the tray show their most recent blocks instead of the oldest.
 
 ## [0.8.17] - 2026-10-09
 

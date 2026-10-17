@@ -1,6 +1,5 @@
 package convex.gui.peer;
 
-import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -39,7 +38,6 @@ import convex.gui.components.DropdownMenu;
 import convex.gui.components.Identicon;
 import convex.gui.etch.EtchWindow;
 import convex.gui.keys.KeyRing;
-import convex.gui.models.StateModel;
 import convex.gui.repl.REPLClient;
 import convex.gui.server.PeerWindow;
 import convex.gui.state.StateExplorer;
@@ -54,9 +52,8 @@ public class PeerComponent extends BaseListComponent implements AutoCloseable {
 
 	public ConvexLocal convex;
 
-	/** Shared peer state model this component listens to, removed on close */
-	private final StateModel<Peer> peerModel;
-	private final PropertyChangeListener peerListener;
+	/** Updates from the peer's server, stopped on close */
+	private final PeerStateUpdates updates;
 	CodeLabel description;
 	
 	private static final Logger log = LoggerFactory.getLogger(PeerComponent.class.getName());
@@ -201,14 +198,10 @@ public class PeerComponent extends BaseListComponent implements AutoCloseable {
 		// Block view at bottom
 		
 		JPanel blockView = new BlockViewComponent(convex);
-		peerModel=PeerGUI.getStateModel(convex);
-		peerListener=e->{
+		updates=new PeerStateUpdates(server,()->{
 			blockView.repaint();
 			updateDescription();
-		};
-		if (peerModel!=null) {
-			peerModel.addPropertyChangeListener(peerListener);
-		}
+		});
 		add(blockView, "dock south");
 
 		
@@ -275,10 +268,10 @@ public class PeerComponent extends BaseListComponent implements AutoCloseable {
 		}
 	}
 
-	/** Stops listening to the shared peer state model */
+	/** Stops following the peer's server */
 	@Override
 	public void close() {
-		if (peerModel!=null) peerModel.removePropertyChangeListener(peerListener);
+		updates.close();
 	}
 
 	public String getPeerDescription() {

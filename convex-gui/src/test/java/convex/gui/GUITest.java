@@ -111,6 +111,7 @@ public class GUITest {
 			AccountKey peerKey=server.getKeyPair().getAccountKey();
 			assertTrue(server.isLive());
 			assertNotNull(keyRing.find(peerKey));
+			assertNotNull(gui.getRestPort());
 
 			gui.run();
 			// run() queued the frame's creation first, so the frame exists by the time this runs
@@ -121,6 +122,7 @@ public class GUITest {
 			gui.waitForClose();
 
 			assertFalse(server.isLive());
+			assertNull(gui.getRestPort());
 			assertNull(keyRing.find(peerKey));
 			assertSame(existing,keyRing.find(genesis.getAccountKey()));
 		} finally {

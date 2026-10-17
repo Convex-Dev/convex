@@ -31,8 +31,6 @@ public class REPLClient extends AbstractGUI {
 
 	private static final Logger log = LoggerFactory.getLogger(REPLClient.class.getName());
 
-	public static long maxBlock = 0;
-
 	protected Convex convex=null;
 
 	/**
