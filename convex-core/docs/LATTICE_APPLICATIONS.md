@@ -199,6 +199,16 @@ string-keyed hash map. Both provide per-child merge, navigation and the right em
 value. Write a custom lattice only for semantics the standard types cannot express;
 it must define merge, child lookup and empty value consistently.
 
+**Bind the child to its key when the rule depends on it.** The map, index and owner
+lattices extend `AUnionLattice`: a union of keys where each entry merges with the
+child `path` returns for its key, and a key with no child is dropped. A collection
+whose entries are valid only under a particular key, an owner's slot or a
+content-addressed entry such as a mail message under `issued-at ‖ hash`, extends the
+same base and returns a key-bound child from `path`, so navigation and merge cannot
+disagree about the rule at a key. Not every map merges this way: a map that is the
+leaf of a last-writer-wins rule keeps whole-value replacement, with navigation below
+it for writes only.
+
 **Wrap with an owner lattice** for self-sovereign data:
 
 ```java

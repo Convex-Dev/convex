@@ -7,12 +7,12 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
-import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
 
 /**
- * Shared machinery for maps of owner identities to signed values.
+ * Shared machinery for maps of owner identities to signed values: a union of owners
+ * where each slot merges with the signed lattice bound to that owner, which
+ * {@link #path} returns.
  *
  * <p>The verifier belongs to this lattice instance. It is retained when navigating
  * to an owner's signed child, and is used for both incoming merges and local
@@ -25,7 +25,7 @@ import convex.lattice.LatticeContext;
  * @param <M> Concrete map type
  */
 public abstract class AOwnerLattice<K extends ACell, V extends ACell,
-		M extends AMap<K, SignedData<V>>> extends ALattice<M> {
+		M extends AMap<K, SignedData<V>>> extends AUnionLattice<K,SignedData<V>,M> {
 
 	protected final SignedLattice<V> signedLattice;
 	private final BiPredicate<? super K, ? super AccountKey> ownerVerifier;
@@ -60,35 +60,6 @@ public abstract class AOwnerLattice<K extends ACell, V extends ACell,
 			// Foreign keys need not have the Java type declared by the caller.
 			return false;
 		}
-	}
-
-	@Override
-	public M merge(M ownValue, M otherValue) {
-		return merge(LatticeContext.EMPTY,ownValue,otherValue);
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public M merge(LatticeContext context, M ownValue, M otherValue) {
-		if (otherValue==null) return ownValue;
-		if (!checkForeign(otherValue)) throw new IllegalArgumentException("Invalid owner map");
-		if (ownValue==null) ownValue=zero();
-		MergeFunction<SignedData<V>> merger=new MergeFunction<>() {
-			@Override
-			public SignedData<V> merge(SignedData<V> own, SignedData<V> other) {
-				throw new IllegalStateException("Owner merge requires a key");
-			}
-
-			@Override
-			public SignedData<V> merge(Object key, SignedData<V> own, SignedData<V> other) {
-				if (other==null) return own;
-				if (!(key instanceof ACell cell)) return own;
-				SignedLattice<V> child=signingFor(cell);
-				return (child==null)?own:child.merge(context,own,other);
-			}
-		};
-		// Both concrete containers retain their type and share unchanged subtrees.
-		return (M)ownValue.mergeDifferences(otherValue,merger);
 	}
 
 	/**

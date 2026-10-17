@@ -236,11 +236,12 @@ keys, and merges each mailbox with its DID-bound `MailboxLattice`.
 `Index.mergeDifferences` visits only keys that differ, and `SignedData` caches
 signature verification, so a merge costs O(delta) as in CAD038.
 
-The per-key rule needs the key, so `MailboxLattice` merges through the keyed
-`MergeFunction.merge(key, own, other)` overload, as `AOwnerLattice` does, rather
-than the two-argument form a plain `IndexLattice` uses; `path(key)` returns a
-register bound to that key and to the mailbox DID, as `signingFor` returns an
-owner-bound `SignedLattice`. Receipts are authored through
+The per-key rule needs the key, so `MailboxLattice` is a union lattice
+(`AUnionLattice`, the base the map, index and owner lattices share) whose
+`path(key)` returns a register bound to that key and to the mailbox DID, as
+`signingFor` returns an owner-bound `SignedLattice`; the base merges each entry
+with that child, rather than with the one shared child a plain `IndexLattice`
+has. Receipts are authored through
 `LatticeContext.signAs(did, receipt)`, so authoring and verification share the
 one rule described under *Owner binding* in the convex-p2p README.
 
@@ -382,12 +383,12 @@ semantics.
 ### `convex.lattice.mail` (convex-core)
 
 ```java
-public final class MailLattice extends ALattice<AHashMap<ACell, Index<ABlob, SignedData<ACell>>>>
+public final class MailLattice extends AUnionLattice<ACell, Index<ABlob, SignedData<ACell>>, AHashMap<...>>
     static MailLattice create(DIDKeyAuthorizer authorizer)   // binds the receipt signer rule
     MailboxLattice forMailbox(AString did)                   // DID-bound mailbox lattice; also returned by path(did)
 
-public final class MailboxLattice extends ALattice<Index<ABlob, SignedData<ACell>>>
-    // keyed dispatch to the register bound to each key; zero() = Index.EMPTY
+public final class MailboxLattice extends AUnionLattice<ABlob, SignedData<ACell>, Index<ABlob, SignedData<ACell>>>
+    // union of entries, each merged with the register bound to its key; zero() = Index.EMPTY
     MailEntryLattice entry(ACell key)                        // key-bound register; also returned by path(key)
 
 public final class MailEntryLattice extends AValueLattice<SignedData<ACell>>

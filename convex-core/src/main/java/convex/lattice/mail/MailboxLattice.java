@@ -8,44 +8,26 @@ import convex.core.data.AString;
 import convex.core.data.Blobs;
 import convex.core.data.Index;
 import convex.core.data.SignedData;
-import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
+import convex.lattice.generic.AUnionLattice;
 
 /**
  * One mailbox: an {@code Index} from entry key {@code issued-at ‖ hash} to the entry
  * register for that key, bound to the mailbox DID.
  *
- * <p>The register's rule needs its key, so the index merges through the keyed
- * {@link MergeFunction} overload rather than the two-argument form a plain
- * {@code IndexLattice} uses, and {@link #path} returns the {@link MailEntryLattice}
- * bound to a key, as an owner lattice returns an owner-bound signed lattice. An entry
- * whose key does not have the shape of an entry key has no register and is dropped.
- * Entries already held are not re-validated: they passed this rule when they were
- * merged or written.</p>
+ * <p>A union of entries. The register's rule needs its key, so {@link #path} returns
+ * the {@link MailEntryLattice} bound to the key, as an owner lattice returns an
+ * owner-bound signed lattice, and the base merges each entry with it. A key without
+ * the shape of an entry key has no register and is dropped.</p>
  */
-public final class MailboxLattice extends ALattice<Index<ABlob,SignedData<ACell>>> {
+public final class MailboxLattice extends AUnionLattice<ABlob,SignedData<ACell>,Index<ABlob,SignedData<ACell>>> {
 
 	private final AString did;
 	private final DIDKeyAuthorizer authorizer;
-	private final MergeFunction<SignedData<ACell>> merger;
 
 	private MailboxLattice(AString did, DIDKeyAuthorizer authorizer) {
 		this.did=did;
 		this.authorizer=authorizer;
-		this.merger=new MergeFunction<>() {
-			@Override
-			public SignedData<ACell> merge(SignedData<ACell> own, SignedData<ACell> other) {
-				throw new IllegalStateException("Mailbox entry merge requires its key");
-			}
-
-			@Override
-			public SignedData<ACell> merge(Object key, SignedData<ACell> own, SignedData<ACell> other) {
-				if (other==null) return own;
-				MailEntryLattice entry=(key instanceof ACell cell)?entry(cell):null;
-				return (entry==null)?own:entry.merge(own,other);
-			}
-		};
 	}
 
 	/**
@@ -68,21 +50,6 @@ public final class MailboxLattice extends ALattice<Index<ABlob,SignedData<ACell>
 	public MailEntryLattice entry(ACell key) {
 		if (!MailEntryLattice.isKey(key)) return null;
 		return MailEntryLattice.create(did,(ABlob)key,authorizer);
-	}
-
-	@Override
-	public Index<ABlob,SignedData<ACell>> merge(Index<ABlob,SignedData<ACell>> own,
-			Index<ABlob,SignedData<ACell>> other) {
-		if (other==null) return own;
-		if (own==null) own=zero();
-		return own.mergeDifferences(other,merger);
-	}
-
-	@Override
-	public Index<ABlob,SignedData<ACell>> merge(LatticeContext context,
-			Index<ABlob,SignedData<ACell>> own, Index<ABlob,SignedData<ACell>> other) {
-		// Receipt authorisation is bound to this instance; the context adds nothing here
-		return merge(own,other);
 	}
 
 	@Override

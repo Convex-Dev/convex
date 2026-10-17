@@ -9,21 +9,20 @@ import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
-import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
+import convex.lattice.generic.AUnionLattice;
 
 /**
  * The {@code :mail} region: a map from recipient canonical base DID to that DID's
  * mailbox, an {@code Index} of entry registers keyed by {@code issued-at ‖ hash}.
  *
- * <p>Each mailbox merges with the {@link MailboxLattice} bound to its DID, so the
- * region's own rule is only the keyed dispatch to the right mailbox and the rejection
- * of keys that are not canonical DIDs. The authoriser bound here decides which signers
- * may issue receipts for each DID; {@link Mail#LATTICE} binds the {@code did:key}-only
- * rule.</p>
+ * <p>A union of mailboxes. Each merges with the {@link MailboxLattice} bound to its
+ * DID, which {@link #path} returns, and a key that is not a canonical DID has no
+ * mailbox and is dropped. The authoriser bound here decides which signers may issue
+ * receipts for each DID; {@link Mail#LATTICE} binds the {@code did:key}-only rule.</p>
  */
-public final class MailLattice extends ALattice<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> {
+public final class MailLattice extends AUnionLattice<ACell,Index<ABlob,SignedData<ACell>>,
+		AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> {
 
 	private final DIDKeyAuthorizer authorizer;
 
@@ -48,39 +47,6 @@ public final class MailLattice extends ALattice<AHashMap<ACell,Index<ABlob,Signe
 	public MailboxLattice forMailbox(ACell did) {
 		if (!(did instanceof AString s) || !DID.isCanonicalBase(s)) return null;
 		return MailboxLattice.create(s,authorizer);
-	}
-
-	@Override
-	public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> merge(
-			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> own,
-			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> other) {
-		if (other==null) return own;
-		if (own==null) own=zero();
-		MergeFunction<Index<ABlob,SignedData<ACell>>> merger=new MergeFunction<>() {
-			@Override
-			public Index<ABlob,SignedData<ACell>> merge(Index<ABlob,SignedData<ACell>> a,
-					Index<ABlob,SignedData<ACell>> b) {
-				throw new IllegalStateException("Mailbox merge requires its DID");
-			}
-
-			@Override
-			public Index<ABlob,SignedData<ACell>> merge(Object key, Index<ABlob,SignedData<ACell>> a,
-					Index<ABlob,SignedData<ACell>> b) {
-				if (b==null) return a;
-				MailboxLattice mailbox=(key instanceof ACell cell)?forMailbox(cell):null;
-				if (mailbox==null || !mailbox.checkForeign(b)) return a;
-				return mailbox.merge(a,b);
-			}
-		};
-		return own.mergeDifferences(other,merger);
-	}
-
-	@Override
-	public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> merge(LatticeContext context,
-			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> own,
-			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> other) {
-		// Receipt authorisation is bound to this instance; the context adds nothing here
-		return merge(own,other);
 	}
 
 	@Override
