@@ -22,7 +22,13 @@ public class TokenComponent extends JPanel {
 	static final Font BALANCE_FONT=Toolkit.BIG_FONT;
 	TokenButton tokenButton;
 
-	public TokenComponent(Convex convex, TokenInfo token) {
+	/**
+	 * Creates a component for a tracked token
+	 * @param convex Connection used for balances and actions
+	 * @param network Network the token is tracked on
+	 * @param token Token to show
+	 */
+	public TokenComponent(Convex convex, NetworkState network, TokenInfo token) {
 		this.convex=convex;
 		this.token=token;
 		
@@ -50,7 +56,7 @@ public class TokenComponent extends JPanel {
 
 		actions.add(ActionButton.build(0xe933,e->{
 			// Token swap
-			TokenInfo with= TokenListPanel.getOtherToken(token);
+			TokenInfo with= network.otherToken(token);
 			if (with==null) {
 				String tok=JOptionPane.showInputDialog(this, "Specify a token to swap with");
 				if (tok==null) return;
@@ -70,7 +76,7 @@ public class TokenComponent extends JPanel {
 			refresh(convex);
 		},"Refresh token info")); 
 		actions.add(ActionButton.build(0xe872,e->{
-			TokenListPanel.model.removeElement(token);
+			network.untrack(token);
 		},"Remove token from tracked list"));
 		
 		add(actions,"dock east");
