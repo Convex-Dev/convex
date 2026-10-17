@@ -298,9 +298,9 @@ source changes.
 
 ### Admission
 
-The ingress filter admits `[:mail <did> ...]` values only for desired DIDs,
-projects a root or region value down to desired slots, and applies the checks the
-lattice cannot:
+The mail application takes `[:mail <did> ...]` values only for desired DIDs,
+selecting the desired mailboxes from a root or region value, and applies the
+checks the lattice cannot before calling its merge:
 
 - complete value within the inbound size bound; each envelope within the
   envelope bound;

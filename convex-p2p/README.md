@@ -342,10 +342,11 @@ key as audience, and the fixed `convex-lattice-peer-v1` context.
 
 An unverified assigned connection may submit complete `LATTICE_VALUE` messages, because
 the P2P data is public, but it cannot stage unsolicited `DATA` or trigger missing-cell
-acquisition. Complete values pass the configured path-aware ingress policy before
-persistence. The default social policy admits and publishes only locally registered
-social DIDs, explicit pins and their direct active follows; every social slot must have
-a valid signature from a key authorised for its DID. `maxConnections` bounds inbound
+acquisition. Complete values are handed to the P2P application, which takes the
+infrastructure regions whole and, from the social region, only the owners it wants:
+locally registered social DIDs, explicit pins and their direct active follows. The
+same set bounds what the node publishes. Every social slot must have a valid signature
+from a key authorised for its DID. `maxConnections` bounds inbound
 sockets and `maxDesiredPeers` bounds explicit plus discovery-driven peers.
 
 ## License

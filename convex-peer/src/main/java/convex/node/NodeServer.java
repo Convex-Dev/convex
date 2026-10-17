@@ -33,8 +33,8 @@ import convex.lattice.cursor.AForkableCursor;
  * host and its applications first, for example with {@link RelayHost}, then
  * construct the node from the host. The node owns host-root publication,
  * persistence and update notification. It does not own peer sets, connection
- * trust, protocol decoding, missing-cell acquisition, ingress filtering,
- * publication filtering, sockets or transport lifecycle. Those are policies and
+ * trust, protocol decoding, missing-cell acquisition, publication filtering,
+ * sockets or transport lifecycle. Those are policies and
  * resources of {@link LatticePropagator} and application-owned transports such as
  * {@link LatticeListener}.</p>
  *

@@ -8,6 +8,7 @@ import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
@@ -20,19 +21,21 @@ import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.social.Social;
+import convex.social.SocialLattice;
 
 /**
  * Root-level application component for the P2P lattice regions.
  *
- * <p>This is the application a P2P host hands incoming values to. It accepts every
- * path its root lattice declares, navigates the P2P regions with their declared
- * shapes and crosses each owner's slot with the owner lattice that verifies it. It
- * also owns the P2P policy that reads the lattice: the node registry as a validated
- * directory, the social owners this node wants, and the paths to pull from a newly
- * admitted peer. It imports nothing from the node package. A {@link P2PNode}
- * assembles it with replication and calls it at the moments replication knows
- * about; a local application may use the same component over a standalone
- * {@link LatticeHost}.</p>
+ * <p>This is the application a P2P host hands incoming values to. It decides at
+ * which paths to call the default merge: the infrastructure regions it takes whole,
+ * through their declared lattices, and from the social region it takes only the
+ * slots of the owners this node wants, crossing each with the owner lattice that
+ * verifies it. It also owns the P2P policy that reads the lattice: the node registry
+ * as a validated directory, the social owners this node wants, and the paths to pull
+ * from a newly admitted peer. It imports nothing from the node package. A
+ * {@link P2PNode} assembles it with replication and calls it at the moments
+ * replication knows about; a local application may use the same component over a
+ * standalone {@link LatticeHost}.</p>
  *
  * <p>The application publishes what it writes. When its policy edits local state,
  * such as this node's own record or a follow key validated during admission, it
@@ -79,10 +82,66 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		return new P2PApplication(lattice,host,context,didAuthorizer);
 	}
 
-	/** Accepts every declared path; a value at an owner slot needs an envelope the context's verifier accepts. */
+	/**
+	 * Takes an incoming root selectively: every declared region other than social
+	 * whole, through its declared lattice, and from the social region only the slots
+	 * of the owners this node wants. A working view bound to a cursor has no policy
+	 * and so no interest of its own; it delegates to the declared lattice.
+	 */
+	@Override
+	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
+		if (socialPolicy==null) return super.merge(other);
+		if (other==null) return cursor.get();
+		for (var entry:other.entrySet()) {
+			ACell key=entry.getKey();
+			if (Social.KEY_SOCIAL.equals(key)) mergeSocialOwners(entry.getValue());
+			else if (getLattice().path(key)!=null) mergeDeclaredPath(entry.getValue(),key);
+		}
+		return cursor.get();
+	}
+
+	/**
+	 * Accepts declared paths outside the social region whole. A social owner map is
+	 * taken for the desired owners only, a social slot only if its owner is desired,
+	 * and nothing inside an owner's envelope.
+	 */
+	@SuppressWarnings("unchecked")
 	@Override
 	public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
-		return mergeDeclaredPath(value,path);
+		if (socialPolicy==null) return mergeDeclaredPath(value,path);
+		if (path.length==0) return merge((Index<Keyword,ACell>)value);
+		if (!Social.KEY_SOCIAL.equals(path[0])) return mergeDeclaredPath(value,path);
+		if (path.length==1) return mergeSocialOwners(value);
+		if (path.length==2 && path[1] instanceof AString did && policy().desiredOwners().contains(did)) {
+			return mergeDesiredOwner(did,value);
+		}
+		return cursor.get();
+	}
+
+	/** Takes the desired owners' slots from an owner map, walking the desired set rather than the peer's map. */
+	@SuppressWarnings("unchecked")
+	private Index<Keyword,ACell> mergeSocialOwners(ACell value) {
+		if (value instanceof AMap<?,?> owners) {
+			for (AString did:policy().desiredOwners()) {
+				ACell slot=((AMap<ACell,ACell>)owners).get(did);
+				if (slot!=null) mergeDesiredOwner(did,slot);
+			}
+		}
+		return cursor.get();
+	}
+
+	/**
+	 * Merges one wanted owner's slot through the owner lattice, which verifies its
+	 * signer, then records the validated signer. The inner state must already be in
+	 * canonical shape: an envelope adopted into an empty slot is taken as it is.
+	 */
+	private Index<Keyword,ACell> mergeDesiredOwner(AString did,ACell slot) {
+		if (!(slot instanceof SignedData<?> signed) || !SocialLattice.isCanonicalState(signed.getValue())) {
+			return cursor.get();
+		}
+		mergeDeclaredPath(slot,Social.KEY_SOCIAL,did);
+		policy().cacheCurrentOwner(did);
+		return cursor.get();
 	}
 
 	/** Registers and opens a local {@code did:key} social user. */

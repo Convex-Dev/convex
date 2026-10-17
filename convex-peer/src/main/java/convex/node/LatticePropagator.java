@@ -41,7 +41,7 @@ import convex.lattice.cursor.Root;
  * Isolated connection and publication policy group for one lattice node.
  *
  * <p>A propagator owns every external route assigned to the group, its bounded
- * CAD036 protocol endpoint, serving store, ingress and publication filters,
+ * CAD036 protocol endpoint, serving store, publication filter,
  * novelty tracking and broadcast worker. A node normally has one group, while
  * multiple groups may expose different filtered views without sharing queues,
  * connection state or acquisition capability.</p>
@@ -94,7 +94,6 @@ public class LatticePropagator implements Closeable {
 
 	/** Endpoint configuration retained until attachment. */
 	private AKeyPair transportKeyPair;
-	private LatticeIngressFilter ingressFilter=(path,value) -> value;
 	private Predicate<Message> applicationMessageHandler;
 	private InboundLatticeListener inboundLatticeListener;
 
@@ -344,7 +343,6 @@ public class LatticePropagator implements Closeable {
 			if (endpoint==null) endpoint=new LatticeProtocolEndpoint(this,node,config);
 			connectionManager.setInboundProbe(endpoint::probe,endpoint::retireConnection);
 			endpoint.setTransportKeyPair(transportKeyPair);
-			endpoint.setIngressFilter(ingressFilter);
 			endpoint.setApplicationMessageHandler(applicationMessageHandler);
 			endpoint.setInboundLatticeListener(inboundLatticeListener);
 		}
@@ -362,18 +360,6 @@ public class LatticePropagator implements Closeable {
 		this.transportKeyPair=keyPair;
 		if (endpoint!=null) endpoint.setTransportKeyPair(keyPair);
 		connectionManager.setKeyPair(keyPair);
-	}
-
-	/**
-	 * Sets complete-value admission and projection for this group.
-	 *
-	 * @param filter inbound policy; returning {@code null} rejects a value
-	 */
-	public void setIngressFilter(LatticeIngressFilter filter) {
-		requireUnattachedPolicy("Ingress policy");
-		if (filter==null) throw new IllegalArgumentException("Ingress filter must not be null");
-		this.ingressFilter=filter;
-		if (endpoint!=null) endpoint.setIngressFilter(filter);
 	}
 
 	/**

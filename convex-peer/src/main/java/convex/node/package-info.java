@@ -56,8 +56,9 @@
  *   <li>That group's endpoint performs a bounded queue offer.</li>
  *   <li>Untrusted input is decoded without a store. Trusted partial input may
  *       acquire missing cells into that propagator's store.</li>
- *   <li>The complete value passes ingress policy and lattice validation.</li>
- *   <li>The node hands the value to its host, whose applications merge it.
+ *   <li>The complete value is persisted in the group's store.</li>
+ *   <li>The node hands the value to its host, whose applications take what they
+ *       want from it under their own lattices.
  *       Host-root publication completes before each propagation group is
  *       notified independently.</li>
  *   <li>An optional {@link convex.node.InboundLatticeListener} may observe the

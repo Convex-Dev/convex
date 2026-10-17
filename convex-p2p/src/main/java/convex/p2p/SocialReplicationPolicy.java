@@ -20,10 +20,10 @@ import convex.social.Social;
 import convex.social.SocialHelpers;
 
 /**
- * Default one-hop social retention and admission policy, owned by the P2P
- * application. It reads the application's lattice to decide which social owners
- * this node wants and offers that decision as ingress and publication filters; a
- * node plugs those into its propagation group.
+ * Default one-hop social retention policy, owned by the P2P application. It reads
+ * the application's lattice to decide which social owners this node wants. The
+ * application applies that decision to incoming values itself; the policy offers it
+ * as the publication projection a node plugs into its propagation group.
  */
 final class SocialReplicationPolicy {
 
@@ -75,46 +75,37 @@ final class SocialReplicationPolicy {
 		return Set.copyOf(desired);
 	}
 
-	ACell filterIngress(ACell[] path,ACell value) {
-		return filter(path,value,true);
-	}
-
+	/** Projects a published value down to the desired owners' valid slots. */
 	ACell filterPublication(ACell[] path,ACell value) {
-		return filter(path,value,false);
-	}
-
-	private ACell filter(ACell[] path,ACell value,boolean cacheValidatedSigner) {
 		Set<AString> desired=desiredOwners();
-		if (path.length==0) return filterRoot(value,desired,cacheValidatedSigner);
+		if (path.length==0) return filterRoot(value,desired);
 		if (!Social.KEY_SOCIAL.equals(path[0])) return value;
-		if (path.length==1) return filterOwners(value,desired,cacheValidatedSigner);
+		if (path.length==1) return filterOwners(value,desired);
 		if (path.length==2 && path[1] instanceof AString did && desired.contains(did)) {
-			return validOwnerSlot(did,value,cacheValidatedSigner)?value:null;
+			return validOwnerSlot(did,value,false)?value:null;
 		}
 		return null;
 	}
 
 	@SuppressWarnings("unchecked")
-	private ACell filterRoot(ACell value,Set<AString> desired,
-			boolean cacheValidatedSigner) {
+	private ACell filterRoot(ACell value,Set<AString> desired) {
 		if (!(value instanceof Index<?,?> rawRoot)) return null;
 		Index<Keyword,ACell> root=(Index<Keyword,ACell>)rawRoot;
 		ACell social=root.get(Social.KEY_SOCIAL);
 		if (social==null) return root;
-		ACell filtered=filterOwners(social,desired,cacheValidatedSigner);
+		ACell filtered=filterOwners(social,desired);
 		return root.assoc(Social.KEY_SOCIAL,
 			(filtered==null)?Maps.empty():filtered);
 	}
 
 	@SuppressWarnings("unchecked")
-	private ACell filterOwners(ACell value,Set<AString> desired,
-			boolean cacheValidatedSigner) {
+	private ACell filterOwners(ACell value,Set<AString> desired) {
 		if (!(value instanceof AHashMap<?,?> raw)) return null;
 		AHashMap<ACell,ACell> owners=(AHashMap<ACell,ACell>)raw;
 		AHashMap<ACell,ACell> filtered=Maps.empty();
 		for (AString did:desired) {
 			ACell slot=owners.get(did);
-			if (slot!=null && validOwnerSlot(did,slot,cacheValidatedSigner)) {
+			if (slot!=null && validOwnerSlot(did,slot,false)) {
 				filtered=filtered.assoc(did,slot);
 			}
 		}
@@ -142,7 +133,7 @@ final class SocialReplicationPolicy {
 		return true;
 	}
 
-	/** Persists the validated binding after an explicit desired-owner pull. */
+	/** Records the validated signer of a desired owner's slot after it has merged. */
 	void cacheCurrentOwner(AString did) {
 		ACell value=application.cursor().get(Social.KEY_SOCIAL,did);
 		if (value!=null) validOwnerSlot(did,value,true);
@@ -162,7 +153,7 @@ final class SocialReplicationPolicy {
 			follows.cacheValidatedKey(target,signer);
 			changed=true;
 		}
-		// Ingress may be a replay which does not otherwise change its target cursor, so
+		// A delivery may be a replay which does not otherwise change its target cursor, so
 		// the node's post-merge sync would not run: the application publishes its edit.
 		if (changed) application.syncHost();
 	}

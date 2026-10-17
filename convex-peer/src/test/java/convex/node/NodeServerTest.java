@@ -61,6 +61,7 @@ import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
+import convex.lattice.ALatticeApplication;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
@@ -111,6 +112,10 @@ public class NodeServerTest {
 		}
 		TestNode(ALattice<V> lattice,AStore store,NodeConfig config,LatticeContext context) {
 			super(relay(lattice,store,config,context),config);
+		}
+		/** A node over an assembled host whose applications decide what they take. */
+		TestNode(LatticeHost<V> host,NodeConfig config) {
+			super(host,config);
 		}
 		private static <V extends ACell> LatticeHost<V> relay(ALattice<V> lattice,AStore store,
 				NodeConfig config,LatticeContext context) {
@@ -226,7 +231,6 @@ public class NodeServerTest {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		LatticePropagator group=unattachedPropagator(maxNodeServer);
 		group.setTransportKeyPair(AKeyPair.generate());
-		group.setIngressFilter((path,value) -> value);
 		group.setPublicationFilter(value -> value);
 		group.setApplicationMessageHandler(message -> false);
 		group.setInboundLatticeListener((connection,owner,path,value,changed) -> {});
@@ -235,8 +239,6 @@ public class NodeServerTest {
 		assertSame(group,maxNodeServer.getPropagators().get(0));
 		assertThrows(IllegalStateException.class,
 			() -> group.setTransportKeyPair(AKeyPair.generate()));
-		assertThrows(IllegalStateException.class,
-			() -> group.setIngressFilter((path,value) -> value));
 		assertThrows(IllegalStateException.class,
 			() -> group.setPublicationFilter(value -> value));
 		assertThrows(IllegalStateException.class,
@@ -1022,28 +1024,33 @@ public class NodeServerTest {
 		}
 	}
 
-	/** Interest-policy rejection is observable and occurs before persistence. */
+	/**
+	 * Which values are wanted is the application's decision, not the transport's: a
+	 * value no application takes leaves the root unchanged, and the delivery still
+	 * completes without counting as a rejection.
+	 */
 	@Test
-	public void testIngressRejectionDoesNotPersist() throws Exception {
+	public void testApplicationTakingNothingLeavesRootUnchanged() throws Exception {
 		try (AStore ingressStore=new MemoryStore()) {
-			Blob unsolicited=Blobs.createRandom(400);
-			ASet<ACell> value=Sets.of(unsolicited);
-			try (NodeServer<ASet<ACell>> node=new TestNode<>(
-					SetLattice.create(),ingressStore)) {
-					LatticePropagator ingress=unattachedPropagator(node);
-					ingress.setIngressFilter((path,received) -> null);
-					node.addPropagator(ingress);
-					selectInboundPropagator(node,connection -> ingress);
+			ASet<ACell> value=Sets.of(Blobs.createRandom(400));
+			LatticeHost<ASet<ACell>> host=LatticeHost.create(Sets.empty(),ingressStore);
+			var indifferent=new ALatticeApplication<ASet<ACell>>(SetLattice.create(),host) {
+				@Override public ASet<ACell> merge(ASet<ACell> incoming) { return cursor.get(); }
+			};
+			host.configureApplications(List.of(indifferent));
+			try (NodeServer<ASet<ACell>> node=new TestNode<>(host,null)) {
+				LatticePropagator ingress=unattachedPropagator(node);
+				node.addPropagator(ingress);
+				selectInboundPropagator(node,connection -> ingress);
 				node.launch();
 				try (ConvexRemote peer=ConvexRemote.connect(address(node))) {
 					AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,
 						null,Vectors.empty(),value);
 					Result result=peer.request(Message.create(
 						MessageType.LATTICE_VALUE,payload)).get(5,TimeUnit.SECONDS);
-					assertEquals(ErrorCodes.FORMAT,result.getErrorCode());
-					assertEquals(1L,ingress.getInboundStats().mergesRejected());
+					assertFalse(result.isError());
+					assertEquals(0L,ingress.getInboundStats().mergesRejected());
 					assertTrue(node.getLocalValue().isEmpty());
-					assertNull(ingressStore.refForHash(unsolicited.getHash()));
 				}
 			}
 		}

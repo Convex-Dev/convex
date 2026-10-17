@@ -25,7 +25,7 @@ A node with no propagators is a valid local, store-backed node.
 | `NodeServer` | Node store root, persistence barriers, attached-group lifecycle and update fan-out for one assembled host | Lattice, merge policy, sockets, peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
 | `LatticeListener` | Application-owned TCP acceptance, physical limits and one immutable connection-to-group assignment | Propagator lifecycle, per-connection protocol state, serving stores, trust or lattice merge |
 | `LatticePropagator` | One propagation policy group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
-| `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, ingress policy, challenge state, statistics and extension handler | Node persistence, peer discovery or application schemas |
+| `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, challenge state, statistics and extension handler | Node persistence, peer discovery, application schemas or which values are wanted |
 | `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification and admitted outbound routes | Discovery records, listener assignment, lattice merge or application-owner validation |
 | `ALattice` / `LatticeContext` | Value validation, merge semantics and application signing authority | Transport identity and routing |
 | Application wrapper | Construction, lifecycle order, transport composition, connection assignment, discovery translation and application handlers | Generic protocol internals |
@@ -49,7 +49,6 @@ LatticePropagatorConfig groupConfig = LatticePropagatorConfig.create();
 LatticePropagator publicGroup = new LatticePropagator(servingStore, groupConfig);
 publicGroup.setPublicationFilter(publicProjection);
 publicGroup.setTransportKeyPair(transportKey);
-publicGroup.setIngressFilter(ingressPolicy);
 publicGroup.setApplicationMessageHandler(extensionHandler);
 
 node.addPropagator(publicGroup);
@@ -126,10 +125,12 @@ Once the listener assigns a socket, all work belongs to that group:
    the connection is trusted; unverified values must already be complete.
 3. Protocol handlers deal with queries, values, DATA, challenges and application
    extensions.
-4. The ingress filter admits or projects a complete value.
+4. The complete value is persisted in the group's store.
 5. The endpoint gives only `(path, completeValue)` to `NodeServer`.
-6. `NodeServer` hands the value to its host, whose applications merge it under
-   their own lattices, then publishes the host root to the node store.
+6. `NodeServer` hands the value to its host, whose applications take what they
+   want from it under their own lattices, then publishes the host root to the
+   node store. Which values are wanted is the applications' decision alone; the
+   propagation group filters only what it serves.
 7. The node schedules a non-blocking update for every attached group.
 
 `DATA` only materialises independently addressable cells in the selected serving

@@ -665,8 +665,10 @@ public class SharedApplicationInternalsTest {
 			assertEquals(socialView.get(Keywords.P2P),filesView.get(Keywords.P2P));
 			assertEquals(socialView.get(Keywords.ID),filesView.get(Keywords.ID));
 			// Independent receiver sees the partial roots in reverse order, with the same result.
+			// It takes only the social owners it wants, so it pins the social user first.
 			var reverse=P2PApplication.connect(HOST_ROOT,LatticeHost.create(HOST_ROOT.zero(),reverseStore));
 			reverse.setContext(VERIFY);
+			reverse.pinSocial(DID.forKey(SOCIAL_KEY.getAccountKey()));
 			reverse.merge(filesView);
 			reverse.merge(socialView);
 			assertEquals(f.node.getCursor().get(),reverse.cursor().get());

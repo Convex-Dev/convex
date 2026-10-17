@@ -91,7 +91,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private Thread maintenanceThread;
 
 	private AKeyPair transportKeyPair;
-	private LatticeIngressFilter ingressFilter=(path,value) -> value;
 	private Predicate<Message> applicationMessageHandler;
 	private InboundLatticeListener inboundLatticeListener;
 
@@ -110,12 +109,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 	/** Configures the identity used only for live transport possession proofs. */
 	void setTransportKeyPair(AKeyPair keyPair) {
 		this.transportKeyPair=keyPair;
-	}
-
-	/** Configures complete-value admission for this propagation group. */
-	void setIngressFilter(LatticeIngressFilter filter) {
-		if (filter==null) throw new IllegalArgumentException("Ingress filter must not be null");
-		this.ingressFilter=filter;
 	}
 
 	/** Configures the handler for complete application extension messages. */
@@ -468,11 +461,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 		Ref.get(value).findMissing(missing,1);
 		if (!missing.isEmpty()) throw new MissingDataException(store,missing.iterator().next());
 		if (!withinInboundSizeLimit(value)) throw new BadFormatException("Acquired lattice value exceeds inbound size limit");
-		ACell[] path=payload.path().toCellArray();
-		ACell admitted=ingressFilter.filter(path,value);
-		if (admitted==null) throw new BadFormatException("Inbound lattice value is not locally desired");
-		if (!withinInboundSizeLimit(admitted)) throw new BadFormatException("Projected lattice value exceeds inbound size limit");
-		ACell complete=Cells.persist(admitted,store);
+		// What the host's applications take from the value is theirs to decide
+		ACell complete=Cells.persist(value,store);
 		AVector<?> completePayload=Vectors.create(
 			MessageTag.LATTICE_VALUE,payload.id(),payload.path(),complete);
 		return Message.create(MessageType.LATTICE_VALUE,completePayload)

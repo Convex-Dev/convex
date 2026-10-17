@@ -246,7 +246,9 @@ public class P2PSocialSyncTest {
 		assertNull(finalInfrastructure.get(Social.KEY_SOCIAL));
 
 		// A public, unverified connection may offer complete data, but possession
-		// of an unrelated key cannot mutate Alice's DID-owned feed.
+		// of an unrelated key cannot mutate Alice's DID-owned feed. The delivery
+		// completes: the application takes nothing from it, and that is not an
+		// error the transport reports.
 		AKeyPair attackerKey=AKeyPair.generate();
 		Blob forgedPost=SocialPost.createKey(Long.MAX_VALUE-1);
 		Index<Blob,ACell> forgedFeed=Index.<Blob,ACell>none().assoc(forgedPost,
@@ -260,8 +262,8 @@ public class P2PSocialSyncTest {
 			MessageTag.LATTICE_VALUE,null,Vectors.of(Social.KEY_SOCIAL),forgedOwners));
 		try (Convex attacker=Convex.connect(aliceNode.getHostAddress(),
 				null,attackerKey)) {
-			Result rejected=attacker.request(forgedUpdate).get(5,TimeUnit.SECONDS);
-			assertTrue(rejected.isError());
+			Result delivered=attacker.request(forgedUpdate).get(5,TimeUnit.SECONDS);
+			assertFalse(delivered.isError());
 		}
 		assertNull(alice.user(aliceDid).feed().getPost(forgedPost));
 	}

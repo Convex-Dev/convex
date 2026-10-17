@@ -122,9 +122,9 @@ public class P2PNode implements Closeable {
 		NodeDirectory directory=application.directory();
 		directory.setMaxRecords(propagator.getConnectionManager().getMaxDesiredPeers());
 		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,directory);
-		// The application decides what is wanted; the propagation group applies it.
+		// The application takes what it wants from incoming values; the propagation
+		// group projects what it serves by the same policy.
 		SocialReplicationPolicy social=application.policy();
-		propagator.setIngressFilter(social::filterIngress);
 		propagator.setPublicationFilter(value -> (Index<Keyword,ACell>)social.filterPublication(
 			new ACell[0],value));
 		propagator.setApplicationMessageHandler(pointOfPresence::handle);
@@ -291,7 +291,7 @@ public class P2PNode implements Closeable {
 	 * group. This is appropriate only for an intentionally public node serving a
 	 * single lattice view.
 	 * The connection remains untrusted unless the independent node-key challenge
-	 * succeeds, and the default social ingress filter remains in force.
+	 * succeeds, and the application still takes only the social owners it wants.
 	 * Must be called before {@link #launch()}.
 	 *
 	 * @return this node, for chaining

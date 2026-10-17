@@ -134,17 +134,16 @@ Inbound protocol work happens in the selected propagation group:
 
 1. bounded queue admission;
 2. complete-value decode or trusted acquisition into the serving store;
-3. ingress filtering;
-4. `NodeServer.mergeInbound(path, value)`, which hands the value to the host and
-   its applications;
-5. host `sync()` if the merge changed the published root; and
-6. asynchronous notification of every attached group.
+3. `NodeServer.mergeInbound(path, value)`, which hands the value to the host and
+   its applications, each taking what it wants;
+4. host `sync()` if the merge changed the published root; and
+5. asynchronous notification of every attached group.
 
 An unverified connection cannot acquire partial trees. A complete public value
-can still be merged under zero trust, but only if the ingress policy and the
-receiving application's lattice accept it.
+can still be merged under zero trust, but only if a receiving application takes
+it and its lattice accepts it.
 
-The response to a correlated update follows step 5. This means the sender learns
+The response to a correlated update follows step 4. This means the sender learns
 whether host publication succeeded without being coupled to optional propagator
 workers.
 
