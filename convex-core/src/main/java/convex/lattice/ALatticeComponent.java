@@ -9,17 +9,13 @@ import java.util.function.Function;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
-import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
-import convex.lattice.cursor.SignedCursor;
 import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.generic.AKeyedLattice;
-import convex.lattice.generic.AOwnerLattice;
-import convex.lattice.generic.SignedLattice;
 
 /**
  * Domain operations over a cursor at one path.
@@ -67,16 +63,6 @@ public abstract class ALatticeComponent<V extends ACell> {
 		ALatticeComponent<T> component=new ALatticeComponent<T>(lattice,destination) {};
 		component.setContext(context);
 		return component;
-	}
-
-	/** Immediate signing boundary with an explicitly bound authoring function. */
-	protected final <T extends ACell> SignedCursor<T> signedCursor(
-			ACursor<SignedData<T>> slot,
-			AOwnerLattice<?,T,?> owners, ACell owner) {
-		SignedLattice<T> rule=owners.signingFor(owner);
-		if (rule==null) throw new IllegalArgumentException("Invalid owner: "+owner);
-		LatticeContext policy=getContext();
-		return SignedCursor.create(slot,v -> rule.sign(policy,v));
 	}
 
 	/** Creates a component over a cursor. */

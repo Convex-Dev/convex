@@ -2,6 +2,7 @@ package convex.lattice.fs;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.File;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
@@ -29,18 +30,21 @@ public class DLFSTransferTest {
 	public void testCrossStoreCopySurvivesSourceCloseAndDestinationReopen() throws Exception {
 		byte[] bytes=new byte[100000];
 		new java.util.Random(729).nextBytes(bytes);
-		var sourceFile=temporary.resolve("source.etch").toFile();
-		var targetFile=temporary.resolve("target.etch").toFile();
-		try (var store=EtchStore.create(sourceFile)) {
+		// Etch's temporary-file lifecycle also supports delayed Windows unmapping.
+		File sourceFile;
+		File targetFile;
+		try (var store=EtchStore.createTemp("dlfs-source")) {
+			sourceFile=store.getFile();
 			try (var fs=DLFSLocal.create(DLFS.provider(),"source",Cursors.root(DLFSLattice.INSTANCE.zero()),store)) {
 				Files.write(fs.getPath("/file"),bytes);
 				store.setRootData(fs.getCursor().get());
 			}
 		}
 		try (var heap=DLFS.create()) {
-			try (var sourceStore=EtchStore.create(sourceFile); var targetStore=EtchStore.create(targetFile);
+			try (var sourceStore=EtchStore.create(sourceFile); var targetStore=EtchStore.createTemp("dlfs-target");
 					var source=DLFSLocal.create(DLFS.provider(),"source",Cursors.root(sourceStore.<AVector<ACell>>getRootData()),sourceStore);
 					var target=DLFSLocal.create(DLFS.provider(),"target",Cursors.root(DLFSLattice.INSTANCE.zero()),targetStore)) {
+				targetFile=targetStore.getFile();
 				var file=source.getPath("/file");
 				Files.copy(file,heap.getPath("/file"));
 				Files.copy(file,target.getPath("/file"));

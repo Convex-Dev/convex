@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
-import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
@@ -59,20 +58,19 @@ public class ApplicationPublicationTest {
 		final SignedComponent<ASet<CVMLong>> owner;
 		final AtomicInteger signatures=new AtomicInteger();
 		Runnable onSign=() -> {};
+		volatile AKeyPair signingKey=KEY;
 
 		Application(LatticeHost<Index<Keyword,ACell>> host) {
 			super(LATTICE,host);
 			// The owned subtree publishes through its own fork of the host, beside this
 			// application's staged root, so each fork reconciles only what it owns.
 			owner=new SignedComponent<>(SIGNED,
-				ALatticeComponent.<SignedData<ASet<CVMLong>>>resolve(host.cursor(),LATTICE,OWNED));
-			owner.setContext(new LatticeContext() {
-				@Override public AKeyPair getSigningKey() { return KEY; }
-				@Override public <T extends ACell> SignedData<T> sign(AccountKey key,T value) {
+				ALatticeComponent.<SignedData<ASet<CVMLong>>>resolve(host.cursor(),LATTICE,OWNED),
+				value -> {
 					signatures.incrementAndGet();
 					onSign.run();
-					return super.sign(key,value);
-				}
+					var key=signingKey;
+					return key==null?null:key.signData(value);
 			});
 		}
 
@@ -213,13 +211,12 @@ public class ApplicationPublicationTest {
 		var second=new Application(host);
 		first.add(1);
 		second.add(2);
-		var signer=second.owner.getContext();
-		second.owner.setContext(LatticeContext.EMPTY);
+		second.signingKey=null;
 		first.sync();
 		assertThrows(IllegalStateException.class,second::sync);
 		assertEquals(Sets.of(0,1),signed(host.cursor().get()).getValue());
 		assertEquals(Sets.of(0,2),second.owner.cursor().get(),"A failed publication leaves the working copy intact");
-		second.owner.setContext(signer);
+		second.signingKey=KEY;
 		second.sync();
 		assertEquals(Sets.of(0,1,2),signed(host.cursor().get()).getValue());
 	}

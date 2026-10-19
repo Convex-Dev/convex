@@ -136,8 +136,12 @@ public class SharedApplicationInternalsTest {
 				LatticeContext context,ACell... path) {
 			ALattice<?> lattice=getLattice();
 			for (ACell key:path) lattice=lattice.path(key);
-			var component=new SignedComponent<>((SignedLattice<T>)lattice,
-				ALatticeComponent.<SignedData<T>>resolve(host.cursor(),getLattice(),path));
+			var rule=(SignedLattice<T>)lattice;
+			// This legacy application's resolver supplies both the public owner rule
+			// and an explicit signer; the draft itself does not look up a context.
+			var component=new SignedComponent<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
+				ALatticeComponent.<SignedData<T>>resolve(host.cursor(),getLattice(),path),
+				value -> context.signAs(rule.getOwner(),value));
 			component.setContext(context);
 			return component;
 		}

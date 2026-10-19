@@ -14,11 +14,13 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -29,10 +31,7 @@ import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.SetLattice;
-import convex.lattice.generic.LWWLattice;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.SignedCursor;
-import convex.lattice.cursor.StampedCursor;
 
 public class ALatticeApplicationTest {
 
@@ -196,30 +195,38 @@ public class ALatticeApplicationTest {
 	public void testIndependentSigningAndStampingThroughExistingChildren() {
 		AKeyPair alice=AKeyPair.createSeeded(6201);
 		AKeyPair bob=AKeyPair.createSeeded(6202);
-		Keyword timestamp=LWWLattice.KEY_TIMESTAMP;
-		var record=LWWLattice.create(LATTICE,v -> ((CVMLong)v.get(timestamp)).longValue());
-		var owners=OwnerKeyLattice.create(record);
+		Keyword timestamp=Timestamped.TIMESTAMP;
+		var owners=OwnerKeyLattice.create(Timestamped.lattice());
 		var host=LatticeHost.create(owners.zero(),null);
 		var first=LatticeApplication.live(owners,host);
 		var second=LatticeApplication.live(owners,host);
-		first.setContext(LatticeContext.create(CVMLong.create(100),alice));
-		second.setContext(LatticeContext.create(CVMLong.create(200),bob));
-		// A domain component would own these two boundaries: sign the owner's record, then
-		// stamp it on every write below.
-		AForkableCursor<ASet<CVMLong>> aliceItems=ALatticeComponent.resolve(StampedCursor.create(ComponentTestSupport.signed(first.cursor().path(alice.getAccountKey()), owners, alice.getAccountKey(), first.getContext()),first.getContext()::currentTimestamp,(v,ts) -> v.assoc(timestamp,ts)),record,ITEMS);
-		AForkableCursor<ASet<CVMLong>> bobItems=ALatticeComponent.resolve(StampedCursor.create(ComponentTestSupport.signed(second.cursor().path(bob.getAccountKey()), owners, bob.getAccountKey(), second.getContext()),second.getContext()::currentTimestamp,(v,ts) -> v.assoc(timestamp,ts)),record,ITEMS);
-		aliceItems.updateAndGet(v -> (v==null?ITEMS_LATTICE.zero():v).include(CVMLong.ONE));
-		bobItems.updateAndGet(v -> (v==null?ITEMS_LATTICE.zero():v).include(CVMLong.TWO));
+		first.setContext(LatticeContext.create(CVMLong.create(100),null));
+		second.setContext(LatticeContext.create(CVMLong.create(200),null));
+		// Each author receives an explicit signer. The timestamp wrapper captures the
+		// application's current clock supplier; nested set views need neither policy.
+		var aliceRecord=new ASignedComponent<>(first.cursor().path(alice.getAccountKey()),
+			owners.signingFor(alice.getAccountKey()),alice::signData) {};
+		var bobRecord=new ASignedComponent<>(second.cursor().path(bob.getAccountKey()),
+			owners.signingFor(bob.getAccountKey()),bob::signData) {};
+		var aliceEdits=Timestamped.create(aliceRecord.cursor().withDefault(Maps.empty()),first.getContext()::currentTimestamp);
+		var bobEdits=Timestamped.create(bobRecord.cursor().withDefault(Maps.empty()),second.getContext()::currentTimestamp);
+		var aliceItems=new SetComponent<CVMLong>(aliceEdits.cursor().path(ITEMS));
+		var bobItems=new SetComponent<CVMLong>(bobEdits.cursor().path(ITEMS));
+		aliceItems.add(CVMLong.ONE);
+		bobItems.add(CVMLong.TWO);
 		var state=host.cursor().get();
 		assertEquals(CVMLong.create(100),state.get(alice.getAccountKey()).getValue().get(timestamp));
 		assertEquals(CVMLong.create(200),state.get(bob.getAccountKey()).getValue().get(timestamp));
 		assertTrue(state.get(alice.getAccountKey()).checkSignature());
 		assertTrue(state.get(bob.getAccountKey()).checkSignature());
 		assertSame(LatticeContext.EMPTY,host.getContext());
-		assertThrows(IllegalStateException.class,() -> ALatticeComponent.<ASet<CVMLong>>resolve(StampedCursor.create(ComponentTestSupport.signed(second.cursor().path(alice.getAccountKey()), owners, alice.getAccountKey(), second.getContext()),second.getContext()::currentTimestamp,(v,ts) -> v.assoc(timestamp,ts)),record,ITEMS).set(Sets.of(3)));
+		var wrongSigner=new ASignedComponent<>(second.cursor().path(alice.getAccountKey()),
+			owners.signingFor(alice.getAccountKey()),bob::signData) {};
+		AHashMap<Keyword,ACell> attempted=Maps.of(timestamp,CVMLong.create(300),ITEMS,Sets.of(3));
+		assertThrows(IllegalStateException.class,() -> wrongSigner.cursor().set(attempted));
 		assertSame(state,host.cursor().get());
-		first.setContext(LatticeContext.create(CVMLong.create(300),alice));
-		aliceItems.updateAndGet(v -> (v==null?ITEMS_LATTICE.zero():v).include(CVMLong.TWO));
+		first.setContext(LatticeContext.create(CVMLong.create(300),null));
+		aliceItems.add(CVMLong.TWO);
 		assertEquals(CVMLong.create(100),host.cursor().get().get(alice.getAccountKey()).getValue().get(timestamp));
 		assertEquals(Sets.of(1,2),aliceItems.get());
 	}

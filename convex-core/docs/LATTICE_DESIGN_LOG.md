@@ -18,6 +18,17 @@ Status values: **Implemented** (on the branch, passing the full build),
 
 ## Current API note
 
+**CAD scope alignment, 18 October 2026:** the local `design` checkout now separates
+CAD024's abstract lattice semantics and CAD038's authorisation rules from CAD045's
+component implementation. CAD035 describes the supporting cursor mechanisms;
+CAD036 covers delivery and replication; CAD053 registers shared region names.
+The affected sections now describe explicit component boundaries, owned-map
+verification, construction and signing views, and fork reconciliation without
+automatic cursor policy inheritance. These are local CAD source changes, not a
+claim that the published documentation has been deployed. Earlier entries below
+remain the history of design decisions; this note does not close unrelated open
+questions or assert that every older CAD discrepancy has been resolved.
+
 The entries below record earlier design steps and may name APIs superseded by the
 current branch. See [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) and
 [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md) for the current API:
@@ -438,10 +449,146 @@ optional region factories".
 
 CAD text affected: CAD045 *Application Architecture* layer table.
 
-## Not affected
+## 18. Named regions compose application behaviour
 
-CAD038 (*Lattice Authorisation*): verification at the merge boundary is unchanged.
-The owner lattices still verify signer against owner on every context-aware merge.
+**Status:** Implemented, 18 October 2026.
+
+Mike proposed an `AKeyedRegions` component that declares the regions an application
+is interested in and the components handling them, including at the host root.
+Applications should reuse standard merges rather than reconstruct container merges
+themselves. Explicitly supplied components may be shared by applications.
+
+`AKeyedRegions` extends the component base and registers children by keyword.
+`createRegion` constructs a child at a supplied region cursor with the resolved
+context; `region` retains an existing child without rebinding it or changing policy.
+Both root and path deliveries use the child's delivery entry point. Missing and
+unregistered entries do nothing. Registration freezes at first use.
+
+The container has no private whole-root snapshot. Sync publishes its children at
+their own boundaries, leaving all other paths alone. Staged state is read through
+the children; the container cursor shows the destination. Merge and publication
+across children are sequential, not an atomic aggregate. A shared instance shares
+pending state as well as its publication destination; repeated lattice deliveries
+are idempotent. `LatticeComponent` supplies the standard lattice-backed child.
+
+`SingleRegion<C>` and `Regions` provide concrete implementations for one typed
+child and a configurable collection respectively. The local application testbed
+uses these directly: favourites can share a region instance, the notebook retains
+its deferred signing boundary, and the task board retains one aggregate boundary
+for transactions across its sets. These applications need no custom root merge or
+sync implementation.
+
+The host accepts any root component, so a normal application can inherit
+`AKeyedRegions` without also inheriting `ALatticeApplication`. The latter remains a
+convenience for root lattice navigation and custom application merges. This is a
+component composition choice, not a change to lattice merge algorithms or encoding.
+
+CAD text affected: CAD045 *Application Architecture*, *Wrapper Pattern* and
+*Connecting to Node Infrastructure*. The earlier cursor/component discrepancies
+remain; this entry records the agreed component-owned composition.
+
+## 19. Owned-map components bind authorisation and publication
+
+Implemented 18 October 2026. `AOwnedMap` extends the concrete `LatticeComponent`
+with standard owner views and drafts. `OwnedMap` and `OwnedIndex` require an
+explicit verifier; `KeyOwnedIndex` specialises the index to public-key equality.
+The component binds this rule to an existing owner lattice, so full-map and
+owner-path delivery share verification. Views sign into the map's working state;
+independent drafts sign on their own sync. Map sync never implicitly publishes a
+draft. Components do not retain or cache domain views or drafts.
+
+Changed foreign entries are checked for a signed envelope before typed dispatch.
+`SignedLattice` checks its payload lattice's foreign-value validator before
+acceptance or signing. Invalid entries leave their owner slot unchanged and do not
+prevent unrelated valid entries merging. A malformed containing value can still
+abort the atomic merge. Value lattices remain responsible for domain validation.
+
+CAD038 *Owner Verifier* describes context-based verification; these components use
+the instance-bound verifier already introduced by the typed owner lattices. Its
+fail-closed guidance and legacy permissive fallback conflict for indirect owners:
+the new components require an explicit verifier, as agreed, while the legacy
+`OwnerLattice` authorisation fallback remains unchanged. CAD043 governs identity
+resolution and CAD004 distinguishes account identity, keys and controllers; this
+change supplies no new DID method or account-authorisation rules. Applications
+provide local resolver data, and a changed resolver governs future verification
+without deleting previously accepted values.
+
+CAD045's component/cursor differences recorded above also apply to these staged
+owned components. Favourites and the DID-keyed scores example exercise the new
+component API in the local application testbed.
+
+## 20. Signed domain components are constructed directly at paths
+
+Implemented 18 October 2026. `ASignedComponent` owns a live signing boundary over
+an explicitly supplied signed storage cursor and owner-bound rule. Domain classes
+extend it and expose operations over its unsigned cursor. Incoming envelope merges
+use the same rule; signing uses the component's current context. Multiple instances
+at a path share edits immediately. Sync does not publish their containing map.
+`SignedComponent` remains the independent draft which signs only on sync.
+
+Removed the owned-map view factory and then its replacement signing-view helper.
+Applications construct their domain classes directly. `AOwnedMap.path(owner)`
+supplies a signed slot and constructs a missing map only on the first changed write;
+plain cursor paths suffice when the containing map exists. Favourites and scores
+exercise this pattern. The favourites root also constructs its region directly at
+`host.cursor().path(FAVOURITES)`. CAD045 describes the resulting component pattern;
+CAD038's authorisation requirements remain unchanged.
+
+## 21. Owned collections merge with public information only
+
+Implemented 18 October 2026. `AOwnedMap` now extends `ALatticeComponent` directly
+and uses the context-free owner lattice for both incoming merges and publication
+conflicts. `OwnedMap`, `OwnedIndex` and `KeyOwnedIndex` constructors no longer take
+a context. They preserve existing signed envelopes and never resolve authoring
+capabilities. If payload merging synthesises a third value, the collection keeps
+its established envelope until an authorised component authors a result.
+
+`SignedLattice.merge(own, other)` uses context-free payload merging and never
+signs. Its explicit-context overload remains available to signed components that
+define an authoring policy. `ASignedComponent` can reconcile and re-sign under
+that policy; drafts require an explicit signing context. The favourites example
+defines its key strategy once, in `Favourites`: use the supplied user's key, with
+no inherited host or region fallback. CAD038 and CAD045 clarify this boundary.
+
+## 22. Signed components take an explicit signer function
+
+Implemented 18 October 2026. `ASignedComponent`, `SignedComponent` and the owned
+map's `draft(owner, signer)` helper take `Function<V, SignedData<V>>`. Domain
+constructors pass `user::signData`; a dynamic function may resolve a wallet key
+when called. The same function handles local edits and re-signing. Components no
+longer construct or inherit a signing context, and the generic component base no
+longer contains a signing-cursor helper. DLFS and Social construct their existing
+signing boundaries locally, retaining their legacy context policy.
+
+The bound `SignedLattice` checks the returned payload, signature and owner
+authorisation. `sign(value, signer)` checks local authoring;
+`mergeAndSign(own, other, signer)` explicitly permits synthesis. Plain
+`merge(own, other)` remains public and never signs. Existing context overloads
+remain for legacy lattice callers. Null or unauthorised results leave synthesis
+unchanged and fail local publication; substituted payloads and invalid signatures
+throw before storage. Unchanged edits and selected envelopes do not invoke the
+signer. Failed draft publication retains the pending edit for retry.
+
+Favourites defines its key strategy once as `user::signData`. Its owner region
+still has no signing capability. CAD038 and CAD045 document the checked signer
+result and explicit capability boundary.
+
+## 23. Timestamped components own stamping and ordering together
+
+Implemented 18 October 2026. `Timestamped` is a live component wrapper whose
+editing cursor is a `StampedCursor`. Incoming merges use the underlying storage
+and whole-record ordering, without re-stamping. The standard map factory handles
+`:timestamp` and shares one validating lattice with enclosing signed and staged
+components. Custom record representations can provide their own ordering and
+stamping rule. The wrapper creates no fork and sync does not publish its storage.
+
+Favourites embeds `Timestamped` around its unsigned record, then constructs its
+set component at `record.cursor().path(ITEMS)`. Its owner index uses
+`Timestamped.lattice()`, removing the application's timestamp extractor and
+stamping lambda. Its public editing cursor also follows this path. Signed
+incoming envelopes still enter at the enclosing signed boundary, retaining the
+selected envelope. CAD024's whole-record LWW rule and CAD035's cursor mechanics
+are unchanged; CAD045 describes the standard component composition.
 
 ## CAD-by-CAD summary
 
@@ -449,5 +596,6 @@ The owner lattices still verify signer against owner on every context-aware merg
 |---|---|---|
 | CAD024 Data Lattice | *Cursors*, *Signed Lattice*, *Cursor Sync Guarantees*, implementation note on cursor types | 1, 3, 5, 6, 13, 15 |
 | CAD035 Lattice Cursors | *Path Cursor*, *Forkable Cursor*, *Cursor Hierarchy*, *Lattice-Aware Cursors*, *Lattice Context*, *Reference Implementation*, Java example | 2, 3, 4, 5, 6, 7, 8, 10 |
-| CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 17 |
+| CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 |
 | CAD036 Lattice Node | pull-path merge description, node construction and restore | 9, 14, 16 |
+| CAD038 Lattice Authentication | *Owner Verifier*, indirect-owner default policy, explicit authoring | 19, 20, 21, 22 |

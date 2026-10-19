@@ -2,6 +2,8 @@ package convex.lattice.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -15,60 +17,90 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.SignedComponent;
-import convex.lattice.cursor.ACursor;
+import convex.lattice.SingleRegion;
+import convex.lattice.SetComponent;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.SetLattice;
-import convex.lattice.generic.SignedLattice;
 
-/** A notebook deliberately batches unsigned edits before publishing through its application. */
+/**
+ * A notebook with an explicit unsigned draft and deferred signing.
+ * Its host stores {@code {:notebook #Signed #{note-texts}}}; each notebook binds its
+ * verification rule to the supplied owner. A notebook uses set union, so notes are unique strings
+ * with no ordering, replacement or deletion semantics.
+ *
+ * <p>{@link Notes} handles share one notebook's private unsigned working set.
+ * Their edits neither sign nor reach the host. {@link Notebook#sync()} reconciles
+ * that set with the current signed destination and signs the result. Independent
+ * notebooks at the same host path have separate drafts and combine them when they
+ * publish. {@link NotebookApp} delegates application sync to its notebook.</p>
+ *
+ * <p>This contrasts with {@link FavouritesExample}, where each changed local edit
+ * is immediately signed into a staged owner region. Here the signed notebook's
+ * destination is already a host path, so notebook sync reaches the host directly.
+ * Host persistence remains a separate step. The tests use only in-memory hosts.</p>
+ */
 class ApplicationPublicationTest {
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(7320);
+	private static final AKeyPair BOB=AKeyPair.createSeeded(7321);
 	private static final Keyword NOTEBOOK=Keyword.intern("notebook");
-	private static final SignedLattice<ASet<AString>> CONTENTS=
-		OwnerKeyLattice.create(SetLattice.<AString>create()).signingFor(ALICE.getAccountKey());
-	private static final KeyedLattice LATTICE=KeyedLattice.create(NOTEBOOK,CONTENTS);
+	private static final OwnerKeyLattice<ASet<AString>> CONTENTS=OwnerKeyLattice.create(SetLattice.create());
 
-	/** Application policy coordinates a notebook; it does not fork the entire host. */
-	static final class NotebookApp {
-		private final ACursor<SignedData<ASet<AString>>> destination;
-		private final Notebook notebook;
-
+	/** Routes complete envelopes at {@code :notebook} and publishes only that component. */
+	static final class NotebookApp extends SingleRegion<Notebook> {
 		NotebookApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair owner) {
-			destination=ALatticeComponent.resolve(host.cursor(),LATTICE,NOTEBOOK);
-			notebook=new Notebook(destination,owner);
+			super(host,NOTEBOOK,new Notebook(host.cursor().path(NOTEBOOK),owner));
 		}
 
-		Notebook notebook() { return notebook; }
-		SignedData<ASet<AString>> publishedNotebook() { return destination.get(); }
-		void sync() { notebook.sync(); }
+		Notebook notebook() { return component(); }
+		/** Reads the host's published envelope, not the notebook's pending unsigned edits. */
+		SignedData<ASet<AString>> publishedNotebook() { return RT.getIn(cursor.get(),NOTEBOOK); }
 	}
 
-	/** This component explicitly owns private working state and defers signing until sync. */
+	/**
+	 * Owns the draft and signing capability. The owner-bound contents rule verifies
+	 * incoming envelopes before their payloads enter the unsigned draft. A union
+	 * assembled from local and remote notes needs a new signature only when published.
+	 */
 	static final class Notebook extends SignedComponent<ASet<AString>> {
-		Notebook(ACursor<SignedData<ASet<AString>>> destination,AKeyPair owner) {
-			super(CONTENTS,destination);
-			setContext(LatticeContext.EMPTY.withSigningKey(owner));
+		Notebook(AForkableCursor<SignedData<ASet<AString>>> destination,AKeyPair owner) {
+			super(CONTENTS.signingFor(owner.getAccountKey()),destination,owner::signData);
 		}
 		Notes notes() { return new Notes(cursor()); }
 	}
 
 	/** Ordinary views share notebook state and have no publication lifecycle of their own. */
 	static final class Notes extends ALatticeComponent<ASet<AString>> {
-		Notes(AForkableCursor<ASet<AString>> cursor) { super(cursor); }
-		void add(String text) {
-			cursor.updateAndGet(notes -> (notes==null?Sets.<AString>empty():notes).include(Strings.create(text)));
+		private final SetComponent<AString> entries;
+		Notes(AForkableCursor<ASet<AString>> cursor) {
+			super(cursor);
+			entries=new SetComponent<>(cursor);
 		}
-		ASet<AString> all() {
-			var notes=cursor.get();
-			return notes==null?Sets.empty():notes;
+		void add(String text) { entries.add(Strings.create(text)); }
+		ASet<AString> all() { return entries.get(); }
+	}
+
+	/** The constructor's owner controls both publication and acceptance of incoming notes. */
+	@Test void eachNotebookBindsItsSuppliedOwner() {
+		for (var owner:List.of(ALICE,BOB)) {
+			var host=LatticeHost.create();
+			var app=new NotebookApp(host,owner);
+			host.configureApplications(List.of(app));
+			var other=owner==ALICE?BOB:ALICE;
+			app.notebook().notes().add("Local");
+			host.mergeAt(other.signData(Sets.of("Unauthorised")),NOTEBOOK);
+			host.mergeAt(owner.signData(Sets.of("Authorised")),NOTEBOOK);
+			assertEquals(Sets.of("Local","Authorised"),app.notebook().notes().all());
+			app.sync();
+			assertEquals(owner.getAccountKey(),app.publishedNotebook().getAccountKey());
+			assertTrue(app.publishedNotebook().checkSignature());
+			assertEquals(Sets.of("Local","Authorised"),app.publishedNotebook().getValue());
 		}
 	}
 
+	/** A lightweight view's sync cannot implicitly publish its enclosing signed draft. */
 	@Test void eachPublicationStopsAtItsSuppliedDestination() {
 		var host=LatticeHost.create();
 		var app=new NotebookApp(host,ALICE);
@@ -88,6 +120,7 @@ class ApplicationPublicationTest {
 		assertNull(host.getContext().getSigningKey());
 	}
 
+	/** Application sync is the convenient entry point for the registered child's publication. */
 	@Test void applicationSyncPublishesItsNotebook() {
 		var host=LatticeHost.create();
 		var app=new NotebookApp(host,ALICE);
@@ -98,6 +131,7 @@ class ApplicationPublicationTest {
 		assertEquals(app.publishedNotebook(),host.cursor().get().get(NOTEBOOK));
 	}
 
+	/** Both drafts start before either publishes; the second publication must retain the first one's notes. */
 	@Test void independentNotebooksReconcileAtTheSigningBoundary() {
 		var host=LatticeHost.create();
 		var first=new NotebookApp(host,ALICE);
@@ -105,10 +139,27 @@ class ApplicationPublicationTest {
 		first.notebook().notes().add("From first workspace");
 		second.notebook().notes().add("From second workspace");
 		first.sync();
+		// Reconciliation and re-signing belong to the notebook, so the host needs no key.
 		second.sync();
 		SignedData<ASet<AString>> published=RT.getIn(host.cursor().get(),NOTEBOOK);
 		assertEquals(Sets.of("From first workspace","From second workspace"),published.getValue());
 		assertTrue(published.checkSignature());
 		assertNull(host.getContext().getSigningKey());
+	}
+
+	/** Incoming delivery contributes verified notes to the draft without forcing a publication. */
+	@Test void aHostedNotebookAcceptsSignedDeliveryWithoutPublishingItsDraft() {
+		var host=LatticeHost.create();
+		var app=new NotebookApp(host,ALICE);
+		host.configureApplications(List.of(app));
+		app.notebook().notes().add("Local draft");
+		// Root routing and direct region delivery must enter the same signed boundary.
+		host.merge(Index.of(NOTEBOOK,ALICE.signData(Sets.of("Received in a root"))));
+		host.mergeAt(ALICE.signData(Sets.of("Received at a path")),NOTEBOOK);
+		assertNull(app.publishedNotebook());
+		assertEquals(Sets.of("Local draft","Received in a root","Received at a path"),app.notebook().notes().all());
+		app.sync();
+		assertEquals(app.notebook().notes().all(),app.publishedNotebook().getValue());
+		assertTrue(app.publishedNotebook().checkSignature());
 	}
 }

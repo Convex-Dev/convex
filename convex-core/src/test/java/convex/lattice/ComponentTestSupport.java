@@ -5,7 +5,11 @@ import convex.core.data.SignedData;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 
-/** Explicit component operations for low-level cursor and lattice fixtures. */
+/**
+ * Compatibility fixtures for low-level tests of context-based signing and lattice
+ * APIs. Application examples use explicit signers through {@link ASignedComponent}
+ * and {@link SignedComponent}; retaining these helpers tests the legacy API too.
+ */
 public final class ComponentTestSupport {
 	private ComponentTestSupport() {}
 	public static <V extends ACell> SignedCursor<V> signed(AForkableCursor<SignedData<V>> slot,

@@ -172,6 +172,21 @@ public class LWWLatticeTest {
 	}
 
 	@Test
+	public void testMergePropertiesAcrossTimestampTies() {
+		ACell[] values={null,value(100,"a"),value(100,"b"),value(200,"c")};
+		for (ACell a:values) {
+			for (ACell b:values) {
+				// Ties are directional, but identity and replay properties still hold.
+				LatticeTest.doMergeTest(LWW,a,b);
+				for (ACell c:values) {
+					assertEquals(LWW.merge(LWW.merge(a,b),c),LWW.merge(a,LWW.merge(b,c)),
+						"grouping must preserve the first value at the highest timestamp");
+				}
+			}
+		}
+	}
+
+	@Test
 	public void testCustomExtractorGenericProperties() {
 		LWWLattice<CVMLong> lat = LWWLattice.create(v -> v.longValue());
 		LatticeTest.doLatticeTest(lat, CVMLong.create(100), CVMLong.create(200));

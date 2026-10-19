@@ -174,8 +174,7 @@ class ApplicationIngressTest {
 			final SignedComponent<ASet<ACell>> owned;
 			OwnerApp() {
 				super(lattice,root);
-				owned=new SignedComponent<>(owners.signingFor(owner.getAccountKey()),resolve(ITEMS,owner.getAccountKey()));
-				owned.setContext(LatticeContext.create(null,owner));
+				owned=new SignedComponent<>(owners.signingFor(owner.getAccountKey()),resolve(ITEMS,owner.getAccountKey()),owner::signData);
 			}
 			@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
 				if (path.length==2 && ITEMS.equals(path[0]) && owner.getAccountKey().equals(path[1])) {

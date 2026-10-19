@@ -7,12 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.nio.file.Path;
+import java.io.File;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -29,6 +28,7 @@ import convex.core.store.MemoryStore;
 import convex.core.store.NullStore;
 import convex.etch.EtchStore;
 import convex.lattice.generic.SetLattice;
+import convex.test.Samples;
 
 /** Host persistence contracts for absent, discarding, volatile and durable stores. */
 public class HostStoresTest {
@@ -84,20 +84,20 @@ public class HostStoresTest {
 
 	@Test
 	public void testLocalStorePersistenceDoesNotMoveCursor() throws Exception {
-		try (EtchStore store=EtchStore.createTemp("root-component")) {
-			LatticeHost<ASet<ACell>> root=LatticeHost.create(SetLattice.create().zero(),store);
-			ABlob blob=Blobs.createRandom(new Random(1234),5000);
-			root.cursor().updateAndGet(values->values.include(blob));
-			ASet<ACell> before=root.cursor().get();
+		// This contract only adds cells: it does not need a private root or file.
+		EtchStore store=Samples.TEST_STORE;
+		LatticeHost<ASet<ACell>> root=LatticeHost.create(SetLattice.create().zero(),store);
+		ABlob blob=Blobs.createRandom(new Random(1234),5000);
+		root.cursor().updateAndGet(values->values.include(blob));
+		ASet<ACell> before=root.cursor().get();
 
-			ASet<ACell> persisted=root.persist();
+		ASet<ACell> persisted=root.persist();
 
-			assertSame(before,root.cursor().get(),"store persistence must not move the cursor");
-			assertEquals(before,persisted);
-			ABlob persistedBlob=(ABlob)persisted.getRef(0).getValue();
-			assertInstanceOf(RefSoft.class,persistedBlob.getRef(0));
-			assertSame(store,root.store());
-		}
+		assertSame(before,root.cursor().get(),"store persistence must not move the cursor");
+		assertEquals(before,persisted);
+		ABlob persistedBlob=(ABlob)persisted.getRef(0).getValue();
+		assertInstanceOf(RefSoft.class,persistedBlob.getRef(0));
+		assertSame(store,root.store());
 	}
 
 	@Test
@@ -147,15 +147,15 @@ public class HostStoresTest {
 	private enum StoreType {
 		MEMORY, ETCH;
 
-		AStore open(Path file) throws IOException {
-			return this==MEMORY?new MemoryStore():EtchStore.create(file.toFile());
+		AStore open() throws IOException {
+			return this==MEMORY?new MemoryStore():EtchStore.createTemp("host-store");
 		}
 	}
 
 	@ParameterizedTest
 	@EnumSource(StoreType.class)
-	void createOpenPersistAndSyncHaveDistinctEffects(StoreType type,@TempDir Path directory) throws Exception {
-		try (var store=type.open(directory.resolve("host.etch"))) {
+	void createOpenPersistAndSyncHaveDistinctEffects(StoreType type) throws Exception {
+		try (var store=type.open()) {
 			var initial=Sets.<ACell>of(CVMLong.ONE);
 			var retained=Sets.<ACell>of(CVMLong.TWO);
 			assertEquals(initial,LatticeHost.open(initial,store).cursor().get());
@@ -188,10 +188,12 @@ public class HostStoresTest {
 	}
 
 	@Test
-	void etchReopensThePublishedTree(@TempDir Path directory) throws Exception {
-		var file=directory.resolve("reopen.etch").toFile();
+	void etchReopensThePublishedTree() throws Exception {
+		File file;
 		var value=Blobs.createRandom(new Random(7311),5000);
-		try (var store=EtchStore.create(file)) {
+		// Temporary stores allow deferred deletion on Windows when using the MBB backend.
+		try (var store=EtchStore.createTemp("host-reopen")) {
+			file=store.getFile();
 			var host=LatticeHost.create(value,store);
 			host.sync();
 			host.flush();

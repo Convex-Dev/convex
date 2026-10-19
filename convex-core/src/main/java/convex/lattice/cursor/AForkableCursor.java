@@ -18,6 +18,18 @@ import convex.core.data.ACell;
 public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 
 	/**
+	 * Presents a caller-supplied value in place of absent storage, without creating
+	 * state. Update functions see that default too; unchanged writes keep storage
+	 * absent. Writing null clears storage and restores the default view.
+	 *
+	 * @param defaultValue Non-null default, for example an empty map
+	 * @return Live cursor with the explicit default
+	 */
+	public AForkableCursor<V> withDefault(V defaultValue) {
+		return new DefaultCursor<>(this,defaultValue);
+	}
+
+	/**
 	 * Creates a path cursor navigating into a nested location within this cursor.
 	 *
 	 * @param <T> Type of value at the path

@@ -44,6 +44,7 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	 * Associates through existing containers only.
 	 */
 	private ACell assocIn(ACell bv, ACell newValue) {
+		if (Utils.equals(RT.getIn(bv,path),newValue)) return bv;
 		return LatticeOps.assocExisting(bv, newValue, path);
 	}
 

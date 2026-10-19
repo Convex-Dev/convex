@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Timestamped` combines atomic timestamping of local edits with whole-record ordering. Its standard map factory handles `:timestamp`, and enclosing signed or staged components share its merge rule. Incoming records retain their timestamps, while no-op edits preserve existing timestamps and signatures.
+- Cursors support explicit `withDefault(value)` views. Absent storage remains absent on reads and unchanged writes, while descendant edits can construct a container of the supplied type.
+- `SetComponent<V>` provides atomic set operations over a shared cursor, including embedded sets inside signed domain records. Enclosing components retain control of merge, timestamp and publication policy.
+- `AKeyedRegions` composes application roots and nested regions from standard or shared components, with `SingleRegion` and `Regions` implementations for ordinary assembly. Incoming values reach only registered children; publication preserves unrelated regions. `LatticeComponent` supplies standard lattice-backed merging and staged or live storage.
+- `OwnedMap`, `OwnedIndex` and `KeyOwnedIndex` supply verified owner-map merging without a signing context, including during publication conflicts. Domain components extend `ASignedComponent` at signed storage paths and supply a signer function such as `user::signData`; independent signed drafts also take an explicit signer. Signer results must contain the requested payload and a valid authorised signature. Indirect identities require an explicit verifier. Owner merges ignore unsigned entries, and signed values are checked against the payload lattice's validator on acceptance and authoring.
 - `LatticeHost.create()` supports purely in-memory applications. Hosts accept a null store; persistence and flush become no-ops, while configured publication policies still run.
 - NodeServer hosts an assembled `LatticeHost`, with applications configured before node launch. Incoming roots and paths delegate to configured applications without forcing publication; applications explicitly opt into handling non-empty paths. `RelayHost.open` assembles the common relay host: one live application over a whole lattice, with restore, transactional root and timestamp skew taken from node configuration.
 - DLFS supports a separate optional content modification time, basic NIO attribute updates and preservation of unknown future node fields. Legacy nodes remain readable; older readers must upgrade before receiving extended nodes.
@@ -51,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `SignedComponent` checks owner authorisation for context-verified owner lattices before accepting an incoming payload, including delivery through a keyed region.
 - A staged component whose keyed lattice declares only some of a container's keys no longer overwrites or removes the other keys when it publishes; undeclared keys adopt the destination. This holds at any level, including an application staged at the host root.
 - Merging a value at one owner's slot of an `OwnerLattice` now verifies the signer for that owner through the context, as merging through the owner map always did, and the context-free merge binds a direct-key owner to its signer. The lattice tree ends at a signed envelope: `SignedLattice.path` no longer continues to the unsigned value, so a path inside an envelope is outside the served lattice. Applications that accept incoming values at declared paths no longer re-apply signing rules along the path; the lattices do.
 - Reading an unset store root handles a null root hash, including explicitly supplied `NullStore` instances.

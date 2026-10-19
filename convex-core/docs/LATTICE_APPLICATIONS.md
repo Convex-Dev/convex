@@ -41,12 +41,12 @@ authorised key or it fails, so local state never contains something peers would
 reject. Authorisation belongs to the schema at that path, and a child rule never
 waives an enclosing one.
 
-**Policy is separate from mechanism.** A write needs a clock and a signer. The
-context supplies both: one timestamp per logical write, used exactly as given, and
-the signing capability this process has, possibly a wallet holding several
-identities. Reusing a timestamp is a deliberate tie, which the local value wins.
-Policy is held by the component doing the work, not by the data and not by the
-storage.
+**Policy is separate from mechanism.** A signed component receives a signer
+function; a stamped component supplies a clock separately. The component chooses
+its capabilities, possibly resolving keys from a wallet when called. One timestamp
+is used exactly as given per logical write. Reusing a timestamp is a deliberate
+tie, which the local value wins. Policy is held by the component doing the work,
+not by the data or storage.
 
 **Cursors are the mutable layer, and only that.** A cursor is a reference to one
 immutable value. It offers atomic update, compare-and-set, navigation into
@@ -86,15 +86,13 @@ staged one by merging on sync. Neither overwrites. Components sharing a region m
 agree on its lattice; two different rules at one path do not converge. That is why
 region definitions are catalogued once and reused.
 
-**An application is the component at the host root.** It owns the root lattice,
-composed from the region lattices it understands, and the navigation from the root
-to those regions; it creates domain components by handing them path cursors. It may
-be configured on the host to receive incoming values, which it merges under its
-lattice and ownership rules, and it decides when its work is published. The typed
-base (`ALatticeApplication`) provides the root lattice, region navigation and
-incoming values; it may be live in the host's root or staged over it. Plain code
-that navigates from the root and groups domain components is doing the same job and
-counts as an application. A host may hold several applications. Conceptually they
+**An application is the component at the host root.** It may extend `AKeyedRegions`
+to compose named child components, or `ALatticeApplication` to define a root lattice
+and its own incoming merge. Either may be configured on the host to receive incoming
+values and decides when its work is published. A regions application routes values
+to registered children; each child supplies its own merge and publication boundary.
+The lattice-based application may be live in the host root or staged over it.
+A host may hold several applications. Conceptually they
 are separate apps that synchronise with each other through the root: each publishes
 into it and observes the others' published state there, immediately when live and on
 sync when staged. They may share regions provided they share each region's lattice.
@@ -144,17 +142,29 @@ against a local host and a networked one.
 - Typed owner slots, so a forgotten signing boundary fails at compile time rather
   than at run time (entry 11).
 
-Component-owned working copies, a host that carries no lattice and a node that only
-replicates are intentional revisions of CAD035, CAD036 and CAD045, which still
-describe lattice-aware cursors, automatic cursor signing boundaries and a node
-constructed from a lattice. Those CADs need corresponding updates before this design
-becomes normative. Ownership remains governed by CAD038.
+The CADs distinguish abstract rules from application implementation:
+
+| CAD | Scope |
+|---|---|
+| [CAD024](https://docs.convex.world/docs/cad/data_lattice) | Abstract value, validation and merge semantics |
+| [CAD038](https://docs.convex.world/docs/cad/lattice_auth) | Signed ownership and authorisation rules |
+| [CAD045](https://docs.convex.world/docs/cad/lattice_apps) | Components as the normal application implementation mechanism |
+| [CAD035](https://docs.convex.world/docs/cad/cursors) | Atomic storage, projections and fork reconciliation used by components |
+| [CAD036](https://docs.convex.world/docs/cad/lattice_node) | Delivery and replication of hosted state |
+| [CAD053](https://docs.convex.world/docs/cad/lattice_regions) | Shared region names and references to their semantic definitions |
+
+Abstract lattice definitions remain useful specifications and reusable merge
+implementations. Components bind those rules to storage, policy and publication;
+their object graph need not mirror a lattice expression. The corresponding CAD
+source updates are in the sibling `design` checkout. Deployment of those pages
+is separate from these local changes.
 
 ## Architecture
 
 ```
 Domain components        DLFSDrive, Social        one component per path
-Application component    ALatticeApplication      root lattice, region navigation, incoming values
+Application component    AKeyedRegions            named children, delivery and publication
+Alternative application  ALatticeApplication      root lattice, navigation, custom incoming merge
 Lattice host             LatticeHost              published root, optional store, publication policy
 Cursor                   path, CAS, drafts        atomic state access
 Optional host runtime    NodeServer               replication only
@@ -164,6 +174,121 @@ Optional host runtime    NodeServer               replication only
 publication policy, and optionally a store whose lifecycle stays with the caller. It
 knows no lattice. A node can host the same root and installs its replication
 pipeline during launch; application code never knows a node exists.
+
+## Composing named regions
+
+Extend `AKeyedRegions` for an application whose interests are named regions of an
+index. Register a child for each region. The same class works at the host root or
+inside another regions component; it has no whole-container working copy to merge
+or publish.
+
+The concrete implementations cover ordinary assembly: `SingleRegion<C>` wraps one
+typed child and exposes it through `component()`; `Regions` collects several
+children. Both work at the host root or a nested index and inherit the same merge
+and publication behaviour. A single-region application can be as small as:
+
+```java
+final class FavouritesApp extends SingleRegion<FavouritesRegion> {
+    FavouritesApp(LatticeHost<Index<Keyword, ACell>> host) {
+        this(host, new FavouritesRegion(host.cursor().path(FAVOURITES)));
+    }
+
+    FavouritesApp(LatticeHost<Index<Keyword, ACell>> host, FavouritesRegion shared) {
+        super(host, FAVOURITES, shared);
+    }
+
+    FavouritesRegion favourites() { return component(); }
+}
+```
+
+Without a domain application subclass, use `SingleRegion.create(host, key, factory)`
+or `new SingleRegion<>(host, key, shared)`. For several regions, construct
+`new Regions(host)` and call `create(key, factory)` or `add(key, shared)` during
+assembly. `new Regions(host, components)` also accepts a map of existing children,
+registered in its iteration order. The cursor-and-context constructors and factory
+support the same composition below the root. Factory methods have separate names
+from existing-component registration to avoid ambiguous Java lambda inference.
+
+For applications declaring their own collection, the base class remains useful:
+
+```java
+final class Counter extends LatticeComponent<AInteger> {
+    Counter(AForkableCursor<AInteger> destination, LatticeContext context) {
+        super(MaxLattice.INSTANCE, destination, context);
+    }
+}
+
+final class Counters extends AKeyedRegions {
+    static final Keyword COUNT = Keyword.intern("count");
+    final Counter count;
+
+    Counters(LatticeHost<Index<Keyword, ACell>> host) {
+        super(host);
+        count = createRegion(COUNT, Counter::new);
+    }
+
+    Counters(LatticeHost<Index<Keyword, ACell>> host, Counter shared) {
+        super(host);
+        count = region(COUNT, shared);
+    }
+}
+
+var host = LatticeHost.create();
+var first = new Counters(host);
+var second = new Counters(host, first.count);
+host.configureApplications(List.of(first, second));
+
+host.merge(Index.of(Counters.COUNT, CVMLong.ONE));
+// Both applications see the same pending value through their shared count.
+second.sync();                  // publishes the child at [:count]
+host.sync();                    // optional persistence / replication
+```
+
+`createRegion(key, factory)` supplies a cursor at the key and the current context
+before constructing the child. It creates an absent containing index on the first
+changed write, not on construction or read. A nested regions factory receives an
+`AForkableCursor<Index<Keyword, ACell>>` and constructs another `AKeyedRegions` over
+it. Java constructor references to overloaded constructors may need explicit factory
+type arguments.
+
+`region(key, component)` registers an existing instance. It preserves that
+component's context, destination and pending state. The caller is responsible for
+binding it to the intended region: registration does not relocate it. Applications
+sharing one instance share pending changes, and either can publish them. Two separate
+staged components at the same destination instead have independent working copies,
+reconciled on publication. Duplicate delivery to a shared component is possible;
+standard lattice merges are idempotent, and custom handlers must support this use.
+
+The composition has the following contracts:
+
+- A root merge delivers only present, registered entries. An empty regions
+  application ignores all incoming roots and paths. An absent key does nothing;
+  an explicitly present null is delivered to its child.
+- Root and path deliveries both invoke the child's `mergeAt` entry point. The
+  child's custom merge remains authoritative. Signed children require a complete,
+  authorised envelope and reject unsigned values at their slot; paths inside an
+  envelope deliver nothing.
+- `sync()` calls each child in registration order and never writes the enclosing
+  index. Unknown siblings, including concurrent updates or removals, are preserved.
+  Neither merge nor publication is atomic across children; earlier successful work
+  remains if a later child fails.
+- The container cursor shows the destination. Read staged edits through the child
+  component's cursor. A live child changes the destination immediately; use
+  `LatticeComponent.live` when that is the intended boundary.
+- Duplicate registrations are rejected. The first merge, path delivery or sync
+  freezes the registrations, without freezing or reconfiguring shared children.
+- Host publication and durability remain separate from application sync.
+
+`LatticeComponent` supplies ordinary lattice-backed merging, shape declaration and
+publication. Subclass it for domain operations, or use it directly with a supplied
+lattice. A component that needs an atomic aggregate should own that aggregate's
+publication boundary and supply its complete merge rule. Declaring a partial
+lattice does not move a component's cursor to a narrower boundary.
+
+`AKeyedRegions` routes through components and does not synthesise a root lattice
+from their behaviour. Components which need lattice-based navigation can still
+declare their shape explicitly. `ALatticeApplication` remains available for
+applications defining their own root merge and lattice-based navigation.
 
 ## Designing the lattice
 
@@ -349,10 +474,55 @@ host.sync();             // optional host policy; otherwise a no-op without a st
 
 The executable [favourites example](../src/test/java/convex/lattice/app/FavouritesApplicationTest.java)
 is one application over an in-memory host. Each user's edits are signed immediately
-through a signing cursor into the application's working copy, and only the
-application's sync publishes to the host. A
+through a signing cursor into its favourites region's working copy. The application
+inherits `SingleRegion`, so its sync publishes that child at `[:favourites]` and
+leaves unrelated host regions alone. Two applications may share the same region
+instance, including its pending edits and clock. A
 [persistence variant](../src/test/java/convex/lattice/app/FavouritesPersistenceTest.java)
 publishes to Etch and reopens the same application.
+
+`Favourites` embeds a `SetComponent<CVMLong>` for its `:items` field. The standard
+component supplies atomic `add`, `remove` and `clear` operations, membership and
+size queries, and immutable snapshots through `get()`. It treats an absent set as
+empty without creating state. Its cursor passes through the favourites record's
+`Timestamped` component and signing boundary, so a changed set and its timestamp are
+signed together. No-op edits retain the existing timestamp and signature.
+
+The record cursor explicitly uses `withDefault(Maps.empty())`, which presents an
+empty record without storing it. The composition is:
+
+```java
+record = Timestamped.create(cursor.withDefault(Maps.empty()), getTimestamp);
+items = new SetComponent<>(record.cursor().path(ITEMS));
+```
+
+`Timestamped.cursor()` is the local editing cursor, implemented by `StampedCursor`.
+The component's `merge` uses its underlying storage, so incoming records keep their
+timestamps. `Timestamped.lattice()` supplies the same whole-record ordering to the
+enclosing owner index; the application defines neither a timestamp extractor nor
+a stamping lambda. Higher timestamps win and ties retain the local record. The
+standard factory requires hash maps with a `CVMLong` `:timestamp`; custom record
+representations can supply an ordering lattice and stamping function explicitly.
+Incoming partial paths do not update a timestamped record.
+
+The wrapper creates no working copy or publication boundary. Its `sync()` does
+not publish the enclosing region. A staged enclosing component uses the same
+lattice for publication conflicts, without re-stamping the winner. Favourites
+also exposes this editing cursor through its own `cursor()`, so direct local
+edits receive the same stamping as embedded set operations. Incoming signed
+envelopes continue through the signed boundary, retaining the winning signature.
+
+These defaults belong at their respective
+levels: the record chooses `{}`, while the set component handles `nil` as `#{}`.
+No projection functions are needed in the application. `withDefault` also supplies
+the default to atomic update functions; a changed write creates storage, and a
+null write clears storage so subsequent reads see the default again.
+
+The set component supplies local collection operations; the containing component
+owns replication semantics. Favourites still merges complete signed records by
+last-write-wins, so removing an item or clearing the set survives replay of an
+older record. Embedding a set does not introduce a union merge or an independent
+publication boundary.
 
 A host's store is optional. Without one the host is purely in memory: persist
 returns its input, flush does nothing, and sync returns the current snapshot unless a
@@ -533,8 +703,7 @@ its working cursor through their rebinding factories and update normally, withou
 signing each edit:
 
 ```java
-var signed = new SignedComponent<>(owners.signingFor(owner), signedSlot);
-signed.setContext(ownerContext);
+var signed = new SignedComponent<>(owners.signingFor(owner), signedSlot, ownerKey::signData);
 var user = existingUser.withCursor(signed.cursor());
 user.feed().post("First post");
 user.feed().post("Second post");
@@ -674,22 +843,29 @@ supplies what the cursor lacks: its lattice's empty value when creating a child
 position, and bound signing or stamping functions when wrapping a boundary. Cursor
 mechanics are in [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
 
-## Write policy: `LatticeContext`
+## Explicit write capabilities
 
-The context supplies signing capabilities and the write clock. Owner verification
-rules are bound to lattice instances, not to the context. Install a context on the
-application for application-local policy, or on the host for construction defaults.
-Components resolve their policy when constructed; replacing a parent's policy later
-does not change existing children. Cursors have no context, and transaction views
-keep the component's policy when rebound. A fixed context suits deterministic tests;
-an application policy resolves dynamically from a clock, wallet or key store and must
-be thread-safe if shared. The `with...` methods override one capability and delegate
-the rest.
+Signed components take a `Function<V, SignedData<V>>`. A supplied key needs only a
+method reference; a wallet can supply a function which resolves its current key
+when called. The component uses this same function for local authoring and any
+re-signing. No signing context needs to be constructed or inherited.
 
 ```java
-component.setContext(LatticeContext.create(null, myKeyPair));                  // runtime clock
-component.setContext(LatticeContext.create(CVMLong.create(1000), myKeyPair));  // fixed clock
+// In a signed domain component's constructor:
+super(destination, ownerRule, myKeyPair::signData);
 ```
+
+Owner verification belongs to the bound lattice and cannot be replaced by the
+signer. The rule checks the requested payload, signature and owner authorisation
+before storage. A null result means signing is unavailable: local writes and draft
+publication fail without changing the destination; merge synthesis keeps the
+existing envelope. Returning a different payload or an invalid signature throws.
+Selecting an existing envelope and unchanged writes never call the signer.
+
+`SignedLattice.merge(own, other)` never signs. Explicit authoring uses
+`mergeAndSign(own, other, signer)` or `sign(value, signer)`. `LatticeContext` remains
+available to existing components and legacy lattice APIs, but setting it cannot
+change the signer supplied to a signed component. Cursors carry no context.
 
 **Time.** The timestamp is resolved once per logical write, even under retry, and
 used exactly: no incrementing, no comparing with stored values, no hidden logical
@@ -717,7 +893,95 @@ that the owner lattice's merge drops it.
 
 ## Owner identity policies
 
-Verification rules belong to lattice instances. Different paths can compose
+Use an owned-map component for a region containing `owner -> SignedData<V>`:
+
+```text
+ALatticeComponent<M>                (abstract component base)
+  AOwnedMap<K,V,M>                    (abstract common ownership behaviour)
+    OwnedMap<K,V>                    (AHashMap storage)
+    OwnedIndex<K,V>                  (Index storage)
+      KeyOwnedIndex<V>               (owner public key must equal signer)
+```
+
+Owned collections take no context in their constructors. Incoming merges and
+publication conflicts both use the owner lattice's context-free merge. They can
+adopt valid signed inputs but cannot author a synthesised payload; in that case
+they retain the existing envelope. An authorised signed domain component can
+reconcile and sign the new value, which the collection can then accept. Setting
+an inherited component context on the collection does not change this behaviour.
+
+`OwnedMap` and `OwnedIndex` require an explicit authorisation predicate. A component
+declares the value lattice and supplies its resolver when constructing the region:
+
+```java
+final class Scores extends OwnedIndex<AString, AInteger> {
+    Scores(AForkableCursor<Index<AString, SignedData<AInteger>>> destination,
+           Authority authority) {
+        super(destination, MaxLattice.INSTANCE, authority::isAuthorised);
+    }
+
+    Score score(AString owner, AKeyPair signer) {
+        return new Score(path(owner), getLattice().signingFor(owner), signer);
+    }
+}
+```
+
+The domain class extends `ASignedComponent` and takes its signed storage path
+in an ordinary constructor:
+
+```java
+final class Score extends ASignedComponent<AInteger> {
+    Score(ACursor<SignedData<AInteger>> destination, SignedLattice<AInteger> rule,
+          AKeyPair signer) {
+        super(destination, rule, signer::signData);
+    }
+
+    void record(long value) {
+        cursor.updateAndGet(old -> MaxLattice.INSTANCE.merge(old, CVMLong.create(value)));
+    }
+}
+```
+
+`ASignedComponent` exposes the unsigned cursor to domain operations and handles
+validation, signing and incoming envelope merges. The supplied owner-bound rule
+is shared with the containing map. Signing uses the supplied function; changing
+its available keys cannot replace that rule. There is no view
+factory or callback into the map to construct the domain component.
+
+The component that signs defines its key-resolution strategy in one place. In the
+favourites example, `Favourites` supplies `user::signData` in its
+constructor. `FavouritesRegion` only binds the owner path and rule, and takes no
+context. The host and region cannot supply an implicit fallback key. The same
+function handles local edits and any re-signing it performs.
+
+An owned map's `path(owner)` returns signed storage, creating a missing map only
+on a changed write. An ordinary `cursor.path(owner)` also works when the containing
+map already exists. Construction, reads and sync of an untouched component create
+no entries. Components on the same path share edits and sign immediately into the
+map's working state; their sync does not publish the map. `get(owner)` reads the
+signed entry.
+
+For independent unsigned edits, `draft(owner, signer)` returns a
+`SignedComponent` which signs into the map's working state on its own sync. The
+signer function is required explicitly; it is never inherited from the map. The
+map's sync publishes its own working state without implicitly publishing drafts.
+The host's sync remains a separate durability or replication boundary.
+
+Whole-map merges and owner-path deliveries use the same owner-bound lattice.
+Unsigned entries, invalid signatures, unauthorised signers and payloads rejected
+by the value lattice's `checkForeign` are ignored. A malformed containing map may
+abort the merge atomically. Payload validation is supplied by the value lattice;
+Java generic types alone do not establish a domain schema. Local authoring also
+checks that validator before producing an envelope. No path crosses inside a
+signed envelope. Accepted envelopes keep their signatures; a synthesised value
+requires an authorised signer.
+
+The [DID-keyed scores example](../src/test/java/convex/lattice/app/OwnedScoresApplicationTest.java)
+exercises a component-supplied local resolver, multiple authorised keys and a
+replica without signing capabilities. The favourites region uses `KeyOwnedIndex`
+for the direct-key case.
+
+Components bind verification rules to their lattice instances. Different paths can compose
 different rules, including different rules for the same owner identity, and
 navigating to a child or deriving a restricted view preserves the applicable
 boundaries.
@@ -744,12 +1008,12 @@ variant fixes authorisation to key equality and needs no predicate. Container ch
 is independent of ownership policy.
 
 The bound predicate is authoritative for this region; an application context cannot
-replace it, and nested boundaries each keep their own rules. The context provides
-the signing capability and write clock, not verification. An application may still
+replace it, and nested boundaries each keep their own rules. Components supply
+signers and write clocks separately from verification. An application may still
 decline to adopt data its lattice would accept. A predicate rejection or an
 unresolved identity never falls back to accepting an arbitrary signer. The predicate
-grants no signing capability: authoring still needs an authorised key in the
-context.
+grants no signing capability: authoring still needs an explicit signer which can
+produce an authorised envelope.
 
 For stateful DID methods, resolve and refresh authority information outside atomic
 updates, so that merge never does unbounded network work. Changing the authority
@@ -933,11 +1197,16 @@ sleeps, wait on real signals; no fixed ports.
 Worked examples:
 
 - The [favourites application](../src/test/java/convex/lattice/app/FavouritesExample.java):
-  one application, immediate signing, explicit publication, with a persistence variant.
+  `SingleRegion` with immediate signing, shared region instances and explicit
+  publication, with a persistence variant.
 - [`ApplicationPublicationTest`](../src/test/java/convex/lattice/app/ApplicationPublicationTest.java):
-  lightweight notes inside a staged, signed notebook published to its host path.
+  lightweight notes inside a staged, signed notebook registered with `SingleRegion`.
 - [`TaskBoardApplicationTest`](../src/test/java/convex/lattice/app/TaskBoardApplicationTest.java):
-  domain operations in transactions, with publication as a separate choice.
+  one aggregate board region for transactions across task records with stable IDs,
+  mutable titles and timestamped completion/reopening, with publication
+  as a separate choice.
+- [`SharedRegionsTest`](../src/test/java/convex/lattice/app/SharedRegionsTest.java):
+  direct assembly with `Regions`, preserving other applications' published state.
 - The [reading-list network example](../../convex-peer/src/test/java/convex/node/app/ReadingListApplicationTest.java):
   applications assembled before node launch, recommendations delivered over a real
   connection.
@@ -954,7 +1223,7 @@ Worked examples:
 - [ ] Design the state tree, then choose a merge rule per leaf.
 - [ ] Compose lattice primitives bottom-up; use keyed lattices for structured
       records and reserve custom lattices for new merge semantics.
-- [ ] Wrap with an owner lattice for per-user ownership; register under a root keyword.
+- [ ] Use `OwnedMap`, `OwnedIndex` or `KeyOwnedIndex` for per-owner signed data; register the component under a region keyword.
 - [ ] Supply the root lattice to an application component; optionally expose
       domain component factories at known paths. Root merge requires no components.
 - [ ] Accept a host in factories; provide a local open and a host-neutral
@@ -971,7 +1240,7 @@ Worked examples:
 
 ## Where the code lives
 
-- `convex.lattice.ALatticeApplication`, `ALatticeComponent`, `LatticeHost`,
+- `convex.lattice.AKeyedRegions`, `LatticeComponent`, `ALatticeApplication`, `ALatticeComponent`, `LatticeHost`,
   `SignedComponent` — the component layer.
 - `convex.lattice.LatticeContext`, `OwnerLattice`, `SignedLattice`,
   `JSONLattice`, `LWWLattice`, `IndexLattice`, `MapLattice`, `SetLattice` — lattices

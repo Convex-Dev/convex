@@ -12,84 +12,96 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeComponent;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
-import convex.lattice.generic.KeyedLattice;
+import convex.lattice.Regions;
+import convex.lattice.SetComponent;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.SetLattice;
 
-/** Staged applications on one host publish only the regions their lattice declares. */
+/**
+ * Two applications share a host while owning disjoint regions. Each {@link Regions}
+ * container is a live view of the host root; each {@link Items} child owns a staged
+ * set at its registered path. The staging boundary is the child, not the root.
+ *
+ * <p>These assembly tests deliberately use minimal regions {@code :a} and
+ * {@code :b}. They establish that routing and publication affect only registered
+ * children, even when both applications were opened against an empty host.
+ * Incoming roots are delivered to both applications, but receipt does not publish
+ * their children. Sharing a host here does not mean sharing a region's working
+ * copy; that separate case is covered by the favourites application tests.</p>
+ */
 class SharedRegionsTest {
 	private static final Keyword A=Keyword.intern("a");
 	private static final Keyword B=Keyword.intern("b");
-	private static final KeyedLattice A_LATTICE=KeyedLattice.create(A,SetLattice.create());
-	private static final KeyedLattice B_LATTICE=KeyedLattice.create(B,SetLattice.create());
 
-	/** One region per application; each is staged at the whole root. */
-	static final class RegionApp extends ALatticeApplication<Index<Keyword,ACell>> {
-		private final Keyword region;
-		RegionApp(KeyedLattice lattice,Keyword region,LatticeHost<Index<Keyword,ACell>> host) {
-			super(lattice,host);
-			this.region=region;
+	/** A staged grow-only set; union is the rule for both incoming merge and publication conflicts. */
+	static final class Items extends LatticeComponent<ASet<ACell>> {
+		private final SetComponent<ACell> items;
+		Items(AForkableCursor<ASet<ACell>> destination,LatticeContext context) {
+			super(SetLattice.create(),destination,context);
+			items=new SetComponent<>(cursor);
 		}
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
-		}
-		void add(long item) {
-			this.<ASet<ACell>>resolve(region).updateAndGet(items ->
-				(items==null?Sets.<ACell>empty():items).include(CVMLong.create(item)));
-		}
+		void add(long item) { items.add(CVMLong.create(item)); }
 	}
 
 	private static ACell region(LatticeHost<Index<Keyword,ACell>> host,Keyword key) {
 		return host.cursor().get().get(key);
 	}
 
+	/** Alternating publications cannot overwrite a sibling with an old root snapshot. */
 	@Test void aStagedApplicationNeverPublishesRegionsItDoesNotDeclare() {
 		var host=LatticeHost.create();
-		var a=new RegionApp(A_LATTICE,A,host);
-		var b=new RegionApp(B_LATTICE,B,host);
+		var a=new Regions(host);
+		var aItems=a.create(A,Items::new);
+		var b=new Regions(host);
+		var bItems=b.create(B,Items::new);
 		host.configureApplications(List.of(a,b));
 
-		a.add(1);
+		aItems.add(1);
 		a.sync();
 		assertEquals(Sets.of(1),region(host,A));
 
-		b.add(2);
-		b.sync(); // b's copy predates :a entirely
+		bItems.add(2);
+		b.sync(); // b was constructed before :a existed
 		assertEquals(Sets.of(1),region(host,A),"publishing :b must not remove :a");
 		assertEquals(Sets.of(2),region(host,B));
 
-		a.add(3);
-		a.sync(); // a's copy holds no :b
+		aItems.add(3);
+		a.sync(); // only a's registered child publishes
 		assertEquals(Sets.of(2),region(host,B),"publishing :a must not remove :b");
 		assertEquals(Sets.of(1,3),region(host,A));
 
-		b.add(4);
-		a.add(5);
+		bItems.add(4);
+		aItems.add(5);
 		a.sync();
-		b.sync(); // both moved: declared regions merge, the rest adopts the host
+		b.sync(); // both moved: each publication touches only its region
 		assertEquals(Sets.of(1,3,5),region(host,A));
 		assertEquals(Sets.of(2,4),region(host,B));
-		assertEquals(host.cursor().get(),b.cursor().get(),"after sync the copy carries the host's other regions");
+		assertSame(host.cursor(),b.cursor(),"the container is a view of the host, not a private copy");
 	}
 
+	/** One incoming root updates both working regions, whose publication remains independent. */
 	@Test void incomingRegionsSurviveAnotherApplicationsPublication() {
 		var host=LatticeHost.create();
-		var a=new RegionApp(A_LATTICE,A,host);
-		var b=new RegionApp(B_LATTICE,B,host);
+		var a=new Regions(host);
+		var aItems=a.create(A,Items::new);
+		var b=new Regions(host);
+		var bItems=b.create(B,Items::new);
 		host.configureApplications(List.of(a,b));
 
 		host.merge(Index.<Keyword,ACell>none().assoc(A,Sets.of(1)).assoc(B,Sets.of(2)));
-		assertTrue(host.cursor().get().isEmpty(),"staged applications merge into their own copies");
-		assertEquals(Sets.of(1),a.cursor().get().get(A));
-		assertNull(a.cursor().get().get(B),"an application ignores incoming regions it does not declare");
-		assertEquals(Sets.of(2),b.cursor().get().get(B));
+		assertTrue(host.cursor().get().isEmpty(),"staged regions merge into their own copies");
+		assertEquals(Sets.of(1),aItems.cursor().get());
+		assertEquals(Sets.of(2),bItems.cursor().get());
 
+		// Publishing :a neither discards nor implicitly publishes :b's received working state.
 		a.sync();
 		assertEquals(Sets.of(1),region(host,A));
 		assertNull(region(host,B));
 
-		b.add(3);
+		bItems.add(3);
 		b.sync();
 		assertEquals(Sets.of(1),region(host,A),"an incoming region published by one application survives another's sync");
 		assertEquals(Sets.of(2,3),region(host,B));

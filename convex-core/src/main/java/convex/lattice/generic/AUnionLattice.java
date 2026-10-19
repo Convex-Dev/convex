@@ -30,6 +30,9 @@ import convex.lattice.LatticeContext;
  */
 public abstract class AUnionLattice<K extends ACell, V extends ACell, M extends AMap<K,V>> extends ALattice<M> {
 
+	/** Checks a changed foreign entry's representation before invoking a typed child. */
+	protected boolean checkEntry(ACell key,ACell value) { return true; }
+
 	@Override
 	public M merge(M own, M other) {
 		return mergeEntries(null,own,other);
@@ -56,7 +59,8 @@ public abstract class AUnionLattice<K extends ACell, V extends ACell, M extends 
 			@Override
 			public V merge(Object key, V a, V b) {
 				if (b==null) return a;
-				ALattice<V> child=(key instanceof ACell cell)?path(cell):null;
+				if (!(key instanceof ACell cell) || !checkEntry(cell,b)) return a;
+				ALattice<V> child=path(cell);
 				if (child==null) return a;
 				return (context==null)?child.merge(a,b):child.merge(context,a,b);
 			}

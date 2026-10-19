@@ -11,6 +11,7 @@ import convex.lattice.ALatticeComponent;
 import convex.lattice.fs.DLFSLocation;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.OwnerLattice;
 
 /**
@@ -83,8 +84,10 @@ public final class DLFSRegion extends ALatticeComponent<
 	 */
 	public DLFSDrives drives(AccountKey owner) {
 		if (owner==null) throw new IllegalArgumentException("Owner key must not be null");
+		var rule=LATTICE.signingFor(owner);
+		var policy=getContext();
 		AForkableCursor<AHashMap<AString,AVector<ACell>>> drivesCursor=
-			signedCursor(resolve(cursor,LATTICE,owner),LATTICE,owner);
+			SignedCursor.create(resolve(cursor,LATTICE,owner),value -> rule.sign(policy,value));
 		return configured(new DLFSDrives(drivesCursor,store,location.child(owner)));
 	}
 

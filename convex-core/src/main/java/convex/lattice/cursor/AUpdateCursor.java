@@ -13,7 +13,7 @@ import convex.core.util.Utils;
  * written through the cursor is funnelled through a single
  * {@link #prepareWrite(ACell) prepare-on-write} function before it is stored.
  *
- * <p>This is the shared machinery behind two quite different cursors:</p>
+ * <p>This is the shared machinery behind these cursors:</p>
  * <ul>
  *   <li>{@link StampedCursor} — a same-type ({@code S == V}) <b>update override</b>:
  *       identity read, stamp on write. It never changes the view.</li>
@@ -21,6 +21,8 @@ import convex.core.util.Utils;
  *       <b>view boundary</b>: the stored cell is a different, envelope type, so it
  *       overrides {@link #view} to project the {@code :value} child on read and
  *       re-signs on write.</li>
+ *   <li>{@link DefaultCursor} — presents a caller-supplied default for absent
+ *       storage, preserving absence on unchanged writes.</li>
  * </ul>
  *
  * <p>The component that owns the boundary wraps its cursor with one of these;

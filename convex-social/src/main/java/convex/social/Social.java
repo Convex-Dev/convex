@@ -16,6 +16,7 @@ import convex.lattice.TransactionalComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.OwnerLattice;
 
 /**
@@ -217,8 +218,10 @@ public class Social extends ALatticeComponent<
 		if (!DID.isCanonicalBase(ownerDid)) {
 			throw new IllegalArgumentException("Social owner must be a canonical base DID");
 		}
+		var rule=SOCIAL_LATTICE.signingFor(ownerDid);
+		var policy=getContext();
 		AForkableCursor<Index<Keyword, ACell>> userCursor =
-			signedCursor(resolve(cursor,SOCIAL_LATTICE,ownerDid),SOCIAL_LATTICE,ownerDid);
+			SignedCursor.create(resolve(cursor,SOCIAL_LATTICE,ownerDid),value -> rule.sign(policy,value));
 		return configured(new SocialUser(userCursor,ownerDid));
 	}
 

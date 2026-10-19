@@ -2,6 +2,7 @@ package convex.lattice.generic;
 
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
@@ -16,11 +17,16 @@ import convex.lattice.LatticeContext;
  * <p>A merge that <em>selects</em> one of its inputs needs no signature: the winner
  * is stored with the signature it arrived with. A merge that <em>synthesises</em> a
  * new value (because the inner lattice combined both inputs) must sign the result as
- * this node's owner. When the context signing policy cannot do that — the usual case
+ * this node's owner. When no authorised signer can do that — the usual case
  * for another owner's data — the merge keeps the own value rather than producing an
  * entry no peer would accept. Convergence for that owner is then the owner's to
  * complete; see the class documentation on {@link ALattice} for why a merge must not
  * fail on data it merely cannot author.</p>
+ *
+ * <p>The context-free merge never signs and uses the payload's context-free
+ * merge. Owned-map components use this public operation. Authoring components use
+ * {@link #mergeAndSign} with an explicit signer. Context-based overloads remain
+ * available for legacy callers.</p>
  *
  * <p>An instance-bound owner verifier, when present, checks incoming signers and
  * authoring independently of legacy context owner verification. The same rule is
@@ -53,11 +59,10 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	}
 
 	/**
-	 * Returns a view bound to a specific owner identity, whose signer the context
-	 * signing policy is asked for when a value must be authored at this position.
+	 * Returns a view bound to a specific owner identity.
 	 *
 	 * @param owner Owner identity. An existing bound verifier is retained; otherwise
-	 *              authoring uses the legacy context owner verifier.
+	 *              verification uses the legacy context owner verifier.
 	 * @return Owner-bound view of this lattice
 	 */
 	public SignedLattice<V> withOwner(ACell owner) {
@@ -82,6 +87,36 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		return valueNode;
 	}
 
+	/**
+	 * Authors exactly the requested value using an explicit signer. Null means the
+	 * signer is unavailable or unauthorised. Malformed results are rejected before
+	 * storage: a signer cannot substitute a different payload or an invalid signature.
+	 */
+	public SignedData<V> sign(V value,Function<V,SignedData<V>> signer) {
+		Objects.requireNonNull(signer,"Signer must not be null");
+		if (!validPayload(value)) throw new IllegalArgumentException("Invalid signed payload");
+		SignedData<V> signed=checkedResult(value,signer.apply(value));
+		if (signed==null) return null;
+		return accepts(LatticeContext.EMPTY,owner,signed)?signed:null;
+	}
+
+	private SignedData<V> checkedResult(V value,SignedData<V> signed) {
+		if (signed==null) return null;
+		if (!Utils.equals(value,signed.getValue())) throw new IllegalArgumentException("Signer changed the requested payload");
+		if (!signed.checkSignature()) throw new IllegalArgumentException("Signer returned an invalid signature");
+		return signed;
+	}
+
+	/**
+	 * Merges with explicit permission to author a synthesised payload. Selecting an
+	 * existing envelope never calls the signer. An unavailable or unauthorised signer
+	 * leaves the established envelope unchanged.
+	 */
+	public SignedData<V> mergeAndSign(SignedData<V> own,SignedData<V> other,Function<V,SignedData<V>> signer) {
+		Objects.requireNonNull(signer,"Signer must not be null");
+		return merge(null,owner,own,other,value -> sign(value,signer));
+	}
+
 
 	/**
 	 * Authors this owner's value with an available authorised signer, or returns
@@ -92,14 +127,15 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	}
 
 	private SignedData<V> sign(LatticeContext context, ACell requestedOwner, V value) {
-		if (ownerVerifier==null) return context.signAs(requestedOwner,value);
+		if (!validPayload(value)) throw new IllegalArgumentException("Invalid signed payload");
+		if (ownerVerifier==null) return checkedResult(value,context.signAs(requestedOwner,value));
 		// A bound instance's owner cannot be replaced by a per-call merge argument.
 		AccountKey direct=LatticeContext.ownerAccountKey(owner);
-		SignedData<V> signed=context.sign(direct,value);
+		SignedData<V> signed=checkedResult(value,context.sign(direct,value));
 		if (signed!=null && ownerVerifier.test(owner,signed.getAccountKey())) return signed;
 		// A custom rule may authorise a delegate even for a direct-key identity.
 		if (direct!=null) {
-			signed=context.sign(null,value);
+			signed=checkedResult(value,context.sign(null,value));
 			if (signed!=null && ownerVerifier.test(owner,signed.getAccountKey())) return signed;
 		}
 		return null;
@@ -108,7 +144,7 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	@Override
 	public SignedData<V> merge(SignedData<V> ownValue, SignedData<V> otherValue) {
 		// No context: signature synthesis is unavailable, so this merge can only select
-		return merge(LatticeContext.EMPTY, ownValue, otherValue);
+		return merge(null,owner,ownValue,otherValue);
 	}
 
 	@Override
@@ -122,8 +158,9 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	 * owner, so merging at one owner's slot means the same as merging through the
 	 * owner map that contains it.
 	 *
-	 * @param context Context supplying the signing policy and, for a lattice without a
-	 *        bound verifier, the owner verification rule
+	 * @param context Explicit authoring policy and, for a lattice without a bound
+	 *        verifier, the owner verification rule. Null selects a public merge which
+	 *        never signs and uses the payload lattice's context-free merge.
 	 * @param owner Owner identity for this position, or null when unknown
 	 * @param ownValue Established value, preferred by directional tie-breaks
 	 * @param otherValue Value to merge in, possibly received from an untrusted source
@@ -131,6 +168,11 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	 */
 	public SignedData<V> merge(LatticeContext context, ACell owner,
 			SignedData<V> ownValue, SignedData<V> otherValue) {
+		return merge(context,owner,ownValue,otherValue,context==null?null:value -> sign(context,owner,value));
+	}
+
+	private SignedData<V> merge(LatticeContext context,ACell owner,SignedData<V> ownValue,
+			SignedData<V> otherValue,Function<V,SignedData<V>> author) {
 		if (otherValue==null) return ownValue;
 		LatticeContext policy=(context==null)?LatticeContext.EMPTY:context;
 
@@ -145,17 +187,17 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		// Bail out if other is not validly authored for this owner
 		if (!accepts(policy,owner,otherValue)) return ownValue;
 
-		// Perform child lattice merge with context
-		V m=valueNode.merge(context, a, b);
+		V m=(context==null)?valueNode.merge(a,b):valueNode.merge(context,a,b);
 
 		// Check if new lattice value is identical to either input
 		if (Utils.equals(a, m)) return ownValue;
 		if (Utils.equals(b, m)) return otherValue;
+		if (author==null) return ownValue;
 
 		// A synthesised value must be signed as this owner. If we cannot author it,
 		// retain the own value: never store, or propagate, a slot signed by a
 		// non-owner, and never abort an otherwise valid merge over it.
-		SignedData<V> signed=sign(context,owner,m);
+		SignedData<V> signed=author.apply(m);
 		return (signed!=null)?signed:ownValue;
 	}
 
@@ -174,7 +216,16 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	public boolean checkForeign(SignedData<V> otherValue) {
 		if (otherValue==null) return false;
 		if (ownerVerifier!=null && !ownerVerifier.test(owner,otherValue.getAccountKey())) return false;
-		return otherValue.checkSignature();
+		return otherValue.checkSignature() && validPayload(otherValue.getValue());
+	}
+
+	private boolean validPayload(V value) {
+		try {
+			return valueNode.checkForeign(value);
+		} catch (ClassCastException e) {
+			// SignedData's Java type parameter is not evidence about a foreign payload.
+			return false;
+		}
 	}
 
 	@Override

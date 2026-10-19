@@ -1,5 +1,8 @@
 package convex.lattice;
 
+import java.util.Objects;
+import java.util.function.Function;
+
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
 import convex.lattice.cursor.ACursor;
@@ -16,10 +19,10 @@ import convex.lattice.generic.SignedLattice;
  * sign. The bound lattice supplies both the merge and the authorisation rule.</p>
  *
  * <p>Sync publishes through this component's own fork of its destination and stops
- * there. Give it a path in the host, not a path inside another staged component's
- * working copy; an application syncs its signed components in
- * {@link ALatticeApplication#beforeSync()} before publishing root-level state of
- * its own. This component retains no parent component or store.</p>
+ * there. The destination may be a host path or a slot in an owned map's working
+ * state. In the latter case the map must subsequently sync to publish outward;
+ * syncing the map never implicitly publishes this draft. This component retains
+ * no parent component or store.</p>
  *
  * <p>Domain components may extend this class to add operations directly over
  * {@link #cursor()}, inheriting verification, batched signing and publication.
@@ -33,22 +36,29 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	/**
 	 * Creates private unsigned working state over a signed destination. The lattice
 	 * should be the owner-bound instance from the destination's lattice definition,
-	 * such as {@code owners.signingFor(owner)}. Signing policy is resolved from the
-	 * component's explicit policy, configured before publication.
-	 * For a lightweight view which signs each atomic edit immediately, compose a
-	 * {@link convex.lattice.cursor.SignedCursor} with the destination instead.
+	 * such as {@code owners.signingFor(owner)}. The supplied signer is used for
+	 * publication and re-signing; a dynamic signer may resolve keys when called.
+	 * For a domain view which signs each atomic edit immediately, extend
+	 * {@link ASignedComponent} over the destination instead.
 	 */
-	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination) {
+	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination,
+			Function<V,SignedData<V>> signer) {
 		super(lattice.getValueLattice(),destination,
 			stored -> (stored==null)?null:stored.getValue(),
-			(context,value) -> {
+			(ignored,value) -> {
 				if (value==null) return null;
-				SignedData<V> signed=lattice.sign(context,value);
+				SignedData<V> signed=lattice.sign(value,signer);
 				if (signed==null) throw new IllegalStateException(
 					"No authorised signer available for component owner "+lattice.getOwner());
 				return signed;
 			});
 		this.lattice=lattice;
+		Objects.requireNonNull(signer,"Signer must not be null");
+	}
+
+	@Override
+	protected V mergePublication(ALattice<V> lattice,V own,V other) {
+		return lattice.merge(own,other);
 	}
 
 	/**
@@ -60,7 +70,22 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * @return Current unsigned value after merging, or unchanged on rejection
 	 */
 	public V merge(SignedData<V> incoming) {
-		if (incoming==null || !lattice.checkForeign(incoming)) return cursor.get();
-		return cursor.updateAndGet(own -> lattice.getValueLattice().merge(getContext(),own,incoming.getValue()));
+		if (incoming==null || lattice.merge(null,incoming)==null) return cursor.get();
+		return cursor.updateAndGet(own -> lattice.getValueLattice().merge(own,incoming.getValue()));
+	}
+
+	/**
+	 * Receives a complete envelope at this boundary. No incoming path can cross
+	 * inside the envelope; unsigned edits use the working cursor instead. This
+	 * entry point also serves deliveries from {@link AKeyedRegions}.
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	public V mergeAt(ACell incoming,ACell... path) {
+		if (path.length!=0) return cursor.get();
+		if (incoming!=null && !(incoming instanceof SignedData<?>)) {
+			throw new IllegalArgumentException("Signed component requires a complete envelope");
+		}
+		return merge((SignedData<V>)incoming);
 	}
 }

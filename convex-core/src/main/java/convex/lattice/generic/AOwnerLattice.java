@@ -88,6 +88,11 @@ public abstract class AOwnerLattice<K extends ACell, V extends ACell,
 		return signedLattice.getValueLattice();
 	}
 
+	@Override
+	protected boolean checkEntry(ACell key,ACell value) {
+		return value instanceof SignedData<?>;
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell key) {

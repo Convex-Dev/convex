@@ -178,8 +178,8 @@ public class OwnershipHierarchyTest {
 		assertThrows(ClassCastException.class,() -> raw.merge(null,convex.core.data.Maps.of(DID,signed)));
 		AForkableCursor root=Cursors.root(didIndex.zero());
 		ACell before=root.get();
-		assertThrows(ClassCastException.class,() -> convex.lattice.ComponentTestSupport.merge(root,didIndex,Index.of(DID,CVMLong.ONE)));
-		assertSame(before,root.get(),"Malformed values must not partially update the root");
+		convex.lattice.ComponentTestSupport.merge(root,didIndex,Index.of(DID,CVMLong.ONE));
+		assertSame(before,root.get(),"Unsigned entries are ignored before the typed signed merge");
 	}
 
 	@Test

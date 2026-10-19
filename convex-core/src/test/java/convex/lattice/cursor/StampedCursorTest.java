@@ -16,7 +16,6 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
-import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.JSONLattice;
@@ -52,12 +51,8 @@ public class StampedCursorTest {
 		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO,B,CVMLong.ZERO));
 		AtomicInteger clocks=new AtomicInteger();
 		AtomicInteger preparations=new AtomicInteger();
-		LatticeContext context=new LatticeContext() {
-			@Override public CVMLong currentTimestamp() {
-				return CVMLong.create(clocks.incrementAndGet());
-			}
-		};
-		StampedCursor<ACell> cursor=StampedCursor.create(root,context::currentTimestamp,(value,time) -> {
+		StampedCursor<ACell> cursor=StampedCursor.create(root,
+			() -> CVMLong.create(clocks.incrementAndGet()),(value,time) -> {
 			// Force the first candidate to lose its CAS to a different field update.
 			if (preparations.incrementAndGet()==1) root.set(Maps.of(A,CVMLong.ZERO,B,CVMLong.ONE));
 			return stampWith(value,time.longValue());
@@ -105,38 +100,28 @@ public class StampedCursorTest {
 
 	/** The component explicitly chooses maps at both levels. */
 	static AForkableCursor<ACell> userView(AForkableCursor<ACell> source) {
-		return ProjectionCursor.create(source,
-			value -> RT.getIn(value, USERS, ALICE),
-			(value, child) -> {
-				if (Utils.equals(RT.getIn(value, USERS, ALICE), child)) return value;
-				AHashMap<ACell, ACell> parent = value == null ? Maps.empty() : RT.ensureMap(value);
-				ACell currentUsers = parent.get(USERS);
-				AHashMap<ACell, ACell> users = currentUsers == null ? Maps.empty() : RT.ensureMap(currentUsers);
-				return parent.assoc(USERS, users.assoc(ALICE, child));
-			});
+		return source.withDefault(Maps.empty())
+			.<AHashMap<ACell,ACell>>path(USERS).withDefault(Maps.empty()).path(ALICE);
 	}
 
 	// ===== Deep write below the leaf: structural + re-stamped =====
 
 	@Test public void testDeepWriteStampsWholeLeaf() {
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
-		// the write clock lives in the context (ts = 100)
-		LatticeContext ctx = LatticeContext.create(CVMLong.create(100), null);
 		Root<ACell> root = Cursors.root(initial);
 
 		// the component owning the stamped leaf wraps it, then navigates below
-		AForkableCursor<ACell> c = userView(StampedCursor.create(root,ctx::currentTimestamp,(v, ts) -> stampWith(v, ts.longValue())));
+		AForkableCursor<ACell> c = userView(StampedCursor.create(root,() -> CVMLong.create(100),(v, ts) -> stampWith(v, ts.longValue())));
 		c.set(Strings.create("bob"));
 
 		// The component write function constructs the missing users map atomically.
 		assertEquals(Strings.create("bob"), RT.getIn(root.get(), USERS, ALICE));
-		// the whole :state leaf was re-stamped from the context timestamp
-		assertEquals(100L, tsOf(root.get()), "deep write must re-stamp the whole :state leaf from context");
+		assertEquals(100L, tsOf(root.get()), "deep write stamps the whole :state leaf using the supplied clock");
 		// the timestamp keyword still coexists with the data at the top level
 		assertNull(RT.getIn(root.get(), Strings.create("nope")));
 	}
 
-	@Test public void testLongLivedDerivedPathUsesAdvancedContextTimestamp() {
+	@Test public void testLongLivedDerivedPathUsesCurrentSupplierTimestamp() {
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
 		Root<ACell> root = Cursors.root(initial);
 
@@ -148,7 +133,7 @@ public class StampedCursorTest {
 
 		assertEquals(Strings.create("bob"), RT.getIn(root.get(), USERS, ALICE));
 		assertEquals(200L, tsOf(root.get()),
-			"a long-lived derived cursor must stamp with the parent’s current context time");
+			"a long-lived derived cursor resolves its supplied clock when writing");
 	}
 
 	// ===== Whole-value LWW merge: deletions are durable =====
@@ -173,7 +158,9 @@ public class StampedCursorTest {
 		Root<ACell> base = Root.create(older);
 		ALattice<ACell> lww = LWWLattice.create(JSONLattice.INSTANCE, StampedCursorTest::tsOf);
 		// stampFn would bump the timestamp to 999 if it were (wrongly) applied to a merge result
-		StampedCursor<ACell> sc = StampedCursor.create(base,LatticeContext.EMPTY::currentTimestamp,(v, ts) -> stampWith(v, 999));
+		StampedCursor<ACell> sc = StampedCursor.create(base,
+			() -> { throw new AssertionError("An incoming merge must not consult the edit clock"); },
+			(v, ts) -> stampWith(v, 999));
 
 		base.updateAndGet(own -> lww.merge(own,newer)); // newer (ts 20) is the LWW winner
 

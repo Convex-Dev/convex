@@ -125,7 +125,14 @@ transactions use `TransactionalComponent.withCursor` to retain component policy.
 
 ## Signing and stamping composition
 
-Components can opt into authoring every changed write through a wrapper:
+Components can opt into authoring every changed write through a wrapper. The
+standard `Timestamped` component owns both the stamp-on-write cursor and the
+ordering used for incoming records. Its `cursor()` is a `StampedCursor`; its merge
+uses the underlying storage and preserves incoming timestamps. Enclosing signed
+or staged boundaries share its lattice for ordering without re-stamping. The
+component creates no additional publication boundary.
+
+For custom composition, the underlying cursor mechanisms remain available:
 
 ```java
 var rule = owners.signingFor(owner);

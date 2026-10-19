@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.fs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -18,6 +18,9 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALattice;
+import convex.lattice.Lattice;
+import convex.lattice.LatticeContext;
 import convex.lattice.fs.DLFSNode;
 
 /**

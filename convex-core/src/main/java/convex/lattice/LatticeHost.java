@@ -45,7 +45,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	private final ReentrantLock syncLock=new ReentrantLock();
 	private volatile Function<V,V> publicationPolicy;
 	private boolean publicationPolicyFrozen;
-	private volatile List<ALatticeApplication<V>> applications;
+	private volatile List<ALatticeComponent<V>> applications;
 
 	/**
 	 * Creates a host around existing atomic storage, optionally backed by a store.
@@ -108,9 +108,9 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * @return Current published root, which may not yet include the incoming state
 	 */
 	public V merge(V other) {
-		List<ALatticeApplication<V>> configured=applications;
+		List<ALatticeComponent<V>> configured=applications;
 		if (configured==null) return cursor.get();
-		for (ALatticeApplication<V> application:configured) application.merge(other);
+		for (ALatticeComponent<V> application:configured) application.merge(other);
 		return cursor.get();
 	}
 
@@ -125,19 +125,20 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * @return Current published root, which may not include this delivery
 	 */
 	public V mergeAt(ACell value, ACell... path) {
-		List<ALatticeApplication<V>> configured=applications;
+		List<ALatticeComponent<V>> configured=applications;
 		if (configured==null) return cursor.get();
-		for (ALatticeApplication<V> application:configured) application.mergeAt(value,path);
+		for (ALatticeComponent<V> application:configured) application.mergeAt(value,path);
 		return cursor.get();
 	}
 
 	/**
 	 * Configures incoming delegation once, before delivering incoming state. The
-	 * caller constructs applications against this restored host. An empty list
+	 * caller constructs root components against this restored host, for example
+	 * {@link AKeyedRegions} or {@link ALatticeApplication}. An empty list
 	 * explicitly ignores incoming values. Configuration retains an immutable list;
 	 * applications do not register their children with the root.
 	 */
-	public synchronized void configureApplications(List<? extends ALatticeApplication<V>> applications) {
+	public synchronized void configureApplications(List<? extends ALatticeComponent<V>> applications) {
 		if (this.applications!=null) throw new IllegalStateException("Applications already configured");
 		this.applications=List.copyOf(applications);
 	}

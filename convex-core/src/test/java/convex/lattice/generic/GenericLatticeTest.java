@@ -1,6 +1,7 @@
 package convex.lattice.generic;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -104,8 +105,8 @@ public class GenericLatticeTest {
 
 	@Test
 	public void testSignedLatticeWithContext() {
-		AKeyPair kp = AKeyPair.generate();
-		CVMLong ts = CVMLong.create(System.currentTimeMillis());
+		AKeyPair kp = AKeyPair.createSeeded(8100);
+		CVMLong ts = CVMLong.create(100);
 		LatticeContext ctx = LatticeContext.create(ts, kp);
 
 		// Create signed lattice (without setting keypair on instance)
@@ -119,7 +120,7 @@ public class GenericLatticeTest {
 		SignedData<AInteger> result = sl.merge(ctx, sd1, sd2);
 
 		assertEquals(CVMLong.create(20), result.getValue());
-		assertEquals(true, result.checkSignature());
+		assertTrue(result.checkSignature());
 	}
 
 	/**
@@ -128,7 +129,7 @@ public class GenericLatticeTest {
 	 */
 	@Test
 	public void testSignedLatticeSynthesisWithAuthorisedSigner() {
-		AKeyPair kp = AKeyPair.generate();
+		AKeyPair kp = AKeyPair.createSeeded(8101);
 		AccountKey owner = kp.getAccountKey();
 		SignedLattice<ASet<CVMLong>> sl =
 			SignedLattice.<ASet<CVMLong>>create(SetLattice.create()).withOwner(owner);
@@ -141,7 +142,7 @@ public class GenericLatticeTest {
 
 		assertEquals(Sets.of(CVMLong.ONE, CVMLong.TWO), result.getValue());
 		assertEquals(owner, result.getAccountKey());
-		assertEquals(true, result.checkSignature());
+		assertTrue(result.checkSignature());
 	}
 
 	/**
@@ -151,8 +152,8 @@ public class GenericLatticeTest {
 	 */
 	@Test
 	public void testSignedLatticeSynthesisKeepsOwnWithoutSigner() {
-		AKeyPair owner = AKeyPair.generate();
-		AKeyPair stranger = AKeyPair.generate();
+		AKeyPair owner = AKeyPair.createSeeded(8102);
+		AKeyPair stranger = AKeyPair.createSeeded(8103);
 		SignedLattice<ASet<CVMLong>> sl = SignedLattice.<ASet<CVMLong>>create(SetLattice.create())
 			.withOwner(owner.getAccountKey());
 
@@ -173,8 +174,8 @@ public class GenericLatticeTest {
 	 */
 	@Test
 	public void testOwnerLatticeMergePartialSynthesis() {
-		AKeyPair alice = AKeyPair.generate();
-		AKeyPair bob = AKeyPair.generate();
+		AKeyPair alice = AKeyPair.createSeeded(8104);
+		AKeyPair bob = AKeyPair.createSeeded(8105);
 		OwnerLattice<ASet<CVMLong>> lattice = OwnerLattice.create(SetLattice.create());
 
 		AHashMap<ACell, SignedData<ASet<CVMLong>>> own = Maps.of(
@@ -200,9 +201,9 @@ public class GenericLatticeTest {
 	@Test
 	public void testOwnerLatticeWithContext() {
 		// Create two key pairs for two different owners
-		AKeyPair kp1 = AKeyPair.generate();
-		AKeyPair kp2 = AKeyPair.generate();
-		CVMLong ts = CVMLong.create(System.currentTimeMillis());
+		AKeyPair kp1 = AKeyPair.createSeeded(8106);
+		AKeyPair kp2 = AKeyPair.createSeeded(8107);
+		CVMLong ts = CVMLong.create(100);
 
 		// Create OwnerLattice for signed max values
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
@@ -237,15 +238,15 @@ public class GenericLatticeTest {
 		assertEquals(CVMLong.create(20), merged2.get(owner2).getValue(), "Owner2's value should remain unchanged");
 
 		// Verify signatures are valid
-		assertEquals(true, merged2.get(owner1).checkSignature(), "Owner1's signature should be valid");
-		assertEquals(true, merged2.get(owner2).checkSignature(), "Owner2's signature should be valid");
+		assertTrue(merged2.get(owner1).checkSignature(), "Owner1's signature should be valid");
+		assertTrue(merged2.get(owner2).checkSignature(), "Owner2's signature should be valid");
 	}
 
 	@Test
 	public void testOwnerLatticeContextFallback() {
 		// Test that OwnerLattice works without context (backwards compatibility)
-		AKeyPair kp1 = AKeyPair.generate();
-		AKeyPair kp2 = AKeyPair.generate();
+		AKeyPair kp1 = AKeyPair.createSeeded(8108);
+		AKeyPair kp2 = AKeyPair.createSeeded(8109);
 
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
 
@@ -271,8 +272,8 @@ public class GenericLatticeTest {
 		// Each owner's slot verifies its signer for its owner, so the context-free
 		// merge(own, other) binds a direct-key owner to its signer exactly as the
 		// context-aware overload does. See testOwnerVerificationBlobKeyMismatch.
-		AKeyPair kpOwner = AKeyPair.generate();
-		AKeyPair kpFake = AKeyPair.generate();
+		AKeyPair kpOwner = AKeyPair.createSeeded(8110);
+		AKeyPair kpFake = AKeyPair.createSeeded(8111);
 
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
 
@@ -317,8 +318,8 @@ public class GenericLatticeTest {
 	@Test
 	public void testOwnerVerificationBlobKeyMatch() {
 		// Blob/AccountKey owner matching the signer → accepted
-		AKeyPair kpOwner = AKeyPair.generate();
-		AKeyPair kpOther = AKeyPair.generate();
+		AKeyPair kpOwner = AKeyPair.createSeeded(8112);
+		AKeyPair kpOther = AKeyPair.createSeeded(8113);
 
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
 
@@ -338,9 +339,9 @@ public class GenericLatticeTest {
 	@Test
 	public void testOwnerVerificationBlobKeyMismatch() {
 		// Blob/AccountKey owner NOT matching the signer → rejected
-		AKeyPair kpOwner = AKeyPair.generate();
-		AKeyPair kpFake = AKeyPair.generate();
-		AKeyPair kpMerger = AKeyPair.generate();
+		AKeyPair kpOwner = AKeyPair.createSeeded(8114);
+		AKeyPair kpFake = AKeyPair.createSeeded(8115);
+		AKeyPair kpMerger = AKeyPair.createSeeded(8116);
 
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
 
@@ -359,9 +360,9 @@ public class GenericLatticeTest {
 	@Test
 	public void testOwnerVerificationWithCustomVerifier() {
 		// String owner with custom verifier
-		AKeyPair kpAuthorised = AKeyPair.generate();
-		AKeyPair kpUnauthorised = AKeyPair.generate();
-		AKeyPair kpMerger = AKeyPair.generate();
+		AKeyPair kpAuthorised = AKeyPair.createSeeded(8117);
+		AKeyPair kpUnauthorised = AKeyPair.createSeeded(8118);
+		AKeyPair kpMerger = AKeyPair.createSeeded(8119);
 
 		AccountKey authorisedKey = kpAuthorised.getAccountKey();
 
@@ -397,10 +398,10 @@ public class GenericLatticeTest {
 	@Test
 	public void testOwnerVerificationMultipleKeys() {
 		// Organisation with multiple authorised keys
-		AKeyPair kpA = AKeyPair.generate();
-		AKeyPair kpB = AKeyPair.generate();
-		AKeyPair kpRogue = AKeyPair.generate();
-		AKeyPair kpMerger = AKeyPair.generate();
+		AKeyPair kpA = AKeyPair.createSeeded(8120);
+		AKeyPair kpB = AKeyPair.createSeeded(8121);
+		AKeyPair kpRogue = AKeyPair.createSeeded(8122);
+		AKeyPair kpMerger = AKeyPair.createSeeded(8123);
 
 		Set<AccountKey> authorisedKeys = Set.of(kpA.getAccountKey(), kpB.getAccountKey());
 
@@ -532,7 +533,7 @@ public class GenericLatticeTest {
 	@Test
 	public void testOwnerVerificationNoVerifierLenient() {
 		// No verifier set → lenient mode, string owners accepted
-		AKeyPair kp = AKeyPair.generate();
+		AKeyPair kp = AKeyPair.createSeeded(8124);
 
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
 
