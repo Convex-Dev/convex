@@ -31,7 +31,7 @@ jobs:
           cache: maven
 
       - name: Build and test
-        run: ./mvnw -B clean install
+        run: ./mvnw -B -Dconvex.test.extended=true clean install
 
       # Sources and Javadocs are attached only under the release profile. Verify
       # them on the release JDK so ordinary green builds cannot hide publishing

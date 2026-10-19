@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.Signature;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Base64;
@@ -21,14 +20,9 @@ import convex.core.data.Strings;
 
 public class JWKSKeysTest {
 
-	private KeyPair generateRSAKeyPair() throws Exception {
-		KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
-		gen.initialize(2048);
-		return gen.generateKeyPair();
-	}
 
 	@Test public void testParseGoogleFormat() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		RSAPublicKey pub = (RSAPublicKey) kp.getPublic();
 		Base64.Encoder enc = Base64.getUrlEncoder().withoutPadding();
 
@@ -66,7 +60,7 @@ public class JWKSKeysTest {
 	}
 
 	@Test public void testFiltersEncryptionKeys() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		RSAPublicKey pub = (RSAPublicKey) kp.getPublic();
 		Base64.Encoder enc = Base64.getUrlEncoder().withoutPadding();
 
@@ -84,7 +78,7 @@ public class JWKSKeysTest {
 	}
 
 	@Test public void testRoundTrip() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		RSAPublicKey pub = (RSAPublicKey) kp.getPublic();
 		Base64.Encoder enc = Base64.getUrlEncoder().withoutPadding();
 
@@ -123,7 +117,7 @@ public class JWKSKeysTest {
 	}
 
 	@Test public void testBuildRSAPublicKey() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		RSAPublicKey original = (RSAPublicKey) kp.getPublic();
 		Base64.Encoder enc = Base64.getUrlEncoder().withoutPadding();
 

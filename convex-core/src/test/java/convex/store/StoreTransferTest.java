@@ -92,12 +92,15 @@ public class StoreTransferTest {
 		MemoryStore src = new MemoryStore();
 		AVector<ACell> v = Cells.persist(tree(30), src);
 
-		StoreTransfer.transfer(Samples.TEST_STORE2, v.getRef());
-		long len = Samples.TEST_STORE2.getEtch().getDataLength();
+		// Exact file length requires a private store: other tests write to shared stores.
+		try (EtchStore dest = EtchStore.createTemp("transfer-no-op")) {
+			StoreTransfer.transfer(dest, v.getRef());
+			long len = dest.getEtch().getDataLength();
 
-		// Second transfer prunes on INV-1: no bytes written
-		StoreTransfer.transfer(Samples.TEST_STORE2, v.getRef());
-		assertEquals(len, Samples.TEST_STORE2.getEtch().getDataLength());
+			// Second transfer prunes on INV-1: no bytes written
+			StoreTransfer.transfer(dest, v.getRef());
+			assertEquals(len, dest.getEtch().getDataLength());
+		}
 	}
 
 	@Test
