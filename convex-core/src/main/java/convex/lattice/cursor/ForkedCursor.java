@@ -2,7 +2,6 @@ package convex.lattice.cursor;
 
 import java.util.Objects;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -20,7 +19,9 @@ import convex.core.util.Utils;
  * working copy was last reconciled against: an unchanged working copy adopts the
  * destination, an unchanged destination keeps the working snapshot, and only when
  * both have changed does the supplied merge run, with the working snapshot as own.
- * Edits that land in the working copy during a sync stay pending for the next one.
+ * Working writes are ordered before or after sync; reconciliation and preparation
+ * finish before publication commits. A failed merge or preparation changes neither
+ * the destination nor the working value or baseline.
  * Publication stops at the destination and never publishes that cursor further.</p>
  *
  * <p>The fork knows no lattice, context or signing policy: the functions it is
@@ -29,8 +30,13 @@ import convex.core.util.Utils;
  * Preparation runs once per distinct candidate, outside the atomic compare-and-set,
  * so an unrelated concurrent write reuses a prepared value such as a signature.</p>
  *
- * <p>Working storage supports exclusive transactions when the destination does.
- * That lock is the working copy's own and excludes nothing at the destination.</p>
+ * <p>Working storage uses {@link TransactionalRootCursor}. Sync holds its write
+ * lock through the destination CAS and installation of the reconciled working value.
+ * Reads of this fork also take that lock, so they cannot observe an incomplete sync.
+ * The destination remains independently writable and CAS conflicts retry normally.</p>
+ *
+ * <p>Read, prepare and merge functions must not mutate or sync this fork, or wait
+ * for another operation on it. Re-entrant writes and syncs are rejected.</p>
  *
  * @param <V> Working value type
  */
@@ -38,16 +44,16 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	private final Target<V,?> target;
 	private final BinaryOperator<V> merge;
-	private final Root<V> working;
-	private final ReentrantLock syncLock=new ReentrantLock();
+	private final TransactionalRootCursor<V> working;
+	/** Used only to reject same-thread writes from sync callbacks. */
+	private volatile Thread syncingThread;
 
 	private <P extends ACell> ForkedCursor(ACursor<P> destination,Function<P,V> read,
 			Function<V,P> prepare,BinaryOperator<V> merge) {
 		Target<V,P> t=new Target<>(destination,read,prepare);
 		this.target=t;
 		this.merge=merge;
-		this.working=destination.supportsExclusiveTransactions()
-			?new TransactionalRootCursor<>(t.baseline):new Root<>(t.baseline);
+		this.working=new TransactionalRootCursor<>(t.baseline);
 	}
 
 	/**
@@ -83,32 +89,30 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	}
 
 	/**
-	 * Publishes the current working snapshot into the destination.
-	 *
-	 * <p>The merge runs outside atomic update callbacks, once per distinct
-	 * destination value and only when both sides changed. The returned value is
-	 * exactly what was published; working edits made during the sync remain
-	 * pending.</p>
+	 * Atomically reconciles and publishes the working value into the destination.
+	 * All fallible computation precedes the destination CAS. Working writes wait
+	 * until sync completes; there is no reconciliation after publication.
 	 *
 	 * @return Published value
 	 */
 	public V sync() {
-		syncLock.lock();
+		checkNotSyncing();
+		Lock lock=working.exclusiveLock();
+		lock.lock();
 		try {
-			V snapshot=working.get();
-			V published=target.publish(snapshot,merge);
-			V expected=snapshot;
-			V candidate=published;
-			while (!working.compareAndSet(expected,candidate)) {
-				V current=working.get();
-				// New working edits are own; the published value is what they reconcile with.
-				candidate=reconcile(merge,expected,current,candidate);
-				if (Utils.equals(current,candidate)) break;
-				expected=current;
-			}
+			syncingThread=Thread.currentThread();
+			V published=target.publish(working.get(),merge);
+			working.set(published);
 			return published;
 		} finally {
-			syncLock.unlock();
+			syncingThread=null;
+			lock.unlock();
+		}
+	}
+
+	private void checkNotSyncing() {
+		if (syncingThread==Thread.currentThread()) {
+			throw new IllegalStateException("Cannot write or sync a fork from its sync callbacks");
 		}
 	}
 
@@ -127,7 +131,7 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 		private final ACursor<P> destination;
 		private final Function<P,V> read;
 		private final Function<V,P> prepare;
-		/** Destination value the working copy was last reconciled against; under the sync lock. */
+		/** Destination value the working copy was last reconciled against; under the working root lock. */
 		private V baseline;
 
 		Target(ACursor<P> destination,Function<P,V> read,Function<V,P> prepare) {
@@ -180,41 +184,50 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	@Override
 	public V get() {
-		return working.get();
+		Lock lock=working.exclusiveLock();
+		lock.lock();
+		try { return working.get(); } finally { lock.unlock(); }
 	}
 
 	@Override
 	public void set(V newValue) {
+		checkNotSyncing();
 		working.set(newValue);
 	}
 
 	@Override
 	public V getAndSet(V newValue) {
+		checkNotSyncing();
 		return working.getAndSet(newValue);
 	}
 
 	@Override
 	public boolean compareAndSet(V expected,V newValue) {
+		checkNotSyncing();
 		return working.compareAndSet(expected,newValue);
 	}
 
 	@Override
 	public V getAndUpdate(UnaryOperator<V> updateFunction) {
+		checkNotSyncing();
 		return working.getAndUpdate(updateFunction);
 	}
 
 	@Override
 	public V updateAndGet(UnaryOperator<V> updateFunction) {
+		checkNotSyncing();
 		return working.updateAndGet(updateFunction);
 	}
 
 	@Override
 	public V getAndAccumulate(V x,BinaryOperator<V> accumulatorFunction) {
+		checkNotSyncing();
 		return working.getAndAccumulate(x,accumulatorFunction);
 	}
 
 	@Override
 	public V accumulateAndGet(V x,BinaryOperator<V> accumulatorFunction) {
+		checkNotSyncing();
 		return working.accumulateAndGet(x,accumulatorFunction);
 	}
 }

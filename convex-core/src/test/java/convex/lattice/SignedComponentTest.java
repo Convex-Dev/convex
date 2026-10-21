@@ -151,9 +151,10 @@ public class SignedComponentTest {
 	}
 
 	@Test
-	public void testEditsDuringSigningRemainPending() throws Exception {
+	public void testEditsDuringSigningCommitAfterSync() throws Exception {
 		var destination=new Root<SignedData<ASet<CVMLong>>>();
 		CountDownLatch signing=new CountDownLatch(1);
+		CountDownLatch editing=new CountDownLatch(1);
 		CountDownLatch resume=new CountDownLatch(1);
 		AtomicInteger signatures=new AtomicInteger();
 		var component=new SignedComponent<>(SIGNED,destination,signer(() -> {
@@ -164,14 +165,20 @@ public class SignedComponentTest {
 			}
 		}));
 		component.cursor().set(Sets.of(1));
-		try (var executor=Executors.newSingleThreadExecutor()) {
+		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
 			var publishing=executor.submit(component::sync);
 			try {
 				assertTrue(signing.await(10,TimeUnit.SECONDS));
-				component.cursor().updateAndGet(v -> v.include(CVMLong.TWO));
+				var edit=executor.submit(() -> component.cursor().updateAndGet(value -> {
+					editing.countDown();
+					return value.include(CVMLong.TWO);
+				}));
+				assertTrue(editing.await(10,TimeUnit.SECONDS));
 				assertNull(destination.get());
+				resume.countDown();
+				publishing.get(10,TimeUnit.SECONDS);
+				edit.get(10,TimeUnit.SECONDS);
 			} finally { resume.countDown(); }
-			publishing.get(10,TimeUnit.SECONDS);
 		}
 		assertEquals(Sets.of(1),destination.get().getValue());
 		assertEquals(Sets.of(1,2),component.cursor().get());

@@ -173,8 +173,9 @@ public class ComponentPublicationTest {
 	}
 
 	@Test
-	public void testEditsDuringPublicationRemainPendingAndPublicationsAreOrdered() throws Exception {
+	public void testEditsAreOrderedAfterPublicationAndRetainedByNextSync() throws Exception {
 		CountDownLatch publishing=new CountDownLatch(1);
+		CountDownLatch editing=new CountDownLatch(1);
 		CountDownLatch resume=new CountDownLatch(1);
 		List<ASet<CVMLong>> installed=new ArrayList<>();
 		var destination=new InterleavingRoot<>(SETS.zero()) {
@@ -195,9 +196,15 @@ public class ComponentPublicationTest {
 			var first=executor.submit(component::sync);
 			try {
 				assertTrue(publishing.await(10,TimeUnit.SECONDS));
-				component.cursor().updateAndGet(v -> v.include(CVMLong.TWO));
+				var second=executor.submit(() -> {
+					component.cursor().updateAndGet(v -> {
+						editing.countDown();
+						return v.include(CVMLong.TWO);
+					});
+					return component.sync();
+				});
+				assertTrue(editing.await(10,TimeUnit.SECONDS));
 				assertEquals(Sets.of(),destination.get());
-				var second=executor.submit(component::sync);
 				resume.countDown();
 				first.get(10,TimeUnit.SECONDS);
 				second.get(10,TimeUnit.SECONDS);

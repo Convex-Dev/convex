@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -356,52 +357,20 @@ public class LatticeCursorTest {
 	}
 
 	@Test
-	public void testSyncPreservesConcurrentWrites() {
-		// Deterministic regression for the sync-clobbers-concurrent-writes race.
-		//
-		// sync() has a window between (a) reading the fork's local value and
-		// (b) writing the synced value back to the local cursor. A write that
-		// lands in that window was being clobbered by the unconditional
-		// localCursor.set(synced) in the original code.
-		//
-		// We reproduce the race deterministically by inserting a hook into the
-		// parent cursor's compareAndSet. That hook runs synchronously inside
-		// sync() — on the same thread, after localVal has been read but before
-		// sync's final set/CAS — and performs the concurrent write. No
-		// multi-threading, no timing assumptions.
-		SetLattice<CVMLong> lattice = SetLattice.create();
-		HookedRootCursor<ASet<CVMLong>> root = new HookedRootCursor<>(lattice, Sets.empty());
-		var forkComponent=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
-		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
-
-		// Prime the fork with value A
-		CVMLong A = CVMLong.ONE;
-		CVMLong B = CVMLong.create(2);
-		fork.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(A));
-
-		// Arm the hook: when sync() calls parent.compareAndSet, inject a
-		// concurrent write of B into the fork's local cursor. This write
-		// happens *after* sync has read localVal (which had only A) but
-		// *before* sync writes back — precisely the race window.
-		root.armHook(() -> fork.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(B)));
-
-		// Sync. Under the buggy code, this would overwrite the fork's local
-		// state with sync's stale snapshot (containing only A), losing B.
-		// Under the fix, the CAS-then-merge path preserves B.
-		forkComponent.sync();
-
-		ASet<CVMLong> localAfter = fork.get();
-		ASet<CVMLong> rootAfter = root.get();
-
-		assertTrue(localAfter.contains(A), "Fork should still have A after sync");
-		assertTrue(localAfter.contains(B),
-			"Fork should preserve B — the concurrent write inserted during sync "
-			+ "(was clobbered by the buggy unconditional localCursor.set)");
-		assertTrue(rootAfter.contains(A), "Root should have A after sync");
-		// Note: root won't have B yet — B was injected after sync's parent
-		// update had already captured the pre-hook localVal. The next sync
-		// would propagate B. The fix guarantees B is safely in the fork.
+	public void testSyncRejectsReentrantWorkingWritesBeforePublication() {
+		SetLattice<CVMLong> lattice=SetLattice.create();
+		var root=new HookedRootCursor<>(lattice,Sets.<CVMLong>empty());
+		var component=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		component.cursor().set(Sets.of(CVMLong.ONE));
+		// A synchronous callback is re-entrant, not a concurrent writer. It cannot
+		// change the working value underneath the sync transaction.
+		root.armHook(() -> component.cursor().updateAndGet(set -> set.include(CVMLong.TWO)));
+		assertThrows(IllegalStateException.class,component::sync);
+		assertEquals(Sets.empty(),root.get());
+		assertEquals(Sets.of(1),component.cursor().get());
+		assertEquals(Sets.of(1),component.sync());
 	}
+
 
 	@Test
 	public void testFastPathOptimization() {

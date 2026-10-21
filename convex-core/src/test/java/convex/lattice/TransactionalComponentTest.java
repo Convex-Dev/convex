@@ -280,7 +280,7 @@ class TransactionalComponentTest {
 			var working=new LatticeComponent<>(
 				convex.lattice.generic.MapLattice.<Keyword,ACell>create(convex.lattice.generic.JSONLattice.INSTANCE),
 				root,LatticeContext.EMPTY);
-			assertEquals(coordinated,working.cursor().supportsExclusiveTransactions());
+			assertTrue(working.cursor().supportsExclusiveTransactions(),"Forks coordinate their own working state independently of the destination");
 		}
 	}
 

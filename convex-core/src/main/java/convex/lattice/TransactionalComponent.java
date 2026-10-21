@@ -54,7 +54,8 @@ public interface TransactionalComponent<V extends ACell,C> {
 
 	/**
 	 * Runs the callback once while excluding other writes to the entire shared root.
-	 * Reads remain available. Keep callbacks short; do not wait for another writer,
+	 * Ordinary root reads remain available; fork reads share its coordination lock.
+	 * Keep callbacks short; do not wait for another operation on the same state,
 	 * publish state, or write through a captured live component inside the callback.
 	 * An ordinary root throws UnsupportedOperationException before invoking the callback.
 	 */

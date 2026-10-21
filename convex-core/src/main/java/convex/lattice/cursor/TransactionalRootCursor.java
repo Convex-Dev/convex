@@ -11,9 +11,9 @@ import convex.core.data.ACell;
  * Opt-in root supporting exclusive transactions and optimistic-to-serial fallback.
  * All mutation entry points coordinate their commits through one root-owned lock.
  * Ordinary update functions still execute optimistically outside the lock, while
- * reads remain lock-free. Live views inherit this policy, and component working
- * state created against such a root gets an independent root with the same
- * capability. No background workers are created.
+ * root reads remain lock-free. Live views inherit this policy. Forks always use
+ * this root for their independent working state so sync can exclude working writes;
+ * fork reads also coordinate with sync. No background workers are created.
  *
  * <p>Choose this variant when constructing the shared host. A locking wrapper
  * around a path cannot exclude writes through other views of an ordinary root.</p>

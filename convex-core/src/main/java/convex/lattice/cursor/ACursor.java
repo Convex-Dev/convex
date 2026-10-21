@@ -25,7 +25,7 @@ public abstract class ACursor<V extends ACell> {
 	 * when that state lives in an ordinary optimistic root. Derived cursors resolve
 	 * this through their existing links; {@link TransactionalRootCursor} supplies its
 	 * write lock. This is the only root-owned capability a cursor exposes, and it
-	 * exists solely to support {@link Transactions}.
+	 * supports {@link Transactions} and atomic fork publication.
 	 *
 	 * @return Shared write lock, or null when exclusive transactions are unsupported
 	 */

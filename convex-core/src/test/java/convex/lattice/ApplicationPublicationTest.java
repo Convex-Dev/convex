@@ -156,7 +156,7 @@ public class ApplicationPublicationTest {
 	}
 
 	@Test
-	public void testEditsDuringPublicationStayPending() throws Exception {
+	public void testEditsDuringPublicationCommitAfterSync() throws Exception {
 		var host=LatticeHost.create(initial(),null);
 		var first=new Application(host);
 		var second=new Application(host);
@@ -164,6 +164,7 @@ public class ApplicationPublicationTest {
 		second.add(2);
 		first.sync();
 		CountDownLatch signing=new CountDownLatch(1);
+		CountDownLatch editing=new CountDownLatch(1);
 		CountDownLatch resume=new CountDownLatch(1);
 		second.onSign=() -> {
 			if (second.signatures.get()==1) {
@@ -172,15 +173,19 @@ public class ApplicationPublicationTest {
 				catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
 			}
 		};
-		try (var executor=Executors.newSingleThreadExecutor()) {
+		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
 			var publication=executor.submit(second::sync);
 			try {
 				assertTrue(signing.await(10,TimeUnit.SECONDS));
-				// A working edit during the owner's publication stays pending and is
-				// reconciled into the working copy after the host CAS.
-				second.add(3);
+				var edit=executor.submit(() -> second.owner.cursor().updateAndGet(value -> {
+					editing.countDown();
+					return value.include(CVMLong.create(3));
+				}));
+				assertTrue(editing.await(10,TimeUnit.SECONDS));
+				resume.countDown();
+				publication.get(10,TimeUnit.SECONDS);
+				edit.get(10,TimeUnit.SECONDS);
 			} finally { resume.countDown(); }
-			publication.get(10,TimeUnit.SECONDS);
 		}
 		assertEquals(Sets.of(0,1,2),signed(host.cursor().get()).getValue());
 		assertEquals(Sets.of(0,1,2,3),second.owner.cursor().get());

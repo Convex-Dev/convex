@@ -643,6 +643,21 @@ destination. Application preparation and managed-child sync remain explicit
 lifecycle extensions. Regression tests cover these ownership boundaries, cursor
 declaration independence and no-op identity through authoring views.
 
+## 27. Fork reconciliation completes before publication commits
+
+Implemented 21 October 2026. Forks always use `TransactionalRootCursor` for private
+working storage. Sync holds that root's existing write lock while reconciling and
+preparing the destination CAS, then installs the result without any further merge.
+Fork reads share the lock; working writes are ordered before or after sync. The
+post-publication reconciliation loop and separate sync lock are removed.
+
+A failed merge or preparation leaves the fork value and baseline unchanged and
+publishes nothing. CAS retries still account for independent destination changes
+and reuse preparation for an unchanged candidate. Re-entrant writes or syncs from
+publication callbacks are rejected. Regression tests exercise concurrent edits,
+failure on retry, failed signing, baseline preservation and nested publication.
+This implements CAD035's atomic cursor and failure-before-publication semantics.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |

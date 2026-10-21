@@ -97,13 +97,21 @@ root.updateAndGet(values -> values.include(item));
 publishes one working snapshot into the destination by compare-and-set and, when
 the destination has moved in between, reconciles through the supplied function with
 the working snapshot as own; an unchanged copy adopts the destination instead.
-Working edits that land during a sync stay pending for the next one. There is no
+Working writes are ordered before or after sync. There is no
 fork without a merge function, and `ForkedCursor` is the only cursor with a `sync()`.
 The fork knows no lattice, context or signing policy: the function closes over
 whatever policy its owner chooses. A destination of a different stored type, such as
 a signed envelope, takes read and prepare functions as well; preparation runs once
 per distinct candidate, outside the compare-and-set, so an unrelated concurrent write
 reuses a prepared signature.
+
+Each fork uses an independent `TransactionalRootCursor`. Sync holds its existing
+write lock while reconciling, preparing and committing to the destination by CAS.
+Fork reads take the same lock. A successful commit installs the reconciled working
+value and advances the baseline without further user code or merging. Failed
+reconciliation or preparation commits nothing; competing destination writes remain
+independent. Read, prepare and merge functions must not write or sync the same fork,
+or wait for operations on it. Re-entrant writes and syncs are rejected.
 
 A component with an independent publication boundary owns such a fork and supplies
 its own reconciliation rule; `ALatticeComponent.mergePublication(own, other)` is

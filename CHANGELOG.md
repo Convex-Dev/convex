@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Fork sync completes reconciliation and signing before its publication commit. Concurrent working edits are ordered around sync, and a failed merge or preparation leaves the fork value and baseline unchanged without publishing. Forks now always support exclusive transactions over their private working state.
+
 - `LatticeHost` no longer requires a lattice: it holds published state, delegates all incoming values to configured applications and persists snapshots. Applications declare their own lattices. `LatticeApplication` supports ordinary or live relay use, and `SignedComponent` can be extended by domain components.
 - `NodeServer` is replication only and is constructed from an assembled `LatticeHost`. The lattice-taking constructors, the application-factory launch overload, the lattice accessor and the merge-context accessors (`setMergeContext`, `getMergeContext`) are removed; policy belongs to the host and its applications, and the relay case is assembled by `RelayHost`. Restoring a retained root now adopts it when the host is opened rather than merging it at launch. `ConvexDB.createNodeServer` now declares `IOException`, and `P2PNode.create` fails at creation with an `UncheckedIOException` when the retained root cannot be read, where it previously failed at launch.
 

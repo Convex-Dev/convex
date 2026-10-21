@@ -686,7 +686,10 @@ Publication captures one snapshot of the working copy. If the destination is
 unchanged since the last publication, the snapshot is installed directly; if the
 working copy is unchanged, it adopts the destination. Only when both changed are they
 merged, with local edits as `own`, so equal-timestamp local edits keep that
-precedence. Edits made during publication stay pending for the next sync. A live view
+precedence. Working writes are ordered before or after publication using the fork's
+transactional working root. All reconciliation and preparation precede the
+destination CAS; failure commits no working value, baseline or destination change.
+A live view
 needs no sync to observe root changes; a staged component sees them when its policy
 calls sync, which reconciles and publishes in one step.
 
@@ -791,7 +794,8 @@ depend on live components outside it. Put such operations at their common ancest
 Completion means committed locally, not persisted, published or acknowledged by
 peers.
 
-The host selects the concurrency policy at construction:
+The host selects its root concurrency policy at construction. Forks always use
+independent transactional working storage, whatever the host policy:
 
 | Root | `transact` | `transactLocked` | Ordinary writes |
 |---|---|---|---|
@@ -804,8 +808,9 @@ NodeConfig config = NodeConfig.create().withTransactionalRoot(true);
 ```
 
 The lock belongs to the shared root and covers every view and write on it, including
-unrelated regions. Reads continue to observe committed values. Locked callbacks must
-stay short and must not wait for another writer or publish state.
+unrelated regions. Ordinary root reads remain lock-free; fork reads take its working
+lock so they cannot observe an incomplete sync. Locked callbacks must stay short
+and must not wait for another operation on the same state or publish state.
 
 For a custom component, implement the interface with a rebinding factory that
 creates a fresh component over a supplied cursor with the same domain metadata and
