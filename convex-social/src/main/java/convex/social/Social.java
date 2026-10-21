@@ -4,16 +4,16 @@ import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
-import convex.core.data.AccountKey;
 import convex.core.data.AHashMap;
+import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.TransactionalComponent;
 import convex.lattice.LatticeContext;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.SignedCursor;
@@ -175,13 +175,13 @@ public class Social extends ALatticeComponent<
 	 * @param keyPair Key pair for signing updates
 	 * @return Social instance connected beneath the application
 	 */
-	public static Social connect(ALatticeApplication<?> application, AKeyPair keyPair) {
+	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application, AKeyPair keyPair) {
 		return connect(application,LatticeContext.create(
 			null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
 	}
 
 	/** Connects to an application's {@code :social} region using an explicit policy. */
-	public static Social connect(ALatticeApplication<?> application,LatticeContext context) {
+	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application,LatticeContext context) {
 		Social social=connect(application);
 		social.setContext(context);
 		return social;
@@ -194,9 +194,9 @@ public class Social extends ALatticeComponent<
 	 * @param application Application at the root whose lattice includes {@code :social}
 	 * @return Social region component
 	 */
-	public static Social connect(ALatticeApplication<?> application) {
+	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application) {
 		if (application==null) throw new IllegalArgumentException("Application must not be null");
-		Social social=connect(application.<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>>resolve(KEY_SOCIAL));
+		Social social=connect(application.cursor().withDefault(Index.none()).<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>>path(KEY_SOCIAL));
 		social.setContext(application.getContext());
 		return social;
 	}
@@ -221,7 +221,7 @@ public class Social extends ALatticeComponent<
 		var rule=SOCIAL_LATTICE.signingFor(ownerDid);
 		var policy=getContext();
 		AForkableCursor<Index<Keyword, ACell>> userCursor =
-			SignedCursor.create(resolve(cursor,SOCIAL_LATTICE,ownerDid),value -> rule.sign(policy,value));
+			SignedCursor.create(cursor.withDefault(Maps.empty()).path(ownerDid),value -> rule.sign(policy,value));
 		return configured(new SocialUser(userCursor,ownerDid));
 	}
 
@@ -243,7 +243,7 @@ public class Social extends ALatticeComponent<
 	}
 
 	private Social(Social source) {
-		super(SOCIAL_LATTICE,source.cursor);
+		super(source);
 	}
 
 	@Override
@@ -251,4 +251,11 @@ public class Social extends ALatticeComponent<
 		return configured(new Social(cursor));
 	}
 
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AHashMap<ACell, SignedData<Index<Keyword, ACell>>> mergePublication(
+			AHashMap<ACell, SignedData<Index<Keyword, ACell>>> own,
+			AHashMap<ACell, SignedData<Index<Keyword, ACell>>> other) {
+		return SOCIAL_LATTICE.merge(getContext(),own,other);
+	}
 }

@@ -68,7 +68,7 @@ public final class SharedApplicationsExample {
 	}
 
 	/** Social feeds, staged at {@code :social}. The P2P regions are shared live. */
-	public static final class SocialApp extends ALatticeApplication<Index<Keyword,ACell>> {
+	public static final class SocialApp extends LatticeApplication<Index<Keyword,ACell>> {
 		private final Social social;
 
 		SocialApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long time) {
@@ -96,7 +96,7 @@ public final class SharedApplicationsExample {
 			return P2PUser.create(this,user.getAccountKey());
 		}
 
-		@Override protected void beforeSync() {
+		@Override protected void syncChildren() {
 			social.sync();
 		}
 	}
@@ -120,7 +120,7 @@ public final class SharedApplicationsExample {
 			return P2PUser.create(this,user.getAccountKey());
 		}
 
-		@Override protected void beforeSync() {
+		@Override protected void syncChildren() {
 			staged.sync();
 		}
 	}

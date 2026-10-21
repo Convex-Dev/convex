@@ -40,7 +40,7 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> implements Tra
 	}
 
 	private P2PNodeRecord(P2PNodeRecord source) {
-		super(P2PLattice.NODES_LATTICE.getValueLattice(),source.cursor);
+		super(source);
 		this.owner=source.owner;
 	}
 	@Override
@@ -48,4 +48,9 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> implements Tra
 		return configured(new P2PNodeRecord(cursor,owner));
 	}
 
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected ACell mergePublication(ACell own,ACell other) {
+		return P2PLattice.NODES_LATTICE.getValueLattice().merge(getContext(),own,other);
+	}
 }

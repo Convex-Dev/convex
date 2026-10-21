@@ -31,7 +31,7 @@ class ApplicationIngressTest {
 	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
 
 	/** Counts root and path deliveries and takes the default for each, unless told to ignore them. */
-	private static class App extends ALatticeApplication<Index<Keyword,ACell>> {
+	private static class App extends LatticeApplication<Index<Keyword,ACell>> {
 		int merges;
 		int pathMerges;
 		int preparations;
@@ -118,10 +118,9 @@ class ApplicationIngressTest {
 	private static final KeyedLattice NESTED=KeyedLattice.create(BOARD,BOARD_LATTICE);
 
 	/** A component one level down with its own merge and the shape below it. */
-	private static final class Board extends ALatticeComponent<Index<Keyword,ACell>> {
+	private static final class Board extends LatticeComponent<Index<Keyword,ACell>> {
 		int merges;
-		Board(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
-		@Override public ALattice<Index<Keyword,ACell>> getLattice() { return BOARD_LATTICE; }
+		Board(AForkableCursor<Index<Keyword,ACell>> cursor) { super(BOARD_LATTICE,cursor); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
 			return cursor.updateAndGet(own -> BOARD_LATTICE.merge(getContext(),own,incoming));

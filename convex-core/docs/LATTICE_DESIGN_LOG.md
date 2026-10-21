@@ -590,12 +590,51 @@ incoming envelopes still enter at the enclosing signed boundary, retaining the
 selected envelope. CAD024's whole-record LWW rule and CAD035's cursor mechanics
 are unchanged; CAD045 describes the standard component composition.
 
+## 24. Abstract lattices are optional component implementations
+
+Implemented 20 October 2026. `ALatticeComponent` no longer accepts or exposes
+`ALattice`. It supplies storage, child routing and a `mergePublication(own, other)`
+hook. Unsupported descendant paths are rejected by `mergeAtPath` unless a
+component defines their handling. A staged component can reconcile directly over
+immutable values without constructing a lattice definition.
+
+`LatticeComponent` is the explicit adapter for lattice-based implementations. It
+owns lattice path reduction, optional shape-based cursor construction and keyed
+publication reconciliation for simple values and caller-supplied lattices.
+`LatticeApplication` opts into these operations (see entry 25). Domain components extend
+`ALatticeComponent` directly and call lattice rules in explicit publication or
+domain operations; using a lattice internally does not grant generic incoming
+merge or path routing. Owned maps explicitly accept complete owner envelopes and
+stop delivery at that boundary. Known map and index paths use explicit
+cursor defaults rather than constructing lattice trees merely for navigation.
+
+This follows CAD045's distinction between component behaviour and reusable value
+semantics, and CAD035's policy-free storage and fork reconciliation. The standard
+merge and signature rules are unchanged.
+
+## 25. Applications own lifecycle independently of lattice definitions
+
+Implemented 20 October 2026. `ALatticeApplication` extends `ALatticeComponent`
+without accepting an `ALattice`. It retains application preparation and adds the
+managed-child publication stage: `beforeSync()`, `syncChildren()`, then its own
+boundary. Failure prevents later stages but does not undo successful children.
+`AKeyedRegions` extends this application base, freezes registrations before
+preparation and publishes children in registration order. Nested applications
+participate through the same lifecycle. The empty collection remains inert.
+
+`LatticeApplication` is the explicit, extensible adapter for a supplied root lattice.
+The P2P and DLFS APIs that accept such lattices opt into it. Generic lattice path
+reduction and publication reconciliation are shared with `LatticeComponent` through
+`LatticeOps`; neither operation is required by ordinary applications. Standard
+region entry points navigate their known index/map types without a root lattice.
+This preserves CAD045's component boundaries and CAD035's fork semantics.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |
 |---|---|---|
 | CAD024 Data Lattice | *Cursors*, *Signed Lattice*, *Cursor Sync Guarantees*, implementation note on cursor types | 1, 3, 5, 6, 13, 15 |
 | CAD035 Lattice Cursors | *Path Cursor*, *Forkable Cursor*, *Cursor Hierarchy*, *Lattice-Aware Cursors*, *Lattice Context*, *Reference Implementation*, Java example | 2, 3, 4, 5, 6, 7, 8, 10 |
-| CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 |
+| CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 |
 | CAD036 Lattice Node | pull-path merge description, node construction and restore | 9, 14, 16 |
 | CAD038 Lattice Authentication | *Owner Verifier*, indirect-owner default policy, explicit authoring | 19, 20, 21, 22 |

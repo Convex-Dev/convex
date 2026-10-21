@@ -28,6 +28,7 @@ import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -467,7 +468,7 @@ public class DLFSLocal extends DLFileSystem {
 	/** Creates a forked view sharing this filesystem's store, if any. */
 	@Override
 	public DLFSLocal fork() {
-		var working=ALatticeComponent.working(DLFSLattice.INSTANCE,rootCursor,getContext());
+		var working=new LatticeComponent<>(DLFSLattice.INSTANCE,rootCursor,getContext());
 		return new WorkingFileSystem(provider(),uriPath,working,store);
 	}
 

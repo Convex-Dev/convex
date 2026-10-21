@@ -9,7 +9,7 @@ import convex.core.data.ASet;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
-import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
 
@@ -21,7 +21,7 @@ class NodeApplicationBoundaryTest {
 		assertEquals("NodeServer requires a host cell store",error.getMessage());
 	}
 
-	private static class App extends ALatticeApplication<ASet<CVMLong>> {
+	private static class App extends LatticeApplication<ASet<CVMLong>> {
 		int preparations;
 		App(LatticeHost<ASet<CVMLong>> host) { super(SetLattice.create(),host); }
 		@Override public ASet<CVMLong> merge(ASet<CVMLong> other) {

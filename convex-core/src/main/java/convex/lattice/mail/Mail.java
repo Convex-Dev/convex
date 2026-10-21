@@ -11,6 +11,7 @@ import convex.core.data.AString;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
@@ -56,7 +57,7 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	}
 
 	private Mail(Mail source) {
-		super(source.lattice,source.cursor);
+		super(source);
 		this.lattice=source.lattice;
 	}
 
@@ -83,9 +84,9 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	}
 
 	/** Connects to the {@code :mail} region of an application whose root includes it. */
-	public static Mail connect(ALatticeApplication<?> application, MailLattice lattice, LatticeContext context) {
+	public static Mail connect(ALatticeApplication<Index<Keyword,ACell>> application, MailLattice lattice, LatticeContext context) {
 		if (application==null) throw new IllegalArgumentException("Application must not be null");
-		return connect(application.resolve(KEY_MAIL),lattice,(context==null)?application.getContext():context);
+		return connect(application.cursor().withDefault(Index.none()).path(KEY_MAIL),lattice,(context==null)?application.getContext():context);
 	}
 
 	public MailLattice getLattice() { return lattice; }
@@ -100,7 +101,7 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	public Mailbox mailbox(AString did) {
 		MailboxLattice mailbox=lattice.forMailbox(did);
 		if (mailbox==null) throw new IllegalArgumentException("Mailbox must be a canonical base DID");
-		return configured(new Mailbox(resolve(cursor,lattice,did),mailbox));
+		return configured(new Mailbox(cursor.withDefault(Maps.empty()).path(did),mailbox));
 	}
 
 	/**
@@ -148,5 +149,13 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	@Override
 	public Mail withCursor(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> cursor) {
 		return configured(new Mail(cursor,lattice));
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AHashMap<ACell,Index<ABlob,SignedData<ACell>>> mergePublication(
+			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> own,
+			AHashMap<ACell,Index<ABlob,SignedData<ACell>>> other) {
+		return lattice.merge(getContext(),own,other);
 	}
 }

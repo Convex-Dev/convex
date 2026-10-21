@@ -43,7 +43,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return configured(new Feed(resolve(cursor,SocialLattice.INSTANCE,SocialLattice.KEY_FEED),ownerDid));
+		return configured(new Feed(cursor.withDefault(Index.none()).path(SocialLattice.KEY_FEED),ownerDid));
 	}
 
 	/**
@@ -56,9 +56,9 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 */
 	public Follows follows() {
 		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
-			resolve(cursor,SocialLattice.INSTANCE,SocialLattice.KEY_FOLLOWING),
+			cursor.withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWING),
 			getContext()::currentTimestamp,(value,time) -> value.assoc(convex.lattice.generic.LWWLattice.KEY_TIMESTAMP,time));
-		return configured(new Follows(resolve(following,SocialLattice.FOLLOWING_LATTICE,SocialLattice.KEY_FOLLOWS)));
+		return configured(new Follows(following.withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWS)));
 	}
 
 	/**
@@ -74,7 +74,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	}
 
 	private SocialUser(SocialUser source) {
-		super(SocialLattice.INSTANCE,source.cursor);
+		super(source);
 		this.ownerDid=source.ownerDid;
 	}
 
@@ -99,4 +99,9 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 		return configured(new SocialUser(cursor,ownerDid));
 	}
 
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+		return SocialLattice.INSTANCE.merge(getContext(),own,other);
+	}
 }

@@ -26,12 +26,12 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.ADelegatingLattice;
 import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.SetLattice;
-import convex.lattice.cursor.AForkableCursor;
 
 public class ALatticeApplicationTest {
 
@@ -94,7 +94,7 @@ public class ALatticeApplicationTest {
 
 	private static final class Items extends ALatticeComponent<ASet<CVMLong>> {
 		Items(ALatticeApplication<Index<Keyword,ACell>> application) {
-			super(application.resolve(ITEMS));
+			super(application.cursor().withDefault(Index.none()).path(ITEMS));
 		}
 
 		void add(CVMLong value) {
@@ -106,9 +106,9 @@ public class ALatticeApplicationTest {
 	public void testPreparationFailureLeavesCheckpointsLocalForRetry() {
 		var host=LatticeHost.create(LATTICE.zero(),null);
 		AtomicInteger calls=new AtomicInteger();
-		var app=new ALatticeApplication<Index<Keyword,ACell>>(LATTICE,host) {
+		var app=new ALatticeApplication<Index<Keyword,ACell>>(host) {
 			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-				return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+				return cursor.updateAndGet(own -> LATTICE.merge(getContext(),own,other));
 			}
 			@Override protected void beforeSync() {
 				new Items(this).add(CVMLong.ONE);
@@ -239,7 +239,7 @@ public class ALatticeApplicationTest {
 		var app=LatticeApplication.live(lattice,host);
 		app.setContext(LatticeContext.create(null,alice));
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(1))));
-		var fork=ALatticeComponent.working(lattice,app.cursor(),app.getContext());
+		var fork=new LatticeComponent<>(lattice,app.cursor(),app.getContext());
 		fork.cursor().updateAndGet(own -> lattice.merge(app.getContext(),own,lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(2)))));
 		assertEquals(Sets.of(1),host.cursor().get().get(alice.getAccountKey()).getValue());
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(3))));

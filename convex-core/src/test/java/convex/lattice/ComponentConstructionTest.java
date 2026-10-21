@@ -9,10 +9,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.cvm.Keywords;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ProjectionCursor;
@@ -47,7 +47,7 @@ public class ComponentConstructionTest {
 
 	@Test public void componentViewsConstructOnlyOnWrite() {
 		Root<Index<Keyword,ACell>> root=new Root<>();
-		AForkableCursor<CVMLong> view=ALatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
+		AForkableCursor<CVMLong> view=LatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
 		assertNull(view.get());
 		assertNull(root.get());
 		assertNull(view.updateAndGet(value -> value));
@@ -74,8 +74,8 @@ public class ComponentConstructionTest {
 
 	@Test public void concurrentConstructionPreservesSiblingWrites() throws Exception {
 		Root<Index<Keyword,ACell>> root=new Root<>();
-		AForkableCursor<CVMLong> left=ALatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
-		AForkableCursor<CVMLong> right=ALatticeComponent.resolve(root,OUTER,REGION,Keywords.BAR);
+		AForkableCursor<CVMLong> left=LatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
+		AForkableCursor<CVMLong> right=LatticeComponent.resolve(root,OUTER,REGION,Keywords.BAR);
 		CountDownLatch entered=new CountDownLatch(1);
 		CountDownLatch resume=new CountDownLatch(1);
 		AtomicBoolean first=new AtomicBoolean(true);
@@ -100,7 +100,7 @@ public class ComponentConstructionTest {
 
 	@Test public void projectionSupportsAtomicOperationsAndTransactions() {
 		var root=new TransactionalRootCursor<Index<Keyword,ACell>>(null);
-		AForkableCursor<CVMLong> view=ALatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
+		AForkableCursor<CVMLong> view=LatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
 		assertTrue(view.supportsExclusiveTransactions());
 		assertTrue(view.compareAndSet(null,CVMLong.ONE));
 		assertFalse(view.compareAndSet(null,CVMLong.TWO));

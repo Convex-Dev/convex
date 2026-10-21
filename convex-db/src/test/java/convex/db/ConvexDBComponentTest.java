@@ -63,6 +63,29 @@ public class ConvexDBComponentTest {
 		assertNotNull(original.tables().selectByKey(TABLE_NAME,CVMLong.ONE));
 	}
 
+	/** Publishing table edits preserves unrelated current fields, including their deletion. */
+	@Test
+	public void testDatabasePublicationPreservesConcurrentChanges() {
+		SQLDatabase original=createDatabase(ConvexDB.connect(host()));
+		Keyword retained=Keyword.intern("external");
+		Keyword removed=Keyword.intern("removed");
+		original.cursor().update(db -> db.assoc(retained,CVMLong.ONE).assoc(removed,CVMLong.ONE));
+		SQLDatabase fork=original.fork();
+		assertTrue(fork.tables().createTable("draft",new String[] {"id"}));
+		assertTrue(original.tables().createTable("concurrent",new String[] {"id"}));
+		original.cursor().update(db -> db.assoc(retained,CVMLong.TWO).dissoc(removed));
+
+		fork.sync();
+		assertTrue(original.tables().tableExists("draft"));
+		assertTrue(original.tables().tableExists("concurrent"));
+		assertTrue(original.tables().tableExists(TABLE_NAME));
+		assertEquals(CVMLong.TWO,original.cursor().get().get(retained));
+		assertFalse(original.cursor().get().containsKey(removed));
+		var published=original.cursor().get();
+		fork.sync();
+		assertSame(published,original.cursor().get());
+	}
+
 	@Test
 	public void testSchemaForkSyncsToOriginal() {
 		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> root=host();

@@ -5,7 +5,9 @@ import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -37,7 +39,7 @@ import convex.lattice.cursor.AForkableCursor;
  * topic.offer(Strings.create("user-42"), Strings.create("login"));
  * }</pre>
  */
-public class LatticeTopic extends convex.lattice.ALatticeComponent<Index<Keyword, ACell>> {
+public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 
 	public static final Keyword KEY_NUM_PARTITIONS = Keyword.intern("num-partitions");
 
@@ -69,7 +71,8 @@ public class LatticeTopic extends convex.lattice.ALatticeComponent<Index<Keyword
 	 * @return Queue for the specified partition
 	 */
 	public LatticeQueue partition(ACell id) {
-		AForkableCursor<AVector<ACell>> partCursor = resolve(cursor,TopicLattice.INSTANCE,TopicLattice.KEY_PARTITIONS,id);
+		AForkableCursor<AVector<ACell>> partCursor = cursor.withDefault(Index.none()).<AHashMap<ACell,AVector<ACell>>>path(TopicLattice.KEY_PARTITIONS)
+			.withDefault(Maps.empty()).path(id);
 		return configured(new LatticeQueue(partCursor));
 	}
 
@@ -151,8 +154,12 @@ public class LatticeTopic extends convex.lattice.ALatticeComponent<Index<Keyword
 	}
 
 	private LatticeTopic(LatticeTopic source) {
-		super(TopicLattice.INSTANCE,source.cursor);
+		super(source);
 	}
 
-
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+		return TopicLattice.INSTANCE.merge(getContext(),own,other);
+	}
 }

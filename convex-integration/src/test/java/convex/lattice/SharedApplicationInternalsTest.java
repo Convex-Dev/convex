@@ -94,7 +94,7 @@ public class SharedApplicationInternalsTest {
 	}
 
 	/** Applications choose working-state policy; ordinary domain views need no fork. */
-	private static final class WorkingApplication extends ALatticeApplication<Index<Keyword,ACell>> {
+	private static final class WorkingApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		final SignedComponent<Index<Keyword,ACell>> socialState;
 		final SignedComponent<AHashMap<AString,AVector<ACell>>> fileState;
 		final SignedComponent<ACell> nodeState;
@@ -140,13 +140,13 @@ public class SharedApplicationInternalsTest {
 			// This legacy application's resolver supplies both the public owner rule
 			// and an explicit signer; the draft itself does not look up a context.
 			var component=new SignedComponent<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
-				ALatticeComponent.<SignedData<T>>resolve(host.cursor(),getLattice(),path),
+				LatticeComponent.<SignedData<T>>resolve(host.cursor(),getLattice(),path),
 				value -> context.signAs(rule.getOwner(),value));
 			component.setContext(context);
 			return component;
 		}
 
-		@Override protected void beforeSync() {
+		@Override protected void syncChildren() {
 			if (socialState!=null) socialState.sync();
 			if (fileState!=null) fileState.sync();
 			nodeState.sync();

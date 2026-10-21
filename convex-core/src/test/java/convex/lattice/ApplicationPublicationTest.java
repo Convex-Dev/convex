@@ -19,8 +19,8 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.Root;
-import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.CompareLattice;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.SetLattice;
@@ -61,11 +61,11 @@ public class ApplicationPublicationTest {
 		volatile AKeyPair signingKey=KEY;
 
 		Application(LatticeHost<Index<Keyword,ACell>> host) {
-			super(LATTICE,host);
+			super(host);
 			// The owned subtree publishes through its own fork of the host, beside this
 			// application's staged root, so each fork reconciles only what it owns.
 			owner=new SignedComponent<>(SIGNED,
-				ALatticeComponent.<SignedData<ASet<CVMLong>>>resolve(host.cursor(),LATTICE,OWNED),
+				LatticeComponent.<SignedData<ASet<CVMLong>>>resolve(host.cursor(),LATTICE,OWNED),
 				value -> {
 					signatures.incrementAndGet();
 					onSign.run();
@@ -75,18 +75,18 @@ public class ApplicationPublicationTest {
 		}
 
 		void add(long value) { owner.cursor().updateAndGet(v -> v.include(CVMLong.create(value))); }
-		void editRegister(long value) { this.<CVMLong>resolve(REGISTER).set(CVMLong.create(value)); }
+		void editRegister(long value) { cursor.<CVMLong>path(REGISTER).set(CVMLong.create(value)); }
 
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			if (incoming!=null) owner.merge(signed(incoming));
 			// This application deliberately ignores all other incoming subtrees.
 			return cursor.get();
 		}
-		@Override protected void beforeSync() { owner.sync(); }
+		@Override protected void syncChildren() { owner.sync(); }
 
 		/** Called only when both this root and the host changed: the owned subtree is
 		 *  the owner component's to publish, so it is taken from the destination. */
-		@Override protected Index<Keyword,ACell> mergePublication(ALattice<Index<Keyword,ACell>> lattice,
+		@Override protected Index<Keyword,ACell> mergePublication(
 				Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
 			CVMLong local=(CVMLong)own.get(REGISTER);
 			CVMLong remote=(CVMLong)other.get(REGISTER);

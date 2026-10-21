@@ -36,7 +36,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	}
 
 	private Mailbox(Mailbox source) {
-		super(source.lattice,source.cursor);
+		super(source);
 		this.lattice=source.lattice;
 	}
 
@@ -167,5 +167,13 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	@Override
 	public Mailbox withCursor(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
 		return configured(new Mailbox(cursor,lattice));
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<ABlob,SignedData<ACell>> mergePublication(
+			Index<ABlob,SignedData<ACell>> own,
+			Index<ABlob,SignedData<ACell>> other) {
+		return lattice.merge(getContext(),own,other);
 	}
 }

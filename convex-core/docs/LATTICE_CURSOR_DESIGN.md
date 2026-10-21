@@ -75,8 +75,10 @@ back leaves the source unchanged by value equality. Construction and the child e
 commit in the same atomic source update. Exceptions commit nothing. Obtaining a view
 or reading it has no state-changing effects.
 
-`ALatticeComponent.resolve(cursor, lattice, path...)` supplies such functions one
-level at a time using the component's lattice. Its write functions use
+`cursor.withDefault(emptyContainer).path(key)` supplies a known container type
+without any merge definition. The optional adapter helper
+`LatticeComponent.resolve(cursor, lattice, path...)` supplies such functions one
+level at a time using an explicit lattice. Its write functions use
 `LatticeOps.assocIn` to construct an absent container from the lattice's zero.
 Unknown missing container types fail; keys never determine container types.
 JSON components supply their own map or vector construction functions. No-op writes do not materialise ancestors.
@@ -104,8 +106,9 @@ per distinct candidate, outside the compare-and-set, so an unrelated concurrent 
 reuses a prepared signature.
 
 A component with an independent publication boundary owns such a fork and supplies
-its lattice merge under its context; `ALatticeComponent.mergePublication` is that
-component's merge, called only when both sides changed. An application overrides it
+its own reconciliation rule; `ALatticeComponent.mergePublication(own, other)` is
+that component's merge, called only when both sides changed. No `ALattice` is
+required. `LatticeComponent` adapts a lattice for components that choose to use one. An application overrides it
 to take regions that its own components publish from the destination; each such
 component publishes through its own fork of the host.
 For a detached snapshot use `Root.create(cursor.get())`; atomic multi-step edits use

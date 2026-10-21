@@ -1034,7 +1034,7 @@ public class NodeServerTest {
 		try (AStore ingressStore=new MemoryStore()) {
 			ASet<ACell> value=Sets.of(Blobs.createRandom(400));
 			LatticeHost<ASet<ACell>> host=LatticeHost.create(Sets.empty(),ingressStore);
-			var indifferent=new ALatticeApplication<ASet<ACell>>(SetLattice.create(),host) {
+			var indifferent=new ALatticeApplication<ASet<ACell>>(host) {
 				@Override public ASet<ACell> merge(ASet<ACell> incoming) { return cursor.get(); }
 			};
 			host.configureApplications(List.of(indifferent));

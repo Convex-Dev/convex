@@ -23,7 +23,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
-import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.KeyedLattice;
@@ -32,7 +32,7 @@ import convex.lattice.generic.SetLattice;
 class NodeApplicationIngressTest {
 	private static final Keyword ITEMS=Keyword.intern("items");
 	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
-	private static class App extends ALatticeApplication<Index<Keyword,ACell>> {
+	private static class App extends LatticeApplication<Index<Keyword,ACell>> {
 		int preparations;
 		int merges;
 		boolean ignore;

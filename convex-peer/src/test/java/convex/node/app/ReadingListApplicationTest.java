@@ -17,7 +17,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.etch.EtchStore;
-import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeApplication;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
@@ -35,7 +35,7 @@ class ReadingListApplicationTest {
 	private static final AKeyPair ALICE_NODE=AKeyPair.createSeeded(9190);
 	private static final AKeyPair BOB_NODE=AKeyPair.createSeeded(9191);
 
-	static final class ReadingListApp extends ALatticeApplication<Index<Keyword,ACell>> {
+	static final class ReadingListApp extends LatticeApplication<Index<Keyword,ACell>> {
 		ReadingListApp(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));

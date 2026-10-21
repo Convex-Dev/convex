@@ -277,7 +277,7 @@ class TransactionalComponentTest {
 			var root=coordinated?new TransactionalRootCursor<>(initial())
 				:new Root<>(initial());
 			assertEquals(coordinated,root.path(COUNT).supportsExclusiveTransactions());
-			var working=ALatticeComponent.working(
+			var working=new LatticeComponent<>(
 				convex.lattice.generic.MapLattice.<Keyword,ACell>create(convex.lattice.generic.JSONLattice.INSTANCE),
 				root,LatticeContext.EMPTY);
 			assertEquals(coordinated,working.cursor().supportsExclusiveTransactions());

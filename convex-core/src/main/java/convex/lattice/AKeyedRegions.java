@@ -35,7 +35,7 @@ import convex.lattice.cursor.ProjectionCursor;
  * context or lifecycle. Shared children may receive repeated or concurrent
  * deliveries and syncs, so their operations must support that use.</p>
  */
-public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACell>> {
+public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	private final Map<Keyword,ALatticeComponent<?>> registrations=new LinkedHashMap<>();
 	private volatile Map<Keyword,ALatticeComponent<?>> regions;
@@ -141,10 +141,16 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		return cursor.get();
 	}
 
-	/** Publishes children in registration order; never publishes the container itself. */
+	/** Freezes registrations before entering the application lifecycle. */
 	@Override
 	public Index<Keyword,ACell> sync() {
+		regions();
+		return super.sync();
+	}
+
+	/** Publishes children in registration order. The container has no staged snapshot. */
+	@Override
+	protected void syncChildren() {
 		for (var component:regions().values()) component.sync();
-		return cursor.get();
 	}
 }

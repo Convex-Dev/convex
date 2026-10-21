@@ -5,13 +5,14 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.fs.DLFSLocation;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
+import convex.lattice.fs.DLFSLocation;
 import convex.lattice.generic.OwnerLattice;
 
 /**
@@ -87,7 +88,7 @@ public final class DLFSRegion extends ALatticeComponent<
 		var rule=LATTICE.signingFor(owner);
 		var policy=getContext();
 		AForkableCursor<AHashMap<AString,AVector<ACell>>> drivesCursor=
-			SignedCursor.create(resolve(cursor,LATTICE,owner),value -> rule.sign(policy,value));
+			SignedCursor.create(cursor.withDefault(Maps.empty()).path(owner),value -> rule.sign(policy,value));
 		return configured(new DLFSDrives(drivesCursor,store,location.child(owner)));
 	}
 
@@ -97,7 +98,7 @@ public final class DLFSRegion extends ALatticeComponent<
 	}
 
 	private DLFSRegion(DLFSRegion source) {
-		super(LATTICE,source.cursor);
+		super(source);
 		this.store=source.store;
 		this.location=DLFSLocation.at(cursor);
 	}
@@ -107,4 +108,11 @@ public final class DLFSRegion extends ALatticeComponent<
 		return configured(new DLFSRegion(cursor,store));
 	}
 
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> mergePublication(
+			AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> own,
+			AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> other) {
+		return LATTICE.merge(getContext(),own,other);
+	}
 }

@@ -12,9 +12,11 @@ import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
@@ -40,7 +42,7 @@ import convex.social.Social;
  * such as this node's own record or a follow key validated during admission, it
  * syncs its host so the edit is persisted and announced.</p>
  */
-public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
+public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 
 	private final LatticeHost<Index<Keyword,ACell>> host;
 	private final NodeDirectory directory;
@@ -166,23 +168,24 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	/**
 	 * Cursor at {@code [:id owner :value]}. The application navigates to the
-	 * {@code :id} level with its own root lattice; this component owns that level,
+	 * {@code :id} level through the known index root; this component owns that level,
 	 * so it wraps the owner's slot in the signing boundary bound to the
 	 * application's policy.
 	 */
-	static AForkableCursor<ACell> identitySlot(ALatticeApplication<?> application, AccountKey userKey) {
-		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> ids=application.resolve(P2PLattice.KEY_ID);
+	static AForkableCursor<ACell> identitySlot(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey) {
+		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> ids=application.cursor().withDefault(Index.none()).path(P2PLattice.KEY_ID);
 		var rule=P2PLattice.ID_LATTICE.signingFor(userKey);
 		LatticeContext context=application.getContext();
-		return SignedCursor.create(resolve(ids,P2PLattice.ID_LATTICE,userKey),v -> rule.sign(context,v));
+		return SignedCursor.create(ids.withDefault(Maps.empty()).path(userKey),v -> rule.sign(context,v));
 	}
 
 	/** Cursor at {@code [:p2p :nodes owner :value]}, navigated and signed the same way. */
-	static AForkableCursor<ACell> nodeSlot(ALatticeApplication<?> application, AccountKey userKey) {
+	static AForkableCursor<ACell> nodeSlot(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey) {
 		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=
-			application.resolve(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+			application.cursor().withDefault(Index.none()).<Index<Keyword,ACell>>path(P2PLattice.KEY_P2P)
+				.withDefault(Index.none()).path(P2PLattice.KEY_NODES);
 		var rule=P2PLattice.NODES_LATTICE.signingFor(userKey);
 		LatticeContext context=application.getContext();
-		return SignedCursor.create(resolve(nodes,P2PLattice.NODES_LATTICE,userKey),v -> rule.sign(context,v));
+		return SignedCursor.create(nodes.withDefault(Maps.empty()).path(userKey),v -> rule.sign(context,v));
 	}
 }

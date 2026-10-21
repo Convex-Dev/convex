@@ -43,9 +43,9 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	 */
 	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination,
 			Function<V,SignedData<V>> signer) {
-		super(lattice.getValueLattice(),destination,
+		super(destination,
 			stored -> (stored==null)?null:stored.getValue(),
-			(ignored,value) -> {
+			value -> {
 				if (value==null) return null;
 				SignedData<V> signed=lattice.sign(value,signer);
 				if (signed==null) throw new IllegalStateException(
@@ -57,8 +57,8 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	@Override
-	protected V mergePublication(ALattice<V> lattice,V own,V other) {
-		return lattice.merge(own,other);
+	protected V mergePublication(V own,V other) {
+		return lattice.getValueLattice().merge(own,other);
 	}
 
 	/**

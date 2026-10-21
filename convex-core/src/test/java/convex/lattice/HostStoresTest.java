@@ -64,7 +64,7 @@ public class HostStoresTest {
 	}
 
 
-	private static final class SetApplication extends ALatticeApplication<ASet<ACell>> {
+	private static final class SetApplication extends LatticeApplication<ASet<ACell>> {
 		SetApplication(LatticeHost<ASet<ACell>> host) {
 			super(SetLattice.create(),host);
 		}

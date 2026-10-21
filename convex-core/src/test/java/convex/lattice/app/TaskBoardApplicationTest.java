@@ -21,12 +21,11 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeComponent;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
+import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.IndexLattice;
 
@@ -66,23 +65,39 @@ class TaskBoardApplicationTest {
 	}
 
 	/** One publication and transaction boundary spanning all task records. */
-	static final class Board extends LatticeComponent<Index<AString,AHashMap<Keyword,ACell>>>
+	static final class Board extends ALatticeComponent<Index<AString,AHashMap<Keyword,ACell>>>
 			implements TransactionalComponent<Index<AString,AHashMap<Keyword,ACell>>,Board> {
 		private final Supplier<CVMLong> getTimestamp;
 
-		Board(AForkableCursor<Index<AString,AHashMap<Keyword,ACell>>> destination,Supplier<CVMLong> getTimestamp) {
-			super(BOARD_LATTICE,destination,LatticeContext.EMPTY);
+		Board(ACursor<Index<AString,AHashMap<Keyword,ACell>>> destination,Supplier<CVMLong> getTimestamp) {
+			super(destination);
 			this.getTimestamp=getTimestamp;
 		}
 
 		// Rebinding shares the supplied draft directly and retains the clock, not the source board.
 		private Board(Board source,AForkableCursor<Index<AString,AHashMap<Keyword,ACell>>> cursor) {
-			super(BOARD_LATTICE,cursor);
+			super(cursor);
 			getTimestamp=source.getTimestamp;
 		}
 
 		@Override public Board withCursor(AForkableCursor<Index<AString,AHashMap<Keyword,ACell>>> cursor) {
 			return new Board(this,cursor);
+		}
+
+		@Override public Index<AString,AHashMap<Keyword,ACell>> merge(Index<AString,AHashMap<Keyword,ACell>> incoming) {
+			return cursor.updateAndGet(own -> BOARD_LATTICE.merge(own,incoming));
+		}
+
+		@Override protected Index<AString,AHashMap<Keyword,ACell>> mergePublication(
+				Index<AString,AHashMap<Keyword,ACell>> own,Index<AString,AHashMap<Keyword,ACell>> other) {
+			return BOARD_LATTICE.merge(own,other);
+		}
+
+		/** A delivery replaces a complete ordered record, never an individual task field. */
+		@SuppressWarnings("unchecked")
+		@Override protected Index<AString,AHashMap<Keyword,ACell>> mergeAtPath(ACell value,ACell... path) {
+			if (path.length!=1 || !(path[0] instanceof AString id) || !(value instanceof AHashMap)) return cursor.get();
+			return merge(Index.of(id,(AHashMap<Keyword,ACell>)value));
 		}
 
 		Task task(String id) {
@@ -221,6 +236,32 @@ class TaskBoardApplicationTest {
 			replica.sync();
 			assertEquals(replica.board().cursor().get(),host.cursor().get().get(BOARD));
 		}
+	}
+
+	/** Whole-board and task-path delivery obey the same ordering and preserve other tasks. */
+	@Test void taskDeliveryStopsAtTheOrderedRecord() {
+		var clock=new AtomicReference<>(CVMLong.ONE);
+		var source=new TaskBoardApp(LatticeHost.create(),clock::get).board();
+		source.plan("review","Review");
+		var planned=source.cursor().get();
+		clock.set(CVMLong.TWO);
+		source.task("review").complete();
+		var completed=source.cursor().get();
+		var whole=new TaskBoardApp(LatticeHost.create(),clock::get).board();
+		var partial=new TaskBoardApp(LatticeHost.create(),clock::get).board();
+		whole.plan("other","Independent task");
+		partial.plan("other","Independent task");
+		var id=Strings.create("review");
+		for (var delivery:List.of(completed,planned,completed)) {
+			whole.merge(delivery);
+			partial.mergeAt(delivery.get(id),id);
+			assertEquals(whole.cursor().get(),partial.cursor().get());
+		}
+		assertTrue(partial.task("review").isDone());
+		assertEquals(Sets.of("other"),partial.pending());
+		var before=partial.cursor().get();
+		partial.mergeAt(CVMBool.FALSE,id,DONE);
+		assertSame(before,partial.cursor().get());
 	}
 
 	/** Read-only handles and failed edits of absent tasks do not create records. */

@@ -10,6 +10,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -22,7 +23,7 @@ import convex.lattice.cursor.Cursors;
  * Built with lattice merge replication: use {@link #fork()} and {@link #sync()}
  * for conflict-free distributed operation.
  */
-public class LatticeKV extends convex.lattice.ALatticeComponent<Index<AString, AVector<ACell>>> {
+public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
 	private static final AString DEFAULT_REPLICA = Strings.create("default");
 
@@ -90,7 +91,7 @@ public class LatticeKV extends convex.lattice.ALatticeComponent<Index<AString, A
 	}
 
 	private LatticeKV(LatticeKV source, AString replicaID) {
-		super(KVStoreLattice.INSTANCE,source.cursor);
+		super(source);
 		this.replicaID=replicaID;
 	}
 
@@ -508,5 +509,13 @@ public class LatticeKV extends convex.lattice.ALatticeComponent<Index<AString, A
 			return result;
 		});
 		return removed[0];
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<AString, AVector<ACell>> mergePublication(
+			Index<AString, AVector<ACell>> own,
+			Index<AString, AVector<ACell>> other) {
+		return KVStoreLattice.INSTANCE.merge(getContext(),own,other);
 	}
 }

@@ -23,7 +23,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.etch.EtchStore;
-import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.KeyedLattice;
@@ -58,7 +58,7 @@ class MailDeliveryTest {
 	 * lattice; a mail replication policy would first project it to the mailboxes a node
 	 * desires.
 	 */
-	static final class MailApp extends ALatticeApplication<Index<Keyword,ACell>> {
+	static final class MailApp extends LatticeApplication<Index<Keyword,ACell>> {
 		MailApp(LatticeHost<Index<Keyword,ACell>> host) { super(ROOT,host); }
 		Mail mail(AKeyPair user) { return Mail.connect(this,Mail.LATTICE,LatticeContext.create(null,user)); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {

@@ -23,7 +23,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeApplication;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.Cursors;
@@ -53,7 +53,7 @@ public class SocialAppTest {
 	}
 
 	/** An application at the root level over an in-memory root. */
-	private static class TestRoot extends ALatticeApplication<Index<Keyword, ACell>> {
+	private static class TestRoot extends LatticeApplication<Index<Keyword, ACell>> {
 		TestRoot(KeyedLattice lattice) {
 			super(lattice,Cursors.root(lattice.zero()));
 		}

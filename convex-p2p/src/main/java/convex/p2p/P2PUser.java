@@ -5,6 +5,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
@@ -68,7 +69,7 @@ public class P2PUser {
 	 * @param userKey P2P user key
 	 * @return P2P user facade
 	 */
-	public static P2PUser create(ALatticeApplication<?> application, AccountKey userKey) {
+	public static P2PUser create(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey) {
 		if (application==null) throw new IllegalArgumentException("Application must not be null");
 		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
 		P2PUser user=new P2PUser(

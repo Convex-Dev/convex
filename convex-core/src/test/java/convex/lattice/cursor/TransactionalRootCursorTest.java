@@ -15,6 +15,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeComponent;
 import convex.lattice.generic.MaxLattice;
 
 class TransactionalRootCursorTest {
@@ -34,7 +35,7 @@ class TransactionalRootCursorTest {
 			writer("getAndAccumulate",r -> r.getAndAccumulate(CVMLong.TWO,(a,b) -> b)),
 			writer("incoming merge",r -> convex.lattice.ComponentTestSupport.merge(r,MaxLattice.INSTANCE,CVMLong.TWO)),
 			writer("component publication",r -> {
-				var working=convex.lattice.ALatticeComponent.working(MaxLattice.INSTANCE,r,convex.lattice.LatticeContext.EMPTY);
+				var working=new LatticeComponent<>(MaxLattice.INSTANCE,r,convex.lattice.LatticeContext.EMPTY);
 				working.cursor().set(CVMLong.TWO);
 				working.sync();
 			}));

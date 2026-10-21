@@ -81,7 +81,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	private SQLSchema(SQLSchema source) {
-		super(TableStoreLattice.INSTANCE,source.cursor);
+		super(source);
 	}
 
 	// ========== Internal Helpers ==========
@@ -94,7 +94,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Gets a cursor-backed table by name, returning null if not found.
 	 */
 	public SQLTable getTable(AString name) {
-		AForkableCursor<AVector<ACell>> tableCursor = resolve(cursor,TableStoreLattice.INSTANCE,name);
+		AForkableCursor<AVector<ACell>> tableCursor = cursor.withDefault(Index.none()).path(name);
 		if (tableCursor.get() == null) return null;
 		return configured(new SQLTable(tableCursor));
 	}
@@ -199,7 +199,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		}
 
 		// Set state on the table's cursor path
-		AForkableCursor<AVector<ACell>> tableCursor = resolve(cursor,TableStoreLattice.INSTANCE,name);
+		AForkableCursor<AVector<ACell>> tableCursor = cursor.withDefault(Index.none()).path(name);
 		tableCursor.set(SQLTable.createState((AVector<AVector<ACell>>) schema, now()));
 		return true;
 	}
@@ -211,7 +211,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	public boolean dropTable(AString name) {
 		if (getLiveTable(name) == null) return false;
-		AForkableCursor<AVector<ACell>> tableCursor = resolve(cursor,TableStoreLattice.INSTANCE,name);
+		AForkableCursor<AVector<ACell>> tableCursor = cursor.withDefault(Index.none()).path(name);
 		tableCursor.set(SQLTable.createTombstoneState(now()));
 		return true;
 	}
@@ -402,5 +402,13 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(name);
 		if (table == null) return 0;
 		return (int) table.getColumnCount();
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<AString, AVector<ACell>> mergePublication(
+			Index<AString, AVector<ACell>> own,
+			Index<AString, AVector<ACell>> other) {
+		return TableStoreLattice.INSTANCE.merge(getContext(),own,other);
 	}
 }

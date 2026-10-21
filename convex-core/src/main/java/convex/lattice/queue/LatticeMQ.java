@@ -4,7 +4,9 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.MapLattice;
@@ -38,7 +40,7 @@ import convex.lattice.generic.MapLattice;
  * mq.partition("user-events", 0).offer(Strings.create("event data"));
  * }</pre>
  */
-public class LatticeMQ extends convex.lattice.ALatticeComponent<AHashMap<ACell, Index<Keyword, ACell>>> {
+public class LatticeMQ extends ALatticeComponent<AHashMap<ACell, Index<Keyword, ACell>>> {
 
 	/**
 	 * The lattice definition for the topic map level:
@@ -82,7 +84,7 @@ public class LatticeMQ extends convex.lattice.ALatticeComponent<AHashMap<ACell, 
 	 * @return Topic handle
 	 */
 	public LatticeTopic topic(ACell name) {
-		return configured(new LatticeTopic(resolve(cursor,TOPIC_MAP,name)));
+		return configured(new LatticeTopic(cursor.withDefault(Maps.empty()).path(name)));
 	}
 
 	/**
@@ -106,7 +108,14 @@ public class LatticeMQ extends convex.lattice.ALatticeComponent<AHashMap<ACell, 
 	}
 
 	private LatticeMQ(LatticeMQ source) {
-		super(TOPIC_MAP,source.cursor);
+		super(source);
 	}
 
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AHashMap<ACell, Index<Keyword, ACell>> mergePublication(
+			AHashMap<ACell, Index<Keyword, ACell>> own,
+			AHashMap<ACell, Index<Keyword, ACell>> other) {
+		return TOPIC_MAP.merge(getContext(),own,other);
+	}
 }

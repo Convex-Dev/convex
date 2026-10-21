@@ -5,6 +5,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -26,7 +27,7 @@ import convex.lattice.cursor.Cursors;
  *   <li>Single-writer per queue recommended for distributed operation</li>
  * </ul>
  */
-public class LatticeQueue extends convex.lattice.ALatticeComponent<AVector<ACell>> {
+public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 
 
 	public LatticeQueue(AForkableCursor<AVector<ACell>> cursor) {
@@ -50,7 +51,7 @@ public class LatticeQueue extends convex.lattice.ALatticeComponent<AVector<ACell
 	}
 
 	private LatticeQueue(LatticeQueue source) {
-		super(QueueLattice.INSTANCE,source.cursor);
+		super(source);
 	}
 
 	// ===== Producer Operations =====
@@ -317,5 +318,11 @@ public class LatticeQueue extends convex.lattice.ALatticeComponent<AVector<ACell
 	// time; applications and tests may supply a fixed or otherwise dynamic clock.
 	private CVMLong now() {
 		return getContext().currentTimestamp();
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AVector<ACell> mergePublication(AVector<ACell> own,AVector<ACell> other) {
+		return QueueLattice.INSTANCE.merge(getContext(),own,other);
 	}
 }

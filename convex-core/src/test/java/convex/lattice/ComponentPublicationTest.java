@@ -29,9 +29,9 @@ public class ComponentPublicationTest {
 
 	private static final SetLattice<CVMLong> SETS=SetLattice.create();
 
-	private static class Component<V extends ACell> extends ALatticeComponent<V> {
+	private static class Component<V extends ACell> extends LatticeComponent<V> {
 		Component(ALattice<V> lattice, AForkableCursor<V> destination) {
-			super(lattice,destination);
+			super(lattice,destination,LatticeContext.EMPTY);
 		}
 	}
 

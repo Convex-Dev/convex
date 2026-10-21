@@ -17,6 +17,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.JSONLattice;
 import convex.lattice.generic.LWWLattice;
@@ -37,7 +38,7 @@ public class StampedCursorTest {
 	@Test public void testWorkingStateAdoptsPreparedDestinationValue() {
 		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO));
 		var stamped=StampedCursor.create(root,() -> CVMLong.create(100),(value,time) -> stampWith(value,time.longValue()));
-		var working=convex.lattice.ALatticeComponent.working(stateLattice(),stamped,LatticeContext.EMPTY);
+		var working=new LatticeComponent<>(stateLattice(),stamped,LatticeContext.EMPTY);
 		working.cursor().set(Maps.of(A,CVMLong.ONE));
 		working.sync();
 		assertEquals(CVMLong.ONE,RT.getIn(root.get(),A));

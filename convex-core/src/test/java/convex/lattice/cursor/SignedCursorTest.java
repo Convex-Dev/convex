@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
@@ -18,7 +19,7 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
-import convex.core.cvm.Keywords;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
@@ -368,7 +369,7 @@ public class SignedCursorTest {
 		AForkableCursor<AHashMap<Keyword, ASet<AInteger>>> innerCursor =
 			convex.lattice.ComponentTestSupport.signed(signedLevel, ownerLattice, ALICE, ctx);
 
-		var forkComponent=convex.lattice.ALatticeComponent.working(mapLattice,innerCursor,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(mapLattice,innerCursor,convex.lattice.LatticeContext.EMPTY);
 
 		AForkableCursor<AHashMap<Keyword, ASet<AInteger>>> fork=forkComponent.cursor();
 		assertTrue(fork.get().get(Keywords.FOO).contains(CVMLong.ONE));
@@ -415,7 +416,7 @@ public class SignedCursorTest {
 		AForkableCursor<AInteger> innerCursor = convex.lattice.ComponentTestSupport.signed(signedLevel, ownerLattice, ALICE, noKeyCtx);
 
 		// Fork and local writes succeed without a key
-		var forkComponent=convex.lattice.ALatticeComponent.working(MaxLattice.INSTANCE,innerCursor,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(MaxLattice.INSTANCE,innerCursor,convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AInteger> fork=forkComponent.cursor();
 		fork.set(CVMLong.create(100));
 		assertEquals(CVMLong.create(100), fork.get());
@@ -634,7 +635,7 @@ public class SignedCursorTest {
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
 			Cursors.root(initial);
 
-		var forkComponent=convex.lattice.ALatticeComponent.working(ownerLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(ownerLattice,root,convex.lattice.LatticeContext.EMPTY);
 
 		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork=forkComponent.cursor();
 
@@ -658,7 +659,7 @@ public class SignedCursorTest {
 		Root<AHashMap<ACell, SignedData<AInteger>>> root =
 			Cursors.root(ownerLattice.zero());
 
-		var fork1Component=convex.lattice.ALatticeComponent.working(ownerLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork1Component=new LatticeComponent<>(ownerLattice,root,convex.lattice.LatticeContext.EMPTY);
 
 		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork1=fork1Component.cursor();
 		fork1.updateAndGet(map -> {
@@ -666,7 +667,7 @@ public class SignedCursorTest {
 			return map.assoc(ALICE, KP_ALICE.signData((AInteger) CVMLong.create(10)));
 		});
 
-		var fork2Component=convex.lattice.ALatticeComponent.working(ownerLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork2Component=new LatticeComponent<>(ownerLattice,root,convex.lattice.LatticeContext.EMPTY);
 
 		AForkableCursor<AHashMap<ACell, SignedData<AInteger>>> fork2=fork2Component.cursor();
 		fork2.updateAndGet(map -> {
@@ -695,7 +696,7 @@ public class SignedCursorTest {
 		SetLattice<CVMLong> setLattice = SetLattice.create();
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
-		var forkComponent=convex.lattice.ALatticeComponent.working(setLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(setLattice,root,convex.lattice.LatticeContext.EMPTY);
 
 		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 
@@ -765,7 +766,7 @@ public class SignedCursorTest {
 		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(Maps.of(Keywords.FOO, Sets.of(CVMLong.ONE), Keywords.BAR, Sets.empty()));
 
 		AForkableCursor<ASet<CVMLong>> fooCursor = root.path(Keywords.FOO);
-		var forkComponent=convex.lattice.ALatticeComponent.working(setLattice,fooCursor,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(setLattice,fooCursor,convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 
 		fork.updateAndGet(s -> s.include(CVMLong.create(2)));

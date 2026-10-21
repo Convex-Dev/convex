@@ -68,7 +68,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	}
 
 	private DLFSDrive(DLFSDrive source) {
-		super(DLFSLattice.INSTANCE,source.cursor);
+		super(source);
 		this.name=source.name;
 		this.store=source.store;
 		this.location=DLFSLocation.at(cursor);
@@ -104,4 +104,9 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		return configured(new DLFSDrive(name,cursor,store,DLFSLocation.at(cursor)));
 	}
 
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AVector<ACell> mergePublication(AVector<ACell> own,AVector<ACell> other) {
+		return DLFSLattice.INSTANCE.merge(getContext(),own,other);
+	}
 }

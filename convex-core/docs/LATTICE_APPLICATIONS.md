@@ -1,7 +1,7 @@
 # Lattice Application Patterns
 
-How to build an application on the Convex Data Lattice: design a lattice for the
-data, wrap it in typed components over cursors, and connect it to a local store or a
+How to build an application on the Convex Data Lattice: choose the data and merge rules,
+compose typed components over cursors, and connect it to a local store or a
 hosting node without the application knowing which. The normative reference is
 [CAD045](https://docs.convex.world/docs/cad/lattice_apps); this document is the
 practical companion for `convex-core`, with `convex-social`, `convex-dlfs` and
@@ -56,7 +56,7 @@ ownership, policy or persistence. It gives atomicity and navigation; meaning com
 from whoever holds it.
 
 **Components give positions their meaning.** A component holds one cursor at one
-path together with everything the cursor does not know: the lattice at that level,
+path together with everything the cursor does not know: the merge rules at that level,
 the policy, and the domain operations such as post, follow or create drive. One
 component per level of the data model. What a component is follows from a small set
 of decisions made when it is constructed:
@@ -64,7 +64,7 @@ of decisions made when it is constructed:
 | Decision | Choices |
 |---|---|
 | Position | A path cursor handed down by the component that owns the level above. An application's position is the host root, handed to it by the host. |
-| Navigation | A component creates its children one level below its own cursor, declaring each child's lattice so that a missing container is created with the right type. An application resolves whole region paths from the root with its root lattice. Boundaries are placed by the owning component, never discovered by navigation. |
+| Navigation | A component creates children at paths below its cursor, supplying known empty container types when needed. A supplied lattice can optionally provide these types. Boundaries are placed by the owning component, never discovered by navigation. |
 | Publication | **Live**: writes go straight through the cursor and there is nothing to publish. **Staged**: a private working copy and a destination; sync reconciles the copy with whatever the destination now holds and publishes the result. A fork is a staged component constructed at the same position. |
 | Boundary | For a level the component owns: none, stamp each write, sign each write, or sign once at publication. Signing once needs a staged component, and is the main reason to stage. |
 | Reconciliation | The lattice merge at that position, with local edits winning ties, applied only when both the copy and its destination changed since they were last reconciled. A keyed lattice publishes only the keys it declares; the rest adopt the destination. |
@@ -73,8 +73,8 @@ of decisions made when it is constructed:
 | Transactions | Whether it offers atomic multi-step operations, by supplying a factory that rebuilds it over a draft cursor. |
 | Store | Whether it carries a store for checkpoints before publication, as file components do. |
 
-A lattice is needed by two of these decisions, declaring children and reconciling on
-sync. A live component with no children needs none. The signed component is the
+Neither navigation nor reconciliation requires an `ALattice` object: components
+can supply container types and merge behaviour directly. The signed component is the
 archetype of the staged choice: an unsigned working copy, a signed destination, one
 signature at publication however many edits preceded it.
 
@@ -87,8 +87,9 @@ agree on its lattice; two different rules at one path do not converge. That is w
 region definitions are catalogued once and reused.
 
 **An application is the component at the host root.** It may extend `AKeyedRegions`
-to compose named child components, or `ALatticeApplication` to define a root lattice
-and its own incoming merge. Either may be configured on the host to receive incoming
+to compose named child components, or `ALatticeApplication` to manage a custom
+hierarchy and incoming merge. Both use the same application lifecycle. Either may
+be configured on the host to receive incoming
 values and decides when its work is published. A regions application routes values
 to registered children; each child supplies its own merge and publication boundary.
 The lattice-based application may be live in the host root or staged over it.
@@ -164,7 +165,8 @@ is separate from these local changes.
 ```
 Domain components        DLFSDrive, Social        one component per path
 Application component    AKeyedRegions            named children, delivery and publication
-Alternative application  ALatticeApplication      root lattice, navigation, custom incoming merge
+Application base         ALatticeApplication      lifecycle and managed child publication
+Optional adapter         LatticeApplication       supplied lattice, navigation and root merge
 Lattice host             LatticeHost              published root, optional store, publication policy
 Cursor                   path, CAS, drafts        atomic state access
 Optional host runtime    NodeServer               replication only
@@ -279,16 +281,37 @@ The composition has the following contracts:
   freezes the registrations, without freezing or reconfiguring shared children.
 - Host publication and durability remain separate from application sync.
 
-`LatticeComponent` supplies ordinary lattice-backed merging, shape declaration and
-publication. Subclass it for domain operations, or use it directly with a supplied
-lattice. A component that needs an atomic aggregate should own that aggregate's
+`ALatticeComponent` does not require an `ALattice`, expose `getLattice()`, or infer
+structure from a lattice tree. It provides working storage, child routing and
+publication. A component implements `merge(incoming)` for incoming values and
+`mergePublication(own, other)` to reconcile staged edits with a changed destination.
+The latter must operate on the supplied snapshots without changing live storage.
+An unresolved descendant delivery goes to `mergeAtPath`; the base rejects it.
+Containers such as `AKeyedRegions` route through their registered children.
+
+`LatticeComponent` is the optional adapter for simple values and caller-supplied
+`ALattice` implementations. It supplies lattice-backed merging, path reduction and
+publication, including preservation of unrelated destination keys for keyed lattices.
+Domain components normally extend `ALatticeComponent` and call reusable lattice
+rules in their own operations. Using a lattice internally does not imply adopting
+the adapter's incoming merge or path routing.
+`getLattice()` and lattice-directed `resolve` belong to this adapter.
+A component that needs an atomic aggregate should own that aggregate's
 publication boundary and supply its complete merge rule. Declaring a partial
 lattice does not move a component's cursor to a narrower boundary.
 
-`AKeyedRegions` routes through components and does not synthesise a root lattice
-from their behaviour. Components which need lattice-based navigation can still
-declare their shape explicitly. `ALatticeApplication` remains available for
-applications defining their own root merge and lattice-based navigation.
+`ALatticeApplication` extends `ALatticeComponent` and adds lifecycle, with no
+required lattice definition. Its `sync()` runs `beforeSync()`, `syncChildren()`,
+then publication of its own working boundary. Failure stops subsequent stages;
+completed child publications are not rolled back. Hooks must support concurrent
+calls. `AKeyedRegions` extends this base and implements child publication in
+registration order. Registrations freeze before preparation begins. A nested
+regions application runs its own lifecycle when its parent syncs that child.
+
+`LatticeApplication` is the optional application adapter for an explicitly supplied
+`ALattice`, including generic merge, publication reconciliation and path navigation.
+P2P and DLFS applications with caller-supplied root lattices use this adapter.
+Ordinary domain applications need neither `getLattice()` nor a parallel lattice tree.
 
 ## Designing the lattice
 
@@ -354,7 +377,7 @@ KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LAT
 **Compose from a generic host.** Application factories accept the host:
 
 ```java
-public final class MyApplication extends ALatticeApplication<Index<Keyword, ACell>> {
+public final class MyApplication extends LatticeApplication<Index<Keyword, ACell>> {
     private final Social social;
     private final DLFSRegion files;
 
@@ -434,9 +457,13 @@ free key starting at the operation timestamp and advances the key on collisions
 without changing the post's timestamp; key allocation is separate from the write
 clock.
 
-Reads return null for absent paths. A write through a child the component declared
-with its lattice creates the missing level from that lattice's empty value; a plain
-path write requires the intermediate containers to exist.
+Reads return null for absent paths. Components with a known container type can use
+`cursor.withDefault(Maps.empty()).path(key)` or the corresponding index default:
+reads and navigation create no state, and the first changed write constructs the
+container atomically. This does not require a lattice definition. The optional
+`LatticeComponent.resolve` helper uses lattice zero values when the implementation
+already has a lattice describing its shape. A plain path write requires the
+intermediate containers to exist.
 
 **Keep record construction in static helpers** (`SocialPost.createPost`), separating
 data format from cursor mechanics. Rules of thumb:
@@ -450,18 +477,16 @@ data format from cursor mechanics. Rules of thumb:
 
 ## Application root and host
 
-The application component declares the root lattice, the shape of the root with a
-default merge for that shape, and owns the merge of incoming root values: it
-delegates to the lattice merge, for the whole root or for the parts it wants, or
-applies its own rule. Nothing assumes the lattice merge on the application's behalf.
-It receives the host's root cursor and navigates below it with the root lattice; the
-domain components it creates receive the cursor for their level and never navigate
-back up. The global root is a keyed map, an `Index<Keyword, ACell>`: an application
-composes the region lattices it understands at the globally defined region paths,
-and the keyed merge ignores unknown incoming regions and retains unknown existing
-ones. Root merge needs no domain components; a relay merges every region in its
-lattice without constructing one. Component factories are a convenience, not a
-registry.
+An application defines which incoming values it accepts and how its components
+merge them. `AKeyedRegions` normally supplies root selection and routing; each
+registered child owns its policy and publication boundary. Custom hierarchies can
+extend `ALatticeApplication` directly. Domain components receive cursors at their
+own paths and need not navigate from the root.
+
+For callers that already have a root `ALattice`, `LatticeApplication` supplies the
+standard adapter. Its lattice describes container types and value merges; it may
+serve a relay without constructing domain children. The following example opts
+into that adapter:
 
 ```java
 var host = LatticeHost.create();
@@ -535,7 +560,7 @@ Opening a host restores the retained root, or starts at the supplied initial val
 by default an empty keyed index, if the store has none. Creating a host deliberately
 starts a fresh root; its first publication replaces any retained root. Applications
 accept a host rather than a store, so this choice belongs to host assembly. Each
-application supplies its own lattice. An application may override `merge` to hand
+application supplies its own component behaviour. An application may override `merge` to hand
 subtrees to components with their own merge rules and discard the rest; verification
 must still use the owner-bound rules for the paths it publishes. Merging keeps the
 current local value in the `own` position and does not publish or flush.
@@ -569,15 +594,13 @@ application list and an unconfigured host both ignore all incoming state. A node
 routes incoming pushes, whole-root and path pulls, direct merge calls and snapshot
 candidates through the host; delivery never invokes application sync, and an
 acknowledgement confirms delivery, not publication of private work. A path-addressed
-delivery goes to each application's `mergeAt`, which walks the path through the
-components that resolve: a component with a child component for the first key hands
-the rest of the path to it, and the deepest component that resolves merges the value
-reduced to its path, the value inside the empty containers that component's lattice
-declares along the way with every sibling ignored, through its own `merge`, whether
-that delegates to a lattice or does something else. By default no child resolves, so
-the application's `merge` sees a path delivery as a partial root. A path the lattice
-does not declare delivers nothing, and the lattice tree ends at a signed envelope, so
-callers supply the complete envelope at its slot.
+delivery goes to each application's `mergeAt`. Registered children handle the
+remaining path; otherwise the component's `mergeAtPath` determines what is accepted.
+The base rejects unsupported descendant delivery, while keyed regions ignore
+unregistered keys. Only the optional lattice adapters reduce a descendant delivery
+to a partial aggregate using declared empty containers, then call their own `merge`.
+Owner components stop at signed boundaries: callers supply the complete envelope.
+
 
 A node is replication. It hosts an assembled `LatticeHost`, attaches propagation
 groups, hands incoming values to the host and sends the host's published root to
@@ -616,7 +639,7 @@ changed under it, so sync reconciles before it installs:
 
 ```java
 // Each application is live at the host root and stages only the region it edits.
-final class SocialApp extends ALatticeApplication<Index<Keyword, ACell>> {
+final class SocialApp extends LatticeApplication<Index<Keyword, ACell>> {
     final Social social;
     SocialApp(LatticeHost<Index<Keyword, ACell>> host) {
         super(SOCIAL_ROOT, host.cursor());    // live at the root
@@ -729,8 +752,9 @@ public void sync() {
 There is no component registry, parent link, scheduler or hidden worker, and no
 atomic transaction across components: a completed publication stands if a later one
 fails. Each signed component publishes through its own fork of the host path it owns.
-An application's `beforeSync()` hook is simply a place to call those syncs before it
-publishes any root-level state of its own.
+An application prepares in `beforeSync()` and publishes managed components in
+`syncChildren()`, before publishing any staged aggregate of its own. Keyed regions
+already implement this child stage; subclasses normally customise preparation only.
 
 ## Component transactions
 
@@ -1090,14 +1114,14 @@ lattice expresses a finite set; map and index lattices express a family of keys
 sharing child semantics. Compose these for structured records instead of writing a
 custom merge for each record.
 
-Runtime subscriptions select from the application's lattice tree:
+Runtime subscriptions select paths served by the application's component hierarchy:
 
 - An empty path selects the whole lattice. A non-empty path selects that subtree,
   including future descendants admitted by its lattice.
 - Several subscriptions form the union of their selections. An ancestor interest
   covers descendant interests for replication, while each handle keeps its own
   observation path. Overlapping interests across applications are reference-counted.
-- An application's lattice provides one merge meaning per path, and applications
+- An application provides one merge meaning per path, and applications
   sharing a path must agree on it. Subscriptions cannot install competing merge
   functions at the same path; subscription creation does not extend the lattice.
 - Interest is demand for acquisition and continued replication, not permission to
@@ -1224,8 +1248,9 @@ Worked examples:
 - [ ] Compose lattice primitives bottom-up; use keyed lattices for structured
       records and reserve custom lattices for new merge semantics.
 - [ ] Use `OwnedMap`, `OwnedIndex` or `KeyOwnedIndex` for per-owner signed data; register the component under a region keyword.
-- [ ] Supply the root lattice to an application component; optionally expose
-      domain component factories at known paths. Root merge requires no components.
+- [ ] Compose region components with `Regions` or `SingleRegion`; use
+      `ALatticeApplication` for custom lifecycle and hierarchies. Choose
+      `LatticeApplication` only when adapting an explicit root lattice.
 - [ ] Accept a host in factories; provide a local open and a host-neutral
       connect. Assemble host and applications first, then the node.
 - [ ] Hand each domain component the cursor for its level; keep region paths in the

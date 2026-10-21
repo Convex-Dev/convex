@@ -81,7 +81,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	}
 
 	private DLFSDrives(DLFSDrives source) {
-		super(LATTICE,source.cursor);
+		super(source);
 		this.store=source.store;
 		this.location=DLFSLocation.at(cursor);
 	}
@@ -94,7 +94,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return configured(new DLFSDrive(key,resolve(cursor,LATTICE,key),store,location.child(key)));
+			return configured(new DLFSDrive(key,cursor.withDefault(Maps.empty()).path(key),store,location.child(key)));
 		});
 	}
 
@@ -269,4 +269,11 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		return configured(new DLFSDrives(cursor,store));
 	}
 
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AHashMap<AString, AVector<ACell>> mergePublication(
+			AHashMap<AString, AVector<ACell>> own,
+			AHashMap<AString, AVector<ACell>> other) {
+		return LATTICE.merge(getContext(),own,other);
+	}
 }

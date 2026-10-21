@@ -123,9 +123,11 @@ public class KVDatabase {
 	 * @param name Database name to connect to
 	 * @return New KVDatabase connected to the cursor chain
 	 */
+	@SuppressWarnings("unchecked")
 	public static KVDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = convex.lattice.ALatticeComponent.resolve(parent,convex.lattice.generic.MapLattice.create(KVStoreLattice.INSTANCE),dbName);
+		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = databases.withDefault(Maps.empty()).path(dbName);
 		if (cursor.get() == null) {
 			cursor.set(KVStoreLattice.INSTANCE.zero());
 		}
@@ -141,9 +143,11 @@ public class KVDatabase {
 	 * @param replicaID Replica ID for PN-counter operations
 	 * @return New KVDatabase connected to the cursor chain
 	 */
+	@SuppressWarnings("unchecked")
 	public static KVDatabase connect(AForkableCursor<?> parent, String name, AString replicaID) {
 		AString dbName = Strings.create(name);
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = convex.lattice.ALatticeComponent.resolve(parent,convex.lattice.generic.MapLattice.create(KVStoreLattice.INSTANCE),dbName);
+		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = databases.withDefault(Maps.empty()).path(dbName);
 		if (cursor.get() == null) {
 			cursor.set(KVStoreLattice.INSTANCE.zero());
 		}

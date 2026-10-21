@@ -9,10 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -25,6 +24,7 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
@@ -183,7 +183,7 @@ public class DLFSCursorTest {
 			Cursors.root((Index<Keyword, ACell>) Index.EMPTY);
 
 		AForkableCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
-		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(convex.lattice.ALatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
+		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
 		DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 		dlfs.setContext(ctx);
 
@@ -217,7 +217,7 @@ public class DLFSCursorTest {
 		LatticeContext context=LatticeContext.create(timestamp,keyPair);
 		LatticeHost<Index<Keyword,ACell>> root=LatticeHost.create((Index<Keyword,ACell>)Index.EMPTY,null);
 		AForkableCursor<?> region=root.cursor().path(dlfsKey);
-		DLFSLocal fileSystem=DLFS.connect(convex.lattice.ComponentTestSupport.signed(convex.lattice.ALatticeComponent.resolve(region,owners,owner), owners, owner, context),driveName);
+		DLFSLocal fileSystem=DLFS.connect(convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(region,owners,owner), owners, owner, context),driveName);
 		fileSystem.setContext(context);
 		Path path=fileSystem.getPath("/recreated");
 		Files.write(path,new byte[] {1});
@@ -282,7 +282,7 @@ public class DLFSCursorTest {
 			Cursors.root((Index<Keyword, ACell>) Index.EMPTY);
 
 		AForkableCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
-		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(convex.lattice.ALatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
+		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
 		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 		dlfs.setContext(ctx);
 

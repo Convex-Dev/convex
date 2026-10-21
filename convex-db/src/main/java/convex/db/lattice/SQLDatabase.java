@@ -98,9 +98,11 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @param name Database name to connect to
 	 * @return New SQLDatabase connected to the cursor chain
 	 */
+	@SuppressWarnings("unchecked")
 	public static SQLDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		AForkableCursor<Index<Keyword, ACell>> cursor = resolve(parent,ConvexDB.DATABASE_MAP_LATTICE,dbName);
+		var databases=(AForkableCursor<AHashMap<AString,Index<Keyword,ACell>>>)parent;
+		AForkableCursor<Index<Keyword, ACell>> cursor = databases.withDefault(Maps.empty()).path(dbName);
 		if (cursor.get() == null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
@@ -118,7 +120,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	public static SQLDatabase connect(ConvexDB parent,String name) {
 		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
 		AString dbName=Strings.create(name);
-		AForkableCursor<Index<Keyword,ACell>> cursor=resolve(parent.cursor(),ConvexDB.DATABASE_MAP_LATTICE,dbName);
+		AForkableCursor<Index<Keyword,ACell>> cursor=parent.cursor().withDefault(Maps.empty()).path(dbName);
 		if (cursor.get()==null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
@@ -140,7 +142,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	private SQLDatabase(SQLDatabase source) {
-		super(ConvexDB.DATABASE_LATTICE,source.cursor);
+		super(source);
 		this.dbName=source.dbName;
 		this.keyPair=source.keyPair;
 		this.ownerKey=source.ownerKey;
@@ -152,7 +154,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return configured(new SQLSchema(resolve(cursor,ConvexDB.DATABASE_LATTICE,ConvexDB.KEY_TABLES)));
+		return configured(new SQLSchema(cursor.withDefault(Index.none()).path(ConvexDB.KEY_TABLES)));
 	}
 
 	/**
@@ -248,5 +250,16 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 			}
 		}
 		return merged;
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+		var merged=ConvexDB.DATABASE_LATTICE.merge(getContext(),own,other);
+		if (other==null) return merged;
+		// Only tables belong to this component; retain current unrelated keys,
+		// including removal of a key still present in our stale working snapshot.
+		return merged!=null && merged.containsKey(ConvexDB.KEY_TABLES)
+			?other.assoc(ConvexDB.KEY_TABLES,merged.get(ConvexDB.KEY_TABLES)):other;
 	}
 }

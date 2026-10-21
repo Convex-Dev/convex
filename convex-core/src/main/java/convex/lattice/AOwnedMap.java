@@ -38,11 +38,10 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	private final AOwnerLattice<K,V,M> owners;
 
 	protected AOwnedMap(AOwnerLattice<K,V,M> owners,ACursor<M> destination) {
-		super(owners,destination);
+		super(destination);
 		this.owners=owners;
 	}
 
-	@Override
 	public final AOwnerLattice<K,V,M> getLattice() { return owners; }
 
 	/** Merges verified envelopes without resolving signing capabilities. */
@@ -53,8 +52,20 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 
 	/** Publication conflicts use the same public merge as incoming deliveries. */
 	@Override
-	protected M mergePublication(ALattice<M> lattice,M own,M other) {
+	protected M mergePublication(M own,M other) {
 		return owners.merge(own,other);
+	}
+
+	/** Delivers one complete owner envelope; paths inside an envelope introduce no data. */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Override
+	protected M mergeAtPath(ACell value,ACell... path) {
+		if (path.length!=1) return cursor.get();
+		SignedLattice<V> rule=owners.signingFor(path[0]);
+		if (rule==null) return cursor.get();
+		// Keep foreign values untyped until the same entry validation as whole-map delivery.
+		AMap incoming=owners.zero();
+		return merge((M)incoming.assoc(rule.getOwner(),value));
 	}
 
 	/** Returns the current signed entry, or null when absent. Does not create state. */

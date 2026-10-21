@@ -10,7 +10,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.lattice.ALattice;
-import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.fs.DLFSLocation;
@@ -35,7 +35,7 @@ import convex.lattice.fs.DLFSLocation;
  *
  * @param <V> Complete application root value type
  */
-public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
+public class DLFSApplication<V extends ACell> extends LatticeApplication<V> {
 
 	private final AStore store;
 	private final ACell[] regionPath;

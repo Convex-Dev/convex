@@ -47,7 +47,7 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 	}
 
 	private P2PIdentity(P2PIdentity source) {
-		super(P2PLattice.ID_LATTICE.getValueLattice(),source.cursor);
+		super(source);
 		this.owner=source.owner;
 	}
 	@Override
@@ -55,4 +55,9 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 		return configured(new P2PIdentity(cursor,owner));
 	}
 
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected ACell mergePublication(ACell own,ACell other) {
+		return P2PLattice.ID_LATTICE.getValueLattice().merge(getContext(),own,other);
+	}
 }

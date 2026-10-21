@@ -1,13 +1,17 @@
 package convex.lattice;
 
+import java.util.Map;
+
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
+import convex.core.data.AMap;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
+import convex.lattice.generic.AKeyedLattice;
 
 /**
- * Utilities for component-supplied lattice construction and strict path updates.
+ * Optional lattice-directed merge, construction and path operations, plus strict path updates.
  *
  * <p>Provides {@link #assocIn} as a replacement for {@link RT#assocIn} which knows
  * how to create a missing container: from the lattice of the position being
@@ -86,6 +90,38 @@ public class LatticeOps {
 		ACell child = struct.get(keys[i]);
 		ACell newChild = assocIn(child, value, null, keys, i + 1);
 		return RT.assoc(struct, keys[i], newChild); // returns struct unchanged if newChild == child
+	}
+
+	/** Reconciles a lattice-backed publication, retaining destination keys outside a keyed lattice. */
+	@SuppressWarnings("unchecked")
+	public static <V extends ACell> V mergePublication(ALattice<V> lattice,LatticeContext context,V own,V other) {
+		V merged=lattice.merge(context,own,other);
+		if (!(lattice instanceof AKeyedLattice<?,?> keyed) || !(other instanceof AMap<?,?>)) return merged;
+		if (merged==null) return other;
+		AMap<ACell,ACell> result=(AMap<ACell,ACell>)other;
+		for (Map.Entry<ACell,ACell> entry:((AMap<ACell,ACell>)merged).entrySet()) {
+			if (keyed.path(entry.getKey())!=null) result=result.assoc(entry.getKey(),entry.getValue());
+		}
+		return (V)result;
+	}
+
+	/** The value a delivery at a path means at this level: that path alone, in the lattice's empty containers. */
+	@SuppressWarnings("unchecked")
+	public static <V extends ACell> V reduce(ALattice<V> lattice,ACell value,ACell... path) {
+		ALattice<?>[] levels=new ALattice<?>[path.length];
+		ALattice<?> level=lattice;
+		for (int i=0; i<path.length; i++) {
+			levels[i]=level;
+			level=level.path(path[i]);
+			if (level==null) return null;
+		}
+		ACell reduced=value;
+		for (int i=path.length-1; i>=0; i--) {
+			if (!(levels[i].zero() instanceof ADataStructure<?> empty)) return null;
+			reduced=RT.assoc((ADataStructure<ACell>)empty,path[i],reduced);
+			if (reduced==null) return null;
+		}
+		return (V)reduced;
 	}
 
 }

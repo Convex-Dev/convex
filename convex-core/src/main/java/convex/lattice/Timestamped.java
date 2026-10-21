@@ -78,7 +78,7 @@ public final class Timestamped<V extends ACell> extends ALatticeComponent<V> {
 		return ORDER;
 	}
 
-	@Override public ALattice<V> getLattice() { return ordering; }
+	public ALattice<V> getLattice() { return ordering; }
 
 	/** Selects a complete incoming record without consulting the clock or re-stamping. */
 	@Override public V merge(V incoming) {

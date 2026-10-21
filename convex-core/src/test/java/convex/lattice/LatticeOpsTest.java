@@ -25,7 +25,7 @@ import convex.lattice.generic.MapLattice;
 /**
  * Tests for {@link LatticeOps#assocIn}: the write engine creates an absent base from
  * the {@link ALattice} it is given and never invents a container below it. Typed intermediates come from the component that
- * owns each level, which declares them with {@code ALatticeComponent.resolve}.
+ * owns each level, which declares them with {@code LatticeComponent.resolve}.
  */
 public class LatticeOpsTest {
 
@@ -63,7 +63,7 @@ public class LatticeOpsTest {
 	/**
 	 * The engine knows only the lattice of the base. An absent intermediate below it has
 	 * no declared type here, so a deep write through it fails rather than guessing;
-	 * the owning component declares each level with {@code ALatticeComponent.resolve} and the
+	 * the owning component declares each level with {@code LatticeComponent.resolve} and the
 	 * same write then creates every container with its correct type.
 	 */
 	@SuppressWarnings("unchecked")
@@ -77,7 +77,7 @@ public class LatticeOpsTest {
 			() -> LatticeOps.assocIn(null, CVMLong.create(99), outer, KEY_A, KEY_B));
 
 		Root<Index<Keyword, ACell>> root = Cursors.root((Index<Keyword, ACell>) null);
-		ALatticeComponent.resolve(root,outer,KEY_A,KEY_B).set(CVMLong.create(99));
+		LatticeComponent.resolve(root,outer,KEY_A,KEY_B).set(CVMLong.create(99));
 
 		Index<Keyword, ACell> outerIdx = root.get();
 		assertNotNull(outerIdx);
