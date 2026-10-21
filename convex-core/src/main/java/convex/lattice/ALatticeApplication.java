@@ -3,7 +3,6 @@ package convex.lattice;
 import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -26,7 +25,7 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 
 	/** Creates private working state over a host, retaining its current context. */
 	protected ALatticeApplication(LatticeHost<V> host) {
-		super((ACursor<V>)Objects.requireNonNull(host,"Application host must not be null").cursor());
+		super(forkOf(Objects.requireNonNull(host,"Application host must not be null").cursor()));
 		setContext(host.getContext());
 	}
 

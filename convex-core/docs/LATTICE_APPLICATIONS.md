@@ -179,6 +179,15 @@ pipeline during launch; application code never knows a node exists.
 
 ## Composing named regions
 
+The default component publication boundary is explicit in its constructor:
+`super(cursor)` shares working storage and makes `sync()` a read-only no-op;
+`super(forkOf(destination))` owns a private working copy that sync reconciles into
+that destination. A live view never publishes a caller-owned fork, including when
+the view is a path into that fork. The component-copy constructor `super(source)`
+creates a fork and retains the source's context. Application lifecycle methods
+explicitly add preparation and child publication; ordinary components inherit
+neither operation.
+
 Extend `AKeyedRegions` for an application whose interests are named regions of an
 index. Register a child for each region. The same class works at the host root or
 inside another regions component; it has no whole-container working copy to merge

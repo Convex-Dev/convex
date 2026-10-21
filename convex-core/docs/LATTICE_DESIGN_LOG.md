@@ -629,6 +629,20 @@ reduction and publication reconciliation are shared with `LatticeComponent` thro
 region entry points navigate their known index/map types without a root lattice.
 This preserves CAD045's component boundaries and CAD035's fork semantics.
 
+## 26. Default sync follows explicit publication ownership
+
+Implemented 21 October 2026. `ALatticeComponent` no longer overloads live and
+staged construction on `AForkableCursor` versus `ACursor`. `super(cursor)` shares
+storage; `super(forkOf(destination))` explicitly creates an owned fork. Component
+copying and stored-representation conversion retain their explicit fork semantics.
+
+Default sync publishes only the owned fork, or reads the current value when there
+is none. It never publishes or refreshes a caller-owned fork through a view, nor
+signs, stamps or creates default state. Nested publication stops at its immediate
+destination. Application preparation and managed-child sync remain explicit
+lifecycle extensions. Regression tests cover these ownership boundaries, cursor
+declaration independence and no-op identity through authoring views.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |

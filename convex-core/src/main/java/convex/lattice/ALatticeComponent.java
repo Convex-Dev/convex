@@ -53,7 +53,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 		return child;
 	}
 
-	/** Creates a component over a cursor. */
+	/**
+	 * Shares supplied working storage without taking ownership of its publication.
+	 * Default sync is a read-only no-op, even when the supplied cursor is a fork.
+	 */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
 		this.cursor=Objects.requireNonNull(cursor,"Component cursor must not be null");
 		owned=null;
@@ -63,15 +66,24 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Creates a component with private working state and a publication destination.
 	 * Children normally share paths in this working state; they need no forks.
 	 * Sync publishes one snapshot into the destination without syncing that
-	 * destination further. Write and merge policy belongs to this component. No workers or timers are created.
+	 * destination further. Use {@code super(forkOf(destination))} to select this
+	 * boundary explicitly, regardless of the destination cursor's Java type.
 	 */
-	protected ALatticeComponent(ACursor<V> destination) {
-		this(destination,Function.identity(),Function.identity());
+	protected ALatticeComponent(ForkTarget<V> target) {
+		this(target.destination(),Function.identity(),Function.identity());
 	}
+
+	/** Declares a destination for a new component-owned fork; does not create or publish state. */
+	protected static <T extends ACell> ForkTarget<T> forkOf(ACursor<T> destination) {
+		return new ForkTarget<>(Objects.requireNonNull(destination,"Fork destination must not be null"));
+	}
+
+	/** Explicit construction choice, distinct from sharing a supplied cursor. */
+	protected record ForkTarget<T extends ACell>(ACursor<T> destination) {}
 
 	/** Creates independent working state over another component, retaining its current context. */
 	protected ALatticeComponent(ALatticeComponent<V> source) {
-		this((ACursor<V>)source.cursor());
+		this(forkOf(source.cursor()));
 		setContext(source.getContext());
 	}
 
@@ -154,6 +166,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * CAS-or-merge. Publication stops at that cursor: its sync is never invoked.
 	 * A lightweight view has no independent boundary and simply returns its value;
 	 * its edits are already visible in the containing working state.
+	 * This default does not write, sign, stamp or create absent state for a view.
 	 *
 	 * <p>Call the enclosing application's sync to run its preparation and publication,
 	 * and the host's sync for persistence or replication. A caller-owned cursor

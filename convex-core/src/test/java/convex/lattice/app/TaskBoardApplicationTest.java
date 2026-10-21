@@ -70,7 +70,7 @@ class TaskBoardApplicationTest {
 		private final Supplier<CVMLong> getTimestamp;
 
 		Board(ACursor<Index<AString,AHashMap<Keyword,ACell>>> destination,Supplier<CVMLong> getTimestamp) {
-			super(destination);
+			super(forkOf(destination));
 			this.getTimestamp=getTimestamp;
 		}
 

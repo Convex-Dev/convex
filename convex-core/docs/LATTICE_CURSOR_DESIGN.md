@@ -120,6 +120,19 @@ The component which supplied the destination owns the next publication step, and
 the host's own `sync()` persists and replicates. Lightweight components have no
 independent publication work. No cursor starts a worker or timer.
 
+Component construction makes that ownership explicit: `super(cursor)` shares
+working storage, while `super(forkOf(destination))` creates an owned fork. Casting
+a cursor to `ACursor` no longer selects a different constructor. The component-copy
+constructor `super(sourceComponent)` also creates an owned fork and retains the
+source's context; the read/prepare constructor explicitly creates a boundary with
+a different stored representation.
+
+Default component `sync()` reads the current value when it owns no fork. It never
+searches the cursor chain for publication work: even a view directly over a
+caller-owned fork neither publishes nor refreshes it. Reads through defaults,
+signing and stamping views create no state and perform no authoring. Applications
+may explicitly add preparation and managed-child publication around this default.
+
 `Transactions` runs a synchronous callback against a private draft and commits by
 CAS, preserving each operation under contention. `TransactionalRootCursor` opts
 into a shared write lock for explicit locked execution and contention fallback.

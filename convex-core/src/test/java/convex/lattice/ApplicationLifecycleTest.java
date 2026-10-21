@@ -26,7 +26,7 @@ class ApplicationLifecycleTest {
 	private static final Keyword OTHER=Keyword.intern("other");
 
 	private static class Values extends ALatticeComponent<ASet<CVMLong>> {
-		Values(ACursor<ASet<CVMLong>> destination) { super(destination); }
+		Values(ACursor<ASet<CVMLong>> destination) { super(forkOf(destination)); }
 		@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) {
 			return cursor.updateAndGet(own -> union(own,incoming));
 		}
