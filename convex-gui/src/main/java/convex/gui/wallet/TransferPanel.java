@@ -125,8 +125,7 @@ public class TransferPanel extends AbstractGUI {
 		} else {
 			qs="(@convex.asset/transfer "+target +" [ "+token.getID()+" "+amount+" ])";
 		}
-		// Off the EDT: preparing a transaction may look up the sequence number
-		return Async.background(()->convex.transactSync(qs));
+		return convex.transact(qs);
 	}
 
 	public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {

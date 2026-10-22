@@ -53,7 +53,7 @@ public class PeerStakePanel extends JPanel {
 					JOptionPane.showMessageDialog(this,"Input amount not valid. Must be a qantity in Convex Gold, e.g. '1000.01' ");
 					return;
 				}
-				Async.whileBusy(e, Async.background(()->convex.transactSync("(set-stake "+peerKey+" "+amt+")")).thenAcceptAsync(r->{
+				Async.whileBusy(e, convex.transact("(set-stake "+peerKey+" "+amt+")").thenAcceptAsync(r->{
 					if (r.isError()) {
 						JOptionPane.showMessageDialog(this,"Stake setting failed: "+r,"Staking problem",JOptionPane.ERROR_MESSAGE);
 					}
