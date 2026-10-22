@@ -14,7 +14,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
-import convex.lattice.generic.OwnerLattice;
+import convex.lattice.generic.OwnerMapLattice;
 import convex.lattice.generic.ReservedLattice;
 import convex.social.Social;
 
@@ -84,20 +84,12 @@ import convex.social.Social;
  * redeclaring it, so the registry's merge semantics cannot drift between the two roots,
  * and adds the P2P-only {@code :id} and {@code :kad} regions alongside it.
  *
- * <h2>Owner binding — always merge with a context</h2>
+ * <h2>Owner binding</h2>
  *
- * <p>Both populated regions are {@link OwnerLattice}s keyed by {@link AccountKey}, so a
- * user can only ever write their own slot. That guarantee is enforced by
- * {@code LatticeContext.verifyOwner}, which {@code OwnerLattice} calls <em>only</em> from
- * its context-aware merge. The two-argument {@code merge(own, other)} does not check the
- * signer against the owner key at all, and would accept an impersonated slot.
- *
- * <p>This is safe on every real path — every cursor merge a component or host performs calls
- * {@code lattice.merge(getContext(), ..)}, and even {@code LatticeContext.EMPTY} triggers
- * the {@code AccountKey} equality fast path — so inbound network values merged by
- * {@code NodeServer} are owner-checked by default. But code that reaches for a raw
- * {@code ALattice.merge(a, b)} on these regions loses the guarantee silently. Merge
- * through a component, or pass a context explicitly.
+ * <p>Identity and node registries bind direct-key ownership to their lattice
+ * instances. Both context-free merge and local signing require the signing key
+ * to equal the owner key. Their LWW payload merge selects an existing envelope;
+ * relaying those records never needs a private key or a signing context.</p>
  *
  * <p>Helpers for building and reading {@code NodeInfo} records live in
  * {@link convex.lattice.p2p.P2PLattice} ({@code createNodeInfo}, {@code createSignedEntry},
@@ -147,7 +139,7 @@ public class P2PLattice {
 	 * {@code :nodes} — the node registry lattice inside {@link #P2P_LATTICE}, exposed
 	 * for direct use.
 	 */
-	public static final OwnerLattice<ACell> NODES_LATTICE =
+	public static final OwnerMapLattice<ACell,ACell> NODES_LATTICE =
 		convex.lattice.p2p.P2PLattice.NODES_LATTICE;
 
 	/**
@@ -155,8 +147,8 @@ public class P2PLattice {
 	 * {@link AccountKey}. Separate from the node registry so one identity can advertise
 	 * several nodes, and so identity claims change independently of transport details.
 	 */
-	public static final OwnerLattice<ACell> ID_LATTICE =
-		OwnerLattice.create(LWWLattice.INSTANCE);
+	public static final OwnerMapLattice<ACell,ACell> ID_LATTICE =
+		OwnerMapLattice.create(LWWLattice.INSTANCE,(owner,key) -> key.equals(owner));
 
 	/**
 	 * {@code :kad} — reserved for Kademlia routing state. Declared so the path is
@@ -207,7 +199,7 @@ public class P2PLattice {
 	 * Creates an IdentityInfo map for a P2P user.
 	 *
 	 * <p>As with NodeInfo, the timestamp is supplied by the caller — the driving process
-	 * or a {@code LatticeContext} — rather than read from the system clock here, so that
+	 * or a supplied clock — rather than read from the system clock here, so that
 	 * merges are reproducible and testable.
 	 *
 	 * @param name Display name for this identity (may be null)

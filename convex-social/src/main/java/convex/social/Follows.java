@@ -1,6 +1,7 @@
 package convex.social;
 
 import java.util.Set;
+import java.util.function.Supplier;
 
 import convex.auth.did.DID;
 import convex.core.data.ACell;
@@ -30,10 +31,13 @@ import convex.lattice.cursor.AForkableCursor;
  * }</pre>
  */
 public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implements TransactionalComponent<AHashMap<ACell, ACell>,Follows> {
+	private final Supplier<CVMLong> clock;
+
 	public static final Keyword KEY_ACCOUNT_KEY=Keyword.intern("account-key");
 
-	Follows(AForkableCursor<AHashMap<ACell, ACell>> cursor) {
+	Follows(AForkableCursor<AHashMap<ACell, ACell>> cursor, Supplier<CVMLong> clock) {
 		super(cursor);
+		this.clock=clock;
 	}
 
 	/**
@@ -120,7 +124,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 
 	@SuppressWarnings("unchecked")
 	private void writeField(AString target,Keyword key,ACell value) {
-		CVMLong timestamp=getContext().currentTimestamp();
+		CVMLong timestamp=clock.get();
 		cursor().updateAndGet(follows -> {
 			ACell existing=(follows==null)?null:follows.get(target);
 			AHashMap<Keyword,ACell> record=(existing instanceof AHashMap<?,?> map)
@@ -135,7 +139,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 
 	@Override
 	public Follows withCursor(AForkableCursor<AHashMap<ACell, ACell>> cursor) {
-		return configured(new Follows(cursor));
+		return new Follows(cursor,clock);
 	}
 
 }

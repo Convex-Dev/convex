@@ -1,5 +1,9 @@
 package convex.social;
 
+import java.util.Objects;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
+
 import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
@@ -10,24 +14,30 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeContext;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.SignedCursor;
-import convex.lattice.generic.OwnerLattice;
+import convex.lattice.generic.OwnerMapLattice;
 
 /**
  * Cursor-based application layer for the Convex social network.
  *
  * <p>{@code Social} wraps a cursor at the {@code :social} level (an
- * {@link OwnerLattice} mapping canonical DIDs to signed per-user state) and
+ * {@link OwnerMapLattice} mapping canonical DIDs to signed per-user state) and
  * provides domain-specific accessors for users, feeds, and follows. The cursor
- * knows nothing of the lattice; this component declares {@link #SOCIAL_LATTICE}
- * for construction at its level, the merge of its forks and the owner rule it crosses
- * into a user's signed value with.</p>
+ * knows nothing of the lattice. The component binds its DID authoriser once and
+ * uses that rule for both incoming envelopes and local signatures.</p>
+ *
+ * <p>An owner-aware signer can serve several DIDs with different keys, returning
+ * null for unavailable owners. Without a signer the component is a relay. The
+ * clock supplies mutation timestamps; ordering comes from the merged values.
+ * Forks and transaction views retain these explicit policies. Inherited contexts
+ * neither grant authority nor change the clock.</p>
  *
  * <h2>Usage</h2>
  * <pre>{@code
@@ -41,8 +51,8 @@ import convex.lattice.generic.OwnerLattice;
  *
  * // Fork for batch operations
  * Social forked = social.fork();
- * forked.user(myKey).feed().post("Post 1");
- * forked.user(myKey).feed().post("Post 2");
+ * forked.user(myDid).feed().post("Post 1");
+ * forked.user(myDid).feed().post("Post 2");
  * forked.sync();
  * }</pre>
  *
@@ -74,130 +84,80 @@ public class Social extends ALatticeComponent<
 	public static final Keyword KEY_SOCIAL = Keyword.intern("social");
 
 	/**
-	 * The social lattice: OwnerLattice mapping canonical DIDs to signed per-user state.
+	 * The social lattice: OwnerMapLattice mapping canonical DIDs to signed per-user state.
 	 *
 	 * <p>Each owner's value is wrapped in {@code SignedData}; its signer must be an
 	 * Ed25519 key authorised for the DID. The inner value is a {@link SocialLattice}
 	 * containing {@code :feed}, {@code :profile}, and {@code :following}.</p>
 	 */
-	public static final OwnerLattice<Index<Keyword, ACell>> SOCIAL_LATTICE =
-		new DIDOwnerLattice();
+	public static final OwnerMapLattice<ACell,Index<Keyword,ACell>> SOCIAL_LATTICE=
+		ownerLattice(DIDKeyAuthorizer.CONVEX);
 
-	/** Owner boundary which admits canonical DID keys only. */
-	private static final class DIDOwnerLattice
-			extends OwnerLattice<Index<Keyword,ACell>> {
+	private final OwnerMapLattice<ACell,Index<Keyword,ACell>> owners;
+	private final BiFunction<ACell,Index<Keyword,ACell>,SignedData<Index<Keyword,ACell>>> signer;
+	private final Supplier<CVMLong> clock;
 
-		DIDOwnerLattice() {
-			super(SocialLattice.INSTANCE);
-		}
-
-		@Override
-		public AHashMap<ACell,SignedData<Index<Keyword,ACell>>> merge(
-				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> own,
-				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> other) {
-			return super.merge(own,sanitise(other,null));
-		}
-
-		@Override
-		public AHashMap<ACell,SignedData<Index<Keyword,ACell>>> merge(
-				LatticeContext context,
-				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> own,
-				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> other) {
-			return super.merge(context,own,sanitise(other,context));
-		}
-
-		@SuppressWarnings({"unchecked","rawtypes"})
-		private AHashMap<ACell,SignedData<Index<Keyword,ACell>>> sanitise(
-				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> other,
-				LatticeContext context) {
-			if (other==null) return null;
-			AHashMap<ACell,SignedData<Index<Keyword,ACell>>> clean=Maps.empty();
-			for (Object item:((AHashMap)other).entrySet()) {
-				java.util.Map.Entry<?,?> entry=(java.util.Map.Entry<?,?>)item;
-				if (!(entry.getKey() instanceof convex.core.data.AString did)
-						|| !DID.isCanonicalBase(did)) continue;
-				if (!(entry.getValue() instanceof SignedData<?> signed)) continue;
-				// did:key is self-certifying. Indirect DIDs must never fall through
-				// LatticeContext's compatibility-lenient no-verifier behaviour.
-				if (DID.keyFromDID(did)==null
-						&& (context==null || context.getOwnerVerifier()==null)) continue;
-				clean=clean.assoc(did,(SignedData<Index<Keyword,ACell>>)signed);
-			}
-			return clean;
-		}
+	/** Binds canonical DID verification for both incoming merge and local signing. */
+	public static OwnerMapLattice<ACell,Index<Keyword,ACell>> ownerLattice(DIDKeyAuthorizer authoriser) {
+		Objects.requireNonNull(authoriser);
+		return OwnerMapLattice.create(SocialLattice.INSTANCE,authoriser::verifiesOwner);
 	}
 
-	Social(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+	private Social(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> cursor,
+			OwnerMapLattice<ACell,Index<Keyword,ACell>> owners,
+			BiFunction<ACell,Index<Keyword,ACell>,SignedData<Index<Keyword,ACell>>> signer,
+			Supplier<CVMLong> clock) {
 		super(cursor);
+		this.owners=owners;
+		this.signer=signer;
+		this.clock=Objects.requireNonNull(clock);
 	}
 
-	/**
-	 * Creates a standalone Social instance with its own cursor.
-	 *
-	 * @param keyPair Key pair for signing updates
-	 * @return New Social instance
-	 */
+	/** Creates a standalone did:key author with wall-clock mutation timestamps. */
 	public static Social create(AKeyPair keyPair) {
-		return create(LatticeContext.create(null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
+		return create((owner,value) -> keyPair.signData(value),Utils::getCurrentTimestampCell);
+	}
+
+	/** Creates a multi-owner did:key author, or a relay with a null signer. */
+	public static Social create(BiFunction<ACell,Index<Keyword,ACell>,SignedData<Index<Keyword,ACell>>> signer,
+			Supplier<CVMLong> clock) {
+		return create(DIDKeyAuthorizer.CONVEX,signer,clock);
+	}
+
+	/** Creates standalone state with explicit DID resolution, multi-owner signing and clock. */
+	public static Social create(DIDKeyAuthorizer authoriser,
+			BiFunction<ACell,Index<Keyword,ACell>,SignedData<Index<Keyword,ACell>>> signer,
+			Supplier<CVMLong> clock) {
+		return connect(Cursors.root(Maps.empty()),authoriser,signer,clock);
+	}
+
+	/** Connects a did:key relay at the social owner-map cursor. */
+	public static Social connect(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> cursor) {
+		return connect(cursor,DIDKeyAuthorizer.CONVEX,null,Utils::getCurrentTimestampCell);
 	}
 
 	/**
-	 * Creates a standalone Social instance using an application policy.
-	 *
-	 * @param context Context supplying signing and timestamp policy
-	 * @return New Social instance
+	 * Connects explicit policy shared by all users and derived views. One signer
+	 * may serve many DIDs using different keys, returning null for unavailable
+	 * owners. Its results must pass the bound authoriser. Callbacks must support
+	 * concurrent use and atomic retries; refresh external authority outside them.
 	 */
-	public static Social create(LatticeContext context) {
-		Social social=new Social(Cursors.root(SOCIAL_LATTICE.zero()));
-		social.setContext(context);
-		return social;
+	public static Social connect(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> cursor,
+			DIDKeyAuthorizer authoriser,
+			BiFunction<ACell,Index<Keyword,ACell>,SignedData<Index<Keyword,ACell>>> signer,
+			Supplier<CVMLong> clock) {
+		return new Social(cursor,ownerLattice(authoriser),signer,clock);
 	}
 
-	/**
-	 * Connects the social component to the cursor at its own level, the owner map
-	 * under {@code :social}. The application that owns the root hands this cursor
-	 * down; the component navigates no further up. Policy starts empty.
-	 *
-	 * @param socialCursor Cursor at the {@code :social} owner map
-	 * @return Social region component
-	 */
-	public static Social connect(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor) {
-		if (socialCursor==null) throw new IllegalArgumentException("Social cursor must not be null");
-		return new Social(socialCursor);
-	}
-
-	/**
-	 * Connects to the {@code :social} region of an application's root, with a signing
-	 * policy for this instance. The region is a path in the application's root index.
-	 *
-	 * @param application Application at a root index containing {@code :social}
-	 * @param keyPair Key pair for signing updates
-	 * @return Social instance connected beneath the application
-	 */
-	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application, AKeyPair keyPair) {
-		return connect(application,LatticeContext.create(
-			null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
-	}
-
-	/** Connects to an application's {@code :social} region using an explicit policy. */
-	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application,LatticeContext context) {
-		Social social=connect(application);
-		social.setContext(context);
-		return social;
-	}
-
-	/**
-	 * Connects to the {@code :social} region of an application's root, resolving the
-	 * application's policy at construction.
-	 *
-	 * @param application Application at a root index containing {@code :social}
-	 * @return Social region component
-	 */
+	/** Opens a relay view of an application's standard social region. */
 	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application) {
-		if (application==null) throw new IllegalArgumentException("Application must not be null");
-		Social social=connect(application.cursor().withDefault(Index.none()).<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>>path(KEY_SOCIAL));
-		social.setContext(application.getContext());
-		return social;
+		return connect(application.cursor().withDefault(Index.none()).path(KEY_SOCIAL));
+	}
+
+	/** Opens a did:key author view of an application's standard social region. */
+	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application,AKeyPair keyPair) {
+		return connect(application.cursor().withDefault(Index.none()).path(KEY_SOCIAL),
+			DIDKeyAuthorizer.CONVEX,(owner,value) -> keyPair.signData(value),Utils::getCurrentTimestampCell);
 	}
 
 	/**
@@ -206,9 +166,8 @@ public class Social extends ALatticeComponent<
 	 * <p>This component owns the owner-keyed level, so it is the one place that
 	 * crosses into a user's signed value. The returned {@link SocialUser} wraps a
 	 * cursor at the per-user {@link SocialLattice} level; writes through it are
-	 * signed with the signer the context policy authorises for {@code ownerDid},
-	 * which need not be its primary account, under exactly the rule
-	 * {@link #SOCIAL_LATTICE} applies to incoming merges.</p>
+	 * signed with the explicit signer for {@code ownerDid}, under the same bound
+	 * authorisation rule as incoming merges. No primary identity is required.</p>
 	 *
 	 * @param ownerDid the user's canonical base DID
 	 * @return SocialUser for the specified owner
@@ -217,11 +176,10 @@ public class Social extends ALatticeComponent<
 		if (!DID.isCanonicalBase(ownerDid)) {
 			throw new IllegalArgumentException("Social owner must be a canonical base DID");
 		}
-		var rule=SOCIAL_LATTICE.signingFor(ownerDid);
-		var policy=getContext();
+		var rule=owners.signingFor(ownerDid);
 		AForkableCursor<Index<Keyword, ACell>> userCursor =
-			SignedCursor.create(cursor().withDefault(Maps.empty()).path(ownerDid),value -> rule.sign(policy,value));
-		return configured(new SocialUser(userCursor,ownerDid));
+			SignedCursor.create(cursor().withDefault(Maps.empty()).path(ownerDid),value -> signer==null?null:rule.sign(value,v -> signer.apply(ownerDid,v)));
+		return new SocialUser(userCursor,ownerDid,clock);
 	}
 
 	/** Convenience migration overload mapping an Ed25519 key to its {@code did:key}. */
@@ -232,29 +190,32 @@ public class Social extends ALatticeComponent<
 
 	/**
 	 * Creates a forked copy for independent operation.
-	 * Changes don't affect the parent until {@link #sync()}, which merges with
-	 * {@link #SOCIAL_LATTICE}.
+	 * Changes don't affect the parent until {@link #sync()}, which reconciles with
+	 * the same owner rule and signer.
 	 *
 	 * @return Forked Social instance
 	 */
 	public Social fork() {
-		return configured(new Social(this));
+		return new Social(this);
 	}
 
 	private Social(Social source) {
 		super(source);
+		owners=source.owners;
+		signer=source.signer;
+		clock=source.clock;
 	}
 
 	@Override
 	public Social withCursor(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
-		return configured(new Social(cursor));
+		return new Social(cursor,owners,signer,clock);
 	}
 
 	/** Merges incoming owner envelopes into this region's working state. */
 	@Override
 	public AHashMap<ACell,SignedData<Index<Keyword,ACell>>> merge(
 			AHashMap<ACell,SignedData<Index<Keyword,ACell>>> incoming) {
-		return cursor().updateAndGet(own -> SOCIAL_LATTICE.merge(getContext(),own,incoming));
+		return cursor().updateAndGet(own -> mergePublication(own,incoming));
 	}
 
 	/** Accepts whole owner envelopes, never unsigned edits inside them. */
@@ -275,6 +236,6 @@ public class Social extends ALatticeComponent<
 	protected AHashMap<ACell, SignedData<Index<Keyword, ACell>>> mergePublication(
 			AHashMap<ACell, SignedData<Index<Keyword, ACell>>> own,
 			AHashMap<ACell, SignedData<Index<Keyword, ACell>>> other) {
-		return SOCIAL_LATTICE.merge(getContext(),own,other);
+		return signer==null?owners.merge(own,other):owners.mergeAndSign(own,other,signer);
 	}
 }

@@ -1,6 +1,7 @@
 package convex.social;
 
 import java.util.function.LongFunction;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -29,11 +30,14 @@ import convex.lattice.cursor.AForkableCursor;
  * }</pre>
  */
 public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements TransactionalComponent<Index<Blob, ACell>,Feed> {
+	private final Supplier<CVMLong> clock;
+
 
 	private final AString author;
 
-	Feed(AForkableCursor<Index<Blob, ACell>> cursor, AString author) {
+	Feed(AForkableCursor<Index<Blob, ACell>> cursor, AString author, Supplier<CVMLong> clock) {
 		super(cursor);
+		this.clock=clock;
 		this.author = author;
 	}
 
@@ -76,13 +80,13 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * free key is found — a new entry never replaces an existing one. The check
 	 * runs inside the atomic cursor update, so it holds across Feed instances
 	 * and concurrent posts on the same cursor. The record's timestamp remains the
-	 * unmodified context time, resolved once for the operation.
+	 * unmodified supplied time, resolved once for the operation.
 	 *
 	 * @param entryFn Creates the entry record for the operation timestamp
 	 * @return The 8-byte timestamp key assigned to the entry
 	 */
 	private Blob addEntry(LongFunction<AHashMap<Keyword, ACell>> entryFn) {
-		long timestamp=getContext().currentTimestampValue();
+		long timestamp=clock.get().longValue();
 		AHashMap<Keyword,ACell> entry=entryFn.apply(timestamp);
 		Blob[] keyHolder = new Blob[1];
 		cursor().updateAndGet(feed -> {
@@ -111,7 +115,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 */
 	@SuppressWarnings("unchecked")
 	public void delete(Blob postKey) {
-		CVMLong now = getContext().currentTimestamp();
+		CVMLong now = clock.get();
 		cursor().updateAndGet(feed -> {
 			if (feed == null) return feed;
 			ACell existing = feed.get(postKey);
@@ -158,7 +162,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 
 	@Override
 	public Feed withCursor(AForkableCursor<Index<Blob, ACell>> cursor) {
-		return configured(new Feed(cursor,author));
+		return new Feed(cursor,author,clock);
 	}
 
 }

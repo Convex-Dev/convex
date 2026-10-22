@@ -20,7 +20,6 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
-import convex.lattice.generic.OwnerLattice;
 import convex.lattice.p2p.P2PLattice;
 
 /**
@@ -193,7 +192,7 @@ public class P2PLatticeTest {
 		// :p2p / :nodes should resolve to OwnerLattice
 		ALattice<?> nodesLattice = p2pLattice.path(Keywords.NODES);
 		assertNotNull(nodesLattice, ":nodes should be in :p2p");
-		assertInstanceOf(OwnerLattice.class, nodesLattice);
+		assertInstanceOf(convex.lattice.generic.OwnerMapLattice.class, nodesLattice);
 	}
 
 	@Test

@@ -49,7 +49,9 @@ the foreign operand before either its null-adoption or timestamp-reordering path
 so malformed values cannot bypass child validation.
 
 Exact timestamp ties retain the receiver's current value as specified by CAD024.
-Writers obtain timestamps from `LatticeContext`, not directly from the system clock.
+Writers obtain timestamps from the component's `Supplier<CVMLong>`. The default
+supplier reads wall-clock time; applications may supply a deterministic clock.
+The supplier is retained by child views, forks and transaction drafts.
 
 ## Follow, unfollow and tombstones
 
@@ -66,11 +68,13 @@ unbounded action log.
 When a complete signed value arrives for a desired target DID:
 
 1. verify the `SignedData` signature;
-2. compare its signer with the last validated key cached for that DID;
-3. if it matches, reuse the binding;
-4. if it differs or is absent, resolve the DID through `DIDKeyAuthorizer`;
-5. reject the owner value if resolution fails;
-6. cache a successful changed binding while preserving the current `:active` value.
+2. verify the signer against the current `DIDKeyAuthorizer` authority view;
+3. reject the owner value if authorisation fails;
+4. cache a successful changed binding while preserving the current `:active` value.
+
+A cached key is useful metadata, not authority. It must not bypass subsequent
+rotation or revocation. Resolution may itself be cached against an immutable,
+authenticated snapshot; refresh that snapshot outside atomic merges.
 
 The cache is part of the target's whole LWW record. Updating it must begin from the
 current record so it cannot accidentally reverse a concurrent follow or unfollow.

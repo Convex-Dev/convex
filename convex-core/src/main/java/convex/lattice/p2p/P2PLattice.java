@@ -18,7 +18,7 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.LocalLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
-import convex.lattice.generic.OwnerLattice;
+import convex.lattice.generic.OwnerMapLattice;
 
 /**
  * Helper for the {@code :p2p} lattice region — peer-to-peer node discovery.
@@ -61,8 +61,8 @@ public class P2PLattice {
 	/**
 	 * OwnerLattice for {@code :nodes} — each node owns a signed LWW NodeInfo map.
 	 */
-	public static final OwnerLattice<ACell> NODES_LATTICE =
-		OwnerLattice.create(LWWLattice.INSTANCE);
+	public static final OwnerMapLattice<ACell,ACell> NODES_LATTICE =
+		OwnerMapLattice.create(LWWLattice.INSTANCE,(owner,key) -> key.equals(owner));
 
 	/**
 	 * KeyedLattice for the {@code :p2p} region, containing {@code :nodes}.
@@ -75,7 +75,7 @@ public class P2PLattice {
 	 *
 	 * <p>The timestamp is supplied by the caller — the driving (merging or test) process —
 	 * rather than read from the system clock here; a node stamps its published NodeInfo from
- * its {@code LatticeContext}; publication policy belongs to the P2P application
+ * its supplied clock; publication policy belongs to the P2P application
  * layer rather than the generic lattice transport.</p>
 	 *
 	 * @param transports Public transport URIs, or empty for an outbound-only node

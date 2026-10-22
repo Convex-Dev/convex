@@ -203,34 +203,17 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 			super(valueNode);
 		}
 
+		/** Validate only changed foreign records through the standard map merge. */
 		@Override
-		public AHashMap<ACell,ACell> merge(AHashMap<ACell,ACell> own,
-				AHashMap<ACell,ACell> other) {
-			return super.merge(own,sanitise(other));
-		}
-
-		@Override
-		public AHashMap<ACell,ACell> merge(convex.lattice.LatticeContext context,
-				AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
-			return super.merge(context,own,sanitise(other));
-		}
-
-		private AHashMap<ACell,ACell> sanitise(AHashMap<ACell,ACell> other) {
-			if (other==null) return null;
-			AHashMap<ACell,ACell> clean=Maps.empty();
-			for (var entry:other.entrySet()) {
-				if (!(entry.getKey() instanceof convex.core.data.AString did)
-						|| !convex.auth.did.DID.isCanonicalBase(did)) continue;
-				ACell value=entry.getValue();
-				if (!(value instanceof AHashMap<?,?> record)) continue;
-				AHashMap<Keyword,ACell> typed=(AHashMap<Keyword,ACell>)record;
-				if (!(typed.get(SocialPost.ACTIVE) instanceof CVMBool)
-						|| !(typed.get(LWWLattice.KEY_TIMESTAMP) instanceof CVMLong)) continue;
-				ACell cached=typed.get(Follows.KEY_ACCOUNT_KEY);
-				if (cached!=null && convex.core.data.AccountKey.parse(cached)==null) continue;
-				clean=clean.assoc(entry.getKey(),value);
-			}
-			return clean;
+		protected boolean checkEntry(ACell key,ACell value) {
+			if (!(key instanceof convex.core.data.AString did)
+					|| !convex.auth.did.DID.isCanonicalBase(did)) return false;
+			if (!(value instanceof AHashMap<?,?> record)) return false;
+			AHashMap<Keyword,ACell> typed=(AHashMap<Keyword,ACell>)record;
+			if (!(typed.get(SocialPost.ACTIVE) instanceof CVMBool)
+					|| !(typed.get(LWWLattice.KEY_TIMESTAMP) instanceof CVMLong)) return false;
+			ACell cached=typed.get(Follows.KEY_ACCOUNT_KEY);
+			return cached==null || convex.core.data.AccountKey.parse(cached)!=null;
 		}
 	}
 }

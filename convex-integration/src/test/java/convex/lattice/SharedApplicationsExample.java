@@ -49,11 +49,6 @@ public final class SharedApplicationsExample {
 	public static final AKeyPair ALICE=AKeyPair.createSeeded(7301);
 	public static final AKeyPair BOB=AKeyPair.createSeeded(7302);
 
-	/** Signs as {@code user} at a fixed logical time, verifying owners by the standard did:key rule. */
-	static LatticeContext policy(AKeyPair user,long time) {
-		return LatticeContext.create(CVMLong.create(time),user,DIDKeyAuthorizer.CONVEX::verifiesOwner);
-	}
-
 	/** A node record for the P2P region. */
 	static AHashMap<Keyword,ACell> nodeInfo(String name,long time) {
 		return convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.empty(),
@@ -66,8 +61,8 @@ public final class SharedApplicationsExample {
 
 		SocialApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long time) {
 			super(host);
-			setContext(policy(user,time));
-			social=region(Social.KEY_SOCIAL,Social.connect(this).fork());
+			social=region(Social.KEY_SOCIAL,Social.connect(cursor().path(Social.KEY_SOCIAL),
+				DIDKeyAuthorizer.CONVEX,(owner,value) -> user.signData(value),() -> CVMLong.create(time)).fork());
 		}
 
 		/** A user's feed in the staged region; edits stay private until {@link #sync()}. */
@@ -81,7 +76,7 @@ public final class SharedApplicationsExample {
 		}
 
 		public P2PUser p2p(AKeyPair user) {
-			return P2PUser.create(this,user.getAccountKey());
+			return P2PUser.create(this,user.getAccountKey(),(owner,value) -> user.signData(value));
 		}
 	}
 
@@ -117,7 +112,6 @@ public final class SharedApplicationsExample {
 				BOB::signData,() -> CVMLong.create(time));
 			// Choose a private publication boundary explicitly; the application retains it.
 			files=host.addApplication(new DLFSApplication(host,Keywords.FS,region.fork()));
-			files.setContext(policy(BOB,time)); // P2P authoring policy; DLFS has its own explicit signer.
 
 			var config=NodeConfig.localNetwork();
 			server=new NodeServer<>(host,config);

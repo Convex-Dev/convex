@@ -1,11 +1,14 @@
 package convex.social;
 
+import java.util.function.Supplier;
+
 import convex.auth.did.DID;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -29,12 +32,15 @@ import convex.lattice.cursor.StampedCursor;
  * @see Social#user(AccountKey)
  */
 public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> implements TransactionalComponent<Index<Keyword, ACell>,SocialUser> {
+	private final Supplier<CVMLong> clock;
+
 
 	private final AString ownerDid;
 
-	SocialUser(AForkableCursor<Index<Keyword, ACell>> cursor, AString ownerDid) {
+	SocialUser(AForkableCursor<Index<Keyword, ACell>> cursor, AString ownerDid, Supplier<CVMLong> clock) {
 		super(cursor);
 		this.ownerDid = ownerDid;
+		this.clock=clock;
 	}
 
 	/**
@@ -43,7 +49,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return configured(new Feed(cursor().withDefault(Index.none()).path(SocialLattice.KEY_FEED),ownerDid));
+		return new Feed(cursor().withDefault(Index.none()).path(SocialLattice.KEY_FEED),ownerDid,clock);
 	}
 
 	/**
@@ -57,8 +63,8 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	public Follows follows() {
 		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
 			cursor().withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWING),
-			getContext()::currentTimestamp,(value,time) -> value.assoc(convex.lattice.generic.LWWLattice.KEY_TIMESTAMP,time));
-		return configured(new Follows(following.withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWS)));
+			clock,(value,time) -> value.assoc(convex.lattice.generic.LWWLattice.KEY_TIMESTAMP,time));
+		return new Follows(following.withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWS),clock);
 	}
 
 	/**
@@ -70,12 +76,13 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return isolated working copy for this user
 	 */
 	public SocialUser fork() {
-		return configured(new SocialUser(this));
+		return new SocialUser(this);
 	}
 
 	private SocialUser(SocialUser source) {
 		super(source);
 		this.ownerDid=source.ownerDid;
+		this.clock=source.clock;
 	}
 
 	// TODO: public Profile profile() { ... }
@@ -96,12 +103,12 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 
 	@Override
 	public SocialUser withCursor(AForkableCursor<Index<Keyword, ACell>> cursor) {
-		return configured(new SocialUser(cursor,ownerDid));
+		return new SocialUser(cursor,ownerDid,clock);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
 	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
-		return SocialLattice.INSTANCE.merge(getContext(),own,other);
+		return SocialLattice.INSTANCE.merge(own,other);
 	}
 }

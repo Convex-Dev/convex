@@ -58,7 +58,8 @@ public abstract class AKeyedLattice<K extends ACell, M extends AMap<K, ACell>> e
 	protected abstract int indexOfKey(ACell externalKey);
 
 	/**
-	 * Returns a new lattice with an additional key/child-lattice pair.
+	 * Returns a new lattice with a key/child-lattice pair, replacing an existing
+	 * rule for that key. Navigation and merge always use the same single rule.
 	 *
 	 * @param key Canonical key for the new section
 	 * @param lattice Child lattice for the new section's values
@@ -67,8 +68,13 @@ public abstract class AKeyedLattice<K extends ACell, M extends AMap<K, ACell>> e
 	public AKeyedLattice<K, M> addLattice(K key, ALattice<?> lattice) {
 		ArrayList<ALattice<?>> newLattices = new ArrayList<>(this.lattices);
 		ArrayList<K> newKeys = new ArrayList<>(this.keys);
-		newLattices.add(lattice);
-		newKeys.add(key);
+		int existing=indexOfKey(key);
+		if (existing<0) {
+			newLattices.add(lattice);
+			newKeys.add(key);
+		} else {
+			newLattices.set(existing,lattice);
+		}
 		return construct(newLattices, newKeys);
 	}
 

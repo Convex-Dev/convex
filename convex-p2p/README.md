@@ -59,32 +59,36 @@ tests.
 
 ### Owner binding
 
-Both populated regions are `OwnerLattice`s keyed by `AccountKey`, so a user can only
-write their own slot. Three points are pinned by tests:
+Both populated regions use `OwnerMapLattice` with direct-key verification bound
+to the lattice instance. Both context-free and context-aware merge require the
+signature's public key to equal the owner key. A permissive context cannot change
+that rule. Identity and node records use whole-value LWW: a relay selects an
+existing envelope, retaining its signature without needing any private key.
 
-**One authorisation rule, applied at both boundaries.** `LatticeContext.signAs` decides
-whether this node may author a value for an owner, and it is the same rule
-`LatticeContext.verifyOwner` applies to data arriving from a peer. An owner that is an
-`AccountKey` requires that key; an indirect owner (Address, DID) is resolved by the
-installed owner verifier, and stays lenient when there is none.
+Local writes receive an explicit owner-aware signer, `(owner, value) -> signed`.
+One signer may use a wallet or keystore to serve several identities. Returning
+null means an owner is unavailable; a local write then fails without changing
+state. Signer output must cover the requested value, have a valid signature and
+pass the same owner rule as incoming delivery.
 
-**Owner paths request their signer on write.** A direct local write through a signed
-owner path asks the installed `LatticeContext` for a signer authorised for that owner.
-A key-store-backed policy can supply any accessible identity, whether or not it is the
-primary key; without one the write throws rather than storing a slot no peer would
-accept.
+`P2PApplication.connect(root, host, ownKey, signer, clock, didAuthoriser)` supplies
+the node's public identity independently of signing capability. `NodeDirectory`
+uses that public key and the supplied `Supplier<CVMLong>` to publish node records.
+`P2PUser.create(application, owner, signer)` opens explicit authoring views;
+the two-argument overload is a read view. `P2PApplication.p2p(owner)` uses the
+application's configured signer.
 
-**A merge never fails over an owner you cannot author.** Most merges select one of the
-two signed values and need no signature. When the inner lattice synthesises a genuinely
-new value, `SignedLattice` signs it as the owner if it can and otherwise keeps the own
-value — so merging a peer's data converges the owners this node holds keys for and
-leaves the others to their owners, instead of aborting the whole merge.
+The application binds the same DID authoriser to social delivery and local social
+views. Registering multiple local DIDs returns one shared `Social` component whose
+signer looks up each DID's key. Key replacement is observed by existing views.
+Cached follow keys are metadata; they cannot bypass current authority after
+rotation or revocation. A relay accepts signed social indexes without requiring
+every field to match this client's schema.
 
-**The two-argument merge skips the check entirely.** `merge(own, other)` does not verify
-the signer against the owner key — only the context-aware overload does. Every real path
-is safe (every cursor merge a component or host performs passes a context, and `LatticeContext.EMPTY` still
-triggers the `AccountKey` fast path), but don't reach for a raw `ALattice.merge(a, b)`
-on these regions.
+`LatticeContext` remains only at the optional supplied-root-lattice adapter, for
+policies such as DLFS future timestamp admission. `P2PNode` supplies that adapter
+with the configured skew and no signing keys. Social and P2P domain views do not
+inherit authoring capabilities or mutation clocks from it.
 
 ## A rollup package
 
@@ -284,7 +288,7 @@ me.identity().sync();                 // merge this working path
 
 me.node().cursor()                    // independent node-record component
 
-P2PUser draft = me.fork();            // batch edits, isolated
+P2PUser draft = me.fork();            // identity edits, isolated
 draft.cursor().set(...);
 draft.sync();                         // merged back under LWW
 node.getApplication().sync();         // publish the complete root
@@ -292,8 +296,9 @@ node.getApplication().sync();         // publish the complete root
 
 Each component cursor is scoped to one user and one region; no other user's data is
 reachable through it. `node.p2p(someoneElse)` is a readable facade over their
-published components; writing it is a mistake the lattice does not need to prevent
-(see [Owner binding](#owner-binding) above).
+published components. Writes require an authorised signer for that owner
+(see [Owner binding](#owner-binding) above). A facade fork isolates identity edits;
+use `me.node().fork()` to stage the independent node-record component.
 
 Or run a node standalone:
 

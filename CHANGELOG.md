@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Social components take an owner-aware signer, DID authoriser and timestamp supplier; one signer can serve multiple DIDs and key rotation reaches existing views. P2P identity and node registries bind direct-key ownership independently of context, and local authoring takes an explicit multi-owner signer. Registered social users share one component. Relay admission preserves unfamiliar signed social fields and rechecks current DID authority instead of treating cached keys as continuing authority.
+
 - DLFS components take explicit signer functions and timestamp suppliers instead of inheriting authoring policy from `LatticeContext`. Applications without a signer act as relays. Custom owner identities use one verifier for incoming envelopes and local signatures; forks and transaction views retain the same policies. Owner lattices also expose `mergeAndSign` for explicit authoring of combined values.
 
 - `DLFSApplication` now composes registered regions without a root `ALattice`. Construct it with a host (default `:fs`), a path of region keys, or an explicitly shared/staged `DLFSRegion`; the old lattice-taking `connect` factory and `region()` override are removed. DLFS and social regions handle incoming owner envelopes directly, and staged regions reconcile incoming data without publishing pending edits. DLFS server entry points register their application before transport starts and accept only their configured DLFS region.
@@ -80,6 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CVM map operations recognise only known maplike records; generic CAD3 records no longer qualify as maps solely through their Java representation.
 
 ### Fixed
+
+- Replacing a keyed lattice region with `addLattice` now installs one rule for both navigation and merge, rather than leaving the old merge active alongside the new rule.
 
 - `SignedComponent` checks owner authorisation for context-verified owner lattices before accepting an incoming payload, including delivery through a keyed region.
 - A staged component whose keyed lattice declares only some of a container's keys no longer overwrites or removes the other keys when it publishes; undeclared keys adopt the destination. This holds at any level, including an application staged at the host root.

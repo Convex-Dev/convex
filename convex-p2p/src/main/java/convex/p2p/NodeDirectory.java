@@ -10,7 +10,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -64,10 +63,9 @@ final class NodeDirectory {
 		this.application=application;
 	}
 
-	/** This node's key, from the application's signing policy, or null for a keyless node. */
+	/** This node's key, supplied explicitly by the application, or null for a keyless node. */
 	private AccountKey ownKey() {
-		AKeyPair keyPair=application.getContext().getSigningKey();
-		return (keyPair==null) ? null : keyPair.getAccountKey();
+		return application.ownKey();
 	}
 
 	/** Bounds the number of remote records indexed; a node sets this to its peer bound. */
@@ -119,7 +117,7 @@ final class NodeDirectory {
 		AString type=Strings.create("Convex Lattice Node");
 		String currentVersion=Utils.getVersion();
 		AString version=Strings.create(currentVersion==null ? "unknown" : currentVersion);
-		long timestamp=application.getContext().currentTimestampValue();
+		long timestamp=application.clock().get().longValue();
 		AHashMap<Keyword,ACell> info=convex.lattice.p2p.P2PLattice.createNodeInfo(
 			transports,type,version,null,pointsOfPresence,relay,timestamp);
 

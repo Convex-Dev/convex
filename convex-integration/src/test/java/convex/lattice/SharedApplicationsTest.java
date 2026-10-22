@@ -112,7 +112,7 @@ public class SharedApplicationsTest {
 			node.social.feed(ALICE).post("A post");
 			Files.writeString(node.files.drives(BOB.getAccountKey()).createDrive("home")
 				.fileSystem().getPath("/hello.txt"),"A file");
-			P2PUser.create(node.files,BOB.getAccountKey()).node().setNodeInfo(nodeInfo("files node",100));
+			P2PUser.create(node.files,BOB.getAccountKey(),(owner,value) -> BOB.signData(value)).node().setNodeInfo(nodeInfo("files node",100));
 			assertNotNull(node.social.p2p(BOB).node().getNodeInfo(),"the P2P region is live and shared");
 			assertNull(node.root().get(Social.KEY_SOCIAL));
 			assertNull(node.root().get(Keywords.FS));

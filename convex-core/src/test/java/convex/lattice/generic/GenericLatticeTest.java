@@ -33,6 +33,20 @@ import convex.lattice.LatticeContext;
 import convex.lattice.LatticeTest;
 
 public class GenericLatticeTest {
+
+	@Test public void replacingARegionRuleCannotLeaveTheOldMergeActive() {
+		var key=Keyword.intern("region");
+		var original=KeyedLattice.create(key,MaxLattice.INSTANCE);
+		var blocked=ReservedLattice.create("Not served");
+		var replaced=original.addLattice(key,blocked);
+		Index<Keyword,ACell> own=Index.of(key,CVMLong.ONE);
+		Index<Keyword,ACell> incoming=Index.of(key,CVMLong.TWO);
+		assertSame(blocked,replaced.path(key));
+		assertSame(own,replaced.merge(own,incoming));
+		assertSame(own,replaced.merge(LatticeContext.EMPTY,own,incoming));
+		assertEquals(incoming,original.merge(own,incoming));
+		assertSame(MaxLattice.INSTANCE,original.path(key));
+	}
 	
 	AKeyPair KP1 = AKeyPair.createSeeded(56756785);
 	AKeyPair KP2 = AKeyPair.createSeeded(756778);

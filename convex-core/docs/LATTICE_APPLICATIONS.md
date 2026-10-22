@@ -712,20 +712,22 @@ host.addApplication(LatticeApplication.live(P2PLattice.ROOT, host));
 
 final class SocialApp extends AKeyedRegions {
     final Social social;
-    SocialApp(LatticeHost<Index<Keyword, ACell>> host, LatticeContext policy) {
+    SocialApp(LatticeHost<Index<Keyword, ACell>> host, AKeyPair keyPair) {
         super(host);
-        setContext(policy);
-        social = region(Social.KEY_SOCIAL, Social.connect(this).fork());
+        social = region(Social.KEY_SOCIAL, Social.connect(cursor().path(Social.KEY_SOCIAL),
+            DIDKeyAuthorizer.CONVEX, (owner, value) -> keyPair.signData(value),
+            Utils::getCurrentTimestampCell).fork());
     }
 }
 
-var socialApp = host.addApplication(new SocialApp(host, socialPolicy));
+var socialApp = host.addApplication(new SocialApp(host, socialKeyPair));
 var files = DLFSRegion.connect(host.cursor().path(Keywords.FS), store,
     fileKeyPair::signData, Utils::getCurrentTimestampCell);
 var filesApp = host.addApplication(new DLFSApplication(host, Keywords.FS, files.fork()));
 
 socialApp.social.user(ownerKey).feed().post("A staged post");
-P2PUser.create(socialApp, ownerKey).node().setNodeInfo(nodeInfo); // live P2P state
+P2PUser.create(socialApp, ownerKey, (owner, value) -> socialKeyPair.signData(value))
+    .node().setNodeInfo(nodeInfo); // live P2P state
 socialApp.sync(); // publishes :social, preserving :fs and :p2p
 filesApp.sync();  // publishes the exact region returned by filesApp.dlfs()
 host.sync();     // persistence and propagation are separate

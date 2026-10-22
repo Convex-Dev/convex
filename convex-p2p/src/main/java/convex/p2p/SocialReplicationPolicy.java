@@ -30,22 +30,24 @@ final class SocialReplicationPolicy {
 
 	private final P2PApplication application;
 	private final DIDKeyAuthorizer authorizer;
+	private final Social social;
 	private final Set<AString> localUsers=ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<AString,AKeyPair> localSigners=
 		new ConcurrentHashMap<>();
 	private final Set<AString> pins=ConcurrentHashMap.newKeySet();
-	private final ConcurrentHashMap<AString,AccountKey> validatedKeys=
-		new ConcurrentHashMap<>();
 
 	SocialReplicationPolicy(P2PApplication application,DIDKeyAuthorizer authorizer) {
 		this.application=application;
 		this.authorizer=authorizer;
+		social=Social.connect(application.cursor().withDefault(Index.none()).path(Social.KEY_SOCIAL),authorizer,
+			(owner,value) -> {
+				AKeyPair key=localSigners.get(owner);
+				return key==null?null:key.signData(value);
+			},application.clock());
 	}
 
-	/** The DID resolution policy social admission verifies against. */
-	DIDKeyAuthorizer authorizer() {
-		return authorizer;
-	}
+	/** Shared multi-DID authoring view; key rotation is observed by existing user views. */
+	Social social() { return social; }
 
 	void addLocalUser(AString did,AKeyPair keyPair) {
 		requireDID(did);
@@ -56,7 +58,6 @@ final class SocialReplicationPolicy {
 		}
 		localUsers.add(did);
 		localSigners.put(did,keyPair);
-		validatedKeys.put(did,signer);
 	}
 
 	void pin(AString did) {
@@ -114,20 +115,12 @@ final class SocialReplicationPolicy {
 	private boolean validOwnerSlot(AString did,ACell value,
 			boolean cacheValidatedSigner) {
 		if (!(value instanceof SignedData<?> signed) || !signed.checkSignature()) return false;
-		if (!convex.social.SocialLattice.isCanonicalState(signed.getValue())) return false;
+		// Relaying an owner's envelope does not require understanding all its fields.
+		if (!(signed.getValue() instanceof Index<?,?>)) return false;
 		AccountKey signer=signed.getAccountKey();
-		AccountKey cached=validatedKeys.get(did);
-		if (cached!=null && signer.equals(cached)) {
-			if (cacheValidatedSigner) cacheFollowKey(did,signer);
-			return true;
-		}
-		if (hasCachedFollowKey(did,signer)) {
-			validatedKeys.put(did,signer);
-			return true;
-		}
+		// A remembered signer is a hint, not authority after rotation or revocation.
 		if (!authorizer.safeAuthorises(did,signer)) return false;
 		if (cacheValidatedSigner) cacheFollowKey(did,signer);
-		validatedKeys.put(did,signer);
 		return true;
 	}
 
@@ -139,11 +132,7 @@ final class SocialReplicationPolicy {
 
 	private void cacheFollowKey(AString target,AccountKey signer) {
 		boolean changed=false;
-		for (var entry:localSigners.entrySet()) {
-			AString localDid=entry.getKey();
-			Social social=Social.connect(application,
-				convex.lattice.LatticeContext.create(
-					null,entry.getValue(),authorizer::verifiesOwner));
+		for (AString localDid:localSigners.keySet()) {
 			Follows follows=social.user(localDid).follows();
 			AccountKey existing=follows.getCachedAccountKey(target);
 			if (!follows.isFollowing(target)
@@ -154,17 +143,6 @@ final class SocialReplicationPolicy {
 		// A delivery may be a replay which does not otherwise change its target cursor, so
 		// the node's post-merge sync would not run: the application publishes its edit.
 		if (changed) application.syncHost();
-	}
-
-	private boolean hasCachedFollowKey(AString target,AccountKey signer) {
-		Social social=Social.connect(application);
-		for (AString local:localUsers) {
-			Follows follows=social.user(local).follows();
-			if (!follows.isFollowing(target)) continue;
-			AccountKey cached=follows.getCachedAccountKey(target);
-			if (cached!=null && signer.equals(cached)) return true;
-		}
-		return false;
 	}
 
 	private static void requireDID(AString did) {

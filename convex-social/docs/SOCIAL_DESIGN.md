@@ -40,8 +40,8 @@ social user. Use `did:convex` or `did:web` when key rotation is required.
 
 Each owner has one signed social value, but that value is not a whole-value LWW
 register. Feed, profile and following merge independently. Concurrent edits from
-separate authorised devices therefore merge structurally. An authorised local
-context re-signs a synthesised merged value; a relay without an authorised owner
+separate authorised devices therefore merge structurally. An explicit owner-aware
+signer re-signs a synthesised merged value; a relay without an authorised owner
 key can retain an existing valid version but cannot forge a synthesis.
 
 The following encoding and merge rules are specified in
@@ -69,12 +69,14 @@ logical retention is defined by the projected root.
 Every admitted owner slot must:
 
 1. be a complete value within the configured inbound size bound;
-2. have the canonical signed social-state shape;
+2. contain a signed social index, without requiring known schemas for every field;
 3. have a valid Ed25519 signature;
 4. use a signer authorised for the path DID.
 
-The policy first reuses a matching validated signer cache. If the signer changes,
-it resolves the DID through `DIDKeyAuthorizer` and rejects the value on failure.
+The policy checks the current `DIDKeyAuthorizer` authority view and rejects the
+value on failure. A remembered key cannot override rotation or revocation.
+An authoriser may cache bindings for an immutable authenticated snapshot, refreshed
+outside merge callbacks. Unfamiliar fields remain covered by the original signature.
 
 ## Network trust boundary
 

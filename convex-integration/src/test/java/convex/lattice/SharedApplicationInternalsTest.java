@@ -6,13 +6,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -25,9 +25,9 @@ import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Index;
@@ -37,18 +37,18 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
-import convex.core.lang.RT;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDrive;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.ALattice;
-import convex.lattice.generic.KeyedLattice;
-import convex.lattice.generic.SignedLattice;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.generic.KeyedLattice;
+import convex.lattice.generic.SignedLattice;
 import convex.node.LatticeFilter;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
@@ -58,8 +58,8 @@ import convex.node.NodeServer;
 import convex.node.RelayHost;
 import convex.p2p.P2PApplication;
 import convex.p2p.P2PLattice;
-import convex.p2p.P2PUser;
 import convex.p2p.P2PNodeRecord;
+import convex.p2p.P2PUser;
 import convex.social.Social;
 import convex.social.SocialPost;
 import convex.social.SocialUser;
@@ -106,7 +106,8 @@ public class SharedApplicationInternalsTest {
 			super(HOST_ROOT,host);
 			if (socialApp) {
 				socialState=owned(host,context(SOCIAL_KEY,signing),Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
-				social=Social.connect(this,socialState.getContext()).user(SOCIAL_KEY.getAccountKey()).withCursor(socialState.cursor());
+				social=Social.connect(cursor().path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+					(owner,value) -> socialState.getContext().signAs(owner,value),() -> socialState.getContext().currentTimestamp()).user(SOCIAL_KEY.getAccountKey()).withCursor(socialState.cursor());
 				files=null;
 				fileState=null;
 			} else {
@@ -161,7 +162,7 @@ public class SharedApplicationInternalsTest {
 		// Distinct post keys are application policy; both applications author the
 		// same signed owner subtree through separate working states.
 		second.socialState.setContext(second.socialState.getContext().withTimestamp(CVMLong.create(200)));
-		second.social.setContext(second.socialState.getContext());
+		// The supplied clock reads the signed draft policy dynamically.
 		Blob a=first.social.feed().post("First application");
 		Blob b=second.social.feed().post("Second application");
 		first.sync();
@@ -241,9 +242,10 @@ public class SharedApplicationInternalsTest {
 			this(SOCIAL_ROOT,host.cursor(),context(SOCIAL_KEY));
 		}
 		SocialWithP2P(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor,LatticeContext context) {
-			super(lattice,cursor);
+			super(lattice,cursor,(owner,value) -> context.signAs(owner,value),context::currentTimestamp);
 			setContext(context);
-			social=Social.connect(this);
+			social=Social.connect(cursor.path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+				(owner,value) -> context.signAs(owner,value),context::currentTimestamp);
 		}
 		@Override public SocialWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			return new SocialWithP2P(getLattice(),cursor,getContext());
@@ -265,7 +267,7 @@ public class SharedApplicationInternalsTest {
 		@Override public FilesWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			return new FilesWithP2P(cursor,store(),getContext());
 		}
-		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner); }
+		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> getContext().signAs(key,value)); }
 	}
 
 	/** Explicit allow-list projection; a selective lattice merge is not projection. */
@@ -398,7 +400,8 @@ public class SharedApplicationInternalsTest {
 					catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
 				}
 			}));
-			var feed=Social.connect(f.social,f.social.getContext()).user(SOCIAL_KEY.getAccountKey()).feed();
+			var feed=Social.connect(f.social.cursor().path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
+				(owner,value) -> f.social.getContext().signAs(owner,value),f.social.getContext()::currentTimestamp).user(SOCIAL_KEY.getAccountKey()).feed();
 			var beforePost=f.node.getCursor().get();
 			try (var executor=Executors.newSingleThreadExecutor()) {
 				var posting=executor.submit(() -> feed.post("First post, delayed before installation"));

@@ -1,5 +1,7 @@
 package convex.p2p;
 
+import java.util.function.BiFunction;
+
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -7,9 +9,9 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.SignedData;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -41,10 +43,10 @@ import convex.lattice.cursor.AForkableCursor;
  * <h2>Writing an owned area</h2>
  *
  * <p>{@code p2p(someoneElse)} is always a valid read view. A write succeeds only when
- * the context signing policy can supply a signer authorised for that user — the same
+ * the explicit signer can supply a signer authorised for that user — the same
  * rule {@code OwnerLattice} applies to data arriving on merge, so a write that would
  * be rejected by every peer fails here instead of entering local state. A wallet or
- * key-store-backed context can therefore manage several identities without treating
+ * key-store-backed signer can therefore manage several identities without treating
  * one as primary.
  */
 public class P2PUser {
@@ -61,25 +63,25 @@ public class P2PUser {
 
 	/**
 	 * Creates a user facade over an application whose root lattice includes the P2P
-	 * regions. The application navigates to the identity and node-record slots and
-	 * supplies the signing policy; a policy without a signer for this user yields a
-	 * read view.
+	 * regions. This overload opens a read view without signing capability.
 	 *
 	 * @param application Application at the root whose lattice declares the P2P regions
 	 * @param userKey P2P user key
 	 * @return P2P user facade
 	 */
-	public static P2PUser create(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey) {
+	public static P2PUser create(ALatticeApplication<Index<Keyword,ACell>> application,AccountKey userKey) {
+		return create(application,userKey,null);
+	}
+
+	/** Opens both owned slots with one owner-aware signer, which may serve multiple keys. */
+	public static P2PUser create(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey,
+			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		if (application==null) throw new IllegalArgumentException("Application must not be null");
 		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		P2PUser user=new P2PUser(
-			new P2PIdentity(P2PApplication.identitySlot(application,userKey),userKey),
-			new P2PNodeRecord(P2PApplication.nodeSlot(application,userKey),userKey),
+		return new P2PUser(
+			new P2PIdentity(P2PApplication.identitySlot(application,userKey,signer),userKey),
+			new P2PNodeRecord(P2PApplication.nodeSlot(application,userKey,signer),userKey),
 			userKey);
-		LatticeContext context=application.getContext();
-		user.identity.setContext(context);
-		user.node.setContext(context);
-		return user;
 	}
 
 	/** Returns the path-specific identity component. */
@@ -135,7 +137,7 @@ public class P2PUser {
 	 * to push it up to the lattice root.
 	 *
 	 * @param identity IdentityInfo map, typically from {@link P2PLattice#createIdentity}
-	 * @throws IllegalStateException if the user's signer is unavailable in context
+	 * @throws IllegalStateException if the user's signer is unavailable
 	 */
 	public void setIdentity(AHashMap<Keyword, ACell> identity) {
 		this.identity.setIdentity(identity);
@@ -148,7 +150,7 @@ public class P2PUser {
 	 * @param name Display name (may be null)
 	 * @param nodes Node keys this user operates (may be null)
 	 * @param timestamp Timestamp in millis, used for LWW ordering
-	 * @throws IllegalStateException if the user's signer is unavailable in context
+	 * @throws IllegalStateException if the user's signer is unavailable
 	 */
 	public void setIdentity(AString name, AVector<ACell> nodes, long timestamp) {
 		identity.setIdentity(name,nodes,timestamp);

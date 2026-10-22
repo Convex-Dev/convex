@@ -89,6 +89,41 @@ work.feed().post("Post 2");
 work.sync();
 ```
 
+One component can author several DIDs. Supply an owner-aware signer and a clock;
+keep key resolution separate from the rule which authorises those keys:
+
+```java
+var keys = new ConcurrentHashMap<ACell, AKeyPair>();
+keys.put(aliceDid, aliceKeyPair);
+keys.put(bobDid, bobKeyPair);
+
+Social social = Social.create(authoriser, (did, value) -> {
+    AKeyPair key = keys.get(did);
+    return key == null ? null : key.signData(value);
+}, Utils::getCurrentTimestampCell);
+
+social.user(aliceDid).feed().post("Alice's post");
+social.user(bobDid).feed().post("Bob's post");
+```
+
+`authoriser` is a `DIDKeyAuthorizer` using an authenticated authority view.
+`DIDKeyAuthorizer.CONVEX` handles self-certifying `did:key` identities; indirect
+DIDs require an explicit resolver. The signer may use a wallet, keystore or signing
+service instead of a map. Returning null means it cannot author that owner.
+Every signature must cover the requested value and pass the same DID rule as
+incoming delivery. A signing exception aborts the atomic edit or fork sync.
+
+Forks, user views and transaction views retain these functions, so existing views
+can observe key rotation through the supplied resolver. Callbacks must support
+concurrent use and retries; refresh external authority outside atomic updates.
+A null signer creates a relay, which reuses existing envelopes and keeps its own
+value when synthesis would need a new signature. No component inherits signing
+authority or timestamps from `LatticeContext`.
+
+For an embedded region, pass the cursor directly to
+`Social.connect(cursor, authoriser, signer, clock)`. The no-policy
+`Social.connect(cursor)` and `Social.connect(application)` overloads are relay views.
+
 ### Node integration
 
 Convex Social is an **application layered on P2P infrastructure**. It supplies one
@@ -141,6 +176,9 @@ application.sync();
 `P2PNode.social` also registers the DID as local, so its own slot and direct active
 follows form the default replicated social view. `Social.connect(parent, keyPair)` is
 available for lower-level hosting when follow-driven P2P policy is not required.
+Registering several DIDs on one P2P application returns the same social component;
+its signer selects each registered DID's key. Registering a replacement authorised
+key updates existing views without replacing the DID.
 
 ## Design
 

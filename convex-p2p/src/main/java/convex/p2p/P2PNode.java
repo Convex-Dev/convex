@@ -24,8 +24,8 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Index;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -34,18 +34,18 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
+import convex.core.util.Utils;
 import convex.etch.EtchStore;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
-import convex.node.NodeConfig;
-import convex.node.NodeServer;
-import convex.node.RelayHost;
 import convex.node.LatticeConnectionManager;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
+import convex.node.NodeConfig;
+import convex.node.NodeServer;
+import convex.node.RelayHost;
 import convex.social.Social;
 
 /**
@@ -220,10 +220,11 @@ public class P2PNode implements Closeable {
 			throw new UncheckedIOException("Unable to read the node's retained root",e);
 		}
 		// From the root down, the P2P application owns the lattice and its policy.
-		LatticeContext policy=RelayHost.applySkew(effectiveConfig,
-			LatticeContext.create(null,keyPair,didAuthorizer::verifiesOwner));
-		host.setContext(policy);
-		P2PApplication application=P2PApplication.connect(root,host,policy,didAuthorizer);
+		P2PApplication application=P2PApplication.connect(root,host,
+			keyPair==null?null:keyPair.getAccountKey(),
+			keyPair==null?null:(owner,value) -> keyPair.signData(value),
+			Utils::getCurrentTimestampCell,didAuthorizer);
+		application.setContext(RelayHost.applySkew(effectiveConfig,convex.lattice.LatticeContext.EMPTY));
 		host.configureApplications(List.of(application));
 
 		NodeServer<Index<Keyword, ACell>> server=new NodeServer<>(host,effectiveConfig);

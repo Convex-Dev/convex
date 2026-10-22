@@ -22,10 +22,9 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeContext;
 import convex.lattice.Lattice;
+import convex.lattice.LatticeContext;
 import convex.lattice.generic.KeyedLattice;
-import convex.lattice.generic.OwnerLattice;
 
 public class SocialLatticeTest {
 
@@ -264,7 +263,7 @@ public class SocialLatticeTest {
 		AKeyPair alice = AKeyPair.generate();
 		AKeyPair bob = AKeyPair.generate();
 
-		OwnerLattice<Index<Keyword, ACell>> socialLattice = Social.SOCIAL_LATTICE;
+		var socialLattice = Social.SOCIAL_LATTICE;
 
 		// Alice creates a post
 		AHashMap<Keyword, ACell> alicePost = SocialPost.createPost("Hello from Alice", 1000L);
