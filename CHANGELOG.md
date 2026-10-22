@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `LatticeHost.addApplication(app)` registers and returns an existing root application without rebinding it or publishing state. Applications own region paths; host registration freezes on the first incoming root or path delivery.
+
 - Lattice components expose explicit `checkValue` compatibility diagnostics returning an error reason or nil. Region checks compose existing children, and set components support optional runtime element types. Checks do not run automatically on local edits or publication and may be less strict than merge acceptance.
 
 - `Timestamped` combines atomic timestamping of local edits with whole-record ordering. Its standard map factory handles `:timestamp`, and enclosing signed or staged components share its merge rule. Incoming records retain their timestamps, while no-op edits preserve existing timestamps and signatures.

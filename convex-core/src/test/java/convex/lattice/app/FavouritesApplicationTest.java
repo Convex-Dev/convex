@@ -23,7 +23,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
-import convex.lattice.SingleRegion;
 
 /**
  * Executable contracts for the composition in {@link FavouritesExample}.
@@ -44,9 +43,8 @@ class FavouritesApplicationTest {
 	@Test void compatibilityChecksCandidateWithoutAuthoringIt() {
 		var host=LatticeHost.create();
 		var appClock=new AtomicReference<>(CVMLong.ZERO);
-		var app=new SingleRegion<>(host,FAVOURITES,
-			new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
-		var favourites=app.component().user(ALICE);
+		var app=new FavouritesApp(host,appClock::get);
+		var favourites=app.user(ALICE);
 		var items=Keyword.intern("items");
 		AHashMap<Keyword,ACell> candidate=Maps.of(TIMESTAMP,CVMLong.ONE,items,Sets.of(1,2));
 		assertNull(favourites.checkValue(null));
@@ -70,22 +68,20 @@ class FavouritesApplicationTest {
 			for (boolean atOwner:new boolean[] {false,true}) {
 				var host=LatticeHost.create();
 				var appClock=new AtomicReference<>(CVMLong.ZERO);
-				var app=new SingleRegion<>(host,FAVOURITES,
-					new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
-				host.configureApplications(List.of(app));
+				var app=new FavouritesApp(host,appClock::get);
+				host.addApplication(app);
 				AHashMap<Keyword,ACell> payload=Maps.of(TIMESTAMP,CVMLong.ONE,items,value,extension,Maps.of("version",2));
 				var envelope=CHARLIE.signData(payload);
 				if (atOwner) host.mergeAt(envelope,FAVOURITES,CHARLIE.getAccountKey());
 				else host.merge(Index.of(FAVOURITES,Index.of(CHARLIE.getAccountKey(),envelope)));
 				assertSame(envelope,app.component().get(CHARLIE.getAccountKey()));
-				assertSame(value,app.component().items(CHARLIE.getAccountKey()));
+				assertSame(value,app.items(CHARLIE.getAccountKey()));
 				app.sync();
 
 				var nextHost=LatticeHost.create();
 				var nextClock=new AtomicReference<>(CVMLong.ZERO);
-				var next=new SingleRegion<>(nextHost,FAVOURITES,
-					new FavouritesRegion(nextHost.cursor().path(FAVOURITES),nextClock::get));
-				nextHost.configureApplications(List.of(next));
+				var next=new FavouritesApp(nextHost,nextClock::get);
+				nextHost.addApplication(next);
 				nextHost.merge(host.cursor().get());
 				next.sync();
 				assertSame(envelope,next.component().get(CHARLIE.getAccountKey()));
@@ -98,8 +94,7 @@ class FavouritesApplicationTest {
 	@Test void numericItemEditsPreserveUnfamiliarContent() {
 		var host=LatticeHost.create();
 		var appClock=new AtomicReference<>(CVMLong.ZERO);
-		var app=new SingleRegion<>(host,FAVOURITES,
-			new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
+		var app=new FavouritesApp(host,appClock::get);
 		var region=app.component();
 		var items=Keyword.intern("items");
 		var extension=Keyword.intern("future-field");
@@ -107,7 +102,7 @@ class FavouritesApplicationTest {
 		var members=Sets.<ACell>of(1,"future-id").include(extra);
 		AHashMap<Keyword,ACell> payload=Maps.of(TIMESTAMP,CVMLong.ONE,items,members,extension,extra);
 		region.mergeAt(ALICE.signData(payload),ALICE.getAccountKey());
-		var alice=region.user(ALICE);
+		var alice=app.user(ALICE);
 		appClock.set(CVMLong.TWO);
 		alice.add(2);
 		alice.remove(1);
@@ -124,20 +119,19 @@ class FavouritesApplicationTest {
 	@Test void setOperationsLeaveAnUnfamiliarFieldIntact() {
 		var host=LatticeHost.create();
 		var appClock=new AtomicReference<>(CVMLong.ZERO);
-		var app=new SingleRegion<>(host,FAVOURITES,
-			new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
+		var app=new FavouritesApp(host,appClock::get);
 		var region=app.component();
 		var items=Keyword.intern("items");
 		AHashMap<Keyword,ACell> payload=Maps.of(TIMESTAMP,CVMLong.ONE,items,Maps.of("future","items"));
 		var envelope=ALICE.signData(payload);
 		region.mergeAt(envelope,ALICE.getAccountKey());
-		var alice=region.user(ALICE);
+		var alice=app.user(ALICE);
 		assertThrows(IllegalStateException.class,alice::items);
 		assertThrows(IllegalStateException.class,() -> alice.add(2));
 		assertThrows(IllegalStateException.class,() -> alice.remove(1));
 		assertThrows(IllegalStateException.class,alice.itemSet::clear);
 		assertSame(envelope,region.get(ALICE.getAccountKey()));
-		assertEquals(payload.get(items),region.items(ALICE.getAccountKey()));
+		assertEquals(payload.get(items),app.items(ALICE.getAccountKey()));
 		app.sync();
 		assertSame(envelope,region.get(ALICE.getAccountKey()));
 	}
@@ -152,11 +146,10 @@ class FavouritesApplicationTest {
 		};
 		host.setContext(unexpected);
 		var appClock=new AtomicReference<>(CVMLong.ZERO);
-		var app=new SingleRegion<>(host,FAVOURITES,
-			new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
+		var app=new FavouritesApp(host,appClock::get);
 		app.component().setContext(unexpected);
-		var alice=app.component().user(ALICE);
-		var bob=app.component().user(BOB);
+		var alice=app.user(ALICE);
+		var bob=app.user(BOB);
 		alice.add(10);
 		bob.add(20);
 		alice.add(30);
@@ -175,9 +168,8 @@ class FavouritesApplicationTest {
 	@Test void embeddedSetEditsStampAndSignOnlyWhenItemsChange() {
 		var host=LatticeHost.create();
 		var appClock=new AtomicReference<>(CVMLong.ZERO);
-		var app=new SingleRegion<>(host,FAVOURITES,
-			new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
-		var alice=app.component().user(ALICE);
+		var app=new FavouritesApp(host,appClock::get);
+		var alice=app.user(ALICE);
 		assertTrue(alice.itemSet.isEmpty());
 		assertFalse(alice.itemSet.remove(CVMLong.ONE));
 		alice.itemSet.clear();
@@ -209,9 +201,8 @@ class FavouritesApplicationTest {
 	@Test void directDomainCursorEditsAlsoStampBeforeSigning() {
 		var host=LatticeHost.create();
 		var appClock=new AtomicReference<>(CVMLong.ZERO);
-		var app=new SingleRegion<>(host,FAVOURITES,
-			new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
-		var alice=app.component().user(ALICE);
+		var app=new FavouritesApp(host,appClock::get);
+		var alice=app.user(ALICE);
 		appClock.set(CVMLong.create(123));
 		assertEquals(Maps.empty(),alice.sync(),"Inherited sync reads the same default editing view");
 		assertNull(app.component().get(ALICE.getAccountKey()),"Reading the default view creates no envelope");
@@ -227,10 +218,11 @@ class FavouritesApplicationTest {
 	/** Domain diagnostics do not tighten the separate signed relay contract. */
 	@Test void signedDeliveryPreservesPayloadWithoutRunningDomainChecksOrClock() {
 		var host=LatticeHost.create();
-		var region=new FavouritesRegion(host.cursor().path(FAVOURITES),() -> {
+		var app=new FavouritesApp(host,() -> {
 			throw new AssertionError("Incoming delivery must not author a timestamp");
 		});
-		var alice=region.user(ALICE);
+		var region=app.component();
+		var alice=app.user(ALICE);
 		AHashMap<Keyword,ACell> payload=Maps.of(TIMESTAMP,CVMLong.ONE,
 			Keyword.intern("items"),Maps.of("future","representation"));
 		var envelope=ALICE.signData(payload);
@@ -245,11 +237,10 @@ class FavouritesApplicationTest {
 	@Test void openingTheSameUserTwiceSharesSignedEdits() {
 		var host=LatticeHost.create();
 		var appClock=new AtomicReference<>(CVMLong.ZERO);
-		var app=new SingleRegion<>(host,FAVOURITES,
-			new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
-		host.configureApplications(List.of(app));
-		var first=app.component().user(ALICE);
-		var second=app.component().user(ALICE);
+		var app=new FavouritesApp(host,appClock::get);
+		host.addApplication(app);
+		var first=app.user(ALICE);
+		var second=app.user(ALICE);
 		assertNotSame(first,second,"User handles are distinct, not cached components");
 		appClock.set(CVMLong.create(100));
 		first.add(10);
@@ -259,9 +250,9 @@ class FavouritesApplicationTest {
 		second.add(20);
 		second.remove(10);
 		assertEquals(Sets.of(20),first.items());
-		assertEquals(Sets.of(20),app.component().user(ALICE).items());
+		assertEquals(Sets.of(20),app.user(ALICE).items());
 		assertEquals(Index.<Keyword,ACell>none(),host.cursor().get(),"Only the application decides when to publish to the host");
-		assertEquals(Sets.of(20),app.component().items(ALICE.getAccountKey()));
+		assertEquals(Sets.of(20),app.items(ALICE.getAccountKey()));
 		assertEquals(CVMLong.create(200),app.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
 		assertTrue(app.component().get(ALICE.getAccountKey()).checkSignature());
 		app.sync();
@@ -276,12 +267,11 @@ class FavouritesApplicationTest {
 		try (var executor=Executors.newFixedThreadPool(2)) {
 			var host=LatticeHost.create();
 			var appClock=new AtomicReference<>(CVMLong.ZERO);
-			var app=new SingleRegion<>(host,FAVOURITES,
-				new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
-			host.configureApplications(List.of(app));
+			var app=new FavouritesApp(host,appClock::get);
+			host.addApplication(app);
 			appClock.set(CVMLong.create(100));
-			var first=app.component().user(ALICE);
-			var second=app.component().user(ALICE);
+			var first=app.user(ALICE);
+			var second=app.user(ALICE);
 			var firstWriter=executor.submit(() -> {
 				for (int i=0;i<20;i++) first.add(i);
 			});
@@ -293,7 +283,7 @@ class FavouritesApplicationTest {
 			// Both futures have completed; the timeout bounds failure rather than scheduling the writers.
 			assertEquals(40,first.items().count());
 			assertEquals(first.items(),second.items());
-			assertEquals(first.items(),app.component().items(ALICE.getAccountKey()));
+			assertEquals(first.items(),app.items(ALICE.getAccountKey()));
 			assertTrue(app.component().get(ALICE.getAccountKey()).checkSignature());
 			assertEquals(CVMLong.create(100),app.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
 			assertEquals(Index.<Keyword,ACell>none(),host.cursor().get());
@@ -306,29 +296,26 @@ class FavouritesApplicationTest {
 	@Test void charliesNewerRecordWinsRegardlessOfDeliveryOrder() {
 		var localHost=LatticeHost.create();
 		var localClock=new AtomicReference<>(CVMLong.ZERO);
-		var local=new SingleRegion<>(localHost,FAVOURITES,
-			new FavouritesRegion(localHost.cursor().path(FAVOURITES),localClock::get));
-		localHost.configureApplications(List.of(local));
+		var local=new FavouritesApp(localHost,localClock::get);
+		localHost.addApplication(local);
 		var remoteHost=LatticeHost.create();
 		var remoteClock=new AtomicReference<>(CVMLong.ZERO);
-		var remote=new SingleRegion<>(remoteHost,FAVOURITES,
-			new FavouritesRegion(remoteHost.cursor().path(FAVOURITES),remoteClock::get));
-		remoteHost.configureApplications(List.of(remote));
+		var remote=new FavouritesApp(remoteHost,remoteClock::get);
+		remoteHost.addApplication(remote);
 		var replicaHost=LatticeHost.create();
 		var replicaClock=new AtomicReference<>(CVMLong.ZERO);
-		var replica=new SingleRegion<>(replicaHost,FAVOURITES,
-			new FavouritesRegion(replicaHost.cursor().path(FAVOURITES),replicaClock::get));
-		replicaHost.configureApplications(List.of(replica));
+		var replica=new FavouritesApp(replicaHost,replicaClock::get);
+		replicaHost.addApplication(replica);
 		localClock.set(CVMLong.create(500));
-		var alice=local.component().user(ALICE);
-		var bob=local.component().user(BOB);
+		var alice=local.user(ALICE);
+		var bob=local.user(BOB);
 		alice.add(10);
 		bob.add(20);
 		local.sync();
 		replicaHost.merge(localHost.cursor().get());
 		replica.sync();
 
-		var charlie=remote.component().user(CHARLIE);
+		var charlie=remote.user(CHARLIE);
 		remoteClock.set(CVMLong.create(100));
 		charlie.add(30);
 		charlie.add(40);
@@ -350,12 +337,12 @@ class FavouritesApplicationTest {
 		assertNull(localHost.cursor().get(FAVOURITES,CHARLIE.getAccountKey()),
 			"Incoming merges wait for application publication");
 		assertEquals(local.component().cursor().get(),replica.component().cursor().get());
-		assertEquals(Sets.of(40),local.component().items(CHARLIE.getAccountKey()));
+		assertEquals(Sets.of(40),local.items(CHARLIE.getAccountKey()));
 		assertEquals(remote.component().get(CHARLIE.getAccountKey()),local.component().get(CHARLIE.getAccountKey()),
 			"The application adopts Charlie's original signed record without his private key");
 		assertEquals(CVMLong.create(200),local.component().get(CHARLIE.getAccountKey()).getValue().get(TIMESTAMP));
-		assertEquals(Sets.of(10),local.component().items(ALICE.getAccountKey()));
-		assertEquals(Sets.of(20),local.component().items(BOB.getAccountKey()));
+		assertEquals(Sets.of(10),local.items(ALICE.getAccountKey()));
+		assertEquals(Sets.of(20),local.items(BOB.getAccountKey()));
 		assertTrue(local.component().get(CHARLIE.getAccountKey()).checkSignature());
 		local.sync();
 		replica.sync();
@@ -367,15 +354,13 @@ class FavouritesApplicationTest {
 	@Test void clearingFavouritesIsANewerRecordRatherThanAnAbsentOwner() {
 		var localHost=LatticeHost.create();
 		var localClock=new AtomicReference<>(CVMLong.ZERO);
-		var local=new SingleRegion<>(localHost,FAVOURITES,
-			new FavouritesRegion(localHost.cursor().path(FAVOURITES),localClock::get));
-		localHost.configureApplications(List.of(local));
+		var local=new FavouritesApp(localHost,localClock::get);
+		localHost.addApplication(local);
 		var remoteHost=LatticeHost.create();
 		var remoteClock=new AtomicReference<>(CVMLong.ZERO);
-		var remote=new SingleRegion<>(remoteHost,FAVOURITES,
-			new FavouritesRegion(remoteHost.cursor().path(FAVOURITES),remoteClock::get));
-		remoteHost.configureApplications(List.of(remote));
-		var charlie=remote.component().user(CHARLIE);
+		var remote=new FavouritesApp(remoteHost,remoteClock::get);
+		remoteHost.addApplication(remote);
+		var charlie=remote.user(CHARLIE);
 		remoteClock.set(CVMLong.create(100));
 		charlie.add(30);
 		remote.sync();
@@ -385,7 +370,7 @@ class FavouritesApplicationTest {
 		remote.sync();
 		localHost.merge(remoteHost.cursor().get());
 		localHost.merge(older);
-		assertEquals(Sets.empty(),local.component().items(CHARLIE.getAccountKey()));
+		assertEquals(Sets.empty(),local.items(CHARLIE.getAccountKey()));
 		assertNotNull(local.component().get(CHARLIE.getAccountKey()));
 		assertEquals(CVMLong.create(200),local.component().get(CHARLIE.getAccountKey()).getValue().get(TIMESTAMP));
 		local.sync();
@@ -399,15 +384,13 @@ class FavouritesApplicationTest {
 	@Test void incomingTiesKeepOwnButLocalSameTimeEditsCanPublish() {
 		var localHost=LatticeHost.create();
 		var localClock=new AtomicReference<>(CVMLong.ZERO);
-		var local=new SingleRegion<>(localHost,FAVOURITES,
-			new FavouritesRegion(localHost.cursor().path(FAVOURITES),localClock::get));
-		localHost.configureApplications(List.of(local));
+		var local=new FavouritesApp(localHost,localClock::get);
+		localHost.addApplication(local);
 		var remoteHost=LatticeHost.create();
 		var remoteClock=new AtomicReference<>(CVMLong.ZERO);
-		var remote=new SingleRegion<>(remoteHost,FAVOURITES,
-			new FavouritesRegion(remoteHost.cursor().path(FAVOURITES),remoteClock::get));
-		remoteHost.configureApplications(List.of(remote));
-		var charlie=remote.component().user(CHARLIE);
+		var remote=new FavouritesApp(remoteHost,remoteClock::get);
+		remoteHost.addApplication(remote);
+		var charlie=remote.user(CHARLIE);
 		remoteClock.set(CVMLong.create(100));
 		charlie.add(30);
 		remote.sync();
@@ -417,14 +400,14 @@ class FavouritesApplicationTest {
 		remote.sync();
 		localHost.merge(remoteHost.cursor().get());
 		remoteHost.merge(first);
-		assertEquals(Sets.of(30),local.component().items(CHARLIE.getAccountKey()),"Incoming ties keep the established value");
-		assertEquals(Sets.of(30,40),remote.component().items(CHARLIE.getAccountKey()),"An intentional local edit replaces its predecessor");
+		assertEquals(Sets.of(30),local.items(CHARLIE.getAccountKey()),"Incoming ties keep the established value");
+		assertEquals(Sets.of(30,40),remote.items(CHARLIE.getAccountKey()),"An intentional local edit replaces its predecessor");
 
 		remoteClock.set(CVMLong.create(101));
 		charlie.remove(30);
 		remote.sync();
 		localHost.merge(remoteHost.cursor().get());
-		assertEquals(Sets.of(40),local.component().items(CHARLIE.getAccountKey()));
+		assertEquals(Sets.of(40),local.items(CHARLIE.getAccountKey()));
 		local.sync();
 		assertEquals(remoteHost.cursor().get(),localHost.cursor().get(),"A strictly newer record resolves the tie");
 	}
@@ -433,15 +416,13 @@ class FavouritesApplicationTest {
 	@Test void existingUserViewsSeeIncomingApplicationMerges() {
 		var localHost=LatticeHost.create();
 		var localClock=new AtomicReference<>(CVMLong.ZERO);
-		var local=new SingleRegion<>(localHost,FAVOURITES,
-			new FavouritesRegion(localHost.cursor().path(FAVOURITES),localClock::get));
-		localHost.configureApplications(List.of(local));
-		var alice=local.component().user(ALICE);
+		var local=new FavouritesApp(localHost,localClock::get);
+		localHost.addApplication(local);
+		var alice=local.user(ALICE);
 		// A separate region instance models another session with its own staged copy.
 		var anotherAppClock=new AtomicReference<>(CVMLong.ZERO);
-		var anotherApp=new SingleRegion<>(localHost,FAVOURITES,
-			new FavouritesRegion(localHost.cursor().path(FAVOURITES),anotherAppClock::get));
-		var anotherSession=anotherApp.component().user(ALICE);
+		var anotherApp=new FavouritesApp(localHost,anotherAppClock::get);
+		var anotherSession=anotherApp.user(ALICE);
 		localClock.set(CVMLong.create(100));
 		alice.add(10);
 		anotherAppClock.set(CVMLong.create(200));
@@ -454,7 +435,7 @@ class FavouritesApplicationTest {
 		alice.add(30);
 		localHost.merge(published);
 		assertEquals(Sets.of(20,30),alice.items(),"A stale incoming record cannot overwrite a newer local edit");
-		assertEquals(Sets.of(20,30),local.component().items(ALICE.getAccountKey()));
+		assertEquals(Sets.of(20,30),local.items(ALICE.getAccountKey()));
 		assertEquals(CVMLong.create(300),local.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
 		local.sync();
 		assertEquals(local.component().cursor().get(),localHost.cursor().get().get(FAVOURITES));
@@ -464,15 +445,13 @@ class FavouritesApplicationTest {
 	@Test void anIncomingRecordCannotForgeItsOwnerOrItsTimestamp() {
 		var localHost=LatticeHost.create();
 		var localClock=new AtomicReference<>(CVMLong.ZERO);
-		var local=new SingleRegion<>(localHost,FAVOURITES,
-			new FavouritesRegion(localHost.cursor().path(FAVOURITES),localClock::get));
-		localHost.configureApplications(List.of(local));
+		var local=new FavouritesApp(localHost,localClock::get);
+		localHost.addApplication(local);
 		var remoteHost=LatticeHost.create();
 		var remoteClock=new AtomicReference<>(CVMLong.ZERO);
-		var remote=new SingleRegion<>(remoteHost,FAVOURITES,
-			new FavouritesRegion(remoteHost.cursor().path(FAVOURITES),remoteClock::get));
-		remoteHost.configureApplications(List.of(remote));
-		var charlie=remote.component().user(CHARLIE);
+		var remote=new FavouritesApp(remoteHost,remoteClock::get);
+		remoteHost.addApplication(remote);
+		var charlie=remote.user(CHARLIE);
 		remoteClock.set(CVMLong.create(100));
 		charlie.add(30);
 		remote.sync();
@@ -493,17 +472,17 @@ class FavouritesApplicationTest {
 		assertEquals(remoteHost.cursor().get(),localHost.cursor().get());
 	}
 
-	/** Explicitly sharing the region shares edits and its clock; duplicate delivery remains idempotent. */
+	/** Explicitly sharing the region shares edits; both applications use the supplied clock; duplicate delivery remains idempotent. */
 	@Test void twoApplicationsCanShareOneFavouritesWorkspace() {
 		var host=LatticeHost.create();
 		var firstClock=new AtomicReference<>(CVMLong.ZERO);
-		var first=new SingleRegion<>(host,FAVOURITES,
-			new FavouritesRegion(host.cursor().path(FAVOURITES),firstClock::get));
-		var second=new SingleRegion<>(host,FAVOURITES,first.component());
-		host.configureApplications(List.of(first,second));
+		var first=new FavouritesApp(host,firstClock::get);
+		var second=new FavouritesApp(host,first.component(),firstClock::get);
+		host.addApplication(first);
+		host.addApplication(second);
 		assertSame(first.component(),second.component());
-		var alice=first.component().user(ALICE);
-		var otherView=second.component().user(ALICE);
+		var alice=first.user(ALICE);
+		var otherView=second.user(ALICE);
 		firstClock.set(CVMLong.create(100));
 		alice.add(10);
 		assertEquals(Sets.of(10),otherView.items());
@@ -525,17 +504,16 @@ class FavouritesApplicationTest {
 		Keyword other=Keyword.intern("other");
 		var host=LatticeHost.create(Index.<Keyword,ACell>of(other,Sets.of(1)),null);
 		var appClock=new AtomicReference<>(CVMLong.ZERO);
-		var app=new SingleRegion<>(host,FAVOURITES,
-			new FavouritesRegion(host.cursor().path(FAVOURITES),appClock::get));
-		host.configureApplications(List.of(app));
+		var app=new FavouritesApp(host,appClock::get);
+		host.addApplication(app);
 		appClock.set(CVMLong.create(100));
-		app.component().user(ALICE).add(10);
+		app.user(ALICE).add(10);
 		host.cursor().update(value -> value.assoc(other,Sets.of(2)));
 		host.merge(Index.of(other,Sets.of(3))); // Not one of this application's interests.
 		app.sync();
 		assertEquals(Sets.of(2),host.cursor().get().get(other));
 		assertEquals(app.component().get(ALICE.getAccountKey()),host.cursor().get(FAVOURITES,ALICE.getAccountKey()));
-		app.component().user(ALICE).add(20);
+		app.user(ALICE).add(20);
 		host.cursor().update(value -> value.dissoc(other));
 		app.sync();
 		assertFalse(host.cursor().get().containsKey(other),"publishing favourites cannot resurrect a removed sibling");
@@ -545,21 +523,18 @@ class FavouritesApplicationTest {
 	@Test void aSignedOwnerRecordMeansTheSameAtARootOrAtItsPath() {
 		var sourceHost=LatticeHost.create();
 		var sourceClock=new AtomicReference<>(CVMLong.ZERO);
-		var source=new SingleRegion<>(sourceHost,FAVOURITES,
-			new FavouritesRegion(sourceHost.cursor().path(FAVOURITES),sourceClock::get));
+		var source=new FavouritesApp(sourceHost,sourceClock::get);
 		sourceClock.set(CVMLong.create(100));
-		source.component().user(CHARLIE).add(30);
+		source.user(CHARLIE).add(30);
 		source.sync();
 		var rootHost=LatticeHost.create();
 		var pathHost=LatticeHost.create();
 		var rootAppClock=new AtomicReference<>(CVMLong.ZERO);
-		var rootApp=new SingleRegion<>(rootHost,FAVOURITES,
-			new FavouritesRegion(rootHost.cursor().path(FAVOURITES),rootAppClock::get));
+		var rootApp=new FavouritesApp(rootHost,rootAppClock::get);
 		var pathAppClock=new AtomicReference<>(CVMLong.ZERO);
-		var pathApp=new SingleRegion<>(pathHost,FAVOURITES,
-			new FavouritesRegion(pathHost.cursor().path(FAVOURITES),pathAppClock::get));
-		rootHost.configureApplications(List.of(rootApp));
-		pathHost.configureApplications(List.of(pathApp));
+		var pathApp=new FavouritesApp(pathHost,pathAppClock::get);
+		rootHost.addApplication(rootApp);
+		pathHost.addApplication(pathApp);
 		rootHost.merge(sourceHost.cursor().get());
 		pathHost.mergeAt(source.component().get(CHARLIE.getAccountKey()),FAVOURITES,CHARLIE.getAccountKey());
 		assertEquals(rootApp.component().cursor().get(),pathApp.component().cursor().get());

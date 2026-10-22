@@ -245,18 +245,26 @@ children. Both work at the host root or a nested index and inherit the same merg
 and publication behaviour. A single-region application can be as small as:
 
 ```java
-var favourites = new FavouritesRegion(host.cursor().path(FAVOURITES), getTimestamp);
-var app = new SingleRegion<>(host, FAVOURITES, favourites);
-host.configureApplications(List.of(app));
-favourites.user(alice).add(42);
+var host = LatticeHost.create();
+var app = host.addApplication(new FavouritesApp(host, getTimestamp));
+app.user(alice).add(42);
 app.sync();
 ```
 
-No application subclass is required: the domain region owns its data and operations,
-while `SingleRegion` supplies root routing and lifecycle. Pass that same region to
-another wrapper to share pending edits. A custom application subclass is useful
-when it adds lifecycle or domain behaviour. `SingleRegion.create(host, key, factory)`
-is also available for factory construction. For several regions, construct
+`FavouritesApp` extends `SingleRegion<KeyOwnedIndex<…>>`: it constructs the standard
+owner index at `:favourites` and exposes domain operations such as `user(key)` and
+`items(owner)`. No custom region class is needed. Its alternative constructor
+accepts an existing owner index to share pending state.
+
+The host registers root applications, with no knowledge of their region names or
+paths. `addApplication(app)` returns the same instance, retaining its policy and
+publication boundary. Applications receive deliveries in registration order.
+Register before the first `host.merge` or `host.mergeAt`, which freezes the list,
+including an empty list. `configureApplications(list)` remains available for one
+bulk setup; further applications may be added before delivery starts.
+
+For simple assembly without a domain API, `new SingleRegion<>(host, key, component)`
+and `SingleRegion.create(host, key, factory)` remain available. For several regions, construct
 `new Regions(host)` and call `create(key, factory)` or `add(key, shared)` during
 assembly. `new Regions(host, components)` also accepts a map of existing children,
 registered in its iteration order. The cursor-and-context constructors and factory
@@ -549,19 +557,19 @@ app.sync();              // merge the working copy back to the host
 host.sync();             // optional host policy; otherwise a no-op without a store
 ```
 
-The executable [favourites example](../src/test/java/convex/lattice/app/FavouritesApplicationTest.java)
+The runnable [favourites example](../src/test/java/convex/lattice/app/FavouritesExample.java)
 is one application over an in-memory host. Each user's edits are signed immediately
 through a signing cursor into its favourites region's working copy. The application
-uses `SingleRegion` directly, so its sync publishes that child at `[:favourites]` and
-leaves unrelated host regions alone. Two applications may share the same region
-instance, including its pending edits and supplied clock. The tests own the mutable
-clock; the domain region accepts only a `Supplier<CVMLong>`. A
+extends `SingleRegion` over a standard `KeyOwnedIndex`, so its sync publishes that
+child at `[:favourites]` and leaves unrelated host regions alone. Two applications
+may share the same region instance and its pending edits. Each application takes a
+`Supplier<CVMLong>` for local authoring; the tests supply the mutable clock. A
 [persistence variant](../src/test/java/convex/lattice/app/FavouritesPersistenceTest.java)
 publishes to Etch and reopens the same application.
 
 `Favourites` embeds a `SetComponent<ACell>` for its `:items` field. Its convenience
 methods add and remove numeric IDs, while retaining unfamiliar members supplied
-by other versions. The region's field accessor exposes the relayed value directly.
+by other versions. The application's field accessor exposes the relayed value directly.
 The standard
 component supplies atomic `add`, `remove` and `clear` operations, membership and
 size queries, and immutable snapshots through `get()`. It treats an absent set as
@@ -1044,9 +1052,10 @@ factory or callback into the map to construct the domain component.
 
 The component that signs defines its key-resolution strategy in one place. In the
 favourites example, `Favourites` supplies `user::signData` in its
-constructor. `FavouritesRegion` only binds the owner path and rule, and takes no
-context. The host and region cannot supply an implicit fallback key. The same
-function handles local edits and any re-signing it performs.
+constructor. `FavouritesApp` binds the owner path and rule through its standard
+owner-index component, with no signing context. The host and region cannot supply
+an implicit fallback key. The same function handles local edits and any re-signing
+it performs.
 
 An owned map's `signingFor(owner)` supplies its bound authorisation rule directly.
 Its `path(owner)` returns signed storage, creating a missing map only

@@ -1,6 +1,5 @@
 package convex.lattice.app;
 
-import java.util.List;
 import java.util.function.Supplier;
 
 import convex.core.crypto.AKeyPair;
@@ -36,8 +35,8 @@ import convex.lattice.generic.SignedLattice;
  *
  * <p>The composition has four responsibilities:</p>
  * <ul>
- *   <li>{@code SingleRegion<FavouritesRegion>} serves only {@code :favourites}, preserving other host regions.</li>
- *   <li>{@link FavouritesRegion} verifies ownership and stages the owner collection.</li>
+ *   <li>{@link FavouritesApp} serves only {@code :favourites}, preserving other host regions.</li>
+ *   <li>{@link KeyOwnedIndex} verifies ownership and stages the owner collection.</li>
  *   <li>{@link Favourites} signs local records with its explicitly supplied user's key.</li>
  *   <li>{@link Timestamped} orders whole records; {@link SetComponent} edits their items.</li>
  * </ul>
@@ -59,7 +58,7 @@ import convex.lattice.generic.SignedLattice;
  * network is needed; persistence is covered by {@link FavouritesPersistenceTest}.</p>
  *
  * <p>The seeded keys and manually advanced clocks in tests are deterministic fixtures.
- * The region receives only a timestamp supplier, so it does not depend
+ * The application receives only a timestamp supplier, so it does not depend
  * on how time is maintained. Equal timestamps deliberately retain the local value
  * on incoming merges; tests advance time when an update must supersede a replica.</p>
  *
@@ -79,18 +78,16 @@ public final class FavouritesExample {
 	/** Runs the complete example using the demo keys and the runtime clock. */
 	public static void main(String[] args) {
 		var host=LatticeHost.create();
-		var favourites=new FavouritesRegion(host.cursor().path(FAVOURITES),Utils::getCurrentTimestampCell);
-		var app=new SingleRegion<>(host,FAVOURITES,favourites);
-		host.configureApplications(List.of(app));
+		var app=host.addApplication(new FavouritesApp(host,Utils::getCurrentTimestampCell));
 
 		// Domain edits stamp and sign immediately, within the region's working state.
-		var alice=favourites.user(ALICE);
+		var alice=app.user(ALICE);
 		alice.add(42);
 		alice.add(7);
 		alice.remove(42);
-		favourites.user(BOB).add(99);
+		app.user(BOB).add(99);
 		System.out.println("Alice's favourites: "+alice.items());
-		System.out.println("Bob's favourites: "+favourites.items(BOB.getAccountKey()));
+		System.out.println("Bob's favourites: "+app.items(BOB.getAccountKey()));
 		System.out.println("Host empty before publication: "+host.cursor().get().isEmpty());
 
 		app.sync(); // Publishes only [:favourites]; host.sync() would persist a store-backed host.
@@ -98,42 +95,45 @@ public final class FavouritesExample {
 
 		// A replica verifies and merges complete signed records without authoring them.
 		var replicaHost=LatticeHost.create();
-		var replica=new FavouritesRegion(replicaHost.cursor().path(FAVOURITES),Utils::getCurrentTimestampCell);
-		var replicaApp=new SingleRegion<>(replicaHost,FAVOURITES,replica);
-		replicaHost.configureApplications(List.of(replicaApp));
+		var replica=replicaHost.addApplication(new FavouritesApp(replicaHost,Utils::getCurrentTimestampCell));
 		replicaHost.merge(host.cursor().get());
-		replicaApp.sync();
+		replica.sync();
 		System.out.println("Alice on replica: "+replica.items(ALICE.getAccountKey()));
 		System.out.println("Bob on replica: "+replica.items(BOB.getAccountKey()));
 		System.out.println("Published hosts agree: "+host.cursor().get().equals(replicaHost.cursor().get()));
 	}
 
 	/**
-	 * Stages the owner index at {@code [:favourites]}. {@link KeyOwnedIndex} checks
+	 * A root application serving an owner index at {@code [:favourites]}. {@link KeyOwnedIndex} checks
 	 * that each envelope's signer matches its owner key. The shared timestamp rule
 	 * selects whole payloads during both incoming merge and publication conflicts.
 	 * The region needs no signing capability to accept another user's record.
 	 * It checks only ownership, signatures and ordering metadata, preserving all
 	 * payload fields even when a local domain view cannot interpret them.
 	 */
-	static final class FavouritesRegion extends KeyOwnedIndex<AHashMap<Keyword,ACell>> {
+	static final class FavouritesApp extends SingleRegion<KeyOwnedIndex<AHashMap<Keyword,ACell>>> {
 		private final Supplier<CVMLong> getTimestamp;
 
-		FavouritesRegion(AForkableCursor<Index<AccountKey,SignedData<AHashMap<Keyword,ACell>>>> destination,
-				Supplier<CVMLong> getTimestamp) {
-			super(destination,Timestamped.lattice());
+		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
+			this(host,new KeyOwnedIndex<>(host.cursor().path(FAVOURITES),Timestamped.lattice()),getTimestamp);
+		}
+
+		/** Shares the supplied region's pending state and destination; the clock is authoring policy. */
+		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,
+				KeyOwnedIndex<AHashMap<Keyword,ACell>> shared,Supplier<CVMLong> getTimestamp) {
+			super(host,FAVOURITES,shared);
 			this.getTimestamp=getTimestamp;
 		}
 
 		/** Opens a live authoring handle. An absent owner is created only by a changed edit. */
 		Favourites user(AKeyPair user) {
 			var owner=user.getAccountKey();
-			return new Favourites(path(owner),signingFor(owner),user,getTimestamp);
+			return new Favourites(component().path(owner),component().signingFor(owner),user,getTimestamp);
 		}
 
 		/** Reads the relayed field without assuming the remote owner's item representation. */
 		ACell items(AccountKey user) {
-			var record=get(user);
+			var record=component().get(user);
 			ACell value=record==null?null:record.getValue().get(ITEMS);
 			return value==null?Sets.empty():value;
 		}

@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static convex.lattice.app.FavouritesExample.*;
 
 import java.io.File;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
@@ -16,7 +15,6 @@ import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeHost;
-import convex.lattice.SingleRegion;
 
 /**
  * The same {@link FavouritesExample} components over an Etch-backed host.
@@ -34,12 +32,11 @@ class FavouritesPersistenceTest {
 			file=store.getFile();
 			var localHost=LatticeHost.open(store);
 			var localClock=new AtomicReference<>(CVMLong.ZERO);
-			var local=new SingleRegion<>(localHost,FAVOURITES,
-				new FavouritesRegion(localHost.cursor().path(FAVOURITES),localClock::get));
-			localHost.configureApplications(List.of(local));
-			var alice=local.component().user(ALICE);
-			var bob=local.component().user(BOB);
-			var favourites=local.component().user(ALICE);
+			var local=new FavouritesApp(localHost,localClock::get);
+			localHost.addApplication(local);
+			var alice=local.user(ALICE);
+			var bob=local.user(BOB);
+			var favourites=local.user(ALICE);
 			// Two Alice handles share one owner record; Bob's record has its own edit time.
 			localClock.set(CVMLong.create(100));
 			favourites.add(10);
@@ -65,11 +62,10 @@ class FavouritesPersistenceTest {
 		try (var store=EtchStore.create(file)) {
 			var reopenedHost=LatticeHost.open(store);
 			var reopenedClock=new AtomicReference<>(CVMLong.ZERO);
-			var reopened=new SingleRegion<>(reopenedHost,FAVOURITES,
-				new FavouritesRegion(reopenedHost.cursor().path(FAVOURITES),reopenedClock::get));
-			reopenedHost.configureApplications(List.of(reopened));
-			assertEquals(Sets.of(10,20),reopened.component().items(ALICE.getAccountKey()));
-			assertEquals(Sets.of(30),reopened.component().items(BOB.getAccountKey()));
+			var reopened=new FavouritesApp(reopenedHost,reopenedClock::get);
+			reopenedHost.addApplication(reopened);
+			assertEquals(Sets.of(10,20),reopened.items(ALICE.getAccountKey()));
+			assertEquals(Sets.of(30),reopened.items(BOB.getAccountKey()));
 			assertEquals(CVMLong.create(200),reopened.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
 			assertEquals(CVMLong.create(100),reopened.component().get(BOB.getAccountKey()).getValue().get(TIMESTAMP));
 			assertTrue(reopened.component().get(ALICE.getAccountKey()).checkSignature());

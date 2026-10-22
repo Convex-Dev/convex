@@ -1,6 +1,7 @@
 package convex.lattice;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
@@ -45,7 +46,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	private final ReentrantLock syncLock=new ReentrantLock();
 	private volatile Function<V,V> publicationPolicy;
 	private boolean publicationPolicyFrozen;
-	private volatile List<ALatticeComponent<V>> applications;
+	private List<ALatticeComponent<V>> applications;
+	private boolean applicationsFrozen;
 
 	/**
 	 * Creates a host around existing atomic storage, optionally backed by a store.
@@ -108,8 +110,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * @return Current published root, which may not yet include the incoming state
 	 */
 	public V merge(V other) {
-		List<ALatticeComponent<V>> configured=applications;
-		if (configured==null) return cursor().get();
+		List<ALatticeComponent<V>> configured=applicationsForDelivery();
 		for (ALatticeComponent<V> application:configured) application.merge(other);
 		return cursor().get();
 	}
@@ -125,8 +126,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * @return Current published root, which may not include this delivery
 	 */
 	public V mergeAt(ACell value, ACell... path) {
-		List<ALatticeComponent<V>> configured=applications;
-		if (configured==null) return cursor().get();
+		List<ALatticeComponent<V>> configured=applicationsForDelivery();
 		for (ALatticeComponent<V> application:configured) application.mergeAt(value,path);
 		return cursor().get();
 	}
@@ -139,8 +139,36 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * applications do not register their children with the root.
 	 */
 	public synchronized void configureApplications(List<? extends ALatticeComponent<V>> applications) {
+		checkApplicationRegistration();
 		if (this.applications!=null) throw new IllegalStateException("Applications already configured");
 		this.applications=List.copyOf(applications);
+	}
+
+	/**
+	 * Adds an existing root application and returns that exact instance. Registration
+	 * neither rebinds the component nor changes its context, working state or publication.
+	 * Applications receive incoming values in registration order and own their paths.
+	 * Register before the first {@link #merge} or {@link #mergeAt}; registration after
+	 * delivery begins is rejected. This also permits additions after bulk configuration.
+	 */
+	public synchronized <C extends ALatticeComponent<V>> C addApplication(C application) {
+		checkApplicationRegistration();
+		Objects.requireNonNull(application,"Application must not be null");
+		var updated=new ArrayList<ALatticeComponent<V>>();
+		if (applications!=null) updated.addAll(applications);
+		updated.add(application);
+		applications=List.copyOf(updated);
+		return application;
+	}
+
+	private void checkApplicationRegistration() {
+		if (applicationsFrozen) throw new IllegalStateException("Application registration is frozen");
+	}
+
+	/** Take a fixed snapshot under the registration lock; invoke applications outside it. */
+	private synchronized List<ALatticeComponent<V>> applicationsForDelivery() {
+		applicationsFrozen=true;
+		return applications==null?List.of():applications;
 	}
 
 	/**
