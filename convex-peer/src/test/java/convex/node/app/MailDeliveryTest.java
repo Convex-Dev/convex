@@ -23,7 +23,6 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeApplication;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.mail.Mail;
@@ -59,7 +58,7 @@ class MailDeliveryTest {
 	 */
 	static final class MailApp extends LatticeApplication<Index<Keyword,ACell>> {
 		MailApp(LatticeHost<Index<Keyword,ACell>> host) { super(ROOT,host); }
-		Mail mail(AKeyPair user) { return Mail.connect(this,Mail.LATTICE,LatticeContext.create(null,user)); }
+		Mail mail(AKeyPair user) { return Mail.connect(this,Mail.LATTICE,(owner,value) -> user.signData(value)); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 		}

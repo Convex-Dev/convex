@@ -146,7 +146,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 
 	/**
 	 * Adds an existing root application and returns that exact instance. Registration
-	 * neither rebinds the component nor changes its context, working state or publication.
+	 * neither rebinds the component nor changes its policy, working state or publication.
 	 * Applications receive incoming values in registration order and own their paths.
 	 * Register before the first {@link #merge} or {@link #mergeAt}; registration after
 	 * delivery begins is rejected. This also permits additions after bulk configuration.

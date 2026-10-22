@@ -18,6 +18,15 @@ import convex.lattice.cursor.AForkableCursor;
 public class LatticeApplication<V extends ACell> extends ALatticeApplication<V> {
 
 	private final ALattice<V> lattice;
+	private volatile LatticeContext context=LatticeContext.EMPTY;
+
+	/** Optional policy for the supplied lattice implementation, local to this adapter. */
+	public final LatticeContext getContext() { return context; }
+
+	/** Configures this adapter only; component bases and hosts carry no context. */
+	public final void setContext(LatticeContext context) {
+		this.context=(context==null)?LatticeContext.EMPTY:context;
+	}
 
 	/** Creates private working state, published to the host by {@link #sync()}. */
 	public LatticeApplication(ALattice<V> lattice,LatticeHost<V> host) {
@@ -33,9 +42,7 @@ public class LatticeApplication<V extends ACell> extends ALatticeApplication<V> 
 
 	/** Creates a live application; the caller configures it on the host explicitly. */
 	public static <V extends ACell> LatticeApplication<V> live(ALattice<V> lattice,LatticeHost<V> host) {
-		var application=new LatticeApplication<>(lattice,host.cursor());
-		application.setContext(host.getContext());
-		return application;
+		return new LatticeApplication<>(lattice,host.cursor());
 	}
 
 	/** Uses the supplied lattice's precheck; merge may impose stronger rules. Nil is absent state. */

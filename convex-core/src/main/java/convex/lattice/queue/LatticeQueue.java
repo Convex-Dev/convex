@@ -1,10 +1,14 @@
 package convex.lattice.queue;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -28,18 +32,30 @@ import convex.lattice.cursor.Cursors;
  * </ul>
  */
 public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
+	private final Supplier<CVMLong> clock;
 
 
 	public LatticeQueue(AForkableCursor<AVector<ACell>> cursor) {
+		this(cursor,Utils::getCurrentTimestampCell);
+	}
+
+	/** Binds the mutation clock retained by children and forks. */
+	public LatticeQueue(AForkableCursor<AVector<ACell>> cursor,Supplier<CVMLong> clock) {
 		super(cursor);
+		this.clock=Objects.requireNonNull(clock);
 	}
 
 	/**
 	 * Creates a new empty queue.
 	 */
 	public static LatticeQueue create() {
+		return create(Utils::getCurrentTimestampCell);
+	}
+
+	/** Creates a standalone partition with an explicit mutation clock. */
+	public static LatticeQueue create(Supplier<CVMLong> clock) {
 		AForkableCursor<AVector<ACell>> cursor = Cursors.root(QueueLattice.INSTANCE.zero());
-		return new LatticeQueue(cursor);
+		return new LatticeQueue(cursor,clock);
 	}
 
 
@@ -47,11 +63,12 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Creates a forked copy of this queue for independent operation.
 	 */
 	public LatticeQueue fork() {
-		return configured(new LatticeQueue(this));
+		return new LatticeQueue(this);
 	}
 
 	private LatticeQueue(LatticeQueue source) {
 		super(source);
+		clock=source.clock;
 	}
 
 	// ===== Producer Operations =====
@@ -317,12 +334,12 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	// #561: resolve time through the component policy. The default policy uses runtime
 	// time; applications and tests may supply a fixed or otherwise dynamic clock.
 	private CVMLong now() {
-		return getContext().currentTimestamp();
+		return clock.get();
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
 	protected AVector<ACell> mergePublication(AVector<ACell> own,AVector<ACell> other) {
-		return QueueLattice.INSTANCE.merge(getContext(),own,other);
+		return QueueLattice.INSTANCE.merge(own,other);
 	}
 }

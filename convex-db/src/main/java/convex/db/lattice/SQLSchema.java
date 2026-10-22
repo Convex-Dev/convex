@@ -77,7 +77,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Forked SQLSchema instance
 	 */
 	public SQLSchema fork() {
-		return configured(new SQLSchema(this));
+		return new SQLSchema(this);
 	}
 
 	private SQLSchema(SQLSchema source) {
@@ -96,7 +96,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	public SQLTable getTable(AString name) {
 		AForkableCursor<AVector<ACell>> tableCursor = cursor().withDefault(Index.none()).path(name);
 		if (tableCursor.get() == null) return null;
-		return configured(new SQLTable(tableCursor));
+		return new SQLTable(tableCursor);
 	}
 
 	/** Convenience overload. */
@@ -409,6 +409,6 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	protected Index<AString, AVector<ACell>> mergePublication(
 			Index<AString, AVector<ACell>> own,
 			Index<AString, AVector<ACell>> other) {
-		return TableStoreLattice.INSTANCE.merge(getContext(),own,other);
+		return TableStoreLattice.INSTANCE.merge(own,other);
 	}
 }

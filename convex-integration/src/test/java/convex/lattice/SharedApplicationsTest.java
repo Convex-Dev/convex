@@ -102,7 +102,6 @@ public class SharedApplicationsTest {
 			SignedData<?> signedFiles=RT.getIn(target.root(),Keywords.FS,BOB.getAccountKey());
 			assertTrue(signedSocial.checkSignature());
 			assertTrue(signedFiles.checkSignature());
-			assertNull(target.host.getContext().getSigningKey());
 		}
 	}
 

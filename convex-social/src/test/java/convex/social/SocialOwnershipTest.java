@@ -15,7 +15,6 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeContext;
 
 /** Owner-aware capabilities are shared by every view, independently of authority. */
 public class SocialOwnershipTest {
@@ -75,7 +74,6 @@ public class SocialOwnershipTest {
 		left.user(A).feed().post("left");
 		right.user(A).feed().post("right");
 		var relay=Social.create(authority,null,() -> CVMLong.ZERO);
-		relay.setContext(LatticeContext.create(null,ALICE,(owner,key) -> true));
 		relay.merge(left.cursor().get());
 		var before=relay.cursor().get();
 		relay.merge(right.cursor().get());

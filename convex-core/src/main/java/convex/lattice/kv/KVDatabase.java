@@ -9,7 +9,6 @@ import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
-import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
@@ -236,9 +235,8 @@ public class KVDatabase {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 
 		// Use OwnerLattice to verify signatures and owner-key matching
-		LatticeContext ctx = LatticeContext.create(null, keyPair);
 		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> verified =
-			OWNER_LATTICE.merge(ctx, Maps.empty(), remoteOwnerMap);
+			OWNER_LATTICE.merge(Maps.empty(),remoteOwnerMap);
 
 		// Absorb verified remote data into local store
 		long merged = 0;
@@ -249,7 +247,7 @@ public class KVDatabase {
 
 			Index<AString, AVector<ACell>> remoteState = (Index<AString, AVector<ACell>>) dbMap.get(dbName);
 			if (remoteState != null) {
-				kv.cursor().updateAndGet(own -> KVStoreLattice.INSTANCE.merge(kv.getContext(),own,remoteState));
+				kv.cursor().updateAndGet(own -> KVStoreLattice.INSTANCE.merge(own,remoteState));
 				merged++;
 			}
 		}

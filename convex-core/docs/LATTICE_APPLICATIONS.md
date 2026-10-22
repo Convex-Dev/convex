@@ -68,7 +68,7 @@ of decisions made when it is constructed:
 | Publication | **Live**: writes go straight through the cursor and there is nothing to publish. **Staged**: a private working copy and a destination; sync reconciles the copy with whatever the destination now holds and publishes the result. A fork is a staged component constructed at the same position. |
 | Boundary | For a level the component owns: none, stamp each write, sign each write, or sign once at publication. Signing once needs a staged component, and is the main reason to stage. |
 | Reconciliation | The lattice merge at that position, with local edits winning ties, applied only when both the copy and its destination changed since they were last reconciled. A keyed lattice publishes only the keys it declares; the rest adopt the destination. |
-| Policy | The context, clock and signers, resolved when the component is constructed. Later changes to the parent's policy do not reach it. |
+| Policy | Explicit clock, signer and admission rules owned by the component. The base classes and hosts carry no policy context. |
 | Incoming values | Whether the component is configured on the host to receive incoming values, and how it merges or routes what it accepts. Only a component at the root can be configured directly. |
 | Transactions | Whether it offers atomic multi-step operations, by supplying a factory that rebuilds it over a draft cursor. |
 | Store | Whether it carries a store for checkpoints before publication, as file components do. |
@@ -230,8 +230,8 @@ The default component publication boundary is explicit in its constructor:
 `super(forkOf(destination))` owns a private working copy that sync reconciles into
 that destination. A live view never publishes a caller-owned fork, including when
 the view is a path into that fork. The component-copy constructor `super(source)`
-creates a fork and retains the source's context. Application lifecycle methods
-explicitly add preparation and child publication; ordinary components inherit
+creates a fork; the subclass retains its own clock, signer and other policy fields.
+Application lifecycle methods explicitly add preparation and child publication; ordinary components inherit
 neither operation.
 
 Extend `AKeyedRegions` for an application whose interests are named regions of an
@@ -267,7 +267,7 @@ For simple assembly without a domain API, `new SingleRegion<>(host, key, compone
 and `SingleRegion.create(host, key, factory)` remain available. For several regions, construct
 `new Regions(host)` and call `create(key, factory)` or `add(key, shared)` during
 assembly. `new Regions(host, components)` also accepts a map of existing children,
-registered in its iteration order. The cursor-and-context constructors and factory
+registered in its iteration order. The cursor constructors and factory
 support the same composition below the root. Factory methods have separate names
 from existing-component registration to avoid ambiguous Java lambda inference.
 
@@ -275,8 +275,8 @@ For applications declaring their own collection, the base class remains useful:
 
 ```java
 final class Counter extends LatticeComponent<AInteger> {
-    Counter(AForkableCursor<AInteger> destination, LatticeContext context) {
-        super(MaxLattice.INSTANCE, destination, context);
+    Counter(AForkableCursor<AInteger> destination) {
+        super(MaxLattice.INSTANCE, forkOf(destination));
     }
 }
 
@@ -306,15 +306,15 @@ second.sync();                  // publishes the child at [:count]
 host.sync();                    // optional persistence / replication
 ```
 
-`createRegion(key, factory)` supplies a cursor at the key and the current context
-before constructing the child. It creates an absent containing index on the first
+`createRegion(key, factory)` supplies only a cursor at the key. A factory binds
+any clock, signer or admission policy needed by its child. It creates an absent containing index on the first
 changed write, not on construction or read. A nested regions factory receives an
 `AForkableCursor<Index<Keyword, ACell>>` and constructs another `AKeyedRegions` over
 it. Java constructor references to overloaded constructors may need explicit factory
 type arguments.
 
 `region(key, component)` registers an existing instance. It preserves that
-component's context, destination and pending state. The caller is responsible for
+component's policy, destination and pending state. The caller is responsible for
 binding it to the intended region: registration does not relocate it. Applications
 sharing one instance share pending changes, and either can publish them. Two separate
 staged components at the same destination instead have independent working copies,
@@ -505,7 +505,7 @@ same atomic update when the path may be absent:
 
 ```java
 public void putPost(Blob key, String text) {
-    long ts = getContext().currentTimestampValue();
+    long ts = clock.get().longValue();
     AHashMap<Keyword, ACell> post = SocialPost.createPost(text, ts);
     cursor().updateAndGet(feed -> (feed == null ? SocialLattice.FEED_LATTICE.zero() : feed)
         .assoc(key, post));
@@ -879,9 +879,28 @@ and must not wait for another operation on the same state or publish state.
 
 For a custom component, implement the interface with a rebinding factory that
 creates a fresh component over a supplied cursor with the same domain metadata and
-resolved context. Rebuild children against that cursor rather than reusing cached
+explicit policies. Rebuild children against that cursor rather than reusing cached
 live children. A component owning configuration, such as a DLFS store, passes it
 along itself.
+
+## Explicit component policies
+
+`ALatticeComponent`, `ALatticeApplication`, region collections and `LatticeHost`
+have no `getContext`, `setContext` or inherited policy. Constructors declare what
+their operations need; forks and `withCursor` retain those fields explicitly.
+Shared clocks and signers must support concurrent use.
+
+- `LatticeKV`, `LatticeMQ`, `LatticeTopic` and `LatticeQueue` accept a
+  `Supplier<CVMLong>` clock. Ordinary constructors use the system clock. Nested
+  queue views and forks retain the supplied clock; merge never reads it.
+- `Mail` accepts a `BiFunction<ACell,ACell,SignedData<ACell>>` receipt signer,
+  receiving the mailbox owner and requested payload. It may serve multiple DIDs;
+  null means no available signer. The mailbox's bound DID authoriser verifies
+  the result before writing. Receipts reuse the envelope's timestamp.
+- `LatticeComponent` and `LatticeApplication` are optional `ALattice` adapters.
+  Their context is local to that adapter and defaults to `LatticeContext.EMPTY`.
+  Call `setContext` explicitly when the supplied lattice needs legacy policy;
+  registration and child creation do not copy it.
 
 ## Fork and sync
 
@@ -1010,8 +1029,8 @@ Owned collections take no context in their constructors. Incoming merges and
 publication conflicts both use the owner lattice's context-free merge. They can
 adopt valid signed inputs but cannot author a synthesised payload; in that case
 they retain the existing envelope. An authorised signed domain component can
-reconcile and sign the new value, which the collection can then accept. Setting
-an inherited component context on the collection does not change this behaviour.
+reconcile and sign the new value, which the collection can then accept. The
+collection has no context or fallback signer.
 
 `OwnedMap` and `OwnedIndex` require an explicit authorisation predicate. A component
 declares the value lattice and supplies its resolver when constructing the region:
@@ -1144,7 +1163,7 @@ ALattice<ACell> state = LWWLattice.create(JSONLattice.INSTANCE, tsFn);
 
 // The component owning the leaf wraps it in a stamped cursor before navigating below.
 AForkableCursor<ACell> leaf = StampedCursor.create(resolve(KEY_STATE),
-    getContext()::currentTimestamp,
+    clock,
     (value, timestamp) -> RT.ensureMap(value).assoc(KEY_TIMESTAMP, timestamp));
 ```
 
@@ -1251,7 +1270,7 @@ Components use the cursor's atomic operations. Views at overlapping paths share 
 same authoritative state, so concurrent updates retry against the latest enclosing
 value instead of replacing it with an earlier snapshot. Update functions must be pure
 and may run more than once; IDs and external effects must not be generated inside
-them. One logical write resolves the context timestamp once and reuses it across
+them. One logical write reads its supplied clock once and reuses it across
 retries.
 
 Whole-value LWW is an explicit schema choice. A deep update inside such a value must
@@ -1264,7 +1283,7 @@ whole; local atomicity does not introduce field-wise merge.
 | Operation | Completion contract |
 |---|---|
 | Cursor update | One local state change is atomically visible; publication may still be pending |
-| Application merge | The application's own rule for an incoming root, typically the lattice merge under its context; publication remains separate |
+| Application merge | The application's own rule for an incoming root, optionally delegating to a supplied lattice; publication remains separate |
 | Fork sync | Merge one working snapshot into its immediate parent; concurrent state follows the declared lattice semantics |
 | Application sync | Publish the application's components in its chosen order, then its own snapshot if it stages one |
 | Host sync | Persist and publish a host root snapshot, then notify configured replication services; no remote acknowledgement |

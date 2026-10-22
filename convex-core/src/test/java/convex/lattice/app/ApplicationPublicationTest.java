@@ -132,7 +132,6 @@ class ApplicationPublicationTest {
 		assertEquals(notes.all(),app.publishedNotebook().getValue());
 		assertTrue(app.publishedNotebook().checkSignature());
 		assertEquals(app.publishedNotebook(),host.cursor().get().get(NOTEBOOK));
-		assertNull(host.getContext().getSigningKey());
 	}
 
 	/** Application sync is the convenient entry point for the registered child's publication. */
@@ -159,7 +158,6 @@ class ApplicationPublicationTest {
 		SignedData<ASet<ACell>> published=RT.getIn(host.cursor().get(),NOTEBOOK);
 		assertEquals(Sets.of("From first workspace","From second workspace"),published.getValue());
 		assertTrue(published.checkSignature());
-		assertNull(host.getContext().getSigningKey());
 	}
 
 	/** Incoming delivery contributes verified notes to the draft without forcing a publication. */

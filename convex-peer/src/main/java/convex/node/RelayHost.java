@@ -63,8 +63,9 @@ public final class RelayHost {
 			NodeConfig config,LatticeContext context) throws IOException {
 		if (lattice==null) throw new IllegalArgumentException("Lattice must not be null");
 		LatticeHost<V> host=openHost(lattice.zero(),store,config);
-		host.setContext(context);
-		host.configureApplications(List.of(LatticeApplication.live(lattice,host)));
+		var application=LatticeApplication.live(lattice,host);
+		application.setContext(context);
+		host.configureApplications(List.of(application));
 		return host;
 	}
 

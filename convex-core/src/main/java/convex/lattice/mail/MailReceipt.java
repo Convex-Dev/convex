@@ -1,5 +1,7 @@
 package convex.lattice.mail;
 
+import java.util.function.BiFunction;
+
 import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
@@ -11,7 +13,6 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeContext;
 
 /**
  * A recipient's receipt for one envelope: a {@link SignedData} over the vector
@@ -64,15 +65,16 @@ public final class MailReceipt {
 	/**
 	 * Authors a receipt on behalf of the mailbox owner.
 	 *
-	 * @param context Policy holding a signer authorised for {@code did}
+	 * @param signer Owner-aware signing function, or null for a relay
 	 * @param did Mailbox DID
 	 * @param envelope Envelope being received
-	 * @return Signed receipt, or null when the context has no authorised signer
+	 * @return Candidate receipt, or null if signing is unavailable or returns a different value;
+	 * the mailbox checks signature and DID authority before accepting it
 	 */
-	public static MailReceipt create(LatticeContext context, AString did, MailEnvelope envelope) {
+	public static MailReceipt create(BiFunction<ACell,ACell,SignedData<ACell>> signer, AString did, MailEnvelope envelope) {
 		AVector<ACell> v=vector(did,envelope.hash(),envelope.issuedAt());
-		SignedData<AVector<ACell>> signed=context.signAs(did,v);
-		return (signed==null)?null:parse(signed);
+		SignedData<ACell> signed=(signer==null)?null:signer.apply(did,v);
+		return (signed==null || !v.equals(signed.getValue()))?null:parse(signed);
 	}
 
 	/** Signs a receipt with an explicit key pair; the caller vouches for its authority. */

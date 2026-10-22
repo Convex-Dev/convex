@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -21,7 +20,6 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 
 /**
@@ -138,16 +136,8 @@ class FavouritesApplicationTest {
 
 	@Test void eachSignedComponentUsesOnlyItsExplicitUserKey() {
 		var host=LatticeHost.create();
-		// A tripwire proves neither the host nor region supplies a fallback signer.
-		var unexpected=new LatticeContext() {
-			@Override public <T extends ACell> SignedData<T> sign(AccountKey key,T value) {
-				throw new AssertionError("Favourites must resolve its signer in the domain component");
-			}
-		};
-		host.setContext(unexpected);
 		var appClock=new AtomicReference<>(CVMLong.ZERO);
 		var app=new FavouritesApp(host,appClock::get);
-		app.component().setContext(unexpected);
 		var alice=app.user(ALICE);
 		var bob=app.user(BOB);
 		alice.add(10);

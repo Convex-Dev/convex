@@ -1,5 +1,8 @@
 package convex.lattice.queue;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
@@ -7,6 +10,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 
@@ -40,6 +44,7 @@ import convex.lattice.cursor.AForkableCursor;
  * }</pre>
  */
 public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
+	private final Supplier<CVMLong> clock;
 
 	public static final Keyword KEY_NUM_PARTITIONS = Keyword.intern("num-partitions");
 
@@ -48,7 +53,13 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * Wraps an existing cursor at the TopicLattice level.
 	 */
 	LatticeTopic(AForkableCursor<Index<Keyword, ACell>> cursor) {
+		this(cursor,Utils::getCurrentTimestampCell);
+	}
+
+	/** Binds the mutation clock retained by children and forks. */
+	public LatticeTopic(AForkableCursor<Index<Keyword, ACell>> cursor,Supplier<CVMLong> clock) {
 		super(cursor);
+		this.clock=Objects.requireNonNull(clock);
 	}
 
 	/**
@@ -73,7 +84,7 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	public LatticeQueue partition(ACell id) {
 		AForkableCursor<AVector<ACell>> partCursor = cursor().withDefault(Index.none()).<AHashMap<ACell,AVector<ACell>>>path(TopicLattice.KEY_PARTITIONS)
 			.withDefault(Maps.empty()).path(id);
-		return configured(new LatticeQueue(partCursor));
+		return new LatticeQueue(partCursor,clock);
 	}
 
 	// ===== Metadata =====
@@ -150,16 +161,17 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeTopic fork() {
-		return configured(new LatticeTopic(this));
+		return new LatticeTopic(this);
 	}
 
 	private LatticeTopic(LatticeTopic source) {
 		super(source);
+		clock=source.clock;
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
 	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
-		return TopicLattice.INSTANCE.merge(getContext(),own,other);
+		return TopicLattice.INSTANCE.merge(own,other);
 	}
 }

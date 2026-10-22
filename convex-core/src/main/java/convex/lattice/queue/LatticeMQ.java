@@ -1,11 +1,16 @@
 package convex.lattice.queue;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -41,6 +46,7 @@ import convex.lattice.generic.MapLattice;
  * }</pre>
  */
 public class LatticeMQ extends ALatticeComponent<AHashMap<ACell, Index<Keyword, ACell>>> {
+	private final Supplier<CVMLong> clock;
 
 	/**
 	 * The lattice definition for the topic map level:
@@ -54,7 +60,13 @@ public class LatticeMQ extends ALatticeComponent<AHashMap<ACell, Index<Keyword, 
 	 * Wraps an existing cursor at the topic-map level.
 	 */
 	public LatticeMQ(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor) {
+		this(cursor,Utils::getCurrentTimestampCell);
+	}
+
+	/** Binds the mutation clock retained by children and forks. */
+	public LatticeMQ(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor,Supplier<CVMLong> clock) {
 		super(cursor);
+		this.clock=Objects.requireNonNull(clock);
 	}
 
 	/**
@@ -64,7 +76,12 @@ public class LatticeMQ extends ALatticeComponent<AHashMap<ACell, Index<Keyword, 
 	 * {@code [:queue, <owner>, :value]} and pass it to the constructor instead.</p>
 	 */
 	public static LatticeMQ create() {
-		return new LatticeMQ(Cursors.root(TOPIC_MAP.zero()));
+		return create(Utils::getCurrentTimestampCell);
+	}
+
+	/** Creates a standalone topic map with an explicit mutation clock. */
+	public static LatticeMQ create(Supplier<CVMLong> clock) {
+		return new LatticeMQ(Cursors.root(TOPIC_MAP.zero()),clock);
 	}
 
 	/**
@@ -84,7 +101,7 @@ public class LatticeMQ extends ALatticeComponent<AHashMap<ACell, Index<Keyword, 
 	 * @return Topic handle
 	 */
 	public LatticeTopic topic(ACell name) {
-		return configured(new LatticeTopic(cursor().withDefault(Maps.empty()).path(name)));
+		return new LatticeTopic(cursor().withDefault(Maps.empty()).path(name),clock);
 	}
 
 	/**
@@ -104,11 +121,12 @@ public class LatticeMQ extends ALatticeComponent<AHashMap<ACell, Index<Keyword, 
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeMQ fork() {
-		return configured(new LatticeMQ(this));
+		return new LatticeMQ(this);
 	}
 
 	private LatticeMQ(LatticeMQ source) {
 		super(source);
+		clock=source.clock;
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
@@ -116,6 +134,6 @@ public class LatticeMQ extends ALatticeComponent<AHashMap<ACell, Index<Keyword, 
 	protected AHashMap<ACell, Index<Keyword, ACell>> mergePublication(
 			AHashMap<ACell, Index<Keyword, ACell>> own,
 			AHashMap<ACell, Index<Keyword, ACell>> other) {
-		return TOPIC_MAP.merge(getContext(),own,other);
+		return TOPIC_MAP.merge(own,other);
 	}
 }

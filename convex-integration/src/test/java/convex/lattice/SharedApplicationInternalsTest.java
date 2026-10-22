@@ -37,7 +37,6 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSApplication;
@@ -95,6 +94,7 @@ public class SharedApplicationInternalsTest {
 
 	/** Applications choose working-state policy; ordinary domain views need no fork. */
 	private static final class WorkingApplication extends LatticeApplication<Index<Keyword,ACell>> {
+		CVMLong timestamp=CVMLong.create(100);
 		final SignedComponent<Index<Keyword,ACell>> socialState;
 		final SignedComponent<AHashMap<AString,AVector<ACell>>> fileState;
 		final SignedComponent<ACell> nodeState;
@@ -104,10 +104,12 @@ public class SharedApplicationInternalsTest {
 
 		WorkingApplication(LatticeHost<Index<Keyword,ACell>> host,boolean socialApp,Runnable signing) {
 			super(HOST_ROOT,host);
+			setContext(VERIFY);
 			if (socialApp) {
-				socialState=owned(host,context(SOCIAL_KEY,signing),Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
+				var policy=context(SOCIAL_KEY,signing);
+				socialState=owned(host,policy,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
 				social=Social.connect(cursor().path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
-					(owner,value) -> socialState.getContext().signAs(owner,value),() -> socialState.getContext().currentTimestamp()).user(SOCIAL_KEY.getAccountKey()).withCursor(socialState.cursor());
+					(owner,value) -> policy.signAs(owner,value),() -> timestamp).user(SOCIAL_KEY.getAccountKey()).withCursor(socialState.cursor());
 				files=null;
 				fileState=null;
 			} else {
@@ -138,11 +140,9 @@ public class SharedApplicationInternalsTest {
 			var rule=(SignedLattice<T>)lattice;
 			// This legacy application's resolver supplies both the public owner rule
 			// and an explicit signer; the draft itself does not look up a context.
-			var component=new SignedComponent<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
+			return new SignedComponent<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
 				LatticeComponent.<SignedData<T>>resolve(host.cursor(),getLattice(),path),
 				value -> context.signAs(rule.getOwner(),value));
-			component.setContext(context);
-			return component;
 		}
 
 		@Override protected void syncChildren() {
@@ -155,14 +155,13 @@ public class SharedApplicationInternalsTest {
 	@Test
 	public void testIndependentSocialApplicationsPublishBothOwnersPosts() {
 		var host=LatticeHost.create(HOST_ROOT.zero(),new MemoryStore());
-		host.setContext(VERIFY);
 		AtomicInteger signatures=new AtomicInteger();
 		var first=new WorkingApplication(host,true,signatures::incrementAndGet);
 		var second=new WorkingApplication(host,true,signatures::incrementAndGet);
 		// Distinct post keys are application policy; both applications author the
 		// same signed owner subtree through separate working states.
-		second.socialState.setContext(second.socialState.getContext().withTimestamp(CVMLong.create(200)));
-		// The supplied clock reads the signed draft policy dynamically.
+		second.timestamp=CVMLong.create(200);
+		// The supplied clock reads this application's timestamp dynamically.
 		Blob a=first.social.feed().post("First application");
 		Blob b=second.social.feed().post("Second application");
 		first.sync();
@@ -172,14 +171,12 @@ public class SharedApplicationInternalsTest {
 		assertNotNull(published.getPost(b));
 		assertEquals(2,published.count());
 		assertEquals(2,signatures.get(),"The first envelope, then one combined signature");
-		assertNull(host.getContext().getSigningKey());
 	}
 
 	@Test
 	public void testWorkingApplicationsPublishSocialFilesAndSharedP2PRegion() throws Exception {
 		var store=new MemoryStore();
 		var host=LatticeHost.create(HOST_ROOT.zero(),store);
-		host.setContext(VERIFY);
 		AtomicInteger signatures=new AtomicInteger();
 		var socialApp=new WorkingApplication(host,true,signatures::incrementAndGet);
 		var filesApp=new WorkingApplication(host,false,signatures::incrementAndGet);
@@ -210,7 +207,6 @@ public class SharedApplicationInternalsTest {
 		socialApp.sync();
 		filesApp.sync();
 		assertEquals(4,signatures.get(),"Unchanged checkpoints do not sign");
-		assertNull(host.getContext().getSigningKey());
 		assertNull(socialApp.getContext().getSigningKey());
 		assertNull(store.getRootData());
 		host.sync();
@@ -254,20 +250,21 @@ public class SharedApplicationInternalsTest {
 
 	private static final class FilesWithP2P extends DLFSApplication
 			implements TransactionalComponent<Index<Keyword,ACell>,FilesWithP2P> {
+		private final LatticeContext policy;
 		FilesWithP2P(LatticeHost<Index<Keyword,ACell>> host) {
 			this(host.cursor(),host.store(),context(FILES_KEY));
 		}
 		FilesWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,LatticeContext context) {
 			super(cursor,store,FILES_KEY::signData,() -> CVMLong.create(100),30_000);
-			setContext(context);
+			policy=context;
 			for (Keyword key:new Keyword[]{Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
 				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),cursor.path(key),context));
 			}
 		}
 		@Override public FilesWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
-			return new FilesWithP2P(cursor,store(),getContext());
+			return new FilesWithP2P(cursor,store(),policy);
 		}
-		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> getContext().signAs(key,value)); }
+		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> policy.signAs(key,value)); }
 	}
 
 	/** Explicit allow-list projection; a selective lattice merge is not projection. */
@@ -300,7 +297,6 @@ public class SharedApplicationInternalsTest {
 		Fixture(boolean coordinated) {
 			var cursor=coordinated?Cursors.transactionalRoot(HOST_ROOT.zero()):Cursors.root(HOST_ROOT.zero());
 			var host=new LatticeHost<>(cursor,store);
-			host.setContext(VERIFY);
 			social=new SocialWithP2P(host);
 			files=new FilesWithP2P(host);
 			host.configureApplications(List.of(social,files));
@@ -579,7 +575,6 @@ public class SharedApplicationInternalsTest {
 	public void testConcurrentUpdatesToCommonSignedRegion() throws Exception {
 		try (Fixture f=new Fixture()) {
 			f.node.launch();
-			LatticeContext hostContext=f.node.getHost().getContext();
 			Data data=populate(f);
 			var socialNode=f.social.p2p(COMMON_KEY.getAccountKey()).node();
 			var filesNode=f.files.p2p(COMMON_KEY.getAccountKey()).node();
@@ -620,8 +615,6 @@ public class SharedApplicationInternalsTest {
 			assertSame(before,f.node.getCursor().get());
 			assertNotNull(f.social.social.user(SOCIAL_KEY.getAccountKey()).feed().getPost(data.post()));
 			assertEquals("Shared host, private file",Files.readString(data.drive().fileSystem().getPath("/hello.txt")));
-			assertSame(hostContext,f.node.getHost().getContext());
-			assertNull(hostContext.getSigningKey());
 			f.files.sync();
 			f.node.getHost().sync();
 			assertEquals(f.node.getCursor().get(),f.store.getRootData());

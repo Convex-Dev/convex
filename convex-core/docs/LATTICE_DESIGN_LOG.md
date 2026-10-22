@@ -667,6 +667,28 @@ Updated 22 October 2026: removed thread tracking and re-entrancy guards. Publica
 callbacks must still avoid mutating or syncing the same fork; this is a caller
 contract. Working-state locking continues to coordinate concurrent edits and sync.
 
+## 28. Component bases carry no context
+
+Implemented 22 October 2026. Removed context storage, accessors and child-policy
+copying from `ALatticeComponent`, `ALatticeApplication`, `LatticeHost` and region
+factories. Factories receive only a cursor. KV and queue components bind an
+explicit `Supplier<CVMLong>`; Mail binds an owner-aware receipt signer and checks
+it against its existing DID authoriser. Forks and rebound views retain these
+policies. SQL components no longer copy unused contexts. Optional `ALattice`
+adapters retain local context support for callers that need it.
+
+CAD045's component-owned policy and CAD038's ownership boundary guide this change;
+CAD037/KV and CAD040/queue merge and timestamp semantics are unchanged. Follow-up
+in the design repository: CAD024's *Merge Context* implementation paragraph still
+says a component holds `LatticeContext`, and CAD045's reference table names it as
+the general component capability mechanism. These references should describe
+explicit component policies and optional adapter contexts instead.
+
+Regression tests cover adapter policy isolation, clocks retained through nested
+views and forks, multi-DID receipt signing, and failed authoring leaving state
+unchanged. Existing publication and integration tests continue to cover routing,
+transaction atomicity and shared application composition.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |

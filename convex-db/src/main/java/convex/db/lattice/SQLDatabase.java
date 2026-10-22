@@ -11,7 +11,6 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.db.ConvexDB;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.OwnerLattice;
@@ -124,9 +123,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		if (cursor.get()==null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
-		SQLDatabase result=new SQLDatabase(cursor,dbName,null,null);
-		result.setContext(parent.getContext());
-		return result;
+		return new SQLDatabase(cursor,dbName,null,null);
 	}
 
 	/**
@@ -138,7 +135,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Forked SQLDatabase instance
 	 */
 	public SQLDatabase fork() {
-		return configured(new SQLDatabase(this));
+		return new SQLDatabase(this);
 	}
 
 	private SQLDatabase(SQLDatabase source) {
@@ -154,7 +151,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return configured(new SQLSchema(cursor().withDefault(Index.none()).path(ConvexDB.KEY_TABLES)));
+		return new SQLSchema(cursor().withDefault(Index.none()).path(ConvexDB.KEY_TABLES));
 	}
 
 	/**
@@ -232,9 +229,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 
 		// Use OwnerLattice to verify signatures and owner-key matching
-		LatticeContext ctx = LatticeContext.create(null, keyPair);
 		AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> verified =
-			OWNER_LATTICE.merge(ctx, Maps.empty(), remoteOwnerMap);
+			OWNER_LATTICE.merge( Maps.empty(), remoteOwnerMap);
 
 		// Absorb verified remote data into local store
 		long merged = 0;
@@ -245,7 +241,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 			@SuppressWarnings("unchecked")
 			Index<Keyword, ACell> remoteState = (Index<Keyword, ACell>) dbMap.get(dbName);
 			if (remoteState != null) {
-				cursor().updateAndGet(own -> ConvexDB.DATABASE_LATTICE.merge(getContext(),own,remoteState));
+				cursor().updateAndGet(own -> ConvexDB.DATABASE_LATTICE.merge(own,remoteState));
 				merged++;
 			}
 		}
@@ -255,7 +251,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
 	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
-		var merged=ConvexDB.DATABASE_LATTICE.merge(getContext(),own,other);
+		var merged=ConvexDB.DATABASE_LATTICE.merge(own,other);
 		if (other==null) return merged;
 		// Only tables belong to this component; retain current unrelated keys,
 		// including removal of a key still present in our stale working snapshot.

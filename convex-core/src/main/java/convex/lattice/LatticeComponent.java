@@ -21,6 +21,15 @@ import convex.lattice.cursor.ProjectionCursor;
  */
 public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 	private final ALattice<V> lattice;
+	private volatile LatticeContext context=LatticeContext.EMPTY;
+
+	/** Optional policy for the supplied lattice implementation, local to this adapter. */
+	public final LatticeContext getContext() { return context; }
+
+	/** Configures this adapter only; component bases and hosts carry no context. */
+	public final void setContext(LatticeContext context) {
+		this.context=(context==null)?LatticeContext.EMPTY:context;
+	}
 
 	/** Creates private working state, published to the destination by sync. */
 	public LatticeComponent(ALattice<V> lattice,ACursor<V> destination,LatticeContext context) {

@@ -24,7 +24,6 @@ import convex.core.message.MessageType;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeApplication;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.SetLattice;
@@ -90,25 +89,21 @@ class NodeApplicationIngressTest {
 		}
 	}
 
-	@Test void suppliedRootKeepsInitialisationContextAndCursorPolicy() throws Exception {
+	@Test void suppliedRootKeepsInitialisationAndCursorPolicy() throws Exception {
 		try (var store=EtchStore.createTemp("supplied-root")) {
 			var retained=LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE));
 			store.setRootData(retained);
 			var root=LatticeHost.open(LATTICE.zero(),store);
-			var context=LatticeContext.create(CVMLong.create(1234),null);
-			root.setContext(context);
 			// A supplied root is already initialised: launch must not reload the store.
 			store.setRootData(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));
 			try (var node=new NodeServer<>(root,NodeConfig.create().withTransactionalRoot(true))) {
 				assertSame(root,node.getHost());
 				assertSame(root.cursor(),node.getCursor());
 				assertSame(store,node.getStore());
-				assertSame(context,node.getHost().getContext());
 				assertFalse(node.getCursor().supportsExclusiveTransactions());
 				var app=new App(node.getHost());
 			node.getHost().configureApplications(List.of(app));
 			node.launch();
-				assertSame(context,app.getContext());
 				assertEquals(retained,app.cursor().get());
 				assertEquals(retained,store.getRootData());
 			}

@@ -151,9 +151,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	public static ConvexDB connect(
 			ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		ConvexDB result=new ConvexDB(parent.cursor());
-		result.setContext(parent.getContext());
-		return result;
+		return new ConvexDB(parent.cursor());
 	}
 
 	/**

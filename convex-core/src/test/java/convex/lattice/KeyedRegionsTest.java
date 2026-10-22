@@ -37,21 +37,21 @@ class KeyedRegionsTest {
 
 	private static class TestRegions extends Regions {
 		TestRegions(LatticeHost<Index<Keyword,ACell>> host) { super(host); }
-		TestRegions(AForkableCursor<Index<Keyword,ACell>> cursor,LatticeContext context) { super(cursor,context); }
+		TestRegions(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
 		Counter counter(Keyword key) { return create(key,Counter::new); }
 		Members members(Keyword key) { return create(key,Members::new); }
 		TestRegions nested(Keyword key) { return this.<Index<Keyword,ACell>,TestRegions>createRegion(key,TestRegions::new); }
 	}
 
 	private static class Counter extends LatticeComponent<AInteger> {
-		Counter(AForkableCursor<AInteger> cursor,LatticeContext context) {
-			super(MaxLattice.INSTANCE,cursor,context);
+		Counter(AForkableCursor<AInteger> cursor) {
+			super(MaxLattice.INSTANCE,forkOf(cursor));
 		}
 	}
 
 	private static class Members extends LatticeComponent<ASet<CVMLong>> {
-		Members(AForkableCursor<ASet<CVMLong>> cursor,LatticeContext context) {
-			super(SetLattice.create(),cursor,context);
+		Members(AForkableCursor<ASet<CVMLong>> cursor) {
+			super(SetLattice.create(),forkOf(cursor));
 		}
 	}
 
@@ -79,7 +79,7 @@ class KeyedRegionsTest {
 		var root=new Regions(host);
 		var nested=root.<Index<Keyword,ACell>,Regions>create(NESTED,Regions::new);
 		var child=nested.create(A,Counter::new);
-		var alias=new Regions(nested.cursor(),nested.getContext());
+		var alias=new Regions(nested.cursor());
 		assertSame(child,alias.add(A,child));
 		assertTrue(host.cursor().get().isEmpty());
 		root.mergeAt(CVMLong.ONE,NESTED,A);
@@ -245,22 +245,24 @@ class KeyedRegionsTest {
 		assertSame(policy,shared.getContext());
 	}
 
-	@Test void factoryContextIsResolvedBeforeNestedChildrenAreConstructed() {
+	@Test void factoriesBindPolicyExplicitlyToTheirAdapters() {
 		var host=LatticeHost.create();
 		var policy=LatticeContext.create(null,AKeyPair.createSeeded(616));
-		host.setContext(policy);
 		var app=new TestRegions(host);
-		var child=app.nested(NESTED).counter(A);
+		var child=app.nested(NESTED).create(A,(AForkableCursor<AInteger> cursor) -> {
+			var counter=new Counter(cursor);
+			counter.setContext(policy);
+			return counter;
+		});
 		assertSame(policy,child.getContext());
-		app.setContext(LatticeContext.EMPTY);
-		assertSame(policy,child.getContext());
+		assertSame(LatticeContext.EMPTY,app.counter(B).getContext());
 	}
 
 	@Test void absenceDoesNotMeanNullAndCustomChildBehaviourIsUsedForBothRoutes() {
 		var host=LatticeHost.create();
 		var app=new TestRegions(host);
 		AtomicInteger deliveries=new AtomicInteger();
-		app.createRegion(A,(AForkableCursor<ACell> destination,LatticeContext context) -> new ALatticeComponent<ACell>(destination) {
+		app.createRegion(A,(AForkableCursor<ACell> destination) -> new ALatticeComponent<ACell>(destination) {
 			@Override public ACell merge(ACell incoming) {
 				deliveries.incrementAndGet();
 				// A domain rule, deliberately different from any inferred lattice merge.
@@ -315,7 +317,6 @@ class KeyedRegionsTest {
 			OwnerLattice.create(SetLattice.<CVMLong>create()).signingFor(owner.getAccountKey()));
 		for (var rule:rules) {
 			var host=LatticeHost.create();
-			host.setContext(LatticeContext.create(null,owner));
 			var app=new TestRegions(host);
 			var child=app.region(A,new SignedComponent<>(rule,host.cursor().path(A),owner::signData));
 			app.merge(Index.of(A,stranger.signData(payload)));
@@ -367,8 +368,8 @@ class KeyedRegionsTest {
 	@Test void liveChildrenControlTheirOwnVisibility() {
 		var host=LatticeHost.create();
 		var app=new TestRegions(host);
-		app.createRegion(A,(AForkableCursor<AInteger> destination,LatticeContext context) ->
-			LatticeComponent.live(MaxLattice.INSTANCE,destination,context));
+		app.createRegion(A,(AForkableCursor<AInteger> destination) ->
+			LatticeComponent.live(MaxLattice.INSTANCE,destination,LatticeContext.EMPTY));
 		host.configureApplications(List.of(app));
 		host.merge(Index.of(A,CVMLong.TWO,UNKNOWN,CVMLong.ONE));
 		assertEquals(Index.of(A,CVMLong.TWO),host.cursor().get());
@@ -379,7 +380,7 @@ class KeyedRegionsTest {
 		var host=LatticeHost.create();
 		var app=new TestRegions(host);
 		app.counter(A).cursor().set(CVMLong.ONE);
-		app.createRegion(B,(AForkableCursor<ACell> destination,LatticeContext context) -> new ALatticeComponent<ACell>(destination) {
+		app.createRegion(B,(AForkableCursor<ACell> destination) -> new ALatticeComponent<ACell>(destination) {
 			@Override public ACell sync() { throw new IllegalStateException("publication failed"); }
 		});
 		var pending=app.counter(UNKNOWN);

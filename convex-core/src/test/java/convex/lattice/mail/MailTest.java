@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ECIES;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -26,11 +29,9 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.lattice.LatticeApplication;
 import convex.lattice.Lattice;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
@@ -38,6 +39,47 @@ import convex.lattice.generic.KeyedLattice;
 
 /** The mail components: atomic sends, open, receive and hosting. */
 public class MailTest {
+
+	/** Identity resolution and signing share one explicit mapping, including indirect DIDs. */
+	@Test void oneSignerServesMultipleOwnersAcrossForksAndTransactions() {
+		var bob=Strings.create("did:convex:42");
+		var carol=Strings.create("did:convex:43");
+		var keys=Map.of(bob,BOB,carol,CAROL);
+		var lattice=MailLattice.create((did,key) -> keys.containsKey(did)
+			&& keys.get(did).getAccountKey().equals(key));
+		var mail=Mail.create(lattice,(owner,value) -> keys.get(owner).signData(value));
+		var first=MailEnvelope.plain(ALICE,bob,ALICE_DID,100,Strings.create("one"));
+		var second=MailEnvelope.plain(ALICE,carol,ALICE_DID,101,Strings.create("two"));
+		mail.send(first);
+		mail.send(second);
+		var draft=mail.fork();
+		draft.transact(tx -> {
+			tx.mailbox(bob).receive(first);
+			tx.mailbox(carol).receive(second);
+		});
+		assertFalse(mail.mailbox(bob).isReceived(first));
+		draft.sync();
+		assertTrue(mail.mailbox(bob).isReceived(first));
+		assertTrue(mail.mailbox(carol).isReceived(second));
+		assertEquals(BOB.getAccountKey(),mail.mailbox(bob).receipts().get(0).signed().getAccountKey());
+		assertEquals(CAROL.getAccountKey(),mail.mailbox(carol).receipts().get(0).signed().getAccountKey());
+	}
+
+	@Test void unavailableOrInvalidReceiptSignersLeaveTheMailboxUnchanged() {
+		List<BiFunction<ACell,ACell,SignedData<ACell>>> signers=List.of(
+			(owner,value) -> null,
+			(owner,value) -> ALICE.signData(value),
+			(owner,value) -> BOB.signData(Strings.create("different payload")),
+			(owner,value) -> SignedData.create(BOB.getAccountKey(),Ed25519Signature.ZERO,BOB.signData(value).getValueRef()));
+		for (var signer:signers) {
+			var mail=Mail.create(signer);
+			var envelope=aliceToBob(100,"one");
+			mail.send(envelope);
+			var before=mail.cursor().get();
+			assertThrows(IllegalStateException.class,() -> mail.mailbox(BOB_DID).receive(envelope));
+			assertSame(before,mail.cursor().get());
+		}
+	}
 
 	static final AKeyPair ALICE=AKeyPair.createSeeded(42001);
 	static final AKeyPair BOB=AKeyPair.createSeeded(42002);
@@ -50,9 +92,6 @@ public class MailTest {
 	static final ECIES.Decryptor BOB_READS=ECIES.createDecryptor(BOB);
 	static final ECIES.Decryptor ALICE_READS=ECIES.createDecryptor(ALICE);
 
-	static LatticeContext context(AKeyPair key, long time) {
-		return LatticeContext.create(CVMLong.create(time),key);
-	}
 
 	static MailEnvelope aliceToBob(long issuedAt, String text) {
 		return MailEnvelope.seal(ALICE,BOB_DID,BOB.getAccountKey(),ALICE_DID,issuedAt,
@@ -66,7 +105,7 @@ public class MailTest {
 
 	/** A batch send commits all recipient entries together; no send state lives on the draft instance. */
 	@Test void sendsCommitTogetherAndSurviveRebinding() {
-		Mail mail=Mail.create(context(ALICE,1000));
+		Mail mail=Mail.create((owner,value) -> ALICE.signData(value));
 		var first=aliceToBob(1000,"one");
 		var second=MailEnvelope.plain(ALICE,CAROL_DID,ALICE_DID,1001,Strings.create("two"));
 		var before=mail.cursor().get();
@@ -80,7 +119,7 @@ public class MailTest {
 		assertEquals(List.of(first),rebound.mailbox(BOB_DID).deposited());
 		assertEquals(List.of(second),rebound.mailbox(CAROL_DID).deposited());
 		// A fresh component over a saved snapshot needs no separate sender state.
-		Mail restored=Mail.connect(Cursors.root(mail.cursor().get()),Mail.LATTICE,mail.getContext());
+		Mail restored=Mail.connect(Cursors.root(mail.cursor().get()),Mail.LATTICE,null);
 		assertEquals(List.of(first),restored.mailbox(BOB_DID).deposited());
 		var committed=mail.cursor().get();
 		mail.send(first);
@@ -88,7 +127,7 @@ public class MailTest {
 	}
 
 	@Test void abortedSendsLeaveNoStateToPublish() {
-		Mail mail=Mail.create(context(ALICE,1000));
+		Mail mail=Mail.create((owner,value) -> ALICE.signData(value));
 		var envelope=aliceToBob(1000,"abandoned");
 		var before=mail.cursor().get();
 		assertThrows(IllegalStateException.class,() -> mail.transact(draft -> {
@@ -117,7 +156,7 @@ public class MailTest {
 				return super.compareAndSet(expected,value);
 			}
 		};
-		Mail mail=Mail.connect(root,Mail.LATTICE,context(ALICE,1000));
+		Mail mail=Mail.connect(root,Mail.LATTICE,(owner,value) -> ALICE.signData(value));
 		var attempts=new AtomicInteger();
 		mail.transact(draft -> {
 			draft.send(envelope);
@@ -130,7 +169,7 @@ public class MailTest {
 
 	/** The mailbox is the sole send state; sync cannot recreate a deliberately removed deposit. */
 	@Test void liveSyncDoesNotRecreateRemovedDeposits() {
-		Mail mail=Mail.create(context(ALICE,1000));
+		Mail mail=Mail.create((owner,value) -> ALICE.signData(value));
 		mail.send(aliceToBob(1000,"removed"));
 		var empty=Mail.LATTICE.zero();
 		mail.cursor().set(empty);
@@ -140,14 +179,14 @@ public class MailTest {
 
 	/** Fork publication reconciles sends and receipts through the same lattice entry. */
 	@Test void forkedSendsPublishOnceAndCannotResurrectReceiptedMail() {
-		Mail mail=Mail.create(context(ALICE,1000));
+		Mail mail=Mail.create((owner,value) -> ALICE.signData(value));
 		var envelope=aliceToBob(1000,"fork");
 		var fork=mail.fork();
 		fork.send(envelope);
 		assertTrue(mail.mailbox(BOB_DID).deposited().isEmpty());
 		fork.sync();
 		assertEquals(List.of(envelope),mail.mailbox(BOB_DID).deposited());
-		Mail bob=Mail.connect(mail.cursor(),Mail.LATTICE,context(BOB,2000));
+		Mail bob=Mail.connect(mail.cursor(),Mail.LATTICE,(owner,value) -> BOB.signData(value));
 		bob.mailbox(BOB_DID).receive(envelope);
 		var next=aliceToBob(1001,"next");
 		fork.send(next);
@@ -160,13 +199,13 @@ public class MailTest {
 	@Test
 	public void testSendOpenReceive() {
 		// One region shared by both parties: a node holding Bob's mailbox
-		Mail alice=Mail.create(context(ALICE,1000));
+		Mail alice=Mail.create((owner,value) -> ALICE.signData(value));
 		MailEnvelope envelope=aliceToBob(1000,"hello bob");
 		Hash hash=alice.send(envelope);
 		assertEquals(envelope.hash(),hash);
 		assertEquals(List.of(envelope),alice.mailbox(BOB_DID).deposited());
 
-		Mail bob=Mail.connect(alice.cursor(),Mail.LATTICE,context(BOB,2000));
+		Mail bob=Mail.connect(alice.cursor(),Mail.LATTICE,(owner,value) -> BOB.signData(value));
 		Mailbox inbox=bob.mailbox(BOB_DID);
 		assertEquals(List.of(envelope),inbox.deposited());
 
@@ -200,12 +239,12 @@ public class MailTest {
 	@Test
 	public void testMisfiledReceiptDoesNotConfirmDelivery() {
 		// Alice sends two messages; Bob receipts the first
-		Mail alice=Mail.create(context(ALICE,1000));
+		Mail alice=Mail.create((owner,value) -> ALICE.signData(value));
 		MailEnvelope first=aliceToBob(1000,"one");
 		MailEnvelope second=aliceToBob(1001,"two");
 		alice.send(first);
 		alice.send(second);
-		Mail bob=Mail.connect(alice.cursor(),Mail.LATTICE,context(BOB,2000));
+		Mail bob=Mail.connect(alice.cursor(),Mail.LATTICE,(owner,value) -> BOB.signData(value));
 		MailReceipt receipt=bob.mailbox(BOB_DID).receive(first).get(0);
 		assertTrue(alice.mailbox(BOB_DID).isReceived(first));
 		assertEquals(List.of(second),alice.mailbox(BOB_DID).deposited());
@@ -227,7 +266,7 @@ public class MailTest {
 
 	@Test
 	public void testReceiveNeedsAuthorisedSigner() {
-		Mail alice=Mail.create(context(ALICE,1000));
+		Mail alice=Mail.create((owner,value) -> ALICE.signData(value));
 		MailEnvelope envelope=aliceToBob(1000,"hello bob");
 		alice.send(envelope);
 		Mailbox bobsInboxSeenByAlice=alice.mailbox(BOB_DID);
@@ -242,7 +281,7 @@ public class MailTest {
 		MailEnvelope rewrapped=MailEnvelope.create(CAROL,BOB_DID,CAROL_DID,1000,true,genuine.body());
 		assertThrows(BadFormatException.class,() -> rewrapped.open(BOB_READS));
 
-		Mail mail=Mail.create(context(BOB,2000));
+		Mail mail=Mail.create((owner,value) -> BOB.signData(value));
 		mail.mailbox(BOB_DID).deposit(rewrapped);
 		mail.mailbox(BOB_DID).deposit(genuine);
 		List<MailMessage> messages=mail.mailbox(BOB_DID).open(BOB_READS);
@@ -270,7 +309,7 @@ public class MailTest {
 			Maps.of(MailEnvelope.CONTENT,Strings.create("anonymous")));
 		assertNull(envelope.from());
 
-		Mail mail=Mail.create(context(BOB,2000));
+		Mail mail=Mail.create((owner,value) -> BOB.signData(value));
 		mail.mailbox(BOB_DID).deposit(envelope);
 		List<MailMessage> messages=mail.mailbox(BOB_DID).open(BOB_READS);
 		assertEquals(1,messages.size());
@@ -289,8 +328,8 @@ public class MailTest {
 
 	@Test
 	public void testTwoRootsConverge() {
-		Mail alice=Mail.create(context(ALICE,1000));
-		Mail bob=Mail.create(context(BOB,2000));
+		Mail alice=Mail.create((owner,value) -> ALICE.signData(value));
+		Mail bob=Mail.create((owner,value) -> BOB.signData(value));
 		MailEnvelope envelope=aliceToBob(1000,"hello bob");
 		alice.send(envelope);
 
@@ -334,7 +373,7 @@ public class MailTest {
 		LatticeHost<Index<Keyword,ACell>> host=LatticeHost.create();
 		HostedRoot app=new HostedRoot(root,host);
 		host.configureApplications(List.of(app));
-		Mail mail=Mail.connect(app,Mail.LATTICE,context(ALICE,1000));
+		Mail mail=Mail.connect(app,Mail.LATTICE,(owner,value) -> ALICE.signData(value));
 		mail.send(aliceToBob(1000,"hello bob"));
 		assertNotNull(app.cursor().get().get(Mail.KEY_MAIL),"working state holds the region");
 		app.sync();
@@ -347,7 +386,7 @@ public class MailTest {
 	public void testHostedRegion() {
 		KeyedLattice root=Lattice.ROOT.addLattice(Mail.KEY_MAIL,Mail.LATTICE);
 		TestRoot app=new TestRoot(root);
-		Mail mail=Mail.connect(app,Mail.LATTICE,context(ALICE,1000));
+		Mail mail=Mail.connect(app,Mail.LATTICE,(owner,value) -> ALICE.signData(value));
 		MailEnvelope envelope=aliceToBob(1000,"hello bob");
 		mail.send(envelope);
 		app.sync();
@@ -358,7 +397,7 @@ public class MailTest {
 		AHashMap<ACell,ACell> region=(AHashMap<ACell,ACell>)published.get(Mail.KEY_MAIL);
 		assertNotNull(region.get(BOB_DID));
 
-		Mail bob=Mail.connect(app,Mail.LATTICE,context(BOB,2000));
+		Mail bob=Mail.connect(app,Mail.LATTICE,(owner,value) -> BOB.signData(value));
 		Mailbox inbox=bob.mailbox(BOB_DID);
 		assertEquals("hello bob",content(inbox.open(BOB_READS).get(0)));
 		inbox.receive(inbox.deposited());

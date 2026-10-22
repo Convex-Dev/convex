@@ -110,7 +110,6 @@ class OwnedScoresApplicationTest {
 		assertSame(accepted,replica.component().get(TEAM));
 		replica.sync();
 		assertEquals(host.cursor().get(),replicaHost.cursor().get());
-		assertNull(replica.component().getContext().getSigningKey());
 	}
 
 	/** Revocation changes the rule used by already-open handles and subsequent incoming deliveries. */

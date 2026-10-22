@@ -14,7 +14,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.dlfs.DLFSRegion;
-import convex.lattice.LatticeContext;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLPath;
@@ -40,8 +39,7 @@ public class DLFSOwnershipTest {
 		var relay=DLFSRegion.connect(Cursors.root(DLFSRegion.LATTICE.zero()),null);
 		relay.merge(left.cursor().get());
 		var before=relay.cursor().get();
-		// Even an inherited signing context does not confer capability on this relay.
-		relay.setContext(LatticeContext.create(null,ALICE,(owner,key) -> true));
+		// A relay cannot sign a merged value; it can only adopt existing envelopes.
 		relay.merge(right.cursor().get());
 		assertSame(before,relay.cursor().get());
 		assertThrows(IllegalStateException.class,() -> relay.drives(ALICE.getAccountKey()).createDrive("no"));

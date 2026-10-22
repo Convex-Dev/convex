@@ -15,7 +15,6 @@ import convex.core.data.Keyword;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
 import convex.lattice.fs.DLFSLattice;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.Regions;
 import convex.lattice.cursor.AForkableCursor;
@@ -69,13 +68,13 @@ public class DLFSApplication extends Regions {
 	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,
 			Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
 			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
-		super(cursor,LatticeContext.EMPTY);
+		super(cursor);
 		this.store=store;
 		Keyword[] keys=path.length==0?new Keyword[]{Keywords.FS}:path.clone();
 		Regions parent=this;
 		for (int i=0;i<keys.length-1;i++) {
 			parent=parent.add(keys[i],new Regions(
-				parent.cursor().withDefault(Index.none()).path(keys[i]),LatticeContext.EMPTY));
+				parent.cursor().withDefault(Index.none()).path(keys[i])));
 		}
 		dlfs=parent.add(keys[keys.length-1],new DLFSRegion(
 			parent.cursor().withDefault(Index.none()).path(keys[keys.length-1]),store,

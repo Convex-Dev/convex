@@ -12,10 +12,12 @@ import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 
 /**
- * Application policy available to lattice merge and write operations.
+ * Optional policy for lattice implementations and legacy write operations.
  *
- * <p>A context is normally installed on a component and explicitly supplied to newly
- * constructed children and rebound views. Implementations may return fixed values (useful for
+ * <p>The optional {@link LatticeComponent} and {@link LatticeApplication} adapters
+ * can supply a context to their lattice. Component bases, hosts and cursors carry
+ * no context; domain components bind their own clocks, signers and admission rules.
+ * Implementations may return fixed values (useful for
  * deterministic tests) or resolve policies dynamically, for example from an
  * application clock, wallet or key store. Dynamic implementations used by shared
  * components must be thread-safe.</p>
@@ -24,7 +26,7 @@ import convex.core.util.Utils;
  * replaces one capability outright and delegates every other to this context, so a
  * fixed timestamp does not freeze a dynamic signing policy, or vice versa.</p>
  *
- * <p>{@link #signAs} is the single rule for authoring owned data, and it is the rule
+ * <p>For callers using this context, {@link #signAs} checks authoring against the rule
  * {@link #verifyOwner} applies to data arriving on merge. Authoring and adopting are
  * therefore judged identically, so a value is never written locally in a form a peer
  * would reject.</p>

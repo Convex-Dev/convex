@@ -86,7 +86,6 @@ class SignedDomainComponentTest {
 		component.set(1);
 		var signed=destination.get();
 		key.set(BOB);
-		component.setContext(LatticeContext.EMPTY.withSigningKey(ALICE).withOwnerVerifier((o,k) -> true));
 		assertThrows(IllegalStateException.class,() -> component.set(2));
 		assertSame(signed,destination.get());
 	}

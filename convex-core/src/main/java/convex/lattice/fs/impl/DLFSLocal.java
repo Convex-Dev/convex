@@ -27,7 +27,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
@@ -475,10 +474,10 @@ public class DLFSLocal extends DLFileSystem {
 
 	/** NIO adapter whose policy belongs to its publication component. */
 	private static final class WorkingFileSystem extends DLFSLocal {
-		private final ALatticeComponent<AVector<ACell>> working;
+		private final LatticeComponent<AVector<ACell>> working;
 
 		WorkingFileSystem(DLFSProvider provider,String uriPath,
-				ALatticeComponent<AVector<ACell>> working,AStore store) {
+				LatticeComponent<AVector<ACell>> working,AStore store) {
 			super(provider,uriPath,working.cursor(),store);
 			this.working=working;
 		}

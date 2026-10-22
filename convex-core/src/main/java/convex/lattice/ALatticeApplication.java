@@ -23,10 +23,9 @@ import convex.lattice.cursor.AForkableCursor;
  */
 public abstract class ALatticeApplication<V extends ACell> extends ALatticeComponent<V> {
 
-	/** Creates private working state over a host, retaining its current context. */
+	/** Creates private working state over a host. */
 	protected ALatticeApplication(LatticeHost<V> host) {
 		super(forkOf(Objects.requireNonNull(host,"Application host must not be null").cursor()));
-		setContext(host.getContext());
 	}
 
 	/** Shares working storage, for live applications, nested containers and transaction views. */

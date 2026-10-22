@@ -13,7 +13,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeComponent;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.Regions;
 import convex.lattice.SetComponent;
@@ -39,8 +38,8 @@ class SharedRegionsTest {
 	/** A staged grow-only set; union is the rule for both incoming merge and publication conflicts. */
 	static final class Items extends LatticeComponent<ASet<ACell>> {
 		private final SetComponent<ACell> items;
-		Items(AForkableCursor<ASet<ACell>> destination,LatticeContext context) {
-			super(SetLattice.create(),destination,context);
+		Items(AForkableCursor<ASet<ACell>> destination) {
+			super(SetLattice.create(),forkOf(destination));
 			items=new SetComponent<>(cursor());
 		}
 		void add(long item) { items.add(CVMLong.create(item)); }

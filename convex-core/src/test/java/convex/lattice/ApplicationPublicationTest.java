@@ -117,7 +117,6 @@ public class ApplicationPublicationTest {
 		second.sync();
 		assertEquals(Sets.of(0,1,2),second.owner.cursor().get());
 		assertEquals(1,second.signatures.get(),"An unchanged subsequent publication must not sign");
-		assertNull(host.getContext().getSigningKey());
 	}
 
 	@Test

@@ -26,7 +26,6 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
-import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.ADelegatingLattice;
 import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
@@ -108,7 +107,7 @@ public class ALatticeApplicationTest {
 		AtomicInteger calls=new AtomicInteger();
 		var app=new ALatticeApplication<Index<Keyword,ACell>>(host) {
 			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-				return cursor().updateAndGet(own -> LATTICE.merge(getContext(),own,other));
+				return cursor().updateAndGet(own -> LATTICE.merge(own,other));
 			}
 			@Override protected void beforeSync() {
 				new Items(this).add(CVMLong.ONE);
@@ -179,14 +178,13 @@ public class ALatticeApplicationTest {
 	}
 
 	@Test
-	public void testContextResolvedAtApplicationConstruction() {
+	public void testAdapterContextIsExplicitAndLocal() {
 		var host=LatticeHost.create(LATTICE.zero(),null);
 		var hostPolicy=LatticeContext.create(CVMLong.ONE,null);
-		host.setContext(hostPolicy);
 		var first=new LatticeApplication<>(LATTICE,host);
-		host.setContext(LatticeContext.create(CVMLong.TWO,null));
+		first.setContext(hostPolicy);
 		assertSame(hostPolicy,first.getContext());
-		assertSame(host.getContext(),new LatticeApplication<>(LATTICE,host).getContext());
+		assertSame(LatticeContext.EMPTY,new LatticeApplication<>(LATTICE,host).getContext());
 		first.setContext(null);
 		assertSame(LatticeContext.EMPTY,first.getContext());
 	}
@@ -219,7 +217,6 @@ public class ALatticeApplicationTest {
 		assertEquals(CVMLong.create(200),state.get(bob.getAccountKey()).getValue().get(timestamp));
 		assertTrue(state.get(alice.getAccountKey()).checkSignature());
 		assertTrue(state.get(bob.getAccountKey()).checkSignature());
-		assertSame(LatticeContext.EMPTY,host.getContext());
 		var wrongSigner=new ASignedComponent<>(second.cursor().path(alice.getAccountKey()),
 			owners.signingFor(alice.getAccountKey()),bob::signData) {};
 		AHashMap<Keyword,ACell> attempted=Maps.of(timestamp,CVMLong.create(300),ITEMS,Sets.of(3));

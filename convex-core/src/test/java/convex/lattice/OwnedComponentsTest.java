@@ -142,7 +142,6 @@ class OwnedComponentsTest {
 
 	@Test void capabilitiesCannotReplaceTheMapsAuthorisationPolicy() {
 		var map=collection(true);
-		map.setContext(LatticeContext.EMPTY.withSigningKey(BOB).withOwnerVerifier((o,k) -> true));
 		var view=new Count(map.path(A),map.getLattice().signingFor(A),BOB::signData);
 		assertThrows(IllegalStateException.class,() -> view.set(1));
 		assertNull(map.cursor().get());
@@ -199,12 +198,6 @@ class OwnedComponentsTest {
 		map.mergeAt(first,A);
 		map.mergeAt(second,A);
 		assertSame(first,map.get(A),"a relay cannot sign a synthesised union");
-		map.setContext(LatticeContext.EMPTY.withSigningKey(BOB));
-		map.mergeAt(second,A);
-		assertSame(first,map.get(A),"an unrelated signer cannot author the union");
-		map.setContext(LatticeContext.EMPTY.withSigningKey(DELEGATE));
-		map.mergeAt(second,A);
-		assertSame(first,map.get(A),"even an authorised key in the map context cannot trigger signing");
 		var author=new ASignedComponent<ASet<CVMLong>>(map.path(A),map.getLattice().signingFor(A),
 			BOB::signData) {};
 		author.merge(second);
@@ -228,13 +221,6 @@ class OwnedComponentsTest {
 	@SuppressWarnings("unchecked")
 	private static <K extends ACell,M extends AMap<K,SignedData<ASet<CVMLong>>>> void assertPublicMerge(
 			AOwnedMap<K,ASet<CVMLong>,M> map,Root<M> destination,K owner) {
-		map.setContext(new LatticeContext() {
-			@Override public <T extends ACell> SignedData<T> sign(AccountKey key,T value) {
-				throw new AssertionError("Owned-map merging must not resolve a signing key");
-			}
-			@Override public CVMLong currentTimestamp() { throw new AssertionError("Owned-map merging must not read a clock"); }
-			@Override public boolean verifyOwner(ACell key,AccountKey signer) { throw new AssertionError("Use the bound owner rule"); }
-		});
 		var first=ALICE.signData(Sets.<CVMLong>of(1));
 		var second=ALICE.signData(Sets.<CVMLong>of(2));
 		map.mergeAt(first,owner);

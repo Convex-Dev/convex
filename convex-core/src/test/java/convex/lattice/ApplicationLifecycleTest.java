@@ -53,7 +53,7 @@ class ApplicationLifecycleTest {
 			}
 		};
 		AForkableCursor<Index<Keyword,ACell>> nestedPath=host.cursor().path(NESTED);
-		var nested=new Regions(nestedPath,LatticeContext.EMPTY) {
+		var nested=new Regions(nestedPath) {
 			@Override protected void beforeSync() { events.add("nested"); }
 		};
 		var values=new Values(nestedPath.withDefault(Index.none()).path(ITEMS)) {

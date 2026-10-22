@@ -3,6 +3,7 @@ package convex.lattice.mail;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.BiFunction;
 
 import convex.core.crypto.ECIES;
 import convex.core.data.ABlob;
@@ -20,24 +21,27 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p>Anyone holding this view may {@link #deposit}. Opening and receiving are the
  * recipient's: {@link #open} needs the decryptors for the recipient's keys and
- * {@link #receive} needs a context holding a signer authorised for the DID. Every
+ * {@link #receive} needs an explicit signer authorised for the DID. Every
  * write goes through the mailbox lattice, so a receipted entry absorbs a later
- * deposit and an unauthorised receipt is dropped locally exactly as a peer would
- * drop it.</p>
+ * deposit. Incoming unauthorised receipts are dropped; attempted local authoring
+ * with an unavailable or unauthorised signer fails before writing the receipt.</p>
  */
 public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACell>>>
 		implements TransactionalComponent<Index<ABlob,SignedData<ACell>>,Mailbox> {
 
 	private final MailboxLattice lattice;
+	private final BiFunction<ACell,ACell,SignedData<ACell>> signer;
 
-	Mailbox(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor, MailboxLattice lattice) {
+	Mailbox(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor, MailboxLattice lattice, BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		super(cursor);
 		this.lattice=lattice;
+		this.signer=signer;
 	}
 
 	private Mailbox(Mailbox source) {
 		super(source);
 		this.lattice=source.lattice;
+		signer=source.signer;
 	}
 
 	/** The mailbox DID. */
@@ -94,13 +98,13 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	 *
 	 * @param envelopes Envelopes the recipient has taken
 	 * @return The receipts written
-	 * @throws IllegalStateException If the context holds no signer authorised for the DID
+	 * @throws IllegalStateException If the signer cannot author a valid receipt for this mailbox
 	 */
 	public List<MailReceipt> receive(Collection<MailEnvelope> envelopes) {
 		List<MailReceipt> receipts=new ArrayList<>();
 		for (MailEnvelope envelope:envelopes) {
-			MailReceipt receipt=MailReceipt.create(getContext(),did(),envelope);
-			if (receipt==null) throw new IllegalStateException("No signer authorised for mailbox "+did());
+			MailReceipt receipt=MailReceipt.create(signer,did(),envelope);
+			if (receipt==null || lattice.entry(envelope.key()).receipt(receipt.signed())==null) throw new IllegalStateException("No signer authorised for mailbox "+did());
 			merge(receipt.key(),receipt.signed());
 			receipts.add(receipt);
 		}
@@ -161,12 +165,12 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 
 	/** Creates an isolated working copy, merged back with the mailbox lattice on sync. */
 	public Mailbox fork() {
-		return configured(new Mailbox(this));
+		return new Mailbox(this);
 	}
 
 	@Override
 	public Mailbox withCursor(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
-		return configured(new Mailbox(cursor,lattice));
+		return new Mailbox(cursor,lattice,signer);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
@@ -174,6 +178,6 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	protected Index<ABlob,SignedData<ACell>> mergePublication(
 			Index<ABlob,SignedData<ACell>> own,
 			Index<ABlob,SignedData<ACell>> other) {
-		return lattice.merge(getContext(),own,other);
+		return lattice.merge(own,other);
 	}
 }

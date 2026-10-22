@@ -35,23 +35,8 @@ import convex.lattice.cursor.ForkedCursor;
 public abstract class ALatticeComponent<V extends ACell> {
 
 	private final AForkableCursor<V> cursor;
-	private volatile LatticeContext context=LatticeContext.EMPTY;
 	/** Working copy this component owns and publishes, or null for a lightweight view. */
 	private final ForkedCursor<V> owned;
-
-	/** Returns this component's write and merge policy. */
-	public final LatticeContext getContext() { return context; }
-
-	/** Replaces policy for this component. Existing children retain their resolved policy. */
-	public final void setContext(LatticeContext context) {
-		this.context=(context==null)?LatticeContext.EMPTY:context;
-	}
-
-	/** Resolves policy for a newly constructed child or rebound view, without retaining a parent. */
-	protected final <C extends ALatticeComponent<?>> C configured(C child) {
-		child.setContext(getContext());
-		return child;
-	}
 
 	/**
 	 * Shares supplied working storage without taking ownership of its publication.
@@ -82,10 +67,9 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** Explicit construction choice, distinct from sharing a supplied cursor. */
 	protected record ForkTarget<T extends ACell>(ACursor<T> destination) {}
 
-	/** Creates independent working state over another component, retaining its current context. */
+	/** Creates independent working state over another component. Subclasses retain their own policies. */
 	protected ALatticeComponent(ALatticeComponent<V> source) {
 		this(forkOf(source.cursor()));
-		setContext(source.getContext());
 	}
 
 	/**

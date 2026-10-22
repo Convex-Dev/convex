@@ -1,5 +1,8 @@
 package convex.lattice.kv;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.AString;
@@ -10,6 +13,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -28,10 +32,17 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	private static final AString DEFAULT_REPLICA = Strings.create("default");
 
 	private final AString replicaID;
+	private final Supplier<CVMLong> clock;
 
 	public LatticeKV(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
+		this(cursor,replicaID,Utils::getCurrentTimestampCell);
+	}
+
+	/** Binds the clock used for writes and expiry checks; forks retain it. */
+	public LatticeKV(AForkableCursor<Index<AString,AVector<ACell>>> cursor,AString replicaID,Supplier<CVMLong> clock) {
 		super(cursor);
-		this.replicaID = replicaID;
+		this.replicaID=replicaID;
+		this.clock=Objects.requireNonNull(clock);
 	}
 
 	/**
@@ -45,9 +56,14 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Creates a new empty KV store with a specific replica ID for PN-counter operations
 	 */
 	public static LatticeKV create(AString replicaID) {
+		return create(replicaID,Utils::getCurrentTimestampCell);
+	}
+
+	/** Creates a store with an explicit clock, which may advance independently of state. */
+	public static LatticeKV create(AString replicaID,Supplier<CVMLong> clock) {
 		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
 			Cursors.root(KVStoreLattice.INSTANCE.zero());
-		return new LatticeKV(cursor, replicaID);
+		return new LatticeKV(cursor,replicaID,clock);
 	}
 
 	/**
@@ -68,7 +84,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return New LatticeKV instance connected to the cursor
 	 */
 	public static LatticeKV connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
-		return new LatticeKV(cursor, replicaID);
+		return new LatticeKV(cursor,replicaID);
 	}
 
 
@@ -87,12 +103,13 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Forked store
 	 */
 	public LatticeKV fork(AString replicaID) {
-		return configured(new LatticeKV(this, replicaID));
+		return new LatticeKV(this, replicaID);
 	}
 
 	private LatticeKV(LatticeKV source, AString replicaID) {
 		super(source);
 		this.replicaID=replicaID;
+		this.clock=source.clock;
 	}
 
 	// ========== Internal Helpers ==========
@@ -100,11 +117,11 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	// #561: resolve time through the component policy. The default policy uses runtime
 	// time; applications and tests may supply a fixed or otherwise dynamic clock.
 	private CVMLong now() {
-		return getContext().currentTimestamp();
+		return clock.get();
 	}
 
 	private long nowMs() {
-		return getContext().currentTimestampValue();
+		return clock.get().longValue();
 	}
 
 	private AString key(String key) {
@@ -516,6 +533,6 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	protected Index<AString, AVector<ACell>> mergePublication(
 			Index<AString, AVector<ACell>> own,
 			Index<AString, AVector<ACell>> other) {
-		return KVStoreLattice.INSTANCE.merge(getContext(),own,other);
+		return KVStoreLattice.INSTANCE.merge(own,other);
 	}
 }

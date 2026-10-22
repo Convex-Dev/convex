@@ -34,7 +34,7 @@ import convex.lattice.cursor.ProjectionCursor;
  * <p>Register children during construction. The first merge, path delivery or
  * sync freezes this component's registrations. Explicit children may be shared
  * with other applications: registration neither rebinds them nor changes their
- * context or lifecycle. Shared children may receive repeated or concurrent
+ * policy or lifecycle. Shared children may receive repeated or concurrent
  * deliveries and syncs, so their operations must support that use.</p>
  */
 public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,ACell>> {
@@ -42,24 +42,23 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 	private final Map<Keyword,ALatticeComponent<?>> registrations=new LinkedHashMap<>();
 	private volatile Map<Keyword,ALatticeComponent<?>> regions;
 
-	/** Constructs a root application using the host's cursor and current context. */
+	/** Constructs a root application using the host's cursor. */
 	protected AKeyedRegions(LatticeHost<Index<Keyword,ACell>> host) {
-		this(host.cursor(),host.getContext());
+		this(host.cursor());
 	}
 
 	/** Constructs a container view without changing or publishing its destination. */
-	protected AKeyedRegions(AForkableCursor<Index<Keyword,ACell>> cursor,LatticeContext context) {
+	protected AKeyedRegions(AForkableCursor<Index<Keyword,ACell>> cursor) {
 		super(cursor);
-		setContext(context);
 	}
 
 	/**
-	 * Constructs a child with its region cursor and resolved context. The stored
+	 * Constructs a child with its region cursor. The stored
 	 * value type can differ from the child's working type, as for signed components.
 	 */
 	@FunctionalInterface
 	public interface RegionFactory<V extends ACell,C extends ALatticeComponent<?>> {
-		C create(AForkableCursor<V> cursor,LatticeContext context);
+		C create(AForkableCursor<V> cursor);
 	}
 
 	/**
@@ -77,7 +76,7 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 	/**
 	 * Constructs and registers a child at this key. A missing containing index is
 	 * created on the first changed write, never on construction or read. The factory
-	 * receives the current context; it decides how the child uses that policy.
+	 * binds any domain policy explicitly.
 	 */
 	@SuppressWarnings("unchecked")
 	protected final synchronized <V extends ACell,C extends ALatticeComponent<?>> C createRegion(
@@ -91,7 +90,7 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 				if (Utils.equals(previous,child)) return value;
 				return (value==null?Index.<Keyword,ACell>none():value).assoc(key,child);
 			});
-		return region(key,factory.create(destination,getContext()));
+		return region(key,factory.create(destination));
 	}
 
 	private void checkRegistration(Keyword key) {

@@ -242,8 +242,9 @@ The per-key rule needs the key, so `MailboxLattice` is a union lattice
 `signingFor` returns an owner-bound `SignedLattice`; the base merges each entry
 with that child, rather than with the one shared child a plain `IndexLattice`
 has. Receipts are authored through
-`LatticeContext.signAs(did, receipt)`, so authoring and verification share the
-one rule described under *Owner binding* in the convex-p2p README.
+an explicit owner-aware signer `(did, receipt) -> SignedData`. The mailbox
+checks the returned payload, signature and DID authority using the same bound
+rule as incoming receipt merge. A signer may handle multiple DIDs.
 
 **Why it is a lattice.** Per key the values form a chain, absent below Deposited
 below Received, with Received made canonical by the tiebreak; join is the
@@ -410,11 +411,11 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell, Index<ABlob, S
         implements TransactionalComponent<..., Mail>
     static Keyword KEY_MAIL                                  // :mail
     static MailLattice LATTICE                               // did:key-only default
-    static Mail create(LatticeContext context)               // standalone root
-    static Mail connect(ALatticeApplication<?> app, LatticeContext context)
+    static Mail create(BiFunction<ACell,ACell,SignedData<ACell>> signer) // standalone root
+    static Mail connect(ALatticeApplication<Index<Keyword,ACell>> app, MailLattice lattice,
+        BiFunction<ACell,ACell,SignedData<ACell>> signer)
     Mailbox mailbox(AString did)                             // view of any mailbox
     Hash send(MailEnvelope envelope)                         // one atomic deposit in the recipient mailbox
-    MailEnvelope.Builder compose(AString from, AString to)   // resolves the recipient key, encrypts, signs with the context
     Mail fork(); void sync();
 
 public final class Mailbox extends ALatticeComponent<Index<ABlob, SignedData<ACell>>>
@@ -422,7 +423,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob, SignedData<ACe
     List<MailEnvelope> deposited()                           // Deposited entries in time order, undecrypted
     boolean isReceived(Hash envelopeHash, long issuedAt)     // a Received entry exists under the key
     List<MailMessage> open(ECIES.Decryptor... decryptors)    // decrypt, bind, authorise from; skips what it cannot open
-    // owner operation: the context must hold a signer authorised for did()
+    // owner operation: the supplied signer must be authorised for did()
     void receive(Collection<MailEnvelope> envelopes)         // writes one Received entry per envelope
 
 public final class MailEnvelope                              // parse(ACell) returns null when malformed
