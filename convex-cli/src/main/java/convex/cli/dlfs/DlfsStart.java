@@ -15,7 +15,6 @@ import convex.cli.Main;
 import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
@@ -30,7 +29,6 @@ import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSServer;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
-import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.node.NodeConfig;
 import convex.node.LatticeListener;
@@ -135,11 +133,15 @@ public class DlfsStart extends ACommand {
 		// Build NodeConfig
 		NodeConfig config = buildNodeConfig();
 
-		// Assemble the relay host, then the node that replicates it
+		// Register DLFS before starting any incoming delivery.
 		LatticeContext context=LatticeContext.create(null,keyPair);
 		NodeServer<Index<Keyword,ACell>> nodeServer;
+		DLFSApplication application;
 		try {
-			nodeServer=new NodeServer<>(RelayHost.open(Lattice.ROOT,store,config,context),config);
+			var host=RelayHost.openHost(Index.<Keyword,ACell>none(),store,config);
+			host.setContext(RelayHost.applySkew(config,context));
+			application=host.addApplication(new DLFSApplication(host));
+			nodeServer=new NodeServer<>(host,config);
 		} catch (IOException e) {
 			store.close();
 			throw new CLIError(ExitCodes.CONFIG, "Failed to open node store: " + e.getMessage(), e);
@@ -168,11 +170,8 @@ public class DlfsStart extends ACommand {
 		// Connect to remote peers
 		connectPeers(propagator);
 
-		// Attach the user's drives component at :fs → accountKey → :value.
-		// This traverses OwnerLattice → SignedLattice → MapLattice<DLFSLattice>
+		// Serve the local owner's drives through the application's registered region.
 		AccountKey accountKey = keyPair.getAccountKey();
-		DLFSApplication<?> application=DLFSApplication.connect(Lattice.ROOT,
-			nodeServer.getHost(),Keywords.FS);
 		DLFSDrives ownerDrives=application.drives(accountKey);
 		DLFSDriveManager driveManager=DLFSDriveManager.createRouter()
 			.mountAnonymous(ownerDrives)

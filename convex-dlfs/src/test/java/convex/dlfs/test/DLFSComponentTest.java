@@ -116,7 +116,7 @@ public class DLFSComponentTest {
 		var key=AKeyPair.generate();
 		var host=LatticeHost.open(convex.lattice.Lattice.ROOT.zero(),new MemoryStore());
 		host.setContext(LatticeContext.create(null,key));
-		var app=DLFSApplication.connect(convex.lattice.Lattice.ROOT,host,Keywords.FS);
+		var app=new DLFSApplication(host,Keywords.FS);
 		var first=app.drives(key.getAccountKey()).getOrCreateDrive("home");
 		var second=app.drives(key.getAccountKey()).getOrCreateDrive("home");
 		assertNotSame(first,second);
@@ -133,13 +133,11 @@ public class DLFSComponentTest {
 	public void testCompleteNodeHostedServerStack() throws Exception {
 		AKeyPair keyPair=AKeyPair.generate();
 		try (EtchStore store=EtchStore.createTemp("dlfs-complete-stack");
-				NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(RelayHost.open(
-					convex.lattice.Lattice.ROOT,store,NodeConfig.port(-1),LatticeContext.create(null,keyPair)),
-					NodeConfig.port(-1))) {
+				NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(RelayHost.openHost(
+					Index.<Keyword,ACell>none(),store,NodeConfig.port(-1)),NodeConfig.port(-1))) {
+			node.getHost().setContext(LatticeContext.create(null,keyPair));
+			var application=node.getHost().addApplication(new DLFSApplication(node.getHost()));
 			node.launch();
-
-			DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(convex.lattice.Lattice.ROOT,
-				node.getHost(),Keywords.FS);
 			DLFSDriveManager drives=new DLFSDriveManager(
 				application.drives(keyPair.getAccountKey()),()->{
 					application.sync();
@@ -168,26 +166,25 @@ public class DLFSComponentTest {
 	}
 
 	private static final class CompositeDLFSApplication
-			extends DLFSApplication<Index<Keyword,ACell>> {
+			extends DLFSApplication {
 
 		private final DLFSRegion archive;
 
 		CompositeDLFSApplication(LatticeHost<Index<Keyword,ACell>> host) {
-			super(KeyedLattice.create(KEY_DOCUMENTS,DLFSRegion.LATTICE).addLattice(KEY_ARCHIVE,DLFSRegion.LATTICE),host,KEY_DOCUMENTS);
-			this.archive=configured(DLFSRegion.connect(resolve(KEY_ARCHIVE),store()));
+			super(host,KEY_DOCUMENTS);
+			this.archive=region(KEY_ARCHIVE,configured(DLFSRegion.connect(cursor().path(KEY_ARCHIVE),store())));
 		}
 	}
 
 	@Test
 	public void testRegionAtArbitraryRootPath() throws Exception {
-		KeyedLattice lattice=KeyedLattice.create(KEY_DOCUMENTS,DLFSRegion.LATTICE);
 		AKeyPair keyPair=AKeyPair.generate();
 		try (EtchStore store=EtchStore.createTemp("dlfs-components");
-				NodeServer<Index<Keyword,ACell>> server=new NodeServer<>(RelayHost.open(
-					lattice,store,NodeConfig.port(-1),LatticeContext.create(null,keyPair)),NodeConfig.port(-1))) {
+				NodeServer<Index<Keyword,ACell>> server=new NodeServer<>(RelayHost.openHost(
+					Index.<Keyword,ACell>none(),store,NodeConfig.port(-1)),NodeConfig.port(-1))) {
+			server.getHost().setContext(LatticeContext.create(null,keyPair));
+			var application=server.getHost().addApplication(new DLFSApplication(server.getHost(),KEY_DOCUMENTS));
 			server.launch();
-			DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(lattice,
-				server.getHost(),KEY_DOCUMENTS);
 			DLFSDrive drive=application.drives(keyPair.getAccountKey()).createDrive("home");
 			assertNotNull(drive);
 
@@ -211,8 +208,8 @@ public class DLFSComponentTest {
 		try (store) {
 			var host=LatticeHost.open(convex.lattice.Lattice.ROOT.zero(),store);
 			host.setContext(LatticeContext.create(null,keyPair));
-			DLFSApplication<Index<Keyword,ACell>> application=
-				DLFSApplication.connect(convex.lattice.Lattice.ROOT,host,Keywords.FS);
+			DLFSApplication application=
+				new DLFSApplication(host,Keywords.FS);
 			DLFSDriveManager driveManager=new DLFSDriveManager(
 				application.drives(keyPair.getAccountKey()));
 			assertNotNull(application.dlfs());
@@ -229,8 +226,8 @@ public class DLFSComponentTest {
 		try (EtchStore reopened=EtchStore.create(storeFile)) {
 			var host=LatticeHost.open(convex.lattice.Lattice.ROOT.zero(),reopened);
 			host.setContext(LatticeContext.create(null,keyPair));
-			DLFSApplication<Index<Keyword,ACell>> application=
-				DLFSApplication.connect(convex.lattice.Lattice.ROOT,host,Keywords.FS);
+			DLFSApplication application=
+				new DLFSApplication(host,Keywords.FS);
 			DLFSDriveManager driveManager=new DLFSDriveManager(
 				application.drives(keyPair.getAccountKey()));
 			assertEquals(java.util.List.of("home"),driveManager.listDrives(null));
@@ -246,8 +243,8 @@ public class DLFSComponentTest {
 		try (EtchStore store=EtchStore.createTemp("dlfs-multi-owner-application")) {
 			var host=LatticeHost.open(convex.lattice.Lattice.ROOT.zero(),store);
 			host.setContext(LatticeContext.create(null,hostKey));
-			DLFSApplication<Index<Keyword,ACell>> application=
-				DLFSApplication.connect(convex.lattice.Lattice.ROOT,host,Keywords.FS);
+			DLFSApplication application=
+				new DLFSApplication(host,Keywords.FS);
 			Index<Keyword,ACell> before=application.cursor().get();
 
 			assertNotSame(application.drives(hostKey.getAccountKey()),

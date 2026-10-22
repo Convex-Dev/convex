@@ -168,10 +168,9 @@ public class Social extends ALatticeComponent<
 
 	/**
 	 * Connects to the {@code :social} region of an application's root, with a signing
-	 * policy for this instance. The application resolves the region with its own root
-	 * lattice.
+	 * policy for this instance. The region is a path in the application's root index.
 	 *
-	 * @param application Application at the root whose lattice includes {@code :social}
+	 * @param application Application at a root index containing {@code :social}
 	 * @param keyPair Key pair for signing updates
 	 * @return Social instance connected beneath the application
 	 */
@@ -191,7 +190,7 @@ public class Social extends ALatticeComponent<
 	 * Connects to the {@code :social} region of an application's root, resolving the
 	 * application's policy at construction.
 	 *
-	 * @param application Application at the root whose lattice includes {@code :social}
+	 * @param application Application at a root index containing {@code :social}
 	 * @return Social region component
 	 */
 	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application) {
@@ -249,6 +248,26 @@ public class Social extends ALatticeComponent<
 	@Override
 	public Social withCursor(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
 		return configured(new Social(cursor));
+	}
+
+	/** Merges incoming owner envelopes into this region's working state. */
+	@Override
+	public AHashMap<ACell,SignedData<Index<Keyword,ACell>>> merge(
+			AHashMap<ACell,SignedData<Index<Keyword,ACell>>> incoming) {
+		return cursor().updateAndGet(own -> SOCIAL_LATTICE.merge(getContext(),own,incoming));
+	}
+
+	/** Accepts whole owner envelopes, never unsigned edits inside them. */
+	@SuppressWarnings("unchecked")
+	@Override
+	public AHashMap<ACell,SignedData<Index<Keyword,ACell>>> mergeAt(
+			ACell value,ACell... path) {
+		if (path.length==0) {
+			return value instanceof AHashMap<?,?>?merge(
+				(AHashMap<ACell,SignedData<Index<Keyword,ACell>>>)value):cursor().get();
+		}
+		if (path.length!=1 || !(value instanceof SignedData<?>)) return cursor().get();
+		return merge(Maps.of(path[0],value));
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */

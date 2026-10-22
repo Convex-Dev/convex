@@ -34,6 +34,32 @@ import convex.lattice.generic.OwnerLattice;
  * Tests for the cursor-based Social application API.
  */
 public class SocialAppTest {
+	@Test void componentDeliveryUsesTheSameOwnerPolicyAtEveryDepth() {
+		var owner=AKeyPair.createSeeded(823);
+		var other=AKeyPair.createSeeded(824);
+		var source=Social.create(owner);
+		var post=source.user(owner.getAccountKey()).feed().post("incoming");
+		var did=DID.forKey(owner.getAccountKey());
+		var signed=source.cursor().get().get(did);
+		for (boolean whole:new boolean[]{false,true}) {
+			var destination=Social.create(owner);
+			var working=destination.fork();
+			if (whole) working.mergeAt(source.cursor().get());
+			else working.mergeAt(signed,did);
+			assertNotNull(working.user(owner.getAccountKey()).feed().getPost(post));
+			assertNull(destination.user(owner.getAccountKey()).feed().getPost(post));
+			var before=working.cursor().get();
+			working.mergeAt(signed,DID.forKey(other.getAccountKey()));
+			working.mergeAt(Maps.of(DID.forKey(other.getAccountKey()),signed));
+			working.mergeAt(CVMLong.ONE);
+			working.mergeAt(signed.getValue(),did);
+			working.mergeAt(Maps.empty(),did,convex.core.cvm.Keywords.VALUE);
+			assertSame(before,working.cursor().get());
+			working.sync();
+			assertNotNull(destination.user(owner.getAccountKey()).feed().getPost(post));
+		}
+	}
+
 	private static LatticeContext wallet(AKeyPair primary,AKeyPair... additional) {
 		return new LatticeContext() {
 			@Override public AKeyPair getSigningKey() {

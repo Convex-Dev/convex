@@ -22,6 +22,7 @@ import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.etch.EtchStore;
 import convex.lattice.SharedApplicationsExample.Node;
+import convex.p2p.P2PUser;
 import convex.social.Social;
 
 /** What an embedder can rely on; {@link SharedApplicationsExample} assembles the nodes. */
@@ -53,10 +54,11 @@ public class SharedApplicationsTest {
 			source.publish();
 
 			target.pullFrom(source);
-			// One incoming root, two receivers: each application admitted its own region.
-			assertEquals(source.root(),target.root());
-			assertNotNull(target.social.publishedFeed(ALICE).getPost(post));
-			assertEquals(TEXT,Files.readString(target.files.dlfs().drives(BOB.getAccountKey())
+			// Each domain application admitted its region; P2P infrastructure remains live.
+			assertNull(target.root().get(Keywords.FS),"incoming files remain staged until application sync");
+			assertNull(target.root().get(Social.KEY_SOCIAL),"incoming social data follows the same policy");
+			assertNotNull(target.social.feed(ALICE).getPost(post));
+			assertEquals(TEXT,Files.readString(target.files.drives(BOB.getAccountKey())
 				.drive("home").fileSystem().getPath("/hello.txt")));
 			assertNotNull(target.social.p2p(ALICE).node().getNodeInfo());
 		}
@@ -80,10 +82,10 @@ public class SharedApplicationsTest {
 
 			target.pullFrom(source);
 			var published=target.social.publishedFeed(ALICE);
-			assertNotNull(published.getPost(remotePost),"the incoming post is in the host");
+			assertNull(published.getPost(remotePost),"incoming data has not been published");
 			assertNull(published.getPost(localPost),"the pending post is not");
-			assertNull(feed.getPost(remotePost),"the staged feed has not reconciled yet");
-			assertFalse(Files.exists(localDrive.fileSystem().getPath("/hello.txt")),"nor has the staged drive");
+			assertNotNull(feed.getPost(remotePost),"incoming data reconciles in the working region");
+			assertTrue(Files.exists(localDrive.fileSystem().getPath("/hello.txt")),"the working drive reconciles too");
 
 			// Each owner reconciles at its own boundary. Publishing one region leaves the other alone.
 			ACell receivedFiles=target.root().get(Keywords.FS);
@@ -110,7 +112,7 @@ public class SharedApplicationsTest {
 			node.social.feed(ALICE).post("A post");
 			Files.writeString(node.files.drives(BOB.getAccountKey()).createDrive("home")
 				.fileSystem().getPath("/hello.txt"),"A file");
-			node.files.p2p(BOB).node().setNodeInfo(nodeInfo("files node",100));
+			P2PUser.create(node.files,BOB.getAccountKey()).node().setNodeInfo(nodeInfo("files node",100));
 			assertNotNull(node.social.p2p(BOB).node().getNodeInfo(),"the P2P region is live and shared");
 			assertNull(node.root().get(Social.KEY_SOCIAL));
 			assertNull(node.root().get(Keywords.FS));
@@ -145,7 +147,7 @@ public class SharedApplicationsTest {
 			assertNotNull(node.social.feed(ALICE).getPost(post));
 			assertEquals(TEXT,Files.readString(node.files.drives(BOB.getAccountKey())
 				.drive("home").fileSystem().getPath("/hello.txt")));
-			assertNotNull(node.files.p2p(ALICE).node().getNodeInfo());
+			assertNotNull(P2PUser.create(node.files,ALICE.getAccountKey()).node().getNodeInfo());
 		}
 	}
 }

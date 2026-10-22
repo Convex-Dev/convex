@@ -648,7 +648,8 @@ host.merge(incomingRoot); // verifies and merges into the shared root once
 Domain components then use live paths in this root or fork their own. Nothing
 requires every application to receive incoming values; observing accepted root
 changes and choosing when to publish private work are application policy. The
-Social + P2P + DLFS example works this way.
+Social + P2P + DLFS example instead registers its domain components directly, as
+shown below.
 
 Several applications may be configured when they accept differently. A staged
 application merges incoming values into its working copy. An application can route a
@@ -706,29 +707,28 @@ its subtree on sync. Either way the component allows for the destination having
 changed under it, so sync reconciles before it installs:
 
 ```java
-// Each application is live at the host root and stages only the region it edits.
-final class SocialApp extends LatticeApplication<Index<Keyword, ACell>> {
+// Infrastructure is shared live and registered once.
+host.addApplication(LatticeApplication.live(P2PLattice.ROOT, host));
+
+final class SocialApp extends AKeyedRegions {
     final Social social;
-    SocialApp(LatticeHost<Index<Keyword, ACell>> host) {
-        super(SOCIAL_ROOT, host.cursor());    // live at the root
-        social = Social.connect(this).fork();  // staged copy of :social
+    SocialApp(LatticeHost<Index<Keyword, ACell>> host, LatticeContext policy) {
+        super(host);
+        setContext(policy);
+        social = region(Social.KEY_SOCIAL, Social.connect(this).fork());
     }
-    P2PUser p2p(AccountKey user) { return P2PUser.create(this, user); } // live in :p2p
 }
 
-final class FilesApp extends DLFSApplication<Index<Keyword, ACell>> {
-    final DLFSRegion files;
-    FilesApp(LatticeHost<Index<Keyword, ACell>> host) {
-        super(FILES_ROOT, host, Keywords.FS);
-        files = dlfs().fork();                 // staged copy of :fs
-    }
-}
+var socialApp = host.addApplication(new SocialApp(host, socialPolicy));
+var files = DLFSRegion.connect(host.cursor().path(Keywords.FS), store);
+files.setContext(filePolicy);
+var filesApp = host.addApplication(new DLFSApplication(host, Keywords.FS, files.fork()));
 
 socialApp.social.user(ownerKey).feed().post("A staged post");
-socialApp.p2p(ownerKey).node().setNodeInfo(nodeInfo); // immediately in the shared :p2p region
-socialApp.social.sync();  // publishes :social into the host root, preserving :fs and :p2p
-filesApp.files.sync();    // publishes :fs
-host.sync();              // persistence and propagation are separate
+P2PUser.create(socialApp, ownerKey).node().setNodeInfo(nodeInfo); // live P2P state
+socialApp.sync(); // publishes :social, preserving :fs and :p2p
+filesApp.sync();  // publishes the exact region returned by filesApp.dlfs()
+host.sync();     // persistence and propagation are separate
 ```
 
 Social and Files are two applications on one host. Each groups domain components
@@ -755,10 +755,11 @@ calls sync, which reconciles and publishes in one step.
 Reconciliation at a signed slot follows the signed lattice's rule. When the result
 equals either input's payload, that envelope is reused and no signer is needed. A
 new payload requires an authorised signer, so a component that cannot sign for the
-owner keeps the rule's selection. In the shared example the live application accepts
-a remote signed feed, and the owner's staged component then combines that accepted
-state with its private posts and signs the result. Divergent edits for one owner
-belong in a component that can sign for that owner.
+owner keeps the rule's selection. In the shared example, incoming feeds and files
+merge directly into their staged region components. These combine remote values
+with pending local edits and sign synthesised owner values. The host does not see
+those regions until application sync. Divergent edits for one owner belong in a
+component that can sign for that owner.
 
 Syncs of separate paths are not atomic together. For a consistent read of several
 published paths, capture the immutable host root once and read each path from that

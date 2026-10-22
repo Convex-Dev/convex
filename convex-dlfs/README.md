@@ -137,8 +137,9 @@ other node under `node.bootstrap`, use the same `dlfs.path`, and explicitly set
 not an Internet-facing private deployment. A replicated remote owner remains hidden
 until `dlfs.mounts` maps a local HTTP identity to that owner's key.
 
-The NodeServer normally hosts `Lattice.ROOT`, with DLFS attached at `:fs`, so root
-publication follows the real persistence and replication path. `dlfs.path` may place
+The NodeServer hosts a registered DLFS application at `:fs`, so root
+publication follows the real persistence and replication path. It accepts only the
+configured DLFS region; compose additional applications to serve other regions. `dlfs.path` may place
 the region under a custom, otherwise unused top-level region, for example
 `["applications", "documents"]`. `dlfs.mounts` is deliberately local service policy:
 it maps anonymous, the symbolic local `"node"` DID, or an explicit `did:key` identity
@@ -151,13 +152,13 @@ The equivalent programmatic setup is:
 EtchStore store = EtchStore.createTemp("convex-dlfs");
 AKeyPair keyPair = AKeyPair.generate();
 LatticeContext context = LatticeContext.create(null, keyPair);
-NodeServer<Index<Keyword, ACell>> node =
-    new NodeServer<>(RelayHost.open(Lattice.ROOT, store, null, context));
+var host = LatticeHost.open(store);
+host.setContext(context);
+var app = host.addApplication(new DLFSApplication(host));
+var node = new NodeServer<>(host);
 node.launch();
-
-DLFSApplication app = DLFSApplication.connect(Lattice.ROOT, node.getHost(), Keywords.FS);
 DLFSDriveManager drives = new DLFSDriveManager(
-    app.drives(keyPair.getAccountKey()));
+    app.drives(keyPair.getAccountKey()), () -> { app.sync(); host.sync(); });
 drives.createDrive(null, "home");
 app.sync();
 
@@ -188,15 +189,15 @@ synchronously at the service `sync()` boundary.
 
 `DLFSApplication` extends the general `ALatticeApplication` component over the
 complete hosted lattice root. It composes a physical, multi-owner `DLFSRegion`
-at any configured path and may be extended with other lattice facilities such
-as P2P discovery. The stack accepts a generic `LatticeHost` and has no
+at a path of region keys, with no separate root lattice definition. It extends
+`Regions`, so applications can register other components alongside DLFS. The stack accepts a generic `LatticeHost` and has no
 dependency on `NodeServer`.
 
 ```java
 // Local: restore or create the standard :fs region in any AStore
 var root = LatticeHost.open(store);
 root.setContext(LatticeContext.create(null, myKeyPair));
-var app = DLFSApplication.connect(Lattice.ROOT, root, Keywords.FS);
+var app = root.addApplication(new DLFSApplication(root));
 DLFSDrives myDrives = app.drives(myKeyPair.getAccountKey());
 DLFSDrive drive = myDrives.getOrCreateDrive("home");
 if (drive == null) throw new IllegalStateException("Cannot open home drive");
@@ -225,12 +226,11 @@ existing drive should make creation fail. These operations do not publish the ro
 Networked bootstrap supplies the host; the DLFS component API is unchanged:
 
 ```java
-KeyedLattice lattice = KeyedLattice.create(
-    Keyword.intern("documents"), DLFSRegion.LATTICE);
 NodeConfig nodeConfig = NodeConfig.port(0);
-LatticeContext context = LatticeContext.create(null, myKeyPair);
-NodeServer<Index<Keyword, ACell>> node =
-    new NodeServer<>(RelayHost.open(lattice, store, nodeConfig, context), nodeConfig);
+var host = RelayHost.openHost(Index.<Keyword, ACell>none(), store, nodeConfig);
+host.setContext(RelayHost.applySkew(nodeConfig, LatticeContext.create(null, myKeyPair)));
+var networkedApp = host.addApplication(new DLFSApplication(host, Keyword.intern("documents")));
+var node = new NodeServer<>(host, nodeConfig);
 LatticePropagator group = new LatticePropagator(store, LatticePropagatorConfig.create());
 group.setTransportKeyPair(myKeyPair);
 node.addPropagator(group);
@@ -240,8 +240,6 @@ transport.setSelector(connection -> group);
 node.launch();
 transport.launch();
 
-DLFSApplication networkedApp = DLFSApplication.connect(Lattice.ROOT,
-    node.getHost(), Keyword.intern("documents"));
 DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
 DLFSDriveManager routes = DLFSDriveManager.createRouter(() -> {
     networkedApp.sync();
@@ -265,19 +263,24 @@ components for multiple owners. Local identity-to-owner and cross-region mapping
 remain `DLFSDriveManager` routing policy; the HTTP server owns no lattice or store
 lifecycle.
 
-A custom application can embed `DLFSRegion` anywhere its lattice declares a DLFS
-subtree, without a `DLFSApplication` adapter. For example, inside an application
-whose lattice defines `:projects → project name → :documents`:
+A custom application can embed `DLFSRegion` at any correctly bound cursor.
+For a root application that stages files, explicitly supply a fork:
 
 ```java
-DLFSRegion files = DLFSRegion.connect(app.cursor(), app.getLattice(), store,
-    Keyword.intern("projects"), Strings.create("example"), Keyword.intern("documents"));
-files.setContext(app.getContext());
+var files = DLFSRegion.connect(host.cursor().path(Keywords.FS), store);
+files.setContext(LatticeContext.create(null, myKeyPair));
+var app = host.addApplication(new DLFSApplication(host, Keywords.FS, files.fork()));
 ```
 
-This is a lightweight view of the application's working state. Use `files.fork()`
-when the subsystem needs its own publication boundary: syncing that fork updates
-only the application's subtree. The application and root publish separately.
+`app.dlfs()` is the exact registered component. Its incoming merges and local
+edits use the same working state, and `app.sync()` publishes that region only.
+Multiple applications may explicitly register the same component. The default
+`new DLFSApplication(host)` instead uses a live region, so edits are immediately
+part of the host's working state. Configuring an application does not overwrite
+an explicit region's policy; configure the region before constructing its children.
+
+A directly connected region is a lightweight view. Syncing its fork updates
+only its destination subtree. Host persistence remains a separate operation.
 Pass `null` for the store when incremental blob checkpointing is unnecessary.
 
 The application does not own or close its root or store. Owner components are cheap

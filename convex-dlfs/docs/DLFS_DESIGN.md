@@ -132,7 +132,7 @@ particular host implementation:
 ```
 LatticeHost<V>                  store persistence, root publication, flush
 └── ALatticeApplication<V>        complete-root application composition
-    └── DLFSApplication<V>        configured DLFS region path
+    └── DLFSApplication           registered DLFS region component
         └── DLFSRegion            physical multi-owner lattice region
             └── DLFSDrives        long-lived component for one owner
                 └── DLFSDrive     named drive plus local NIO view
@@ -500,15 +500,12 @@ networked application. A physical `DLFSRegion` can be connected at the root or a
 any nested lattice path without depending on NodeServer:
 
 ```java
-KeyedLattice lattice = KeyedLattice.create(
-    Keyword.intern("documents"), DLFSRegion.LATTICE);
-NodeServer<Index<Keyword, ACell>> node =
-    new NodeServer<>(RelayHost.open(lattice, store, null));
+var host = LatticeHost.open(store);
+host.setContext(LatticeContext.create(null, ownerKeyPair));
+var app = host.addApplication(new DLFSApplication(host, Keyword.intern("documents")));
+var node = new NodeServer<>(host);
 node.launch();
-
-DLFSApplication<Index<Keyword, ACell>> app = DLFSApplication.connect(lattice,
-    node.getHost(), Keyword.intern("documents"));
-DLFSDrives drives = app.drives(ownerKey);
+DLFSDrives drives = app.drives(ownerKeyPair.getAccountKey());
 DLFSDrive drive = drives.createDrive("home");
 Files.writeString(drive.fileSystem().getPath("/data.txt"), "value");
 app.sync();
@@ -516,7 +513,7 @@ node.getHost().sync();
 ```
 
 For a non-networked host, explicitly open `LatticeHost.open(store)`,
-set its context, and connect with `DLFSApplication.connect(Lattice.ROOT, root, Keywords.FS)`.
+set its context, and register `root.addApplication(new DLFSApplication(root))`.
 There is no hidden-host factory: retain the root and publish with `root.sync()`.
 
 `DLFSDriveManager.mount(identity, drives)` exposes owner components to WebDAV and

@@ -252,17 +252,19 @@ public class SharedApplicationInternalsTest {
 		}
 	}
 
-	private static final class FilesWithP2P extends DLFSApplication<Index<Keyword,ACell>>
+	private static final class FilesWithP2P extends DLFSApplication
 			implements TransactionalComponent<Index<Keyword,ACell>,FilesWithP2P> {
 		FilesWithP2P(LatticeHost<Index<Keyword,ACell>> host) {
-			this(FILES_ROOT,host.cursor(),host.store());
-			setContext(context(FILES_KEY));
+			this(host.cursor(),host.store(),context(FILES_KEY));
 		}
-		FilesWithP2P(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor,AStore store) {
-			super(lattice,cursor,store,Keywords.FS);
+		FilesWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,LatticeContext context) {
+			super(cursor,store,context);
+			for (Keyword key:new Keyword[]{Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
+				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),cursor.path(key),context));
+			}
 		}
 		@Override public FilesWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
-			return configured(new FilesWithP2P(getLattice(),cursor,store()));
+			return new FilesWithP2P(cursor,store(),getContext());
 		}
 		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner); }
 	}
@@ -467,7 +469,7 @@ public class SharedApplicationInternalsTest {
 				CountDownLatch signing=new CountDownLatch(1);
 				CountDownLatch resume=new CountDownLatch(1);
 				AtomicInteger attempts=new AtomicInteger();
-				f.files.setContext(context(FILES_KEY,() -> {
+				f.files.dlfs().setContext(context(FILES_KEY,() -> {
 					if (attempts.incrementAndGet()==1) {
 						signing.countDown();
 						try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
@@ -507,7 +509,7 @@ public class SharedApplicationInternalsTest {
 			CountDownLatch signing=new CountDownLatch(1);
 			CountDownLatch resume=new CountDownLatch(1);
 			AtomicInteger attempts=new AtomicInteger();
-			f.files.setContext(context(FILES_KEY,() -> {
+			f.files.dlfs().setContext(context(FILES_KEY,() -> {
 				if (attempts.incrementAndGet()==1) {
 					signing.countDown();
 					try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }

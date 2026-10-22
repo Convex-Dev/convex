@@ -108,7 +108,27 @@ public final class DLFSRegion extends ALatticeComponent<
 		return configured(new DLFSRegion(cursor,store));
 	}
 
-	/** Reconciles this component's draft using its domain merge rule. */
+	/** Merges owner envelopes into this region's working state, without publishing a fork. */
+	@Override
+	public AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> merge(
+			AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> incoming) {
+		return cursor().updateAndGet(own -> LATTICE.merge(getContext(),own,incoming));
+	}
+
+	/** Owner deliveries must contain a complete signed envelope; its interior is private. */
+	@SuppressWarnings("unchecked")
+	@Override
+	public AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> mergeAt(
+			ACell value,ACell... path) {
+		if (path.length==0) {
+			return value instanceof AHashMap<?,?>?merge(
+				(AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>)value):cursor().get();
+		}
+		if (path.length!=1 || !(value instanceof SignedData<?>)) return cursor().get();
+		return merge(Maps.of(path[0],value));
+	}
+
+	/** Reconciles this component's draft using the same owner and filesystem rules. */
 	@Override
 	protected AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> mergePublication(
 			AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> own,

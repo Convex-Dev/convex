@@ -1,126 +1,81 @@
 package convex.dlfs;
 
-import java.util.Objects;
-
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
-import convex.core.data.AString;
-import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.SignedData;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.store.AStore;
-import convex.lattice.ALattice;
-import convex.lattice.LatticeApplication;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
+import convex.lattice.Regions;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.fs.DLFSLocation;
 
 /**
- * Application-level component for a lattice application providing DLFS.
+ * Root application serving a multi-owner DLFS region, normally at {@code :fs}.
  *
- * <p>The application works at the complete hosted lattice root and composes a
- * physical {@link DLFSRegion} at a configured path, navigated with the root
- * lattice so the region can be created when absent. It is not scoped to one
- * owner: callers select any owner's {@link DLFSDrives} component as needed.
- * Subclasses may attach further application facilities, such as P2P discovery,
- * beneath this same application component.</p>
+ * <p>The registered region defines delivery and publication policy; no separate
+ * root lattice is required. The default region is a live view of the supplied
+ * cursor. Supply an explicit region to share it with another application or to
+ * stage edits in a {@link DLFSRegion#fork() fork}. In either case {@link #dlfs()}
+ * and {@link #drives} use that same component, and sync follows its boundary.</p>
  *
- * <p>DLFS is the one application whose components need a store before
- * publication: streamed file writes checkpoint blob branches so large files do
- * not accumulate on the heap. The application therefore takes the host's store
- * and hands it down to regions, drive maps and drives explicitly. It owns neither
- * the host nor the store lifecycle. This adapter is a live view; its edits are
- * already in the host's working state. Explicit {@link LatticeHost#sync()}
- * publishes that state, and {@link LatticeHost#flush()} provides durability.</p>
- *
- * @param <V> Complete application root value type
+ * <p>The host's store is passed to drives for incremental blob checkpoints.
+ * The application owns neither the host nor the store lifecycle. Host sync
+ * persists and announces the root; host flush makes it durable.</p>
  */
-public class DLFSApplication<V extends ACell> extends LatticeApplication<V> {
+public class DLFSApplication extends Regions {
 
 	private final AStore store;
-	private final ACell[] regionPath;
+	private final DLFSRegion dlfs;
 
-	/**
-	 * Creates an extensible DLFS application over a host.
-	 *
-	 * @param lattice Application root structure and merge semantics
-	 * @param host Generic lattice application host
-	 * @param regionPath Path from the application root to the physical DLFS region
-	 */
-	protected DLFSApplication(ALattice<V> lattice,LatticeHost<V> host, ACell... regionPath) {
-		this(lattice,Objects.requireNonNull(host,"DLFS application host must not be null").cursor(),host.store(),regionPath);
-		setContext(host.getContext());
+	/** Creates a live DLFS application at {@code :fs}, or an explicit path of region keys. */
+	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword... path) {
+		this(host.cursor(),host.store(),host.getContext(),path);
 	}
 
 	/**
-	 * Binds a working view, such as a fork or transaction draft, to a cursor.
-	 *
-	 * @param lattice Root lattice of the complete application root
-	 * @param cursor Cursor at the complete application root
-	 * @param store Store for incremental blob checkpoints, or null for heap-only file data
-	 * @param regionPath Path from the application root to the physical DLFS region
+	 * Binds a live view to a root cursor, including a transaction draft.
+	 * Missing containing indexes are created only by a changed write.
 	 */
-	protected DLFSApplication(ALattice<V> lattice, AForkableCursor<V> cursor, AStore store, ACell... regionPath) {
-		super(lattice,cursor);
-		if (regionPath==null) throw new IllegalArgumentException("DLFS region path must not be null");
+	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,
+			LatticeContext context,Keyword... path) {
+		super(cursor,context);
 		this.store=store;
-		this.regionPath=regionPath.clone();
+		Keyword[] keys=path.length==0?new Keyword[]{Keywords.FS}:path.clone();
+		Regions parent=this;
+		for (int i=0;i<keys.length-1;i++) {
+			parent=parent.add(keys[i],new Regions(
+				parent.cursor().withDefault(Index.none()).path(keys[i]),context));
+		}
+		dlfs=parent.add(keys[keys.length-1],configured(DLFSRegion.connect(
+			parent.cursor().withDefault(Index.none()).path(keys[keys.length-1]),store,
+			DLFSLocation.at(cursor,keys))));
 	}
 
 	/**
-	 * Connects a DLFS application to a region at an arbitrary path beneath an
-	 * existing hosted lattice root.
-	 *
-	 * @param <V> Complete application root value type
-	 * @param lattice Application root structure and merge semantics
-	 * @param host Generic lattice application host
-	 * @param regionPath Path from the application root to the physical DLFS region
-	 * @return Connected DLFS application
+	 * Registers an existing region at a root key, retaining its cursor, policy and
+	 * publication boundary. The caller binds the region to its intended destination.
 	 */
-	public static <V extends ACell> DLFSApplication<V> connect(ALattice<V> lattice,LatticeHost<V> host,
-			ACell... regionPath) {
-		return new DLFSApplication<>(lattice,host,regionPath);
+	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword key,DLFSRegion files) {
+		super(host);
+		store=host.store();
+		dlfs=add(key,files);
 	}
 
-	/** Returns the store used for blob checkpoints, or null when file data is heap-only. */
+	/** Returns the store available for new components' blob checkpoints. */
 	protected AStore store() {
 		return store;
 	}
 
-	/** Delegates an incoming root to the lattice merge under this application's context. */
-	@Override
-	public V merge(V other) {
-		return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
+	/** Returns the exact registered region, for both domain edits and incoming merges. */
+	public final DLFSRegion dlfs() {
+		return dlfs;
 	}
 
-	/**
-	 * Returns the physical multi-owner DLFS region. The application resolves the
-	 * region path with its root lattice and hands the region its cursor together
-	 * with its logical location, so repeated calls identify the same files.
-	 */
-	public DLFSRegion dlfs() {
-		AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> region=resolve(regionPath);
-		return configured(DLFSRegion.connect(region,store,DLFSLocation.at(cursor(),regionPath)));
-	}
-
-	/**
-	 * Returns the region whose drives this application serves. The default is the
-	 * live region in the host root; an application that stages its region overrides
-	 * this to serve drives from the staged copy, so edits stay private until it syncs.
-	 */
-	protected DLFSRegion region() {
-		return dlfs();
-	}
-
-	/**
-	 * Returns the component representing one owner's named drives, from the region
-	 * selected by {@link #region()}.
-	 *
-	 * @param owner Drive owner
-	 * @return Owner-scoped drives component
-	 */
+	/** Returns one owner's named drives in this application's working region. */
 	public DLFSDrives drives(AccountKey owner) {
-		return region().drives(owner);
+		return dlfs.drives(owner);
 	}
-
 }

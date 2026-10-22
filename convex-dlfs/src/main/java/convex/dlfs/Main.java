@@ -9,17 +9,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
-import convex.lattice.ALattice;
-import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeServer;
 import convex.node.RelayHost;
 import convex.node.LatticeListener;
@@ -66,11 +62,12 @@ public final class Main {
 		}
 		AStore store=openStore(config,keyPair);
 		Keyword[] regionPath=config.getRegionPath();
-		KeyedLattice root=createRoot(regionPath);
 		NodeConfig nodeConfig=config.getNodeConfig();
 		LatticeContext context=LatticeContext.create(null,keyPair);
-		NodeServer<Index<Keyword,ACell>> node=
-			new NodeServer<>(RelayHost.open(root,store,nodeConfig,context),nodeConfig);
+		var host=RelayHost.openHost(Index.<Keyword,ACell>none(),store,nodeConfig);
+		host.setContext(RelayHost.applySkew(nodeConfig,context));
+		var application=host.addApplication(new DLFSApplication(host,regionPath));
+		NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(host,nodeConfig);
 		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(nodeConfig));
 		propagator.setTransportKeyPair(keyPair);
 		node.addPropagator(propagator);
@@ -92,8 +89,6 @@ public final class Main {
 			}
 		}
 
-		DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(root,
-			node.getHost(),regionPath);
 		DLFSDrives localDrives=application.drives(keyPair.getAccountKey());
 		String driveName=config.getDriveName();
 		if (localDrives.getOrCreateDrive(driveName)==null) {
@@ -245,24 +240,6 @@ public final class Main {
 				?EtchStore.create(new File(storePath))
 				:EtchStore.create(new File(storePath),etchConfig);
 		};
-	}
-
-	private static KeyedLattice createRoot(Keyword[] path) {
-		if ((path.length==1)&&Keywords.FS.equals(path[0])) return Lattice.ROOT;
-		if (isStandardRootKey(path[0])) {
-			throw new IllegalArgumentException("DLFS path conflicts with standard lattice region: "+path[0]);
-		}
-		ALattice<?> nested=DLFSRegion.LATTICE;
-		for (int i=path.length-1;i>0;i--) {
-			nested=KeyedLattice.create(path[i],nested);
-		}
-		return Lattice.ROOT.addLattice(path[0],nested);
-	}
-
-	private static boolean isStandardRootKey(Keyword key) {
-		return Keywords.DATA.equals(key)||Keywords.FS.equals(key)||Keywords.KV.equals(key)
-			||Keywords.QUEUE.equals(key)||Keywords.P2P.equals(key)
-			||convex.lattice.LocalLattice.KEY_LOCAL.equals(key);
 	}
 
 	private static String requireValue(String[] args, int index, String option) {
