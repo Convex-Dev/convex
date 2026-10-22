@@ -8,10 +8,8 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
-import convex.core.util.Utils;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.generic.AOwnerLattice;
 import convex.lattice.generic.SignedLattice;
 
@@ -122,15 +120,7 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		return rule;
 	}
 
-	@SuppressWarnings("unchecked")
 	private AForkableCursor<SignedData<V>> slot(SignedLattice<V> rule) {
-		K owner=(K)rule.getOwner();
-		return ProjectionCursor.create(cursor,
-			map -> map==null?null:map.get(owner),
-			(map,value) -> {
-				SignedData<V> previous=map==null?null:map.get(owner);
-				if (Utils.equals(previous,value)) return map;
-				return (M)(map==null?owners.zero():map).assoc(owner,value);
-			});
+		return cursor.withDefault(owners.zero()).path(rule.getOwner());
 	}
 }

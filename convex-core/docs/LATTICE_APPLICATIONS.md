@@ -1294,7 +1294,9 @@ Worked examples:
 - [`TaskBoardApplicationTest`](../src/test/java/convex/lattice/app/TaskBoardApplicationTest.java):
   one aggregate board region for transactions across task records with stable IDs,
   mutable titles and timestamped completion/reopening, with publication
-  as a separate choice.
+  as a separate choice. Its `LatticeComponent` base supplies ordinary index merging
+  and whole-task delivery routing from `IndexLattice.create(Timestamped.lattice())`;
+  the domain code defines task operations and rebinds the clock into transaction views.
 - [`SharedRegionsTest`](../src/test/java/convex/lattice/app/SharedRegionsTest.java):
   direct assembly with `Regions`, preserving other applications' published state.
 - The [reading-list network example](../../convex-peer/src/test/java/convex/node/app/ReadingListApplicationTest.java):

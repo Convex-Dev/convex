@@ -26,7 +26,9 @@
  *       public keys act for one identity, with authority changes checked by existing views.</li>
  *   <li>{@link convex.lattice.app.TaskBoardApplicationTest}: transactions atomically
  *       change timestamped tasks with stable IDs before explicit publication;
- *       titles can change and completed tasks can reopen.</li>
+ *       titles can change and completed tasks can reopen. The optional
+ *       {@link convex.lattice.LatticeComponent} adapter handles standard index merging
+ *       and path delivery; retries retain concurrent tasks without leaking draft edits.</li>
  *   <li>{@link convex.lattice.app.SharedRegionsTest}: separate staged regions share
  *       a host without publishing or overwriting one another's state.</li>
  * </ul>

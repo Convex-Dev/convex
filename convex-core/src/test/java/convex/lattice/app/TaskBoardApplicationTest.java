@@ -3,7 +3,10 @@ package convex.lattice.app;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -22,11 +25,11 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.IndexLattice;
 
@@ -60,45 +63,33 @@ class TaskBoardApplicationTest {
 	/** Constructs the domain component directly at its host path. */
 	static final class TaskBoardApp extends SingleRegion<Board> {
 		TaskBoardApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
-			super(host,BOARD,new Board(host.cursor().path(BOARD),getTimestamp));
+			super(host,BOARD,new Board(forkOf(host.cursor().path(BOARD)),getTimestamp));
 		}
 		Board board() { return component(); }
 	}
 
-	/** One publication and transaction boundary spanning all task records. */
-	static final class Board extends ALatticeComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>>
+	/**
+	 * One publication and transaction boundary spanning all task records. The standard
+	 * lattice adapter supplies merge and delivery routing from the index ordering rule.
+	 * Timestamped records have no mergeable interior paths, so delivery stops at a task.
+	 */
+	static final class Board extends LatticeComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>>
 			implements TransactionalComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>,Board> {
 		private final Supplier<CVMLong> getTimestamp;
 
-		Board(ACursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> destination,Supplier<CVMLong> getTimestamp) {
-			super(forkOf(destination));
+		Board(ForkTarget<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> destination,Supplier<CVMLong> getTimestamp) {
+			super(BOARD_LATTICE,destination);
 			this.getTimestamp=getTimestamp;
 		}
 
 		// Rebinding shares the supplied draft directly and retains the clock, not the source board.
-		private Board(Board source,AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
-			super(cursor);
-			getTimestamp=source.getTimestamp;
+		private Board(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor,Supplier<CVMLong> getTimestamp) {
+			super(BOARD_LATTICE,cursor);
+			this.getTimestamp=getTimestamp;
 		}
 
 		@Override public Board withCursor(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
-			return new Board(this,cursor);
-		}
-
-		@Override public Index<ABlobLike<?>,AHashMap<Keyword,ACell>> merge(Index<ABlobLike<?>,AHashMap<Keyword,ACell>> incoming) {
-			return cursor.updateAndGet(own -> BOARD_LATTICE.merge(own,incoming));
-		}
-
-		@Override protected Index<ABlobLike<?>,AHashMap<Keyword,ACell>> mergePublication(
-				Index<ABlobLike<?>,AHashMap<Keyword,ACell>> own,Index<ABlobLike<?>,AHashMap<Keyword,ACell>> other) {
-			return BOARD_LATTICE.merge(own,other);
-		}
-
-		/** A delivery replaces a complete ordered record, never an individual task field. */
-		@SuppressWarnings("unchecked")
-		@Override protected Index<ABlobLike<?>,AHashMap<Keyword,ACell>> mergeAtPath(ACell value,ACell... path) {
-			if (path.length!=1 || !(path[0] instanceof ABlobLike<?> id) || !(value instanceof AHashMap)) return cursor.get();
-			return merge(Index.of(id,(AHashMap<Keyword,ACell>)value));
+			return new Board(cursor,getTimestamp);
 		}
 
 		Task task(String id) {
@@ -185,6 +176,7 @@ class TaskBoardApplicationTest {
 		board.transact(draft -> {
 			draft.plan("review","Review the example");
 			draft.task("write").complete();
+			draft.sync(); // A rebound view has no publication boundary of its own.
 			assertEquals(Sets.of("write"),board.pending());
 			assertFalse(board.task("write").isDone());
 			assertFalse(board.task("review").exists());
@@ -198,6 +190,39 @@ class TaskBoardApplicationTest {
 			.thenRun(app::sync).get(10,TimeUnit.SECONDS);
 		assertEquals(board.cursor().get(),host.cursor().get().get(BOARD));
 		assertTrue(board.pending().isEmpty());
+	}
+
+	/** A conflicting edit retries the whole domain operation without publishing either attempt early. */
+	@Test void transactionRetryPreservesConcurrentTasksAndCommitsTheWholePlan() {
+		var host=LatticeHost.create();
+		var app=new TaskBoardApp(host,() -> CVMLong.ONE);
+		var board=app.board();
+		board.plan("review","Review");
+		var firstDraft=new CompletableFuture<Void>();
+		var attempts=new AtomicInteger();
+		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+			var competing=CompletableFuture.runAsync(() -> {
+				firstDraft.orTimeout(10,TimeUnit.SECONDS).join();
+				board.plan("other","Independent task");
+			},executor);
+			board.transact(draft -> {
+				draft.task("review").complete();
+				draft.plan("publish","Publish"); // Stable ID across retries.
+				if (attempts.incrementAndGet()==1) {
+					firstDraft.complete(null);
+					competing.orTimeout(10,TimeUnit.SECONDS).join();
+					assertFalse(board.task("review").isDone());
+					assertFalse(board.task("publish").exists());
+				}
+				assertTrue(host.cursor().get().isEmpty());
+			});
+		}
+		assertEquals(2,attempts.get());
+		assertTrue(board.task("review").isDone());
+		assertEquals(Sets.of("publish","other"),board.pending());
+		assertTrue(host.cursor().get().isEmpty());
+		app.sync();
+		assertEquals(board.cursor().get(),host.cursor().get().get(BOARD));
 	}
 
 	/** Failure after changing two task records must leak neither change into the live board. */

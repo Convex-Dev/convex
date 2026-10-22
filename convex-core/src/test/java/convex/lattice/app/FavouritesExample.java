@@ -1,6 +1,6 @@
 package convex.lattice.app;
 
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import convex.core.crypto.AKeyPair;
@@ -106,20 +106,19 @@ final class FavouritesExample {
 	 */
 	static final class FavouritesRegion extends KeyOwnedIndex<AHashMap<Keyword,ACell>> {
 		// Test-controlled time shared by all user handles, including handles already opened.
-		private final AtomicLong clock=new AtomicLong();
+		private final AtomicReference<CVMLong> clock=new AtomicReference<>(CVMLong.ZERO);
 
 		FavouritesRegion(AForkableCursor<Index<AccountKey,SignedData<AHashMap<Keyword,ACell>>>> destination) {
 			super(destination,Timestamped.lattice());
 		}
 
 		/** Sets the exact next edit time; edits do not automatically advance it. */
-		void setTime(long timestamp) { clock.set(timestamp); }
-		private CVMLong getTimestamp() { return CVMLong.create(clock.get()); }
+		void setTime(long timestamp) { clock.set(CVMLong.create(timestamp)); }
 
 		/** Opens a live authoring handle. An absent owner is created only by a changed edit. */
 		Favourites user(AKeyPair user) {
 			var owner=user.getAccountKey();
-			return new Favourites(path(owner),getLattice().signingFor(owner),user,this::getTimestamp);
+			return new Favourites(path(owner),getLattice().signingFor(owner),user,clock::get);
 		}
 
 		SignedData<AHashMap<Keyword,ACell>> record(AccountKey user) {

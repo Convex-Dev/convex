@@ -24,9 +24,14 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	/** Creates private working state, published to the destination by sync. */
 	public LatticeComponent(ALattice<V> lattice,ACursor<V> destination,LatticeContext context) {
-		super(forkOf(destination));
-		this.lattice=Objects.requireNonNull(lattice,"Component lattice must not be null");
+		this(lattice,forkOf(destination));
 		setContext(context);
+	}
+
+	/** Creates an explicitly owned fork using the supplied merge and routing rules. */
+	protected LatticeComponent(ALattice<V> lattice,ForkTarget<V> target) {
+		super(target);
+		this.lattice=Objects.requireNonNull(lattice,"Component lattice must not be null");
 	}
 
 	/** Creates a live view over caller-supplied working storage. */
