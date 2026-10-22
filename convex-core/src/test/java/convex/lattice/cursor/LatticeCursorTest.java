@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -328,49 +327,6 @@ public class LatticeCursorTest {
 		assertSame(edited, root.get(),
 			"the fork's local edit must win a timestamp tie against a concurrent parent advance");
 	}
-
-	/**
-	 * Root cursor with a one-shot hook that runs synchronously inside
-	 * {@link #compareAndSet}, before the actual update. Used to deterministically
-	 * inject a concurrent write into the exact window inside component publication
-	 * between its read of the working snapshot and the final CAS on the working
-	 * cursor.
-	 */
-	private static class HookedRootCursor<V extends ACell> extends Root<V> {
-		private Runnable oneShotHook;
-
-		HookedRootCursor(ALattice<V> lattice, V initialValue) {
-			super(initialValue);
-		}
-
-		void armHook(Runnable hook) {
-			this.oneShotHook = hook;
-		}
-
-		@Override
-		public boolean compareAndSet(V expected,V value) {
-			Runnable hook = oneShotHook;
-			oneShotHook = null;
-			if (hook != null) hook.run();
-			return super.compareAndSet(expected,value);
-		}
-	}
-
-	@Test
-	public void testSyncRejectsReentrantWorkingWritesBeforePublication() {
-		SetLattice<CVMLong> lattice=SetLattice.create();
-		var root=new HookedRootCursor<>(lattice,Sets.<CVMLong>empty());
-		var component=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
-		component.cursor().set(Sets.of(CVMLong.ONE));
-		// A synchronous callback is re-entrant, not a concurrent writer. It cannot
-		// change the working value underneath the sync transaction.
-		root.armHook(() -> component.cursor().updateAndGet(set -> set.include(CVMLong.TWO)));
-		assertThrows(IllegalStateException.class,component::sync);
-		assertEquals(Sets.empty(),root.get());
-		assertEquals(Sets.of(1),component.cursor().get());
-		assertEquals(Sets.of(1),component.sync());
-	}
-
 
 	@Test
 	public void testFastPathOptimization() {

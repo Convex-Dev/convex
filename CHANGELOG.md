@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Fork publication callbacks rely on the documented side-effect contract; removed thread tracking and defensive re-entrancy checks. Concurrent edits and sync still coordinate through the working-state lock.
+
 - Lattice transaction drafts use standard thread-safe root storage without thread ownership or closing guards. Callbacks may coordinate worker edits before returning; later edits to retained drafts remain isolated from live state.
 
 - `Mail.send` now holds all send state in one atomic recipient-mailbox deposit. Removed the separate in-memory outbox, `outbox()`, `redeposit()` and automatic redeposit on sync. Inspect mailbox deposits and receipts for delivery state; sends now have no extra mutable state outside transactions and forks.

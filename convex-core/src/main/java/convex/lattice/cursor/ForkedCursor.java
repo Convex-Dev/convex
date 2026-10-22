@@ -36,7 +36,7 @@ import convex.core.util.Utils;
  * The destination remains independently writable and CAS conflicts retry normally.</p>
  *
  * <p>Read, prepare and merge functions must not mutate or sync this fork, or wait
- * for another operation on it. Re-entrant writes and syncs are rejected.</p>
+ * for another operation on it.</p>
  *
  * @param <V> Working value type
  */
@@ -45,8 +45,6 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	private final Target<V,?> target;
 	private final BinaryOperator<V> merge;
 	private final TransactionalRootCursor<V> working;
-	/** Used only to reject same-thread writes from sync callbacks. */
-	private volatile Thread syncingThread;
 
 	private <P extends ACell> ForkedCursor(ACursor<P> destination,Function<P,V> read,
 			Function<V,P> prepare,BinaryOperator<V> merge) {
@@ -96,23 +94,14 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	 * @return Published value
 	 */
 	public V sync() {
-		checkNotSyncing();
 		Lock lock=working.exclusiveLock();
 		lock.lock();
 		try {
-			syncingThread=Thread.currentThread();
 			V published=target.publish(working.get(),merge);
 			working.set(published);
 			return published;
 		} finally {
-			syncingThread=null;
 			lock.unlock();
-		}
-	}
-
-	private void checkNotSyncing() {
-		if (syncingThread==Thread.currentThread()) {
-			throw new IllegalStateException("Cannot write or sync a fork from its sync callbacks");
 		}
 	}
 
@@ -191,43 +180,36 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	@Override
 	public void set(V newValue) {
-		checkNotSyncing();
 		working.set(newValue);
 	}
 
 	@Override
 	public V getAndSet(V newValue) {
-		checkNotSyncing();
 		return working.getAndSet(newValue);
 	}
 
 	@Override
 	public boolean compareAndSet(V expected,V newValue) {
-		checkNotSyncing();
 		return working.compareAndSet(expected,newValue);
 	}
 
 	@Override
 	public V getAndUpdate(UnaryOperator<V> updateFunction) {
-		checkNotSyncing();
 		return working.getAndUpdate(updateFunction);
 	}
 
 	@Override
 	public V updateAndGet(UnaryOperator<V> updateFunction) {
-		checkNotSyncing();
 		return working.updateAndGet(updateFunction);
 	}
 
 	@Override
 	public V getAndAccumulate(V x,BinaryOperator<V> accumulatorFunction) {
-		checkNotSyncing();
 		return working.getAndAccumulate(x,accumulatorFunction);
 	}
 
 	@Override
 	public V accumulateAndGet(V x,BinaryOperator<V> accumulatorFunction) {
-		checkNotSyncing();
 		return working.accumulateAndGet(x,accumulatorFunction);
 	}
 }

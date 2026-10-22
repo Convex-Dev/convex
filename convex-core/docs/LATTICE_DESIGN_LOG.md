@@ -658,6 +658,10 @@ publication callbacks are rejected. Regression tests exercise concurrent edits,
 failure on retry, failed signing, baseline preservation and nested publication.
 This implements CAD035's atomic cursor and failure-before-publication semantics.
 
+Updated 22 October 2026: removed thread tracking and re-entrancy guards. Publication
+callbacks must still avoid mutating or syncing the same fork; this is a caller
+contract. Working-state locking continues to coordinate concurrent edits and sync.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |

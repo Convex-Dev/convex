@@ -110,7 +110,8 @@ Fork reads take the same lock. A successful commit installs the reconciled worki
 value and advances the baseline without further user code or merging. Failed
 reconciliation or preparation commits nothing; competing destination writes remain
 independent. Read, prepare and merge functions must not write or sync the same fork,
-or wait for operations on it. Re-entrant writes and syncs are rejected.
+or wait for operations on it. This is a callback contract, without thread ownership
+or re-entrancy guards.
 
 A component with an independent publication boundary owns such a fork and supplies
 its own reconciliation rule; `ALatticeComponent.mergePublication(own, other)` is

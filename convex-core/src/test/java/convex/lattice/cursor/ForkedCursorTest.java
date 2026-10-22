@@ -109,28 +109,6 @@ public class ForkedCursorTest {
 		assertSame(root.get(),fork.get());
 	}
 
-	@Test public void reentrantPreparationCannotWriteOrSyncTheFork() {
-		var root=Root.create(CVMLong.ZERO);
-		var reference=new java.util.concurrent.atomic.AtomicReference<ForkedCursor<CVMLong>>();
-		var action=new java.util.concurrent.atomic.AtomicReference<Runnable>();
-		var fork=ForkedCursor.create(root,value -> value,value -> {
-			action.get().run();
-			return value;
-		},(own,other) -> own);
-		reference.set(fork);
-		fork.set(CVMLong.ONE);
-		for (Runnable invalid:new Runnable[] {
-			() -> reference.get().set(CVMLong.TWO), () -> reference.get().sync()
-		}) {
-			action.set(invalid);
-			assertThrows(IllegalStateException.class,fork::sync);
-			assertSame(CVMLong.ZERO,root.get());
-			assertSame(CVMLong.ONE,fork.get());
-		}
-		action.set(() -> {});
-		assertSame(CVMLong.ONE,fork.sync());
-	}
-
 	@Test public void failedReconciliationOnCASRetryDoesNotPublishOrAdvanceBaseline() {
 		var root=new Root<ASet<CVMLong>>(Sets.empty()) {
 			boolean conflict=true;
