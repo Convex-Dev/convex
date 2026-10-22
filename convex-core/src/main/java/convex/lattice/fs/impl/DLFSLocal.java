@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileTime;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ABlob;
@@ -27,10 +28,9 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
-import convex.lattice.LatticeComponent;
-import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSCorruptionException;
 import convex.lattice.fs.DLFSLattice;
@@ -50,10 +50,17 @@ public class DLFSLocal extends DLFileSystem {
 	// Store for incremental blob checkpoints during streamed writes, or null for heap-only
 	private final AStore store;
 	private final DLFSLocation location;
-	private volatile LatticeContext context=LatticeContext.EMPTY;
-	public LatticeContext getContext() { return context; }
-	public void setContext(LatticeContext context) {
-		this.context=java.util.Objects.requireNonNull(context);
+	private volatile Supplier<CVMLong> clock;
+
+	/** Returns the supplier used for local mutation timestamps. */
+	public Supplier<CVMLong> getClock() { return clock; }
+
+	/**
+	 * Supplies mutation time. Existing forks and clones retain their own supplier;
+	 * a shared dynamic supplier must support concurrent use. Merge never reads it.
+	 */
+	public void setClock(Supplier<CVMLong> clock) {
+		this.clock=java.util.Objects.requireNonNull(clock);
 	}
 
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
@@ -85,10 +92,17 @@ public class DLFSLocal extends DLFileSystem {
 	/** Binds a NIO view to the working location known by its domain component. */
 	protected DLFSLocal(DLFSProvider dlfsProvider,String uriPath,
 			AForkableCursor<AVector<ACell>> cursor,AStore store,DLFSLocation location) {
+		this(dlfsProvider,uriPath,cursor,store,location,Utils::getCurrentTimestampCell);
+	}
+
+	/** Binds a NIO view to its component's location, store and mutation clock. */
+	protected DLFSLocal(DLFSProvider dlfsProvider,String uriPath,
+			AForkableCursor<AVector<ACell>> cursor,AStore store,DLFSLocation location,Supplier<CVMLong> clock) {
 		super(dlfsProvider,uriPath);
 		this.rootCursor=cursor;
 		this.store=store;
 		this.location=java.util.Objects.requireNonNull(location);
+		this.clock=java.util.Objects.requireNonNull(clock);
 	}
 
 	@Override public boolean isSameDrive(DLFileSystem other) {
@@ -142,8 +156,8 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	/**
-	 * Returns the underlying cursor. Applications control mutation time by
-	 * configuring this filesystem's explicit {@link convex.lattice.LatticeContext}.
+	 * Returns the underlying cursor. Applications control mutation time with
+	 * {@link #setClock(Supplier)} or supply a clock when constructing a domain adapter.
 	 *
 	 * @return cursor holding this drive's root node
 	 */
@@ -153,7 +167,7 @@ public class DLFSLocal extends DLFileSystem {
 
 	// Time comes from the configured policy. DLFS never advances it implicitly.
 	protected CVMLong currentTimestamp() {
-		return getContext().currentTimestamp();
+		return clock.get();
 	}
 
 	@Override
@@ -468,23 +482,18 @@ public class DLFSLocal extends DLFileSystem {
 	/** Creates a forked view sharing this filesystem's store, if any. */
 	@Override
 	public DLFSLocal fork() {
-		var working=new LatticeComponent<>(DLFSLattice.INSTANCE,rootCursor,getContext());
-		return new WorkingFileSystem(provider(),uriPath,working,store);
+		var working=rootCursor.fork(DLFSLattice.INSTANCE::merge);
+		return new WorkingFileSystem(provider(),uriPath,working,store,clock);
 	}
 
-	/** NIO adapter whose policy belongs to its publication component. */
+	/** NIO view owning an independent publication boundary. */
 	private static final class WorkingFileSystem extends DLFSLocal {
-		private final LatticeComponent<AVector<ACell>> working;
+		private final ForkedCursor<AVector<ACell>> working;
 
 		WorkingFileSystem(DLFSProvider provider,String uriPath,
-				LatticeComponent<AVector<ACell>> working,AStore store) {
-			super(provider,uriPath,working.cursor(),store);
+				ForkedCursor<AVector<ACell>> working,AStore store,Supplier<CVMLong> clock) {
+			super(provider,uriPath,working,store,DLFSLocation.at(working),clock);
 			this.working=working;
-		}
-
-		@Override public LatticeContext getContext() { return working.getContext(); }
-		@Override public void setContext(LatticeContext context) {
-			working.setContext(java.util.Objects.requireNonNull(context));
 		}
 
 		@Override public void sync() { working.sync(); }
@@ -500,9 +509,7 @@ public class DLFSLocal extends DLFileSystem {
 	public DLFSLocal clone() {
 		AVector<ACell> root=rootCursor.get();
 		AForkableCursor<AVector<ACell>> cursor=Cursors.root(root);
-		DLFSLocal result=new DLFSLocal(provider(),uriPath,cursor,store);
-		result.setContext(getContext());
-		return result;
+		return new DLFSLocal(provider(),uriPath,cursor,store,DLFSLocation.at(cursor),clock);
 	}
 
 	private static void requireAbsent(AVector<ACell> parent, AString name, DLPath path) throws IOException {

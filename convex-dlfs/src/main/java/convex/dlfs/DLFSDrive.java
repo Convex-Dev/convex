@@ -32,7 +32,6 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 
 	private final AString name;
 	private final AStore store;
-	private final Supplier<CVMLong> clock;
 	private final DLFSLattice lattice;
 	private final DLFSLocation location;
 	private final HostedFileSystem fileSystem;
@@ -43,9 +42,8 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		this.name=name;
 		this.store=store;
 		this.location=location;
-		this.clock=clock;
 		this.lattice=lattice;
-		this.fileSystem=new HostedFileSystem(this);
+		this.fileSystem=new HostedFileSystem(this,clock);
 	}
 
 	/** Returns this drive's name within its owner's drive map. */
@@ -80,9 +78,8 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		this.name=source.name;
 		this.store=source.store;
 		this.location=DLFSLocation.at(cursor());
-		this.clock=source.clock;
 		this.lattice=source.lattice;
-		this.fileSystem=new HostedFileSystem(this);
+		this.fileSystem=new HostedFileSystem(this,source.fileSystem.getClock());
 	}
 
 	@Override
@@ -94,12 +91,11 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	private static final class HostedFileSystem extends DLFSLocal {
 		private final DLFSDrive drive;
 
-		HostedFileSystem(DLFSDrive drive) {
-			super(DLFS.provider(),drive.name(),drive.cursor(),drive.store,drive.location);
+		HostedFileSystem(DLFSDrive drive,Supplier<CVMLong> clock) {
+			super(DLFS.provider(),drive.name(),drive.cursor(),drive.store,drive.location,clock);
 			this.drive=drive;
 		}
 
-		@Override protected CVMLong currentTimestamp() { return drive.clock.get(); }
 		@Override public void merge(AVector<ACell> incoming) {
 			drive.cursor().updateAndGet(own -> drive.lattice.merge(own,incoming));
 		}
@@ -116,7 +112,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 
 	@Override
 	public DLFSDrive withCursor(AForkableCursor<AVector<ACell>> cursor) {
-		return new DLFSDrive(name,cursor,store,DLFSLocation.at(cursor),clock,lattice);
+		return new DLFSDrive(name,cursor,store,DLFSLocation.at(cursor),fileSystem.getClock(),lattice);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */

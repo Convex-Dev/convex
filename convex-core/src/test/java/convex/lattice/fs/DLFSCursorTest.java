@@ -185,7 +185,7 @@ public class DLFSCursorTest {
 		AForkableCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
 		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
 		DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
-		dlfs.setContext(ctx);
+		dlfs.setClock(ctx::currentTimestamp);
 
 		Files.createDirectory(dlfs.getPath("/tmp"));
 		Files.writeString(dlfs.getPath("/tmp/deleteme.txt"), "delete me");
@@ -218,7 +218,7 @@ public class DLFSCursorTest {
 		LatticeHost<Index<Keyword,ACell>> root=LatticeHost.create((Index<Keyword,ACell>)Index.EMPTY,null);
 		AForkableCursor<?> region=root.cursor().path(dlfsKey);
 		DLFSLocal fileSystem=DLFS.connect(convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(region,owners,owner), owners, owner, context),driveName);
-		fileSystem.setContext(context);
+		fileSystem.setClock(context::currentTimestamp);
 		Path path=fileSystem.getPath("/recreated");
 		Files.write(path,new byte[] {1});
 		Files.delete(path);
@@ -284,7 +284,7 @@ public class DLFSCursorTest {
 		AForkableCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
 		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
 		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
-		dlfs.setContext(ctx);
+		dlfs.setClock(ctx::currentTimestamp);
 
 		String[] dirs = { "alpha", "beta", "gamma" };
 		java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);

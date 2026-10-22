@@ -15,7 +15,6 @@ import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeContext;
 
 public class DLFSAttributesTest {
 	@Test
@@ -46,13 +45,13 @@ public class DLFSAttributesTest {
 	@Test
 	public void testDirectoryTimesTrackImmediateEntriesOnly() throws Exception {
 		try (var fs=DLFS.create()) {
-			fs.setContext(LatticeContext.create(CVMLong.create(100),null));
+			fs.setClock(() -> CVMLong.create(100));
 			var dir=Files.createDirectory(fs.getPath("/dir"));
-			fs.setContext(LatticeContext.create(CVMLong.create(200),null));
+			fs.setClock(() -> CVMLong.create(200));
 			var file=Files.writeString(dir.resolve("file"),"first");
 			assertEquals(100,Files.getLastModifiedTime(fs.getRoot()).toMillis());
 			assertEquals(200,Files.getLastModifiedTime(dir).toMillis());
-			fs.setContext(LatticeContext.create(CVMLong.create(300),null));
+			fs.setClock(() -> CVMLong.create(300));
 			Files.writeString(file,"second");
 			assertEquals(100,Files.getLastModifiedTime(fs.getRoot()).toMillis());
 			assertEquals(200,Files.getLastModifiedTime(dir).toMillis());
@@ -60,7 +59,7 @@ public class DLFSAttributesTest {
 			Files.move(file,dir.resolve("renamed"));
 			assertEquals(300,Files.getLastModifiedTime(dir).toMillis());
 			assertEquals(100,Files.getLastModifiedTime(fs.getRoot()).toMillis());
-			fs.setContext(LatticeContext.create(CVMLong.create(400),null));
+			fs.setClock(() -> CVMLong.create(400));
 			Files.delete(dir.resolve("renamed"));
 			assertEquals(400,Files.getLastModifiedTime(dir).toMillis());
 			assertEquals(100,Files.getLastModifiedTime(fs.getRoot()).toMillis());
@@ -83,7 +82,7 @@ public class DLFSAttributesTest {
 	@Test
 	public void testIndependentTimesAndContentChanges() throws Exception {
 		try (var fs=DLFS.create()) {
-			fs.setContext(LatticeContext.create(CVMLong.create(100),null));
+			fs.setClock(() -> CVMLong.create(100));
 			var path=fs.getPath("/file");
 			Files.writeString(path,"first");
 			var view=Files.getFileAttributeView(path,BasicFileAttributeView.class);
@@ -98,7 +97,7 @@ public class DLFSAttributesTest {
 			assertSame(before,fs.getCursor().get(),"unsupported timestamps must not cause writes");
 			assertEquals(6,fs.getNode(path).count(),"mtime is the only timestamp extension");
 			assertEquals(CVMLong.create(100),DLFSNode.getUTime(fs.getNode(path)));
-			fs.setContext(LatticeContext.create(CVMLong.create(200),null));
+			fs.setClock(() -> CVMLong.create(200));
 			Files.writeString(path,"second");
 			attrs=view.readAttributes();
 			assertEquals(200,attrs.lastModifiedTime().toMillis());
@@ -118,7 +117,7 @@ public class DLFSAttributesTest {
 			Files.writeString(file,"data");
 			Files.getFileAttributeView(file,BasicFileAttributeView.class).setTimes(
 				FileTime.fromMillis(10),FileTime.fromMillis(20),FileTime.fromMillis(30));
-			destination.setContext(LatticeContext.create(CVMLong.create(200),null));
+			destination.setClock(() -> CVMLong.create(200));
 			Files.copy(file,destination.getPath("/copy"),StandardCopyOption.COPY_ATTRIBUTES);
 			var attrs=Files.readAttributes(destination.getPath("/copy"),BasicFileAttributes.class);
 			assertEquals(10,attrs.lastModifiedTime().toMillis());
@@ -158,13 +157,13 @@ public class DLFSAttributesTest {
 	@Test
 	public void testFileExtensionsSurviveContentMetadataAndTransferChanges() throws Exception {
 		try (var fs=DLFS.create(); var destination=DLFS.create()) {
-			fs.setContext(LatticeContext.create(CVMLong.create(100),null));
+			fs.setClock(() -> CVMLong.create(100));
 			var file=fs.getPath("/file");
 			Files.writeString(file,"initial");
 			var extension=Strings.create("unknown file extension");
 			var node=fs.getNode(file).conj(extension);
 			fs.updateNode(file,node);
-			fs.setContext(LatticeContext.create(CVMLong.create(200),null));
+			fs.setClock(() -> CVMLong.create(200));
 			Files.writeString(file,"changed");
 			node=DLFSNode.withMetadata(fs.getNode(file),Strings.create("metadata"),CVMLong.create(300));
 			assertEquals(CVMLong.create(200),DLFSNode.getMTime(node));
@@ -180,8 +179,8 @@ public class DLFSAttributesTest {
 	@Test
 	public void testDirectoryMergePreservesWinningExtensionsWhileCombiningChildren() throws Exception {
 		try (var own=DLFS.create(); var other=DLFS.create()) {
-			own.setContext(LatticeContext.create(CVMLong.create(200),null));
-			other.setContext(LatticeContext.create(CVMLong.create(100),null));
+			own.setClock(() -> CVMLong.create(200));
+			other.setClock(() -> CVMLong.create(100));
 			Files.writeString(own.getPath("/own"),"own");
 			Files.writeString(other.getPath("/other"),"other");
 			var extension=Strings.create("unknown directory extension");

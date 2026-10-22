@@ -893,6 +893,11 @@ have no `getContext`, `setContext` or inherited policy. Constructors declare wha
 their operations need; forks and `withCursor` retain those fields explicitly.
 Shared clocks and signers must support concurrent use.
 
+- `DLFSLocal` uses a `Supplier<CVMLong>` for local filesystem mutations. The
+  default is the system clock; `setClock` replaces the supplier for that view.
+  Forks and clones retain the supplier present when they are created, so a shared
+  dynamic clock keeps advancing. Domain drive adapters pass their clock directly
+  to the filesystem. Merge preserves stored timestamps without consulting it.
 - `LatticeKV`, `LatticeMQ`, `LatticeTopic` and `LatticeQueue` accept a
   `Supplier<CVMLong>` clock. Ordinary constructors use the system clock. Nested
   queue views and forks retain the supplied clock; merge never reads it.

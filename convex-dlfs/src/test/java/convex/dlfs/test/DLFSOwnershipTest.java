@@ -116,13 +116,19 @@ public class DLFSOwnershipTest {
 		var region=DLFSRegion.connect(Cursors.root(DLFSRegion.LATTICE.zero()),null,ALICE::signData,time::get);
 		var drive=region.drives(ALICE.getAccountKey()).createDrive("home");
 		assertEquals(time.get(),DLFSNode.getUTime(drive.cursor().get()));
+		time.set(CVMLong.create(125));
+		Files.createDirectory(drive.fileSystem().getPath("/original-clock"));
+		assertEquals(time.get(),DLFSNode.getUTime(drive.cursor().get()));
+		// The NIO adapter owns the same explicit clock policy for its derived views.
+		var replacement=new AtomicReference<>(CVMLong.create(150));
+		((DLFSLocal)drive.fileSystem()).setClock(replacement::get);
 		var fork=drive.fork();
 		var snapshot=((DLFSLocal)drive.fileSystem()).clone();
-		time.set(CVMLong.create(200));
+		replacement.set(CVMLong.create(200));
 		for (var fs:new DLFSLocal[]{(DLFSLocal)drive.fileSystem(),(DLFSLocal)fork.fileSystem(),snapshot}) {
 			var path=fs.getPath("/file");
 			Files.writeString(path,"clock");
-			assertEquals(time.get(),DLFSNode.getUTime(fs.getNode((DLPath)path)));
+			assertEquals(replacement.get(),DLFSNode.getUTime(fs.getNode((DLPath)path)));
 		}
 	}
 

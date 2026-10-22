@@ -98,16 +98,16 @@ public class DLFSTest {
 	}
 
 	@Test
-	public void testMutationTimestampComesFromCursorContext() throws IOException {
+	public void testMutationTimestampComesFromSuppliedClock() throws IOException {
 		DLFSLocal fs=DLFS.createLocal();
-		DLPath path=fs.getPath("/context-time");
+		DLPath path=fs.getPath("/clock-time");
 		setDriveTimes(123,fs);
 		Files.write(path,new byte[] {1});
 		assertEquals(123,DLFSNode.getUTime(fs.getNode(path)).longValue());
 		setDriveTimes(100,fs);
 		Files.write(path,new byte[] {2});
 		assertEquals(100,DLFSNode.getUTime(fs.getNode(path)).longValue(),
-			"DLFS must use the caller's exact context timestamp without ratcheting");
+			"DLFS must use the caller's exact supplied timestamp without ratcheting");
 	}
 
 	private static void writeAfter(CountDownLatch start, DLFileSystem fs, DLPath path, byte[] value) {
@@ -557,11 +557,11 @@ public class DLFSTest {
 		setDriveTimes(TS+5,driveA,driveB);
 		driveB.replicate(driveA);
 		assertTrue(Files.isRegularFile(driveB.getPath("conflict"))); // should prefer current value at same timestamp
-		// With deterministic merge, timestamp is max of merged nodes (TS+4), not context time (TS+5)
+		// With deterministic merge, timestamp is max of merged nodes (TS+4), not clock time (TS+5)
 		assertEquals(TS+4,Files.getLastModifiedTime(driveB.getPath("/")).toMillis());
 
 		// Delete conflicting file, should make a tombstone!
-		// Note: Delete uses the current context timestamp (TS+5, not TS+6)
+		// Note: Delete uses the current supplied timestamp (TS+5, not TS+6)
 		Files.delete(driveA.getPath("conflict"));
 
 		// Replicate back to A, should get same root hash with no conflicts
@@ -574,7 +574,7 @@ public class DLFSTest {
 		setDriveTimes(TS+7,driveA,driveB);
 		driveA.replicate(driveB);
 		driveB.replicate(driveA);
-		// With deterministic merge, timestamp is max of nodes (TS+5 from tombstone), not context time
+		// With deterministic merge, timestamp is max of nodes (TS+5 from tombstone), not clock time
 		assertEquals(TS+5,Files.getLastModifiedTime(driveA.getPath("/")).toMillis());
 		assertEquals(driveA.getRootHash(),driveB.getRootHash());
 	}
@@ -585,7 +585,7 @@ public class DLFSTest {
 
 	private void setDriveTimes(CVMLong utime, DLFSLocal... drives) {
 		for (DLFSLocal d: drives) {
-			d.setContext(d.getContext().withTimestamp(utime));
+			d.setClock(() -> utime);
 		}
 	}
 
@@ -756,12 +756,8 @@ public class DLFSTest {
 	}
 
 	/**
-	 * Test that DLFSLattice context-aware merge uses timestamp from context.
-	 *
-	 * Verifies:
-	 * - Context timestamp is used for merge operations when provided
-	 * - Fallback to node timestamps when context timestamp is null
-	 * - Context timestamp overrides node timestamps for conflict resolution
+	 * The optional context-aware lattice API preserves stored timestamps too:
+	 * neither a fixed context timestamp nor the runtime clock stamps incoming data.
 	 */
 	@Test
 	public void testDLFSLatticeContextAwareMerge() throws IOException {
@@ -805,7 +801,7 @@ public class DLFSTest {
 		assertNotNull(merged2, "Merged value should not be null");
 
 		CVMLong mergedTime2 = DLFSNode.getUTime(merged2);
-		assertEquals(2000L, mergedTime2.longValue(), "Merged root should use max node timestamp when context timestamp is null");
+		assertEquals(2000L, mergedTime2.longValue(), "Merged root should use max node timestamp when supplied timestamp is null");
 
 		// Test 3: Basic merge (no context) should behave as before
 		AVector<ACell> merged3 = lattice.merge(node1, node2);
@@ -838,7 +834,7 @@ public class DLFSTest {
 		LatticeContext context2 = LatticeContext.create(CVMLong.create(4000), null);
 		AVector<ACell> merged4 = lattice.merge(context2, node3, node4);
 
-		// Verify merged root uses max node timestamp (2000), not context timestamp
+		// Verify merged root uses max node timestamp (2000), not supplied timestamp
 		// This ensures merge is deterministic
 		assertEquals(2000L, DLFSNode.getUTime(merged4).longValue(), "Merged root with subdirs should use max node timestamp (deterministic)");
 
@@ -961,8 +957,8 @@ public class DLFSTest {
 		setDriveTimes(2000,driveB);
 		Files.createFile(driveB.getPath("fileB.txt"));
 
-		// Now set driveA's context timestamp to 1000 (EARLIER than the files that exist).
-		// This is valid: the driving application may supply any context timestamp.
+		// Now set driveA's supplied timestamp to 1000 (EARLIER than the files that exist).
+		// This is valid: the driving application chooses its mutation time.
 		setDriveTimes(1000,driveA);
 
 		// Record root timestamp before merge
@@ -970,15 +966,15 @@ public class DLFSTest {
 		CVMLong timeBeforeMerge = DLFSNode.getUTime(rootBeforeMerge);
 		assertEquals(2000L, timeBeforeMerge.longValue(), "Root should be at time 2000 before merge");
 
-		// Merge uses timestamps FROM the nodes (2000), not the mutation context (1000).
+		// Merge uses timestamps FROM the nodes (2000), not the mutation clock (1000).
 		driveA.replicate(driveB);
 
 		AVector<ACell> rootAfterMerge = driveA.getNode(driveA.getRoot());
 		CVMLong timeAfterMerge = DLFSNode.getUTime(rootAfterMerge);
 
-		// Root remains at 2000 (max of node timestamps), not context time (1000).
+		// Root remains at 2000 (max of node timestamps), not clock time (1000).
 		assertEquals(2000L, timeAfterMerge.longValue(),
-		    "Merge should use node timestamps (2000), not mutation context time (1000)");
+		    "Merge should use node timestamps (2000), not mutation clock time (1000)");
 	}
 
 	/**
