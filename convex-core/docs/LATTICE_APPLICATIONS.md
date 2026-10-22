@@ -720,8 +720,8 @@ final class SocialApp extends AKeyedRegions {
 }
 
 var socialApp = host.addApplication(new SocialApp(host, socialPolicy));
-var files = DLFSRegion.connect(host.cursor().path(Keywords.FS), store);
-files.setContext(filePolicy);
+var files = DLFSRegion.connect(host.cursor().path(Keywords.FS), store,
+    fileKeyPair::signData, Utils::getCurrentTimestampCell);
 var filesApp = host.addApplication(new DLFSApplication(host, Keywords.FS, files.fork()));
 
 socialApp.social.user(ownerKey).feed().post("A staged post");

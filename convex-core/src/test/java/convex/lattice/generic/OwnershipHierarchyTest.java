@@ -106,11 +106,38 @@ public class OwnershipHierarchyTest {
 		checkSynthesis(OwnerIndexLattice.create(SetLattice.create(),ALICE_RULE));
 	}
 
+	@SuppressWarnings({"unchecked","rawtypes"})
 	private <M extends AMap<AString,SignedData<ASet<CVMLong>>>> void checkSynthesis(
 			AOwnerLattice<AString,ASet<CVMLong>,M> lattice) {
 		M own=entry(lattice.zero(),DID,ALICE.signData(Sets.of(1)));
 		M other=entry(lattice.zero(),DID,ALICE.signData(Sets.of(2)));
 		assertSame(own,lattice.merge(own,other)); // A relay cannot author the union.
+		M unsigned=(M)((AMap)lattice.zero()).assoc(DID,CVMLong.ONE);
+		assertSame(own,lattice.mergeAndSign(own,unsigned,(owner,value) -> {
+			fail("Unsigned incoming entries must be ignored before authoring");
+			return null;
+		}));
+		assertSame(own,lattice.mergeAndSign(own,other,(owner,value) -> null));
+		assertSame(own,lattice.mergeAndSign(own,other,(owner,value) -> BOB.signData(value)));
+		var authored=lattice.mergeAndSign(own,other,(owner,value) -> {
+			assertEquals(DID,owner);
+			return ALICE.signData(value);
+		});
+		assertEquals(Sets.of(1,2),authored.get(DID).getValue());
+		assertTrue(authored.get(DID).checkSignature());
+		assertSame(authored,lattice.mergeAndSign(authored,own,(owner,value) -> {
+			fail("Selecting an existing envelope must not sign");
+			return null;
+		}));
+		assertSame(own.get(DID),lattice.mergeAndSign(null,own,(owner,value) -> {
+			fail("Adopting an incoming envelope must not sign");
+			return null;
+		}).get(DID));
+		assertThrows(IllegalArgumentException.class,() ->
+			lattice.mergeAndSign(own,other,(owner,value) -> ALICE.signData(Sets.of(3))));
+		assertThrows(IllegalArgumentException.class,() ->
+			lattice.mergeAndSign(own,other,(owner,value) -> SignedData.create(
+				ALICE.getAccountKey(),own.get(DID).getSignature(),Ref.get(value))));
 		assertSame(own,lattice.merge(LatticeContext.create(null,BOB,(o,k) -> true),own,other));
 		M combined=lattice.merge(LatticeContext.create(null,ALICE,(o,k) -> false),own,other);
 		assertEquals(Sets.of(1,2),combined.get(DID).getValue());

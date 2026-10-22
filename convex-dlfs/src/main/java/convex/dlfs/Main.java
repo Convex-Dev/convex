@@ -15,7 +15,7 @@ import convex.core.data.Keyword;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
-import convex.lattice.LatticeContext;
+import convex.core.util.Utils;
 import convex.node.NodeServer;
 import convex.node.RelayHost;
 import convex.node.LatticeListener;
@@ -63,10 +63,10 @@ public final class Main {
 		AStore store=openStore(config,keyPair);
 		Keyword[] regionPath=config.getRegionPath();
 		NodeConfig nodeConfig=config.getNodeConfig();
-		LatticeContext context=LatticeContext.create(null,keyPair);
+
 		var host=RelayHost.openHost(Index.<Keyword,ACell>none(),store,nodeConfig);
-		host.setContext(RelayHost.applySkew(nodeConfig,context));
-		var application=host.addApplication(new DLFSApplication(host,regionPath));
+		var application=host.addApplication(new DLFSApplication(host,keyPair::signData,Utils::getCurrentTimestampCell,
+			nodeConfig.getMaxFutureTimestampSkew(),regionPath));
 		NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(host,nodeConfig);
 		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(nodeConfig));
 		propagator.setTransportKeyPair(keyPair);

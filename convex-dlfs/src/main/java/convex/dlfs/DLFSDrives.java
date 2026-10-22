@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -13,6 +14,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
+import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -37,53 +39,76 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		MapLattice.create(DLFSLattice.INSTANCE);
 
 	private final AStore store;
+	private final Supplier<CVMLong> clock;
+	private final DLFSLattice files;
+	private final MapLattice<AString,AVector<ACell>> values;
 	private final DLFSLocation location;
 	private final ConcurrentHashMap<AString,DLFSDrive> drives=new ConcurrentHashMap<>();
 
-	DLFSDrives(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor, AStore store) {
-		this(cursor,store,DLFSLocation.at(cursor));
-	}
-
-	DLFSDrives(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,AStore store,DLFSLocation location) {
+	DLFSDrives(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,AStore store,DLFSLocation location,
+			Supplier<CVMLong> clock,DLFSLattice files) {
 		super(cursor);
 		this.store=store;
 		this.location=location;
+		this.clock=clock;
+		this.files=files;
+		this.values=MapLattice.create(files);
 	}
 
 	/** Creates a standalone, in-memory set of drives for one owner. */
 	public static DLFSDrives create() {
-		return new DLFSDrives(Cursors.root(LATTICE.zero()),null);
+		return create(Utils::getCurrentTimestampCell);
+	}
+
+	/** Creates standalone unsigned drives with an explicit mutation and admission clock. */
+	public static DLFSDrives create(Supplier<CVMLong> clock) {
+		return connect(Cursors.root(LATTICE.zero()),null,clock);
 	}
 
 	/** Wraps an existing cursor over one owner's drive map; file data stays heap-backed. */
 	public static DLFSDrives wrap(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
-		if (cursor==null) throw new IllegalArgumentException("Drives cursor must not be null");
-		return new DLFSDrives(cursor,null);
+		return connect(cursor,null);
+	}
+
+	/** Wraps unsigned working state with an explicit clock. */
+	public static DLFSDrives wrap(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,
+			Supplier<CVMLong> clock) {
+		return connect(cursor,null,clock);
 	}
 
 	/**
 	 * Connects one owner's drive map at the position of a cursor, checkpointing
 	 * streamed blob data into the supplied store. The owning component hands the
-	 * cursor down; set the context explicitly when the owner's policy should apply.
+	 * cursor down; signing belongs to that cursor's owner boundary.
 	 *
 	 * @param cursor Cursor at the drive map
 	 * @param store Store for incremental blob checkpoints, or null for heap-only file data
 	 * @return Drives component
 	 */
 	public static DLFSDrives connect(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,AStore store) {
+		return connect(cursor,store,Utils::getCurrentTimestampCell);
+	}
+
+	/** Connects unsigned drives with an explicit clock and optional blob store. */
+	public static DLFSDrives connect(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor,
+			AStore store,Supplier<CVMLong> clock) {
 		if (cursor==null) throw new IllegalArgumentException("Drives cursor must not be null");
-		return new DLFSDrives(cursor,store);
+		return new DLFSDrives(cursor,store,DLFSLocation.at(cursor),clock,
+			DLFSLattice.withClock(clock,DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW));
 	}
 
 	/** Creates an isolated temporary multi-drive working component. */
 	public DLFSDrives fork() {
-		return configured(new DLFSDrives(this));
+		return new DLFSDrives(this);
 	}
 
 	private DLFSDrives(DLFSDrives source) {
 		super(source);
 		this.store=source.store;
 		this.location=DLFSLocation.at(cursor());
+		this.clock=source.clock;
+		this.files=source.files;
+		this.values=source.values;
 	}
 
 	/** Opens an existing drive, or returns null if it is absent. */
@@ -94,7 +119,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return configured(new DLFSDrive(key,cursor().withDefault(Maps.empty()).path(key),store,location.child(key)));
+			return new DLFSDrive(key,cursor().withDefault(Maps.empty()).path(key),store,location.child(key),clock,files);
 		});
 	}
 
@@ -249,10 +274,10 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	/**
 	 * Returns the caller-controlled write timestamp without modification.
 	 * Ordering distinct mutations is the responsibility of the application which
-	 * owns the lattice context.
+	 * supplies the clock.
 	 */
 	private CVMLong mutationTimestamp() {
-		return getContext().currentTimestamp();
+		return clock.get();
 	}
 
 	private void closeCached(AString name) {
@@ -266,7 +291,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	}
 	@Override
 	public DLFSDrives withCursor(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
-		return configured(new DLFSDrives(cursor,store));
+		return new DLFSDrives(cursor,store,DLFSLocation.at(cursor),clock,files);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
@@ -274,6 +299,6 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	protected AHashMap<AString, AVector<ACell>> mergePublication(
 			AHashMap<AString, AVector<ACell>> own,
 			AHashMap<AString, AVector<ACell>> other) {
-		return LATTICE.merge(getContext(),own,other);
+		return values.merge(own,other);
 	}
 }

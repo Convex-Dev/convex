@@ -29,7 +29,7 @@ import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSServer;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
-import convex.lattice.LatticeContext;
+import convex.core.util.Utils;
 import convex.node.NodeConfig;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
@@ -134,13 +134,12 @@ public class DlfsStart extends ACommand {
 		NodeConfig config = buildNodeConfig();
 
 		// Register DLFS before starting any incoming delivery.
-		LatticeContext context=LatticeContext.create(null,keyPair);
 		NodeServer<Index<Keyword,ACell>> nodeServer;
 		DLFSApplication application;
 		try {
 			var host=RelayHost.openHost(Index.<Keyword,ACell>none(),store,config);
-			host.setContext(RelayHost.applySkew(config,context));
-			application=host.addApplication(new DLFSApplication(host));
+			application=host.addApplication(new DLFSApplication(host,keyPair::signData,Utils::getCurrentTimestampCell,
+				config.getMaxFutureTimestampSkew()));
 			nodeServer=new NodeServer<>(host,config);
 		} catch (IOException e) {
 			store.close();

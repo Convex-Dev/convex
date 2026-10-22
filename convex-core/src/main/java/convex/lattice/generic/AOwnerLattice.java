@@ -2,11 +2,13 @@ package convex.lattice.generic;
 
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.BiFunction;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
+import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
 
 /**
@@ -16,8 +18,8 @@ import convex.lattice.ALattice;
  *
  * <p>The verifier belongs to this lattice instance. It is retained when navigating
  * to an owner's signed child, and is used for both incoming merges and local
- * authoring. Contexts supply signing capabilities, not replacement verification
- * rules. Verifiers must be thread-safe and should use locally available authority
+ * authoring. Explicit signers (or legacy contexts) supply capabilities, not
+ * replacement verification rules. Verifiers must be thread-safe and use available authority
  * information rather than perform network work inside atomic updates.</p>
  *
  * @param <K> Owner identity type
@@ -86,6 +88,34 @@ public abstract class AOwnerLattice<K extends ACell, V extends ACell,
 	 */
 	public ALattice<V> getValueLattice() {
 		return signedLattice.getValueLattice();
+	}
+
+	/**
+	 * Merges with an explicit authoring capability for synthesised owner values.
+	 * Unchanged and selected envelopes retain their signatures. The signer may
+	 * return null for an owner it cannot author; that slot keeps its established
+	 * envelope. Every result is checked by the same owner-bound rule as delivery.
+	 * Callbacks run inside callers' atomic updates and must be safe to retry.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	public M mergeAndSign(M own,M other,BiFunction<? super K,V,SignedData<V>> signer) {
+		Objects.requireNonNull(signer);
+		if (other==null) return own;
+		if (!checkForeign(other)) throw new IllegalArgumentException("Invalid owner map");
+		if (own==null) own=zero();
+		// Keep foreign entries untyped until their envelope representation is checked.
+		return (M)((AMap)own).mergeDifferences(other,new MergeFunction<ACell>() {
+			@Override public ACell merge(ACell a,ACell b) {
+				throw new IllegalStateException("Owner merge requires the entry key");
+			}
+			@Override public ACell merge(Object key,ACell a,ACell b) {
+				if (!(key instanceof ACell owner) || !(b instanceof SignedData<?>) || !checkEntry(owner,b)) return a;
+				SignedLattice<V> rule=signingFor(owner);
+				if (rule==null) return a;
+				return rule.mergeAndSign((SignedData<V>)a,(SignedData<V>)b,
+					value -> signer.apply((K)rule.getOwner(),value));
+			}
+		});
 	}
 
 	@Override

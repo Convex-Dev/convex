@@ -151,10 +151,8 @@ The equivalent programmatic setup is:
 ```java
 EtchStore store = EtchStore.createTemp("convex-dlfs");
 AKeyPair keyPair = AKeyPair.generate();
-LatticeContext context = LatticeContext.create(null, keyPair);
 var host = LatticeHost.open(store);
-host.setContext(context);
-var app = host.addApplication(new DLFSApplication(host));
+var app = host.addApplication(new DLFSApplication(host, keyPair::signData));
 var node = new NodeServer<>(host);
 node.launch();
 DLFSDriveManager drives = new DLFSDriveManager(
@@ -196,8 +194,7 @@ dependency on `NodeServer`.
 ```java
 // Local: restore or create the standard :fs region in any AStore
 var root = LatticeHost.open(store);
-root.setContext(LatticeContext.create(null, myKeyPair));
-var app = root.addApplication(new DLFSApplication(root));
+var app = root.addApplication(new DLFSApplication(root, myKeyPair::signData));
 DLFSDrives myDrives = app.drives(myKeyPair.getAccountKey());
 DLFSDrive drive = myDrives.getOrCreateDrive("home");
 if (drive == null) throw new IllegalStateException("Cannot open home drive");
@@ -228,8 +225,9 @@ Networked bootstrap supplies the host; the DLFS component API is unchanged:
 ```java
 NodeConfig nodeConfig = NodeConfig.port(0);
 var host = RelayHost.openHost(Index.<Keyword, ACell>none(), store, nodeConfig);
-host.setContext(RelayHost.applySkew(nodeConfig, LatticeContext.create(null, myKeyPair)));
-var networkedApp = host.addApplication(new DLFSApplication(host, Keyword.intern("documents")));
+var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
+    Utils::getCurrentTimestampCell, nodeConfig.getMaxFutureTimestampSkew(),
+    Keyword.intern("documents")));
 var node = new NodeServer<>(host, nodeConfig);
 LatticePropagator group = new LatticePropagator(store, LatticePropagatorConfig.create());
 group.setTransportKeyPair(myKeyPair);
@@ -267,17 +265,28 @@ A custom application can embed `DLFSRegion` at any correctly bound cursor.
 For a root application that stages files, explicitly supply a fork:
 
 ```java
-var files = DLFSRegion.connect(host.cursor().path(Keywords.FS), store);
-files.setContext(LatticeContext.create(null, myKeyPair));
+var files = DLFSRegion.connect(host.cursor().path(Keywords.FS), store,
+    myKeyPair::signData, Utils::getCurrentTimestampCell);
 var app = host.addApplication(new DLFSApplication(host, Keywords.FS, files.fork()));
 ```
 
 `app.dlfs()` is the exact registered component. Its incoming merges and local
 edits use the same working state, and `app.sync()` publishes that region only.
 Multiple applications may explicitly register the same component. The default
-`new DLFSApplication(host)` instead uses a live region, so edits are immediately
-part of the host's working state. Configuring an application does not overwrite
-an explicit region's policy; configure the region before constructing its children.
+`new DLFSApplication(host, myKeyPair::signData)` instead uses a live region, so edits
+are immediately part of the host's working state. Without a signer,
+`new DLFSApplication(host)` is a relay: it can accept existing signed envelopes,
+but cannot write or author a combination that requires a new signature.
+
+Ownership, signing and clocks are explicit DLFS policies; a host or application
+`LatticeContext` does not grant signing authority. The standard owner key is an
+`AccountKey`. For indirect identities, the full `DLFSRegion.connect` overload takes
+an owner/key verifier and an owner-aware signer, alongside the clock and allowed
+future timestamp skew. A signer may return null for owners it cannot author.
+Every signature it supplies must pass the same owner rule as incoming delivery.
+Forks and transaction views retain these policies. A mutable key resolver can
+support rotation without reconstructing the component tree; callbacks must be
+safe for concurrent use and retries during atomic updates.
 
 A directly connected region is a lightweight view. Syncing its fork updates
 only its destination subtree. Host persistence remains a separate operation.

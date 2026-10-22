@@ -20,7 +20,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSRegion;
-import convex.lattice.LatticeContext;
+import convex.lattice.fs.DLFSLattice;
 import convex.lattice.LatticeHost;
 
 /** Component boundaries, independent of transport or disk-store lifecycle. */
@@ -30,8 +30,8 @@ public class DLFSApplicationTest {
 	private static final Keyword UNRELATED=Keyword.intern("unrelated");
 
 	private static DLFSApplication files(LatticeHost<Index<Keyword,ACell>> host) {
-		host.setContext(LatticeContext.create(CVMLong.create(100),OWNER));
-		return host.addApplication(new DLFSApplication(host));
+		return host.addApplication(new DLFSApplication(host,OWNER::signData,() -> CVMLong.create(100),
+			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW));
 	}
 
 	@Test void emptyApplicationAndUnknownDeliveriesDoNotChangeTheRoot() {
@@ -79,8 +79,7 @@ public class DLFSApplicationTest {
 
 	@Test void sharedForkReconcilesIncomingFilesWithoutPublishingPendingEdits() throws Exception {
 		var host=LatticeHost.create();
-		var region=DLFSRegion.connect(host.cursor().path(Keywords.FS),null);
-		region.setContext(LatticeContext.create(CVMLong.create(100),OWNER));
+		var region=DLFSRegion.connect(host.cursor().path(Keywords.FS),null,OWNER::signData,() -> CVMLong.create(100));
 		var staged=region.fork();
 		var app=host.addApplication(new DLFSApplication(host,Keywords.FS,staged));
 		var shared=host.addApplication(new DLFSApplication(host,Keywords.FS,staged));
@@ -112,8 +111,8 @@ public class DLFSApplicationTest {
 		var projects=Keyword.intern("projects");
 		var documents=Keyword.intern("documents");
 		var host=LatticeHost.<Index<Keyword,ACell>>create(null,new MemoryStore());
-		host.setContext(LatticeContext.create(CVMLong.create(100),OWNER));
-		var app=host.addApplication(new DLFSApplication(host,projects,documents));
+		var app=host.addApplication(new DLFSApplication(host,OWNER::signData,() -> CVMLong.create(100),
+			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW,projects,documents));
 		assertNull(host.cursor().get());
 		var drive=app.drives(OWNER.getAccountKey()).createDrive("home");
 		assertEquals(List.of(projects,documents,OWNER.getAccountKey(),Strings.create("home")),

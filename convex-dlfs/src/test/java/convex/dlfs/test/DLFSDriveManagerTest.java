@@ -138,14 +138,14 @@ public class DLFSDriveManagerTest {
 	@Test
 	public void testDeletedDriveCanBeRecreatedWithNewerTimestamp() {
 		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
-		var component=convex.dlfs.DLFSDrives.wrap(cursor);
+		var time=new java.util.concurrent.atomic.AtomicReference<>(CVMLong.create(100));
+		var component=DLFSDrives.wrap(cursor,time::get);
 		DLFSDriveManager manager=new DLFSDriveManager(component);
-		component.setContext(LatticeContext.create(CVMLong.create(100),null));
 		assertTrue(manager.createDrive(null,"home"));
-		component.setContext(LatticeContext.create(CVMLong.create(200),null));
+		time.set(CVMLong.create(200));
 		assertTrue(manager.deleteDrive(null,"home"));
 		CVMLong deletionTime=DLFSNode.getUTime(cursor.get().get(Strings.create("home")));
-		component.setContext(LatticeContext.create(CVMLong.create(300),null));
+		time.set(CVMLong.create(300));
 		assertTrue(manager.createDrive(null,"home"));
 		AVector<ACell> recreated=cursor.get().get(Strings.create("home"));
 		assertTrue(DLFSNode.isDirectory(recreated));
@@ -156,8 +156,7 @@ public class DLFSDriveManagerTest {
 	@Test
 	public void testEqualTimestampLocalRegistryMutationRemainsOwn() {
 		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
-		var component=convex.dlfs.DLFSDrives.wrap(cursor);
-		component.setContext(LatticeContext.create(CVMLong.create(100),null));
+		var component=DLFSDrives.wrap(cursor,() -> CVMLong.create(100));
 		DLFSDriveManager manager=new DLFSDriveManager(component);
 		assertTrue(manager.createDrive(null,"home"));
 		assertTrue(manager.deleteDrive(null,"home"));
@@ -182,17 +181,13 @@ public class DLFSDriveManagerTest {
 	}
 
 	@Test
-	public void testDriveMutationUsesExactContextTimestamp() {
-		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
+	public void testDriveMutationUsesExactSuppliedTimestamp() {
 		AString home=Strings.create("home");
 		AHashMap<AString,AVector<ACell>> initial=convex.core.data.Maps.of(
 			home,DLFSNode.createDirectory(CVMLong.create(1_031)));
-		LatticeContext context=LatticeContext.create(CVMLong.create(1_000),null)
-			.withMaxFutureTimestampSkew(30);
 		Root<AHashMap<AString, AVector<ACell>>> cursor=
 			Cursors.root(initial);
-		var component=convex.dlfs.DLFSDrives.wrap(cursor);
-		component.setContext(context);
+		var component=DLFSDrives.wrap(cursor,() -> CVMLong.create(1_000));
 		DLFSDriveManager manager=new DLFSDriveManager(component);
 
 		assertTrue(manager.deleteDrive(null,"home"));
@@ -297,7 +292,6 @@ public class DLFSDriveManagerTest {
 			first.launch();
 			try {
 				var drives=DLFSDrives.connect(first.getHost().cursor(),store);
-				drives.setContext(first.getHost().getContext());
 				DLFSDriveManager manager=new DLFSDriveManager(drives);
 				assertTrue(manager.createDrive(null, "home"));
 				Files.writeString(manager.getDrive(null, "home").getPath("/hello.txt"), "after restart");
@@ -311,7 +305,6 @@ public class DLFSDriveManagerTest {
 			restored.launch();
 			try {
 				var drives=DLFSDrives.connect(restored.getHost().cursor(),store);
-				drives.setContext(restored.getHost().getContext());
 				DLFSDriveManager manager=new DLFSDriveManager(drives);
 				assertEquals(List.of("home"), manager.listDrives(null));
 				assertEquals("after restart",

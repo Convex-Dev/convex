@@ -111,9 +111,7 @@ public class SharedApplicationInternalsTest {
 				fileState=null;
 			} else {
 				fileState=owned(host,context(FILES_KEY,signing),Keywords.FS,FILES_KEY.getAccountKey());
-				files=DLFSRegion.connect(resolve(Keywords.FS),host.store()).drives(FILES_KEY.getAccountKey())
-					.withCursor(fileState.cursor());
-				files.setContext(fileState.getContext());
+				files=convex.dlfs.DLFSDrives.wrap(fileState.cursor(),() -> CVMLong.create(100));
 				social=null;
 				socialState=null;
 			}
@@ -258,7 +256,8 @@ public class SharedApplicationInternalsTest {
 			this(host.cursor(),host.store(),context(FILES_KEY));
 		}
 		FilesWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,LatticeContext context) {
-			super(cursor,store,context);
+			super(cursor,store,FILES_KEY::signData,() -> CVMLong.create(100),30_000);
+			setContext(context);
 			for (Keyword key:new Keyword[]{Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
 				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),cursor.path(key),context));
 			}
@@ -469,14 +468,15 @@ public class SharedApplicationInternalsTest {
 				CountDownLatch signing=new CountDownLatch(1);
 				CountDownLatch resume=new CountDownLatch(1);
 				AtomicInteger attempts=new AtomicInteger();
-				f.files.dlfs().setContext(context(FILES_KEY,() -> {
+				var signingFiles=DLFSRegion.connect(f.files.dlfs().cursor(),f.store,value -> {
 					if (attempts.incrementAndGet()==1) {
 						signing.countDown();
 						try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
 						catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
 					}
-				}));
-				DLFSDrive first=f.files.drives(FILES_KEY.getAccountKey()).drive("home");
+					return FILES_KEY.signData(value);
+				},() -> CVMLong.create(100));
+				DLFSDrive first=signingFiles.drives(FILES_KEY.getAccountKey()).drive("home");
 			try (var executor=Executors.newSingleThreadExecutor();
 						var a=Files.newByteChannel(first.fileSystem().getPath("/same.txt"),StandardOpenOption.WRITE);
 						var b=Files.newByteChannel(second.fileSystem().getPath("/same.txt"),StandardOpenOption.WRITE)) {
@@ -509,14 +509,15 @@ public class SharedApplicationInternalsTest {
 			CountDownLatch signing=new CountDownLatch(1);
 			CountDownLatch resume=new CountDownLatch(1);
 			AtomicInteger attempts=new AtomicInteger();
-			f.files.dlfs().setContext(context(FILES_KEY,() -> {
+			var signingFiles=DLFSRegion.connect(f.files.dlfs().cursor(),f.store,value -> {
 				if (attempts.incrementAndGet()==1) {
 					signing.countDown();
 					try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
 					catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
 				}
-			}));
-			DLFSDrive first=f.files.drives(FILES_KEY.getAccountKey()).drive("home");
+				return FILES_KEY.signData(value);
+			},() -> CVMLong.create(100));
+			DLFSDrive first=signingFiles.drives(FILES_KEY.getAccountKey()).drive("home");
 			try (var executor=Executors.newSingleThreadExecutor()) {
 				var creating=executor.submit(() -> Files.createFile(first.fileSystem().getPath("/new.txt")));
 				try {

@@ -363,17 +363,20 @@ DLFS itself guarantees only whole-slot last-write-wins behaviour.
 
 | Timestamp | Source | Used For |
 |-----------|--------|----------|
-| **Mutation timestamp** | `DLFSLocal.getContext().currentTimestamp()` | Creating new files, directories, tombstones |
+| **Mutation timestamp** | Component's `Supplier<CVMLong>` | Creating new files, directories, tombstones |
 | **Merge timestamp** | `max(getUTime(a), getUTime(b))` | Conflict resolution during merge |
 
-These are deliberately separate. The application supplies mutation time through the
-component's `LatticeContext` exposed by the NIO adapter; neither `DLFileSystem` nor `DLFSLocal` updates a
-separate clock. DLFS consumes the context timestamp exactly and never derives a later
-mutation time from stored nodes or tombstones. The application owns the clock and its
-refresh cadence. An empty context uses `LatticeContext.currentTimestamp()`'s standalone
-wall-clock fallback.
-The merge timestamp is always derived from the data being merged—never from the
-current application context.
+These are deliberately separate. The application supplies mutation time through a
+clock function, shared by drives and their NIO adapters. DLFS consumes that timestamp
+exactly and never derives a later mutation time from stored nodes or tombstones.
+The default supplier reads wall-clock time; an application can supply its own clock.
+Forks and transaction views retain the same supplier.
+
+The merge timestamp is always derived from the data being merged. The region also
+binds its clock and allowed future skew to `DLFSLattice.withClock` for admission of
+incoming nodes during reconciliation. This does not rewrite incoming timestamps.
+The low-level standalone `DLFSLocal` API retains its legacy context-based clock;
+component-backed adapters use the explicit supplier instead.
 
 ## API
 
@@ -384,7 +387,7 @@ current application context.
 DLFSLocal drive = DLFS.create();
 
 // Connected drive — path into a parent lattice cursor, heap-backed file data
-AForkableCursor<?> parent = Cursors.root(MapLattice.create(DLFSLattice.INSTANCE));
+AForkableCursor<AHashMap<AString, AVector<ACell>>> parent = Cursors.root(Maps.empty());
 DLFSLocal drive = DLFS.connect(parent, Strings.create("myDrive"));
 
 // Store-backed cursor drive — large NIO writes persist incrementally
@@ -399,9 +402,8 @@ DLFSLocal drive = DLFS.createLocal();
 Standard Java NIO operations work transparently:
 
 ```java
-DLFSLocal drive = DLFS.create();
-drive.getCursor().setContext(
-    drive.getCursor().getContext().withTimestamp(operationTimestamp));
+var drives = DLFSDrives.create(() -> operationTimestamp);
+DLFileSystem drive = drives.createDrive("home").fileSystem();
 
 Path file = Files.createFile(drive.getPath("readme.txt"));
 Files.write(file, "hello".getBytes());
@@ -440,16 +442,12 @@ assert Files.exists(drive.getPath("/data/file1.txt"));
 ### Replication
 
 ```java
-DLFSLocal driveA = DLFS.create();
-DLFSLocal driveB = DLFS.create();
+DLFileSystem driveA = DLFSDrives.create(() -> timestampA).createDrive("home").fileSystem();
+DLFileSystem driveB = DLFSDrives.create(() -> timestampB).createDrive("home").fileSystem();
 
 // Make changes to both
-driveA.getCursor().setContext(
-    driveA.getCursor().getContext().withTimestamp(timestampA));
 Files.createFile(driveA.getPath("fileA.txt"));
 
-driveB.getCursor().setContext(
-    driveB.getCursor().getContext().withTimestamp(timestampB));
 Files.createFile(driveB.getPath("fileB.txt"));
 
 // Merge B into A — both files present after merge
@@ -468,18 +466,18 @@ AVector<ACell> node = drive.getNode(path);     // Get raw node at path
 ### Cursor-Backed Drives
 
 A `DLFSLocal` is backed by an `AForkableCursor<AVector<ACell>>` which may be a
-standalone `Root` or a child cursor navigated from a parent drives map, declared
-with `DLFSLattice` as its shape so an absent drive is created correctly. This enables multi-drive setups where each drive is a key in a `MapLattice`:
+standalone `Root` or a child cursor navigated from a parent drives map. Components
+create absent drives explicitly and supply their merge policy:
 
 ```java
-// Create a lattice of drives
-MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattice.INSTANCE);
+// Connect a collection of named drives
 AForkableCursor<AHashMap<AString, AVector<ACell>>> drivesRoot =
-    Cursors.root(drivesLattice);
+    Cursors.root(Maps.empty());
+DLFSDrives drives = DLFSDrives.connect(drivesRoot, store);
 
-// Connect a named drive — initialises with zero value if absent and uses the
+// Create a named drive if absent and use the
 // containing application's store for incremental blob persistence
-DLFSLocal drive = DLFS.connect(drivesRoot, Strings.create("myDrive"), store);
+DLFileSystem drive = drives.getOrCreateDrive("myDrive").fileSystem();
 
 // File operations automatically update the cursor, which propagates
 // up through the lattice hierarchy
@@ -501,8 +499,8 @@ any nested lattice path without depending on NodeServer:
 
 ```java
 var host = LatticeHost.open(store);
-host.setContext(LatticeContext.create(null, ownerKeyPair));
-var app = host.addApplication(new DLFSApplication(host, Keyword.intern("documents")));
+var app = host.addApplication(new DLFSApplication(host, ownerKeyPair::signData,
+    Keyword.intern("documents")));
 var node = new NodeServer<>(host);
 node.launch();
 DLFSDrives drives = app.drives(ownerKeyPair.getAccountKey());
@@ -513,7 +511,7 @@ node.getHost().sync();
 ```
 
 For a non-networked host, explicitly open `LatticeHost.open(store)`,
-set its context, and register `root.addApplication(new DLFSApplication(root))`.
+and register `root.addApplication(new DLFSApplication(root, ownerKeyPair::signData))`.
 There is no hidden-host factory: retain the root and publish with `root.sync()`.
 
 `DLFSDriveManager.mount(identity, drives)` exposes owner components to WebDAV and
@@ -549,7 +547,7 @@ explicitly synced.
 | Cursor-backed drive registry | ✅ Atomic create/rename/delete with explicit sync |
 | Hosted DLFS components | ✅ Generic root parent, arbitrary region path, owner drive maps, temporary forks |
 | DLFSBrowser with NodeServer | ✅ Etch-backed drive contents and persistent registry |
-| Network replication via NodeServer | ⚠️ Basic (pull/push working, no signing) |
+| Network replication via NodeServer | ⚠️ Signed owner maps; peer selection and bootstrap orchestration remain limited |
 
 ### DLFSBrowser
 
@@ -591,38 +589,32 @@ DLFS follows the lattice application best practices defined in CAD045:
 | **Cursor-backed mutability** | `DLFSLocal` wraps `AForkableCursor<AVector<ACell>>`; all writes via `cursor.updateAndGet()` |
 | **Factory methods** | `DLFS.create()` (standalone), `DLFS.connect(parent, name, store)` (store-backed cursor), component-backed `DLFSDrive.fileSystem()` |
 | **Fork/sync** | `DLFileSystem.fork()` → component working state reconciled with `DLFSLattice` for isolated batch operations; `sync()` merges back |
-| **Lattice merge** | `DLFSLocal.merge()` applies `DLFSLattice.INSTANCE.merge` inside `rootCursor.updateAndGet()` |
+| **Lattice merge** | Component NIO adapters apply the drive's bound `DLFSLattice` inside a cursor update |
 | **Foreign validation** | `DLFSLattice.checkForeign()` validates node structure (vector length, timestamp type) |
-| **OwnerLattice** | ROOT lattice: `:fs → OwnerLattice(MapLattice(DLFSLattice))` — forgery-resistant with `LatticeContext` |
+| **Ownership** | `DLFSRegion` binds an `OwnerMapLattice` to its verifier; explicit signers cannot replace that rule |
 | **NIO compatibility** | Focused basic-file API; unsupported operations throw explicitly |
 
+## Owner-Signed Drives
+
+`DLFSRegion` stores a map from owner identities to signed maps of named drives.
+The default verifier requires the owner's `AccountKey` to match the signing key.
+Custom owner identities supply a verifier, for example one backed by a local DID
+resolver. The same bound rule checks incoming envelopes and locally produced
+signatures. The wire structure does not depend on how that authority is resolved.
+
+Local edits cross one `SignedCursor` at the owner's slot. Its signer is an explicit
+function, normally `keyPair::signData` for a single-key application. Incoming merges
+and fork reconciliation use the common owner lattice's `mergeAndSign`: selecting
+an existing envelope reuses its signature; combining different payloads requires
+an authorised signer. A relay without that capability retains its established
+envelope when the combination would need a new signature.
+
+The signer can return null when an owner is unavailable. Invalid signature bytes
+or a substituted payload fail before the atomic update commits. A failed fork sync
+leaves both destination and working state unchanged. Neither host context nor
+application context confers signing authority on DLFS components.
+
 ## Future Enhancements
-
-### Owner-Signed Drives (OwnerLattice Integration)
-
-For multi-user network sync, each owner's DLFS tree should be wrapped in
-`OwnerLattice → SignedLattice → DLFSLattice`. This requires:
-
-- OwnerLattice passing `LatticeContext` through to child lattices
-- `SignedLattice` using `context.getSigningKey()` to sign merged values
-- DLFSLocal `syncToNode()` / `syncFromNode()` convenience API
-
-```
-User modifies DLFS (Java NIO API)
-    ↓
-DLFSLocal (cursor into lattice tree)
-    ↓
-Sync to NodeServer
-    ↓
-OwnerLattice.merge(context) → SignedLattice → DLFSLattice
-    ↓
-Network propagation via LatticePropagator
-    ↓
-Remote NodeServers receive and merge with signature verification
-```
-
-This is not needed for single-user or trusted-network deployments but is required
-for multi-user production use with untrusted peers.
 
 ### Filtering for Public/Private Drives
 

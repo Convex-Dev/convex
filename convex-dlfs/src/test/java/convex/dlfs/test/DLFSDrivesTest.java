@@ -22,7 +22,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSDrives;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Root;
 import convex.lattice.fs.DLFSNode;
@@ -31,13 +30,13 @@ public class DLFSDrivesTest {
 
 	@Test
 	public void testExistingDrivePreservedAndReopenedAtCapacity() throws Exception {
-		var drives=DLFSDrives.create();
-		drives.setContext(LatticeContext.create(CVMLong.create(100),null));
+		var time=new java.util.concurrent.atomic.AtomicReference<>(CVMLong.create(100));
+		var drives=DLFSDrives.create(time::get);
 		var drive=drives.getOrCreateDrive("home",1);
 		assertNotNull(drive);
 		Files.writeString(drive.fileSystem().getPath("/hello.txt"),"preserved");
 		var before=drives.cursor().get();
-		drives.setContext(LatticeContext.create(CVMLong.create(200),null));
+		time.set(CVMLong.create(200));
 		assertSame(drive,drives.getOrCreateDrive("home",0));
 		assertNull(drives.createDrive("home"));
 		assertNull(drives.getOrCreateDrive("another",1));
@@ -64,9 +63,8 @@ public class DLFSDrivesTest {
 
 	@Test
 	public void testRecreateUsesExactClockAndPreservesLocalTie() throws Exception {
-		var drives=DLFSDrives.create();
 		var time=CVMLong.create(100);
-		drives.setContext(LatticeContext.create(time,null));
+		var drives=DLFSDrives.create(() -> time);
 		var old=drives.getOrCreateDrive("home",1);
 		Files.writeString(old.fileSystem().getPath("/old.txt"),"deleted");
 		assertTrue(drives.deleteDrive("home"));
@@ -92,16 +90,12 @@ public class DLFSDrivesTest {
 	}
 
 	@Test
-	public void testHostedDrivesInheritClock() {
+	public void testHostedDrivesUseSuppliedClock() {
 		var host=LatticeHost.create(DLFSDrives.LATTICE.zero(),new MemoryStore());
-		var context=LatticeContext.create(CVMLong.create(123),null);
-		host.setContext(context);
-		var drives=DLFSDrives.connect(host.cursor(),host.store());
-		drives.setContext(host.getContext());
-		assertSame(context,drives.getContext());
+		var time=CVMLong.create(123);
+		var drives=DLFSDrives.connect(host.cursor(),host.store(),() -> time);
 		var drive=drives.getOrCreateDrive("home");
-		assertSame(context,drive.getContext());
-		assertEquals(context.currentTimestamp(),DLFSNode.getUTime(drive.cursor().get()));
+		assertEquals(time,DLFSNode.getUTime(drive.cursor().get()));
 	}
 
 	@Test
@@ -153,8 +147,7 @@ public class DLFSDrivesTest {
 				return previous;
 			}
 		};
-		var drives=DLFSDrives.wrap(cursor);
-		drives.setContext(LatticeContext.create(time,null));
+		var drives=DLFSDrives.wrap(cursor,() -> time);
 		assertNull(drives.getOrCreateDrive("home"));
 		assertEquals(DLFSDrives.DriveStatus.DELETED,drives.driveStatus("home"));
 	}

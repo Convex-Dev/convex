@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- DLFS components take explicit signer functions and timestamp suppliers instead of inheriting authoring policy from `LatticeContext`. Applications without a signer act as relays. Custom owner identities use one verifier for incoming envelopes and local signatures; forks and transaction views retain the same policies. Owner lattices also expose `mergeAndSign` for explicit authoring of combined values.
+
 - `DLFSApplication` now composes registered regions without a root `ALattice`. Construct it with a host (default `:fs`), a path of region keys, or an explicitly shared/staged `DLFSRegion`; the old lattice-taking `connect` factory and `region()` override are removed. DLFS and social regions handle incoming owner envelopes directly, and staged regions reconcile incoming data without publishing pending edits. DLFS server entry points register their application before transport starts and accept only their configured DLFS region.
 
 - Lattice components use `cursor()` as the single editing access point; the backing field is now private, so subclass operations honour cursor wrappers. `ASignedComponent.checkPayload` supports optional unsigned domain diagnostics, and owned maps expose `signingFor(owner)` directly.

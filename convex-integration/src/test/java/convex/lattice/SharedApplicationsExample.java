@@ -113,11 +113,11 @@ public final class SharedApplicationsExample {
 			// Infrastructure is registered once; both domain applications use its live state.
 			host.addApplication(LatticeApplication.live(P2PLattice.ROOT,host));
 			social=host.addApplication(new SocialApp(host,ALICE,time));
-			var region=DLFSRegion.connect(host.cursor().path(Keywords.FS),store);
-			region.setContext(policy(BOB,time));
+			var region=DLFSRegion.connect(host.cursor().path(Keywords.FS),store,
+				BOB::signData,() -> CVMLong.create(time));
 			// Choose a private publication boundary explicitly; the application retains it.
 			files=host.addApplication(new DLFSApplication(host,Keywords.FS,region.fork()));
-			files.setContext(region.getContext());
+			files.setContext(policy(BOB,time)); // P2P authoring policy; DLFS has its own explicit signer.
 
 			var config=NodeConfig.localNetwork();
 			server=new NodeServer<>(host,config);

@@ -153,7 +153,7 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	// Time comes from the configured policy. DLFS never advances it implicitly.
-	CVMLong currentTimestamp() {
+	protected CVMLong currentTimestamp() {
 		return getContext().currentTimestamp();
 	}
 
