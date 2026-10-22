@@ -597,7 +597,12 @@ are unchanged; CAD045 describes the standard component composition.
 
 ## 24. Abstract lattices are optional component implementations
 
-Implemented 20 October 2026. `ALatticeComponent` no longer accepts or exposes
+**Status:** Implemented 20 October 2026; agreed 22 October 2026. Mike's wording: the
+`ALattice` classes are optional as a mechanism. A lattice is conceptually a structure
+plus a merge function, and every component's level has one; how that rule is
+implemented is left to the application or implementer.
+
+`ALatticeComponent` no longer accepts or exposes
 `ALattice`. It supplies storage, child routing and a `mergePublication(own, other)`
 hook. Unsupported descendant paths are rejected by `mergeAtPath` unless a
 component defines their handling. A staged component can reconcile directly over

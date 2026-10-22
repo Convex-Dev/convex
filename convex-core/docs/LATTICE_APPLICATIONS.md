@@ -30,7 +30,10 @@ register where the newer timestamp wins, collections that take the union of keys
 merge each entry by its own rule, records with named children, and owner namespaces.
 Design the data tree first, choose a rule for each leaf, and compose. Write a custom
 merge only for semantics the primitives cannot express. Lattices are pure functions
-over values and know nothing about cursors, components or storage.
+over values and know nothing about cursors, components or storage. The `ALattice`
+classes are one way of writing a rule down: a component may use them for its level,
+or embody its structure and merge directly in code. What matters is that every level
+has one rule, however it is implemented.
 
 **Ownership is a lattice rule.** Self-sovereign data lives in regions keyed by owner
 identity, each slot holding a signed envelope. The merge rule at that level checks
