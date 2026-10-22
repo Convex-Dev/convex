@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
-import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
@@ -28,8 +27,9 @@ import convex.lattice.generic.SetLattice;
 /**
  * A notebook with an explicit unsigned draft and deferred signing.
  * Its host stores {@code {:notebook #Signed #{note-texts}}}; each notebook binds its
- * verification rule to the supplied owner. A notebook uses set union, so notes are unique strings
- * with no ordering, replacement or deletion semantics.
+ * verification rule to the supplied owner. A notebook uses set union, so notes are unique values
+ * with no ordering, replacement or deletion semantics. Local operations add text;
+ * unfamiliar incoming members survive editing and publication unchanged.
  *
  * <p>{@link Notes} handles share one notebook's private unsigned working set.
  * Their edits neither sign nor reach the host. {@link Notebook#sync()} reconciles
@@ -46,7 +46,7 @@ class ApplicationPublicationTest {
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(7320);
 	private static final AKeyPair BOB=AKeyPair.createSeeded(7321);
 	private static final Keyword NOTEBOOK=Keyword.intern("notebook");
-	private static final OwnerKeyLattice<ASet<AString>> CONTENTS=OwnerKeyLattice.create(SetLattice.create());
+	private static final OwnerKeyLattice<ASet<ACell>> CONTENTS=OwnerKeyLattice.create(SetLattice.create());
 
 	/** Routes complete envelopes at {@code :notebook} and publishes only that component. */
 	static final class NotebookApp extends SingleRegion<Notebook> {
@@ -56,7 +56,7 @@ class ApplicationPublicationTest {
 
 		Notebook notebook() { return component(); }
 		/** Reads the host's published envelope, not the notebook's pending unsigned edits. */
-		SignedData<ASet<AString>> publishedNotebook() { return RT.getIn(cursor.get(),NOTEBOOK); }
+		SignedData<ASet<ACell>> publishedNotebook() { return RT.getIn(cursor.get(),NOTEBOOK); }
 	}
 
 	/**
@@ -64,22 +64,37 @@ class ApplicationPublicationTest {
 	 * incoming envelopes before their payloads enter the unsigned draft. A union
 	 * assembled from local and remote notes needs a new signature only when published.
 	 */
-	static final class Notebook extends SignedComponent<ASet<AString>> {
-		Notebook(AForkableCursor<SignedData<ASet<AString>>> destination,AKeyPair owner) {
+	static final class Notebook extends SignedComponent<ASet<ACell>> {
+		Notebook(AForkableCursor<SignedData<ASet<ACell>>> destination,AKeyPair owner) {
 			super(CONTENTS.signingFor(owner.getAccountKey()),destination,owner::signData);
 		}
 		Notes notes() { return new Notes(cursor()); }
 	}
 
 	/** Ordinary views share notebook state and have no publication lifecycle of their own. */
-	static final class Notes extends ALatticeComponent<ASet<AString>> {
-		private final SetComponent<AString> entries;
-		Notes(AForkableCursor<ASet<AString>> cursor) {
+	static final class Notes extends ALatticeComponent<ASet<ACell>> {
+		private final SetComponent<ACell> entries;
+		Notes(AForkableCursor<ASet<ACell>> cursor) {
 			super(cursor);
 			entries=new SetComponent<>(cursor);
 		}
 		void add(String text) { entries.add(Strings.create(text)); }
-		ASet<AString> all() { return entries.get(); }
+		ASet<ACell> all() { return entries.get(); }
+	}
+
+	/** A text authoring API does not turn foreign set members into a string schema. */
+	@Test void unfamiliarNotesSurviveLocalEditingAndPublication() {
+		var host=LatticeHost.create();
+		var app=new NotebookApp(host,ALICE);
+		host.configureApplications(List.of(app));
+		var foreign=Sets.<ACell>of(42,"remote");
+		host.mergeAt(ALICE.signData(foreign),NOTEBOOK);
+		var notes=app.notebook().notes();
+		for (ACell note:notes.all()) assertNotNull(note);
+		notes.add("local");
+		app.sync();
+		assertEquals(foreign.include(Strings.create("local")),app.publishedNotebook().getValue());
+		assertTrue(app.publishedNotebook().checkSignature());
 	}
 
 	/** The constructor's owner controls both publication and acceptance of incoming notes. */
@@ -141,7 +156,7 @@ class ApplicationPublicationTest {
 		first.sync();
 		// Reconciliation and re-signing belong to the notebook, so the host needs no key.
 		second.sync();
-		SignedData<ASet<AString>> published=RT.getIn(host.cursor().get(),NOTEBOOK);
+		SignedData<ASet<ACell>> published=RT.getIn(host.cursor().get(),NOTEBOOK);
 		assertEquals(Sets.of("From first workspace","From second workspace"),published.getValue());
 		assertTrue(published.checkSignature());
 		assertNull(host.getContext().getSigningKey());

@@ -13,7 +13,10 @@
  * domain model: an owner index, signed records, {@link convex.lattice.Timestamped}
  * ordering and an embedded {@link convex.lattice.SetComponent}. Its application
  * tests cover shared edits, incoming verification, replay, ties and publication;
- * its persistence test adds Etch without changing the domain components.</p>
+ * its persistence test adds Etch without changing the domain components.
+ * Relay tests preserve unfamiliar signed payloads, while local operations interpret
+ * only the fields they need and retain unknown set members and record fields.
+ * Java convenience types do not impose a schema on every received value.</p>
  *
  * <p>The other examples each isolate a different application choice:</p>
  * <ul>

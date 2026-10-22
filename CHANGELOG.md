@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `SetComponent` reports non-set storage with an explicit state error and leaves it unchanged. Set edits preserve unfamiliar members without imposing a runtime element schema.
+
 - Fork sync completes reconciliation and signing before its publication commit. Concurrent working edits are ordered around sync, and a failed merge or preparation leaves the fork value and baseline unchanged without publishing. Forks now always support exclusive transactions over their private working state.
 
 - `LatticeHost` no longer requires a lattice: it holds published state, delegates all incoming values to configured applications and persists snapshots. Applications declare their own lattices. `LatticeApplication` supports ordinary or live relay use, and `SignedComponent` can be extended by domain components.

@@ -27,6 +27,7 @@ import convex.lattice.generic.SignedLattice;
 /**
  * A complete favourites application assembled from standard lattice components.
  * Each public key owns a signed record containing a timestamp and a set of item IDs.
+ * Local operations author numeric IDs; replicas may carry unfamiliar item values.
  * The host root and owner collection are indexes; each unsigned record is a hash map:
  * <pre>{@code
  * {:favourites {owner #Signed {:timestamp t :items #{item-ids}}}}
@@ -99,7 +100,9 @@ final class FavouritesExample {
 	 * Stages the owner index at {@code [:favourites]}. {@link KeyOwnedIndex} checks
 	 * that each envelope's signer matches its owner key. The shared timestamp rule
 	 * selects whole payloads during both incoming merge and publication conflicts.
-	 * The region needs no signing capability to accept another user's valid record.
+	 * The region needs no signing capability to accept another user's record.
+	 * It checks only ownership, signatures and ordering metadata, preserving all
+	 * payload fields even when a local domain view cannot interpret them.
 	 */
 	static final class FavouritesRegion extends KeyOwnedIndex<AHashMap<Keyword,ACell>> {
 		// Test-controlled time shared by all user handles, including handles already opened.
@@ -123,10 +126,11 @@ final class FavouritesExample {
 			return get(user);
 		}
 
-		/** Reads any owner's accepted items without needing their private signing key. */
-		ASet<CVMLong> items(AccountKey user) {
+		/** Reads the relayed field without assuming the remote owner's item representation. */
+		ACell items(AccountKey user) {
 			var record=record(user);
-			return Favourites.items(record==null?null:record.getValue());
+			ACell value=record==null?null:record.getValue().get(ITEMS);
+			return value==null?Sets.empty():value;
 		}
 	}
 
@@ -141,7 +145,7 @@ final class FavouritesExample {
 	 */
 	static final class Favourites extends ASignedComponent<AHashMap<Keyword,ACell>> {
 		private final Timestamped<AHashMap<Keyword,ACell>> record;
-		final SetComponent<CVMLong> items;
+		final SetComponent<ACell> items;
 
 		Favourites(AForkableCursor<SignedData<AHashMap<Keyword,ACell>>> destination,
 				SignedLattice<AHashMap<Keyword,ACell>> rule,AKeyPair user,Supplier<CVMLong> getTimestamp) {
@@ -150,7 +154,7 @@ final class FavouritesExample {
 			// The inherited field is the unsigned signing view. Supply an absent record
 			// for editing without storing it until something changes; the set handles nil itself.
 			record=Timestamped.create(cursor.withDefault(Maps.empty()),getTimestamp);
-			items=new SetComponent<>(record.cursor().path(ITEMS),CVMLong.class);
+			items=new SetComponent<>(record.cursor().path(ITEMS));
 		}
 
 		/** Direct local edits use the same timestamped path as the embedded set. */
@@ -169,13 +173,8 @@ final class FavouritesExample {
 		void add(long item) { items.add(CVMLong.create(item)); }
 		void remove(long item) { items.remove(CVMLong.create(item)); }
 
-		@SuppressWarnings("unchecked")
-		private static ASet<CVMLong> items(AHashMap<Keyword,ACell> record) {
-			ASet<CVMLong> value=record==null?null:(ASet<CVMLong>)record.get(ITEMS);
-			return value==null?Sets.empty():value;
-		}
-
-		ASet<CVMLong> items() { return items.get(); }
+		/** Set operations preserve unfamiliar members; an incompatible field remains available in the region. */
+		ASet<ACell> items() { return items.get(); }
 	}
 
 }

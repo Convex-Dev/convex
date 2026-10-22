@@ -12,7 +12,8 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
-import convex.core.data.AString;
+import convex.core.data.ABlobLike;
+import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -53,7 +54,7 @@ class TaskBoardApplicationTest {
 	private static final Keyword BOARD=Keyword.intern("board");
 	private static final Keyword TITLE=Keyword.intern("title");
 	private static final Keyword DONE=Keyword.intern("done");
-	private static final IndexLattice<AString,AHashMap<Keyword,ACell>> BOARD_LATTICE=
+	private static final IndexLattice<ABlobLike<?>,AHashMap<Keyword,ACell>> BOARD_LATTICE=
 		IndexLattice.create(Timestamped.lattice());
 
 	/** Constructs the domain component directly at its host path. */
@@ -65,38 +66,38 @@ class TaskBoardApplicationTest {
 	}
 
 	/** One publication and transaction boundary spanning all task records. */
-	static final class Board extends ALatticeComponent<Index<AString,AHashMap<Keyword,ACell>>>
-			implements TransactionalComponent<Index<AString,AHashMap<Keyword,ACell>>,Board> {
+	static final class Board extends ALatticeComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>>
+			implements TransactionalComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>,Board> {
 		private final Supplier<CVMLong> getTimestamp;
 
-		Board(ACursor<Index<AString,AHashMap<Keyword,ACell>>> destination,Supplier<CVMLong> getTimestamp) {
+		Board(ACursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> destination,Supplier<CVMLong> getTimestamp) {
 			super(forkOf(destination));
 			this.getTimestamp=getTimestamp;
 		}
 
 		// Rebinding shares the supplied draft directly and retains the clock, not the source board.
-		private Board(Board source,AForkableCursor<Index<AString,AHashMap<Keyword,ACell>>> cursor) {
+		private Board(Board source,AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
 			super(cursor);
 			getTimestamp=source.getTimestamp;
 		}
 
-		@Override public Board withCursor(AForkableCursor<Index<AString,AHashMap<Keyword,ACell>>> cursor) {
+		@Override public Board withCursor(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
 			return new Board(this,cursor);
 		}
 
-		@Override public Index<AString,AHashMap<Keyword,ACell>> merge(Index<AString,AHashMap<Keyword,ACell>> incoming) {
+		@Override public Index<ABlobLike<?>,AHashMap<Keyword,ACell>> merge(Index<ABlobLike<?>,AHashMap<Keyword,ACell>> incoming) {
 			return cursor.updateAndGet(own -> BOARD_LATTICE.merge(own,incoming));
 		}
 
-		@Override protected Index<AString,AHashMap<Keyword,ACell>> mergePublication(
-				Index<AString,AHashMap<Keyword,ACell>> own,Index<AString,AHashMap<Keyword,ACell>> other) {
+		@Override protected Index<ABlobLike<?>,AHashMap<Keyword,ACell>> mergePublication(
+				Index<ABlobLike<?>,AHashMap<Keyword,ACell>> own,Index<ABlobLike<?>,AHashMap<Keyword,ACell>> other) {
 			return BOARD_LATTICE.merge(own,other);
 		}
 
 		/** A delivery replaces a complete ordered record, never an individual task field. */
 		@SuppressWarnings("unchecked")
-		@Override protected Index<AString,AHashMap<Keyword,ACell>> mergeAtPath(ACell value,ACell... path) {
-			if (path.length!=1 || !(path[0] instanceof AString id) || !(value instanceof AHashMap)) return cursor.get();
+		@Override protected Index<ABlobLike<?>,AHashMap<Keyword,ACell>> mergeAtPath(ACell value,ACell... path) {
+			if (path.length!=1 || !(path[0] instanceof ABlobLike<?> id) || !(value instanceof AHashMap)) return cursor.get();
 			return merge(Index.of(id,(AHashMap<Keyword,ACell>)value));
 		}
 
@@ -107,9 +108,9 @@ class TaskBoardApplicationTest {
 		void plan(String id,String title) { task(id).create(title); }
 
 		/** Computes pending IDs from one immutable snapshot, independent of task titles. */
-		ASet<AString> pending() {
+		ASet<ACell> pending() {
 			var tasks=cursor.get();
-			ASet<AString> pending=Sets.empty();
+			ASet<ACell> pending=Sets.empty();
 			if (tasks!=null) {
 				for (var entry:tasks.entrySet()) {
 					if (!CVMBool.TRUE.equals(entry.getValue().get(DONE))) pending=pending.include(entry.getKey());
@@ -126,7 +127,9 @@ class TaskBoardApplicationTest {
 		}
 
 		boolean exists() { return cursor.get().containsKey(TITLE); }
-		AString title() { return (AString)cursor.get().get(TITLE); }
+		// Titles may have a representation introduced by another application version.
+		ACell title() { return cursor.get().get(TITLE); }
+		/** Only literal true means completed; other values remain pending until explicitly changed. */
 		boolean isDone() { return CVMBool.TRUE.equals(cursor.get().get(DONE)); }
 
 		void create(String title) {
@@ -144,6 +147,32 @@ class TaskBoardApplicationTest {
 			if (!record.containsKey(TITLE)) throw new IllegalStateException("Task does not exist");
 			return record;
 		}
+	}
+
+	/** Completion does not require interpreting a remote title or unrelated fields. */
+	@Test void taskOperationsPreserveUnfamiliarFields() {
+		var board=new TaskBoardApp(LatticeHost.create(),() -> CVMLong.TWO).board();
+		var title=Maps.of("text","A structured title","language","en");
+		var extra=Maps.of("version",2);
+		var extension=Keyword.intern("future-field");
+		AHashMap<Keyword,ACell> record=Maps.of(Timestamped.TIMESTAMP,CVMLong.ONE,
+			TITLE,title,DONE,Strings.create("waiting"),extension,extra);
+		var remoteId=Blob.fromHex("abcd");
+		board.merge(Index.of(Strings.create("remote"),record,remoteId,record));
+		var task=board.task("remote");
+		assertSame(title,task.title());
+		assertFalse(task.isDone());
+		assertTrue(board.pending().contains(remoteId));
+		board.mergeAt(record.assoc(Timestamped.TIMESTAMP,CVMLong.TWO),remoteId);
+		assertEquals(CVMLong.TWO,board.cursor().get().get(remoteId).get(Timestamped.TIMESTAMP));
+		task.complete();
+		assertTrue(task.isDone());
+		assertSame(title,task.title());
+		assertSame(extra,task.cursor().get().get(extension));
+		assertEquals(Sets.of(remoteId),board.pending());
+		task.rename("Local title"); // An explicit replacement changes only this field and its timestamp.
+		assertEquals(Strings.create("Local title"),task.title());
+		assertSame(extra,task.cursor().get().get(extension));
 	}
 
 	/** Readers see the old board until commit; the async continuation publishes only after commit. */

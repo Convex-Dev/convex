@@ -17,6 +17,22 @@ import convex.lattice.cursor.Root;
 
 class SetComponentTest {
 
+	/** Shape is required by the operation, but an incompatible field is never treated as empty. */
+	@Test void operationsOnANonSetLeaveStorageUnchanged() {
+		var key=Keyword.intern("items");
+		var root=Root.create(Index.<Keyword,ACell>of(key,CVMLong.ONE));
+		var set=new SetComponent<ACell>(root.path(key));
+		var before=root.get();
+		assertThrows(IllegalStateException.class,set::get);
+		assertThrows(IllegalStateException.class,() -> set.add(CVMLong.TWO));
+		assertThrows(IllegalStateException.class,() -> set.remove(CVMLong.ONE));
+		assertThrows(IllegalStateException.class,set::clear);
+		assertSame(before,root.get());
+		root.set(before.assoc(key,Sets.of(1,"future")));
+		set.add(CVMLong.TWO); // The same view follows a later compatible value.
+		assertEquals(Sets.of(1,2,"future"),set.get());
+	}
+
 	/** The boolean result describes this operation's committed change, not its first attempted edit. */
 	@Test void aConcurrentIdenticalEditIsReportedAsUnchanged() {
 		for (boolean adding:new boolean[] {true,false}) {

@@ -92,10 +92,11 @@ Checks inspect the candidate without installing it, publishing, signing or stamp
 `AKeyedRegions` delegates present known entries to its existing registered children;
 unknown regions are outside its policy, and inspection does not freeze registrations.
 The favourites domain view checks the envelope's payload using its existing
-`Timestamped` and `SetComponent<CVMLong>` children, without a separate schema tree.
+`Timestamped` and `SetComponent<ACell>` children, without a separate schema tree.
 
 `SetComponent(cursor, CVMLong.class)` supplies an explicit runtime element type;
-Java generics alone cannot check foreign elements. Domain subclasses may override
+this is an optional diagnostic constraint, not a default schema. Java generics
+alone cannot check foreign elements. Domain subclasses may override
 `checkElement` for further constraints. The one-argument constructor checks only
 set shape. Nil represents an absent set; it is compatible without creating storage.
 
@@ -105,6 +106,23 @@ remains responsible for acceptance and may reuse compatibility checks where usef
 usually on changed incoming parts. Existing merge-time validation remains in place;
 these diagnostics do not automatically strengthen an application's payload policy.
 Direct raw cursor writes remain the caller's responsibility.
+
+**Relay acceptance does not imply domain understanding.** An owner region may
+verify signatures and authorisation, and inspect only the metadata its merge needs.
+The favourites region, for example, orders signed records by timestamp without
+checking their items. It retains and republishes the complete winning envelope,
+including unfamiliar fields and representations. A local domain view may report
+incompatibility without preventing the region from relaying that record.
+
+Read or edit only what an operation needs. The examples expose remote task titles
+as cells and use `SetComponent<ACell>` to preserve unfamiliar set members. Adding a
+numeric favourite or a text note does not require every existing member to have
+the same type. Editing one field preserves all unrelated fields. Set operations
+on a non-set field throw `IllegalStateException` without changing it; they never
+silently treat an unfamiliar representation as empty. Nil still means absence.
+A caller can inspect the original value through the region or its raw record.
+These are operation requirements, not recursive schema validation. Numeric score
+merging, by contrast, requires numbers because it orders values numerically.
 
 **Components must be robust to external change.** Whatever it chose above, a
 component must allow for the value at its position changing under it at any time:
@@ -543,7 +561,10 @@ instance, including its pending edits and clock. A
 [persistence variant](../src/test/java/convex/lattice/app/FavouritesPersistenceTest.java)
 publishes to Etch and reopens the same application.
 
-`Favourites` embeds a `SetComponent<CVMLong>` for its `:items` field. The standard
+`Favourites` embeds a `SetComponent<ACell>` for its `:items` field. Its convenience
+methods add and remove numeric IDs, while retaining unfamiliar members supplied
+by other versions. The region's field accessor exposes the relayed value directly.
+The standard
 component supplies atomic `add`, `remove` and `clear` operations, membership and
 size queries, and immutable snapshots through `get()`. It treats an absent set as
 empty without creating state. Its cursor passes through the favourites record's

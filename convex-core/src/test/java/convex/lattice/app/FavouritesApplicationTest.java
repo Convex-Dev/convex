@@ -18,6 +18,7 @@ import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
@@ -46,12 +47,84 @@ class FavouritesApplicationTest {
 		AHashMap<Keyword,ACell> candidate=Maps.of(TIMESTAMP,CVMLong.ONE,items,Sets.of(1,2));
 		assertNull(favourites.checkValue(ALICE.signData(candidate)));
 		assertNotNull(favourites.checkValue(ALICE.signData(candidate.assoc(items,CVMLong.ONE))));
-		assertNotNull(favourites.checkValue(ALICE.signData(candidate.assoc(items,Sets.of("wrong")))));
+		assertNull(favourites.checkValue(ALICE.signData(candidate.assoc(items,Sets.of("future-id")))));
 		assertNotNull(favourites.checkValue(ALICE.signData(candidate.assoc(TIMESTAMP,Sets.empty()))));
 		assertNull(app.favourites().record(ALICE.getAccountKey()));
 		assertTrue(host.cursor().get().isEmpty());
 	}
 
+
+	/** Relay policy understands ordering and authorship, not every field in the signed payload. */
+	@Test void unfamiliarPayloadsRelayIntactThroughRootAndOwnerDeliveries() {
+		var items=Keyword.intern("items");
+		var extension=Keyword.intern("future-field");
+		for (ACell value:List.of(CVMLong.ONE,Maps.of("future","representation"),Sets.of(1,"future-id"))) {
+			for (boolean atOwner:new boolean[] {false,true}) {
+				var host=LatticeHost.create();
+				var app=new FavouritesApp(host);
+				host.configureApplications(List.of(app));
+				AHashMap<Keyword,ACell> payload=Maps.of(TIMESTAMP,CVMLong.ONE,items,value,extension,Maps.of("version",2));
+				var envelope=CHARLIE.signData(payload);
+				if (atOwner) host.mergeAt(envelope,FAVOURITES,CHARLIE.getAccountKey());
+				else host.merge(Index.of(FAVOURITES,Index.of(CHARLIE.getAccountKey(),envelope)));
+				assertSame(envelope,app.favourites().record(CHARLIE.getAccountKey()));
+				assertSame(value,app.favourites().items(CHARLIE.getAccountKey()));
+				app.sync();
+
+				var nextHost=LatticeHost.create();
+				var next=new FavouritesApp(nextHost);
+				nextHost.configureApplications(List.of(next));
+				nextHost.merge(host.cursor().get());
+				next.sync();
+				assertSame(envelope,next.favourites().record(CHARLIE.getAccountKey()));
+				assertEquals(host.cursor().get(),nextHost.cursor().get());
+			}
+		}
+	}
+
+	/** A local edit interprets only the collection operation and retains unfamiliar members and fields. */
+	@Test void numericItemEditsPreserveUnfamiliarContent() {
+		var host=LatticeHost.create();
+		var app=new FavouritesApp(host);
+		var region=app.favourites();
+		var items=Keyword.intern("items");
+		var extension=Keyword.intern("future-field");
+		var extra=Maps.of("version",2);
+		var members=Sets.<ACell>of(1,"future-id").include(extra);
+		AHashMap<Keyword,ACell> payload=Maps.of(TIMESTAMP,CVMLong.ONE,items,members,extension,extra);
+		region.mergeAt(ALICE.signData(payload),ALICE.getAccountKey());
+		var alice=region.user(ALICE);
+		region.setTime(2);
+		alice.add(2);
+		alice.remove(1);
+		assertEquals(members.include(CVMLong.TWO).exclude(CVMLong.ONE),alice.items());
+		assertTrue(alice.items().contains(Strings.create("future-id")));
+		for (ACell member:alice.items()) assertNotNull(member);
+		var edited=region.record(ALICE.getAccountKey());
+		assertSame(extra,edited.getValue().get(extension));
+		assertEquals(CVMLong.TWO,edited.getValue().get(TIMESTAMP));
+		assertTrue(edited.checkSignature());
+	}
+
+	/** Inability to edit a field must neither discard nor re-sign the relayed record. */
+	@Test void setOperationsLeaveAnUnfamiliarFieldIntact() {
+		var host=LatticeHost.create();
+		var app=new FavouritesApp(host);
+		var region=app.favourites();
+		var items=Keyword.intern("items");
+		AHashMap<Keyword,ACell> payload=Maps.of(TIMESTAMP,CVMLong.ONE,items,Maps.of("future","items"));
+		var envelope=ALICE.signData(payload);
+		region.mergeAt(envelope,ALICE.getAccountKey());
+		var alice=region.user(ALICE);
+		assertThrows(IllegalStateException.class,alice::items);
+		assertThrows(IllegalStateException.class,() -> alice.add(2));
+		assertThrows(IllegalStateException.class,() -> alice.remove(1));
+		assertThrows(IllegalStateException.class,alice.items::clear);
+		assertSame(envelope,region.record(ALICE.getAccountKey()));
+		assertEquals(payload.get(items),region.items(ALICE.getAccountKey()));
+		app.sync();
+		assertSame(envelope,region.record(ALICE.getAccountKey()));
+	}
 
 	@Test void eachSignedComponentUsesOnlyItsExplicitUserKey() {
 		var host=LatticeHost.create();
