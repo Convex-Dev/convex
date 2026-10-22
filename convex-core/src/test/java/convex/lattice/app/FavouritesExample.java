@@ -1,5 +1,6 @@
 package convex.lattice.app;
 
+import java.util.List;
 import java.util.function.Supplier;
 
 import convex.core.crypto.AKeyPair;
@@ -14,9 +15,12 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.lattice.ASignedComponent;
 import convex.lattice.KeyOwnedIndex;
+import convex.lattice.LatticeHost;
 import convex.lattice.SetComponent;
+import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.SignedLattice;
@@ -47,16 +51,12 @@ import convex.lattice.generic.SignedLattice;
  *
  * <p>Publication is explicit: {@code app.sync()} publishes the region to the host;
  * {@code host.sync()} handles host persistence/publication. Neither creating a user
- * handle nor syncing its embedded components publishes the region. For example:</p>
- * <pre>{@code
- * var host = LatticeHost.create();
- * var region = new FavouritesRegion(host.cursor().path(FAVOURITES), Utils::getCurrentTimestampCell);
- * var app = new SingleRegion<>(host, FAVOURITES, region);
- * host.configureApplications(java.util.List.of(app)); // Route incoming state to this app.
- * region.user(ALICE).add(42);               // Signed region edit, not yet in the host.
- * app.sync();                                       // Publish at [:favourites].
- * host.sync();                                      // Persist when the host has a store.
- * }</pre>
+ * handle nor syncing its embedded components publishes the region.</p>
+ *
+ * <p>Run {@link #main(String[])} as a Java application (for example, Eclipse's
+ * Run As &gt; Java Application). It edits two owners' favourites, publishes them,
+ * and delivers the signed state to a second in-memory host. No disk store or
+ * network is needed; persistence is covered by {@link FavouritesPersistenceTest}.</p>
  *
  * <p>The seeded keys and manually advanced clocks in tests are deterministic fixtures.
  * The region receives only a timestamp supplier, so it does not depend
@@ -66,7 +66,7 @@ import convex.lattice.generic.SignedLattice;
  * @see FavouritesApplicationTest
  * @see FavouritesPersistenceTest
  */
-final class FavouritesExample {
+public final class FavouritesExample {
 	private FavouritesExample() {}
 	static final AKeyPair ALICE=AKeyPair.createSeeded(7310);
 	static final AKeyPair BOB=AKeyPair.createSeeded(7311);
@@ -75,6 +75,38 @@ final class FavouritesExample {
 	static final Keyword FAVOURITES=Keyword.intern("favourites");
 	private static final Keyword ITEMS=Keyword.intern("items");
 	static final Keyword TIMESTAMP=Timestamped.TIMESTAMP;
+
+	/** Runs the complete example using the demo keys and the runtime clock. */
+	public static void main(String[] args) {
+		var host=LatticeHost.create();
+		var favourites=new FavouritesRegion(host.cursor().path(FAVOURITES),Utils::getCurrentTimestampCell);
+		var app=new SingleRegion<>(host,FAVOURITES,favourites);
+		host.configureApplications(List.of(app));
+
+		// Domain edits stamp and sign immediately, within the region's working state.
+		var alice=favourites.user(ALICE);
+		alice.add(42);
+		alice.add(7);
+		alice.remove(42);
+		favourites.user(BOB).add(99);
+		System.out.println("Alice's favourites: "+alice.items());
+		System.out.println("Bob's favourites: "+favourites.items(BOB.getAccountKey()));
+		System.out.println("Host empty before publication: "+host.cursor().get().isEmpty());
+
+		app.sync(); // Publishes only [:favourites]; host.sync() would persist a store-backed host.
+		System.out.println("Host empty after publication: "+host.cursor().get().isEmpty());
+
+		// A replica verifies and merges complete signed records without authoring them.
+		var replicaHost=LatticeHost.create();
+		var replica=new FavouritesRegion(replicaHost.cursor().path(FAVOURITES),Utils::getCurrentTimestampCell);
+		var replicaApp=new SingleRegion<>(replicaHost,FAVOURITES,replica);
+		replicaHost.configureApplications(List.of(replicaApp));
+		replicaHost.merge(host.cursor().get());
+		replicaApp.sync();
+		System.out.println("Alice on replica: "+replica.items(ALICE.getAccountKey()));
+		System.out.println("Bob on replica: "+replica.items(BOB.getAccountKey()));
+		System.out.println("Published hosts agree: "+host.cursor().get().equals(replicaHost.cursor().get()));
+	}
 
 	/**
 	 * Stages the owner index at {@code [:favourites]}. {@link KeyOwnedIndex} checks
