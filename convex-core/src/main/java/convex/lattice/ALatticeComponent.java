@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
@@ -111,6 +112,31 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** Returns atomic working storage. Updating it does not publish this component. */
 	public AForkableCursor<V> cursor() {
 		return cursor;
+	}
+
+	/**
+	 * Checks whether a candidate value is compatible with this component.
+	 * Validity is application-defined; success need not imply merge acceptance.
+	 * For example, merge may additionally enforce ownership, freshness or limits.
+	 * The default declares no constraints and accepts every value, including nil.
+	 *
+	 * <p>The candidate uses this component's delivery representation, which may
+	 * differ from its working cursor: signed components check complete envelopes.
+	 * Implementations must inspect the supplied value without installing it or
+	 * changing component state. Ordinary incompatibility, including a wrong value
+	 * type, should return an explanation rather than throw.</p>
+	 *
+	 * <p>This is an explicit diagnostic, not an automatic lifecycle guard. Reads,
+	 * local edits and sync do not invoke it. Local operations should preserve their
+	 * invariants by construction; merge must enforce its own acceptance rules even
+	 * when this method has not been called. A merge may reuse checks where useful,
+	 * normally only for changed incoming data rather than established state.</p>
+	 *
+	 * @param value Candidate value, possibly nil or of an unexpected type
+	 * @return Null if compatible, otherwise an application-defined error reason
+	 */
+	public AString checkValue(ACell value) {
+		return null;
 	}
 
 	/**

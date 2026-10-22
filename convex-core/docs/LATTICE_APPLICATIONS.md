@@ -78,6 +78,34 @@ can supply container types and merge behaviour directly. The signed component is
 archetype of the staged choice: an unsigned working copy, a signed destination, one
 signature at publication however many edits preceded it.
 
+**Compatibility checks are explicit.** `component.checkValue(ACell)` answers
+“is this value compatible with this component?”, returning `null` or an `AString`
+error reason. Validity is application-defined. The base implementation imposes no
+constraints; applications may make this check less strict than merge acceptance.
+For example, signed components check envelope shape by default, while merge still
+verifies signatures, owner authorisation and payload acceptance. A successful check
+is never evidence of authority or a promise that merge will accept the candidate.
+
+Candidates use the component's delivery representation. For signed components this
+is a complete `SignedData` envelope, even though their working cursor is unsigned.
+Checks inspect the candidate without installing it, publishing, signing or stamping.
+`AKeyedRegions` delegates present known entries to its existing registered children;
+unknown regions are outside its policy, and inspection does not freeze registrations.
+The favourites domain view checks the envelope's payload using its existing
+`Timestamped` and `SetComponent<CVMLong>` children, without a separate schema tree.
+
+`SetComponent(cursor, CVMLong.class)` supplies an explicit runtime element type;
+Java generics alone cannot check foreign elements. Domain subclasses may override
+`checkElement` for further constraints. The one-argument constructor checks only
+set shape. Nil represents an absent set; it is compatible without creating storage.
+
+No generic read, edit, transaction, merge or sync automatically calls `checkValue`.
+Local domain operations preserve their invariants by construction. Incoming merge
+remains responsible for acceptance and may reuse compatibility checks where useful,
+usually on changed incoming parts. Existing merge-time validation remains in place;
+these diagnostics do not automatically strengthen an application's payload policy.
+Direct raw cursor writes remain the caller's responsibility.
+
 **Components must be robust to external change.** Whatever it chose above, a
 component must allow for the value at its position changing under it at any time:
 another component publishing into the same region, an incoming merge, or a fork

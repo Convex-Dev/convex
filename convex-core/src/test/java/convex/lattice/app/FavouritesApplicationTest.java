@@ -10,15 +10,17 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeHost;
 import convex.lattice.LatticeContext;
+import convex.lattice.LatticeHost;
 
 /**
  * Executable contracts for the composition in {@link FavouritesExample}.
@@ -34,6 +36,22 @@ import convex.lattice.LatticeContext;
  * @see FavouritesPersistenceTest
  */
 class FavouritesApplicationTest {
+
+	/** Domain compatibility composes the same timestamp and set components used for editing. */
+	@Test void compatibilityChecksCandidateWithoutAuthoringIt() {
+		var host=LatticeHost.create();
+		var app=new FavouritesApp(host);
+		var favourites=app.favourites().user(ALICE);
+		var items=Keyword.intern("items");
+		AHashMap<Keyword,ACell> candidate=Maps.of(TIMESTAMP,CVMLong.ONE,items,Sets.of(1,2));
+		assertNull(favourites.checkValue(ALICE.signData(candidate)));
+		assertNotNull(favourites.checkValue(ALICE.signData(candidate.assoc(items,CVMLong.ONE))));
+		assertNotNull(favourites.checkValue(ALICE.signData(candidate.assoc(items,Sets.of("wrong")))));
+		assertNotNull(favourites.checkValue(ALICE.signData(candidate.assoc(TIMESTAMP,Sets.empty()))));
+		assertNull(app.favourites().record(ALICE.getAccountKey()));
+		assertTrue(host.cursor().get().isEmpty());
+	}
+
 
 	@Test void eachSignedComponentUsesOnlyItsExplicitUserKey() {
 		var host=LatticeHost.create();

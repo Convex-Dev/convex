@@ -7,6 +7,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -17,8 +18,8 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.ASignedComponent;
 import convex.lattice.KeyOwnedIndex;
 import convex.lattice.LatticeHost;
-import convex.lattice.SingleRegion;
 import convex.lattice.SetComponent;
+import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.SignedLattice;
@@ -149,11 +150,21 @@ final class FavouritesExample {
 			// The inherited field is the unsigned signing view. Supply an absent record
 			// for editing without storing it until something changes; the set handles nil itself.
 			record=Timestamped.create(cursor.withDefault(Maps.empty()),getTimestamp);
-			items=new SetComponent<>(record.cursor().path(ITEMS));
+			items=new SetComponent<>(record.cursor().path(ITEMS),CVMLong.class);
 		}
 
 		/** Direct local edits use the same timestamped path as the embedded set. */
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record.cursor(); }
+
+		/** Checks a complete candidate without editing, stamping or signing it. */
+		@Override public AString checkValue(ACell value) {
+			AString error=super.checkValue(value);
+			if (error!=null || value==null) return error;
+			ACell payload=((SignedData<?>)value).getValue();
+			error=record.checkValue(payload);
+			if (error!=null || payload==null) return error;
+			return items.checkValue(((AHashMap<?,?>)payload).get(ITEMS));
+		}
 
 		void add(long item) { items.add(CVMLong.create(item)); }
 		void remove(long item) { items.remove(CVMLong.create(item)); }

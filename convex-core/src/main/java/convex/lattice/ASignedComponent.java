@@ -4,7 +4,9 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.SignedLattice;
@@ -36,6 +38,15 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 		this.destination=destination;
 		this.lattice=Objects.requireNonNull(lattice);
 		this.signer=Objects.requireNonNull(signer);
+	}
+
+	/**
+	 * Checks envelope shape only. Merge separately verifies the signature, owner
+	 * and payload; subclasses may compose domain checks over the unsigned value.
+	 */
+	@Override public AString checkValue(ACell value) {
+		return value==null || value instanceof SignedData<?>?null:
+			Strings.create("Expected a signed envelope");
 	}
 
 	/** Verifies and merges a complete envelope, retaining its signature when selected. */

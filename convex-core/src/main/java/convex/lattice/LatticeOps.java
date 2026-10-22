@@ -5,7 +5,9 @@ import java.util.Map;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.lattice.generic.AKeyedLattice;
@@ -19,6 +21,17 @@ import convex.lattice.generic.AKeyedLattice;
  * {@link #assocExisting}; components opt into construction via {@code assocIn}.</p>
  */
 public class LatticeOps {
+
+	/** Optional adapter diagnostic, not a substitute for merge-time validation. */
+	@SuppressWarnings("unchecked")
+	static <V extends ACell> AString checkValue(ALattice<V> lattice,ACell value) {
+		if (value==null) return null;
+		try {
+			return lattice.checkForeign((V)value)?null:Strings.create("Incompatible lattice value");
+		} catch (ClassCastException e) {
+			return Strings.create("Incompatible lattice value type");
+		}
+	}
 
 	/** Updates an existing path without creating any missing containers. */
 	@SuppressWarnings("unchecked")

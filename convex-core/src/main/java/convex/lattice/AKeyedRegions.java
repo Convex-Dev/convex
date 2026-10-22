@@ -8,8 +8,10 @@ import java.util.Objects;
 
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Strings;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ProjectionCursor;
@@ -105,6 +107,22 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 			if (regions==null) regions=Collections.unmodifiableMap(new LinkedHashMap<>(registrations));
 			return regions;
 		}
+	}
+
+	/** Checks present registered regions, leaving unknown keys outside this component's policy. */
+	@Override public AString checkValue(ACell value) {
+		if (value==null) return null;
+		if (!(value instanceof Index<?,?> index)) return Strings.create("Expected a region index");
+		// Inspection must not freeze registrations or initialise a child view.
+		Map<Keyword,ALatticeComponent<?>> selected;
+		synchronized (this) { selected=new LinkedHashMap<>(registrations); }
+		for (var entry:selected.entrySet()) {
+			Keyword key=entry.getKey();
+			if (!index.containsKey(key)) continue;
+			AString error=entry.getValue().checkValue(index.get(key));
+			if (error!=null) return Strings.create(key+": "+error);
+		}
+		return null;
 	}
 
 	/** Delivers present registered entries, without publishing staged children. */
