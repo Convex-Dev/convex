@@ -516,6 +516,35 @@ public class PgServerTest {
 	}
 
 	/**
+	 * A statement the driver has named is prepared on the server's connection once,
+	 * and every later execution only binds new values.
+	 */
+	@Test
+	public void testPreparedStatementPreparedOnce() throws Exception {
+		AtomicInteger prepares = new AtomicInteger();
+		PgServer counting = countingServer(prepares);
+		try {
+			// prepareThreshold=1: the driver names the statement from its first execution on
+			String url = "jdbc:postgresql://localhost:" + counting.getPort() + "/" + dbName + "?user=testuser&prepareThreshold=1";
+			try (Connection conn = DriverManager.getConnection(url);
+				 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE id = ?")) {
+				for (int i = 0; i < 12; i++) {
+					boolean alice = (i % 2 == 0);
+					select.setLong(1, alice ? 1L : 2L);
+					try (ResultSet rs = select.executeQuery()) {
+						assertTrue(rs.next());
+						assertEquals(alice ? "Alice" : "Bob", rs.getString("name"));
+						assertFalse(rs.next());
+					}
+				}
+			}
+			assertEquals(1, prepares.get());
+		} finally {
+			counting.stop();
+		}
+	}
+
+	/**
 	 * pgjdbc sends a batch as one pipeline ending in a single Sync. After a statement
 	 * fails, the server must discard the rest until Sync, so no later statement runs.
 	 */
@@ -534,6 +563,39 @@ public class PgServerTest {
 	}
 
 	/**
+	 * A statement parsed again under the same name is a new statement: the one prepared
+	 * for the previous query is not reused for it. The driver sends every execution as
+	 * the unnamed statement with prepareThreshold=0.
+	 */
+	@Test
+	public void testStatementParsedAgainUnderSameName() throws Exception {
+		AtomicInteger prepares = new AtomicInteger();
+		PgServer counting = countingServer(prepares);
+		try {
+			String url = "jdbc:postgresql://localhost:" + counting.getPort() + "/" + dbName + "?user=testuser&prepareThreshold=0";
+			try (Connection conn = DriverManager.getConnection(url);
+				 java.sql.PreparedStatement byId = conn.prepareStatement("SELECT name FROM users WHERE id = ?");
+				 java.sql.PreparedStatement byEmail = conn.prepareStatement("SELECT id FROM users WHERE email = ?")) {
+				for (int i = 0; i < 3; i++) {
+					byId.setLong(1, 2L);
+					try (ResultSet rs = byId.executeQuery()) {
+						assertTrue(rs.next());
+						assertEquals("Bob", rs.getString(1));
+					}
+					byEmail.setString(1, "alice@example.com");
+					try (ResultSet rs = byEmail.executeQuery()) {
+						assertTrue(rs.next());
+						assertEquals(1L, rs.getLong(1));
+					}
+				}
+			}
+			assertEquals(6, prepares.get());
+		} finally {
+			counting.stop();
+		}
+	}
+
+	/**
 	 * Tests aggregation via PostgreSQL JDBC driver.
 	 */
 	@Test
@@ -549,6 +611,33 @@ public class PgServerTest {
 	}
 
 	// Helper methods
+
+	/** A second server on the test database whose connections count the statements prepared on them. */
+	private PgServer countingServer(AtomicInteger prepares) throws Exception {
+		PgServer counting = PgServer.builder()
+			.port(0)
+			.database(dbName)
+			.connectionSupplier(() -> {
+				try {
+					Connection real = DriverManager.getConnection("jdbc:convex:database=" + dbName);
+					return (Connection) java.lang.reflect.Proxy.newProxyInstance(
+						Connection.class.getClassLoader(), new Class<?>[] { Connection.class },
+						(proxy, method, args) -> {
+							if (method.getName().equals("prepareStatement")) prepares.incrementAndGet();
+							try {
+								return method.invoke(real, args);
+							} catch (java.lang.reflect.InvocationTargetException e) {
+								throw e.getCause();
+							}
+						});
+				} catch (java.sql.SQLException e) {
+					throw new RuntimeException(e);
+				}
+			})
+			.build();
+		counting.start();
+		return counting;
+	}
 
 	private void sendStartupMessage(DataOutputStream out, String database, String user) throws IOException {
 		byte[] dbBytes = database.getBytes(StandardCharsets.UTF_8);

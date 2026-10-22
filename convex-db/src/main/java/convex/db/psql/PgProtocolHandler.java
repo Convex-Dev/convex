@@ -406,6 +406,10 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	private final Map<String, PreparedStmt> statements = new java.util.HashMap<>();
 	// Portals are bound statements ready to execute (Bind creates these)
 	private final Map<String, Portal> portals = new java.util.HashMap<>();
+	// The JDBC statement prepared for each statement above, made on its first Execute and
+	// reused for every later one: binding new values and executing again skips parsing and
+	// planning. By identity: a statement parsed again under the same name is a new one.
+	private final Map<PreparedStmt, PreparedStatement> jdbcStatements = new java.util.IdentityHashMap<>();
 
 	private void handleParse(ChannelHandlerContext ctx, PgMessageDecoder.Parse parse) {
 		if (!authenticated) {
@@ -418,11 +422,8 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			String query = parse.query();
 			log.debug("Parse: name='{}', query='{}'", name, query);
 
-			// Close existing statement with same name (PostgreSQL behavior)
-			statements.remove(name);
-
-			// Store the prepared statement
-			statements.put(name, new PreparedStmt(query, parse.paramTypes()));
+			// Store the prepared statement, closing an existing one with the same name (PostgreSQL behavior)
+			closeJdbcStatement(statements.put(name, new PreparedStmt(query, parse.paramTypes())));
 
 			write(ctx, ParseComplete.INSTANCE);
 		} catch (Exception e) {
@@ -561,7 +562,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				return;
 			}
 
-			executeWithParameters(ctx, query, portal.paramValues(), portal.paramFormats(), portal.stmt().paramTypes());
+			executeWithParameters(ctx, portal.stmt(), portal.paramValues(), portal.paramFormats());
 		} catch (SQLException e) {
 			log.warn("Execute error: {}", e.getMessage(), e);
 			writeExtendedError(ctx, ErrorResponse.fromException(e));
@@ -576,10 +577,11 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	/**
-	 * Execute a query with bound parameters.
+	 * Execute a prepared statement with bound parameters.
 	 */
-	private void executeWithParameters(ChannelHandlerContext ctx, String sql, byte[][] paramValues, short[] paramFormats, int[] paramTypes) throws SQLException {
-		sql = rewriteQuery(sql);
+	private void executeWithParameters(ChannelHandlerContext ctx, PreparedStmt stmt, byte[][] paramValues, short[] paramFormats) throws SQLException {
+		String sql = rewriteQuery(stmt.query());
+		int[] paramTypes = stmt.paramTypes();
 
 		if (sql == null) {
 			write(ctx, CommandComplete.select(0));
@@ -607,52 +609,57 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		// Convert $1, $2 to ? for JDBC
 		String jdbcSql = sql.replaceAll("\\$\\d+", "?");
 
-		try (PreparedStatement pstmt = connection.prepareStatement(jdbcSql)) {
-			// Bind parameters
-			ParameterMetaData inferred = null;
-			for (int i = 0; i < paramValues.length; i++) {
-				byte[] value = paramValues[i];
-				if (value == null) {
-					pstmt.setNull(i + 1, java.sql.Types.NULL);
-				} else {
-					// Determine format: 0 = text, 1 = binary
-					short format = (paramFormats != null && paramFormats.length > 0)
-						? (paramFormats.length == 1 ? paramFormats[0] : paramFormats[i])
-						: 0;
-					int oid = (paramTypes != null && i < paramTypes.length) ? paramTypes[i] : 0;
+		PreparedStatement pstmt = jdbcStatements.get(stmt);
+		if (pstmt == null) {
+			pstmt = connection.prepareStatement(jdbcSql);
+			jdbcStatements.put(stmt, pstmt);
+		} else {
+			pstmt.clearParameters();
+		}
+		// Bind parameters
+		ParameterMetaData inferred = null;
+		for (int i = 0; i < paramValues.length; i++) {
+			byte[] value = paramValues[i];
+			if (value == null) {
+				pstmt.setNull(i + 1, java.sql.Types.NULL);
+			} else {
+				// Determine format: 0 = text, 1 = binary
+				short format = (paramFormats != null && paramFormats.length > 0)
+					? (paramFormats.length == 1 ? paramFormats[0] : paramFormats[i])
+					: 0;
+				int oid = (paramTypes != null && i < paramTypes.length) ? paramTypes[i] : 0;
 
-					if (format == 0) {
-						// Text format - parse by the declared type, or the type the query implies
-						if (oid == 0 || oid == PgType.UNKNOWN) {
-							if (inferred == null) inferred = pstmt.getParameterMetaData();
-							oid = inferredType(inferred, i + 1);
-						}
-						String strValue = new String(value, java.nio.charset.StandardCharsets.UTF_8);
-						bindTextParameter(pstmt, i + 1, strValue, oid);
-					} else {
-						// Binary format - decode by the type the client declared in Parse
-						bindBinaryParameter(pstmt, i + 1, value, oid);
+				if (format == 0) {
+					// Text format - parse by the declared type, or the type the query implies
+					if (oid == 0 || oid == PgType.UNKNOWN) {
+						if (inferred == null) inferred = pstmt.getParameterMetaData();
+						oid = inferredType(inferred, i + 1);
 					}
+					String strValue = new String(value, java.nio.charset.StandardCharsets.UTF_8);
+					bindTextParameter(pstmt, i + 1, strValue, oid);
+				} else {
+					// Binary format - decode by the type the client declared in Parse
+					bindBinaryParameter(pstmt, i + 1, value, oid);
 				}
 			}
+		}
 
-			boolean hasResultSet = pstmt.execute();
-			if (hasResultSet) {
-				try (ResultSet rs = pstmt.getResultSet()) {
-					sendResultSet(ctx, rs, false);
-				}
+		boolean hasResultSet = pstmt.execute();
+		if (hasResultSet) {
+			try (ResultSet rs = pstmt.getResultSet()) {
+				sendResultSet(ctx, rs, false);
+			}
+		} else {
+			int updateCount = pstmt.getUpdateCount();
+			String upperSql = sql.toUpperCase().trim();
+			if (upperSql.startsWith("INSERT")) {
+				write(ctx, CommandComplete.insert(updateCount));
+			} else if (upperSql.startsWith("UPDATE")) {
+				write(ctx, CommandComplete.update(updateCount));
+			} else if (upperSql.startsWith("DELETE")) {
+				write(ctx, CommandComplete.delete(updateCount));
 			} else {
-				int updateCount = pstmt.getUpdateCount();
-				String upperSql = sql.toUpperCase().trim();
-				if (upperSql.startsWith("INSERT")) {
-					write(ctx, CommandComplete.insert(updateCount));
-				} else if (upperSql.startsWith("UPDATE")) {
-					write(ctx, CommandComplete.update(updateCount));
-				} else if (upperSql.startsWith("DELETE")) {
-					write(ctx, CommandComplete.delete(updateCount));
-				} else {
-					write(ctx, new CommandComplete("OK"));
-				}
+				write(ctx, new CommandComplete("OK"));
 			}
 		}
 	}
@@ -879,7 +886,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		log.debug("Close: type={}, name='{}'", (char) close.type(), close.name());
 
 		if (close.type() == 'S') {
-			statements.remove(close.name());
+			closeJdbcStatement(statements.remove(close.name()));
 		} else {
 			portals.remove(close.name());
 		}
@@ -928,7 +935,22 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		ctx.write(buf);
 	}
 
+	/** Closes the JDBC statement prepared for a statement that is closed or replaced, if there is one. */
+	private void closeJdbcStatement(PreparedStmt stmt) {
+		PreparedStatement pstmt = (stmt == null) ? null : jdbcStatements.remove(stmt);
+		if (pstmt != null) {
+			try {
+				pstmt.close();
+			} catch (SQLException e) {
+				log.warn("Error closing prepared statement", e);
+			}
+		}
+	}
+
 	private void closeConnection() {
+		for (PreparedStmt stmt : new java.util.ArrayList<>(jdbcStatements.keySet())) {
+			closeJdbcStatement(stmt);
+		}
 		if (connection != null) {
 			try {
 				connection.close();
