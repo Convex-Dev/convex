@@ -18,7 +18,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.Root;
+import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
@@ -43,7 +43,8 @@ public class ApplicationPublicationTest {
 		return LATTICE.zero().assoc(OWNED,KEY.signData(Sets.of(0))).assoc(REGISTER,CVMLong.ZERO);
 	}
 
-	private static final class InterleavingRoot extends Root<Index<Keyword,ACell>> {
+	/** Transactional roots route atomic updates through CAS, where the race is injected. */
+	private static final class InterleavingRoot extends TransactionalRootCursor<Index<Keyword,ACell>> {
 		Runnable beforeCAS;
 		InterleavingRoot() { super(initial()); }
 		@Override public boolean compareAndSet(Index<Keyword,ACell> expected,Index<Keyword,ACell> value) {

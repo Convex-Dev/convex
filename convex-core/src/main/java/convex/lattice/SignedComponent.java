@@ -8,6 +8,7 @@ import convex.core.data.AString;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.lattice.cursor.ACursor;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.SignedLattice;
 
 /**
@@ -20,8 +21,9 @@ import convex.lattice.generic.SignedLattice;
  * the payload may require another signature. An unchanged publication does not
  * sign. The bound lattice supplies both the merge and the authorisation rule.</p>
  *
- * <p>Sync publishes through this component's own fork of its destination and stops
- * there. The destination may be a host path or a slot in an owned map's working
+ * <p>This component composes an ordinary fork with a {@link SignedCursor} over its
+ * destination. The fork reconciles unsigned values; the cursor signs on publication.
+ * Sync stops there. The destination may be a host path or a slot in an owned map's working
  * state. In the latter case the map must subsequently sync to publish outward;
  * syncing the map never implicitly publishes this draft. This component retains
  * no parent component or store.</p>
@@ -45,15 +47,7 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	 */
 	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination,
 			Function<V,SignedData<V>> signer) {
-		super(destination,
-			stored -> (stored==null)?null:stored.getValue(),
-			value -> {
-				if (value==null) return null;
-				SignedData<V> signed=lattice.sign(value,signer);
-				if (signed==null) throw new IllegalStateException(
-					"No authorised signer available for component owner "+lattice.getOwner());
-				return signed;
-			});
+		super(forkOf(SignedCursor.create(destination,value -> lattice.sign(value,signer))));
 		this.lattice=lattice;
 		Objects.requireNonNull(signer,"Signer must not be null");
 	}

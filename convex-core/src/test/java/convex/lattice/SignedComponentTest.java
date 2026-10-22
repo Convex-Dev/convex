@@ -104,20 +104,17 @@ public class SignedComponentTest {
 	public void testUnrelatedAncestorCASFailureReusesSignature() {
 		Keyword slot=Keyword.intern("owner");
 		Keyword sibling=Keyword.intern("sibling");
-		AtomicInteger attempts=new AtomicInteger();
-		var root=new Root<>(Index.<Keyword,ACell>none()) {
-			@Override public boolean compareAndSet(Index<Keyword,ACell> expected,Index<Keyword,ACell> value) {
-				if (attempts.incrementAndGet()==1) set(get().assoc(sibling,CVMLong.ONE));
-				return super.compareAndSet(expected,value);
-			}
-		};
+		var root=new Root<>(Index.<Keyword,ACell>none());
 		var destination=root.<SignedData<ASet<CVMLong>>>path(slot);
 		AtomicInteger signatures=new AtomicInteger();
-		var component=new SignedComponent<>(SIGNED,destination,signer(signatures::incrementAndGet));
+		var component=new SignedComponent<>(SIGNED,destination,signer(() -> {
+			signatures.incrementAndGet();
+			// Change the ancestor after the update reads it, forcing a CAS retry.
+			root.updateAndGet(value -> value.assoc(sibling,CVMLong.ONE));
+		}));
 		component.cursor().set(Sets.of(1));
 		component.sync();
 		assertEquals(1,signatures.get());
-		assertEquals(2,attempts.get());
 		assertEquals(CVMLong.ONE,root.get().get(sibling));
 		assertEquals(Sets.of(1),destination.get().getValue());
 	}

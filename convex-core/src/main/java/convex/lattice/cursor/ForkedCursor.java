@@ -3,164 +3,90 @@ package convex.lattice.cursor;
 import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
 
 /**
- * An isolated working copy of a destination cursor, merged by a plug-in function
- * when it publishes.
+ * Independent working storage which reconciles with a destination on sync.
+ * An unchanged fork adopts the destination; an unchanged destination accepts
+ * the working value. When both changed, the supplied merge decides.
  *
- * <p>Edits apply to private working storage and are invisible at the destination
- * until {@link #sync()}. Sync publishes one working snapshot by compare-and-set and
- * retries while the destination moves. The fork tracks the destination value the
- * working copy was last reconciled against: an unchanged working copy adopts the
- * destination, an unchanged destination keeps the working snapshot, and only when
- * both have changed does the supplied merge run, with the working snapshot as own.
- * Working writes are ordered before or after sync; reconciliation and preparation
- * finish before publication commits. A failed merge or preparation changes neither
- * the destination nor the working value or baseline.
- * Publication stops at the destination and never publishes that cursor further.</p>
+ * <p>Sync updates the destination atomically while holding the working root's
+ * write lock. Working reads and writes are ordered around sync. Failed
+ * reconciliation or destination preparation leaves the working value and
+ * baseline unchanged. Successful publication requires no further merge.</p>
  *
- * <p>The fork knows no lattice, context or signing policy: the functions it is
- * given carry whatever policy their owner closed over. A type-changing destination,
- * such as a signed envelope, supplies {@code read} and {@code prepare} functions.
- * Preparation runs once per distinct candidate, outside the atomic compare-and-set,
- * so an unrelated concurrent write reuses a prepared value such as a signature.</p>
+ * <p>The destination has the same value type as the fork. Compose a cursor view,
+ * such as {@link SignedCursor}, for representation changes or write policy.
+ * Sync stops at that destination and never publishes it further.</p>
  *
- * <p>Working storage uses {@link TransactionalRootCursor}. Sync holds its write
- * lock through the destination CAS and installation of the reconciled working value.
- * Reads of this fork also take that lock, so they cannot observe an incomplete sync.
- * The destination remains independently writable and CAS conflicts retry normally.</p>
+ * <p>Merge and destination write functions must not mutate or sync this fork,
+ * or wait for another operation on it.</p>
  *
- * <p>Read, prepare and merge functions must not mutate or sync this fork, or wait
- * for another operation on it.</p>
- *
- * @param <V> Working value type
+ * @param <V> Working and destination value type
  */
 public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
-	private final Target<V,?> target;
+	private final ACursor<V> destination;
 	private final BinaryOperator<V> merge;
 	private final TransactionalRootCursor<V> working;
+	/** Last reconciled destination value, protected by the working root lock. */
+	private V baseline;
 
-	private <P extends ACell> ForkedCursor(ACursor<P> destination,Function<P,V> read,
-			Function<V,P> prepare,BinaryOperator<V> merge) {
-		Target<V,P> t=new Target<>(destination,read,prepare);
-		this.target=t;
-		this.merge=merge;
-		this.working=new TransactionalRootCursor<>(t.baseline);
+	private ForkedCursor(ACursor<V> destination,BinaryOperator<V> merge) {
+		this.destination=Objects.requireNonNull(destination,"Destination must not be null");
+		this.merge=Objects.requireNonNull(merge,"Merge function must not be null");
+		this.baseline=destination.get();
+		this.working=new TransactionalRootCursor<>(baseline);
 	}
 
 	/**
-	 * Creates a working copy over a destination of the same type.
-	 *
+	 * Creates an independent working copy of the destination.
 	 * @param <V> Value type
 	 * @param destination Cursor the copy publishes into
-	 * @param merge Merge of own and other, applied only when both have changed
-	 * @return Working copy initialised to the destination's current value
+	 * @param merge Merge of own and other when both changed
+	 * @return Working copy initialised from the destination
 	 */
 	public static <V extends ACell> ForkedCursor<V> create(ACursor<V> destination,BinaryOperator<V> merge) {
-		return create(destination,Function.identity(),Function.identity(),merge);
+		return new ForkedCursor<>(destination,merge);
 	}
 
 	/**
-	 * Creates a working copy over a destination with a different stored type.
-	 *
-	 * @param <V> Working value type
-	 * @param <P> Stored value type at the destination
-	 * @param destination Cursor the copy publishes into
-	 * @param read Projection from a stored value to a working value
-	 * @param prepare Authoring of a stored value from a working value, such as signing
-	 * @param merge Merge of own and other, applied only when both have changed
-	 * @return Working copy initialised to the destination's current value
-	 */
-	public static <V extends ACell,P extends ACell> ForkedCursor<V> create(ACursor<P> destination,
-			Function<P,V> read,Function<V,P> prepare,BinaryOperator<V> merge) {
-		return new ForkedCursor<>(
-			Objects.requireNonNull(destination,"Destination must not be null"),
-			Objects.requireNonNull(read,"Read function must not be null"),
-			Objects.requireNonNull(prepare,"Prepare function must not be null"),
-			Objects.requireNonNull(merge,"Merge function must not be null"));
-	}
-
-	/**
-	 * Atomically reconciles and publishes the working value into the destination.
-	 * All fallible computation precedes the destination CAS. Working writes wait
-	 * until sync completes; there is no reconciliation after publication.
-	 *
+	 * Reconciles and publishes through one atomic destination update. Its cursor
+	 * handles CAS retries and any signing or stamping. Concurrent working writes
+	 * wait until publication and adoption of the result are complete.
 	 * @return Published value
 	 */
 	public V sync() {
 		Lock lock=working.exclusiveLock();
 		lock.lock();
 		try {
-			V published=target.publish(working.get(),merge);
+			V published=destination.updateAndGet(new Reconciliation(working.get()));
 			working.set(published);
+			baseline=published;
 			return published;
 		} finally {
 			lock.unlock();
 		}
 	}
 
-	/**
-	 * Decides whether a merge is needed. An unchanged own adopts other; an unchanged
-	 * other, or equal values, keep own; otherwise the merge decides.
-	 */
-	private static <V extends ACell> V reconcile(BinaryOperator<V> merge,V baseline,V own,V other) {
-		if (Utils.equals(own,baseline)) return other;
-		if (Utils.equals(other,baseline) || Utils.equals(own,other)) return own;
-		return merge.apply(own,other);
-	}
+	/** Retains reconciled changes as the destination update retries. */
+	private final class Reconciliation implements UnaryOperator<V> {
+		private V previous=baseline;
+		private V candidate;
 
-	/** The destination side of a fork, holding the stored-type functions and the baseline. */
-	private static final class Target<V extends ACell,P extends ACell> {
-		private final ACursor<P> destination;
-		private final Function<P,V> read;
-		private final Function<V,P> prepare;
-		/** Destination value the working copy was last reconciled against; under the working root lock. */
-		private V baseline;
+		Reconciliation(V snapshot) { candidate=snapshot; }
 
-		Target(ACursor<P> destination,Function<P,V> read,Function<V,P> prepare) {
-			this.destination=destination;
-			this.read=read;
-			this.prepare=prepare;
-			this.baseline=read.apply(destination.get());
-		}
-
-		V publish(V snapshot,BinaryOperator<V> merge) {
-			P observed=destination.get();
-			V currentValue=read.apply(observed);
-			V candidate=reconcile(merge,baseline,snapshot,currentValue);
-			V preparedValue=null;
-			P prepared=null;
-			boolean hasPrepared=false;
-			while (true) {
-				// A no-op completes at the observation without changing identities.
-				if (Utils.equals(currentValue,candidate)) {
-					baseline=currentValue;
-					return currentValue;
-				}
-				if (!hasPrepared || !Utils.equals(candidate,preparedValue)) {
-					prepared=prepare.apply(candidate);
-					preparedValue=candidate;
-					hasPrepared=true;
-				}
-				if (destination.compareAndSet(observed,prepared)) {
-					baseline=candidate;
-					return candidate;
-				}
-				P current=destination.get();
-				V nextValue=read.apply(current);
-				// An unrelated ancestor write or equal replacement needs no new merge.
-				if (!Utils.equals(nextValue,currentValue)) {
-					candidate=reconcile(merge,currentValue,candidate,nextValue);
-				}
-				observed=current;
-				currentValue=nextValue;
+		@Override public V apply(V other) {
+			if (Utils.equals(candidate,previous) || Utils.equals(candidate,other)) {
+				candidate=other;
+			} else if (!Utils.equals(other,previous)) {
+				candidate=merge.apply(candidate,other);
 			}
+			previous=other;
+			return candidate;
 		}
 	}
 

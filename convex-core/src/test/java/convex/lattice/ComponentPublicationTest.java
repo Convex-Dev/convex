@@ -20,6 +20,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
+import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.generic.ADelegatingLattice;
 import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
@@ -35,7 +36,8 @@ public class ComponentPublicationTest {
 		}
 	}
 
-	private static class InterleavingRoot<V extends ACell> extends Root<V> {
+	/** Transactional roots route atomic updates through CAS, where the race is injected. */
+	private static class InterleavingRoot<V extends ACell> extends TransactionalRootCursor<V> {
 		Runnable beforeCAS;
 		InterleavingRoot(V value) { super(value); }
 		@Override public boolean compareAndSet(V expected,V value) {

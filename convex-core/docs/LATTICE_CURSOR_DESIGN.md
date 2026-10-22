@@ -4,8 +4,7 @@ Cursors provide atomic access to immutable CVM values. Components own lattice
 structure, merge policy, signing policy and publication. Cursors carry no lattice,
 shape, context or store, and do not construct missing containers.
 
-This document describes the current implementation. CAD035 describes an earlier
-lattice-aware hierarchy and needs updating before this branch's design is normative.
+This document describes the current implementation of CAD035's cursor mechanisms.
 See [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md) for application assembly,
 component-owned working state and batched signing.
 
@@ -18,10 +17,12 @@ ACursor<V>                                get / atomic update / path
     │   └── TransactionalRootCursor<V>    opt-in coordinated writes
     ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
     ├── PathCursor<V>                     navigation through existing containers
-    ├── ProjectionCursor<S,V>             caller-supplied read/write functions
-    └── AUpdateCursor<V,S>                prepare-on-write machinery
-        ├── StampedCursor<V>              explicit clock and stamp function
-        └── SignedCursor<V>               explicit signing function
+    └── ATransformCursor<V,S>             shared atomic mutable-view operations
+        ├── ProjectionCursor<S,V>         caller-supplied read/rebuild functions
+        └── AUpdateCursor<V,S>            cached preparation per atomic operation
+            ├── StampedCursor<V>          explicit clock and stamp function
+            ├── SignedCursor<V>           explicit signing function
+            └── DefaultCursor<V>          explicit default for absent storage
 AView<T>                                  read-only cursor views
 Transactions                              optimistic and locked subtree transactions
 ```
@@ -99,17 +100,17 @@ the working snapshot as own; an unchanged copy adopts the destination instead.
 Working writes are ordered before or after sync. There is no
 fork without a merge function, and `ForkedCursor` is the only cursor with a `sync()`.
 The fork knows no lattice, context or signing policy: the function closes over
-whatever policy its owner chooses. A destination of a different stored type, such as
-a signed envelope, takes read and prepare functions as well; preparation runs once
-per distinct candidate, outside the compare-and-set, so an unrelated concurrent write
-reuses a prepared signature.
+whatever policy its owner chooses. The destination has the same value type as the
+fork. Representation changes compose through cursor views, for example
+`SignedCursor.create(slot, signer).fork(merge)`. The signing view prepares and caches
+signatures; the fork only reconciles values and invokes an atomic destination update.
 
 Each fork uses an independent `TransactionalRootCursor`. Sync holds its existing
-write lock while reconciling, preparing and committing to the destination by CAS.
+write lock while the destination's atomic update reconciles and commits by CAS.
 Fork reads take the same lock. A successful commit installs the reconciled working
 value and advances the baseline without further user code or merging. Failed
 reconciliation or preparation commits nothing; competing destination writes remain
-independent. Read, prepare and merge functions must not write or sync the same fork,
+independent. Destination write functions and the merge must not write or sync the same fork,
 or wait for operations on it. This is a callback contract, without thread ownership
 or re-entrancy guards.
 
@@ -132,8 +133,8 @@ Component construction makes that ownership explicit: `super(cursor)` shares
 working storage, while `super(forkOf(destination))` creates an owned fork. Casting
 a cursor to `ACursor` no longer selects a different constructor. The component-copy
 constructor `super(sourceComponent)` also creates an owned fork and retains the
-source's context; the read/prepare constructor explicitly creates a boundary with
-a different stored representation.
+source's context. Supply a cursor view as the destination when stored representation
+differs from the working value; components need no separate conversion constructor.
 
 Default component `sync()` reads the current value when it owns no fork. It never
 searches the cursor chain for publication work: even a view directly over a
@@ -168,8 +169,13 @@ var unsigned = SignedCursor.create(slot, value -> rule.sign(context, value));
 var edits = StampedCursor.create(storage, context::currentTimestamp, lattice::stamp);
 ```
 
-`AUpdateCursor` applies authoring to all atomic operations. Unchanged views preserve
-the existing stored value. Prepared signatures are reused while retries request the
+`ATransformCursor` supplies the atomic operations for projections and authored views.
+It reads a view value, rebuilds the source on a changed write, and preserves the
+source on a no-op. Returned values reflect the source's write policy, including
+stamping. Read functions must accept the values that policy can produce.
+
+`ProjectionCursor` rebuilds from the current source on retries, preserving siblings.
+`AUpdateCursor` adds caching for prepared replacements. Prepared signatures are reused while retries request the
 same value; a genuinely different payload must be signed again. `StampedCursor`
 resolves its clock once per changed operation, reusing that timestamp across retries.
 Writes through descendant views pass through the same authoring boundary atomically.

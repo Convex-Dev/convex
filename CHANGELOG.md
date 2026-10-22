@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Projection, signing, stamping and default cursor views share atomic operations through `ATransformCursor`. Forks now publish through ordinary cursor views; removed the fork's read/prepare overload and the corresponding component constructor. Compose `SignedCursor.create(destination, signer).fork(merge)` for unsigned working state with signed publication.
+
 - Fork publication callbacks rely on the documented side-effect contract; removed thread tracking and defensive re-entrancy checks. Concurrent edits and sync still coordinate through the working-state lock.
 
 - Lattice transaction drafts use standard thread-safe root storage without thread ownership or closing guards. Callbacks may coordinate worker edits before returning; later edits to retained drafts remain isolated from live state.

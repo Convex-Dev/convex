@@ -92,10 +92,13 @@ public class ForkedCursorTest {
 		var root=Root.<ASet<CVMLong>>create(Sets.empty());
 		AtomicBoolean reject=new AtomicBoolean(true);
 		AtomicInteger merges=new AtomicInteger();
-		var fork=ForkedCursor.create(root,value -> value,value -> {
-			if (reject.get()) throw new IllegalArgumentException("Signing failed");
-			return value;
-		},(own,other) -> { merges.incrementAndGet(); return union(own,other); });
+		var destination=new AUpdateCursor<ASet<CVMLong>,ASet<CVMLong>>(root) {
+			@Override protected ASet<CVMLong> prepareWrite(ASet<CVMLong> value) {
+				if (reject.get()) throw new IllegalArgumentException("Preparation failed");
+				return value;
+			}
+		};
+		var fork=destination.fork((own,other) -> { merges.incrementAndGet(); return union(own,other); });
 		var local=Sets.<CVMLong>of(CVMLong.ONE);
 		var remote=Sets.<CVMLong>of(CVMLong.TWO);
 		fork.set(local);
@@ -112,13 +115,15 @@ public class ForkedCursorTest {
 	@Test public void failedReconciliationOnCASRetryDoesNotPublishOrAdvanceBaseline() {
 		var root=new Root<ASet<CVMLong>>(Sets.empty()) {
 			boolean conflict=true;
-			@Override public boolean compareAndSet(ASet<CVMLong> expected,ASet<CVMLong> next) {
-				if (conflict) {
-					conflict=false;
-					super.set(Sets.of(CVMLong.TWO));
-					return false;
-				}
-				return super.compareAndSet(expected,next);
+			@Override public ASet<CVMLong> updateAndGet(java.util.function.UnaryOperator<ASet<CVMLong>> action) {
+				return super.updateAndGet(current -> {
+					ASet<CVMLong> next=action.apply(current);
+					if (conflict) {
+						conflict=false;
+						super.set(Sets.of(CVMLong.TWO));
+					}
+					return next;
+				});
 			}
 		};
 		var fork=root.fork((own,other) -> { throw new IllegalArgumentException("Conflict rejected"); });

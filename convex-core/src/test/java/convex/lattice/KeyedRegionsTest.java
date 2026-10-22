@@ -21,7 +21,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Root;
+import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.OwnerLattice;
@@ -211,7 +211,8 @@ class KeyedRegionsTest {
 
 	@Test void publicationRetriesPreserveConcurrentUnregisteredWrites() {
 		AtomicInteger attempts=new AtomicInteger();
-		var root=new Root<>(Index.<Keyword,ACell>none()) {
+		// This root's atomic updates use CAS, allowing a race at the commit boundary.
+		var root=new TransactionalRootCursor<>(Index.<Keyword,ACell>none()) {
 			@Override public boolean compareAndSet(Index<Keyword,ACell> expected,Index<Keyword,ACell> value) {
 				if (attempts.incrementAndGet()==1) set(get().assoc(UNKNOWN,CVMLong.TWO));
 				return super.compareAndSet(expected,value);

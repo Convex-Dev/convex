@@ -2,7 +2,6 @@ package convex.lattice;
 
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -15,8 +14,8 @@ import convex.lattice.cursor.ForkedCursor;
  *
  * <p>Lightweight components share a working cursor. Components with an independent
  * publication boundary own a {@link ForkedCursor} of their destination, whose sync
- * reconciles through functions this component supplies: its publication merge,
- * and for a type-changing destination its read and prepare functions.
+ * reconciles through this component's publication merge. Representation changes
+ * compose through destination cursor views, such as signing or projection.
  * Publication uses ordinary cursor updates; there is no component parent link.
  * The cursor knows nothing about lattices: the component declares the structure of
  * the level it owns, supplying read/write functions for child views and binding
@@ -71,7 +70,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * boundary explicitly, regardless of the destination cursor's Java type.
 	 */
 	protected ALatticeComponent(ForkTarget<V> target) {
-		this(target.destination(),Function.identity(),Function.identity());
+		owned=ForkedCursor.create(target.destination(),this::mergePublication);
+		cursor=owned;
 	}
 
 	/** Declares a destination for a new component-owned fork; does not create or publish state. */
@@ -89,19 +89,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Creates a publication boundary with a different stored representation.
-	 * Read and prepare supply the representation conversion; reconciliation calls
-	 * this component's {@link #mergePublication}. No merge policy is inferred.
-	 */
-	protected <P extends ACell> ALatticeComponent(ACursor<P> destination,
-			Function<P,V> read, Function<V,P> prepare) {
-		owned=ForkedCursor.create(destination,read,prepare,this::mergePublication);
-		cursor=owned;
-	}
-
-	/**
 	 * Reconciles a working snapshot with a concurrently changed destination.
-	 * Called only when both sides changed, outside atomic update callbacks.
+	 * Called only when both sides changed, within the destination's atomic update.
 	 * Implementations must use the supplied values without mutating working state.
 	 * Staged components must define this operation; live views do not need it.
 	 */

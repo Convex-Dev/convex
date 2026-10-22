@@ -1,195 +1,68 @@
 package convex.lattice.cursor;
 
-import java.util.concurrent.locks.Lock;
-import java.util.function.BinaryOperator;
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.util.Utils;
 
 /**
- * Abstract base for cursors that override <em>update semantics</em>: every value
- * written through the cursor is funnelled through a single
- * {@link #prepareWrite(ACell) prepare-on-write} function before it is stored.
+ * A transforming cursor which authors replacement storage from a view value.
+ * {@link SignedCursor} signs payloads, {@link StampedCursor} stamps local edits,
+ * and {@link DefaultCursor} presents an explicit default for absent storage.
  *
- * <p>This is the shared machinery behind these cursors:</p>
- * <ul>
- *   <li>{@link StampedCursor} — a same-type ({@code S == V}) <b>update override</b>:
- *       identity read, stamp on write. It never changes the view.</li>
- *   <li>{@link SignedCursor} — a type-changing ({@code S = SignedData<V>})
- *       <b>view boundary</b>: the stored cell is a different, envelope type, so it
- *       overrides {@link #view} to project the {@code :value} child on read and
- *       re-signs on write.</li>
- *   <li>{@link DefaultCursor} — presents a caller-supplied default for absent
- *       storage, preserving absence on unchanged writes.</li>
- * </ul>
+ * <p>Atomic operations and unchanged-write handling come from
+ * {@link ATransformCursor}. This class adds operation-local preparation caching:
+ * an unchanged candidate reuses its prepared cell across source CAS retries.
+ * Nil clears storage without preparing. No cache is shared between operations.</p>
  *
- * <p>The component that owns the boundary wraps its cursor with one of these;
- * navigation never inserts them. All eight atomic operations and
- * {@code compareAndSet} are implemented here in terms of two hooks:</p>
- * <ul>
- *   <li>{@link #prepareWrite(ACell)} — <b>the</b> point every write funnels through:
- *       it authors the cell to store for a new view value. This is where write-time
- *       preconditions are enforced by the supplied authoring function, which may throw).</li>
- *   <li>{@link #view(ACell)} — how a stored cell reads back as a view value. Identity
- *       by default (the stored type <em>is</em> the view type); only a type-changing
- *       boundary overrides it.</li>
- * </ul>
- *
- * <p><b>Preparing is done once, not once per CAS attempt.</b> The atomic operations
- * are implemented over an {@code AtomicReference}-style retry loop, whose update
- * function is re-invoked on every contended CAS failure. Authoring a cell can be
- * expensive and can reach outside the JVM — signing may consult a wallet, key store
- * or remote signer — so this class never calls {@link #prepareWrite} from inside the
- * loop more than once per distinct value: a write of a fixed value prepares exactly
- * once however often it retries. A write whose value is computed from the current
- * one re-prepares only when a retry actually computes a different value.</p>
- *
- * <p>A write that does not change the view is not a write at all: the stored cell is
- * kept as it is, so an unchanged value keeps its existing signature or timestamp and
- * {@link #prepareWrite} is never called. That rule is uniform across subclasses.</p>
- *
- * @param <V> Type of the view value presented by this cursor
- * @param <S> Type of the stored value held by the base cursor
+ * @param <V> Viewed value type
+ * @param <S> Stored value type
  */
-public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AForkableCursor<V> {
+public abstract class AUpdateCursor<V extends ACell,S extends ACell> extends ATransformCursor<V,S> {
 
-	protected final ACursor<S> base;
-
-	protected AUpdateCursor(ACursor<S> base) {
-		this.base = base;
-	}
-
-
-	@Override
-	protected Lock exclusiveLock() {
-		return base.exclusiveLock();
-	}
-
+	protected AUpdateCursor(ACursor<S> base) { super(base); }
 
 	/**
-	 * The prepare-on-write function: authors the cell to store for a new, non-null
-	 * view value. This is the single point every write funnels through — stamp here,
-	 * sign here, enforce write preconditions here.
-	 *
-	 * <p>Never called for a null value, nor for a write that leaves the view
-	 * unchanged; both are handled before it. It is called at most once per distinct
-	 * value written, so it may safely be expensive, but it must be free of side
-	 * effects beyond authoring the returned cell.</p>
-	 *
-	 * @param value New view value being written (never null)
-	 * @return Stored cell to write
+	 * Authors storage for a changed, non-null value. May enforce authoring
+	 * preconditions; must not mutate cursors or perform external side effects.
 	 */
 	protected abstract S prepareWrite(V value);
 
 	/**
-	 * Creates the authoring function for one atomic operation, on its first actual
-	 * non-null change. Reused when retries produce different values, so subclasses
-	 * can capture operation-scoped inputs without resolving them for no-op writes.
-	 *
-	 * @return Operation-local authoring function
+	 * Resolves authoring inputs on the first non-null change of one operation.
+	 * Reused on retries, so a timestamp or similar input is resolved only once.
 	 */
-	protected Function<V,S> prepareWriteOperation() {
-		return this::prepareWrite;
-	}
+	protected Function<V,S> prepareWriteOperation() { return this::prepareWrite; }
 
-	/**
-	 * Reads the view value from a stored cell. Identity by default — the stored type
-	 * <em>is</em> the view type. A type-changing boundary (e.g. signing, whose stored
-	 * cell is an envelope) overrides this to project to the inner value.
-	 *
-	 * @param stored Stored cell (may be null)
-	 * @return View value (null maps to null)
-	 */
+	/** Identity read by default; representation-changing subclasses override it. */
 	@SuppressWarnings("unchecked")
-	protected V view(S stored) {
-		return (V)(ACell) stored;
+	@Override protected V view(S stored) { return (V)(ACell)stored; }
+
+	@Override protected S write(S current,V value) {
+		return value==null?null:prepareWrite(value);
 	}
 
-	/**
-	 * One prepared write, reused across CAS retries. Keeps the cost of authoring a
-	 * cell proportional to the number of distinct values written, not to contention.
-	 */
-	private final class PreparedWrite {
+	@Override protected BiFunction<S,V,S> writeOperation() { return new PreparedWrite(); }
+
+	/** Preparation depends on the new value, so source-only changes can reuse it. */
+	private final class PreparedWrite implements BiFunction<S,V,S> {
 		private V value;
 		private S stored;
 		private boolean present;
 		private Function<V,S> prepare;
 
-		/** Applies a write of {@code newValue} over the current stored cell. */
-		S apply(S current, V newValue) {
-			// Unchanged write: keep the current cell, so its signature or stamp stands
-			if (Utils.equals(newValue, view(current))) return current;
-			if (present && Utils.equals(newValue, value)) return stored;
-			value = newValue;
+		@Override public S apply(S current,V newValue) {
+			if (present && Utils.equals(newValue,value)) return stored;
+			value=newValue;
 			if (newValue==null) {
 				stored=null;
 			} else {
 				if (prepare==null) prepare=prepareWriteOperation();
 				stored=prepare.apply(newValue);
 			}
-			present = true;
+			present=true;
 			return stored;
 		}
-	}
-
-	@Override
-	public V get() {
-		return view(base.get());
-	}
-
-	@Override
-	public void set(V newValue) {
-		PreparedWrite write = new PreparedWrite();
-		base.getAndUpdate(s -> write.apply(s, newValue));
-	}
-
-	@Override
-	public V getAndSet(V newValue) {
-		PreparedWrite write = new PreparedWrite();
-		return view(base.getAndUpdate(s -> write.apply(s, newValue)));
-	}
-
-	@Override
-	public V getAndUpdate(UnaryOperator<V> updateFunction) {
-		PreparedWrite write = new PreparedWrite();
-		return view(base.getAndUpdate(s -> write.apply(s, updateFunction.apply(view(s)))));
-	}
-
-	@Override
-	public V updateAndGet(UnaryOperator<V> updateFunction) {
-		PreparedWrite write = new PreparedWrite();
-		return view(base.updateAndGet(s -> write.apply(s, updateFunction.apply(view(s)))));
-	}
-
-	@Override
-	public V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction) {
-		PreparedWrite write = new PreparedWrite();
-		return view(base.getAndUpdate(s -> write.apply(s, accumulatorFunction.apply(view(s), x))));
-	}
-
-	@Override
-	public V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction) {
-		PreparedWrite write = new PreparedWrite();
-		return view(base.updateAndGet(s -> write.apply(s, accumulatorFunction.apply(view(s), x))));
-	}
-
-	/**
-	 * Compare-and-set on the view value.
-	 *
-	 * <p>Compares {@code expected} against the current view by {@link Utils#equals
-	 * value equality} (at a type-changing boundary {@code expected} is a view value
-	 * while the stored cell has a different type, and {@link #view} may mint a fresh
-	 * value on each read, so a reference CAS is not possible). On a match, writes
-	 * {@code newValue} via a single compare-and-set of the observed stored cell —
-	 * single-shot: returns {@code false} without retrying if {@code base} changed
-	 * concurrently.</p>
-	 */
-	@Override
-	public boolean compareAndSet(V expected, V newValue) {
-		S cur = base.get();
-		if (!Utils.equals(expected, view(cur))) return false;
-		return base.compareAndSet(cur, new PreparedWrite().apply(cur, newValue));
 	}
 }
