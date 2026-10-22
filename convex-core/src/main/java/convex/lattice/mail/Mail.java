@@ -1,8 +1,5 @@
 package convex.lattice.mail;
 
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -23,10 +20,15 @@ import convex.lattice.cursor.Cursors;
 /**
  * Component at the {@code :mail} region: the map of mailboxes.
  *
- * <p>Deposits go through {@link #send}, which also records the envelope in a local
- * outbox until a receipt for it is seen; {@link #sync} redeposits outstanding envelopes
- * first, so a deposit refused or forgotten elsewhere is delayed rather than lost. The
- * outbox is sender-local state, not part of the region.</p>
+ * <p>{@link #send} atomically deposits one envelope in its recipient's mailbox.
+ * That lattice entry is the complete send state: replication propagates it, and
+ * a recipient's receipt replaces it at the same key. There is no separate sender
+ * buffer. Pending envelopes and receipts are inspected through {@link #mailbox}.</p>
+ *
+ * <p>Sends participate in an enclosing transaction or fork through their supplied
+ * cursor. Sync has the ordinary component behaviour: a live view does nothing,
+ * while a fork publishes its working state. Application publication and host
+ * persistence remain separate from the local send.</p>
  *
  * <pre>{@code
  * Mail mail = Mail.create(LatticeContext.create(null, aliceKey));
@@ -49,7 +51,6 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	public static final MailLattice LATTICE=MailLattice.create(DIDKeyAuthorizer.CONVEX);
 
 	private final MailLattice lattice;
-	private final ConcurrentHashMap<Hash,MailEnvelope> outbox=new ConcurrentHashMap<>();
 
 	private Mail(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> cursor, MailLattice lattice) {
 		super(cursor);
@@ -105,40 +106,17 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	}
 
 	/**
-	 * Deposits an envelope into its recipient's mailbox and keeps it in the outbox
-	 * until a receipt is seen.
+	 * Atomically deposits an envelope into its recipient's mailbox. Repeating the
+	 * same send is idempotent; an existing receipt absorbs it. The envelope is
+	 * prepared before this call so a transaction retry reuses the same signed value.
+	 * Completion means a local update, not remote receipt or durable publication.
 	 *
 	 * @param envelope Envelope to send
 	 * @return Envelope hash
 	 */
 	public Hash send(MailEnvelope envelope) {
 		mailbox(envelope.to()).deposit(envelope);
-		outbox.put(envelope.hash(),envelope);
 		return envelope.hash();
-	}
-
-	/** Hashes of sent envelopes with no receipt yet. */
-	public Set<Hash> outbox() {
-		outbox.values().removeIf(e -> mailbox(e.to()).isReceived(e));
-		return Set.copyOf(outbox.keySet());
-	}
-
-	/** Deposits every outstanding envelope again. A receipted entry absorbs the deposit. */
-	public void redeposit() {
-		for (MailEnvelope envelope:outbox.values()) {
-			Mailbox mailbox=mailbox(envelope.to());
-			if (!mailbox.isReceived(envelope)) mailbox.deposit(envelope);
-		}
-	}
-
-	/**
-	 * Redeposits outstanding envelopes, then publishes as the base component does. For
-	 * a lightweight view the redeposit is the only effect.
-	 */
-	@Override
-	public AHashMap<ACell,Index<ABlob,SignedData<ACell>>> sync() {
-		redeposit();
-		return super.sync();
 	}
 
 	/** Creates an isolated working copy, merged back with the region lattice on sync. */

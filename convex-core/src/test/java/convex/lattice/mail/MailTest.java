@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
-import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -33,9 +33,10 @@ import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 
-/** The mail components: send, open, receive, outbox and hosting. */
+/** The mail components: atomic sends, open, receive and hosting. */
 public class MailTest {
 
 	static final AKeyPair ALICE=AKeyPair.createSeeded(42001);
@@ -63,13 +64,107 @@ public class MailTest {
 		return ((AHashMap<Keyword,ACell>)message.payload()).get(MailEnvelope.CONTENT).toString();
 	}
 
+	/** A batch send commits all recipient entries together; no send state lives on the draft instance. */
+	@Test void sendsCommitTogetherAndSurviveRebinding() {
+		Mail mail=Mail.create(context(ALICE,1000));
+		var first=aliceToBob(1000,"one");
+		var second=MailEnvelope.plain(ALICE,CAROL_DID,ALICE_DID,1001,Strings.create("two"));
+		var before=mail.cursor().get();
+		mail.transact(draft -> {
+			draft.send(first);
+			draft.send(second);
+			assertSame(before,mail.cursor().get());
+		});
+		assertEquals(2,mail.cursor().get().count());
+		Mail rebound=mail.withCursor(mail.cursor());
+		assertEquals(List.of(first),rebound.mailbox(BOB_DID).deposited());
+		assertEquals(List.of(second),rebound.mailbox(CAROL_DID).deposited());
+		// A fresh component over a saved snapshot needs no separate sender state.
+		Mail restored=Mail.connect(Cursors.root(mail.cursor().get()),Mail.LATTICE,mail.getContext());
+		assertEquals(List.of(first),restored.mailbox(BOB_DID).deposited());
+		var committed=mail.cursor().get();
+		mail.send(first);
+		assertSame(committed,mail.cursor().get(),"repeated sends must not duplicate a deposit");
+	}
+
+	@Test void abortedSendsLeaveNoStateToPublish() {
+		Mail mail=Mail.create(context(ALICE,1000));
+		var envelope=aliceToBob(1000,"abandoned");
+		var before=mail.cursor().get();
+		assertThrows(IllegalStateException.class,() -> mail.transact(draft -> {
+			draft.send(envelope);
+			throw new IllegalStateException("abort");
+		}));
+		mail.sync();
+		assertSame(before,mail.cursor().get());
+		assertTrue(mail.mailbox(BOB_DID).deposited().isEmpty());
+	}
+
+	/** A forced CAS conflict retries the same envelope without duplicating it or leaking the failed attempt. */
+	@Test void retryKeepsOnlyCommittedSends() {
+		var envelope=aliceToBob(1000,"retry");
+		var abandoned=aliceToBob(1001,"first attempt only");
+		var concurrent=MailEnvelope.plain(ALICE,CAROL_DID,ALICE_DID,1002,Strings.create("concurrent"));
+		var commits=new AtomicInteger();
+		var root=new Root<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>>(Mail.LATTICE.zero()) {
+			@Override public boolean compareAndSet(AHashMap<ACell,Index<ABlob,SignedData<ACell>>> expected,
+					AHashMap<ACell,Index<ABlob,SignedData<ACell>>> value) {
+				if (commits.incrementAndGet()==1) {
+					// Another writer deposits before the first transaction can commit.
+					super.set(expected.assoc(CAROL_DID,Index.create(concurrent.key(),concurrent.signed())));
+					return false;
+				}
+				return super.compareAndSet(expected,value);
+			}
+		};
+		Mail mail=Mail.connect(root,Mail.LATTICE,context(ALICE,1000));
+		var attempts=new AtomicInteger();
+		mail.transact(draft -> {
+			draft.send(envelope);
+			if (attempts.incrementAndGet()==1) draft.send(abandoned);
+		});
+		assertEquals(2,attempts.get());
+		assertEquals(List.of(envelope),mail.mailbox(BOB_DID).deposited());
+		assertEquals(List.of(concurrent),mail.mailbox(CAROL_DID).deposited());
+	}
+
+	/** The mailbox is the sole send state; sync cannot recreate a deliberately removed deposit. */
+	@Test void liveSyncDoesNotRecreateRemovedDeposits() {
+		Mail mail=Mail.create(context(ALICE,1000));
+		mail.send(aliceToBob(1000,"removed"));
+		var empty=Mail.LATTICE.zero();
+		mail.cursor().set(empty);
+		mail.sync();
+		assertSame(empty,mail.cursor().get());
+	}
+
+	/** Fork publication reconciles sends and receipts through the same lattice entry. */
+	@Test void forkedSendsPublishOnceAndCannotResurrectReceiptedMail() {
+		Mail mail=Mail.create(context(ALICE,1000));
+		var envelope=aliceToBob(1000,"fork");
+		var fork=mail.fork();
+		fork.send(envelope);
+		assertTrue(mail.mailbox(BOB_DID).deposited().isEmpty());
+		fork.sync();
+		assertEquals(List.of(envelope),mail.mailbox(BOB_DID).deposited());
+		Mail bob=Mail.connect(mail.cursor(),Mail.LATTICE,context(BOB,2000));
+		bob.mailbox(BOB_DID).receive(envelope);
+		var next=aliceToBob(1001,"next");
+		fork.send(next);
+		fork.sync();
+		assertTrue(mail.mailbox(BOB_DID).isReceived(envelope));
+		assertEquals(List.of(next),mail.mailbox(BOB_DID).deposited());
+		assertSame(mail.cursor().get(),fork.sync());
+	}
+
 	@Test
 	public void testSendOpenReceive() {
 		// One region shared by both parties: a node holding Bob's mailbox
 		Mail alice=Mail.create(context(ALICE,1000));
 		MailEnvelope envelope=aliceToBob(1000,"hello bob");
 		Hash hash=alice.send(envelope);
-		assertEquals(Set.of(hash),alice.outbox());
+		assertEquals(envelope.hash(),hash);
+		assertEquals(List.of(envelope),alice.mailbox(BOB_DID).deposited());
 
 		Mail bob=Mail.connect(alice.cursor(),Mail.LATTICE,context(BOB,2000));
 		Mailbox inbox=bob.mailbox(BOB_DID);
@@ -92,13 +187,13 @@ public class MailTest {
 		assertEquals(BOB.getAccountKey(),receipts.get(0).signed().getAccountKey());
 		assertTrue(inbox.deposited().isEmpty());
 		assertTrue(inbox.isReceived(envelope));
-		assertTrue(alice.outbox().isEmpty());
+		assertTrue(alice.mailbox(BOB_DID).isReceived(envelope));
 
 		// A later deposit of the same envelope is absorbed by the receipt
 		alice.mailbox(BOB_DID).deposit(envelope);
 		assertTrue(inbox.deposited().isEmpty());
 		alice.send(envelope);
-		assertTrue(alice.outbox().isEmpty());
+		assertTrue(alice.mailbox(BOB_DID).isReceived(envelope));
 		assertEquals(1,inbox.receipts().size());
 	}
 
@@ -112,7 +207,8 @@ public class MailTest {
 		alice.send(second);
 		Mail bob=Mail.connect(alice.cursor(),Mail.LATTICE,context(BOB,2000));
 		MailReceipt receipt=bob.mailbox(BOB_DID).receive(first).get(0);
-		assertEquals(Set.of(second.hash()),alice.outbox());
+		assertTrue(alice.mailbox(BOB_DID).isReceived(first));
+		assertEquals(List.of(second),alice.mailbox(BOB_DID).deposited());
 
 		// A peer files Bob's genuine receipt under the second message's key. The register
 		// is bound to its key, so the receipt is invalid there and the message survives
@@ -122,7 +218,8 @@ public class MailTest {
 		assertSame(before,alice.cursor().updateAndGet(own -> Mail.LATTICE.merge(own,attack)));
 		assertEquals(List.of(second),bob.mailbox(BOB_DID).deposited());
 		assertFalse(bob.mailbox(BOB_DID).isReceived(second));
-		assertEquals(Set.of(second.hash()),alice.outbox());
+		assertTrue(alice.mailbox(BOB_DID).isReceived(first));
+		assertEquals(List.of(second),alice.mailbox(BOB_DID).deposited());
 
 		// Nor does it take root in an empty mailbox
 		assertEquals(0,Mail.LATTICE.merge(Mail.LATTICE.zero(),attack).get(BOB_DID).count());
@@ -203,14 +300,14 @@ public class MailTest {
 		assertEquals(1,inbox.open(BOB_READS).size());
 		inbox.receive(inbox.deposited());
 
-		// Alice's node merges Bob's region: the receipt replaces the body and clears her outbox
-		assertEquals(Set.of(envelope.hash()),alice.outbox());
+		// Alice's node merges Bob's region: the receipt replaces the body in the same entry
+		assertEquals(List.of(envelope),alice.mailbox(BOB_DID).deposited());
 		alice.cursor().updateAndGet(own -> Mail.LATTICE.merge(own,bob.cursor().get()));
-		assertTrue(alice.outbox().isEmpty());
+		assertTrue(alice.mailbox(BOB_DID).isReceived(envelope));
 		assertTrue(alice.mailbox(BOB_DID).deposited().isEmpty());
 		assertEquals(1,alice.mailbox(BOB_DID).receipts().size());
 
-		// Redeposit on sync changes nothing once the receipt is held
+		// Live sync leaves the receipt unchanged
 		alice.sync();
 		assertEquals(bob.cursor().get(),alice.cursor().get());
 	}

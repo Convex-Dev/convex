@@ -289,12 +289,13 @@ desired = L ∪ P ∪ F(L) ∪ C ∪ O
 | `P` | DIDs pinned by the operator | `pinMailbox` |
 | `F(L)` | direct active follows of local users | the recipient's `:social` slot, via `SocialHelpers.computeFollowSet`; one hop, as for social |
 | `C` | `did:key` of each node key currently authenticated as a peer | the propagator's verified connections; opt-in through `storeMailForPeers(true)` |
-| `O` | recipients of local users' unreceived outgoing envelopes | the local outbox |
+| `O` | recipients of local users' unreceived outgoing envelopes | deposited entries in held mailboxes, selected by local signing keys |
 
 `O` is what makes the sender's node a courier: the mailbox is held until the
 receipt arrives or the envelope ages out of the window, then leaves the desired
 set. The desired set is bounded (`maxDesiredMailboxes`) and recomputed when any
-source changes.
+source changes. This is a derived view of committed mailbox entries, not a second
+store of envelopes. Match local signing keys, not an unverified `from` claim.
 
 ### Admission
 
@@ -323,8 +324,10 @@ window (receipts a skew allowance later than envelopes), and drop whole slots th
 leave the desired set, as the social policy does for unfollowed owners. An
 operator may also cap entries per mailbox; a cap is a retention choice with no
 lattice meaning, and a deposit dropped by one node is recoverable from any other
-that kept it, or from the sender's outbox. Logical retention is the projected
-root; Etch reclamation follows normal store policy.
+that kept it, including the sender's copy of that mailbox. Removing the last
+retained copy deliberately discards that deposit; sync does not recreate it from
+a hidden buffer. Logical retention is the projected root; Etch reclamation follows
+normal store policy.
 
 ### Replication
 
@@ -341,7 +344,6 @@ and otherwise relies on gossip. Nothing here needs new transport: path-scoped
  ─────────────            ──────────────────────        ───────────────          ────────────
  compose, encrypt to
  Bob's key, sign   ──►  deposit [:mail bob]
-                         outbox += key
                          Bob ∈ desired (O)       ──►   admit, merge             (offline)
                                                        ...
                                                        pull [:mail bob] ◄──  connect
@@ -349,7 +351,7 @@ and otherwise relies on gossip. Nothing here needs new transport: path-scoped
                                                                            inner :to/:from
                                                                            sign receipt   ──► merge; body gone
                          merge receipt ◄── gossip ◄──  publish
-                         body gone; outbox -= key
+                         receipt replaces body
                          Bob ∉ desired
  receipt seen: delivered
 ```
@@ -370,9 +372,18 @@ delivery queue, not a store.
 seen before the envelope ages out of the window means not delivered: the sender
 resends with a fresh `issued-at` and the same `:id`. A resend of a message whose
 receipt was delivered but has since expired is a duplicate the recipient drops by
-`:id`. The outbox holds the envelope until a receipt is seen or the window
-passes, redepositing it on each sync meanwhile. This is at-least-once delivery,
+`:id`. The sender holds the deposited entry in its local copy of the recipient's
+mailbox until a receipt replaces it or retention removes it. Ordinary replication
+propagates that state; sync does not redeposit envelopes. Repeated delivery is
 idempotent by hash on the lattice and by `:id` at the application.
+
+`send` stores the envelope once, at `[:mail recipient entry-key]`. It uses the
+mailbox's atomic cursor update and participates in any enclosing transaction or
+fork. A successful transaction commits all its sends; an aborted attempt leaves
+none, and retries reuse envelopes prepared before the callback. No extra sender
+state needs committing, copying into a fork or restoring after restart. Pending
+envelopes and delivery receipts are read from the mailbox itself. Local commit,
+application publication, host persistence and remote receipt are distinct steps.
 
 ## Key API surface
 
@@ -402,9 +413,8 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell, Index<ABlob, S
     static Mail create(LatticeContext context)               // standalone root
     static Mail connect(ALatticeApplication<?> app, LatticeContext context)
     Mailbox mailbox(AString did)                             // view of any mailbox
-    Hash send(MailEnvelope envelope)                         // deposits, records in the outbox, redeposits on sync until received
+    Hash send(MailEnvelope envelope)                         // one atomic deposit in the recipient mailbox
     MailEnvelope.Builder compose(AString from, AString to)   // resolves the recipient key, encrypts, signs with the context
-    Set<Hash> outbox()                                       // unreceived local sends within the window
     Mail fork(); void sync();
 
 public final class Mailbox extends ALatticeComponent<Index<ABlob, SignedData<ACell>>>
@@ -446,7 +456,7 @@ P2PNode
 P2PLattice
     NODE_ROOT  gains  :mail → Mail.LATTICE       // a node with an authoriser composes MailLattice.create(authorizer)
 
-MailReplicationPolicy (package-private)          // desired set, ingress and publication filters, outbox courier, retention
+MailReplicationPolicy (package-private)          // desired set, ingress and publication filters, mailbox courier, retention
 ```
 
 ### Catalogue entry
@@ -548,7 +558,7 @@ Network, in `convex-integration` alongside the social and DLFS stories:
 - Alice's node, Bob's home node and Bob's device, with Bob offline when Alice
   sends. Alice's node couriers the mailbox; Bob's node connects and pulls it;
   Bob's device opens and receipts; the receipt reaches Alice's node, which drops
-  the body and clears its outbox. Each step waits on a connect, pull, publication
+  the body at the same entry. Each step waits on a connect, pull, publication
   or upgrade future. No sleeps; port `0`.
 - A public node with the sender filter on: an envelope from a key cached in the
   recipient's follow records is admitted, a stranger's is rejected at ingress,
@@ -661,8 +671,6 @@ possible later if mail grows a product surface of its own.
 
 - Whether to add the recipient-signed horizon from the outset, for bulk abandon
   of old unconfirmed mail, or wait until a need appears.
-- Where the outbox persists for a hosted sender: `:local` under the node key is
-  the natural slot; a standalone `Mail` keeps it in memory unless given a store.
 - Whether a sender may put a `:prev` reference inside the plaintext as a gap hint
   the recipient's client can display, without the lattice depending on it.
 - How `DIDKeyResolver` obtains keys for `did:web` recipients: through the same

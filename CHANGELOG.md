@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Mail.send` now holds all send state in one atomic recipient-mailbox deposit. Removed the separate in-memory outbox, `outbox()`, `redeposit()` and automatic redeposit on sync. Inspect mailbox deposits and receipts for delivery state; sends now have no extra mutable state outside transactions and forks.
+
 - `SetComponent` reports non-set storage with an explicit state error and leaves it unchanged. Set edits preserve unfamiliar members without imposing a runtime element schema.
 
 - Fork sync completes reconciliation and signing before its publication commit. Concurrent working edits are ordered around sync, and a failed merge or preparation leaves the fork value and baseline unchanged without publishing. Forks now always support exclusive transactions over their private working state.

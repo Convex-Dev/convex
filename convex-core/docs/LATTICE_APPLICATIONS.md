@@ -1346,3 +1346,17 @@ Worked examples:
 - [CAD024 Data Lattice](https://docs.convex.world/docs/cad/data_lattice) and [CAD036 Lattice Node](https://docs.convex.world/docs/cad/lattice_node) — lattice model and hosting.
 - [CAD038 Lattice Authorisation](https://docs.convex.world/docs/cad/lattice_auth) — signer authorisation.
 - [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) and [LATTICE_REGIONS.md](LATTICE_REGIONS.md).
+
+### Atomic mail sends
+
+`Mail.send(envelope)` performs one atomic deposit in the recipient's mailbox.
+The deposited lattice entry is the complete send state. There is no separate
+outbox or automatic redeposit step; pending envelopes and receipts are read with
+`mail.mailbox(recipient).deposited()` and `isReceived(envelope)`.
+
+Prepare signed envelopes before a transaction callback, then use
+`mail.transact(draft -> draft.send(envelope))` to include a send in an atomic batch.
+All sends commit or abort with the draft. Repeated sends of the same envelope are
+idempotent, and a receipt absorbs later deposits at that key. Forks use the same
+state and merge rule. Live `Mail.sync()` is a no-op; a fork's sync publishes its
+working state. Publication, persistence and receipt are separate from local commit.

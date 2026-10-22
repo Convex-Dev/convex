@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,7 @@ import convex.node.NodeServer;
 /**
  * Mail delivered between two nodes: Alice deposits on her node, Bob's node pulls only
  * his mailbox path, Bob receipts, and Alice's node pulls the receipt back, which replaces
- * the body and clears her outbox. Every step waits on a connection, pull or announce
+ * the body at the same lattice entry. Every step waits on a connection, pull or announce
  * future; nothing sleeps.
  */
 class MailDeliveryTest {
@@ -174,9 +173,10 @@ class MailDeliveryTest {
 			assertEquals(1,bob.publishedRegion().count());
 
 			// Alice's node pulls the mailbox back: the receipt replaces the body
-			assertEquals(Set.of(toBob.hash(),toCarol.hash()),aliceMail.outbox());
+			assertEquals(List.of(toBob),aliceMail.mailbox(BOB_DID).deposited());
+			assertEquals(List.of(toCarol),aliceMail.mailbox(CAROL_DID).deposited());
 			alice.pullMailbox(bob,BOB_NODE,BOB_DID);
-			assertEquals(Set.of(toCarol.hash()),aliceMail.outbox());
+			assertTrue(aliceMail.mailbox(BOB_DID).isReceived(toBob));
 			assertTrue(aliceMail.mailbox(BOB_DID).deposited().isEmpty());
 			assertEquals(1,aliceMail.mailbox(BOB_DID).receipts().size());
 			assertEquals(1,aliceMail.mailbox(CAROL_DID).deposited().size());
