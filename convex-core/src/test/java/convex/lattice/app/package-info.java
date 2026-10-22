@@ -11,7 +11,9 @@
  *
  * <p>Start with {@link convex.lattice.app.FavouritesExample} for a complete small
  * domain model: an owner index, signed records, {@link convex.lattice.Timestamped}
- * ordering and an embedded {@link convex.lattice.SetComponent}. Its application
+ * ordering and an embedded {@link convex.lattice.SetComponent}. A plain
+ * {@link convex.lattice.SingleRegion} supplies application routing and lifecycle;
+ * no domain application subclass is needed. The tests supply the clock. Its application
  * tests cover shared edits, incoming verification, replay, ties and publication;
  * its persistence test adds Etch without changing the domain components.
  * Relay tests preserve unfamiliar signed payloads, while local operations interpret

@@ -94,7 +94,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	@Override
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 		Index<Keyword,ACell> wanted=(socialPolicy==null)?other:socialPolicy.projectRoot(other);
-		Index<Keyword,ACell> result=cursor.updateAndGet(own -> getLattice().merge(getContext(),own,wanted));
+		Index<Keyword,ACell> result=cursor().updateAndGet(own -> getLattice().merge(getContext(),own,wanted));
 		if (socialPolicy!=null) socialPolicy.recordOwners(wanted);
 		return result;
 	}

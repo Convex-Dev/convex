@@ -221,7 +221,7 @@ public class Social extends ALatticeComponent<
 		var rule=SOCIAL_LATTICE.signingFor(ownerDid);
 		var policy=getContext();
 		AForkableCursor<Index<Keyword, ACell>> userCursor =
-			SignedCursor.create(cursor.withDefault(Maps.empty()).path(ownerDid),value -> rule.sign(policy,value));
+			SignedCursor.create(cursor().withDefault(Maps.empty()).path(ownerDid),value -> rule.sign(policy,value));
 		return configured(new SocialUser(userCursor,ownerDid));
 	}
 

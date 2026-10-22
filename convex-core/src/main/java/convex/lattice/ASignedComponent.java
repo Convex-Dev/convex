@@ -41,12 +41,19 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	}
 
 	/**
-	 * Checks envelope shape only. Merge separately verifies the signature, owner
-	 * and payload; subclasses may compose domain checks over the unsigned value.
+	 * Checks envelope shape, then delegates to the optional {@link #checkPayload}
+	 * diagnostic. Merge separately verifies the signature, owner and payload under
+	 * its own acceptance policy; it does not invoke this diagnostic.
 	 */
 	@Override public AString checkValue(ACell value) {
-		return value==null || value instanceof SignedData<?>?null:
-			Strings.create("Expected a signed envelope");
+		if (value==null) return null;
+		if (!(value instanceof SignedData<?> signed)) return Strings.create("Expected a signed envelope");
+		return checkPayload(signed.getValue());
+	}
+
+	/** Optional domain compatibility check. Receives the untrusted payload without a generic cast. */
+	protected AString checkPayload(ACell value) {
+		return null;
 	}
 
 	/** Verifies and merges a complete envelope, retaining its signature when selected. */
@@ -59,7 +66,7 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	@SuppressWarnings("unchecked")
 	@Override
 	public V mergeAt(ACell incoming,ACell... path) {
-		if (path.length!=0) return cursor.get();
+		if (path.length!=0) return cursor().get();
 		if (incoming!=null && !(incoming instanceof SignedData<?>)) {
 			throw new IllegalArgumentException("Signed component requires a complete envelope");
 		}

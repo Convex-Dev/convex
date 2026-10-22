@@ -71,7 +71,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		super(source);
 		this.name=source.name;
 		this.store=source.store;
-		this.location=DLFSLocation.at(cursor);
+		this.location=DLFSLocation.at(cursor());
 		this.fileSystem=new HostedFileSystem(this);
 	}
 

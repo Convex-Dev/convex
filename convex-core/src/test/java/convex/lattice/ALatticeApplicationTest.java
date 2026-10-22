@@ -98,7 +98,7 @@ public class ALatticeApplicationTest {
 		}
 
 		void add(CVMLong value) {
-			cursor.updateAndGet(items -> (items==null?ITEMS_LATTICE.zero():items).include(value));
+			cursor().updateAndGet(items -> (items==null?ITEMS_LATTICE.zero():items).include(value));
 		}
 	}
 
@@ -108,7 +108,7 @@ public class ALatticeApplicationTest {
 		AtomicInteger calls=new AtomicInteger();
 		var app=new ALatticeApplication<Index<Keyword,ACell>>(host) {
 			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-				return cursor.updateAndGet(own -> LATTICE.merge(getContext(),own,other));
+				return cursor().updateAndGet(own -> LATTICE.merge(getContext(),own,other));
 			}
 			@Override protected void beforeSync() {
 				new Items(this).add(CVMLong.ONE);

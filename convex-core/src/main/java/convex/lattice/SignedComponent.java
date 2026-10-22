@@ -75,8 +75,8 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * @return Current unsigned value after merging, or unchanged on rejection
 	 */
 	public V merge(SignedData<V> incoming) {
-		if (incoming==null || lattice.merge(null,incoming)==null) return cursor.get();
-		return cursor.updateAndGet(own -> lattice.getValueLattice().merge(own,incoming.getValue()));
+		if (incoming==null || lattice.merge(null,incoming)==null) return cursor().get();
+		return cursor().updateAndGet(own -> lattice.getValueLattice().merge(own,incoming.getValue()));
 	}
 
 	/**
@@ -87,7 +87,7 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public V mergeAt(ACell incoming,ACell... path) {
-		if (path.length!=0) return cursor.get();
+		if (path.length!=0) return cursor().get();
 		if (incoming!=null && !(incoming instanceof SignedData<?>)) {
 			throw new IllegalArgumentException("Signed component requires a complete envelope");
 		}

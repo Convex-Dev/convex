@@ -90,7 +90,7 @@ public class DLFSApplication<V extends ACell> extends LatticeApplication<V> {
 	/** Delegates an incoming root to the lattice merge under this application's context. */
 	@Override
 	public V merge(V other) {
-		return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 	}
 
 	/**
@@ -100,7 +100,7 @@ public class DLFSApplication<V extends ACell> extends LatticeApplication<V> {
 	 */
 	public DLFSRegion dlfs() {
 		AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> region=resolve(regionPath);
-		return configured(DLFSRegion.connect(region,store,DLFSLocation.at(cursor,regionPath)));
+		return configured(DLFSRegion.connect(region,store,DLFSLocation.at(cursor(),regionPath)));
 	}
 
 	/**

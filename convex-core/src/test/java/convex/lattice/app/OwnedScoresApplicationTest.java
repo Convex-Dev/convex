@@ -81,7 +81,7 @@ class OwnedScoresApplicationTest {
 			super(destination,rule,signer::signData);
 		}
 		/** A lower or equal observation leaves the established value and signature unchanged. */
-		void record(long value) { cursor.updateAndGet(old -> MaxLattice.INSTANCE.merge(old,CVMLong.create(value))); }
+		void record(long value) { cursor().updateAndGet(old -> MaxLattice.INSTANCE.merge(old,CVMLong.create(value))); }
 	}
 
 	/** Different authorised signers update one owner slot; a replica verifies and keeps the winner's envelope. */

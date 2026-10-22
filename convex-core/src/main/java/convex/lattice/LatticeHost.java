@@ -109,9 +109,9 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 */
 	public V merge(V other) {
 		List<ALatticeComponent<V>> configured=applications;
-		if (configured==null) return cursor.get();
+		if (configured==null) return cursor().get();
 		for (ALatticeComponent<V> application:configured) application.merge(other);
-		return cursor.get();
+		return cursor().get();
 	}
 
 	/**
@@ -126,9 +126,9 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 */
 	public V mergeAt(ACell value, ACell... path) {
 		List<ALatticeComponent<V>> configured=applications;
-		if (configured==null) return cursor.get();
+		if (configured==null) return cursor().get();
 		for (ALatticeComponent<V> application:configured) application.mergeAt(value,path);
-		return cursor.get();
+		return cursor().get();
 	}
 
 	/**
@@ -164,7 +164,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * @throws IOException If persistence fails
 	 */
 	public V persist() throws IOException {
-		return persist(cursor.get());
+		return persist(cursor().get());
 	}
 
 	/** Publishes one snapshot, persisting it if a store is present. */
@@ -183,10 +183,10 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 		Objects.requireNonNull(publish);
 		syncLock.lock();
 		try {
-			V snapshot=cursor.get();
+			V snapshot=cursor().get();
 			V published=publish.apply(snapshot);
 			// Persisted references may replace the snapshot; concurrent edits stay pending.
-			cursor.compareAndSet(snapshot,published);
+			cursor().compareAndSet(snapshot,published);
 			return published;
 		} finally {
 			syncLock.unlock();

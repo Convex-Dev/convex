@@ -79,7 +79,7 @@ public final class SharedApplicationsExample {
 
 		/** Incoming roots merge through this application's lattice. */
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 		}
 
 		/** A user's feed in the staged region; edits stay private until {@link #sync()}. */

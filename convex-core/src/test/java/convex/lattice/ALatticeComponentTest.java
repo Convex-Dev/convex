@@ -40,11 +40,11 @@ public class ALatticeComponentTest {
 
 		@Override
 		public ASet<ACell> merge(ASet<ACell> incoming) {
-			return cursor.updateAndGet(own -> own.includeAll(incoming));
+			return cursor().updateAndGet(own -> own.includeAll(incoming));
 		}
 
 		void add(ACell value) {
-			cursor.updateAndGet(set->set.include(value));
+			cursor().updateAndGet(set->set.include(value));
 		}
 	}
 

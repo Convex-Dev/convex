@@ -209,7 +209,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return Array of database names
 	 */
 	public String[] getDatabaseNames() {
-		AHashMap<AString, Index<Keyword, ACell>> map = cursor.get();
+		AHashMap<AString, Index<Keyword, ACell>> map = cursor().get();
 		if (map == null) return new String[0];
 		java.util.List<String> names = new java.util.ArrayList<>();
 		for (var entry : map.entrySet()) {

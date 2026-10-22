@@ -264,8 +264,8 @@ class KeyedRegionsTest {
 			@Override public ACell merge(ACell incoming) {
 				deliveries.incrementAndGet();
 				// A domain rule, deliberately different from any inferred lattice merge.
-				if (incoming==null || CVMLong.TWO.equals(incoming)) cursor.set(incoming);
-				return cursor.get();
+				if (incoming==null || CVMLong.TWO.equals(incoming)) cursor().set(incoming);
+				return cursor().get();
 			}
 		});
 		app.merge(Index.of(A,CVMLong.ONE));

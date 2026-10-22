@@ -60,7 +60,7 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	@Override
 	public V merge(V incoming) {
-		return cursor.updateAndGet(own -> lattice.merge(getContext(),own,incoming));
+		return cursor().updateAndGet(own -> lattice.merge(getContext(),own,incoming));
 	}
 
 	/** Reconciles declared lattice values while preserving unrelated destination keys. */
@@ -72,7 +72,7 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 	@Override
 	protected V mergeAtPath(ACell value,ACell... path) {
 		V reduced=LatticeOps.reduce(lattice,value,path);
-		return reduced==null?cursor.get():merge(reduced);
+		return reduced==null?cursor().get():merge(reduced);
 	}
 
 

@@ -84,7 +84,7 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 			Keyword key,RegionFactory<V,C> factory) {
 		checkRegistration(key);
 		Objects.requireNonNull(factory,"Region factory must not be null");
-		AForkableCursor<V> destination=ProjectionCursor.create(cursor,
+		AForkableCursor<V> destination=ProjectionCursor.create(cursor(),
 			value -> value==null?null:(V)value.get(key),
 			(value,child) -> {
 				ACell previous=value==null?null:value.get(key);
@@ -135,7 +135,7 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 				if (incoming.containsKey(key)) entry.getValue().mergeAt(incoming.get(key));
 			}
 		}
-		return cursor.get();
+		return cursor().get();
 	}
 
 	/** Resolves keys with the same blob comparison as the underlying index. */
@@ -156,7 +156,7 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 		if (path.length==0) return super.mergeAt(value,path);
 		ALatticeComponent<?> component=child(path[0]);
 		if (component!=null) component.mergeAt(value,Arrays.copyOfRange(path,1,path.length));
-		return cursor.get();
+		return cursor().get();
 	}
 
 	/** Freezes registrations before entering the application lifecycle. */

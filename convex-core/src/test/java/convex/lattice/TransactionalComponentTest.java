@@ -41,9 +41,9 @@ class TransactionalComponentTest {
 			return new Counter(cursor);
 		}
 		void increment() {
-			cursor.updateAndGet(m -> m.assoc(COUNT,CVMLong.create(count(m)+1)));
+			cursor().updateAndGet(m -> m.assoc(COUNT,CVMLong.create(count(m)+1)));
 		}
-		long count() { return count(cursor.get()); }
+		long count() { return count(cursor().get()); }
 		static long count(AHashMap<Keyword,ACell> map) {
 			return ((CVMLong)map.get(COUNT)).longValue();
 		}

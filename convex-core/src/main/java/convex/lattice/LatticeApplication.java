@@ -46,7 +46,7 @@ public class LatticeApplication<V extends ACell> extends ALatticeApplication<V> 
 	/** Delegates to the lattice merge under this application's context. */
 	@Override
 	public V merge(V other) {
-		return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 	}
 
 	/** The explicitly supplied implementation; ordinary applications need no lattice definition. */
@@ -54,7 +54,7 @@ public class LatticeApplication<V extends ACell> extends ALatticeApplication<V> 
 
 	/** Navigates using this adapter's declared container types. */
 	public <T extends ACell> AForkableCursor<T> resolve(ACell... path) {
-		return LatticeComponent.resolve(cursor,lattice,path);
+		return LatticeComponent.resolve(cursor(),lattice,path);
 	}
 
 	@Override
@@ -65,7 +65,7 @@ public class LatticeApplication<V extends ACell> extends ALatticeApplication<V> 
 	@Override
 	protected V mergeAtPath(ACell value,ACell... path) {
 		V reduced=LatticeOps.reduce(lattice,value,path);
-		return reduced==null?cursor.get():merge(reduced);
+		return reduced==null?cursor().get():merge(reduced);
 	}
 
 }

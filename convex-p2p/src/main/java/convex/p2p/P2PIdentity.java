@@ -28,12 +28,12 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 	/** Returns the published identity record, or {@code null}. */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword,ACell> getIdentity() {
-		return (AHashMap<Keyword,ACell>) cursor.get();
+		return (AHashMap<Keyword,ACell>) cursor().get();
 	}
 
 	/** Replaces the identity record in this component's working cursor. */
 	public void setIdentity(AHashMap<Keyword,ACell> identity) {
-		cursor.set(identity);
+		cursor().set(identity);
 	}
 
 	/** Publishes name and operated-node keys with an explicit timestamp. */

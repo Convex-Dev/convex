@@ -61,7 +61,7 @@ public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
 	// Inspect foreign storage as cells before the Java generic cast to ASet.
 	@SuppressWarnings("unchecked")
 	private AForkableCursor<ACell> values() {
-		return (AForkableCursor<ACell>)(AForkableCursor<?>)cursor;
+		return (AForkableCursor<ACell>)(AForkableCursor<?>)cursor();
 	}
 
 	private ASet<V> requireSet(ACell value) {

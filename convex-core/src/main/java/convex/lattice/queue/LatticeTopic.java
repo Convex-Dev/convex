@@ -71,7 +71,7 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Queue for the specified partition
 	 */
 	public LatticeQueue partition(ACell id) {
-		AForkableCursor<AVector<ACell>> partCursor = cursor.withDefault(Index.none()).<AHashMap<ACell,AVector<ACell>>>path(TopicLattice.KEY_PARTITIONS)
+		AForkableCursor<AVector<ACell>> partCursor = cursor().withDefault(Index.none()).<AHashMap<ACell,AVector<ACell>>>path(TopicLattice.KEY_PARTITIONS)
 			.withDefault(Maps.empty()).path(id);
 		return configured(new LatticeQueue(partCursor));
 	}
@@ -83,7 +83,7 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public ACell getMeta(ACell key) {
-		AForkableCursor<Index<Keyword, ACell>> c = cursor;
+		AForkableCursor<Index<Keyword, ACell>> c = cursor();
 		Index<Keyword, ACell> state = c.get();
 		AHashMap<ACell, ACell> meta = TopicLattice.getMeta(state);
 		return meta.get(key);
@@ -94,7 +94,7 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public void setMeta(ACell key, ACell value) {
-		AForkableCursor<Index<Keyword, ACell>> c = cursor;
+		AForkableCursor<Index<Keyword, ACell>> c = cursor();
 		c.updateAndGet(state -> {
 			if (state == null) state = TopicLattice.INSTANCE.zero();
 			AHashMap<ACell, ACell> meta = TopicLattice.getMeta(state);

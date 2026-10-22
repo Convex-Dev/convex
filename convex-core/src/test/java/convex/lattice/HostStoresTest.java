@@ -69,7 +69,7 @@ public class HostStoresTest {
 			super(SetLattice.create(),host);
 		}
 		@Override public ASet<ACell> merge(ASet<ACell> other) {
-			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 		}
 	}
 

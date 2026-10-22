@@ -64,7 +64,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	 */
 	@SuppressWarnings("unchecked")
 	public boolean isFollowing(AString target) {
-		AHashMap<ACell, ACell> follows = cursor.get();
+		AHashMap<ACell, ACell> follows = cursor().get();
 		if (follows == null) return false;
 		ACell record = follows.get(target);
 		if (record instanceof AHashMap<?,?> map) {
@@ -79,7 +79,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	 * @return set of canonical base DIDs
 	 */
 	public Set<AString> getActive() {
-		return SocialHelpers.getActiveFollows(cursor.get());
+		return SocialHelpers.getActiveFollows(cursor().get());
 	}
 
 	/** Stores a signer already validated for this target DID without changing intent. */
@@ -111,7 +111,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 
 	@SuppressWarnings("unchecked")
 	private AHashMap<Keyword,ACell> getRecord(AString target) {
-		AHashMap<ACell,ACell> follows=cursor.get();
+		AHashMap<ACell,ACell> follows=cursor().get();
 		if (follows==null) return null;
 		ACell record=follows.get(target);
 		return (record instanceof AHashMap<?,?> map)
@@ -121,7 +121,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	@SuppressWarnings("unchecked")
 	private void writeField(AString target,Keyword key,ACell value) {
 		CVMLong timestamp=getContext().currentTimestamp();
-		cursor.updateAndGet(follows -> {
+		cursor().updateAndGet(follows -> {
 			ACell existing=(follows==null)?null:follows.get(target);
 			AHashMap<Keyword,ACell> record=(existing instanceof AHashMap<?,?> map)
 				?(AHashMap<Keyword,ACell>)map:convex.core.data.Maps.empty();

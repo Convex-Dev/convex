@@ -85,7 +85,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 		long timestamp=getContext().currentTimestampValue();
 		AHashMap<Keyword,ACell> entry=entryFn.apply(timestamp);
 		Blob[] keyHolder = new Blob[1];
-		cursor.updateAndGet(feed -> {
+		cursor().updateAndGet(feed -> {
 			if (feed==null) feed=SocialLattice.FEED_LATTICE.zero();
 			long ts = timestamp;
 			Blob key = SocialPost.createKey(ts);
@@ -112,7 +112,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	@SuppressWarnings("unchecked")
 	public void delete(Blob postKey) {
 		CVMLong now = getContext().currentTimestamp();
-		cursor.updateAndGet(feed -> {
+		cursor().updateAndGet(feed -> {
 			if (feed == null) return feed;
 			ACell existing = feed.get(postKey);
 			if (existing == null) return feed;
@@ -131,7 +131,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword, ACell> getPost(Blob key) {
-		Index<Blob, ACell> feed = cursor.get();
+		Index<Blob, ACell> feed = cursor().get();
 		if (feed == null) return null;
 		ACell value = feed.get(key);
 		return (value instanceof AHashMap) ? (AHashMap<Keyword, ACell>) value : null;
@@ -143,7 +143,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * @return Entry count
 	 */
 	public long count() {
-		Index<Blob, ACell> feed = cursor.get();
+		Index<Blob, ACell> feed = cursor().get();
 		return (feed != null) ? feed.count() : 0;
 	}
 

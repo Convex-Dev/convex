@@ -33,7 +33,7 @@ class SignedDomainComponentTest {
 		Count(ACursor<SignedData<AInteger>> path,SignedLattice<AInteger> rule,Function<AInteger,SignedData<AInteger>> signer) {
 			super(path,rule,signer);
 		}
-		void set(long value) { cursor.set(CVMLong.create(value)); }
+		void set(long value) { cursor().set(CVMLong.create(value)); }
 	}
 
 	@Test void directPathConstructionIsInertAndViewsShareSignedEdits() {

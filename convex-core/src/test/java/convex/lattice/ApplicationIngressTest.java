@@ -39,13 +39,13 @@ class ApplicationIngressTest {
 		App(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host) { super(lattice,host); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
-			if (ignore) return cursor.get();
-			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,incoming));
+			if (ignore) return cursor().get();
+			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,incoming));
 		}
 		@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
 			if (path.length>0) {
 				pathMerges++;
-				if (ignore) return cursor.get();
+				if (ignore) return cursor().get();
 			}
 			return super.mergeAt(value,path);
 		}
@@ -123,7 +123,7 @@ class ApplicationIngressTest {
 		Board(AForkableCursor<Index<Keyword,ACell>> cursor) { super(BOARD_LATTICE,cursor); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
-			return cursor.updateAndGet(own -> BOARD_LATTICE.merge(getContext(),own,incoming));
+			return cursor().updateAndGet(own -> BOARD_LATTICE.merge(getContext(),own,incoming));
 		}
 	}
 
@@ -180,7 +180,7 @@ class ApplicationIngressTest {
 					@SuppressWarnings("unchecked")
 					var envelope=(SignedData<ASet<ACell>>)value;
 					owned.merge(envelope);
-					return cursor.get();
+					return cursor().get();
 				}
 				return super.mergeAt(value,path);
 			}

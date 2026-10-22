@@ -34,7 +34,7 @@ import convex.lattice.cursor.ForkedCursor;
  */
 public abstract class ALatticeComponent<V extends ACell> {
 
-	protected final AForkableCursor<V> cursor;
+	private final AForkableCursor<V> cursor;
 	private volatile LatticeContext context=LatticeContext.EMPTY;
 	/** Working copy this component owns and publishes, or null for a lightweight view. */
 	private final ForkedCursor<V> owned;
@@ -98,7 +98,13 @@ public abstract class ALatticeComponent<V extends ACell> {
 		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no publication merge");
 	}
 
-	/** Returns atomic working storage. Updating it does not publish this component. */
+	/**
+	 * Returns the atomic editing view. Domain operations and children use this
+	 * accessor so an override can consistently apply policies such as timestamping.
+	 * A subclass can wrap {@code super.cursor()} during construction; constructors
+	 * must not invoke an override before its view is initialised. Updating this
+	 * cursor does not publish the component.
+	 */
 	public AForkableCursor<V> cursor() {
 		return cursor;
 	}
@@ -166,7 +172,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 		ALatticeComponent<ACell> child=child(path[0]);
 		if (child!=null) {
 			child.mergeAt(value,Arrays.copyOfRange(path,1,path.length));
-			return cursor.get();
+			return cursor().get();
 		}
 		return mergeAtPath(value,path);
 	}
@@ -191,7 +197,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 *         concurrent edits may remain pending in working storage.
 	 */
 	public V sync() {
-		return owned==null?cursor.get():owned.sync();
+		return owned==null?cursor().get():owned.sync();
 	}
 
 }

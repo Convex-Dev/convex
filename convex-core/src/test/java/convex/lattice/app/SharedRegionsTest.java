@@ -41,7 +41,7 @@ class SharedRegionsTest {
 		private final SetComponent<ACell> items;
 		Items(AForkableCursor<ASet<ACell>> destination,LatticeContext context) {
 			super(SetLattice.create(),destination,context);
-			items=new SetComponent<>(cursor);
+			items=new SetComponent<>(cursor());
 		}
 		void add(long item) { items.add(CVMLong.create(item)); }
 	}

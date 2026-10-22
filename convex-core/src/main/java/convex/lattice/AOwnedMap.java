@@ -22,7 +22,7 @@ import convex.lattice.generic.SignedLattice;
  * component authors the result. Unresolved or unauthorised owners cannot introduce data.
  *
  * <p>Domain subclasses of {@link ASignedComponent} are constructed at {@link #path}
- * with an owner-bound rule from {@link #getLattice()}. They share this map's working
+	 * with an owner-bound rule from {@link #signingFor}. They share this map's working
  * state and sign each edit. Independent drafts
  * defer signing until their own sync, which stops at this map's working state.
  * Neither opening a view nor opening a draft creates an entry. This component's
@@ -43,6 +43,9 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	}
 
 	public final AOwnerLattice<K,V,M> getLattice() { return owners; }
+
+	/** The same owner-bound rule used for delivery, publication and local authoring. */
+	public final SignedLattice<V> signingFor(K owner) { return rule(owner); }
 
 	/**
 	 * Checks container and envelope shape. Signature, owner authorisation and
@@ -69,7 +72,7 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	/** Merges verified envelopes without resolving signing capabilities. */
 	@Override
 	public M merge(M incoming) {
-		return cursor.updateAndGet(own -> owners.merge(own,incoming));
+		return cursor().updateAndGet(own -> owners.merge(own,incoming));
 	}
 
 	/** Publication conflicts use the same public merge as incoming deliveries. */
@@ -82,9 +85,9 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	@SuppressWarnings({"unchecked","rawtypes"})
 	@Override
 	protected M mergeAtPath(ACell value,ACell... path) {
-		if (path.length!=1) return cursor.get();
+		if (path.length!=1) return cursor().get();
 		SignedLattice<V> rule=owners.signingFor(path[0]);
-		if (rule==null) return cursor.get();
+		if (rule==null) return cursor().get();
 		// Keep foreign values untyped until the same entry validation as whole-map delivery.
 		AMap incoming=owners.zero();
 		return merge((M)incoming.assoc(rule.getOwner(),value));
@@ -92,7 +95,7 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 
 	/** Returns the current signed entry, or null when absent. Does not create state. */
 	public SignedData<V> get(K owner) {
-		M map=cursor.get();
+		M map=cursor().get();
 		return map==null?null:map.get(owner);
 	}
 
@@ -121,6 +124,6 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	}
 
 	private AForkableCursor<SignedData<V>> slot(SignedLattice<V> rule) {
-		return cursor.withDefault(owners.zero()).path(rule.getOwner());
+		return cursor().withDefault(owners.zero()).path(rule.getOwner());
 	}
 }

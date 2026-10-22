@@ -10,7 +10,7 @@ import convex.lattice.LatticeContext;
 public class ContextInheritanceTest {
 	private static class Component extends ALatticeComponent<CVMLong> {
 		Component(AForkableCursor<CVMLong> cursor) { super(cursor); }
-		Component view() { return configured(new Component(cursor)); }
+		Component view() { return configured(new Component(cursor())); }
 	}
 	@Test public void childrenResolvePolicyWithoutLiveInheritance() {
 		var parent=new Component(Root.create(CVMLong.ZERO));

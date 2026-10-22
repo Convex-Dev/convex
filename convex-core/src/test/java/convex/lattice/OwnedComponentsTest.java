@@ -47,7 +47,7 @@ class OwnedComponentsTest {
 		Count(ACursor<SignedData<AInteger>> destination,SignedLattice<AInteger> rule,Function<AInteger,SignedData<AInteger>> signer) {
 			super(destination,rule,signer);
 		}
-		void set(long value) { cursor.set(CVMLong.create(value)); }
+		void set(long value) { cursor().set(CVMLong.create(value)); }
 	}
 
 	private static AOwnedMap<AString,AInteger,?> collection(boolean indexed) {

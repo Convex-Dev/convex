@@ -46,7 +46,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	/** Envelopes not yet receipted, in key order (issued-at, then hash). */
 	public List<MailEnvelope> deposited() {
 		List<MailEnvelope> list=new ArrayList<>();
-		Index<ABlob,SignedData<ACell>> index=cursor.get();
+		Index<ABlob,SignedData<ACell>> index=cursor().get();
 		if (index!=null) index.forEach((key,value) -> {
 			MailEnvelope envelope=MailEnvelope.parse(value);
 			if (envelope!=null) list.add(envelope);
@@ -57,7 +57,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	/** Receipts held, in key order. */
 	public List<MailReceipt> receipts() {
 		List<MailReceipt> list=new ArrayList<>();
-		Index<ABlob,SignedData<ACell>> index=cursor.get();
+		Index<ABlob,SignedData<ACell>> index=cursor().get();
 		if (index!=null) index.forEach((key,value) -> {
 			MailReceipt receipt=MailReceipt.parse(value);
 			if (receipt!=null) list.add(receipt);
@@ -72,7 +72,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 
 	/** True iff the entry under this key is a receipt. */
 	public boolean isReceived(ABlob key) {
-		Index<ABlob,SignedData<ACell>> index=cursor.get();
+		Index<ABlob,SignedData<ACell>> index=cursor().get();
 		return index!=null && MailReceipt.parse(index.get(key))!=null;
 	}
 
@@ -156,7 +156,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 
 	private void merge(ABlob key, SignedData<ACell> value) {
 		Index<ABlob,SignedData<ACell>> single=Index.create(key,value);
-		cursor.updateAndGet(index -> lattice.merge((index==null)?lattice.zero():index,single));
+		cursor().updateAndGet(index -> lattice.merge((index==null)?lattice.zero():index,single));
 	}
 
 	/** Creates an isolated working copy, merged back with the mailbox lattice on sync. */

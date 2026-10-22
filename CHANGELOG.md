@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Lattice components use `cursor()` as the single editing access point; the backing field is now private, so subclass operations honour cursor wrappers. `ASignedComponent.checkPayload` supports optional unsigned domain diagnostics, and owned maps expose `signingFor(owner)` directly.
+
 - `PathCursor` shares atomic operations with other transforming cursor views. Update-and-return operations now return the stored path value after enclosing write policies such as stamping.
 
 - Projection, signing, stamping and default cursor views share atomic operations through `ATransformCursor`. Forks now publish through ordinary cursor views; removed the fork's read/prepare overload and the corresponding component constructor. Compose `SignedCursor.create(destination, signer).fork(merge)` for unsigned working state with signed publication.

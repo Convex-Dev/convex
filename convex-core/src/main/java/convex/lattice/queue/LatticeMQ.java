@@ -84,7 +84,7 @@ public class LatticeMQ extends ALatticeComponent<AHashMap<ACell, Index<Keyword, 
 	 * @return Topic handle
 	 */
 	public LatticeTopic topic(ACell name) {
-		return configured(new LatticeTopic(cursor.withDefault(Maps.empty()).path(name)));
+		return configured(new LatticeTopic(cursor().withDefault(Maps.empty()).path(name)));
 	}
 
 	/**

@@ -43,7 +43,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return configured(new Feed(cursor.withDefault(Index.none()).path(SocialLattice.KEY_FEED),ownerDid));
+		return configured(new Feed(cursor().withDefault(Index.none()).path(SocialLattice.KEY_FEED),ownerDid));
 	}
 
 	/**
@@ -56,7 +56,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 */
 	public Follows follows() {
 		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
-			cursor.withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWING),
+			cursor().withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWING),
 			getContext()::currentTimestamp,(value,time) -> value.assoc(convex.lattice.generic.LWWLattice.KEY_TIMESTAMP,time));
 		return configured(new Follows(following.withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWS)));
 	}

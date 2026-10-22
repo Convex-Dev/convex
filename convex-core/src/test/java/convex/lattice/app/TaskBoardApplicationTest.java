@@ -93,14 +93,14 @@ class TaskBoardApplicationTest {
 		}
 
 		Task task(String id) {
-			return new Task(cursor.withDefault(Index.none()).path(Strings.create(id)),getTimestamp);
+			return new Task(cursor().withDefault(Index.none()).path(Strings.create(id)),getTimestamp);
 		}
 
 		void plan(String id,String title) { task(id).create(title); }
 
 		/** Computes pending IDs from one immutable snapshot, independent of task titles. */
 		ASet<ACell> pending() {
-			var tasks=cursor.get();
+			var tasks=cursor().get();
 			ASet<ACell> pending=Sets.empty();
 			if (tasks!=null) {
 				for (var entry:tasks.entrySet()) {
@@ -117,23 +117,23 @@ class TaskBoardApplicationTest {
 			super(Timestamped.create(storage.withDefault(Maps.empty()),getTimestamp).cursor());
 		}
 
-		boolean exists() { return cursor.get().containsKey(TITLE); }
+		boolean exists() { return cursor().get().containsKey(TITLE); }
 		// Titles may have a representation introduced by another application version.
-		ACell title() { return cursor.get().get(TITLE); }
+		ACell title() { return cursor().get().get(TITLE); }
 		/** Only literal true means completed; other values remain pending until explicitly changed. */
-		boolean isDone() { return CVMBool.TRUE.equals(cursor.get().get(DONE)); }
+		boolean isDone() { return CVMBool.TRUE.equals(cursor().get().get(DONE)); }
 
 		void create(String title) {
-			cursor.update(record -> {
+			cursor().update(record -> {
 				if (record.containsKey(TITLE)) throw new IllegalStateException("Task ID already exists");
 				return record.assoc(TITLE,Strings.create(title)).assoc(DONE,CVMBool.FALSE);
 			});
 		}
 
-		void rename(String title) { cursor.update(record -> requireTask(record).assoc(TITLE,Strings.create(title))); }
+		void rename(String title) { cursor().update(record -> requireTask(record).assoc(TITLE,Strings.create(title))); }
 		void complete() { setDone(true); }
 		void reopen() { setDone(false); }
-		private void setDone(boolean done) { cursor.update(record -> requireTask(record).assoc(DONE,CVMBool.create(done))); }
+		private void setDone(boolean done) { cursor().update(record -> requireTask(record).assoc(DONE,CVMBool.create(done))); }
 		private static AHashMap<Keyword,ACell> requireTask(AHashMap<Keyword,ACell> record) {
 			if (!record.containsKey(TITLE)) throw new IllegalStateException("Task does not exist");
 			return record;

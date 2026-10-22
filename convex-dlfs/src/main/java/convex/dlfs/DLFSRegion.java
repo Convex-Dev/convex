@@ -88,7 +88,7 @@ public final class DLFSRegion extends ALatticeComponent<
 		var rule=LATTICE.signingFor(owner);
 		var policy=getContext();
 		AForkableCursor<AHashMap<AString,AVector<ACell>>> drivesCursor=
-			SignedCursor.create(cursor.withDefault(Maps.empty()).path(owner),value -> rule.sign(policy,value));
+			SignedCursor.create(cursor().withDefault(Maps.empty()).path(owner),value -> rule.sign(policy,value));
 		return configured(new DLFSDrives(drivesCursor,store,location.child(owner)));
 	}
 
@@ -100,7 +100,7 @@ public final class DLFSRegion extends ALatticeComponent<
 	private DLFSRegion(DLFSRegion source) {
 		super(source);
 		this.store=source.store;
-		this.location=DLFSLocation.at(cursor);
+		this.location=DLFSLocation.at(cursor());
 	}
 
 	@Override

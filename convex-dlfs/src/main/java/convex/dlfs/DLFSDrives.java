@@ -83,18 +83,18 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	private DLFSDrives(DLFSDrives source) {
 		super(source);
 		this.store=source.store;
-		this.location=DLFSLocation.at(cursor);
+		this.location=DLFSLocation.at(cursor());
 	}
 
 	/** Opens an existing drive, or returns null if it is absent. */
 	public DLFSDrive drive(String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return null;
 		AString name=Strings.create(driveName);
-		AHashMap<AString,AVector<ACell>> registry=cursor.get();
+		AHashMap<AString,AVector<ACell>> registry=cursor().get();
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return configured(new DLFSDrive(key,cursor.withDefault(Maps.empty()).path(key),store,location.child(key)));
+			return configured(new DLFSDrive(key,cursor().withDefault(Maps.empty()).path(key),store,location.child(key)));
 		});
 	}
 
@@ -141,7 +141,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	private DLFSDrive acquireDrive(String driveName, long maximumDrives, boolean openExisting) {
 		AString name=Strings.create(driveName);
 		CVMLong operationTime=mutationTimestamp();
-		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
+		AHashMap<AString,AVector<ACell>> previous=cursor().getAndUpdate(registry->{
 			if (!canCreate(registry,name,maximumDrives)) return registry;
 			if (registry==null) registry=Maps.empty();
 			return registry.assoc(name,DLFSNode.createDirectory(operationTime));
@@ -170,7 +170,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		AString name=Strings.create(driveName);
 		CVMLong operationTime=mutationTimestamp();
-		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
+		AHashMap<AString,AVector<ACell>> previous=cursor().getAndUpdate(registry->{
 			if (registry==null) return null;
 			AVector<ACell> root=registry.get(name);
 			if (status(root)!=DriveStatus.LIVE) return registry;
@@ -189,7 +189,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		AString oldKey=Strings.create(oldName);
 		AString newKey=Strings.create(newName);
 		CVMLong operationTime=mutationTimestamp();
-		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
+		AHashMap<AString,AVector<ACell>> previous=cursor().getAndUpdate(registry->{
 			if (registry==null) return null;
 			AVector<ACell> root=registry.get(oldKey);
 			if (status(root)!=DriveStatus.LIVE) return registry;
@@ -211,7 +211,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 
 	/** Returns sorted drive names belonging to this owner. */
 	public List<String> driveNames() {
-		AHashMap<AString,AVector<ACell>> registry=cursor.get();
+		AHashMap<AString,AVector<ACell>> registry=cursor().get();
 		if (registry==null || registry.isEmpty()) return List.of();
 		List<String> result=new ArrayList<>((int)Math.min(Integer.MAX_VALUE,registry.count()));
 		for (AString name: registry.keySet()) {
@@ -224,7 +224,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	/** Returns whether a name is live, deleted, or has never been tracked. */
 	public DriveStatus driveStatus(String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return DriveStatus.UNTRACKED;
-		AHashMap<AString,AVector<ACell>> registry=cursor.get();
+		AHashMap<AString,AVector<ACell>> registry=cursor().get();
 		return status((registry==null)?null:registry.get(Strings.create(driveName)));
 	}
 

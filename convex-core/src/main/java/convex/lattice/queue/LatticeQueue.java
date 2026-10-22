@@ -94,7 +94,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 		AVector<ACell> entry = QueueEntry.create(key, value, now, headers);
 
 		long[] offset = new long[1];
-		cursor.updateAndGet(state -> {
+		cursor().updateAndGet(state -> {
 			if (state == null) state = QueueLattice.INSTANCE.zero();
 
 			AVector<ACell> entries = QueueLattice.getEntries(state);
@@ -117,7 +117,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> peekEntry(long offset) {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 
 		AVector<ACell> entries = QueueLattice.getEntries(state);
@@ -157,7 +157,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> peekFirstEntry() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		AVector<ACell> entries = QueueLattice.getEntries(state);
 		if (entries.isEmpty()) return null;
@@ -169,7 +169,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> peekLastEntry() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		AVector<ACell> entries = QueueLattice.getEntries(state);
 		if (entries.isEmpty()) return null;
@@ -182,7 +182,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Returns the first valid absolute offset, or 0 if empty.
 	 */
 	public long startOffset() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		return QueueLattice.getStartOffset(state);
 	}
 
@@ -190,7 +190,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Returns the next absolute offset to be written (exclusive end).
 	 */
 	public long endOffset() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return 0L;
 		return QueueLattice.getStartOffset(state) + QueueLattice.getEntries(state).count();
 	}
@@ -199,7 +199,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Returns the number of entries currently in the queue.
 	 */
 	public long size() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return 0L;
 		return QueueLattice.getEntries(state).count();
 	}
@@ -218,7 +218,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> range(long fromOffset, long toOffset) {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return Vectors.empty();
 		if (fromOffset > toOffset) return Vectors.empty();
 
@@ -252,7 +252,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Gets a metadata value by key.
 	 */
 	public ACell getMeta(ACell key) {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		AHashMap<ACell, ACell> meta = QueueLattice.getMeta(state);
 		return meta.get(key);
@@ -263,7 +263,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	public void setMeta(ACell key, ACell value) {
 		CVMLong now = now();
-		cursor.updateAndGet(state -> {
+		cursor().updateAndGet(state -> {
 			if (state == null) state = QueueLattice.INSTANCE.zero();
 			AHashMap<ACell, ACell> meta = QueueLattice.getMeta(state);
 			AHashMap<ACell, ACell> newMeta = meta.assoc(key, value);
@@ -285,7 +285,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	public long truncate(long newStartOffset) {
 		long[] removed = new long[1];
 		CVMLong now = now();
-		cursor.updateAndGet(state -> {
+		cursor().updateAndGet(state -> {
 			if (state == null) state = QueueLattice.INSTANCE.zero();
 
 			long currentStart = QueueLattice.getStartOffset(state);

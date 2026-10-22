@@ -38,7 +38,7 @@ class ReadingListApplicationTest {
 	static final class ReadingListApp extends LatticeApplication<Index<Keyword,ACell>> {
 		ReadingListApp(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 		}
 		Books books() { return new Books(resolve(BOOKS)); }
 	}
@@ -46,9 +46,9 @@ class ReadingListApplicationTest {
 	static final class Books extends ALatticeComponent<ASet<AString>> {
 		Books(AForkableCursor<ASet<AString>> cursor) { super(cursor); }
 		void recommend(String title) {
-			cursor.updateAndGet(books -> (books==null?Sets.<AString>empty():books).include(Strings.create(title)));
+			cursor().updateAndGet(books -> (books==null?Sets.<AString>empty():books).include(Strings.create(title)));
 		}
-		ASet<AString> titles() { return cursor.get()==null?Sets.empty():cursor.get(); }
+		ASet<AString> titles() { return cursor().get()==null?Sets.empty():cursor().get(); }
 	}
 
 	/** The caller owns networking and stores; the application itself has no workers. */

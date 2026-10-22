@@ -1,6 +1,5 @@
 package convex.lattice.app;
 
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import convex.core.crypto.AKeyPair;
@@ -17,9 +16,7 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ASignedComponent;
 import convex.lattice.KeyOwnedIndex;
-import convex.lattice.LatticeHost;
 import convex.lattice.SetComponent;
-import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.SignedLattice;
@@ -35,7 +32,7 @@ import convex.lattice.generic.SignedLattice;
  *
  * <p>The composition has four responsibilities:</p>
  * <ul>
- *   <li>{@link FavouritesApp} serves only {@code :favourites}, preserving other host regions.</li>
+ *   <li>{@code SingleRegion<FavouritesRegion>} serves only {@code :favourites}, preserving other host regions.</li>
  *   <li>{@link FavouritesRegion} verifies ownership and stages the owner collection.</li>
  *   <li>{@link Favourites} signs local records with its explicitly supplied user's key.</li>
  *   <li>{@link Timestamped} orders whole records; {@link SetComponent} edits their items.</li>
@@ -53,16 +50,16 @@ import convex.lattice.generic.SignedLattice;
  * handle nor syncing its embedded components publishes the region. For example:</p>
  * <pre>{@code
  * var host = LatticeHost.create();
- * var app = new FavouritesApp(host);
+ * var region = new FavouritesRegion(host.cursor().path(FAVOURITES), Utils::getCurrentTimestampCell);
+ * var app = new SingleRegion<>(host, FAVOURITES, region);
  * host.configureApplications(java.util.List.of(app)); // Route incoming state to this app.
- * app.favourites().setTime(100);
- * app.favourites().user(ALICE).add(42);               // Signed region edit, not yet in the host.
+ * region.user(ALICE).add(42);               // Signed region edit, not yet in the host.
  * app.sync();                                       // Publish at [:favourites].
  * host.sync();                                      // Persist when the host has a store.
  * }</pre>
  *
- * <p>The seeded keys and manually advanced clock are deterministic test fixtures.
- * The domain component receives only a timestamp supplier, so it does not depend
+ * <p>The seeded keys and manually advanced clocks in tests are deterministic fixtures.
+ * The region receives only a timestamp supplier, so it does not depend
  * on how time is maintained. Equal timestamps deliberately retain the local value
  * on incoming merges; tests advance time when an update must supersede a replica.</p>
  *
@@ -80,23 +77,6 @@ final class FavouritesExample {
 	static final Keyword TIMESTAMP=Timestamped.TIMESTAMP;
 
 	/**
-	 * Serves one region using inherited routing and publication. It has no custom
-	 * root merge: values outside {@code :favourites} belong to other applications.
-	 */
-	static final class FavouritesApp extends SingleRegion<FavouritesRegion> {
-		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host) {
-			this(host,new FavouritesRegion(host.cursor().path(FAVOURITES)));
-		}
-
-		/** Shares the region's working state and clock; does not create a second draft. */
-		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,FavouritesRegion shared) {
-			super(host,FAVOURITES,shared);
-		}
-
-		FavouritesRegion favourites() { return component(); }
-	}
-
-	/**
 	 * Stages the owner index at {@code [:favourites]}. {@link KeyOwnedIndex} checks
 	 * that each envelope's signer matches its owner key. The shared timestamp rule
 	 * selects whole payloads during both incoming merge and publication conflicts.
@@ -105,29 +85,23 @@ final class FavouritesExample {
 	 * payload fields even when a local domain view cannot interpret them.
 	 */
 	static final class FavouritesRegion extends KeyOwnedIndex<AHashMap<Keyword,ACell>> {
-		// Test-controlled time shared by all user handles, including handles already opened.
-		private final AtomicReference<CVMLong> clock=new AtomicReference<>(CVMLong.ZERO);
+		private final Supplier<CVMLong> getTimestamp;
 
-		FavouritesRegion(AForkableCursor<Index<AccountKey,SignedData<AHashMap<Keyword,ACell>>>> destination) {
+		FavouritesRegion(AForkableCursor<Index<AccountKey,SignedData<AHashMap<Keyword,ACell>>>> destination,
+				Supplier<CVMLong> getTimestamp) {
 			super(destination,Timestamped.lattice());
+			this.getTimestamp=getTimestamp;
 		}
-
-		/** Sets the exact next edit time; edits do not automatically advance it. */
-		void setTime(long timestamp) { clock.set(CVMLong.create(timestamp)); }
 
 		/** Opens a live authoring handle. An absent owner is created only by a changed edit. */
 		Favourites user(AKeyPair user) {
 			var owner=user.getAccountKey();
-			return new Favourites(path(owner),getLattice().signingFor(owner),user,clock::get);
-		}
-
-		SignedData<AHashMap<Keyword,ACell>> record(AccountKey user) {
-			return get(user);
+			return new Favourites(path(owner),signingFor(owner),user,getTimestamp);
 		}
 
 		/** Reads the relayed field without assuming the remote owner's item representation. */
 		ACell items(AccountKey user) {
-			var record=record(user);
+			var record=get(user);
 			ACell value=record==null?null:record.getValue().get(ITEMS);
 			return value==null?Sets.empty():value;
 		}
@@ -144,36 +118,32 @@ final class FavouritesExample {
 	 */
 	static final class Favourites extends ASignedComponent<AHashMap<Keyword,ACell>> {
 		private final Timestamped<AHashMap<Keyword,ACell>> record;
-		final SetComponent<ACell> items;
+		final SetComponent<ACell> itemSet;
 
 		Favourites(AForkableCursor<SignedData<AHashMap<Keyword,ACell>>> destination,
 				SignedLattice<AHashMap<Keyword,ACell>> rule,AKeyPair user,Supplier<CVMLong> getTimestamp) {
 			// This component authors only with the explicitly supplied user's key.
 			super(destination,rule,user::signData);
-			// The inherited field is the unsigned signing view. Supply an absent record
-			// for editing without storing it until something changes; the set handles nil itself.
-			record=Timestamped.create(cursor.withDefault(Maps.empty()),getTimestamp);
-			items=new SetComponent<>(record.cursor().path(ITEMS));
+			// Wrap the base signing view once; every domain edit uses cursor().
+			record=Timestamped.create(super.cursor().withDefault(Maps.empty()),getTimestamp);
+			itemSet=new SetComponent<>(cursor().path(ITEMS));
 		}
 
 		/** Direct local edits use the same timestamped path as the embedded set. */
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record.cursor(); }
 
-		/** Checks a complete candidate without editing, stamping or signing it. */
-		@Override public AString checkValue(ACell value) {
-			AString error=super.checkValue(value);
-			if (error!=null || value==null) return error;
-			ACell payload=((SignedData<?>)value).getValue();
-			error=record.checkValue(payload);
+		/** Domain checks inspect the payload; the base handles the signed envelope. */
+		@Override protected AString checkPayload(ACell payload) {
+			AString error=record.checkValue(payload);
 			if (error!=null || payload==null) return error;
-			return items.checkValue(((AHashMap<?,?>)payload).get(ITEMS));
+			return itemSet.checkValue(((AHashMap<?,?>)payload).get(ITEMS));
 		}
 
-		void add(long item) { items.add(CVMLong.create(item)); }
-		void remove(long item) { items.remove(CVMLong.create(item)); }
+		void add(long item) { itemSet.add(CVMLong.create(item)); }
+		void remove(long item) { itemSet.remove(CVMLong.create(item)); }
 
 		/** Set operations preserve unfamiliar members; an incompatible field remains available in the region. */
-		ASet<ACell> items() { return items.get(); }
+		ASet<ACell> items() { return itemSet.get(); }
 	}
 
 }

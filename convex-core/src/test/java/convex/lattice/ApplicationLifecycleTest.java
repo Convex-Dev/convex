@@ -28,7 +28,7 @@ class ApplicationLifecycleTest {
 	private static class Values extends ALatticeComponent<ASet<CVMLong>> {
 		Values(ACursor<ASet<CVMLong>> destination) { super(forkOf(destination)); }
 		@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) {
-			return cursor.updateAndGet(own -> union(own,incoming));
+			return cursor().updateAndGet(own -> union(own,incoming));
 		}
 		@Override protected ASet<CVMLong> mergePublication(ASet<CVMLong> own,ASet<CVMLong> other) {
 			return union(own,other);
@@ -85,7 +85,7 @@ class ApplicationLifecycleTest {
 	@Test void childFailureDefersApplicationPublicationAndCanRetry() {
 		var host=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),null);
 		var app=new ALatticeApplication<ASet<CVMLong>>(host) {
-			final Values child=new Values(cursor);
+			final Values child=new Values(cursor());
 			boolean fail=true;
 			@Override protected void beforeSync() { child.merge(Sets.of(1)); }
 			@Override protected void syncChildren() {
@@ -114,7 +114,7 @@ class ApplicationLifecycleTest {
 		class App extends ALatticeApplication<ASet<CVMLong>> {
 			App() { super(host); }
 			@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) {
-				return cursor.updateAndGet(own -> union(own,incoming));
+				return cursor().updateAndGet(own -> union(own,incoming));
 			}
 			@Override protected ASet<CVMLong> mergePublication(ASet<CVMLong> own,ASet<CVMLong> other) {
 				return union(own,other);

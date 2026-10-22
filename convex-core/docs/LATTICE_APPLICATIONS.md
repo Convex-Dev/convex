@@ -245,21 +245,18 @@ children. Both work at the host root or a nested index and inherit the same merg
 and publication behaviour. A single-region application can be as small as:
 
 ```java
-final class FavouritesApp extends SingleRegion<FavouritesRegion> {
-    FavouritesApp(LatticeHost<Index<Keyword, ACell>> host) {
-        this(host, new FavouritesRegion(host.cursor().path(FAVOURITES)));
-    }
-
-    FavouritesApp(LatticeHost<Index<Keyword, ACell>> host, FavouritesRegion shared) {
-        super(host, FAVOURITES, shared);
-    }
-
-    FavouritesRegion favourites() { return component(); }
-}
+var favourites = new FavouritesRegion(host.cursor().path(FAVOURITES), getTimestamp);
+var app = new SingleRegion<>(host, FAVOURITES, favourites);
+host.configureApplications(List.of(app));
+favourites.user(alice).add(42);
+app.sync();
 ```
 
-Without a domain application subclass, use `SingleRegion.create(host, key, factory)`
-or `new SingleRegion<>(host, key, shared)`. For several regions, construct
+No application subclass is required: the domain region owns its data and operations,
+while `SingleRegion` supplies root routing and lifecycle. Pass that same region to
+another wrapper to share pending edits. A custom application subclass is useful
+when it adds lifecycle or domain behaviour. `SingleRegion.create(host, key, factory)`
+is also available for factory construction. For several regions, construct
 `new Regions(host)` and call `create(key, factory)` or `add(key, shared)` during
 assembly. `new Regions(host, components)` also accepts a map of existing children,
 registered in its iteration order. The cursor-and-context constructors and factory
@@ -443,7 +440,7 @@ public final class MyApplication extends LatticeApplication<Index<Keyword, ACell
     }
     // This application's rule for an incoming root: the lattice's default merge
     @Override public Index<Keyword, ACell> merge(Index<Keyword, ACell> incoming) {
-        return cursor.updateAndGet(own -> getLattice().merge(getContext(), own, incoming));
+        return cursor().updateAndGet(own -> getLattice().merge(getContext(), own, incoming));
     }
     public static MyApplication connect(LatticeHost<Index<Keyword, ACell>> host) {
         return new MyApplication(host);
@@ -502,7 +499,7 @@ same atomic update when the path may be absent:
 public void putPost(Blob key, String text) {
     long ts = getContext().currentTimestampValue();
     AHashMap<Keyword, ACell> post = SocialPost.createPost(text, ts);
-    cursor.updateAndGet(feed -> (feed == null ? SocialLattice.FEED_LATTICE.zero() : feed)
+    cursor().updateAndGet(feed -> (feed == null ? SocialLattice.FEED_LATTICE.zero() : feed)
         .assoc(key, post));
 }
 ```
@@ -555,9 +552,10 @@ host.sync();             // optional host policy; otherwise a no-op without a st
 The executable [favourites example](../src/test/java/convex/lattice/app/FavouritesApplicationTest.java)
 is one application over an in-memory host. Each user's edits are signed immediately
 through a signing cursor into its favourites region's working copy. The application
-inherits `SingleRegion`, so its sync publishes that child at `[:favourites]` and
+uses `SingleRegion` directly, so its sync publishes that child at `[:favourites]` and
 leaves unrelated host regions alone. Two applications may share the same region
-instance, including its pending edits and clock. A
+instance, including its pending edits and supplied clock. The tests own the mutable
+clock; the domain region accepts only a `Supplier<CVMLong>`. A
 [persistence variant](../src/test/java/convex/lattice/app/FavouritesPersistenceTest.java)
 publishes to Etch and reopens the same application.
 
@@ -571,12 +569,16 @@ empty without creating state. Its cursor passes through the favourites record's
 `Timestamped` component and signing boundary, so a changed set and its timestamp are
 signed together. No-op edits retain the existing timestamp and signature.
 
+Components access their editing view through `cursor()`, including inherited
+operations. A wrapper is constructed once from `super.cursor()` and returned by
+the override; there is no protected backing field for domain methods to bypass it.
+
 The record cursor explicitly uses `withDefault(Maps.empty())`, which presents an
 empty record without storing it. The composition is:
 
 ```java
-record = Timestamped.create(cursor.withDefault(Maps.empty()), getTimestamp);
-items = new SetComponent<>(record.cursor().path(ITEMS));
+record = Timestamped.create(super.cursor().withDefault(Maps.empty()), getTimestamp);
+itemSet = new SetComponent<>(cursor().path(ITEMS));
 ```
 
 `Timestamped.cursor()` is the local editing cursor, implemented by `StampedCursor`.
@@ -1011,7 +1013,7 @@ final class Scores extends OwnedIndex<AString, AInteger> {
     }
 
     Score score(AString owner, AKeyPair signer) {
-        return new Score(path(owner), getLattice().signingFor(owner), signer);
+        return new Score(path(owner), signingFor(owner), signer);
     }
 }
 ```
@@ -1027,7 +1029,7 @@ final class Score extends ASignedComponent<AInteger> {
     }
 
     void record(long value) {
-        cursor.updateAndGet(old -> MaxLattice.INSTANCE.merge(old, CVMLong.create(value)));
+        cursor().updateAndGet(old -> MaxLattice.INSTANCE.merge(old, CVMLong.create(value)));
     }
 }
 ```
@@ -1035,7 +1037,9 @@ final class Score extends ASignedComponent<AInteger> {
 `ASignedComponent` exposes the unsigned cursor to domain operations and handles
 validation, signing and incoming envelope merges. The supplied owner-bound rule
 is shared with the containing map. Signing uses the supplied function; changing
-its available keys cannot replace that rule. There is no view
+its available keys cannot replace that rule. Optional `checkPayload(ACell)` overrides
+inspect the unsigned candidate; the base handles envelope shape and unwrapping.
+These diagnostics run only through explicit `checkValue` calls. There is no view
 factory or callback into the map to construct the domain component.
 
 The component that signs defines its key-resolution strategy in one place. In the
@@ -1044,7 +1048,8 @@ constructor. `FavouritesRegion` only binds the owner path and rule, and takes no
 context. The host and region cannot supply an implicit fallback key. The same
 function handles local edits and any re-signing it performs.
 
-An owned map's `path(owner)` returns signed storage, creating a missing map only
+An owned map's `signingFor(owner)` supplies its bound authorisation rule directly.
+Its `path(owner)` returns signed storage, creating a missing map only
 on a changed write. An ordinary `cursor.path(owner)` also works when the containing
 map already exists. Construction, reads and sync of an untouched component create
 no entries. Components on the same path share edits and sign immediately into the

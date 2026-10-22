@@ -5,6 +5,7 @@ import static convex.lattice.app.FavouritesExample.*;
 
 import java.io.File;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,7 @@ import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeHost;
+import convex.lattice.SingleRegion;
 
 /**
  * The same {@link FavouritesExample} components over an Etch-backed host.
@@ -31,28 +33,30 @@ class FavouritesPersistenceTest {
 		try (var store=EtchStore.createTemp("favourites")) {
 			file=store.getFile();
 			var localHost=LatticeHost.open(store);
-			var local=new FavouritesApp(localHost);
+			var localClock=new AtomicReference<>(CVMLong.ZERO);
+			var local=new SingleRegion<>(localHost,FAVOURITES,
+				new FavouritesRegion(localHost.cursor().path(FAVOURITES),localClock::get));
 			localHost.configureApplications(List.of(local));
-			var alice=local.favourites().user(ALICE);
-			var bob=local.favourites().user(BOB);
-			var favourites=local.favourites().user(ALICE);
+			var alice=local.component().user(ALICE);
+			var bob=local.component().user(BOB);
+			var favourites=local.component().user(ALICE);
 			// Two Alice handles share one owner record; Bob's record has its own edit time.
-			local.favourites().setTime(100);
+			localClock.set(CVMLong.create(100));
 			favourites.add(10);
 			bob.add(30);
-			local.favourites().setTime(200);
+			localClock.set(CVMLong.create(200));
 			alice.add(20); // Both handles share the same user state and clock.
 			assertEquals(Sets.of(10,20),favourites.items(),"Views share the region working state");
 			assertEquals(Sets.of(30),bob.items());
-			assertTrue(local.favourites().record(ALICE.getAccountKey()).checkSignature());
-			assertTrue(local.favourites().record(BOB.getAccountKey()).checkSignature());
+			assertTrue(local.component().get(ALICE.getAccountKey()).checkSignature());
+			assertTrue(local.component().get(BOB.getAccountKey()).checkSignature());
 
-			local.favourites().setTime(1000); // Application publication must not replace the edit timestamps.
+			localClock.set(CVMLong.create(1000)); // Application publication must not replace the edit timestamps.
 			assertEquals(Index.<Keyword,ACell>none(),localHost.cursor().get(),"Signing publishes into region working state only");
 			local.sync();
-			assertEquals(local.favourites().cursor().get(),localHost.cursor().get().get(FAVOURITES));
-			assertEquals(CVMLong.create(200),local.favourites().record(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
-			assertEquals(CVMLong.create(100),local.favourites().record(BOB.getAccountKey()).getValue().get(TIMESTAMP));
+			assertEquals(local.component().cursor().get(),localHost.cursor().get().get(FAVOURITES));
+			assertEquals(CVMLong.create(200),local.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
+			assertEquals(CVMLong.create(100),local.component().get(BOB.getAccountKey()).getValue().get(TIMESTAMP));
 			assertNull(store.getRootData(),"Application publication stops at the host");
 			// Only this step records the host root for a future open.
 			localHost.sync();
@@ -60,14 +64,16 @@ class FavouritesPersistenceTest {
 		// A fresh store and host prove restoration from the retained root, not a live cursor.
 		try (var store=EtchStore.create(file)) {
 			var reopenedHost=LatticeHost.open(store);
-			var reopened=new FavouritesApp(reopenedHost);
+			var reopenedClock=new AtomicReference<>(CVMLong.ZERO);
+			var reopened=new SingleRegion<>(reopenedHost,FAVOURITES,
+				new FavouritesRegion(reopenedHost.cursor().path(FAVOURITES),reopenedClock::get));
 			reopenedHost.configureApplications(List.of(reopened));
-			assertEquals(Sets.of(10,20),reopened.favourites().items(ALICE.getAccountKey()));
-			assertEquals(Sets.of(30),reopened.favourites().items(BOB.getAccountKey()));
-			assertEquals(CVMLong.create(200),reopened.favourites().record(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
-			assertEquals(CVMLong.create(100),reopened.favourites().record(BOB.getAccountKey()).getValue().get(TIMESTAMP));
-			assertTrue(reopened.favourites().record(ALICE.getAccountKey()).checkSignature());
-			assertTrue(reopened.favourites().record(BOB.getAccountKey()).checkSignature());
+			assertEquals(Sets.of(10,20),reopened.component().items(ALICE.getAccountKey()));
+			assertEquals(Sets.of(30),reopened.component().items(BOB.getAccountKey()));
+			assertEquals(CVMLong.create(200),reopened.component().get(ALICE.getAccountKey()).getValue().get(TIMESTAMP));
+			assertEquals(CVMLong.create(100),reopened.component().get(BOB.getAccountKey()).getValue().get(TIMESTAMP));
+			assertTrue(reopened.component().get(ALICE.getAccountKey()).checkSignature());
+			assertTrue(reopened.component().get(BOB.getAccountKey()).checkSignature());
 		}
 	}
 

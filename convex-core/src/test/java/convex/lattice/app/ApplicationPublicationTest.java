@@ -56,7 +56,7 @@ class ApplicationPublicationTest {
 
 		Notebook notebook() { return component(); }
 		/** Reads the host's published envelope, not the notebook's pending unsigned edits. */
-		SignedData<ASet<ACell>> publishedNotebook() { return RT.getIn(cursor.get(),NOTEBOOK); }
+		SignedData<ASet<ACell>> publishedNotebook() { return RT.getIn(cursor().get(),NOTEBOOK); }
 	}
 
 	/**

@@ -102,7 +102,7 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	public Mailbox mailbox(AString did) {
 		MailboxLattice mailbox=lattice.forMailbox(did);
 		if (mailbox==null) throw new IllegalArgumentException("Mailbox must be a canonical base DID");
-		return configured(new Mailbox(cursor.withDefault(Maps.empty()).path(did),mailbox));
+		return configured(new Mailbox(cursor().withDefault(Maps.empty()).path(did),mailbox));
 	}
 
 	/**

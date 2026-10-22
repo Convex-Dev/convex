@@ -39,8 +39,8 @@ class NodeApplicationIngressTest {
 		App(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
-			if (ignore) return cursor.get();
-			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,incoming));
+			if (ignore) return cursor().get();
+			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,incoming));
 		}
 		@Override protected void beforeSync() { preparations++; }
 	}

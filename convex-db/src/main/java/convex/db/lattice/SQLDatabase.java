@@ -154,7 +154,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return configured(new SQLSchema(cursor.withDefault(Index.none()).path(ConvexDB.KEY_TABLES)));
+		return configured(new SQLSchema(cursor().withDefault(Index.none()).path(ConvexDB.KEY_TABLES)));
 	}
 
 	/**
@@ -197,7 +197,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	public SignedData<AHashMap<AString, Index<Keyword, ACell>>> getSignedState() {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 		AHashMap<AString, Index<Keyword, ACell>> dbMap =
-			(AHashMap) Maps.of(dbName, cursor.get());
+			(AHashMap) Maps.of(dbName, cursor().get());
 		return keyPair.signData(dbMap);
 	}
 
@@ -245,7 +245,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 			@SuppressWarnings("unchecked")
 			Index<Keyword, ACell> remoteState = (Index<Keyword, ACell>) dbMap.get(dbName);
 			if (remoteState != null) {
-				cursor.updateAndGet(own -> ConvexDB.DATABASE_LATTICE.merge(getContext(),own,remoteState));
+				cursor().updateAndGet(own -> ConvexDB.DATABASE_LATTICE.merge(getContext(),own,remoteState));
 				merged++;
 			}
 		}

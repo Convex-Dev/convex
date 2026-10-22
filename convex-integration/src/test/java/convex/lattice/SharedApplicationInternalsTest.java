@@ -123,7 +123,7 @@ public class SharedApplicationInternalsTest {
 		}
 
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 		}
 
 		/**

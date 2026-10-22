@@ -316,7 +316,7 @@ public class MailTest {
 	private static final class TestRoot extends LatticeApplication<Index<Keyword,ACell>> {
 		TestRoot(KeyedLattice lattice) { super(lattice,Cursors.root(lattice.zero())); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 		}
 	}
 
@@ -324,7 +324,7 @@ public class MailTest {
 	private static final class HostedRoot extends LatticeApplication<Index<Keyword,ACell>> {
 		HostedRoot(KeyedLattice lattice, LatticeHost<Index<Keyword,ACell>> host) { super(lattice,host); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor.updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 		}
 	}
 
