@@ -16,8 +16,8 @@ ACursor<V>                                get / atomic update / path
     ├── Root<V>                           atomic value holder
     │   └── TransactionalRootCursor<V>    opt-in coordinated writes
     ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
-    ├── PathCursor<V>                     navigation through existing containers
     └── ATransformCursor<V,S>             shared atomic mutable-view operations
+        ├── PathCursor<V>                 navigation through existing containers
         ├── ProjectionCursor<S,V>         caller-supplied read/rebuild functions
         └── AUpdateCursor<V,S>            cached preparation per atomic operation
             ├── StampedCursor<V>          explicit clock and stamp function
@@ -169,7 +169,7 @@ var unsigned = SignedCursor.create(slot, value -> rule.sign(context, value));
 var edits = StampedCursor.create(storage, context::currentTimestamp, lattice::stamp);
 ```
 
-`ATransformCursor` supplies the atomic operations for projections and authored views.
+`ATransformCursor` supplies the atomic operations for paths, projections and authored views.
 It reads a view value, rebuilds the source on a changed write, and preserves the
 source on a no-op. Returned values reflect the source's write policy, including
 stamping. Read functions must accept the values that policy can produce.

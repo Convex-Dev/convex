@@ -35,6 +35,19 @@ import convex.lattice.generic.LWWLattice;
  */
 public class StampedCursorTest {
 
+	/** Path update results must reflect the enclosing cursor's actual write policy. */
+	@Test public void testPathUpdateReturnsStoredTimestamp() {
+		Root<ACell> root=Root.create(Maps.of(LWWLattice.KEY_TIMESTAMP,CVMLong.create(5)));
+		var stamped=StampedCursor.create(root,() -> CVMLong.create(100),
+			(value,time) -> stampWith(value,time.longValue()));
+		AForkableCursor<CVMLong> timestamp=stamped.path(LWWLattice.KEY_TIMESTAMP);
+		assertEquals(CVMLong.create(100),timestamp.updateAndGet(value -> CVMLong.create(999)));
+		assertEquals(CVMLong.create(100),timestamp.get());
+		assertEquals(CVMLong.create(100),timestamp.accumulateAndGet(CVMLong.ONE,
+			(value,delta) -> CVMLong.create(value.longValue()+delta.longValue())));
+		assertEquals(CVMLong.create(100),timestamp.get());
+	}
+
 	@Test public void testWorkingStateAdoptsPreparedDestinationValue() {
 		Root<ACell> root=Root.create(Maps.of(A,CVMLong.ZERO));
 		var stamped=StampedCursor.create(root,() -> CVMLong.create(100),(value,time) -> stampWith(value,time.longValue()));
