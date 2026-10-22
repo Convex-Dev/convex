@@ -123,9 +123,6 @@ public class NodeConfig {
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT =
 		LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT;
 
-	/** Maximum accepted wall-clock lead for timestamp-ordered lattice values. */
-	public static final AString MAX_FUTURE_TIMESTAMP_SKEW = Strings.intern("maxFutureTimestampSkew");
-
 	/** Conservative public-node default: large lattice trees are transferred via DATA_REQUEST. */
 	public static final int DEFAULT_MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
 
@@ -161,9 +158,6 @@ public class NodeConfig {
 	@Deprecated
 	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT =
 		LatticePropagatorConfig.DEFAULT_INBOUND_SHUTDOWN_TIMEOUT;
-
-	/** Default wall-clock lead accepted from timestamp-ordered lattice values. */
-	public static final long DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW = 30_000L;
 
 	// ========== Instance ==========
 
@@ -456,22 +450,6 @@ public class NodeConfig {
 	@Deprecated
 	public long getInboundShutdownTimeout() {
 		return LatticePropagatorConfig.from(this).getInboundShutdownTimeout();
-	}
-
-	/**
-	 * Returns the maximum accepted lead over the local clock for lattice values
-	 * that use wall-clock conflict ordering. Zero requires timestamps no later
-	 * than the local clock.
-	 *
-	 * @return non-negative future timestamp allowance in milliseconds
-	 */
-	public long getMaxFutureTimestampSkew() {
-		CVMLong v = RT.ensureLong(config.get(MAX_FUTURE_TIMESTAMP_SKEW));
-		long value = (v != null) ? v.longValue() : DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW;
-		if (value < 0) {
-			throw new IllegalArgumentException(MAX_FUTURE_TIMESTAMP_SKEW + " must not be negative: " + value);
-		}
-		return value;
 	}
 
 	// ========== URL validation ==========

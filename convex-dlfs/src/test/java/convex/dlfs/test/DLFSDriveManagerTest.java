@@ -26,7 +26,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
@@ -198,20 +197,19 @@ public class DLFSDriveManagerTest {
 
 	@Test
 	public void testDriveMergeRejectsDistantFutureTombstones() {
-		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
+		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(
+			DLFSLattice.withClock(() -> CVMLong.create(1_000),30));
 		AString home=Strings.create("home");
 		AString untracked=Strings.create("untracked");
 		AHashMap<AString,AVector<ACell>> initial=convex.core.data.Maps.of(
 			home,DLFSNode.createDirectory(CVMLong.create(900)));
-		LatticeContext context=LatticeContext.create(CVMLong.create(1_000),null)
-			.withMaxFutureTimestampSkew(30);
 		Root<AHashMap<AString, AVector<ACell>>> cursor=
 			Cursors.root(initial);
 
 		AHashMap<AString,AVector<ACell>> foreign=convex.core.data.Maps.of(
 			home,DLFSNode.createEmptyFile(CVMLong.create(1_031)),
 			untracked,DLFSNode.createEmptyFile(CVMLong.create(1_031)));
-		cursor.updateAndGet(own -> lattice.merge(context,own,foreign));
+		cursor.updateAndGet(own -> lattice.merge(own,foreign));
 
 		assertTrue(DLFSNode.isDirectory(cursor.get().get(home)));
 		assertNull(cursor.get().get(untracked));

@@ -40,20 +40,14 @@ public abstract class LatticeContext {
 
 	/** Creates a fixed timestamp/key policy. A null timestamp uses runtime time. */
 	public static LatticeContext create(CVMLong timestamp, AKeyPair signingKey) {
-		return create(timestamp,signingKey,null,null);
+		return create(timestamp,signingKey,null);
 	}
 
 	/** Creates a fixed timestamp/key/verifier policy. */
 	public static LatticeContext create(CVMLong timestamp, AKeyPair signingKey,
 			BiPredicate<ACell, AccountKey> ownerVerifier) {
-		return create(timestamp,signingKey,ownerVerifier,null);
-	}
-
-	private static LatticeContext create(CVMLong timestamp, AKeyPair signingKey,
-			BiPredicate<ACell, AccountKey> ownerVerifier, Long maxFutureTimestampSkew) {
-		if (timestamp==null && signingKey==null && ownerVerifier==null
-				&& maxFutureTimestampSkew==null) return EMPTY;
-		return new Fixed(timestamp,signingKey,ownerVerifier,maxFutureTimestampSkew);
+		if (timestamp==null && signingKey==null && ownerVerifier==null) return EMPTY;
+		return new Fixed(timestamp,signingKey,ownerVerifier);
 	}
 
 	/** Returns a delegated policy with an exact timestamp override. */
@@ -73,14 +67,6 @@ public abstract class LatticeContext {
 	public LatticeContext withOwnerVerifier(
 			BiPredicate<ACell, AccountKey> ownerVerifier) {
 		return new OwnerVerifierOverride(this,ownerVerifier);
-	}
-
-	/** Returns a delegated policy with a future-timestamp-skew override. */
-	public LatticeContext withMaxFutureTimestampSkew(long skewMillis) {
-		if (skewMillis<0) {
-			throw new IllegalArgumentException("Future timestamp skew must not be negative");
-		}
-		return new FutureSkewOverride(this,skewMillis);
 	}
 
 	/**
@@ -208,40 +194,22 @@ public abstract class LatticeContext {
 		return null;
 	}
 
-	/**
-	 * Gets the accepted future timestamp skew, or the lattice's own default when this
-	 * policy does not override it. The allowance itself is validated where it is
-	 * configured, in {@link #withMaxFutureTimestampSkew(long)}.
-	 *
-	 * @param defaultValue Lattice-specific default in milliseconds
-	 * @return Future skew allowance in milliseconds
-	 */
-	public long getMaxFutureTimestampSkew(long defaultValue) {
-		return defaultValue;
-	}
-
 	/** Immutable fixed policy used by compatibility factories. */
 	private static final class Fixed extends LatticeContext {
 		private final CVMLong timestamp;
 		private final AKeyPair signingKey;
 		private final BiPredicate<ACell,AccountKey> ownerVerifier;
-		private final Long maxFutureTimestampSkew;
 
 		private Fixed(CVMLong timestamp, AKeyPair signingKey,
-				BiPredicate<ACell, AccountKey> ownerVerifier,
-				Long maxFutureTimestampSkew) {
+				BiPredicate<ACell, AccountKey> ownerVerifier) {
 			this.timestamp=timestamp;
 			this.signingKey=signingKey;
 			this.ownerVerifier=ownerVerifier;
-			this.maxFutureTimestampSkew=maxFutureTimestampSkew;
 		}
 
 		@Override public CVMLong getTimestamp() { return timestamp; }
 		@Override public AKeyPair getSigningKey() { return signingKey; }
 		@Override public BiPredicate<ACell, AccountKey> getOwnerVerifier() { return ownerVerifier; }
-		@Override public long getMaxFutureTimestampSkew(long defaultValue) {
-			return (maxFutureTimestampSkew==null)?defaultValue:maxFutureTimestampSkew;
-		}
 	}
 
 	/** Base for small overrides which retain all other live policy. */
@@ -263,9 +231,6 @@ public abstract class LatticeContext {
 		}
 		@Override public boolean verifyOwner(ACell ownerKey, AccountKey signerKey) {
 			return delegate.verifyOwner(ownerKey,signerKey);
-		}
-		@Override public long getMaxFutureTimestampSkew(long defaultValue) {
-			return delegate.getMaxFutureTimestampSkew(defaultValue);
 		}
 	}
 
@@ -317,16 +282,4 @@ public abstract class LatticeContext {
 		}
 	}
 
-	private static final class FutureSkewOverride extends Delegating {
-		private final long maxFutureTimestampSkew;
-
-		private FutureSkewOverride(LatticeContext delegate, long maxFutureTimestampSkew) {
-			super(delegate);
-			this.maxFutureTimestampSkew=maxFutureTimestampSkew;
-		}
-
-		@Override public long getMaxFutureTimestampSkew(long defaultValue) {
-			return maxFutureTimestampSkew;
-		}
-	}
 }

@@ -462,7 +462,8 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public void merge(AVector<ACell> other) {
-		rootCursor.updateAndGet(own -> DLFSLattice.INSTANCE.merge(getContext(),own,other));
+		// The local filesystem merges values. Hosted components own incoming admission.
+		rootCursor.updateAndGet(own -> DLFSLattice.INSTANCE.merge(own,other));
 	}
 
 	/** Creates a forked view sharing this filesystem's store, if any. */

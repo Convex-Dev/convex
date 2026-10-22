@@ -95,7 +95,7 @@ class NodeApplicationIngressTest {
 			var retained=LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE));
 			store.setRootData(retained);
 			var root=LatticeHost.open(LATTICE.zero(),store);
-			var context=LatticeContext.EMPTY.withMaxFutureTimestampSkew(1234L);
+			var context=LatticeContext.create(CVMLong.create(1234),null);
 			root.setContext(context);
 			// A supplied root is already initialised: launch must not reload the store.
 			store.setRootData(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));

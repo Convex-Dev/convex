@@ -1,8 +1,6 @@
 {
   // Generic lattice host. Keep the key seed and store together across restarts.
   node: {
-    // Maximum accepted lead over this host's clock for DLFS updates and tombstones.
-    maxFutureTimestampSkew: 30000,
     port: 19888,
     store: "dlfs.etch",
     etch: {version: 3},
@@ -23,6 +21,8 @@
 
   // Application policy. A custom path must start in a non-standard root region.
   dlfs: {
+    // Maximum accepted lead over this application's clock for DLFS updates and tombstones.
+    maxFutureTimestampSkew: 30000,
     path: ["fs"],
     drive: "home",
     mounts: [

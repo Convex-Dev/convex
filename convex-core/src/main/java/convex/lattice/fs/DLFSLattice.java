@@ -11,7 +11,6 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
 import convex.lattice.generic.IndexLattice;
 
 /**
@@ -29,11 +28,12 @@ import convex.lattice.generic.IndexLattice;
  * - Conflicts are resolved by timestamp (newer wins)
  */
 public class DLFSLattice extends ALattice<AVector<ACell>> {
-	/** Default accepted lead over the receiving host's clock. */
+	/** Default accepted lead over a DLFS component's clock. */
 	public static final long DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW = 30_000L;
 
 	/**
-	 * Singleton instance of DLFSLattice
+	 * Value-based merge with no clock-dependent admission. Applications that limit
+	 * incoming update times bind their own policy with {@link #withClock}.
 	 */
 	public static final DLFSLattice INSTANCE = new DLFSLattice();
 
@@ -81,15 +81,6 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		}
 
 		return safeMerge(ownValue, otherValue);
-	}
-
-	@Override
-	public AVector<ACell> merge(LatticeContext context, AVector<ACell> ownValue, AVector<ACell> otherValue) {
-		if (clock!=null) return merge(ownValue,otherValue);
-		if (context==null) context=LatticeContext.EMPTY;
-		long now=context.currentTimestampValue();
-		long skew=context.getMaxFutureTimestampSkew(DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW);
-		return mergeBefore(now,skew,ownValue,otherValue);
 	}
 
 	private AVector<ACell> mergeBefore(long now,long skew,AVector<ACell> ownValue,AVector<ACell> otherValue) {

@@ -85,10 +85,11 @@ Cached follow keys are metadata; they cannot bypass current authority after
 rotation or revocation. A relay accepts signed social indexes without requiring
 every field to match this client's schema.
 
-`LatticeContext` remains only at the optional supplied-root-lattice adapter, for
-policies such as DLFS future timestamp admission. `P2PNode` supplies that adapter
-with the configured skew and no signing keys. Social and P2P domain views do not
-inherit authoring capabilities or mutation clocks from it.
+P2P incoming merges use the supplied lattice's own rules. Timestamp admission
+belongs to each application or component: for example, a DLFS lattice can bind
+its clock and allowance with `DLFSLattice.withClock(clock, skew)`. Node configuration
+does not impose a shared allowance. Social and P2P domain views do not inherit
+authoring capabilities or mutation clocks from `LatticeContext`.
 
 ## A rollup package
 

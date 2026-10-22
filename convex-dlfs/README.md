@@ -76,7 +76,6 @@ drive and inbound switches remain useful as development overrides.
 {
   node: {
     port: 19888,
-    maxFutureTimestampSkew: 30000,
     store: "dlfs.etch",
     etch: {version: 3},
     keypair: "<32-byte Ed25519 seed hex>",
@@ -86,6 +85,7 @@ drive and inbound switches remain useful as development overrides.
     ],
   },
   dlfs: {
+    maxFutureTimestampSkew: 30000,
     path: ["fs"],
     drive: "home",
     mounts: [
@@ -102,10 +102,12 @@ drive and inbound switches remain useful as development overrides.
 }
 ```
 
-`node.maxFutureTimestampSkew` is the maximum accepted lead, in milliseconds, for
+`dlfs.maxFutureTimestampSkew` is the maximum accepted lead, in milliseconds, for
 timestamp-ordered DLFS updates and tombstones received from another replica. It
 defaults to 30 seconds; lower it only when participating hosts have tighter clock
-synchronisation.
+synchronisation. This belongs to the DLFS application; other components on the
+same host may use different allowances or no clock-based admission. Move existing
+`node.maxFutureTimestampSkew` settings into the `dlfs` section.
 
 Bootstrap entries pair a TCP address with its expected `AccountKey`; the connection
 manager challenges that identity after connecting and keeps an unverified connection
@@ -226,7 +228,7 @@ Networked bootstrap supplies the host; the DLFS component API is unchanged:
 NodeConfig nodeConfig = NodeConfig.port(0);
 var host = RelayHost.openHost(Index.<Keyword, ACell>none(), store, nodeConfig);
 var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
-    Utils::getCurrentTimestampCell, nodeConfig.getMaxFutureTimestampSkew(),
+    Utils::getCurrentTimestampCell, 30_000,
     Keyword.intern("documents")));
 var node = new NodeServer<>(host, nodeConfig);
 LatticePropagator group = new LatticePropagator(store, LatticePropagatorConfig.create());

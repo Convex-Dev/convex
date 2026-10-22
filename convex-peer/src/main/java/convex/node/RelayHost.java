@@ -48,7 +48,8 @@ public final class RelayHost {
 
 	/**
 	 * Opens a relay host: {@link #openHost} with one live application over the whole
-	 * lattice, under the supplied policy with the configured timestamp skew applied.
+	 * lattice, under the supplied policy. Admission rules belong to that lattice;
+	 * node configuration does not modify them.
 	 *
 	 * @param <V> root value type
 	 * @param lattice the complete lattice the relay accepts and serves
@@ -62,7 +63,7 @@ public final class RelayHost {
 			NodeConfig config,LatticeContext context) throws IOException {
 		if (lattice==null) throw new IllegalArgumentException("Lattice must not be null");
 		LatticeHost<V> host=openHost(lattice.zero(),store,config);
-		host.setContext(applySkew(config,context));
+		host.setContext(context);
 		host.configureApplications(List.of(LatticeApplication.live(lattice,host)));
 		return host;
 	}
@@ -95,21 +96,4 @@ public final class RelayHost {
 		return new LatticeHost<>(storage,store);
 	}
 
-	/**
-	 * Applies the configured maximum future timestamp skew to a policy. A skew set
-	 * explicitly in configuration overrides the context's own; otherwise the context's
-	 * skew stands, with the configuration default as the fallback.
-	 *
-	 * @param config node configuration, or {@code null} for defaults
-	 * @param context policy to adjust, or {@code null} for the empty policy
-	 * @return policy carrying the effective skew
-	 */
-	public static LatticeContext applySkew(NodeConfig config,LatticeContext context) {
-		NodeConfig settings=(config==null)?NodeConfig.create():config;
-		LatticeContext policy=(context==null)?LatticeContext.EMPTY:context;
-		long configuredSkew=settings.getMaxFutureTimestampSkew();
-		long effectiveSkew=settings.getMap().containsKey(NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW)
-			?configuredSkew:policy.getMaxFutureTimestampSkew(configuredSkew);
-		return policy.withMaxFutureTimestampSkew(effectiveSkew);
-	}
 }

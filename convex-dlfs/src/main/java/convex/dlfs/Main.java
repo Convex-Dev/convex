@@ -66,7 +66,7 @@ public final class Main {
 
 		var host=RelayHost.openHost(Index.<Keyword,ACell>none(),store,nodeConfig);
 		var application=host.addApplication(new DLFSApplication(host,keyPair::signData,Utils::getCurrentTimestampCell,
-			nodeConfig.getMaxFutureTimestampSkew(),regionPath));
+			config.getMaxFutureTimestampSkew(),regionPath));
 		NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(host,nodeConfig);
 		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(nodeConfig));
 		propagator.setTransportKeyPair(keyPair);

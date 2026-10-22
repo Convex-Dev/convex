@@ -849,15 +849,7 @@ public class DLFSTest {
 	}
 
 	/**
-	 * Test cursor-level merge with DLFSLattice and LatticeContext.
-	 *
-	 * This test demonstrates:
-	 * - Direct cursor manipulation with lattice merge
-	 * - Context-aware merge at the cursor level
-	 * - How DLFSLocal could implement context-aware merge API
-	 *
-	 * NOTE: Currently DLFSLocal.merge() bypasses DLFSLattice and calls DLFSNode.merge() directly.
-	 * This test shows how it SHOULD work with the lattice abstraction.
+	 * Cursor-level value merge preserves both trees and uses their stored timestamps.
 	 */
 	@Test
 	public void testCursorMergeWithLattice() throws IOException {
@@ -878,22 +870,17 @@ public class DLFSTest {
 		}
 		AVector<ACell> node2 = fs2.getNode(fs2.getRoot());
 
-		// Demonstrate cursor-level merge with lattice and context
+		// Apply the value merge atomically at the cursor.
 		convex.lattice.cursor.Root<AVector<ACell>> cursor = convex.lattice.cursor.Root.create(node1);
 
-		// Merge using DLFSLattice with explicit context
-		// Note: Merge is deterministic, so context timestamp is currently not used
-		CVMLong mergeTime = CVMLong.create(3000);
-		LatticeContext ctx = LatticeContext.create(mergeTime, null);
-
 		AVector<ACell> merged = cursor.updateAndGet(current ->
-			DLFSLattice.INSTANCE.merge(ctx, current, node2)
+			DLFSLattice.INSTANCE.merge(current, node2)
 		);
 
 		// Verify merge combined both trees
 		assertNotNull(merged, "Merged result should not be null");
 
-		// Verify merged root has max node timestamp (2000), not context timestamp
+		// Verify merged root has max node timestamp (2000).
 		// This ensures merge is deterministic (same inputs → same output)
 		assertEquals(2000L, DLFSNode.getUTime(merged).longValue(),
 			"Merged root should use max node timestamp (deterministic)");
@@ -912,11 +899,6 @@ public class DLFSTest {
 		assertTrue(DLFSNode.isRegularFile(mergedFileA), "fileA should be a regular file");
 		assertTrue(DLFSNode.isRegularFile(mergedFileB), "fileB should be a regular file");
 
-		// NOTE: This demonstrates how DLFSLocal.merge() SHOULD work:
-		// Instead of:
-		//   rootCursor.updateAndGet(rootNode -> DLFSNode.merge(rootNode, other, contextTimestamp))
-		// It should be:
-		//   rootCursor.updateAndGet(rootNode -> DLFSLattice.INSTANCE.merge(LatticeContext.EMPTY, rootNode, other))
 	}
 
 	/**

@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Future-timestamp admission belongs to the application or component. Removed node-wide and `LatticeContext` skew settings; standalone DLFS now reads `dlfs.maxFutureTimestampSkew` (previously `node.maxFutureTimestampSkew`). `DLFSLattice.withClock(clock, skew)` binds explicit admission policy, while the unconfigured lattice merges solely by value. P2P no longer supplies an ambient merge context.
+
 - Social components take an owner-aware signer, DID authoriser and timestamp supplier; one signer can serve multiple DIDs and key rotation reaches existing views. P2P identity and node registries bind direct-key ownership independently of context, and local authoring takes an explicit multi-owner signer. Registered social users share one component. Relay admission preserves unfamiliar signed social fields and rechecks current DID authority instead of treating cached keys as continuing authority.
 
 - DLFS components take explicit signer functions and timestamp suppliers instead of inheriting authoring policy from `LatticeContext`. Applications without a signer act as relays. Custom owner identities use one verifier for incoming envelopes and local signatures; forks and transaction views retain the same policies. Owner lattices also expose `mergeAndSign` for explicit authoring of combined values.

@@ -382,12 +382,17 @@ store root of its own, and attaching needs no lattice. `NodeServer` is construct
 from an assembled `LatticeHost` only; the lattice-taking constructors, the
 restore-by-merge at launch and the merge-context accessors are gone.
 `RelayHost.open(lattice, store, config, policy)` in convex-peer assembles the relay
-case, one live application over the whole lattice, with restore, transactional root
-and timestamp skew taken from node configuration. Restore adopts the retained root
+case, one live application over the whole lattice, with restore and transactional
+root policy taken from node configuration. Restore adopts the retained root
 at open, as `LatticeHost.open` does. Incoming completeness is unchanged: the protocol
 endpoint acquires missing cells before the node's merge, and pulls acquire before
 returning. The application-factory launch overload and the node's lattice accessor
 went earlier (`971790597`).
+
+On 22 October, timestamp admission was removed from node configuration and
+`LatticeContext`. Each component binds its own clock and allowance where needed
+(for DLFS, `DLFSLattice.withClock`). Standalone DLFS reads
+`dlfs.maxFutureTimestampSkew`; sharing a host imposes no common allowance.
 
 On 17 October the P2P node followed (`3e08a8a35`). `P2PNode.create` opens the host
 with `RelayHost.openHost`, configures `P2PApplication` on it as the receiver and

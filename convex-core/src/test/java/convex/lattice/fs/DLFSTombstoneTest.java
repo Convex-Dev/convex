@@ -3,6 +3,7 @@ package convex.lattice.fs;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -187,19 +188,18 @@ public class DLFSTombstoneTest {
 
 	@Test
 	public void testFutureUpdatesAndTombstonesAreRejectedAtMergeFrontier() {
-		LatticeContext context=LatticeContext.create(CVMLong.create(1_000),null)
-			.withMaxFutureTimestampSkew(30);
+		DLFSLattice lattice=DLFSLattice.withClock(() -> CVMLong.create(1_000),30);
 		AVector<ACell> own=DLFSNode.createDirectory(CVMLong.create(900));
 
 		AVector<ACell> tooFar=DLFSNode.createDirectory(CVMLong.create(1_031));
-		assertSame(own,DLFSLattice.INSTANCE.merge(context,own,tooFar));
+		assertSame(own,lattice.merge(own,tooFar));
 		AVector<ACell> boundary=DLFSNode.createDirectory(CVMLong.create(1_030));
-		assertSame(boundary,DLFSLattice.INSTANCE.merge(context,own,boundary));
+		assertSame(boundary,lattice.merge(own,boundary));
 
 		AVector<ACell> futureChild=DLFSNode.createEmptyFile(CVMLong.create(1_031));
 		AVector<ACell> hiddenChild=DLFSNode.createDirectory(CVMLong.create(1_000)).assoc(
 			DLFSNode.POS_DIR,Index.of(Strings.create("future"),futureChild));
-		assertSame(own,DLFSLattice.INSTANCE.merge(context,own,hiddenChild));
+		assertSame(own,lattice.merge(own,hiddenChild));
 
 		AVector<ACell> live=DLFSNode.createEmptyFile(CVMLong.create(900));
 		AVector<ACell> ownWithFile=DLFSNode.createDirectory(CVMLong.create(900)).assoc(
@@ -207,6 +207,25 @@ public class DLFSTombstoneTest {
 		AVector<ACell> futureDelete=DLFSNode.deleteNode(ownWithFile,
 			new DLPath(null,new AString[] {Strings.create("deleted")},false),CVMLong.create(1_031))
 			.assoc(DLFSNode.POS_UTIME,CVMLong.create(1_000));
-		assertSame(ownWithFile,DLFSLattice.INSTANCE.merge(context,ownWithFile,futureDelete));
+		assertSame(ownWithFile,lattice.merge(ownWithFile,futureDelete));
+	}
+
+	@Test
+	public void testAdmissionClockIsBoundToTheLattice() {
+		var time=new java.util.concurrent.atomic.AtomicReference<>(CVMLong.create(1_000));
+		var strict=DLFSLattice.withClock(time::get,0);
+		var tolerant=DLFSLattice.withClock(time::get,30);
+		var own=DLFSNode.createDirectory(CVMLong.create(900));
+		var incoming=DLFSNode.createDirectory(CVMLong.create(1_030));
+		var ambient=LatticeContext.create(CVMLong.create(Long.MAX_VALUE),null);
+		assertSame(own,strict.merge(ambient,own,incoming));
+		assertSame(incoming,tolerant.merge(LatticeContext.create(CVMLong.ZERO,null),own,incoming));
+		assertSame(incoming,DLFSLattice.INSTANCE.merge(LatticeContext.create(CVMLong.ZERO,null),own,incoming),
+			"An unconfigured value lattice has no clock-dependent admission rule");
+		time.set(CVMLong.create(1_030));
+		assertSame(incoming,strict.merge(own,incoming));
+		assertThrows(IllegalArgumentException.class,() -> DLFSLattice.withClock(time::get,-1));
+		assertSame(incoming,DLFSLattice.withClock(() -> CVMLong.create(Long.MAX_VALUE),30).merge(own,incoming),
+			"The admission ceiling must not overflow");
 	}
 }

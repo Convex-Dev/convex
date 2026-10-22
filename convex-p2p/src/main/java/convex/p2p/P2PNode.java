@@ -224,7 +224,6 @@ public class P2PNode implements Closeable {
 			keyPair==null?null:keyPair.getAccountKey(),
 			keyPair==null?null:(owner,value) -> keyPair.signData(value),
 			Utils::getCurrentTimestampCell,didAuthorizer);
-		application.setContext(RelayHost.applySkew(effectiveConfig,convex.lattice.LatticeContext.EMPTY));
 		host.configureApplications(List.of(application));
 
 		NodeServer<Index<Keyword, ACell>> server=new NodeServer<>(host,effectiveConfig);

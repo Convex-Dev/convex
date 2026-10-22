@@ -495,7 +495,6 @@ public class NodeServerTest {
 		NodeConfig hostDefaults=NodeConfig.create();
 		assertEquals(4*1024*1024,hostDefaults.getMaxMessageSize());
 		assertEquals(256,hostDefaults.getMaxConnections());
-		assertEquals(30_000L,hostDefaults.getMaxFutureTimestampSkew());
 
 		LatticePropagatorConfig groupDefaults=LatticePropagatorConfig.create();
 		assertEquals(groupDefaults.getMaxMessageSize(),groupDefaults.getMaxDeltaMessageSize());
@@ -510,11 +509,9 @@ public class NodeServerTest {
 
 		NodeConfig host = NodeConfig.create(Maps.of(
 			NodeConfig.MAX_MESSAGE_SIZE, CVMLong.create(8192),
-			NodeConfig.MAX_CONNECTIONS, CVMLong.create(12),
-			NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW, CVMLong.create(78)));
+			NodeConfig.MAX_CONNECTIONS, CVMLong.create(12)));
 		assertEquals(8192,host.getMaxMessageSize());
 		assertEquals(12,host.getMaxConnections());
-		assertEquals(78,host.getMaxFutureTimestampSkew());
 
 		LatticePropagatorConfig group=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.MAX_MESSAGE_SIZE,CVMLong.create(8192),
@@ -540,9 +537,6 @@ public class NodeServerTest {
 		LatticePropagatorConfig invalidTimeout=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.ZERO));
 		assertThrows(IllegalArgumentException.class, invalidTimeout::getInboundShutdownTimeout);
-		NodeConfig invalidSkew = NodeConfig.create(Maps.of(
-			NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW, CVMLong.create(-1)));
-		assertThrows(IllegalArgumentException.class, invalidSkew::getMaxFutureTimestampSkew);
 		LatticePropagatorConfig invalidDeltaBudget=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.MAX_DELTA_MESSAGE_SIZE,CVMLong.create(4096),
 			LatticePropagatorConfig.MAX_DELTA_BROADCAST_SIZE,CVMLong.create(2048)));

@@ -45,6 +45,33 @@ public class DLFSApplicationTest {
 		assertSame(before,host.cursor().get());
 	}
 
+	@Test void applicationsOnOneHostHaveIndependentTimestampAdmission() {
+		var strictKey=Keyword.intern("strict");
+		var tolerantKey=Keyword.intern("tolerant");
+		var time=new java.util.concurrent.atomic.AtomicReference<>(CVMLong.create(100));
+		var host=LatticeHost.create();
+		var strict=host.addApplication(new DLFSApplication(host,null,time::get,0,strictKey));
+		var tolerant=host.addApplication(new DLFSApplication(host,null,time::get,30,tolerantKey));
+		var source=new DLFSApplication(LatticeHost.create(),OWNER::signData,() -> CVMLong.create(90),30);
+		source.drives(OWNER.getAccountKey()).createDrive("home");
+		var baseline=source.dlfs().cursor().get();
+		host.merge(Index.of(strictKey,baseline,tolerantKey,baseline));
+		var later=new DLFSApplication(LatticeHost.create(),OWNER::signData,() -> CVMLong.create(130),30);
+		later.drives(OWNER.getAccountKey()).createDrive("home");
+		var region=later.dlfs().cursor().get();
+		var signed=region.get(OWNER.getAccountKey());
+		// A root delivery gives the same envelope to two different application policies.
+		host.merge(Index.of(strictKey,region,tolerantKey,region));
+		assertEquals(baseline,strict.dlfs().cursor().get());
+		assertSame(signed,tolerant.dlfs().cursor().get().get(OWNER.getAccountKey()));
+		// Path delivery uses the same rule. Advancing only the component clock admits it.
+		host.mergeAt(signed,strictKey,OWNER.getAccountKey());
+		assertEquals(baseline,strict.dlfs().cursor().get());
+		time.set(CVMLong.create(130));
+		host.mergeAt(signed,strictKey,OWNER.getAccountKey());
+		assertSame(signed,strict.dlfs().cursor().get().get(OWNER.getAccountKey()));
+	}
+
 	@Test void rootRegionAndOwnerDeliveryEnforceTheSameSignedBoundary() throws Exception {
 		var source=files(LatticeHost.create());
 		Files.writeString(source.drives(OWNER.getAccountKey()).createDrive("home")
