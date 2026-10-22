@@ -837,8 +837,11 @@ The callback receives a private view of the component. Its child components shar
 the same private state, and the final value is installed atomically through the live
 cursor's signing and stamping boundaries. An exception discards the staged state.
 Callbacks may run more than once, so they must be pure, confine their changes to the
-supplied view and leave external effects until after completion. The view must not
-escape the callback. The transaction protects only its subtree: decisions must not
+supplied view and leave external effects until after completion. The draft uses an
+independent, thread-safe root. Complete any worker tasks contributing edits before
+returning from the callback. Retained views and forks still work afterwards, but
+their edits and fork syncs only update private draft storage, never the live state.
+The transaction protects only its subtree: decisions must not
 depend on live components outside it. Put such operations at their common ancestor.
 Completion means committed locally, not persisted, published or acknowledged by
 peers.

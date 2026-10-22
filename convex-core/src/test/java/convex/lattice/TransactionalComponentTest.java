@@ -24,6 +24,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.cursor.Transactions;
@@ -68,13 +69,58 @@ class TransactionalComponentTest {
 			throw new IllegalArgumentException("abort");
 		}));
 		assertSame(before,live.cursor().get());
-		assertThrows(IllegalStateException.class,() -> escaped.get().increment());
+		escaped.get().increment();
+		assertEquals(2,escaped.get().count());
+		assertSame(before,live.cursor().get());
 		live.transact(draft -> {
 			draft.increment();
 			draft.transact(nested -> nested.increment());
 			assertSame(before,live.cursor().get());
 		});
 		assertEquals(2,live.count());
+	}
+
+	@Test void retainedDraftAndForkCannotChangeCommittedState() {
+		var live=new Root<>(CVMLong.ZERO);
+		AtomicReference<AForkableCursor<CVMLong>> retained=new AtomicReference<>();
+		AtomicReference<ForkedCursor<CVMLong>> fork=new AtomicReference<>();
+		Transactions.transact(live,draft -> {
+			retained.set(draft);
+			draft.set(CVMLong.ONE);
+			fork.set(draft.fork((a,b) -> a.longValue()>=b.longValue()?a:b));
+		});
+		assertEquals(CVMLong.ONE,live.get());
+		retained.get().set(CVMLong.TWO);
+		fork.get().set(CVMLong.create(3));
+		fork.get().sync();
+		assertEquals(CVMLong.create(3),retained.get().get());
+		fork.get().set(CVMLong.create(4));
+		fork.get().sync();
+		assertEquals(CVMLong.create(4),retained.get().get());
+		assertEquals(CVMLong.ONE,live.get());
+	}
+
+	@Test void callbackCanJoinConcurrentDraftEditsBeforeCommit() {
+		Counter live=counter();
+		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+			live.transact(draft -> {
+				CountDownLatch start=new CountDownLatch(1);
+				List<CompletableFuture<Void>> work=new ArrayList<>();
+				for (int i=0;i<2;i++) {
+					work.add(CompletableFuture.runAsync(() -> {
+						await(start);
+						for (int j=0;j<32;j++) draft.increment();
+					},executor));
+				}
+				start.countDown();
+				CompletableFuture.allOf(work.toArray(CompletableFuture[]::new))
+					.orTimeout(10,TimeUnit.SECONDS).join();
+				draft.transactLocked(Counter::increment);
+				assertEquals(65,draft.count());
+				assertEquals(0,live.count());
+			});
+		}
+		assertEquals(65,live.count());
 	}
 
 	@ParameterizedTest

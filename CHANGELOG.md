@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Lattice transaction drafts use standard thread-safe root storage without thread ownership or closing guards. Callbacks may coordinate worker edits before returning; later edits to retained drafts remain isolated from live state.
+
 - `Mail.send` now holds all send state in one atomic recipient-mailbox deposit. Removed the separate in-memory outbox, `outbox()`, `redeposit()` and automatic redeposit on sync. Inspect mailbox deposits and receipts for delivery state; sends now have no extra mutable state outside transactions and forks.
 
 - `SetComponent` reports non-set storage with an explicit state error and leaves it unchanged. Set edits preserve unfamiliar members without imposing a runtime element schema.

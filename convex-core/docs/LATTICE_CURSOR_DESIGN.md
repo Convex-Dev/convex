@@ -19,7 +19,6 @@ ACursor<V>                                get / atomic update / path
     ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
     ├── PathCursor<V>                     navigation through existing containers
     ├── ProjectionCursor<S,V>             caller-supplied read/write functions
-    ├── TransactionCursor<V>              draft confined to a transaction callback
     └── AUpdateCursor<V,S>                prepare-on-write machinery
         ├── StampedCursor<V>              explicit clock and stamp function
         └── SignedCursor<V>               explicit signing function
@@ -146,6 +145,10 @@ CAS, preserving each operation under contention. `TransactionalRootCursor` opts
 into a shared write lock for explicit locked execution and contention fallback.
 Derived views forward that lock through their existing source links. Typed domain
 transactions use `TransactionalComponent.withCursor` to retain component policy.
+Each attempt uses a fresh `TransactionalRootCursor` for its draft, supporting
+concurrent edits and nested transactions through the existing cursor machinery.
+The callback must finish its work before returning. Only the captured immutable
+value is committed; later edits to a retained draft or its forks remain private.
 
 ## Signing and stamping composition
 

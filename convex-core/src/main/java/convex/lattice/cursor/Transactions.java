@@ -14,8 +14,10 @@ import convex.core.util.Utils;
  *
  * <p>This is {@code updateAndGet} whose update function receives a cursor instead of
  * a bare value, so a callback can navigate, wrap boundaries and write through
- * descendants exactly as it would against the live tree. The draft is confined to
- * the callback thread and lifetime. Typed domain transactions build on this in
+ * descendants exactly as it would against the live tree. The draft uses independent,
+ * thread-safe root storage. Complete all work contributing to the transaction before
+ * returning from the callback; later edits only change the retained draft.
+ * Typed domain transactions build on this in
  * {@code TransactionalComponent}.</p>
  *
  * <p>Ordinary roots retry optimistically without limit. A root supporting
@@ -34,7 +36,7 @@ public final class Transactions {
 	 *
 	 * @param <V> Value type
 	 * @param cursor Cursor whose value the transaction updates
-	 * @param action Operations on a private draft, valid only during the callback
+	 * @param action Operations on a private draft, completed before the callback returns
 	 */
 	public static <V extends ACell> void transact(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action) {
 		Objects.requireNonNull(cursor);
@@ -53,7 +55,7 @@ public final class Transactions {
 	 *
 	 * @param <V> Value type
 	 * @param cursor Cursor whose root supports exclusive transactions
-	 * @param action Operations on a private draft, valid only during the callback
+	 * @param action Operations on a private draft, completed before the callback returns
 	 * @throws UnsupportedOperationException if the cursor's root is an ordinary optimistic root
 	 */
 	public static <V extends ACell> void transactLocked(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action) {
@@ -89,16 +91,12 @@ public final class Transactions {
 			V observed=cursor.get();
 			if (!computed || !Utils.equals(observed,input)) {
 				input=observed;
-				TransactionCursor<V> draft=new TransactionCursor<>(input);
-				try {
-					action.accept(draft);
-					V candidate=draft.get();
-					// Preserve the original immutable value for a no-op.
-					result=Utils.equals(input,candidate)?input:candidate;
-					computed=true;
-				} finally {
-					draft.close();
-				}
+				var draft=new TransactionalRootCursor<>(input);
+				action.accept(draft);
+				V candidate=draft.get();
+				// Preserve the original immutable value for a no-op.
+				result=Utils.equals(input,candidate)?input:candidate;
+				computed=true;
 			}
 			// Validate against a fresh observation, including no-ops. Its reference
 			// may differ from the input while denoting exactly the same value.

@@ -17,7 +17,8 @@ import convex.lattice.cursor.Transactions;
  * must use that view for all lattice changes, and must not perform external side
  * effects. Descendants share the private working state. Exceptions discard the
  * attempt. Successful completion means committed locally, not published or durable.
- * A transaction view and its descendants must not escape the callback.</p>
+ * Complete all draft work before returning from the callback. Retained views and
+ * their forks remain independent storage; later edits do not change live state.</p>
  *
  * <p>Implementations need only provide their cursor and a factory which binds the
  * same domain operations and configuration to a supplied cursor. This interface
