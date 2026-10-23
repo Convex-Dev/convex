@@ -9,7 +9,7 @@ import convex.core.lang.RT;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Ordinary set operations over shared working storage. An absent set reads as
+ * Ordinary set operations over a cursor. An absent set reads as
  * empty; construction, reads and edits which change nothing leave storage alone.
  * Updates are atomic through the supplied cursor, including any enclosing signing
  * or timestamp boundary. Sync does not publish the containing component.
@@ -18,6 +18,11 @@ import convex.lattice.cursor.AForkableCursor;
  * The enclosing component determines how incoming state merges: for example, a
  * signed last-write-wins record replaces its entire set, preserving removals.
  * A grow-only set may instead use {@code SetLattice} at its merge boundary.</p>
+ *
+ * <p>A specialised component can own private working state by calling
+ * {@code super(forkOf(destination))} and implementing {@link #mergePublication}.
+ * Its inherited sync then publishes at that destination only. The ordinary
+ * cursor constructors continue to create shared views with no publication boundary.</p>
  *
  * <p>Operations require only a set at this path, not a schema for its members.
  * A non-set value is left intact and reported as an unsupported operation on the
@@ -39,6 +44,15 @@ public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
 	public SetComponent(AForkableCursor<ASet<V>> cursor,Class<V> elementType) {
 		super(cursor);
 		this.elementType=elementType;
+	}
+
+	/**
+	 * Creates private working state for a specialised set component. The subclass
+	 * supplies its publication merge; ordinary set views retain their no-op sync.
+	 */
+	protected SetComponent(ForkTarget<ASet<V>> target) {
+		super(target);
+		elementType=null;
 	}
 
 	/** Nil is the absent/empty set. Typed sets require every element to match. */
