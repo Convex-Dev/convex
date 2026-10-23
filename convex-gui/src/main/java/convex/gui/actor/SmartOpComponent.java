@@ -134,10 +134,10 @@ public class SmartOpComponent extends BaseListComponent {
 			String mode = execPanel.getMode();
 			CompletableFuture<Result> r;
 			if (mode.equals("Query")) {
-				r=Async.background(()->peerConnection.querySync(message));
+				r=peerConnection.query(message);
 			} else if (mode.equals("Transact")) {
 				ATransaction trans = Invoke.create(myAddress,-1, message);
-				r=Async.background(()->peerConnection.transactSync(trans));
+				r=peerConnection.transact(trans);
 			} else {
 				throw new Error("Unexpected mode: "+mode);
 			}
