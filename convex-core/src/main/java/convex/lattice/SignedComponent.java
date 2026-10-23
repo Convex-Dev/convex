@@ -8,6 +8,7 @@ import convex.core.data.AString;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.lattice.cursor.ACursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.SignedLattice;
 
@@ -47,10 +48,25 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	 */
 	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination,
 			Function<V,SignedData<V>> signer) {
-		super(SignedCursor.create(destination,value -> lattice.sign(value,signer)).fork());
-		this.lattice=lattice;
+		this(lattice,SignedCursor.create(destination,value -> lattice.sign(value,signer)).fork());
 		Objects.requireNonNull(signer,"Signer must not be null");
 	}
+
+	/**
+	 * Binds existing unsigned working storage, including a transaction draft or a
+	 * nested fork. Signing remains at the original signed destination, not at each
+	 * intermediate unsigned commit.
+	 */
+	protected SignedComponent(SignedLattice<V> lattice,AForkableCursor<V> cursor) {
+		super(cursor);
+		this.lattice=Objects.requireNonNull(lattice);
+	}
+
+	@Override protected SignedComponent<V> rebind(AForkableCursor<V> cursor) {
+		return new SignedComponent<>(lattice,cursor);
+	}
+
+	@Override public SignedComponent<V> fork() { return rebind(storage.fork()); }
 
 	/**
 	 * Checks envelope shape only. Merge separately verifies the signature, owner

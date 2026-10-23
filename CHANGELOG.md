@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Timestamped` combines atomic timestamping of local edits with whole-record ordering. Its standard map factory handles `:timestamp`, and enclosing signed or staged components share its merge rule. Incoming records retain their timestamps, while no-op edits preserve existing timestamps and signatures.
 - Cursors support explicit `withDefault(value)` views. Absent storage remains absent on reads and unchanged writes, while descendant edits can construct a container of the supplied type.
+- `UnionSet<V>` supplies standard union delivery and publication for set domain components, with explicit forks. Local removal has no replicated deletion semantics.
 - `SetComponent<V>` provides atomic set operations over a shared cursor, including embedded sets inside signed domain records. Enclosing components retain control of merge, timestamp and publication policy.
 - Component bases and hosts no longer carry `LatticeContext`. Region factories receive only a cursor; KV, queues and DLFS use explicit clocks, and Mail accepts an owner-aware receipt signer. `DLFSLocal` exposes `getClock`/`setClock` in place of its context accessors. Optional `ALattice` adapters retain local context support.
 - `AKeyedRegions` composes application roots and nested regions from standard or shared components, with `SingleRegion` and `Regions` implementations for ordinary assembly. Incoming values reach only registered children; publication preserves unrelated regions. `LatticeComponent` supplies standard lattice-backed merging and staged or live storage.
@@ -37,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Owned collections bind supplied cursors directly; use `.fork()` to stage them explicitly. Forks retain owner verification policy. Signed components retain deliberate unsigned staging and support nested drafts that sign only at the envelope publication boundary. Component transactions commit through bound `storage()`, avoiding duplicate application of editing policies.
+
 - Future-timestamp admission belongs to the application or component. Removed node-wide and `LatticeContext` skew settings; standalone DLFS now reads `dlfs.maxFutureTimestampSkew` (previously `node.maxFutureTimestampSkew`). `DLFSLattice.withClock(clock, skew)` binds explicit admission policy, while the unconfigured lattice merges solely by value. P2P no longer supplies an ambient merge context.
 
 - Social components take an owner-aware signer, DID authoriser and timestamp supplier; one signer can serve multiple DIDs and key rotation reaches existing views. P2P identity and node registries bind direct-key ownership independently of context, and local authoring takes an explicit multi-owner signer. Registered social users share one component. Relay admission preserves unfamiliar signed social fields and rechecks current DID authority instead of treating cached keys as continuing authority.
@@ -45,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `DLFSApplication` now composes registered regions without a root `ALattice`. Construct it with a host (default `:fs`), a path of region keys, or an explicitly shared/staged `DLFSRegion`; the old lattice-taking `connect` factory and `region()` override are removed. DLFS and social regions handle incoming owner envelopes directly, and staged regions reconcile incoming data without publishing pending edits. DLFS server entry points register their application before transport starts and accept only their configured DLFS region.
 
-- Lattice components use `cursor()` as the single editing access point; the backing field is now private, so subclass operations honour cursor wrappers. `ASignedComponent.checkPayload` supports optional unsigned domain diagnostics, and owned maps expose `signingFor(owner)` directly.
+- Lattice components use `cursor()` as the single editing access point; bound `storage()` is separate from the editing view, so lifecycle operations preserve their boundary while domain operations honour cursor wrappers. `ASignedComponent.checkPayload` supports optional unsigned domain diagnostics, and owned maps expose `signingFor(owner)` directly.
 
 - `PathCursor` shares atomic operations with other transforming cursor views. Update-and-return operations now return the stored path value after enclosing write policies such as stamping.
 

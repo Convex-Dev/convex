@@ -81,6 +81,14 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
+	 * Returns the bound working storage, before this component's editing policies.
+	 * Lifecycle operations use this boundary; ordinary domain edits use {@link #cursor()}.
+	 */
+	public final AForkableCursor<V> storage() {
+		return storage;
+	}
+
+	/**
 	 * Checks whether a candidate value is compatible with this component.
 	 * Validity is application-defined; success need not imply merge acceptance.
 	 * For example, merge may additionally enforce ownership, freshness or limits.

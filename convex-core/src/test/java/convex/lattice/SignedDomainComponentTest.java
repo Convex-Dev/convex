@@ -60,9 +60,9 @@ class SignedDomainComponentTest {
 
 	@Test void absentOwnerMapIsCreatedOnlyByTheFirstEditAndPublishesSeparately() {
 		var destination=new Root<Index<AccountKey,SignedData<AInteger>>>();
-		var map=new KeyOwnedIndex<>(destination,MaxLattice.INSTANCE);
+		var map=new KeyOwnedIndex<>(destination,MaxLattice.INSTANCE).fork();
 		var owner=ALICE.getAccountKey();
-		var count=new Count(map.path(owner),map.getLattice().signingFor(owner),
+		var count=new Count(map.path(owner),map.signingFor(owner),
 			ALICE::signData);
 		assertNull(count.sync());
 		assertNull(map.sync());

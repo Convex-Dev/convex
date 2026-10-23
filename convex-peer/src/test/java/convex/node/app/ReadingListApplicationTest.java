@@ -19,10 +19,9 @@ import convex.core.data.Strings;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeHost;
-import convex.lattice.SetComponent;
+import convex.lattice.UnionSet;
 import convex.lattice.SingleRegion;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.generic.SetLattice;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
@@ -43,7 +42,7 @@ class ReadingListApplicationTest {
 	}
 
 	/** Staged recommendations, combined by union both on receipt and on publication. */
-	static final class Books extends SetComponent<AString> {
+	static final class Books extends UnionSet<AString> {
 		Books(AForkableCursor<ASet<AString>> cursor) { super(cursor); }
 		@Override protected Books rebind(AForkableCursor<ASet<AString>> cursor) {
 			return new Books(cursor);
@@ -51,13 +50,6 @@ class ReadingListApplicationTest {
 		@Override public Books fork() { return rebind(storage.fork()); }
 		void recommend(String title) { add(Strings.create(title)); }
 		ASet<AString> titles() { return get(); }
-
-		@Override public ASet<AString> merge(ASet<AString> incoming) {
-			return cursor().updateAndGet(own -> mergePublication(own,incoming));
-		}
-		@Override protected ASet<AString> mergePublication(ASet<AString> own,ASet<AString> other) {
-			return SetLattice.<AString>create().merge(own,other);
-		}
 	}
 
 	/** Independent drafts reconcile at their shared region without rewriting sibling regions. */

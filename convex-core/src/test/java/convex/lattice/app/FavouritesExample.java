@@ -115,7 +115,7 @@ public final class FavouritesExample {
 		private final Supplier<CVMLong> getTimestamp;
 
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
-			this(host,new KeyOwnedIndex<>(host.cursor().path(FAVOURITES),Timestamped.lattice()),getTimestamp);
+			this(host,new KeyOwnedIndex<>(host.cursor().path(FAVOURITES),Timestamped.lattice()).fork(),getTimestamp);
 		}
 
 		/** Shares the supplied region's pending state and destination; the clock is authoring policy. */

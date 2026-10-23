@@ -60,6 +60,41 @@ class OwnedComponentsTest {
 		return indexed?Index.of(owner,value):Maps.of(owner,value);
 	}
 
+	@Test void bindingIsLiveAndForksRetainOwnershipPolicy() {
+		var indexRoot=new Root<Index<AString,SignedData<AInteger>>>();
+		var index=new OwnedIndex<>(indexRoot,MaxLattice.INSTANCE,VERIFIER);
+		assertSame(indexRoot,index.storage());
+		assertForkContract(index,index.fork(),A);
+		var mapRoot=new Root<AHashMap<AString,SignedData<AInteger>>>();
+		var map=new OwnedMap<>(mapRoot,MaxLattice.INSTANCE,VERIFIER);
+		assertSame(mapRoot,map.storage());
+		assertForkContract(map,map.fork(),A);
+		var keyRoot=new Root<Index<AccountKey,SignedData<AInteger>>>();
+		var keys=new KeyOwnedIndex<>(keyRoot,MaxLattice.INSTANCE);
+		assertSame(keyRoot,keys.storage());
+		assertForkContract(keys,keys.fork(),ALICE.getAccountKey());
+	}
+
+	private static <K extends ACell,M extends AMap<K,SignedData<AInteger>>> void assertForkContract(
+			AOwnedMap<K,AInteger,M> live,AOwnedMap<K,AInteger,M> draft,K owner) {
+		assertSame(live.getLattice(),draft.getLattice(),"Forks retain the exact verification policy");
+		assertNull(live.sync());
+		draft.mergeAt(BOB.signData(CVMLong.create(10)),owner);
+		draft.sync();
+		assertNull(live.cursor().get(),"Rejected delivery must not create a collection");
+		var first=ALICE.signData(CVMLong.ONE);
+		draft.mergeAt(first,owner);
+		assertNull(live.cursor().get());
+		var second=ALICE.signData(CVMLong.TWO);
+		live.mergeAt(second,owner);
+		assertSame(second,live.storage().get().get(owner),"Ordinary construction binds live storage");
+		draft.sync();
+		assertSame(second,draft.get(owner),"Publication reconciles with a concurrent authorised value");
+		var before=live.cursor().get();
+		draft.sync();
+		assertSame(before,live.cursor().get());
+	}
+
 	@Test void rootAndOwnerPathDeliveriesHaveIdenticalAuthorisationAndMerge() {
 		for (boolean indexed:new boolean[] {false,true}) {
 			var root=collection(indexed);
@@ -123,10 +158,10 @@ class OwnedComponentsTest {
 
 	@Test void openingViewsIsInertAndEditsShareOneSignedWorkspace() {
 		var destination=new Root<Index<AString,SignedData<AInteger>>>();
-		var map=new OwnedIndex<>(destination,MaxLattice.INSTANCE,VERIFIER);
+		var map=new OwnedIndex<>(destination,MaxLattice.INSTANCE,VERIFIER).fork();
 		Function<AInteger,SignedData<AInteger>> alice=ALICE::signData;
-		var first=new Count(map.path(A),map.getLattice().signingFor(A),alice);
-		var second=new Count(map.path(A),map.getLattice().signingFor(A),alice);
+		var first=new Count(map.path(A),map.signingFor(A),alice);
+		var second=new Count(map.path(A),map.signingFor(A),alice);
 		map.draft(A,alice);
 		assertNull(map.cursor().get());
 		assertNull(map.sync());
@@ -142,23 +177,23 @@ class OwnedComponentsTest {
 
 	@Test void capabilitiesCannotReplaceTheMapsAuthorisationPolicy() {
 		var map=collection(true);
-		var view=new Count(map.path(A),map.getLattice().signingFor(A),BOB::signData);
+		var view=new Count(map.path(A),map.signingFor(A),BOB::signData);
 		assertThrows(IllegalStateException.class,() -> view.set(1));
 		assertNull(map.cursor().get());
 		var draft=map.draft(A,BOB::signData);
 		draft.cursor().set(CVMLong.ONE);
 		assertThrows(IllegalStateException.class,draft::sync);
 		assertNull(map.cursor().get());
-		new Count(map.path(A),map.getLattice().signingFor(A),DELEGATE::signData).set(2);
+		new Count(map.path(A),map.signingFor(A),DELEGATE::signData).set(2);
 		assertEquals(DELEGATE.getAccountKey(),map.get(A).getAccountKey());
-		var unknown=new Count(map.path(UNKNOWN),map.getLattice().signingFor(UNKNOWN),ALICE::signData);
+		var unknown=new Count(map.path(UNKNOWN),map.signingFor(UNKNOWN),ALICE::signData);
 		assertThrows(IllegalStateException.class,() -> unknown.set(3));
 		assertNull(map.get(UNKNOWN));
 	}
 
 	@Test void independentDraftsPublishOnlyAtTheirOwnBoundaryAndReconcile() {
 		var destination=new Root<Index<AccountKey,SignedData<ASet<CVMLong>>>>();
-		var map=new KeyOwnedIndex<>(destination,SetLattice.<CVMLong>create());
+		var map=new KeyOwnedIndex<>(destination,SetLattice.<CVMLong>create()).fork();
 		var first=map.draft(ALICE.getAccountKey(),ALICE::signData);
 		var second=map.draft(ALICE.getAccountKey(),ALICE::signData);
 		first.cursor().set(Sets.of(1));
@@ -198,11 +233,11 @@ class OwnedComponentsTest {
 		map.mergeAt(first,A);
 		map.mergeAt(second,A);
 		assertSame(first,map.get(A),"a relay cannot sign a synthesised union");
-		var author=new ASignedComponent<ASet<CVMLong>>(map.path(A),map.getLattice().signingFor(A),
+		var author=new ASignedComponent<ASet<CVMLong>>(map.path(A),map.signingFor(A),
 			BOB::signData) {};
 		author.merge(second);
 		assertSame(first,map.get(A),"the domain component's chosen signer must be authorised");
-		var authorised=new ASignedComponent<ASet<CVMLong>>(map.path(A),map.getLattice().signingFor(A),DELEGATE::signData) {};
+		var authorised=new ASignedComponent<ASet<CVMLong>>(map.path(A),map.signingFor(A),DELEGATE::signData) {};
 		authorised.merge(second);
 		assertEquals(Sets.of(1,2),map.get(A).getValue());
 		assertEquals(DELEGATE.getAccountKey(),map.get(A).getAccountKey());
@@ -211,11 +246,11 @@ class OwnedComponentsTest {
 
 	@Test void ownedCollectionsNeverResolveCapabilitiesWhenMergingOrPublishing() {
 		var indexDestination=new Root<Index<AString,SignedData<ASet<CVMLong>>>>();
-		assertPublicMerge(new OwnedIndex<>(indexDestination,SetLattice.create(),VERIFIER),indexDestination,A);
+		assertPublicMerge(new OwnedIndex<>(indexDestination,SetLattice.<CVMLong>create(),VERIFIER).fork(),indexDestination,A);
 		var mapDestination=new Root<AHashMap<AString,SignedData<ASet<CVMLong>>>>();
-		assertPublicMerge(new OwnedMap<>(mapDestination,SetLattice.create(),VERIFIER),mapDestination,A);
+		assertPublicMerge(new OwnedMap<>(mapDestination,SetLattice.<CVMLong>create(),VERIFIER).fork(),mapDestination,A);
 		var keyDestination=new Root<Index<AccountKey,SignedData<ASet<CVMLong>>>>();
-		assertPublicMerge(new KeyOwnedIndex<>(keyDestination,SetLattice.create()),keyDestination,ALICE.getAccountKey());
+		assertPublicMerge(new KeyOwnedIndex<>(keyDestination,SetLattice.<CVMLong>create()).fork(),keyDestination,ALICE.getAccountKey());
 	}
 
 	@SuppressWarnings("unchecked")
@@ -238,7 +273,7 @@ class OwnedComponentsTest {
 	@Test @SuppressWarnings({"rawtypes","unchecked"})
 	void localPayloadsMustAlsoMeetTheValueLatticesValidation() {
 		var map=collection(true);
-		var view=new Count(map.path(A),map.getLattice().signingFor(A),ALICE::signData);
+		var view=new Count(map.path(A),map.signingFor(A),ALICE::signData);
 		AForkableCursor raw=view.cursor();
 		assertThrows(IllegalArgumentException.class,() -> raw.set(Strings.create("not an integer")));
 		assertNull(map.cursor().get());
@@ -252,7 +287,7 @@ class OwnedComponentsTest {
 	@Test void hashMapsSupportNonIndexOwnerIdentities() {
 		var destination=new Root<AHashMap<CVMLong,SignedData<AInteger>>>();
 		var map=new OwnedMap<>(destination,MaxLattice.INSTANCE,
-			(CVMLong owner,AccountKey signer) -> owner.equals(CVMLong.ONE) && signer.equals(ALICE.getAccountKey()));
+			(CVMLong owner,AccountKey signer) -> owner.equals(CVMLong.ONE) && signer.equals(ALICE.getAccountKey())).fork();
 		map.mergeAt(ALICE.signData(CVMLong.TWO),CVMLong.ONE);
 		assertEquals(CVMLong.TWO,map.get(CVMLong.ONE).getValue());
 		assertNull(destination.get());

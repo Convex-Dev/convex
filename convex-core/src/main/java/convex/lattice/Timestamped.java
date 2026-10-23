@@ -56,14 +56,14 @@ public final class Timestamped<V extends ACell> extends ALatticeComponent<V> {
 		@Override public <T extends ACell> ALattice<T> path(ACell key) { return null; }
 	};
 
-	private final AForkableCursor<V> storage;
+	private final AForkableCursor<V> unstamped;
 	private final ALattice<V> ordering;
 
 	/** Wraps a custom record representation with its ordering, clock and stamping rule. */
 	public Timestamped(AForkableCursor<V> storage,ALattice<V> ordering,
 			Supplier<CVMLong> getTimestamp,BiFunction<V,CVMLong,V> stamp) {
 		super(StampedCursor.create(Objects.requireNonNull(storage),getTimestamp,stamp));
-		this.storage=storage;
+		this.unstamped=storage;
 		this.ordering=Objects.requireNonNull(ordering);
 	}
 
@@ -88,11 +88,11 @@ public final class Timestamped<V extends ACell> extends ALatticeComponent<V> {
 
 	/** Selects a complete incoming record without consulting the clock or re-stamping. */
 	@Override public V merge(V incoming) {
-		return storage.updateAndGet(own -> getLattice().merge(own,incoming));
+		return unstamped.updateAndGet(own -> getLattice().merge(own,incoming));
 	}
 
 	/** Incoming updates supply the complete timestamped record. */
 	@Override public V mergeAt(ACell incoming,ACell... path) {
-		return path.length==0?super.mergeAt(incoming):storage.get();
+		return path.length==0?super.mergeAt(incoming):unstamped.get();
 	}
 }

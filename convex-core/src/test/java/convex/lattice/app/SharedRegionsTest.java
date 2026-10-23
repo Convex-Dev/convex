@@ -11,12 +11,10 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.Regions;
-import convex.lattice.SetComponent;
+import convex.lattice.UnionSet;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.generic.SetLattice;
 
 /**
  * Two applications share a host while owning disjoint regions. Each {@link Regions}
@@ -35,15 +33,13 @@ class SharedRegionsTest {
 	private static final Keyword B=Keyword.intern("b");
 
 	/** A staged grow-only set; union is the rule for both incoming merge and publication conflicts. */
-	static final class Items extends LatticeComponent<ASet<ACell>> {
-		private final SetComponent<ACell> items;
+	static final class Items extends UnionSet<ACell> {
 		Items(AForkableCursor<ASet<ACell>> destination) {
-			super(SetLattice.create(),destination);
-			items=new SetComponent<>(cursor());
+			super(destination);
 		}
 		@Override protected Items rebind(AForkableCursor<ASet<ACell>> cursor) { return new Items(cursor); }
 		@Override public Items fork() { return rebind(storage.fork()); }
-		void add(long item) { items.add(CVMLong.create(item)); }
+		void add(long item) { add(CVMLong.create(item)); }
 	}
 
 	private static ACell region(LatticeHost<Index<Keyword,ACell>> host,Keyword key) {

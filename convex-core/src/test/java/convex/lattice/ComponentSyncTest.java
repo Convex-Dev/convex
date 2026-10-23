@@ -20,6 +20,7 @@ import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.SignedCursor;
+import convex.lattice.cursor.TransactionalRootCursor;
 
 /** Publication follows bound storage, independently of editing views. */
 class ComponentSyncTest {
@@ -99,8 +100,34 @@ class ComponentSyncTest {
 			view.sync(); // Transaction storage is a root, so this cannot publish.
 		});
 		assertEquals(Sets.of(1,3),live.items.get());
+		assertEquals(4,ticks.get(),"Transaction commit must not stamp the prepared record again");
 		draft.sync();
 		assertEquals(Sets.of(1,3,4),live.items.get());
+	}
+
+	@Test void transactionsRetainPreparedTimestampsAndDiscardFailedEdits() {
+		for (boolean locked:new boolean[] {false,true}) {
+			var root=new TransactionalRootCursor<AHashMap<Keyword,ACell>>(null);
+			var ticks=new AtomicLong();
+			var record=new Record(root,() -> CVMLong.create(ticks.incrementAndGet()));
+			java.util.function.Consumer<Record> edit=draft -> {
+				draft.items.add(CVMLong.ONE);
+				draft.items.add(CVMLong.TWO);
+				assertNull(root.get());
+			};
+			if (locked) record.transactLocked(edit); else record.transact(edit);
+			assertEquals(2,ticks.get(),"Only the two changed domain edits should consult the clock");
+			assertEquals(CVMLong.TWO,root.get().get(Timestamped.TIMESTAMP));
+			var before=root.get();
+			record.transact(draft -> draft.items.add(CVMLong.ONE));
+			assertSame(before,root.get());
+			assertEquals(2,ticks.get(),"A no-op transaction must not stamp");
+			assertThrows(IllegalStateException.class,() -> record.transact(draft -> {
+				draft.items.add(CVMLong.create(3));
+				throw new IllegalStateException("Abort");
+			}));
+			assertSame(before,root.get(),"Failed edits must not publish their values or timestamps");
+		}
 	}
 
 	@Test void liveSyncPreservesAbsentAndPresentStorage() {

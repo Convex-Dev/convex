@@ -20,19 +20,21 @@ import convex.lattice.cursor.Transactions;
  * Complete all draft work before returning from the callback. Retained views and
  * their forks remain independent storage; later edits do not change live state.</p>
  *
- * <p>Implementations need only provide their cursor and a factory which binds the
+ * <p>Implementations need only provide their bound storage and a factory which binds the
  * same domain operations and configuration to a supplied cursor. This interface
  * can also be implemented by application subclasses without changing their base
  * class or introducing a component registry. The engine is
- * {@link Transactions}; this interface adds the typed component view.</p>
+ * {@link Transactions}; this interface adds the typed component view. Rebinding
+ * reinstalls editing policies on the draft. Commit uses bound storage so those
+ * policies are not applied twice.</p>
  *
  * @param <V> Lattice value type
  * @param <C> Domain component type supplied to callbacks
  */
 public interface TransactionalComponent<V extends ACell,C> {
 
-	/** Returns this component's cursor. */
-	AForkableCursor<V> cursor();
+	/** Returns bound working storage, before editing policies reinstalled by withCursor. */
+	AForkableCursor<V> storage();
 
 	/**
 	 * Creates a fresh component over the supplied cursor, retaining domain metadata
@@ -50,7 +52,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 */
 	default void transact(Consumer<? super C> action) {
 		Objects.requireNonNull(action);
-		Transactions.transact(cursor(),draft -> action.accept(withCursor(draft)));
+		Transactions.transact(storage(),draft -> action.accept(withCursor(draft)));
 	}
 
 	/**
@@ -62,7 +64,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 */
 	default void transactLocked(Consumer<? super C> action) {
 		Objects.requireNonNull(action);
-		Transactions.transactLocked(cursor(),draft -> action.accept(withCursor(draft)));
+		Transactions.transactLocked(storage(),draft -> action.accept(withCursor(draft)));
 	}
 
 	/**

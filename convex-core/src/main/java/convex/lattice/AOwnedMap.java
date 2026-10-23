@@ -8,24 +8,25 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
-import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.AOwnerLattice;
 import convex.lattice.generic.SignedLattice;
 
 /**
- * A staged map of owner identities to signed values. The instance-bound owner
- * lattice supplies one verification rule for whole-map delivery, owner-path
+ * A map of owner identities to signed values over supplied working storage.
+ * The instance-bound owner lattice supplies one verification rule for whole-map delivery, owner-path
  * delivery and local authoring. Merging and publication use public information
- * only and never consult this component's context. A merge requiring a newly
+ * only and require no signing capability. A merge requiring a newly
  * signed payload retains the existing envelope until an authorised domain
  * component authors the result. Unresolved or unauthorised owners cannot introduce data.
  *
  * <p>Domain subclasses of {@link ASignedComponent} are constructed at {@link #path}
-	 * with an owner-bound rule from {@link #signingFor}. They share this map's working
+ * with an owner-bound rule from {@link #signingFor}. They share this map's working
  * state and sign each edit. Independent drafts
  * defer signing until their own sync, which stops at this map's working state.
- * Neither opening a view nor opening a draft creates an entry. This component's
+ * Construction binds the supplied cursor; call fork on a concrete collection
+ * when it needs an independent publication boundary. Neither opening a view nor
+ * opening a draft creates an entry. This component's
  * sync publishes the map only; it does not publish outstanding drafts.</p>
  *
  * @param <K> Owner identity type
@@ -37,8 +38,8 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 
 	private final AOwnerLattice<K,V,M> owners;
 
-	protected AOwnedMap(AOwnerLattice<K,V,M> owners,ACursor<M> destination) {
-		super(convex.lattice.cursor.ForkedCursor.create(destination));
+	protected AOwnedMap(AOwnerLattice<K,V,M> owners,AForkableCursor<M> cursor) {
+		super(cursor);
 		this.owners=owners;
 	}
 
@@ -72,13 +73,19 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	/** Merges verified envelopes without resolving signing capabilities. */
 	@Override
 	public M merge(M incoming) {
-		return cursor().updateAndGet(own -> owners.merge(own,incoming));
+		return storage.updateAndGet(own -> mergeValues(own,incoming));
 	}
 
 	/** Publication conflicts use the same public merge as incoming deliveries. */
 	@Override
 	protected M mergePublication(M own,M other) {
-		return owners.merge(own,other);
+		return mergeValues(own,other);
+	}
+
+	private M mergeValues(M own,M other) {
+		M merged=owners.merge(own,other);
+		// Empty or wholly rejected delivery must not materialise an absent collection.
+		return own==null && merged!=null && merged.isEmpty()?null:merged;
 	}
 
 	/** Delivers one complete owner envelope; paths inside an envelope introduce no data. */

@@ -738,6 +738,27 @@ and component rebinding. Regression tests cover shared publication, view no-ops,
 recreated timestamping and set children, per-sync policy, and existing atomic
 failure and concurrency guarantees.
 
+## 30. Consistent storage binding with deliberate domain lifecycles
+
+Implemented 23 October 2026. Ordinary owned collections now bind supplied storage
+and support explicit forks retaining their verification rule. Domain and application
+constructors may still deliberately establish staging, especially signed components
+which batch unsigned edits before publication. Rebinding always binds the supplied
+storage directly. Nested signed drafts reconcile unsigned state and sign only when
+the original envelope boundary publishes.
+
+Transactions use bound `storage()`, with editing policies reinstalled on their
+private component view by `withCursor`/`rebind`. Committing a prepared timestamped
+record no longer stamps it twice. The public interface bridge remains a small
+adapter to the protected construction hook; no self-type hierarchy is introduced.
+
+`UnionSet` supplies standard union merging for set domain components. Reading List
+and Shared Regions use it; Notebook embeds ordinary set operations behind its own
+domain API rather than using a default-value projection to suppress child sync.
+Empty or rejected owner-map deliveries preserve absent storage. Tests cover these
+properties, nested signing counts, fork verification policy and failed transactions.
+CAD035/CAD045's atomic publication and component binding contracts govern this work.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |

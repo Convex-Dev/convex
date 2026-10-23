@@ -39,6 +39,31 @@ public class SignedComponentTest {
 	}
 
 	@Test
+	public void testNestedDraftsReconcileUnsignedAndSignOnlyAtTheEnvelopeBoundary() {
+		var destination=new Root<SignedData<ASet<CVMLong>>>();
+		var signatures=new AtomicInteger();
+		var notebook=new SignedComponent<>(SIGNED,destination,signer(signatures::incrementAndGet));
+		var first=notebook.fork();
+		var second=notebook.fork();
+		new SetComponent<>(first.cursor()).add(CVMLong.ONE);
+		new SetComponent<>(second.cursor()).add(CVMLong.TWO);
+		assertNull(notebook.cursor().get());
+		first.sync();
+		second.sync();
+		assertEquals(Sets.of(1,2),notebook.cursor().get());
+		assertNull(destination.get());
+		assertEquals(0,signatures.get());
+		notebook.sync();
+		assertEquals(Sets.of(1,2),destination.get().getValue());
+		assertTrue(destination.get().checkSignature());
+		assertEquals(1,signatures.get());
+		first.sync(); // Adopt the sibling's contribution without publishing the notebook.
+		notebook.sync();
+		assertEquals(Sets.of(1,2),first.cursor().get());
+		assertEquals(1,signatures.get(),"Unchanged publication must not sign again");
+	}
+
+	@Test
 	public void testSignedLocalEditWinsAnEqualTimestampConflict() {
 		var lattice=OwnerKeyLattice.create(LWWLattice.<CVMLong>create(v -> 100)).signingFor(KEY.getAccountKey());
 		var destination=new Root<>(KEY.signData(CVMLong.ZERO));

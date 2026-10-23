@@ -44,7 +44,7 @@ import convex.lattice.generic.SignedLattice;
 class OwnedScoresApplicationTest {
 
 	private static final Keyword SCORES=Keyword.intern("scores");
-	private static final AString TEAM=Strings.create("did:example:team");
+	private static final AString TEAM=Strings.intern("did:example:team");
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(7410);
 	private static final AKeyPair BOB=AKeyPair.createSeeded(7411);
 	private static final AKeyPair STRANGER=AKeyPair.createSeeded(7412);
@@ -62,15 +62,21 @@ class OwnedScoresApplicationTest {
 		}
 	}
 
-	/** Owns identity verification and staged storage, but no private signing capability. */
+	/** Binds identity verification to supplied storage, with no private signing capability. */
 	static final class Scores extends OwnedIndex<AString,AInteger> {
+		private final Authority authority;
 		Scores(AForkableCursor<Index<AString,SignedData<AInteger>>> destination,
 				Authority authority) {
 			super(destination,MaxLattice.INSTANCE,authority::isAuthorised);
+			this.authority=authority;
 		}
+		@Override protected Scores rebind(AForkableCursor<Index<AString,SignedData<AInteger>>> cursor) {
+			return new Scores(cursor,authority);
+		}
+		@Override public Scores fork() { return rebind(storage.fork()); }
 		/** Opens a live handle; possession of the supplied key alone does not authorise an edit. */
 		Score score(AString owner,AKeyPair signer) {
-			return new Score(path(owner),getLattice().signingFor(owner),signer);
+			return new Score(path(owner),signingFor(owner),signer);
 		}
 	}
 
@@ -88,7 +94,7 @@ class OwnedScoresApplicationTest {
 		var authority=new Authority();
 		authority.authorise(TEAM,ALICE.getAccountKey(),BOB.getAccountKey());
 		var host=LatticeHost.create();
-		var app=new SingleRegion<>(host,SCORES,new Scores(host.cursor().path(SCORES),authority));
+		var app=new SingleRegion<>(host,SCORES,new Scores(host.cursor().path(SCORES),authority).fork());
 		var alice=app.component().score(TEAM,ALICE);
 		var bob=app.component().score(TEAM,BOB);
 		alice.record(10);
@@ -98,7 +104,7 @@ class OwnedScoresApplicationTest {
 		app.sync();
 
 		var replicaHost=LatticeHost.create();
-		var replica=new SingleRegion<>(replicaHost,SCORES,new Scores(replicaHost.cursor().path(SCORES),authority));
+		var replica=new SingleRegion<>(replicaHost,SCORES,new Scores(replicaHost.cursor().path(SCORES),authority).fork());
 		replicaHost.addApplication(replica);
 		replicaHost.merge(host.cursor().get());
 		var accepted=replica.component().get(TEAM);

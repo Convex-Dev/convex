@@ -228,8 +228,12 @@ pipeline during launch; application code never knows a node exists.
 
 ## Composing named regions
 
-A component constructor binds the supplied working cursor directly. Its default
-`sync()` supplies `mergePublication` to that bound cursor: a fork publishes into its
+An ordinary component constructor binds the supplied working cursor directly.
+A domain or application constructor may deliberately establish a lifecycle boundary;
+for example, `SignedComponent` creates an unsigned draft over a signed destination.
+That choice belongs in construction, never in `rebind`.
+
+The default `sync()` supplies `mergePublication` to that bound cursor: a fork publishes into its
 immediate destination, while an ordinary root, path or transformed view only reads.
 Wrappers bound to the same fork share its publication boundary. A child editing
 view over a fork does not publish the enclosing fork.
@@ -238,9 +242,11 @@ The protected `rebind(cursor)` hook reconstructs the domain component over suppl
 storage, retaining clocks, signers and merge rules while rebuilding child views.
 It must not fork the supplied cursor. Component `fork()` rebinds to a fork of bound
 storage. An overridden `cursor()` may expose a signing or timestamping editing
-view without changing what sync publishes. Transactional components can delegate
-`withCursor(cursor)` to the same construction hook. Application lifecycle methods
-explicitly add preparation and child publication.
+view without changing what sync publishes. `storage()` exposes the bound working
+cursor for lifecycle operations. Transactional components delegate
+`withCursor(cursor)` to the same construction hook and transact over bound storage;
+editing policies are installed once on the private view, not reapplied on commit.
+Application lifecycle methods explicitly add preparation and child publication.
 
 Extend `AKeyedRegions` for an application whose interests are named regions of an
 index. Register a child for each region. The same class works at the host root or
@@ -593,9 +599,17 @@ empty without creating state. Its cursor passes through the favourites record's
 `Timestamped` component and signing boundary, so a changed set and its timestamp are
 signed together. No-op edits retain the existing timestamp and signature.
 
+`UnionSet<V>` adds standard set-union delivery and publication to `SetComponent`.
+Use it for recommendations or memberships whose merge should retain contributions
+from either replica. Plain `SetComponent` remains policy-neutral for fields inside
+a timestamped or signed record. Local `remove` and `clear` are still available,
+but union can restore those members from another replica; it provides no replicated
+deletion rule.
+
 Components access their editing view through `cursor()`, including inherited
 operations. A wrapper is constructed once from `super.cursor()` and returned by
-the override; there is no protected backing field for domain methods to bypass it.
+the override. The protected `storage` field and `storage()` accessor identify the
+boundary for lifecycle operations; ordinary domain operations use `cursor()`.
 
 The record cursor explicitly uses `withDefault(Maps.empty())`, which presents an
 empty record without storing it. The composition is:
@@ -800,8 +814,9 @@ some of a container's keys cannot overwrite or remove what another component own
 there. A declared key it did not edit follows the lattice rule rather than adopting,
 which differs only on an exact tie. What a component's own staged children publish is
 theirs: each publishes through its own fork of the host, beside the parent's copy,
-and the parent's merge takes those regions from the host. Nesting a staged component
-inside another component's working copy is the shape to avoid.
+and the parent's merge takes those regions from the host. A nested fork is also useful
+when an operation needs its own draft: its sync commits only to its immediate
+destination. Publishing the enclosing component remains an explicit separate step.
 
 The whole root, a domain region and an owner's slot are the three usual boundaries,
 chosen by what the component edits: a relay lives at the whole root, a domain
@@ -830,11 +845,12 @@ user.feed().post("Second post");
 signed.sync(); // one signed publication to signedSlot
 ```
 
-On sync, the component merges the unsigned payload with the destination, signs the
-result once and publishes the envelope. Unchanged payloads do not sign. A signing
-failure leaves the destination unchanged. Sync is not a rollback transaction: a
-completed publication stands even if later reconciliation fails. Untrusted envelopes
-enter through verified merge; publication reconciles only values the application has
+On sync, the component merges the unsigned payload with the destination, prepares
+a signature and publishes the envelope. Concurrent changes to that payload can
+require fresh preparation; unrelated ancestor changes reuse the signature.
+Unchanged payloads do not sign. A signing failure leaves the destination unchanged. Reconciliation and signing complete
+before the publication commit; there is no fallible reconciliation after publication.
+Untrusted envelopes enter through verified merge; publication reconciles only values the application has
 already accepted.
 
 Applications choose their components and publication order explicitly:
@@ -870,8 +886,12 @@ user.transactAsync(u -> u.feed().post("Another post"))
 ```
 
 The callback receives a private view of the component. Its child components share
-the same private state, and the final value is installed atomically through the live
-cursor's signing and stamping boundaries. An exception discards the staged state.
+the same private state. Rebinding reinstalls the component's editing policies on
+that private storage. The prepared value is committed atomically through `storage()`,
+so an overridden editing `cursor()` does not stamp it a second time. A signing
+view already present in bound storage signs at commit; a component bound to an
+unsigned fork continues to defer signing until its explicit publication.
+An exception discards the staged state.
 Callbacks may run more than once, so they must be pure, confine their changes to the
 supplied view and leave external effects until after completion. The draft uses an
 independent, thread-safe root. Complete any worker tasks contributing edits before
@@ -1052,6 +1072,11 @@ ALatticeComponent<M>                (abstract component base)
     OwnedIndex<K,V>                  (Index storage)
       KeyOwnedIndex<V>               (owner public key must equal signer)
 ```
+
+Owned collections bind the supplied working cursor without forking it. Call
+`.fork()` explicitly to stage a region, or let a domain constructor deliberately
+choose that lifecycle. Forks retain the same authorisation and merge policy.
+Empty or wholly rejected deliveries do not create an absent collection.
 
 Owned collections take no context in their constructors. Incoming merges and
 publication conflicts both use the owner lattice's context-free merge. They can
@@ -1354,7 +1379,9 @@ Worked examples:
   `SingleRegion` with immediate signing, shared region instances and explicit
   publication, with a persistence variant.
 - [`ApplicationPublicationTest`](../src/test/java/convex/lattice/app/ApplicationPublicationTest.java):
-  lightweight notes inside a staged, signed notebook registered with `SingleRegion`.
+  a notebook with direct domain operations and an embedded `SetComponent`, registered
+  with `SingleRegion`. Edits stay unsigned until notebook sync; a nested notebook
+  fork commits back to that draft without crossing its signing boundary.
 - [`TaskBoardApplicationTest`](../src/test/java/convex/lattice/app/TaskBoardApplicationTest.java):
   one aggregate board region for transactions across task records with stable IDs,
   mutable titles and timestamped completion/reopening, with publication
@@ -1364,8 +1391,8 @@ Worked examples:
 - [`SharedRegionsTest`](../src/test/java/convex/lattice/app/SharedRegionsTest.java):
   direct assembly with `Regions`, preserving other applications' published state.
 - The [reading-list network example](../../convex-peer/src/test/java/convex/node/app/ReadingListApplicationTest.java):
-  applications assembled before node launch, recommendations delivered over a real
-  connection.
+  `Books` extends `UnionSet` for standard union merging; applications exchange
+  recommendations over a real connection.
 - [SharedApplicationsExample](../../convex-integration/src/test/java/convex/lattice/SharedApplicationsExample.java),
   runnable from `main`, with its [stories](../../convex-integration/src/test/java/convex/lattice/SharedApplicationsTest.java):
   a social feed and a file store as two applications live at one host root, each

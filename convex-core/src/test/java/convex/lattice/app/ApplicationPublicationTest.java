@@ -30,8 +30,8 @@ import convex.lattice.generic.SetLattice;
  * with no ordering, replacement or deletion semantics. Local operations add text;
  * unfamiliar incoming members survive editing and publication unchanged.
  *
- * <p>{@link Notes} handles share one notebook's private unsigned working set.
- * Their edits neither sign nor reach the host. {@link Notebook#sync()} reconciles
+ * <p>Domain operations edit the notebook's private unsigned working set.
+ * These edits neither sign nor reach the host. {@link Notebook#sync()} reconciles
  * that set with the current signed destination and signs the result. Independent
  * notebooks at the same host path have separate drafts and combine them when they
  * publish. {@link NotebookApp} delegates application sync to its notebook.</p>
@@ -64,20 +64,28 @@ class ApplicationPublicationTest {
 	 * assembled from local and remote notes needs a new signature only when published.
 	 */
 	static final class Notebook extends SignedComponent<ASet<ACell>> {
+		private final AKeyPair owner;
+		private final SetComponent<ACell> notes;
+
 		Notebook(AForkableCursor<SignedData<ASet<ACell>>> destination,AKeyPair owner) {
 			super(CONTENTS.signingFor(owner.getAccountKey()),destination,owner::signData);
+			this.owner=owner;
+			notes=new SetComponent<>(cursor());
 		}
-		// Give children the default editing view; the raw fork remains this boundary.
-		Notes notes() { return new Notes(cursor().withDefault(Sets.empty())); }
-	}
 
-	/** Ordinary views share notebook state and have no publication lifecycle of their own. */
-	static final class Notes extends SetComponent<ACell> {
-		Notes(AForkableCursor<ASet<ACell>> cursor) {
-			super(cursor);
+		private Notebook(AKeyPair owner,AForkableCursor<ASet<ACell>> cursor) {
+			super(CONTENTS.signingFor(owner.getAccountKey()),cursor);
+			this.owner=owner;
+			notes=new SetComponent<>(cursor());
 		}
-		void add(String text) { add(Strings.create(text)); }
-		ASet<ACell> all() { return get(); }
+
+		@Override protected Notebook rebind(AForkableCursor<ASet<ACell>> cursor) {
+			return new Notebook(owner,cursor);
+		}
+		@Override public Notebook fork() { return rebind(storage.fork()); }
+
+		void add(String text) { notes.add(Strings.create(text)); }
+		ASet<ACell> all() { return notes.get(); }
 	}
 
 	/** A text authoring API does not turn foreign set members into a string schema. */
@@ -87,9 +95,9 @@ class ApplicationPublicationTest {
 		host.addApplication(app);
 		var foreign=Sets.<ACell>of(42,"remote");
 		host.mergeAt(ALICE.signData(foreign),NOTEBOOK);
-		var notes=app.notebook().notes();
-		for (ACell note:notes.all()) assertNotNull(note);
-		notes.add("local");
+		var notebook=app.notebook();
+		for (ACell note:notebook.all()) assertNotNull(note);
+		notebook.add("local");
 		app.sync();
 		assertEquals(foreign.include(Strings.create("local")),app.publishedNotebook().getValue());
 		assertTrue(app.publishedNotebook().checkSignature());
@@ -102,10 +110,10 @@ class ApplicationPublicationTest {
 			var app=new NotebookApp(host,owner);
 			host.addApplication(app);
 			var other=owner==ALICE?BOB:ALICE;
-			app.notebook().notes().add("Local");
+			app.notebook().add("Local");
 			host.mergeAt(other.signData(Sets.of("Unauthorised")),NOTEBOOK);
 			host.mergeAt(owner.signData(Sets.of("Authorised")),NOTEBOOK);
-			assertEquals(Sets.of("Local","Authorised"),app.notebook().notes().all());
+			assertEquals(Sets.of("Local","Authorised"),app.notebook().all());
 			app.sync();
 			assertEquals(owner.getAccountKey(),app.publishedNotebook().getAccountKey());
 			assertTrue(app.publishedNotebook().checkSignature());
@@ -113,16 +121,16 @@ class ApplicationPublicationTest {
 		}
 	}
 
-	/** A lightweight view's sync cannot implicitly publish its enclosing signed draft. */
+	/** A nested draft publishes into the notebook without crossing its signing boundary. */
 	@Test void eachPublicationStopsAtItsSuppliedDestination() {
 		var host=LatticeHost.create();
 		var app=new NotebookApp(host,ALICE);
 		var notebook=app.notebook();
-		var notes=notebook.notes();
+		var notes=notebook.fork();
 		notes.add("First note");
-		notebook.notes().add("Second note");
+		notes.add("Second note");
 		assertEquals(Sets.of("First note","Second note"),notes.all());
-		notes.sync(); // Lightweight views already share their enclosing notebook state.
+		notes.sync(); // The nested draft commits unsigned notes into the notebook only.
 		assertNull(app.publishedNotebook());
 		assertTrue(host.cursor().get().isEmpty());
 
@@ -136,7 +144,7 @@ class ApplicationPublicationTest {
 	@Test void applicationSyncPublishesItsNotebook() {
 		var host=LatticeHost.create();
 		var app=new NotebookApp(host,ALICE);
-		app.notebook().notes().add("Publish in one call");
+		app.notebook().add("Publish in one call");
 		assertNull(app.publishedNotebook());
 		app.sync();
 		assertEquals(Sets.of("Publish in one call"),app.publishedNotebook().getValue());
@@ -148,8 +156,8 @@ class ApplicationPublicationTest {
 		var host=LatticeHost.create();
 		var first=new NotebookApp(host,ALICE);
 		var second=new NotebookApp(host,ALICE);
-		first.notebook().notes().add("From first workspace");
-		second.notebook().notes().add("From second workspace");
+		first.notebook().add("From first workspace");
+		second.notebook().add("From second workspace");
 		first.sync();
 		// Reconciliation and re-signing belong to the notebook, so the host needs no key.
 		second.sync();
@@ -163,14 +171,14 @@ class ApplicationPublicationTest {
 		var host=LatticeHost.create();
 		var app=new NotebookApp(host,ALICE);
 		host.addApplication(app);
-		app.notebook().notes().add("Local draft");
+		app.notebook().add("Local draft");
 		// Root routing and direct region delivery must enter the same signed boundary.
 		host.merge(Index.of(NOTEBOOK,ALICE.signData(Sets.of("Received in a root"))));
 		host.mergeAt(ALICE.signData(Sets.of("Received at a path")),NOTEBOOK);
 		assertNull(app.publishedNotebook());
-		assertEquals(Sets.of("Local draft","Received in a root","Received at a path"),app.notebook().notes().all());
+		assertEquals(Sets.of("Local draft","Received in a root","Received at a path"),app.notebook().all());
 		app.sync();
-		assertEquals(app.notebook().notes().all(),app.publishedNotebook().getValue());
+		assertEquals(app.notebook().all(),app.publishedNotebook().getValue());
 		assertTrue(app.publishedNotebook().checkSignature());
 	}
 }

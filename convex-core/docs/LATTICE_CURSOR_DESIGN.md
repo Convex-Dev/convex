@@ -150,6 +150,10 @@ into a shared write lock for explicit locked execution and contention fallback.
 Derived views forward that lock through their existing source links. Typed domain
 transactions use `TransactionalComponent.withCursor` to retain component policy;
 components can delegate that public adapter to their protected `rebind` hook.
+The transaction targets bound `storage()`, while the rebound view reinstalls its
+editing policies. Commit therefore does not reapply a component's timestamping
+wrapper to the prepared value. Signing views already present in bound storage
+still sign at commit; unsigned staged components defer signing to publication.
 Each attempt uses a fresh `TransactionalRootCursor` for its draft, supporting
 concurrent edits and nested transactions through the existing cursor machinery.
 The callback must finish its work before returning. Only the captured immutable
