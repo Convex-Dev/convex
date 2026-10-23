@@ -83,18 +83,19 @@ class ReadingListApplicationTest {
 					bobNetwork.getServer().pull(bobGroup,peer).get(10,TimeUnit.SECONDS);
 				}
 				var expectedTitles=Sets.of("The Dispossessed","A Wizard of Earthsea");
+				var expectedRoot=Index.of(BOOKS,expectedTitles);
 				assertEquals(expectedTitles,bob.titles());
-				assertTrue(bobHost.cursor().get().isEmpty());
-				assertTrue(bobStore.<Index<Keyword,ACell>>getRootData().isEmpty());
+				assertEquals(Index.none(),bobHost.cursor().get());
+				assertEquals(Index.none(),bobStore.getRootData());
 
 				// Application sync publishes into the host, without advancing the stored root.
 				bob.sync();
-				assertEquals(expectedTitles,bobHost.cursor().get().get(BOOKS));
-				assertTrue(bobStore.<Index<Keyword,ACell>>getRootData().isEmpty());
+				assertEquals(expectedRoot,bobHost.cursor().get());
+				assertEquals(Index.none(),bobStore.getRootData());
 
 				// Host sync advances the stored root and schedules propagation.
 				bobHost.sync();
-				assertEquals(expectedTitles,bobStore.<Index<Keyword,ACell>>getRootData().get(BOOKS));
+				assertEquals(expectedRoot,bobStore.getRootData());
 			}
 		}
 	}
