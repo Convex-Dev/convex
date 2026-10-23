@@ -161,12 +161,12 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeTopic fork() {
-		return new LatticeTopic(this);
+		return rebind(storage.fork());
 	}
 
-	private LatticeTopic(LatticeTopic source) {
-		super(source);
-		clock=source.clock;
+	@Override
+	protected LatticeTopic rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+		return new LatticeTopic(cursor,clock);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */

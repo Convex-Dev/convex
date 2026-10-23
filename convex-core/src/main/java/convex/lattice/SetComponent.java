@@ -17,9 +17,9 @@ import convex.lattice.cursor.AForkableCursor;
  * Use {@code SetComponent<ACell>} when foreign members may have unfamiliar types.</p>
  *
  * <p>No replication rule is supplied. Ordinary views share their cursor and
- * have a read-only sync. A subclass can own private working state by calling
- * {@code super(forkOf(destination))} and implementing {@link #mergePublication}.
- * Its inherited sync publishes at that destination only.</p>
+ * have a read-only sync. A subclass can implement {@link #rebind} and
+ * {@link #mergePublication} to support independent working copies. Sync publishes
+ * a bound fork at its destination only.</p>
  *
  * @param <V> Set element type
  */
@@ -27,17 +27,9 @@ public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
 
 	private static final AString EXPECTED_SET=Strings.intern("Expected a set");
 
-	/** Shares working storage without taking ownership of its publication. */
+	/** Binds supplied working storage. Fork publication requires a domain merge rule. */
 	public SetComponent(AForkableCursor<ASet<V>> cursor) {
 		super(cursor);
-	}
-
-	/**
-	 * Creates private working state for a specialised set component. The subclass
-	 * supplies its publication merge; ordinary set views retain their no-op sync.
-	 */
-	protected SetComponent(ForkTarget<ASet<V>> target) {
-		super(target);
 	}
 
 	/** Nil is the absent/empty set; members have no runtime type constraint. */

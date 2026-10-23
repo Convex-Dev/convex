@@ -63,7 +63,7 @@ class TaskBoardApplicationTest {
 	/** Constructs the domain component directly at its host path. */
 	static final class TaskBoardApp extends SingleRegion<Board> {
 		TaskBoardApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
-			super(host,BOARD,new Board(forkOf(host.cursor().path(BOARD)),getTimestamp));
+			super(host,BOARD,new Board(host.cursor().path(BOARD),getTimestamp).fork());
 		}
 		Board board() { return component(); }
 	}
@@ -77,20 +77,21 @@ class TaskBoardApplicationTest {
 			implements TransactionalComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>,Board> {
 		private final Supplier<CVMLong> getTimestamp;
 
-		Board(ForkTarget<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> destination,Supplier<CVMLong> getTimestamp) {
-			super(BOARD_LATTICE,destination);
-			this.getTimestamp=getTimestamp;
-		}
 
 		// Rebinding shares the supplied draft directly and retains the clock, not the source board.
-		private Board(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor,Supplier<CVMLong> getTimestamp) {
+		Board(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor,Supplier<CVMLong> getTimestamp) {
 			super(BOARD_LATTICE,cursor);
 			this.getTimestamp=getTimestamp;
 		}
 
 		@Override public Board withCursor(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
+			return rebind(cursor);
+		}
+
+		@Override protected Board rebind(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
 			return new Board(cursor,getTimestamp);
 		}
+		@Override public Board fork() { return rebind(storage.fork()); }
 
 		Task task(String id) {
 			return new Task(cursor().withDefault(Index.none()).path(Strings.create(id)),getTimestamp);

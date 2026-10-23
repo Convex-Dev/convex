@@ -57,7 +57,6 @@ class FavouritesApplicationTest {
 		assertTrue(host.cursor().get().isEmpty());
 	}
 
-
 	/** Relay policy understands ordering and authorship, not every field in the signed payload. */
 	@Test void unfamiliarPayloadsRelayIntactThroughRootAndOwnerDeliveries() {
 		var items=Keyword.intern("items");
@@ -194,7 +193,8 @@ class FavouritesApplicationTest {
 		var app=new FavouritesApp(host,appClock::get);
 		var alice=app.user(ALICE);
 		appClock.set(CVMLong.create(123));
-		assertEquals(Maps.empty(),alice.sync(),"Inherited sync reads the same default editing view");
+		assertNull(alice.sync(),"Sync returns the absent bound value without materialising editing defaults");
+		assertEquals(Maps.empty(),alice.cursor().get());
 		assertNull(app.component().get(ALICE.getAccountKey()),"Reading the default view creates no envelope");
 		alice.cursor().path(Keyword.intern("note")).set(CVMLong.ONE);
 		var record=app.component().get(ALICE.getAccountKey());

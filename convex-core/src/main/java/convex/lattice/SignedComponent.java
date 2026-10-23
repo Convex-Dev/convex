@@ -47,7 +47,7 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	 */
 	public SignedComponent(SignedLattice<V> lattice, ACursor<SignedData<V>> destination,
 			Function<V,SignedData<V>> signer) {
-		super(forkOf(SignedCursor.create(destination,value -> lattice.sign(value,signer))));
+		super(SignedCursor.create(destination,value -> lattice.sign(value,signer)).fork());
 		this.lattice=lattice;
 		Objects.requireNonNull(signer,"Signer must not be null");
 	}

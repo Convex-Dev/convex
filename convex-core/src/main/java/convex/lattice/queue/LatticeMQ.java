@@ -121,12 +121,12 @@ public class LatticeMQ extends ALatticeComponent<AHashMap<ACell, Index<Keyword, 
 	 */
 	@SuppressWarnings("unchecked")
 	public LatticeMQ fork() {
-		return new LatticeMQ(this);
+		return rebind(storage.fork());
 	}
 
-	private LatticeMQ(LatticeMQ source) {
-		super(source);
-		clock=source.clock;
+	@Override
+	protected LatticeMQ rebind(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor) {
+		return new LatticeMQ(cursor,clock);
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */

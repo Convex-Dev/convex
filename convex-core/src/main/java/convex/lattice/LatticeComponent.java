@@ -6,7 +6,6 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
-import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ProjectionCursor;
 
@@ -31,30 +30,32 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 		this.context=(context==null)?LatticeContext.EMPTY:context;
 	}
 
-	/** Creates private working state, published to the destination by sync. */
-	public LatticeComponent(ALattice<V> lattice,ACursor<V> destination,LatticeContext context) {
-		this(lattice,forkOf(destination));
+	/** Binds supplied working storage and optional policy for the lattice adapter. */
+	public LatticeComponent(ALattice<V> lattice,AForkableCursor<V> cursor,LatticeContext context) {
+		this(lattice,cursor);
 		setContext(context);
 	}
 
-	/** Creates an explicitly owned fork using the supplied merge and routing rules. */
-	protected LatticeComponent(ALattice<V> lattice,ForkTarget<V> target) {
-		super(target);
-		this.lattice=Objects.requireNonNull(lattice,"Component lattice must not be null");
-	}
-
-	/** Creates a live view over caller-supplied working storage. */
-	protected LatticeComponent(ALattice<V> lattice,AForkableCursor<V> cursor) {
+	/** Binds supplied working storage without creating a fork. */
+	public LatticeComponent(ALattice<V> lattice,AForkableCursor<V> cursor) {
 		super(cursor);
 		this.lattice=Objects.requireNonNull(lattice,"Component lattice must not be null");
 	}
 
-	/** Creates a live component, with no independent publication boundary. */
+	@Override
+	protected LatticeComponent<V> rebind(AForkableCursor<V> cursor) {
+		return new LatticeComponent<>(lattice,cursor,context);
+	}
+
+	@Override
+	public LatticeComponent<V> fork() {
+		return rebind(storage.fork());
+	}
+
+	/** Binds a component directly to the supplied cursor. */
 	public static <V extends ACell> LatticeComponent<V> live(ALattice<V> lattice,
 			AForkableCursor<V> cursor,LatticeContext context) {
-		var component=new LatticeComponent<>(lattice,cursor);
-		component.setContext(context);
-		return component;
+		return new LatticeComponent<>(lattice,cursor,context);
 	}
 
 	/** Uses the supplied lattice's precheck; merge may impose stronger rules. Nil is absent state. */
@@ -83,7 +84,6 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 		V reduced=LatticeOps.reduce(lattice,value,path);
 		return reduced==null?cursor().get():merge(reduced);
 	}
-
 
 	/**
 	 * Builds child views with component-supplied read/write functions. Each write

@@ -30,11 +30,6 @@ public class ComponentPublicationTest {
 
 	private static final SetLattice<CVMLong> SETS=SetLattice.create();
 
-	private static class Component<V extends ACell> extends LatticeComponent<V> {
-		Component(ALattice<V> lattice, AForkableCursor<V> destination) {
-			super(lattice,destination,LatticeContext.EMPTY);
-		}
-	}
 
 	/** Transactional roots route atomic updates through CAS, where the race is injected. */
 	private static class InterleavingRoot<V extends ACell> extends TransactionalRootCursor<V> {
@@ -54,7 +49,7 @@ public class ComponentPublicationTest {
 			var host=LatticeHost.create(SETS.zero(),store);
 			AtomicInteger publications=new AtomicInteger();
 			host.attachPublisher(value -> { publications.incrementAndGet(); return value; });
-			var component=new Component<>(SETS,host.cursor());
+			var component=new LatticeComponent<>(SETS,host.cursor().fork());
 			component.cursor().updateAndGet(v -> v.include(CVMLong.ONE));
 			assertEquals(SETS.zero(),host.cursor().get());
 			component.sync();
@@ -68,7 +63,7 @@ public class ComponentPublicationTest {
 	@Test
 	public void testConcurrentDestinationChangeIsMerged() {
 		var destination=new InterleavingRoot<>(SETS.zero());
-		var component=new Component<>(SETS,destination);
+		var component=new LatticeComponent<>(SETS,destination.fork());
 		component.cursor().set(Sets.of(1));
 		destination.beforeCAS=() -> destination.set(Sets.of(2));
 		component.sync();
@@ -89,7 +84,7 @@ public class ComponentPublicationTest {
 		Keyword sibling=Keyword.intern("sibling");
 		var root=new InterleavingRoot<>(Index.<Keyword,ACell>none().assoc(key,Sets.of(1)));
 		var destination=root.<ASet<CVMLong>>path(key);
-		var component=new Component<>(lattice,destination);
+		var component=new LatticeComponent<>(lattice,destination.fork());
 		component.cursor().set(Sets.of(1,2));
 		root.beforeCAS=() -> {
 			ASet<CVMLong> equal=Sets.of(1);
@@ -112,7 +107,7 @@ public class ComponentPublicationTest {
 		var root=new Root<Index<Keyword,ACell>>(Index.<Keyword,ACell>none().assoc(record,
 			Index.<Keyword,ACell>none().assoc(a,Sets.of(1)).assoc(b,Sets.of(2))));
 		AForkableCursor<Index<Keyword,ACell>> destination=root.path(record);
-		var component=new Component<>(partial,destination);
+		var component=new LatticeComponent<>(partial,destination.fork());
 		component.cursor().updateAndGet(v -> v.assoc(a,Sets.of(1,3)));
 		// Another writer advances the key this component does not declare.
 		destination.updateAndGet(v -> v.assoc(b,Sets.of(2,4)));
@@ -126,7 +121,7 @@ public class ComponentPublicationTest {
 	public void testUneditedComponentAdoptsParentInsteadOfWinningATie() {
 		var lattice=CompareLattice.<CVMLong>create((a,b) -> 0);
 		var destination=new Root<>(CVMLong.ONE);
-		var component=new Component<>(lattice,destination);
+		var component=new LatticeComponent<>(lattice,destination.fork());
 		destination.set(CVMLong.TWO);
 		component.sync();
 		assertEquals(CVMLong.TWO,destination.get());
@@ -146,7 +141,7 @@ public class ComponentPublicationTest {
 			}
 		};
 		var destination=new Root<>(SETS.zero());
-		var component=new Component<>(lattice,destination);
+		var component=new LatticeComponent<>(lattice,destination.fork());
 		component.setContext(context);
 		component.cursor().set(Sets.of(1));
 		destination.set(Sets.of(2));
@@ -163,7 +158,7 @@ public class ComponentPublicationTest {
 			}
 		};
 		var destination=new Root<>(SETS.zero());
-		var component=new Component<>(lattice,destination);
+		var component=new LatticeComponent<>(lattice,destination.fork());
 		component.cursor().set(Sets.of(1));
 		destination.set(Sets.of(2));
 		assertThrows(IllegalArgumentException.class,component::sync);
@@ -187,7 +182,7 @@ public class ComponentPublicationTest {
 				return success;
 			}
 		};
-		var component=new Component<>(SETS,destination);
+		var component=new LatticeComponent<>(SETS,destination.fork());
 		component.cursor().set(Sets.of(1));
 		destination.beforeCAS=() -> {
 			publishing.countDown();

@@ -76,13 +76,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return isolated working copy for this user
 	 */
 	public SocialUser fork() {
-		return new SocialUser(this);
-	}
-
-	private SocialUser(SocialUser source) {
-		super(source);
-		this.ownerDid=source.ownerDid;
-		this.clock=source.clock;
+		return rebind(storage.fork());
 	}
 
 	// TODO: public Profile profile() { ... }
@@ -103,6 +97,11 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 
 	@Override
 	public SocialUser withCursor(AForkableCursor<Index<Keyword, ACell>> cursor) {
+		return rebind(cursor);
+	}
+
+	@Override
+	protected SocialUser rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
 		return new SocialUser(cursor,ownerDid,clock);
 	}
 

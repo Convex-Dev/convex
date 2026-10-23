@@ -15,7 +15,6 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.SignedComponent;
 import convex.lattice.SingleRegion;
@@ -68,18 +67,17 @@ class ApplicationPublicationTest {
 		Notebook(AForkableCursor<SignedData<ASet<ACell>>> destination,AKeyPair owner) {
 			super(CONTENTS.signingFor(owner.getAccountKey()),destination,owner::signData);
 		}
-		Notes notes() { return new Notes(cursor()); }
+		// Give children the default editing view; the raw fork remains this boundary.
+		Notes notes() { return new Notes(cursor().withDefault(Sets.empty())); }
 	}
 
 	/** Ordinary views share notebook state and have no publication lifecycle of their own. */
-	static final class Notes extends ALatticeComponent<ASet<ACell>> {
-		private final SetComponent<ACell> entries;
+	static final class Notes extends SetComponent<ACell> {
 		Notes(AForkableCursor<ASet<ACell>> cursor) {
 			super(cursor);
-			entries=new SetComponent<>(cursor);
 		}
-		void add(String text) { entries.add(Strings.create(text)); }
-		ASet<ACell> all() { return entries.get(); }
+		void add(String text) { add(Strings.create(text)); }
+		ASet<ACell> all() { return get(); }
 	}
 
 	/** A text authoring API does not turn foreign set members into a string schema. */

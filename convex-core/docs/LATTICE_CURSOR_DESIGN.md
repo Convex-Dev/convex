@@ -12,7 +12,7 @@ component-owned working state and batched signing.
 
 ```text
 ACursor<V>                                get / atomic update / path
-└── AForkableCursor<V>                    typed paths; fork(merge)
+└── AForkableCursor<V>                    typed paths; fork(); sync(merge)
     ├── Root<V>                           atomic value holder
     │   └── TransactionalRootCursor<V>    opt-in coordinated writes
     ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
@@ -93,17 +93,18 @@ root.updateAndGet(values -> values.include(item));
 
 ## Forks, transactions and publication
 
-`fork(merge)` creates an isolated working copy, a `ForkedCursor`. Its `sync()`
-publishes one working snapshot into the destination by compare-and-set and, when
-the destination has moved in between, reconciles through the supplied function with
-the working snapshot as own; an unchanged copy adopts the destination instead.
-Working writes are ordered before or after sync. There is no
-fork without a merge function, and `ForkedCursor` is the only cursor with a `sync()`.
-The fork knows no lattice, context or signing policy: the function closes over
-whatever policy its owner chooses. The destination has the same value type as the
-fork. Representation changes compose through cursor views, for example
-`SignedCursor.create(slot, signer).fork(merge)`. The signing view prepares and caches
-signatures; the fork only reconciles values and invokes an atomic destination update.
+`fork()` creates an isolated working copy, a `ForkedCursor`, retaining its
+destination and reconciliation baseline. Each `sync(merge)` supplies the policy for
+that publication: an unchanged copy adopts the destination, an unchanged destination
+accepts the working value, and divergent changes invoke the supplied function.
+The fork retains no merge callback. Ordinary roots, paths and transformed views
+implement `sync(merge)` as a read-only no-op without invoking that function or
+publishing any enclosing fork.
+
+The destination has the same value type as the fork. Representation changes compose
+through cursor views: `SignedCursor.create(slot, signer).fork()` creates unsigned
+working state which signs on publication. A signing view around a fork of envelopes
+instead signs each local edit. The component chooses this order explicitly.
 
 Each fork uses an independent `TransactionalRootCursor`. Sync holds its existing
 write lock while the destination's atomic update reconciles and commits by CAS.
@@ -129,24 +130,26 @@ The component which supplied the destination owns the next publication step, and
 the host's own `sync()` persists and replicates. Lightweight components have no
 independent publication work. No cursor starts a worker or timer.
 
-Component construction makes that ownership explicit: `super(cursor)` shares
-working storage, while `super(forkOf(destination))` creates an owned fork. Casting
-a cursor to `ACursor` no longer selects a different constructor. The component-copy
-constructor `super(sourceComponent)` also creates an owned fork and retains the
-source's context. Supply a cursor view as the destination when stored representation
-differs from the working value; components need no separate conversion constructor.
+Component constructors bind their supplied working cursor directly. The protected
+`rebind(cursor)` hook recreates the same domain operations, configuration and child
+views over new storage, without creating another fork. A component's `fork()`
+rebinds to a fork of its bound storage. Concrete subclasses can refine the return
+type without adding self-type parameters to the component hierarchy.
 
-Default component `sync()` reads the current value when it owns no fork. It never
-searches the cursor chain for publication work: even a view directly over a
-caller-owned fork neither publishes nor refreshes it. Reads through defaults,
-signing and stamping views create no state and perform no authoring. Applications
-may explicitly add preparation and managed-child publication around this default.
+The base component retains one bound `storage` cursor. Its overridable `cursor()`
+exposes the editing view, which may stamp local changes. Sync always uses bound
+storage, so an editing-view override cannot hide the publication boundary. Wrappers
+bound to the same fork share publication; a path or transformed view over that fork
+has no publication of its own. Sync returns the bound value, which may be nil even
+when the editing view supplies a default. Reads and ordinary view sync never author
+state. Applications may add preparation and managed-child publication explicitly.
 
 `Transactions` runs a synchronous callback against a private draft and commits by
 CAS, preserving each operation under contention. `TransactionalRootCursor` opts
 into a shared write lock for explicit locked execution and contention fallback.
 Derived views forward that lock through their existing source links. Typed domain
-transactions use `TransactionalComponent.withCursor` to retain component policy.
+transactions use `TransactionalComponent.withCursor` to retain component policy;
+components can delegate that public adapter to their protected `rebind` hook.
 Each attempt uses a fresh `TransactionalRootCursor` for its draft, supporting
 concurrent edits and nested transactions through the existing cursor machinery.
 The callback must finish its work before returning. Only the captured immutable

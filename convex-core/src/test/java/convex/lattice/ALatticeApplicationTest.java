@@ -229,7 +229,7 @@ public class ALatticeApplicationTest {
 		var app=LatticeApplication.live(lattice,host);
 		app.setContext(LatticeContext.create(null,alice));
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(1))));
-		var fork=new LatticeComponent<>(lattice,app.cursor(),app.getContext());
+		var fork=new LatticeComponent<>(lattice,app.cursor().fork(),app.getContext());
 		fork.cursor().updateAndGet(own -> lattice.merge(app.getContext(),own,lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(2)))));
 		assertEquals(Sets.of(1),host.cursor().get().get(alice.getAccountKey()).getValue());
 		app.merge(lattice.zero().assoc(alice.getAccountKey(),alice.signData(Sets.of(3))));

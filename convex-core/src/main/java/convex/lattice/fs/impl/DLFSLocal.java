@@ -482,7 +482,7 @@ public class DLFSLocal extends DLFileSystem {
 	/** Creates a forked view sharing this filesystem's store, if any. */
 	@Override
 	public DLFSLocal fork() {
-		var working=rootCursor.fork(DLFSLattice.INSTANCE::merge);
+		var working=rootCursor.fork();
 		return new WorkingFileSystem(provider(),uriPath,working,store,clock);
 	}
 
@@ -496,7 +496,7 @@ public class DLFSLocal extends DLFileSystem {
 			this.working=working;
 		}
 
-		@Override public void sync() { working.sync(); }
+		@Override public void sync() { working.sync(DLFSLattice.INSTANCE::merge); }
 	}
 
 	@Override

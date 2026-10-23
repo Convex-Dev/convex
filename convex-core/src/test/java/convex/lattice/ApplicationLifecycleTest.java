@@ -16,7 +16,6 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 
 /** Application lifecycle properties without a parallel ALattice definition. */
@@ -26,7 +25,7 @@ class ApplicationLifecycleTest {
 	private static final Keyword OTHER=Keyword.intern("other");
 
 	private static class Values extends ALatticeComponent<ASet<CVMLong>> {
-		Values(ACursor<ASet<CVMLong>> destination) { super(forkOf(destination)); }
+		Values(AForkableCursor<ASet<CVMLong>> cursor) { super(cursor); }
 		@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) {
 			return cursor().updateAndGet(own -> union(own,incoming));
 		}
@@ -56,7 +55,7 @@ class ApplicationLifecycleTest {
 		var nested=new Regions(nestedPath) {
 			@Override protected void beforeSync() { events.add("nested"); }
 		};
-		var values=new Values(nestedPath.withDefault(Index.none()).path(ITEMS)) {
+		var values=new Values(nestedPath.withDefault(Index.none()).<ASet<CVMLong>>path(ITEMS).fork()) {
 			@Override public ASet<CVMLong> sync() {
 				events.add("values");
 				return super.sync();
@@ -85,7 +84,7 @@ class ApplicationLifecycleTest {
 	@Test void childFailureDefersApplicationPublicationAndCanRetry() {
 		var host=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),null);
 		var app=new ALatticeApplication<ASet<CVMLong>>(host) {
-			final Values child=new Values(cursor());
+			final Values child=new Values(cursor().fork());
 			boolean fail=true;
 			@Override protected void beforeSync() { child.merge(Sets.of(1)); }
 			@Override protected void syncChildren() {

@@ -35,7 +35,7 @@ class TransactionalRootCursorTest {
 			writer("getAndAccumulate",r -> r.getAndAccumulate(CVMLong.TWO,(a,b) -> b)),
 			writer("incoming merge",r -> convex.lattice.ComponentTestSupport.merge(r,MaxLattice.INSTANCE,CVMLong.TWO)),
 			writer("component publication",r -> {
-				var working=new LatticeComponent<>(MaxLattice.INSTANCE,r,convex.lattice.LatticeContext.EMPTY);
+				var working=new LatticeComponent<>(MaxLattice.INSTANCE,r.fork(),convex.lattice.LatticeContext.EMPTY);
 				working.cursor().set(CVMLong.TWO);
 				working.sync();
 			}));

@@ -82,7 +82,7 @@ class ComponentCompatibilityTest {
 
 	@Test void mergeAndPublicationDoNotAutomaticallyPrecheck() {
 		var root=Root.<AHashMap<Keyword,ACell>>create(null);
-		var component=new LatticeComponent<>(Timestamped.lattice(),root,LatticeContext.EMPTY) {
+		var component=new LatticeComponent<>(Timestamped.lattice(),root.fork(),LatticeContext.EMPTY) {
 			@Override public AString checkValue(ACell value) {
 				throw new AssertionError("Diagnostic must be explicitly requested");
 			}

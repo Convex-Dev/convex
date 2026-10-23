@@ -5,7 +5,6 @@ import java.util.Objects;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
-import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
 
@@ -13,8 +12,8 @@ import convex.lattice.cursor.ForkedCursor;
  * Domain operations over a cursor at one path.
  *
  * <p>Lightweight components share a working cursor. Components with an independent
- * publication boundary own a {@link ForkedCursor} of their destination, whose sync
- * reconciles through this component's publication merge. Representation changes
+ * publication boundary bind a {@link ForkedCursor} of their destination. Sync
+ * supplies this component's publication merge to that fork. Representation changes
  * compose through destination cursor views, such as signing or projection.
  * Publication uses ordinary cursor updates; there is no component parent link.
  * The cursor knows nothing about lattices: the component declares the structure of
@@ -34,42 +33,30 @@ import convex.lattice.cursor.ForkedCursor;
  */
 public abstract class ALatticeComponent<V extends ACell> {
 
-	private final AForkableCursor<V> cursor;
-	/** Working copy this component owns and publishes, or null for a lightweight view. */
-	private final ForkedCursor<V> owned;
+	/** Working storage bound at construction; editing views do not move this boundary. */
+	protected final AForkableCursor<V> storage;
 
-	/**
-	 * Shares supplied working storage without taking ownership of its publication.
-	 * Default sync is a read-only no-op, even when the supplied cursor is a fork.
-	 */
+	/** Binds the supplied storage directly, without creating another fork. */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
-		this.cursor=Objects.requireNonNull(cursor,"Component cursor must not be null");
-		owned=null;
+		this.storage=Objects.requireNonNull(cursor,"Component cursor must not be null");
 	}
 
 	/**
-	 * Creates a component with private working state and a publication destination.
-	 * Children normally share paths in this working state; they need no forks.
-	 * Sync publishes one snapshot into the destination without syncing that
-	 * destination further. Use {@code super(forkOf(destination))} to select this
-	 * boundary explicitly, regardless of the destination cursor's Java type.
+	 * Binds the same domain operations and configuration to supplied working storage.
+	 * Recreate child and editing views against that storage; do not fork it or retain
+	 * children bound to this instance. Components supporting forks override this hook.
 	 */
-	protected ALatticeComponent(ForkTarget<V> target) {
-		owned=ForkedCursor.create(target.destination(),this::mergePublication);
-		cursor=owned;
+	protected ALatticeComponent<V> rebind(AForkableCursor<V> cursor) {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" does not support rebinding");
 	}
 
-	/** Declares a destination for a new component-owned fork; does not create or publish state. */
-	protected static <T extends ACell> ForkTarget<T> forkOf(ACursor<T> destination) {
-		return new ForkTarget<>(Objects.requireNonNull(destination,"Fork destination must not be null"));
-	}
-
-	/** Explicit construction choice, distinct from sharing a supplied cursor. */
-	protected record ForkTarget<T extends ACell>(ACursor<T> destination) {}
-
-	/** Creates independent working state over another component. Subclasses retain their own policies. */
-	protected ALatticeComponent(ALatticeComponent<V> source) {
-		this(forkOf(source.cursor()));
+	/**
+	 * Creates independent working state over this component's bound storage. Rebinding
+	 * reinstalls local editing policies around the new storage. Subclasses may refine
+	 * the return type; publication policy is supplied only when the fork syncs.
+	 */
+	public ALatticeComponent<V> fork() {
+		return rebind(storage.fork());
 	}
 
 	/**
@@ -90,7 +77,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * cursor does not publish the component.
 	 */
 	public AForkableCursor<V> cursor() {
-		return cursor;
+		return storage;
 	}
 
 	/**
@@ -167,21 +154,13 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Publishes one working snapshot into this component's destination using
-	 * CAS-or-merge. Publication stops at that cursor: its sync is never invoked.
-	 * A lightweight view has no independent boundary and simply returns its value;
-	 * its edits are already visible in the containing working state.
-	 * This default does not write, sign, stamp or create absent state for a view.
-	 *
-	 * <p>Call the enclosing application's sync to run its preparation and publication,
-	 * and the host's sync for persistence or replication. A caller-owned cursor
-	 * supplied to a view, forked or not, is never published by the component.</p>
-	 *
-	 * @return Published snapshot, or current value for a lightweight view. Later
-	 *         concurrent edits may remain pending in working storage.
+	 * Syncs the bound storage with this component's reconciliation policy. A fork
+	 * publishes into its immediate destination; ordinary cursors return their value.
+	 * Editing-view overrides cannot hide this boundary, and descendant views never
+	 * publish enclosing storage. No host persistence is implied.
 	 */
 	public V sync() {
-		return owned==null?cursor().get():owned.sync();
+		return storage.sync(this::mergePublication);
 	}
 
 }

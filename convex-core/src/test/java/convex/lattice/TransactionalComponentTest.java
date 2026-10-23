@@ -87,15 +87,15 @@ class TransactionalComponentTest {
 		Transactions.transact(live,draft -> {
 			retained.set(draft);
 			draft.set(CVMLong.ONE);
-			fork.set(draft.fork((a,b) -> a.longValue()>=b.longValue()?a:b));
+			fork.set(draft.fork());
 		});
 		assertEquals(CVMLong.ONE,live.get());
 		retained.get().set(CVMLong.TWO);
 		fork.get().set(CVMLong.create(3));
-		fork.get().sync();
+		fork.get().sync((a,b) -> a.longValue()>=b.longValue()?a:b);
 		assertEquals(CVMLong.create(3),retained.get().get());
 		fork.get().set(CVMLong.create(4));
-		fork.get().sync();
+		fork.get().sync((a,b) -> a.longValue()>=b.longValue()?a:b);
 		assertEquals(CVMLong.create(4),retained.get().get());
 		assertEquals(CVMLong.ONE,live.get());
 	}
@@ -325,7 +325,7 @@ class TransactionalComponentTest {
 			assertEquals(coordinated,root.path(COUNT).supportsExclusiveTransactions());
 			var working=new LatticeComponent<>(
 				convex.lattice.generic.MapLattice.<Keyword,ACell>create(convex.lattice.generic.JSONLattice.INSTANCE),
-				root,LatticeContext.EMPTY);
+				root.fork(),LatticeContext.EMPTY);
 			assertTrue(working.cursor().supportsExclusiveTransactions(),"Forks coordinate their own working state independently of the destination");
 		}
 	}

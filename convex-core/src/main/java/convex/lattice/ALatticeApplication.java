@@ -25,7 +25,7 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 
 	/** Creates private working state over a host. */
 	protected ALatticeApplication(LatticeHost<V> host) {
-		super(forkOf(Objects.requireNonNull(host,"Application host must not be null").cursor()));
+		super(Objects.requireNonNull(host,"Application host must not be null").cursor().fork());
 	}
 
 	/** Shares working storage, for live applications, nested containers and transaction views. */

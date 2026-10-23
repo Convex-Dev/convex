@@ -38,26 +38,30 @@ class KeyedRegionsTest {
 	private static class TestRegions extends Regions {
 		TestRegions(LatticeHost<Index<Keyword,ACell>> host) { super(host); }
 		TestRegions(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
-		Counter counter(Keyword key) { return create(key,Counter::new); }
-		Members members(Keyword key) { return create(key,Members::new); }
+		Counter counter(Keyword key) { return create(key,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork()); }
+		Members members(Keyword key) { return create(key,(AForkableCursor<ASet<CVMLong>> cursor) -> new Members(cursor).fork()); }
 		TestRegions nested(Keyword key) { return this.<Index<Keyword,ACell>,TestRegions>createRegion(key,TestRegions::new); }
 	}
 
 	private static class Counter extends LatticeComponent<AInteger> {
 		Counter(AForkableCursor<AInteger> cursor) {
-			super(MaxLattice.INSTANCE,forkOf(cursor));
+			super(MaxLattice.INSTANCE,cursor);
 		}
+		@Override protected Counter rebind(AForkableCursor<AInteger> cursor) { return new Counter(cursor); }
+		@Override public Counter fork() { return rebind(storage.fork()); }
 	}
 
 	private static class Members extends LatticeComponent<ASet<CVMLong>> {
 		Members(AForkableCursor<ASet<CVMLong>> cursor) {
-			super(SetLattice.create(),forkOf(cursor));
+			super(SetLattice.create(),cursor);
 		}
+		@Override protected Members rebind(AForkableCursor<ASet<CVMLong>> cursor) { return new Members(cursor); }
+		@Override public Members fork() { return rebind(storage.fork()); }
 	}
 
 	@Test void singleAndMultipleRegionsShareTheSameWorkspaceAndPolicy() {
 		var host=LatticeHost.create();
-		var single=SingleRegion.create(host,A,Counter::new);
+		var single=SingleRegion.create(host,A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
 		var shared=single.component();
 		shared.setContext(LatticeContext.EMPTY.withSigningKey(AKeyPair.createSeeded(42)));
 		var context=shared.getContext();
@@ -80,7 +84,7 @@ class KeyedRegionsTest {
 		var host=LatticeHost.create();
 		var root=new Regions(host);
 		var nested=root.<Index<Keyword,ACell>,Regions>create(NESTED,Regions::new);
-		var child=nested.create(A,Counter::new);
+		var child=nested.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
 		var alias=new Regions(nested.cursor());
 		assertSame(child,alias.add(A,child));
 		assertTrue(host.cursor().get().isEmpty());

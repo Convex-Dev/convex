@@ -27,11 +27,11 @@ public class ALatticeComponentTest {
 			super(cursor);
 		}
 
-		TestComponent fork() {
-			return new TestComponent(this);
+		public TestComponent fork() {
+			return rebind(storage.fork());
 		}
 
-		private TestComponent(TestComponent source) { super(source); }
+		@Override protected TestComponent rebind(AForkableCursor<ASet<ACell>> cursor) { return new TestComponent(cursor); }
 
 		@Override
 		protected ASet<ACell> mergePublication(ASet<ACell> own,ASet<ACell> other) {
@@ -69,7 +69,7 @@ public class ALatticeComponentTest {
 		assertFalse(host.cursor().get().contains(value));
 
 		new TestComponent(fork.cursor()).sync();
-		assertFalse(host.cursor().get().contains(value));
+		assertTrue(host.cursor().get().contains(value),"Wrappers share the bound fork publication boundary");
 		fork.sync();
 		assertTrue(host.cursor().get().contains(value));
 		assertNull(store.getRootData(),"Merging a fork into the live cursor must not publish the root");

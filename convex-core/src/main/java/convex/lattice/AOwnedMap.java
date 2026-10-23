@@ -38,7 +38,7 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	private final AOwnerLattice<K,V,M> owners;
 
 	protected AOwnedMap(AOwnerLattice<K,V,M> owners,ACursor<M> destination) {
-		super(forkOf(destination));
+		super(convex.lattice.cursor.ForkedCursor.create(destination));
 		this.owners=owners;
 	}
 

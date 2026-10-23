@@ -61,12 +61,6 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 		this.signer=signer;
 	}
 
-	private Mail(Mail source) {
-		super(source);
-		this.lattice=source.lattice;
-		signer=source.signer;
-	}
-
 	/** Creates a relay which may deposit envelopes but cannot author receipts. */
 	public static Mail create() { return create(null); }
 
@@ -124,11 +118,16 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 
 	/** Creates an isolated working copy, merged back with the region lattice on sync. */
 	public Mail fork() {
-		return new Mail(this);
+		return rebind(storage.fork());
 	}
 
 	@Override
 	public Mail withCursor(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> cursor) {
+		return rebind(cursor);
+	}
+
+	@Override
+	protected Mail rebind(AForkableCursor<AHashMap<ACell,Index<ABlob,SignedData<ACell>>>> cursor) {
 		return new Mail(cursor,lattice,signer);
 	}
 

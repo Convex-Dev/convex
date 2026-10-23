@@ -38,9 +38,11 @@ class SharedRegionsTest {
 	static final class Items extends LatticeComponent<ASet<ACell>> {
 		private final SetComponent<ACell> items;
 		Items(AForkableCursor<ASet<ACell>> destination) {
-			super(SetLattice.create(),forkOf(destination));
+			super(SetLattice.create(),destination);
 			items=new SetComponent<>(cursor());
 		}
+		@Override protected Items rebind(AForkableCursor<ASet<ACell>> cursor) { return new Items(cursor); }
+		@Override public Items fork() { return rebind(storage.fork()); }
 		void add(long item) { items.add(CVMLong.create(item)); }
 	}
 
@@ -52,9 +54,9 @@ class SharedRegionsTest {
 	@Test void aStagedApplicationNeverPublishesRegionsItDoesNotDeclare() {
 		var host=LatticeHost.create();
 		var a=new Regions(host);
-		var aItems=a.create(A,Items::new);
+		var aItems=a.create(A,(AForkableCursor<ASet<ACell>> cursor) -> new Items(cursor).fork());
 		var b=new Regions(host);
-		var bItems=b.create(B,Items::new);
+		var bItems=b.create(B,(AForkableCursor<ASet<ACell>> cursor) -> new Items(cursor).fork());
 		host.addApplication(a);
 		host.addApplication(b);
 
@@ -85,9 +87,9 @@ class SharedRegionsTest {
 	@Test void incomingRegionsSurviveAnotherApplicationsPublication() {
 		var host=LatticeHost.create();
 		var a=new Regions(host);
-		var aItems=a.create(A,Items::new);
+		var aItems=a.create(A,(AForkableCursor<ASet<ACell>> cursor) -> new Items(cursor).fork());
 		var b=new Regions(host);
-		var bItems=b.create(B,Items::new);
+		var bItems=b.create(B,(AForkableCursor<ASet<ACell>> cursor) -> new Items(cursor).fork());
 		host.addApplication(a);
 		host.addApplication(b);
 

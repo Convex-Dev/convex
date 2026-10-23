@@ -35,7 +35,7 @@ public class ForkedContextSyncTest {
 	public void syncUsesPublishingComponentContextForSynthesisedSignedValue() {
 		SignedLattice<ASet<CVMLong>> lattice = SignedLattice.create(SetLattice.create());
 		Root<SignedData<ASet<CVMLong>>> root = Cursors.root(ALICE_KEY.signData(Sets.of(CVMLong.ONE)));
-		var component=new LatticeComponent<>(lattice,root,LatticeContext.create(null,ALICE_KEY));
+		var component=new LatticeComponent<>(lattice,root.fork(),LatticeContext.create(null,ALICE_KEY));
 
 		AForkableCursor<SignedData<ASet<CVMLong>>> fork = component.cursor();
 		fork.set(ALICE_KEY.signData(Sets.of(CVMLong.ONE, CVMLong.create(2))));
@@ -55,7 +55,7 @@ public class ForkedContextSyncTest {
 			ForkedContextSyncTest::timestamp);
 		AHashMap<Keyword, ACell> initial = value(1, "initial");
 		Root<ACell> root = Cursors.root(initial);
-		var forkComponent=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ACell> fork=forkComponent.cursor();
 
 		fork.set(value(2, "fork"));

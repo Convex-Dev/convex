@@ -70,16 +70,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	 * which merges with {@link DLFSLattice}, to reach the long-lived drive cursor.
 	 */
 	public DLFSDrive fork() {
-		return new DLFSDrive(this);
-	}
-
-	private DLFSDrive(DLFSDrive source) {
-		super(source);
-		this.name=source.name;
-		this.store=source.store;
-		this.location=DLFSLocation.at(cursor());
-		this.lattice=source.lattice;
-		this.fileSystem=new HostedFileSystem(this,source.fileSystem.getClock());
+		return rebind(storage.fork());
 	}
 
 	@Override
@@ -112,6 +103,11 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 
 	@Override
 	public DLFSDrive withCursor(AForkableCursor<AVector<ACell>> cursor) {
+		return rebind(cursor);
+	}
+
+	@Override
+	protected DLFSDrive rebind(AForkableCursor<AVector<ACell>> cursor) {
 		return new DLFSDrive(name,cursor,store,DLFSLocation.at(cursor),fileSystem.getClock(),lattice);
 	}
 

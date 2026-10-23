@@ -105,17 +105,7 @@ public final class DLFSRegion extends ALatticeComponent<
 
 	/** Creates isolated working state with the same ownership and authoring policy. */
 	public DLFSRegion fork() {
-		return new DLFSRegion(this);
-	}
-
-	private DLFSRegion(DLFSRegion source) {
-		super(source);
-		store=source.store;
-		location=DLFSLocation.at(cursor());
-		clock=source.clock;
-		files=source.files;
-		owners=source.owners;
-		signer=source.signer;
+		return rebind(storage.fork());
 	}
 
 	private DLFSRegion(DLFSRegion source,
@@ -131,6 +121,11 @@ public final class DLFSRegion extends ALatticeComponent<
 
 	@Override
 	public DLFSRegion withCursor(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
+		return rebind(cursor);
+	}
+
+	@Override
+	protected DLFSRegion rebind(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
 		return new DLFSRegion(this,cursor);
 	}
 

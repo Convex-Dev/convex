@@ -85,7 +85,7 @@ public class LatticeCursorTest {
 	public void testWorkingStateCursorOperations() {
 		MaxLattice lattice = MaxLattice.INSTANCE;
 		Root<AInteger> root = Cursors.root(null);
-		var forkComponent=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AInteger> fork=forkComponent.cursor();
 		doIntCursorTest(fork);
 	}
@@ -101,7 +101,7 @@ public class LatticeCursorTest {
 		MapLattice<Keyword,ASet<CVMLong>> lattice = MapLattice.create(setLattice);
 		Root<AHashMap<Keyword,ASet<CVMLong>>> root =
 				Cursors.root(Maps.empty());
-		var forkComponent=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword,ASet<CVMLong>>> fork=forkComponent.cursor();
 
 		try (ExecutorService writer = Executors.newSingleThreadExecutor();
@@ -161,7 +161,7 @@ public class LatticeCursorTest {
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
 		// Fork for modifications
-		var forkComponent=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 		assertNotNull(fork);
 		assertEquals(Sets.empty(), fork.get());
@@ -197,9 +197,9 @@ public class LatticeCursorTest {
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
 		// Create two concurrent forks
-		var fork1Component=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork1Component=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ASet<CVMLong>> fork1=fork1Component.cursor();
-		var fork2Component=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork2Component=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ASet<CVMLong>> fork2=fork2Component.cursor();
 
 		// Independent modifications
@@ -225,12 +225,12 @@ public class LatticeCursorTest {
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
 		// Outer fork
-		var outerComponent=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var outerComponent=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ASet<CVMLong>> outer=outerComponent.cursor();
 		outer.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
 
 		// Inner fork (nested)
-		var innerComponent=new LatticeComponent<>(lattice,outer,convex.lattice.LatticeContext.EMPTY);
+		var innerComponent=new LatticeComponent<>(lattice,outer.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ASet<CVMLong>> inner=innerComponent.cursor();
 		inner.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(2)));
 
@@ -276,7 +276,7 @@ public class LatticeCursorTest {
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
 		// Fork and add A
-		var fork1Component=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork1Component=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ASet<CVMLong>> fork1=fork1Component.cursor();
 		fork1.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
 
@@ -308,7 +308,7 @@ public class LatticeCursorTest {
 		AHashMap<Keyword, ACell> original = Maps.of(TS, CVMLong.create(100), V, Strings.create("original"));
 		Root<ACell> root = Cursors.root(original);
 
-		var forkComponent=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 
 		AForkableCursor<ACell> fork=forkComponent.cursor();
 
@@ -334,7 +334,7 @@ public class LatticeCursorTest {
 		SetLattice<CVMLong> lattice = SetLattice.create();
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
-		var forkComponent=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 
 		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 		ASet<CVMLong> newValue = Sets.of(CVMLong.ONE);
@@ -558,7 +558,7 @@ public class LatticeCursorTest {
 		});
 
 		// Create working state, write to it, sync the component
-		var forkComponent=new LatticeComponent<>(lattice,host.cursor(),convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(lattice,host.cursor().fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 		fork.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.ONE));
 		forkComponent.sync();
@@ -642,7 +642,7 @@ public class LatticeCursorTest {
 		SetLattice<CVMLong> lattice = SetLattice.create();
 		Root<ASet<CVMLong>> root = Cursors.root(Sets.empty());
 
-		var forkComponent=new LatticeComponent<>(lattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 
 		AForkableCursor<ASet<CVMLong>> fork=forkComponent.cursor();
 
@@ -733,7 +733,7 @@ public class LatticeCursorTest {
 		PathCursor<ASet<CVMLong>> pathA = new PathCursor<>(root, Keywords.FOO);
 
 		// Fork the root for isolated modifications
-		var forkComponent=new LatticeComponent<>(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(mapLattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork=forkComponent.cursor();
 
 		// Create a PathCursor on the fork to modify :b
@@ -804,17 +804,17 @@ public class LatticeCursorTest {
 		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(Maps.empty());
 
 		// Level 1 fork - add :a => #{1}
-		var fork1Component=new LatticeComponent<>(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork1Component=new LatticeComponent<>(mapLattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1=fork1Component.cursor();
 		fork1.updateAndGet(map -> map.assoc(Keywords.FOO, Sets.of(CVMLong.ONE)));
 
 		// Level 2 fork (from fork1) - add :b => #{2}
-		var fork2Component=new LatticeComponent<>(mapLattice,fork1,convex.lattice.LatticeContext.EMPTY);
+		var fork2Component=new LatticeComponent<>(mapLattice,fork1.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2=fork2Component.cursor();
 		fork2.updateAndGet(map -> map.assoc(Keywords.BAR, Sets.of(CVMLong.create(2))));
 
 		// Level 3 fork (from fork2) - modify :a to add 3
-		var fork3Component=new LatticeComponent<>(mapLattice,fork2,convex.lattice.LatticeContext.EMPTY);
+		var fork3Component=new LatticeComponent<>(mapLattice,fork2.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork3=fork3Component.cursor();
 		PathCursor<ASet<CVMLong>> fork3PathA = new PathCursor<>(fork3, Keywords.FOO);
 		fork3PathA.updateAndGet(set -> (set == null) ? Sets.of(CVMLong.create(3)) : set.include(CVMLong.create(3)));
@@ -863,11 +863,11 @@ public class LatticeCursorTest {
 		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(initial);
 
 		// Create 3 concurrent forks, each modifying :a via path
-		var fork1Component=new LatticeComponent<>(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork1Component=new LatticeComponent<>(mapLattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1=fork1Component.cursor();
-		var fork2Component=new LatticeComponent<>(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork2Component=new LatticeComponent<>(mapLattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2=fork2Component.cursor();
-		var fork3Component=new LatticeComponent<>(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork3Component=new LatticeComponent<>(mapLattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork3=fork3Component.cursor();
 
 		PathCursor<ASet<CVMLong>> path1 = new PathCursor<>(fork1, Keywords.FOO);
@@ -909,7 +909,7 @@ public class LatticeCursorTest {
 		Root<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.root(initial);
 
 		// Fork and modify :a
-		var fork1Component=new LatticeComponent<>(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork1Component=new LatticeComponent<>(mapLattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1=fork1Component.cursor();
 		PathCursor<ASet<CVMLong>> fork1PathA = new PathCursor<>(fork1, Keywords.FOO);
 		fork1PathA.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(1)));
@@ -922,7 +922,7 @@ public class LatticeCursorTest {
 		fork1Component.sync();
 
 		// Create another fork and modify :a again
-		var fork2Component=new LatticeComponent<>(mapLattice,root,convex.lattice.LatticeContext.EMPTY);
+		var fork2Component=new LatticeComponent<>(mapLattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2=fork2Component.cursor();
 		PathCursor<ASet<CVMLong>> fork2PathA = new PathCursor<>(fork2, Keywords.FOO);
 		fork2PathA.updateAndGet(set -> (set==null?Sets.<CVMLong>empty():set).include(CVMLong.create(2)));
@@ -968,9 +968,9 @@ public class LatticeCursorTest {
 		// Descend to :foo and :bar via path(), fork each
 		AForkableCursor<AInteger> fooCursor = root.path(Keywords.FOO);
 		AForkableCursor<AInteger> barCursor = root.path(Keywords.BAR);
-		var fooForkComponent=new LatticeComponent<>(MaxLattice.INSTANCE,fooCursor,convex.lattice.LatticeContext.EMPTY);
+		var fooForkComponent=new LatticeComponent<>(MaxLattice.INSTANCE,fooCursor.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AInteger> fooFork=fooForkComponent.cursor();
-		var barForkComponent=new LatticeComponent<>(MaxLattice.INSTANCE,barCursor,convex.lattice.LatticeContext.EMPTY);
+		var barForkComponent=new LatticeComponent<>(MaxLattice.INSTANCE,barCursor.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AInteger> barFork=barForkComponent.cursor();
 
 		// Modify each fork independently
@@ -1026,7 +1026,7 @@ public class LatticeCursorTest {
 		AForkableCursor<AHashMap<Keyword, AInteger>> bazCursor = root.path(Keywords.BAZ);
 
 		// Fork and modify :foo within the inner map
-		var forkComponent=new LatticeComponent<>(innerLattice,bazCursor,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(innerLattice,bazCursor.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AHashMap<Keyword, AInteger>> fork=forkComponent.cursor();
 		fork.updateAndGet(m -> m.assoc(Keywords.FOO, CVMLong.create(99)));
 

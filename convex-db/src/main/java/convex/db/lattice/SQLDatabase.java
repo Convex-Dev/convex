@@ -135,14 +135,12 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Forked SQLDatabase instance
 	 */
 	public SQLDatabase fork() {
-		return new SQLDatabase(this);
+		return rebind(storage.fork());
 	}
 
-	private SQLDatabase(SQLDatabase source) {
-		super(source);
-		this.dbName=source.dbName;
-		this.keyPair=source.keyPair;
-		this.ownerKey=source.ownerKey;
+	@Override
+	protected SQLDatabase rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+		return new SQLDatabase(cursor,dbName,keyPair,ownerKey);
 	}
 
 	/**

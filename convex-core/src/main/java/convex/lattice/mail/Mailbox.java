@@ -38,12 +38,6 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 		this.signer=signer;
 	}
 
-	private Mailbox(Mailbox source) {
-		super(source);
-		this.lattice=source.lattice;
-		signer=source.signer;
-	}
-
 	/** The mailbox DID. */
 	public AString did() { return lattice.getDID(); }
 
@@ -165,11 +159,16 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 
 	/** Creates an isolated working copy, merged back with the mailbox lattice on sync. */
 	public Mailbox fork() {
-		return new Mailbox(this);
+		return rebind(storage.fork());
 	}
 
 	@Override
 	public Mailbox withCursor(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
+		return rebind(cursor);
+	}
+
+	@Override
+	protected Mailbox rebind(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
 		return new Mailbox(cursor,lattice,signer);
 	}
 

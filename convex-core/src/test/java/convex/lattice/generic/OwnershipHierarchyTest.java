@@ -33,7 +33,6 @@ import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.SignedCursor;
 
 /** Ownership rules survive container choice, navigation, contexts and fork/sync. */
 public class OwnershipHierarchyTest {
@@ -90,7 +89,7 @@ public class OwnershipHierarchyTest {
 		value.set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,root.get().get(DID).getValue());
 		assertTrue(root.get().get(DID).checkSignature());
-		var forkComponent=new LatticeComponent<>(lattice.getValueLattice(),value,convex.lattice.LatticeContext.EMPTY);
+		var forkComponent=new LatticeComponent<>(lattice.getValueLattice(),value.fork(),convex.lattice.LatticeContext.EMPTY);
 		AForkableCursor<AInteger> fork=forkComponent.cursor();
 		fork.set(CVMLong.create(3));
 		assertEquals(CVMLong.TWO,value.get());

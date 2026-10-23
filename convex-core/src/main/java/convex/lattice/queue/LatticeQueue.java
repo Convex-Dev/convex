@@ -58,17 +58,16 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 		return new LatticeQueue(cursor,clock);
 	}
 
-
 	/**
 	 * Creates a forked copy of this queue for independent operation.
 	 */
 	public LatticeQueue fork() {
-		return new LatticeQueue(this);
+		return rebind(storage.fork());
 	}
 
-	private LatticeQueue(LatticeQueue source) {
-		super(source);
-		clock=source.clock;
+	@Override
+	protected LatticeQueue rebind(AForkableCursor<AVector<ACell>> cursor) {
+		return new LatticeQueue(cursor,clock);
 	}
 
 	// ===== Producer Operations =====

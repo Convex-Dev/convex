@@ -228,14 +228,19 @@ pipeline during launch; application code never knows a node exists.
 
 ## Composing named regions
 
-The default component publication boundary is explicit in its constructor:
-`super(cursor)` shares working storage and makes `sync()` a read-only no-op;
-`super(forkOf(destination))` owns a private working copy that sync reconciles into
-that destination. A live view never publishes a caller-owned fork, including when
-the view is a path into that fork. The component-copy constructor `super(source)`
-creates a fork; the subclass retains its own clock, signer and other policy fields.
-Application lifecycle methods explicitly add preparation and child publication; ordinary components inherit
-neither operation.
+A component constructor binds the supplied working cursor directly. Its default
+`sync()` supplies `mergePublication` to that bound cursor: a fork publishes into its
+immediate destination, while an ordinary root, path or transformed view only reads.
+Wrappers bound to the same fork share its publication boundary. A child editing
+view over a fork does not publish the enclosing fork.
+
+The protected `rebind(cursor)` hook reconstructs the domain component over supplied
+storage, retaining clocks, signers and merge rules while rebuilding child views.
+It must not fork the supplied cursor. Component `fork()` rebinds to a fork of bound
+storage. An overridden `cursor()` may expose a signing or timestamping editing
+view without changing what sync publishes. Transactional components can delegate
+`withCursor(cursor)` to the same construction hook. Application lifecycle methods
+explicitly add preparation and child publication.
 
 Extend `AKeyedRegions` for an application whose interests are named regions of an
 index. Register a child for each region. The same class works at the host root or
@@ -281,9 +286,13 @@ For applications declaring their own collection, the base class remains useful:
 
 ```java
 final class Counter extends LatticeComponent<AInteger> {
-    Counter(AForkableCursor<AInteger> destination) {
-        super(MaxLattice.INSTANCE, forkOf(destination));
+    Counter(AForkableCursor<AInteger> cursor) {
+        super(MaxLattice.INSTANCE, cursor);
     }
+    @Override protected Counter rebind(AForkableCursor<AInteger> cursor) {
+        return new Counter(cursor);
+    }
+    @Override public Counter fork() { return rebind(storage.fork()); }
 }
 
 final class Counters extends AKeyedRegions {
@@ -292,7 +301,7 @@ final class Counters extends AKeyedRegions {
 
     Counters(LatticeHost<Index<Keyword, ACell>> host) {
         super(host);
-        count = createRegion(COUNT, Counter::new);
+        count = createRegion(COUNT, (AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
     }
 
     Counters(LatticeHost<Index<Keyword, ACell>> host, Counter shared) {

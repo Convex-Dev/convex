@@ -52,13 +52,13 @@ class ProjectionCursorTest {
 			if (reject.get()) throw new IllegalArgumentException("Write rejected");
 			return value;
 		});
-		var fork=view.fork((own,other) -> { throw new AssertionError("Unchanged destination needs no merge"); });
+		var fork=view.fork();
 		fork.set(CVMLong.ONE);
-		assertThrows(IllegalArgumentException.class,fork::sync);
+		assertThrows(IllegalArgumentException.class,() -> fork.sync((own,other) -> own));
 		assertSame(CVMLong.ZERO,root.get());
 		assertSame(CVMLong.ONE,fork.get());
 		reject.set(false);
-		assertSame(CVMLong.ONE,fork.sync());
+		assertSame(CVMLong.ONE,fork.sync((own,other) -> own));
 		assertSame(CVMLong.ONE,root.get());
 	}
 
@@ -76,15 +76,15 @@ class ProjectionCursorTest {
 		});
 		var projected=ProjectionCursor.create(signed,map -> (CVMLong)map.get(VALUE),
 			(map,value) -> map.assoc(VALUE,value));
-		var fork=projected.fork((own,other) -> own);
+		var fork=projected.fork();
 		fork.set(CVMLong.ONE);
 		assertEquals(0,signatures.get());
-		assertEquals(CVMLong.ONE,fork.sync());
+		assertEquals(CVMLong.ONE,fork.sync((own,other) -> own));
 		assertEquals(CVMLong.ONE,root.get().getValue().get(VALUE));
 		assertEquals(CVMLong.TWO,root.get().getValue().get(OTHER));
 		assertTrue(root.get().checkSignature());
 		assertEquals(2,signatures.get(),"Changed payload must be rebuilt and signed again");
-		fork.sync();
+		fork.sync((own,other) -> own);
 		assertEquals(2,signatures.get(),"Unchanged publication preserves the envelope");
 	}
 
@@ -93,11 +93,11 @@ class ProjectionCursorTest {
 		var stamped=StampedCursor.create(root,() -> CVMLong.TWO,(value,time) -> value.assoc(OTHER,time));
 		// The identity projection must return the stamped source value, too.
 		var view=ProjectionCursor.create(stamped,value -> value,(current,value) -> value);
-		var fork=view.fork((own,other) -> own);
+		var fork=view.fork();
 		fork.updateAndGet(value -> value.assoc(VALUE,CVMLong.ONE));
-		var published=fork.sync();
+		var published=fork.sync((own,other) -> own);
 		assertSame(root.get(),published);
 		assertEquals(CVMLong.TWO,fork.get().get(OTHER));
-		assertSame(root.get(),fork.sync());
+		assertSame(root.get(),fork.sync((own,other) -> own));
 	}
 }

@@ -119,7 +119,7 @@ class TimestampedTest {
 
 	@Test void enclosingPublicationUsesTheSameOrderingWithoutRestamping() {
 		var root=Root.create(record(1,0));
-		var staged=new LatticeComponent<>(Timestamped.lattice(),root,LatticeContext.EMPTY);
+		var staged=new LatticeComponent<>(Timestamped.lattice(),root.fork(),LatticeContext.EMPTY);
 		var calls=new AtomicInteger();
 		var component=Timestamped.create(staged.cursor(),() -> {
 			calls.incrementAndGet();

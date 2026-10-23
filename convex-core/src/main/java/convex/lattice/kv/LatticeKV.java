@@ -87,12 +87,11 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return new LatticeKV(cursor,replicaID);
 	}
 
-
 	/**
 	 * Creates a forked copy of this store for independent operation
 	 */
 	public LatticeKV fork() {
-		return fork(replicaID);
+		return rebind(storage.fork());
 	}
 
 	/**
@@ -103,13 +102,12 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Forked store
 	 */
 	public LatticeKV fork(AString replicaID) {
-		return new LatticeKV(this, replicaID);
+		return new LatticeKV(storage.fork(),replicaID,clock);
 	}
 
-	private LatticeKV(LatticeKV source, AString replicaID) {
-		super(source);
-		this.replicaID=replicaID;
-		this.clock=source.clock;
+	@Override
+	protected LatticeKV rebind(AForkableCursor<Index<AString,AVector<ACell>>> cursor) {
+		return new LatticeKV(cursor,replicaID,clock);
 	}
 
 	// ========== Internal Helpers ==========

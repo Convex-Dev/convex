@@ -7,8 +7,7 @@ import convex.core.data.ACell;
 /**
  * Mutable cursors whose paths are themselves mutable cursors and which can be
  * forked. A fork is an isolated working copy that reconciles with this cursor
- * through a merge function supplied when it is created; there is no fork without
- * one. Cursors carry no lattice, context or signing policy: the merge function
+ * through a merge function supplied to each sync. Cursors carry no lattice, context or signing policy: the merge function
  * closes over whatever policy its owner chooses. A short atomic edit is a
  * {@link Transactions} draft, and a detached snapshot is simply
  * {@code Root.create(cursor.get())}.
@@ -43,17 +42,17 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 		return PathCursor.create(this, path);
 	}
 
+	/** Creates isolated working storage which publishes here when explicitly synced. */
+	public ForkedCursor<V> fork() {
+		return ForkedCursor.create(this);
+	}
+
 	/**
-	 * Creates an isolated working copy of this cursor. Its {@link ForkedCursor#sync()}
-	 * publishes the working snapshot here by compare-and-set and applies {@code merge},
-	 * with the working snapshot as own, only when both this cursor and the copy have
-	 * changed since they were last reconciled. An unchanged copy adopts this cursor's
-	 * value; an unchanged cursor takes the copy's.
-	 *
-	 * @param merge Merge of own and other, typically a lattice merge under a context
-	 * @return Working copy initialised to this cursor's current value
+	 * Returns the current value. Ordinary cursors, including paths and transformed
+	 * views over forks, never publish enclosing storage or invoke the merge function.
+	 * ForkedCursor overrides this to reconcile at its own destination.
 	 */
-	public ForkedCursor<V> fork(BinaryOperator<V> merge) {
-		return ForkedCursor.create(this,merge);
+	public V sync(BinaryOperator<V> merge) {
+		return get();
 	}
 }

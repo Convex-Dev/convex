@@ -716,6 +716,28 @@ design left open (Convex-Dev/convex#769). The networking narrative has one home,
 CAD text affected: CAD036 (*Lattice Node*) node construction, propagation group
 lifecycle and node identity.
 
+## 29. Rebinding separates construction, working storage and publication
+
+Implemented 23 October 2026. Component constructors bind supplied storage;
+`rebind(cursor)` reconstructs the domain component with its configuration and fresh
+child views. Forks rebind to a fork of bound storage. The base retains that storage
+independently of an overridden editing `cursor()`, so timestamping views neither
+hide nor move the publication boundary. `ForkTarget`, `forkOf` and the separate
+owned-fork field are removed. Wrappers sharing a fork share publication; ordinary
+cursor views never publish enclosing state. This supersedes entry 26's ownership
+selection and the earlier fork-time merge API.
+
+Cursor `fork()` retains only destination, working state and baseline. The merge
+function is supplied to each `sync(merge)`; atomic reconciliation, failure handling
+and working-state coordination are unchanged. `AForkableCursor` remains distinct
+from the read-only view hierarchy. The lattice adapter's constructors now bind;
+callers explicitly choose a fork when staging is intended.
+
+CAD035 describes fork/sync mechanics; CAD045 describes bound storage, editing views
+and component rebinding. Regression tests cover shared publication, view no-ops,
+recreated timestamping and set children, per-sync policy, and existing atomic
+failure and concurrency guarantees.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |

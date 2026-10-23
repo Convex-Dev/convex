@@ -11,7 +11,7 @@ import convex.core.util.Utils;
 /**
  * Independent working storage which reconciles with a destination on sync.
  * An unchanged fork adopts the destination; an unchanged destination accepts
- * the working value. When both changed, the supplied merge decides.
+ * the working value. When both changed, the merge supplied to sync decides.
  *
  * <p>Sync updates the destination atomically while holding the working root's
  * write lock. Working reads and writes are ordered around sync. Failed
@@ -30,14 +30,12 @@ import convex.core.util.Utils;
 public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	private final ACursor<V> destination;
-	private final BinaryOperator<V> merge;
 	private final TransactionalRootCursor<V> working;
 	/** Last reconciled destination value, protected by the working root lock. */
 	private V baseline;
 
-	private ForkedCursor(ACursor<V> destination,BinaryOperator<V> merge) {
+	private ForkedCursor(ACursor<V> destination) {
 		this.destination=Objects.requireNonNull(destination,"Destination must not be null");
-		this.merge=Objects.requireNonNull(merge,"Merge function must not be null");
 		this.baseline=destination.get();
 		this.working=new TransactionalRootCursor<>(baseline);
 	}
@@ -46,24 +44,27 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	 * Creates an independent working copy of the destination.
 	 * @param <V> Value type
 	 * @param destination Cursor the copy publishes into
-	 * @param merge Merge of own and other when both changed
 	 * @return Working copy initialised from the destination
 	 */
-	public static <V extends ACell> ForkedCursor<V> create(ACursor<V> destination,BinaryOperator<V> merge) {
-		return new ForkedCursor<>(destination,merge);
+	public static <V extends ACell> ForkedCursor<V> create(ACursor<V> destination) {
+		return new ForkedCursor<>(destination);
 	}
 
 	/**
 	 * Reconciles and publishes through one atomic destination update. Its cursor
 	 * handles CAS retries and any signing or stamping. Concurrent working writes
 	 * wait until publication and adoption of the result are complete.
+	 * @param merge Reconciliation of working and destination values when both changed;
+	 *        must be retry-safe and must not mutate either cursor
 	 * @return Published value
 	 */
-	public V sync() {
+	@Override
+	public V sync(BinaryOperator<V> merge) {
+		Objects.requireNonNull(merge,"Merge function must not be null");
 		Lock lock=working.exclusiveLock();
 		lock.lock();
 		try {
-			V published=destination.updateAndGet(new Reconciliation(working.get()));
+			V published=destination.updateAndGet(new Reconciliation(working.get(),merge));
 			working.set(published);
 			baseline=published;
 			return published;
@@ -74,10 +75,14 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	/** Retains reconciled changes as the destination update retries. */
 	private final class Reconciliation implements UnaryOperator<V> {
+		private final BinaryOperator<V> merge;
 		private V previous=baseline;
 		private V candidate;
 
-		Reconciliation(V snapshot) { candidate=snapshot; }
+		Reconciliation(V snapshot,BinaryOperator<V> merge) {
+			this.merge=merge;
+			candidate=snapshot;
+		}
 
 		@Override public V apply(V other) {
 			if (Utils.equals(candidate,previous) || Utils.equals(candidate,other)) {

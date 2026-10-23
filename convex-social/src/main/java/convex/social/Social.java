@@ -196,18 +196,16 @@ public class Social extends ALatticeComponent<
 	 * @return Forked Social instance
 	 */
 	public Social fork() {
-		return new Social(this);
-	}
-
-	private Social(Social source) {
-		super(source);
-		owners=source.owners;
-		signer=source.signer;
-		clock=source.clock;
+		return rebind(storage.fork());
 	}
 
 	@Override
 	public Social withCursor(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+		return rebind(cursor);
+	}
+
+	@Override
+	protected Social rebind(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
 		return new Social(cursor,owners,signer,clock);
 	}
 
