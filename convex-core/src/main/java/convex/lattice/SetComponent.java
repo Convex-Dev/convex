@@ -9,25 +9,17 @@ import convex.core.lang.RT;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Ordinary set operations over a cursor. An absent set reads as
- * empty; construction, reads and edits which change nothing leave storage alone.
- * Updates are atomic through the supplied cursor, including any enclosing signing
- * or timestamp boundary. Sync does not publish the containing component.
+ * Atomic set operations over a cursor. Nil reads as empty; reads and no-op edits
+ * leave absent storage absent. Non-set storage is rejected without changing it.
  *
- * <p>This component supplies collection operations, not a replication rule.
- * The enclosing component determines how incoming state merges: for example, a
- * signed last-write-wins record replaces its entire set, preserving removals.
- * A grow-only set may instead use {@code SetLattice} at its merge boundary.</p>
+ * <p>Compatibility checks require only set shape. Applications may override
+ * {@link #checkValue} for domain constraints; operations do not call it.
+ * Use {@code SetComponent<ACell>} when foreign members may have unfamiliar types.</p>
  *
- * <p>A specialised component can own private working state by calling
+ * <p>No replication rule is supplied. Ordinary views share their cursor and
+ * have a read-only sync. A subclass can own private working state by calling
  * {@code super(forkOf(destination))} and implementing {@link #mergePublication}.
- * Its inherited sync then publishes at that destination only. The ordinary
- * cursor constructors continue to create shared views with no publication boundary.</p>
- *
- * <p>Operations require only a set at this path, not a schema for its members.
- * A non-set value is left intact and reported as an unsupported operation on the
- * current state. Use {@code SetComponent<ACell>} when foreign members may have
- * unfamiliar types; ordinary include/exclude operations preserve them.</p>
+ * Its inherited sync publishes at that destination only.</p>
  *
  * @param <V> Set element type
  */
@@ -35,17 +27,9 @@ public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
 
 	private static final AString EXPECTED_SET=Strings.intern("Expected a set");
 
-	private final Class<V> elementType;
-
-	/** Checks set shape only; Java generics do not supply a runtime element constraint. */
+	/** Shares working storage without taking ownership of its publication. */
 	public SetComponent(AForkableCursor<ASet<V>> cursor) {
-		this(cursor,null);
-	}
-
-	/** Supplies an optional runtime element type for explicit compatibility checks. */
-	public SetComponent(AForkableCursor<ASet<V>> cursor,Class<V> elementType) {
 		super(cursor);
-		this.elementType=elementType;
 	}
 
 	/**
@@ -54,24 +38,11 @@ public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
 	 */
 	protected SetComponent(ForkTarget<ASet<V>> target) {
 		super(target);
-		elementType=null;
 	}
 
-	/** Nil is the absent/empty set. Typed sets require every element to match. */
+	/** Nil is the absent/empty set; members have no runtime type constraint. */
 	@Override public AString checkValue(ACell value) {
-		if (value==null) return null;
-		if (!(value instanceof ASet<?> set)) return EXPECTED_SET;
-		for (ACell element:set) {
-			AString error=checkElement(element);
-			if (error!=null) return error;
-		}
-		return null;
-	}
-
-	/** Override for domain element constraints; called only by explicit checks. */
-	protected AString checkElement(ACell value) {
-		return elementType==null || elementType.isInstance(value)?null:
-			Strings.create("Expected set element of type "+elementType.getSimpleName());
+		return value==null || value instanceof ASet<?>?null:EXPECTED_SET;
 	}
 
 	// Inspect foreign storage as cells before the Java generic cast to ASet.

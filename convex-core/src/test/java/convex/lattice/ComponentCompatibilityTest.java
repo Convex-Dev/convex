@@ -25,6 +25,7 @@ import convex.lattice.generic.OwnerKeyLattice;
 /** Compatibility is an explicit diagnostic, independent of storage and merge acceptance. */
 class ComponentCompatibilityTest {
 	private static final Keyword ITEMS=Keyword.intern("items");
+	private static final AString EXPECTED_INTEGER=Strings.intern("Expected an integer set member");
 
 	@Test void baseDeclaresNoConstraints() {
 		var root=Root.<ACell>create(null);
@@ -35,30 +36,38 @@ class ComponentCompatibilityTest {
 		assertNull(root.get());
 	}
 
-	@Test void typedSetChecksForeignElementsWithoutInstallingThem() {
+	@Test void specialisedSetChecksForeignElementsWithoutInstallingThem() {
 		var root=Root.<ASet<CVMLong>>create(null);
-		var set=new SetComponent<>(root,CVMLong.class);
+		// Runtime member constraints belong to the application, independently of Java generics.
+		var set=new SetComponent<>(root) {
+			@Override public AString checkValue(ACell value) {
+				AString error=super.checkValue(value);
+				if (error!=null || value==null) return error;
+				for (ACell member:(ASet<?>)value) {
+					if (!(member instanceof CVMLong)) return EXPECTED_INTEGER;
+				}
+				return null;
+			}
+		};
 		assertNull(set.checkValue(null));
 		assertNull(set.checkValue(Sets.empty()));
 		assertNull(set.checkValue(Sets.of(1,2)));
 		assertNotNull(set.checkValue(CVMLong.ONE));
 		assertNotNull(set.checkValue(Sets.of("wrong")));
 		assertNotNull(set.checkValue(Sets.<ACell>empty().include(null)));
-		assertNull(new SetComponent<>(root).checkValue(Sets.of("unconstrained")));
+		var ordinary=new SetComponent<>(root);
+		assertNull(ordinary.checkValue(Sets.of("unconstrained")));
+		assertNull(ordinary.checkValue(Sets.<ACell>empty().include(null)));
 		assertNull(root.get());
 	}
 
 	@Test void localOperationsAndSyncDoNotRunCompatibilityChecks() {
 		var calls=new AtomicInteger();
 		var root=Root.<ASet<CVMLong>>create(null);
-		var set=new SetComponent<>(root,CVMLong.class) {
+		var set=new SetComponent<>(root) {
 			@Override public AString checkValue(ACell value) {
 				calls.incrementAndGet();
 				return super.checkValue(value);
-			}
-			@Override protected AString checkElement(ACell value) {
-				calls.incrementAndGet();
-				return super.checkElement(value);
 			}
 		};
 		set.add(CVMLong.ONE);
@@ -68,7 +77,7 @@ class ComponentCompatibilityTest {
 		set.sync();
 		assertEquals(0,calls.get());
 		assertNull(set.checkValue(Sets.of(1)));
-		assertEquals(2,calls.get());
+		assertEquals(1,calls.get());
 	}
 
 	@Test void mergeAndPublicationDoNotAutomaticallyPrecheck() {
@@ -94,7 +103,7 @@ class ComponentCompatibilityTest {
 	@Test void regionChecksComposeExistingChildrenWithoutFreezingRegistration() {
 		var host=LatticeHost.create();
 		var app=new Regions(host);
-		var set=new SetComponent<CVMLong>(host.cursor().path(ITEMS),CVMLong.class);
+		var set=new SetComponent<CVMLong>(host.cursor().path(ITEMS));
 		var initial=host.cursor().get();
 		assertNull(app.checkValue(Index.of(ITEMS,CVMLong.ONE)),"unknown regions are outside our policy");
 		app.add(ITEMS,set); // Inspection must not freeze the region set.
