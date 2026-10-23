@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `LatticeNode` supports an optional primary DID and authorised signing key. New propagators default to that key, or null for an unidentified node, with explicit per-group overrides. Indirect DIDs use a supplied `DIDKeyAuthorizer`; no transient identities are generated.
+
 - `LatticeNode` assembles optional TCP networking around an existing host, with one closeable lifecycle. `createPropagator()` creates and starts a managed group; groups, identity, filters and inbound selection can change while running. `serveAllInbound(group)` explicitly selects public serving. `NodeServer` detaches its publisher on shutdown or failed launch, leaving the host usable locally or with a replacement server. Host publisher attachment replaces the permanent publication-policy freeze.
 
 - `LatticeHost.addApplication(app)` registers and returns an existing root application without rebinding it or publishing state. Applications own region paths and can be added incrementally; each incoming delivery uses a stable registration snapshot. The one-time `configureApplications` API has been removed.

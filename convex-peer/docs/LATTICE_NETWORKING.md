@@ -22,8 +22,8 @@ For TCP networking with dynamically managed groups,
 
 ```java
 try (var network = new LatticeNode<>(host, config).launch()) {
+    network.setIdentity(nodeDID, nodeKey, didAuthorizer);
     var group = network.createPropagator();
-    group.setTransportKeyPair(transportKey);
     network.serveAllInbound(group);
     // Applications publish to the existing host; host.sync() publishes to the network.
 }
@@ -33,6 +33,15 @@ try (var network = new LatticeNode<>(host, config).launch()) {
 it when the network is running. No separate add or activation call is needed.
 New groups have no peers or assigned inbound sockets. `removePropagator(group)`
 revokes inbound assignments and closes that group without stopping other groups.
+
+The node may configure a primary DID and an authorised key pair with `setIdentity`.
+The two-argument overload validates `did:key`; other methods require an explicit
+`DIDKeyAuthorizer` backed by authenticated resolver data. The binding is checked
+when configured. New groups use that key by default; without a configured identity
+their key is null. No transient keys are generated. Group-specific key overrides
+remain possible, and existing groups keep their keys when the node default changes.
+The primary DID is local configuration: remote peers still verify possession of
+the expected public key, resolving any DID binding through their own trust policy.
 
 `serveAllInbound(group)` is an explicit public serving choice. Otherwise the listener
 denies inbound access unless the caller installs a selector. The selector can change

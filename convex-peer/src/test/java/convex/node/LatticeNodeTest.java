@@ -9,12 +9,14 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 import convex.api.ConvexRemote;
+import convex.auth.did.DID;
 import convex.core.ErrorCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.StoreException;
@@ -28,6 +30,43 @@ import convex.lattice.generic.SetLattice;
 
 /** Optional networking preserves the existing host, application boundaries and store ownership. */
 class LatticeNodeTest {
+
+	/** Node identity supplies group defaults without inventing keys or replacing group overrides. */
+	@Test void primaryIdentityIsValidatedAndUsedAsTheGroupDefault() throws Exception {
+		try (var store=new MemoryStore();
+				var network=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(-1)).launch()) {
+			assertNull(network.getDID());
+			assertNull(network.getKeyPair());
+			var anonymous=network.createPropagator();
+			assertNull(anonymous.getTransportKey());
+			var primary=AKeyPair.createSeeded(703);
+			var separate=AKeyPair.createSeeded(704);
+			var did=DID.forKey(primary.getAccountKey());
+			network.setIdentity(did,primary);
+			var first=network.createPropagator();
+			var second=network.createPropagator();
+			assertEquals(primary.getAccountKey(),first.getTransportKey());
+			assertEquals(primary.getAccountKey(),second.getTransportKey());
+			assertNull(anonymous.getTransportKey(),"Existing groups retain their identity");
+			first.setTransportKeyPair(separate);
+			assertEquals(primary.getAccountKey(),second.getTransportKey());
+			assertThrows(IllegalArgumentException.class,() -> network.setIdentity(did,separate));
+			assertThrows(IllegalArgumentException.class,() -> network.setIdentity(did,null));
+			assertThrows(IllegalArgumentException.class,() -> network.setIdentity(null,primary));
+			assertSame(primary,network.getKeyPair());
+			assertEquals(did,network.getDID());
+
+			var indirect=Strings.create("did:web:node.example");
+			assertThrows(IllegalArgumentException.class,() -> network.setIdentity(indirect,separate));
+			network.setIdentity(indirect,separate,(subject,key) -> indirect.equals(subject) && separate.getAccountKey().equals(key));
+			assertEquals(indirect,network.getDID());
+			assertEquals(separate.getAccountKey(),network.createPropagator().getTransportKey());
+			assertEquals(primary.getAccountKey(),second.getTransportKey());
+			network.setIdentity(null,null);
+			assertNull(network.createPropagator().getTransportKey());
+			assertEquals(separate.getAccountKey(),first.getTransportKey(),"Clearing the default preserves overrides");
+		}
+	}
 
 	/** New policies affect new assignments; existing sockets retain their group's live view. */
 	@Test void groupsAndServingPoliciesCanChangeWhileRunning() throws Exception {
@@ -97,11 +136,12 @@ class LatticeNodeTest {
 			var sourceKey=AKeyPair.createSeeded(701);
 			try (var sender=new LatticeNode<>(source,NodeConfig.port(0)).launch();
 					var receiver=new LatticeNode<>(target,NodeConfig.port(-1)).launch()) {
+				sender.setIdentity(DID.forKey(sourceKey.getAccountKey()),sourceKey);
+				var targetKey=AKeyPair.createSeeded(702);
+				receiver.setIdentity(DID.forKey(targetKey.getAccountKey()),targetKey);
 				var sourceGroup=sender.createPropagator();
-				sourceGroup.setTransportKeyPair(sourceKey);
 				sender.serveAllInbound(sourceGroup);
 				var targetGroup=receiver.createPropagator();
-				targetGroup.setTransportKeyPair(AKeyPair.createSeeded(702));
 				try (var peer=ConvexRemote.connect(sender.getHostAddress())) {
 					targetGroup.addPeer(sourceKey.getAccountKey(),peer).get(5,TimeUnit.SECONDS);
 					receiver.getServer().pull(targetGroup,peer).get(5,TimeUnit.SECONDS);

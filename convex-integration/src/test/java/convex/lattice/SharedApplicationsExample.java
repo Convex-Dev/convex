@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.auth.did.DIDKeyAuthorizer;
+import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -114,8 +115,8 @@ public final class SharedApplicationsExample {
 			var config=NodeConfig.localNetwork();
 			// Replication knows no lattice: it serves whatever the host publishes, from the host's store.
 			network=new LatticeNode<>(host,config);
+			network.setIdentity(DID.forKey(nodeKey.getAccountKey()),nodeKey);
 			propagation=network.createPropagator();
-			propagation.setTransportKeyPair(nodeKey);
 			network.serveAllInbound(propagation).launch();
 		}
 

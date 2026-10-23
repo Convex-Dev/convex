@@ -353,6 +353,13 @@ public class LatticePropagator implements Closeable {
 
 	// ========== Configuration ==========
 
+	/** Public transport identity used for possession proofs, or null when unconfigured. */
+	public AccountKey getTransportKey() {
+		synchronized (writeLock) {
+			return transportKeyPair==null?null:transportKeyPair.getAccountKey();
+		}
+	}
+
 	/**
 	 * Sets the key used by this group's challenge/response endpoint.
 	 * Changes apply to subsequent handshakes; existing routes are not reauthenticated.

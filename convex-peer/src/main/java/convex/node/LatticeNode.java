@@ -4,7 +4,10 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import convex.auth.did.DIDKeyAuthorizer;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.lattice.LatticeHost;
 
 /**
@@ -23,6 +26,8 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 
 	private final NodeServer<V> server;
 	private final LatticeListener listener;
+	private AString did;
+	private AKeyPair keyPair;
 
 	/** Assembles networking without starting workers or opening a socket. */
 	public LatticeNode(LatticeHost<V> host,NodeConfig config) {
@@ -30,9 +35,44 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 		listener=new LatticeListener(config);
 	}
 
-	/** Creates and registers a group over the host store, starting it if already running. */
+	/** Configures a primary did:key identity, or clears it when both arguments are null. */
+	public LatticeNode<V> setIdentity(AString did,AKeyPair keyPair) {
+		return setIdentity(did,keyPair,DIDKeyAuthorizer.CONVEX);
+	}
+
+	/**
+	 * Configures the primary DID and a key authorised for it. The authoriser must
+	 * use authenticated resolution data for indirect DIDs. The binding is checked
+	 * before changing configuration; no network resolution is performed here.
+	 * New groups copy this key. Existing groups retain their independently
+	 * configured transport keys. Pass null for both DID and key to clear the default.
+	 */
+	public synchronized LatticeNode<V> setIdentity(AString did,AKeyPair keyPair,DIDKeyAuthorizer authorizer) {
+		if (did!=null || keyPair!=null) {
+			if (did==null || keyPair==null || authorizer==null
+					|| !authorizer.safeAuthorises(did,keyPair.getAccountKey())) {
+				throw new IllegalArgumentException("Node key is not authorised for its primary DID");
+			}
+		}
+		this.did=did;
+		this.keyPair=keyPair;
+		return this;
+	}
+
+	/** Primary DID, or null when no identity is configured. */
+	public synchronized AString getDID() { return did; }
+
+	/** Configured primary key, or null. No identity or key is generated implicitly. */
+	public synchronized AKeyPair getKeyPair() { return keyPair; }
+
+	/**
+	 * Creates and registers a group over the host store, starting it if already running.
+	 * Its transport key defaults to the node's configured key, or null without an identity.
+	 * The group can override this default through {@link LatticePropagator#setTransportKeyPair(AKeyPair)}.
+	 */
 	public synchronized LatticePropagator createPropagator() {
 		var propagator=new LatticePropagator(server.getStore());
+		propagator.setTransportKeyPair(keyPair);
 		server.addPropagator(propagator);
 		listener.registerPropagator(propagator);
 		return propagator;

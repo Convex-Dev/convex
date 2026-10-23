@@ -710,8 +710,8 @@ server and listener lifecycle together:
 
 ```java
 try (var network = new LatticeNode<>(host, config).launch()) {
+    network.setIdentity(nodeDID, nodeKey, didAuthorizer);
     var propagation = network.createPropagator();
-    propagation.setTransportKeyPair(transportKey);
     network.serveAllInbound(propagation);
     // The same application instances continue to operate on the same host.
     app.sync();
@@ -735,6 +735,16 @@ subsequent handshakes, without reauthenticating existing routes.
 `getHostAddress()` returns the actual bound address. Use port `0` for local tests.
 A host needs a cell store to attach networking; `MemoryStore` suffices for an
 ephemeral node. Custom stores, group limits or transports can use the explicit assembly.
+
+The node's optional primary identity is a DID and an authorised key pair.
+`setIdentity(did, keyPair)` checks a `did:key` binding; indirect DIDs require the
+overload taking a `DIDKeyAuthorizer` backed by authenticated resolution data.
+Invalid bindings leave the previous identity unchanged. `createPropagator()` uses
+the configured key, or null when no identity is configured; no keys are generated.
+Groups may override their transport key. Changing or clearing the node's identity
+affects newly created groups only. The DID binding is checked when configured;
+applications must refresh it when their resolver state changes. Transport proofs
+remain public-key possession proofs, not remote DID resolution or automatic trust.
 
 ### Sharing a host
 
