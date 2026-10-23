@@ -9,6 +9,9 @@ import convex.core.data.Maps;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
+import convex.core.util.MergeFunction;
+import convex.core.lang.RT;
+import convex.core.data.prim.AInteger;
 import convex.lattice.ALattice;
 import convex.lattice.generic.IndexLattice;
 import convex.lattice.generic.JSONLattice;
@@ -23,7 +26,7 @@ import convex.lattice.generic.MaxLattice;
  *
  * <p>The user state is an {@code Index<Keyword, ACell>} with three keys:</p>
  * <ul>
- *   <li>{@link #KEY_FEED} — post feed ({@code Index<Blob, ACell>}, 8-byte timestamp keys, LWW per entry)</li>
+ *   <li>{@link #KEY_FEED} — post feed ({@code Index<Blob, ACell>}, timestamp-prefixed keys, LWW per entry)</li>
  *   <li>{@link #KEY_PROFILE} — user profile (LWW register)</li>
  *   <li>{@link #KEY_FOLLOWING} — stamped LWP section containing the DID-keyed
  *       {@link #KEY_FOLLOWS} map with whole-record LWW values</li>
@@ -72,34 +75,40 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		if (ownValue == null) ownValue=zero();
 		if (Utils.equals(ownValue, otherValue)) return ownValue;
 
-		// Merge feed via IndexLattice
-		Index<Blob, ACell> ownFeed = getFeed(ownValue);
-		Index<Blob, ACell> otherFeed = getFeed(otherValue);
-		Index<Blob, ACell> mergedFeed = FEED_LATTICE.merge(ownFeed, otherFeed);
+		return ownValue.mergeDifferences(otherValue,new MergeFunction<ACell>() {
+			@Override public ACell merge(ACell own,ACell other) {
+				return own==null?other:own;
+			}
+			@Override public ACell merge(Object key,ACell own,ACell other) {
+				if (other==null) return own;
+				// Index keys compare by blob, including decoded/JSON key representations.
+				ALattice<?> section=key instanceof ACell cell?INSTANCE.path(cell):null;
+				if (section==FEED_LATTICE) return mergeFeed(own,other);
+				if (section==FOLLOWING_LATTICE) return mergeFollowing(own,other);
+				if (section==LWWLattice.INSTANCE) return LWWLattice.INSTANCE.merge(own,other);
+				// Unknown fields are opaque. Carry new fields, retaining established conflicts.
+				return merge(own,other);
+			}
+		});
+	}
 
-		// Merge profile via LWW
-		ACell ownProfile = ownValue.get(KEY_PROFILE);
-		ACell otherProfile = otherValue.get(KEY_PROFILE);
-		ACell mergedProfile = LWWLattice.INSTANCE.merge(ownProfile, otherProfile);
+	private static ACell mergeFeed(ACell own,ACell other) {
+		Index<Blob,ACell> a=RT.ensureIndex(own), b=RT.ensureIndex(other);
+		if (b==null || (own!=null && a==null)) return own==null?other:own;
+		return FEED_LATTICE.merge(a,b);
+	}
 
-		// Merge the independently stamped following section. LWP only establishes
-		// operand preference; distinct target records still merge structurally.
-		Index<Keyword,ACell> ownFollowing=getFollowing(ownValue);
-		Index<Keyword,ACell> otherFollowing=getFollowing(otherValue);
-		Index<Keyword,ACell> mergedFollowing=FOLLOWING_LATTICE.merge(ownFollowing,otherFollowing);
+	private static ACell mergeFollowing(ACell own,ACell other) {
+		Index<Keyword,ACell> a=RT.ensureIndex(own), b=RT.ensureIndex(other);
+		if (!canMergeFollowing(b) || (own!=null && !canMergeFollowing(a))) return own==null?other:own;
+		return FOLLOWING_LATTICE.merge(a,b);
+	}
 
-		// Build result, only updating changed fields
-		Index<Keyword, ACell> result = ownValue;
-		if (!Utils.equals(mergedFeed, ownFeed)) {
-			result = result.assoc(KEY_FEED, mergedFeed);
-		}
-		if (!Utils.equals(mergedProfile, ownProfile)) {
-			result = result.assoc(KEY_PROFILE, mergedProfile);
-		}
-		if (!Utils.equals(mergedFollowing, ownFollowing)) {
-			result = result.assoc(KEY_FOLLOWING, mergedFollowing);
-		}
-		return result;
+	/** Guard only the fields the following merge actually examines; everything else is opaque. */
+	private static boolean canMergeFollowing(Index<Keyword,ACell> value) {
+		if (value==null) return false;
+		ACell time=value.get(LWWLattice.KEY_TIMESTAMP), follows=value.get(KEY_FOLLOWS);
+		return (time==null || time instanceof AInteger) && (follows==null || follows instanceof AHashMap<?,?>);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -116,10 +125,11 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
-		if (childKey instanceof Keyword k) {
-			if (k.equals(KEY_FEED)) return (ALattice<T>) FEED_LATTICE;
-			if (k.equals(KEY_PROFILE)) return (ALattice<T>) LWWLattice.INSTANCE;
-			if (k.equals(KEY_FOLLOWING)) return (ALattice<T>) FOLLOWING_LATTICE;
+		if (childKey instanceof convex.core.data.ABlobLike<?> key) {
+			var blob=key.toBlob();
+			if (blob.equals(KEY_FEED.toBlob())) return (ALattice<T>) FEED_LATTICE;
+			if (blob.equals(KEY_PROFILE.toBlob())) return (ALattice<T>) LWWLattice.INSTANCE;
+			if (blob.equals(KEY_FOLLOWING.toBlob())) return (ALattice<T>) FOLLOWING_LATTICE;
 		}
 		return null;
 	}
@@ -134,7 +144,8 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		if (state == null) return Index.none();
 		ACell feed = state.get(KEY_FEED);
 		if (feed == null) return Index.none();
-		return (Index<Blob, ACell>) feed;
+		Index<Blob,ACell> index=RT.ensureIndex(feed);
+		return index==null?Index.none():index;
 	}
 
 	/**
@@ -145,7 +156,8 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		if (state == null) return Maps.empty();
 		ACell profile = state.get(KEY_PROFILE);
 		if (profile == null) return Maps.empty();
-		return (AHashMap<Keyword, ACell>) profile;
+		AHashMap<Keyword,ACell> map=RT.ensureHashMap(profile);
+		return map==null?Maps.empty():map;
 	}
 
 	/**
@@ -156,7 +168,8 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		Index<Keyword,ACell> following=getFollowing(state);
 		ACell follows = following.get(KEY_FOLLOWS);
 		if (follows == null) return Maps.empty();
-		return (AHashMap<ACell, ACell>) follows;
+		AHashMap<ACell,ACell> map=RT.ensureHashMap(follows);
+		return map==null?Maps.empty():map;
 	}
 
 	/** Returns true iff a value is already in the canonical social-state shape. */

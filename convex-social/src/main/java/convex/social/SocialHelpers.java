@@ -125,23 +125,8 @@ public class SocialHelpers {
 			Index<Blob, ACell> feed = e.getValue();
 			if (feed == null || feed.isEmpty()) continue;
 
-			long feedSize = feed.count();
-			// Find the starting position: last entry, or search backwards from beforeTimestamp
-			long pos = feedSize - 1;
-			if (beforeTimestamp > 0) {
-				// Scan backwards to find first entry before the cursor
-				while (pos >= 0) {
-					MapEntry<Blob, ACell> entry = feed.entryAt(pos);
-					long ts = SocialPost.extractTimestamp(entry.getKey());
-					if (ts < beforeTimestamp) break;
-					pos--;
-				}
-			}
-			if (pos >= 0) {
-				MapEntry<Blob, ACell> entry = feed.entryAt(pos);
-				long ts = SocialPost.extractTimestamp(entry.getKey());
-				heap.offer(new FeedCursor(author, feed, pos, entry, ts));
-			}
+			FeedCursor first=previousEntry(author,feed,feed.count()-1,beforeTimestamp);
+			if (first!=null) heap.offer(first);
 		}
 
 		// Pull entries from the heap
@@ -161,16 +146,24 @@ public class SocialHelpers {
 			}
 
 			// Advance cursor to previous entry
-			long prevPos = cursor.position - 1;
-			if (prevPos >= 0) {
-				MapEntry<Blob, ACell> prevEntry = cursor.feed.entryAt(prevPos);
-				long prevTs = SocialPost.extractTimestamp(prevEntry.getKey());
-				heap.offer(new FeedCursor(cursor.author, cursor.feed,
-					prevPos, prevEntry, prevTs));
-			}
+			FeedCursor previous=previousEntry(cursor.author,cursor.feed,cursor.position-1,0);
+			if (previous!=null) heap.offer(previous);
 		}
 
 		return result;
+	}
+
+	/** Skip unfamiliar keys before they can affect the timeline's chronological ordering. */
+	private static FeedCursor previousEntry(AString author,Index<Blob,ACell> feed,long position,long before) {
+		for (long i=position;i>=0;i--) {
+			MapEntry<Blob,ACell> entry=feed.entryAt(i);
+			ACell rawKey=entry.getKey();
+			if (!(rawKey instanceof Blob key) || key.count()<8) continue;
+			long timestamp=SocialPost.extractTimestamp(key);
+			if (before>0 && timestamp>=before) continue;
+			return new FeedCursor(author,feed,i,entry,timestamp);
+		}
+		return null;
 	}
 
 	/**

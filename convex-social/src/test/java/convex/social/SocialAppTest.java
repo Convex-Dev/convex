@@ -88,7 +88,7 @@ public class SocialAppTest {
 		Blob key = feed.post("Hello, lattice world!");
 
 		assertNotNull(key);
-		assertEquals(8, key.count());
+		assertEquals(16, key.count());
 
 		AHashMap<Keyword, ACell> post = feed.getPost(key);
 		assertNotNull(post);
@@ -104,7 +104,7 @@ public class SocialAppTest {
 		Feed feed = social.user(kp.getAccountKey()).feed();
 
 		// No delay between posts: same-millisecond posts must still get
-		// distinct keys (Feed increments the key on collision)
+		// distinct keys through their independent salts
 		Blob k1 = feed.post("First");
 		Blob k2 = feed.post("Second");
 		Blob k3 = feed.post("Third");
@@ -142,8 +142,9 @@ public class SocialAppTest {
 		Feed feed=social.user(key.getAccountKey()).feed();
 		Blob first=feed.post("first");
 		Blob reply=feed.reply("reply",first,key.getAccountKey());
-		assertEquals(SocialPost.createKey(100),first);
-		assertEquals(SocialPost.createKey(101),reply);
+		assertEquals(100,SocialPost.extractTimestamp(first));
+		assertEquals(100,SocialPost.extractTimestamp(reply));
+		assertNotEquals(first,reply);
 		assertEquals(CVMLong.create(100),feed.getPost(first).get(SocialPost.TIMESTAMP));
 		assertEquals(CVMLong.create(100),feed.getPost(reply).get(SocialPost.TIMESTAMP));
 		time.set(CVMLong.create(200));
@@ -168,23 +169,23 @@ public class SocialAppTest {
 		beforeSign.set(() -> second.set(other.post("installed first")));
 		Blob first=feed.post("retried");
 		assertEquals(2,clocks.get(),"Each logical post resolves its clock once");
-		assertEquals(SocialPost.createKey(100),first);
-		assertEquals(SocialPost.createKey(101),second.get());
+		assertEquals(100,SocialPost.extractTimestamp(first));
+		assertEquals(101,SocialPost.extractTimestamp(second.get()));
 		assertEquals(CVMLong.create(100),feed.getPost(first).get(SocialPost.TIMESTAMP));
 		assertEquals(CVMLong.create(101),feed.getPost(second.get()).get(SocialPost.TIMESTAMP));
 		assertEquals(2,feed.count());
 	}
 
 	@Test
-	public void testPostKeyExhaustionDoesNotOverwriteOrWrap() {
+	public void testPostKeysDoNotNeedToAdvanceTheClock() {
 		AKeyPair key=AKeyPair.createSeeded(7308);
 		Social social=Social.create(wallet(key),() -> CVMLong.create(Long.MAX_VALUE));
 		Feed feed=social.user(key.getAccountKey()).feed();
-		Blob first=feed.post("last key");
-		var before=social.cursor().get();
-		assertThrows(IllegalStateException.class,() -> feed.post("cannot allocate"));
-		assertSame(before,social.cursor().get());
-		assertEquals("last key",SocialPost.getText(feed.getPost(first)));
+		Blob first=feed.post("first");
+		Blob second=feed.post("second");
+		assertNotEquals(first,second);
+		assertEquals(Long.MAX_VALUE,SocialPost.extractTimestamp(second));
+		assertEquals(2,feed.count());
 	}
 
 	@Test
@@ -277,8 +278,7 @@ public class SocialAppTest {
 		// Post in the original
 		social.user(key).feed().post("Before fork");
 
-		// Fork, post in fork (fork copies the feed, so a same-millisecond post
-		// gets a bumped key rather than colliding with "Before fork")
+		// The fork retains earlier posts; the new post gets its own salted identity.
 		Social forked = social.fork();
 		Blob forkedKey = forked.user(key).feed().post("In fork");
 
@@ -444,7 +444,7 @@ public class SocialAppTest {
 		Feed feed = social.user(kp.getAccountKey()).feed();
 
 		assertEquals(0, feed.count());
-		assertNull(feed.getPost(SocialPost.createKey(1000L)));
+		assertNull(feed.getPost(SocialPost.createKey(1000L,0)));
 	}
 
 	@Test
@@ -480,7 +480,7 @@ public class SocialAppTest {
 		// Build legitimate state: Alice posts to her own feed
 		AHashMap<Keyword, ACell> alicePost = SocialPost.createPost("Alice legit", 1000L);
 		Index<Blob, ACell> aliceFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(1000L), alicePost);
+			.assoc(SocialPost.createKey(1000L,0), alicePost);
 		Index<Keyword, ACell> aliceState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, aliceFeed);
 		SignedData<Index<Keyword, ACell>> aliceSigned = alice.signData(aliceState);
@@ -488,7 +488,7 @@ public class SocialAppTest {
 		// Build forged state: Alice signs a post but places it under Bob's key
 		AHashMap<Keyword, ACell> forgedPost = SocialPost.createPost("Forged by Alice!", 2000L);
 		Index<Blob, ACell> forgedFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(2000L), forgedPost);
+			.assoc(SocialPost.createKey(2000L,0), forgedPost);
 		Index<Keyword, ACell> forgedState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, forgedFeed);
 		// Signed by Alice — but placed under Bob's owner key
@@ -504,7 +504,7 @@ public class SocialAppTest {
 		// Bob's node: contains Bob's legitimate data
 		AHashMap<Keyword, ACell> bobPost = SocialPost.createPost("Bob legit", 3000L);
 		Index<Blob, ACell> bobFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(3000L), bobPost);
+			.assoc(SocialPost.createKey(3000L,0), bobPost);
 		Index<Keyword, ACell> bobState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, bobFeed);
 		SignedData<Index<Keyword, ACell>> bobSigned = bob.signData(bobState);
@@ -535,8 +535,8 @@ public class SocialAppTest {
 		Index<Blob, ACell> bobResultFeed = SocialLattice.getFeed(bobResult.getValue());
 		assertEquals(1, bobResultFeed.count());
 		assertEquals("Bob legit",
-			SocialPost.getText((AHashMap<Keyword, ACell>) bobResultFeed.get(SocialPost.createKey(3000L))));
-		assertNull(bobResultFeed.get(SocialPost.createKey(2000L)),
+			SocialPost.getText((AHashMap<Keyword, ACell>) bobResultFeed.get(SocialPost.createKey(3000L,0))));
+		assertNull(bobResultFeed.get(SocialPost.createKey(2000L,0)),
 			"Forged post (t=2000, signed by Alice) should be rejected under Bob's key");
 	}
 
@@ -552,7 +552,7 @@ public class SocialAppTest {
 		// Alice forges a post under Bob's key — Bob has no data on the receiving node
 		AHashMap<Keyword, ACell> forgedPost = SocialPost.createPost("Forged!", 1000L);
 		Index<Blob, ACell> forgedFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(1000L), forgedPost);
+			.assoc(SocialPost.createKey(1000L,0), forgedPost);
 		Index<Keyword, ACell> forgedState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, forgedFeed);
 		SignedData<Index<Keyword, ACell>> forgedSigned = alice.signData(forgedState);

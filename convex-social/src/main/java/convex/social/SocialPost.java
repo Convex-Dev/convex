@@ -1,5 +1,7 @@
 package convex.social;
 
+import java.security.SecureRandom;
+
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -19,17 +21,20 @@ import convex.core.util.Utils;
  * <ul>
  *   <li>{@code :text} — AString (required)</li>
  *   <li>{@code :timestamp} — CVMLong millis since epoch (required)</li>
- *   <li>{@code :reply-to} — Blob, 8-byte key of parent post (optional)</li>
+ *   <li>{@code :reply-to} — Blob, key of parent post (optional)</li>
 	 *   <li>{@code :reply-did} — AString, stable DID of parent author (optional)</li>
  *   <li>{@code :media} — AVector of Hash refs to :data lattice (optional)</li>
  *   <li>{@code :tags} — ASet of AString hashtags (optional)</li>
  *   <li>{@code :deleted} — CVMLong, deletion timestamp (optional, tombstone)</li>
  * </ul>
  *
- * <p>Feed keys are 8-byte big-endian timestamp Blobs giving chronological
- * lexicographic ordering in {@code Index}.</p>
+ * <p>Feed keys contain an eight-byte big-endian timestamp followed by eight random
+ * bytes. The timestamp prefix preserves chronological index ordering; the salt
+ * separates independent writers. Existing eight-byte keys remain readable.</p>
  */
 public class SocialPost {
+
+	private static final SecureRandom KEY_RANDOM=new SecureRandom();
 
 	public static final Keyword TEXT = Keyword.intern("text");
 	public static final Keyword TIMESTAMP = Keyword.intern("timestamp");
@@ -39,23 +44,23 @@ public class SocialPost {
 	public static final Keyword TAGS = Keyword.intern("tags");
 	public static final Keyword DELETED = Keyword.intern("deleted");
 
-	/**
-	 * Creates an 8-byte feed key from a timestamp.
-	 * Big-endian encoding gives chronological lexicographic ordering.
-	 *
-	 * @param timestampMillis Timestamp in milliseconds since epoch
-	 * @return 8-byte Blob key
-	 */
+	/** Creates a timestamp-prefixed key with an independent 64-bit random salt. */
 	public static Blob createKey(long timestampMillis) {
-		byte[] key = new byte[8];
-		Utils.writeLong(key, 0, timestampMillis);
+		return createKey(timestampMillis,KEY_RANDOM.nextLong());
+	}
+
+	/** Creates a key with an explicit salt, for deterministic fixtures or caller-owned allocation. */
+	public static Blob createKey(long timestampMillis,long salt) {
+		byte[] key=new byte[16];
+		Utils.writeLong(key,0,timestampMillis);
+		Utils.writeLong(key,8,salt);
 		return Blob.wrap(key);
 	}
 
 	/**
 	 * Extracts the timestamp from a feed key.
 	 *
-	 * @param key 8-byte Blob feed key
+	 * @param key Timestamp-prefixed feed key, including legacy eight-byte keys
 	 * @return Timestamp in milliseconds since epoch
 	 */
 	public static long extractTimestamp(Blob key) {
@@ -81,7 +86,7 @@ public class SocialPost {
 	 *
 	 * @param text Post text content
 	 * @param timestamp Timestamp in milliseconds since epoch
-	 * @param parentKey 8-byte key of the parent post
+	 * @param parentKey key of the parent post
 	 * @param parentDid Owner key of the parent post's author
 	 * @return Reply post as AHashMap
 	 */

@@ -19,7 +19,7 @@ import convex.lattice.cursor.AForkableCursor;
  * Cursor wrapper for a user's post feed.
  *
  * <p>A {@code Feed} wraps a lattice cursor at the feed level
- * ({@code Index<Blob, ACell>} with 8-byte timestamp keys). All
+ * ({@code Index<Blob, ACell>} with timestamp-prefixed salted keys). All
  * writes propagate through the cursor chain and are automatically
  * signed at the {@code SignedCursor} boundary.</p>
  *
@@ -45,7 +45,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * Posts a new entry to the feed.
 	 *
 	 * @param text Post text content
-	 * @return The 8-byte timestamp key assigned to the post
+	 * @return The timestamp-prefixed key assigned to the post
 	 */
 	public Blob post(String text) {
 		return addEntry(ts -> SocialPost.createPost(text, ts));
@@ -55,9 +55,9 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * Posts a reply to another post.
 	 *
 	 * @param text Reply text content
-	 * @param parentKey 8-byte key of the parent post
+	 * @param parentKey key of the parent post
 	 * @param parentAuthor Account key of the parent post's author
-	 * @return The 8-byte timestamp key assigned to this reply
+	 * @return The timestamp-prefixed key assigned to this reply
 	 */
 	public Blob reply(String text, Blob parentKey, AccountKey parentAuthor) {
 		return reply(text,parentKey,convex.auth.did.DID.forKey(parentAuthor));
@@ -71,37 +71,18 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 		return addEntry(ts -> SocialPost.createReply(text, ts, parentKey, parentAuthor));
 	}
 
-	/**
-	 * Adds a new entry to the feed under a unique timestamp key.
-	 *
-	 * <p>Keys start at the operation's millisecond timestamp, so two entries created
-	 * with the same time would otherwise collide and the later one silently overwrite
-	 * the earlier (LWW data loss). On collision the key is incremented until a
-	 * free key is found — a new entry never replaces an existing one. The check
-	 * runs inside the atomic cursor update, so it holds across Feed instances
-	 * and concurrent posts on the same cursor. The record's timestamp remains the
-	 * unmodified supplied time, resolved once for the operation.
-	 *
-	 * @param entryFn Creates the entry record for the operation timestamp
-	 * @return The 8-byte timestamp key assigned to the entry
-	 */
+	/** Allocates identity and time once, preserving both across atomic update retries. */
 	private Blob addEntry(LongFunction<AHashMap<Keyword, ACell>> entryFn) {
 		long timestamp=clock.get().longValue();
 		AHashMap<Keyword,ACell> entry=entryFn.apply(timestamp);
-		Blob[] keyHolder = new Blob[1];
+		Blob key=SocialPost.createKey(timestamp);
 		cursor().updateAndGet(feed -> {
 			if (feed==null) feed=SocialLattice.FEED_LATTICE.zero();
-			long ts = timestamp;
-			Blob key = SocialPost.createKey(ts);
-			while (feed != null && feed.get(key) != null) {
-				if (ts==Long.MAX_VALUE) throw new IllegalStateException("Post key range exhausted");
-				ts++;
-				key = SocialPost.createKey(ts);
-			}
-			keyHolder[0] = key;
-			return feed.assoc(key, entry);
+			// Even an exceptionally unlikely salt collision must never overwrite a post.
+			if (feed.containsKey(key)) throw new IllegalStateException("Post key already exists");
+			return feed.assoc(key,entry);
 		});
-		return keyHolder[0];
+		return key;
 	}
 
 	/**
@@ -111,7 +92,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * and the {@code :timestamp} is updated so LWW merge picks the
 	 * deletion. Timeline construction filters out tombstoned posts.</p>
 	 *
-	 * @param postKey 8-byte key of the post to delete
+	 * @param postKey key of the post to delete
 	 */
 	@SuppressWarnings("unchecked")
 	public void delete(Blob postKey) {
@@ -119,7 +100,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 		cursor().updateAndGet(feed -> {
 			if (feed == null) return feed;
 			ACell existing = feed.get(postKey);
-			if (existing == null) return feed;
+			if (!(existing instanceof AHashMap<?,?>)) return feed;
 			AHashMap<Keyword, ACell> post = (AHashMap<Keyword, ACell>) existing;
 			post = post.assoc(SocialPost.DELETED, now);
 			post = post.assoc(SocialPost.TIMESTAMP, now);
@@ -130,7 +111,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	/**
 	 * Gets a post by key.
 	 *
-	 * @param key 8-byte timestamp key
+	 * @param key timestamp-prefixed key
 	 * @return The post record, or null if not found
 	 */
 	@SuppressWarnings("unchecked")

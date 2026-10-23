@@ -10,7 +10,7 @@ import convex.core.data.Keyword;
  * A single entry in a merged timeline view.
  *
  * @param author The account key of the post author
- * @param postKey The 8-byte timestamp key in the author's feed
+ * @param postKey The timestamp-prefixed key in the author's feed
  * @param timestamp The extracted timestamp (millis since epoch)
  * @param post The post content
  */

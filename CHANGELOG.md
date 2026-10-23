@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Social posts use timestamp-prefixed keys with a 64-bit random salt, preventing same-time posts on independent replicas from sharing an identity. Legacy timestamp-only keys remain readable. Social merges guard examined container shapes and preserve opaque fields without blocking unrelated updates.
+
 - Signed domain components can rebind their existing API to unsigned forks, batching edits into one signed publication without re-stamping. `SignedComponent` shares verification and reconciliation through `ASignedComponent`; nested drafts sign only at the original envelope boundary.
 
 - Owned collections bind supplied cursors directly; use `.fork()` to stage them explicitly. Forks retain owner verification policy. Signed components retain deliberate unsigned staging and support nested drafts that sign only at the envelope publication boundary. Component transactions commit through bound `storage()`, avoiding duplicate application of editing policies.
