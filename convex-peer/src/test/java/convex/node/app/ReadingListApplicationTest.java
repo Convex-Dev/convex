@@ -16,14 +16,16 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeApplication;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeHost;
+import convex.lattice.SetComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.SetLattice;
 import convex.node.LatticeNode;
+import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
 
 /** Two reading-list applications exchange published recommendations over a real connection. */
@@ -33,27 +35,30 @@ class ReadingListApplicationTest {
 	private static final AKeyPair ALICE_NODE=AKeyPair.createSeeded(9190);
 	private static final AKeyPair BOB_NODE=AKeyPair.createSeeded(9191);
 
+	/** Stages recommendations privately and merges incoming lists by set union. */
 	static final class ReadingListApp extends LatticeApplication<Index<Keyword,ACell>> {
-		ReadingListApp(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
+		private final Books books;
+
+		ReadingListApp(LatticeHost<Index<Keyword,ACell>> host) {
+			super(LATTICE,host);
+			books=new Books(resolve(BOOKS));
 		}
-		Books books() { return new Books(resolve(BOOKS)); }
+		void recommend(String title) { books.recommend(title); }
+		ASet<AString> titles() { return books.titles(); }
 	}
 
-	static final class Books extends ALatticeComponent<ASet<AString>> {
+	/** Domain names for ordinary set operations; the application supplies the merge policy. */
+	static final class Books extends SetComponent<AString> {
 		Books(AForkableCursor<ASet<AString>> cursor) { super(cursor); }
-		void recommend(String title) {
-			cursor().updateAndGet(books -> (books==null?Sets.<AString>empty():books).include(Strings.create(title)));
-		}
-		ASet<AString> titles() { return cursor().get()==null?Sets.empty():cursor().get(); }
+		void recommend(String title) { add(Strings.create(title)); }
+		ASet<AString> titles() { return get(); }
 	}
 
 	@Test void receivedRecommendationsStayPrivateUntilTheApplicationPublishes() throws Exception {
-		try (var aliceStore=EtchStore.createTemp("reading-list-alice");
+		try (var aliceStore=new MemoryStore();
 				var bobStore=EtchStore.createTemp("reading-list-bob")) {
-			var aliceHost=LatticeHost.<Index<Keyword,ACell>>open(aliceStore);
-			var bobHost=LatticeHost.<Index<Keyword,ACell>>open(bobStore);
+			var aliceHost=LatticeHost.open(aliceStore);
+			var bobHost=LatticeHost.open(bobStore);
 			var alice=aliceHost.addApplication(new ReadingListApp(aliceHost));
 			var bob=bobHost.addApplication(new ReadingListApp(bobHost));
 			// Networking is optional and scoped independently of the applications.
@@ -66,29 +71,42 @@ class ReadingListApplicationTest {
 				var bobGroup=bobNetwork.createPropagator();
 				aliceNetwork.serveAllInbound(aliceGroup);
 
-				alice.books().recommend("The Dispossessed");
+				// Alice publishes her recommendation and waits until it can be served.
+				alice.recommend("The Dispossessed");
 				alice.sync();
-				aliceHost.sync();
-				long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
-				while (true) {
-					var next=aliceGroup.nextAnnounce();
-					if (aliceHost.cursor().get().equals(aliceGroup.getLastAnnouncedValue())) break;
-					next.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
-				}
+				awaitAnnounced(aliceGroup,aliceHost.sync());
 
-				bob.books().recommend("A Wizard of Earthsea");
+				// Receiving Alice's list preserves Bob's pending recommendation.
+				bob.recommend("A Wizard of Earthsea");
 				try (var peer=ConvexRemote.connect(aliceNetwork.getHostAddress())) {
 					bobGroup.addPeer(aliceGroup.getTransportKey(),peer).get(10,TimeUnit.SECONDS);
 					bobNetwork.getServer().pull(bobGroup,peer).get(10,TimeUnit.SECONDS);
 				}
-				assertEquals(Sets.of("The Dispossessed","A Wizard of Earthsea"),bob.books().titles());
+				var expectedTitles=Sets.of("The Dispossessed","A Wizard of Earthsea");
+				assertEquals(expectedTitles,bob.titles());
 				assertTrue(bobHost.cursor().get().isEmpty());
 				assertTrue(bobStore.<Index<Keyword,ACell>>getRootData().isEmpty());
+
+				// Application sync publishes into the host, without advancing the stored root.
 				bob.sync();
+				assertEquals(expectedTitles,bobHost.cursor().get().get(BOOKS));
+				assertTrue(bobStore.<Index<Keyword,ACell>>getRootData().isEmpty());
+
+				// Host sync advances the stored root and schedules propagation.
 				bobHost.sync();
-				bobHost.flush();
-				assertEquals(bob.cursor().get(),bobStore.getRootData());
+				assertEquals(expectedTitles,bobStore.<Index<Keyword,ACell>>getRootData().get(BOOKS));
 			}
+		}
+	}
+
+	/** Waits for this exact snapshot; this scenario makes no further edits while waiting. */
+	private static void awaitAnnounced(LatticePropagator group,ACell expected) throws Exception {
+		long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
+		while (true) {
+			// Subscribe before inspecting the view so a concurrent announcement cannot be missed.
+			var next=group.nextAnnounce();
+			if (expected.equals(group.getLastAnnouncedValue())) return;
+			next.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
 		}
 	}
 }
