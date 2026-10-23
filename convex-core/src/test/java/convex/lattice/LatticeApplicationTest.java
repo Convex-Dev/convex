@@ -2,7 +2,6 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +22,7 @@ class LatticeApplicationTest {
 	@Test void privateApplicationAcceptsPathsButWaitsForPublication() {
 		var host=LatticeHost.create();
 		var app=new LatticeApplication<>(LATTICE,host);
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		host.mergeAt(Sets.of(1),ITEMS);
 		assertEquals(Sets.of(1),app.cursor().get().get(ITEMS));
 		assertTrue(host.cursor().get().isEmpty());
@@ -36,7 +35,7 @@ class LatticeApplicationTest {
 		var stranger=AKeyPair.createSeeded(9184);
 		var lattice=KeyedLattice.create(ITEMS,OwnerLattice.create(SetLattice.create()));
 		var root=LatticeHost.create();
-		root.configureApplications(List.of(LatticeApplication.live(lattice,root)));
+		root.addApplication(LatticeApplication.live(lattice,root));
 		var values=Sets.of(CVMLong.ONE);
 		root.mergeAt(stranger.signData(values),ITEMS,owner.getAccountKey());
 		assertNull(RT.getIn(root.cursor().get(),ITEMS,owner.getAccountKey()));

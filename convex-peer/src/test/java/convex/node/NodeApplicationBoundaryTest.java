@@ -34,7 +34,7 @@ class NodeApplicationBoundaryTest {
 		var lattice=SetLattice.<CVMLong>create();
 		try (var store=new MemoryStore(); var node=new NodeServer<>(LatticeHost.create(lattice.zero(),store))) {
 			var app=new App(node.getHost());
-			node.getHost().configureApplications(java.util.List.of(app));
+			node.getHost().addApplication(app);
 			node.launch();
 			var first=Sets.of(CVMLong.ONE);
 			var outcome=node.mergeInbound(new ACell[0],first);

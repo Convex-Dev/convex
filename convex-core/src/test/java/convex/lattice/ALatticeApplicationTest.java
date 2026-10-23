@@ -2,8 +2,6 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -44,25 +42,20 @@ public class ALatticeApplicationTest {
 		var host=LatticeHost.create(LATTICE.zero(),null);
 		var first=new LatticeApplication<>(LATTICE,host);
 		var second=new LatticeApplication<>(LATTICE,host);
-		var configured=new ArrayList<ALatticeApplication<Index<Keyword,ACell>>>();
-		configured.add(first);
-		configured.add(second);
-		host.configureApplications(configured);
-		configured.clear();
+		host.addApplication(first);
+		host.addApplication(second);
 		var incoming=LATTICE.zero().assoc(ITEMS,Sets.of(1));
 		assertEquals(LATTICE.zero(),host.merge(incoming));
 		assertEquals(incoming,first.cursor().get());
 		assertEquals(incoming,second.cursor().get());
 		assertEquals(LATTICE.zero(),host.cursor().get());
-		assertThrows(IllegalStateException.class,() -> host.configureApplications(List.of()));
 		first.sync();
 		assertEquals(incoming,host.cursor().get());
 	}
 
 	@Test
-	public void testExplicitlyEmptyApplicationsIgnoreIncomingState() {
+	public void testEmptyHostIgnoresIncomingState() {
 		var host=LatticeHost.create(LATTICE.zero(),null);
-		host.configureApplications(List.of());
 		host.merge(LATTICE.zero().assoc(ITEMS,Sets.of(1)));
 		assertEquals(LATTICE.zero(),host.cursor().get());
 	}

@@ -65,7 +65,9 @@ class KeyedRegionsTest {
 		var another=new SingleRegion<>(host,A,shared);
 		assertSame(shared,another.component());
 		assertSame(context,shared.getContext());
-		host.configureApplications(List.of(single,multiple,another));
+		host.addApplication(single);
+		host.addApplication(multiple);
+		host.addApplication(another);
 		host.merge(Index.of(A,CVMLong.TWO,UNKNOWN,CVMLong.ONE));
 		assertTrue(host.cursor().get().isEmpty());
 		assertEquals(CVMLong.TWO,shared.cursor().get());
@@ -94,7 +96,7 @@ class KeyedRegionsTest {
 		var initial=Index.<Keyword,ACell>of(A,CVMLong.ONE,NESTED,Index.of(B,Strings.create("keep")));
 		var host=LatticeHost.create(initial,store);
 		var app=new Regions(host);
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		for (int i=0;i<12;i++) {
 			var incoming=Index.<Keyword,ACell>of(A,CVMLong.create(i),UNKNOWN,Sets.of(i));
 			assertSame(initial,host.merge(incoming));
@@ -150,8 +152,8 @@ class KeyedRegionsTest {
 		var paths=new TestRegions(pathHost);
 		root.nested(NESTED).members(A);
 		paths.nested(NESTED).members(A);
-		rootHost.configureApplications(List.of(root));
-		pathHost.configureApplications(List.of(paths));
+		rootHost.addApplication(root);
+		pathHost.addApplication(paths);
 		for (int i=0;i<8;i++) {
 			var members=Sets.<CVMLong>of(i);
 			var incoming=Index.<Keyword,ACell>of(NESTED,Index.of(A,members));
@@ -236,7 +238,8 @@ class KeyedRegionsTest {
 		assertSame(shared,second.region(A,shared));
 		assertSame(policy,shared.getContext(),"registration must not configure shared children");
 		assertEquals(Sets.of(1),shared.cursor().get());
-		host.configureApplications(List.of(first,second));
+		host.addApplication(first);
+		host.addApplication(second);
 		host.merge(Index.of(A,Sets.of(2)));
 		assertEquals(Sets.of(1,2),shared.cursor().get(),"duplicate delivery is harmless for a lattice merge");
 		assertEquals(Index.none(),host.cursor().get());
@@ -370,7 +373,7 @@ class KeyedRegionsTest {
 		var app=new TestRegions(host);
 		app.createRegion(A,(AForkableCursor<AInteger> destination) ->
 			LatticeComponent.live(MaxLattice.INSTANCE,destination,LatticeContext.EMPTY));
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		host.merge(Index.of(A,CVMLong.TWO,UNKNOWN,CVMLong.ONE));
 		assertEquals(Index.of(A,CVMLong.TWO),host.cursor().get());
 		assertSame(host.cursor().get(),app.sync());

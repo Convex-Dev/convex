@@ -50,7 +50,7 @@ class NodeApplicationIngressTest {
 			store.setRootData(retained);
 			var host=LatticeHost.open(store);
 			var app=new App(host);
-			host.configureApplications(List.of(app));
+			host.addApplication(app);
 			try (var node=new NodeServer<>(host)) {
 				assertEquals(retained,app.cursor().get());
 				assertFalse(node.isRunning());
@@ -102,7 +102,7 @@ class NodeApplicationIngressTest {
 				assertSame(store,node.getStore());
 				assertFalse(node.getCursor().supportsExclusiveTransactions());
 				var app=new App(node.getHost());
-			node.getHost().configureApplications(List.of(app));
+			node.getHost().addApplication(app);
 			node.launch();
 				assertEquals(retained,app.cursor().get());
 				assertEquals(retained,store.getRootData());
@@ -114,7 +114,7 @@ class NodeApplicationIngressTest {
 		try (var store=new MemoryStore()) {
 			var root=LatticeHost.create(KeyedLattice.create().zero(),store);
 			var app=new App(root);
-			root.configureApplications(List.of(app));
+			root.addApplication(app);
 			try (var node=new NodeServer<>(root)) {
 				node.launch();
 				var incoming=LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE));
@@ -155,7 +155,7 @@ class NodeApplicationIngressTest {
 			transport.registerPropagator(group);
 			transport.setSelector(connection -> group);
 			var app=new App(node.getHost());
-			node.getHost().configureApplications(List.of(app));
+			node.getHost().addApplication(app);
 			node.launch();
 			transport.launch();
 			try (var peer=ConvexRemote.connect(transport.getHostAddress())) {
@@ -178,7 +178,7 @@ class NodeApplicationIngressTest {
 	@Test void directAndSnapshotEntryPointsRespectApplicationAcceptance() throws Exception {
 		try (var store=new MemoryStore(); var node=new NodeServer<>(LatticeHost.open(store))) {
 			var app=new App(node.getHost());
-			node.getHost().configureApplications(List.of(app));
+			node.getHost().addApplication(app);
 			node.launch();
 			app.ignore=true;
 			var incoming=LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE));
@@ -211,7 +211,7 @@ class NodeApplicationIngressTest {
 			};
 			node.addPropagator(group);
 			var app=new App(node.getHost());
-			node.getHost().configureApplications(List.of(app));
+			node.getHost().addApplication(app);
 			node.launch();
 			assertEquals(LATTICE.zero(),node.pull(group,(Convex)null).get(5,TimeUnit.SECONDS));
 			assertNull(node.pullPath(group,null,ITEMS).get(5,TimeUnit.SECONDS));

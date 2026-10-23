@@ -1,7 +1,6 @@
 package convex.node;
 
 import java.io.IOException;
-import java.util.List;
 
 import convex.core.data.ACell;
 import convex.core.store.AStore;
@@ -65,7 +64,7 @@ public final class RelayHost {
 		LatticeHost<V> host=openHost(lattice.zero(),store,config);
 		var application=LatticeApplication.live(lattice,host);
 		application.setContext(context);
-		host.configureApplications(List.of(application));
+		host.addApplication(application);
 		return host;
 	}
 

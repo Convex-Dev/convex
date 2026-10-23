@@ -1031,7 +1031,7 @@ public class NodeServerTest {
 			var indifferent=new ALatticeApplication<ASet<ACell>>(host) {
 				@Override public ASet<ACell> merge(ASet<ACell> incoming) { return cursor().get(); }
 			};
-			host.configureApplications(List.of(indifferent));
+			host.addApplication(indifferent);
 			try (NodeServer<ASet<ACell>> node=new TestNode<>(host,null)) {
 				LatticePropagator ingress=unattachedPropagator(node);
 				node.addPropagator(ingress);

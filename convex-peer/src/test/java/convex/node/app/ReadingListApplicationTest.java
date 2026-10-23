@@ -2,7 +2,6 @@ package convex.node.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
@@ -62,7 +61,7 @@ class ReadingListApplicationTest {
 		RunningList(EtchStore store,AKeyPair transportKey) throws Exception {
 			host=LatticeHost.open(store);
 			app=new ReadingListApp(host);
-			host.configureApplications(List.of(app));
+			host.addApplication(app);
 			var config=NodeConfig.localNetwork();
 			node=new NodeServer<>(host,config);
 			group=new LatticePropagator(store);

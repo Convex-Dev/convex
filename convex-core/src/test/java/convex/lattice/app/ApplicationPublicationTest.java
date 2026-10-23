@@ -86,7 +86,7 @@ class ApplicationPublicationTest {
 	@Test void unfamiliarNotesSurviveLocalEditingAndPublication() {
 		var host=LatticeHost.create();
 		var app=new NotebookApp(host,ALICE);
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		var foreign=Sets.<ACell>of(42,"remote");
 		host.mergeAt(ALICE.signData(foreign),NOTEBOOK);
 		var notes=app.notebook().notes();
@@ -102,7 +102,7 @@ class ApplicationPublicationTest {
 		for (var owner:List.of(ALICE,BOB)) {
 			var host=LatticeHost.create();
 			var app=new NotebookApp(host,owner);
-			host.configureApplications(List.of(app));
+			host.addApplication(app);
 			var other=owner==ALICE?BOB:ALICE;
 			app.notebook().notes().add("Local");
 			host.mergeAt(other.signData(Sets.of("Unauthorised")),NOTEBOOK);
@@ -164,7 +164,7 @@ class ApplicationPublicationTest {
 	@Test void aHostedNotebookAcceptsSignedDeliveryWithoutPublishingItsDraft() {
 		var host=LatticeHost.create();
 		var app=new NotebookApp(host,ALICE);
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		app.notebook().notes().add("Local draft");
 		// Root routing and direct region delivery must enter the same signed boundary.
 		host.merge(Index.of(NOTEBOOK,ALICE.signData(Sets.of("Received in a root"))));

@@ -2,7 +2,6 @@ package convex.lattice.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -56,7 +55,8 @@ class SharedRegionsTest {
 		var aItems=a.create(A,Items::new);
 		var b=new Regions(host);
 		var bItems=b.create(B,Items::new);
-		host.configureApplications(List.of(a,b));
+		host.addApplication(a);
+		host.addApplication(b);
 
 		aItems.add(1);
 		a.sync();
@@ -88,7 +88,8 @@ class SharedRegionsTest {
 		var aItems=a.create(A,Items::new);
 		var b=new Regions(host);
 		var bItems=b.create(B,Items::new);
-		host.configureApplications(List.of(a,b));
+		host.addApplication(a);
+		host.addApplication(b);
 
 		host.merge(Index.<Keyword,ACell>none().assoc(A,Sets.of(1)).assoc(B,Sets.of(2)));
 		assertTrue(host.cursor().get().isEmpty(),"staged regions merge into their own copies");

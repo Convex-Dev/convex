@@ -170,7 +170,7 @@ class TaskBoardApplicationTest {
 	@Test void completeAndPlanAtomicallyThenPublish() throws Exception {
 		var host=LatticeHost.create();
 		var app=new TaskBoardApp(host,() -> CVMLong.ONE);
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		var board=app.board();
 		board.plan("write","Write the example");
 		board.transact(draft -> {
@@ -280,7 +280,7 @@ class TaskBoardApplicationTest {
 		for (var deliveries:List.of(List.of(completed,reopened),List.of(reopened,completed))) {
 			var host=LatticeHost.create();
 			var replica=new TaskBoardApp(host,() -> CVMLong.create(1000));
-			host.configureApplications(List.of(replica));
+			host.addApplication(replica);
 			replica.board().plan("other","Independent task");
 			for (var incoming:deliveries) host.merge(incoming);
 			host.merge(completed);

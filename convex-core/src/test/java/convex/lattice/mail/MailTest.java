@@ -372,7 +372,7 @@ public class MailTest {
 		KeyedLattice root=KeyedLattice.create(Mail.KEY_MAIL,Mail.LATTICE);
 		LatticeHost<Index<Keyword,ACell>> host=LatticeHost.create();
 		HostedRoot app=new HostedRoot(root,host);
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		Mail mail=Mail.connect(app,Mail.LATTICE,(owner,value) -> ALICE.signData(value));
 		mail.send(aliceToBob(1000,"hello bob"));
 		assertNotNull(app.cursor().get().get(Mail.KEY_MAIL),"working state holds the region");

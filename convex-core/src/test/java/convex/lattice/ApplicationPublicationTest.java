@@ -2,7 +2,6 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -199,7 +198,7 @@ public class ApplicationPublicationTest {
 		var maximum=CompareLattice.<CVMLong>create((a,b) -> a.compareTo(b));
 		var host=LatticeHost.create(CVMLong.create(5),null);
 		var app=new LatticeApplication<>(maximum,host);
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		app.cursor().set(CVMLong.ONE);
 		host.setPublicationPolicy(snapshot -> {
 			app.sync();
@@ -231,7 +230,7 @@ public class ApplicationPublicationTest {
 		var host=LatticeHost.create(initial(),null);
 		var selected=KeyedLattice.create(REGISTER,LWW);
 		var app=new LatticeApplication<>(selected,host);
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		host.merge(LATTICE.zero().assoc(REGISTER,CVMLong.ONE).assoc(IGNORED,CVMLong.TWO));
 		app.sync();
 		assertSame(selected,app.getLattice());
@@ -246,7 +245,7 @@ public class ApplicationPublicationTest {
 	public void testRootRetainsOnlyWhatApplicationsAcceptAndPublish() {
 		var host=LatticeHost.create(initial(),null);
 		var app=new Application(host);
-		host.configureApplications(List.of(app));
+		host.addApplication(app);
 		var incoming=LATTICE.zero().assoc(OWNED,KEY.signData(Sets.of(1))).assoc(IGNORED,CVMLong.ONE);
 		host.merge(incoming);
 		assertEquals(initial(),host.cursor().get());

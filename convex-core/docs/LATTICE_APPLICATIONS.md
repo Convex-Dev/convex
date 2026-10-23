@@ -262,9 +262,12 @@ accepts an existing owner index to share pending state.
 The host registers root applications, with no knowledge of their region names or
 paths. `addApplication(app)` returns the same instance, retaining its policy and
 publication boundary. Applications receive deliveries in registration order.
-Register before the first `host.merge` or `host.mergeAt`, which freezes the list,
-including an empty list. `configureApplications(list)` remains available for one
-bulk setup; further applications may be added before delivery starts.
+Applications can be added incrementally, including after delivery has begun.
+Each `host.merge` or `host.mergeAt` uses a stable registration snapshot: additions
+during delivery receive subsequent deliveries only. Registration does not replay
+earlier input, merge existing host state into an application or publish its pending
+edits. The host remains a root component; adding an application requires no separate
+builder or declaration of its regions.
 
 For simple assembly without a domain API, `new SingleRegion<>(host, key, component)`
 and `SingleRegion.create(host, key, factory)` remain available. For several regions, construct
@@ -301,7 +304,8 @@ final class Counters extends AKeyedRegions {
 var host = LatticeHost.create();
 var first = new Counters(host);
 var second = new Counters(host, first.count);
-host.configureApplications(List.of(first, second));
+host.addApplication(first);
+host.addApplication(second);
 
 host.merge(Index.of(Counters.COUNT, CVMLong.ONE));
 // Both applications see the same pending value through their shared count.
@@ -461,12 +465,12 @@ public final class MyApplication extends LatticeApplication<Index<Keyword, ACell
 // Local
 LatticeHost<Index<Keyword, ACell>> local = LatticeHost.open(store);
 MyApplication app = MyApplication.connect(local);
-local.configureApplications(List.of(app));
+local.addApplication(app);
 
 // Hosted by a node: identical application code
 var host = LatticeHost.open(store);
 MyApplication networked = MyApplication.connect(host);
-host.configureApplications(List.of(networked));
+host.addApplication(networked);
 var node = new NodeServer<>(host, config);
 node.launch();
 ```
@@ -554,7 +558,7 @@ into that adapter:
 ```java
 var host = LatticeHost.create();
 var app = new LatticeApplication<>(selectedRegions, host);
-host.configureApplications(List.of(app));
+host.addApplication(app);
 host.merge(incomingRoot); // delegated to the application's working copy
 app.sync();              // merge the working copy back to the host
 host.sync();             // optional host policy; otherwise a no-op without a store
@@ -644,7 +648,7 @@ enough:
 
 ```java
 var incoming = LatticeApplication.live(rootLattice, host);
-host.configureApplications(List.of(incoming));
+host.addApplication(incoming);
 host.merge(incomingRoot); // verifies and merges into the shared root once
 ```
 
@@ -682,7 +686,7 @@ the host and its applications first, then start the node:
 ```java
 var host = LatticeHost.open(store);
 var app = new MyApplication(host);
-host.configureApplications(List.of(app));
+host.addApplication(app);
 var node = new NodeServer<>(host, config);
 node.launch();
 // Later, according to application policy:

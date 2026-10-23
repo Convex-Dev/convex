@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -38,12 +39,11 @@ public class LatticeHostTest {
 		first.sync();
 		second.sync();
 		assertEquals(Sets.of(1,2),host.cursor().get());
-		assertThrows(IllegalStateException.class,() -> host.addApplication(first));
 	}
 
-	/** Bulk and individual setup share one ordered list; failed registration changes nothing. */
+	/** Incremental additions preserve delivery order; failed registration changes nothing. */
 	@Test
-	public void testAddAfterBulkConfigurationPreservesDeliveryOrder() {
+	public void testAddAfterDeliveryPreservesDeliveryOrder() {
 		var host=LatticeHost.create(CVMLong.ZERO,null);
 		var received=new ArrayList<Integer>();
 		class Receiver extends ALatticeComponent<CVMLong> {
@@ -54,24 +54,27 @@ public class LatticeHostTest {
 				return cursor().get();
 			}
 		}
-		host.configureApplications(List.of(new Receiver(1)));
+		host.addApplication(new Receiver(1));
 		assertThrows(NullPointerException.class,() -> host.addApplication(null));
 		host.addApplication(new Receiver(2));
 		host.addApplication(new Receiver(3));
 		host.mergeAt(CVMLong.ONE);
 		assertEquals(List.of(1,2,3),received);
 		assertSame(CVMLong.ZERO,host.cursor().get());
-		assertThrows(IllegalStateException.class,() -> host.addApplication(new Receiver(4)));
-		assertThrows(IllegalStateException.class,() -> host.configureApplications(List.of()));
+		host.addApplication(new Receiver(4));
+		assertEquals(List.of(1,2,3),received,"Registration does not replay input");
+		received.clear();
+		host.merge(CVMLong.TWO);
+		assertEquals(List.of(1,2,3,4),received);
 	}
 
-	/** Registration synchronises setup only; independent deliveries can make progress together. */
+	/** Root and path deliveries retain their snapshot while registrations and other deliveries proceed. */
 	@Test
-	public void testConcurrentDeliveryRunsOutsideRegistrationLock() throws Exception {
+	public void testConcurrentDeliveryUsesStableRegistrationSnapshots() throws Exception {
 		var host=LatticeHost.create(CVMLong.ZERO,null);
 		var entered=new CountDownLatch(2);
 		var release=new CountDownLatch(1);
-		var app=host.addApplication(new ALatticeComponent<CVMLong>(host.cursor()) {
+		host.addApplication(new ALatticeComponent<CVMLong>(host.cursor()) {
 			@Override public CVMLong merge(CVMLong incoming) {
 				entered.countDown();
 				try {
@@ -83,30 +86,45 @@ public class LatticeHostTest {
 				return cursor().get();
 			}
 		});
+		var lateDeliveries=new AtomicInteger();
 		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
 			var first=executor.submit(() -> host.merge(CVMLong.ONE));
 			var second=executor.submit(() -> host.mergeAt(CVMLong.TWO));
 			try {
 				assertTrue(entered.await(5,TimeUnit.SECONDS),"Incoming callbacks can run concurrently");
+				host.addApplication(new ALatticeComponent<CVMLong>(host.cursor()) {
+					@Override public CVMLong merge(CVMLong incoming) {
+						lateDeliveries.incrementAndGet();
+						return cursor().get();
+					}
+				});
 			} finally {
 				release.countDown();
 			}
 			assertSame(CVMLong.ZERO,first.get(5,TimeUnit.SECONDS));
 			assertSame(CVMLong.ZERO,second.get(5,TimeUnit.SECONDS));
 		}
-		assertThrows(IllegalStateException.class,() -> host.addApplication(app));
+		assertEquals(0,lateDeliveries.get(),"In-flight deliveries keep their original registrations");
+		host.merge(CVMLong.ONE);
+		host.mergeAt(CVMLong.TWO);
+		assertEquals(2,lateDeliveries.get(),"Subsequent root and path deliveries include the addition");
 	}
 
-	/** Starting delivery freezes even an empty registration list, for root and path input. */
+	/** An empty delivery leaves the host open for additions, without replaying discarded input. */
 	@Test
-	public void testEmptyRegistrationFreezesOnFirstDelivery() {
+	public void testAddAfterEmptyDelivery() {
 		for (boolean path:new boolean[] {false,true}) {
-			var host=LatticeHost.create();
-			if (path) host.mergeAt(CVMLong.ONE,Keyword.intern("unknown"));
-			else host.merge(null);
+			var host=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),null);
+			if (path) host.mergeAt(Sets.of(1));
+			else host.merge(Sets.of(1));
 			assertTrue(host.cursor().get().isEmpty());
-			assertThrows(IllegalStateException.class,() -> host.addApplication(new Regions(host)));
-			assertThrows(IllegalStateException.class,() -> host.configureApplications(List.of()));
+			var app=host.addApplication(new LatticeApplication<>(SetLattice.<CVMLong>create(),host));
+			assertTrue(app.cursor().get().isEmpty());
+			host.merge(Sets.of(2));
+			assertEquals(Sets.of(2),app.cursor().get());
+			assertTrue(host.cursor().get().isEmpty(),"Registration and delivery do not publish staged state");
+			app.sync();
+			assertEquals(Sets.of(2),host.cursor().get());
 		}
 	}
 

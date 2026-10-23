@@ -64,7 +64,7 @@ class ApplicationLifecycleTest {
 		};
 		nested.add(ITEMS,values);
 		root.add(NESTED,nested);
-		host.configureApplications(List.of(root));
+		host.addApplication(root);
 		host.mergeAt(Sets.of(1),NESTED,ITEMS);
 		assertTrue(events.isEmpty(),"Delivery does not run publication lifecycle");
 		var before=host.cursor().get();

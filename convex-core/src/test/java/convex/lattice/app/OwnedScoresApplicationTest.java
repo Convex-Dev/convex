@@ -2,7 +2,6 @@ package convex.lattice.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -100,7 +99,7 @@ class OwnedScoresApplicationTest {
 
 		var replicaHost=LatticeHost.create();
 		var replica=new SingleRegion<>(replicaHost,SCORES,new Scores(replicaHost.cursor().path(SCORES),authority));
-		replicaHost.configureApplications(List.of(replica));
+		replicaHost.addApplication(replica);
 		replicaHost.merge(host.cursor().get());
 		var accepted=replica.component().get(TEAM);
 		assertSame(app.component().get(TEAM),accepted);

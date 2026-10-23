@@ -75,7 +75,7 @@ class MailDeliveryTest {
 		RunningNode(EtchStore store,AKeyPair transportKey) throws Exception {
 			host=LatticeHost.open(store);
 			app=new MailApp(host);
-			host.configureApplications(List.of(app));
+			host.addApplication(app);
 			var config=NodeConfig.localNetwork();
 			node=new NodeServer<>(host,config);
 			group=new LatticePropagator(store);

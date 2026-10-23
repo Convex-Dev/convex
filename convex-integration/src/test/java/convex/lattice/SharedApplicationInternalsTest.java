@@ -9,7 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -302,7 +301,8 @@ public class SharedApplicationInternalsTest {
 			var host=new LatticeHost<>(cursor,store);
 			social=new SocialWithP2P(host);
 			files=new FilesWithP2P(host);
-			host.configureApplications(List.of(social,files));
+			host.addApplication(social);
+			host.addApplication(files);
 			node=new NodeServer<>(host,NodeConfig.port(-1));
 			socialGroup.setTransportKeyPair(SOCIAL_TRANSPORT);
 			filesGroup.setTransportKeyPair(FILES_TRANSPORT);

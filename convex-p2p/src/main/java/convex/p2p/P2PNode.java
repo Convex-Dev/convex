@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -224,7 +223,7 @@ public class P2PNode implements Closeable {
 			keyPair==null?null:keyPair.getAccountKey(),
 			keyPair==null?null:(owner,value) -> keyPair.signData(value),
 			Utils::getCurrentTimestampCell,didAuthorizer);
-		host.configureApplications(List.of(application));
+		host.addApplication(application);
 
 		NodeServer<Index<Keyword, ACell>> server=new NodeServer<>(host,effectiveConfig);
 		LatticeConnectionManager manager=new LatticeConnectionManager(store);

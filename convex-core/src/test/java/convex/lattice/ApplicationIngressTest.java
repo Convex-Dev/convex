@@ -58,7 +58,8 @@ class ApplicationIngressTest {
 		var first=new App(LATTICE,root);
 		var second=new App(LATTICE,root);
 		second.ignore=true;
-		root.configureApplications(List.of(first,second));
+		root.addApplication(first);
+		root.addApplication(second);
 		var values=Sets.of(CVMLong.ONE);
 		assertEquals(LATTICE.zero(),root.mergeAt(values,ITEMS));
 		assertEquals(values,first.cursor().get().get(ITEMS));
@@ -79,7 +80,7 @@ class ApplicationIngressTest {
 	@Test void applicationsOwnPathSelectionIndependentlyOfHostSchema() {
 		var root=LatticeHost.create(KeyedLattice.create().zero(),null);
 		var app=new App(LATTICE,root);
-		root.configureApplications(List.of(app));
+		root.addApplication(app);
 		root.mergeAt(Sets.of(CVMLong.ONE),UNKNOWN);
 		assertEquals(0,app.merges,"a path the application's lattice does not declare delivers nothing");
 		assertEquals(LATTICE.zero(),app.cursor().get());
@@ -100,7 +101,7 @@ class ApplicationIngressTest {
 				return super.merge(incoming);
 			}
 		};
-		root.configureApplications(List.of(app));
+		root.addApplication(app);
 		root.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
 		assertEquals(List.of(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE))),delivered,"the value at its path, siblings ignored");
 		assertEquals(Sets.of(CVMLong.ONE),app.cursor().get().get(ITEMS));
@@ -138,7 +139,7 @@ class ApplicationIngressTest {
 			}
 		};
 		board[0]=new Board(app.resolve(BOARD));
-		root.configureApplications(List.of(app));
+		root.addApplication(app);
 
 		root.mergeAt(Sets.of(CVMLong.ONE),BOARD,PLANNED);
 		assertEquals(1,board[0].merges,"the board took the delivery, reduced to its own level");
@@ -187,7 +188,7 @@ class ApplicationIngressTest {
 			@Override protected void beforeSync() { owned.sync(); }
 		}
 		var app=new OwnerApp();
-		root.configureApplications(List.of(app));
+		root.addApplication(app);
 		var values=Sets.of(CVMLong.ONE);
 		root.mergeAt(values,ITEMS,owner.getAccountKey(),Keywords.VALUE);
 		assertNull(app.owned.cursor().get(),"a path inside the envelope is outside the lattice");
@@ -242,7 +243,8 @@ class ApplicationIngressTest {
 		var root=LatticeHost.create(initial,null);
 		var ab=new SelectiveApp(root,A,B);
 		var bc=new SelectiveApp(root,B,C);
-		root.configureApplications(List.of(ab,bc));
+		root.addApplication(ab);
+		root.addApplication(bc);
 
 		// The host calls each application's merge; each takes only what it wants
 		root.merge(four(2,2,2,2));
@@ -270,7 +272,9 @@ class ApplicationIngressTest {
 			}
 		};
 		var last=new App(LATTICE,root);
-		root.configureApplications(List.of(first,failure,last));
+		root.addApplication(first);
+		root.addApplication(failure);
+		root.addApplication(last);
 		assertThrows(IllegalStateException.class,() -> root.mergeAt(Sets.of(CVMLong.ONE),ITEMS));
 		assertEquals(Sets.of(CVMLong.ONE),first.cursor().get().get(ITEMS));
 		assertEquals(0,last.pathMerges);
