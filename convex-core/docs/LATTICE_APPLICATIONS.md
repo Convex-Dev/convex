@@ -705,14 +705,14 @@ projection. A relay node is the same assembly with `LatticeApplication.live(latt
 host)` as the host's one application; the peer module's `RelayHost` assembles that
 host from a lattice, a store, node configuration and the relay's policy.
 
-For an ordinary TCP deployment with one propagation group, `LatticeNode` owns the
+For an ordinary TCP deployment, `LatticeNode` owns the
 server and listener lifecycle together:
 
 ```java
-var propagation = new LatticePropagator(store);
-propagation.setTransportKeyPair(transportKey);
-try (var network = new LatticeNode<>(host, config, propagation)
-        .serveAllInbound().launch()) {
+try (var network = new LatticeNode<>(host, config).launch()) {
+    var propagation = network.createPropagator();
+    propagation.setTransportKeyPair(transportKey);
+    network.serveAllInbound(propagation);
     // The same application instances continue to operate on the same host.
     app.sync();
     host.sync();
@@ -720,15 +720,21 @@ try (var network = new LatticeNode<>(host, config, propagation)
 // Networking is closed; host, applications and caller-owned store remain usable.
 ```
 
-The group is explicitly supplied and configured before attachment. The example
+`createPropagator()` creates, registers and starts a group on a running network,
+using the host store. It initially has no peers or inbound assignments. Additional
+groups can be created and configured at any time; `removePropagator(group)` revokes
+its inbound assignments and closes it. The example
 opts into serving its view to all inbound connections; without `serveAllInbound`,
 the listener denies connections unless a selector is installed through
 `network.getListener()`. Serving a view does not authenticate an outbound peer.
-For private selection, construct the wrapper, configure its listener, then launch.
-`getServer()` and `getPropagator()` expose the existing pull and peer APIs, while
+Selectors may change while running; established sockets retain their group.
+Publication-filter changes rebuild the existing view before returning. They cannot
+revoke data already sent or remove cached cells. Transport-key changes apply to
+subsequent handshakes, without reauthenticating existing routes.
+`getServer()` and the returned propagators expose the existing pull and peer APIs, while
 `getHostAddress()` returns the actual bound address. Use port `0` for local tests.
 A host needs a cell store to attach networking; `MemoryStore` suffices for an
-ephemeral node. For multiple groups or custom transports, use the explicit assembly.
+ephemeral node. Custom stores, group limits or transports can use the explicit assembly.
 
 ### Sharing a host
 

@@ -39,11 +39,12 @@ import convex.lattice.cursor.AForkableCursor;
  * resources of {@link LatticePropagator} and application-owned transports such as
  * {@link LatticeListener}.</p>
  *
- * <p>The calling application constructs and completely configures each
- * propagator before attaching it with {@link #addPropagator(LatticePropagator)}.
+ * <p>The calling application explicitly adds each
+ * propagator with {@link #addPropagator(LatticePropagator)}.
  * Attaching connects the group to this node for publication and inbound
  * delivery. It does not copy a transport key or filters into the group. A node
- * with no propagators is a valid local, store-backed node.</p>
+ * with no propagators is a valid local, store-backed node. Groups may be added,
+ * configured and removed while running.</p>
  *
  * <p>The calling application separately owns transport composition. It may
  * register one or more attached groups with a shared {@link LatticeListener},
@@ -428,19 +429,21 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Attaches an already-configured propagation policy group.
+	 * Attaches a propagation policy group, starting it if the server is running.
 	 *
 	 * <p>This operation deliberately performs no policy configuration. In
 	 * particular it does not supply an identity, filters, handlers or peer routes.
-	 * The application must set those directly on the propagator before calling
-	 * this method. Attachment transfers lifecycle ownership: the node starts and
+	 * The application sets those directly on the propagator. Attachment transfers
+	 * lifecycle ownership: the node starts and
 	 * closes the group with its own resources.</p>
 	 *
 	 * @param propagator configured policy group to attach
 	 */
 	public synchronized void addPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
-		requireNewLifecycle("addPropagator");
+		if (lifecycleState!=LifecycleState.NEW && lifecycleState!=LifecycleState.RUNNING) {
+			throw new IllegalStateException("Cannot add a propagator while the node is starting or stopped");
+		}
 		if (attachedPropagators.contains(propagator)) {
 			throw new IllegalArgumentException("Propagator is already attached to this node");
 		}
@@ -449,6 +452,20 @@ public class NodeServer<V extends ACell> implements Closeable {
 		updated.add(propagator);
 		propagators=List.copyOf(updated);
 		attachedPropagators.add(propagator);
+		if (isRunning()) {
+			// Seed and start under the host publication lock so no newer notification
+			// can be lost between the initial snapshot and starting the worker.
+			try {
+				host.sync(snapshot -> {
+					runIsolated(propagator,"initial view materialisation",() -> propagator.processSnapshot(snapshot));
+					runIsolated(propagator,"launch",propagator::start);
+					return publishApplicationRoot(snapshot);
+				});
+			} catch (RuntimeException | Error failure) {
+				removePropagator(propagator);
+				throw failure;
+			}
+		}
 	}
 
 	/**
@@ -488,13 +505,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private void requireAttached(LatticePropagator propagator) {
 		if (propagator==null || !attachedPropagators.contains(propagator)) {
 			throw new IllegalArgumentException("Propagation group is not attached to this node");
-		}
-	}
-
-	private void requireNewLifecycle(String operation) {
-		if (lifecycleState!=LifecycleState.NEW) {
-			throw new IllegalStateException(
-				operation+" is configuration-only and must precede first launch");
 		}
 	}
 

@@ -17,24 +17,37 @@ The central boundary is simple:
 
 A node with no propagators is a valid local, store-backed node.
 
-For the common case of one explicitly configured group and a TCP listener,
+For TCP networking with dynamically managed groups,
 `LatticeNode` supplies an optional application assembly:
 
 ```java
-var group = new LatticePropagator(host.store());
-group.setTransportKeyPair(transportKey);
-try (var network = new LatticeNode<>(host, config, group).serveAllInbound().launch()) {
+try (var network = new LatticeNode<>(host, config).launch()) {
+    var group = network.createPropagator();
+    group.setTransportKeyPair(transportKey);
+    network.serveAllInbound(group);
     // Applications publish to the existing host; host.sync() publishes to the network.
 }
 ```
 
-`serveAllInbound()` is an explicit public serving choice. Otherwise the listener
-denies inbound access unless the caller installs a selector before launch. The
+`createPropagator()` creates and registers a group using the host store and starts
+it when the network is running. No separate add or activation call is needed.
+New groups have no peers or assigned inbound sockets. `removePropagator(group)`
+revokes inbound assignments and closes that group without stopping other groups.
+
+`serveAllInbound(group)` is an explicit public serving choice. Otherwise the listener
+denies inbound access unless the caller installs a selector. The selector can change
+while running; existing sockets keep their assigned group until closed or revoked. The
 wrapper starts the server before the listener, closes the listener before draining
 the server, and cleans up a failed launch. The host store remains caller-owned.
 `NodeServer` detaches its publisher on close or failed launch, restoring local host
 publication and permitting a replacement server. Only one publisher may attach at
 a time. The wrapper creates no implicit propagation group and changes no group policy.
+
+Group identity, message handlers, observers and publication filters can change
+while running. A filter change reprojects the latest processed source before
+returning; failed projection retains the previous filter and view. Already sent
+data and cached cells cannot be revoked by changing the filter. Identity changes
+apply to subsequent handshakes; established routes are not reauthenticated.
 
 ## Ownership
 
@@ -56,7 +69,7 @@ internals.
 
 ## Application composition
 
-The application must configure every group before attaching it:
+For custom serving stores, limits or transports, the application can assemble groups directly:
 
 ```java
 NodeConfig nodeConfig = NodeConfig.port(0);

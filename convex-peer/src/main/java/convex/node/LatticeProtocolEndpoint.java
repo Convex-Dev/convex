@@ -90,9 +90,9 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private Thread inboundThread;
 	private Thread maintenanceThread;
 
-	private AKeyPair transportKeyPair;
-	private Predicate<Message> applicationMessageHandler;
-	private InboundLatticeListener inboundLatticeListener;
+	private volatile AKeyPair transportKeyPair;
+	private volatile Predicate<Message> applicationMessageHandler;
+	private volatile InboundLatticeListener inboundLatticeListener;
 
 	LatticeProtocolEndpoint(LatticePropagator propagator,NodeServer<?> node,
 			LatticePropagatorConfig config) {

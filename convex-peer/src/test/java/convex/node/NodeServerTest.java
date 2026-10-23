@@ -225,9 +225,9 @@ public class NodeServerTest {
 		assertTrue(maxNodeServer.isRunning());
 	}
 
-	/** Attachment consumes a complete application policy; it never becomes a node setter. */
+	/** Runtime policy remains on the propagation group, not the authoritative node. */
 	@Test
-	public void testPropagatorPolicyMustPrecedeAttachment() {
+	public void testPropagatorPolicyCanChangeWhileRunning() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		LatticePropagator group=unattachedPropagator(maxNodeServer);
 		group.setTransportKeyPair(AKeyPair.generate());
@@ -236,15 +236,13 @@ public class NodeServerTest {
 		group.setInboundLatticeListener((connection,owner,path,value,changed) -> {});
 
 		maxNodeServer.addPropagator(group);
+		maxNodeServer.launch();
 		assertSame(group,maxNodeServer.getPropagators().get(0));
-		assertThrows(IllegalStateException.class,
-			() -> group.setTransportKeyPair(AKeyPair.generate()));
-		assertThrows(IllegalStateException.class,
-			() -> group.setPublicationFilter(value -> value));
-		assertThrows(IllegalStateException.class,
-			() -> group.setApplicationMessageHandler(message -> true));
-		assertThrows(IllegalStateException.class,
-			() -> group.setInboundLatticeListener(null));
+		group.setTransportKeyPair(AKeyPair.generate());
+		group.setPublicationFilter(value -> CVMLong.ONE);
+		group.setApplicationMessageHandler(message -> true);
+		group.setInboundLatticeListener(null);
+		assertEquals(CVMLong.ONE,group.getLastAnnouncedValue());
 	}
 
 	/** Attachment transfers lifecycle ownership even if the host never launches. */
@@ -1348,7 +1346,7 @@ public class NodeServerTest {
 	 * until launch publishes RUNNING, then reject against that completed state.
 	 */
 	@Test
-	public void testLifecycleTransitionsFreezeTopologyDeterministically() throws Exception {
+	public void testDynamicAdditionSerialisesWithLaunch() throws Exception {
 		BlockingRootStore testStore = new BlockingRootStore();
 		NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), testStore, NodeConfig.port(-1));
 		LatticePropagator primary = new LatticePropagator(testStore,LatticePropagatorConfig.create());
@@ -1387,14 +1385,16 @@ public class NodeServerTest {
 			testStore.release();
 			launchFuture.get(5, TimeUnit.SECONDS);
 			assertEquals(NodeServer.LifecycleState.RUNNING, node.getLifecycleState());
-			assertTrue(mutationFuture.get(5, TimeUnit.SECONDS) instanceof IllegalStateException);
-			assertThrows(IllegalStateException.class, () -> node.addPropagator(primary));
+			assertNull(mutationFuture.get(5, TimeUnit.SECONDS));
+			assertEquals(2,node.getPropagators().size());
+			assertTrue(node.getPropagators().get(1).isRunning());
+			assertThrows(IllegalArgumentException.class, () -> node.addPropagator(primary));
 
 			node.close();
 			assertEquals(NodeServer.LifecycleState.STOPPED, node.getLifecycleState());
 			assertThrows(IllegalStateException.class,
 				() -> node.addPropagator(new LatticePropagator(testStore)),
-				"topology configuration remains frozen across relaunches");
+				"adding groups requires a new or running node");
 
 			node.launch();
 			assertEquals(NodeServer.LifecycleState.RUNNING, node.getLifecycleState(),

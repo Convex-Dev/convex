@@ -27,6 +27,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.exceptions.StoreException;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -85,6 +86,8 @@ public class LatticePropagator implements Closeable {
 
 	/** Projection applied before any value crosses this propagator's store boundary. */
 	private LatticeFilter<ACell> filter = value -> value;
+	/** Last unfiltered snapshot, retained so a live filter change can rebuild the view. */
+	private ACell lastSource;
 
 	/** Owning node, set at attachment; inbound values are handed to it for its host. */
 	private NodeServer<?> node;
@@ -180,7 +183,7 @@ public class LatticePropagator implements Closeable {
 	/**
 	 * Creates a propagation group with application-supplied limits. Identity,
 	 * admission, projection and application hooks are optional policy configured
-	 * through the setters before attachment.
+	 * through the setters, including while running.
 	 *
 	 * @param store serving store for delta tracking and data resolution
 	 * @param connectionManager connection manager for outbound routes
@@ -352,27 +355,34 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Sets the key used by this group's challenge/response endpoint.
+	 * Changes apply to subsequent handshakes; existing routes are not reauthenticated.
 	 *
 	 * @param keyPair transport identity, or {@code null} for unverified outbound routes
 	 */
 	public void setTransportKeyPair(AKeyPair keyPair) {
-		requireUnattachedPolicy("Transport identity");
-		this.transportKeyPair=keyPair;
-		if (endpoint!=null) endpoint.setTransportKeyPair(keyPair);
-		connectionManager.setKeyPair(keyPair);
+		synchronized (writeLock) {
+			this.transportKeyPair=keyPair;
+			if (endpoint!=null) endpoint.setTransportKeyPair(keyPair);
+			connectionManager.setKeyPair(keyPair);
+		}
 	}
 
 	/**
 	 * Sets the projection applied before this group materialises or broadcasts a view.
+	 * Rebuilds an existing view before returning. Failure retains the previous filter
+	 * and view. Already transmitted data and cached cells are not revoked.
 	 *
 	 * @param filter publication projection
 	 * @param <V> projected lattice value type
 	 */
 	@SuppressWarnings("unchecked")
 	public <V extends ACell> void setPublicationFilter(LatticeFilter<V> filter) {
-		requireUnattachedPolicy("Publication policy");
 		if (filter==null) throw new IllegalArgumentException("Publication filter must not be null");
-		this.filter=(LatticeFilter<ACell>)filter;
+		try {
+			processSnapshot(null,(LatticeFilter<ACell>)filter);
+		} catch (IOException e) {
+			throw new StoreException("Unable to update propagation view",e);
+		}
 	}
 
 	/**
@@ -381,9 +391,10 @@ public class LatticePropagator implements Closeable {
 	 * @param handler application handler, or {@code null} to reject extension messages
 	 */
 	public void setApplicationMessageHandler(Predicate<Message> handler) {
-		requireUnattachedPolicy("Application handler");
-		this.applicationMessageHandler=handler;
-		if (endpoint!=null) endpoint.setApplicationMessageHandler(handler);
+		synchronized (writeLock) {
+			this.applicationMessageHandler=handler;
+			if (endpoint!=null) endpoint.setApplicationMessageHandler(handler);
+		}
 	}
 
 	/**
@@ -392,15 +403,9 @@ public class LatticePropagator implements Closeable {
 	 * @param listener observer, or {@code null} for none
 	 */
 	public void setInboundLatticeListener(InboundLatticeListener listener) {
-		requireUnattachedPolicy("Inbound listener");
-		this.inboundLatticeListener=listener;
-		if (endpoint!=null) endpoint.setInboundLatticeListener(listener);
-	}
-
-	private void requireUnattachedPolicy(String policy) {
-		if (node!=null || running) {
-			throw new IllegalStateException(
-				policy+" must be configured by the application before attachment");
+		synchronized (writeLock) {
+			this.inboundLatticeListener=listener;
+			if (endpoint!=null) endpoint.setInboundLatticeListener(listener);
 		}
 	}
 
@@ -929,10 +934,23 @@ public class LatticePropagator implements Closeable {
 	 * @throws IOException if announcement fails
 	 */
 	public ACell processSnapshot(ACell value) throws IOException {
+		return processSnapshot(value,null);
+	}
+
+	/** A replacement filter reprojects the latest source under the same publication lock. */
+	private ACell processSnapshot(ACell value,LatticeFilter<ACell> replacement) throws IOException {
 		CompletableFuture<ACell> announceFuture;
 		synchronized (writeLock) {
+			if (replacement!=null) {
+				value=lastSource;
+				if (value==null) {
+					filter=replacement;
+					return null;
+				}
+			}
+			ACell source=value;
 			// Projection precedes every outbound operation.
-			value = filter.filter(value);
+			value = (replacement==null?filter:replacement).filter(value);
 			if (value == null) throw new IllegalArgumentException("Lattice filter returned null");
 
 			// 1. Announce to store (writes cells, collects novelty for delta)
@@ -946,6 +964,8 @@ public class LatticePropagator implements Closeable {
 			// The store-backed root becomes externally visible before best-effort network
 			// encoding. A failed delta must therefore still be eligible for periodic
 			// root sync and must still complete the caller's publication future.
+			lastSource=source;
+			if (replacement!=null) filter=replacement;
 			announcedCursor.set(value);
 			announceFuture = nextAnnounceFuture;
 			nextAnnounceFuture = new CompletableFuture<>();

@@ -15,9 +15,12 @@ import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.StoreException;
 import convex.core.message.Message;
+import convex.core.message.MessageTag;
+import convex.core.message.MessageType;
 import convex.core.store.MemoryStore;
 import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeHost;
@@ -26,11 +29,56 @@ import convex.lattice.generic.SetLattice;
 /** Optional networking preserves the existing host, application boundaries and store ownership. */
 class LatticeNodeTest {
 
+	/** New policies affect new assignments; existing sockets retain their group's live view. */
+	@Test void groupsAndServingPoliciesCanChangeWhileRunning() throws Exception {
+		try (var store=new MemoryStore()) {
+			var host=LatticeHost.create(CVMLong.create(99),store);
+			try (var network=new LatticeNode<>(host,NodeConfig.port(0)).launch()) {
+				assertTrue(network.getServer().getPropagators().isEmpty());
+				var first=network.createPropagator();
+				first.setPublicationFilter(value -> CVMLong.ONE);
+				network.serveAllInbound(first);
+				try (var firstClient=ConvexRemote.connect(network.getHostAddress())) {
+					assertEquals(CVMLong.ONE,queryRoot(firstClient));
+					var second=network.createPropagator();
+					second.setPublicationFilter(value -> CVMLong.TWO);
+					network.serveAllInbound(second);
+					try (var secondClient=ConvexRemote.connect(network.getHostAddress())) {
+						assertEquals(CVMLong.TWO,queryRoot(secondClient));
+						assertEquals(CVMLong.ONE,queryRoot(firstClient));
+						first.setPublicationFilter(value -> CVMLong.create(3));
+						assertEquals(CVMLong.create(3),queryRoot(firstClient));
+						assertThrows(IllegalArgumentException.class,() -> first.setPublicationFilter(value -> null));
+						var announced=first.nextAnnounce();
+						host.sync();
+						assertEquals(CVMLong.create(3),announced.get(5,TimeUnit.SECONDS),"Failed policy changes preserve the previous filter");
+						assertTrue(network.removePropagator(first));
+						assertFalse(network.removePropagator(first));
+						assertFalse(first.isRunning());
+						assertTrue(second.isRunning());
+						assertEquals(CVMLong.TWO,queryRoot(secondClient));
+						assertEquals(CVMLong.create(99),host.cursor().get(),"Serving policy never edits host state");
+					}
+				}
+			}
+		}
+	}
+
+	private static ACell queryRoot(ConvexRemote client) throws Exception {
+		var message=Message.create(MessageType.LATTICE_QUERY,
+			Vectors.create(MessageTag.LATTICE_QUERY,CVMLong.ONE,Vectors.empty()));
+		var result=client.message(message).get(5,TimeUnit.SECONDS);
+		assertFalse(result.isError(),result.toString());
+		return result.getValue();
+	}
+
 	@Test void inboundAccessRequiresAnExplicitPolicy() throws Exception {
 		try (var store=new MemoryStore()) {
 			var host=LatticeHost.create(CVMLong.ONE,store);
-			try (var network=new LatticeNode<>(host,NodeConfig.port(0),new LatticePropagator(store)).launch();
+			try (var network=new LatticeNode<>(host,NodeConfig.port(0)).launch();
 					var client=ConvexRemote.connect(network.getHostAddress())) {
+				var group=network.createPropagator();
+				assertTrue(group.isRunning());
 				assertSame(host,network.getServer().getHost());
 				assertEquals(ErrorCodes.TRUST,client.message(Message.createPing(1))
 					.get(5,TimeUnit.SECONDS).getErrorCode());
@@ -47,20 +95,22 @@ class LatticeNodeTest {
 			var target=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),targetStore);
 			var app=target.addApplication(new LatticeApplication<>(SetLattice.<CVMLong>create(),target));
 			var sourceKey=AKeyPair.createSeeded(701);
-			var sourceGroup=new LatticePropagator(sourceStore);
-			sourceGroup.setTransportKeyPair(sourceKey);
-			var targetGroup=new LatticePropagator(targetStore);
-			targetGroup.setTransportKeyPair(AKeyPair.createSeeded(702));
-			try (var sender=new LatticeNode<>(source,NodeConfig.port(0),sourceGroup).serveAllInbound().launch();
-					var receiver=new LatticeNode<>(target,NodeConfig.port(-1),targetGroup).launch();
-					var peer=ConvexRemote.connect(sender.getHostAddress())) {
-				targetGroup.addPeer(sourceKey.getAccountKey(),peer).get(5,TimeUnit.SECONDS);
-				receiver.getServer().pull(targetGroup,peer).get(5,TimeUnit.SECONDS);
-				assertEquals(Sets.of(1),app.cursor().get());
-				assertTrue(target.cursor().get().isEmpty(),"Network delivery respects the staged boundary");
-				app.sync();
-				target.sync();
-				assertEquals(Sets.of(1),targetStore.getRootData());
+			try (var sender=new LatticeNode<>(source,NodeConfig.port(0)).launch();
+					var receiver=new LatticeNode<>(target,NodeConfig.port(-1)).launch()) {
+				var sourceGroup=sender.createPropagator();
+				sourceGroup.setTransportKeyPair(sourceKey);
+				sender.serveAllInbound(sourceGroup);
+				var targetGroup=receiver.createPropagator();
+				targetGroup.setTransportKeyPair(AKeyPair.createSeeded(702));
+				try (var peer=ConvexRemote.connect(sender.getHostAddress())) {
+					targetGroup.addPeer(sourceKey.getAccountKey(),peer).get(5,TimeUnit.SECONDS);
+					receiver.getServer().pull(targetGroup,peer).get(5,TimeUnit.SECONDS);
+					assertEquals(Sets.of(1),app.cursor().get());
+					assertTrue(target.cursor().get().isEmpty(),"Network delivery respects the staged boundary");
+					app.sync();
+					target.sync();
+					assertEquals(Sets.of(1),targetStore.getRootData());
+				}
 			}
 		}
 	}
@@ -68,8 +118,10 @@ class LatticeNodeTest {
 	@Test void failedListenerLaunchReleasesTheHost() throws Exception {
 		try (var store=new MemoryStore(); var occupied=new ServerSocket(0)) {
 			var host=LatticeHost.create(CVMLong.ONE,store);
-			try (var failed=new LatticeNode<>(host,NodeConfig.port(occupied.getLocalPort()),new LatticePropagator(store))) {
+			try (var failed=new LatticeNode<>(host,NodeConfig.port(occupied.getLocalPort()))) {
+				var group=failed.createPropagator();
 				assertThrows(IOException.class,failed::launch);
+				assertFalse(group.isRunning());
 				assertFalse(failed.getServer().isRunning());
 				assertFalse(failed.getListener().isRunning());
 				try (var replacement=new NodeServer<>(host)) {
@@ -101,6 +153,10 @@ class LatticeNodeTest {
 				store.fail=false;
 				server.launch();
 				store.fail=true;
+				var rejected=new LatticePropagator(store);
+				assertThrows(StoreException.class,() -> server.addPropagator(rejected));
+				assertTrue(server.getPropagators().isEmpty(),"Failed dynamic attachment does not leave an orphan group");
+				assertFalse(rejected.isRunning());
 				assertThrows(IOException.class,server::close);
 				store.fail=false;
 				try (var replacement=new NodeServer<>(host)) {

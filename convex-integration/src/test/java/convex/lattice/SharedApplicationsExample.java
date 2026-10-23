@@ -113,9 +113,10 @@ public final class SharedApplicationsExample {
 
 			var config=NodeConfig.localNetwork();
 			// Replication knows no lattice: it serves whatever the host publishes, from the host's store.
-			propagation=new LatticePropagator(store);
+			network=new LatticeNode<>(host,config);
+			propagation=network.createPropagator();
 			propagation.setTransportKeyPair(nodeKey);
-			network=new LatticeNode<>(host,config,propagation).serveAllInbound().launch();
+			network.serveAllInbound(propagation).launch();
 		}
 
 		/** The root value this node's host currently holds. */

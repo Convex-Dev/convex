@@ -66,23 +66,28 @@ notification, but no lattice, merge policy, socket or transport: the host's
 applications own merge semantics, and `RelayHost.open` assembles the relay case
 of one live application over a whole lattice. It does not publish or interpret
 `NodeInfo`, inspect `:p2p` / `:social` paths, or implement discovery policy. The
-calling application must construct and configure every `LatticePropagator`
-before attaching it; there is no implicit/default group. A zero-propagator node
+calling application explicitly creates each `LatticePropagator`; there is no
+implicit/default group. `LatticeNode.createPropagator()` creates and registers a
+group using the host store, starting it if running. Identity, filters and handlers
+may be configured dynamically. A zero-propagator node
 is a valid local persistent node. Each propagator owns its connection manager,
 transport identity, trust, bounded protocol endpoint, filters and serving store,
 and merges nothing.
 
 The calling application separately owns any `LatticeListener`: register every
-eligible propagator, install a one-time connection selector, launch the listener
+eligible propagator, install a connection selector, launch the listener
 after the node, and close it before the node. One listener may route connections
 to several groups, and groups may instead use independent listeners or custom
-transports. `P2PNode` performs this composition; its `NodeDirectory` owns
+transports. Registrations and selectors can change while running; existing sockets
+keep their assignment until closed or the group is unregistered. `LatticeNode`
+supplies the standard TCP assembly, and `serveAllInbound(group)` explicitly selects
+a group for new inbound assignments. `P2PNode` performs its own composition; its `NodeDirectory` owns
 signed `[:p2p :nodes]` publication, validation, discovery translation and PoP
 metadata. Keep tests for those behaviours in `convex-p2p`, not `convex-peer`.
 `P2PNode` also configures its node key explicitly as both its transport challenge
 identity and its signed `NodeInfo` owner. A generic `NodeServer` does not infer a
-transport key from the host's `LatticeContext`; direct tests must set it on the
-propagator itself before `addPropagator`. Social user DIDs
+transport key from the host; direct tests set it on the
+propagator itself before opening connections. Social user DIDs
 and their account keys remain a separate application concern.
 
 For a small lattice network test:

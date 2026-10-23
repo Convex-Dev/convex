@@ -71,8 +71,10 @@
  * failures: the application decides whether a degraded group should be restarted,
  * replaced or left running.</p>
  *
- * <p>The calling application constructs and configures every propagation group
- * before attaching it, then composes any transports separately. {@code NodeServer}
+ * <p>The calling application explicitly creates each propagation group and may
+ * configure it while running. {@link convex.node.LatticeNode} combines dynamic
+ * group creation with a TCP listener; custom assemblies can compose transports
+ * separately. {@code NodeServer}
  * creates no default group or listener, and a node with no groups remains a valid
  * local store-backed node.</p>
  *

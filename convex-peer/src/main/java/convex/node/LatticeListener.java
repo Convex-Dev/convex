@@ -49,7 +49,7 @@ public final class LatticeListener implements Closeable {
 		new ConcurrentHashMap<>();
 	/** Serialises initial assignment with revocation; established traffic does not lock. */
 	private final Object assignmentLock=new Object();
-	private Function<AConnection,LatticePropagator> selector;
+	private volatile Function<AConnection,LatticePropagator> selector;
 	private AServer server;
 	private Integer port;
 	private boolean launchStarted;
@@ -74,7 +74,6 @@ public final class LatticeListener implements Closeable {
 	 */
 	public synchronized void registerPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
-		requireNotLaunched("registerPropagator");
 		allowedPropagators.add(propagator);
 	}
 
@@ -113,11 +112,12 @@ public final class LatticeListener implements Closeable {
 	/**
 	 * Configures the application policy used once for each new inbound socket.
 	 * The returned group must have been registered with this listener.
+	 * Changes affect new assignments; established sockets keep their group until
+	 * closed or the group is unregistered.
 	 *
 	 * @param selector assignment policy, or {@code null} to deny every connection
 	 */
 	public synchronized void setSelector(Function<AConnection,LatticePropagator> selector) {
-		requireNotLaunched("setSelector");
 		this.selector=selector;
 	}
 

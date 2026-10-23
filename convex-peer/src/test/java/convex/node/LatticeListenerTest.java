@@ -50,10 +50,8 @@ public class LatticeListenerTest {
 			listener.launch();
 			assertTrue(listener.getPort()>0);
 			assertTrue(listener.isRunning());
-			assertThrows(IllegalStateException.class,
-				() -> listener.registerPropagator(group));
-			assertThrows(IllegalStateException.class,
-				() -> listener.setSelector(connection -> group));
+			listener.registerPropagator(group);
+			listener.setSelector(connection -> group);
 			assertThrows(IllegalStateException.class,listener::launch);
 
 			listener.close();
