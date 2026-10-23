@@ -236,12 +236,21 @@ public class AccountChooserPanel extends JPanel {
 	private void askNextSequence(long seq) {
 		String s = JOptionPane.showInputDialog(this, "Current sequence number is "+seq+", so the next sequence number expected is "+(seq+1), "Enter next sequence number", JOptionPane.QUESTION_MESSAGE);
 		if (s==null) return;
+		if (!setNextSequence(s)) JOptionPane.showMessageDialog(this, "Invalid sequence number");
+	}
+
+	/**
+	 * Sets the sequence number the connection uses for its next transaction
+	 * @param s Sequence number as entered
+	 * @return false if the entry is not a number, leaving the sequence unchanged
+	 */
+	boolean setNextSequence(String s) {
 		try {
 			convex.setNextSequence(Long.parseLong(s));
+			return true;
 		} catch (NumberFormatException e) {
-			JOptionPane.showMessageDialog(this, "Invalid sequence number");
+			return false;
 		}
-		convex.clearSequence();
 	}
 
 	public String getMode() {

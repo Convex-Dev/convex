@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wallets open on different networks in the same process no longer share tracked tokens or token library addresses, which could make the second network's balances query the wrong address. Wallets on the same network still share their tracked tokens.
 - The GUI no longer freezes while connecting, launching an extra peer, transferring, trading, setting stake, tracking tokens or running account operations. Buttons are disabled while their work runs, and failures that were silently ignored now show a message.
 - The Desktop Explorer button opens the most recently launched local network that is still running, and peer windows opened from the tray show their most recent blocks instead of the oldest.
+- The GUI account menu's "Set sequence..." takes effect: the next transaction uses the number entered, where previously the entry was discarded and the sequence looked up again.
 
 ## [0.8.17] - 2026-10-09
 
