@@ -22,6 +22,7 @@ import convex.lattice.LatticeHost;
 import convex.lattice.SetComponent;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
+import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.SignedLattice;
 
@@ -56,7 +57,7 @@ import convex.lattice.generic.SignedLattice;
  * {@code host.sync()} handles host persistence/publication. Neither creating a user
  * handle nor syncing its embedded components publishes the region. Application
  * sync does not publish outstanding user drafts; each draft is explicitly synced
- * first. The main method demonstrates one batch alongside an immediate signed edit.</p>
+ * first. The main method demonstrates a fork alongside an atomic transaction.</p>
  *
  * <p>Run {@link #main(String[])} as a Java application (for example, Eclipse's
  * Run As &gt; Java Application). It edits two owners' favourites, publishes them,
@@ -92,7 +93,11 @@ public final class FavouritesExample {
 		alice.add(7);
 		alice.remove(42);
 		alice.sync(); // One signature, into the region only.
-		app.user(BOB).add(99);
+		// A transaction reruns these operations on conflict instead of reconciling snapshots.
+		app.user(BOB).transact(bob -> {
+			bob.add(99);
+			bob.add(100);
+		}); // One signature at local commit; no explicit draft sync needed.
 		System.out.println("Alice's favourites: "+alice.items());
 		System.out.println("Bob's favourites: "+app.items(BOB.getAccountKey()));
 		System.out.println("Host empty before publication: "+host.cursor().get().isEmpty());
@@ -156,7 +161,8 @@ public final class FavouritesExample {
 	 * to the whole record, so clearing items retains a newer signed record with an empty set rather
 	 * than removing the owner entry and losing the evidence of deletion.</p>
 	 */
-	static final class Favourites extends ASignedComponent<AHashMap<Keyword,ACell>> {
+	static final class Favourites extends ASignedComponent<AHashMap<Keyword,ACell>>
+			implements TransactionalComponent<AHashMap<Keyword,ACell>,Favourites> {
 		private final Supplier<CVMLong> getTimestamp;
 		private final Timestamped<AHashMap<Keyword,ACell>> record;
 		final SetComponent<ACell> itemSet;
@@ -185,6 +191,9 @@ public final class FavouritesExample {
 			return new Favourites(cursor,lattice,getTimestamp);
 		}
 		@Override public Favourites fork() { return rebind(storage.fork()); }
+		@Override public Favourites withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+			return rebind(cursor);
+		}
 
 		/** Direct local edits use the same timestamped path as the embedded set. */
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record.cursor(); }

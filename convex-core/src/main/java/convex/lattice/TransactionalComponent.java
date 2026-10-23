@@ -28,6 +28,12 @@ import convex.lattice.cursor.Transactions;
  * reinstalls editing policies on the draft. Commit uses bound storage so those
  * policies are not applied twice.</p>
  *
+ * <p>Transactions rerun domain operations on conflict; they do not invoke incoming
+ * merge or fork reconciliation. No lattice definition or publication merge is
+ * required. Choose a component containing every value the operation reads or
+ * writes, and obtain children from the callback's view. A transaction on an
+ * existing fork commits only to that fork; publishing it remains a separate sync.</p>
+ *
  * @param <V> Lattice value type
  * @param <C> Domain component type supplied to callbacks
  */
@@ -40,7 +46,10 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 * Creates a fresh component over the supplied cursor, retaining domain metadata
 	 * and any explicitly owned configuration such as a DLFS store. All mutable child
 	 * views must use the supplied cursor; never reuse children bound to the original
-	 * live cursor. The new view retains no reference to its source component.
+	 * live cursor. Do not fork the supplied cursor: the transaction engine reads its
+	 * completed value directly. An {@link ALatticeComponent} subclass normally
+	 * delegates to its protected {@code rebind(cursor)} hook, sharing construction
+	 * with {@code fork()}. Retain configuration, not the source component's working views.
 	 */
 	C withCursor(AForkableCursor<V> cursor);
 

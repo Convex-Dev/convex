@@ -54,6 +54,9 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Creates independent working state over this component's bound storage. Rebinding
 	 * reinstalls local editing policies around the new storage. Subclasses may refine
 	 * the return type; publication policy is supplied only when the fork syncs.
+	 * This is independent state with reconciliation, not a retrying transaction.
+	 * Use {@link TransactionalComponent} when domain operations must be rerun on
+	 * concurrent changes rather than selecting or merging competing results.
 	 */
 	public ALatticeComponent<V> fork() {
 		return rebind(storage.fork());

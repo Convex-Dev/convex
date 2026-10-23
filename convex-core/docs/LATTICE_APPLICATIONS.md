@@ -900,6 +900,22 @@ A transactional component (`TransactionalComponent`) adds typed transactions,
 synchronous, asynchronous and locked. Social, feed, follow, identity, node-record and
 DLFS components implement it, and any component subclass can opt in.
 
+Choose the operation by its purpose:
+
+| Operation | Meaning |
+|---|---|
+| Ordinary domain mutation | One atomic local update through the component's editing view |
+| `transact(draft -> ...)` | Several domain operations committed together; conflicts rerun the callback |
+| `fork()` then `sync()` | Independent working state reconciled with its destination using the component's merge policy |
+| Application / host `sync()` | Explicit publication at that boundary, with persistence where the host owns a store |
+
+A fork is not a substitute for a transaction. For example, two favourites forks
+can each add a different item, but whole-record timestamp reconciliation selects
+one record. Transactions instead rerun the additions against current local state,
+preserving both operations. Transactions do not use `merge` or `mergePublication`,
+and do not require an `ALattice`. Replica conflicts still follow the domain's
+replication policy after local commit.
+
 ```java
 user.transact(u -> {
     u.feed().post("Hello");
@@ -917,7 +933,7 @@ so an overridden editing `cursor()` does not stamp it a second time. A signing
 view already present in bound storage signs at commit; a component bound to an
 unsigned fork continues to defer signing until its explicit publication.
 An exception discards the staged state.
-Callbacks may run more than once, so they must be pure, confine their changes to the
+Callbacks may run more than once, so they must be retry-safe, confine their changes to the
 supplied view and leave external effects until after completion. The draft uses an
 independent, thread-safe root. Complete any worker tasks contributing edits before
 returning from the callback. Retained views and forks still work afterwards, but
@@ -950,6 +966,34 @@ creates a fresh component over a supplied cursor with the same domain metadata a
 explicit policies. Rebuild children against that cursor rather than reusing cached
 live children. A component owning configuration, such as a DLFS store, passes it
 along itself.
+
+For example, `Favourites` extends `ASignedComponent` and implements
+`TransactionalComponent<AHashMap<Keyword,ACell>,Favourites>`. It uses one
+construction hook for both kinds of private view:
+
+```java
+@Override protected Favourites rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+    return new Favourites(cursor, lattice, getTimestamp);
+}
+@Override public Favourites withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+    return rebind(cursor);
+}
+@Override public Favourites fork() { return rebind(storage.fork()); }
+```
+
+The unsigned constructor binds that cursor directly, retains the owner rule and
+clock, and constructs the timestamped view and embedded set against it. The signer
+stays at the original signed destination. This supports the same `add` and `remove`
+methods on live components, transaction views and reusable forks. A child class
+only needs its own transaction interface if callers also need transactions scoped
+to that child; ordinary child operations already participate in the enclosing draft.
+
+Acquire children from the callback argument, not a captured live component. Bind
+shared immutable configuration and services explicitly, and keep network calls or
+other external effects outside the callback. A transaction cannot roll those back.
+Do not call application or host publication from inside a transaction. Local commit
+is complete when `transact` returns; publish the containing application afterwards
+when its lifecycle requires it.
 
 ## Explicit component policies
 
