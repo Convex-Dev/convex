@@ -33,6 +33,8 @@ import convex.lattice.cursor.AForkableCursor;
  */
 public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
 
+	private static final AString EXPECTED_SET=Strings.intern("Expected a set");
+
 	private final Class<V> elementType;
 
 	/** Checks set shape only; Java generics do not supply a runtime element constraint. */
@@ -58,7 +60,7 @@ public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
 	/** Nil is the absent/empty set. Typed sets require every element to match. */
 	@Override public AString checkValue(ACell value) {
 		if (value==null) return null;
-		if (!(value instanceof ASet<?> set)) return Strings.create("Expected a set");
+		if (!(value instanceof ASet<?> set)) return EXPECTED_SET;
 		for (ACell element:set) {
 			AString error=checkElement(element);
 			if (error!=null) return error;
