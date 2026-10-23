@@ -132,7 +132,7 @@ public class DLFSCursorTest {
 
 		// Track publications (like NodeServer's propagator trigger)
 		AtomicReference<ACell> synced = new AtomicReference<>();
-		host.setPublicationPolicy(value -> { synced.set(value); return value; });
+		host.attachPublisher(value -> { synced.set(value); return value; });
 
 		// Connect a drive and write
 		AString driveName = Strings.create("vault");
@@ -225,7 +225,7 @@ public class DLFSCursorTest {
 
 		CountDownLatch snapshotTaken=new CountDownLatch(1);
 		CountDownLatch continueSync=new CountDownLatch(1);
-		root.setPublicationPolicy(snapshot->{
+		root.attachPublisher(snapshot->{
 			snapshotTaken.countDown();
 			try {
 				continueSync.await();

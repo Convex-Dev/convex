@@ -268,7 +268,7 @@ public class DLFSDriveManagerTest {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
 		LatticeHost<AHashMap<AString, AVector<ACell>>> host=LatticeHost.create(lattice.zero(),null);
 		AtomicReference<ACell> synced=new AtomicReference<>();
-		host.setPublicationPolicy(value->{ synced.set(value); return value; });
+		host.attachPublisher(value->{ synced.set(value); return value; });
 		var component=convex.dlfs.DLFSDrives.wrap(host.cursor());
 		DLFSDriveManager manager=new DLFSDriveManager(component,host::sync);
 

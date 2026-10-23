@@ -53,7 +53,7 @@ public class ComponentPublicationTest {
 		try (MemoryStore store=new MemoryStore()) {
 			var host=LatticeHost.create(SETS.zero(),store);
 			AtomicInteger publications=new AtomicInteger();
-			host.setPublicationPolicy(value -> { publications.incrementAndGet(); return value; });
+			host.attachPublisher(value -> { publications.incrementAndGet(); return value; });
 			var component=new Component<>(SETS,host.cursor());
 			component.cursor().updateAndGet(v -> v.include(CVMLong.ONE));
 			assertEquals(SETS.zero(),host.cursor().get());

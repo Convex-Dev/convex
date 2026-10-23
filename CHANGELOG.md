@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `LatticeNode` assembles optional TCP networking around an existing host and an explicitly configured propagation group, with one closeable lifecycle and explicit inbound serving policy. `NodeServer` detaches its publisher on shutdown or failed launch, leaving the host usable locally or with a replacement server. Host publisher attachment replaces the permanent publication-policy freeze.
+
 - `LatticeHost.addApplication(app)` registers and returns an existing root application without rebinding it or publishing state. Applications own region paths and can be added incrementally; each incoming delivery uses a stable registration snapshot. The one-time `configureApplications` API has been removed.
 
 - Lattice components expose explicit `checkValue` compatibility diagnostics returning an error reason or nil. Region checks compose existing children, and set components support optional runtime element types. Checks do not run automatically on local edits or publication and may be less strict than merge acceptance.

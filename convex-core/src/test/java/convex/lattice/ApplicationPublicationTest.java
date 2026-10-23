@@ -200,7 +200,7 @@ public class ApplicationPublicationTest {
 		var app=new LatticeApplication<>(maximum,host);
 		host.addApplication(app);
 		app.cursor().set(CVMLong.ONE);
-		host.setPublicationPolicy(snapshot -> {
+		host.attachPublisher(snapshot -> {
 			app.sync();
 			return snapshot;
 		});

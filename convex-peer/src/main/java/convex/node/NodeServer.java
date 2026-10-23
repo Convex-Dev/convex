@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,7 +76,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final Object persistenceLock=new Object();
 	private boolean storeDirty;
 
-	private boolean rootPublicationConfigured;
+	private final Function<V,V> publisher=this::publishApplicationRoot;
 	private Thread maintenanceThread;
 	private final Object maintenanceSignal=new Object();
 	private final Runnable shutdownHook=this::shutdownPersist;
@@ -94,7 +95,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * and configure its applications first; {@link RelayHost} assembles the common
 	 * case of a host with one live application over a whole lattice. The node
 	 * installs its publication pipeline at launch and owns attached propagation
-	 * resources, not the store.
+	 * resources, not the store. Closing or failed launch detaches its publication
+	 * callback, leaving the host available for local use or another server.
 	 *
 	 * @param host assembled host with a non-null cell store
 	 * @param config node persistence configuration, or {@code null} for defaults
@@ -145,10 +147,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	private void configurePublicationPipeline() {
-		if (rootPublicationConfigured) return;
-		host.setPublicationPolicy(this::publishApplicationRoot);
-		host.freezePublicationPolicy();
-		rootPublicationConfigured=true;
+		host.attachPublisher(publisher);
 	}
 
 	private void seedPropagationViews() throws IOException {
@@ -178,6 +177,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 		lifecycleState=LifecycleState.STOPPED;
 		removeShutdownHook();
+		host.detachPublisher(publisher);
 	}
 
 	private static void addCleanupFailure(Throwable failure,Throwable cleanupFailure) {
@@ -716,6 +716,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	@Override
 	public synchronized void close() throws IOException {
+		try {
+			closeResources();
+		} finally {
+			host.detachPublisher(publisher);
+		}
+	}
+
+	private void closeResources() throws IOException {
 		if (lifecycleState==LifecycleState.STOPPED) return;
 		if (lifecycleState==LifecycleState.NEW) {
 			// Attachment transfers lifecycle ownership even before launch. This matters

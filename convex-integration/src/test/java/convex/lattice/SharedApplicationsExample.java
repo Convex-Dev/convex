@@ -22,10 +22,9 @@ import convex.core.util.Shutdown;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSRegion;
 import convex.etch.EtchStore;
-import convex.node.LatticeListener;
+import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
-import convex.node.NodeServer;
 import convex.p2p.P2PLattice;
 import convex.p2p.P2PUser;
 import convex.social.Feed;
@@ -88,9 +87,8 @@ public final class SharedApplicationsExample {
 		public final LatticeHost<Index<Keyword,ACell>> host;
 		public final SocialApp social;
 		public final DLFSApplication files;
-		private final NodeServer<Index<Keyword,ACell>> server;
+		private final LatticeNode<Index<Keyword,ACell>> network;
 		private final LatticePropagator propagation;
-		private final LatticeListener listener;
 		private final AKeyPair nodeKey;
 
 		/**
@@ -114,16 +112,10 @@ public final class SharedApplicationsExample {
 			files=host.addApplication(new DLFSApplication(host,Keywords.FS,region.fork()));
 
 			var config=NodeConfig.localNetwork();
-			server=new NodeServer<>(host,config);
 			// Replication knows no lattice: it serves whatever the host publishes, from the host's store.
 			propagation=new LatticePropagator(store);
 			propagation.setTransportKeyPair(nodeKey);
-			server.addPropagator(propagation);
-			listener=new LatticeListener(config);
-			listener.registerPropagator(propagation);
-			listener.setSelector(connection -> propagation);
-			server.launch();
-			listener.launch();
+			network=new LatticeNode<>(host,config,propagation).serveAllInbound().launch();
 		}
 
 		/** The root value this node's host currently holds. */
@@ -141,9 +133,9 @@ public final class SharedApplicationsExample {
 
 		/** Pulls the peer's served root; the host hands it to both applications. */
 		public void pullFrom(Node peer) throws Exception {
-			try (Convex connection=ConvexRemote.connect(peer.listener.getHostAddress())) {
+			try (Convex connection=ConvexRemote.connect(peer.network.getHostAddress())) {
 				propagation.addPeer(peer.nodeKey.getAccountKey(),connection).get(10,TimeUnit.SECONDS);
-				server.pull(propagation,connection).get(10,TimeUnit.SECONDS);
+				network.getServer().pull(propagation,connection).get(10,TimeUnit.SECONDS);
 			}
 		}
 
@@ -163,11 +155,7 @@ public final class SharedApplicationsExample {
 		}
 
 		@Override public void close() throws Exception {
-			try {
-				listener.close();
-			} finally {
-				server.close();
-			}
+			network.close();
 		}
 	}
 

@@ -8,6 +8,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
@@ -141,7 +142,7 @@ public class LatticeHostTest {
 	@Test
 	public void testPublicationKeepsConcurrentWritesWithoutAMergeRule() {
 		var host=LatticeHost.create(Sets.of(1),null);
-		host.setPublicationPolicy(snapshot -> {
+		host.attachPublisher(snapshot -> {
 			host.cursor().set(Sets.of(2));
 			return snapshot;
 		});
@@ -150,10 +151,22 @@ public class LatticeHostTest {
 	}
 
 	@Test
-	public void testPublicationPolicyCanBeConfiguredAndFrozen() {
-		var host=LatticeHost.create();
-		host.setPublicationPolicy(value -> value);
-		host.freezePublicationPolicy();
-		assertThrows(IllegalStateException.class,() -> host.setPublicationPolicy(value -> value));
+	public void testPublisherAttachmentIsExclusiveAndDetachable() {
+		var host=LatticeHost.create(CVMLong.ONE,null);
+		var calls=new AtomicInteger();
+		Function<CVMLong,CVMLong> first=value -> { calls.incrementAndGet(); return value; };
+		Function<CVMLong,CVMLong> second=value -> { calls.addAndGet(10); return value; };
+		host.attachPublisher(first);
+		assertThrows(IllegalStateException.class,() -> host.attachPublisher(second));
+		host.detachPublisher(second);
+		assertSame(CVMLong.ONE,host.sync());
+		assertEquals(1,calls.get());
+		host.detachPublisher(first);
+		assertSame(CVMLong.ONE,host.sync());
+		assertEquals(1,calls.get(),"Detached publishers are no longer invoked");
+		host.attachPublisher(second);
+		host.detachPublisher(first);
+		host.sync();
+		assertEquals(11,calls.get(),"A stale detach leaves the replacement attached");
 	}
 }

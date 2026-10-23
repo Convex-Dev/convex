@@ -55,7 +55,7 @@ public class HostStoresTest {
 	public void testStorelessHostStillRunsPublicationPolicy() throws Exception {
 		var host=LatticeHost.create(CVMLong.ONE,null);
 		var published=new AtomicReference<CVMLong>();
-		host.setPublicationPolicy(value -> {
+		host.attachPublisher(value -> {
 			published.set(value);
 			return value;
 		});

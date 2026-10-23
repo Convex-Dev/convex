@@ -360,7 +360,7 @@ public class LatticeCursorTest {
 
 		AtomicInteger callCount = new AtomicInteger();
 		AtomicReference<ASet<CVMLong>> received = new AtomicReference<>();
-		host.setPublicationPolicy(value -> {
+		host.attachPublisher(value -> {
 			callCount.incrementAndGet();
 			received.set(value);
 			return value;
@@ -429,7 +429,7 @@ public class LatticeCursorTest {
 			}
 			return snapshot;
 		};
-		root.setPublicationPolicy(callback);
+		root.attachPublisher(callback);
 
 		Runnable sync = () -> {
 			try {
@@ -498,7 +498,7 @@ public class LatticeCursorTest {
 		ASet<CVMLong> concurrent = published.include(CVMLong.TWO);
 		LatticeHost<ASet<CVMLong>> host = LatticeHost.create(published, null);
 
-		host.setPublicationPolicy(snapshot -> {
+		host.attachPublisher(snapshot -> {
 			assertSame(published, snapshot);
 			host.cursor().set(concurrent);
 			return snapshot;
@@ -530,7 +530,7 @@ public class LatticeCursorTest {
 			assertNotSame(local, foreign);
 
 			LatticeHost<ASet<Blob>> host = LatticeHost.create(Sets.<Blob>empty(), null);
-			host.setPublicationPolicy(snapshot -> {
+			host.attachPublisher(snapshot -> {
 				host.cursor().set(local);
 				return foreign;
 			});
@@ -552,7 +552,7 @@ public class LatticeCursorTest {
 		LatticeHost<ASet<CVMLong>> host = LatticeHost.create(Sets.<CVMLong>empty(), null);
 
 		AtomicInteger hostSyncCount = new AtomicInteger();
-		host.setPublicationPolicy(value -> {
+		host.attachPublisher(value -> {
 			hostSyncCount.incrementAndGet();
 			return value;
 		});
@@ -617,7 +617,7 @@ public class LatticeCursorTest {
 			LatticeHost.<AHashMap<AString, ASet<CVMLong>>>create(Maps.empty(), null);
 
 		AtomicInteger callCount = new AtomicInteger();
-		host.setPublicationPolicy(value -> { callCount.incrementAndGet(); return value; });
+		host.attachPublisher(value -> { callCount.incrementAndGet(); return value; });
 
 		// Write through a path-derived view
 		AForkableCursor<ASet<CVMLong>> pathCursor = host.cursor().path(Strings.create("k"));

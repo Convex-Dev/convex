@@ -695,13 +695,40 @@ host.sync();
 ```
 
 The supplied host is already initialised, restored by `open`; the node never reloads
-it. Launch installs the node's publication pipeline, so the host's publication
-policy must not already be frozen. Node startup does not invoke application sync.
+it. Launch attaches the node's publication pipeline; a host accepts one publisher
+at a time. Closing the node, or failed launch, detaches that publisher. Subsequent
+host syncs use the host store directly, and another server may attach. Node startup
+does not invoke application sync.
 Transport and propagation configuration remain explicit, and a propagation group
 knows no lattice either: it announces whatever the host publishes, through its own
 projection. A relay node is the same assembly with `LatticeApplication.live(lattice,
 host)` as the host's one application; the peer module's `RelayHost` assembles that
 host from a lattice, a store, node configuration and the relay's policy.
+
+For an ordinary TCP deployment with one propagation group, `LatticeNode` owns the
+server and listener lifecycle together:
+
+```java
+var propagation = new LatticePropagator(store);
+propagation.setTransportKeyPair(transportKey);
+try (var network = new LatticeNode<>(host, config, propagation)
+        .serveAllInbound().launch()) {
+    // The same application instances continue to operate on the same host.
+    app.sync();
+    host.sync();
+}
+// Networking is closed; host, applications and caller-owned store remain usable.
+```
+
+The group is explicitly supplied and configured before attachment. The example
+opts into serving its view to all inbound connections; without `serveAllInbound`,
+the listener denies connections unless a selector is installed through
+`network.getListener()`. Serving a view does not authenticate an outbound peer.
+For private selection, construct the wrapper, configure its listener, then launch.
+`getServer()` and `getPropagator()` expose the existing pull and peer APIs, while
+`getHostAddress()` returns the actual bound address. Use port `0` for local tests.
+A host needs a cell store to attach networking; `MemoryStore` suffices for an
+ephemeral node. For multiple groups or custom transports, use the explicit assembly.
 
 ### Sharing a host
 

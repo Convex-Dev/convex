@@ -17,6 +17,25 @@ The central boundary is simple:
 
 A node with no propagators is a valid local, store-backed node.
 
+For the common case of one explicitly configured group and a TCP listener,
+`LatticeNode` supplies an optional application assembly:
+
+```java
+var group = new LatticePropagator(host.store());
+group.setTransportKeyPair(transportKey);
+try (var network = new LatticeNode<>(host, config, group).serveAllInbound().launch()) {
+    // Applications publish to the existing host; host.sync() publishes to the network.
+}
+```
+
+`serveAllInbound()` is an explicit public serving choice. Otherwise the listener
+denies inbound access unless the caller installs a selector before launch. The
+wrapper starts the server before the listener, closes the listener before draining
+the server, and cleans up a failed launch. The host store remains caller-owned.
+`NodeServer` detaches its publisher on close or failed launch, restoring local host
+publication and permitting a replacement server. Only one publisher may attach at
+a time. The wrapper creates no implicit propagation group and changes no group policy.
+
 ## Ownership
 
 | Component | Owns | Does not own |

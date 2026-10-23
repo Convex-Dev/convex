@@ -151,7 +151,7 @@ public class ALatticeApplicationTest {
 		LatticeApplication<Index<Keyword,ACell>> first=LatticeApplication.live(LATTICE,host);
 		LatticeApplication<Index<Keyword,ACell>> second=LatticeApplication.live(LATTICE,host);
 		AtomicInteger publications=new AtomicInteger();
-		host.setPublicationPolicy(value -> {
+		host.attachPublisher(value -> {
 			publications.incrementAndGet();
 			return value;
 		});
@@ -265,7 +265,7 @@ public class ALatticeApplicationTest {
 		assertSame(appPolicy,mergeContext.get());
 		var published=first.cursor().get();
 		mergeContext.set(null);
-		host.setPublicationPolicy(value -> {
+		host.attachPublisher(value -> {
 			new Items(second).add(CVMLong.TWO);
 			return value;
 		});

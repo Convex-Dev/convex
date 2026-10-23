@@ -23,7 +23,7 @@ import convex.lattice.cursor.Root;
  * It is the generic host persistence boundary; specialised domain components may
  * separately own stores for their own data. Standalone roots publish their current
  * value as the store root on {@link #sync()}. Network infrastructure may configure
- * a replication pipeline before freezing host configuration. Neither operation
+ * a replication pipeline while attached. Neither operation
  * performs a durability barrier or owns the store lifecycle.</p>
  *
  * <p>All incoming values are delegated to configured applications. The host knows
@@ -44,8 +44,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 
 	private final AStore store;
 	private final ReentrantLock syncLock=new ReentrantLock();
-	private volatile Function<V,V> publicationPolicy;
-	private boolean publicationPolicyFrozen;
+	private Function<V,V> publisher;
 	private volatile List<ALatticeComponent<V>> applications=List.of();
 
 	/**
@@ -182,6 +181,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * The callback runs once outside atomic update callbacks. Concurrent writes
 	 * remain pending; the returned value is the snapshot actually published.
 	 * This is a host integration point, not a component-to-parent link.
+	 * The publisher must preserve the snapshot's value; only its storage references
+	 * may change, as with {@link #attachPublisher(Function)}.
 	 */
 	public V sync(Function<V,V> publish) {
 		Objects.requireNonNull(publish);
@@ -198,35 +199,38 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	/**
-	 * Configures the synchronous root publication policy.
+	 * Attaches one synchronous publisher, such as a node server. It must publish
+	 * the supplied snapshot unchanged, though it may return equivalent store-backed
+	 * references. Domain edits belong in components, before publication.
+	 * Attachment and detachment are serialised with sync. The caller retains this
+	 * exact function instance to detach it when its publication resources close.
 	 *
-	 * <p>This is a host integration point. The caller invokes this root's
-	 * {@link #sync()} to persist or replicate its current state. Child component
-	 * publication does not invoke this policy. The handler returns the published value to install
-	 * back into the root cursor, usually with store-backed references.</p>
-	 *
-	 * <p>Until a policy is configured, sync publishes to this component's store,
-	 * or returns the current snapshot if there is no store.
-	 * Host infrastructure may install a replication pipeline during configuration
-	 * and then call {@link #freezePublicationPolicy()} before application work begins.</p>
-	 *
-	 * @param policy Root publication policy
-	 * @throws IllegalStateException If host publication configuration is frozen
+	 * @param publish Snapshot publisher
+	 * @throws IllegalStateException If a publisher is already attached
 	 */
-	public synchronized void setPublicationPolicy(Function<V,V> policy) {
-		if (publicationPolicyFrozen) {
-			throw new IllegalStateException("Root publication policy is frozen");
+	public void attachPublisher(Function<V,V> publish) {
+		Objects.requireNonNull(publish);
+		syncLock.lock();
+		try {
+			if (publisher!=null) throw new IllegalStateException("Host already has a publisher");
+			publisher=publish;
+		} finally {
+			syncLock.unlock();
 		}
-		if (policy==null) throw new IllegalArgumentException("Root publication policy must not be null");
-		publicationPolicy=policy;
 	}
 
 	/**
-	 * Freezes host publication configuration against later replacement.
-	 * Application state may continue to sync normally after this boundary.
+	 * Detaches this exact publisher, waiting for in-progress sync to finish.
+	 * Later syncs use the host store directly, or are no-ops without a store.
+	 * A stale detach cannot remove a replacement publisher.
 	 */
-	public synchronized void freezePublicationPolicy() {
-		publicationPolicyFrozen=true;
+	public void detachPublisher(Function<V,V> publish) {
+		syncLock.lock();
+		try {
+			if (publisher==publish) publisher=null;
+		} finally {
+			syncLock.unlock();
+		}
 	}
 
 	/**
@@ -239,7 +243,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	private V publishRoot(V value) {
-		Function<V,V> policy=publicationPolicy;
+		Function<V,V> policy=publisher;
 		return (policy==null)?storeRoot(value):policy.apply(value);
 	}
 
