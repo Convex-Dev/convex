@@ -681,70 +681,34 @@ Owner components stop at signed boundaries: callers supply the complete envelope
 A node is replication. It hosts an assembled `LatticeHost`, attaches propagation
 groups, hands incoming values to the host and sends the host's published root to
 its propagation sets. It holds no lattice and performs no merge of its own. Assemble
-the host and its applications first, then start the node:
+the host and its applications first, then put networking around them. The standard
+TCP assembly is `LatticeNode`, which owns the server, the listener and the node's
+propagation groups in one lifecycle:
 
 ```java
 var host = LatticeHost.open(store);
-var app = new MyApplication(host);
-host.addApplication(app);
-var node = new NodeServer<>(host, config);
-node.launch();
-// Later, according to application policy:
-app.sync();
-host.sync();
+var app = host.addApplication(new MyApplication(host));
+try (var network = new LatticeNode<>(host, config).launch()) {
+    network.setIdentity(nodeDID, nodeKey);              // optional
+    network.serveAllInbound(network.createPropagator()); // an explicit choice to serve
+    app.sync();                                          // according to application policy
+    host.sync();                                         // persists and announces the root
+}
+// Networking is closed; the host, its applications and the store remain usable.
 ```
 
 The supplied host is already initialised, restored by `open`; the node never reloads
-it. Launch attaches the node's publication pipeline; a host accepts one publisher
-at a time. Closing the node, or failed launch, detaches that publisher. Subsequent
-host syncs use the host store directly, and another server may attach. Node startup
-does not invoke application sync.
-Transport and propagation configuration remain explicit, and a propagation group
-knows no lattice either: it announces whatever the host publishes, through its own
-projection. A relay node is the same assembly with `LatticeApplication.live(lattice,
-host)` as the host's one application; the peer module's `RelayHost` assembles that
-host from a lattice, a store, node configuration and the relay's policy.
-
-For an ordinary TCP deployment, `LatticeNode` owns the
-server and listener lifecycle together:
-
-```java
-try (var network = new LatticeNode<>(host, config).launch()) {
-    network.setIdentity(nodeDID, nodeKey, didAuthorizer);
-    var propagation = network.createPropagator();
-    network.serveAllInbound(propagation);
-    // The same application instances continue to operate on the same host.
-    app.sync();
-    host.sync();
-}
-// Networking is closed; host, applications and caller-owned store remain usable.
-```
-
-`createPropagator()` creates, registers and starts a group on a running network,
-using the host store. It initially has no peers or inbound assignments. Additional
-groups can be created and configured at any time; `removePropagator(group)` revokes
-its inbound assignments and closes it. The example
-opts into serving its view to all inbound connections; without `serveAllInbound`,
-the listener denies connections unless a selector is installed through
-`network.getListener()`. Serving a view does not authenticate an outbound peer.
-Selectors may change while running; established sockets retain their group.
-Publication-filter changes rebuild the existing view before returning. They cannot
-revoke data already sent or remove cached cells. Transport-key changes apply to
-subsequent handshakes, without reauthenticating existing routes.
-`getServer()` and the returned propagators expose the existing pull and peer APIs, while
-`getHostAddress()` returns the actual bound address. Use port `0` for local tests.
-A host needs a cell store to attach networking; `MemoryStore` suffices for an
-ephemeral node. Custom stores, group limits or transports can use the explicit assembly.
-
-The node's optional primary identity is a DID and an authorised key pair.
-`setIdentity(did, keyPair)` checks a `did:key` binding; indirect DIDs require the
-overload taking a `DIDKeyAuthorizer` backed by authenticated resolution data.
-Invalid bindings leave the previous identity unchanged. `createPropagator()` uses
-the configured key, or null when no identity is configured; no keys are generated.
-Groups may override their transport key. Changing or clearing the node's identity
-affects newly created groups only. The DID binding is checked when configured;
-applications must refresh it when their resolver state changes. Transport proofs
-remain public-key possession proofs, not remote DID resolution or automatic trust.
+it. Launch attaches the node as the host's one publisher and closing the node
+detaches it, so a host outlives its networking. Node startup does not invoke
+application sync. Groups, their policies and the node's identity may change while
+the node runs: dynamic is the default unless something genuinely cannot change. A
+node's DID is optional; nodes with more to say about themselves will want one. A
+propagation group knows no lattice: it announces whatever the host publishes, through
+its own projection. A relay node is the same assembly with `LatticeApplication.live(lattice,
+host)` as the host's one application, which the peer module's `RelayHost` assembles.
+The groups, identity, inbound selection and the explicit assembly for custom
+transports are described in the peer module's networking document,
+`convex-peer/docs/LATTICE_NETWORKING.md`.
 
 ### Sharing a host
 
@@ -1429,8 +1393,9 @@ Worked examples:
 - `convex.lattice.LatticeContext`, `OwnerLattice`, `SignedLattice`,
   `JSONLattice`, `LWWLattice`, `IndexLattice`, `MapLattice`, `SetLattice` — lattices
   and write policy.
-- `convex.node.NodeServer`, `LatticePropagator` and `RelayHost` (`convex-peer`) — the
-  replication runtime and host assembly from node configuration.
+- `convex.node.LatticeNode`, `NodeServer`, `LatticePropagator` and `RelayHost`
+  (`convex-peer`) — the standard TCP assembly, the replication runtime and host
+  assembly from node configuration.
 - `convex-p2p` (`P2PNode`, `P2PApplication`) — a node assembled up to the root, with
   the application owning everything below it.
 - `convex-social` (`Social`, `SocialUser`, `Feed`, `SocialPost`) and `convex-dlfs` —

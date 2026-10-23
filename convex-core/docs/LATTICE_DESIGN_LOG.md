@@ -694,6 +694,28 @@ views and forks, multi-DID receipt signing, and failed authoring leaving state
 unchanged. Existing publication and integration tests continue to cover routing,
 transaction atomicity and shared application composition.
 
+## 28. Networking is optional, dynamic and detachable; a node's DID is optional
+
+**Status:** Implemented 23 October 2026 (`e87af7ebc`, `d2dad4b32`, `a14716eec`);
+decided 23 October 2026.
+
+`LatticeNode` wraps a `NodeServer`, a `LatticeListener` and dynamically created
+propagation groups in one lifecycle around an existing host. The node attaches itself
+as the host's one publisher and detaches on close, so a host outlives its networking.
+Groups, their transport keys, filters, handlers and inbound selection can change while
+the node runs; the configure-before-attach rule is gone. The node may carry a primary
+DID and an authorised key as the default transport identity of new groups.
+
+Mike's decisions: dynamic is the default unless something genuinely cannot change; a
+DID is optional, and more capable nodes will almost certainly want one; the
+hand-assembled node setups (the P2P node, the CLI and DLFS servers, ConvexDB and the
+GUI browser) port to `LatticeNode` as the standard assembly, with the wrapper's own
+design left open (Convex-Dev/convex#769). The networking narrative has one home,
+`convex-peer/docs/LATTICE_NETWORKING.md`; the applications manual points there.
+
+CAD text affected: CAD036 (*Lattice Node*) node construction, propagation group
+lifecycle and node identity.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |
@@ -701,5 +723,5 @@ transaction atomicity and shared application composition.
 | CAD024 Data Lattice | *Cursors*, *Signed Lattice*, *Cursor Sync Guarantees*, implementation note on cursor types | 1, 3, 5, 6, 13, 15 |
 | CAD035 Lattice Cursors | *Path Cursor*, *Forkable Cursor*, *Cursor Hierarchy*, *Lattice-Aware Cursors*, *Lattice Context*, *Reference Implementation*, Java example | 2, 3, 4, 5, 6, 7, 8, 10 |
 | CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 |
-| CAD036 Lattice Node | pull-path merge description, node construction and restore | 9, 14, 16 |
+| CAD036 Lattice Node | pull-path merge description, node construction and restore, group lifecycle, node identity | 9, 14, 16, 28 |
 | CAD038 Lattice Authentication | *Owner Verifier*, indirect-owner default policy, explicit authoring | 19, 20, 21, 22 |
