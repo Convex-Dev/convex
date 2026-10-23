@@ -4,9 +4,7 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import convex.core.data.ACell;
-import convex.core.data.AString;
 import convex.core.data.SignedData;
-import convex.core.data.Strings;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
@@ -35,8 +33,7 @@ import convex.lattice.generic.SignedLattice;
  *
  * @param <V> Unsigned working value
  */
-public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
-	private final SignedLattice<V> lattice;
+public class SignedComponent<V extends ACell> extends ASignedComponent<V> {
 
 	/**
 	 * Creates private unsigned working state over a signed destination. The lattice
@@ -58,8 +55,7 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 	 * intermediate unsigned commit.
 	 */
 	protected SignedComponent(SignedLattice<V> lattice,AForkableCursor<V> cursor) {
-		super(cursor);
-		this.lattice=Objects.requireNonNull(lattice);
+		super(lattice,cursor);
 	}
 
 	@Override protected SignedComponent<V> rebind(AForkableCursor<V> cursor) {
@@ -68,45 +64,4 @@ public class SignedComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	@Override public SignedComponent<V> fork() { return rebind(storage.fork()); }
 
-	/**
-	 * Checks envelope shape only. Merge separately verifies the signature, owner
-	 * and payload; subclasses may compose domain checks over the unsigned value.
-	 */
-	@Override public AString checkValue(ACell value) {
-		return value==null || value instanceof SignedData<?>?null:
-			Strings.create("Expected a signed envelope");
-	}
-
-	@Override
-	protected V mergePublication(V own,V other) {
-		return lattice.getValueLattice().merge(own,other);
-	}
-
-	/**
-	 * Verifies an incoming owner envelope and atomically merges its payload into
-	 * working state. Invalid signatures and unauthorised signers are ignored.
-	 * Signing and publication remain deferred until sync. The caller must also
-	 * verify any enclosing signed envelopes before routing an interior value here.
-	 *
-	 * @return Current unsigned value after merging, or unchanged on rejection
-	 */
-	public V merge(SignedData<V> incoming) {
-		if (incoming==null || lattice.merge(null,incoming)==null) return cursor().get();
-		return cursor().updateAndGet(own -> lattice.getValueLattice().merge(own,incoming.getValue()));
-	}
-
-	/**
-	 * Receives a complete envelope at this boundary. No incoming path can cross
-	 * inside the envelope; unsigned edits use the working cursor instead. This
-	 * entry point also serves deliveries from {@link AKeyedRegions}.
-	 */
-	@SuppressWarnings("unchecked")
-	@Override
-	public V mergeAt(ACell incoming,ACell... path) {
-		if (path.length!=0) return cursor().get();
-		if (incoming!=null && !(incoming instanceof SignedData<?>)) {
-			throw new IllegalArgumentException("Signed component requires a complete envelope");
-		}
-		return merge((SignedData<V>)incoming);
-	}
 }

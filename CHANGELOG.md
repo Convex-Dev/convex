@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Signed domain components can rebind their existing API to unsigned forks, batching edits into one signed publication without re-stamping. `SignedComponent` shares verification and reconciliation through `ASignedComponent`; nested drafts sign only at the original envelope boundary.
+
 - Owned collections bind supplied cursors directly; use `.fork()` to stage them explicitly. Forks retain owner verification policy. Signed components retain deliberate unsigned staging and support nested drafts that sign only at the envelope publication boundary. Component transactions commit through bound `storage()`, avoiding duplicate application of editing policies.
 
 - Future-timestamp admission belongs to the application or component. Removed node-wide and `LatticeContext` skew settings; standalone DLFS now reads `dlfs.maxFutureTimestampSkew` (previously `node.maxFutureTimestampSkew`). `DLFSLattice.withClock(clock, skew)` binds explicit admission policy, while the unconfigured lattice merges solely by value. P2P no longer supplies an ambient merge context.

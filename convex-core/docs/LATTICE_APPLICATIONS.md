@@ -828,10 +828,35 @@ Verification is bound to the lattice instances, configured before use.
 
 ### Batched signing
 
+A signed domain component can retain the same API for immediate editing and batching.
+Implement `rebind` using the unsigned-storage constructor of `ASignedComponent`;
+retain its protected `lattice` rule and rebuild the domain's editing views:
+
+```java
+var draft = app.user(alice).fork();
+draft.add(42);
+draft.add(7);
+draft.remove(42);
+draft.sync(); // Reconcile and sign into the owner region.
+app.sync();   // Publish that region into the host.
+```
+
+The fork is taken from bound storage, below the domain's timestamp wrapper.
+Rebinding reinstalls timestamping for edits, while sync preserves their timestamps.
+Incoming envelopes are verified by the same owner rule and merged into unsigned
+storage without signing or re-stamping. No incoming merge writes through to the
+original signed destination. A nested fork syncs into its enclosing unsigned draft;
+only the signing boundary produces an envelope. An unchanged sync does not sign,
+and failed reconciliation or signing leaves destination, draft and baseline intact.
+The signer remains attached to the original signing cursor, so changes in available
+keys are observed when publication is attempted.
+
+
 For immediate signed edits, a live component wraps its destination with
 `SignedCursor.create(slot, key)`. It needs no working copy and no sync of its own.
 
-Deferred signing is an explicit choice. A signed component (`SignedComponent`) owns
+For a component that stages from construction, `SignedComponent` is the concrete
+unsigned-draft implementation of `ASignedComponent`. It owns
 an unsigned working copy and a signed destination. Bind it to the owner-bound signed
 lattice at that host path, so it carries the owner verifier. Domain components use
 its working cursor through their rebinding factories and update normally, without
@@ -1126,9 +1151,10 @@ These diagnostics run only through explicit `checkValue` calls. There is no view
 factory or callback into the map to construct the domain component.
 
 The component that signs defines its key-resolution strategy in one place. In the
-favourites example, `Favourites` supplies `user::signData` in its
-constructor. `FavouritesApp` binds the owner path and rule through its standard
-owner-index component, with no signing context. The host and region cannot supply
+favourites example, `FavouritesApp.user` supplies `user::signData` together with
+the owner path and rule from its standard owner-index component. `Favourites`
+passes that function to its signed base constructor; rebind retains the rule
+without creating another signing policy or context. The host and region cannot supply
 an implicit fallback key. The same function handles local edits and any re-signing
 it performs.
 
@@ -1376,8 +1402,9 @@ sleeps, wait on real signals; no fixed ports.
 Worked examples:
 
 - The [favourites application](../src/test/java/convex/lattice/app/FavouritesExample.java):
-  `SingleRegion` with immediate signing, shared region instances and explicit
-  publication, with a persistence variant.
+  `SingleRegion` with shared signed user handles, same-type unsigned forks for
+  batched signing, shared region instances and explicit publication, with a
+  persistence variant.
 - [`ApplicationPublicationTest`](../src/test/java/convex/lattice/app/ApplicationPublicationTest.java):
   a notebook with direct domain operations and an embedded `SetComponent`, registered
   with `SingleRegion`. Edits stay unsigned until notebook sync; a nested notebook

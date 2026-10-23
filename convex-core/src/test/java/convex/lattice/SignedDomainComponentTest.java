@@ -17,6 +17,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.ACursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.OwnerKeyLattice;
@@ -30,10 +31,40 @@ class SignedDomainComponentTest {
 	private static final OwnerKeyLattice<AInteger> OWNERS=OwnerKeyLattice.create(MaxLattice.INSTANCE);
 
 	private static final class Count extends ASignedComponent<AInteger> {
+		int reconciliations;
 		Count(ACursor<SignedData<AInteger>> path,SignedLattice<AInteger> rule,Function<AInteger,SignedData<AInteger>> signer) {
 			super(path,rule,signer);
 		}
+		private Count(SignedLattice<AInteger> rule,AForkableCursor<AInteger> cursor) { super(rule,cursor); }
+		@Override protected Count rebind(AForkableCursor<AInteger> cursor) { return new Count(lattice,cursor); }
+		@Override public Count fork() { return rebind(storage.fork()); }
+		@Override protected AInteger mergePublication(AInteger own,AInteger other) {
+			reconciliations++;
+			return super.mergePublication(own,other);
+		}
 		void set(long value) { cursor().set(CVMLong.create(value)); }
+	}
+
+	@Test void failedSignedPublicationPreservesTheOriginalBaseline() {
+		var initial=ALICE.<AInteger>signData(CVMLong.ONE);
+		var destination=Root.create(initial);
+		var key=new AtomicReference<>(BOB);
+		var live=new Count(destination,OWNERS.signingFor(ALICE.getAccountKey()),value -> key.get().signData(value));
+		var draft=live.fork();
+		draft.set(3);
+		destination.set(ALICE.signData(CVMLong.TWO));
+		var before=destination.get();
+		assertThrows(IllegalStateException.class,draft::sync);
+		assertSame(before,destination.get());
+		assertEquals(CVMLong.create(3),draft.cursor().get());
+		assertEquals(1,draft.reconciliations);
+		// Returning the destination to the original baseline must remove the conflict.
+		destination.set(initial);
+		key.set(ALICE);
+		draft.sync();
+		assertEquals(1,draft.reconciliations,"A failed sync must not advance the fork's baseline");
+		assertEquals(CVMLong.create(3),destination.get().getValue());
+		assertTrue(destination.get().checkSignature());
 	}
 
 	@Test void directPathConstructionIsInertAndViewsShareSignedEdits() {

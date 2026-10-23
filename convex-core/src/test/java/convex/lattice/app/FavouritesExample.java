@@ -1,6 +1,7 @@
 package convex.lattice.app;
 
 import java.util.function.Supplier;
+import java.util.function.Function;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -43,6 +44,9 @@ import convex.lattice.generic.SignedLattice;
  *
  * <p>A changed local edit updates the items, stamps the record and signs it in one
  * atomic storage operation. Repeated user handles share that signed working state.
+ * A user handle can fork the same domain API for a batch: edits then stamp private
+ * unsigned state, and sync signs the reconciled record into the region. A nested
+ * draft sync stops at its enclosing draft, without signing early.
  * Incoming envelopes are verified and compared by their signed timestamps; a selected
  * envelope keeps its signature and is never stamped with the receiver's clock.
  * The newer record replaces the entire older record, so removed items stay removed.
@@ -50,7 +54,9 @@ import convex.lattice.generic.SignedLattice;
  *
  * <p>Publication is explicit: {@code app.sync()} publishes the region to the host;
  * {@code host.sync()} handles host persistence/publication. Neither creating a user
- * handle nor syncing its embedded components publishes the region.</p>
+ * handle nor syncing its embedded components publishes the region. Application
+ * sync does not publish outstanding user drafts; each draft is explicitly synced
+ * first. The main method demonstrates one batch alongside an immediate signed edit.</p>
  *
  * <p>Run {@link #main(String[])} as a Java application (for example, Eclipse's
  * Run As &gt; Java Application). It edits two owners' favourites, publishes them,
@@ -80,11 +86,12 @@ public final class FavouritesExample {
 		var host=LatticeHost.create();
 		var app=host.addApplication(new FavouritesApp(host,Utils::getCurrentTimestampCell));
 
-		// Domain edits stamp and sign immediately, within the region's working state.
-		var alice=app.user(ALICE);
+		// A domain fork stamps each edit privately and signs the completed batch on sync.
+		var alice=app.user(ALICE).fork();
 		alice.add(42);
 		alice.add(7);
 		alice.remove(42);
+		alice.sync(); // One signature, into the region only.
 		app.user(BOB).add(99);
 		System.out.println("Alice's favourites: "+alice.items());
 		System.out.println("Bob's favourites: "+app.items(BOB.getAccountKey()));
@@ -128,7 +135,7 @@ public final class FavouritesExample {
 		/** Opens a live authoring handle. An absent owner is created only by a changed edit. */
 		Favourites user(AKeyPair user) {
 			var owner=user.getAccountKey();
-			return new Favourites(component().path(owner),component().signingFor(owner),user,getTimestamp);
+			return new Favourites(component().path(owner),component().signingFor(owner),user::signData,getTimestamp);
 		}
 
 		/** Reads the relayed field without assuming the remote owner's item representation. */
@@ -142,24 +149,42 @@ public final class FavouritesExample {
 	/**
 	 * A live view of one owner's record. Local writes pass through the embedded set,
 	 * then the timestamp wrapper, then the signing boundary. All handles at this path
-	 * observe the same edits; this class owns no detached copy or publication step.
+	 * observe the same edits. Calling fork creates the same domain API over a private
+	 * unsigned draft; its sync signs once into the region, without publishing the app.
 	 *
 	 * <p>The set supplies ordinary collection operations. Timestamp ordering belongs
 	 * to the whole record, so clearing items retains a newer signed record with an empty set rather
 	 * than removing the owner entry and losing the evidence of deletion.</p>
 	 */
 	static final class Favourites extends ASignedComponent<AHashMap<Keyword,ACell>> {
+		private final Supplier<CVMLong> getTimestamp;
 		private final Timestamped<AHashMap<Keyword,ACell>> record;
 		final SetComponent<ACell> itemSet;
 
 		Favourites(AForkableCursor<SignedData<AHashMap<Keyword,ACell>>> destination,
-				SignedLattice<AHashMap<Keyword,ACell>> rule,AKeyPair user,Supplier<CVMLong> getTimestamp) {
-			// This component authors only with the explicitly supplied user's key.
-			super(destination,rule,user::signData);
+				SignedLattice<AHashMap<Keyword,ACell>> rule,
+				Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer,
+				Supplier<CVMLong> getTimestamp) {
+			// The application supplies this owner's signer; forks keep it at the destination.
+			super(destination,rule,signer);
+			this.getTimestamp=getTimestamp;
 			// Wrap the base signing view once; every domain edit uses cursor().
 			record=Timestamped.create(super.cursor().withDefault(Maps.empty()),getTimestamp);
 			itemSet=new SetComponent<>(cursor().path(ITEMS));
 		}
+
+		private Favourites(AForkableCursor<AHashMap<Keyword,ACell>> cursor,
+				SignedLattice<AHashMap<Keyword,ACell>> rule,Supplier<CVMLong> getTimestamp) {
+			super(rule,cursor);
+			this.getTimestamp=getTimestamp;
+			record=Timestamped.create(super.cursor().withDefault(Maps.empty()),getTimestamp);
+			itemSet=new SetComponent<>(cursor().path(ITEMS));
+		}
+
+		@Override protected Favourites rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+			return new Favourites(cursor,lattice,getTimestamp);
+		}
+		@Override public Favourites fork() { return rebind(storage.fork()); }
 
 		/** Direct local edits use the same timestamped path as the embedded set. */
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record.cursor(); }

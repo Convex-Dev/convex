@@ -759,6 +759,26 @@ Empty or rejected owner-map deliveries preserve absent storage. Tests cover thes
 properties, nested signing counts, fork verification policy and failed transactions.
 CAD035/CAD045's atomic publication and component binding contracts govern this work.
 
+## 31. Signed domain forks retain the domain API
+
+Implemented 23 October 2026. `ASignedComponent` binds either a live signed path or
+supplied unsigned working storage. Domain rebind hooks retain the owner-bound rule
+and reconstruct editing views. Forking uses the existing unsigned storage fork;
+sync signs only when it reaches the original signing cursor. Nested drafts remain
+unsigned until that boundary publishes. No fork-specific conversion wrapper or
+second domain class is introduced.
+
+Incoming live merges preserve selected envelopes. Incoming draft merges verify the
+same owner rule but update private unsigned storage without stamping or signing.
+`SignedComponent` now extends this common base and selects staging at construction,
+removing its duplicate envelope handling and merge policy. Favourites demonstrates
+both immediate signed editing and batching through the same methods.
+
+CAD035's atomic fork guarantees and CAD038/CAD045's ownership and component rules
+are unchanged. Tests cover signature counts, preserved timestamps, newer whole-record
+selection, incoming verification, nested drafts, signer recovery and unchanged fork
+baselines after failed publication.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |
