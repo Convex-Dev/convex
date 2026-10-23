@@ -90,7 +90,6 @@ public final class SharedApplicationsExample {
 		public final DLFSApplication files;
 		private final LatticeNode<Index<Keyword,ACell>> network;
 		private final LatticePropagator propagation;
-		private final AKeyPair nodeKey;
 
 		/**
 		 * Opens a node over a store, restoring whatever the store retained. Writes on
@@ -102,7 +101,6 @@ public final class SharedApplicationsExample {
 		}
 
 		private Node(EtchStore store,AKeyPair nodeKey,long time) throws Exception {
-			this.nodeKey=nodeKey;
 			host=LatticeHost.open(store);
 			// Infrastructure is registered once; both domain applications use its live state.
 			host.addApplication(LatticeApplication.live(P2PLattice.ROOT,host));
@@ -115,6 +113,7 @@ public final class SharedApplicationsExample {
 			var config=NodeConfig.localNetwork();
 			// Replication knows no lattice: it serves whatever the host publishes, from the host's store.
 			network=new LatticeNode<>(host,config);
+			// Groups inherit this primary identity; domain users keep their own signers.
 			network.setIdentity(DID.forKey(nodeKey.getAccountKey()),nodeKey);
 			propagation=network.createPropagator();
 			network.serveAllInbound(propagation).launch();
@@ -136,7 +135,7 @@ public final class SharedApplicationsExample {
 		/** Pulls the peer's served root; the host hands it to both applications. */
 		public void pullFrom(Node peer) throws Exception {
 			try (Convex connection=ConvexRemote.connect(peer.network.getHostAddress())) {
-				propagation.addPeer(peer.nodeKey.getAccountKey(),connection).get(10,TimeUnit.SECONDS);
+				propagation.addPeer(peer.propagation.getTransportKey(),connection).get(10,TimeUnit.SECONDS);
 				network.getServer().pull(propagation,connection).get(10,TimeUnit.SECONDS);
 			}
 		}

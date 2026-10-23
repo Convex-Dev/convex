@@ -2,9 +2,11 @@ package convex.node;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
+import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -45,36 +47,33 @@ public class KVReplicationDemo {
 	public static void main(String[] args) throws Exception {
 		System.out.println("=== KV Store Replication Demo ===\n");
 
-		List<NodeServer<?>> servers = new ArrayList<>();
+		List<LatticeNode<?>> networks = new ArrayList<>();
 		List<LatticePropagator> propagators=new ArrayList<>();
-		List<LatticeListener> transports=new ArrayList<>();
 		List<AStore> stores = new ArrayList<>();
 		List<KVDatabase> databases = new ArrayList<>();
 
 		try {
 			// --- Create and launch nodes ---
 			for (int i = 0; i < NUM_NODES; i++) {
-				AKeyPair kp = AKeyPair.generate();
+				// Demo keys only: a deployment loads its configured identity.
+				AKeyPair kp=AKeyPair.createSeeded(8200+i);
 				AStore store = new MemoryStore();
 				stores.add(store);
 
-				NodeConfig config=NodeConfig.port(0);
-				NodeServer<?> server = new NodeServer<>(RelayHost.open(Lattice.ROOT,store,config),config);
-				LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.create());
-				server.addPropagator(propagator);
-				LatticeListener transport=new LatticeListener(config);
-				transport.registerPropagator(propagator);
-				transport.setSelector(connection -> propagator);
-				server.launch();
-				transport.launch();
-				servers.add(server);
+				NodeConfig config=NodeConfig.localNetwork();
+				var network=new LatticeNode<>(RelayHost.open(Lattice.ROOT,store,config),config);
+				// Retain ownership before starting anything, so finally also covers setup failures.
+				networks.add(network);
+				network.setIdentity(DID.forKey(kp.getAccountKey()),kp);
+				network.launch();
+				var propagator=network.createPropagator();
+				network.serveAllInbound(propagator);
 				propagators.add(propagator);
-				transports.add(transport);
 
 				KVDatabase db = KVDatabase.create(DB_NAME, kp, Strings.create("node-" + i));
 				databases.add(db);
 
-				System.out.println("Node " + i + " started on port " + transport.getPort()
+				System.out.println("Node " + i + " started on port " + network.getHostAddress().getPort()
 					+ "  key=" + kp.getAccountKey().toHexString(6) + "...");
 			}
 
@@ -83,9 +82,9 @@ public class KVReplicationDemo {
 			for (int i = 0; i < NUM_NODES; i++) {
 				for (int j = 0; j < NUM_NODES; j++) {
 					if (i != j) {
-						AccountKey peerKey = AKeyPair.generate().getAccountKey();
-						Convex peer=ConvexRemote.connect(transports.get(j).getHostAddress());
-						propagators.get(i).addPeer(peerKey,peer);
+						AccountKey peerKey=propagators.get(j).getTransportKey();
+						Convex peer=ConvexRemote.connect(networks.get(j).getHostAddress());
+						propagators.get(i).addPeer(peerKey,peer).get(10,TimeUnit.SECONDS);
 					}
 				}
 			}
@@ -121,21 +120,21 @@ public class KVReplicationDemo {
 				@SuppressWarnings("unchecked")
 				AHashMap<ACell, ACell> replica =
 					(AHashMap<ACell, ACell>)(AHashMap<?,?>) databases.get(i).exportReplica();
-				servers.get(i).mergeAt(replica,Keywords.KV);
-				servers.get(i).getHost().sync();
+				networks.get(i).getServer().mergeAt(replica,Keywords.KV);
+				networks.get(i).getServer().getHost().sync();
 			}
 
 			// --- Pull from peers ---
 			System.out.println("Pulling from peers...");
-			for (int i=0; i<servers.size(); i++) servers.get(i).pull(propagators.get(i));
-			for (int i=0; i<servers.size(); i++) servers.get(i).pull(propagators.get(i));
+			for (int i=0; i<networks.size(); i++) networks.get(i).getServer().pull(propagators.get(i));
+			for (int i=0; i<networks.size(); i++) networks.get(i).getServer().pull(propagators.get(i));
 
 			// --- Verify lattice convergence ---
 			System.out.println("\n=== Lattice Convergence ===");
 			Hash refHash = null;
 			boolean converged = true;
 			for (int i = 0; i < NUM_NODES; i++) {
-				Hash h = Hash.get(servers.get(i).getLocalValue());
+				Hash h = Hash.get(networks.get(i).getServer().getLocalValue());
 				System.out.println("Node " + i + " hash: " + h.toHexString(8) + "...");
 				if (refHash == null) refHash = h;
 				else if (!refHash.equals(h)) converged = false;
@@ -148,7 +147,7 @@ public class KVReplicationDemo {
 			System.out.println("\n=== KV Merge ===");
 			for (int i = 0; i < NUM_NODES; i++) {
 				// :kv value is OwnerLattice: {ownerKey → signed({dbName → kvStore})}
-				ACell kvValue = servers.get(i).getCursor().get(Keywords.KV);
+				ACell kvValue = networks.get(i).getServer().getCursor().get(Keywords.KV);
 				if (kvValue instanceof AHashMap<?,?>) {
 					@SuppressWarnings({"rawtypes"})
 					AHashMap ownerMap = (AHashMap) kvValue;
@@ -181,8 +180,7 @@ public class KVReplicationDemo {
 
 		} finally {
 			System.out.println("\nShutting down...");
-			for (LatticeListener transport:transports) transport.close();
-			for (NodeServer<?> s : servers) s.close();
+			for (LatticeNode<?> network : networks) network.close();
 			for (AStore s : stores) s.close();
 		}
 

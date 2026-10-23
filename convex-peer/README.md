@@ -163,6 +163,7 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 | `ConnectionManager` | Manages peer-to-peer network connections |
 | `BeliefPropagator` | Handles CPoS belief propagation protocol |
 | `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost`, owning node-root persistence and group notifications |
+| `LatticeNode` | Optional TCP networking for a host: owns the server, listener and dynamic propagation groups |
 | `LatticeListener` | Application-owned inbound TCP transport and connection-to-group router |
 | `LatticePropagator` | Owns one filtered serving view, protocol endpoint and external route set |
 | `LatticeConnectionManager` | Maintains bounded connection intent and authenticated routes for one propagator; discovery schemas live in application modules |
@@ -177,6 +178,36 @@ merge semantics; `LatticePropagator` handles CAD036 messages and routes; and the
 application-owned `LatticeListener` provides the standard inbound TCP transport.
 None interprets application paths or records; the `convex-p2p` module layers
 node discovery, social selection and PoP routing on them.
+
+For ordinary TCP networking, wrap an assembled host in `LatticeNode`:
+
+```java
+host.addApplication(app);
+try (var network = new LatticeNode<>(host, NodeConfig.localNetwork()).launch()) {
+    network.setIdentity(nodeDID, nodeKey); // configured did:key and its signing key
+    var group = network.createPropagator();
+    network.serveAllInbound(group); // explicitly make this view available to inbound connections
+
+    // Use the application, connect peers, or add/remove groups while running.
+    app.sync();
+    host.sync();
+}
+```
+
+New groups inherit the configured node key; without an identity they have no
+transport key. For an indirect DID, supply the authoriser as the third argument
+to `setIdentity`. A group can override its own key. Changing the node default
+affects future groups only.
+
+The node closes its listener, groups and server, leaving the host and its
+caller-owned store usable. A host sync persists and schedules propagation;
+group announcement completes asynchronously. See the
+[reading-list example](src/test/java/convex/node/app/ReadingListApplicationTest.java)
+for a complete exchange with authenticated peer admission and staged publication,
+and the [mail example](src/test/java/convex/node/app/MailDeliveryTest.java) for
+path-specific pulls with separate node and user identities.
+
+The underlying components remain available for custom transport assembly:
 
 - **Construction** - Assemble a `LatticeHost` with its applications
   (`RelayHost.open` covers the relay case: one live application over a whole

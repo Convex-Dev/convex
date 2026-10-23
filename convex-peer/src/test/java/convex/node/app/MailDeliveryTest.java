@@ -29,10 +29,9 @@ import convex.lattice.mail.Mail;
 import convex.lattice.mail.MailEnvelope;
 import convex.lattice.mail.MailMessage;
 import convex.lattice.mail.Mailbox;
-import convex.node.LatticeListener;
+import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
-import convex.node.NodeServer;
 
 /**
  * Mail delivered between two nodes: Alice deposits on her node, Bob's node pulls only
@@ -68,24 +67,18 @@ class MailDeliveryTest {
 	static final class RunningNode implements AutoCloseable {
 		final LatticeHost<Index<Keyword,ACell>> host;
 		final MailApp app;
-		final NodeServer<Index<Keyword,ACell>> node;
+		final LatticeNode<Index<Keyword,ACell>> network;
 		final LatticePropagator group;
-		final LatticeListener listener;
 
 		RunningNode(EtchStore store,AKeyPair transportKey) throws Exception {
 			host=LatticeHost.open(store);
 			app=new MailApp(host);
 			host.addApplication(app);
-			var config=NodeConfig.localNetwork();
-			node=new NodeServer<>(host,config);
-			group=new LatticePropagator(store);
-			group.setTransportKeyPair(transportKey);
-			node.addPropagator(group);
-			listener=new LatticeListener(config);
-			listener.registerPropagator(group);
-			listener.setSelector(connection -> group);
-			node.launch();
-			listener.launch();
+			network=new LatticeNode<>(host,NodeConfig.localNetwork());
+			// The node's transport identity is independent of the users signing mail.
+			network.setIdentity(DID.forKey(transportKey.getAccountKey()),transportKey);
+			group=network.createPropagator();
+			network.serveAllInbound(group).launch();
 		}
 
 		/** Waits until the propagator has announced the host's current root. */
@@ -99,10 +92,10 @@ class MailDeliveryTest {
 		}
 
 		/** Pulls one mailbox path from another running node and waits for the merge. */
-		void pullMailbox(RunningNode from,AKeyPair fromKey,AString did) throws Exception {
-			try (var peer=ConvexRemote.connect(from.listener.getHostAddress())) {
-				group.addPeer(fromKey.getAccountKey(),peer).get(10,TimeUnit.SECONDS);
-				node.pullPath(group,peer,true,Mail.KEY_MAIL,did).get(10,TimeUnit.SECONDS);
+		void pullMailbox(RunningNode from,AString did) throws Exception {
+			try (var peer=ConvexRemote.connect(from.network.getHostAddress())) {
+				group.addPeer(from.group.getTransportKey(),peer).get(10,TimeUnit.SECONDS);
+				network.getServer().pullPath(group,peer,true,Mail.KEY_MAIL,did).get(10,TimeUnit.SECONDS);
 			}
 		}
 
@@ -119,8 +112,7 @@ class MailDeliveryTest {
 		}
 
 		@Override public void close() throws Exception {
-			try { listener.close(); }
-			finally { node.close(); }
+			network.close();
 		}
 	}
 
@@ -150,7 +142,7 @@ class MailDeliveryTest {
 			// Bob's node pulls only his mailbox: Carol's never reaches it. The pulled
 			// value lands in Bob's application state and stays off his published root
 			// until his application syncs.
-			bob.pullMailbox(alice,ALICE_NODE,BOB_DID);
+			bob.pullMailbox(alice,BOB_DID);
 			assertEquals(1,bob.region().count());
 			assertNotNull(bob.region().get(BOB_DID));
 			assertNull(bob.region().get(CAROL_DID));
@@ -174,7 +166,7 @@ class MailDeliveryTest {
 			// Alice's node pulls the mailbox back: the receipt replaces the body
 			assertEquals(List.of(toBob),aliceMail.mailbox(BOB_DID).deposited());
 			assertEquals(List.of(toCarol),aliceMail.mailbox(CAROL_DID).deposited());
-			alice.pullMailbox(bob,BOB_NODE,BOB_DID);
+			alice.pullMailbox(bob,BOB_DID);
 			assertTrue(aliceMail.mailbox(BOB_DID).isReceived(toBob));
 			assertTrue(aliceMail.mailbox(BOB_DID).deposited().isEmpty());
 			assertEquals(1,aliceMail.mailbox(BOB_DID).receipts().size());

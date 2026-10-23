@@ -4,9 +4,11 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
+import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
@@ -60,9 +62,8 @@ public class LatticeDemo {
 		System.out.println("Creating " + NUM_NODES + " nodes with automatic propagation...\n");
 
 		// Collections to hold our nodes and their storage
-		List<NodeServer<?>> servers = new ArrayList<>();
+		List<LatticeNode<?>> networks = new ArrayList<>();
 		List<LatticePropagator> propagators=new ArrayList<>();
-		List<LatticeListener> transports=new ArrayList<>();
 		List<AStore> stores = new ArrayList<>();
 
 		// Use Lattice.ROOT - the standard Convex lattice with :data keyword for storage
@@ -76,24 +77,19 @@ public class LatticeDemo {
 				AStore store = new MemoryStore();
 				stores.add(store);
 
-				// Create and launch a NodeServer
-				// - Takes the lattice definition (what data structure to use)
-				// - Takes a store (where to persist data)
-				// - Takes a port number (how other nodes can connect to it)
-				NodeConfig config=NodeConfig.port(0);
-				NodeServer<?> server = new NodeServer<>(RelayHost.open(lattice,store,config),config);
-				LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.create());
-				server.addPropagator(propagator);
-				LatticeListener transport=new LatticeListener(config);
-				transport.registerPropagator(propagator);
-				transport.setSelector(connection -> propagator);
-				server.launch();
-				transport.launch();
-				servers.add(server);
+				// Give each demo node a stable identity. Real deployments load their own keys.
+				AKeyPair nodeKey=AKeyPair.createSeeded(8100+i);
+				NodeConfig config=NodeConfig.localNetwork();
+				var network=new LatticeNode<>(RelayHost.open(lattice,store,config),config);
+				// Retain ownership before starting anything, so finally also covers setup failures.
+				networks.add(network);
+				network.setIdentity(DID.forKey(nodeKey.getAccountKey()),nodeKey);
+				network.launch();
+				var propagator=network.createPropagator();
+				network.serveAllInbound(propagator);
 				propagators.add(propagator);
-				transports.add(transport);
 
-				System.out.println("Node " + (i + 1) + " started on port " + transport.getPort());
+				System.out.println("Node " + (i + 1) + " started on port " + network.getHostAddress().getPort());
 			}
 
 			System.out.println("\nEstablishing peer connections (full mesh)...");
@@ -105,13 +101,13 @@ public class LatticeDemo {
 				for (int j = 0; j < NUM_NODES; j++) {
 					if (i != j) {  // Don't connect to self
 						// Create a connection to the remote node
-						InetSocketAddress peerAddress=transports.get(j).getHostAddress();
-						AccountKey peerKey = AKeyPair.generate().getAccountKey();
+						InetSocketAddress peerAddress=networks.get(j).getHostAddress();
+						AccountKey peerKey=propagators.get(j).getTransportKey();
 						Convex peer = ConvexRemote.connect(peerAddress);
 
 						// Add this peer to the node's peer list
 						// Now this node can send broadcasts to this peer
-						propagators.get(i).addPeer(peerKey,peer);
+						propagators.get(i).addPeer(peerKey,peer).get(10,TimeUnit.SECONDS);
 					}
 				}
 				System.out.println("Node " + (i + 1) + " connected to " + (NUM_NODES - 1) + " peers");
@@ -129,7 +125,7 @@ public class LatticeDemo {
 
 			// We'll make all our changes on node 1
 			// The propagator will automatically broadcast them to nodes 2 and 3
-			NodeServer<?> node1 = servers.get(0);
+			NodeServer<?> node1 = networks.get(0).getServer();
 
 			long startTime = System.currentTimeMillis();
 
@@ -179,7 +175,7 @@ public class LatticeDemo {
 			// explicitly sync to ensure everything is caught up right now
 			long syncStart = System.currentTimeMillis();
 			for (int i = 0; i < NUM_NODES; i++) {
-				NodeServer<?> server = servers.get(i);
+				NodeServer<?> server = networks.get(i).getServer();
 
 				// pull() queries all peers for their current state and merges it locally
 				// This ensures this node has the latest data from everyone
@@ -199,7 +195,7 @@ public class LatticeDemo {
 			// Get the final lattice value from each node
 			List<ACell> finalValues = new ArrayList<>();
 			for (int i = 0; i < NUM_NODES; i++) {
-				ACell value = servers.get(i).getLocalValue();
+				ACell value = networks.get(i).getServer().getLocalValue();
 				finalValues.add(value);
 
 				// Show the hash of each node's value
@@ -257,12 +253,9 @@ public class LatticeDemo {
 			// CLEANUP: Always close resources properly
 			System.out.println("\nShutting down nodes...");
 
-			// Close transports before the authoritative nodes drain propagators.
-			for (LatticeListener transport:transports) transport.close();
-
-			// Close all servers and propagators.
-			for (int i = 0; i < servers.size(); i++) {
-				servers.get(i).close();
+			// Each network closes its listener, server and propagation groups.
+			for (int i = 0; i < networks.size(); i++) {
+				networks.get(i).close();
 				System.out.println("Node " + (i + 1) + " shutdown complete");
 			}
 
