@@ -11,6 +11,7 @@ import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -116,7 +117,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword, ACell> getPost(Blob key) {
-		Index<Blob, ACell> feed = cursor().get();
+		Index<Blob, ACell> feed = RT.ensureIndex(cursor().get());
 		if (feed == null) return null;
 		ACell value = feed.get(key);
 		return (value instanceof AHashMap) ? (AHashMap<Keyword, ACell>) value : null;
@@ -128,7 +129,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * @return Entry count
 	 */
 	public long count() {
-		Index<Blob, ACell> feed = cursor().get();
+		Index<Blob, ACell> feed = RT.ensureIndex(cursor().get());
 		return (feed != null) ? feed.count() : 0;
 	}
 

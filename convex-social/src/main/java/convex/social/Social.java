@@ -17,11 +17,11 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeApplication;
-import convex.lattice.ALatticeComponent;
+import convex.lattice.OwnedMap;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.SignedCursor;
+import convex.lattice.generic.AOwnerLattice;
 import convex.lattice.generic.OwnerMapLattice;
 
 /**
@@ -75,8 +75,7 @@ import convex.lattice.generic.OwnerMapLattice;
  * KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
  * }</pre>
  */
-public class Social extends ALatticeComponent<
-		AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> implements TransactionalComponent<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>,Social> {
+public class Social extends OwnedMap<ACell,Index<Keyword,ACell>> implements TransactionalComponent<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>,Social> {
 
 	/**
 	 * Keyword for the social section in a node's root lattice.
@@ -93,7 +92,6 @@ public class Social extends ALatticeComponent<
 	public static final OwnerMapLattice<ACell,Index<Keyword,ACell>> SOCIAL_LATTICE=
 		ownerLattice(DIDKeyAuthorizer.CONVEX);
 
-	private final OwnerMapLattice<ACell,Index<Keyword,ACell>> owners;
 	private final BiFunction<ACell,Index<Keyword,ACell>,SignedData<Index<Keyword,ACell>>> signer;
 	private final Supplier<CVMLong> clock;
 
@@ -104,11 +102,10 @@ public class Social extends ALatticeComponent<
 	}
 
 	private Social(AForkableCursor<AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> cursor,
-			OwnerMapLattice<ACell,Index<Keyword,ACell>> owners,
+			AOwnerLattice<ACell,Index<Keyword,ACell>,AHashMap<ACell,SignedData<Index<Keyword,ACell>>>> owners,
 			BiFunction<ACell,Index<Keyword,ACell>,SignedData<Index<Keyword,ACell>>> signer,
 			Supplier<CVMLong> clock) {
-		super(cursor);
-		this.owners=owners;
+		super(owners,cursor);
 		this.signer=signer;
 		this.clock=Objects.requireNonNull(clock);
 	}
@@ -176,9 +173,7 @@ public class Social extends ALatticeComponent<
 		if (!DID.isCanonicalBase(ownerDid)) {
 			throw new IllegalArgumentException("Social owner must be a canonical base DID");
 		}
-		var rule=owners.signingFor(ownerDid);
-		AForkableCursor<Index<Keyword, ACell>> userCursor =
-			SignedCursor.create(cursor().withDefault(Maps.empty()).path(ownerDid),value -> signer==null?null:rule.sign(value,v -> signer.apply(ownerDid,v)));
+		var userCursor=authoringCursor(ownerDid,value -> signer==null?null:signer.apply(ownerDid,value));
 		return new SocialUser(userCursor,ownerDid,clock);
 	}
 
@@ -206,34 +201,14 @@ public class Social extends ALatticeComponent<
 
 	@Override
 	protected Social rebind(AForkableCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
-		return new Social(cursor,owners,signer,clock);
+		return new Social(cursor,getLattice(),signer,clock);
 	}
 
-	/** Merges incoming owner envelopes into this region's working state. */
+	/** Explicit authoring policy shared by delivery and fork reconciliation. */
 	@Override
-	public AHashMap<ACell,SignedData<Index<Keyword,ACell>>> merge(
-			AHashMap<ACell,SignedData<Index<Keyword,ACell>>> incoming) {
-		return cursor().updateAndGet(own -> mergePublication(own,incoming));
-	}
-
-	/** Accepts whole owner envelopes, never unsigned edits inside them. */
-	@SuppressWarnings("unchecked")
-	@Override
-	public AHashMap<ACell,SignedData<Index<Keyword,ACell>>> mergeAt(
-			ACell value,ACell... path) {
-		if (path.length==0) {
-			return value instanceof AHashMap<?,?>?merge(
-				(AHashMap<ACell,SignedData<Index<Keyword,ACell>>>)value):cursor().get();
-		}
-		if (path.length!=1 || !(value instanceof SignedData<?>)) return cursor().get();
-		return merge(Maps.of(path[0],value));
-	}
-
-	/** Reconciles this component's draft using its domain merge rule. */
-	@Override
-	protected AHashMap<ACell, SignedData<Index<Keyword, ACell>>> mergePublication(
+	protected AHashMap<ACell, SignedData<Index<Keyword, ACell>>> mergeValues(
 			AHashMap<ACell, SignedData<Index<Keyword, ACell>>> own,
 			AHashMap<ACell, SignedData<Index<Keyword, ACell>>> other) {
-		return signer==null?owners.merge(own,other):owners.mergeAndSign(own,other,signer);
+		return signer==null?super.mergeValues(own,other):getLattice().mergeAndSign(own,other,signer);
 	}
 }

@@ -26,6 +26,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeComponent;
+import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.SingleRegion;
 import convex.lattice.Timestamped;
@@ -76,12 +77,14 @@ class TaskBoardApplicationTest {
 	static final class Board extends LatticeComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>>
 			implements TransactionalComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>,Board> {
 		private final Supplier<CVMLong> getTimestamp;
+		private final IndexComponent<ABlobLike<?>,AHashMap<Keyword,ACell>> tasks;
 
 
 		// Rebinding shares the supplied draft directly and retains the clock, not the source board.
 		Board(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor,Supplier<CVMLong> getTimestamp) {
 			super(BOARD_LATTICE,cursor);
 			this.getTimestamp=getTimestamp;
+			tasks=new IndexComponent<>(cursor);
 		}
 
 		@Override public Board withCursor(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
@@ -94,19 +97,17 @@ class TaskBoardApplicationTest {
 		@Override public Board fork() { return rebind(storage.fork()); }
 
 		Task task(String id) {
-			return new Task(cursor().withDefault(Index.none()).path(Strings.create(id)),getTimestamp);
+			return new Task(tasks.path(Strings.create(id)),getTimestamp);
 		}
 
 		void plan(String id,String title) { task(id).create(title); }
 
 		/** Computes pending IDs from one immutable snapshot, independent of task titles. */
 		ASet<ACell> pending() {
-			var tasks=cursor().get();
+			var snapshot=tasks.get();
 			ASet<ACell> pending=Sets.empty();
-			if (tasks!=null) {
-				for (var entry:tasks.entrySet()) {
-					if (!CVMBool.TRUE.equals(entry.getValue().get(DONE))) pending=pending.include(entry.getKey());
-				}
+			for (var entry:snapshot.entrySet()) {
+				if (!CVMBool.TRUE.equals(entry.getValue().get(DONE))) pending=pending.include(entry.getKey());
 			}
 			return pending;
 		}

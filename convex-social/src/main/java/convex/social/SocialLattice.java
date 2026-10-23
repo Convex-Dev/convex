@@ -101,7 +101,21 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 	private static ACell mergeFollowing(ACell own,ACell other) {
 		Index<Keyword,ACell> a=RT.ensureIndex(own), b=RT.ensureIndex(other);
 		if (!canMergeFollowing(b) || (own!=null && !canMergeFollowing(a))) return own==null?other:own;
-		return FOLLOWING_LATTICE.merge(a,b);
+		var merged=FOLLOWING_LATTICE.merge(a,b);
+		// The LWP structure knows only timestamp/follows. Preserve extensions even
+		// when its timestamp preference reverses the operands internally.
+		merged=retainFollowingExtensions(merged,a);
+		return retainFollowingExtensions(merged,b);
+	}
+
+	private static Index<Keyword,ACell> retainFollowingExtensions(Index<Keyword,ACell> target,Index<Keyword,ACell> source) {
+		if (source==null) return target;
+		return target.mergeDifferences(source,new MergeFunction<ACell>() {
+			@Override public ACell merge(ACell own,ACell other) { return own==null?other:own; }
+			@Override public ACell merge(Object key,ACell own,ACell other) {
+				return key instanceof ACell cell && FOLLOWING_STRUCTURE.path(cell)!=null?own:merge(own,other);
+			}
+		});
 	}
 
 	/** Guard only the fields the following merge actually examines; everything else is opaque. */

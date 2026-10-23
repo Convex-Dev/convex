@@ -47,6 +47,24 @@ key can retain an existing valid version but cannot forge a synthesis.
 The following encoding and merge rules are specified in
 [FOLLOWING.md](FOLLOWING.md).
 
+New post keys contain an eight-byte big-endian timestamp followed by eight random
+bytes. Distinct devices can post at the same millisecond without allocating the
+same key. Identity and record time are selected once per post operation, before
+the atomic update, and retained on retries. Existing eight-byte timestamp-only
+keys remain readable, including reply references and timelines. Explicit salted
+keys can be constructed with `SocialPost.createKey(timestamp, salt)`.
+
+Merge guards the container shapes of sections it examines. Unfamiliar sections
+are retained as opaque values; unknown fields are carried without interpretation.
+An incompatible incoming section does not replace an established section, and
+other compatible sections can still advance. Signature and DID authorisation
+checks remain mandatory. Timeline readers skip unfamiliar keys and post values.
+
+Timestamp ties for revisions of the same record still prefer the established
+value. Salting distinguishes post identities; it does not change revision ordering.
+The timestamp-only timeline pagination bound excludes the whole timestamp group;
+it does not provide a continuation position within a group of simultaneous posts.
+
 ## Default replication policy
 
 For local social DIDs `L`, operator pins `P`, and each local user's direct active

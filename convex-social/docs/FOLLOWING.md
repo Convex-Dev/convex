@@ -26,13 +26,10 @@ than relying on the JVM subtype.
 ## Lattice composition
 
 ```text
-StampingLattice(
-  LWPLattice(
-    KeyedLattice(
-      :timestamp -> MaxLattice
-      :follows   -> MapLattice(
-                      StampingLattice(
-                        LWWLattice(JSONLattice, record timestamp))))))
+LWPLattice(
+  KeyedLattice(
+    :timestamp -> MaxLattice
+    :follows   -> MapLattice(LWWLattice(JSONLattice, record timestamp))))
 ```
 
 The outer LWP chooses the newer following value as the preferred operand and then
@@ -47,6 +44,11 @@ delegates to the keyed structure. It does not replace the whole set. Therefore:
 No custom follow-set lattice is needed. Generic `LWPLattice` validates and sanitises
 the foreign operand before either its null-adoption or timestamp-reordering paths,
 so malformed values cannot bypass child validation.
+
+Social guards the examined section fields before invoking this typed merge and
+retains opaque extension fields around it. Local record edits supply their own
+timestamps; the enclosing section is stamped through `StampedCursor`. Incoming
+values are never stamped with the receiver's clock.
 
 Exact timestamp ties retain the receiver's current value as specified by CAD024.
 Writers obtain timestamps from the component's `Supplier<CVMLong>`. The default

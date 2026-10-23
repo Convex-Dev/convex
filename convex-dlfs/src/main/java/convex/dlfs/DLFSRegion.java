@@ -11,15 +11,13 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
-import convex.lattice.ALatticeComponent;
+import convex.lattice.OwnedMap;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSLocation;
 import convex.lattice.generic.MapLattice;
@@ -38,8 +36,7 @@ import convex.lattice.generic.OwnerMapLattice;
  * Callbacks must support concurrent use and retries inside atomic updates.
  * The optional store is passed to drives for incremental blob checkpoints.</p>
  */
-public final class DLFSRegion extends ALatticeComponent<
-		AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> implements TransactionalComponent<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>,DLFSRegion> {
+public final class DLFSRegion extends OwnedMap<ACell,AHashMap<AString,AVector<ACell>>> implements TransactionalComponent<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>,DLFSRegion> {
 
 	/** The standard rule is shared by region and application construction. */
 	static final BiPredicate<ACell,AccountKey> KEY_OWNER=(owner,key) -> key.equals(owner);
@@ -52,19 +49,24 @@ public final class DLFSRegion extends ALatticeComponent<
 	private final DLFSLocation location;
 	private final Supplier<CVMLong> clock;
 	private final DLFSLattice files;
-	private final OwnerMapLattice<ACell,AHashMap<AString,AVector<ACell>>> owners;
 	private final BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer;
 
 	DLFSRegion(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor,
 			AStore store,DLFSLocation location,BiPredicate<ACell,AccountKey> verifier,
 			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
 			Supplier<CVMLong> clock,long maxFutureSkew) {
-		super(cursor);
+		this(cursor,store,location,verifier,signer,clock,DLFSLattice.withClock(clock,maxFutureSkew));
+	}
+
+	private DLFSRegion(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor,
+			AStore store,DLFSLocation location,BiPredicate<ACell,AccountKey> verifier,
+			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+			Supplier<CVMLong> clock,DLFSLattice files) {
+		super(OwnerMapLattice.create(MapLattice.create(files),verifier),cursor);
 		this.store=store;
 		this.location=Objects.requireNonNull(location);
 		this.clock=Objects.requireNonNull(clock);
-		this.files=DLFSLattice.withClock(clock,maxFutureSkew);
-		this.owners=OwnerMapLattice.create(MapLattice.create(files),verifier);
+		this.files=files;
 		this.signer=signer;
 	}
 
@@ -96,10 +98,7 @@ public final class DLFSRegion extends ALatticeComponent<
 
 	/** Opens an unsigned drive-map view through this region's one signing boundary. */
 	public DLFSDrives drives(ACell owner) {
-		var rule=owners.signingFor(Objects.requireNonNull(owner));
-		AForkableCursor<AHashMap<AString,AVector<ACell>>> drivesCursor=
-			SignedCursor.create(cursor().withDefault(Maps.empty()).path(owner),
-				value -> signer==null?null:rule.sign(value,v -> signer.apply(owner,v)));
+		var drivesCursor=authoringCursor(owner,value -> signer==null?null:signer.apply(owner,value));
 		return new DLFSDrives(drivesCursor,store,location.child(owner),clock,files);
 	}
 
@@ -110,12 +109,11 @@ public final class DLFSRegion extends ALatticeComponent<
 
 	private DLFSRegion(DLFSRegion source,
 			AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
-		super(cursor);
+		super(source.getLattice(),cursor);
 		store=source.store;
 		location=DLFSLocation.at(cursor);
 		clock=source.clock;
 		files=source.files;
-		owners=source.owners;
 		signer=source.signer;
 	}
 
@@ -129,31 +127,11 @@ public final class DLFSRegion extends ALatticeComponent<
 		return new DLFSRegion(this,cursor);
 	}
 
-	/** Merges incoming envelopes into working state; a fork remains unpublished. */
-	@Override
-	public AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> merge(
-			AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> incoming) {
-		return cursor().updateAndGet(own -> mergePublication(own,incoming));
-	}
-
-	/** Only whole maps and complete owner envelopes are admissible deliveries. */
-	@SuppressWarnings("unchecked")
-	@Override
-	public AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> mergeAt(
-			ACell value,ACell... path) {
-		if (path.length==0) {
-			return value instanceof AHashMap<?,?>?merge(
-				(AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>)value):cursor().get();
-		}
-		if (path.length!=1 || !(value instanceof SignedData<?>)) return cursor().get();
-		return merge(Maps.of(path[0],value));
-	}
-
 	/** Both delivery and publication can author a synthesised value when authorised. */
 	@Override
-	protected AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> mergePublication(
+	protected AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> mergeValues(
 			AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> own,
 			AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>> other) {
-		return signer==null?owners.merge(own,other):owners.mergeAndSign(own,other,signer);
+		return signer==null?super.mergeValues(own,other):getLattice().mergeAndSign(own,other,signer);
 	}
 }

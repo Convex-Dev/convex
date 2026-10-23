@@ -60,6 +60,30 @@ class OwnedComponentsTest {
 		return indexed?Index.of(owner,value):Maps.of(owner,value);
 	}
 
+	@Test void standardAuthoringViewUsesTheSameOwnerRuleWithoutMaterialisingReads() {
+		for (boolean indexed:new boolean[] {false,true}) {
+			var owners=collection(indexed);
+			var edits=owners.authoringCursor(A,DELEGATE::signData);
+			assertNull(edits.get());
+			assertNull(owners.storage().get());
+			var unauthorised=owners.authoringCursor(A,BOB::signData);
+			assertThrows(IllegalStateException.class,() -> unauthorised.set(CVMLong.ONE));
+			assertNull(owners.storage().get());
+			edits.set(CVMLong.ONE);
+			var signed=owners.get(A);
+			assertEquals(DELEGATE.getAccountKey(),signed.getAccountKey());
+			assertTrue(signed.checkSignature());
+			owners.mergeAt(CVMLong.TWO); // Wrong containing representation is ignored.
+			owners.mergeAt(BOB.signData(CVMLong.TWO),A);
+			assertSame(signed,owners.get(A));
+			var draft=edits.fork();
+			draft.set(CVMLong.TWO);
+			assertSame(signed,owners.get(A));
+			draft.sync(MaxLattice.INSTANCE::merge);
+			assertEquals(CVMLong.TWO,owners.get(A).getValue());
+		}
+	}
+
 	@Test void bindingIsLiveAndForksRetainOwnershipPolicy() {
 		var indexRoot=new Root<Index<AString,SignedData<AInteger>>>();
 		var index=new OwnedIndex<>(indexRoot,MaxLattice.INSTANCE,VERIFIER);

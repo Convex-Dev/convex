@@ -97,11 +97,10 @@ unknown regions are outside its policy, and inspection does not freeze registrat
 The favourites domain view checks the envelope's payload using its existing
 `Timestamped` and `SetComponent<ACell>` children, without a separate schema tree.
 
-`SetComponent(cursor, CVMLong.class)` supplies an explicit runtime element type;
-this is an optional diagnostic constraint, not a default schema. Java generics
-alone cannot check foreign elements. Domain subclasses may override
-`checkElement` for further constraints. The one-argument constructor checks only
-set shape. Nil represents an absent set; it is compatible without creating storage.
+`SetComponent` checks set shape, without imposing a runtime member schema.
+Java generics alone cannot check foreign elements. Domain subclasses may override
+`checkValue` when they need a stricter diagnostic. Nil represents an absent set;
+it is compatible without creating storage.
 
 No generic read, edit, transaction, merge or sync automatically calls `checkValue`.
 Local domain operations preserve their invariants by construction. Incoming merge
@@ -534,10 +533,10 @@ public void putPost(Blob key, String text) {
 }
 ```
 
-This example writes an explicitly chosen key. The feed's post operation allocates a
-free key starting at the operation timestamp and advances the key on collisions
-without changing the post's timestamp; key allocation is separate from the write
-clock.
+This example writes an explicitly chosen key. The feed's post operation allocates
+an eight-byte timestamp prefix plus eight random bytes. Independent replicas can
+post at the same time without choosing the same identity. The key and timestamp
+are resolved once per operation and retained across atomic update retries.
 
 Reads return null for absent paths. Components with a known container type can use
 `cursor.withDefault(Maps.empty()).path(key)` or the corresponding index default:
@@ -894,6 +893,23 @@ An application prepares in `beforeSync()` and publishes managed components in
 `syncChildren()`, before publishing any staged aggregate of its own. Keyed regions
 already implement this child stage; subclasses normally customise preparation only.
 
+## Collection components
+
+`MapComponent<K,V>` and `IndexComponent<K,V>` provide ordinary atomic collection
+operations: `get`, `put`, `remove`, `clear`, `containsKey`, `size` and `path(key)`.
+They share their supplied storage. Nil reads as an empty collection; reads and
+no-op removals do not materialise it. An entry path creates the correctly typed
+containing collection on its first changed write and preserves sibling entries.
+Nil is also a legitimate stored value, so use `containsKey` to distinguish it from
+an absent entry. Incompatible container representations are rejected on access.
+
+These components supply no replication, signing or timestamp policy. Embed one
+inside a domain component to handle collection operations, while the enclosing
+component owns those separate concerns. Follows uses `MapComponent` for target
+records; the task-board example uses `IndexComponent` for its task collection.
+Their common abstract base, `AMapComponent`, shares operations without forcing
+hash maps and indexes into the same storage representation.
+
 ## Component transactions
 
 A transactional component (`TransactionalComponent`) adds typed transactions,
@@ -1153,6 +1169,14 @@ adopt valid signed inputs but cannot author a synthesised payload; in that case
 they retain the existing envelope. An authorised signed domain component can
 reconcile and sign the new value, which the collection can then accept. The
 collection has no context or fallback signer.
+
+An authoring domain may override the protected `mergeValues(own, other)` operation
+and call `getLattice().mergeAndSign(own, other, signer)` with its explicit signer.
+The standard collection still handles delivery, owner-path routing and publication;
+the domain only supplies its authoring strategy. Social and DLFS use this pattern.
+`authoringCursor(owner, signer)` binds an unsigned editing view to the same verified
+owner slot, without giving the collection an implicit signer. It is useful when a
+domain child needs ordinary cursor operations rather than envelope delivery.
 
 `OwnedMap` and `OwnedIndex` require an explicit authorisation predicate. A component
 declares the value lattice and supplies its resolver when constructing the region:

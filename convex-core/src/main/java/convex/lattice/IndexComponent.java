@@ -1,0 +1,34 @@
+package convex.lattice;
+
+import convex.core.data.ABlobLike;
+import convex.core.data.ACell;
+import convex.core.data.AString;
+import convex.core.data.Index;
+import convex.core.data.Strings;
+import convex.core.lang.RT;
+import convex.lattice.cursor.AForkableCursor;
+
+/** Ordered index operations over shared storage, with no implied replication rule. */
+public class IndexComponent<K extends ABlobLike<?>,V extends ACell> extends AMapComponent<K,V,Index<K,V>> {
+
+	private static final AString EXPECTED_INDEX=Strings.intern("Expected an index");
+
+	public IndexComponent(AForkableCursor<Index<K,V>> cursor) { super(cursor); }
+
+	/** Index keys must be blob-like; nil is not an index key. */
+	@Override public AForkableCursor<V> path(K key) {
+		if (key==null) throw new IllegalArgumentException("Index key must not be nil");
+		return super.path(key);
+	}
+
+	@Override protected Index<K,V> requireMap(ACell value) {
+		if (value==null) return Index.none();
+		Index<K,V> index=RT.ensureIndex(value);
+		if (index==null) throw new IllegalStateException("Index operation requires an index at this path");
+		return index;
+	}
+
+	@Override public AString checkValue(ACell value) {
+		return value==null || value instanceof Index<?,?>?null:EXPECTED_INDEX;
+	}
+}

@@ -9,9 +9,12 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.MapComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 
@@ -32,12 +35,14 @@ import convex.lattice.cursor.AForkableCursor;
  */
 public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implements TransactionalComponent<AHashMap<ACell, ACell>,Follows> {
 	private final Supplier<CVMLong> clock;
+	private final MapComponent<ACell,ACell> records;
 
 	public static final Keyword KEY_ACCOUNT_KEY=Keyword.intern("account-key");
 
 	Follows(AForkableCursor<AHashMap<ACell, ACell>> cursor, Supplier<CVMLong> clock) {
 		super(cursor);
 		this.clock=clock;
+		this.records=new MapComponent<>(cursor);
 	}
 
 	/**
@@ -66,15 +71,8 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	 * @param target canonical base DID to check
 	 * @return true if the user is actively followed
 	 */
-	@SuppressWarnings("unchecked")
 	public boolean isFollowing(AString target) {
-		AHashMap<ACell, ACell> follows = cursor().get();
-		if (follows == null) return false;
-		ACell record = follows.get(target);
-		if (record instanceof AHashMap<?,?> map) {
-			return SocialPost.isActiveFollow((AHashMap<Keyword, ACell>) map);
-		}
-		return false;
+		return SocialPost.isActiveFollow(getRecord(target));
 	}
 
 	/**
@@ -83,7 +81,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	 * @return set of canonical base DIDs
 	 */
 	public Set<AString> getActive() {
-		return SocialHelpers.getActiveFollows(cursor().get());
+		return SocialHelpers.getActiveFollows(records.get());
 	}
 
 	/** Stores a signer already validated for this target DID without changing intent. */
@@ -96,7 +94,6 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	}
 
 	/** Gets the last validated signer cached in the winning target record. */
-	@SuppressWarnings("unchecked")
 	public AccountKey getCachedAccountKey(AString target) {
 		AHashMap<Keyword,ACell> record=getRecord(target);
 		return (record==null)?null:AccountKey.parse(record.get(KEY_ACCOUNT_KEY));
@@ -115,25 +112,17 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 
 	@SuppressWarnings("unchecked")
 	private AHashMap<Keyword,ACell> getRecord(AString target) {
-		AHashMap<ACell,ACell> follows=cursor().get();
-		if (follows==null) return null;
-		ACell record=follows.get(target);
+		ACell record=records.get(target);
 		return (record instanceof AHashMap<?,?> map)
 			?(AHashMap<Keyword,ACell>)map:null;
 	}
 
-	@SuppressWarnings("unchecked")
 	private void writeField(AString target,Keyword key,ACell value) {
 		CVMLong timestamp=clock.get();
-		cursor().updateAndGet(follows -> {
-			ACell existing=(follows==null)?null:follows.get(target);
-			AHashMap<Keyword,ACell> record=(existing instanceof AHashMap<?,?> map)
-				?(AHashMap<Keyword,ACell>)map:convex.core.data.Maps.empty();
-			record=record.assoc(key,value)
-				.assoc(SocialPost.TIMESTAMP,timestamp);
-			AHashMap<ACell,ACell> base=(follows==null)
-				?convex.core.data.Maps.empty():follows;
-			return base.assoc(target,record);
+		records.path(target).updateAndGet(existing -> {
+			AHashMap<Keyword,ACell> record=RT.ensureHashMap(existing);
+			if (record==null) record=Maps.empty();
+			return record.assoc(key,value).assoc(SocialPost.TIMESTAMP,timestamp);
 		});
 	}
 

@@ -9,16 +9,18 @@ import convex.core.data.AString;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.AOwnerLattice;
 import convex.lattice.generic.SignedLattice;
 
 /**
  * A map of owner identities to signed values over supplied working storage.
  * The instance-bound owner lattice supplies one verification rule for whole-map delivery, owner-path
- * delivery and local authoring. Merging and publication use public information
- * only and require no signing capability. A merge requiring a newly
+ * delivery and local authoring. Standard merging and publication use public
+ * information only and require no signing capability. A merge requiring a newly
  * signed payload retains the existing envelope until an authorised domain
- * component authors the result. Unresolved or unauthorised owners cannot introduce data.
+ * component authors the result. Authoring domains may override {@link #mergeValues}
+ * with an explicit signing strategy. Unresolved or unauthorised owners cannot introduce data.
  *
  * <p>Domain subclasses of {@link ASignedComponent} are constructed at {@link #path}
  * with an owner-bound rule from {@link #signingFor}. They share this map's working
@@ -70,22 +72,45 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		return null;
 	}
 
-	/** Merges verified envelopes without resolving signing capabilities. */
+	/** Merges verified envelopes using this component's merge policy. */
 	@Override
 	public M merge(M incoming) {
-		return storage.updateAndGet(own -> mergeValues(own,incoming));
+		return storage.updateAndGet(own -> mergeWorkingValues(own,incoming));
 	}
 
-	/** Publication conflicts use the same public merge as incoming deliveries. */
+	/** Publication conflicts use the same merge policy as incoming deliveries. */
 	@Override
 	protected M mergePublication(M own,M other) {
-		return mergeValues(own,other);
+		return mergeWorkingValues(own,other);
 	}
 
-	private M mergeValues(M own,M other) {
-		M merged=owners.merge(own,other);
+	/**
+	 * Public verification and merge by default. An authoring domain may override
+	 * this with {@link AOwnerLattice#mergeAndSign} and its explicit signing strategy.
+	 * Both incoming delivery and fork reconciliation use this same operation.
+	 */
+	protected M mergeValues(M own,M other) {
+		return owners.merge(own,other);
+	}
+
+	private M mergeWorkingValues(M own,M other) {
+		M merged=mergeValues(own,other);
 		// Empty or wholly rejected delivery must not materialise an absent collection.
 		return own==null && merged!=null && merged.isEmpty()?null:merged;
+	}
+
+	/** Whole-map deliveries must have this collection's representation. */
+	@SuppressWarnings("unchecked")
+	@Override public M mergeAt(ACell value,ACell... path) {
+		if (path.length!=0) return mergeAtPath(value,path);
+		if (value!=null) {
+			try {
+				if (!owners.checkForeign((M)value)) return storage.get();
+			} catch (ClassCastException e) {
+				return storage.get();
+			}
+		}
+		return merge((M)value);
 	}
 
 	/** Delivers one complete owner envelope; paths inside an envelope introduce no data. */
@@ -113,6 +138,17 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	 */
 	public AForkableCursor<SignedData<V>> path(K owner) {
 		return slot(rule(owner));
+	}
+
+	/**
+	 * Opens an unsigned editing view with an explicit signer, checked against the
+	 * same owner rule as incoming delivery. Construction is inert. This does not
+	 * give the collection a signer or change its public merge policy.
+	 */
+	public AForkableCursor<V> authoringCursor(K owner,Function<V,SignedData<V>> signer) {
+		Objects.requireNonNull(signer);
+		SignedLattice<V> rule=rule(owner);
+		return SignedCursor.create(slot(rule),value -> rule.sign(value,signer));
 	}
 
 	/**

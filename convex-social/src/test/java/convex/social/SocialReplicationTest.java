@@ -102,4 +102,20 @@ class SocialReplicationTest {
 		assertEquals(legacy,timeline.get(1).postKey());
 		assertEquals(100,SocialPost.extractTimestamp(legacy));
 	}
+
+	@Test void followingTimestampPreferencePreservesOpaqueExtensions() {
+		var first=Keyword.intern("first-extension");
+		var second=Keyword.intern("second-extension");
+		var opaque=Vectors.of("opaque");
+		Index<Keyword,ACell> a=Index.of(SocialLattice.KEY_FOLLOWING,
+			Index.of(SocialPost.TIMESTAMP,CVMLong.ONE,first,opaque));
+		Index<Keyword,ACell> b=Index.of(SocialLattice.KEY_FOLLOWING,
+			Index.of(SocialPost.TIMESTAMP,CVMLong.TWO,second,opaque));
+		for (var merged:List.of(SocialLattice.INSTANCE.merge(a,b),SocialLattice.INSTANCE.merge(b,a))) {
+			var following=SocialLattice.getFollowing(merged);
+			assertEquals(opaque,following.get(first));
+			assertEquals(opaque,following.get(second));
+			assertEquals(CVMLong.TWO,following.get(SocialPost.TIMESTAMP));
+		}
+	}
 }
