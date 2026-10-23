@@ -231,21 +231,24 @@ public class SharedApplicationInternalsTest {
 		}.withOwnerVerifier(VERIFY.getOwnerVerifier());
 	}
 
-	private static final class SocialWithP2P extends P2PApplication
+	/** Domain composition over a root cursor, also usable as an isolated transaction view. */
+	private static final class SocialWithP2P extends LatticeApplication<Index<Keyword,ACell>>
 			implements TransactionalComponent<Index<Keyword,ACell>,SocialWithP2P> {
+		private final LatticeContext policy;
 		final Social social;
 		SocialWithP2P(LatticeHost<Index<Keyword,ACell>> host) {
-			this(SOCIAL_ROOT,host.cursor(),context(SOCIAL_KEY));
+			this(host.cursor(),context(SOCIAL_KEY));
 		}
-		SocialWithP2P(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor,LatticeContext context) {
-			super(lattice,cursor,(owner,value) -> context.signAs(owner,value),context::currentTimestamp);
-			setContext(context);
+		SocialWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,LatticeContext policy) {
+			super(SOCIAL_ROOT,cursor);
+			this.policy=policy;
 			social=Social.connect(cursor.path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
-				(owner,value) -> context.signAs(owner,value),context::currentTimestamp);
+				(owner,value) -> policy.signAs(owner,value),policy::currentTimestamp);
 		}
 		@Override public SocialWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
-			return new SocialWithP2P(getLattice(),cursor,getContext());
+			return new SocialWithP2P(cursor,policy);
 		}
+		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> policy.signAs(key,value)); }
 	}
 
 	private static final class FilesWithP2P extends DLFSApplication
@@ -347,14 +350,14 @@ public class SharedApplicationInternalsTest {
 				var user=app.social.user(SOCIAL_KEY.getAccountKey());
 				user.feed().post("Atomic post and follow");
 				user.follows().follow(FILES_KEY.getAccountKey());
-				app.node(COMMON_KEY.getAccountKey()).setNodeInfo(convex.lattice.p2p.P2PLattice.createNodeInfo(
+				app.p2p(COMMON_KEY.getAccountKey()).node().setNodeInfo(convex.lattice.p2p.P2PLattice.createNodeInfo(
 					Vectors.empty(),Strings.create("transactional node"),Strings.create("test"),Vectors.empty(),100));
 				assertSame(before,root.get());
 			});
 			var user=f.social.social.user(SOCIAL_KEY.getAccountKey());
 			assertEquals(1,user.feed().count());
 			assertTrue(user.follows().isFollowing(FILES_KEY.getAccountKey()));
-			assertNotNull(f.social.node(COMMON_KEY.getAccountKey()).getNodeInfo());
+			assertNotNull(f.social.p2p(COMMON_KEY.getAccountKey()).node().getNodeInfo());
 			var socialState=root.get().get(Social.KEY_SOCIAL);
 			f.files.transactAsync(app -> {
 				var drive=app.drives(FILES_KEY.getAccountKey()).createDrive("transaction");
@@ -389,15 +392,15 @@ public class SharedApplicationInternalsTest {
 			CountDownLatch signing=new CountDownLatch(1);
 			CountDownLatch resume=new CountDownLatch(1);
 			AtomicInteger signatures=new AtomicInteger();
-			f.social.setContext(context(SOCIAL_KEY,() -> {
+			var delayedPolicy=context(SOCIAL_KEY,() -> {
 				if (signatures.incrementAndGet()==1) {
 					signing.countDown();
 					try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
 					catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
 				}
-			}));
+			});
 			var feed=Social.connect(f.social.cursor().path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
-				(owner,value) -> f.social.getContext().signAs(owner,value),f.social.getContext()::currentTimestamp).user(SOCIAL_KEY.getAccountKey()).feed();
+				(owner,value) -> delayedPolicy.signAs(owner,value),delayedPolicy::currentTimestamp).user(SOCIAL_KEY.getAccountKey()).feed();
 			var beforePost=f.node.getCursor().get();
 			try (var executor=Executors.newSingleThreadExecutor()) {
 				var posting=executor.submit(() -> feed.post("First post, delayed before installation"));

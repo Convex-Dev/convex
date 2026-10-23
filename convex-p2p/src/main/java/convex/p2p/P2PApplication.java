@@ -42,6 +42,11 @@ import convex.social.Social;
  * moments replication knows about; a local application may use the same component
  * over a standalone {@link LatticeHost}.</p>
  *
+ * <p>Every instance is bound to a host and has a directory and social policy.
+ * Applications needing domain views or transaction drafts compose {@link Social}
+ * and {@link P2PUser} over their own working cursor instead of inheriting this
+ * node coordination component.</p>
+ *
  * <p>The application publishes what it writes. When its policy edits local state,
  * such as this node's own record or a follow key validated during admission, it
  * syncs its host so the edit is persisted and announced.</p>
@@ -87,18 +92,6 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		this.socialPolicy=new SocialReplicationPolicy(this,java.util.Objects.requireNonNull(didAuthorizer));
 	}
 
-	/** Binds a working view, including a transaction draft, with an explicit signer. */
-	protected P2PApplication(ALattice<Index<Keyword,ACell>> lattice,AForkableCursor<Index<Keyword,ACell>> cursor,
-			BiFunction<ACell,ACell,SignedData<ACell>> signer,Supplier<CVMLong> clock) {
-		super(lattice,cursor);
-		this.host=null;
-		this.directory=null;
-		this.socialPolicy=null;
-		this.ownKey=null;
-		this.signer=signer;
-		this.clock=java.util.Objects.requireNonNull(clock);
-	}
-
 	AccountKey ownKey() { return ownKey; }
 	Supplier<CVMLong> clock() { return clock; }
 
@@ -107,14 +100,13 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	 * declared, the social region reduced to the owners this node wants. The lattice
 	 * merge does the rest, verifying each owner's slot, and the validated signer of
 	 * each wanted owner whose slot arrived is then recorded. A path delivery arrives
-	 * here reduced to its path, so the same projection selects it. A working view
-	 * bound to a cursor has no policy and so no interest of its own; it delegates whole.
+	 * here reduced to its path, so the same projection selects it.
 	 */
 	@Override
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-		Index<Keyword,ACell> wanted=(socialPolicy==null)?other:socialPolicy.projectRoot(other);
+		Index<Keyword,ACell> wanted=socialPolicy.projectRoot(other);
 		Index<Keyword,ACell> result=cursor().updateAndGet(own -> getLattice().merge(own,wanted));
-		if (socialPolicy!=null) socialPolicy.recordOwners(wanted);
+		socialPolicy.recordOwners(wanted);
 		return result;
 	}
 
@@ -169,19 +161,17 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 
 	/** This application's validated view of the node registry. */
 	NodeDirectory directory() {
-		if (directory==null) throw new IllegalStateException("A working view has no node directory");
 		return directory;
 	}
 
 	/** This application's social retention and admission policy. */
 	SocialReplicationPolicy policy() {
-		if (socialPolicy==null) throw new IllegalStateException("A working view has no social policy");
 		return socialPolicy;
 	}
 
 	/** Publishes the host root, so an edit made by this application's policy is persisted and announced. */
 	void syncHost() {
-		if (host!=null) host.sync();
+		host.sync();
 	}
 
 	/**
