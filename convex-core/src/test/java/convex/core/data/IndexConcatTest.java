@@ -167,7 +167,7 @@ class IndexConcatTest {
 		assertSame(b,joined.getRef(1).getValue());
 	}
 
-	@Test void maximumDepthJoinUsesNoJavaRecursion() throws Exception {
+	@Test void maximumDepthJoinIsStackSafe() throws Exception {
 		Index<Blob,CVMLong> built=Index.of(Blob.wrap(new byte[255]),0);
 		for (int digit=509;digit>=0;digit--) {
 			byte[] bytes=new byte[255];
@@ -177,6 +177,8 @@ class IndexConcatTest {
 		final var index=built;
 		var failure=new AtomicReference<Throwable>();
 		var results=new ArrayList<Index<Blob,CVMLong>>();
+		// Both slicing and joining must recover from recursive overflow without
+		// publishing partially constructed nodes or changing the input Index.
 		Thread worker=new Thread(null,() -> {
 			try {
 				for (int cut:new int[] {0,1,2,254,509,510,511}) {

@@ -103,7 +103,8 @@ Parameters cover 1,024 and 65,536 resident random keys, retaining either half,
 ten middle entries, or all but the first and last entries. `seekAndSlice` includes
 locating both key bounds. The source index is immutable and reused across calls.
 
-A local JDK 25.0.1 run on 2026-10-24 used two forks, three 300 ms warmup
+For the initial iterative slice implementation, a local JDK 25.0.1 run on
+2026-10-24 used two forks, three 300 ms warmup
 iterations, four 300 ms measurement iterations, and `-Xms256m -Xmx512m`.
 At 65,536 entries:
 
@@ -134,7 +135,8 @@ entry on either side. `merge` is the ordinary per-entry map merge baseline;
 `splitAndRejoin` includes both slices and the concatenation. Boundary validation
 is included in every concatenation measurement.
 
-A local JDK 25.0.1 run on 2026-10-24 used two forks, three 300 ms warmup
+For the initial iterative concat implementation, a local JDK 25.0.1 run on
+2026-10-24 used two forks, three 300 ms warmup
 iterations, four 300 ms measurement iterations, and `-Xms256m -Xmx512m`.
 At 65,536 total entries:
 
@@ -149,6 +151,32 @@ The balanced map merge allocated 20.9 MB/op. Single-entry append remains cheaper
 through ordinary insertion: map merge does not check that the new key follows
 the existing range. These fixed, resident ranges measure traversal and allocation;
 they do not include store loading, and short-run timings are indicative.
+
+Slice and concat now use recursive boundary traversal, retaining the iterative
+implementations as fallbacks after stack overflow. Ordinary calls allocate no
+traversal frames; new Index nodes and child arrays are still required. Slice
+also avoids revisiting retained interior child roots after selecting its range.
+
+A before/after comparison on 2026-10-24 used the same JDK, heap settings and
+resident inputs at both 1,024 and 65,536 entries. Slice and split/rejoin used two
+forks, four 500 ms warmup iterations and five 500 ms measurement iterations.
+Standalone concat used two forks, three 300 ms warmup iterations and four
+300 ms measurement iterations. All runs used `-prof gc`. At 65,536 entries:
+
+| Operation | Iterative (ns/op) | Recursive (ns/op) | Iterative (bytes/op) | Recursive (bytes/op) |
+|---|---:|---:|---:|---:|
+| Slice first half | 123 | 78 | 816 | 536 |
+| Slice last half | 136 | 94 | 744 | 464 |
+| Slice ten middle entries | 105 | 96 | 576 | 240 |
+| Slice all except first and last | 269 | 164 | 1,504 | 1,112 |
+| Concat equal halves | 612 | 594 | 1,016 | 736 |
+| Split into halves and rejoin | 876 | 789 | 2,576 | 1,736 |
+
+Allocation fell in every measured case. Standalone concat's timing difference
+was within the measurement uncertainty; the larger slice improvements were
+clearer. Maximum-depth small-stack tests separately verify recovery through
+the fallback. These resident benchmarks measure the normal path: overflowing
+the stack incurs a retry, so the same timing gains are not claimed for it.
 
 Measure Etch L1 hits and allocation with both unpersisted direct refs and stored
 soft refs:
