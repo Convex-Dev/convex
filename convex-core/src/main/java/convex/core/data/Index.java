@@ -1182,6 +1182,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K,V> left=this;
 		ConcatFrame<K,V> frame=null;
 		while (true) {
+			// The boundary keys remain representatives of both ranges at every level.
+			// Join where either root branches, or where the boundary keys diverge.
 			long depth=Math.min(shared,Math.min(left.getDepth(),right.getDepth()));
 			if (frame!=null && depth<=frame.depth) throw new IllegalStateException("Non-increasing Index depth");
 			frame=new ConcatFrame<>(left,right,depth,leftKey,rightKey,frame);
@@ -1213,6 +1215,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			this.depth=depth;
 			count=left.count+right.count;
 			boolean alignedLeft=left.getDepth()==depth, alignedRight=right.getDepth()==depth;
+			// A prefix entry precedes its descendants, so only the left range can
+			// supply an entry at the join depth. A deeper root stays a whole child.
 			entry=alignedLeft?left.entry:null;
 			int lm=alignedLeft?(left.mask&0xffff):(1<<leftKey.getHexDigit(depth));
 			int rm=alignedRight?(right.mask&0xffff):(1<<rightKey.getHexDigit(depth));
@@ -1223,6 +1227,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			refs=new Ref[ln+rn-(overlap?1:0)];
 			if (alignedLeft) System.arraycopy(left.children,0,refs,0,ln);
 			else refs[0]=left.getRef();
+			// Save the left overlap before the right copy occupies its slot. The
+			// caller joins that pair and replaces the slot while unwinding.
 			leftBoundary=overlap?refs[boundary]:null;
 			int offset=overlap?boundary:ln;
 			if (alignedRight) System.arraycopy(right.children,0,refs,offset,rn);
@@ -1250,6 +1256,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			this.parent=parent;
 			this.start=start;
 			this.end=end;
+			// All positions are relative to this node. Select the contiguous child
+			// range first; the caller trims only its partially retained boundaries.
 			position=node.entry==null?0:1;
 			int from=0, remaining=node.mask&0xffff;
 			while (position<end && from<node.children.length) {

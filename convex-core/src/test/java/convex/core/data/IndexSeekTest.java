@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.cvm.Address;
 import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
 import convex.core.store.MemoryStore;
 
 class IndexSeekTest {
@@ -85,6 +86,36 @@ class IndexSeekTest {
 			for (int b=0;b<256;b++) check(index,keys,Blob.wrap(new byte[] {0x12,0x34,(byte)b}));
 			for (String hex:List.of("","12","1233","1234","1235","13")) check(index,keys,Blob.fromHex(hex));
 		}
+	}
+
+	@SuppressWarnings({"rawtypes","unchecked"})
+	@Test void seeksNearEitherEdgeDoNotLoadUnneededSiblings() {
+		// Unequal child counts ensure ranks come from entries, not child slots.
+		Ref<Index>[] children=new Ref[4];
+		int[] digits={0,4,11,15};
+		for (int slot=0;slot<digits.length;slot++) {
+			Index<Blob,CVMLong> child=Index.none();
+			for (int i=0;i<=slot;i++) {
+				byte[] bytes=new byte[32];
+				bytes[0]=(byte)(digits[slot]<<4);
+				bytes[1]=(byte)i;
+				child=child.assoc(Blob.wrap(bytes),CVMLong.ONE);
+			}
+			children[slot]=(Ref)child.getRef();
+		}
+		// Neither interior child root is available. Edge searches and gaps near
+		// either edge must count from the cheaper side without resolving them.
+		for (int slot=1;slot<=2;slot++) {
+			children[slot]=RefSoft.<Index>createForHash(children[slot].getHash(),null);
+			assertThrows(MissingDataException.class,children[slot]::getValue);
+		}
+		Index<Blob,CVMLong> index=Index.unsafeCreate(0,null,children,0x8811,10);
+		assertEquals(0,index.seek(Blob.EMPTY));
+		assertEquals(0,index.seek(Blob.fromHex("00")));
+		assertEquals(1,index.seek(Blob.fromHex("30")));
+		assertEquals(6,index.seek(Blob.fromHex("c0")));
+		assertEquals(6,index.seek(Blob.fromHex("f0")));
+		assertEquals(10,index.seek(Blob.fromHex("ff")));
 	}
 
 	@Test void blobLikeRepresentationsAndLongAliasesUseTheSamePosition() {
