@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -413,21 +414,26 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (entry!=null) return keyBlob(entry);
 		ABlob result=cachedPrefix;
 		if (result!=null) return result;
-		// walk to the first descendant entry, remembering entry-less nodes passed
-		ArrayList<Index<K,V>> path=new ArrayList<>();
+		// Walk to the first descendant entry or cached prefix.
 		Index<K,V> node=this;
 		while (true) {
 			if (node.entry!=null) { result=keyBlob(node.entry); break; }
 			result=node.cachedPrefix;
 			if (result!=null) break;
 			if (node.children.length==0) { result=Blob.EMPTY; break; } // only valid for EMPTY
-			path.add(node);
 			ACell c=node.children[0].getValue();
 			if (!(c instanceof Index)) { result=Blob.EMPTY; break; } // malformed child
 			node=(Index<K,V>)c;
 		}
-		// benign race: all threads compute the same immutable result
-		for (Index<K,V> n : path) n.cachedPrefix=result;
+		// A second walk caches the path without allocating a temporary list.
+		// Benign race: all threads compute the same immutable prefix.
+		Index<K,V> end=node;
+		node=this;
+		while (node.entry==null && node.cachedPrefix==null) {
+			node.cachedPrefix=result;
+			if (node==end) break;
+			node=(Index<K,V>)node.children[0].getValue();
+		}
 		return result;
 	}
 
@@ -1514,9 +1520,73 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		throw new TODOException();
 	}
 
+	/**
+	 * Returns the first position whose key is greater than or equal to {@code key},
+	 * or {@link #count()} if there is none. A prefix locates the start of its group.
+	 * Keys use the same effective 255-byte limit and byte identity as {@link #get}.
+	 *
+	 * <p>Iterative radix descent: match each prefix range once and skip whole
+	 * subtrees by count. No search objects are allocated; lazy references may load
+	 * cells. Results on malformed trees are unspecified, but detected malformed
+	 * prefixes/children terminate the search without unbounded descent.</p>
+	 *
+	 * @param key Non-null blob-like key or prefix
+	 * @return Lower-bound position in {@code 0..count()}
+	 */
+	@SuppressWarnings("unchecked")
 	@Override
 	public long seek(ABlobLike<?> key) {
-		throw new TODOException();
+		Objects.requireNonNull(key);
+		long length=effectiveLength(key), matched=0, rank=0;
+		Index<K,V> node=this;
+		while (node.count!=0) {
+			if (length<=matched) return rank;
+			long depth=node.getDepth();
+			if (depth>matched) {
+				ABlob prefix=node.getPrefix();
+				long limit=Math.min(length,Math.min(depth,effectiveLength(prefix)));
+				if (limit<matched) return rank; // malformed physical prefix
+				long equal=matched+key.hexMatch(prefix,matched,limit-matched);
+				if (equal<limit) {
+					return key.getHexDigit(equal)<prefix.getHexDigit(equal)?rank:rank+node.count;
+				}
+				if (length<=depth || limit<depth) return rank;
+			}
+
+			int digit=key.getHexDigit(depth);
+			int slot=Bits.positionForDigit(digit,node.mask);
+			boolean present=(node.mask & (1<<digit))!=0;
+			int after=slot+(present?1:0);
+			if (after>node.children.length) return rank; // malformed mask
+			Index<K,V> next=null;
+			if (present) {
+				ACell cell=node.children[slot].getValue();
+				if (!(cell instanceof Index<?,?> child) || child.getDepth()<=depth) return rank;
+				next=(Index<K,V>)child;
+			}
+
+			// Sum the cheaper side. Edge branches need no sibling loads; an interior
+			// branch needs at most seven (eight for an absent branch's insertion point).
+			if (slot<=node.children.length-after) {
+				if (node.entry!=null) rank++;
+				for (int i=0;i<slot;i++) {
+					ACell cell=node.children[i].getValue();
+					if (!(cell instanceof Index<?,?> child)) return rank;
+					rank+=child.count;
+				}
+			} else {
+				rank+=node.count-(next==null?0:next.count);
+				for (int i=after;i<node.children.length;i++) {
+					ACell cell=node.children[i].getValue();
+					if (!(cell instanceof Index<?,?> child)) return rank;
+					rank-=child.count;
+				}
+			}
+			if (next==null) return rank;
+			matched=depth+1; // the selected branch digit is already known to match
+			node=next;
+		}
+		return rank;
 	}
 
 }
