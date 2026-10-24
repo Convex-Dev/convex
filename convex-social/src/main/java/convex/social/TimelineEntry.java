@@ -9,7 +9,7 @@ import convex.core.data.Keyword;
 /**
  * A single entry in a merged timeline view.
  *
- * @param author The account key of the post author
+ * @param author The canonical DID of the post author
  * @param postKey The timestamp-prefixed key in the author's feed
  * @param timestamp The extracted timestamp (millis since epoch)
  * @param post The post content
@@ -21,8 +21,11 @@ public record TimelineEntry(
 	AHashMap<Keyword, ACell> post
 ) implements Comparable<TimelineEntry> {
 
+	/** Full continuation position, independent of mutable post content. */
+	public TimelinePosition position() { return new TimelinePosition(postKey,author); }
+
 	@Override
 	public int compareTo(TimelineEntry other) {
-		return Long.compare(this.timestamp, other.timestamp);
+		return position().compareTo(other.position());
 	}
 }

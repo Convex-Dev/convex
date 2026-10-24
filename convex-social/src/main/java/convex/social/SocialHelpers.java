@@ -97,27 +97,47 @@ public class SocialHelpers {
 	/**
 	 * Builds a merged timeline from multiple user feeds, newest first.
 	 *
-	 * <p>Uses a K-way merge with a max-heap to efficiently merge feeds
-	 * in reverse chronological order. Tombstoned posts (with :deleted field)
-	 * are filtered out.</p>
+	 * <p>This coarse bound excludes every post at the timestamp. For exact
+	 * continuation, pass the last entry's {@link TimelineEntry#position()} to
+	 * {@link #buildTimeline(Map, TimelinePosition, int)}.</p>
 	 *
 	 * @param feeds Map of author → feed index
 	 * @param beforeTimestamp Only include posts before this timestamp (0 for no limit)
 	 * @param limit Maximum number of entries to return
 	 * @return List of timeline entries, newest first
 	 */
-	@SuppressWarnings("unchecked")
 	public static List<TimelineEntry> buildTimeline(
 			Map<AString, Index<Blob, ACell>> feeds,
 			long beforeTimestamp, int limit) {
+		return buildTimeline(feeds,beforeTimestamp>0?TimelinePosition.atTimestamp(beforeTimestamp):null,limit);
+	}
+
+	/**
+	 * Builds a timeline in descending feed-key order, breaking ties by author DID.
+	 * Uses a K-way merge; tombstones and unfamiliar post/key shapes are skipped.
+	 *
+	 * <p>Pass the last returned entry's position for exact continuation, or a
+	 * key-prefix position to skip a whole group. The bound need not exist in the
+	 * feeds. Pagination over the same immutable feeds has no gaps or duplicates;
+	 * changing feeds between calls does not provide snapshot isolation.</p>
+	 *
+	 * @param feeds Map of author DID to feed index
+	 * @param before Exclusive position bound, or null to start at the newest entry
+	 * @param limit Maximum number of entries to return
+	 * @return Timeline entries in descending position order
+	 */
+	@SuppressWarnings("unchecked")
+	public static List<TimelineEntry> buildTimeline(
+			Map<AString, Index<Blob, ACell>> feeds,
+			TimelinePosition before, int limit) {
 
 		if (feeds == null || feeds.isEmpty() || limit <= 0) {
 			return Collections.emptyList();
 		}
 
-		// Max-heap by timestamp (newest first)
+		// Use exactly the same total order for selection and continuation.
 		PriorityQueue<FeedCursor> heap = new PriorityQueue<>((a, b) ->
-			Long.compare(b.timestamp, a.timestamp));
+			b.order.compareTo(a.order));
 
 		// Seed the heap with the last entry from each feed
 		for (Map.Entry<AString, Index<Blob, ACell>> e : feeds.entrySet()) {
@@ -125,7 +145,7 @@ public class SocialHelpers {
 			Index<Blob, ACell> feed = e.getValue();
 			if (feed == null || feed.isEmpty()) continue;
 
-			FeedCursor first=previousEntry(author,feed,feed.count()-1,beforeTimestamp);
+			FeedCursor first=previousEntry(author,feed,feed.count()-1,before);
 			if (first!=null) heap.offer(first);
 		}
 
@@ -140,13 +160,13 @@ public class SocialHelpers {
 				AHashMap<Keyword, ACell> postMap = (AHashMap<Keyword, ACell>) post;
 				if (!SocialPost.isDeleted(postMap)) {
 					result.add(new TimelineEntry(
-						cursor.author, cursor.entry.getKey(),
-						cursor.timestamp, postMap));
+						cursor.order.author(), cursor.order.postKey(),
+						SocialPost.extractTimestamp(cursor.order.postKey()), postMap));
 				}
 			}
 
 			// Advance cursor to previous entry
-			FeedCursor previous=previousEntry(cursor.author,cursor.feed,cursor.position-1,0);
+			FeedCursor previous=previousEntry(cursor.order.author(),cursor.feed,cursor.position-1,null);
 			if (previous!=null) heap.offer(previous);
 		}
 
@@ -154,14 +174,14 @@ public class SocialHelpers {
 	}
 
 	/** Skip unfamiliar keys before they can affect the timeline's chronological ordering. */
-	private static FeedCursor previousEntry(AString author,Index<Blob,ACell> feed,long position,long before) {
+	private static FeedCursor previousEntry(AString author,Index<Blob,ACell> feed,long position,TimelinePosition before) {
 		for (long i=position;i>=0;i--) {
 			MapEntry<Blob,ACell> entry=feed.entryAt(i);
 			ACell rawKey=entry.getKey();
 			if (!(rawKey instanceof Blob key) || key.count()<8) continue;
-			long timestamp=SocialPost.extractTimestamp(key);
-			if (before>0 && timestamp>=before) continue;
-			return new FeedCursor(author,feed,i,entry,timestamp);
+			TimelinePosition order=new TimelinePosition(key,author);
+			if (before!=null && order.compareTo(before)>=0) continue;
+			return new FeedCursor(order,feed,i,entry);
 		}
 		return null;
 	}
@@ -170,10 +190,9 @@ public class SocialHelpers {
 	 * Internal cursor for tracking position in a feed during K-way merge.
 	 */
 	private record FeedCursor(
-		AString author,
+		TimelinePosition order,
 		Index<Blob, ACell> feed,
 		long position,
-		MapEntry<Blob, ACell> entry,
-		long timestamp
+		MapEntry<Blob, ACell> entry
 	) {}
 }

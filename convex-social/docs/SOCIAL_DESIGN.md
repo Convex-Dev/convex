@@ -62,8 +62,25 @@ checks remain mandatory. Timeline readers skip unfamiliar keys and post values.
 
 Timestamp ties for revisions of the same record still prefer the established
 value. Salting distinguishes post identities; it does not change revision ordering.
-The timestamp-only timeline pagination bound excludes the whole timestamp group;
-it does not provide a continuation position within a group of simultaneous posts.
+
+Timelines use descending `(postKey, author DID)` order, comparing key bytes in the
+same order as the feed index. Continue a page with its last entry's `position()`:
+
+```java
+var first = SocialHelpers.buildTimeline(feeds, null, 20);
+if (!first.isEmpty()) {
+    var next = SocialHelpers.buildTimeline(feeds, first.getLast().position(), 20);
+}
+```
+
+The exclusive bound includes the full key and author, so simultaneous posts and
+identical keys belonging to different authors are not skipped or repeated.
+`new TimelinePosition(keyOrPrefix)` omits the author and excludes the whole key
+or prefix group. `TimelinePosition.atTimestamp(time)` supplies the eight-byte
+timestamp prefix; the existing timestamp overload keeps this coarse behaviour
+(zero means unbounded). A bound need not identify an existing entry. Reusing the
+same immutable feeds gives stable pagination; changing feeds between requests
+does not imply snapshot isolation.
 
 ## Default replication policy
 

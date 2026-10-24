@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Social timelines support exact continuation by full post key and author DID, with optional key-prefix bounds for coarse cutoffs. Ordering is deterministic for simultaneous posts across authors.
+
 - `MapComponent` and `IndexComponent` provide atomic local collection operations and child views, without imposing replication, signing or timestamp policy. Social and DLFS share standard owned-map delivery and authoring views while retaining explicit signing strategies.
 
 - `LatticeNode` supports an optional primary DID and authorised signing key. New propagators default to that key, or null for an unidentified node, with explicit per-group overrides. Indirect DIDs use a supplied `DIDKeyAuthorizer`; no transient identities are generated.
