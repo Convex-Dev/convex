@@ -30,8 +30,8 @@ import convex.core.util.Utils;
  * <li>Up to 16 child entries at the next level of depth</li>
  * </ul>
  *
- * <p>Stack safety: recursive structural operations and traversals run an allocation-free
- * recursive algorithm optimistically. Recursion descends one node level per call,
+ * <p>Stack safety: recursive structural operations and traversals normally keep
+ * traversal state on the Java stack. Recursion descends one node level per call,
  * which only approaches the {@link #MAX_DEPTH} bound on an adversarial "comb" whose
  * keys diverge at nearly every nibble. If that recursion overflows the thread
  * stack, the public entry point catches the {@link StackOverflowError} once the
@@ -40,7 +40,7 @@ import convex.core.util.Utils;
  * so they simply restart; traversals resume from the number of entries already
  * delivered, so each callback completes exactly once (an entry whose own callback
  * overflowed is delivered again).</p>
- * <p>Rank access, seeking, slicing and concatenation use iterative descent directly.</p>
+ * <p>Rank access and seeking use iterative descent directly.</p>
  *
  * @param <K> Type of Keys
  * @param <V> Type of values
@@ -1113,6 +1113,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * retained or removed. No keys or values need to be inspected.
 	 * Use {@code slice(seek(lower),seek(upper))} for the key range
 	 * {@code [lower,upper)}, whether or not either bound is present.
+	 * Recursive boundary traversal falls back to iteration on stack overflow.
 	 * 
 	 * @param start Start position of slice (inclusive)
 	 * @param end End position of slice (exclusive)
@@ -1125,8 +1126,57 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		long n=end-start;
 		if (n==0) return empty();
 		if (n==count) return this;
-		
-		// Explicit boundary frames keep even maximum-depth indexes stack-safe.
+		try {
+			return sliceRecursive(start,end);
+		} catch (StackOverflowError e) {
+			// Fully unwound; no partial result has escaped, so restart iteratively.
+			return sliceDeep(start,end);
+		}
+	}
+
+	/** Retains a non-empty partial range, recursing only into boundary children. */
+	@SuppressWarnings({"rawtypes","unchecked"})
+	private Index<K,V> sliceRecursive(long start,long end) {
+		long position=entry==null?0:1;
+		int from=0, remaining=mask&0xffff;
+		while (position<end && from<children.length) {
+			long after=position+children[from].getValue().count;
+			if (after>start) break;
+			position=after;
+			from++;
+			remaining&=remaining-1;
+		}
+		int to=from, selected=remaining;
+		long after=position, lastStart=position;
+		while (to<children.length && after<end) {
+			lastStart=after;
+			after+=children[to++].getValue().count;
+			remaining&=remaining-1;
+		}
+		if (after<end) throw new IllegalStateException("Inconsistent Index count");
+		Ref<Index<K,V>>[] refs=Arrays.copyOfRange(children,from,to);
+		// The selected interior children are complete. Only the first and last
+		// can need trimming; when they coincide, recurse just once.
+		if (refs.length>0) {
+			Index<K,V> child=refs[0].getValue();
+			long lo=Math.max(0,start-position), hi=Math.min(child.count,end-position);
+			if (lo!=0 || hi!=child.count) {
+				if (child.getDepth()<=getDepth()) throw new IllegalStateException("Non-increasing Index depth");
+				refs[0]=child.sliceRecursive(lo,hi).getRef();
+			}
+			if (refs.length>1 && end<after) {
+				child=refs[refs.length-1].getValue();
+				if (child.getDepth()<=getDepth()) throw new IllegalStateException("Non-increasing Index depth");
+				refs[refs.length-1]=child.sliceRecursive(0,end-lastStart).getRef();
+			}
+		}
+		MapEntry<K,V> retained=start==0?entry:null;
+		if (retained==null && refs.length==1) return refs[0].getValue();
+		return new Index<>(getDepth(),retained,(Ref[])refs,(short)(selected&~remaining),end-start);
+	}
+
+	/** Iterative fallback for a non-empty partial range after recursive overflow. */
+	private Index<K,V> sliceDeep(long start,long end) {
 		SliceFrame<K,V> frame=new SliceFrame<>(this,start,end,null);
 		while (true) {
 			if (frame.next<frame.refs.length) {
@@ -1156,7 +1206,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 *
 	 * <p>Checks only the last left and first right keys, then shares whole subtrees
 	 * and rebuilds the joining boundary path. Work and allocation are bounded by
-	 * tree depth, with no Java recursion or per-entry merge callbacks.</p>
+	 * tree depth, with an iterative fallback on stack overflow and no per-entry
+	 * merge callbacks.</p>
 	 *
 	 * @param right Index to append in key order
 	 * @return Concatenated Index
@@ -1178,7 +1229,43 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (shared==rightLength || (shared<leftLength && leftKey.getHexDigit(shared)>=rightKey.getHexDigit(shared))) {
 			throw new IllegalArgumentException("Index concat requires strictly increasing key ranges");
 		}
+		try {
+			return concatRecursive(right,shared,leftKey,rightKey);
+		} catch (StackOverflowError e) {
+			// The ranges are already checked; restart the pure join after unwinding.
+			return concatDeep(right,shared,leftKey,rightKey);
+		}
+	}
 
+	/** Joins already ordered ranges, recursing only into an overlapping child pair. */
+	@SuppressWarnings({"rawtypes","unchecked"})
+	private Index<K,V> concatRecursive(Index<K,V> right,long shared,K leftKey,K rightKey) {
+		long depth=Math.min(shared,Math.min(getDepth(),right.getDepth()));
+		boolean alignedLeft=getDepth()==depth, alignedRight=right.getDepth()==depth;
+		int lm=alignedLeft?(mask&0xffff):(1<<leftKey.getHexDigit(depth));
+		int rm=alignedRight?(right.mask&0xffff):(1<<rightKey.getHexDigit(depth));
+		int ln=alignedLeft?children.length:1, rn=alignedRight?right.children.length:1;
+		boolean overlap=(lm&rm)!=0;
+		Index<K,V> joined=null;
+		if (overlap) {
+			Index<K,V> a=alignedLeft?children[ln-1].getValue():this;
+			Index<K,V> b=alignedRight?right.children[0].getValue():right;
+			if (a.getDepth()<=depth || b.getDepth()<=depth) throw new IllegalStateException("Non-increasing Index depth");
+			joined=a.concatRecursive(b,shared,leftKey,rightKey);
+		}
+		Ref<Index<K,V>>[] refs=new Ref[ln+rn-(overlap?1:0)];
+		if (alignedLeft) System.arraycopy(children,0,refs,0,ln);
+		else refs[0]=getRef();
+		int offset=overlap?ln-1:ln;
+		if (alignedRight) System.arraycopy(right.children,0,refs,offset,rn);
+		else refs[offset]=right.getRef();
+		if (overlap) refs[offset]=joined.getRef();
+		// A prefix entry precedes its descendants, so it can only come from the left.
+		return new Index<>(depth,alignedLeft?entry:null,(Ref[])refs,(short)(lm|rm),count+right.count);
+	}
+
+	/** Iterative fallback for already ordered ranges after recursive overflow. */
+	private Index<K,V> concatDeep(Index<K,V> right,long shared,K leftKey,K rightKey) {
 		Index<K,V> left=this;
 		ConcatFrame<K,V> frame=null;
 		while (true) {
@@ -1199,7 +1286,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return result;
 	}
 
-	/** A join at one radix depth; at most the last left / first right child overlaps. */
+	/** Fallback join state at one radix depth; only the boundary child pair overlaps. */
 	private static final class ConcatFrame<K extends ABlobLike<?>,V extends ACell> {
 		final ConcatFrame<K,V> parent;
 		final long depth,count;
@@ -1241,7 +1328,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 	}
 
-	/** A partially retained node. Only boundary children require further work. */
+	/** Fallback slice state for a partially retained node. Only boundaries need work. */
 	private static final class SliceFrame<K extends ABlobLike<?>,V extends ACell> {
 		final Index<K,V> node;
 		final SliceFrame<K,V> parent;

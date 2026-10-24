@@ -180,7 +180,7 @@ class IndexSliceTest {
 		assertEquals(3,index.seek(longKey.slice(0,255)));
 	}
 
-	@Test void maximumDepthSlicesUseNoJavaRecursion() throws Exception {
+	@Test void maximumDepthSlicesAreStackSafe() throws Exception {
 		Index<Blob,CVMLong> built=Index.of(Blob.wrap(new byte[255]),0);
 		for (int digit=509;digit>=0;digit--) {
 			byte[] bytes=new byte[255];
@@ -189,6 +189,8 @@ class IndexSliceTest {
 		}
 		final var index=built;
 		var failure=new AtomicReference<Throwable>();
+		// The recursive fast path must recover through the iterative fallback
+		// when the worker's small stack cannot hold the maximum-depth boundary.
 		Thread worker=new Thread(null,() -> {
 			try {
 				for (int start:new int[] {0,1,2,254,509,510,511}) {
