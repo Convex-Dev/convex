@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `mod` handles the minimum supported integer divisor without overflowing an intermediate negation or throwing a Java exception.
+
 - Big-integer sign queries handle empty zero representations and positive values with a leading sign byte consistently before and after Java value materialisation.
 - Casting a blob of more than 8 bytes to an integer keeps its value when the blob starts with redundant sign bytes; for example `(int 0x00008000000000000000)` returned `0` instead of `9223372036854775808`.
 - Multiplying a big integer by zero returns an ordinary integer zero, and integers behave the same whatever their internal representation. Previously `(get [10 20 30] (* 9223372036854775808 0) :none)` returned `:none` instead of `10`, and `split` rejected such a value as a character code, so peers holding the value in different forms could disagree.

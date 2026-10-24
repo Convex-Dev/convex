@@ -173,6 +173,29 @@ public class NumericsTest extends ACVMTest {
 		doIntConsistencyChecks(CVMBigInteger.MIN_POSITIVE,Long.MAX_VALUE);
 		doIntConsistencyChecks(156756567568L,CVMBigInteger.MIN_NEGATIVE);
 	}
+
+	@ParameterizedTest
+	@ValueSource(longs = {0,1})
+	public void testModMinimumInteger(long version) {
+		BigInteger magnitude=BigInteger.ONE.shiftLeft(Constants.MAX_BIG_INTEGER_LENGTH*8-1);
+		var divisor=CVMBigInteger.wrap(magnitude.negate());
+		assertNotNull(divisor);
+		assertNull(divisor.negate()); // The positive magnitude cannot be a CVM integer.
+		var state=Migrations.applyTo(InitTest.STATE,version);
+		for (long value:new long[] {Long.MIN_VALUE,-7,-1,0,1,7,Long.MAX_VALUE}) {
+			var dividend=CVMLong.create(value);
+			// |dividend| < |divisor|: a negative dividend wraps once; others stay unchanged.
+			var expected=AInteger.create(value<0?magnitude.add(dividend.big()):dividend.big());
+			assertNotNull(expected);
+			assertEquals(expected,dividend.mod(divisor));
+			var result=Core.MOD.invoke(Context.create(state,HERO),new ACell[] {dividend,divisor});
+			assertNotError(result);
+			assertEquals(expected,result.getResult());
+			// Euclidean division identity and idempotence, including big remainders.
+			assertEquals(dividend.big(),divisor.big().multiply(dividend.div(divisor).big()).add(expected.big()));
+			assertEquals(expected,expected.mod(divisor));
+		}
+	}
 	
 	private void doIntConsistencyChecks(Object oa, Object ob) {
 		AInteger a=AInteger.parse(oa);
