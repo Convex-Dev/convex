@@ -14,6 +14,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `OpBenchmark` | Execution of low-level CVM ops |
 | `BigBlockBenchmark` | Applying a large block of signed transactions to state |
 | `MapBenchmark` | Immutable map update operations |
+| `IndexSeekBenchmark` | Lower-bound search for exact keys, absent keys and prefixes |
 | `MemorySizeBenchmark` | Memory accounting for cached cells and newly changed state paths |
 | `ListDataBenchmark` | Immutable list append operations |
 | `EncodingBenchmark` | Data encoding and decoding |
@@ -55,6 +56,39 @@ java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
 The sizing-only cases reuse cells and reset their memory-size caches; the update
 cases include constructing the changed values. Compare allocation per operation
 to distinguish traversal overhead from those necessary value allocations.
+
+Measure index lower-bound searches and allocation:
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  org.openjdk.jmh.Main IndexSeekBenchmark -prof gc
+```
+
+The benchmark compares direct radix descent with binary search using `entryAt`.
+Parameters cover 1,024 and 65,536 entries, random and timestamp-plus-salt keys,
+and exact, absent and prefix queries. Queries are preallocated and cycle through
+a deterministic set. Nodes and prefix caches are warm; this measures resident
+search cost, not cold store loading. Use multiple forks and compare confidence
+intervals when evaluating changes to the traversal.
+
+A local JDK 25.0.1 run on 2026-10-24 used two forks, three 300 ms warmup
+iterations and four 300 ms measurement iterations. At 65,536 entries it measured:
+
+| Keys / query | Radix seek (ns/op) | Binary search (ns/op) |
+|---|---:|---:|
+| Random / present | 99 | 1,717 |
+| Random / absent | 113 | 1,695 |
+| Random / prefix | 108 | 1,684 |
+| Timestamp / present | 125 | 1,251 |
+| Timestamp / absent | 128 | 1,320 |
+| Timestamp / prefix | 57 | 1,269 |
+
+Seek allocation was below 0.003 bytes/op (measurement noise), with no collections
+reported. An isolated variant always summing preceding children measured
+116–161 ns/op for the four full-key cases, versus 99–128 ns/op for counting
+from the cheaper side. Small-index differences were often within the confidence
+intervals. These are indicative resident-data measurements, not latency promises;
+rerun on the target workload and hardware.
 
 Measure Etch L1 hits and allocation with both unpersisted direct refs and stored
 soft refs:
