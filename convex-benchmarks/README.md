@@ -15,6 +15,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `BigBlockBenchmark` | Applying a large block of signed transactions to state |
 | `MapBenchmark` | Immutable map update operations |
 | `IndexSeekBenchmark` | Lower-bound search for exact keys, absent keys and prefixes |
+| `IndexSliceBenchmark` | Structural slices and seek-based cuts against per-entry deletion |
 | `MemorySizeBenchmark` | Memory accounting for cached cells and newly changed state paths |
 | `ListDataBenchmark` | Immutable list append operations |
 | `EncodingBenchmark` | Data encoding and decoding |
@@ -89,6 +90,35 @@ reported. An isolated variant always summing preceding children measured
 from the cheaper side. Small-index differences were often within the confidence
 intervals. These are indicative resident-data measurements, not latency promises;
 rerun on the target workload and hardware.
+
+Measure structural slices, including the old deletion loop as a baseline:
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  org.openjdk.jmh.Main IndexSliceBenchmark -prof gc
+```
+
+Parameters cover 1,024 and 65,536 resident random keys, retaining either half,
+ten middle entries, or all but the first and last entries. `seekAndSlice` includes
+locating both key bounds. The source index is immutable and reused across calls.
+
+A local JDK 25.0.1 run on 2026-10-24 used two forks, three 300 ms warmup
+iterations, four 300 ms measurement iterations, and `-Xms256m -Xmx512m`.
+At 65,536 entries:
+
+| Retained range | Structural slice (ns/op) | Deletion loop (ns/op) | Structural allocation (bytes/op) |
+|---|---:|---:|---:|
+| First half | 128 | 5,044,014 | 816 |
+| Last half | 168 | 6,171,760 | 744 |
+| Ten middle entries | 108 | 10,409,255 | 576 |
+| All except first and last | 280 | 346 | 1,504 |
+
+The ten-entry cut including both seeks measured 203 ns/op. Its deletion baseline
+allocated 31.9 MB/op. Removing only two entries still favours the old loop on
+allocation (1,248 bytes/op), though structural slicing was faster in this run.
+These are indicative resident-data measurements; short runs have noise, and
+lazy store loads have separate costs. Empty and complete slices return existing
+objects without traversal or allocation.
 
 Measure Etch L1 hits and allocation with both unpersisted direct refs and stored
 soft refs:

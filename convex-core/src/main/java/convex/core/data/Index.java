@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,7 +30,7 @@ import convex.core.util.Utils;
  * <li>Up to 16 child entries at the next level of depth</li>
  * </ul>
  *
- * <p>Stack safety: structural operations and traversals run an allocation-free
+ * <p>Stack safety: recursive structural operations and traversals run an allocation-free
  * recursive algorithm optimistically. Recursion descends one node level per call,
  * which only approaches the {@link #MAX_DEPTH} bound on an adversarial "comb" whose
  * keys diverge at nearly every nibble. If that recursion overflows the thread
@@ -39,6 +40,7 @@ import convex.core.util.Utils;
  * so they simply restart; traversals resume from the number of entries already
  * delivered, so each callback completes exactly once (an entry whose own callback
  * overflowed is delivered again).</p>
+ * <p>Rank access, seeking and slicing use iterative descent directly.</p>
  *
  * @param <K> Type of Keys
  * @param <V> Type of values
@@ -1105,7 +1107,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 	
 	/**
-	 * Returns a slice of this Index
+	 * Returns a slice of this Index in key order. Whole subtrees are shared; only
+	 * the two boundary paths are rebuilt. Work and allocation are bounded by tree
+	 * depth (at most 16 children examined per node), not the number of entries
+	 * retained or removed. No keys or values need to be inspected.
+	 * Use {@code slice(seek(lower),seek(upper))} for the key range
+	 * {@code [lower,upper)}, whether or not either bound is present.
 	 * 
 	 * @param start Start position of slice (inclusive)
 	 * @param end End position of slice (exclusive)
@@ -1119,18 +1126,69 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (n==0) return empty();
 		if (n==count) return this;
 		
-		// TODO: optimise this
-		Index<K, V> bm = this;
-		for (long i=count-1; i>=end; i--) {
-			MapEntry<K, V> me = bm.entryAt(i);
-			bm = bm.dissoc(me.getKey());
+		// Explicit boundary frames keep even maximum-depth indexes stack-safe.
+		SliceFrame<K,V> frame=new SliceFrame<>(this,start,end,null);
+		while (true) {
+			if (frame.next<frame.refs.length) {
+				Index<K,V> child=frame.refs[frame.next++].getValue();
+				long lo=Math.max(0,frame.start-frame.position);
+				long hi=Math.min(child.count,frame.end-frame.position);
+				frame.position+=child.count;
+				if (lo==0 && hi==child.count) continue; // preserve the original Ref
+				if (child.getDepth()<=frame.node.getDepth()) {
+					throw new IllegalStateException("Non-increasing Index depth");
+				}
+				frame=new SliceFrame<>(child,lo,hi,frame);
+			} else {
+				Index<K,V> result=frame.build();
+				frame=frame.parent;
+				if (frame==null) return result;
+				frame.refs[frame.next-1]=result.getRef();
+			}
 		}
-		
-		for (long i = 0; i < start; i++) {
-			MapEntry<K, V> me = bm.entryAt(0);
-			bm = bm.dissoc(me.getKey());
+	}
+
+	/** A partially retained node. Only boundary children require further work. */
+	private static final class SliceFrame<K extends ABlobLike<?>,V extends ACell> {
+		final Index<K,V> node;
+		final SliceFrame<K,V> parent;
+		final long start,end;
+		final Ref<Index<K,V>>[] refs;
+		final short mask;
+		long position;
+		int next;
+
+		SliceFrame(Index<K,V> node,long start,long end,SliceFrame<K,V> parent) {
+			this.node=node;
+			this.parent=parent;
+			this.start=start;
+			this.end=end;
+			position=node.entry==null?0:1;
+			int from=0, remaining=node.mask&0xffff;
+			while (position<end && from<node.children.length) {
+				long after=position+node.children[from].getValue().count;
+				if (after>start) break;
+				position=after;
+				from++;
+				remaining&=remaining-1;
+			}
+			int to=from, selected=remaining;
+			long after=position;
+			while (to<node.children.length && after<end) {
+				after+=node.children[to++].getValue().count;
+				remaining&=remaining-1;
+			}
+			if (after<end) throw new IllegalStateException("Inconsistent Index count");
+			mask=(short)(selected&~remaining);
+			refs=Arrays.copyOfRange(node.children,from,to);
 		}
-		return bm;
+
+		@SuppressWarnings({"rawtypes","unchecked"})
+		Index<K,V> build() {
+			MapEntry<K,V> entry=start==0?node.entry:null;
+			if (entry==null && refs.length==1) return refs[0].getValue();
+			return new Index<>(node.getDepth(),entry,(Ref[])refs,mask,end-start);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
