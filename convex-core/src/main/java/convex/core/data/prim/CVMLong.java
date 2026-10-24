@@ -374,8 +374,8 @@ public final class CVMLong extends AInteger {
 	public AInteger mod(AInteger base) {
 		// Fast long path, except denom == MIN_VALUE where Math.abs overflows
 		if ((base instanceof CVMLong)&&(((CVMLong)base).value!=Long.MIN_VALUE)) return mod((CVMLong)base);
-		if (base.isNegative()) base=base.negate();
-		return AInteger.create(big().mod(base.big()));
+		// The minimum CVM integer's positive magnitude only fits in Java BigInteger.
+		return AInteger.create(big().mod(base.big().abs()));
 	}
 
 	public CVMLong mod(CVMLong base) {

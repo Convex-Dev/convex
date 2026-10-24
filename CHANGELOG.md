@@ -106,6 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `mod` handles the minimum supported integer divisor without overflowing an intermediate negation or throwing a Java exception.
+
 - Replacing a keyed lattice region with `addLattice` now installs one rule for both navigation and merge, rather than leaving the old merge active alongside the new rule.
 
 - `SignedComponent` checks owner authorisation for context-verified owner lattices before accepting an incoming payload, including delivery through a keyed region.
