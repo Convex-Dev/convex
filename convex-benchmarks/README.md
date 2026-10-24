@@ -16,6 +16,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `MapBenchmark` | Immutable map update operations |
 | `IndexSeekBenchmark` | Lower-bound search for exact keys, absent keys and prefixes |
 | `IndexSliceBenchmark` | Structural slices and seek-based cuts against per-entry deletion |
+| `IndexConcatBenchmark` | Ordered concatenation and split/rejoin against ordinary map merge |
 | `MemorySizeBenchmark` | Memory accounting for cached cells and newly changed state paths |
 | `ListDataBenchmark` | Immutable list append operations |
 | `EncodingBenchmark` | Data encoding and decoding |
@@ -119,6 +120,35 @@ allocation (1,248 bytes/op), though structural slicing was faster in this run.
 These are indicative resident-data measurements; short runs have noise, and
 lazy store loads have separate costs. Empty and complete slices return existing
 objects without traversal or allocation.
+
+Measure ordered concatenation and split/rejoin:
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  org.openjdk.jmh.Main IndexConcatBenchmark -prof gc
+```
+
+The benchmark joins independently sliced, ordered ranges of resident random keys.
+Parameters cover 1,024 and 65,536 total entries, split equally or with a single
+entry on either side. `merge` is the ordinary per-entry map merge baseline;
+`splitAndRejoin` includes both slices and the concatenation. Boundary validation
+is included in every concatenation measurement.
+
+A local JDK 25.0.1 run on 2026-10-24 used two forks, three 300 ms warmup
+iterations, four 300 ms measurement iterations, and `-Xms256m -Xmx512m`.
+At 65,536 total entries:
+
+| Split | Validated concat (ns/op) | Map merge (ns/op) | Concat allocation (bytes/op) |
+|---|---:|---:|---:|
+| Equal halves | 573 | 7,636,518 | 1,016 |
+| Single entry on right | 461 | 172 | 848 |
+| Single entry on left | 441 | 17,816,496 | 856 |
+
+Splitting into halves and rejoining measured 904 ns/op and 2,576 bytes/op.
+The balanced map merge allocated 20.9 MB/op. Single-entry append remains cheaper
+through ordinary insertion: map merge does not check that the new key follows
+the existing range. These fixed, resident ranges measure traversal and allocation;
+they do not include store loading, and short-run timings are indicative.
 
 Measure Etch L1 hits and allocation with both unpersisted direct refs and stored
 soft refs:

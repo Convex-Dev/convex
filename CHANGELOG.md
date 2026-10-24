@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Index.concat(right)` joins strictly ordered key ranges by sharing subtrees, with stack-safe work bounded by tree depth. Empty indexes are identities; overlapping or reversed ranges throw `IllegalArgumentException`, including aliases at the effective 255-byte key limit.
+
 - Social timelines support exact continuation by full post key and author DID, with optional key-prefix bounds for coarse cutoffs. Ordering is deterministic for simultaneous posts across authors. Page continuation seeks directly to each feed's bound instead of scanning newer posts.
 
 - `MapComponent` and `IndexComponent` provide atomic local collection operations and child views, without imposing replication, signing or timestamp policy. Social and DLFS share standard owned-map delivery and authoring views while retaining explicit signing strategies.
