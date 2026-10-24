@@ -139,13 +139,16 @@ public class SocialHelpers {
 		PriorityQueue<FeedCursor> heap = new PriorityQueue<>((a, b) ->
 			b.order.compareTo(a.order));
 
-		// Seed the heap with the last entry from each feed
+		// Seek each feed directly to the bound instead of revisiting all newer posts.
 		for (Map.Entry<AString, Index<Blob, ACell>> e : feeds.entrySet()) {
 			AString author = e.getKey();
 			Index<Blob, ACell> feed = e.getValue();
 			if (feed == null || feed.isEmpty()) continue;
 
-			FeedCursor first=previousEntry(author,feed,feed.count()-1,before);
+			long start=before==null?feed.count()-1:Math.min(feed.seek(before.postKey()),feed.count()-1);
+			// Keep the lower-bound entry as a candidate: an equal key with an earlier
+			// author is below the full position. previousEntry applies that final test.
+			FeedCursor first=previousEntry(author,feed,start,before);
 			if (first!=null) heap.offer(first);
 		}
 

@@ -91,4 +91,18 @@ class TimelinePaginationTest {
 			.assoc(SocialPost.createKey(1005,0),SocialPost.createPost("new",1005));
 		assertEquals(expected,SocialHelpers.buildTimeline(Map.of(ALICE,changed),before,100));
 	}
+
+	@Test void boundsInGapsAndOutsideFeedsLocateTheCorrectEntries() {
+		var feeds=Map.of(ALICE,Index.<Blob,ACell>of(
+			SocialPost.createKey(100,0),SocialPost.createPost("first",100),
+			SocialPost.createKey(300,0),SocialPost.createPost("third",300)),
+			BOB,Index.<Blob,ACell>of(
+				SocialPost.createKey(200,0),SocialPost.createPost("second",200),
+				SocialPost.createKey(400,0),SocialPost.createPost("fourth",400)));
+		var gap=new TimelinePosition(SocialPost.createKey(250,0),ALICE);
+		assertEquals(List.of(200L,100L),SocialHelpers.buildTimeline(feeds,gap,10)
+			.stream().map(TimelineEntry::timestamp).toList());
+		assertEquals(4,SocialHelpers.buildTimeline(feeds,TimelinePosition.atTimestamp(500),10).size());
+		assertTrue(SocialHelpers.buildTimeline(feeds,TimelinePosition.atTimestamp(50),10).isEmpty());
+	}
 }

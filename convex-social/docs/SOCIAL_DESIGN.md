@@ -82,6 +82,9 @@ timestamp prefix; the existing timestamp overload keeps this coarse behaviour
 same immutable feeds gives stable pagination; changing feeds between requests
 does not imply snapshot isolation.
 
+Each feed uses `Index.seek` to locate the bound directly, then the timeline heap
+merges entries below it. Continuing a deep page does not scan all newer posts.
+
 ## Default replication policy
 
 For local social DIDs `L`, operator pins `P`, and each local user's direct active
