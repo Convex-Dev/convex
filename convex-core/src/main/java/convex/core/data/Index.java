@@ -40,7 +40,7 @@ import convex.core.util.Utils;
  * so they simply restart; traversals resume from the number of entries already
  * delivered, so each callback completes exactly once (an entry whose own callback
  * overflowed is delivered again).</p>
- * <p>Rank access, seeking and slicing use iterative descent directly.</p>
+ * <p>Rank access, seeking, slicing and concatenation use iterative descent directly.</p>
  *
  * @param <K> Type of Keys
  * @param <V> Type of values
@@ -1145,6 +1145,93 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				if (frame==null) return result;
 				frame.refs[frame.next-1]=result.getRef();
 			}
+		}
+	}
+
+	/**
+	 * Concatenates two strictly ordered key ranges. Every key in this Index must
+	 * precede every key in {@code right}, using Index's effective 255-byte keys.
+	 * Empty indexes are identities. Values, including nil, are preserved unchanged.
+	 * For any valid cut, {@code slice(0,cut).concat(slice(cut))} equals this Index.
+	 *
+	 * <p>Checks only the last left and first right keys, then shares whole subtrees
+	 * and rebuilds the joining boundary path. Work and allocation are bounded by
+	 * tree depth, with no Java recursion or per-entry merge callbacks.</p>
+	 *
+	 * @param right Index to append in key order
+	 * @return Concatenated Index
+	 * @throws IllegalArgumentException If the non-empty ranges overlap or are reversed
+	 * @throws NullPointerException If right is null
+	 */
+	public Index<K,V> concat(Index<K,V> right) {
+		Objects.requireNonNull(right);
+		if (count==0) return right;
+		if (right.count==0) return this;
+
+		// Follow the outer edges directly: sibling counts and values are irrelevant.
+		Index<K,V> last=this;
+		while (last.children.length>0) last=last.children[last.children.length-1].getValue();
+		K leftKey=last.entry.getKey();
+		K rightKey=right.entryAt(0).getKey();
+		long leftLength=effectiveLength(leftKey), rightLength=effectiveLength(rightKey);
+		long shared=leftKey.hexMatch(rightKey,0,Math.min(leftLength,rightLength));
+		if (shared==rightLength || (shared<leftLength && leftKey.getHexDigit(shared)>=rightKey.getHexDigit(shared))) {
+			throw new IllegalArgumentException("Index concat requires strictly increasing key ranges");
+		}
+
+		Index<K,V> left=this;
+		ConcatFrame<K,V> frame=null;
+		while (true) {
+			long depth=Math.min(shared,Math.min(left.getDepth(),right.getDepth()));
+			if (frame!=null && depth<=frame.depth) throw new IllegalStateException("Non-increasing Index depth");
+			frame=new ConcatFrame<>(left,right,depth,leftKey,rightKey,frame);
+			if (frame.leftBoundary==null) break;
+			left=frame.leftBoundary.getValue();
+			right=frame.refs[frame.boundary].getValue();
+		}
+		Index<K,V> result=frame.build();
+		while ((frame=frame.parent)!=null) {
+			frame.refs[frame.boundary]=result.getRef();
+			result=frame.build();
+		}
+		return result;
+	}
+
+	/** A join at one radix depth; at most the last left / first right child overlaps. */
+	private static final class ConcatFrame<K extends ABlobLike<?>,V extends ACell> {
+		final ConcatFrame<K,V> parent;
+		final long depth,count;
+		final MapEntry<K,V> entry;
+		final short mask;
+		final Ref<Index<K,V>>[] refs;
+		final int boundary;
+		final Ref<Index<K,V>> leftBoundary;
+
+		@SuppressWarnings({"rawtypes","unchecked"})
+		ConcatFrame(Index<K,V> left,Index<K,V> right,long depth,K leftKey,K rightKey,ConcatFrame<K,V> parent) {
+			this.parent=parent;
+			this.depth=depth;
+			count=left.count+right.count;
+			boolean alignedLeft=left.getDepth()==depth, alignedRight=right.getDepth()==depth;
+			entry=alignedLeft?left.entry:null;
+			int lm=alignedLeft?(left.mask&0xffff):(1<<leftKey.getHexDigit(depth));
+			int rm=alignedRight?(right.mask&0xffff):(1<<rightKey.getHexDigit(depth));
+			mask=(short)(lm|rm);
+			int ln=alignedLeft?left.children.length:1, rn=alignedRight?right.children.length:1;
+			boolean overlap=(lm&rm)!=0;
+			boundary=overlap?ln-1:-1;
+			refs=new Ref[ln+rn-(overlap?1:0)];
+			if (alignedLeft) System.arraycopy(left.children,0,refs,0,ln);
+			else refs[0]=left.getRef();
+			leftBoundary=overlap?refs[boundary]:null;
+			int offset=overlap?boundary:ln;
+			if (alignedRight) System.arraycopy(right.children,0,refs,offset,rn);
+			else refs[offset]=right.getRef();
+		}
+
+		@SuppressWarnings({"rawtypes","unchecked"})
+		Index<K,V> build() {
+			return new Index<>(depth,entry,(Ref[])refs,mask,count);
 		}
 	}
 

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Index.concat(right)` joins strictly ordered key ranges by sharing subtrees, with stack-safe work bounded by tree depth. Empty indexes are identities; overlapping or reversed ranges throw `IllegalArgumentException`, including aliases at the effective 255-byte key limit.
+
 - Typed lattice component transactions stage domain operations atomically, with async completion and an opt-in transactional root for exclusive execution and contention fallback. Ordinary roots retain their existing write path.
 - REST `POST /api/v1/simulate` accepts source or binary transactions without signing credentials, returning transaction accounting results under public query limits, including `JUICE` errors for zero-balance accounts.
 - Java clients expose `simulate` and `simulateSync` for transaction accounting and cost estimates; the GUI stress tool labels this mode "Simulate" to distinguish it from ordinary queries.
