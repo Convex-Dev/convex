@@ -176,6 +176,11 @@ Shutdown order prevents new work racing store closure:
 3. the owning service explicitly saves any accepted host state it wants retained;
 4. the service closes its automatic-flush resource, if any, and then its store.
 
+A service that shuts down from a JVM shutdown hook registers that work with
+`Shutdown.addHook(Shutdown.SERVICE, ...)`, not `Runtime.addShutdownHook`. The JVM
+runs separate hooks concurrently, so a separate hook races Convex's own hook,
+which closes transports and every Etch file. The `SERVICE` level completes first.
+
 Network close does not publish pending host state or flush the store. The host
 and its applications remain usable after detachment.
 

@@ -16,6 +16,7 @@ import convex.core.data.Keyword;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
+import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.node.NodeServer;
 import convex.lattice.LatticeHost;
@@ -170,7 +171,8 @@ public final class Main {
 			stopped.countDown();
 		};
 
-		Runtime.getRuntime().addShutdownHook(new Thread(shutdown,"convex-dlfs-shutdown"));
+		// Runs in Convex's shutdown order, before transports and Etch files close
+		Shutdown.addHook(Shutdown.SERVICE,shutdown);
 		try {
 			stopped.await();
 		} finally {
