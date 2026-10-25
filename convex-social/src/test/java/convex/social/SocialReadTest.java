@@ -118,13 +118,11 @@ class SocialReadTest {
 			var social=social(state);
 			var before=social.cursor().get();
 			var component=social.user(DID_ALICE).follows();
-			assertThrows(ClassCastException.class,() -> component.getRecord(DID_ALICE));
-			assertThrows(ClassCastException.class,component::getActive);
-			if (follows instanceof AHashMap<?,?>) {
-				assertThrows(ClassCastException.class,() -> component.follow(DID_ALICE));
-			} else {
-				assertThrows(IllegalStateException.class,() -> component.follow(DID_ALICE));
-			}
+			Class<? extends RuntimeException> error=follows instanceof AHashMap<?,?>
+				?ClassCastException.class:IllegalStateException.class;
+			assertThrows(error,() -> component.getRecord(DID_ALICE));
+			assertThrows(error,component::getActive);
+			assertThrows(error,() -> component.follow(DID_ALICE));
 			assertSame(before,social.cursor().get());
 		}
 	}

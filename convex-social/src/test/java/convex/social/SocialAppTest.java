@@ -23,6 +23,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.Lattice;
@@ -224,6 +225,35 @@ public class SocialAppTest {
 		follows.unfollow(bob.getAccountKey());
 		assertFalse(follows.isFollowing(bob.getAccountKey()));
 		assertTrue(follows.getActive().isEmpty());
+	}
+
+	@Test
+	public void followTransactionSignsOnceAndFailedEditsLeaveStateUntouched() {
+		var alice=AKeyPair.createSeeded(8200);
+		var bob=Strings.intern("did:web:bob.example");
+		var carol=Strings.intern("did:web:carol.example");
+		var signatures=new AtomicInteger();
+		var social=Social.create((owner,value) -> {
+			signatures.incrementAndGet();
+			return alice.signData(value);
+		},() -> CVMLong.ONE);
+		var follows=social.user(alice.getAccountKey()).follows();
+		follows.transact(draft -> {
+			draft.follow(bob);
+			draft.follow(carol);
+			assertNull(follows.getActive());
+			assertEquals(0,signatures.get());
+		});
+		assertEquals(Set.of(bob,carol),follows.getActive());
+		assertEquals(1,signatures.get());
+		var before=social.cursor().get();
+		assertTrue(before.get(DID.forKey(alice.getAccountKey())).checkSignature());
+		assertThrows(IllegalStateException.class,() -> follows.transact(draft -> {
+			draft.unfollow(bob);
+			throw new IllegalStateException("Abort the edit");
+		}));
+		assertSame(before,social.cursor().get());
+		assertEquals(1,signatures.get());
 	}
 
 	@Test

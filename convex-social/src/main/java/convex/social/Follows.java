@@ -12,13 +12,12 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ALatticeComponent;
 import convex.lattice.MapComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Cursor wrapper for a user's follow list.
+ * Map component for a user's follow list.
  *
  * <p>A {@code Follows} wraps a lattice cursor at the {@code :following :follows}
  * level ({@code AHashMap<ACell, ACell>} with LWW per DID). The {@code :active}
@@ -32,14 +31,12 @@ import convex.lattice.cursor.AForkableCursor;
  * Set<AString> active = follows.getActive();
  * }</pre>
  */
-public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implements TransactionalComponent<AHashMap<ACell, ACell>,Follows> {
+public class Follows extends MapComponent<ACell, ACell> implements TransactionalComponent<AHashMap<ACell, ACell>,Follows> {
 	private final Supplier<CVMLong> clock;
-	private final MapComponent<ACell,ACell> records;
 
 	Follows(AForkableCursor<AHashMap<ACell, ACell>> cursor, Supplier<CVMLong> clock) {
 		super(cursor);
 		this.clock=clock;
-		this.records=new MapComponent<>(cursor);
 	}
 
 	/**
@@ -78,7 +75,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	 * @return Set of canonical base DIDs, or null if the follows map is absent
 	 */
 	public Set<AString> getActive() {
-		return SocialHelpers.getActiveFollows(cursor().get());
+		return SocialHelpers.getActiveFollows(get());
 	}
 
 	/** Convenience migration overload mapping an Ed25519 key to {@code did:key}. */
@@ -95,14 +92,13 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	/** Returns the stored follow record, or null if absent. Incompatible values throw. */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword,ACell> getRecord(AString target) {
-		AHashMap<ACell,ACell> follows=cursor().get();
-		return follows==null?null:(AHashMap<Keyword,ACell>)follows.get(target);
+		return (AHashMap<Keyword,ACell>)get(target);
 	}
 
 	@SuppressWarnings("unchecked")
 	private void writeField(AString target,Keyword key,ACell value) {
 		CVMLong timestamp=clock.get();
-		records.path(target).updateAndGet(existing -> {
+		path(target).update(existing -> {
 			AHashMap<Keyword,ACell> record=(AHashMap<Keyword,ACell>)existing;
 			if (record==null) record=Maps.empty();
 			return record.assoc(key,value).assoc(SocialPost.TIMESTAMP,timestamp);
