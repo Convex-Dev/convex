@@ -167,18 +167,15 @@ class MapComponentTest {
 	}
 
 	@ParameterizedTest @ValueSource(booleans={false,true})
-	void incompatibleStorageIsDiagnosedWithoutChangingIt(boolean indexed) {
+	void incompatibleStorageIsRejectedWithoutChangingIt(boolean indexed) {
 		var root=Root.<ACell>create(CVMLong.ONE);
 		var map=component(root,indexed);
-		assertNotNull(map.checkValue(root.get()));
 		assertThrows(IllegalStateException.class,map::get);
 		assertThrows(IllegalStateException.class,() -> map.put(A,CVMLong.TWO));
 		assertThrows(IllegalStateException.class,() -> map.remove(A));
 		assertThrows(IllegalStateException.class,map::clear);
 		assertThrows(IllegalStateException.class,() -> map.path(A).set(CVMLong.TWO));
 		assertSame(CVMLong.ONE,root.get());
-		assertNull(map.checkValue(null));
-		assertNotNull(map.checkValue(indexed?Maps.empty():Index.none()));
 		root.set(indexed?Maps.empty():Index.none());
 		assertThrows(IllegalStateException.class,() -> map.path(A).set(CVMLong.TWO));
 	}

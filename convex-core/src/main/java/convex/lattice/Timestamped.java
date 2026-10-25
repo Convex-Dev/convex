@@ -6,7 +6,6 @@ import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
@@ -77,11 +76,6 @@ public final class Timestamped<V extends ACell> extends ALatticeComponent<V> {
 	/** Shared whole-record ordering for this wrapper and its enclosing boundaries. */
 	public static ALattice<AHashMap<Keyword,ACell>> lattice() {
 		return ORDER;
-	}
-
-	/** Uses the supplied lattice's precheck; merge may impose stronger rules. Nil is absent state. */
-	@Override public AString checkValue(ACell value) {
-		return LatticeOps.checkValue(ordering,value);
 	}
 
 	public ALattice<V> getLattice() { return ordering; }

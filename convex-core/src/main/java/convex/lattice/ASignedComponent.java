@@ -4,9 +4,7 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import convex.core.data.ACell;
-import convex.core.data.AString;
 import convex.core.data.SignedData;
-import convex.core.data.Strings;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
@@ -29,8 +27,6 @@ import convex.lattice.generic.SignedLattice;
  * @param <V> Unsigned domain value
  */
 public abstract class ASignedComponent<V extends ACell> extends ALatticeComponent<V> {
-
-	private static final AString EXPECTED_ENVELOPE=Strings.intern("Expected a signed envelope");
 
 	/** Signed storage for live envelope merging; unsigned drafts have no direct envelope destination. */
 	private final ACursor<SignedData<V>> destination;
@@ -62,22 +58,6 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	/** Reconciles unsigned drafts using the payload policy bound to their owner. */
 	@Override protected V mergePublication(V own,V other) {
 		return lattice.getValueLattice().merge(own,other);
-	}
-
-	/**
-	 * Checks envelope shape, then delegates to the optional {@link #checkPayload}
-	 * diagnostic. Merge separately verifies the signature, owner and payload under
-	 * its own acceptance policy; it does not invoke this diagnostic.
-	 */
-	@Override public AString checkValue(ACell value) {
-		if (value==null) return null;
-		if (!(value instanceof SignedData<?> signed)) return EXPECTED_ENVELOPE;
-		return checkPayload(signed.getValue());
-	}
-
-	/** Optional domain compatibility check. Receives the untrusted payload without a generic cast. */
-	protected AString checkPayload(ACell value) {
-		return null;
 	}
 
 	/**

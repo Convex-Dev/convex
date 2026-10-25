@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.data.AString;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
 
@@ -92,36 +91,12 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Checks whether a candidate value is compatible with this component.
-	 * Validity is application-defined; success need not imply merge acceptance.
-	 * For example, merge may additionally enforce ownership, freshness or limits.
-	 * The default declares no constraints and accepts every value, including nil.
-	 *
-	 * <p>The candidate uses this component's delivery representation, which may
-	 * differ from its working cursor: signed components check complete envelopes.
-	 * Implementations must inspect the supplied value without installing it or
-	 * changing component state. Ordinary incompatibility, including a wrong value
-	 * type, should return an explanation rather than throw.</p>
-	 *
-	 * <p>This is an explicit diagnostic, not an automatic lifecycle guard. Reads,
-	 * local edits and sync do not invoke it. Local operations should preserve their
-	 * invariants by construction; merge must enforce its own acceptance rules even
-	 * when this method has not been called. A merge may reuse checks where useful,
-	 * normally only for changed incoming data rather than established state.</p>
-	 *
-	 * @param value Candidate value, possibly nil or of an unexpected type
-	 * @return Null if compatible, otherwise an application-defined error reason
-	 */
-	public AString checkValue(ACell value) {
-		return null;
-	}
-
-	/**
 	 * Merges an incoming value at this component's level into its working state. This
 	 * is the component's own behaviour: a lattice offers a default merge for the shape
 	 * it declares, and the component delegates to it, in whole or in part, or applies
-	 * another rule. A component that receives nothing need not define one; the base
-	 * refuses, so a delivery routed to it fails rather than vanishing.
+	 * another rule. Merge is the acceptance boundary for incoming data, so it enforces
+	 * any ownership, validity or limits itself. A component that receives nothing need
+	 * not define one; the base refuses, so a delivery routed to it fails rather than vanishing.
 	 *
 	 * @param other Incoming value at this level
 	 * @return Current working value

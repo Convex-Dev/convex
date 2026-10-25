@@ -2,9 +2,7 @@ package convex.lattice;
 
 import convex.core.data.ACell;
 import convex.core.data.ASet;
-import convex.core.data.AString;
 import convex.core.data.Sets;
-import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.lattice.cursor.AForkableCursor;
 
@@ -13,9 +11,8 @@ import convex.lattice.cursor.AForkableCursor;
  * no-op edits leave it absent. Non-set storage is rejected without changing it.
  * Subclasses can override {@link #createContainer()} to control initialisation.
  *
- * <p>Compatibility checks require only set shape. Applications may override
- * {@link #checkValue} for domain constraints; operations do not call it.
- * Use {@code SetComponent<ACell>} when foreign members may have unfamiliar types.</p>
+ * <p>Members have no runtime type constraint. Use {@code SetComponent<ACell>}
+ * when foreign members may have unfamiliar types.</p>
  *
  * <p>No replication rule is supplied. Ordinary views share their cursor and
  * have a read-only sync. A subclass can implement {@link #rebind} and
@@ -25,8 +22,6 @@ import convex.lattice.cursor.AForkableCursor;
  * @param <V> Set element type
  */
 public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
-
-	private static final AString EXPECTED_SET=Strings.intern("Expected a set");
 
 	/** Binds supplied working storage. Fork publication requires a domain merge rule. */
 	public SetComponent(AForkableCursor<ASet<V>> cursor) {
@@ -39,11 +34,6 @@ public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
 	 * atomic updates may retry it. Reads, removals and clear never call it.
 	 */
 	protected ASet<V> createContainer() { return Sets.empty(); }
-
-	/** Nil denotes absence; members have no runtime type constraint. */
-	@Override public AString checkValue(ACell value) {
-		return value==null || value instanceof ASet<?>?null:EXPECTED_SET;
-	}
 
 	// Inspect foreign storage as cells before the Java generic cast to ASet.
 	@SuppressWarnings("unchecked")
