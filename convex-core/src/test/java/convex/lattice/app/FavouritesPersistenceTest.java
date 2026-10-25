@@ -56,7 +56,7 @@ class FavouritesPersistenceTest {
 			assertEquals(CVMLong.create(100),local.component().get(BOB.getAccountKey()).getValue().get(TIMESTAMP));
 			assertNull(store.getRootData(),"Application publication stops at the host");
 			// Only this step records the host root for a future open.
-			localHost.sync();
+			localHost.checkpoint();
 		}
 		// A fresh store and host prove restoration from the retained root, not a live cursor.
 		try (var store=EtchStore.create(file)) {

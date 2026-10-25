@@ -1409,6 +1409,64 @@ one. The stamped cursor timestamps each changed local write, and a delete is a
 read-modify-write that dissociates a key. Missing maps or vectors below the leaf are
 constructed by the component's write; navigation does not infer container types.
 
+## Saving application state
+
+The same application can run locally, with a durable store, or with optional
+networking. The host owns saving; a network connection does not define durability.
+For a desktop tool or a request requiring durable completion:
+
+```java
+try (var store = EtchStore.create(file)) {
+    var host = LatticeHost.open(store);
+    var app = host.addApplication(new FavouritesApp(host, clock));
+    app.user(key).add(42);
+    app.sync();
+    host.checkpoint();
+}
+```
+
+`checkpoint()` retains and publishes one host snapshot and flushes its store,
+serialised with other host publication. It returns the saved snapshot. It does not
+sync applications or accept private drafts. Without a persistent store, it cannot
+provide restart durability. A failed flush does not undo an edit, retained root or
+network notification; the caller can retry, but must not report durable success.
+Neither checkpoint nor sync acknowledges receipt by another peer.
+
+For a service choosing batched durability, publish with `app.sync(); host.sync();`
+and scope a worker around the service lifetime:
+
+```java
+try (var durability = host.autoFlush(Duration.ofSeconds(1))) {
+    durability.failure().thenAcceptAsync(error -> reportStorageFailure(error));
+    runUntilStopped();
+}
+```
+
+The resource flushes already-retained state only. Closing stops and drains the
+worker, then performs a final flush; it never closes the borrowed store. Its
+`failure()` stage reports the first background error, even if a later retry
+succeeds. Close from the owning service, not a synchronous failure callback.
+The interval is a batching policy, not a deadline guarantee. Requests requiring
+durability still call `host.checkpoint()` explicitly.
+
+`create` requires an empty store; `open` restores its retained root; `replace`
+explicitly discards that root. Several applications share one host. Independent
+hosts must not compete to write one store's retained root.
+
+A durable private draft uses a separate host and store. A forked host's
+`checkpoint()` saves its own snapshot without exchanging with its origin;
+`sync()` explicitly exchanges roots. Reopening restores state, not a hidden
+origin link: accept a reopened draft by delivering its value to the destination
+and explicitly publishing the destination application.
+
+Executable recipes are in
+[`FavouritesLifecycleTest`](../src/test/java/convex/lattice/app/FavouritesLifecycleTest.java)
+and [`FavouritesPersistenceTest`](../src/test/java/convex/lattice/app/FavouritesPersistenceTest.java).
+They cover local saving, reopening, shared applications, automatic flushing,
+private draft storage and explicit replacement. The host failure and concurrency
+contracts are exercised in
+[`LatticeHostDurabilityTest`](../src/test/java/convex/lattice/LatticeHostDurabilityTest.java).
+
 ## Lifecycle and subscriptions (open)
 
 **Not implemented; principles agreed.** Root merge, ownership and publication are

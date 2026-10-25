@@ -1,6 +1,7 @@
 package convex.lattice;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -52,6 +53,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	private final LatticeHost<V> origin;
 	private final ReentrantLock syncLock=new ReentrantLock();
 	private Function<V,V> publisher;
+	private AutoFlush autoFlush;
 	private volatile List<ALatticeComponent<V>> applications=List.of();
 
 	/**
@@ -355,7 +357,62 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * @throws IOException If the store flush fails
 	 */
 	public void flush() throws IOException {
-		if (store!=null) store.flush();
+		syncLock.lock();
+		try {
+			if (store!=null) store.flush();
+		} finally {
+			syncLock.unlock();
+		}
+	}
+
+	/**
+	 * Retains and publishes one host snapshot, then completes its durability barrier.
+	 * Does not sync applications or exchange a fork with its origin: a private host
+	 * can be checkpointed without accepting its changes into the original host.
+	 * Concurrent edits remain pending. A failed barrier does not undo publication;
+	 * callers may retry. Without a store there is no restart durability guarantee.
+	 *
+	 * @return the snapshot retained and flushed, not any concurrent working edits
+	 * @throws IOException if retaining the root or flushing fails
+	 */
+	public V checkpoint() throws IOException {
+		syncLock.lock();
+		try {
+			V published=sync(this::publishRoot);
+			flush();
+			return published;
+		} catch (StoreException e) {
+			if (e.getCause() instanceof IOException cause) throw cause;
+			throw e;
+		} finally {
+			syncLock.unlock();
+		}
+	}
+
+	/**
+	 * Starts scoped periodic flushing of already-retained state. Neither application
+	 * publication nor host sync is automatic. Close the returned resource before the
+	 * borrowed store; it stops the worker and performs a final flush. Only one such
+	 * resource may be active on a host. Use {@link #checkpoint()} for durable requests.
+	 */
+	public AutoFlush autoFlush(Duration interval) {
+		syncLock.lock();
+		try {
+			if (autoFlush!=null) throw new IllegalStateException("Host already has an automatic flusher");
+			autoFlush=new AutoFlush(this,interval);
+			return autoFlush;
+		} finally {
+			syncLock.unlock();
+		}
+	}
+
+	void releaseAutoFlush(AutoFlush resource) {
+		syncLock.lock();
+		try {
+			if (autoFlush==resource) autoFlush=null;
+		} finally {
+			syncLock.unlock();
+		}
 	}
 
 	private V publishRoot(V value) {
