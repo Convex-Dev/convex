@@ -182,6 +182,10 @@ the host, then the store. Closing the host neither syncs applications nor closes
 the store. A closed host refuses further syncs, checkpoints and flushes. If the
 final checkpoint fails, the host stays open and closing again retries.
 
+Only the service that owns the host closes it. A component running on a host it
+was given, such as an embedded engine, syncs its own drafts at shutdown and leaves
+closing the host to its owner.
+
 A service that shuts down from a JVM shutdown hook registers that work with
 `Shutdown.addHook(Shutdown.SERVICE, ...)`, not `Runtime.addShutdownHook`. The JVM
 runs separate hooks concurrently, so a separate hook races Convex's own hook,
