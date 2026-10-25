@@ -276,8 +276,8 @@ The CAD028 node vector is:
 
 Exactly one of entries and data is non-null. Legacy four- and five-field nodes
 remain readable without rewriting. Local edits materialise `mtime` when needed;
-merge does not synthesise an extension. Older readers which reject extra fields
-must upgrade before receiving extended nodes. Empty tombstone indexes remain
+merge does not synthesise an extension. The upgrade from legacy nodes is one-way
+(see [Upgrading Is One-Way](#upgrading-is-one-way)). Empty tombstone indexes remain
 invalid; an unused slot is omitted or padded with nil.
 
 When effective `mtime` equals `utime`, writers may store nil in the `mtime` slot
@@ -315,6 +315,30 @@ deleting that same source value. If the source changes meanwhile, both versions
 remain and the move reports an error. Such moves cannot honour `ATOMIC_MOVE`.
 Different NIO providers use Java's generic copy/move path. Copies of directories
 are shallow unless `DLFSOption.RECURSIVE` is supplied between DLFS drives.
+
+### Upgrading Is One-Way
+
+Readers without `mtime` support (convex-core 0.8.17 and earlier) accept only
+four- and five-field nodes. A current implementation reads such a drive without
+rewriting it, but its first ordinary write extends every node on the written
+path, the root included, because ancestors keep their `mtime` while their `utime`
+advances. An older reader then rejects the drive at its root. It cannot open the
+drive, and as a replica its merge falls back to its own value, so it stops
+receiving updates without reporting an error.
+
+Operators should therefore:
+
+- **Back up before upgrading.** Copy the store (for example the closed Etch file)
+  before the first start with a current version. The only way back is to restore
+  that copy, and writes made after the upgrade are lost unless another replica
+  holds them.
+- **Upgrade every replica of a drive together.** An upgraded replica merges legacy
+  state from an older one; the reverse does not hold.
+
+Readers from this version on accept and preserve unknown trailing fields, so a
+later trailing extension does not make drives unreadable to them.
+`DLFSCompatibilityTest` reads fixtures written by 0.8.17 and by the current
+writer, and checks that a first write extends the path to the root.
 
 ## Merge Semantics
 
