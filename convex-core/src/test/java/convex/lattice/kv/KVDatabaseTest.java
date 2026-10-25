@@ -26,6 +26,23 @@ import convex.lattice.generic.MapLattice;
  */
 public class KVDatabaseTest {
 
+	@Test void namedDatabaseAccessRejectsIncompatibleParentsAndPreservesSiblings() {
+		for (boolean explicitReplica:new boolean[] {false,true}) {
+			var root=new Root<ACell>();
+			var db=explicitReplica?KVDatabase.connect(root,"db",Strings.intern("replica")):KVDatabase.connect(root,"db");
+			for (ACell bad:new ACell[] {Strings.intern("not a map"),Index.none()}) {
+				root.set(bad);
+				assertThrows(IllegalStateException.class,() -> db.kv().get("key"));
+				assertThrows(IllegalStateException.class,() -> db.kv().set("key",Strings.intern("value")));
+				assertSame(bad,root.get());
+			}
+			var opaque=Strings.intern("future database");
+			root.set(Maps.of(Strings.intern("other"),opaque));
+			db.kv().set("key",Strings.intern("value"));
+			assertSame(opaque,((AHashMap<?,?>)root.get()).get(Strings.intern("other")));
+		}
+	}
+
 	@Test
 	public void testDefaultReplicaRuleRejectsUnresolvedOwners() {
 		var attacker=AKeyPair.createSeeded(9291);

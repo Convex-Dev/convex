@@ -15,6 +15,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.lattice.IndexComponent;
 import convex.social.Social;
 import convex.social.SocialHelpers;
 
@@ -37,7 +38,7 @@ final class SocialReplicationPolicy {
 	SocialReplicationPolicy(P2PApplication application,DIDKeyAuthorizer authorizer) {
 		this.application=application;
 		this.authorizer=authorizer;
-		social=Social.connect(application.cursor().withDefault(Index.none()).path(Social.KEY_SOCIAL),authorizer,
+		social=Social.connect(new IndexComponent<>(application.cursor()).path(Social.KEY_SOCIAL),authorizer,
 			(owner,value) -> {
 				AKeyPair key=localSigners.get(owner);
 				return key==null?null:key.signData(value);

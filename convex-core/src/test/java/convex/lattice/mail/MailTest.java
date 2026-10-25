@@ -40,6 +40,27 @@ import convex.lattice.generic.KeyedLattice;
 /** The mail components: atomic sends, open, receive and hosting. */
 public class MailTest {
 
+	@Test void applicationAndMailboxViewsRejectIncompatibleContainersWithoutCreatingState() {
+		var root=new Root<ACell>();
+		var app=new LatticeApplication<Index<Keyword,ACell>>(KeyedLattice.create(Mail.KEY_MAIL,Mail.LATTICE),root.path()) {};
+		var mail=Mail.connect(app,Mail.LATTICE,null);
+		var inbox=mail.mailbox(BOB_DID);
+		assertTrue(inbox.deposited().isEmpty());
+		assertNull(root.get());
+		var envelope=MailEnvelope.plain(ALICE,BOB_DID,ALICE_DID,100,Strings.intern("hello"));
+		for (ACell bad:List.<ACell>of(Strings.intern("not an index"),Maps.empty(),Index.of(Mail.KEY_MAIL,Index.none()))) {
+			root.set(bad);
+			assertThrows(IllegalStateException.class,inbox::deposited);
+			assertThrows(IllegalStateException.class,() -> mail.send(envelope));
+			assertSame(bad,root.get());
+		}
+		var other=Keyword.intern("other");
+		root.set(Index.of(other,Strings.intern("opaque")));
+		mail.send(envelope);
+		assertEquals(List.of(envelope),inbox.deposited());
+		assertEquals(Strings.intern("opaque"),((Index<?,?>)root.get()).get(other));
+	}
+
 	/** Identity resolution and signing share one explicit mapping, including indirect DIDs. */
 	@Test void oneSignerServesMultipleOwnersAcrossForksAndTransactions() {
 		var bob=Strings.create("did:convex:42");

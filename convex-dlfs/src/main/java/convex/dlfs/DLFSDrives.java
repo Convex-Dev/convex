@@ -16,6 +16,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.MapComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -110,7 +111,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
-			return new DLFSDrive(key,cursor().withDefault(Maps.empty()).path(key),store,location.child(key),clock,files);
+			return new DLFSDrive(key,new MapComponent<>(cursor()).path(key),store,location.child(key),clock,files);
 		});
 	}
 

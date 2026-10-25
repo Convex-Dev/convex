@@ -578,10 +578,11 @@ an eight-byte timestamp prefix plus eight random bytes. Independent replicas can
 post at the same time without choosing the same identity. The key and timestamp
 are resolved once per operation and retained across atomic update retries.
 
-Reads return null for absent paths. Components with a known container type can use
-`cursor.withDefault(Maps.empty()).path(key)` or the corresponding index default:
-reads and navigation create no state, and the first changed write constructs the
-container atomically. This does not require a lattice definition. The optional
+Reads return null for absent paths. `MapComponent.path(key)` and
+`IndexComponent.path(key)` construct the appropriate container on the first changed
+write. Reads, navigation and no-op edits create no state; incompatible containers
+throw instead of being replaced. Override `createContainer()` to supply initial
+contents or reject creation. This does not require a lattice definition. The optional
 `LatticeComponent.resolve` helper uses lattice zero values when the implementation
 already has a lattice describing its shape. A plain path write requires the
 intermediate containers to exist.
@@ -633,8 +634,10 @@ methods add and remove numeric IDs, while retaining unfamiliar members supplied
 by other versions. The application's field accessor exposes the relayed value directly.
 The standard
 component supplies atomic `add`, `remove` and `clear` operations, membership and
-size queries, and immutable snapshots through `get()`. It treats an absent set as
-empty without creating state. Its cursor passes through the favourites record's
+size queries, and immutable snapshots through `get()`. Missing storage reads as null;
+size and membership queries return zero and false. Adding an item creates a set,
+while removing or clearing an absent set creates no state. Its cursor passes
+through the favourites record's
 `Timestamped` component and signing boundary, so a changed set and its timestamp are
 signed together. No-op edits retain the existing timestamp and signature.
 
@@ -675,7 +678,8 @@ edits receive the same stamping as embedded set operations. Incoming signed
 envelopes continue through the signed boundary, retaining the winning signature.
 
 These defaults belong at their respective
-levels: the record chooses `{}`, while the set component handles `nil` as `#{}`.
+levels: the record chooses `{}`, while the set component creates a set on addition
+and leaves absent storage as null on reads.
 No projection functions are needed in the application. `withDefault` also supplies
 the default to atomic update functions; a changed write creates storage, and a
 null write clears storage so subsequent reads see the default again.
@@ -795,9 +799,7 @@ final class SocialApp extends AKeyedRegions {
     final Social social;
     SocialApp(LatticeHost<Index<Keyword, ACell>> host, AKeyPair keyPair) {
         super(host);
-        social = region(Social.KEY_SOCIAL, Social.connect(cursor().path(Social.KEY_SOCIAL),
-            DIDKeyAuthorizer.CONVEX, (owner, value) -> keyPair.signData(value),
-            Utils::getCurrentTimestampCell).fork());
+        social = region(Social.KEY_SOCIAL, Social.connect(this, keyPair).fork());
     }
 }
 
@@ -969,9 +971,12 @@ already implement this child stage; subclasses normally customise preparation on
 
 `MapComponent<K,V>` and `IndexComponent<K,V>` provide ordinary atomic collection
 operations: `get`, `put`, `remove`, `clear`, `containsKey`, `size` and `path(key)`.
-They share their supplied storage. Nil reads as an empty collection; reads and
-no-op removals do not materialise it. An entry path creates the correctly typed
-containing collection on its first changed write and preserves sibling entries.
+They share their supplied storage. `get()` returns null for absent storage;
+counts and predicates return zero and false. Reads and no-op removals do not
+materialise a collection. An entry path creates the correctly typed containing
+collection on its first changed write and preserves sibling entries. Override the
+pure `createContainer()` hook to supply initial contents or reject creation;
+atomic updates may retry this hook.
 Nil is also a legitimate stored value, so use `containsKey` to distinguish it from
 an absent entry. Incompatible container representations are rejected on access.
 
@@ -1623,7 +1628,7 @@ Worked examples:
 - [CAD038 Lattice Authorisation](https://docs.convex.world/docs/cad/lattice_auth) — signer authorisation.
 - [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) and [LATTICE_REGIONS.md](LATTICE_REGIONS.md).
 
-### Atomic mail sends
+### Atomic mail operations
 
 `Mail.send(envelope)` performs one atomic deposit in the recipient's mailbox.
 The deposited lattice entry is the complete send state. There is no separate
@@ -1636,3 +1641,9 @@ All sends commit or abort with the draft. Repeated sends of the same envelope ar
 idempotent, and a receipt absorbs later deposits at that key. Forks use the same
 state and merge rule. Live `Mail.sync()` is a no-op; a fork's sync publishes its
 working state. Publication, persistence and receipt are separate from local commit.
+
+`mail.mailbox(recipient).receive(envelopes)` prepares and verifies all signed
+receipts before committing them in one component transaction. A signer failure
+leaves the mailbox unchanged. Commit retries retain concurrent deposits and reuse
+the prepared receipts. On a fork or inside a larger transaction, the batch remains
+within that working state until its enclosing boundary publishes or commits.

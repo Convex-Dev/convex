@@ -11,10 +11,11 @@ import convex.core.data.AString;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.IndexComponent;
+import convex.lattice.MapComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
@@ -83,7 +84,7 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	/** Connects to an application's mail region without inheriting any policy. */
 	public static Mail connect(ALatticeApplication<Index<Keyword,ACell>> application,MailLattice lattice,
 			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		return connect(application.cursor().withDefault(Index.none()).path(KEY_MAIL),lattice,signer);
+		return connect(new IndexComponent<>(application.cursor()).path(KEY_MAIL),lattice,signer);
 	}
 
 	public MailLattice getLattice() { return lattice; }
@@ -99,7 +100,7 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	public Mailbox mailbox(AString did) {
 		MailboxLattice mailbox=lattice.forMailbox(did);
 		if (mailbox==null) throw new IllegalArgumentException("Mailbox must be a canonical base DID");
-		return new Mailbox(cursor().withDefault(Maps.empty()).path(did),mailbox,signer);
+		return new Mailbox(new MapComponent<>(cursor()).path(did),mailbox,signer);
 	}
 
 	/**

@@ -7,9 +7,9 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
+import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.impl.DLFSLocal;
@@ -71,7 +71,7 @@ public class DLFS {
 	@SuppressWarnings("unchecked")
 	public static DLFSLocal connect(AForkableCursor<?> parent, AString driveName, AStore store) {
 		var drives=(AForkableCursor<AHashMap<AString,AVector<ACell>>>)parent;
-		AForkableCursor<AVector<ACell>> cursor=drives.withDefault(Maps.empty()).path(driveName);
+		AForkableCursor<AVector<ACell>> cursor=new MapComponent<>(drives).path(driveName);
 		// Atomic initialisation must not replace another caller's concurrent writes.
 		cursor.updateAndGet(current -> current!=null?current:DLFSLattice.INSTANCE.zero());
 		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store,DLFSLocation.at(parent,driveName));
@@ -103,7 +103,7 @@ public class DLFS {
 	@SuppressWarnings("unchecked")
 	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName, AStore store) {
 		var drives=(AForkableCursor<AHashMap<AString,AVector<ACell>>>)parent;
-		AForkableCursor<AVector<ACell>> cursor=drives.withDefault(Maps.empty()).path(driveName);
+		AForkableCursor<AVector<ACell>> cursor=new MapComponent<>(drives).path(driveName);
 		if (cursor.get()==null) return null;
 		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store,DLFSLocation.at(parent,driveName));
 	}

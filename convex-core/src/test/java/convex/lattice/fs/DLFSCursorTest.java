@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -21,6 +23,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
@@ -46,6 +49,27 @@ import convex.lattice.generic.OwnerLattice;
  * - Syncing changes back via lattice merge
  */
 public class DLFSCursorTest {
+
+	@Test void namedDriveNavigationDistinguishesAbsenceFromIncompatibleParents() throws Exception {
+		var root=new Root<ACell>();
+		var name=Strings.intern("home");
+		assertNull(DLFS.open(root,name));
+		assertNull(root.get(),"Opening must not initialise a drive map");
+		for (ACell bad:new ACell[] {CVMLong.ONE,Index.none()}) {
+			root.set(bad);
+			assertThrows(IllegalStateException.class,() -> DLFS.open(root,name));
+			assertThrows(IllegalStateException.class,() -> DLFS.connect(root,name));
+			assertSame(bad,root.get());
+		}
+		var other=Strings.intern("other");
+		root.set(Maps.of(other,CVMLong.ONE));
+		try (var created=DLFS.connect(root,name); var opened=DLFS.open(root,name)) {
+			assertNotNull(opened);
+			Files.writeString(created.getPath("/hello"),"hello");
+			assertEquals("hello",Files.readString(opened.getPath("/hello")));
+			assertSame(CVMLong.ONE,((AHashMap<?,?>)root.get()).get(other));
+		}
+	}
 
 	@Test
 	public void testStandaloneDLFS() throws Exception {

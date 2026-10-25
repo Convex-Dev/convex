@@ -38,7 +38,9 @@ ordinary Java functions supplied by their owning components.
 callbacks may retry and must be side-effect free. They receive the actual current
 value, including `null`; no empty value is substituted.
 
-`path(keys...)` creates a view without changing state. Reads use `RT.getIn`; writes
+`path(keys...)` creates a view without changing state. Reads use `RT.getIn`, which
+returns null for absent or incompatible ancestors. Use collection component paths
+when incompatible containers must be distinguished from absence. Writes
 use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. All
 intermediate containers must already exist. An absent final value can be replaced,
 but writing through an absent container throws. `assoc` and `assocIn` follow the same
@@ -54,8 +56,14 @@ component concern; cursors accept canonical CVM keys.
 
 ## Component-supplied construction
 
-A component can use `ProjectionCursor.create(source, read, write)` to expose a child
-without requiring existing containers. The cursor only executes the supplied
+For ordinary collections, use `MapComponent.path(key)` or `IndexComponent.path(key)`.
+They reject incompatible stored containers and create a correctly typed container
+only on a changed write. Their pure `createContainer()` hook can supply initial
+contents or refuse creation. Reads and no-op edits leave missing storage absent.
+
+For custom representations, a component can use
+`ProjectionCursor.create(source, read, write)` to expose a child without requiring
+existing containers. The cursor only executes the supplied
 functions; the component's write function chooses what to construct:
 
 ```java
@@ -172,8 +180,8 @@ For custom composition, the underlying cursor mechanisms remain available:
 
 ```java
 var rule = owners.signingFor(owner);
-var unsigned = SignedCursor.create(slot, value -> rule.sign(context, value));
-var edits = StampedCursor.create(storage, context::currentTimestamp, lattice::stamp);
+var unsigned = SignedCursor.create(slot, value -> rule.sign(value, signer));
+var edits = StampedCursor.create(storage, getTimestamp, lattice::stamp);
 ```
 
 `ATransformCursor` supplies the atomic operations for paths, projections and authored views.
@@ -203,7 +211,8 @@ for unsigned working state that is signed only when published.
 - `convex.lattice.LatticeOps`: strict path updates and explicit component construction helpers.
 - `convex.lattice.ALatticeComponent`, `ALatticeApplication`, `LatticeHost`: structure,
   merge policy and publication lifecycle.
-- `convex.lattice.LatticeContext`: component signing capabilities and write policy.
+- `convex.lattice.LatticeContext`: optional policy for lattice adapters; domain
+  components bind their own signing and clock functions.
 - [CAD035 Lattice Cursors](https://docs.convex.world/docs/cad/cursors): earlier cursor model.
 - [CAD024 Data Lattice](https://docs.convex.world/docs/cad/data_lattice): lattice specification.
 - [CAD038 Lattice Authorisation](https://docs.convex.world/docs/cad/lattice_auth): authorisation.

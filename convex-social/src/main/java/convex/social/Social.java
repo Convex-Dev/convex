@@ -17,6 +17,7 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeApplication;
+import convex.lattice.IndexComponent;
 import convex.lattice.OwnedMap;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -148,12 +149,12 @@ public class Social extends OwnedMap<ACell,Index<Keyword,ACell>> implements Tran
 
 	/** Opens a relay view of an application's standard social region. */
 	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application) {
-		return connect(application.cursor().withDefault(Index.none()).path(KEY_SOCIAL));
+		return connect(new IndexComponent<>(application.cursor()).path(KEY_SOCIAL));
 	}
 
 	/** Opens a did:key author view of an application's standard social region. */
 	public static Social connect(ALatticeApplication<Index<Keyword,ACell>> application,AKeyPair keyPair) {
-		return connect(application.cursor().withDefault(Index.none()).path(KEY_SOCIAL),
+		return connect(new IndexComponent<>(application.cursor()).path(KEY_SOCIAL),
 			DIDKeyAuthorizer.CONVEX,(owner,value) -> keyPair.signData(value),Utils::getCurrentTimestampCell);
 	}
 

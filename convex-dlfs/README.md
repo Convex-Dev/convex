@@ -230,32 +230,34 @@ var host = RelayHost.openHost(Index.<Keyword, ACell>none(), store, nodeConfig);
 var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
     Utils::getCurrentTimestampCell, 30_000,
     Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
-var node = new NodeServer<>(host, nodeConfig);
-LatticePropagator group = new LatticePropagator(store, LatticePropagatorConfig.create());
-group.setTransportKeyPair(myKeyPair);
-node.addPropagator(group);
-LatticeListener transport = new LatticeListener(nodeConfig);
-transport.registerPropagator(group);
-transport.setSelector(connection -> group);
-node.launch();
-transport.launch();
+var did = DID.forKey(myKeyPair.getAccountKey());
+try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPair).launch()) {
+    var group = network.createPropagator();
+    network.serveAllInbound(group); // explicitly allow inbound access to this view
 
-DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
-DLFSDriveManager routes = DLFSDriveManager.createRouter(() -> {
+    DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
+    DLFSDriveManager routes = DLFSDriveManager.createRouter(() -> {
+        networkedApp.sync();
+        host.sync();
+    })
+        .mountAnonymous(ownerDrives)
+        .mount(did.toString(), ownerDrives);
+    if (ownerDrives.getOrCreateDrive("home") == null) {
+        throw new IllegalStateException("Cannot open home drive");
+    }
     networkedApp.sync();
-    node.getHost().sync();
-})
-    .mountAnonymous(ownerDrives)
-    .mount(DID.forKey(myKeyPair.getAccountKey()).toString(), ownerDrives);
-if (ownerDrives.getOrCreateDrive("home") == null) {
-    throw new IllegalStateException("Cannot open home drive");
-}
-networkedApp.sync();
-node.getHost().sync();
+    host.sync();
 
-DLFSServer networkedServer = DLFSServer.createWithAudience(routes, myKeyPair);
-networkedServer.start(0);
+    try (var networkedServer = DLFSServer.createWithAudience(routes, myKeyPair)) {
+        networkedServer.start(0);
+        // Run the application's service loop here, until shutdown is requested.
+    }
+}
 ```
+
+The propagator inherits the node's identity key and can be configured with peers
+while running. An empty peer list is safe. Closing the network stops its listener
+and propagators; the caller retains ownership of the store.
 
 The standard assembly is `LatticeHost` → `DLFSApplication` → `DLFSRegion`
 → `DLFSDrives` → `DLFSDrive`. The application is not owner-scoped: it can obtain

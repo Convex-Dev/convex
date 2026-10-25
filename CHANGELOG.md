@@ -41,12 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Typed lattice component transactions stage domain operations atomically, with async completion and an opt-in transactional root for exclusive execution and contention fallback. Ordinary roots retain their existing write path.
 - REST `POST /api/v1/simulate` accepts source or binary transactions without signing credentials, returning transaction accounting results under public query limits, including `JUICE` errors for zero-balance accounts.
 - Java clients expose `simulate` and `simulateSync` for transaction accounting and cost estimates; the GUI stress tool labels this mode "Simulate" to distinguish it from ordinary queries.
-- Lattice applications attach to an explicitly created or opened root host, inspect their root lattice, and atomically merge incoming state without defining domain components.
+- Lattice applications attach to an explicitly created or opened root host and define incoming merge policy through their domain components or an optional lattice adapter.
 - Lattice applications support private working state and an application-defined `beforeSync` hook. `SignedComponent` batches unsigned domain edits into signed publications, reusing prepared signatures across unrelated CAS conflicts. Applications needing immediate visibility share the host cursor directly.
 - Root components can delegate incoming values to a fixed application list, retaining only application publication results. Applications may supply their own lattices, and a signed subtree is published by the component that owns it through that component's own fork, so sequential and racing edits to the same signed subtree combine without giving the root a signer.
 - Typed ownership lattices for hash maps and indexes, including DID verification bound to each lattice instance and a public-key index specialisation. Existing `OwnerLattice<V>` callers remain supported.
 
 ### Changed
+
+- Social, Mail, KV and DLFS entry views use standard collection navigation: absent reads leave storage untouched, changed writes create the declared container type, and incompatible containers throw without replacing existing data.
+
+- Mailbox receipt batches commit atomically. All receipts are prepared and verified before any state changes; failed signing leaves the batch unapplied and commit retries preserve concurrent deposits without signing unchanged receipts again.
 
 - `LatticeQueue` uses an overridable `createContainer()` for local initialisation, matching the collection component policy. Broader queue design review is tracked in [#770](https://github.com/Convex-Dev/convex/issues/770).
 

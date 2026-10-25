@@ -14,6 +14,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.lattice.LatticeContext;
+import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerMapLattice;
@@ -159,7 +160,7 @@ public class KVDatabase {
 	public static KVDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
 		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = databases.withDefault(Maps.empty()).path(dbName);
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = new MapComponent<>(databases).path(dbName);
 		LatticeKV kv = LatticeKV.connect(cursor);
 		return new KVDatabase(dbName, null, null, kv);
 	}
@@ -177,7 +178,7 @@ public class KVDatabase {
 	public static KVDatabase connect(AForkableCursor<?> parent, String name, AString replicaID) {
 		AString dbName = Strings.create(name);
 		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = databases.withDefault(Maps.empty()).path(dbName);
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = new MapComponent<>(databases).path(dbName);
 		LatticeKV kv = LatticeKV.connect(cursor, replicaID);
 		return new KVDatabase(dbName, null, null, kv);
 	}

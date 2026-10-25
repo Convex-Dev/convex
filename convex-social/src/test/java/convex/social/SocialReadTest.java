@@ -21,7 +21,9 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeApplication;
 import convex.lattice.cursor.Root;
+import convex.lattice.generic.KeyedLattice;
 
 /** Reads distinguish absence, empty values and incompatible data without modifying storage. */
 class SocialReadTest {
@@ -29,6 +31,27 @@ class SocialReadTest {
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(7812);
 	private static final AString DID_ALICE=DID.forKey(ALICE.getAccountKey());
 	private static final Blob POST=SocialPost.createKey(100,1);
+
+	@Test void applicationViewsRejectIncompatibleRootsAndPreserveOtherRegions() {
+		var root=new Root<ACell>();
+		var app=new LatticeApplication<Index<Keyword,ACell>>(
+			KeyedLattice.create(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE),root.path()) {};
+		var relay=Social.connect(app).user(DID_ALICE);
+		var author=Social.connect(app,ALICE).user(DID_ALICE);
+		assertEquals(0,relay.feed().count());
+		assertNull(root.get());
+		for (ACell bad:List.<ACell>of(CVMLong.ONE,Maps.empty(),Index.of(Social.KEY_SOCIAL,Index.none()))) {
+			root.set(bad);
+			assertThrows(IllegalStateException.class,() -> relay.feed().count());
+			assertThrows(IllegalStateException.class,() -> author.feed().post("hello"));
+			assertSame(bad,root.get());
+		}
+		var other=Keyword.intern("other");
+		root.set(Index.of(other,CVMLong.ONE));
+		var key=author.feed().post("hello");
+		assertNotNull(relay.feed().getPost(key));
+		assertSame(CVMLong.ONE,((Index<?,?>)root.get()).get(other));
+	}
 
 	private static Social social(Index<Keyword,ACell> state) {
 		var social=Social.create(ALICE);
