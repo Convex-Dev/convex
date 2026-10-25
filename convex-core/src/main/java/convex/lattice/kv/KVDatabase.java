@@ -116,7 +116,9 @@ public class KVDatabase {
 	/**
 	 * Connects to a database within an existing cursor chain (e.g. from a NodeServer).
 	 * The parent cursor should be post-SignedCursor (navigated past the signing boundary).
-	 * Signing and replication are handled by the cursor chain.
+	 * Signing belongs to that boundary; host publication remains explicit.
+	 * Connecting does not write or sign state. Missing containers are created
+	 * atomically by the first changed KV operation.
 	 *
 	 * @param parent Parent lattice cursor (e.g. a SignedCursor for the owner's db map)
 	 * @param name Database name to connect to
@@ -127,15 +129,13 @@ public class KVDatabase {
 		AString dbName = Strings.create(name);
 		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
 		AForkableCursor<Index<AString, AVector<ACell>>> cursor = databases.withDefault(Maps.empty()).path(dbName);
-		if (cursor.get() == null) {
-			cursor.set(KVStoreLattice.INSTANCE.zero());
-		}
 		LatticeKV kv = LatticeKV.connect(cursor);
 		return new KVDatabase(dbName, null, null, kv);
 	}
 
 	/**
 	 * Connects to a database within an existing cursor chain with a replica ID.
+	 * Like {@link #connect(AForkableCursor, String)}, opening the view is read-only.
 	 *
 	 * @param parent Parent lattice cursor (e.g. a SignedCursor for the owner's db map)
 	 * @param name Database name to connect to
@@ -147,9 +147,6 @@ public class KVDatabase {
 		AString dbName = Strings.create(name);
 		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
 		AForkableCursor<Index<AString, AVector<ACell>>> cursor = databases.withDefault(Maps.empty()).path(dbName);
-		if (cursor.get() == null) {
-			cursor.set(KVStoreLattice.INSTANCE.zero());
-		}
 		LatticeKV kv = LatticeKV.connect(cursor, replicaID);
 		return new KVDatabase(dbName, null, null, kv);
 	}

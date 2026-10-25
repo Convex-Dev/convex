@@ -16,12 +16,62 @@ import convex.core.data.Strings;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.Root;
 import convex.lattice.generic.MapLattice;
 
 /**
  * Tests for KVDatabase — signed, replicated KV stores in the global lattice.
  */
 public class KVDatabaseTest {
+
+	@Test
+	public void testConnectingAbsentDatabaseDoesNotWrite() {
+		for (boolean explicitReplica:new boolean[]{false,true}) {
+			var parent=Root.<AHashMap<AString,Index<AString,AVector<ACell>>>>create(null);
+			var db=explicitReplica?KVDatabase.connect(parent,"db",Strings.create("replica")):
+				KVDatabase.connect(parent,"db");
+			assertNull(parent.get(),"connecting must not initialise or sign state");
+			assertNull(db.kv().get("missing"));
+			assertFalse(db.kv().del("missing"));
+			db.kv().sync();
+			assertNull(parent.get(),"reads and no-op edits must preserve absence");
+			db.kv().set("first",Strings.create("value"));
+			assertEquals(Strings.create("value"),db.kv().get("first"));
+			assertNotNull(parent.get().get(Strings.create("db")));
+		}
+	}
+
+	@Test
+	public void testConnectPreservesConcurrentCreation() {
+		var content=LatticeKV.create();
+		content.set("valuable",Strings.create("concurrent write"));
+		AHashMap<AString,Index<AString,AVector<ACell>>> populated=
+			Maps.of(Strings.create("db"),content.cursor().get());
+		for (boolean explicitReplica:new boolean[]{false,true}) {
+			// Deterministically publish another writer's database just after a read of
+			// absent state. A read-then-set initialisation would erase that writer.
+			var parent=new Root<AHashMap<AString,Index<AString,AVector<ACell>>>>(Maps.empty()) {
+				boolean pending=true;
+				void publish() {
+					if (!pending) return;
+					pending=false;
+					super.set(populated);
+				}
+				@Override public AHashMap<AString,Index<AString,AVector<ACell>>> get() {
+					var observed=super.get();
+					publish();
+					return observed;
+				}
+			};
+			var db=explicitReplica?KVDatabase.connect(parent,"db",Strings.create("replica")):
+				KVDatabase.connect(parent,"db");
+			parent.publish(); // A read-free connect leaves the other writer to run now.
+			assertSame(populated,parent.get());
+			db.kv().set("local",Strings.create("local write"));
+			assertEquals(Strings.create("concurrent write"),db.kv().get("valuable"));
+			assertEquals(Strings.create("local write"),db.kv().get("local"));
+		}
+	}
 
 	@Test
 	public void testCreateAndUse() {
