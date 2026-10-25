@@ -35,12 +35,17 @@ public class DLFSDrivesTest {
 		var drive=drives.getOrCreateDrive("home",1);
 		assertNotNull(drive);
 		Files.writeString(drive.fileSystem().getPath("/hello.txt"),"preserved");
+		var oldPath=drive.fileSystem().getPath("/hello.txt");
 		var before=drives.cursor().get();
 		time.set(CVMLong.create(200));
 		assertSame(drive,drives.getOrCreateDrive("home",0));
 		assertNull(drives.createDrive("home"));
 		assertNull(drives.getOrCreateDrive("another",1));
 		drive.close();
+		assertThrows(java.nio.file.ClosedFileSystemException.class,()->Files.writeString(oldPath,"stale write"));
+		assertThrows(java.nio.file.ClosedFileSystemException.class,drive.fileSystem()::sync);
+		assertThrows(java.nio.file.ClosedFileSystemException.class,drive.fileSystem()::fork);
+		assertThrows(java.nio.file.ClosedFileSystemException.class,drive.fileSystem()::clone);
 		var reopened=drives.getOrCreateDrive("home",1);
 		assertNotSame(drive,reopened);
 		assertEquals("preserved",Files.readString(reopened.fileSystem().getPath("/hello.txt")));

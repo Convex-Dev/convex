@@ -23,7 +23,7 @@ import convex.lattice.fs.DLPath;
 
 public class DLFileChannel implements SeekableByteChannel {
 
-	private boolean isOpen=true;
+	private volatile boolean isOpen=true;
 	private boolean readOnly=true;
 	private long position=0;
 	private int bytesUntilPersist=DLFileSystem.BLOB_PERSIST_INTERVAL;
@@ -74,7 +74,7 @@ public class DLFileChannel implements SeekableByteChannel {
 
 	@Override
 	public boolean isOpen() {
-		return isOpen;
+		return isOpen && fileSystem.isOpen();
 	}
 
 	@Override
@@ -163,7 +163,7 @@ public class DLFileChannel implements SeekableByteChannel {
 	}
 
 	private void checkOpen() throws ClosedChannelException {
-		if (!isOpen) {
+		if (!isOpen()) {
 			throw new ClosedChannelException();
 		}
 	}

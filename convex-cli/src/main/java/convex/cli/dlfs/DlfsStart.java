@@ -27,6 +27,7 @@ import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSServer;
+import convex.lattice.LatticeHost;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
 import convex.node.NodeConfig;
@@ -169,10 +170,7 @@ public class DlfsStart extends ACommand {
 
 		// Serve the local owner's drives through the application's registered region.
 		AccountKey accountKey = keyPair.getAccountKey();
-		DLFSDrives ownerDrives=application.drives(accountKey);
-		DLFSDriveManager driveManager=DLFSDriveManager.createRouter()
-			.mountAnonymous(ownerDrives)
-			.mount(DID.forKey(accountKey).toString(),ownerDrives);
+		DLFSDriveManager driveManager=createDriveManager(nodeServer.getHost(),application,accountKey);
 		DLFSServer dlfsServer = DLFSServer.createWithAudience(driveManager,keyPair);
 		// The CLI currently exposes shared anonymous drives on the loopback-only server.
 		// Authentication-aware per-user drive provisioning is a separate product concern.
@@ -186,7 +184,7 @@ public class DlfsStart extends ACommand {
 				}
 				inform("Drive '" + driveName + "' connected to lattice at :fs/" + accountKey.toHexString(6) + ".../" + driveName);
 			}
-			application.sync();
+			driveManager.sync();
 			dlfsServer.start(port);
 		} catch (RuntimeException e) {
 			dlfsServer.close();
@@ -239,6 +237,17 @@ public class DlfsStart extends ACommand {
 			if (trayInstalled) TrayManager.remove();
 			shutdown.run();
 		}
+	}
+
+	/** Composes local routing with the CLI's explicit publication policy. */
+	static DLFSDriveManager createDriveManager(LatticeHost<Index<Keyword,ACell>> host,
+			DLFSApplication application,AccountKey accountKey) {
+		DLFSDrives ownerDrives=application.drives(accountKey);
+		return DLFSDriveManager.createRouter(()->{
+			application.sync();
+			host.sync();
+		}).mountAnonymous(ownerDrives)
+			.mount(DID.forKey(accountKey).toString(),ownerDrives);
 	}
 
 	private AKeyPair resolveKeyPair() {

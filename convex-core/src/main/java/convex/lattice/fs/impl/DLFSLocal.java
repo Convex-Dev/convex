@@ -3,6 +3,7 @@ package convex.lattice.fs.impl;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.ClosedFileSystemException;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileAlreadyExistsException;
@@ -137,11 +138,13 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public AVector<ACell> getNode(DLPath path) throws IOException {
+		checkOpen();
 		AVector<ACell> rootNode=rootCursor.get();
 		return DLFSNode.resolveNode(rootNode,path);
 	}
 
 	@Override public void setTimes(DLPath path,FileTime modified,FileTime accessed,FileTime created) throws IOException {
+		checkOpen();
 		// Access and creation times are unsupported. Ignore them without a lattice write.
 		if (modified==null) return;
 		CVMLong operationTime=currentTimestamp();
@@ -172,6 +175,7 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	protected DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) throws IOException {
+		checkOpen();
 		AVector<ACell> rootNode=rootCursor.get();
 		Index<?,?> entries=DLFSNode.resolveDirectoryEntries(rootNode,dir);
 		return DLDirectoryStream.create(dir,entries,filter);
@@ -179,6 +183,7 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) throws IOException {
+		checkOpen();
 		path=path.normalize();
 		return DLFileChannel.create(this,options,path);
 	}
@@ -200,6 +205,7 @@ public class DLFSLocal extends DLFileSystem {
 	 */
 	AVector<ACell> updateFileData(DLPath path, UnaryOperator<ABlob> transform,
 			CVMLong operationTime, boolean checkpoint) throws IOException {
+		checkOpen();
 		ABlob preparedFrom=null;
 		ABlob prepared=null;
 		while (true) {
@@ -235,6 +241,7 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	private void createNode(DLPath path, AVector<ACell> node, CVMLong operationTime) throws IOException {
+		checkOpen();
 		DLPath target=path.toAbsolutePath();
 		DLPath parent=target.getParent();
 		if (parent==null) throw new FileAlreadyExistsException(path.toString());
@@ -252,6 +259,7 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public synchronized void delete(DLPath path) throws IOException {
+		checkOpen();
 		final DLPath p=path.toAbsolutePath();
 		if (p.getNameCount()==0) {
 			throw new IOException("Can't delete DLFS Root node");
@@ -289,6 +297,8 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public void copy(DLPath source,DLPath target,boolean recursive,boolean replaceExisting,boolean copyAttributes) throws IOException {
+		checkOpen();
+		if (!target.getFileSystem().isOpen()) throw new ClosedFileSystemException();
 		if (!isSameDrive(target.getFileSystem())) {
 			transfer(source,target,recursive,replaceExisting,false,copyAttributes);
 			return;
@@ -331,6 +341,8 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public void move(DLPath source, DLPath target, boolean replaceExisting) throws IOException {
+		checkOpen();
+		if (!target.getFileSystem().isOpen()) throw new ClosedFileSystemException();
 		if (!isSameDrive(target.getFileSystem())) {
 			transfer(source,target,true,replaceExisting,true,true);
 			return;
@@ -442,6 +454,7 @@ public class DLFSLocal extends DLFileSystem {
 	/** Updates a node using one timestamp already resolved for the logical operation. */
 	synchronized AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode,
 			CVMLong operationTime) throws IOException {
+		checkOpen();
 		if (newNode!=null && !DLFSNode.isValidNodeShallow(newNode)) throw new IllegalArgumentException("Invalid replacement DLFS node");
 		try {
 			rootCursor.updateAndGet(rootNode->{
@@ -461,6 +474,7 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	protected void checkAccess(DLPath path) throws IOException {
+		checkOpen();
 		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> node=DLFSNode.resolveNode(rootNode,path);
 		if (node==null) {
@@ -470,11 +484,13 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public Hash getRootHash() {
+		checkOpen();
 		return Cells.getHash(rootCursor.get());
 	}
 
 	@Override
 	public void merge(AVector<ACell> other) {
+		checkOpen();
 		// The local filesystem merges values. Hosted components own incoming admission.
 		rootCursor.updateAndGet(own -> DLFSLattice.INSTANCE.merge(own,other));
 	}
@@ -482,6 +498,7 @@ public class DLFSLocal extends DLFileSystem {
 	/** Creates a forked view sharing this filesystem's store, if any. */
 	@Override
 	public DLFSLocal fork() {
+		checkOpen();
 		var working=rootCursor.fork();
 		return new WorkingFileSystem(provider(),uriPath,working,store,clock);
 	}
@@ -496,17 +513,22 @@ public class DLFSLocal extends DLFileSystem {
 			this.working=working;
 		}
 
-		@Override public void sync() { working.sync(DLFSLattice.INSTANCE::merge); }
+		@Override public void sync() {
+			checkOpen();
+			working.sync(DLFSLattice.INSTANCE::merge);
+		}
 	}
 
 	@Override
 	public void sync() {
+		checkOpen();
 		// A live view is already updated. Only independent working views publish.
 	}
 
 	/** Creates an independent snapshot of the current state, checkpointing into the same store, if any. */
 	@Override
 	public DLFSLocal clone() {
+		checkOpen();
 		AVector<ACell> root=rootCursor.get();
 		AForkableCursor<AVector<ACell>> cursor=Cursors.root(root);
 		return new DLFSLocal(provider(),uriPath,cursor,store,DLFSLocation.at(cursor),clock);

@@ -116,6 +116,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- DLFS CLI service mutations and initial drive creation now publish the host root for persistence and replication. Closed DLFS filesystem views reject further I/O through existing paths and channels, without closing other views or publishing drafts.
+
 - Hash-map lattice merges retain and reconcile entries with nil keys using the child merge rule.
 
 - Keyed component publication preserves removal of unrelated keys when the destination is cleared to nil. Region collections publish only their children, leaving a supplied aggregate fork for its owner to publish explicitly.

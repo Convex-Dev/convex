@@ -166,6 +166,7 @@ public class DLFSProvider extends FileSystemProvider {
 	private DLPath checkProviderPath(Path path) {
 		DLPath result=DLFS.checkPath(Objects.requireNonNull(path));
 		if (result.getFileSystem().provider()!=this) throw new ProviderMismatchException("Different DLFS provider");
+		result.getFileSystem().checkOpen();
 		return result;
 	}
 
@@ -173,6 +174,7 @@ public class DLFSProvider extends FileSystemProvider {
 	public boolean isSameFile(Path path, Path path2) throws IOException {
 		DLPath first=checkProviderPath(path);
 		if (!(path2 instanceof DLPath second) || second.getFileSystem().provider()!=this) return false;
+		second.getFileSystem().checkOpen();
 		if (first.equals(second)) return true;
 		first.getFileSystem().checkAccess(first);
 		second.getFileSystem().checkAccess(second);
@@ -182,7 +184,7 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public boolean isHidden(Path path) throws IOException {
-		// TODO Auto-generated method stub
+		checkProviderPath(path);
 		return false;
 	}
 

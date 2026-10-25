@@ -16,9 +16,11 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NonWritableChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.ClosedFileSystemException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
@@ -50,6 +52,79 @@ import convex.lattice.LatticeTest;
 import convex.lattice.fs.impl.DLFSLocal;
 
 public class DLFSTest {
+
+	@Test
+	public void testClosedFilesystemRejectsExistingPathsAndHandles() throws Exception {
+		var fs=DLFSLocal.create(DLFS.provider());
+		var path=fs.getPath("/existing");
+		var directory=fs.getRoot();
+		var newDirectory=fs.getPath("/new");
+		Files.writeString(path,"original");
+		var before=fs.getCursor().get();
+		var attributes=Files.getFileAttributeView(path,java.nio.file.attribute.BasicFileAttributeView.class);
+		try (var channel=Files.newByteChannel(path,StandardOpenOption.READ,StandardOpenOption.WRITE);
+				var stream=Files.newDirectoryStream(directory)) {
+			var iterator=stream.iterator();
+			assertTrue(iterator.hasNext()); // Include an already-prefetched directory entry.
+			fs.close();
+			fs.close();
+			assertFalse(channel.isOpen());
+			assertThrows(ClosedChannelException.class,()->channel.read(ByteBuffer.allocate(1)));
+			assertThrows(ClosedChannelException.class,()->channel.write(ByteBuffer.wrap(new byte[]{1})));
+			assertThrows(ClosedChannelException.class,channel::size);
+			assertThrows(ClosedChannelException.class,channel::position);
+			assertThrows(ClosedChannelException.class,()->channel.position(0));
+			assertThrows(ClosedChannelException.class,()->channel.truncate(0));
+			assertFalse(iterator.hasNext());
+			assertThrows(java.util.NoSuchElementException.class,iterator::next);
+		}
+		assertThrows(ClosedFileSystemException.class,()->Files.readString(path));
+		assertThrows(ClosedFileSystemException.class,()->Files.writeString(path,"changed"));
+		assertThrows(ClosedFileSystemException.class,()->Files.delete(path));
+		assertThrows(ClosedFileSystemException.class,()->Files.createDirectory(newDirectory));
+		assertThrows(ClosedFileSystemException.class,()->Files.newDirectoryStream(directory));
+		assertThrows(ClosedFileSystemException.class,attributes::readAttributes);
+		assertThrows(ClosedFileSystemException.class,()->attributes.setTimes(
+			java.nio.file.attribute.FileTime.fromMillis(123),null,null));
+		assertThrows(ClosedFileSystemException.class,()->Files.isSameFile(path,path));
+		assertThrows(ClosedFileSystemException.class,()->fs.provider().checkAccess(path));
+		assertThrows(ClosedFileSystemException.class,fs::fork);
+		assertThrows(ClosedFileSystemException.class,fs::clone);
+		assertThrows(ClosedFileSystemException.class,fs::sync);
+		assertThrows(ClosedFileSystemException.class,()->fs.merge(before));
+		assertSame(before,fs.getCursor().get(),"failed I/O must leave the lattice untouched");
+	}
+
+	@Test
+	public void testClosedCopyAndMoveEndpoints() throws Exception {
+		try (var open=DLFSLocal.create(DLFS.provider()); var closed=open.clone()) {
+			var source=open.getPath("/source");
+			var target=closed.getPath("/target");
+			Files.writeString(source,"source");
+			Files.writeString(target,"target");
+			var beforeOpen=open.getCursor().get();
+			var beforeClosed=closed.getCursor().get();
+			closed.close();
+			assertThrows(ClosedFileSystemException.class,()->Files.copy(source,target));
+			assertThrows(ClosedFileSystemException.class,()->Files.copy(target,source));
+			assertThrows(ClosedFileSystemException.class,()->Files.move(source,target));
+			assertThrows(ClosedFileSystemException.class,()->Files.move(target,source));
+			assertSame(beforeOpen,open.getCursor().get());
+			assertSame(beforeClosed,closed.getCursor().get());
+		}
+	}
+
+	@Test
+	public void testClosingFilesystemDraftDoesNotPublishOrCloseParent() throws Exception {
+		try (var parent=DLFSLocal.create(DLFS.provider())) {
+			var draft=parent.fork();
+			Files.writeString(draft.getPath("/draft"),"private");
+			draft.close();
+			assertThrows(ClosedFileSystemException.class,draft::sync);
+			assertTrue(parent.isOpen());
+			assertFalse(Files.exists(parent.getPath("/draft")));
+		}
+	}
 
 	@Test
 	public void testUnsupportedProviderOperationsFailHonestly() throws Exception {

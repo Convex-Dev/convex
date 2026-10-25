@@ -88,15 +88,21 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		}
 
 		@Override public void merge(AVector<ACell> incoming) {
+			checkOpen();
 			drive.cursor().updateAndGet(own -> drive.lattice.merge(own,incoming));
 		}
 		@Override public DLFSLocal clone() {
+			checkOpen();
 			return drive.withCursor(Cursors.root(drive.cursor().get())).fileSystem;
 		}
-		@Override public void sync() { drive.sync(); }
+		@Override public void sync() {
+			checkOpen();
+			drive.sync();
+		}
 
 		@Override
 		public DLFSLocal fork() {
+			checkOpen();
 			return drive.fork().fileSystem;
 		}
 	}

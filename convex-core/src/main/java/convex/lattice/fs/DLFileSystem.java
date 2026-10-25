@@ -65,9 +65,15 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 		return this==other;
 	}
 
+	/** Closes this view and its I/O handles without publishing or closing the store. */
 	@Override
 	public void close() throws IOException {
 		open = false;
+	}
+
+	/** Rejects I/O through this view after close, including through existing paths. */
+	protected final void checkOpen() {
+		if (!open) throw new java.nio.file.ClosedFileSystemException();
 	}
 	
 	@Override
@@ -103,7 +109,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	@Override
 	public DLPath getPath(String first, String... more) {
-		if (!open) throw new java.nio.file.ClosedFileSystemException();
+		checkOpen();
 		String fullPath=first;
 		if ((more!=null)&&(more.length>0)) {
 			fullPath=fullPath+SEP+String.join(SEP,more);

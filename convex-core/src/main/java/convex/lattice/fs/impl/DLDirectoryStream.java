@@ -26,6 +26,11 @@ public class DLDirectoryStream implements DirectoryStream<Path> {
 		boolean prepared;
 
 		private void prepare() {
+			if (!isOpen()) {
+				next=null;
+				prepared=true;
+				return;
+			}
 			if (prepared) return;
 			while (pos<dirs.count()) {
 				MapEntry<?,?> entry=dirs.entryAt(pos++);
@@ -69,7 +74,7 @@ public class DLDirectoryStream implements DirectoryStream<Path> {
 	private Index<?,?> dirs;
 	private DLPath base;
 	private Filter<? super Path> filter;
-	private boolean open=true;
+	private volatile boolean open=true;
 	private boolean iterated=false;
 
 	public DLDirectoryStream(DLPath base, Index<?,?> dirs, Filter<? super Path> filter) {
@@ -83,9 +88,13 @@ public class DLDirectoryStream implements DirectoryStream<Path> {
 		open=false;
 	}
 
+	private boolean isOpen() {
+		return open && base.getFileSystem().isOpen();
+	}
+
 	@Override
 	public synchronized DIterator iterator() {
-		if (!open) throw new IllegalStateException("Directory stream is closed");
+		if (!isOpen()) throw new IllegalStateException("Directory stream is closed");
 		if (iterated) throw new IllegalStateException("Directory stream iterator already obtained");
 		iterated=true;
 		return new DIterator();
