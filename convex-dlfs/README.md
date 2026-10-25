@@ -160,7 +160,7 @@ node.launch();
 DLFSDriveManager drives = new DLFSDriveManager(
     app.drives(keyPair.getAccountKey()), () -> { app.sync(); host.sync(); });
 drives.createDrive(null, "home");
-app.sync();
+drives.sync(); // publish initial drives through the same application/host policy
 
 DLFSServer server = DLFSServer.create(drives);
 server.start(8080); // use 0 for a random port
@@ -229,7 +229,7 @@ NodeConfig nodeConfig = NodeConfig.port(0);
 var host = RelayHost.openHost(Index.<Keyword, ACell>none(), store, nodeConfig);
 var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
     Utils::getCurrentTimestampCell, 30_000,
-    Keyword.intern("documents")));
+    Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
 var node = new NodeServer<>(host, nodeConfig);
 LatticePropagator group = new LatticePropagator(store, LatticePropagatorConfig.create());
 group.setTransportKeyPair(myKeyPair);

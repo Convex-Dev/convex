@@ -405,13 +405,29 @@ Keep any enclosing signed-owner boundary responsible for verifying envelopes;
 an unsigned payload adapter must not provide an alternate route around it.
 Domain `sync()` still publishes only its bound fork and never persists a host.
 
+`KVDatabase.connect(parent, name)` opens a view of one named database inside an
+owner's unsigned database map. It does not write or sign empty state; the first
+changed KV operation creates missing containers atomically. The supplied owner
+cursor handles signing, and the application and host handle publication.
+
+For standalone replicas, `KVDatabase.create(name, keyPair)` uses direct-key
+ownership. Its default owner rule also accepts self-certifying `did:key` owners,
+but rejects unresolved DIDs and account addresses. Use
+`KVDatabase.create(name, keyPair, owner, replicaID, verifier)` to bind an explicit
+`(owner, signingKey)` predicate. The same rule checks incoming replicas and signed
+exports. It may consult a locally refreshed authority view for key rotation;
+network resolution belongs outside the verifier. The `OWNER_LATTICE` constant
+now exposes this default rule as an `OwnerMapLattice`, rather than the legacy
+context-verified `OwnerLattice`.
+
 `ALatticeApplication` extends `ALatticeComponent` and adds lifecycle, with no
 required lattice definition. Its `sync()` runs `beforeSync()`, `syncChildren()`,
 then publication of its own working boundary. Failure stops subsequent stages;
 completed child publications are not rolled back. Hooks must support concurrent
-calls. `AKeyedRegions` extends this base and implements child publication in
-registration order. Registrations freeze before preparation begins. A nested
-regions application runs its own lifecycle when its parent syncs that child.
+calls. `AKeyedRegions` overrides sync to publish children in registration order
+without publishing an enclosing aggregate fork. Registrations freeze before
+preparation begins. A nested regions application runs its own lifecycle when its
+parent syncs that child.
 
 `LatticeApplication` is the optional application adapter for an explicitly supplied
 `ALattice`, including generic merge, publication reconciliation and path navigation.
