@@ -35,6 +35,7 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
+import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeHost;
@@ -666,17 +667,16 @@ public class P2PNode implements Closeable {
 				stopped.countDown();
 			}
 		};
-		Thread hook=new Thread(shutdown,"convex-p2p-service-shutdown");
 		try {
 			node.launch();
 			host.checkpoint();
-			Runtime.getRuntime().addShutdownHook(hook);
+			// Runs in Convex's shutdown order, before transports and Etch files close
+			Shutdown.addHook(Shutdown.SERVICE,shutdown);
 			// A real service can run its control loop here.
 			stopped.await();
 		} finally {
+			Shutdown.removeHook(Shutdown.SERVICE,shutdown);
 			shutdown.run();
-			try { Runtime.getRuntime().removeShutdownHook(hook); }
-			catch (IllegalStateException e) { /* JVM shutdown is already in progress. */ }
 		}
 	}
 }

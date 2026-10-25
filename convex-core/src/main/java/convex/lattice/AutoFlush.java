@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 public final class AutoFlush implements Closeable {
 	private final LatticeHost<?> host;
 	private final ScheduledExecutorService executor;
-	private final CompletableFuture<Exception> failure=new CompletableFuture<>();
+	private final CompletableFuture<Throwable> failure=new CompletableFuture<>();
 	private boolean closed;
 	private volatile Thread worker;
 
@@ -34,7 +34,7 @@ public final class AutoFlush implements Closeable {
 	 * Completes with the first background failure, if any. Later successful retries
 	 * do not erase this signal. Monitoring code can subscribe without polling.
 	 */
-	public CompletionStage<Exception> failure() {
+	public CompletionStage<Throwable> failure() {
 		return failure.minimalCompletionStage();
 	}
 
@@ -42,7 +42,12 @@ public final class AutoFlush implements Closeable {
 		worker=Thread.currentThread();
 		try {
 			host.flush();
-		} catch (IOException | RuntimeException e) {
+		} catch (VirtualMachineError e) {
+			if (!(e instanceof StackOverflowError)) throw e;
+			failure.complete(e);
+		} catch (Throwable e) {
+			// Includes EtchCorruptionError. A periodic task that throws is never run
+			// again, so every recoverable failure is reported and flushing continues.
 			failure.complete(e);
 		}
 	}

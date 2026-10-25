@@ -2,6 +2,7 @@ package convex.cli.dlfs;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -22,6 +23,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.core.util.Shutdown;
 import convex.etch.EtchStore;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDriveManager;
@@ -204,25 +206,36 @@ public class DlfsStart extends ACommand {
 		cli().notifyStartup();
 
 		AtomicBoolean closing=new AtomicBoolean();
+		CountDownLatch closed=new CountDownLatch(1);
 		Runnable shutdown=()->{
-			if (!closing.compareAndSet(false,true)) return;
-			dlfsServer.close();
-			latticeTransport.close();
-			try {
-				nodeServer.close();
-			} catch (Exception e) {
-				log.warn("Error closing NodeServer", e);
+			if (!closing.compareAndSet(false,true)) {
+				// Another thread is closing: wait, so neither process exit nor the
+				// Etch shutdown hook can overtake its final flush.
+				try { closed.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+				return;
 			}
 			try {
-				store.flush();
-			} catch (Exception e) {
-				log.warn("Error flushing DLFS store",e);
+				dlfsServer.close();
+				latticeTransport.close();
+				try {
+					nodeServer.close();
+				} catch (Exception e) {
+					log.warn("Error closing NodeServer", e);
+				}
+				try {
+					store.flush();
+				} catch (Exception e) {
+					log.warn("Error flushing DLFS store",e);
+				}
+				store.close();
+			} finally {
+				closed.countDown();
 			}
-			store.close();
 		};
 
-		// Ensure JVM and tray shutdown use the same idempotent close path.
-		Runtime.getRuntime().addShutdownHook(new Thread(shutdown,"convex-dlfs-shutdown"));
+		// JVM and tray shutdown use the same idempotent close path. Registered in
+		// Convex's shutdown order so it completes before transports and Etch files close.
+		Shutdown.addHook(Shutdown.SERVICE,shutdown);
 		String webUrl="http://localhost:"+dlfsServer.getPort()+"/dlfs/";
 		boolean trayInstalled=!noTray&&TrayManager.install(
 			"Convex DLFS on port "+dlfsServer.getPort(),"Open Web",()->Toolkit.launchBrowser(webUrl),shutdown);
@@ -234,6 +247,7 @@ public class DlfsStart extends ACommand {
 			}
 		} finally {
 			if (trayInstalled) TrayManager.remove();
+			Shutdown.removeHook(Shutdown.SERVICE,shutdown);
 			shutdown.run();
 		}
 	}

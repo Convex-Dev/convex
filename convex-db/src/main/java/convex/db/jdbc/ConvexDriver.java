@@ -2,6 +2,7 @@ package convex.db.jdbc;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
@@ -18,6 +19,7 @@ import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.schema.SchemaPlus;
 
 import convex.core.store.AStore;
+import convex.core.util.Shutdown;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexSchema;
 import convex.db.calcite.ConvexSchemaFactory;
@@ -50,6 +52,10 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  * jdbc:convex:file:/data/store.etch;database=market
  * </pre>
  *
+ * <p>A file-backed database is saved durably on each commit, when a connection
+ * closes, by {@link #closeAll()} and at JVM shutdown. Auto-committed statements
+ * on a connection that stays open are saved when it closes.
+ *
  * <p>Usage:
  * <pre>
  * // Simple — no setup needed
@@ -75,6 +81,9 @@ public class ConvexDriver extends Driver {
 	/** Open database instances, keyed by canonical identifier. */
 	public static final ConcurrentHashMap<String, ManagedInstance> instances = new ConcurrentHashMap<>();
 
+	/** File instance being connected; Avatica creates the meta inside {@code super.connect}. */
+	private static final ThreadLocal<ManagedInstance> CONNECTING = new ThreadLocal<>();
+
 	static {
 		new ConvexDriver().register();
 
@@ -95,7 +104,8 @@ public class ConvexDriver extends Driver {
 
 	@Override
 	public Meta createMeta(AvaticaConnection connection) {
-		return ConvexMeta.create(connection);
+		ManagedInstance file = CONNECTING.get();
+		return ConvexMeta.create(connection, (file == null) ? null : file::checkpoint);
 	}
 
 	@Override
@@ -119,13 +129,20 @@ public class ConvexDriver extends Driver {
 		}
 
 		// Resolve the ConvexDB instance
-		ConvexDB cdb = resolveInstance(parsed);
+		ManagedInstance file = (parsed.mode == ParsedURL.Mode.FILE) ? resolveFileInstance(parsed.identifier) : null;
+		ConvexDB cdb = (file != null) ? file.cdb : resolveInstance(parsed);
 		if (cdb == null) {
 			throw new SQLException("Cannot resolve database for URL: " + url);
 		}
 
 		// Get connection from Calcite
-		Connection conn = super.connect(url, info);
+		Connection conn;
+		CONNECTING.set(file);
+		try {
+			conn = super.connect(url, info);
+		} finally {
+			CONNECTING.remove();
+		}
 		if (conn == null) return null;
 
 		// Set up ConvexSchema
@@ -269,7 +286,7 @@ public class ConvexDriver extends Driver {
 				return resolveMemInstance(parsed.identifier);
 
 			case FILE:
-				return resolveFileInstance(parsed.identifier);
+				return resolveFileInstance(parsed.identifier).cdb;
 
 			default:
 				throw new SQLException("Unknown mode: " + parsed.mode);
@@ -285,8 +302,8 @@ public class ConvexDriver extends Driver {
 		}).cdb;
 	}
 
-	/** Gets or creates a file-backed instance. */
-	private ConvexDB resolveFileInstance(String path) throws SQLException {
+	/** Gets or creates a file-backed instance, saved at JVM shutdown unless closed first. */
+	private ManagedInstance resolveFileInstance(String path) throws SQLException {
 		String key;
 		try {
 			key = "file:" + new File(path).getCanonicalPath();
@@ -302,28 +319,39 @@ public class ConvexDriver extends Driver {
 				var server = ConvexDB.createNodeServer(store);
 				server.launch();
 				ConvexDB cdb = ConvexDB.connect(server.getHost());
-				return new ManagedInstance(cdb, server, store);
+				ManagedInstance created = new ManagedInstance(cdb, server, store);
+				Shutdown.addHook(Shutdown.SERVICE, created.shutdownHook);
+				return created;
 			} catch (Exception e) {
 				throw new RuntimeException("Failed to open Etch store: " + path, e);
 			}
 		});
-		return inst.cdb;
+		return inst;
 	}
 
 	/**
-	 * Closes and removes all managed instances. Intended for testing.
+	 * Saves and closes all managed instances, then removes them. Intended for
+	 * testing. Every instance is closed; the first failure is rethrown afterwards.
 	 */
 	public static void closeAll() {
-		for (var entry : instances.entrySet()) {
-			ManagedInstance inst = entry.getValue();
+		RuntimeException failure = null;
+		for (ManagedInstance inst : instances.values()) {
 			try {
-				if (inst.server != null) inst.server.close();
-				if (inst.store != null) inst.store.close();
-			} catch (Exception e) {
-				// best effort
+				inst.close();
+			} catch (IOException e) {
+				failure = append(failure, new UncheckedIOException("Unable to save Convex database", e));
+			} catch (RuntimeException e) {
+				failure = append(failure, e);
 			}
 		}
 		instances.clear();
+		if (failure != null) throw failure;
+	}
+
+	private static RuntimeException append(RuntimeException current, RuntimeException next) {
+		if (current == null) return next;
+		current.addSuppressed(next);
+		return current;
 	}
 
 	/** A managed ConvexDB instance with optional server and store. */
@@ -331,11 +359,40 @@ public class ConvexDriver extends Driver {
 		public final ConvexDB cdb;
 		final NodeServer<?> server; // null for mem: mode
 		final AStore store;         // null for mem: mode
+		private final Runnable shutdownHook = () -> {
+			try {
+				close();
+			} catch (IOException e) {
+				throw new UncheckedIOException("Unable to save Convex database at shutdown", e);
+			}
+		};
 
 		ManagedInstance(ConvexDB cdb, NodeServer<?> server, AStore store) {
 			this.cdb = cdb;
 			this.server = server;
 			this.store = store;
+		}
+
+		/** Saves published state durably; no-op for an in-memory instance. */
+		void checkpoint() {
+			if (server == null) return;
+			try {
+				server.getHost().checkpoint();
+			} catch (IOException e) {
+				throw new UncheckedIOException("Unable to save Convex database", e);
+			}
+		}
+
+		/** Stops the node, saves, then closes the store; no-op for an in-memory instance. */
+		void close() throws IOException {
+			if (server == null) return;
+			Shutdown.removeHook(Shutdown.SERVICE, shutdownHook);
+			try {
+				server.close();
+				server.getHost().checkpoint();
+			} finally {
+				store.close();
+			}
 		}
 	}
 }

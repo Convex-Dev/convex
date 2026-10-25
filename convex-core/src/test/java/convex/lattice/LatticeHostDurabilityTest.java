@@ -80,6 +80,24 @@ class LatticeHostDurabilityTest {
 		}
 	}
 
+	@Test void automaticFlushReportsAnErrorAndKeepsFlushing() throws Exception {
+		var attempts=new AtomicInteger();
+		var retried=new CountDownLatch(1);
+		try (var store=new MemoryStore() {
+			@Override public void flush() {
+				// e.g. EtchCorruptionError: a periodic task that throws is never rescheduled
+				if (attempts.getAndIncrement()==0) throw new AssertionError("corrupt store");
+				retried.countDown();
+			}
+		}) {
+			var host=LatticeHost.create(CVMLong.ONE,store);
+			try (var durability=host.autoFlush(Duration.ofMillis(1))) {
+				assertEquals("corrupt store",durability.failure().toCompletableFuture().get(10,TimeUnit.SECONDS).getMessage());
+				assertTrue(retried.await(10,TimeUnit.SECONDS));
+			}
+		}
+	}
+
 	@Test void invalidIntervalDoesNotClaimTheHost() throws Exception {
 		var host=LatticeHost.create();
 		assertThrows(IllegalArgumentException.class,() -> host.autoFlush(Duration.ZERO));
