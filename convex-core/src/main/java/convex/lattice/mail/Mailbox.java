@@ -87,8 +87,10 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	}
 
 	/**
-	 * Receipts envelopes on behalf of the mailbox owner. Each receipt replaces its
-	 * envelope in the mailbox.
+	 * Receipts a batch atomically on behalf of the mailbox owner. Each receipt
+	 * replaces its envelope in the mailbox. Signing and verification complete before
+	 * the transaction begins, so retries reuse the prepared receipts. Failure leaves
+	 * the mailbox unchanged; on a fork or enclosing transaction, changes remain there.
 	 *
 	 * @param envelopes Envelopes the recipient has taken
 	 * @return The receipts written
@@ -99,9 +101,11 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 		for (MailEnvelope envelope:envelopes) {
 			MailReceipt receipt=MailReceipt.create(signer,did(),envelope);
 			if (receipt==null || lattice.entry(envelope.key()).receipt(receipt.signed())==null) throw new IllegalStateException("No signer authorised for mailbox "+did());
-			merge(receipt.key(),receipt.signed());
 			receipts.add(receipt);
 		}
+		transact(draft -> {
+			for (MailReceipt receipt:receipts) draft.merge(receipt.key(),receipt.signed());
+		});
 		return receipts;
 	}
 

@@ -65,20 +65,92 @@ public class MailTest {
 		assertEquals(CAROL.getAccountKey(),mail.mailbox(carol).receipts().get(0).signed().getAccountKey());
 	}
 
-	@Test void unavailableOrInvalidReceiptSignersLeaveTheMailboxUnchanged() {
+	@Test void laterReceiptSigningFailureLeavesTheWholeBatchUnchanged() {
 		List<BiFunction<ACell,ACell,SignedData<ACell>>> signers=List.of(
 			(owner,value) -> null,
 			(owner,value) -> ALICE.signData(value),
 			(owner,value) -> BOB.signData(Strings.create("different payload")),
-			(owner,value) -> SignedData.create(BOB.getAccountKey(),Ed25519Signature.ZERO,BOB.signData(value).getValueRef()));
+			(owner,value) -> SignedData.create(BOB.getAccountKey(),Ed25519Signature.ZERO,BOB.signData(value).getValueRef()),
+			(owner,value) -> { throw new IllegalStateException("Signer unavailable"); });
 		for (var signer:signers) {
-			var mail=Mail.create(signer);
-			var envelope=aliceToBob(100,"one");
-			mail.send(envelope);
+			var signatures=new AtomicInteger();
+			var mail=Mail.create((owner,value) -> signatures.incrementAndGet()==1
+				?BOB.signData(value):signer.apply(owner,value));
+			var first=MailEnvelope.plain(ALICE,BOB_DID,ALICE_DID,100,Strings.create("one"));
+			var second=MailEnvelope.plain(ALICE,BOB_DID,ALICE_DID,101,Strings.create("two"));
+			mail.send(first);
+			mail.send(second);
 			var before=mail.cursor().get();
-			assertThrows(IllegalStateException.class,() -> mail.mailbox(BOB_DID).receive(envelope));
+			assertThrows(IllegalStateException.class,() -> mail.mailbox(BOB_DID).receive(first,second));
+			assertEquals(2,signatures.get(),"The first receipt was prepared before the second failed");
 			assertSame(before,mail.cursor().get());
 		}
+	}
+
+	/** The only visible commit contains the entire batch, even after a competing deposit. */
+	@Test void receiptBatchRetriesWithoutResigningAndPreservesConcurrentDeposits() {
+		var first=MailEnvelope.plain(ALICE,BOB_DID,ALICE_DID,100,Strings.create("one"));
+		var second=MailEnvelope.plain(ALICE,BOB_DID,ALICE_DID,101,Strings.create("two"));
+		var concurrent=MailEnvelope.plain(ALICE,BOB_DID,ALICE_DID,102,Strings.create("concurrent"));
+		var initial=Index.<ABlob,SignedData<ACell>>of(first.key(),first.signed(),second.key(),second.signed());
+		var commits=new AtomicInteger();
+		var signatures=new AtomicInteger();
+		var root=new Root<>(initial) {
+			@Override public boolean compareAndSet(Index<ABlob,SignedData<ACell>> expected,
+					Index<ABlob,SignedData<ACell>> value) {
+				assertSame(first.signed(),get().get(first.key()));
+				assertSame(second.signed(),get().get(second.key()));
+				assertNotNull(MailReceipt.parse(value.get(first.key())));
+				assertNotNull(MailReceipt.parse(value.get(second.key())));
+				if (commits.incrementAndGet()==1) set(expected.assoc(concurrent.key(),concurrent.signed()));
+				return super.compareAndSet(expected,value);
+			}
+		};
+		var inbox=new Mailbox(root,Mail.LATTICE.forMailbox(BOB_DID),(owner,value) -> {
+			assertSame(initial,root.get(),"All signing precedes the first commit attempt");
+			signatures.incrementAndGet();
+			return BOB.signData(value);
+		});
+		var receipts=inbox.receive(first,second);
+		assertEquals(2,commits.get());
+		assertEquals(2,signatures.get());
+		assertSame(receipts.get(0).signed(),root.get().get(first.key()));
+		assertSame(receipts.get(1).signed(),root.get().get(second.key()));
+		assertEquals(List.of(concurrent),inbox.deposited());
+		// Repeated delivery and empty batches perform no commit and retain exact storage.
+		var before=root.get();
+		var repeated=new Mailbox(root,Mail.LATTICE.forMailbox(BOB_DID),(owner,value) -> BOB.signData(value));
+		repeated.receive(first,second);
+		assertTrue(repeated.receive(List.of()).isEmpty());
+		assertSame(before,root.get());
+		assertEquals(2,commits.get());
+	}
+
+	@Test void batchReceiptsStayWithinForkAndEnclosingTransactionBoundaries() {
+		var mail=Mail.create((owner,value) -> BOB.signData(value));
+		var first=MailEnvelope.plain(ALICE,BOB_DID,ALICE_DID,100,Strings.create("one"));
+		var second=MailEnvelope.plain(ALICE,BOB_DID,ALICE_DID,101,Strings.create("two"));
+		mail.send(first);
+		mail.send(second);
+		var inbox=mail.mailbox(BOB_DID);
+		var before=mail.cursor().get();
+		assertThrows(IllegalStateException.class,() -> mail.transact(draft -> {
+			draft.mailbox(BOB_DID).receive(first,second);
+			assertSame(before,mail.cursor().get());
+			throw new IllegalStateException("Abort enclosing transaction");
+		}));
+		assertSame(before,mail.cursor().get());
+		var fork=inbox.fork();
+		fork.receive(first,second);
+		assertTrue(fork.isReceived(first));
+		assertTrue(fork.isReceived(second));
+		assertSame(before,mail.cursor().get());
+		fork.sync();
+		assertTrue(inbox.isReceived(first));
+		assertTrue(inbox.isReceived(second));
+		var absent=new Mailbox(new Root<>(),Mail.LATTICE.forMailbox(BOB_DID),null);
+		assertTrue(absent.receive(List.of()).isEmpty());
+		assertNull(absent.cursor().get());
 	}
 
 	static final AKeyPair ALICE=AKeyPair.createSeeded(42001);
