@@ -120,6 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Opening a relay host with restoration disabled rejects a null replacement root, preserving any retained state instead of creating a host whose root disagrees with its store.
+
 - X402 replay confirmation requires a successful recorded transaction result. Failed transactions in history no longer grant paid access or report successful settlement.
 
 - Standalone KV replica verification now rejects unresolved owners by default. An explicit owner/key verifier supports indirect DIDs and account addresses and governs both incoming replicas and signed exports, including key rotation.

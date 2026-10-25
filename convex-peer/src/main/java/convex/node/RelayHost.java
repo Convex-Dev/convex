@@ -1,6 +1,7 @@
 package convex.node;
 
 import java.io.IOException;
+import java.util.Objects;
 
 import convex.core.data.ACell;
 import convex.core.store.AStore;
@@ -15,7 +16,7 @@ import convex.lattice.cursor.Root;
  * Host assembly from node configuration.
  *
  * <p>{@link #openHost} opens a store-backed root the way node configuration asks:
- * the retained root is adopted when restore is enabled and the store is persistent,
+ * the retained root is adopted when restore is enabled, for any kind of store,
  * and the root supports exclusive transactions when configured. The caller then
  * configures the applications that receive incoming values. The relay variant,
  * {@link #open}, configures one live application that accepts the whole supplied
@@ -72,7 +73,7 @@ public final class RelayHost {
 	 * Opens a host over a store as node configuration directs, with no applications
 	 * configured. With restore enabled, a retained root is adopted as the initial value
 	 * whatever kind of store holds it; with restore disabled, the retained root is
-	 * replaced by {@code initial} at once. The root supports exclusive transactions
+	 * replaced by a non-null {@code initial} at once. The root supports exclusive transactions
 	 * when configured.
 	 *
 	 * @param <V> root value type
@@ -81,6 +82,7 @@ public final class RelayHost {
 	 * @param config node configuration, or {@code null} for defaults
 	 * @return host with no applications configured
 	 * @throws IOException if the retained root cannot be read or replaced
+	 * @throws NullPointerException if restore is disabled and the replacement root is null
 	 */
 	public static <V extends ACell> LatticeHost<V> openHost(V initial,AStore store,
 			NodeConfig config) throws IOException {
@@ -90,8 +92,8 @@ public final class RelayHost {
 		if (settings.isRestore()) {
 			V retained=store.getRootData();
 			if (retained!=null) value=retained;
-		} else if (initial!=null) {
-			store.setRootData(initial);
+		} else {
+			store.setRootData(Objects.requireNonNull(initial,"Replacement root must not be null"));
 		}
 		Root<V> storage=settings.isTransactionalRoot()
 			?Cursors.transactionalRoot(value)
