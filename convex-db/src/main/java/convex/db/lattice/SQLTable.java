@@ -8,7 +8,7 @@ import convex.core.data.Index;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
  * A single SQL table within the lattice table store.
@@ -37,12 +37,8 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	/** Position of live row count */
 	static final int POS_LIVE_COUNT = 3;
 
-	SQLTable(ALatticeCursor<AVector<ACell>> cursor) {
-		this(null,cursor);
-	}
-
-	SQLTable(ALatticeComponent<?> parent,ALatticeCursor<AVector<ACell>> cursor) {
-		super(parent,cursor);
+	SQLTable(AForkableCursor<AVector<ACell>> cursor) {
+		super(cursor);
 	}
 
 	// ========== Static State Factories ==========
@@ -84,7 +80,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Returns the underlying state vector.
 	 */
 	public AVector<ACell> getState() {
-		return cursor.get();
+		return cursor().get();
 	}
 
 	/**
@@ -94,7 +90,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<AVector<ACell>> getSchema() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		return (AVector<AVector<ACell>>) state.get(POS_SCHEMA);
 	}
@@ -106,7 +102,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public Index<ABlob, AVector<ACell>> getRows() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		return (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
 	}
@@ -115,7 +111,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Gets the update timestamp.
 	 */
 	public CVMLong getTimestamp() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		return (CVMLong) state.get(POS_UTIME);
 	}
@@ -124,7 +120,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Checks if this table is a tombstone (dropped).
 	 */
 	public boolean isTombstone() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		return state != null && state.get(POS_SCHEMA) == null;
 	}
 
@@ -132,7 +128,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Checks if this table is live (not dropped).
 	 */
 	public boolean isLive() {
-		return isLiveState(cursor.get());
+		return isLiveState(cursor().get());
 	}
 
 	/**
@@ -165,7 +161,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Gets the number of live (non-tombstone) rows. O(1).
 	 */
 	public long getRowCount() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return 0;
 		if (state.count() <= POS_LIVE_COUNT) {
 			// Legacy state vector without liveCount — fall back to Index.count()
@@ -189,7 +185,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	@SuppressWarnings("unchecked")
 	public boolean insertRow(ABlob pk, AVector<ACell> values, CVMLong timestamp) {
 		boolean[] result = new boolean[1];
-		cursor.updateAndGet(state -> {
+		cursor().updateAndGet(state -> {
 			if (state == null || state.get(POS_SCHEMA) == null) return state;
 			Index<ABlob, AVector<ACell>> rows = (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
 			if (rows == null) rows = TableLattice.INSTANCE.zero();
@@ -214,7 +210,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	@SuppressWarnings("unchecked")
 	public boolean deleteRow(ABlob key, CVMLong timestamp) {
 		boolean[] result = new boolean[1];
-		cursor.updateAndGet(state -> {
+		cursor().updateAndGet(state -> {
 			if (state == null || state.get(POS_SCHEMA) == null) return state;
 			Index<ABlob, AVector<ACell>> rows = (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
 			if (rows == null) return state;

@@ -9,7 +9,8 @@ import convex.core.util.Utils;
 /**
  * Abstract base class for non-CVM CAD3 Records values. 
  * 
- * These look like maps of longs to values in CVM code.
+ * The Java record API exposes their raw fields. CVM map operations require a
+ * recognised CVM record schema rather than this generic representation.
  * 
  * These should always have an encoding since the only way to create them is load from network or storage
  */

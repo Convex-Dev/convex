@@ -1,5 +1,6 @@
 package convex.db;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,12 +15,13 @@ import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.TableStoreLattice;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.RootComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.LatticeHost;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 
 /**
  * Root lattice component for the Convex DB SQL database system.
@@ -47,7 +49,7 @@ import convex.node.NodeServer;
  * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
  *     ConvexDB.createNodeServer(store);
  * server.launch();
- * ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+ * ConvexDB cdb = ConvexDB.connect(server.getHost());
  * cdb.register();
  *
  * // JDBC access (after register)
@@ -107,14 +109,8 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	// ========== Instance ==========
 
-	private ConvexDB(ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-		this(null,cursor);
-	}
-
-	private ConvexDB(
-			ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent,
-			ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-		super(parent,cursor);
+	private ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
+		super(cursor);
 	}
 
 	/**
@@ -123,8 +119,8 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return New ConvexDB instance
 	 */
 	public static ConvexDB create() {
-		ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor =
-			Cursors.createLattice(DATABASE_MAP_LATTICE);
+		AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor =
+			Cursors.root(DATABASE_MAP_LATTICE.zero());
 		return new ConvexDB(cursor);
 	}
 
@@ -132,36 +128,38 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * Connects directly to an existing cursor chain without a containing
 	 * component policy. This form is retained for standalone and compatibility
 	 * use; hosted applications should use {@link #connect(ALatticeComponent)}
-	 * with {@link NodeServer#getRootComponent()}.
+	 * with {@link NodeServer#getHost()}.
 	 *
 	 * @param parent Parent lattice cursor at the database-map level
 	 * @return ConvexDB connected to the cursor chain
 	 */
-	public static ConvexDB connect(ALatticeCursor<?> parent) {
+	public static ConvexDB connect(AForkableCursor<?> parent) {
 		return new ConvexDB(parent.path());
 	}
 
 	/**
 	 * Connects to a containing component at the database-map level.
 	 *
-	 * <p>This is the preferred hosted form. Component policy such as persistence
-	 * delegates through the supplied parent, while cursor writes remain at the
-	 * same database-map position. A {@link RootComponent} obtained from a
-	 * {@link NodeServer} can be supplied directly.</p>
+	 * <p>This is the preferred hosted form: cursor writes share the containing
+	 * component's atomic state and context at the same database-map position. A
+	 * {@link LatticeHost} obtained from a {@link NodeServer} can be supplied
+	 * directly.</p>
 	 *
 	 * @param parent Containing database-map component
-	 * @return ConvexDB connected to the component hierarchy
+	 * @return ConvexDB connected to the containing component's cursor
 	 */
 	public static ConvexDB connect(
 			ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		return new ConvexDB(parent,parent.cursor());
+		return new ConvexDB(parent.cursor());
 	}
 
 	/**
-	 * Creates a persisted ConvexDB backed by a local-only {@link NodeServer}.
-	 * The NodeServer handles Etch persistence; call {@code server.close()} to
-	 * flush and shut down.
+	 * Creates optional networking around a store-backed ConvexDB host.
+	 * Call {@code server.getHost().checkpoint()} to save durably while running. At
+	 * shutdown, close the server, then {@code server.getHost()} to save, then the
+	 * store; network close does not save pending state. Local-only applications can
+	 * use {@link #openHost}.
 	 *
 	 * <p>Usage:
 	 * <pre>
@@ -169,14 +167,20 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
 	 *     ConvexDB.createNodeServer(store);
 	 * server.launch();
-	 * ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+	 * ConvexDB cdb = ConvexDB.connect(server.getHost());
 	 * </pre>
 	 *
 	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
-	 * @return NodeServer configured for SQL database lattice (local-only, no network)
+	 * @return NodeServer replicating a relay host over the SQL database lattice (local-only, no network)
+	 * @throws IOException if the store's retained root cannot be read
 	 */
-	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) {
-		return new NodeServer<>(DATABASE_MAP_LATTICE,store);
+	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) throws IOException {
+		return new NodeServer<>(openHost(store));
+	}
+
+	/** Opens a retained database host for local use, without constructing networking. */
+	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store) throws IOException {
+		return RelayHost.open(DATABASE_MAP_LATTICE,store);
 	}
 
 	/**
@@ -210,7 +214,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return Array of database names
 	 */
 	public String[] getDatabaseNames() {
-		AHashMap<AString, Index<Keyword, ACell>> map = cursor.get();
+		AHashMap<AString, Index<Keyword, ACell>> map = cursor().get();
 		if (map == null) return new String[0];
 		java.util.List<String> names = new java.util.ArrayList<>();
 		for (var entry : map.entrySet()) {
@@ -233,7 +237,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * Bypasses DriverManager and the static registry entirely.
 	 *
 	 * <p>This is the preferred API when you already hold a ConvexDB instance
-	 * (e.g. from {@link #connect(ALatticeCursor)}).
+	 * (e.g. from {@link #connect(AForkableCursor)}).
 	 *
 	 * @param dbName Database name within this ConvexDB
 	 * @return JDBC Connection backed by this instance's cursor chain

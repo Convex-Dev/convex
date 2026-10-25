@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
+import convex.core.data.ASequence;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -29,6 +31,120 @@ import convex.test.Samples;
 public class BigIntegerTest {
 	
 	protected Object temp = null;
+
+	@Test public void testSignumBeforeAndAfterMaterialisingBigInteger() {
+		for (byte[] bytes:new byte[][] { {}, {0}, {0,(byte)128}, {1}, {(byte)128},
+				{0,(byte)128,0,0,0,0,0,0,0} }) {
+			CVMBigInteger value=CVMBigInteger.wrap(bytes);
+			int sign=bytes.length==0?0:new BigInteger(bytes).signum();
+			assertEquals(CVMLong.forSignum(sign),value.signum());
+			value.big();
+			assertEquals(CVMLong.forSignum(sign),value.signum());
+		}
+	}
+
+	/**
+	 * A decoded big integer is blob-backed until materialised. Regression: a positive
+	 * value with a leading 0x00 sign byte had signum 0, so (signum 9223372036854775808)
+	 * returned 0 in any transaction that arrived encoded.
+	 */
+	@Test public void testSignumOfDecodedBigInteger() throws BadFormatException {
+		Blob enc=CVMBigInteger.wrap(CVMBigInteger.MIN_POSITIVE_BIG).getEncoding();
+		AInteger decoded=(AInteger)Samples.TEST_STORE.decode(enc);
+		assertEquals(CVMLong.ONE,decoded.signum());
+		assertTrue(decoded.isPositive());
+	}
+
+	/**
+	 * An empty blob is zero. Regression: signum threw IndexOutOfBoundsException on a
+	 * fresh instance. CorePropertyTest.testCoreArgs hit this only when the per-JVM hash
+	 * salt ordered #%signum before every core function that materialised its argument.
+	 */
+	@Test public void testCreateFromEmptyBlobIsZero() {
+		assertEquals(CVMLong.ZERO,CVMBigInteger.create(Blob.EMPTY).signum());
+		assertEquals(CVMLong.ZERO,RT.signum(CVMBigInteger.create(Blob.EMPTY)));
+
+		CVMBigInteger zero=CVMBigInteger.create(Blob.EMPTY);
+		assertFalse(zero.isCanonical());
+		assertSame(CVMLong.ZERO,zero.getCanonical());
+		assertEquals(CVMLong.ZERO,zero);
+		assertEquals(BigInteger.ZERO,zero.big());
+	}
+
+	/**
+	 * Regression: trimming re-read the first two bytes on every pass, so any blob of three
+	 * or more bytes starting with a redundant sign byte collapsed to its last byte.
+	 */
+	@Test public void testCreateTrimsRedundantLeadingBytes() {
+		assertCreate("128","000080");
+		assertCreate("-129","ffff7f");
+		assertCreate("32767","007fff");
+		assertCreate("-32513","ff80ff");
+		assertCreate("0","0000");
+		assertCreate("-1","ffff");
+		assertCreate("9223372036854775808","00008000000000000000");
+		assertCreate("2361183241434822606847","007fffffffffffffffff");
+		assertCreate("-2361183241434822606849","ffff7fffffffffffffffff");
+	}
+
+	private static void assertCreate(String expected, String hex) {
+		Blob b=Blob.fromHex(hex);
+		BigInteger value=new BigInteger(expected);
+		CVMBigInteger bi=CVMBigInteger.create(b);
+		assertEquals(Blob.wrap(value.toByteArray()),bi.toBlob(),hex); // minimal two's complement
+		assertEquals(value,bi.big(),hex);
+		assertEquals(value,AInteger.create(b).big(),hex);
+	}
+
+	/**
+	 * Products are canonical: a big integer times zero is CVMLong zero
+	 */
+	@Test public void testMultiplyIsCanonical() {
+		assertCVMLongZero(CVMBigInteger.MIN_POSITIVE.multiply(CVMLong.ZERO));
+		assertCVMLongZero(CVMLong.ZERO.multiply(CVMBigInteger.MIN_NEGATIVE));
+		assertCVMLongZero(CVMBigInteger.MIN_POSITIVE.multiply(CVMBigInteger.wrap(BigInteger.ZERO)));
+		assertTrue(CVMBigInteger.MIN_POSITIVE.multiply(CVMLong.create(2)).isCanonical());
+	}
+
+	private static void assertCVMLongZero(ANumeric a) {
+		assertTrue(a instanceof CVMLong,()->"Expected CVMLong but was "+a.getClass());
+		assertEquals(CVMLong.ZERO,a);
+	}
+
+	/**
+	 * A non-canonical big integer in long range behaves exactly like the equal CVMLong,
+	 * since peers may hold either form of the same value
+	 */
+	@Test public void testNonCanonicalBehavesAsLong() {
+		ASequence<ACell> v=Reader.read("[10 20 30]");
+		for (CVMBigInteger x: nonCanonical(1)) {
+			assertFalse(x.isCanonical());
+			assertTrue(AInteger.isLong(x));
+			assertEquals(CVMLong.create(20),v.get(x));
+			assertEquals(CVMLong.create(20),v.get(x,CVMLong.MINUS_ONE));
+		}
+		for (CVMBigInteger x: nonCanonical(65)) {
+			assertEquals(CVMChar.create('A'),RT.ensureChar(x));
+		}
+		for (CVMBigInteger x: nonCanonical(0)) {
+			assertEquals(Long.valueOf(0),RT.jvm(x));
+		}
+
+		assertTrue(AInteger.isLong(CVMLong.MAX_VALUE));
+		assertTrue(AInteger.isLong(CVMBigInteger.create(Blob.EMPTY)));
+		assertFalse(AInteger.isLong(CVMBigInteger.MIN_POSITIVE));
+		assertFalse(AInteger.isLong(CVMDouble.ONE));
+		assertFalse(AInteger.isLong(null));
+	}
+
+	/**
+	 * Non-canonical big integers equal to n, held as a Java BigInteger (as arithmetic builds them)
+	 * and as a blob
+	 */
+	private static CVMBigInteger[] nonCanonical(long n) {
+		BigInteger bi=BigInteger.valueOf(n);
+		return new CVMBigInteger[] {CVMBigInteger.wrap(bi),CVMBigInteger.wrap(bi.toByteArray())};
+	}
 
 	@Test public void testBigIntegerAssumptions() {
 		assertThrows(java.lang.NumberFormatException.class,()->{

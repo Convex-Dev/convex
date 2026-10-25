@@ -1,5 +1,8 @@
 package convex.lattice.fs;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -8,7 +11,6 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
 import convex.lattice.generic.IndexLattice;
 
 /**
@@ -26,11 +28,12 @@ import convex.lattice.generic.IndexLattice;
  * - Conflicts are resolved by timestamp (newer wins)
  */
 public class DLFSLattice extends ALattice<AVector<ACell>> {
-	/** Default accepted lead over the receiving host's clock. */
+	/** Default accepted lead over a DLFS component's clock. */
 	public static final long DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW = 30_000L;
 
 	/**
-	 * Singleton instance of DLFSLattice
+	 * Value-based merge with no clock-dependent admission. Applications that limit
+	 * incoming update times bind their own policy with {@link #withClock}.
 	 */
 	public static final DLFSLattice INSTANCE = new DLFSLattice();
 
@@ -43,10 +46,27 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 
 	private DLFSLattice() {
 		// Private constructor for singleton
+		clock=null;
+		maxFutureSkew=0;
+	}
+
+	private final Supplier<CVMLong> clock;
+	private final long maxFutureSkew;
+
+	private DLFSLattice(Supplier<CVMLong> clock,long maxFutureSkew) {
+		this.clock=Objects.requireNonNull(clock);
+		if (maxFutureSkew<0) throw new IllegalArgumentException("Timestamp skew must be non-negative");
+		this.maxFutureSkew=maxFutureSkew;
+	}
+
+	/** Binds incoming timestamp admission independently of signing or a lattice context. */
+	public static DLFSLattice withClock(Supplier<CVMLong> clock,long maxFutureSkew) {
+		return new DLFSLattice(clock,maxFutureSkew);
 	}
 
 	@Override
 	public AVector<ACell> merge(AVector<ACell> ownValue, AVector<ACell> otherValue) {
+		if (clock!=null) return mergeBefore(clock.get().longValue(),maxFutureSkew,ownValue,otherValue);
 		// Handle null cases
 		if (ownValue == null) {
 			return DLFSNode.isValidNodeShallow(otherValue) ? otherValue : null;
@@ -63,11 +83,7 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		return safeMerge(ownValue, otherValue);
 	}
 
-	@Override
-	public AVector<ACell> merge(LatticeContext context, AVector<ACell> ownValue, AVector<ACell> otherValue) {
-		if (context==null) context=LatticeContext.EMPTY;
-		long now=context.currentTimestampValue();
-		long skew=context.getMaxFutureTimestampSkew(DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW);
+	private AVector<ACell> mergeBefore(long now,long skew,AVector<ACell> ownValue,AVector<ACell> otherValue) {
 		long maximumTimestamp=(now>Long.MAX_VALUE-skew)?Long.MAX_VALUE:now+skew;
 		if (ownValue == null) {
 			return isAcceptableRoot(otherValue,maximumTimestamp) ? otherValue : null;
@@ -151,7 +167,7 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 			if (idx == DLFSNode.POS_DIR) {
 				// Position 0: directory entries (Index<AString, AVector<ACell>>)
 				// Navigate further with path(AString) on the IndexLattice
-				return (ALattice<T>) DIR_ENTRIES_LATTICE;
+				return (ALattice<T>)(clock==null?DIR_ENTRIES_LATTICE:IndexLattice.create(this));
 			}
 			// Other positions (1=data, 2=metadata, 3=utime) are leaf values
 			return null;

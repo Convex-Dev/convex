@@ -8,7 +8,6 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.Timer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,16 +15,18 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
+import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.ops.Special;
 import convex.core.data.AccountKey;
-import convex.core.exceptions.ResultException;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.DropdownMenu;
-import convex.gui.keys.KeyRingPanel;
-import convex.gui.keys.UnlockWalletDialog;
+import convex.gui.keys.KeyAccess;
+import convex.gui.keys.KeyRing;
+import convex.gui.utils.Async;
+import convex.gui.utils.Refresh;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -47,9 +48,11 @@ public class AccountChooserPanel extends JPanel {
 	protected Convex convex;
 
 	private static final int BALANCE_REFRESH_MS = 5000;
-	private Timer balanceRefreshTimer;
 
     AWalletEntry previousSelection = null;
+
+	/** True while showing a signer found elsewhere, so selecting it doesn't ask again. EDT only. */
+	private boolean showingSigner=false;
 
 
 	public AccountChooserPanel(Convex convex) {
@@ -81,7 +84,7 @@ public class AccountChooserPanel extends JPanel {
 				if (e.getStateChange()==ItemEvent.DESELECTED) {
 					previousSelection=we;
 					return;
-				} else {
+				} else if (!showingSigner) {
 					setKeyPair(we);
 				}
 			});
@@ -93,11 +96,8 @@ public class AccountChooserPanel extends JPanel {
 			balanceLabel = new BalanceLabel();
 			balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
 			mp.add(balanceLabel);
-			updateBalance(getAddress());
-
-			// Periodic refresh so balance stays current when updated outside this panel
-			balanceRefreshTimer = new Timer(BALANCE_REFRESH_MS, e -> updateBalance());
-			balanceRefreshTimer.start();
+			// Keeps the balance current when it changes outside this panel
+			Refresh.whileShowing(balanceLabel, BALANCE_REFRESH_MS, this::updateBalance);
 
 			add(mp,"dock west");
 		}
@@ -115,35 +115,15 @@ public class AccountChooserPanel extends JPanel {
 			popupMenu.add(clearSeqButton);
 			
 			JMenuItem setSeqButton = new JMenuItem("Set sequence...",Toolkit.menuIcon(0xe6d4));
-			setSeqButton.addActionListener(e -> {
-				try {
-					long seq=convex.getSequence();
-					String s = JOptionPane.showInputDialog(this, "Current sequence number is "+seq+", so the next sequence number expected is "+(seq+1), "Enter next sequence number", JOptionPane.QUESTION_MESSAGE);
-					if (s==null) return;
-					
-					long nextSeq=Long.parseLong(s);
-					
-					convex.setNextSequence(nextSeq);
-					System.err.println("Sequence number set: "+convex.getSequence());
-				} catch (NumberFormatException e1) {
-					JOptionPane.showMessageDialog(this, "Invalid sequence number");
-				}catch (ResultException e1) {
-					e1.printStackTrace();
-				} catch (InterruptedException e1) {
-					Thread.currentThread().interrupt();
-				}
-				convex.clearSequence();
-			});
+			setSeqButton.addActionListener(e -> Async.whileBusy(e,
+				Async.background(convex::getSequence).thenAcceptAsync(this::askNextSequence, Async.EDT)));
 			popupMenu.add(setSeqButton);
-			
+
 			JMenuItem reconnectButton = new JMenuItem("Reconnect",Toolkit.menuIcon(0xe157));
-			reconnectButton.addActionListener(e -> {
-				try {
-					convex.reconnect();
-				} catch (Exception ex) {
-					log.info("Reconnect failed",ex);
-				}
-			});
+			reconnectButton.addActionListener(e -> Async.whileBusy(e, Async.background(()->{
+				convex.reconnect();
+				return null;
+			})));
 			popupMenu.add(reconnectButton);
 			
 			JMenuItem connInfoButton = new JMenuItem("Connection Info...",Toolkit.menuIcon(0xe157));
@@ -169,7 +149,7 @@ public class AccountChooserPanel extends JPanel {
 			mp.setBorder(null);
 			modeCombo = new JComboBox<String>();
 			modeCombo.setToolTipText("Use Transact to execute transactions (uses Convex Coins).\n\n"
-					+ "Use Query to compute results without changing on-chain state (free).\n\n"
+					+ "Use Query to compute results without changing on-chain state (free, including zero-balance accounts).\n\n"
 					+ "Use Prepare to prepare the transcation without submitting."
 					);
 			modeCombo.addItem("Transact");
@@ -190,6 +170,7 @@ public class AccountChooserPanel extends JPanel {
 	
 	public void updateAddress(Address a) {
 		convex.setAddress(a);
+		// Continue on the EDT, since choosing a key may ask for its password
 		convex.query(Special.forSymbol(Symbols.STAR_KEY)).thenAcceptAsync(r-> {
 			if (r.isError()) {
 				// ignore?
@@ -197,11 +178,11 @@ public class AccountChooserPanel extends JPanel {
 				setKeyPair(null);
 			} else {
 				AccountKey ak=AccountKey.parse(r.getValue()); // might be null, will clear key
-				AWalletEntry we=KeyRingPanel.getKeyRingEntry(ak);
+				AWalletEntry we=KeyRing.get().find(ak);
 				setKeyPair(we);
 			}
-		});
-		
+		}, Async.EDT);
+
 		updateBalance();
 	}
 	
@@ -212,44 +193,63 @@ public class AccountChooserPanel extends JPanel {
 			return;
 		}
 		
-		System.err.println("Setting wallet entry:" +we);
 		if (we==null) {
 			convex.setKeyPair(null);
 		} else {
-			AKeyPair kp;
-			if (we.isLocked()) {
-				boolean unlock=UnlockWalletDialog.offerUnlock(this, we);
-				if (!unlock) {
-					keyCombo.setSelectedItem(previousSelection);
-					return;
-				} else {
-					kp=we.getKeyPair();
-					we.lock();					
-				}
-			} else {
-				kp=we.getKeyPair();
+			AKeyPair kp=KeyAccess.unlockForUse(this, we);
+			if (kp==null) {
+				keyCombo.setSelectedItem(previousSelection);
+				return;
 			}
 			convex.setKeyPair(kp);
 		}
 	}
-	
+
+	/**
+	 * Shows a key pair the connection now signs with, found elsewhere (e.g. when
+	 * the window opened), and switches to Transact mode. Doesn't ask for the key
+	 * again. Call on the EDT.
+	 * @param kp Key pair set on the connection
+	 */
+	public void showSigner(AKeyPair kp) {
+		AWalletEntry we=KeyRing.get().find(kp.getAccountKey());
+		showingSigner=true;
+		try {
+			// Via the model: the combo ignores items not in its list, such as a key outside the key ring
+			keyCombo.getModel().setSelectedItem((we!=null)?we:new HotWalletEntry(kp,null));
+		} finally {
+			showingSigner=false;
+		}
+		modeCombo.setSelectedItem("Transact");
+	}
+
 	public void updateBalance() {
 		updateBalance(getAddress());
 	}
 
-	@Override
-	public void removeNotify() {
-		if (balanceRefreshTimer != null) balanceRefreshTimer.stop();
-		super.removeNotify();
-	}
 
 	private void updateBalance(Address a) {
+		balanceLabel.showResult(convex.query(Special.get("*balance*"),a));
+	}
+
+	/** Asks for the next sequence number to use, given the current one. Runs on the EDT. */
+	private void askNextSequence(long seq) {
+		String s = JOptionPane.showInputDialog(this, "Current sequence number is "+seq+", so the next sequence number expected is "+(seq+1), "Enter next sequence number", JOptionPane.QUESTION_MESSAGE);
+		if (s==null) return;
+		if (!setNextSequence(s)) JOptionPane.showMessageDialog(this, "Invalid sequence number");
+	}
+
+	/**
+	 * Sets the sequence number the connection uses for its next transaction
+	 * @param s Sequence number as entered
+	 * @return false if the entry is not a number, leaving the sequence unchanged
+	 */
+	boolean setNextSequence(String s) {
 		try {
-			convex.query(Special.get("*balance*"),a).thenAccept(r-> {
-				balanceLabel.setFromResult(r);
-			});
-		} catch (NullPointerException t) {
-			balanceLabel.setText(t.getClass().getName());
+			convex.setNextSequence(Long.parseLong(s));
+			return true;
+		} catch (NumberFormatException e) {
+			return false;
 		}
 	}
 

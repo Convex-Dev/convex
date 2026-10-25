@@ -490,4 +490,41 @@ public class OwnerLatticeTest {
 		// Verifier rejects because attacker is not authorised for org address
 		assertNull(result.get(orgAddress), "Unauthorised signer for Address owner should be rejected");
 	}
+
+	// ===== Slot-Level Verification =====
+
+	/** Merging at one owner's slot means the same as merging through the owner map. */
+	@Test
+	public void testSlotMergeVerifiesOwnerThroughContext() {
+		AKeyPair kpAuthorised = AKeyPair.generate();
+		AKeyPair kpStranger = AKeyPair.generate();
+		OwnerLattice<AInteger> lattice = OwnerLattice.create(MaxLattice.create());
+		ACell did = Strings.create("did:example:org");
+		BiPredicate<ACell, AccountKey> verifier =
+			(owner, signer) -> did.equals(owner) && kpAuthorised.getAccountKey().equals(signer);
+		LatticeContext ctx = LatticeContext.create(null, kpAuthorised, verifier);
+		SignedLattice<AInteger> slot = lattice.signingFor(did);
+
+		SignedData<AInteger> good = kpAuthorised.signData(CVMLong.create(1));
+		SignedData<AInteger> bad = kpStranger.signData(CVMLong.create(2));
+		assertSame(good, slot.merge(ctx, null, good));
+		assertNull(slot.merge(ctx, null, bad), "a signer the context does not authorise is rejected at the slot");
+		assertSame(good, slot.merge(ctx, good, bad));
+	}
+
+	/** A direct-key owner needs its own key as signer even when no context is supplied. */
+	@Test
+	public void testMergeWithoutContextStillBindsDirectKeyOwner() {
+		AKeyPair kpOwner = AKeyPair.generate();
+		AKeyPair kpSigner = AKeyPair.generate();
+		OwnerLattice<AInteger> lattice = OwnerLattice.create(MaxLattice.create());
+		ACell ownerKey = kpOwner.getAccountKey();
+
+		SignedData<AInteger> wrong = kpSigner.signData(CVMLong.create(42));
+		assertNull(lattice.signingFor(ownerKey).merge(null, wrong));
+		assertNull(lattice.merge(Maps.empty(), Maps.of(ownerKey, wrong)).get(ownerKey),
+			"the context-free owner map merge binds signer to owner too");
+		SignedData<AInteger> right = kpOwner.signData(CVMLong.create(42));
+		assertSame(right, lattice.merge(Maps.empty(), Maps.of(ownerKey, right)).get(ownerKey));
+	}
 }

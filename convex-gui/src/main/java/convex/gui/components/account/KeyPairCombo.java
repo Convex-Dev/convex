@@ -1,15 +1,16 @@
 package convex.gui.components.account;
 
 import java.awt.Component;
-import java.util.NoSuchElementException;
+import java.util.List;
 
+import javax.swing.AbstractListModel;
 import javax.swing.ComboBoxModel;
-import javax.swing.DefaultListModel;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.ListCellRenderer;
+import javax.swing.ListModel;
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
 
@@ -22,7 +23,7 @@ import convex.core.data.Blobs;
 import convex.core.util.Utils;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.Identicon;
-import convex.gui.keys.KeyRingPanel;
+import convex.gui.keys.KeyRing;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -30,19 +31,42 @@ import net.miginfocom.swing.MigLayout;
  * Combo box for choosing a key pair from a list of wallet entries.
  */
 @SuppressWarnings("serial")
-public class KeyPairCombo extends JComboBox<AWalletEntry> {
+public class KeyPairCombo extends JComboBox<AWalletEntry> implements AutoCloseable {
 
-	public static class KeyPairModel implements ComboBoxModel<AWalletEntry> {
+	/**
+	 * Combo box model over a list of wallet entries (by default the global key
+	 * ring), with an extra null entry for "no key pair". Selection is per model.
+	 */
+	public static class KeyPairModel extends AbstractListModel<AWalletEntry> implements ComboBoxModel<AWalletEntry>, AutoCloseable {
 
-		private DefaultListModel<AWalletEntry> underlying;
+		private final ListModel<AWalletEntry> underlying;
 		private AWalletEntry selected;
-		
-		public KeyPairModel(DefaultListModel<AWalletEntry> underlying) {
+
+		/** Forwards changes in the underlying list to this model's listeners */
+		private final ListDataListener forwarder=new ListDataListener() {
+			@Override
+			public void intervalAdded(ListDataEvent e) {
+				fireIntervalAdded(KeyPairModel.this, e.getIndex0(), e.getIndex1());
+			}
+
+			@Override
+			public void intervalRemoved(ListDataEvent e) {
+				fireIntervalRemoved(KeyPairModel.this, e.getIndex0(), e.getIndex1());
+			}
+
+			@Override
+			public void contentsChanged(ListDataEvent e) {
+				fireContentsChanged(KeyPairModel.this, e.getIndex0(), e.getIndex1());
+			}
+		};
+
+		public KeyPairModel(ListModel<AWalletEntry> underlying) {
 			this.underlying=underlying;
+			underlying.addListDataListener(forwarder);
 		}
-		
+
 		public KeyPairModel() {
-			this(KeyRingPanel.getListModel());
+			this(KeyRing.get().listModel());
 		}
 
 		@Override
@@ -58,23 +82,9 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 		}
 
 		@Override
-		public void addListDataListener(ListDataListener l) {
-			underlying.addListDataListener(l);
-		}
-
-		@Override
-		public void removeListDataListener(ListDataListener l) {
-			underlying.removeListDataListener(l);
-		}
-
-		@Override
 		public void setSelectedItem(Object anItem) {
 			this.selected=(AWalletEntry)anItem;
-			ListDataListener[] listeners = underlying.getListDataListeners();
-			ListDataEvent e=new ListDataEvent(this,ListDataEvent.CONTENTS_CHANGED,0,0);
-			for (ListDataListener l: listeners) {
-				l.contentsChanged(e);
-			}
+			fireContentsChanged(this, -1, -1);
 		}
 
 		@Override
@@ -82,8 +92,10 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 			return this.selected;
 		}
 
-		public void addElement(AWalletEntry entry) {
-			underlying.addElement(entry);
+		/** Stops following the underlying list */
+		@Override
+		public void close() {
+			underlying.removeListDataListener(forwarder);
 		}
 
 	}
@@ -129,9 +141,8 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 		JPanel p=new JPanel();
 		p.setLayout(new MigLayout("insets 20 20 20 20, wrap 1"));
 		
-		KeyPairModel model=new KeyPairModel();
-		model.addElement(HotWalletEntry.create(AKeyPair.generate(),"Test key"));
-		KeyPairCombo kpCombo=new KeyPairCombo(model);
+		KeyRing.get().add(HotWalletEntry.create(AKeyPair.generate(),"Test key"));
+		KeyPairCombo kpCombo=new KeyPairCombo(new KeyPairModel());
 		p.add(kpCombo);
 		
 		CodeLabel sel=new CodeLabel("Nothing selected");		
@@ -157,10 +168,9 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 	
 	public static KeyPairCombo create() {
 		KeyPairModel model=new KeyPairModel();
-		try {
-			model.setSelectedItem(model.underlying.firstElement());
-		} catch (NoSuchElementException e) {
-			// ignore
+		List<AWalletEntry> entries=KeyRing.get().getEntries();
+		if (!entries.isEmpty()) {
+			model.setSelectedItem(entries.get(0));
 		}
 		return new KeyPairCombo(model);
 	}
@@ -169,12 +179,18 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 		KeyPairModel model=new KeyPairModel();
 		if (kp!=null) {
 			AccountKey publicKey=kp.getAccountKey();
-			AWalletEntry we=KeyRingPanel.getKeyRingEntry(publicKey);
+			AWalletEntry we=KeyRing.get().find(publicKey);
 			if (we==null) {
 				we=new HotWalletEntry(kp,null);
 			}
 			model.setSelectedItem(we);
 		}
  		return new KeyPairCombo(model);
+	}
+
+	/** Stops following the key ring. Called when the owning window closes. */
+	@Override
+	public void close() {
+		if (getModel() instanceof KeyPairModel model) model.close();
 	}
 }

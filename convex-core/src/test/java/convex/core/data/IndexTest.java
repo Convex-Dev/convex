@@ -17,7 +17,9 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -39,6 +41,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
+import convex.core.store.MemoryStore;
 import convex.core.store.NullStore;
 import convex.etch.EtchStore;
 import convex.test.Samples;
@@ -1114,5 +1117,214 @@ public class IndexTest {
 			built=built.assoc(Blob.create(kb),CVMLong.create(digit));
 		}
 		return built;
+	}
+
+	// ---- Stack overflow fallback (Convex-Dev/convex#727) ----
+
+	/** Recurses until the thread stack overflows. HotSpot never eliminates recursion. */
+	private static void blowStack() {
+		blowStack();
+	}
+
+	/**
+	 * A store whose lookups overflow the stack while armed, then behave normally.
+	 * Lets a test inject a {@link StackOverflowError} inside an Index descent
+	 * through a store-backed child Ref, with no hook in the Index code.
+	 */
+	private static final class OverflowingStore extends MemoryStore {
+		int armed=0;
+		int fired=0;
+
+		@Override
+		public <T extends ACell> Ref<T> refForHash(Hash hash) {
+			if (armed>0) {
+				armed--;
+				fired++;
+				blowStack();
+			}
+			return super.refForHash(hash);
+		}
+	}
+
+	private static final Blob K10=Blob.fromHex("10");
+	private static final Blob K1000=Blob.fromHex("1000");
+	private static final Blob K1001=Blob.fromHex("1001");
+	private static final Blob K1010=Blob.fromHex("1010");
+
+	/** Root "10" with its own entry, a two-entry subtrie at digit 0 and a leaf at digit 1. */
+	private static Index<Blob,CVMLong> fourKeyIndex() {
+		return Index.of(K10,0,K1000,1,K1001,2,K1010,3);
+	}
+
+	/**
+	 * {@link #fourKeyIndex()} with the digit-0 subtrie behind a Ref that loads
+	 * from {@code store}, so the first descent into it overflows while the store
+	 * is armed. The root entry is delivered before the overflow, which exercises
+	 * traversal resumption part-way through.
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private static Index<Blob,CVMLong> hostileIndex(OverflowingStore store) throws IOException {
+		Index<Blob,CVMLong> sub=Index.of(K1000,1,K1001,2);
+		Index<Blob,CVMLong> leaf=Index.of(K1010,3);
+		Cells.persist(sub,store);
+		Ref<Index> subRef=RefSoft.createForHash(sub.getHash(),store);
+		Index<Blob,CVMLong> root=Index.unsafeCreate(2,MapEntry.create(K10,CVMLong.ZERO),
+				new Ref[] { subRef, leaf.getRef() },0x0003,4);
+		store.armed=1;
+		return root;
+	}
+
+	@Test
+	public void testHostileIndexFixture() throws IOException, InvalidDataException {
+		OverflowingStore store=new OverflowingStore();
+		Index<Blob,CVMLong> baseline=fourKeyIndex();
+		Index<Blob,CVMLong> hostile=hostileIndex(store);
+		store.armed=0; // plain comparison, no overflow
+		assertEquals(baseline,hostile);
+		baseline.validate();
+		assertEquals(0,store.fired);
+	}
+
+	@Test
+	public void testStackOverflowFallbackAssocDissoc() throws IOException {
+		OverflowingStore store=new OverflowingStore();
+		Index<Blob,CVMLong> baseline=fourKeyIndex();
+		CVMLong v99=CVMLong.create(99);
+
+		Index<Blob,CVMLong> updated=hostileIndex(store).assoc(K1000,v99);
+		assertEquals(1,store.fired);
+		assertEquals(baseline.assoc(K1000,v99),updated);
+		assertEquals(v99,updated.get(K1000));
+
+		Blob fresh=Blob.fromHex("100a");
+		Index<Blob,CVMLong> added=hostileIndex(store).assoc(fresh,v99);
+		assertEquals(2,store.fired);
+		assertEquals(baseline.assoc(fresh,v99),added);
+		assertEquals(5,added.count());
+
+		Index<Blob,CVMLong> removed=hostileIndex(store).dissoc(K1001);
+		assertEquals(3,store.fired);
+		assertEquals(baseline.dissoc(K1001),removed);
+		assertEquals(3,removed.count());
+	}
+
+	@Test
+	public void testStackOverflowFallbackTraversals() throws IOException {
+		OverflowingStore store=new OverflowingStore();
+		Index<Blob,CVMLong> baseline=fourKeyIndex();
+		ArrayList<Blob> expectedKeys=new ArrayList<>();
+		baseline.forEach((k,v) -> expectedKeys.add(k));
+		assertEquals(Arrays.asList(K10,K1000,K1001,K1010),expectedKeys);
+
+		// forEach: the root entry is visited, the overflow fires on the subtrie,
+		// and the walk resumes with no repeat and no omission
+		ArrayList<Blob> keys=new ArrayList<>();
+		hostileIndex(store).forEach((k,v) -> keys.add(k));
+		assertEquals(1,store.fired);
+		assertEquals(expectedKeys,keys);
+
+		// reductions: the accumulator survives the overflow
+		assertEquals(6L,hostileIndex(store).reduceValues((acc,v) -> acc+v.longValue(),0L));
+		assertEquals(6L,hostileIndex(store).reduceEntries((acc,me) -> acc+me.getValue().longValue(),0L));
+
+		// accumulators (protected, same package). Note entrySet() is a lazy view
+		// over entryAt and does not traverse, so it is not exercised here.
+		HashSet<Map.Entry<Blob,CVMLong>> entries=new HashSet<>();
+		hostileIndex(store).accumulateEntries(entries);
+		assertEquals(new HashSet<>(baseline.entrySet()),entries);
+		HashSet<Blob> keySet=new HashSet<>();
+		hostileIndex(store).accumulateKeySet(keySet);
+		assertEquals(new HashSet<>(baseline.keySet()),keySet);
+		ArrayList<CVMLong> vals=new ArrayList<>();
+		hostileIndex(store).accumulateValues(vals);
+		assertEquals(Arrays.asList(CVMLong.ZERO,CVMLong.ONE,CVMLong.create(2),CVMLong.create(3)),vals);
+		assertEquals(baseline.values(),hostileIndex(store).values());
+		assertEquals(new HashSet<>(baseline.keySet()),new HashSet<>(hostileIndex(store).keySet()));
+
+		// containsValue: early exit after resumption, and a full scan
+		assertTrue(hostileIndex(store).containsValue(CVMLong.create(2)));
+		assertFalse(hostileIndex(store).containsValue(CVMLong.create(42)));
+
+		// filterValues and merge through the store-backed child
+		assertEquals(baseline.filterValues(v -> v.longValue()!=1),hostileIndex(store).filterValues(v -> v.longValue()!=1));
+		Index<Blob,CVMLong> changed=baseline.assoc(K1001,CVMLong.create(20));
+		assertEquals(changed,hostileIndex(store).mergeDifferences(changed,(a,b) -> b));
+		assertEquals(12,store.fired);
+	}
+
+	/**
+	 * An overflow raised inside a caller's callback is recovered too. The entry
+	 * whose callback overflowed is delivered again (its call never completed);
+	 * every other entry is delivered exactly once.
+	 */
+	@Test
+	public void testStackOverflowInsideCallback() {
+		Index<Blob,CVMLong> index=fourKeyIndex();
+		List<Blob> expectedKeys=Arrays.asList(K10,K1000,K1001,K1010);
+		int[] armed= {1};
+
+		ArrayList<Blob> delivered=new ArrayList<>();
+		ArrayList<Blob> completed=new ArrayList<>();
+		index.forEach((k,v) -> {
+			delivered.add(k);
+			if (k.equals(K1001)&&(armed[0]-->0)) blowStack();
+			completed.add(k);
+		});
+		assertEquals(expectedKeys,completed);
+		assertEquals(expectedKeys.size()+1,delivered.size());
+		assertEquals(K1001,delivered.get(2));
+		assertEquals(K1001,delivered.get(3));
+
+		armed[0]=1;
+		long sum=index.reduceEntries((acc,me) -> {
+			if (me.getKey().equals(K1001)&&(armed[0]-->0)) blowStack();
+			return acc+me.getValue().longValue();
+		},0L);
+		assertEquals(6L,sum);
+
+		armed[0]=1;
+		Index<Blob,CVMLong> changed=index.assoc(K1001,CVMLong.create(20));
+		Index<Blob,CVMLong> merged=index.mergeDifferences(changed,(a,b) -> {
+			if (armed[0]-->0) blowStack();
+			return b;
+		});
+		assertEquals(changed,merged);
+
+		armed[0]=1;
+		Index<Blob,CVMLong> filtered=index.filterValues(v -> {
+			if (armed[0]-->0) blowStack();
+			return v.longValue()!=2;
+		});
+		assertEquals(index.dissoc(K1001),filtered);
+	}
+
+	/**
+	 * The explicit-stack variants are only reached after an overflow, so check
+	 * them directly against the recursive results, including the identity
+	 * contract for unchanged results.
+	 */
+	@Test
+	public void testDeepVariantsMatchRecursive() {
+		Blob fresh=Blob.fromHex("ff00ff00ff");
+		for (Index<Blob,CVMLong> m : Arrays.asList(fourKeyIndex(),comb(16))) {
+			for (long i=0; i<m.count(); i++) {
+				MapEntry<Blob,CVMLong> me=m.entryAt(i);
+				assertSame(m,m.assocEntry(me));
+				assertSame(m,m.assocEntryDeep(me,0));
+
+				MapEntry<Blob,CVMLong> ne=MapEntry.create(me.getKey(),CVMLong.create(1000+i));
+				assertEquals(m.assocEntry(ne),m.assocEntryDeep(ne,0));
+				assertEquals(m.dissoc(me.getKey()),m.dissocDeep(me.getKey()));
+			}
+			MapEntry<Blob,CVMLong> fe=MapEntry.create(fresh,CVMLong.ONE);
+			assertEquals(m.assocEntry(fe),m.assocEntryDeep(fe,0));
+			assertSame(m,m.dissocDeep(fresh));
+
+			Index<Blob,CVMLong> changed=m.assoc(m.entryAt(0).getKey(),CVMLong.create(-99)).assoc(fresh,CVMLong.ONE);
+			assertSame(m,Index.mergeDeep(m,m,(a,b) -> b));
+			assertEquals(m.mergeDifferences(changed,(a,b) -> b),Index.mergeDeep(m,changed,(a,b) -> b));
+			assertEquals(m.mergeDifferences(changed,(a,b) -> (a==null)?b:a),Index.mergeDeep(m,changed,(a,b) -> (a==null)?b:a));
+			assertEquals(m.mergeDifferences(changed,(a,b) -> null),Index.mergeDeep(m,changed,(a,b) -> null));
+		}
 	}
 }

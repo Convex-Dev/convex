@@ -65,6 +65,7 @@ public final class CVMBigInteger extends AInteger {
 	
 	/**
 	 * Create a big integer from a blob representation. Blob can be non-canonical.
+	 * An empty blob represents zero.
 	 * @param data Blob data containing twos complement representation
 	 * @return Big Integer value or null if not valid.
 	 */
@@ -81,9 +82,10 @@ public final class CVMBigInteger extends AInteger {
 		if (n==1) return data.toFlatBlob();
 		int start=0;
 		while (start+1<n) {
-			byte bs=data.byteAt(0);
+			// A leading 0x00 or 0xff is redundant if the next byte carries the same sign bit
+			byte bs=data.byteAt(start);
 			if ((bs==0)||(bs==-1)) {
-				byte bs2=data.byteAt(1);
+				byte bs2=data.byteAt(start+1);
 				if ((bs&0x80)==(bs2&0x80)) {
 					start++;
 					continue;
@@ -142,7 +144,12 @@ public final class CVMBigInteger extends AInteger {
 	@Override
 	public CVMLong signum() {
 		if (data!=null) return CVMLong.forSignum(data.signum());
-		return CVMLong.forSignum(blob.byteAt(0));
+		long length=blob.count();
+		if (length==0) return CVMLong.ZERO;
+		byte first=blob.byteAt(0);
+		if (first<0) return CVMLong.MINUS_ONE;
+		// A trimmed positive integer may need a leading zero sign byte.
+		return (first!=0 || length>1)?CVMLong.ONE:CVMLong.ZERO;
 	}
 	
 	@Override
@@ -367,7 +374,7 @@ public final class CVMBigInteger extends AInteger {
 		} else {
 			bb=((CVMBigInteger)b).getBigInteger();
 		}
-		return wrap(big().multiply(bb));
+		return AInteger.create(big().multiply(bb)); // canonical, e.g. a product with zero is a CVMLong
 	}
 
 	@Override

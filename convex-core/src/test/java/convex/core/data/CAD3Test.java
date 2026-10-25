@@ -137,10 +137,10 @@ public class CAD3Test extends ACVMTest {
 		DenseRecord dr=ctx.getResult();
 		assertNotNull(dr);
 		
-		// DenseRecord behaves like a map
-		assertCVMEquals(3,eval(ctx,"(count dr)"));
-		assertCVMEquals(Vectors.of(1,2,3),eval(ctx,"(values dr)"));
-		assertTrue(evalB(ctx,"(map? dr)"));
+		// Unrecognised CAD3 records retain their bytes but have no CVM map schema.
+		assertCastError(step(ctx,"(count dr)"));
+		assertCastError(step(ctx,"(values dr)"));
+		assertFalse(evalB(ctx,"(map? dr)"));
 		
 		assertFalse(evalB(ctx,"(vector? dr)"));
 	}

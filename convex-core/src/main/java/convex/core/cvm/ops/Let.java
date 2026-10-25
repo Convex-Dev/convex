@@ -1,9 +1,11 @@
 package convex.core.cvm.ops;
 
+import convex.core.ErrorCodes;
 import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
 import convex.core.cvm.exception.RecurValue;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -57,14 +59,17 @@ public class Let<T extends ACell> extends ACodedOp<T,AVector<ACell>,AVector<AOp<
 		Context ctx = context.consumeJuice(Juice.LET);
 		if (ctx.isExceptional()) return ctx;
 
-		AVector<ACell> symbols=code.getValue();
+		AVector<ACell> symbols=RT.ensureVector(code.getValue());
+		AVector<ACell> ops=RT.ensureVector(value.getValue());
+		if ((symbols==null)||(ops==null)||(symbols.count()>ops.count())) {
+			return ctx.withError(ErrorCodes.FORMAT,"Invalid let bindings or operations vector");
+		}
 		int bindingCount=symbols.size();
-		AVector<AOp<ACell>> ops=value.getValue();
 		AVector<ACell> savedEnv = ctx.getLocalBindings();
 		
 		// execute each operation for bound values in turn
 		for (int i = 0; i < bindingCount; i++) {
-			AOp<?> op = ops.get(i);
+			AOp<?> op = Ops.ensureOp(ops.get(i));
 			ctx = ctx.executeLocalBinding(symbols.get(i), op);
 			if (ctx.isExceptional()) {
 				// return if exception during initial binding. 
@@ -102,13 +107,17 @@ public class Let<T extends ACell> extends ACodedOp<T,AVector<ACell>,AVector<AOp<
 	}
 
 	public Context executeBody(Context ctx) {
-		AVector<AOp<ACell>> ops=value.getValue();
+		AVector<ACell> ops=RT.ensureVector(value.getValue());
+		AVector<ACell> symbols=RT.ensureVector(code.getValue());
+		if ((symbols==null)||(ops==null)||(symbols.count()>ops.count())) {
+			return ctx.withError(ErrorCodes.FORMAT,"Invalid let bindings or operations vector");
+		}
 		int end = ops.size();
-		int bindingCount=code.getValue().size(); // number of binding symbols
+		int bindingCount=symbols.size(); // number of binding symbols
 
 		if (bindingCount == end) return ctx.withResult(null);
 		for (int i = bindingCount; i < end; i++) {
-			ctx = ctx.execute(ops.get(i));
+			ctx = ctx.execute(Ops.ensureOp(ops.get(i)));
 			if (ctx.isExceptional()) {
 				return ctx;
 			}
@@ -118,8 +127,9 @@ public class Let<T extends ACell> extends ACodedOp<T,AVector<ACell>,AVector<AOp<
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
-		AVector<AOp<ACell>> ops=value.getValue();
-		AVector<ACell> symbols=code.getValue();
+		AVector<ACell> ops=RT.ensureVector(value.getValue());
+		AVector<ACell> symbols=RT.ensureVector(code.getValue());
+		if ((symbols==null)||(ops==null)||(symbols.count()>ops.count())) return printRaw(bb,limit);
 		int bindingCount=symbols.size();
 		bb.append(isLoop ? "(loop [" : "(let [");
 		int len = ops.size();
@@ -127,14 +137,14 @@ public class Let<T extends ACell> extends ACodedOp<T,AVector<ACell>,AVector<AOp<
 			if (i > 0) bb.append(' ');
 			if (!RT.print(bb, symbols.get(i),limit)) return false;
 			bb.append(' ');
-			if (!ops.get(i).print(bb,limit)) return false;
+			if (!RT.print(bb,Ops.ensureOp(ops.get(i)),limit)) return false;
 			bb.append(' ');
 		}
 		bb.append("] ");
 
 		for (int i = bindingCount; i < len; i++) {
 			bb.append(' ');
-			if (!ops.get(i).print(bb,limit)) return false;
+			if (!RT.print(bb,Ops.ensureOp(ops.get(i)),limit)) return false;
 		}
 		bb.append(')');
 		return bb.check(limit);

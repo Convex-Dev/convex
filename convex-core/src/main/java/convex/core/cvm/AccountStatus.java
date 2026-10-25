@@ -81,11 +81,11 @@ public class AccountStatus extends ARecordGeneric {
 	
 	private AccountStatus(AVector<ACell> values) {
 		super(CVMTag.ACCOUNT_STATUS,FORMAT,values);
-		this.sequence = RT.ensureLong(values.get(IX_SEQUENCE)).longValue();
-		this.publicKey = RT.ensureAccountKey(values.get(IX_KEY));
-		this.balance = RT.ensureLong(values.get(IX_BALANCE)).longValue();;
-		this.memory = RT.ensureLong(values.get(IX_ALLOWANCE)).longValue();;
-		this.parent = RT.ensureAddress(values.get(IX_PARENT));
+		this.sequence = RT.ensureLong(embeddedField(IX_SEQUENCE)).longValue();
+		this.publicKey = RT.ensureAccountKey(embeddedField(IX_KEY));
+		this.balance = RT.ensureLong(embeddedField(IX_BALANCE)).longValue();;
+		this.memory = RT.ensureLong(embeddedField(IX_ALLOWANCE)).longValue();;
+		this.parent = RT.ensureAddress(embeddedField(IX_PARENT));
 	}
 
 	/**

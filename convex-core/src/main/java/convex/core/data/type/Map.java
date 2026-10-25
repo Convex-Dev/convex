@@ -1,6 +1,7 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
+import convex.core.lang.RT;
 import convex.core.data.AMap;
 import convex.core.data.Maps;
 
@@ -18,7 +19,7 @@ public class Map extends AStandardType<AMap> {
 
 	@Override
 	public boolean check(ACell value) {
-		return (value instanceof AMap);
+		return RT.ensureMap(value)!=null;
 	}
 
 	@Override
@@ -33,8 +34,7 @@ public class Map extends AStandardType<AMap> {
 
 	@Override
 	public AMap implicitCast(ACell a) {
-		if (a instanceof AMap) return (AMap)a;
-		return null;
+		return RT.ensureMap(a);
 	}
 
 }

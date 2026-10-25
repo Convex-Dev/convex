@@ -107,6 +107,7 @@ public abstract class AStore implements Closeable {
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> getRootRef() throws IOException {
 		Hash h=getRootHash();
+		if (h==null) return null;
 		Ref<T> ref=refForHash(h);
 		
 		// Special roots need no stored entry. UNSET_HASH means the root was never
@@ -146,8 +147,10 @@ public abstract class AStore implements Closeable {
 	public abstract void close();
 	
 	/**
-	 * Decodes a Cell from an Encoding using this store's encoder.
-	 * Subclasses may override to add caching.
+	 * Decodes a Cell from an Encoding using this store's encoder (CVMEncoder for
+	 * the standard stores). Subclasses may override to add caching. The generic
+	 * return type is a convenience, not schema validation: callers expecting a
+	 * specific type must check or coerce it at their typed access boundary.
 	 * @param encoding Encoding of Cell
 	 * @return Decoded Cell (may be a null value)
 	 *

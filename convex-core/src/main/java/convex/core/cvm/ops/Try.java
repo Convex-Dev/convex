@@ -1,9 +1,11 @@
 package convex.core.cvm.ops;
 
+import convex.core.ErrorCodes;
 import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
 import convex.core.cvm.exception.AExceptional;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
@@ -12,6 +14,7 @@ import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.data.prim.ByteFlag;
 import convex.core.data.util.BlobBuilder;
+import convex.core.lang.RT;
 
 /**
  * Op for executing a sequence of child operations until one succeeds
@@ -62,7 +65,8 @@ public class Try<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>> 
 
 	@Override
 	public Context execute(Context context) {
-		AVector<AOp<ACell>> ops=value.getValue();
+		AVector<ACell> ops=RT.ensureVector(value.getValue());
+		if (ops==null) return context.withError(ErrorCodes.FORMAT,"Try requires an operations vector");
 		int n = ops.size();
 		if (n == 0) return context.withResult(Juice.TRY,  null);
 
@@ -73,7 +77,7 @@ public class Try<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>> 
 			ctx = context.consumeJuice(Juice.TRY);
 			if (ctx.isExceptional()) return ctx;
 			
-			AOp<?> op = ops.get(i);
+			AOp<?> op = Ops.ensureOp(ops.get(i));
 			Context fctx=ctx.fork();
 			fctx=fctx.execute(op);
 			if (fctx.isExceptional()) {
@@ -95,12 +99,13 @@ public class Try<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>> 
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
-		AVector<AOp<ACell>> ops=value.getValue();
+		AVector<ACell> ops=RT.ensureVector(value.getValue());
+		if (ops==null) return printRaw(bb,limit);
 		bb.append("(try");
 		int len = ops.size();
 		for (int i = 0; i < len; i++) {
 			bb.append(' ');
-			if (!ops.get(i).print(bb,limit)) return false;
+			if (!RT.print(bb,Ops.ensureOp(ops.get(i)),limit)) return false;
 		}
 		bb.append(')');
 		return bb.check(limit);

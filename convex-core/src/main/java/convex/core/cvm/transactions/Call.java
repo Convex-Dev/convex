@@ -28,7 +28,7 @@ import convex.core.lang.RT;
 public class Call extends ATransaction {
 	public static final long DEFAULT_OFFER = 0;
 
-	protected final ACell target;
+	protected ACell target;
 	protected final long offer;
 	protected final Symbol functionName;
 	protected AVector<ACell> args;
@@ -38,9 +38,8 @@ public class Call extends ATransaction {
 
 	protected Call(AVector<ACell> values) {
 		super(CVMTag.CALL,FORMAT,values);
-		this.target=values.get(2);
-		this.offer=RT.ensureLong(values.get(3)).longValue();
-		this.functionName=RT.ensureSymbol(values.get(4));
+		this.offer=RT.ensureLong(embeddedField(3)).longValue();
+		this.functionName=RT.ensureSymbol(embeddedField(4));
 		// no need to set args, will be pulled on demand
 	}
 	
@@ -72,7 +71,7 @@ public class Call extends ATransaction {
 		// populates it, so the field must not be read directly here
 		AVector<ACell> as = RT.ensureVector(getArgs());
 		if (as == null) return ctx.withError(ErrorCodes.FORMAT, "Call transaction args must be a Vector");
-		return ctx.actorCall(target, offer, functionName, as.toCellArray());
+		return ctx.actorCall(getTarget(), offer, functionName, as.toCellArray());
 	}
 
 	@Override
@@ -84,20 +83,20 @@ public class Call extends ATransaction {
 	@Override
 	public Call withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
-		return create(origin,newSequence,target,offer,functionName,args);
+		return create(origin,newSequence,getTarget(),offer,functionName,RT.ensureVector(getArgs()));
 	}
 	
 	@Override
 	public Call withOrigin(Address newAddress) {
 		if (newAddress==this.origin) return this;
-		return create(newAddress,sequence,target,offer,functionName,args);
+		return create(newAddress,sequence,getTarget(),offer,functionName,RT.ensureVector(getArgs()));
 	}
 
 	@Override
 	public ACell get(Keyword key) {
 		if (Keywords.CALL.equals(key)) return functionName;
-		if (Keywords.OFFER.equals(key)) return values.get(3);
-		if (Keywords.TARGET.equals(key)) return target;
+		if (Keywords.OFFER.equals(key)) return embeddedField(3);
+		if (Keywords.TARGET.equals(key)) return getTarget();
 		if (Keywords.ARGS.equals(key)) return getArgs();
 		return super.get(key); // covers origin and sequence
 	}
@@ -107,6 +106,12 @@ public class Call extends ATransaction {
 			args=RT.ensureVector(values.get(5));
 		}
 		return args;
+	}
+
+	/** @return Address or scoped actor reference, resolved only when accessed. */
+	public ACell getTarget() {
+		if (target==null) target=values.get(2);
+		return target;
 	}
 
 	@Override

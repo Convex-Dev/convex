@@ -14,7 +14,9 @@ import org.junit.jupiter.api.Test;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
+import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.Hash;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
@@ -42,14 +44,35 @@ public class ConvexHTTPTest extends ARESTTest {
 	@Test public void testPreCalculate() throws ResultException, InterruptedException {
 		ConvexHTTP convex=newClient();
 		
-		Result r=convex.querySync("(+ 2 3)");
+		// A large command also exercises binary transport of referenced cells.
+		String source="(count \""+"x".repeat(1_000)+"\")";
+		Invoke tx=Invoke.create(convex.getAddress(),convex.getSequence()+1,source);
+		Result r=convex.simulateSync(tx);
 		assertFalse(r.isError());
+		assertEquals(CVMLong.create(1_000),r.getValue());
 		AInteger fees=r.getIn(Keywords.INFO,Keywords.FEES);
 		assertNotNull(fees);
+		Result signedEstimate=convex.querySync(CLIENT_KP.signData(tx));
+		assertSucceeded(signedEstimate);
+		assertEquals(fees,signedEstimate.getIn(Keywords.INFO,Keywords.FEES));
 		
-		Result r2=convex.transactSync("(+ 2 3)");
+		Result r2=convex.transactSync(source);
 		assertNull(r2.getErrorCode());
 		assertEquals(fees,r2.getIn(Keywords.INFO,Keywords.FEES));
+	}
+
+	@Test public void testZeroBalanceQuery() throws ResultException, InterruptedException {
+		ConvexHTTP convex=newClient();
+		Address empty=convex.createAccountSync(CLIENT_KP.getAccountKey());
+		Result r=convex.querySync(Reader.read("[*balance* *juice-limit*]"),empty);
+		assertSucceeded(r);
+		assertEquals(Reader.read("[0 "+server.getRESTConfig().getMaxQueryJuice()+"]"),r.getValue());
+		assertNull(r.getIn(Keywords.INFO,Keywords.FEES));
+		assertNotNull(r.getIn(Keywords.INFO,Keywords.JUICE));
+		Result exhausted=convex.querySync(Reader.read("(loop [] (recur))"),empty);
+		assertEquals(ErrorCodes.JUICE,exhausted.getErrorCode());
+		assertEquals(CVMLong.create(server.getRESTConfig().getMaxQueryJuice()),exhausted.getIn(Keywords.INFO,Keywords.JUICE));
+		assertEquals(ErrorCodes.JUICE,convex.simulate(Invoke.create(empty,1,"1")).join().getErrorCode());
 	}
 
 	@Test public void testOffensiveMessages() throws ResultException, InterruptedException {
@@ -62,9 +85,7 @@ public class ConvexHTTPTest extends ARESTTest {
 	}
 	
 	@Test public void testTransact() throws ResultException, InterruptedException {
-		ConvexHTTP convex=connect();
-		convex.setAddress(Init.GENESIS_ADDRESS);
-		convex.setKeyPair(KP);
+		ConvexHTTP convex=newClient();
 		
 		Result r=convex.transactSync("(+ 2 3)");
 		assertFalse(r.isError());

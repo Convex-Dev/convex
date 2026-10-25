@@ -5,10 +5,12 @@ import convex.core.data.AHashMap;
 import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
+import convex.core.util.MergeFunction;
+import convex.core.lang.RT;
+import convex.core.data.prim.AInteger;
 import convex.lattice.ALattice;
 import convex.lattice.generic.IndexLattice;
 import convex.lattice.generic.JSONLattice;
@@ -17,14 +19,13 @@ import convex.lattice.generic.LWPLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
-import convex.lattice.generic.StampingLattice;
 
 /**
  * Lattice for a single user's social network state.
  *
  * <p>The user state is an {@code Index<Keyword, ACell>} with three keys:</p>
  * <ul>
- *   <li>{@link #KEY_FEED} — post feed ({@code Index<Blob, ACell>}, 8-byte timestamp keys, LWW per entry)</li>
+ *   <li>{@link #KEY_FEED} — post feed ({@code Index<Blob, ACell>}, timestamp-prefixed keys, LWW per entry)</li>
  *   <li>{@link #KEY_PROFILE} — user profile (LWW register)</li>
  *   <li>{@link #KEY_FOLLOWING} — stamped LWP section containing the DID-keyed
  *       {@link #KEY_FOLLOWS} map with whole-record LWW values</li>
@@ -51,9 +52,7 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		IndexLattice.create(LWWLattice.INSTANCE);
 
 	private static final ALattice<ACell> FOLLOW_RECORD_LATTICE =
-		StampingLattice.create(
-			LWWLattice.create(JSONLattice.INSTANCE,SocialLattice::recordTimestamp),
-			SocialLattice::stampRecord);
+		LWWLattice.create(JSONLattice.INSTANCE,SocialLattice::recordTimestamp);
 
 	static final MapLattice<ACell, ACell> FOLLOWS_LATTICE =
 		new DIDFollowMapLattice(FOLLOW_RECORD_LATTICE);
@@ -63,9 +62,7 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		KEY_FOLLOWS,FOLLOWS_LATTICE);
 
 	static final ALattice<Index<Keyword,ACell>> FOLLOWING_LATTICE=
-		StampingLattice.create(
-			LWPLattice.create(FOLLOWING_STRUCTURE,SocialLattice::followingTimestamp),
-			SocialLattice::stampFollowing);
+		LWPLattice.create(FOLLOWING_STRUCTURE,SocialLattice::followingTimestamp);
 
 	private SocialLattice() {
 		// Singleton
@@ -77,34 +74,54 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		if (ownValue == null) ownValue=zero();
 		if (Utils.equals(ownValue, otherValue)) return ownValue;
 
-		// Merge feed via IndexLattice
-		Index<Blob, ACell> ownFeed = getFeed(ownValue);
-		Index<Blob, ACell> otherFeed = getFeed(otherValue);
-		Index<Blob, ACell> mergedFeed = FEED_LATTICE.merge(ownFeed, otherFeed);
+		return ownValue.mergeDifferences(otherValue,new MergeFunction<ACell>() {
+			@Override public ACell merge(ACell own,ACell other) {
+				return own==null?other:own;
+			}
+			@Override public ACell merge(Object key,ACell own,ACell other) {
+				if (other==null) return own;
+				// Index keys compare by blob, including decoded/JSON key representations.
+				ALattice<?> section=key instanceof ACell cell?INSTANCE.path(cell):null;
+				if (section==FEED_LATTICE) return mergeFeed(own,other);
+				if (section==FOLLOWING_LATTICE) return mergeFollowing(own,other);
+				if (section==LWWLattice.INSTANCE) return LWWLattice.INSTANCE.merge(own,other);
+				// Unknown fields are opaque. Carry new fields, retaining established conflicts.
+				return merge(own,other);
+			}
+		});
+	}
 
-		// Merge profile via LWW
-		ACell ownProfile = ownValue.get(KEY_PROFILE);
-		ACell otherProfile = otherValue.get(KEY_PROFILE);
-		ACell mergedProfile = LWWLattice.INSTANCE.merge(ownProfile, otherProfile);
+	private static ACell mergeFeed(ACell own,ACell other) {
+		Index<Blob,ACell> a=RT.ensureIndex(own), b=RT.ensureIndex(other);
+		if (b==null || (own!=null && a==null)) return own==null?other:own;
+		return FEED_LATTICE.merge(a,b);
+	}
 
-		// Merge the independently stamped following section. LWP only establishes
-		// operand preference; distinct target records still merge structurally.
-		Index<Keyword,ACell> ownFollowing=getFollowing(ownValue);
-		Index<Keyword,ACell> otherFollowing=getFollowing(otherValue);
-		Index<Keyword,ACell> mergedFollowing=FOLLOWING_LATTICE.merge(ownFollowing,otherFollowing);
+	private static ACell mergeFollowing(ACell own,ACell other) {
+		Index<Keyword,ACell> a=RT.ensureIndex(own), b=RT.ensureIndex(other);
+		if (!canMergeFollowing(b) || (own!=null && !canMergeFollowing(a))) return own==null?other:own;
+		var merged=FOLLOWING_LATTICE.merge(a,b);
+		// The LWP structure knows only timestamp/follows. Preserve extensions even
+		// when its timestamp preference reverses the operands internally.
+		merged=retainFollowingExtensions(merged,a);
+		return retainFollowingExtensions(merged,b);
+	}
 
-		// Build result, only updating changed fields
-		Index<Keyword, ACell> result = ownValue;
-		if (!Utils.equals(mergedFeed, ownFeed)) {
-			result = result.assoc(KEY_FEED, mergedFeed);
-		}
-		if (!Utils.equals(mergedProfile, ownProfile)) {
-			result = result.assoc(KEY_PROFILE, mergedProfile);
-		}
-		if (!Utils.equals(mergedFollowing, ownFollowing)) {
-			result = result.assoc(KEY_FOLLOWING, mergedFollowing);
-		}
-		return result;
+	private static Index<Keyword,ACell> retainFollowingExtensions(Index<Keyword,ACell> target,Index<Keyword,ACell> source) {
+		if (source==null) return target;
+		return target.mergeDifferences(source,new MergeFunction<ACell>() {
+			@Override public ACell merge(ACell own,ACell other) { return own==null?other:own; }
+			@Override public ACell merge(Object key,ACell own,ACell other) {
+				return key instanceof ACell cell && FOLLOWING_STRUCTURE.path(cell)!=null?own:merge(own,other);
+			}
+		});
+	}
+
+	/** Guard only the fields the following merge actually examines; everything else is opaque. */
+	private static boolean canMergeFollowing(Index<Keyword,ACell> value) {
+		if (value==null) return false;
+		ACell time=value.get(LWWLattice.KEY_TIMESTAMP), follows=value.get(KEY_FOLLOWS);
+		return (time==null || time instanceof AInteger) && (follows==null || follows instanceof AHashMap<?,?>);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -121,47 +138,34 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
-		if (childKey instanceof Keyword k) {
-			if (k.equals(KEY_FEED)) return (ALattice<T>) FEED_LATTICE;
-			if (k.equals(KEY_PROFILE)) return (ALattice<T>) LWWLattice.INSTANCE;
-			if (k.equals(KEY_FOLLOWING)) return (ALattice<T>) FOLLOWING_LATTICE;
+		if (childKey instanceof convex.core.data.ABlobLike<?> key) {
+			var blob=key.toBlob();
+			if (blob.equals(KEY_FEED.toBlob())) return (ALattice<T>) FEED_LATTICE;
+			if (blob.equals(KEY_PROFILE.toBlob())) return (ALattice<T>) LWWLattice.INSTANCE;
+			if (blob.equals(KEY_FOLLOWING.toBlob())) return (ALattice<T>) FOLLOWING_LATTICE;
 		}
 		return null;
 	}
 
 	// ===== Static helpers =====
 
-	/**
-	 * Gets the feed index from user state.
-	 */
+	/** Returns the stored feed, or null if absent. Incompatible values throw ClassCastException. */
 	@SuppressWarnings("unchecked")
 	public static Index<Blob, ACell> getFeed(Index<Keyword, ACell> state) {
-		if (state == null) return Index.none();
-		ACell feed = state.get(KEY_FEED);
-		if (feed == null) return Index.none();
-		return (Index<Blob, ACell>) feed;
+		return state==null?null:(Index<Blob,ACell>)state.get(KEY_FEED);
 	}
 
-	/**
-	 * Gets the profile from user state.
-	 */
+	/** Returns the stored profile, or null if absent. Incompatible values throw ClassCastException. */
 	@SuppressWarnings("unchecked")
 	public static AHashMap<Keyword, ACell> getProfile(Index<Keyword, ACell> state) {
-		if (state == null) return Maps.empty();
-		ACell profile = state.get(KEY_PROFILE);
-		if (profile == null) return Maps.empty();
-		return (AHashMap<Keyword, ACell>) profile;
+		return state==null?null:(AHashMap<Keyword,ACell>)state.get(KEY_PROFILE);
 	}
 
-	/**
-	 * Gets the DID-keyed follows map from the {@code :following} section.
-	 */
+	/** Returns the stored follows map, or null if absent. Incompatible ancestors or values throw. */
 	@SuppressWarnings("unchecked")
 	public static AHashMap<ACell, ACell> getFollows(Index<Keyword, ACell> state) {
 		Index<Keyword,ACell> following=getFollowing(state);
-		ACell follows = following.get(KEY_FOLLOWS);
-		if (follows == null) return Maps.empty();
-		return (AHashMap<ACell, ACell>) follows;
+		return following==null?null:(AHashMap<ACell,ACell>)following.get(KEY_FOLLOWS);
 	}
 
 	/** Returns true iff a value is already in the canonical social-state shape. */
@@ -181,24 +185,16 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		return (Index<Keyword,ACell>)Index.EMPTY;
 	}
 
+	/** Returns the stored following section, or null if absent. Incompatible values throw. */
 	@SuppressWarnings("unchecked")
 	public static Index<Keyword,ACell> getFollowing(Index<Keyword,ACell> state) {
-		if (state==null) return zeroState();
-		ACell following=state.get(KEY_FOLLOWING);
-		if (!(following instanceof Index<?,?>)) return zeroState();
-		return (Index<Keyword,ACell>)following;
+		return state==null?null:(Index<Keyword,ACell>)state.get(KEY_FOLLOWING);
 	}
 
 	private static long followingTimestamp(Index<Keyword,ACell> following) {
 		if (following==null) return 0;
 		ACell timestamp=following.get(LWWLattice.KEY_TIMESTAMP);
 		return (timestamp instanceof CVMLong l)?l.longValue():0;
-	}
-
-	private static Index<Keyword,ACell> stampFollowing(
-			Index<Keyword,ACell> following,CVMLong timestamp) {
-		if (following==null) following=getFollowing(null);
-		return following.assoc(LWWLattice.KEY_TIMESTAMP,timestamp);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -208,47 +204,22 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		return (timestamp instanceof CVMLong l)?l.longValue():0;
 	}
 
-	@SuppressWarnings("unchecked")
-	private static ACell stampRecord(ACell value,CVMLong timestamp) {
-		AHashMap<Keyword,ACell> record=(value instanceof AHashMap<?,?> map)
-			?(AHashMap<Keyword,ACell>)map:Maps.empty();
-		return record.assoc(LWWLattice.KEY_TIMESTAMP,timestamp);
-	}
-
 	/** Map boundary which drops malformed target DIDs and follow records. */
 	private static final class DIDFollowMapLattice extends MapLattice<ACell,ACell> {
 		DIDFollowMapLattice(ALattice<ACell> valueNode) {
 			super(valueNode);
 		}
 
+		/** Validate only changed foreign records through the standard map merge. */
 		@Override
-		public AHashMap<ACell,ACell> merge(AHashMap<ACell,ACell> own,
-				AHashMap<ACell,ACell> other) {
-			return super.merge(own,sanitise(other));
-		}
-
-		@Override
-		public AHashMap<ACell,ACell> merge(convex.lattice.LatticeContext context,
-				AHashMap<ACell,ACell> own,AHashMap<ACell,ACell> other) {
-			return super.merge(context,own,sanitise(other));
-		}
-
-		private AHashMap<ACell,ACell> sanitise(AHashMap<ACell,ACell> other) {
-			if (other==null) return null;
-			AHashMap<ACell,ACell> clean=Maps.empty();
-			for (var entry:other.entrySet()) {
-				if (!(entry.getKey() instanceof convex.core.data.AString did)
-						|| !convex.auth.did.DID.isCanonicalBase(did)) continue;
-				ACell value=entry.getValue();
-				if (!(value instanceof AHashMap<?,?> record)) continue;
-				AHashMap<Keyword,ACell> typed=(AHashMap<Keyword,ACell>)record;
-				if (!(typed.get(SocialPost.ACTIVE) instanceof CVMBool)
-						|| !(typed.get(LWWLattice.KEY_TIMESTAMP) instanceof CVMLong)) continue;
-				ACell cached=typed.get(Follows.KEY_ACCOUNT_KEY);
-				if (cached!=null && convex.core.data.AccountKey.parse(cached)==null) continue;
-				clean=clean.assoc(entry.getKey(),value);
-			}
-			return clean;
+		protected boolean checkEntry(ACell key,ACell value) {
+			if (!(key instanceof convex.core.data.AString did)
+					|| !convex.auth.did.DID.isCanonicalBase(did)) return false;
+			if (!(value instanceof AHashMap<?,?> record)) return false;
+			AHashMap<Keyword,ACell> typed=(AHashMap<Keyword,ACell>)record;
+			if (!(typed.get(SocialPost.ACTIVE) instanceof CVMBool)
+					|| !(typed.get(LWWLattice.KEY_TIMESTAMP) instanceof CVMLong)) return false;
+			return true; // Other fields, including legacy key caches, are opaque.
 		}
 	}
 }

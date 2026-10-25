@@ -85,7 +85,7 @@ public class Multi extends ATransaction {
 	
 	protected Multi(AVector<ACell> values) {
 		super(CVMTag.MULTI,FORMAT, values);
-		this.mode=Utils.checkedInt(RT.ensureLong(values.get(IX_MODE)).longValue());
+		this.mode=Utils.checkedInt(RT.ensureLong(embeddedField(IX_MODE)).longValue());
 		if (!isValidMode(mode)) throw new IllegalArgumentException("Bad mode");
 	}
 
@@ -123,7 +123,8 @@ public class Multi extends ATransaction {
 		long n=ts.count();
 		AVector<Result> rs=Vectors.empty();
 		for (int i=0; i<n; i++) {
-			ATransaction t=ts.get(i);
+			ATransaction t=RT.ensureTransaction(ts.get(i));
+			if (t==null) return ctx.withError(ErrorCodes.FORMAT,"Invalid child transaction");
 			
 			ctx=applySubTransaction(ctx,t);
 			Result r=Result.fromContext(ctx);
@@ -196,7 +197,7 @@ public class Multi extends ATransaction {
 	
 	@Override
 	public ACell get(Keyword key) {
-		if (Keywords.MODE.equals(key)) return values.get(IX_MODE);
+		if (Keywords.MODE.equals(key)) return embeddedField(IX_MODE);
 		if (Keywords.TXS.equals(key)) return getTransactions();
 		return super.get(key); // covers origin and sequence
 	}

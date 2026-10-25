@@ -29,6 +29,14 @@ public abstract class AArrayBlob extends ABlob {
 	 * Cached hash of the Blob data. Might be null.
 	 */
 	protected Hash contentHash = null;
+
+	/**
+	 * Returns the cached hash of the raw bytes, without computing it.
+	 * @return Content hash, or null if not already available
+	 */
+	public final Hash cachedContentHash() {
+		return contentHash;
+	}
 	
 	@Override
 	public final Hash getContentHash() {
@@ -312,8 +320,26 @@ public abstract class AArrayBlob extends ABlob {
 	
 	@Override
 	public long hexMatch(ABlobLike<?> b, long start, long length) {
-		if (b == this) return length;
+		if (b == this || length==0) return length;
 		long end = start + length;
+		if (b instanceof AArrayBlob other) {
+			long pos=start;
+			// Only the requested nibbles participate, including odd range endpoints.
+			if ((pos&1)!=0) {
+				if (getHexDigit(pos)!=other.getHexDigit(pos)) return 0;
+				pos++;
+			}
+			int from=(int)(pos>>>1), to=(int)(end>>>1);
+			int mismatch=Arrays.mismatch(store,offset+from,offset+to,
+				other.store,other.offset+from,other.offset+to);
+			if (mismatch>=0) {
+				long digit=2L*(from+mismatch);
+				if (getHexDigit(digit)==other.getHexDigit(digit)) digit++;
+				return digit-start;
+			}
+			if ((end&1)!=0 && getHexDigit(end-1)!=other.getHexDigit(end-1)) return end-1-start;
+			return length;
+		}
 		for (long i = start; i < end; i++) {
 			if (!(getHexDigit(i) == b.getHexDigit(i))) return i - start;
 		}

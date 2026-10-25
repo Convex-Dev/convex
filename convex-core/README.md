@@ -52,6 +52,7 @@ ACell result = ctx.getResult();  // Returns 6
 ## Documentation
 
 - [Javadoc API Reference](https://javadoc.io/doc/world.convex/convex-core)
+- [JWT time-bound validation](docs/JWT.md) — explicit time, strict NumericDate bounds and composable failure reasons
 - Design documents under [`docs/`](docs/), each an implementation companion to a
   CAD:
   - [Encoder design](docs/ENCODER_DESIGN.md) — encoding lengths, embedding, encoder hierarchy, multi-cell messages

@@ -91,14 +91,14 @@ public class PeerStatus extends ARecordGeneric {
 
 	public PeerStatus(AVector<ACell> values) {
 		super(CVMTag.PEER_STATUS,FORMAT,values);
-		this.controller = RT.ensureAddress(values.get(IX_CONTROLLER));
-		this.peerStake = RT.ensureLong(values.get(IX_STAKE)).longValue();
+		this.controller = RT.ensureAddress(embeddedField(IX_CONTROLLER));
+		this.peerStake = RT.ensureLong(embeddedField(IX_STAKE)).longValue();
 		// stakes and metadata may be non-embedded — defer to lazy getters
 		this.stakes = null;
-		this.delegatedStake = RT.ensureLong(values.get(IX_DEL_STAKE)).longValue();
+		this.delegatedStake = RT.ensureLong(embeddedField(IX_DEL_STAKE)).longValue();
 		this.metadata = null;
-		this.timestamp = RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
-		this.balance = RT.ensureLong(values.get(IX_BALANCE)).longValue();
+		this.timestamp = RT.ensureLong(embeddedField(IX_TIMESTAMP)).longValue();
+		this.balance = RT.ensureLong(embeddedField(IX_BALANCE)).longValue();
 	}
 
 	public static PeerStatus create(Address controller, long stake) {
@@ -297,12 +297,12 @@ public class PeerStatus extends ARecordGeneric {
 		// If we have a local field value cached, use this directly rather than going through the values vector
 		
 		if (Keywords.CONTROLLER.equals(key)) return controller;
-		if (Keywords.STAKE.equals(key)) return values.get(IX_STAKE); // already a CVMLong
+		if (Keywords.STAKE.equals(key)) return embeddedField(IX_STAKE); // already a CVMLong
 		if (Keywords.STAKES.equals(key)) return values.get(IX_STAKES);
-		if (Keywords.DELEGATED_STAKE.equals(key)) return values.get(IX_DEL_STAKE); // already a CVMLong
+		if (Keywords.DELEGATED_STAKE.equals(key)) return embeddedField(IX_DEL_STAKE); // already a CVMLong
 		if (Keywords.METADATA.equals(key)) return values.get(IX_METADATA);
-		if (Keywords.TIMESTAMP.equals(key)) return values.get(IX_TIMESTAMP); // already a CVMLong
-		if (Keywords.BALANCE.equals(key)) return values.get(IX_BALANCE); // already a CVMLong
+		if (Keywords.TIMESTAMP.equals(key)) return embeddedField(IX_TIMESTAMP); // already a CVMLong
+		if (Keywords.BALANCE.equals(key)) return embeddedField(IX_BALANCE); // already a CVMLong
 
 		return null;
 	}

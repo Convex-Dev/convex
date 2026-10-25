@@ -5,7 +5,6 @@ import java.awt.Dimension;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -13,14 +12,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.core.crypto.AKeyPair;
-import convex.core.crypto.wallet.AWalletEntry;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
+import convex.gui.keys.KeyAccess;
 import convex.gui.keys.KeyRingPanel;
-import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.Toolkit;
-import net.miginfocom.swing.MigLayout;
 
 /**
  * A Client application for the Convex Network.
@@ -32,10 +28,7 @@ public class REPLClient extends AbstractGUI {
 
 	private static final Logger log = LoggerFactory.getLogger(REPLClient.class.getName());
 
-	public static long maxBlock = 0;
-
 	protected Convex convex=null;
-	private final boolean ownsConnection;
 
 	/**
 	 * Launch the application.
@@ -46,11 +39,12 @@ public class REPLClient extends AbstractGUI {
 	public static void main(String[] args) throws IOException, TimeoutException {
 		log.info("Starting Convex Client");
 
-		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
+		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex").join();
 		if (convex==null) {
 			System.exit(1);
 		}
-		REPLClient gui=new REPLClient(convex,true);
+		REPLClient gui=new REPLClient(convex);
+		gui.own(convex);
 		gui.run();
 		gui.waitForClose();
 		System.exit(0);
@@ -61,19 +55,11 @@ public class REPLClient extends AbstractGUI {
 	public REPLPanel replPanel;
 
 	/**
-	 * Create the application.
+	 * Create the application. The caller keeps ownership of the connection,
+	 * and may hand it over with {@link #own(AutoCloseable)}.
 	 * @param convex Convex client instance
 	 */
 	public REPLClient(Convex convex) {
-		this(convex,false);
-	}
-
-	/**
-	 * Creates a terminal with explicit connection ownership.
-	 * @param convex client used by the terminal
-	 * @param ownsConnection true to close the client with this terminal
-	 */
-	public REPLClient(Convex convex,boolean ownsConnection) {
 		super ("Convex Terminal");
 		setLayout(new BorderLayout());
 		replPanel=new REPLPanel(convex);
@@ -87,23 +73,20 @@ public class REPLClient extends AbstractGUI {
 		this.setPreferredSize(new Dimension(800,600));
 		
 		this.convex=convex;
-		this.ownsConnection=ownsConnection;
 	}
 	
 	@Override
 	public void afterRun() {
 		super.afterRun();
 		if (convex.getKeyPair()==null) {
-			AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
-			if (we!=null) {
-				if (we.isLocked()) {
-					UnlockWalletDialog.offerUnlock(this, we);
+			KeyAccess.signerFor(this, convex).thenAccept(signer->{
+				if (signer.keyPair()!=null) {
+					convex.setKeyPair(signer.keyPair());
+					replPanel.showSigner(signer.keyPair());
+				} else {
+					Toolkit.showMessge(this, signer.reason()+"\n\nTerminal opened in Query mode.");
 				}
-				AKeyPair kp=we.getKeyPair();
-				convex.setKeyPair(kp);
-			} else {
-				Toolkit.showMessge(this, "The key for this account is not in your key ring.\n\nTerminal opened in Query mode.");
-			}
+			});
 		}
 	}
 
@@ -117,21 +100,5 @@ public class REPLClient extends AbstractGUI {
 		}
 		System.err.println("Missing tab: " + title);
 	}
-
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this,"dock center");
-	}
-
-	@Override
-	public void close() {
-		try {
-			if (ownsConnection && convex!=null) convex.close();
-		} finally {
-			super.close();
-		}
-	}
-
 
 }

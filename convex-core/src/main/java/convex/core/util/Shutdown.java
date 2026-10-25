@@ -11,6 +11,12 @@ import java.util.concurrent.ConcurrentSkipListMap;
  */
 public class Shutdown {
 
+	/**
+	 * Application services: stop intake, drain and save before shared transports
+	 * and stores close. Use this instead of a separate JVM shutdown hook, which the
+	 * JVM would run concurrently with the Etch close.
+	 */
+	public static final int SERVICE = 50;
 	public static final int CLIENTHTTP = 60;
 	public static final int SERVER = 80;
 	public static final int CONNECTION = 90;

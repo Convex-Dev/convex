@@ -1,5 +1,6 @@
 package convex.core.cvm;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
@@ -55,8 +56,7 @@ public class CVMEncoder extends CAD3Encoder {
 	public CVMEncoder() {}
 
 	/**
-	 * Creates a store-bound encoder. The encoder will manage the thread-local
-	 * store context during decode operations.
+	 * Creates an encoder whose branch references resolve against the given store.
 	 * @param store Store to associate with this encoder
 	 */
 	public CVMEncoder(AStore store) {
@@ -80,6 +80,10 @@ public class CVMEncoder extends CAD3Encoder {
 	@Override
 	protected ACell readExtension(byte tag, DecodeState ds) throws BadFormatException {
 		long code = readVLQCount(ds);
+		return specialiseExtension(tag,code);
+	}
+
+	private static ACell specialiseExtension(byte tag,long code) throws BadFormatException {
 		if (tag == CVMTag.CORE_DEF) {
 			ACell cc = Core.fromCode(code);
 			if (cc != null) return cc;
@@ -97,7 +101,10 @@ public class CVMEncoder extends CAD3Encoder {
 	protected ACell readCodedData(byte tag, DecodeState ds) throws BadFormatException {
 		Ref<ACell> r1 = readRef(ds);
 		Ref<ACell> r2 = readRef(ds);
+		return specialiseCoded(tag,r1,r2);
+	}
 
+	private static ACell specialiseCoded(byte tag,Ref<ACell> r1,Ref<ACell> r2) {
 		try {
 			// CVM op codes are always embedded. A branch code is generic CAD3 data
 			// and may not be available until multi-cell child resolution completes.
@@ -112,13 +119,14 @@ public class CVMEncoder extends CAD3Encoder {
 						case CVMTag.OPCODE_QUERY: return Query.createFromRefs(r1, r2);
 					}
 				}
-				// CVMLong codes (0x10-0x18) encode Set op position
-				return Set.createFromRefs(r1, r2);
+				// CVMLong codes (0x10-0x18) encode Set op position.
+				if (code instanceof CVMLong) return Set.createFromRefs(r1, r2);
 			}
 			if (tag == CVMTag.OP_LOOKUP) return Lookup.createFromRefs(r1, r2);
 			if (tag == CVMTag.OP_DEF) return Def.createFromRefs(r1, r2);
-			if (tag == CVMTag.OP_LET) return Let.createFromRefs(r1, r2, false);
-			if (tag == CVMTag.OP_LOOP) return Let.createFromRefs(r1, r2, true);
+			if ((tag == CVMTag.OP_LET)||(tag == CVMTag.OP_LOOP)) {
+				return Let.createFromRefs(r1,r2,tag==CVMTag.OP_LOOP);
+			}
 		} catch (MissingDataException e) {
 			throw e; // fail-fast: don't degrade type on unresolvable refs
 		} catch (Exception e) {
@@ -132,7 +140,10 @@ public class CVMEncoder extends CAD3Encoder {
 	@Override
 	protected ACell readDenseRecord(byte tag, DecodeState ds) throws BadFormatException {
 		AVector<ACell> data = readVector(ds);
+		return specialiseRecord(tag,data);
+	}
 
+	private static ACell specialiseRecord(byte tag,AVector<ACell> data) throws BadFormatException {
 		try {
 			if (tag == CVMTag.INVOKE) return Invoke.create(data);
 			if (tag == CVMTag.TRANSFER) return Transfer.create(data);
@@ -168,16 +179,53 @@ public class CVMEncoder extends CAD3Encoder {
 	 * otherwise MultiFn. Uses isEmbedded() to avoid dereferencing non-embedded
 	 * refs (which may not be resolvable during multi-cell child decode).
 	 */
-	private ACell readFn(AVector<ACell> data) throws BadFormatException {
+	private static ACell readFn(AVector<ACell> data) throws BadFormatException {
 		if (data.isEmpty()) throw new BadFormatException("Empty record in Fn");
 		Ref<ACell> firstRef = data.getRef(0);
 		if (firstRef.isEmbedded()) {
 			ACell typeFlag = firstRef.getValue();
 			if (typeFlag instanceof AByteFlag && ((AByteFlag) typeFlag).getTag() == CVMTag.FN_NORMAL) {
+				if (data.count()!=4) throw new BadFormatException("Invalid function data length");
 				return Fn.create(data);
 			}
 		}
 		return MultiFn.create(data);
+	}
+
+	/**
+	 * Obtains the CVM view of a generic CAD3 value. Already specialised values are
+	 * returned unchanged. Conversion is shallow: child references are retained,
+	 * and typed accessors specialise children when needed. No encoding round trip
+	 * or recursive traversal is performed.
+	 *
+	 * Unknown tags and rejected shapes remain generic. This is not full CVM
+	 * validation; consumers must still validate code or state before use.
+	 * Missing branch data still propagates
+	 * as a MissingDataException; it must not be mistaken for an unknown type.
+	 * @param cell Value to interpret (may be null)
+	 * @return Equivalent CVM value, or the original generic value
+	 */
+	public static ACell specialise(ACell cell) {
+		ACell result;
+		try {
+			if (cell instanceof ExtensionValue extension) {
+				result=specialiseExtension(extension.getTag(),extension.longValue());
+				if (result instanceof ExtensionValue) return cell;
+			} else if (cell instanceof CodedValue coded) {
+				result=specialiseCoded(coded.getTag(),coded.getRef(0),coded.getRef(1));
+				if (result instanceof CodedValue) return cell;
+			} else if (cell instanceof DenseRecord record) {
+				result=specialiseRecord(record.getTag(),record.values());
+				if (result instanceof DenseRecord) return cell;
+			} else {
+				return cell;
+			}
+		} catch (BadFormatException e) {
+			return cell;
+		}
+		// Reuse existing bytes without forcing encoding or borrowing ref status.
+		if (cell.cachedEncoding()!=null) result.attachEncoding(cell.cachedEncoding());
+		return result;
 	}
 
 }

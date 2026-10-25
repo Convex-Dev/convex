@@ -1,5 +1,7 @@
 package convex.core.cvm;
 
+import convex.core.lang.RT;
+
 import convex.core.Result;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
@@ -51,7 +53,7 @@ public class PeerIndex {
 		BlockResult br=peer.getBlockResult(blockNum);
 		SignedData<Block> blockSD=peer.getPeerOrder().getBlock(blockNum);
 		nBlockLocs=nBlockLocs.assoc(blockSD.getHash(), CVMLong.create(blockNum));
-		AVector<SignedData<ATransaction>> txs = blockSD.getValue().getTransactions();
+		AVector<SignedData<ATransaction>> txs = RT.ensureCVM(blockSD.getValue(),Block.class).getTransactions();
 		AVector<Result> rs = br.getResults();
 		long n=rs.count();
 		for (long i=0; i<n; i++) {
@@ -72,7 +74,8 @@ public class PeerIndex {
 	public SignedData<ATransaction> getTransaction(Peer peer, Hash transactionID) {
 		AVector<CVMLong> loc=txLocations.get(transactionID);
 		if (loc==null) return null;
-		return peer.getPeerOrder().getBlock(loc.get(0).longValue()).getValue().getTransactions().get(loc.get(1).longValue());
+		Block block=RT.ensureCVM(peer.getPeerOrder().getBlock(loc.get(0).longValue()).getValue(),Block.class);
+		return block.getTransactions().get(loc.get(1).longValue());
 	}
 
 	public AVector<CVMLong> getTransactionLocation(Hash transactionID) {

@@ -2,6 +2,7 @@ package convex.lattice.queue;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,9 +18,20 @@ import convex.lattice.generic.SignedLattice;
 /**
  * Tests that the queue system is correctly wired into the global Lattice.ROOT.
  *
- * <p>Full path: {@code [:queue, <owner>, :value, <topic>, :partitions, <partition-id>]}</p>
+ * <p>Path in the root: {@code [:queue, <owner>]} reaches the owner's signed slot, a
+ * leaf of the lattice tree. The component owning that slot navigates the unsigned
+ * value with the owner lattice's value lattice: {@code [<topic>, :partitions,
+ * <partition-id>]}. See design log entry 2: the value key is not navigated.</p>
  */
 public class LatticeRootQueueTest {
+
+	private static final Keyword VALUE=Keyword.create("value");
+
+	/** The lattice of an owner's unsigned queue value, as the owning component sees it. */
+	private static ALattice<?> ownerValue() {
+		ALattice<?> owners=Lattice.ROOT.path(Keywords.QUEUE);
+		return ((OwnerLattice<?>)owners).getValueLattice();
+	}
 
 	@Test
 	public void testQueueBranchExists() {
@@ -30,7 +42,7 @@ public class LatticeRootQueueTest {
 
 	@Test
 	public void testPathToOwner() {
-		// :queue → OwnerLattice → path(ownerKey) → SignedLattice
+		// :queue → OwnerLattice → path(ownerKey) → SignedLattice, a leaf of the tree
 		ALattice<?> ownerLevel = Lattice.ROOT.path(Keywords.QUEUE);
 		assertNotNull(ownerLevel);
 
@@ -38,47 +50,32 @@ public class LatticeRootQueueTest {
 		ALattice<?> signedLevel = ownerLevel.path(Strings.create("any-owner"));
 		assertNotNull(signedLevel);
 		assertInstanceOf(SignedLattice.class, signedLevel);
+
+		// No path continues inside the envelope
+		assertNull(signedLevel.path(VALUE));
+		assertNull(signedLevel.path(Strings.create("my-topic")));
+		assertNull(Lattice.ROOT.path(Keywords.QUEUE, Strings.create("any-owner"), VALUE));
 	}
 
 	@Test
 	public void testPathToTopics() {
-		// :queue → OwnerLattice → SignedLattice → path(:value) → MapLattice (topics)
-		ALattice<?> signedLevel = Lattice.ROOT.path(Keywords.QUEUE, Strings.create("owner"));
-		assertNotNull(signedLevel);
-
-		Keyword VALUE = Keyword.create("value");
-		ALattice<?> topicLevel = signedLevel.path(VALUE);
+		// Owner value → MapLattice (topics)
+		ALattice<?> topicLevel = ownerValue();
 		assertNotNull(topicLevel);
 		assertInstanceOf(MapLattice.class, topicLevel);
 	}
 
 	@Test
 	public void testPathToTopicLattice() {
-		// Full path through topics to TopicLattice level
-		Keyword VALUE = Keyword.create("value");
-		ALattice<?> topicLevel = Lattice.ROOT.path(
-			Keywords.QUEUE,
-			Strings.create("owner"),
-			VALUE
-		);
-		assertNotNull(topicLevel);
-
 		// Descend into a specific topic → TopicLattice
-		ALattice<?> topicLattice = topicLevel.path(Strings.create("my-topic"));
+		ALattice<?> topicLattice = ownerValue().path(Strings.create("my-topic"));
 		assertNotNull(topicLattice);
 		assertInstanceOf(TopicLattice.class, topicLattice);
 	}
 
 	@Test
 	public void testPathToPartitions() {
-		// Full path through topic to partition map
-		Keyword VALUE = Keyword.create("value");
-		ALattice<?> topicLattice = Lattice.ROOT.path(
-			Keywords.QUEUE,
-			Strings.create("owner"),
-			VALUE,
-			Strings.create("my-topic")
-		);
+		ALattice<?> topicLattice = ownerValue().path(Strings.create("my-topic"));
 		assertNotNull(topicLattice);
 		assertInstanceOf(TopicLattice.class, topicLattice);
 
@@ -90,12 +87,7 @@ public class LatticeRootQueueTest {
 
 	@Test
 	public void testPathToQueueLattice() {
-		// Full path down to the partition MapLattice
-		Keyword VALUE = Keyword.create("value");
-		ALattice<?> partitionLevel = Lattice.ROOT.path(
-			Keywords.QUEUE,
-			Strings.create("owner"),
-			VALUE,
+		ALattice<?> partitionLevel = ownerValue().path(
 			Strings.create("my-topic"),
 			TopicLattice.KEY_PARTITIONS
 		);
@@ -109,12 +101,8 @@ public class LatticeRootQueueTest {
 
 	@Test
 	public void testFullPathTraversal() {
-		// Walk the full path using multi-key path()
-		Keyword VALUE = Keyword.create("value");
-		ALattice<?> leaf = Lattice.ROOT.path(
-			Keywords.QUEUE,
-			Strings.create("owner"),
-			VALUE,
+		// Walk the full path below the owner's value using multi-key path()
+		ALattice<?> leaf = ownerValue().path(
 			Strings.create("events"),
 			TopicLattice.KEY_PARTITIONS,
 			Strings.create("0")

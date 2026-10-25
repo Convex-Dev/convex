@@ -2,10 +2,12 @@ package convex.core.data.type;
 
 import convex.core.cpos.Block;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.ACVMRecord;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.Vectors;
+import convex.core.lang.RT;
 
 /**
  * Type that represents any CVM collection
@@ -24,7 +26,7 @@ public class Record extends AStandardType<ARecord> {
 
 	@Override
 	public boolean check(ACell value) {
-		return (value instanceof ARecord);
+		return implicitCast(value)!=null;
 	}
 
 	@Override
@@ -49,8 +51,7 @@ public class Record extends AStandardType<ARecord> {
 
 	@Override
 	public ARecord implicitCast(ACell a) {
-		if (a instanceof ARecord) return (ARecord)a;
-		return null;
+		return RT.ensureCVM(a,ACVMRecord.class);
 	}
 
 }

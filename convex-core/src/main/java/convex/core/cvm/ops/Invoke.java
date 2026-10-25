@@ -60,7 +60,7 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 		AOp<?>[] ops=new AOp[n];
 		for (int i=0; i<n; i++) {
 			ACell v=RT.cvm(vals[i]);
-			ops[i]=(v instanceof AOp)?(AOp<?>) v:Constant.of(v);
+			ops[i]=Ops.castOp(v);
 		}
 		return create(ops);
 	}

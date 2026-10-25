@@ -1,11 +1,16 @@
 package convex.lattice.queue;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.core.util.Utils;
+import convex.lattice.ALatticeComponent;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
 /**
@@ -26,41 +31,52 @@ import convex.lattice.cursor.Cursors;
  *   <li>Single-writer per queue recommended for distributed operation</li>
  * </ul>
  */
-public class LatticeQueue {
+public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
+	private final Supplier<CVMLong> clock;
 
-	private final ALatticeCursor<AVector<ACell>> cursor;
 
-	public LatticeQueue(ALatticeCursor<AVector<ACell>> cursor) {
-		this.cursor = cursor;
+	public LatticeQueue(AForkableCursor<AVector<ACell>> cursor) {
+		this(cursor,Utils::getCurrentTimestampCell);
 	}
+
+	/** Binds the mutation clock retained by children and forks. */
+	public LatticeQueue(AForkableCursor<AVector<ACell>> cursor,Supplier<CVMLong> clock) {
+		super(cursor);
+		this.clock=Objects.requireNonNull(clock);
+	}
+
+	/**
+	 * Creates the state for a mutation of an absent queue. Override to supply initial
+	 * state or throw to require explicit initialisation. Return a non-null queue state.
+	 * This hook must be pure because atomic updates may retry it. Reads and no-op
+	 * truncation do not call it. Subclasses retain their policy through {@link #rebind}.
+	 */
+	protected AVector<ACell> createContainer() { return QueueLattice.INSTANCE.zero(); }
 
 	/**
 	 * Creates a new empty queue.
 	 */
 	public static LatticeQueue create() {
-		ALatticeCursor<AVector<ACell>> cursor = Cursors.createLattice(QueueLattice.INSTANCE);
-		return new LatticeQueue(cursor);
+		return create(Utils::getCurrentTimestampCell);
 	}
 
-	/**
-	 * Returns the underlying lattice cursor.
-	 */
-	public ALatticeCursor<AVector<ACell>> cursor() {
-		return cursor;
+	/** Creates a standalone partition with an explicit mutation clock. */
+	public static LatticeQueue create(Supplier<CVMLong> clock) {
+		AForkableCursor<AVector<ACell>> cursor = Cursors.root(QueueLattice.INSTANCE.zero());
+		return new LatticeQueue(cursor,clock);
 	}
 
 	/**
 	 * Creates a forked copy of this queue for independent operation.
 	 */
+	@Override
 	public LatticeQueue fork() {
-		return new LatticeQueue(cursor.fork());
+		return rebind(storage.fork());
 	}
 
-	/**
-	 * Syncs this forked queue back to its parent, merging changes.
-	 */
-	public void sync() {
-		cursor.sync();
+	@Override
+	protected LatticeQueue rebind(AForkableCursor<AVector<ACell>> cursor) {
+		return new LatticeQueue(cursor,clock);
 	}
 
 	// ===== Producer Operations =====
@@ -99,12 +115,12 @@ public class LatticeQueue {
 			throw new IllegalArgumentException("Queue value must not be null");
 		}
 
-		CVMLong now = now();
+		CVMLong now = clock.get();
 		AVector<ACell> entry = QueueEntry.create(key, value, now, headers);
 
 		long[] offset = new long[1];
-		cursor.updateAndGet(state -> {
-			if (state == null) state = QueueLattice.INSTANCE.zero();
+		cursor().updateAndGet(state -> {
+			if (state == null) state = createContainer();
 
 			AVector<ACell> entries = QueueLattice.getEntries(state);
 			long startOffset = QueueLattice.getStartOffset(state);
@@ -126,7 +142,7 @@ public class LatticeQueue {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> peekEntry(long offset) {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 
 		AVector<ACell> entries = QueueLattice.getEntries(state);
@@ -166,7 +182,7 @@ public class LatticeQueue {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> peekFirstEntry() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		AVector<ACell> entries = QueueLattice.getEntries(state);
 		if (entries.isEmpty()) return null;
@@ -178,7 +194,7 @@ public class LatticeQueue {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> peekLastEntry() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		AVector<ACell> entries = QueueLattice.getEntries(state);
 		if (entries.isEmpty()) return null;
@@ -191,7 +207,7 @@ public class LatticeQueue {
 	 * Returns the first valid absolute offset, or 0 if empty.
 	 */
 	public long startOffset() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		return QueueLattice.getStartOffset(state);
 	}
 
@@ -199,7 +215,7 @@ public class LatticeQueue {
 	 * Returns the next absolute offset to be written (exclusive end).
 	 */
 	public long endOffset() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return 0L;
 		return QueueLattice.getStartOffset(state) + QueueLattice.getEntries(state).count();
 	}
@@ -208,7 +224,7 @@ public class LatticeQueue {
 	 * Returns the number of entries currently in the queue.
 	 */
 	public long size() {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return 0L;
 		return QueueLattice.getEntries(state).count();
 	}
@@ -227,7 +243,7 @@ public class LatticeQueue {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> range(long fromOffset, long toOffset) {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return Vectors.empty();
 		if (fromOffset > toOffset) return Vectors.empty();
 
@@ -261,7 +277,7 @@ public class LatticeQueue {
 	 * Gets a metadata value by key.
 	 */
 	public ACell getMeta(ACell key) {
-		AVector<ACell> state = cursor.get();
+		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		AHashMap<ACell, ACell> meta = QueueLattice.getMeta(state);
 		return meta.get(key);
@@ -271,9 +287,9 @@ public class LatticeQueue {
 	 * Sets a metadata value.
 	 */
 	public void setMeta(ACell key, ACell value) {
-		CVMLong now = now();
-		cursor.updateAndGet(state -> {
-			if (state == null) state = QueueLattice.INSTANCE.zero();
+		CVMLong now = clock.get();
+		cursor().updateAndGet(state -> {
+			if (state == null) state = createContainer();
 			AHashMap<ACell, ACell> meta = QueueLattice.getMeta(state);
 			AHashMap<ACell, ACell> newMeta = meta.assoc(key, value);
 			return state.assoc(QueueLattice.POS_META, newMeta).assoc(QueueLattice.POS_TIMESTAMP, now);
@@ -293,10 +309,9 @@ public class LatticeQueue {
 	 */
 	public long truncate(long newStartOffset) {
 		long[] removed = new long[1];
-		CVMLong now = now();
-		cursor.updateAndGet(state -> {
-			if (state == null) state = QueueLattice.INSTANCE.zero();
-
+		CVMLong now = clock.get();
+		cursor().updateAndGet(state -> {
+			if (state == null && newStartOffset>0) state = createContainer();
 			long currentStart = QueueLattice.getStartOffset(state);
 			if (newStartOffset <= currentStart) {
 				removed[0] = 0;
@@ -321,11 +336,9 @@ public class LatticeQueue {
 		return removed[0];
 	}
 
-	// ===== Internal =====
-
-	// #561: resolve time through the cursor policy. The default policy uses runtime
-	// time; applications and tests may supply a fixed or otherwise dynamic clock.
-	private CVMLong now() {
-		return cursor.getContext().currentTimestamp();
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AVector<ACell> mergePublication(AVector<ACell> own,AVector<ACell> other) {
+		return QueueLattice.INSTANCE.merge(own,other);
 	}
 }

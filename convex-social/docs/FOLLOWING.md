@@ -16,23 +16,15 @@ is named `:follows`:
     <target-did>
       :active      true | false
       :timestamp   <record timestamp>
-      :account-key <last validated 32-byte Ed25519 key, optional>
 ```
-
-The cached `:account-key` is an authentication optimisation, not identity. CAD3 may
-decode it as a canonical `Blob`; readers therefore use `AccountKey.parse` rather
-than relying on the JVM subtype.
 
 ## Lattice composition
 
 ```text
-StampingLattice(
-  LWPLattice(
-    KeyedLattice(
-      :timestamp -> MaxLattice
-      :follows   -> MapLattice(
-                      StampingLattice(
-                        LWWLattice(JSONLattice, record timestamp))))))
+LWPLattice(
+  KeyedLattice(
+    :timestamp -> MaxLattice
+    :follows   -> MapLattice(LWWLattice(JSONLattice, record timestamp))))
 ```
 
 The outer LWP chooses the newer following value as the preferred operand and then
@@ -48,8 +40,15 @@ No custom follow-set lattice is needed. Generic `LWPLattice` validates and sanit
 the foreign operand before either its null-adoption or timestamp-reordering paths,
 so malformed values cannot bypass child validation.
 
+Social guards the examined section fields before invoking this typed merge and
+retains opaque extension fields around it. Local record edits supply their own
+timestamps; the enclosing section is stamped through `StampedCursor`. Incoming
+values are never stamped with the receiver's clock.
+
 Exact timestamp ties retain the receiver's current value as specified by CAD024.
-Writers obtain timestamps from `LatticeContext`, not directly from the system clock.
+Writers obtain timestamps from the component's `Supplier<CVMLong>`. The default
+supplier reads wall-clock time; applications may supply a deterministic clock.
+The supplier is retained by child views, forks and transaction drafts.
 
 ## Follow, unfollow and tombstones
 
@@ -61,22 +60,18 @@ would allow an older active record, present on another replica, to reappear duri
 later structural merge. This retains one winning record per target rather than an
 unbounded action log.
 
-## Validated signer cache
+## Local resolution caching
 
-When a complete signed value arrives for a desired target DID:
+Incoming signed values must pass signature verification and the current
+`DIDKeyAuthorizer` policy. Receiving a value does not edit or re-sign any local
+user's follow records.
 
-1. verify the `SignedData` signature;
-2. compare its signer with the last validated key cached for that DID;
-3. if it matches, reuse the binding;
-4. if it differs or is absent, resolve the DID through `DIDKeyAuthorizer`;
-5. reject the owner value if resolution fails;
-6. cache a successful changed binding while preserving the current `:active` value.
-
-The cache is part of the target's whole LWW record. Updating it must begin from the
-current record so it cannot accidentally reverse a concurrent follow or unfollow.
-For `did:key`, the DID itself supplies the immutable key. For rotating methods,
-resolution is performed only when the signer changes, subject to the authorizer's
-authenticated snapshot/cache policy.
+Key resolution is local bookkeeping. `DIDKeyAuthorizer.cached(...)` provides a
+bounded in-memory cache for an immutable authenticated resolver snapshot; replace
+it when that snapshot changes. A persistent materialised cache may instead use
+local-only, non-replicated storage. Neither cache belongs in the social follow
+graph or advances its timestamps. Existing `:account-key` fields are opaque
+extensions and do not grant authority.
 
 ## Replication meaning
 

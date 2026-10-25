@@ -43,7 +43,7 @@ import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.account.KeyPairCombo;
-import convex.gui.keys.UnlockWalletDialog;
+import convex.gui.keys.KeyAccess;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -259,12 +259,8 @@ public class JWTBuilderPanel extends JPanel {
 			infoArea.setText("No signing key selected");
 			return null;
 		}
-		if (walletEntry.isLocked()&&!UnlockWalletDialog.offerUnlock(this,walletEntry)) {
-			infoArea.setText("Signing key remains locked");
-			return null;
-		}
-		AKeyPair keyPair=walletEntry.getKeyPair();
-		if (keyPair==null) infoArea.setText("Selected keyring entry has no key pair");
+		AKeyPair keyPair=KeyAccess.unlockForUse(this,walletEntry);
+		if (keyPair==null) infoArea.setText("Signing key remains locked");
 		return keyPair;
 	}
 

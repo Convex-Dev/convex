@@ -23,7 +23,7 @@ import convex.lattice.fs.DLPath;
 
 public class DLFileChannel implements SeekableByteChannel {
 
-	private boolean isOpen=true;
+	private volatile boolean isOpen=true;
 	private boolean readOnly=true;
 	private long position=0;
 	private int bytesUntilPersist=DLFileSystem.BLOB_PERSIST_INTERVAL;
@@ -74,7 +74,7 @@ public class DLFileChannel implements SeekableByteChannel {
 
 	@Override
 	public boolean isOpen() {
-		return isOpen;
+		return isOpen && fileSystem.isOpen();
 	}
 
 	@Override
@@ -102,6 +102,7 @@ public class DLFileChannel implements SeekableByteChannel {
 		// Coordinate writes from distinct channels with filesystem-level mutations.
 		synchronized(fileSystem) {
 			checkOpen();
+			if (readOnly) throw new NonWritableChannelException();
 			int written=src.remaining();
 			CVMLong operationTime=fileSystem.currentTimestamp();
 			while (src.hasRemaining()) {
@@ -111,23 +112,11 @@ public class DLFileChannel implements SeekableByteChannel {
 				Blob blob=Blob.fromByteBuffer(part);
 
 				long pos=position;
-				AVector<ACell> node=getNode();
-				ABlob data=DLFSNode.getData(node);
-				if (data==null) throw new NoSuchFileException(path.toString());
-				if (data.count()<pos) {
-					// Sparse zero blob uses structural sharing, so this is cheap.
-					data=data.append(Blobs.createZero(pos-data.count()));
-				}
-
-				ABlob newData=data.replaceSlice(pos,blob);
 				boolean persist=(n==bytesUntilPersist);
-				if (persist) newData=fileSystem.checkpointBlob(newData);
-
-				if (newData!=data) {
-					AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA,newData)
-						.assoc(DLFSNode.POS_UTIME,operationTime);
-					updateNode(newNode,operationTime);
-				}
+				fileSystem.updateFileData(path,data -> {
+					if (data.count()<pos) data=data.append(Blobs.createZero(pos-data.count()));
+					return data.replaceSlice(pos,blob);
+				},operationTime,persist);
 
 				position=pos+n;
 				src.position(src.position()+n);
@@ -174,7 +163,7 @@ public class DLFileChannel implements SeekableByteChannel {
 	}
 
 	private void checkOpen() throws ClosedChannelException {
-		if (!isOpen) {
+		if (!isOpen()) {
 			throw new ClosedChannelException();
 		}
 	}
@@ -203,20 +192,12 @@ public class DLFileChannel implements SeekableByteChannel {
 	@Override
 	public SeekableByteChannel truncate(long size) throws IOException {
 		checkOpen();
+		if (readOnly) throw new NonWritableChannelException();
 		if (size<0) throw new IllegalArgumentException("Negative position");
 
 		synchronized(fileSystem) {
-			AVector<ACell> node=getNode();
-			ABlob data = DLFSNode.getData(node);
-			if (data==null) throw new NoSuchFileException(path.toString());
-			long newSize=Math.min(size, data.count());
-			ABlob newData=data.slice(0, newSize);
-			if (newData!=data) {
-				CVMLong operationTime=fileSystem.currentTimestamp();
-				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData)
-					.assoc(DLFSNode.POS_UTIME,operationTime);
-				updateNode(newNode,operationTime);
-			}
+			fileSystem.updateFileData(path,data -> data.slice(0,Math.min(size,data.count())),
+				fileSystem.currentTimestamp(),false);
 			position=0;
 		}
 		return this;

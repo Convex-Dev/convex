@@ -555,7 +555,7 @@ public class ExplorerAPI extends AWebSite {
 		ArrayList<DomContent[]> rows = new ArrayList<>();
 		for (long i = start; i < end; i++) {
 			Address address = Address.create(i);
-			AccountStatus account = accounts.get(i);
+			AccountStatus account = RT.ensureCVM(accounts.get(i),AccountStatus.class);
 			String accountLink = ROUTE+"accounts/"+i;
 			
 			rows.add(new DomContent[] {
@@ -760,7 +760,7 @@ public class ExplorerAPI extends AWebSite {
 		if (txNum >= txCount) throw new NotFoundResponse("Transaction "+txNum+" does not exist in block "+blockNum);
 		
 		SignedData<ATransaction> signedTx = transactions.get(txNum);
-		ATransaction trans=signedTx.getValue();
+		ATransaction trans=RT.ensureTransaction(signedTx.getValue());
 		
 		// Create navigation links for transactions within this block
 		long txOffset = txNum;
@@ -970,7 +970,7 @@ public class ExplorerAPI extends AWebSite {
 					
 					// Build row with dynamic number of value cells
 					ArrayList<DomContent> cells = new ArrayList<>();
-					cells.add(td(address != null ? showAddress((Address)address) : code("nil")));
+					cells.add(td(address != null ? showAddress(RT.ensureAddress(address)) : code("nil")));
 					cells.add(td(scope != null ? showCVX(scope) : code("nil")));
 					cells.add(td(showCVX(position)));
 					
@@ -1082,7 +1082,7 @@ public class ExplorerAPI extends AWebSite {
                     	text("Storage for holdings data referenced by other accounts.")),
                     row(
                     	code(":controller"), 
-                    	account.getController()==null?code("nil"):showAddress((Address)account.getController()),
+					account.getController()==null?code("nil"):showAddress(RT.ensureAddress(account.getController())),
                     	text("Account controller. If set, the controller can execute code in this account (e.g. change the key). If you don't trust the controller, don't trust the account!")),
                     row(
                     	code(":environment"), 
@@ -1188,7 +1188,7 @@ public class ExplorerAPI extends AWebSite {
 		for (long i = start; i < end; i++) {
 			MapEntry<AArrayBlob, PeerStatus> entry = peers.entryAt(i);
 			AccountKey peerKey = RT.ensureAccountKey(entry.getKey());
-			PeerStatus peerStatus = entry.getValue();
+			PeerStatus peerStatus = RT.ensureCVM(entry.getValue(),PeerStatus.class);
 			String peerLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"peers/"+peerKey.toHexString());
 			double percent = (totalStakeAllPeers>0)?(100.0*peerStatus.getBalance()/ (double)totalStakeAllPeers):0.0;
 			

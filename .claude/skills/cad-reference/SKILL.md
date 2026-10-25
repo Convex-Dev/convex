@@ -70,15 +70,16 @@ in `design/docs/cad/<nnn>_<slug>/index.md`. Do not assume it is present.
 | 047 | `etch` | Etch storage format — see the `etch` skill |
 | 048 | `stores` | Lattice store abstraction — roots, persistence status |
 | 049 | `etch_gc` | Etch garbage collection and migration — see the `etch` skill |
-| 024 | `data_lattice` | Data lattice |
-| 035 | `cursors` | Lattice cursors |
-| 036 | `lattice_node` | Lattice node |
+| 024 | `data_lattice` | Abstract value, validation and merge semantics |
+| 035 | `cursors` | Atomic storage, projections and fork reconciliation |
+| 036 | `lattice_node` | Network delivery and replication of hosted state |
 | 037 | `kv_database` | KV database |
 | 039 | `convex_sql` | Convex SQL — see the `convex-db` skill |
 | 040 | `lattice_queue` | Lattice queue |
 | 028 | `dlfs` | Data Lattice File System |
 | 044 | `json` | JSON on the lattice |
-| 045 | `lattice_apps` | Lattice applications |
+| 045 | `lattice_apps` | Components: domain operations, policy, routing and publication boundaries |
+| 053 | `lattice_regions` | Shared region names and references to their semantic definitions |
 | 046 | `cell_explorer` | Cell explorer |
 
 ## Assets, Identity and Trust
@@ -94,8 +95,15 @@ in `design/docs/cad/<nnn>_<slug>/index.md`. Do not assume it is present.
 | 034 | `curated_registry` | Curated registry |
 | 023 | `keystore` | Keystore |
 | 025 | `wallet` | HD wallets |
-| 038 | `lattice_auth` | Lattice authentication |
+| 038 | `lattice_auth` | Signed ownership, authorisation and authoring rules |
 | 043 | `did` | Decentralised identity |
+
+CAD024 and CAD038 define semantics independently of implementation classes.
+Components are the normal application implementation mechanism under CAD045;
+they may delegate to reusable lattice definitions and use CAD035 cursors for
+storage. A lattice expression does not prescribe a component superclass or
+require a monolithic root lattice object. CAD036 supplies replication, while
+CAD053 registers the shared region namespace.
 
 For a DID used as a lattice owner or signed application subject, read CAD043, CAD038 and
 CAD004 together. Use CAD043 for DID method syntax and resolution, CAD038 for

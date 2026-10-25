@@ -4,8 +4,6 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
-import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
 
 /**
  * Factory methods for creating cursors.
@@ -32,49 +30,36 @@ public class Cursors {
 		return Root.create(value);
 	}
 
-	// ===== Lattice Cursor Factory Methods =====
+	// ===== Roots =====
 
 	/**
-	 * Creates a root lattice cursor with the given lattice and initial value.
+	 * Creates a root holding the supplied value.
 	 *
 	 * @param <V> Type of cursor value
-	 * @param lattice The lattice defining merge semantics
-	 * @param initialValue Initial value for the cursor
-	 * @return New lattice cursor instance
+	 * @param value Initial value
+	 * @return New root
 	 */
-	public static <V extends ACell> RootLatticeCursor<V> createLattice(ALattice<V> lattice, V initialValue) {
-		return new RootLatticeCursor<>(lattice, initialValue);
+	public static <V extends ACell> Root<V> root(V value) {
+		return new Root<>(value);
 	}
 
 	/**
-	 * Creates a root lattice cursor with the given lattice, initial value, and context.
+	 * Creates an opt-in transactional root, whose writes coordinate through one lock
+	 * so that {@link Transactions#transactLocked} and contention fallback are available.
 	 *
 	 * @param <V> Type of cursor value
-	 * @param lattice The lattice defining merge semantics
-	 * @param initialValue Initial value for the cursor
-	 * @param context Merge context for lattice operations
-	 * @return New lattice cursor instance
+	 * @param value Initial value
+	 * @return New transactional root
 	 */
-	public static <V extends ACell> RootLatticeCursor<V> createLattice(ALattice<V> lattice, V initialValue, LatticeContext context) {
-		return new RootLatticeCursor<>(lattice, initialValue, context);
-	}
-
-	/**
-	 * Creates a root lattice cursor using the lattice's zero value as initial value.
-	 *
-	 * @param <V> Type of cursor value
-	 * @param lattice The lattice defining merge semantics
-	 * @return New lattice cursor instance with zero initial value
-	 */
-	public static <V extends ACell> RootLatticeCursor<V> createLattice(ALattice<V> lattice) {
-		return new RootLatticeCursor<>(lattice, lattice.zero());
+	public static <V extends ACell> TransactionalRootCursor<V> transactionalRoot(V value) {
+		return new TransactionalRootCursor<>(value);
 	}
 
 	/**
 	 * Creates a cached transformation cursor that combines a TimeCache with a Transformer.
-	 * 
+	 *
 	 * This is useful if you have an expensive transformation that you don't want to run repeatedly and a small delay is acceptable.
-	 * 
+	 *
 	 * @param <S> The type of values from the source cursor
 	 * @param <T> The type of transformed values (must extend ACell)
 	 * @param source The source cursor to transform values from
@@ -85,12 +70,12 @@ public class Cursors {
 	 * @throws NullPointerException if source or transformFunction is null (from Transformer)
 	 */
 	public static <S extends ACell, T extends ACell> TimeCache<T> cachedTransform(
-			ACursor<S> source, 
-			Function<S, T> transformFunction, 
+			ACursor<S> source,
+			Function<S, T> transformFunction,
 			long ttl) {
 		// Create a transformer cursor
 		Transformer<S, T> transformer = new Transformer<>(source, transformFunction);
-		
+
 		// Wrap it with a time cache
 		return new TimeCache<>(transformer, ttl);
 	}

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,7 +35,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.RefSoft;
 import convex.core.exceptions.StoreException;
-import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
@@ -105,11 +105,18 @@ public class NodeServerPersistenceTest {
 	private final ConcurrentHashMap<NodeServer<?>,LatticeListener> transports=
 		new ConcurrentHashMap<>();
 
+	/** A relay node over the root lattice: the host admits everything, the node replicates it. */
+	private static NodeServer<Index<Keyword,ACell>> node(AStore store) throws IOException {
+		return node(store,null);
+	}
+
+	private static NodeServer<Index<Keyword,ACell>> node(AStore store,NodeConfig config) throws IOException {
+		return new NodeServer<>(RelayHost.open(Lattice.ROOT,store),config);
+	}
+
 	/** Attaches the explicit identity-view group used by replication tests. */
 	private LatticePropagator addPropagationGroup(NodeServer<?> node) {
-		LatticePropagator propagator=new LatticePropagator(
-			node.getStore(),node.getLattice(),value -> value,
-			LatticePropagatorConfig.create());
+		LatticePropagator propagator=new LatticePropagator(node.getStore(),LatticePropagatorConfig.create());
 		node.addPropagator(propagator);
 		transport(node).registerPropagator(propagator);
 		return propagator;
@@ -216,7 +223,7 @@ public class NodeServerPersistenceTest {
 		ACell expected=primary.getCursor().get();
 		CompletableFuture<ACell> announced=nextAnnouncement(
 			propagationGroup(primary),expected,16);
-		primary.getCursor().sync();
+		primary.getHost().sync();
 		announced.get(5,TimeUnit.SECONDS);
 
 		pullBackupFromPrimary();
@@ -252,7 +259,7 @@ public class NodeServerPersistenceTest {
 	 * Helper: explicitly persist the current value.
 	 */
 	private void persistCurrent(NodeServer<?> server) throws IOException {
-		server.persistSnapshot(server.getLocalValue());
+		server.getHost().checkpoint();
 	}
 
 	/** Adds enough small values to ensure the {@code :data} child is non-embedded. */
@@ -283,8 +290,8 @@ public class NodeServerPersistenceTest {
 	@Test
 	public void testPrimaryBackupPersistAndRestore() throws Exception {
 		// Launch primary and backup
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		primary = node(primaryStore);
+		backup = node(backupStore);
 		serveInbound(primary);
 		addPropagationGroup(backup);
 		primary.launch();
@@ -304,14 +311,16 @@ public class NodeServerPersistenceTest {
 		assertEquals(CVMLong.create(42), readDataValue(backup, 42));
 		assertEquals(CVMLong.create(99), readDataValue(backup, 99));
 
-		// Close both (triggers final persist)
+		// The service saves explicitly before closing its networking.
+		primary.getHost().checkpoint();
+		backup.getHost().checkpoint();
 		primary.close();
 		backup.close();
 		primary = null;
 		backup = null;
 
 		// Restart primary from same store — should restore
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 		assertEquals(CVMLong.create(42), readDataValue(primary, 42),
 			"Primary should restore value 42 from store");
@@ -319,7 +328,7 @@ public class NodeServerPersistenceTest {
 			"Primary should restore value 99 from store");
 
 		// Restart backup from same store — should restore
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		backup = node(backupStore);
 		backup.launch();
 		assertEquals(CVMLong.create(42), readDataValue(backup, 42),
 			"Backup should restore value 42 from store");
@@ -328,72 +337,74 @@ public class NodeServerPersistenceTest {
 	}
 
 	/**
-	 * Test that restore=false gives a clean start even on a persistent store.
+	 * Test that explicit replacement gives a clean start even on a persistent store.
 	 */
 	@Test
-	public void testRestoreDisabled() throws Exception {
+	public void testExplicitRootReplacement() throws Exception {
 		// Write and persist some data
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 		writeDataValue(primary, 777);
 		primary.close();
 		primary = null;
 
-		// Restart with restore=false
-		NodeConfig noRestore = NodeConfig.create(Maps.of(NodeConfig.RESTORE, CVMBool.FALSE));
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, noRestore);
+		// Restart with explicit replacement
+		convex.lattice.LatticeHost.replace(Lattice.ROOT.zero(),primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 
 		// Value should NOT be restored
 		assertNull(readDataValue(primary, 777),
-			"Value should not be restored when restore=false");
+			"Value should not be restored when explicit replacement");
 	}
 
 	/**
-	 * Test that persist=false prevents writing to store.
+	 * The host writes its root on sync and saves explicitly, independently of node configuration.
 	 */
 	@Test
-	public void testPersistDisabled() throws Exception {
-		// Launch with persist=false
-		NodeConfig noPersist = NodeConfig.create(Maps.of(NodeConfig.PERSIST, CVMBool.FALSE));
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, noPersist);
+	public void testHostDurabilityDoesNotNeedNodeConfiguration() throws Exception {
+		primary = node(primaryStore);
 		primary.launch();
 
-		// Write data
 		writeDataValue(primary, 888);
+		primary.getHost().sync();
+		assertEquals(primary.getLocalValue(), primaryStore.getRootData(), "the host wrote its root on sync");
+		primary.getHost().checkpoint(); // Node configuration cannot disable an explicit host barrier.
 		primary.close();
 		primary = null;
 
-		// Restart with defaults (restore=true)
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		// Restart with defaults (retained-root opening)
+		primary = node(primaryStore);
 		primary.launch();
 
-		// Value should NOT be there (was never persisted)
-		assertNull(readDataValue(primary, 888),
-			"Value should not survive restart when persist=false");
+		assertEquals(CVMLong.create(888), readDataValue(primary, 888),
+			"Persistence is the host's; the value survives a restart");
 	}
 
+
 	/**
-	 * Test with MemoryStore — persist/restore are no-ops, no errors.
+	 * A memory store holds its root like any other store while it exists: a node
+	 * reopened over the same store adopts it. The store simply does not survive the
+	 * process, and the node never checkpoints a store that is not persistent.
 	 */
 	@Test
-	public void testMemoryStoreNoPersistence() throws Exception {
+	public void testMemoryStoreRetainsWithinTheProcess() throws Exception {
 		primaryStore = new MemoryStore();
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 
 		writeDataValue(primary, 555);
 		assertEquals(CVMLong.create(555), readDataValue(primary, 555));
+		primary.getHost().checkpoint(); // Retains state for this process only.
 
-		// Close and restart — value should be gone
 		primary.close();
 		primary = null;
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
-		assertNull(readDataValue(primary, 555),
-			"MemoryStore should not persist data across restarts");
+		assertEquals(CVMLong.create(555), readDataValue(primary, 555),
+			"the same memory store still holds the root, so reopening adopts it");
 	}
 
 	/**
@@ -403,15 +414,16 @@ public class NodeServerPersistenceTest {
 	@Test
 	public void testPrimaryRestartThenSync() throws Exception {
 		// Launch primary, write data, close
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 		writeDataValue(primary, 100);
 		writeDataValue(primary, 200);
+		primary.getHost().checkpoint();
 		primary.close();
 		primary = null;
 
 		// Restart primary
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		serveInbound(primary);
 		primary.launch();
 
@@ -420,7 +432,7 @@ public class NodeServerPersistenceTest {
 		assertEquals(CVMLong.create(200), readDataValue(primary, 200));
 
 		// Launch backup and sync from restarted primary
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		backup = node(backupStore);
 		addPropagationGroup(backup);
 		backup.launch();
 		pullBackupFromPrimary();
@@ -438,8 +450,8 @@ public class NodeServerPersistenceTest {
 	@Test
 	public void testBackupRestoreAfterBroadcast() throws Exception {
 		// Launch both
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		primary = node(primaryStore);
+		backup = node(backupStore);
 		serveInbound(primary);
 		addPropagationGroup(backup);
 		primary.launch();
@@ -460,7 +472,7 @@ public class NodeServerPersistenceTest {
 		writeDataValue(primary, 400);
 
 		// Restart backup — should restore value 300 from its own store
-		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		backup = node(backupStore);
 		addPropagationGroup(backup);
 		backup.launch();
 		assertEquals(CVMLong.create(300), readDataValue(backup, 300),
@@ -481,7 +493,7 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testStoreRootDataIsLatticeValue() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 
 		writeDataValue(primary, 12345);
@@ -501,19 +513,19 @@ public class NodeServerPersistenceTest {
 	}
 
 	/**
-	 * Test that cursor.sync() triggers propagator persist (without relying on close).
+	 * Test that root component sync triggers propagator persist (without relying on close).
 	 * This is the pattern the venue uses: write → sync → propagator persists.
 	 */
 	@Test
 	public void testSyncTriggersPersist() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 
 		writeDataValue(primary, 42);
 
 		// Sync cursor — synchronous publication on the primary completes announce
 		// + setRootData on this thread before returning.
-		primary.getCursor().sync();
+		primary.getHost().sync();
 
 		// Store should have the data without needing close()
 		ACell rootData = primaryStore.getRootData();
@@ -531,11 +543,11 @@ public class NodeServerPersistenceTest {
 	@Test
 	public void testSyncPersistLocalOnly() throws Exception {
 		// Local-only mode, same as venue: NodeConfig.port(-1)
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 
 		writeDataValue(primary, 77);
-		primary.getCursor().sync();
+		primary.getHost().sync();
 
 		// Verify persisted
 		ACell rootData = primaryStore.getRootData();
@@ -550,7 +562,7 @@ public class NodeServerPersistenceTest {
 		primary.close();
 		primary = null;
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		assertEquals(CVMLong.create(77), readDataValue(primary, 77),
 			"Local-only node should restore data from store");
@@ -562,18 +574,18 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testSyncConvergesToStableStoreBackedIdentity() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		writeNonEmbeddedRoot(primary);
 
-		ACell first = primary.getCursor().sync();
+		ACell first = primary.getHost().sync();
 		assertSame(first, primary.getCursor().get(),
 			"root cursor should install the value returned by synchronous persistence");
 		assertSame(first, primaryStore.getRootData(),
 			"cursor and store should expose the same canonical root object");
 		assertStoreBackedRoot(first);
 
-		ACell second = primary.getCursor().sync();
+		ACell second = primary.getHost().sync();
 		assertSame(first, second, "an unchanged sync should reuse the canonical root identity");
 		assertSame(first, primary.getCursor().get());
 		assertSame(first, primaryStore.getRootData());
@@ -590,7 +602,7 @@ public class NodeServerPersistenceTest {
 		CountDownLatch allowPersistence = new CountDownLatch(1);
 		AtomicInteger rootWrites = new AtomicInteger();
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 
 		sharedPrimaryStore.setRootWriteHook(() -> {
@@ -611,7 +623,7 @@ public class NodeServerPersistenceTest {
 		AtomicReference<Throwable> failure = new AtomicReference<>();
 		Thread syncThread = new Thread(() -> {
 			try {
-				primary.getCursor().sync();
+				primary.getHost().sync();
 			} catch (Throwable e) {
 				failure.set(e);
 			}
@@ -629,7 +641,7 @@ public class NodeServerPersistenceTest {
 		assertEquals(CVMLong.create(999), readDataValue(primary, 999),
 			"concurrent write must survive the raced sync");
 
-		ACell converged = primary.getCursor().sync();
+		ACell converged = primary.getHost().sync();
 		assertSame(converged, primary.getCursor().get());
 		assertSame(converged, primaryStore.getRootData(),
 			"quiescent sync should converge cursor and store root identities");
@@ -638,12 +650,12 @@ public class NodeServerPersistenceTest {
 
 	/**
 	 * Synchronous publication must surface store errors to the caller. If
-	 * setRootData throws, cursor.sync() must throw rather than falsely confirming
+	 * setRootData throws, root component sync must throw rather than falsely confirming
 	 * root publication.
 	 */
 	@Test
 	public void testSyncSurfacesPersistenceFailure() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary, 99);
 		sharedPrimaryStore.setRootWriteHook(() -> {
@@ -652,7 +664,7 @@ public class NodeServerPersistenceTest {
 
 		// sync() must propagate, not swallow
 		StoreException ex = assertThrows(StoreException.class,
-			() -> primary.getCursor().sync(),
+			() -> primary.getHost().sync(),
 			"sync() must throw when setRootData fails");
 		assertTrue(ex.getCause() instanceof IOException,
 			"Cause must be the original IOException, was: " + ex.getCause());
@@ -661,54 +673,52 @@ public class NodeServerPersistenceTest {
 	}
 
 	@Test
-	public void testLaunchCompletesInitialCheckpoint() throws Exception {
+	public void testLaunchLeavesDurabilityToTheHostOwner() throws Exception {
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary=node(primaryStore,NodeConfig.port(-1));
 
 		primary.launch();
 
-		assertEquals(1,flushes.get(),"launch must checkpoint the initial published root");
+		assertEquals(0,flushes.get(),"network launch does not choose a durability policy");
+		primary.getHost().checkpoint();
+		assertEquals(1,flushes.get());
 	}
 
 	@Test
-	public void testExplicitCheckpointCoalescesCleanStore() throws Exception {
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+	public void testExplicitHostCheckpointFlushesItsSnapshot() throws Exception {
+		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
 		writeDataValue(primary,102);
-		primary.getCursor().sync();
+		primary.getHost().sync();
 
-		assertTrue(primary.checkpoint());
-		assertFalse(primary.checkpoint(),"a clean store must not be flushed again");
+		assertEquals(primary.getLocalValue(),primary.getHost().checkpoint());
 		assertEquals(1,flushes.get());
 	}
 
 	@Test
 	public void testFailedCheckpointRemainsDirtyForRetry() throws Exception {
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary,103);
-		primary.getCursor().sync();
+		primary.getHost().sync();
 		AtomicInteger attempts=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(()->{
 			if (attempts.incrementAndGet()==1) throw new IOException("simulated checkpoint failure");
 		});
 
-		IOException failure=assertThrows(IOException.class,primary::checkpoint);
+		IOException failure=assertThrows(IOException.class,primary.getHost()::checkpoint);
 		assertEquals("simulated checkpoint failure",failure.getMessage());
-		assertTrue(primary.checkpoint(),"a failed barrier must leave the store dirty");
-		assertFalse(primary.checkpoint());
+		primary.getHost().checkpoint();
 		assertEquals(2,attempts.get());
 	}
 
 	@Test
 	public void testPeriodicCheckpointUsesMaintenanceLoop() throws Exception {
-		NodeConfig config=NodeConfig.create(Maps.of(
-				NodeConfig.PORT,CVMLong.create(-1),
-				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
+		NodeConfig config=NodeConfig.port(-1);
+		primary=node(primaryStore,config);
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
 		AtomicInteger flushes=new AtomicInteger();
@@ -717,18 +727,18 @@ public class NodeServerPersistenceTest {
 			checkpointed.countDown();
 		});
 		writeDataValue(primary,104);
-		primary.getCursor().sync();
+		primary.getHost().sync();
 
-		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint signal not received");
-		assertEquals(1,flushes.get());
+		try (var durability=primary.getHost().autoFlush(Duration.ofMillis(20))) {
+			assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint signal not received");
+		}
+		assertTrue(flushes.get()>=2,"periodic flush and final barrier both complete");
 	}
 
 	@Test
 	public void testPeriodicCheckpointRetriesFailure() throws Exception {
-		NodeConfig config=NodeConfig.create(Maps.of(
-				NodeConfig.PORT,CVMLong.create(-1),
-				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
+		NodeConfig config=NodeConfig.port(-1);
+		primary=node(primaryStore,config);
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
 		AtomicInteger attempts=new AtomicInteger();
@@ -737,32 +747,35 @@ public class NodeServerPersistenceTest {
 		});
 		sharedPrimaryStore.setFlushCompleteHook(checkpointed::countDown);
 		writeDataValue(primary,107);
-		primary.getCursor().sync();
+		primary.getHost().sync();
 
-		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint retry not received");
-		assertEquals(2,attempts.get());
+		try (var durability=primary.getHost().autoFlush(Duration.ofMillis(20))) {
+			assertEquals("simulated periodic failure",durability.failure().toCompletableFuture()
+				.get(2,TimeUnit.SECONDS).getMessage());
+			assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint retry not received");
+		}
+		assertTrue(attempts.get()>=3,"failed attempt, retry and final barrier");
 	}
 
 	@Test
 	public void testPeriodicCheckpointAppliesToCustomPrimary() throws Exception {
-		NodeConfig config=NodeConfig.create(Maps.of(
-				NodeConfig.PORT,CVMLong.create(-1),
-				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
-		primary.addPropagator(new LatticePropagator(
-			primaryStore,Lattice.ROOT,value -> value,LatticePropagatorConfig.create()));
+		NodeConfig config=NodeConfig.port(-1);
+		primary=node(primaryStore,config);
+		primary.addPropagator(new LatticePropagator(primaryStore,LatticePropagatorConfig.create()));
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
 		sharedPrimaryStore.setFlushCompleteHook(checkpointed::countDown);
 		writeDataValue(primary,108);
-		primary.getCursor().sync();
+		primary.getHost().sync();
 
-		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"custom primary was not checkpointed");
+		try (var durability=primary.getHost().autoFlush(Duration.ofMillis(20))) {
+			assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"custom primary was not checkpointed");
+		}
 	}
 
 	@Test
-	public void testCloseCompletesFinalCheckpoint() throws Exception {
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+	public void testCloseDoesNotPublishOrFlushPendingHostState() throws Exception {
+		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
@@ -770,21 +783,24 @@ public class NodeServerPersistenceTest {
 
 		primary.close();
 
-		assertEquals(1,flushes.get());
+		assertEquals(0,flushes.get());
 		assertNotNull(readDataValue(primary,105));
-		assertNotNull(RT.getIn(primaryStore.getRootData(),Keyword.intern("data"),Hash.get(CVMLong.create(105))));
+		assertNull(RT.getIn(primaryStore.getRootData(),Keyword.intern("data"),Hash.get(CVMLong.create(105))));
+		primary.getHost().checkpoint();
+		assertEquals(1,flushes.get());
 	}
 
 	@Test
-	public void testCloseSurfacesFinalCheckpointFailureAfterStopping() throws Exception {
-		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+	public void testServiceCanReportFinalCheckpointFailureAfterStoppingNetworking() throws Exception {
+		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary,106);
 		sharedPrimaryStore.setFlushHook(()->{
 			throw new IOException("simulated final checkpoint failure");
 		});
 
-		IOException failure=assertThrows(IOException.class,primary::close);
+		primary.close();
+		IOException failure=assertThrows(IOException.class,primary.getHost()::checkpoint);
 		sharedPrimaryStore.setFlushHook(null);
 		assertEquals("simulated final checkpoint failure",failure.getMessage());
 		assertFalse(primary.isRunning(),"resources must be stopped even when the final barrier fails");
@@ -793,13 +809,13 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testSyncPublishesWithoutDurabilityBarrier() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
 		writeDataValue(primary,100);
 
-		ACell synced=primary.getCursor().sync();
+		ACell synced=primary.getHost().sync();
 
 		assertEquals(0,flushes.get(),"sync must not force a physical durability barrier");
 		assertSame(synced,primaryStore.getRootData(),"sync must publish the root to the primary store");
@@ -807,14 +823,14 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testSyncDoesNotInvokeDurabilityBarrier() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary,101);
 		sharedPrimaryStore.setFlushHook(()->{
 			throw new IOException("simulated flush failure");
 		});
 
-		ACell synced=primary.getCursor().sync();
+		ACell synced=primary.getHost().sync();
 
 		assertSame(synced,primaryStore.getRootData(),"sync must still publish with a failing flush hook");
 		assertTrue(primary.isRunning());
@@ -822,14 +838,14 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testExplicitPersistSurfacesDurabilityBarrierFailure() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		sharedPrimaryStore.setFlushHook(()->{
 			throw new IOException("simulated explicit flush failure");
 		});
 
 		IOException ex=assertThrows(IOException.class,
-				()->primary.persistSnapshot(primary.getLocalValue()));
+				()->primary.getHost().checkpoint());
 		assertEquals("simulated explicit flush failure",ex.getMessage());
 	}
 
@@ -837,7 +853,7 @@ public class NodeServerPersistenceTest {
 	 * Concurrent app writes during sync must not be lost. Thread A calls
 	 * {@code sync()} (announce + setRootData on caller's thread); thread B
 	 * writes a new key to the cursor mid-sync. After both, both writes must
-	 * be visible — the {@code RootLatticeCursor.sync()} CAS-or-merge fallback
+	 * be visible — the {@code Root.sync()} CAS-or-merge fallback
 	 * is what guarantees this.
 	 *
 	 * <p>Thread B writes at a fresh top-level key per iteration via the
@@ -847,7 +863,7 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testConcurrentWriteDuringSync() throws Exception {
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 
 		Keyword stable = Keyword.intern("stable");
@@ -868,7 +884,7 @@ public class NodeServerPersistenceTest {
 			});
 			b.start();
 			ready.countDown();
-			primary.getCursor().sync();
+			primary.getHost().sync();
 			b.join();
 
 			// B's write must survive the CAS-or-merge fallback inside sync()
@@ -897,7 +913,7 @@ public class NodeServerPersistenceTest {
 		CountDownLatch releaseFirst = new CountDownLatch(1);
 		CountDownLatch secondStarted = new CountDownLatch(1);
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary = node(primaryStore, NodeConfig.port(-1));
 		primary.launch();
 
 		sharedPrimaryStore.setRootWriteHook(() -> {
@@ -926,12 +942,12 @@ public class NodeServerPersistenceTest {
 		final ACell v2 = primary.getCursor().get();
 
 		Thread t1 = new Thread(() -> {
-			try { primary.persistSnapshot(v1); }
+			try { primary.getHost().mergeAt(v1); primary.getHost().checkpoint(); }
 			catch (Throwable e) { failure.compareAndSet(null, e); }
 		}, "snapshot-A");
 		Thread t2 = new Thread(() -> {
 			secondStarted.countDown();
-			try { primary.persistSnapshot(v2); }
+			try { primary.getHost().mergeAt(v2); primary.getHost().checkpoint(); }
 			catch (Throwable e) { failure.compareAndSet(null, e); }
 		}, "snapshot-B");
 

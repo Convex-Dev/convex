@@ -1,5 +1,7 @@
 package convex.core.cpos;
 
+import convex.core.cvm.CVMEncoder;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -158,7 +160,7 @@ public class Belief extends ARecordGeneric {
 	public Order getOrder(AccountKey address) {
 		SignedData<Order> sc = getOrders().get(address);
 		if (sc == null) return null;
-		return sc.getValue();
+		return RT.ensureCVM(sc.getValue(),Order.class);
 	}
 
 	/**
@@ -186,9 +188,10 @@ public class Belief extends ARecordGeneric {
 	 */
 	@SuppressWarnings("unchecked")
 	public static Collection<SignedData<Order>> extractOrders(ACell payload) {
+		payload=CVMEncoder.specialise(payload);
 		ArrayList<SignedData<Order>> result=new ArrayList<>();
 		if (payload instanceof SignedData sd) {
-			if (sd.getValue() instanceof Order) {
+			if (RT.ensureCVM(sd.getValue(),Order.class)!=null) {
 				result.add((SignedData<Order>) sd);
 			}
 		} else if (payload instanceof Belief b) {
@@ -225,7 +228,7 @@ public class Belief extends ARecordGeneric {
 		if (mySO==null) {
 			throw new IllegalStateException("Trying to propose block without a current ordering for peer "+peerKey);
 		} else {
-			myOrder=mySO.getValue();
+			myOrder=RT.ensureCVM(mySO.getValue(),Order.class);
 		}
 
 		// Create new order with signed Block

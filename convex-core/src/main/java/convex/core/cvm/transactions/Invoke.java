@@ -1,5 +1,7 @@
 package convex.core.cvm.transactions;
 
+import convex.core.cvm.Ops;
+
 import convex.core.cvm.AOp;
 import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.Address;
@@ -82,8 +84,9 @@ public class Invoke extends ATransaction {
 		Context ctx=context;
 		ACell cmd=getCommand();
 		// Run command
-		if (cmd instanceof AOp) {
-			ctx = ctx.run((AOp<?>) cmd);
+		AOp<?> op=Ops.ensureOp(cmd);
+		if (op!=null) {
+			ctx = ctx.run(op);
 		} else {
 			ctx = ctx.run(cmd);
 		}

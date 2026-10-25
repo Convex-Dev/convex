@@ -1,5 +1,6 @@
 package convex.core.cvm.ops;
 
+import convex.core.data.util.BlobBuilder;
 import convex.core.cvm.AOp;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
@@ -68,6 +69,14 @@ public abstract class ACodedOp<T extends ACell, C extends ACell, V extends ACell
 		Ref<C> nc=func.apply(code);
 		Ref<V> nv=func.apply(value);
 		return rebuild(nc,nv);
+	}
+
+	/** Print malformed code without inspecting its child types. */
+	protected boolean printRaw(BlobBuilder bb,long limit) {
+		bb.append("#[");
+		bb.append(getEncoding().toHexString());
+		bb.append(']');
+		return bb.check(limit);
 	}
 
 	protected abstract AOp<T> rebuild(Ref<C> newCode, Ref<V> newValue);

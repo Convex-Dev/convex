@@ -15,6 +15,7 @@ import convex.etch.EtchStore;
 import convex.db.lattice.SQLDatabase;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -53,15 +54,11 @@ public class ReplicationDemo {
 		NodeConfig configLondon=NodeConfig.port(0);
 		NodeConfig configTokyo=NodeConfig.port(0);
 		NodeServer<?> serverLondon = new NodeServer<>(
-				ConvexDB.DATABASE_MAP_LATTICE,storeLondon,configLondon);
+				RelayHost.open(ConvexDB.DATABASE_MAP_LATTICE,storeLondon),configLondon);
 		NodeServer<?> serverTokyo  = new NodeServer<>(
-				ConvexDB.DATABASE_MAP_LATTICE,storeTokyo,configTokyo);
-		LatticePropagator propagatorLondon=new LatticePropagator(
-			storeLondon,ConvexDB.DATABASE_MAP_LATTICE,value -> value,
-			LatticePropagatorConfig.create());
-		LatticePropagator propagatorTokyo=new LatticePropagator(
-			storeTokyo,ConvexDB.DATABASE_MAP_LATTICE,value -> value,
-			LatticePropagatorConfig.create());
+				RelayHost.open(ConvexDB.DATABASE_MAP_LATTICE,storeTokyo),configTokyo);
+		LatticePropagator propagatorLondon=new LatticePropagator(storeLondon,LatticePropagatorConfig.create());
+		LatticePropagator propagatorTokyo=new LatticePropagator(storeTokyo,LatticePropagatorConfig.create());
 		serverLondon.addPropagator(propagatorLondon);
 		serverTokyo.addPropagator(propagatorTokyo);
 		LatticeListener transportLondon=new LatticeListener(configLondon);
@@ -119,13 +116,13 @@ public class ReplicationDemo {
 			dbLondon.tables().insert("products", 2, "Gadget",   24.99,  50);
 			dbLondon.tables().insert("products", 3, "Sprocket", 14.99,  75);
 			// Sync so the propagator sees the changes
-			serverLondon.getCursor().sync();
+			serverLondon.getHost().sync();
 
 			dbTokyo.tables().createTable("products", new String[]{"id", "name", "price", "stock"});
 			dbTokyo.tables().insert("products", 4, "Connector",  4.99, 200);
 			dbTokyo.tables().insert("products", 5, "Capacitor",  1.99, 500);
 			dbTokyo.tables().insert("products", 6, "Transistor", 0.49, 1000);
-			serverTokyo.getCursor().sync();
+			serverTokyo.getHost().sync();
 
 			section("4. Independent inserts (no sync yet)");
 			System.out.println("  London: " + dbLondon.tables().getRowCount("products") + " rows (ids 1-3)");
@@ -153,13 +150,13 @@ public class ReplicationDemo {
 
 			section("6. Conflicting update on row id=1");
 			dbLondon.tables().insert("products", 1, "Widget Pro",   12.99, 80);
-			serverLondon.getCursor().sync();
+			serverLondon.getHost().sync();
 			System.out.println("  London: id=1 -> 'Widget Pro' @ 12.99");
 
 			Thread.sleep(15); // ensure later timestamp
 
 			dbTokyo.tables().insert("products",  1, "Widget Ultra", 15.99, 60);
-			serverTokyo.getCursor().sync();
+			serverTokyo.getHost().sync();
 			System.out.println("  Tokyo:  id=1 -> 'Widget Ultra' @ 15.99 (later timestamp)");
 
 			// Sync (two rounds for full convergence with Etch stores)
@@ -177,7 +174,7 @@ public class ReplicationDemo {
 
 			section("7. Delete replication");
 			dbTokyo.tables().deleteByKey("products", CVMLong.create(6));
-			serverTokyo.getCursor().sync();
+			serverTokyo.getHost().sync();
 			System.out.println("  Tokyo deletes id=6 (Transistor)");
 
 			serverLondon.pull(propagatorLondon);

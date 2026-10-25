@@ -9,13 +9,17 @@ import java.util.Map;
 import convex.core.Constants;
 import convex.core.cvm.AFn;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMEncoder;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
+import convex.core.data.ACAD3Record;
 import convex.core.data.ACell;
 import convex.core.data.ACollection;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
+import convex.core.data.AExtensionValue;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.AMap;
@@ -332,6 +336,7 @@ public class RT {
 		for (int i = 1; i < n; i++) {
 			ANumeric b = RT.ensureNumber(args[i]);
 			result = result.sub(b);
+			if (result == null) return null;
 		}
 		return result;
 	}
@@ -634,10 +639,8 @@ public class RT {
 			return CVMLong.create(((APrimitive) a).longValue());
 		}
 
-		if (a instanceof Address) {
-			long lv = ((Address) a).longValue();
-			return CVMLong.create(lv);
-		}
+		Address address=ensureAddress(a);
+		if (address!=null) return CVMLong.create(address.longValue());
 
 		if (a instanceof ABlob) {
 			long lv = ((ABlob) a).longValue();
@@ -790,8 +793,8 @@ public class RT {
 		if (o instanceof ACollection)
 			return vec((ACollection<T>) o);
 
-		if (o instanceof ACountable) {
-			ACountable<T> ds = (ACountable<T>) o;
+		ACountable<T> ds=ensureCountable(o);
+		if (ds!=null) {
 			long n = ds.count();
 			AVector<T> r = Vectors.empty();
 			for (int i = 0; i < n; i++) {
@@ -814,8 +817,8 @@ public class RT {
 			return Sets.empty();
 		if (o instanceof ASet)
 			return (ASet<T>) o;
-		if (o instanceof ACountable)
-			return Sets.create((ACountable<T>) o);
+		ACountable<T> counted=ensureCountable(o);
+		if (counted!=null) return Sets.create(counted);
 		return null;
 	}
 
@@ -855,10 +858,8 @@ public class RT {
 			return (ASequence<T>) o;
 		if (o instanceof ACollection)
 			return ((ACollection<T>) o).toVector();
-		if (o instanceof AMap) {
-			// TODO: probably needs fixing! SECURITY
-			return sequence(((AMap<?, ?>) o).entryVector());
-		}
+		AMap<?,?> map=ensureMap(o);
+		if (map!=null) return sequence(map.entryVector());
 
 		return null;
 	}
@@ -913,8 +914,8 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T nth(ACell o, long i) {
-		if (o instanceof ACountable)
-			return ((ACountable<T>) o).get(i); // blobs, maps, strings and collections
+		ACountable<T> counted=ensureCountable(o);
+		if (counted!=null) return counted.get(i); // blobs, maps, strings and collections
 
 		throw new ClassCastException("Don't know how to get nth item of type " + RT.getType(o));
 	}
@@ -929,8 +930,7 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T nth(Object o, long i) {
-		if (o instanceof ACountable)
-			return ((ACountable<T>) o).get(i);
+		if (o instanceof ACell cell) return nth(cell,i);
 
 		try {
 			if (o.getClass().isArray()) {
@@ -972,8 +972,10 @@ public class RT {
 	public static Long argumentCount(Object o) {
 		if (o == null)
 			return 0L;
-		if (o instanceof ADataStructure)
-			return ((ADataStructure<?>) o).count();
+		if (o instanceof ACell cell) {
+			ADataStructure<?> ds=ensureDataStructure(cell);
+			return (ds==null)?null:ds.count();
+		}
 		if (o.getClass().isArray()) {
 			return (long) Array.getLength(o);
 		}
@@ -993,8 +995,8 @@ public class RT {
 		if (a == null)
 			return 0L;
 
-		if (a instanceof ACountable)
-			return ((ACountable<?>) a).count();
+		ACountable<?> counted=ensureCountable(a);
+		if (counted!=null) return counted.count();
 
 		return null;
 	}
@@ -1032,6 +1034,7 @@ public class RT {
 	 *         partially written to BlobBuilder)
 	 */
 	public static boolean print(BlobBuilder bb, ACell a, long limit) {
+		a=CVMEncoder.specialise(a);
 		if (a == null) {
 			bb.append(Strings.NIL);
 			return bb.check(limit);
@@ -1088,6 +1091,7 @@ public class RT {
 	 * @return CVM String representation of object
 	 */
 	public static AString str(ACell a) {
+		a=CVMEncoder.specialise(a);
 		if (a == null) {
 			return Strings.NIL;
 		}
@@ -1203,9 +1207,7 @@ public class RT {
 	static <E extends ACell> ADataStructure<E> castDataStructure(ACell a) {
 		if (a == null)
 			return Vectors.empty();
-		if (a instanceof ADataStructure)
-			return (ADataStructure<E>) a;
-		return null;
+		return ensureDataStructure(a);
 	}
 
 	/**
@@ -1220,9 +1222,10 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AFn<T> castFunction(ACell a) {
+		a=CVMEncoder.specialise(a);
 		if (a instanceof AFn)
 			return (AFn<T>) a;
-		if (a instanceof AMap)
+		if ((a instanceof AMap)&&a.isCVMValue())
 			return MapFn.wrap((AMap<?, T>) a);
 		if (a instanceof ASequence)
 			return SeqFn.wrap((ASequence<?>) a);
@@ -1244,6 +1247,7 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AFn<T> ensureFunction(ACell a) {
+		a=CVMEncoder.specialise(a);
 		if (a instanceof AFn)
 			return (AFn<T>) a;
 		return null;
@@ -1265,8 +1269,8 @@ public class RT {
 	 * @return Address value or null if not castable to a valid address
 	 */
 	public static Address castAddress(ACell a) {
-		if (a instanceof Address)
-			return (Address) a;
+		Address address=ensureAddress(a);
+		if (address!=null) return address;
 		if (a instanceof AVector) {
 			AVector<?> v = RT.ensureVector(a);
 			if (v.count() == 0)
@@ -1296,7 +1300,8 @@ public class RT {
 	}
 
 	/**
-	 * Ensures the argument is a valid Address.
+	 * Ensures the argument is an Address, accepting equivalent generic CAD3
+	 * extension values. Does not convert numbers, strings or blobs.
 	 * 
 	 * @param a Value to cast
 	 * @return Address value or null if not a valid address
@@ -1304,7 +1309,23 @@ public class RT {
 	public static Address ensureAddress(ACell a) {
 		if (a instanceof Address)
 			return (Address) a;
+		if ((a instanceof AExtensionValue extension)&&(a.getTag()==CVMTag.ADDRESS)) {
+			return Address.create(extension.longValue());
+		}
 		return null;
+	}
+
+	/**
+	 * Obtains a typed CVM view without rebuilding the value's child tree.
+	 * @param <T> Expected Java representation
+	 * @param value Raw value from a collection, ref or store
+	 * @param type Expected CVM class
+	 * @return Equivalent specialised value, or null if the type does not match
+	 */
+	public static <T extends ACell> T ensureCVM(ACell value,Class<T> type) {
+		if (type.isInstance(value)) return type.cast(value);
+		ACell specialised=CVMEncoder.specialise(value);
+		return type.isInstance(specialised)?type.cast(specialised):null;
 	}
 
 	/**
@@ -1348,6 +1369,7 @@ public class RT {
 	 * @return Blob value, or null if not convertible to a blob
 	 */
 	public static ABlob castBlob(ACell a) {
+		a=CVMEncoder.specialise(a);
 		if (a instanceof AString)
 			return Blobs.fromHex((AString) a);
 
@@ -1385,9 +1407,7 @@ public class RT {
 	public static <K extends ACell, V extends ACell, R extends AMap<K, V>> R castMap(ACell a) {
 		if (a == null)
 			return (R) Maps.empty();
-		if (a instanceof AMap)
-			return (R) a;
-		return null;
+		return ensureMap(a);
 	}
 
 	/**
@@ -1407,7 +1427,9 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell, R extends AMap<K, V>> R ensureMap(ACell a) {
-		if (a instanceof AMap)
+		a=CVMEncoder.specialise(a);
+		// CAD3 records are not CVM maps merely because their Java base class is AMap.
+		if ((a instanceof AMap)&&a.isCVMValue())
 			return (R) a;
 		return null;
 	}
@@ -1436,7 +1458,8 @@ public class RT {
 	public static <T extends ACell> T getIn(ACell coll, Object... keys) {
 		ACell result=coll;
 		for (int i=0; i<keys.length; i++) {
-			if (result instanceof ADataStructure ds) {
+			ADataStructure<?> ds=ensureDataStructure(result);
+			if (ds!=null) {
 				ACell key=RT.cvm(keys[i]);
 				result=RT.get(ds,key);
 			} else {
@@ -1457,7 +1480,8 @@ public class RT {
 	public static <T extends ACell> T getIn(ACell coll, ACell... keys) {
 		ACell result=coll;
 		for (int i=0; i<keys.length; i++) {
-			if (result instanceof ADataStructure ds) {
+			ADataStructure<?> ds=ensureDataStructure(result);
+			if (ds!=null) {
 				ACell key=keys[i];
 				result=RT.get(ds,key);
 			} else {
@@ -1479,7 +1503,8 @@ public class RT {
 		ACell current = coll;
 		for (int i = 0; i < keys.length; i++) {
 			if (current == null) return false;
-			if (current instanceof ADataStructure<?> ds) {
+			ADataStructure<?> ds=ensureDataStructure(current);
+			if (ds!=null) {
 				current = ds.get(keys[i]);
 			} else {
 				return false;
@@ -1497,7 +1522,8 @@ public class RT {
 	 */
 	public static boolean pathExists(ACell coll, ACell key) {
 		if (coll == null) return false;
-		if (coll instanceof ADataStructure<?> ds) {
+		ADataStructure<?> ds=ensureDataStructure(coll);
+		if (ds!=null) {
 			return ds.get(key) != null;
 		}
 		return false;
@@ -1691,7 +1717,8 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <E extends ACell> ADataStructure<E> ensureDataStructure(ACell a) {
-		if (a instanceof ADataStructure)
+		a=CVMEncoder.specialise(a);
+		if ((a instanceof ADataStructure)&&a.isCVMValue())
 			return (ADataStructure<E>) a;
 		return null;
 	}
@@ -1705,13 +1732,14 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <E extends ACell> ACountable<E> ensureCountable(ACell a) {
-		if (a instanceof ACountable)
+		a=CVMEncoder.specialise(a);
+		if ((a instanceof ACountable)&&!(a instanceof ACAD3Record))
 			return (ACountable<E>) a;
 		return null;
 	}
 
 	public static boolean isCountable(ACell val) {
-		return (val == null) || (val instanceof ACountable);
+		return (val == null) || (ensureCountable(val)!=null);
 	}
 
 	/**
@@ -1787,9 +1815,8 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> AVector<R> keys(ACell a) {
-		if (!(a instanceof AMap))
-			return null;
-		AMap<R, ACell> m = (AMap<R, ACell>) a;
+		AMap<R, ACell> m = ensureMap(a);
+		if (m==null) return null;
 		return m.getKeys();
 	}
 
@@ -1801,9 +1828,8 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> AVector<R> values(ACell a) {
-		if (!(a instanceof AMap))
-			return null;
-		AMap<ACell, R> m = (AMap<ACell, R>) a;
+		AMap<ACell, R> m = ensureMap(a);
+		if (m==null) return null;
 		return m.values();
 	}
 
@@ -1817,8 +1843,8 @@ public class RT {
 	public static ADataStructure<?> ensureAssociative(ACell o) {
 		if (o == null)
 			return Maps.empty();
-		if (o instanceof IAssociative)
-			return (ADataStructure<?>) o;
+		ADataStructure<?> ds=ensureDataStructure(o);
+		if (ds instanceof IAssociative) return ds;
 		return null;
 	}
 
@@ -1971,8 +1997,8 @@ public class RT {
 		if (o==null) return null;
 		if (o instanceof AString)
 			return (T) o.toString();
-		if (o instanceof CVMLong)
-			return (T) (Long) ((CVMLong) o).longValue();
+		if (AInteger.isLong(o))
+			return (T) (Long) ((AInteger) o).longValue();
 		if (o instanceof CVMBigInteger bi)
 			return (T) bi.big();
 		if (o instanceof CVMDouble)
@@ -2015,6 +2041,7 @@ public class RT {
 	 * @return Type of CVM value
 	 */
 	public static AType getType(ACell a) {
+		a=CVMEncoder.specialise(a);
 		if (a == null)
 			return Types.NIL;
 		return a.getType();
@@ -2033,8 +2060,8 @@ public class RT {
 	public static CVMChar ensureChar(ACell a) {
 		if (a instanceof CVMChar)
 			return (CVMChar) a;
-		if (a instanceof CVMLong)
-			return CVMChar.create(((CVMLong) a).longValue());
+		if (AInteger.isLong(a))
+			return CVMChar.create(((AInteger) a).longValue());
 		if (a instanceof AString) {
 			AString s = (AString) a;
 			long n = s.count();
@@ -2078,9 +2105,7 @@ public class RT {
 	 * @return Transaction value, or null if not a transaction
 	 */
 	public static ATransaction ensureTransaction(ACell maybeTx) {
-		if (maybeTx instanceof ATransaction)
-			return (ATransaction) maybeTx;
-		return null;
+		return ensureCVM(maybeTx,ATransaction.class);
 	}
 
 	public static boolean printCAD3(BlobBuilder sb, long limit, ACell cell) {

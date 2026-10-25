@@ -107,6 +107,55 @@ that store. The store is a field on the encoder, set at construction; nothing in
 decode chain consults a thread-local. The static `CVMEncoder.INSTANCE`, which has no
 store, is the entry point for decoding complete values outside any store.
 
+### Cached representations and typed access
+
+A value's encoding and hash identify it; its Java class does not. A generic
+`ExtensionValue` with the address tag and an `Address` represent the same value.
+Likewise, generic CAD3 records and coded values may represent CVM transactions,
+functions and operations. Raw refs and collections can contain either form,
+including inside a cached parent. A Java generic parameter such as `Ref<Address>`
+does not prove which representation is present.
+
+`CVMEncoder.specialise(value)` provides a shallow CVM view using the same tag
+dispatch as decoding. It returns existing CVM representations unchanged, preserves
+child references, and does not serialise or recursively rebuild the tree. Unknown
+tags remain generic. Specialisation is not full validation of executable code or
+state: typed consumers must still apply their normal validity checks.
+
+At typed access points, use `RT.ensureAddress`, `RT.ensureTransaction`,
+`RT.ensureFunction`, `Ops.ensureOp`, or `RT.ensureCVM(value, ExpectedClass.class)`.
+These return null for a mismatched type. Address coercion accepts the equivalent
+address-tagged extension, but does not implicitly convert numbers or blobs.
+Typed getters handle children as they are accessed. Schema-specific blob types
+such as `AccountKey` still need their own coercion (`RT.ensureAccountKey`).
+
+CVM predicates, casts and printing use the interpreted value. For example, an
+address-tagged extension prints as `#17` and supports the same `long` conversion
+as an `Address`. A generic dense record is not a map just because its Java base
+class is `AMap`: it must specialise to a known CVM maplike record. Operations and
+functions are not maps, and unrecognised CAD3 records remain opaque to CVM map
+operations. Their raw encodings and generic Java access remain available.
+
+Compiling precompiled operations remains a shallow pass-through (CAD008).
+Execution checks operand types when they are accessed and reports malformed
+operands as CVM errors. Conversion and compilation do not validate an entire
+subtree or resolve unselected branches. Generic, specialised and cached forms
+must produce the same result, state, error and Juice usage.
+
+Default store decoding uses `CVMEncoder`, including specialisation of a cached
+top-level value. Embedded encodings probe the cache only when their content hash
+is already available; decoding never computes that hash merely for lookup, and
+never automatically admits embedded values. Their non-embedded child refs still
+resolve through the store cache as needed. Explicit
+persistence of an embedded root is separate: it remains legal and produces a
+store-owned ref. Raw store/ref lookup remains value-oriented and does not promise
+a particular Java representation. Use the typed access helpers at that boundary.
+
+Record fields required to be small scalar values are checked for embedding before
+dereferencing. A branch in such a field is a different generic CAD3 shape, not a
+reason to fetch data while interpreting the record. Legitimate compound fields
+remain lazy, so multi-cell decoding can resolve their branches before access.
+
 ### Storeless decode
 
 A storeless encoder cannot create a store-backed ref, so each encoder class keeps a

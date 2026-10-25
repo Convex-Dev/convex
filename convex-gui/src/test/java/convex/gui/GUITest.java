@@ -1,12 +1,20 @@
 package convex.gui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.awt.EventQueue;
 import java.awt.GraphicsEnvironment;
 import java.awt.HeadlessException;
+import java.awt.event.WindowEvent;
+
+import javax.swing.JFrame;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,8 +22,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import convex.api.Convex;
 import convex.core.cvm.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.wallet.AWalletEntry;
+import convex.core.crypto.wallet.HotWalletEntry;
+import convex.core.data.AccountKey;
 import convex.core.exceptions.InvalidDataException;
 import convex.gui.dlfs.DLFSBrowser;
+import convex.gui.keys.KeyRing;
 import convex.gui.peer.PeerGUI;
 import convex.gui.repl.REPLClient;
 import convex.gui.tools.HackerTools;
@@ -80,7 +92,44 @@ public class GUITest {
 		State s = manager.getLatestState();
 		s.validate();
 	}
-	
+
+	/**
+	 * Closing the Peer Manager window shuts down the local network it runs, and
+	 * removes the temporary keys it added without touching keys already present
+	 */
+	@Test
+	public void testClosingPeerManager() throws Exception {
+		GUITest.assumeGUI();
+
+		KeyRing keyRing=KeyRing.get();
+		AKeyPair genesis=AKeyPair.generate();
+		AWalletEntry existing=HotWalletEntry.create(genesis,"Test genesis key");
+		keyRing.add(existing);
+		try {
+			PeerGUI gui=PeerGUI.create(1,genesis,0);
+			Server server=gui.getPrimaryServer();
+			AccountKey peerKey=server.getKeyPair().getAccountKey();
+			assertTrue(server.isLive());
+			assertNotNull(keyRing.find(peerKey));
+			assertNotNull(gui.getRestPort());
+
+			gui.run();
+			// run() queued the frame's creation first, so the frame exists by the time this runs
+			EventQueue.invokeAndWait(()->{
+				JFrame frame=gui.getFrame();
+				frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
+			});
+			gui.waitForClose();
+
+			assertFalse(server.isLive());
+			assertNull(gui.getRestPort());
+			assertNull(keyRing.find(peerKey));
+			assertSame(existing,keyRing.find(genesis.getAccountKey()));
+		} finally {
+			keyRing.remove(existing);
+		}
+	}
+
 	/**
 	 * Simple test that DLFSBrowser can be constructed and functionality is working
 	 */

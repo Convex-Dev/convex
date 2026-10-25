@@ -56,6 +56,7 @@ rest.start(8080);
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/v1/query` | POST | Execute read-only query |
+| `/api/v1/simulate` | POST | Simulate transaction accounting without signing or committing state |
 | `/api/v1/transact` | POST | Submit a signed transaction, or a seed for server-side signing |
 | `/api/v1/faucet` | POST | Request test funds (test networks) |
 | `/api/v1/accounts/{address}` | GET | Get account information |
@@ -70,6 +71,53 @@ curl -X POST http://localhost:8080/api/v1/query \
   -H "Content-Type: application/json" \
   -d '{"address": "#11", "source": "*balance*"}'
 ```
+
+Ordinary queries work even when the selected account has no CVM coins. They see
+its real balance and receive an execution Juice allowance independent of funds.
+State changes are discarded, and the result reports Juice used without charging
+transaction fees or purchasing memory.
+
+Public REST and MCP queries use the peer's `query.maxJuice` setting (100,000 by
+default), capped at the CVM transaction maximum. `query.maxConcurrent` and
+`query.maxWaitMillis` bound concurrent work and the wait for capacity. Callers
+cannot raise these limits through the query request.
+
+**Simulate:**
+
+`POST /api/v1/simulate` takes the same `address` and `source` fields as a
+transaction, without a seed or signature:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/simulate \
+  -H "Content-Type: application/json" \
+  -d '{"address": "#11", "source": "(+ 2 3)"}'
+```
+
+An optional non-negative integer `sequence` supplies the encoded transaction
+sequence; omission or `null` uses the account's next sequence. Simulation retains
+transaction balance and memory checks, so a zero-balance account returns a `JUICE`
+error even when the equivalent ordinary query succeeds. The response is a normal
+Result (HTTP 200, including CVM errors) with estimated costs. Malformed requests
+return HTTP 400; exhausted public query capacity returns HTTP 503 with `LOAD`.
+No state, balance or sequence changes are committed.
+
+The endpoint also accepts an unsigned or signed transaction directly as binary
+CAD3 (`application/cvx-raw`). Java clients already expose simulation using a
+transaction payload:
+
+```java
+Invoke tx = Invoke.create(convex.getAddress(), convex.getSequence() + 1, "(+ 2 3)");
+Result estimate = convex.simulateSync(tx); // or simulate(tx) for a future
+```
+
+Transaction simulations retain balance and memory checks and report estimated
+fees. They obey the same public execution ceiling and never commit state.
+The HTTP client sends these payloads as `application/cvx-raw`, preserving their
+transaction type; `/query` accepts a binary CAD3 map with the same `:source` and
+`:address` fields as its CVX text form.
+Existing transaction-payload queries remain compatible. Simulation does not
+validate signatures or sequence numbers, and estimates reflect the current peer
+snapshot and execution ceiling rather than guaranteeing a later transaction's cost.
 
 **Transaction:**
 ```bash

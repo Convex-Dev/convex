@@ -18,6 +18,7 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
@@ -233,33 +234,32 @@ public class EtchRobustnessTest {
 		int NTHREADS = 8;
 		int PER = 100;
 
-		List<Callable<Hash>> tasks = new ArrayList<>();
+		List<Callable<AVector<ACell>>> tasks = new ArrayList<>();
 		for (int t = 0; t < NTHREADS; t++) {
 			for (int i = 0; i < PER; i++) {
 				final int seed = 1000 + t * PER + i;
 				tasks.add(() -> {
 					AVector<ACell> v = Vectors.of(CVMLong.create(seed), nonEmbedded(seed));
-					Ref<ACell> r = store.storeTopRef(v.getRef(), Ref.PERSISTED, null);
-					return r.getHash();
+					store.storeTopRef(v.getRef(), Ref.PERSISTED, null);
+					return v;
 				});
 			}
 		}
 
 		ExecutorService ex = Executors.newFixedThreadPool(NTHREADS);
 		try {
-			List<Future<Hash>> results = ex.invokeAll(tasks);
-			for (Future<Hash> fr : results) {
-				Hash h = fr.get(); // propagates any worker exception
-				assertNotNull(store.refForHash(h));
+			List<Future<AVector<ACell>>> results = ex.invokeAll(tasks);
+			for (Future<AVector<ACell>> fr : results) {
+				AVector<ACell> expected = fr.get(); // propagates any worker exception
+				// Read each committed value from disk, bypassing the reference cache.
+				assertEquals(expected,store.getEtch().read(expected.getHash()).getValue());
 			}
 		} finally {
 			ex.shutdown();
 		}
 
-		// Structural integrity after concurrent writes
-		EtchVerifier.IndexVisitor vd = new EtchVerifier.IndexVisitor();
-		store.getEtch().visitIndex(vd);
-		assertTrue(vd.values >= NTHREADS * PER);
+		// A whole-index visit requires a quiescent store. Other tests can still be
+		// writing to this shared store, so verify our writes instead of scanning it.
 	}
 
 	/**
@@ -286,7 +286,11 @@ public class EtchRobustnessTest {
 
 		Callable<Void> writer = () -> {
 			for (int i = 0; i < N; i++) {
-				etch.write(keys[i], CVMLong.create(i).getRef());
+				// Synthetic index keys are not content hashes. Use fresh blob payloads:
+				// decoding an interned integer would attach this fake hash to a shared
+				// singleton's encoding and corrupt unrelated concurrent tests.
+				Blob payload=Blob.wrap(new byte[] {(byte)(i>>>8),(byte)i});
+				etch.write(keys[i], payload.getRef());
 				published.set(i + 1);
 			}
 			return null;

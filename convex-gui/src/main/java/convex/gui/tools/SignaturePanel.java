@@ -29,7 +29,7 @@ import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.account.KeyPairCombo;
-import convex.gui.keys.UnlockWalletDialog;
+import convex.gui.keys.KeyAccess;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -233,16 +233,9 @@ public class SignaturePanel extends JPanel {
 			updateInfo("No key selected");
 			return null;
 		}
-		if (walletEntry.isLocked()) {
-			boolean unlocked = UnlockWalletDialog.offerUnlock(this, walletEntry);
-			if (!unlocked) {
-				updateInfo("Key is locked — unlock cancelled");
-				return null;
-			}
-		}
-		AKeyPair kp = walletEntry.getKeyPair();
+		AKeyPair kp = KeyAccess.unlockForUse(this, walletEntry);
 		if (kp == null) {
-			updateInfo("Could not get key pair from wallet entry");
+			updateInfo("Key is locked — unlock cancelled");
 			return null;
 		}
 		return kp;

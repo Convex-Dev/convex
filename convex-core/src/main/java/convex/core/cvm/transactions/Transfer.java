@@ -36,8 +36,8 @@ public class Transfer extends ATransaction {
 	
 	protected Transfer(AVector<ACell> values) {
 		super(CVMTag.TRANSFER,FORMAT,values);
-		this.target = RT.ensureAddress(values.get(2));
-		this.amount = RT.ensureLong(values.get(3)).longValue();
+		this.target = RT.ensureAddress(embeddedField(2));
+		this.amount = RT.ensureLong(embeddedField(3)).longValue();
 	}
 
 	/**
@@ -105,8 +105,8 @@ public class Transfer extends ATransaction {
 
 	@Override
 	public ACell get(Keyword key) {
-		if (Keywords.TARGET.equals(key)) return RT.ensureAddress(values.get(2));
-		if (Keywords.AMOUNT.equals(key)) return RT.ensureLong(values.get(3));
+		if (Keywords.TARGET.equals(key)) return RT.ensureAddress(embeddedField(2));
+		if (Keywords.AMOUNT.equals(key)) return RT.ensureLong(embeddedField(3));
 		return super.get(key); // covers origin and sequence
 	}
 

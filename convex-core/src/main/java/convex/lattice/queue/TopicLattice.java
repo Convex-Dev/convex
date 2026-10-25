@@ -5,7 +5,6 @@ import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.generic.MapLattice;
@@ -61,7 +60,8 @@ public class TopicLattice extends ALattice<Index<Keyword, ACell>> {
 
 		// Build result
 		Index<Keyword, ACell> result = ownValue;
-		if (!Utils.equals(mergedParts, ownParts)) {
+		// Empty partition deliveries do not materialise an absent section.
+		if (mergedParts!=null && !mergedParts.isEmpty() && !Utils.equals(mergedParts, ownParts)) {
 			result = result.assoc(KEY_PARTITIONS, mergedParts);
 		}
 		if (!Utils.equals(mergedMeta, ownMeta)) {
@@ -70,10 +70,9 @@ public class TopicLattice extends ALattice<Index<Keyword, ACell>> {
 		return result;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Index<Keyword, ACell> zero() {
-		return (Index<Keyword, ACell>) Index.EMPTY;
+		return Index.none();
 	}
 
 	@Override
@@ -94,25 +93,19 @@ public class TopicLattice extends ALattice<Index<Keyword, ACell>> {
 	// ===== Static helpers =====
 
 	/**
-	 * Gets the partitions map from topic state.
+	 * Gets the partitions map, or null when absent. Incompatible values throw.
 	 */
 	@SuppressWarnings("unchecked")
 	public static AHashMap<ACell, AVector<ACell>> getPartitions(Index<Keyword, ACell> state) {
-		if (state == null) return Maps.empty();
-		ACell parts = state.get(KEY_PARTITIONS);
-		if (parts == null) return Maps.empty();
-		return (AHashMap<ACell, AVector<ACell>>) parts;
+		return state==null?null:(AHashMap<ACell, AVector<ACell>>)state.get(KEY_PARTITIONS);
 	}
 
 	/**
-	 * Gets the metadata map from topic state.
+	 * Gets the metadata map, or null when absent. Incompatible values throw.
 	 */
 	@SuppressWarnings("unchecked")
 	public static AHashMap<ACell, ACell> getMeta(Index<Keyword, ACell> state) {
-		if (state == null) return Maps.empty();
-		ACell meta = state.get(KEY_META);
-		if (meta == null) return Maps.empty();
-		return (AHashMap<ACell, ACell>) meta;
+		return state==null?null:(AHashMap<ACell, ACell>)state.get(KEY_META);
 	}
 
 	/**

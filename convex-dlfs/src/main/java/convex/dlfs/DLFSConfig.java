@@ -26,6 +26,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.etch.EtchConfig;
+import convex.lattice.fs.DLFSLattice;
 import convex.node.NodeConfig;
 import convex.peer.Config;
 
@@ -73,6 +74,7 @@ public final class DLFSConfig {
 	public static final AString PATH=Strings.intern("path");
 	public static final AString DRIVE=Strings.intern("drive");
 	public static final AString MOUNTS=Strings.intern("mounts");
+	public static final AString MAX_FUTURE_TIMESTAMP_SKEW=Strings.intern("maxFutureTimestampSkew");
 	public static final AString IDENTITY=Strings.intern("identity");
 	public static final AString OWNER=Strings.intern("owner");
 	public static final String LOCAL_IDENTITY="node";
@@ -229,6 +231,16 @@ public final class DLFSConfig {
 		} catch (URISyntaxException e) {
 			throw new IllegalArgumentException("Invalid URL at node.bootstrap["+index+"].url",e);
 		}
+	}
+
+	/** Maximum future update-time lead accepted by this DLFS application, in milliseconds. */
+	public long getMaxFutureTimestampSkew() {
+		ACell value=getSection(DLFS).get(MAX_FUTURE_TIMESTAMP_SKEW);
+		if (value==null) return DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW;
+		if (!(value instanceof CVMLong skew) || skew.longValue()<0) {
+			throw new IllegalArgumentException("dlfs.maxFutureTimestampSkew must be a non-negative integer");
+		}
+		return skew.longValue();
 	}
 
 	/** Gets the configured lattice path containing the DLFS region. */
@@ -392,6 +404,7 @@ public final class DLFSConfig {
 		}
 		getBootstrapPeers();
 		getRegionPath();
+		getMaxFutureTimestampSkew();
 		getDriveName();
 		getDriveMounts();
 		String bind=getHTTPBindHost();

@@ -298,7 +298,7 @@ public class KVDemo {
 			mergeB.set("b:" + i, Strings.create("vb" + i));
 		}
 		t0 = System.nanoTime();
-		mergeA.cursor().merge(mergeB.cursor().get());
+		convex.lattice.ComponentTestSupport.merge(mergeA.cursor(),KVStoreLattice.INSTANCE, mergeB.cursor().get());
 		long mergeNs = System.nanoTime() - t0;
 		System.out.printf("MERGE %,d+%,d keys : %,d ms%n", MERGE_SIZE, MERGE_SIZE, mergeNs / 1_000_000);
 

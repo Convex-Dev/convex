@@ -1,6 +1,7 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
+import convex.core.lang.RT;
 
 /**
  * Static base class for Type system functionality
@@ -94,6 +95,6 @@ public class Types {
 
 	public static AType get(ACell data) {
 		if (data==null) return Types.NIL;
-		return data.getType();
+		return RT.getType(data);
 	}
 }

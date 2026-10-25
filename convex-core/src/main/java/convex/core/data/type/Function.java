@@ -3,6 +3,7 @@ package convex.core.data.type;
 import convex.core.cvm.AFn;
 import convex.core.data.ACell;
 import convex.core.lang.Core;
+import convex.core.lang.RT;
 
 /**
  * Type that represents any CVM collection
@@ -18,7 +19,7 @@ public class Function extends AStandardType<AFn> {
 
 	@Override
 	public boolean check(ACell value) {
-		return (value instanceof AFn);
+		return RT.ensureFunction(value)!=null;
 	}
 
 	@Override
@@ -33,8 +34,7 @@ public class Function extends AStandardType<AFn> {
 
 	@Override
 	public AFn implicitCast(ACell a) {
-		if (a instanceof AFn) return (AFn)a;
-		return null;
+		return RT.ensureFunction(a);
 	}
 
 }

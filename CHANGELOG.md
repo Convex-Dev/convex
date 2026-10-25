@@ -5,6 +5,32 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.18] - 2026-10-25
+
+### Added
+
+- Support lattice applications composed from reusable components, with signed ownership, timestamped records, forks and atomic transactions. ([Design](convex-core/docs/LATTICE_APPLICATIONS.md))
+- Allow `LatticeNode` to manage lattice networking for an application, with optional DID identity. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md))
+- Allow services to choose their durability with host checkpoints and scoped automatic flushing. ([Persistence](convex-peer/docs/PERSISTENCE.md))
+- Support DLFS file modification times and safe concurrent drive creation. ([DLFS](convex-dlfs/docs/DLFS_DESIGN.md))
+- Allow transaction simulation as an alternative to query execution, for cost estimates through REST and the Java client.
+- Support fast `Index` seek, slice and concat.
+
+### Changed
+
+- Simplify lattice host, node and cursor APIs around the application model; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading. Services save by closing the host, as closing a node no longer saves.
+- Extend DLFS data with modification times as a one-way upgrade: back up stores and upgrade all replicas together. ([#688](https://github.com/Convex-Dev/convex/issues/688))
+- Improve responsiveness of Java client transactions and the GUI.
+
+### Fixed
+
+- Make CVM integer behaviour consistent across internal representations.
+- Improve robustness of shutdown and persistence for lattice services, P2P nodes, DLFS and JDBC file databases.
+- Improve reliability of client requests across reconnects, timeouts and duplicate transactions.
+- Harden scheduled execution, owner verification and X402 payment confirmation.
+- Show text from other parties safely in the GUI, and keep it responsive during network operations. ([#765](https://github.com/Convex-Dev/convex/issues/765))
+- Improve PostgreSQL wire protocol handling in Convex DB.
+
 ## [0.8.17] - 2026-10-09
 
 ### Added
@@ -147,7 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Priority own-Order broadcasts now carry their novel cells inline when they fit the priority message limit, and novelty from a superseded priority message is folded into the next full Belief broadcast. Announcing the Order previously consumed announce-novelty without delivering it, so no later delta carried the new Block data and receivers fell back to status polling for every confirmation round — observed as ~1.5s median transaction confirmation on an otherwise idle local 5-peer network, restored to ~35ms by this fix.
 - A peer's confirmed consensus points no longer retreat during Belief merge. Recomputing levels from the current voting set could lower consensus and finality whenever a lagging copy of another peer's Order supplied the stake that tipped the 2/3 threshold; the peer then signed the receded Order and silently truncated already-executed state, so a client could transiently observe state missing a transaction whose result had already been reported. CAD051 requires that confirmed points never retreat; consensus and finality are now ratchets (proposal may still recede when switching proposals). The bounded delta propagation in this release made lagging Order copies routine, surfacing the latent defect and causing repeated truncate-and-replay churn under load.
-- Convex DB components now retain their containing application-policy hierarchy, so nested table persistence reaches a hosted `RootComponent` without moving cursors and database/schema forks keep the same persistence policy while synchronising only to their original cursor (#698).
+- Convex DB components now retain their containing application-policy hierarchy, so nested table persistence reaches a hosted `LatticeHost` without moving cursors and database/schema forks keep the same persistence policy while synchronising only to their original cursor (#698).
 - Delta fan-out is isolated per peer so a full receiver queue cannot block healthy peers, queued bytes are bounded independently of message count, and a failed delta encoding no longer prevents the announced lattice root or publication future from advancing. CPoS prioritises a coalesced own-Order root ahead of best-effort full-Belief replication; root sync and pulls recover dropped data.
 - The GUI passphrase strength estimate awards the documented 2 bits per character category used, rather than 1. The multiply sat inside `Integer.bitCount`, where doubling a bit mask cannot change the count.
 

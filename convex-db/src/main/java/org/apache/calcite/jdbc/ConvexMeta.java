@@ -11,16 +11,19 @@ import convex.db.lattice.SQLDatabase;
  *
  * <p>Adds JDBC transaction support by overriding CalciteMetaImpl (which throws
  * UnsupportedOperationException for commit/rollback). Transaction isolation
- * uses Convex's lattice cursor fork/sync model:
+ * uses Convex's lattice component fork/sync model:
  * <ul>
- *   <li><b>BEGIN</b> (setAutoCommit(false)): forks the SQLDatabase cursor</li>
- *   <li><b>COMMIT</b>: syncs the fork back to the parent</li>
+ *   <li><b>BEGIN</b> (setAutoCommit(false)): forks the SQLDatabase component</li>
+ *   <li><b>COMMIT</b>: syncs the fork back into the live database</li>
  *   <li><b>ROLLBACK</b>: discards the fork</li>
  * </ul>
  *
  * <p>During a transaction, the connection's ConvexSchema is swapped to one
- * backed by the forked cursor, so SELECT queries read from the fork. Other
- * connections continue to read from the original cursor.
+ * backed by the fork's working cursor, so SELECT queries read from the fork. Other
+ * connections continue to read from the live cursor.
+ *
+ * <p>An optional durability action, supplied by the driver for store-backed
+ * databases, runs after each commit and when the connection closes.
  *
  * <p>Must live in {@code org.apache.calcite.jdbc} to access the package-private
  * CalciteConnectionImpl.
@@ -28,6 +31,9 @@ import convex.db.lattice.SQLDatabase;
 public class ConvexMeta extends CalciteMetaImpl {
 
 	private final CalciteConnectionImpl calciteConnection;
+
+	/** Saves published state durably, or null for an in-memory database. */
+	private final Runnable durability;
 
 	/** The forked database for the current transaction, or null if not in a transaction. */
 	private SQLDatabase txDatabase;
@@ -43,28 +49,53 @@ public class ConvexMeta extends CalciteMetaImpl {
 	/** Reentrancy guard: getSchema() triggers connectionSync() internally. */
 	private boolean inSync = false;
 
-	protected ConvexMeta(CalciteConnectionImpl connection) {
+	protected ConvexMeta(CalciteConnectionImpl connection, Runnable durability) {
 		super(connection,
 			CalciteMetaTableFactoryImpl.INSTANCE,
 			CalciteMetaColumnFactoryImpl.INSTANCE);
 		this.calciteConnection = connection;
+		this.durability = durability;
 	}
 
-	/** Factory method called by {@link convex.db.jdbc.ConvexDriver#createMeta}. */
+	/** Creates a meta for an in-memory database. */
 	public static ConvexMeta create(AvaticaConnection connection) {
-		return new ConvexMeta((CalciteConnectionImpl) connection);
+		return create(connection, null);
 	}
 
-	/** Syncs fork to parent, then starts a new fork if still in manual-commit mode. */
+	/**
+	 * Factory method called by {@link convex.db.jdbc.ConvexDriver#createMeta}.
+	 *
+	 * @param durability Saves published state durably, or null for none
+	 */
+	public static ConvexMeta create(AvaticaConnection connection, Runnable durability) {
+		return new ConvexMeta((CalciteConnectionImpl) connection, durability);
+	}
+
+	/** Syncs fork to parent and saves, then starts a new fork if still in manual-commit mode. */
 	@Override
 	public void commit(ConnectionHandle ch) {
 		if (txDatabase != null) {
 			txDatabase.sync();
 			endTransaction();
 		}
+		save();
 		if (!autoCommit) {
 			beginTransaction();
 		}
+	}
+
+	/** Saves published state, excluding any open transaction, before closing. */
+	@Override
+	public void closeConnection(ConnectionHandle ch) {
+		try {
+			save();
+		} finally {
+			super.closeConnection(ch);
+		}
+	}
+
+	private void save() {
+		if (durability != null) durability.run();
 	}
 
 	/** Discards fork, then starts a new fork if still in manual-commit mode. */
@@ -91,6 +122,7 @@ public class ConvexMeta extends CalciteMetaImpl {
 	private ConnectionProperties doConnectionSync(ConnectionHandle ch, ConnectionProperties connProps) {
 		ConnectionProperties result = super.connectionSync(ch, connProps);
 
+		boolean committed = false;
 		try {
 			// Read from connProps (the request), not result (Calcite internal state)
 			boolean newAutoCommit = connProps.isAutoCommit();
@@ -104,6 +136,7 @@ public class ConvexMeta extends CalciteMetaImpl {
 					if (txDatabase != null) {
 						txDatabase.sync();
 						endTransaction();
+						committed = true;
 					}
 					autoCommit = true;
 				}
@@ -111,6 +144,8 @@ public class ConvexMeta extends CalciteMetaImpl {
 		} catch (Exception e) {
 			// connProps.isAutoCommit() throws if not explicitly set (e.g. during init)
 		}
+		// Enabling autoCommit commits the open transaction; save failures must surface
+		if (committed) save();
 
 		return result;
 	}

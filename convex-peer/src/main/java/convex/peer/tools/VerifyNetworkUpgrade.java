@@ -262,7 +262,7 @@ public class VerifyNetworkUpgrade {
 			fail("Remote peer's own order not present in acquired belief — cannot replay");
 			return null;
 		}
-		Order order = so.getValue();
+		Order order = RT.ensureCVM(so.getValue(),Order.class);
 		long cp = order.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
 		AVector<SignedData<Block>> blocks = order.getBlocks();
 		info("Order: " + blocks.count() + " blocks, finality consensus point: " + cp);
@@ -467,8 +467,8 @@ public class VerifyNetworkUpgrade {
 		}
 		long n = pre.getAccounts().count();
 		for (long i = 0; i < n; i++) {
-			convex.core.cvm.AccountStatus before = pre.getAccounts().get(i);
-			convex.core.cvm.AccountStatus after = post.getAccounts().get(i);
+			convex.core.cvm.AccountStatus before = pre.getAccount(i);
+			convex.core.cvm.AccountStatus after = post.getAccount(i);
 			if (before.equals(after)) continue;
 			Address address = Address.create(i);
 			if (!allowed.contains(address)) return "unapproved account changed: " + address;
@@ -642,8 +642,8 @@ public class VerifyNetworkUpgrade {
 		long n = Math.min(ne, na);
 		int shown = 0;
 		for (long i = 0; i < n; i++) {
-			convex.core.cvm.AccountStatus ea = expected.getAccounts().get(i);
-			convex.core.cvm.AccountStatus aa = actual.getAccounts().get(i);
+			convex.core.cvm.AccountStatus ea = expected.getAccount(i);
+			convex.core.cvm.AccountStatus aa = actual.getAccount(i);
 			if (ea.equals(aa)) continue;
 			flags |= accountDiffFlags(ea, aa);
 			if (shown++ >= MAX_DIFF_ITEMS) continue;

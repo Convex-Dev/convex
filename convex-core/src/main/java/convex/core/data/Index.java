@@ -1,9 +1,11 @@
 package convex.core.data;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -27,19 +29,23 @@ import convex.core.util.Utils;
  * <li>An optional entry with this exact prefix </li>
  * <li>Up to 16 child entries at the next level of depth</li>
  * </ul>
+ *
+ * <p>Stack safety: recursive structural operations and traversals normally keep
+ * traversal state on the Java stack. Recursion descends one node level per call,
+ * which only approaches the {@link #MAX_DEPTH} bound on an adversarial "comb" whose
+ * keys diverge at nearly every nibble. If that recursion overflows the thread
+ * stack, the public entry point catches the {@link StackOverflowError} once the
+ * stack has fully unwound and completes the operation with an explicit-stack
+ * variant, as {@link ACell#getMemorySize()} does. Structural operations are pure,
+ * so they simply restart; traversals resume from the number of entries already
+ * delivered, so each callback completes exactly once (an entry whose own callback
+ * overflowed is delivered again).</p>
+ * <p>Rank access and seeking use iterative descent directly.</p>
+ *
  * @param <K> Type of Keys
  * @param <V> Type of values
  */
 public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex<K, V> {
-	/**
-	 * Maximum depth (in hex digits, i.e. 64 bytes of key) handled with the
-	 * allocation-free recursive algorithms. Each recursive level adds at least one
-	 * hex digit, so this also bounds recursion depth. Beyond it the explicit-stack
-	 * variants take over. Note this gates on key length rather than on the number
-	 * of node levels actually descended, so it is deliberately generous; gating on
-	 * recursion level instead is tracked in Convex-Dev/convex#727.
-	 */
-	private static final int MAX_RECURSIVE_DEPTH=128;
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final Ref<Index>[] EMPTY_CHILDREN = new Ref[0];
@@ -251,10 +257,19 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return assocEntry(MapEntry.create((K)key, (V)value));
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
 	public Index<K, V> dissoc(K k) {
-		if (getDepth()>MAX_RECURSIVE_DEPTH) return dissocDeep(k);
+		try {
+			return dissocRecursive(k);
+		} catch (StackOverflowError e) {
+			// Fully unwound; the structure is immutable, so restart iteratively.
+			return dissocDeep(k);
+		}
+	}
+
+	/** Recursive dissociation, without an overflow handler at each level. */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private Index<K, V> dissocRecursive(K k) {
 		if (count <= 1) {
 			if (count == 0) return this; // Must already be empty singleton
 			if (entryKeyMatch(k,entry)) {
@@ -286,15 +301,18 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K, V> oldChild = getChild(digit);
 		if (oldChild == null) return this; // key miss (or malformed non-Index child)
 		if (oldChild.getDepth() <= pDepth) return this; // malformed: child depth must increase, bounds recursion
-		Index<K, V> newChild = oldChild.dissoc(k);
+		Index<K, V> newChild = oldChild.dissocRecursive(k);
 		Index<K,V> r=this.withChild(digit, oldChild, newChild);
-		
+
 		return r;
 	}
 
-	/** Extended-depth dissociation without a key-controlled Java call stack. */
+	/**
+	 * Dissociation with an explicit path stack, used once {@link #dissocRecursive}
+	 * has overflowed the thread stack. Package-private so tests can reach it directly.
+	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private Index<K,V> dissocDeep(K k) {
+	Index<K,V> dissocDeep(K k) {
 		Index<K,V>[] parents=(Index<K,V>[])new Index[MAX_DEPTH+1];
 		Index<K,V>[] oldChildren=(Index<K,V>[])new Index[MAX_DEPTH+1];
 		byte[] childDigits=new byte[MAX_DEPTH+1];
@@ -398,21 +416,26 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (entry!=null) return keyBlob(entry);
 		ABlob result=cachedPrefix;
 		if (result!=null) return result;
-		// walk to the first descendant entry, remembering entry-less nodes passed
-		ArrayList<Index<K,V>> path=new ArrayList<>();
+		// Walk to the first descendant entry or cached prefix.
 		Index<K,V> node=this;
 		while (true) {
 			if (node.entry!=null) { result=keyBlob(node.entry); break; }
 			result=node.cachedPrefix;
 			if (result!=null) break;
 			if (node.children.length==0) { result=Blob.EMPTY; break; } // only valid for EMPTY
-			path.add(node);
 			ACell c=node.children[0].getValue();
 			if (!(c instanceof Index)) { result=Blob.EMPTY; break; } // malformed child
 			node=(Index<K,V>)c;
 		}
-		// benign race: all threads compute the same immutable result
-		for (Index<K,V> n : path) n.cachedPrefix=result;
+		// A second walk caches the path without allocating a temporary list.
+		// Benign race: all threads compute the same immutable prefix.
+		Index<K,V> end=node;
+		node=this;
+		while (node.entry==null && node.cachedPrefix==null) {
+			node.cachedPrefix=result;
+			if (node==end) break;
+			node=(Index<K,V>)node.children[0].getValue();
+		}
 		return result;
 	}
 
@@ -426,61 +449,97 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return ((ABlobLike<?>)k).toBlob();
 	}
 
-	@Override
-	protected void accumulateEntries(Collection<Entry<K, V>> h) {
-		if (getDepth()>MAX_RECURSIVE_DEPTH) {
-			for (long i=0;i<count;i++) h.add(entryAt(i));
-			return;
+	/**
+	 * Progress of a traversal, so that it can resume after a stack overflow.
+	 *
+	 * @param <R> Accumulator type for reductions (unused by plain visits)
+	 */
+	private static final class Walk<R> {
+		/** Number of entries whose visitor call has completed, in key order. */
+		long done;
+		/** Running accumulator for reductions, updated before {@link #done}. */
+		R acc;
+	}
+
+	/**
+	 * Visits every entry in key order (entry before children, children by digit,
+	 * the same order as {@link #entryAt(long)}).
+	 *
+	 * The recursive walk is attempted first. If it overflows the thread stack,
+	 * the visit resumes from the first entry whose visitor call did not complete,
+	 * using the iterative {@link #entryAt(long)}. An entry whose own visitor call
+	 * overflowed is therefore delivered again; every other entry is delivered
+	 * exactly once.
+	 *
+	 * @param visitor Visitor returning false to stop the traversal early
+	 * @param w Progress holder, fresh for each top-level traversal
+	 * @return false if the visitor stopped the traversal, true otherwise
+	 */
+	private boolean walk(Predicate<? super MapEntry<K, V>> visitor, Walk<?> w) {
+		try {
+			return walkRecursive(visitor, w);
+		} catch (StackOverflowError e) {
+			// Fully unwound. Entries [0, w.done) have been delivered and completed.
+		}
+		for (long i = w.done; i < count; i++) {
+			if (!visitor.test(entryAt(i))) return false;
+			w.done++;
+		}
+		return true;
+	}
+
+	/** Recursive walk, without an overflow handler at each level. */
+	private boolean walkRecursive(Predicate<? super MapEntry<K, V>> visitor, Walk<?> w) {
+		if (entry != null) {
+			if (!visitor.test(entry)) return false;
+			w.done++; // no call between the visitor returning and this increment
 		}
 		for (int i = 0; i < children.length; i++) {
-			children[i].getValue().accumulateEntries(h);
+			if (!children[i].getValue().walkRecursive(visitor, w)) return false;
 		}
-		if (entry != null) h.add(entry);
+		return true;
+	}
+
+	@Override
+	protected void accumulateEntries(Collection<Entry<K, V>> h) {
+		walk(me -> {
+			h.add(me);
+			return true;
+		}, new Walk<Void>());
 	}
 
 	@Override
 	protected void accumulateKeySet(Set<K> h) {
-		if (getDepth()>MAX_RECURSIVE_DEPTH) {
-			for (long i=0;i<count;i++) h.add(entryAt(i).getKey());
-			return;
-		}
-		for (int i = 0; i < children.length; i++) {
-			children[i].getValue().accumulateKeySet(h);
-		}
-		if (entry != null) h.add(entry.getKey());
+		walk(me -> {
+			h.add(me.getKey());
+			return true;
+		}, new Walk<Void>());
 	}
 
 	@Override
 	protected void accumulateValues(java.util.List<V> al) {
-		if (getDepth()>MAX_RECURSIVE_DEPTH) {
-			for (long i=0;i<count;i++) al.add(entryAt(i).getValue());
-			return;
-		}
-		// add this entry first, since we want lexicographic order
-		if (entry != null) al.add(entry.getValue());
-		for (int i = 0; i < children.length; i++) {
-			children[i].getValue().accumulateValues(al);
-		}
+		walk(me -> {
+			al.add(me.getValue());
+			return true;
+		}, new Walk<Void>());
 	}
 
 	@Override
 	public void forEach(BiConsumer<? super K, ? super V> action) {
-		if (getDepth()>MAX_RECURSIVE_DEPTH) {
-			for (long i=0;i<count;i++) {
-				MapEntry<K,V> me=entryAt(i);
-				action.accept(me.getKey(),me.getValue());
-			}
-			return;
-		}
-		if (entry != null) action.accept(entry.getKey(), entry.getValue());
-		for (int i = 0; i < children.length; i++) {
-			children[i].getValue().forEach(action);
-		}
+		walk(me -> {
+			action.accept(me.getKey(), me.getValue());
+			return true;
+		}, new Walk<Void>());
 	}
 
 	@Override
 	public Index<K, V> assocEntry(MapEntry<K, V> e) {
-		return assocEntry(e,0);
+		try {
+			return assocEntry(e,0);
+		} catch (StackOverflowError t) {
+			// Fully unwound; the structure is immutable, so restart iteratively.
+			return assocEntryDeep(e,0);
+		}
 	}
 	
 	/**
@@ -501,10 +560,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private Index<K, V> assocEntry(MapEntry<K, V> e, long match) {
-		// Preserve the original allocation-free recursive path for all historical
-		// Index depths. Extended-depth tries use an explicit stack below.
-		if (getDepth()>MAX_RECURSIVE_DEPTH) return assocEntryDeep(e,match);
-
 		if (count == 0L) return create(e);
 		if (count == 1L) {
 			assert (mask == (short) 0); // should be no children
@@ -594,11 +649,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	/**
-	 * Extended-depth association. This is deliberately a cold path: the arrays are
-	 * allocated only after descent passes the historical 32-byte Index limit.
+	 * Association with an explicit path stack, used once the recursive
+	 * {@link #assocEntry(MapEntry, long)} has overflowed the thread stack. This is a
+	 * cold path: its arrays are sized for the maximum trie depth. Package-private so
+	 * tests can reach it directly.
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private Index<K,V> assocEntryDeep(MapEntry<K,V> e, long match) {
+	Index<K,V> assocEntryDeep(MapEntry<K,V> e, long match) {
 		ACell maybeValidKey=e.getKey();
 		if (!(maybeValidKey instanceof ABlobLike)) return null;
 		ABlobLike<?> k=(ABlobLike)maybeValidKey;
@@ -751,54 +808,59 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public <R> R reduceValues(BiFunction<? super R, ? super V, ? extends R> func, R initial) {
-		if (getDepth()>MAX_RECURSIVE_DEPTH) {
-			for (long i=0;i<count;i++) initial=func.apply(initial,entryAt(i).getValue());
-			return initial;
-		}
-		if (entry != null) initial = func.apply(initial, entry.getValue());
-		int n = children.length;
-		for (int i = 0; i < n; i++) {
-			initial = children[i].getValue().reduceValues(func, initial);
-		}
-		return initial;
+		Walk<R> w = new Walk<>();
+		w.acc = initial;
+		walk(me -> {
+			w.acc = func.apply(w.acc, me.getValue());
+			return true;
+		}, w);
+		return w.acc;
 	}
 
 	@Override
 	public <R> R reduceEntries(BiFunction<? super R, MapEntry<K, V>, ? extends R> func, R initial) {
-		if (getDepth()>MAX_RECURSIVE_DEPTH) {
-			for (long i=0;i<count;i++) initial=func.apply(initial,entryAt(i));
-			return initial;
-		}
-		if (entry != null) initial = func.apply(initial, entry);
-		int n = children.length;
-		for (int i = 0; i < n; i++) {
-			initial = children[i].getValue().reduceEntries(func, initial);
-		}
-		return initial;
+		Walk<R> w = new Walk<>();
+		w.acc = initial;
+		walk(me -> {
+			w.acc = func.apply(w.acc, me);
+			return true;
+		}, w);
+		return w.acc;
 	}
-	
+
 	@Override
 	public Index<K, V> filterValues(Predicate<V> pred) {
-		if (getDepth()>MAX_RECURSIVE_DEPTH) {
-			Index<K,V> result=this;
-			for (long i=0;i<count;i++) {
-				MapEntry<K,V> me=entryAt(i);
-				if (!pred.test(me.getValue())) result=result.dissoc(me.getKey());
-			}
-			return result;
+		try {
+			return filterValuesRecursive(pred);
+		} catch (StackOverflowError e) {
+			// Fully unwound; the structure is immutable, so restart iteratively.
+			// The predicate is re-applied to entries already tested.
 		}
+		Index<K,V> result=this;
+		for (long i=0;i<count;i++) {
+			MapEntry<K,V> me=entryAt(i);
+			if (!pred.test(me.getValue())) {
+				result=result.dissocDeep(me.getKey());
+				if (result==null) return empty();
+			}
+		}
+		return result;
+	}
+
+	/** Recursive filter, without an overflow handler at each level. */
+	private Index<K, V> filterValuesRecursive(Predicate<V> pred) {
 		Index<K, V> r=this;
 		for (int i=0; i<16; i++) {
 			if (r==null) break; // might be null from dissoc
 			Index<K,V> oldChild=r.getChild(i);
 			if (oldChild==null) continue;
-			Index<K,V> newChild=oldChild.filterValues(pred);
+			Index<K,V> newChild=oldChild.filterValuesRecursive(pred);
 			r=r.withChild(i, oldChild, newChild);
 		}
 		
 		// check entry at this level. A child might have moved here during the above loop!
 		if (r!=null) {
-			if ((r.entry!=null)&&!pred.test(r.entry.getValue())) r=r.dissoc(r.entry.getKey());
+			if ((r.entry!=null)&&!pred.test(r.entry.getValue())) r=r.dissocRecursive(r.entry.getKey());
 		}
 		
 		// check if whole Index was emptied
@@ -1045,7 +1107,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 	
 	/**
-	 * Returns a slice of this Index
+	 * Returns a slice of this Index in key order. Whole subtrees are shared; only
+	 * the two boundary paths are rebuilt. Work and allocation are bounded by tree
+	 * depth (at most 16 children examined per node), not the number of entries
+	 * retained or removed. No keys or values need to be inspected.
+	 * Use {@code slice(seek(lower),seek(upper))} for the key range
+	 * {@code [lower,upper)}, whether or not either bound is present.
+	 * Recursive boundary traversal falls back to iteration on stack overflow.
 	 * 
 	 * @param start Start position of slice (inclusive)
 	 * @param end End position of slice (exclusive)
@@ -1058,19 +1126,251 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		long n=end-start;
 		if (n==0) return empty();
 		if (n==count) return this;
-		
-		// TODO: optimise this
-		Index<K, V> bm = this;
-		for (long i=count-1; i>=end; i--) {
-			MapEntry<K, V> me = bm.entryAt(i);
-			bm = bm.dissoc(me.getKey());
+		try {
+			return sliceRecursive(start,end);
+		} catch (StackOverflowError e) {
+			// Fully unwound; no partial result has escaped, so restart iteratively.
+			return sliceDeep(start,end);
 		}
-		
-		for (long i = 0; i < start; i++) {
-			MapEntry<K, V> me = bm.entryAt(0);
-			bm = bm.dissoc(me.getKey());
+	}
+
+	/** Retains a non-empty partial range, recursing only into boundary children. */
+	@SuppressWarnings({"rawtypes","unchecked"})
+	private Index<K,V> sliceRecursive(long start,long end) {
+		long position=entry==null?0:1;
+		int from=0, remaining=mask&0xffff;
+		while (position<end && from<children.length) {
+			long after=position+children[from].getValue().count;
+			if (after>start) break;
+			position=after;
+			from++;
+			remaining&=remaining-1;
 		}
-		return bm;
+		int to=from, selected=remaining;
+		long after=position, lastStart=position;
+		while (to<children.length && after<end) {
+			lastStart=after;
+			after+=children[to++].getValue().count;
+			remaining&=remaining-1;
+		}
+		if (after<end) throw new IllegalStateException("Inconsistent Index count");
+		Ref<Index<K,V>>[] refs=Arrays.copyOfRange(children,from,to);
+		// The selected interior children are complete. Only the first and last
+		// can need trimming; when they coincide, recurse just once.
+		if (refs.length>0) {
+			Index<K,V> child=refs[0].getValue();
+			long lo=Math.max(0,start-position), hi=Math.min(child.count,end-position);
+			if (lo!=0 || hi!=child.count) {
+				if (child.getDepth()<=getDepth()) throw new IllegalStateException("Non-increasing Index depth");
+				refs[0]=child.sliceRecursive(lo,hi).getRef();
+			}
+			if (refs.length>1 && end<after) {
+				child=refs[refs.length-1].getValue();
+				if (child.getDepth()<=getDepth()) throw new IllegalStateException("Non-increasing Index depth");
+				refs[refs.length-1]=child.sliceRecursive(0,end-lastStart).getRef();
+			}
+		}
+		MapEntry<K,V> retained=start==0?entry:null;
+		if (retained==null && refs.length==1) return refs[0].getValue();
+		return new Index<>(getDepth(),retained,(Ref[])refs,(short)(selected&~remaining),end-start);
+	}
+
+	/** Iterative fallback for a non-empty partial range after recursive overflow. */
+	private Index<K,V> sliceDeep(long start,long end) {
+		SliceFrame<K,V> frame=new SliceFrame<>(this,start,end,null);
+		while (true) {
+			if (frame.next<frame.refs.length) {
+				Index<K,V> child=frame.refs[frame.next++].getValue();
+				long lo=Math.max(0,frame.start-frame.position);
+				long hi=Math.min(child.count,frame.end-frame.position);
+				frame.position+=child.count;
+				if (lo==0 && hi==child.count) continue; // preserve the original Ref
+				if (child.getDepth()<=frame.node.getDepth()) {
+					throw new IllegalStateException("Non-increasing Index depth");
+				}
+				frame=new SliceFrame<>(child,lo,hi,frame);
+			} else {
+				Index<K,V> result=frame.build();
+				frame=frame.parent;
+				if (frame==null) return result;
+				frame.refs[frame.next-1]=result.getRef();
+			}
+		}
+	}
+
+	/**
+	 * Concatenates two strictly ordered key ranges. Every key in this Index must
+	 * precede every key in {@code right}, using Index's effective 255-byte keys.
+	 * Empty indexes are identities. Values, including nil, are preserved unchanged.
+	 * For any valid cut, {@code slice(0,cut).concat(slice(cut))} equals this Index.
+	 *
+	 * <p>Checks only the last left and first right keys, then shares whole subtrees
+	 * and rebuilds the joining boundary path. Work and allocation are bounded by
+	 * tree depth, with an iterative fallback on stack overflow and no per-entry
+	 * merge callbacks.</p>
+	 *
+	 * @param right Index to append in key order
+	 * @return Concatenated Index
+	 * @throws IllegalArgumentException If the non-empty ranges overlap or are reversed
+	 * @throws NullPointerException If right is null
+	 */
+	public Index<K,V> concat(Index<K,V> right) {
+		Objects.requireNonNull(right);
+		if (count==0) return right;
+		if (right.count==0) return this;
+
+		// Follow the outer edges directly: sibling counts and values are irrelevant.
+		Index<K,V> last=this;
+		while (last.children.length>0) last=last.children[last.children.length-1].getValue();
+		K leftKey=last.entry.getKey();
+		K rightKey=right.entryAt(0).getKey();
+		long leftLength=effectiveLength(leftKey), rightLength=effectiveLength(rightKey);
+		long shared=leftKey.hexMatch(rightKey,0,Math.min(leftLength,rightLength));
+		if (shared==rightLength || (shared<leftLength && leftKey.getHexDigit(shared)>=rightKey.getHexDigit(shared))) {
+			throw new IllegalArgumentException("Index concat requires strictly increasing key ranges");
+		}
+		try {
+			return concatRecursive(right,shared,leftKey,rightKey);
+		} catch (StackOverflowError e) {
+			// The ranges are already checked; restart the pure join after unwinding.
+			return concatDeep(right,shared,leftKey,rightKey);
+		}
+	}
+
+	/** Joins already ordered ranges, recursing only into an overlapping child pair. */
+	@SuppressWarnings({"rawtypes","unchecked"})
+	private Index<K,V> concatRecursive(Index<K,V> right,long shared,K leftKey,K rightKey) {
+		long depth=Math.min(shared,Math.min(getDepth(),right.getDepth()));
+		boolean alignedLeft=getDepth()==depth, alignedRight=right.getDepth()==depth;
+		int lm=alignedLeft?(mask&0xffff):(1<<leftKey.getHexDigit(depth));
+		int rm=alignedRight?(right.mask&0xffff):(1<<rightKey.getHexDigit(depth));
+		int ln=alignedLeft?children.length:1, rn=alignedRight?right.children.length:1;
+		boolean overlap=(lm&rm)!=0;
+		Index<K,V> joined=null;
+		if (overlap) {
+			Index<K,V> a=alignedLeft?children[ln-1].getValue():this;
+			Index<K,V> b=alignedRight?right.children[0].getValue():right;
+			if (a.getDepth()<=depth || b.getDepth()<=depth) throw new IllegalStateException("Non-increasing Index depth");
+			joined=a.concatRecursive(b,shared,leftKey,rightKey);
+		}
+		Ref<Index<K,V>>[] refs=new Ref[ln+rn-(overlap?1:0)];
+		if (alignedLeft) System.arraycopy(children,0,refs,0,ln);
+		else refs[0]=getRef();
+		int offset=overlap?ln-1:ln;
+		if (alignedRight) System.arraycopy(right.children,0,refs,offset,rn);
+		else refs[offset]=right.getRef();
+		if (overlap) refs[offset]=joined.getRef();
+		// A prefix entry precedes its descendants, so it can only come from the left.
+		return new Index<>(depth,alignedLeft?entry:null,(Ref[])refs,(short)(lm|rm),count+right.count);
+	}
+
+	/** Iterative fallback for already ordered ranges after recursive overflow. */
+	private Index<K,V> concatDeep(Index<K,V> right,long shared,K leftKey,K rightKey) {
+		Index<K,V> left=this;
+		ConcatFrame<K,V> frame=null;
+		while (true) {
+			// The boundary keys remain representatives of both ranges at every level.
+			// Join where either root branches, or where the boundary keys diverge.
+			long depth=Math.min(shared,Math.min(left.getDepth(),right.getDepth()));
+			if (frame!=null && depth<=frame.depth) throw new IllegalStateException("Non-increasing Index depth");
+			frame=new ConcatFrame<>(left,right,depth,leftKey,rightKey,frame);
+			if (frame.leftBoundary==null) break;
+			left=frame.leftBoundary.getValue();
+			right=frame.refs[frame.boundary].getValue();
+		}
+		Index<K,V> result=frame.build();
+		while ((frame=frame.parent)!=null) {
+			frame.refs[frame.boundary]=result.getRef();
+			result=frame.build();
+		}
+		return result;
+	}
+
+	/** Fallback join state at one radix depth; only the boundary child pair overlaps. */
+	private static final class ConcatFrame<K extends ABlobLike<?>,V extends ACell> {
+		final ConcatFrame<K,V> parent;
+		final long depth,count;
+		final MapEntry<K,V> entry;
+		final short mask;
+		final Ref<Index<K,V>>[] refs;
+		final int boundary;
+		final Ref<Index<K,V>> leftBoundary;
+
+		@SuppressWarnings({"rawtypes","unchecked"})
+		ConcatFrame(Index<K,V> left,Index<K,V> right,long depth,K leftKey,K rightKey,ConcatFrame<K,V> parent) {
+			this.parent=parent;
+			this.depth=depth;
+			count=left.count+right.count;
+			boolean alignedLeft=left.getDepth()==depth, alignedRight=right.getDepth()==depth;
+			// A prefix entry precedes its descendants, so only the left range can
+			// supply an entry at the join depth. A deeper root stays a whole child.
+			entry=alignedLeft?left.entry:null;
+			int lm=alignedLeft?(left.mask&0xffff):(1<<leftKey.getHexDigit(depth));
+			int rm=alignedRight?(right.mask&0xffff):(1<<rightKey.getHexDigit(depth));
+			mask=(short)(lm|rm);
+			int ln=alignedLeft?left.children.length:1, rn=alignedRight?right.children.length:1;
+			boolean overlap=(lm&rm)!=0;
+			boundary=overlap?ln-1:-1;
+			refs=new Ref[ln+rn-(overlap?1:0)];
+			if (alignedLeft) System.arraycopy(left.children,0,refs,0,ln);
+			else refs[0]=left.getRef();
+			// Save the left overlap before the right copy occupies its slot. The
+			// caller joins that pair and replaces the slot while unwinding.
+			leftBoundary=overlap?refs[boundary]:null;
+			int offset=overlap?boundary:ln;
+			if (alignedRight) System.arraycopy(right.children,0,refs,offset,rn);
+			else refs[offset]=right.getRef();
+		}
+
+		@SuppressWarnings({"rawtypes","unchecked"})
+		Index<K,V> build() {
+			return new Index<>(depth,entry,(Ref[])refs,mask,count);
+		}
+	}
+
+	/** Fallback slice state for a partially retained node. Only boundaries need work. */
+	private static final class SliceFrame<K extends ABlobLike<?>,V extends ACell> {
+		final Index<K,V> node;
+		final SliceFrame<K,V> parent;
+		final long start,end;
+		final Ref<Index<K,V>>[] refs;
+		final short mask;
+		long position;
+		int next;
+
+		SliceFrame(Index<K,V> node,long start,long end,SliceFrame<K,V> parent) {
+			this.node=node;
+			this.parent=parent;
+			this.start=start;
+			this.end=end;
+			// All positions are relative to this node. Select the contiguous child
+			// range first; the caller trims only its partially retained boundaries.
+			position=node.entry==null?0:1;
+			int from=0, remaining=node.mask&0xffff;
+			while (position<end && from<node.children.length) {
+				long after=position+node.children[from].getValue().count;
+				if (after>start) break;
+				position=after;
+				from++;
+				remaining&=remaining-1;
+			}
+			int to=from, selected=remaining;
+			long after=position;
+			while (to<node.children.length && after<end) {
+				after+=node.children[to++].getValue().count;
+				remaining&=remaining-1;
+			}
+			if (after<end) throw new IllegalStateException("Inconsistent Index count");
+			mask=(short)(selected&~remaining);
+			refs=Arrays.copyOfRange(node.children,from,to);
+		}
+
+		@SuppressWarnings({"rawtypes","unchecked"})
+		Index<K,V> build() {
+			MapEntry<K,V> entry=start==0?node.entry:null;
+			if (entry==null && refs.length==1) return refs[0].getValue();
+			return new Index<>(node.getDepth(),entry,(Ref[])refs,mask,end-start);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -1111,17 +1411,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public boolean containsValue(ACell value) {
-		if (getDepth()>MAX_RECURSIVE_DEPTH) {
-			for (long i=0;i<count;i++) {
-				if (Cells.equals(value,entryAt(i).getValue())) return true;
-			}
-			return false;
-		}
-		if ((entry!=null)&&Cells.equals(value, entry.getValue())) return true;
-		for (Ref<Index<K,V>> cr : children) {
-			if (cr.getValue().containsValue(value)) return true;
-		}
-		return false;
+		// walk returns false only when the visitor stopped it, i.e. on a match
+		return !walk(me -> !Cells.equals(value, me.getValue()), new Walk<Void>());
 	}
 
 	@SuppressWarnings("unchecked")
@@ -1189,7 +1480,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * @return Merged Index, or {@code this} by reference identity if the result is unchanged
 	 */
 	public Index<K, V> mergeDifferences(Index<K, V> b, MergeFunction<V> func) {
-		return mergeNode(this, b, func);
+		try {
+			return mergeNode(this, b, func);
+		} catch (StackOverflowError e) {
+			// Fully unwound; both structures are immutable, so restart iteratively.
+			// The merge function is re-applied to keys already merged.
+			return mergeDeep(this, b, func);
+		}
 	}
 
 	/**
@@ -1209,7 +1506,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Hash ah=a.cachedHash();
 		Hash bh=b.cachedHash();
 		if (ah!=null&&bh!=null&&ah.equals(bh)) return a;      // equal known structure: no child resolution
-		if (a.getDepth()>MAX_RECURSIVE_DEPTH||b.getDepth()>MAX_RECURSIVE_DEPTH) return mergeDeep(a,b,func);
 		if (a.count == 0) return applySide(b, func, false);  // a empty: all of b is right-side
 		if (b.count == 0) return applySide(a, func, true);   // b empty: all of a is left-side
 
@@ -1327,21 +1623,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	/** Apply {@code func} to every entry of a node as a single side (other side null). Returns the same node if unchanged. */
 	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> applySide(Index<K, V> node, MergeFunction<V> func, boolean left) {
 		if (node.count == 0) return node;
-		if (node.getDepth()>MAX_RECURSIVE_DEPTH) {
-			Index<K,V> result=node;
-			for (long i=0;i<node.count;i++) {
-				MapEntry<K,V> me=node.entryAt(i);
-				V oldValue=me.getValue();
-				V newValue=left ? func.merge(me.getKey(),oldValue,null)
-						: func.merge(me.getKey(),null,oldValue);
-				if (newValue==null) {
-					result=result.dissoc(me.getKey());
-				} else if (!Utils.equals(oldValue,newValue)) {
-					result=result.assoc(me.getKey(),newValue);
-				}
-			}
-			return result;
-		}
 		MapEntry<K, V> ne = singleEntry(node.entry, func, left);
 		Index<K, V>[] kids = null;
 		int m = node.mask & 0xFFFF;
@@ -1363,11 +1644,14 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	/**
-	 * Stack-safe ordered merge for extended-depth subtries. The structural merge
-	 * remains the fast path; this bounded fallback is reached only beyond the old
-	 * 32-byte key limit.
+	 * Ordered merge with no recursion, used once the structural {@link #mergeNode}
+	 * has overflowed the thread stack. Walks both sides by index and applies each
+	 * change with the explicit-stack primitives, so an adversarial trie does not
+	 * pay a further overflow per entry. Preserves the identity contract of
+	 * {@link #mergeDifferences(Index, MergeFunction)}. Package-private so tests
+	 * can reach it directly.
 	 */
-	private static <K extends ABlobLike<?>, V extends ACell> Index<K,V> mergeDeep(
+	static <K extends ABlobLike<?>, V extends ACell> Index<K,V> mergeDeep(
 			Index<K,V> a, Index<K,V> b, MergeFunction<V> func) {
 		Index<K,V> result=a;
 		long ai=0;
@@ -1380,8 +1664,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				V bv=be.getValue();
 				if (!Utils.equals(av,bv)) {
 					V nv=func.merge(ae.getKey(),av,bv);
-					if (nv==null) result=result.dissoc(ae.getKey());
-					else if (!Utils.equals(av,nv)) result=result.assoc(ae.getKey(),nv);
+					if (nv==null) result=result.dissocDeep(ae.getKey());
+					else if (!Utils.equals(av,nv)) result=result.assocEntryDeep(MapEntry.create(ae.getKey(),nv),0);
 				}
 				ai++;
 				bi++;
@@ -1394,11 +1678,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			V nv=takeA ? func.merge(me.getKey(),oldValue,null)
 					: func.merge(me.getKey(),null,oldValue);
 			if (takeA) {
-				if (nv==null) result=result.dissoc(me.getKey());
-				else if (!Utils.equals(oldValue,nv)) result=result.assoc(me.getKey(),nv);
+				if (nv==null) result=result.dissocDeep(me.getKey());
+				else if (!Utils.equals(oldValue,nv)) result=result.assocEntryDeep(MapEntry.create(me.getKey(),nv),0);
 				ai++;
 			} else {
-				if (nv!=null) result=result.assoc(me.getKey(),nv);
+				if (nv!=null) result=result.assocEntryDeep(MapEntry.create(me.getKey(),nv),0);
 				bi++;
 			}
 		}
@@ -1476,9 +1760,73 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		throw new TODOException();
 	}
 
+	/**
+	 * Returns the first position whose key is greater than or equal to {@code key},
+	 * or {@link #count()} if there is none. A prefix locates the start of its group.
+	 * Keys use the same effective 255-byte limit and byte identity as {@link #get}.
+	 *
+	 * <p>Iterative radix descent: match each prefix range once and skip whole
+	 * subtrees by count. No search objects are allocated; lazy references may load
+	 * cells. Results on malformed trees are unspecified, but detected malformed
+	 * prefixes/children terminate the search without unbounded descent.</p>
+	 *
+	 * @param key Non-null blob-like key or prefix
+	 * @return Lower-bound position in {@code 0..count()}
+	 */
+	@SuppressWarnings("unchecked")
 	@Override
 	public long seek(ABlobLike<?> key) {
-		throw new TODOException();
+		Objects.requireNonNull(key);
+		long length=effectiveLength(key), matched=0, rank=0;
+		Index<K,V> node=this;
+		while (node.count!=0) {
+			if (length<=matched) return rank;
+			long depth=node.getDepth();
+			if (depth>matched) {
+				ABlob prefix=node.getPrefix();
+				long limit=Math.min(length,Math.min(depth,effectiveLength(prefix)));
+				if (limit<matched) return rank; // malformed physical prefix
+				long equal=matched+key.hexMatch(prefix,matched,limit-matched);
+				if (equal<limit) {
+					return key.getHexDigit(equal)<prefix.getHexDigit(equal)?rank:rank+node.count;
+				}
+				if (length<=depth || limit<depth) return rank;
+			}
+
+			int digit=key.getHexDigit(depth);
+			int slot=Bits.positionForDigit(digit,node.mask);
+			boolean present=(node.mask & (1<<digit))!=0;
+			int after=slot+(present?1:0);
+			if (after>node.children.length) return rank; // malformed mask
+			Index<K,V> next=null;
+			if (present) {
+				ACell cell=node.children[slot].getValue();
+				if (!(cell instanceof Index<?,?> child) || child.getDepth()<=depth) return rank;
+				next=(Index<K,V>)child;
+			}
+
+			// Sum the cheaper side. Edge branches need no sibling loads; an interior
+			// branch needs at most seven (eight for an absent branch's insertion point).
+			if (slot<=node.children.length-after) {
+				if (node.entry!=null) rank++;
+				for (int i=0;i<slot;i++) {
+					ACell cell=node.children[i].getValue();
+					if (!(cell instanceof Index<?,?> child)) return rank;
+					rank+=child.count;
+				}
+			} else {
+				rank+=node.count-(next==null?0:next.count);
+				for (int i=after;i<node.children.length;i++) {
+					ACell cell=node.children[i].getValue();
+					if (!(cell instanceof Index<?,?> child)) return rank;
+					rank-=child.count;
+				}
+			}
+			if (next==null) return rank;
+			matched=depth+1; // the selected branch digit is already known to match
+			node=next;
+		}
+		return rank;
 	}
 
 }

@@ -153,9 +153,17 @@ set (a transaction); balance checks are free queries.
 For applications that need the binary peer protocol (lower latency, streaming,
 running an embedded peer), `convex-java` also pulls in [`convex-peer`](../convex-peer/),
 whose `convex.api.Convex` client connects directly to a peer and returns
-`CompletableFuture<convex.core.Result>` from its `query` / `transact` methods. Most
+`CompletableFuture<convex.core.Result>` from its `query`, `simulate` and `transact` methods. Most
 applications should prefer `ConvexJSON` above; reach for `convex.api.Convex` only when
 you specifically need the binary transport.
+
+Use `query` for ordinary reads, including from zero-balance accounts, with a
+balance-independent Juice allowance bounded by the peer. Use `simulate(transaction)`
+or `simulateSync(transaction)` to estimate transaction costs with balance and memory
+checks, without committing state. Simulation does not validate signatures or sequence
+numbers; estimates reflect the peer's current snapshot and execution limit.
+These simulation methods are also available on `ConvexHTTP`, the client that returns
+CVM `Result` values over HTTP; `ConvexJSON` does not expose transaction simulation.
 
 ## Building from Source
 

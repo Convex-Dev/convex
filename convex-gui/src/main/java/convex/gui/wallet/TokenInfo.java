@@ -73,37 +73,31 @@ public class TokenInfo {
 		return cf;
 	}
 
-	static Address fungibleAddress=null;
 	public static Address getFungibleAddress(Convex convex) {
-		if (fungibleAddress!=null) return fungibleAddress;
-		try {
-			fungibleAddress=(Address) convex.resolve("convex.fungible").get();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return fungibleAddress;
+		return getLibrary(convex,"convex.fungible");
 	}
-	
-	static Address multiAddress=null;
+
 	public static Address getMultiAddress(Convex convex) {
-		if (multiAddress!=null) return multiAddress;
-		try {
-			multiAddress=(Address) convex.resolve("asset.multi-token").get();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return multiAddress;
+		return getLibrary(convex,"asset.multi-token");
 	}
-	
-	static Address torusAddress=null;
+
 	public static Address getTorusAddress(Convex convex) {
-		if (torusAddress!=null) return torusAddress;
+		return getLibrary(convex,"torus.exchange");
+	}
+
+	/**
+	 * Gets a library address on the connection's network, cached per network
+	 * @return Library address, or null if unavailable
+	 */
+	private static Address getLibrary(Convex convex, String cnsName) {
 		try {
-			torusAddress=(Address) convex.resolve("torus.exchange").get();
+			return NetworkState.of(convex).resolveLibrary(convex, cnsName);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return torusAddress;
+		return null;
 	}
 
 	public static TokenInfo get(Convex convex, ACell tokenID) {

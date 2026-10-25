@@ -18,7 +18,6 @@ import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.transactions.ATransaction;
-import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -155,12 +154,12 @@ public class Peer {
 	 */
 	@SuppressWarnings("unchecked")
 	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, ACell> peerData)  {
-		Belief belief=(Belief) peerData.get(Keywords.BELIEF);
+		Belief belief=RT.ensureCVM(peerData.get(Keywords.BELIEF),Belief.class);
 		AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
-		State genesis=(State) peerData.get(Keywords.GENESIS);
-		State state=(State) peerData.get(Keywords.STATE);
+		State genesis=RT.ensureCVM(peerData.get(Keywords.GENESIS),State.class);
+		State state=RT.ensureCVM(peerData.get(Keywords.STATE),State.class);
 		long pos=((CVMLong) peerData.get(Keywords.POSITION)).longValue();
-		Order co=((Order) peerData.get(Keywords.ORDER));
+		Order co=RT.ensureCVM(peerData.get(Keywords.ORDER),Order.class);
 		long hpos=((CVMLong) peerData.get(Keywords.HISTORY)).longValue();
 		long timestamp=((CVMLong) peerData.get(Keywords.TIMESTAMP)).longValue();
 		// This gets inferred from keypair, caller might want to check it is correct though!
@@ -311,8 +310,11 @@ public class Peer {
 	/**
 	 * Compiles and executes a query on the current consensus state of this Peer.
 	 *
+	 * Ordinary forms receive the maximum execution Juice independently of account
+	 * balance. Transaction payloads instead simulate normal transaction accounting.
+	 *
 	 * @param form Form to compile and execute.
-	 * @param address Address to use for query execution. If null, core address will be used
+	 * @param address Address to use for query execution. If null, genesis address will be used
 	 * @return The Context containing the query results. Will be NOBODY error if address / account does not exist
 	 */
 	public ResultContext executeQuery(ACell form, Address address) {
@@ -321,14 +323,20 @@ public class Peer {
 
 	/**
 	 * Compiles and executes a query with an explicit execution Juice ceiling.
+	 * Ordinary forms execute without transaction accounting, using the real account
+	 * balance but a balance-independent Juice allowance. Any state changes are local
+	 * to the returned context and never applied to this Peer. Results report execution
+	 * Juice, not transaction fees. For cost estimation, pass a transaction (optionally
+	 * signed), which uses {@link #executeDetached(ATransaction, long)} instead.
 	 *
 	 * @param form Form to compile and execute
 	 * @param address Address to use for query execution, or {@code null} for the
 	 *        genesis address
-	 * @param maxJuice Maximum execution Juice, must be non-negative
+	 * @param maxJuice Maximum execution Juice, non-negative and capped at the transaction maximum
 	 * @return Query result context
 	 */
 	public ResultContext executeQuery(ACell form, Address address, long maxJuice) {
+		form=CVMEncoder.specialise(form);
 		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		State state=getConsensusState();
 
@@ -338,7 +346,7 @@ public class Peer {
 		
 		if (form instanceof SignedData) {
 			SignedData<?> sc=(SignedData<?>)form;
-			ACell val=sc.getValue();
+			ACell val=CVMEncoder.specialise(sc.getValue());
 			if (val instanceof ATransaction tx) {
 				return executeDetached(tx,maxJuice);
 			}
@@ -346,34 +354,34 @@ public class Peer {
 		
 		if (address==null) {
 			address=Init.getGenesisAddress();
-			//return  Context.createFake(state).withError(ErrorCodes.NOBODY,"Null Address provided for query");
 		} else if (!state.hasAccount(address)) {
-			return  ResultContext.error(state,ErrorCodes.NOBODY,"Query for non-existant account");
+			return ResultContext.error(state,ErrorCodes.NOBODY,"Query for non-existent account");
 		}
 
-		// Run query in a fake transaction for given address
-		ATransaction tx=Invoke.create(address, state.getAccount(address).getSequence()+1, form);
-		ResultContext rctx=state.applyTransaction(tx,TransactionContext.create(state),maxJuice);
-		return rctx;
+		Context ctx=Context.createQuery(state,address,maxJuice).run(form);
+		return ResultContext.fromContext(ctx);
 	}
 
 	/**
-	 * Executes a "detached" transaction on the current consensus state of this Peer, but without any effect on current CVM state.
-	 * This can be used for query, estimating potential fees etc.
+	 * Simulates transaction execution and accounting on this Peer's current consensus
+	 * state without committing changes. Balance and memory checks apply, and the result
+	 * includes estimated costs. Signature and sequence validity are not checked.
+	 * Use {@link #executeQuery(ACell, Address)} for ordinary balance-independent queries.
 	 *
-	 * @param transaction Transaction to execute
-	 * @return The Context containing the transaction results.
+	 * @param transaction Transaction to simulate
+	 * @return Context containing the simulated transaction result and costs
 	 */
 	public ResultContext executeDetached(ATransaction transaction) {
 		return executeDetached(transaction,Constants.MAX_TRANSACTION_JUICE);
 	}
 
 	/**
-	 * Executes a detached transaction with an explicit execution Juice ceiling.
+	 * Simulates transaction execution and accounting with an explicit execution Juice
+	 * ceiling. See {@link #executeDetached(ATransaction)} for simulation semantics.
 	 *
-	 * @param transaction Transaction to execute
+	 * @param transaction Transaction to simulate
 	 * @param maxJuice Maximum execution Juice, must be non-negative
-	 * @return Detached transaction result
+	 * @return Simulated transaction result and costs
 	 */
 	public ResultContext executeDetached(ATransaction transaction, long maxJuice) {
 		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
@@ -649,7 +657,7 @@ public class Peer {
 	private void validateSignatures(AVector<SignedData<Block>> blocks, long start, long end) {
 		java.util.ArrayList<Future<?>> futures = null;
 		for (long b = start; b < end; b++) {
-			AVector<SignedData<ATransaction>> transactions = blocks.get(b).getValue().getTransactions();
+			AVector<SignedData<ATransaction>> transactions = RT.ensureCVM(blocks.get(b).getValue(),Block.class).getTransactions();
 			int count = (int) transactions.count();
 			if (count == 0) continue;
 
@@ -736,7 +744,7 @@ public class Peer {
 		if (hpos<1) return null;
 		if (hpos>blockResults.count()) return null;
 		
-		BlockResult br=blockResults.get(hpos-1);
+		BlockResult br=RT.ensureCVM(blockResults.get(hpos-1),BlockResult.class);
 		return br.getState();
 	}
 
@@ -761,7 +769,7 @@ public class Peer {
 		if (i<historyPosition) return null; // Ancient history
 		long brix=i-historyPosition;
 		if (brix>=blockResults.count()) return null;
-		return blockResults.get(brix);
+		return RT.ensureCVM(blockResults.get(brix),BlockResult.class);
 	}
 	
 

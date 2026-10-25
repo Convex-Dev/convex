@@ -86,6 +86,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
@@ -480,7 +481,12 @@ public abstract class CoreTest extends ACVMTest {
 		assertEquals(-1L, evalL("(int 0xffffffff)"));
 		assertEquals(0x0cff00000050l, evalL("(int 0x0cff00000050)")); 
 		
-		assertCVMEquals(-1L, evalL("(int 0xffffffffffffffffffffffff)")); // big int 
+		assertCVMEquals(-1L, evalL("(int 0xffffffffffffffffffffffff)")); // big int
+
+		// Redundant leading sign bytes on big blobs are trimmed without changing the value
+		assertEquals(AInteger.parse("9223372036854775808"), eval("(int 0x00008000000000000000)"));
+		assertEquals(AInteger.parse("2361183241434822606847"), eval("(int 0x007fffffffffffffffff)"));
+		assertEquals(AInteger.parse("-2361183241434822606849"), eval("(int 0xffff7fffffffffffffffff)"));
 		
 		// Address casts to equivalent Long value. See #431
 		assertEquals(1L, evalL("(long #1)"));
@@ -1231,6 +1237,15 @@ public abstract class CoreTest extends ACVMTest {
 		assertEquals(1L,evalL("(signum 9223372036854775807)"));
 		assertEquals(-1L,evalL("(signum -9223372036854775808)"));
 
+		// Big integers, including one created from a blob with a leading 0x00 sign byte
+		assertEquals(1L,evalL("(signum 9223372036854775808)"));
+		assertEquals(1L,evalL("(signum (int 0x008000000000000000))"));
+		assertEquals(-1L,evalL("(signum (int 0xff7fffffffffffffff))"));
+
+		// A fresh big integer from an empty blob is zero (CorePropertyTest.testCoreArgs regression)
+		Context ctx=Core.SIGNUM.invoke(context(), new ACell[] {CVMBigInteger.create(Blob.EMPTY)});
+		assertEquals(CVMLong.ZERO,ctx.getResult());
+
 		// Double cases
 		assertEquals(0.0,evalD("(signum 0.0)"));
 		assertEquals(-0.0,evalD("(signum -0.0)"));
@@ -1252,6 +1267,20 @@ public abstract class CoreTest extends ACVMTest {
 
 		assertArityError(step("(signum)"));
 		assertArityError(step("(signum :foo :bar)")); // arity > cast
+	}
+
+	@Test
+	public void testNonCanonicalIntegerArgs() {
+		// Products are canonical
+		ACell zero=eval("(* 9223372036854775808 0)");
+		assertTrue(zero instanceof CVMLong);
+		assertEquals(CVMLong.ZERO,zero);
+
+		// A non-canonical big integer argument behaves like the equal long
+		ACell one=CVMBigInteger.wrap(new byte[] {1});
+		assertEquals(CVMLong.create(20),Core.GET.invoke(context(),new ACell[] {eval("[10 20 30]"),one,eval(":missing")}).getResult());
+		ACell b=CVMBigInteger.wrap(new byte[] {98});
+		assertEquals(Vectors.of("a","c"),Core.SPLIT.invoke(context(),new ACell[] {eval("\"abc\""),b}).getResult());
 	}
 
 	@Test

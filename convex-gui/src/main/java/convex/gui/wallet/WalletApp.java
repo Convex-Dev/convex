@@ -7,18 +7,17 @@ import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
 
 import convex.api.Convex;
-import convex.core.crypto.wallet.AWalletEntry;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSPanel;
+import convex.gui.keys.KeyAccess;
 import convex.gui.keys.KeyRingPanel;
-import convex.gui.keys.UnlockWalletDialog;
-import convex.gui.panels.HomePanel;
 import convex.gui.peer.stake.PeerStakePanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFileSystem;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
@@ -28,35 +27,33 @@ public class WalletApp extends AbstractGUI {
 	 */
 	JPanel panel = new JPanel();
 
-	HomePanel homePanel = new HomePanel();
 	JTabbedPane tabs = new JTabbedPane(JTabbedPane.LEFT);
 
 	protected Convex convex;
-	private final boolean ownsConnection;
-	
+
 	protected static final int TAB_ICON_SIZE=Toolkit.ICON_SIZE;
-	
+
 	/**
-	 * Create the application.
+	 * Create the application. The caller keeps ownership of the connection,
+	 * and may hand it over with {@link #own(AutoCloseable)}.
+	 * @param convex Connection for this wallet
 	 */
 	public WalletApp(Convex convex) {
-		this(convex,false);
-	}
-
-	public WalletApp(Convex convex,boolean ownsConnection) {
 		super ("Convex Wallet");
 		this.convex=convex;
-		this.ownsConnection=ownsConnection;
-		
+
 		setLayout(new MigLayout("fill"));
-		
+
 		add(new AccountOverview(convex),"dock north");
 
 		addTab("Wallet", 0xe850, new TokenListPanel(convex));
 
 		addTab("Friends",0xf233, new FriendPanel(convex));
-		
-		addTab("Drive", 0xe1db, new DLFSPanel(DLFS.createLocal()).createView());
+
+		DLFileSystem drive=own(DLFS.createLocal());
+		DLFSPanel drivePanel=new DLFSPanel(drive);
+		own(drivePanel::close);
+		addTab("Drive", 0xe1db, drivePanel.createView());
 
 		addTab("Staking", 0xf56e, new PeerStakePanel(convex));
 
@@ -74,15 +71,13 @@ public class WalletApp extends AbstractGUI {
 	public void afterRun() {
 		super.afterRun();
 		if (convex.getKeyPair()==null) {
-			AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
-			if (we!=null) {
-				if (we.isLocked()) {
-					UnlockWalletDialog.offerUnlock(homePanel, we);
+			KeyAccess.signerFor(this, convex).thenAccept(signer->{
+				if (signer.keyPair()!=null) {
+					convex.setKeyPair(signer.keyPair());
+				} else {
+					Toolkit.showMessge(this, signer.reason()+"\n\nWallet opened in read-only mode: transactions will fail.");
 				}
-				convex.setKeyPair(we.getKeyPair());
-			} else {
-				Toolkit.showMessge(this, "The key for this account is not in your key ring.\n\nWallet opened in read-only mode: transactions will fail.");
-			}
+			});
 		}
 	}
 
@@ -115,15 +110,6 @@ public class WalletApp extends AbstractGUI {
 		return "Convex Wallet";
 	}
 
-	@Override
-	public void close() {
-		try {
-			if (ownsConnection && convex!=null) convex.close();
-		} finally {
-			super.close();
-		}
-	}
-
 	/**
 	 * Launch the application.
 	 * @param args Command line args
@@ -132,9 +118,10 @@ public class WalletApp extends AbstractGUI {
 	public static void main(String[] args) throws InterruptedException {
 		// call to set up Look and Feel
 		Toolkit.init();
-		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
+		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex").join();
 		if (convex!=null) {
-			WalletApp app=new WalletApp(convex,true);
+			WalletApp app=new WalletApp(convex);
+			app.own(convex);
 			app.run();
 			app.waitForClose();
 		} 

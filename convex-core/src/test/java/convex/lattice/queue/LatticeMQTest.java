@@ -5,11 +5,37 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 
 public class LatticeMQTest {
+
+	@Test public void nestedViewsAndForksRetainTheMutationClock() {
+		var time=new AtomicReference<>(CVMLong.ONE);
+		var mq=LatticeMQ.create(time::get);
+		var mqDraft=mq.fork();
+		var topic=mqDraft.topic("events");
+		var topicDraft=topic.fork();
+		var queue=topicDraft.partition(0);
+		var queueDraft=queue.fork();
+		time.set(CVMLong.TWO);
+		queueDraft.offer(Strings.create("first"));
+		assertEquals(CVMLong.TWO,QueueEntry.getTimestamp(queueDraft.peekEntry(0)));
+		assertTrue(mq.partition("events",0).isEmpty());
+		// None of the three publication boundaries needs a clock to merge.
+		time.set(null);
+		queueDraft.sync();
+		topicDraft.sync();
+		mqDraft.sync();
+		assertEquals(CVMLong.TWO,QueueEntry.getTimestamp(mq.partition("events",0).peekEntry(0)));
+		time.set(CVMLong.create(3));
+		queue.offer(Strings.create("second"));
+		assertEquals(time.get(),QueueEntry.getTimestamp(queue.peekEntry(1)));
+	}
 
 	// ===== Basic Navigation =====
 

@@ -11,7 +11,7 @@ import convex.lattice.fs.DLFSNode;
 
 public class DLFSFileAttributes implements BasicFileAttributes {
 
-	private AVector<ACell> node;
+	private final AVector<ACell> node;
 
 	public DLFSFileAttributes(AVector<ACell> node) {
 		this.node=node;
@@ -27,17 +27,17 @@ public class DLFSFileAttributes implements BasicFileAttributes {
 	}
 
 	protected FileTime getFileTime() {
-		return FileTime.fromMillis(DLFSNode.getUTime(node).longValue());
+		return FileTime.fromMillis(DLFSNode.getMTime(node).longValue());
 	}
 
 	@Override
 	public FileTime lastAccessTime() {
-		return getFileTime();
+		return lastModifiedTime(); // unsupported: documented NIO fallback
 	}
 
 	@Override
 	public FileTime creationTime() {
-		return getFileTime();
+		return FileTime.fromMillis(0); // creation time is not recorded
 	}
 
 	@Override

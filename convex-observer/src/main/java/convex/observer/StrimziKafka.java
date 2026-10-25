@@ -68,7 +68,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		val.put("order-id",JSON.json(so.getHash()));
 		val.put("ts",Utils.getCurrentTimestamp());
 		
-		Order o=so.getValue();
+		Order o=RT.ensureCVM(so.getValue(),Order.class);
 		val.put("cps",RT.cvm(o.getConsensusPoints()));
 
 		return buildRecord(val);

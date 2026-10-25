@@ -1,60 +1,64 @@
 package convex.lattice;
 
-import java.io.IOException;
+import java.util.Objects;
 
 import convex.core.data.ACell;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Base class for an application composed over a hosted lattice root.
+ * Application lifecycle over a component's working state and managed children.
  *
- * <p>An application component works at the same cursor position as its
- * {@link RootComponent} parent. It provides the application-level composition
- * point beneath which independently located domain regions can be attached,
- * while persistence continues to delegate to the host.</p>
+ * <p>Applications define incoming merge and routing through their domain components.
+ * No abstract lattice or parallel structure declaration is required. A host-bound
+ * application owns a staged copy of the host value; a cursor-bound application
+ * shares the supplied working state. Children may share that state or own separate
+ * publication boundaries.</p>
  *
- * <p>The application does not own the root, store or replication lifecycle.
- * Calling {@link #sync()} invokes the host's root publication policy;
- * {@link #flush()} remains a distinct durability boundary.</p>
+ * <p>Sync prepares the application, syncs its managed children, then publishes its
+ * own working boundary. Publication stops at the destination cursor. The host owns
+ * storage and replication; host sync and physical durability remain separate.
+ * Failures stop later stages without rolling back completed child publications.</p>
  *
- * @param <V> Complete application root value type
+ * @param <V> Value managed by the application
  */
 public abstract class ALatticeApplication<V extends ACell> extends ALatticeComponent<V> {
 
-	private final RootComponent<V> host;
-
-	/**
-	 * Creates an application over an existing lattice host.
-	 *
-	 * @param host Root component providing the application cursor and host policy
-	 */
-	protected ALatticeApplication(RootComponent<V> host) {
-		super(host,requireHost(host).cursor());
-		this.host=host;
+	/** Creates private working state over a host. */
+	protected ALatticeApplication(LatticeHost<V> host) {
+		super(Objects.requireNonNull(host,"Application host must not be null").cursor().fork());
 	}
 
-	private static <V extends ACell> RootComponent<V> requireHost(RootComponent<V> host) {
-		if (host==null) throw new IllegalArgumentException("Application host must not be null");
-		return host;
+	/** Shares working storage, for live applications, nested containers and transaction views. */
+	protected ALatticeApplication(AForkableCursor<V> cursor) {
+		super(cursor);
 	}
 
 	/**
-	 * Returns the application host for specialised application infrastructure.
-	 *
-	 * @return Hosted root component
+	 * Prepares application state before children or the application publish.
+	 * Failure prevents subsequent publication stages. This hook can be called
+	 * concurrently and must use thread-safe component APIs. Individual component
+	 * syncs do not invoke the containing application's lifecycle.
 	 */
-	protected final RootComponent<V> host() {
-		return host;
+	protected void beforeSync() {
 	}
 
 	/**
-	 * Requests the host store's physical durability barrier.
-	 *
-	 * <p>Call {@link #sync()} first when working state must become the selected,
-	 * published root. Flush deliberately does not move or merge any cursor.</p>
-	 *
-	 * @throws IOException If the store flush fails
+	 * Publishes managed children after preparation and before this application's
+	 * own boundary. The default has none. Implementations define child order;
+	 * completed child publications stand if a later child fails.
 	 */
-	public void flush() throws IOException {
-		host.flush();
+	protected void syncChildren() {
 	}
+
+	/** Prepares, publishes managed children, then publishes this application's own boundary. */
+	@Override
+	public V sync() {
+		beforeSync();
+		syncChildren();
+		return super.sync();
+	}
+
+	/** Accepts incoming state according to this application's domain policy, without publishing it. */
+	@Override
+	public abstract V merge(V incoming);
 }

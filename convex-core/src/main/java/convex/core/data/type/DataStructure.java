@@ -1,6 +1,7 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
+import convex.core.lang.RT;
 import convex.core.data.ADataStructure;
 import convex.core.data.Vectors;
 
@@ -18,7 +19,7 @@ public class DataStructure extends AStandardType<ADataStructure> {
 
 	@Override
 	public boolean check(ACell value) {
-		return (value instanceof ADataStructure);
+		return RT.ensureDataStructure(value)!=null;
 	}
 
 	@Override
@@ -33,8 +34,7 @@ public class DataStructure extends AStandardType<ADataStructure> {
 	
 	@Override
 	public ADataStructure<?> implicitCast(ACell a) {
-		if (a instanceof ADataStructure) return (ADataStructure<?>)a;
-		return null;
+		return RT.ensureDataStructure(a);
 	}
 
 }

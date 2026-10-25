@@ -76,7 +76,6 @@ drive and inbound switches remain useful as development overrides.
 {
   node: {
     port: 19888,
-    maxFutureTimestampSkew: 30000,
     store: "dlfs.etch",
     etch: {version: 3},
     keypair: "<32-byte Ed25519 seed hex>",
@@ -86,6 +85,7 @@ drive and inbound switches remain useful as development overrides.
     ],
   },
   dlfs: {
+    maxFutureTimestampSkew: 30000,
     path: ["fs"],
     drive: "home",
     mounts: [
@@ -102,10 +102,12 @@ drive and inbound switches remain useful as development overrides.
 }
 ```
 
-`node.maxFutureTimestampSkew` is the maximum accepted lead, in milliseconds, for
+`dlfs.maxFutureTimestampSkew` is the maximum accepted lead, in milliseconds, for
 timestamp-ordered DLFS updates and tombstones received from another replica. It
 defaults to 30 seconds; lower it only when participating hosts have tighter clock
-synchronisation.
+synchronisation. This belongs to the DLFS application; other components on the
+same host may use different allowances or no clock-based admission. Move existing
+`node.maxFutureTimestampSkew` settings into the `dlfs` section.
 
 Bootstrap entries pair a TCP address with its expected `AccountKey`; the connection
 manager challenges that identity after connecting and keeps an unverified connection
@@ -137,8 +139,9 @@ other node under `node.bootstrap`, use the same `dlfs.path`, and explicitly set
 not an Internet-facing private deployment. A replicated remote owner remains hidden
 until `dlfs.mounts` maps a local HTTP identity to that owner's key.
 
-The NodeServer normally hosts `Lattice.ROOT`, with DLFS attached at `:fs`, so root
-publication follows the real persistence and replication path. `dlfs.path` may place
+The NodeServer hosts a registered DLFS application at `:fs`, so root
+publication follows the real persistence and replication path. It accepts only the
+configured DLFS region; compose additional applications to serve other regions. `dlfs.path` may place
 the region under a custom, otherwise unused top-level region, for example
 `["applications", "documents"]`. `dlfs.mounts` is deliberately local service policy:
 it maps anonymous, the symbolic local `"node"` DID, or an explicit `did:key` identity
@@ -150,15 +153,14 @@ The equivalent programmatic setup is:
 ```java
 EtchStore store = EtchStore.createTemp("convex-dlfs");
 AKeyPair keyPair = AKeyPair.generate();
-NodeServer node = new NodeServer(Lattice.ROOT, store);
-node.setMergeContext(LatticeContext.create(null, keyPair));
+var host = LatticeHost.open(store);
+var app = host.addApplication(new DLFSApplication(host, keyPair::signData));
+var node = new NodeServer<>(host);
 node.launch();
-
-DLFSApplication app = DLFSApplication.connect(node.getRootComponent(), Keywords.FS);
 DLFSDriveManager drives = new DLFSDriveManager(
-    app.drives(keyPair.getAccountKey()));
+    app.drives(keyPair.getAccountKey()), () -> { app.sync(); host.sync(); });
 drives.createDrive(null, "home");
-app.sync();
+drives.sync(); // publish initial drives through the same application/host policy
 
 DLFSServer server = DLFSServer.create(drives);
 server.start(8080); // use 0 for a random port
@@ -187,64 +189,137 @@ synchronously at the service `sync()` boundary.
 
 `DLFSApplication` extends the general `ALatticeApplication` component over the
 complete hosted lattice root. It composes a physical, multi-owner `DLFSRegion`
-at any configured path and may be extended with other lattice facilities such
-as P2P discovery. The stack accepts a generic `RootComponent` and has no
+at a path of region keys, with no separate root lattice definition. It extends
+`Regions`, so applications can register other components alongside DLFS. The stack accepts a generic `LatticeHost` and has no
 dependency on `NodeServer`.
 
 ```java
 // Local: restore or create the standard :fs region in any AStore
-DLFSApplication app = DLFSApplication.open(store, myKeyPair);
-DLFSDriveManager myDrives = new DLFSDriveManager(
-    app.drives(myKeyPair.getAccountKey()));
-myDrives.createDrive(null, "home");
-FileSystem home = myDrives.getDrive(null, "home");
+var root = LatticeHost.open(store);
+var app = root.addApplication(new DLFSApplication(root, myKeyPair::signData));
+DLFSDrives myDrives = app.drives(myKeyPair.getAccountKey());
+DLFSDrive drive = myDrives.getOrCreateDrive("home");
+if (drive == null) throw new IllegalStateException("Cannot open home drive");
+FileSystem home = drive.fileSystem();
 Files.writeString(home.getPath("/hello.txt"), "Hello");
-app.sync();  // select and persist the current lattice root
-app.flush(); // separate physical durability barrier
+app.sync();   // complete this application's preparation/publication
+root.checkpoint(); // retain the host root and complete its durability barrier
 
-DLFSServer server = DLFSServer.create(myDrives);
+// Optional HTTP access uses a manager for identity routing
+DLFSServer server = DLFSServer.create(new DLFSDriveManager(myDrives, () -> {
+    app.sync();
+    try { root.checkpoint(); }
+    catch (IOException e) { throw new UncheckedIOException(e); }
+}));
 server.start(0);
 ```
+
+`getOrCreateDrive(name, maximumDrives)` enforces the live-drive limit atomically
+within shared working state. Opening an existing drive preserves its contents and
+timestamps, even when the limit is reached. Invalid names, malformed entries and
+failed creation return null. Concurrent deletion can also make a drive unavailable;
+the operation does not retry creation after deletion. Independent replicas enforce
+their own limits. Use `drive(name)` for lookup only and `createDrive(name)` when an
+existing drive should make creation fail. These operations do not publish the root.
 
 Networked bootstrap supplies the host; the DLFS component API is unchanged:
 
 ```java
-KeyedLattice lattice = KeyedLattice.create(
-    Keyword.intern("documents"), DLFSRegion.LATTICE);
 NodeConfig nodeConfig = NodeConfig.port(0);
-NodeServer<Index<Keyword, ACell>> node =
-    new NodeServer<>(lattice, store, nodeConfig);
-LatticeContext context = LatticeContext.create(null, myKeyPair);
-node.setMergeContext(context);
-LatticePropagator group = new LatticePropagator(
-    store, lattice, value -> value, LatticePropagatorConfig.create());
-group.setMergeContext(context);
-group.setTransportKeyPair(myKeyPair);
-node.addPropagator(group);
-LatticeListener transport = new LatticeListener(nodeConfig);
-transport.registerPropagator(group);
-transport.setSelector(connection -> group);
-node.launch();
-transport.launch();
+var host = LatticeHost.open(store);
+var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
+    Utils::getCurrentTimestampCell, 30_000,
+    Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
+var did = DID.forKey(myKeyPair.getAccountKey());
+try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPair).launch()) {
+    var group = network.createPropagator();
+    network.serveAllInbound(group); // explicitly allow inbound access to this view
 
-DLFSApplication networkedApp = DLFSApplication.connect(
-    node.getRootComponent(), Keyword.intern("documents"));
-DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
-DLFSDriveManager routes = DLFSDriveManager.createRouter()
-    .mountAnonymous(ownerDrives)
-    .mount(DID.forKey(myKeyPair.getAccountKey()).toString(), ownerDrives);
-routes.createDrive(null, "home");
-networkedApp.sync();
+    DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
+    DLFSDriveManager routes = DLFSDriveManager.createRouter(() -> {
+        networkedApp.sync();
+        try { host.checkpoint(); }
+        catch (IOException e) { throw new UncheckedIOException(e); }
+    })
+        .mountAnonymous(ownerDrives)
+        .mount(did.toString(), ownerDrives);
+    if (ownerDrives.getOrCreateDrive("home") == null) {
+        throw new IllegalStateException("Cannot open home drive");
+    }
+    networkedApp.sync();
+    host.checkpoint();
 
-DLFSServer networkedServer = DLFSServer.createWithAudience(routes, myKeyPair);
-networkedServer.start(0);
+    try (var networkedServer = DLFSServer.createWithAudience(routes, myKeyPair)) {
+        networkedServer.start(0);
+        // Run the application's service loop here, until shutdown is requested.
+    }
+}
 ```
 
-The component hierarchy is `RootComponent` → `DLFSApplication` → `DLFSRegion`
+The propagator inherits the node's identity key and can be configured with peers
+while running. An empty peer list is safe. Closing the network stops its listener
+and propagators; the caller retains ownership of the store.
+
+The callbacks above promise durable completion by calling `checkpoint()` before
+returning. A callback using `host.sync()` instead retains and offers the root to
+replication but leaves the physical barrier to the service's policy, for example
+a scoped `host.autoFlush(Duration.ofSeconds(1))`. Close the HTTP service first,
+then networking, then the host, which stops the durability resource and saves a
+final checkpoint, then the store. A failed checkpoint
+must fail the request; it does not undo a file write already made locally.
+
+Custom owner authority and region placement can be supplied together:
+
+```java
+var files = host.addApplication(new DLFSApplication(host,
+    ownerVerifier, ownerSigner, clock, 30_000,
+    Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
+var home = files.drives(ownerDid).getOrCreateDrive("home");
+```
+
+`ownerVerifier` checks an owner cell and signing public key using locally available
+authority data. `ownerSigner` receives the owner and payload, returning a signed
+payload or null if it cannot author for that owner. Passing null as signer opens a
+relay/reader. The transport identity does not supply either authority policy.
+The complete assembly, reopen and failed-HTTP-barrier scenarios run in
+[`DLFSLifecycleExampleTest`](src/test/java/convex/dlfs/test/DLFSLifecycleExampleTest.java).
+
+The standard assembly is `LatticeHost` → `DLFSApplication` → `DLFSRegion`
 → `DLFSDrives` → `DLFSDrive`. The application is not owner-scoped: it can obtain
 components for multiple owners. Local identity-to-owner and cross-region mappings
 remain `DLFSDriveManager` routing policy; the HTTP server owns no lattice or store
 lifecycle.
+
+A custom application can embed `DLFSRegion` at any correctly bound cursor.
+For a root application that stages files, explicitly supply a fork:
+
+```java
+var files = DLFSRegion.connect(host.cursor().path(Keywords.FS), store,
+    myKeyPair::signData, Utils::getCurrentTimestampCell);
+var app = host.addApplication(new DLFSApplication(host, Keywords.FS, files.fork()));
+```
+
+`app.dlfs()` is the exact registered component. Its incoming merges and local
+edits use the same working state, and `app.sync()` publishes that region only.
+Multiple applications may explicitly register the same component. The default
+`new DLFSApplication(host, myKeyPair::signData)` instead uses a live region, so edits
+are immediately part of the host's working state. Without a signer,
+`new DLFSApplication(host)` is a relay: it can accept existing signed envelopes,
+but cannot write or author a combination that requires a new signature.
+
+Ownership, signing and clocks are explicit DLFS policies; a host or application
+`LatticeContext` does not grant signing authority. The standard owner key is an
+`AccountKey`. For indirect identities, the full `DLFSRegion.connect` overload takes
+an owner/key verifier and an owner-aware signer, alongside the clock and allowed
+future timestamp skew. A signer may return null for owners it cannot author.
+Every signature it supplies must pass the same owner rule as incoming delivery.
+Forks and transaction views retain these policies. A mutable key resolver can
+support rotation without reconstructing the component tree; callbacks must be
+safe for concurrent use and retries during atomic updates.
+
+A directly connected region is a lightweight view. Syncing its fork updates
+only its destination subtree. Host persistence remains a separate operation.
+Pass `null` for the store when incremental blob checkpointing is unnecessary.
 
 The application does not own or close its root or store. Owner components are cheap
 views and are not retained globally; long-lived services keep the `DLFSDrives`
@@ -260,7 +335,7 @@ roots; those remain application policy. `fork()` on a region, drive collection o
 drive creates a temporary component which keeps the same store and only merges
 logical changes when explicitly synced.
 
-Lower-level embedders that deliberately open a drive from an `ALatticeCursor`
+Lower-level embedders that deliberately open a drive from a cursor
 instead of the component hierarchy must supply the host store explicitly:
 
 ```java
@@ -284,6 +359,20 @@ curl -X PROPFIND http://localhost:8080/dlfs/
 ```
 
 ## Design
+
+DLFS supports NIO copy and move between drives, and ordinary `Files.copy` /
+`Files.move` with other providers. Aliased views obtained from the same component
+root recognise the same working drive; atomic moves are supported within that
+drive. Cross-drive moves copy first and remove the source only if it still matches
+the copied snapshot. A concurrent source edit leaves both versions and reports an
+error. `ATOMIC_MOVE` across independent drives is rejected.
+
+Nodes have an optional content modification time (`mtime`) independent of their
+application-controlled merge clock. NIO `COPY_ATTRIBUTES` and moves preserve
+`mtime`; ordinary copies use the destination operation time. Reads do not update
+state. Access time is reported as `mtime`, creation time as the epoch, and setters
+for these unsupported times are ignored. See the node format and compatibility
+details in the design document.
 
 See [docs/DLFS_DESIGN.md](docs/DLFS_DESIGN.md) for the architecture, and
 [docs/DLFS_AUTH.md](docs/DLFS_AUTH.md) for the authentication model.

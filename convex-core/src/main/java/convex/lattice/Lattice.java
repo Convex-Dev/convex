@@ -7,6 +7,7 @@ import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.lattice.kv.KVStoreLattice;
+import convex.lattice.p2p.P2PLattice;
 import convex.lattice.queue.TopicLattice;
 
 /**

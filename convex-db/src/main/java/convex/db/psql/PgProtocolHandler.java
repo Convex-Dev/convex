@@ -211,6 +211,15 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	private void executeQuery(ChannelHandlerContext ctx, String sql) throws SQLException {
+		executeQuery(ctx, sql, true);
+	}
+
+	/**
+	 * @param describeRows Whether a result set is preceded by its RowDescription. True for
+	 *        the simple query protocol. False for Execute in the extended protocol, which
+	 *        never sends one: there the client asks for it with Describe.
+	 */
+	private void executeQuery(ChannelHandlerContext ctx, String sql, boolean describeRows) throws SQLException {
 		sql = rewriteQuery(sql);
 
 		// Null means return empty result (e.g., for system catalog queries)
@@ -224,7 +233,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 			if (hasResultSet) {
 				try (ResultSet rs = stmt.getResultSet()) {
-					sendResultSet(ctx, rs);
+					sendResultSet(ctx, rs, describeRows);
 				}
 			} else {
 				int updateCount = stmt.getUpdateCount();
@@ -351,12 +360,14 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		return CAST.matcher(sql).replaceAll("");
 	}
 
-	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs) throws SQLException {
+	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs, boolean describeRows) throws SQLException {
 		ResultSetMetaData meta = rs.getMetaData();
 		int columnCount = meta.getColumnCount();
 
 		// Send row description
-		write(ctx, RowDescription.fromMetaData(meta));
+		if (describeRows) {
+			write(ctx, RowDescription.fromMetaData(meta));
+		}
 
 		// Send data rows
 		long rowCount = 0;
@@ -540,7 +551,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				return;
 			}
 
-			executeWithParameters(ctx, query, portal.paramValues(), portal.paramFormats());
+			executeWithParameters(ctx, query, portal.paramValues(), portal.paramFormats(), portal.stmt().paramTypes());
 		} catch (SQLException e) {
 			log.warn("Execute error: {}", e.getMessage(), e);
 			write(ctx, ErrorResponse.fromException(e));
@@ -557,7 +568,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	/**
 	 * Execute a query with bound parameters.
 	 */
-	private void executeWithParameters(ChannelHandlerContext ctx, String sql, byte[][] paramValues, short[] paramFormats) throws SQLException {
+	private void executeWithParameters(ChannelHandlerContext ctx, String sql, byte[][] paramValues, short[] paramFormats, int[] paramTypes) throws SQLException {
 		sql = rewriteQuery(sql);
 
 		if (sql == null) {
@@ -567,7 +578,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 		// If no parameters, execute directly
 		if (paramValues == null || paramValues.length == 0) {
-			executeQuery(ctx, sql);
+			executeQuery(ctx, sql, false);
 			return;
 		}
 
@@ -579,7 +590,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			lowerSql.contains("pg_namespace") || lowerSql.contains("pg_attribute") ||
 			lowerSql.contains("pg_tables")) {
 			String substituted = substituteParameters(sql, paramValues, paramFormats);
-			executeQuery(ctx, substituted);
+			executeQuery(ctx, substituted, false);
 			return;
 		}
 
@@ -603,8 +614,9 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 						String strValue = new String(value, java.nio.charset.StandardCharsets.UTF_8);
 						pstmt.setString(i + 1, strValue);
 					} else {
-						// Binary format - set as bytes
-						pstmt.setBytes(i + 1, value);
+						// Binary format - decode by the type the client declared in Parse
+						int oid = (paramTypes != null && i < paramTypes.length) ? paramTypes[i] : 0;
+						bindBinaryParameter(pstmt, i + 1, value, oid);
 					}
 				}
 			}
@@ -612,7 +624,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			boolean hasResultSet = pstmt.execute();
 			if (hasResultSet) {
 				try (ResultSet rs = pstmt.getResultSet()) {
-					sendResultSet(ctx, rs);
+					sendResultSet(ctx, rs, false);
 				}
 			} else {
 				int updateCount = pstmt.getUpdateCount();
@@ -627,6 +639,38 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 					write(ctx, new CommandComplete("OK"));
 				}
 			}
+		}
+	}
+
+	/**
+	 * Binds a parameter that arrived in binary format, decoding it by the type OID the
+	 * client declared for it in the Parse message.
+	 *
+	 * <p>The PostgreSQL JDBC driver sends numbers in binary format: setLong arrives as
+	 * the 8 bytes of an int8, not as the digits of the number. Binding those bytes as
+	 * they are hands Calcite a byte string where it expects a number, and the statement
+	 * fails. Types without a decoding here, and parameters the client declared no type
+	 * for, are bound as bytes as before.
+	 */
+	static void bindBinaryParameter(PreparedStatement pstmt, int index, byte[] value, int oid) throws SQLException {
+		java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(value);
+		switch (oid) {
+			case PgType.INT2 -> { requireLength(value, 2, "int2"); pstmt.setLong(index, buf.getShort()); }
+			case PgType.INT4 -> { requireLength(value, 4, "int4"); pstmt.setLong(index, buf.getInt()); }
+			case PgType.OID -> { requireLength(value, 4, "oid"); pstmt.setLong(index, Integer.toUnsignedLong(buf.getInt())); }
+			case PgType.INT8 -> { requireLength(value, 8, "int8"); pstmt.setLong(index, buf.getLong()); }
+			case PgType.FLOAT4 -> { requireLength(value, 4, "float4"); pstmt.setDouble(index, buf.getFloat()); }
+			case PgType.FLOAT8 -> { requireLength(value, 8, "float8"); pstmt.setDouble(index, buf.getDouble()); }
+			case PgType.BOOL -> { requireLength(value, 1, "bool"); pstmt.setBoolean(index, value[0] != 0); }
+			case PgType.TEXT, PgType.VARCHAR, PgType.CHAR, PgType.NAME ->
+				pstmt.setString(index, new String(value, java.nio.charset.StandardCharsets.UTF_8));
+			default -> pstmt.setBytes(index, value);
+		}
+	}
+
+	private static void requireLength(byte[] value, int expected, String type) throws SQLException {
+		if (value.length != expected) {
+			throw new SQLException("Binary " + type + " parameter has " + value.length + " bytes, expected " + expected, "08P01");
 		}
 	}
 

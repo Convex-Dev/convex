@@ -1,5 +1,7 @@
 package convex.peer;
 
+import convex.core.lang.RT;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -155,8 +157,11 @@ public class TransactionHandler extends AThreadedComponent {
 	 * @param signedTransactionHash
 	 * @param m
 	 */
-	private void registerInterest(Hash signedTransactionHash, Message m) {
-		interests.put(signedTransactionHash, m);
+	private boolean registerInterest(Hash signedTransactionHash, Message m) {
+		if (interests.putIfAbsent(signedTransactionHash,m)==null) return true;
+		m.returnResult(Result.error(ErrorCodes.STATE,"Transaction already pending; recover its result by transaction hash")
+				.withSource(SourceCodes.PEER).withInfo(Keywords.TX,signedTransactionHash));
+		return false;
 	}
 	
 	private static final Result ERR_NOT_LIVE=Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
@@ -170,7 +175,7 @@ public class TransactionHandler extends AThreadedComponent {
 			}
 			Peer p=server.getPeer();
 			State s=p.getConsensusState();
-			PeerStatus ps=s.getPeers().get(p.getPeerKey());
+			PeerStatus ps=s.getPeer(p.getPeerKey());
 			if (ps==null) {
 				return ERR_NOT_REGISTERED;
 			}
@@ -274,7 +279,7 @@ public class TransactionHandler extends AThreadedComponent {
 				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 				continue;
 			}
-			registerInterest(sd.getHash(), m);
+			if (!registerInterest(sd.getHash(), m)) continue;
 			transactionQueue.put(sd);
 			observeTransactionRequest(sd);
 			this.clientTransactionCount++;
@@ -320,7 +325,7 @@ public class TransactionHandler extends AThreadedComponent {
 		}
 	}
 	
-	private void reportTransactions(Block block, BlockResult br, long blockNum) {
+	void reportTransactions(Block block, BlockResult br, long blockNum) {
 		// TODO: consider culling old interests after some time period
 		int nTrans = block.length();
 		HashMap<Keyword,ACell> extInfo=new HashMap<>(5);
@@ -351,7 +356,7 @@ public class TransactionHandler extends AThreadedComponent {
 					log.debug("Dropped transaction result for connection {}", m.getConnection());
 				}
 				observeTransactionResponse(t,res);
-				interests.remove(h);
+				interests.remove(h,m);
 			}
 		}
 	}
@@ -638,7 +643,7 @@ public class TransactionHandler extends AThreadedComponent {
 		for (long i = 0; i < n; i++) {
 			MapEntry<AArrayBlob, PeerStatus> e = peers.entryAt(i);
 			if (Cells.equals(e.getKey(), myKey)) continue;
-			if (e.getValue().getPeerStake() >= CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return true;
+			if (RT.ensureCVM(e.getValue(),PeerStatus.class).getPeerStake() >= CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return true;
 		}
 		return false;
 	}

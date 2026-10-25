@@ -1,5 +1,8 @@
 package convex.lattice.kv;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.AString;
@@ -10,7 +13,9 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.core.util.Utils;
+import convex.lattice.ALatticeComponent;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
 /**
@@ -22,16 +27,22 @@ import convex.lattice.cursor.Cursors;
  * Built with lattice merge replication: use {@link #fork()} and {@link #sync()}
  * for conflict-free distributed operation.
  */
-public class LatticeKV {
+public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
 	private static final AString DEFAULT_REPLICA = Strings.create("default");
 
-	private final ALatticeCursor<Index<AString, AVector<ACell>>> cursor;
 	private final AString replicaID;
+	private final Supplier<CVMLong> clock;
 
-	public LatticeKV(ALatticeCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
-		this.cursor = cursor;
-		this.replicaID = replicaID;
+	public LatticeKV(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
+		this(cursor,replicaID,Utils::getCurrentTimestampCell);
+	}
+
+	/** Binds the clock used for writes and expiry checks; forks retain it. */
+	public LatticeKV(AForkableCursor<Index<AString,AVector<ACell>>> cursor,AString replicaID,Supplier<CVMLong> clock) {
+		super(cursor);
+		this.replicaID=replicaID;
+		this.clock=Objects.requireNonNull(clock);
 	}
 
 	/**
@@ -45,9 +56,14 @@ public class LatticeKV {
 	 * Creates a new empty KV store with a specific replica ID for PN-counter operations
 	 */
 	public static LatticeKV create(AString replicaID) {
-		ALatticeCursor<Index<AString, AVector<ACell>>> cursor =
-			Cursors.createLattice(KVStoreLattice.INSTANCE);
-		return new LatticeKV(cursor, replicaID);
+		return create(replicaID,Utils::getCurrentTimestampCell);
+	}
+
+	/** Creates a store with an explicit clock, which may advance independently of state. */
+	public static LatticeKV create(AString replicaID,Supplier<CVMLong> clock) {
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
+			Cursors.root(KVStoreLattice.INSTANCE.zero());
+		return new LatticeKV(cursor,replicaID,clock);
 	}
 
 	/**
@@ -56,7 +72,7 @@ public class LatticeKV {
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
 	 * @return New LatticeKV instance connected to the cursor
 	 */
-	public static LatticeKV connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+	public static LatticeKV connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
 		return new LatticeKV(cursor, DEFAULT_REPLICA);
 	}
 
@@ -67,41 +83,43 @@ public class LatticeKV {
 	 * @param replicaID Replica ID for PN-counter operations
 	 * @return New LatticeKV instance connected to the cursor
 	 */
-	public static LatticeKV connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
-		return new LatticeKV(cursor, replicaID);
-	}
-
-	/**
-	 * Returns the underlying lattice cursor for direct lattice operations
-	 */
-	public ALatticeCursor<Index<AString, AVector<ACell>>> cursor() {
-		return cursor;
+	public static LatticeKV connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
+		return new LatticeKV(cursor,replicaID);
 	}
 
 	/**
 	 * Creates a forked copy of this store for independent operation
 	 */
 	public LatticeKV fork() {
-		return new LatticeKV(cursor.fork(), replicaID);
+		return rebind(storage.fork());
 	}
 
 	/**
-	 * Syncs this forked store back to its parent, merging changes
+	 * Creates a forked copy acting as a different replica, so that PN-counter
+	 * increments made on the fork are attributed to that replica when synced.
+	 *
+	 * @param replicaID Replica ID for PN-counter operations on the fork
+	 * @return Forked store
 	 */
-	public void sync() {
-		cursor.sync();
+	public LatticeKV fork(AString replicaID) {
+		return new LatticeKV(storage.fork(),replicaID,clock);
+	}
+
+	@Override
+	protected LatticeKV rebind(AForkableCursor<Index<AString,AVector<ACell>>> cursor) {
+		return new LatticeKV(cursor,replicaID,clock);
 	}
 
 	// ========== Internal Helpers ==========
 
-	// #561: resolve time through the cursor policy. The default policy uses runtime
+	// #561: resolve time through the component policy. The default policy uses runtime
 	// time; applications and tests may supply a fixed or otherwise dynamic clock.
 	private CVMLong now() {
-		return cursor.getContext().currentTimestamp();
+		return clock.get();
 	}
 
 	private long nowMs() {
-		return cursor.getContext().currentTimestampValue();
+		return clock.get().longValue();
 	}
 
 	private AString key(String key) {
@@ -109,7 +127,7 @@ public class LatticeKV {
 	}
 
 	private AVector<ACell> getEntry(String key) {
-		Index<AString, AVector<ACell>> store = cursor.get();
+		Index<AString, AVector<ACell>> store = cursor().get();
 		if (store == null) return null;
 		return store.get(key(key));
 	}
@@ -123,7 +141,7 @@ public class LatticeKV {
 
 	private void putEntry(String key, AVector<ACell> entry) {
 		AString k = key(key);
-		cursor.updateAndGet(store -> {
+		cursor().updateAndGet(store -> {
 			if (store == null) store = KVStoreLattice.INSTANCE.zero();
 			return store.assoc(k, entry);
 		});
@@ -187,7 +205,7 @@ public class LatticeKV {
 	 * Returns all live keys
 	 */
 	public ASet<AString> keys() {
-		Index<AString, AVector<ACell>> store = cursor.get();
+		Index<AString, AVector<ACell>> store = cursor().get();
 		if (store == null) return Sets.empty();
 		long now = nowMs();
 		ASet<AString> result = Sets.empty();
@@ -493,7 +511,7 @@ public class LatticeKV {
 	public long gc() {
 		long now = nowMs();
 		long[] removed = {0};
-		cursor.updateAndGet(store -> {
+		cursor().updateAndGet(store -> {
 			if (store == null) return store;
 			Index<AString, AVector<ACell>> result = store;
 			for (var e : store.entrySet()) {
@@ -506,5 +524,13 @@ public class LatticeKV {
 			return result;
 		});
 		return removed[0];
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<AString, AVector<ACell>> mergePublication(
+			Index<AString, AVector<ACell>> own,
+			Index<AString, AVector<ACell>> other) {
+		return KVStoreLattice.INSTANCE.merge(own,other);
 	}
 }

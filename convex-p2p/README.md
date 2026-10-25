@@ -4,7 +4,7 @@
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-p2p/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-p2p)
 
 Rollup package for Convex P2P nodes. Builds on the lattice data structures in
-`convex-core` and the authoritative node, propagator and transport components in
+`convex-core` and the node, propagator and transport components in
 `convex-peer` to provide nodes that discover each other, exchange lattice values
 and converge on shared state — and bundles the application regions those nodes
 serve, so one dependency gives you a complete node.
@@ -44,7 +44,7 @@ k-buckets being node-local rather than propagated), so it is backed by core's
 `convex.lattice.generic.ReservedLattice`, which discards anything sent there. Discarding
 rather than throwing matters: an unimplemented lattice that throws would abort the whole
 enclosing merge, costing a peer its valid sibling regions and counting against
-`NodeServer`'s per-connection circuit-breaker.
+the propagation group's per-connection circuit-breaker.
 
 ### Independent top-level regions
 
@@ -59,32 +59,37 @@ tests.
 
 ### Owner binding
 
-Both populated regions are `OwnerLattice`s keyed by `AccountKey`, so a user can only
-write their own slot. Three points are pinned by tests:
+Both populated regions use `OwnerMapLattice` with direct-key verification bound
+to the lattice instance. Both context-free and context-aware merge require the
+signature's public key to equal the owner key. A permissive context cannot change
+that rule. Identity and node records use whole-value LWW: a relay selects an
+existing envelope, retaining its signature without needing any private key.
 
-**One authorisation rule, applied at both boundaries.** `LatticeContext.signAs` decides
-whether this node may author a value for an owner, and it is the same rule
-`LatticeContext.verifyOwner` applies to data arriving from a peer. An owner that is an
-`AccountKey` requires that key; an indirect owner (Address, DID) is resolved by the
-installed owner verifier, and stays lenient when there is none.
+Local writes receive an explicit owner-aware signer, `(owner, value) -> signed`.
+One signer may use a wallet or keystore to serve several identities. Returning
+null means an owner is unavailable; a local write then fails without changing
+state. Signer output must cover the requested value, have a valid signature and
+pass the same owner rule as incoming delivery.
 
-**Owner paths request their signer on write.** A direct local write through a signed
-owner path asks the installed `LatticeContext` for a signer authorised for that owner.
-A key-store-backed policy can supply any accessible identity, whether or not it is the
-primary key; without one the write throws rather than storing a slot no peer would
-accept.
+`P2PApplication.connect(root, host, ownKey, signer, clock, didAuthoriser)` supplies
+the node's public identity independently of signing capability. `NodeDirectory`
+uses that public key and the supplied `Supplier<CVMLong>` to publish node records.
+`P2PUser.create(application, owner, signer)` opens explicit authoring views;
+the two-argument overload is a read view. `P2PApplication.p2p(owner)` uses the
+application's configured signer.
 
-**A merge never fails over an owner you cannot author.** Most merges select one of the
-two signed values and need no signature. When the inner lattice synthesises a genuinely
-new value, `SignedLattice` signs it as the owner if it can and otherwise keeps the own
-value — so merging a peer's data converges the owners this node holds keys for and
-leaves the others to their owners, instead of aborting the whole merge.
+The application binds the same DID authoriser to social delivery and local social
+views. Registering multiple local DIDs returns one shared `Social` component whose
+signer looks up each DID's key. Key replacement is observed by existing views.
+Cached follow keys are metadata; they cannot bypass current authority after
+rotation or revocation. A relay accepts signed social indexes without requiring
+every field to match this client's schema.
 
-**The two-argument merge skips the check entirely.** `merge(own, other)` does not verify
-the signer against the owner key — only the context-aware overload does. Every real path
-is safe (`ALatticeCursor.merge` always passes a context, and `LatticeContext.EMPTY` still
-triggers the `AccountKey` fast path), but don't reach for a raw `ALattice.merge(a, b)`
-on these regions.
+P2P incoming merges use the supplied lattice's own rules. Timestamp admission
+belongs to each application or component: for example, a DLFS lattice can bind
+its clock and allowance with `DLFSLattice.withClock(clock, skew)`. Node configuration
+does not impose a shared allowance. Social and P2P domain views do not inherit
+authoring capabilities or mutation clocks from `LatticeContext`.
 
 ## A rollup package
 
@@ -109,7 +114,7 @@ decision, and the only place that decision is recorded.
         ├─────────────┴─────────────┴─────────────┤
         │        :p2p    :id    :kad              │   infrastructure floor (always on)
         ├─────────────────────────────────────────┤
-        │ NodeServer — authoritative merge + host │   convex-peer
+        │ NodeServer — replicates the host root   │   convex-peer
         │ Propagator — filtered view + routes      │
         ├─────────────────────────────────────────┤
         │   lattice types, cursors, CAD3, Etch    │   convex-core
@@ -263,9 +268,18 @@ ECIES wrapper; relays see only routing metadata and ciphertext. See
 [Points of Presence](docs/POINTS_OF_PRESENCE.md) for the wire format, routing rules,
 bounds and trust model.
 
-`P2PNode` is the network bootstrap and lifecycle owner. `P2PApplication` is the
-host-neutral lattice application component; it can also be connected directly to a
-standalone `RootComponent` for local use.
+`P2PNode` assembles the node up to the lattice root: the host opened from the store,
+the replicating node server, one propagation group and the transport. `P2PApplication`
+is the application the host hands incoming values to. It owns the P2P policy that
+reads the lattice and imports nothing from the node package, so it can also be
+connected directly to a standalone `LatticeHost` for local use.
+
+The owning service chooses durability through `node.getNodeServer().getHost()`:
+call `checkpoint()` for a durable save, or publish with `sync()` and use a scoped
+`autoFlush(Duration)` for batched barriers. Stop request handling and networking
+before the final service save; close the durability resource before its store.
+`P2PNode.close()` stops replication without accepting pending host edits or
+flushing the borrowed store.
 
 ### The user area API
 
@@ -282,7 +296,7 @@ me.identity().sync();                 // merge this working path
 
 me.node().cursor()                    // independent node-record component
 
-P2PUser draft = me.fork();            // batch edits, isolated
+P2PUser draft = me.fork();            // identity edits, isolated
 draft.cursor().set(...);
 draft.sync();                         // merged back under LWW
 node.getApplication().sync();         // publish the complete root
@@ -290,8 +304,9 @@ node.getApplication().sync();         // publish the complete root
 
 Each component cursor is scoped to one user and one region; no other user's data is
 reachable through it. `node.p2p(someoneElse)` is a readable facade over their
-published components; writing it is a mistake the lattice does not need to prevent
-(see [Owner binding](#owner-binding) above).
+published components. Writes require an authorised signer for that owner
+(see [Owner binding](#owner-binding) above). A facade fork isolates identity edits;
+use `me.node().fork()` to stage the independent node-record component.
 
 Or run a node standalone:
 
@@ -340,10 +355,11 @@ key as audience, and the fixed `convex-lattice-peer-v1` context.
 
 An unverified assigned connection may submit complete `LATTICE_VALUE` messages, because
 the P2P data is public, but it cannot stage unsolicited `DATA` or trigger missing-cell
-acquisition. Complete values pass the configured path-aware ingress policy before
-persistence. The default social policy admits and publishes only locally registered
-social DIDs, explicit pins and their direct active follows; every social slot must have
-a valid signature from a key authorised for its DID. `maxConnections` bounds inbound
+acquisition. Complete values are handed to the P2P application, which takes the
+infrastructure regions whole and, from the social region, only the owners it wants:
+locally registered social DIDs, explicit pins and their direct active follows. The
+same set bounds what the node publishes. Every social slot must have a valid signature
+from a key authorised for its DID. `maxConnections` bounds inbound
 sockets and `maxDesiredPeers` bounds explicit plus discovery-driven peers.
 
 ## License

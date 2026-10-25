@@ -1,0 +1,339 @@
+package convex.lattice.app;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+
+import org.junit.jupiter.api.Test;
+
+import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.ASet;
+import convex.core.data.ABlobLike;
+import convex.core.data.Blob;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
+import convex.core.data.Sets;
+import convex.core.data.Strings;
+import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMLong;
+import convex.lattice.ALatticeComponent;
+import convex.lattice.LatticeComponent;
+import convex.lattice.IndexComponent;
+import convex.lattice.LatticeHost;
+import convex.lattice.SingleRegion;
+import convex.lattice.Timestamped;
+import convex.lattice.TransactionalComponent;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.generic.IndexLattice;
+
+/**
+ * A task board with stable IDs and independently ordered task records:
+ * <pre>{@code
+ * {:board {task-id {:timestamp t :title "Review" :done false}}}
+ * }</pre>
+ * Titles may repeat or change without changing identity. Completion and reopening
+ * update a task's record; its newer timestamp wins over an older status on merge.
+ * Different task IDs merge independently. Concurrent edits to the same task select
+ * one whole record, with the established record winning timestamp ties.
+ *
+ * <p>{@link Board} owns one staged copy of the task index. Transactions commit
+ * changes to several tasks together into that copy; exceptions discard the attempt.
+ * Application sync subsequently publishes the board to the host. The transaction
+ * callback may be retried, so callers supply stable IDs chosen before entering it.
+ * IDs must be unique across the writers of a board; the test IDs are fixtures.</p>
+ *
+ * <p>The clock is an explicit capability shared by rebound transaction views.
+ * {@link Timestamped} handles local stamping and supplies the payload ordering to
+ * the board's index lattice. This example has no signing policy.</p>
+ */
+class TaskBoardApplicationTest {
+	private static final Keyword BOARD=Keyword.intern("board");
+	private static final Keyword TITLE=Keyword.intern("title");
+	private static final Keyword DONE=Keyword.intern("done");
+	private static final IndexLattice<ABlobLike<?>,AHashMap<Keyword,ACell>> BOARD_LATTICE=
+		IndexLattice.create(Timestamped.lattice());
+
+	/** Constructs the domain component directly at its host path. */
+	static final class TaskBoardApp extends SingleRegion<Board> {
+		TaskBoardApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
+			super(host,BOARD,new Board(host.cursor().path(BOARD),getTimestamp).fork());
+		}
+		Board board() { return component(); }
+	}
+
+	/**
+	 * One publication and transaction boundary spanning all task records. The standard
+	 * lattice adapter supplies merge and delivery routing from the index ordering rule.
+	 * Timestamped records have no mergeable interior paths, so delivery stops at a task.
+	 */
+	static final class Board extends LatticeComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>>
+			implements TransactionalComponent<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>,Board> {
+		private final Supplier<CVMLong> getTimestamp;
+		private final IndexComponent<ABlobLike<?>,AHashMap<Keyword,ACell>> tasks;
+
+
+		// Rebinding shares the supplied draft directly and retains the clock, not the source board.
+		Board(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor,Supplier<CVMLong> getTimestamp) {
+			super(BOARD_LATTICE,cursor);
+			this.getTimestamp=getTimestamp;
+			tasks=new IndexComponent<>(cursor);
+		}
+
+		@Override public Board withCursor(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
+			return rebind(cursor);
+		}
+
+		@Override protected Board rebind(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
+			return new Board(cursor,getTimestamp);
+		}
+		@Override public Board fork() { return rebind(storage.fork()); }
+
+		Task task(String id) {
+			return new Task(tasks.path(Strings.create(id)),getTimestamp);
+		}
+
+		void plan(String id,String title) { task(id).create(title); }
+
+		/** Computes pending IDs from one snapshot; null means the board is absent. */
+		ASet<ACell> pending() {
+			var snapshot=tasks.get();
+			if (snapshot==null) return null;
+			ASet<ACell> pending=Sets.empty();
+			for (var entry:snapshot.entrySet()) {
+				if (!CVMBool.TRUE.equals(entry.getValue().get(DONE))) pending=pending.include(entry.getKey());
+			}
+			return pending;
+		}
+	}
+
+	/** Local operations on one timestamped record; no extra fork or publication step. */
+	static final class Task extends ALatticeComponent<AHashMap<Keyword,ACell>> {
+		Task(AForkableCursor<AHashMap<Keyword,ACell>> storage,Supplier<CVMLong> getTimestamp) {
+			super(Timestamped.create(storage.withDefault(Maps.empty()),getTimestamp).cursor());
+		}
+
+		boolean exists() { return cursor().get().containsKey(TITLE); }
+		// Titles may have a representation introduced by another application version.
+		ACell title() { return cursor().get().get(TITLE); }
+		/** Only literal true means completed; other values remain pending until explicitly changed. */
+		boolean isDone() { return CVMBool.TRUE.equals(cursor().get().get(DONE)); }
+
+		void create(String title) {
+			cursor().update(record -> {
+				if (record.containsKey(TITLE)) throw new IllegalStateException("Task ID already exists");
+				return record.assoc(TITLE,Strings.create(title)).assoc(DONE,CVMBool.FALSE);
+			});
+		}
+
+		void rename(String title) { cursor().update(record -> requireTask(record).assoc(TITLE,Strings.create(title))); }
+		void complete() { setDone(true); }
+		void reopen() { setDone(false); }
+		private void setDone(boolean done) { cursor().update(record -> requireTask(record).assoc(DONE,CVMBool.create(done))); }
+		private static AHashMap<Keyword,ACell> requireTask(AHashMap<Keyword,ACell> record) {
+			if (!record.containsKey(TITLE)) throw new IllegalStateException("Task does not exist");
+			return record;
+		}
+	}
+
+	/** Completion does not require interpreting a remote title or unrelated fields. */
+	@Test void taskOperationsPreserveUnfamiliarFields() {
+		var board=new TaskBoardApp(LatticeHost.create(),() -> CVMLong.TWO).board();
+		assertNull(board.pending());
+		var title=Maps.of("text","A structured title","language","en");
+		var extra=Maps.of("version",2);
+		var extension=Keyword.intern("future-field");
+		AHashMap<Keyword,ACell> record=Maps.of(Timestamped.TIMESTAMP,CVMLong.ONE,
+			TITLE,title,DONE,Strings.create("waiting"),extension,extra);
+		var remoteId=Blob.fromHex("abcd");
+		board.merge(Index.of(Strings.create("remote"),record,remoteId,record));
+		var task=board.task("remote");
+		assertSame(title,task.title());
+		assertFalse(task.isDone());
+		assertTrue(board.pending().contains(remoteId));
+		board.mergeAt(record.assoc(Timestamped.TIMESTAMP,CVMLong.TWO),remoteId);
+		assertEquals(CVMLong.TWO,board.cursor().get().get(remoteId).get(Timestamped.TIMESTAMP));
+		task.complete();
+		assertTrue(task.isDone());
+		assertSame(title,task.title());
+		assertSame(extra,task.cursor().get().get(extension));
+		assertEquals(Sets.of(remoteId),board.pending());
+		task.rename("Local title"); // An explicit replacement changes only this field and its timestamp.
+		assertEquals(Strings.create("Local title"),task.title());
+		assertSame(extra,task.cursor().get().get(extension));
+	}
+
+	/** Readers see the old board until commit; the async continuation publishes only after commit. */
+	@Test void completeAndPlanAtomicallyThenPublish() throws Exception {
+		var host=LatticeHost.create();
+		var app=new TaskBoardApp(host,() -> CVMLong.ONE);
+		host.addApplication(app);
+		var board=app.board();
+		board.plan("write","Write the example");
+		board.transact(draft -> {
+			draft.plan("review","Review the example");
+			draft.task("write").complete();
+			draft.sync(); // A rebound view has no publication boundary of its own.
+			assertEquals(Sets.of("write"),board.pending());
+			assertFalse(board.task("write").isDone());
+			assertFalse(board.task("review").exists());
+		});
+		assertEquals(Sets.of("review"),board.pending());
+		assertTrue(board.task("write").isDone());
+		assertTrue(host.cursor().get().isEmpty());
+
+		// The future signals commit and publication; the timeout only bounds test failure.
+		board.transactAsync(draft -> draft.task("review").complete())
+			.thenRun(app::sync).get(10,TimeUnit.SECONDS);
+		assertEquals(board.cursor().get(),host.cursor().get().get(BOARD));
+		assertTrue(board.pending().isEmpty());
+	}
+
+	/** A conflicting edit retries the whole domain operation without publishing either attempt early. */
+	@Test void transactionRetryPreservesConcurrentTasksAndCommitsTheWholePlan() {
+		var host=LatticeHost.create();
+		var app=new TaskBoardApp(host,() -> CVMLong.ONE);
+		var board=app.board();
+		board.plan("review","Review");
+		var firstDraft=new CompletableFuture<Void>();
+		var attempts=new AtomicInteger();
+		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+			var competing=CompletableFuture.runAsync(() -> {
+				firstDraft.orTimeout(10,TimeUnit.SECONDS).join();
+				board.plan("other","Independent task");
+			},executor);
+			board.transact(draft -> {
+				draft.task("review").complete();
+				draft.plan("publish","Publish"); // Stable ID across retries.
+				if (attempts.incrementAndGet()==1) {
+					firstDraft.complete(null);
+					competing.orTimeout(10,TimeUnit.SECONDS).join();
+					assertFalse(board.task("review").isDone());
+					assertFalse(board.task("publish").exists());
+				}
+				assertTrue(host.cursor().get().isEmpty());
+			});
+		}
+		assertEquals(2,attempts.get());
+		assertTrue(board.task("review").isDone());
+		assertEquals(Sets.of("publish","other"),board.pending());
+		assertTrue(host.cursor().get().isEmpty());
+		app.sync();
+		assertEquals(board.cursor().get(),host.cursor().get().get(BOARD));
+	}
+
+	/** Failure after changing two task records must leak neither change into the live board. */
+	@Test void abandonedPlanLeavesTheBoardUnchanged() {
+		var board=new TaskBoardApp(LatticeHost.create(),() -> CVMLong.ONE).board();
+		board.plan("review","Review");
+		var before=board.cursor().get();
+		assertThrows(IllegalStateException.class,() -> board.transact(draft -> {
+			draft.plan("publish","Publish");
+			draft.task("review").complete();
+			throw new IllegalStateException("Review not approved");
+		}));
+		assertSame(before,board.cursor().get());
+		assertEquals(Sets.of("review"),board.pending());
+		assertFalse(board.task("publish").exists());
+	}
+
+	/** Labels are mutable display data; duplicate labels and reopening never change identity. */
+	@Test void duplicateTitlesRenameAndReopenPreserveTaskIdentity() {
+		var clock=new AtomicReference<>(CVMLong.ONE);
+		var board=new TaskBoardApp(LatticeHost.create(),clock::get).board();
+		board.plan("first","Review");
+		board.plan("second","Review");
+		var first=board.task("first");
+		clock.set(CVMLong.TWO);
+		first.complete();
+		assertEquals(Sets.of("second"),board.pending());
+		clock.set(CVMLong.create(3));
+		first.rename("Review revised draft");
+		first.reopen();
+		assertEquals(Sets.of("first","second"),board.pending());
+		assertEquals(Strings.create("Review revised draft"),board.task("first").title());
+		assertEquals(Strings.create("Review"),board.task("second").title());
+		var before=board.cursor().get();
+		assertThrows(IllegalStateException.class,() -> board.plan("first","Replacement"));
+		clock.set(CVMLong.create(4));
+		first.reopen(); // An unchanged edit must not stamp, even after the clock advances.
+		assertSame(before,board.cursor().get());
+	}
+
+	/** Stale completion cannot undo a later reopen; different IDs survive replica merges. */
+	@Test void replayCannotUndoReopeningOrDiscardAnotherTask() {
+		var sourceHost=LatticeHost.create();
+		var clock=new AtomicReference<>(CVMLong.ONE);
+		var source=new TaskBoardApp(sourceHost,clock::get);
+		source.board().plan("review","Review");
+		clock.set(CVMLong.TWO);
+		source.board().task("review").complete();
+		source.sync();
+		var completed=sourceHost.cursor().get();
+		clock.set(CVMLong.create(3));
+		source.board().task("review").reopen();
+		source.sync();
+		var reopened=sourceHost.cursor().get();
+		for (var deliveries:List.of(List.of(completed,reopened),List.of(reopened,completed))) {
+			var host=LatticeHost.create();
+			var replica=new TaskBoardApp(host,() -> CVMLong.create(1000));
+			host.addApplication(replica);
+			replica.board().plan("other","Independent task");
+			for (var incoming:deliveries) host.merge(incoming);
+			host.merge(completed);
+			assertEquals(Sets.of("review","other"),replica.board().pending());
+			assertEquals(CVMLong.create(3),replica.board().task("review").cursor().get().get(Timestamped.TIMESTAMP));
+			assertTrue(host.cursor().get().isEmpty());
+			replica.sync();
+			assertEquals(replica.board().cursor().get(),host.cursor().get().get(BOARD));
+		}
+	}
+
+	/** Whole-board and task-path delivery obey the same ordering and preserve other tasks. */
+	@Test void taskDeliveryStopsAtTheOrderedRecord() {
+		var clock=new AtomicReference<>(CVMLong.ONE);
+		var source=new TaskBoardApp(LatticeHost.create(),clock::get).board();
+		source.plan("review","Review");
+		var planned=source.cursor().get();
+		clock.set(CVMLong.TWO);
+		source.task("review").complete();
+		var completed=source.cursor().get();
+		var whole=new TaskBoardApp(LatticeHost.create(),clock::get).board();
+		var partial=new TaskBoardApp(LatticeHost.create(),clock::get).board();
+		whole.plan("other","Independent task");
+		partial.plan("other","Independent task");
+		var id=Strings.create("review");
+		for (var delivery:List.of(completed,planned,completed)) {
+			whole.merge(delivery);
+			partial.mergeAt(delivery.get(id),id);
+			assertEquals(whole.cursor().get(),partial.cursor().get());
+		}
+		assertTrue(partial.task("review").isDone());
+		assertEquals(Sets.of("other"),partial.pending());
+		var before=partial.cursor().get();
+		partial.mergeAt(CVMBool.FALSE,id,DONE);
+		assertSame(before,partial.cursor().get());
+	}
+
+	/** Read-only handles and failed edits of absent tasks do not create records. */
+	@Test void missingTasksAndUnchangedEditsAreInert() {
+		var host=LatticeHost.create();
+		var app=new TaskBoardApp(host,() -> { throw new AssertionError("No changed edit needs a timestamp"); });
+		var missing=app.board().task("missing");
+		assertFalse(missing.exists());
+		assertNull(missing.title());
+		assertThrows(IllegalStateException.class,missing::complete);
+		assertThrows(IllegalStateException.class,missing::reopen);
+		assertThrows(IllegalStateException.class,() -> missing.rename("No task"));
+		missing.sync();
+		app.sync();
+		assertTrue(host.cursor().get().isEmpty());
+	}
+}

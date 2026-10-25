@@ -7,7 +7,6 @@ import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.RowSorter;
 import javax.swing.SortOrder;
-import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableModel;
@@ -22,6 +21,7 @@ import convex.gui.components.renderer.AccountKeyRenderer;
 import convex.gui.components.renderer.AddressRenderer;
 import convex.gui.components.renderer.BalanceRenderer;
 import convex.gui.components.renderer.StringRenderer;
+import convex.gui.utils.Async;
 
 @SuppressWarnings("serial")
 public class PeerStakeTable extends ConvexTable {
@@ -94,17 +94,15 @@ public class PeerStakeTable extends ConvexTable {
 		sortKeys.add(new RowSorter.SortKey(2, SortOrder.ASCENDING));
 		sorter.setSortKeys(sortKeys);
 
-		SwingUtilities.invokeLater(()->{
-			refresh();
-		});
+		refresh();
 	}
-	
+
 	public boolean isCellEditable(int row, int column) {
         return false;
     }
 
+	/** Reloads the peer rows. Safe from any thread. */
 	void refresh() {
-		tm.setRowCount(0);
 		String cs=("(mapv (fn [[pk p]] "
 				+"[pk "
 				+" (:controller p)"
@@ -117,17 +115,13 @@ public class PeerStakeTable extends ConvexTable {
 				+"(:peers *state*))");
 		ACell cmd=Reader.read(cs);
 		convex.query(cmd).thenAcceptAsync(r->{
-			//if (r.isError()) {
-				System.err.println(r);
-			//	return;
-			//}
-
+			tm.setRowCount(0);
+			if (r.isError()) return;
 			AVector<AVector<?>> rows=r.getValue();
 			for (AVector<?> row: rows) {
 				tm.addRow(row.toArray());
 			}
-			
-		});
+		}, Async.EDT);
 	}
 	
 	

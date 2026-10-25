@@ -41,6 +41,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.etch.EtchStore;
 import convex.test.Samples;
 import convex.test.Testing;
 
@@ -120,14 +121,28 @@ public class EncodingTest {
 		assertEquals(x,r);
 	}
 	
-	@Test public void testEmbeddedRegression() throws BadFormatException {
-		Keyword k=Keyword.create("foo");
+	@Test public void testEmbeddedRegression() throws BadFormatException, IOException {
+		Keyword k=Keyword.create("encoding-test-embedded-root");
 		Blob b=Cells.encode(k);
-		ACell o=Samples.TEST_STORE.decode(b);
-		assertEquals(k,o);
-		assertTrue(Cells.isEmbedded(k));
-		Ref<?> r=Ref.get(o);
-		assertTrue(r.isDirect());
+		try (EtchStore store=EtchStore.createTemp()) {
+			ACell fresh=store.getEncoder().decode(b);
+			assertEquals(k,fresh);
+			assertTrue(Ref.get(fresh).isDirect());
+			assertTrue(Cells.isEmbedded(fresh));
+
+			// An embedded value persisted as a root has a store-owned soft ref.
+			// A known encoding hash permits reuse of the persisted root and its ref.
+			Cells.persist(k,store);
+			ACell o=store.decode(b);
+			assertEquals(k,o);
+			assertEquals(b,o.getEncoding());
+			assertSame(k,o);
+			assertFalse(Ref.get(o).isDirect());
+			Ref<?> r=store.refForHash(k.getHash());
+			assertTrue(r.isEmbedded());
+			assertFalse(r.isDirect());
+			assertSame(store,((RefSoft<?>) r).getStore());
+		}
 	}
 	
 	@Test public void testByteFlags() throws BadFormatException {

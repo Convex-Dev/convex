@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
+import convex.core.ErrorCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -302,5 +303,46 @@ public class X402Test {
 		convex.core.Result balance = deployer
 				.querySync("(@convex.fungible/balance " + token + " #13)");
 		assertEquals(CVMLong.create(500), balance.getValue());
+	}
+
+	@Test
+	public void testFailedPaymentCannotBeReplayedAsSettled() throws Exception {
+		PaymentRequirements req = fetchDemand().accepts().get(0);
+		long sequence = convex.lookupSequence(Init.GENESIS_ADDRESS) + 5;
+		ATransaction transaction = Transfer.create(Init.GENESIS_ADDRESS, sequence, PAY_TO, PRICE);
+		SignedData<ATransaction> signed = kp.signData(transaction);
+		long before = convex.getBalance(PAY_TO);
+
+		// Intake accepts future sequences, but execution records a failed result.
+		var failed = convex.transactSync(signed);
+		assertEquals(ErrorCodes.SEQUENCE, failed.getErrorCode());
+		assertNotNull(peerServer.getPeer().getTransaction(signed.getHash()));
+		assertEquals(ErrorCodes.SEQUENCE,
+				peerServer.getPeer().getTransactionResult(signed.getHash()).getErrorCode());
+		assertEquals(before, convex.getBalance(PAY_TO));
+
+		PaymentPayload payment = new PaymentPayload(X402.VERSION, null, req,
+				Maps.of(Fields.TRANSACTION,
+						Strings.create(Format.encodeMultiCell(signed, true).toHexString())));
+		HttpResponse<String> response = httpClient.send(
+				HttpRequest.newBuilder(gatedUri()).GET()
+						.header(X402.HEADER_PAYMENT_SIGNATURE, X402.encodeHeader(payment.toJSON())).build(),
+				HttpResponse.BodyHandlers.ofString());
+		assertEquals(402, response.statusCode(), "A failed transaction must not authorise paid access");
+
+		String body = JSON.toString(Maps.of(
+				Fields.X402_VERSION, CVMLong.create(X402.VERSION),
+				Fields.PAYMENT_PAYLOAD, payment.toJSON(),
+				Fields.PAYMENT_REQUIREMENTS, req.toJSON()));
+		HttpResponse<String> settleResponse = httpClient.send(
+				HttpRequest.newBuilder(URI.create(hostPath + "/x402/settle"))
+						.header("Content-Type", "application/json")
+						.POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+				HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, settleResponse.statusCode());
+		SettlementResponse settled = SettlementResponse.fromJSON(RT.castMap(JSON.parse(settleResponse.body())));
+		assertFalse(settled.success());
+		assertEquals(ErrorReasons.INVALID_SEQUENCE, settled.errorReason());
+		assertEquals(before, convex.getBalance(PAY_TO));
 	}
 }

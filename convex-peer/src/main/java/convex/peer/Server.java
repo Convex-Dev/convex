@@ -270,7 +270,9 @@ public class Server implements Closeable {
 			} 
 			
 			// No sync or restored state, so use passed state
-			State genesisState = (State) config.get(Keywords.STATE);
+			Object suppliedState=config.get(Keywords.STATE);
+			State genesisState = RT.ensureCVM(RT.cvm(suppliedState),State.class);
+			if ((suppliedState!=null)&&(genesisState==null)) throw new LaunchException("Invalid :STATE for peer launch");
 			if (genesisState!=null) {
 				log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
 			} else {
@@ -318,7 +320,7 @@ public class Server implements Closeable {
 			}
 			
 			log.debug("Attempting to sync remote state: "+stateHash + " on network: "+genesisHash);
-			State genF=(State) convex.acquire(genesisHash).get(timeout,TimeUnit.MILLISECONDS);
+			State genF=RT.ensureCVM(convex.acquire(genesisHash).get(timeout,TimeUnit.MILLISECONDS),State.class);
 			log.debug("Retrieved Genesis State: "+genesisHash);
 			
 			// Belief acquisition
@@ -327,7 +329,7 @@ public class Server implements Closeable {
 			long timeElapsed=0;
 			while (belF==null) {
 				try {
-					belF=(Belief) convex.acquire(beliefHash).get(timeout,TimeUnit.MILLISECONDS);
+					belF=RT.ensureCVM(convex.acquire(beliefHash).get(timeout,TimeUnit.MILLISECONDS),Belief.class);
 				} catch (TimeoutException te) {
 					timeElapsed+=timeout;
 					log.info("Still waiting for Belief sync after "+timeElapsed/1000+"s");
@@ -611,8 +613,8 @@ public class Server implements Closeable {
 			case COMMAND:
 				return null;
 			case RESULT:
-				// Check if this is a response to a server-initiated verification
-				if (inboundVerifier.handleResult(m)) return null;
+				// Correlate replies to requests initiated by this physical connection.
+				if (m.getConnection()!=null && m.getConnection().completeRequest(m)) return null;
 				returnError(m,ErrorCodes.UNEXPECTED,Strings.UNEXPECTED_RESULT);
 				return null;
 			default:

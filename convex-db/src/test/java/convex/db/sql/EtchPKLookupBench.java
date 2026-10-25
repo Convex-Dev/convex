@@ -16,7 +16,7 @@ import convex.node.NodeServer;
 /**
  * Benchmark: PK lookup latency on Etch-backed tables after persist.
  *
- * <p>After persistSnapshot(), Index nodes become RefSoft pointers into
+ * <p>After host.checkpoint(), Index nodes become RefSoft pointers into
  * the Etch store. This benchmark measures the lookup cost when the JVM
  * must reload tree nodes from Etch (simulating the reporter's 141ms
  * scenario from issue #541).
@@ -57,7 +57,7 @@ public class EtchPKLookupBench {
 
 		// Persist — forces Index nodes into RefSoft (Etch-backed)
 		t0 = System.nanoTime();
-		server.persistSnapshot(server.getLocalValue());
+		server.getHost().checkpoint();
 		report("Persist", System.nanoTime() - t0);
 
 		// Warmup: a few lookups to prime the Etch memory map

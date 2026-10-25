@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.Signature;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
@@ -367,11 +366,6 @@ public class JWTTest {
 
 	// ========== RS256 tests ==========
 
-	private KeyPair generateRSAKeyPair() throws Exception {
-		KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
-		gen.initialize(2048);
-		return gen.generateKeyPair();
-	}
 
 	private AString buildRS256JWT(AMap<AString, ACell> claims, java.security.PrivateKey privateKey) throws Exception {
 		Base64.Encoder enc = Base64.getUrlEncoder().withoutPadding();
@@ -391,7 +385,7 @@ public class JWTTest {
 	}
 
 	@Test public void testVerifyRS256() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		RSAPublicKey pubKey = (RSAPublicKey) kp.getPublic();
 
 		AMap<AString, ACell> claims = Maps.of("sub", "alice", "iss", "test-issuer");
@@ -411,7 +405,7 @@ public class JWTTest {
 	}
 
 	@Test public void testVerifyRS256RejectsTampered() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		RSAPublicKey pubKey = (RSAPublicKey) kp.getPublic();
 
 		AMap<AString, ACell> claims = Maps.of("sub", "alice");
@@ -426,8 +420,8 @@ public class JWTTest {
 	}
 
 	@Test public void testVerifyRS256RejectsWrongKey() throws Exception {
-		KeyPair kp1 = generateRSAKeyPair();
-		KeyPair kp2 = generateRSAKeyPair();
+		KeyPair kp1 = RSAFixtures.KEY;
+		KeyPair kp2 = RSAFixtures.OTHER_KEY;
 
 		AMap<AString, ACell> claims = Maps.of("sub", "alice");
 		AString jwtString = buildRS256JWT(claims, kp1.getPrivate());
@@ -442,7 +436,7 @@ public class JWTTest {
 	// ========== Claims validation tests ==========
 
 	@Test public void testValidateClaimsExpired() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		long pastExp = System.currentTimeMillis() / 1000 - 3600; // 1 hour ago
 		AMap<AString, ACell> claims = Maps.of("sub", "alice", "exp", pastExp);
 		AString jwtString = buildRS256JWT(claims, kp.getPrivate());
@@ -475,7 +469,7 @@ public class JWTTest {
 	}
 
 	@Test public void testValidateClaimsWrongIssuer() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		long futureExp = System.currentTimeMillis() / 1000 + 3600;
 		AMap<AString, ACell> claims = Maps.of("sub", "alice", "iss", "wrong-issuer", "exp", futureExp);
 		AString jwtString = buildRS256JWT(claims, kp.getPrivate());
@@ -487,7 +481,7 @@ public class JWTTest {
 	}
 
 	@Test public void testValidateClaimsWrongAudience() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		long futureExp = System.currentTimeMillis() / 1000 + 3600;
 		AMap<AString, ACell> claims = Maps.of("sub", "alice", "aud", "client-123", "exp", futureExp);
 		AString jwtString = buildRS256JWT(claims, kp.getPrivate());
@@ -499,7 +493,7 @@ public class JWTTest {
 	}
 
 	@Test public void testValidateClaimsPass() throws Exception {
-		KeyPair kp = generateRSAKeyPair();
+		KeyPair kp = RSAFixtures.KEY;
 		long futureExp = System.currentTimeMillis() / 1000 + 3600;
 		AMap<AString, ACell> claims = Maps.of(
 			"sub", "alice",

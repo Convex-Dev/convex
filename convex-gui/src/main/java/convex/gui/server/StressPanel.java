@@ -53,10 +53,13 @@ import convex.gui.utils.Toolkit;
 import convex.peer.Server;
 
 @SuppressWarnings("serial")
-public class StressPanel extends JPanel {
+public class StressPanel extends JPanel implements AutoCloseable {
 	static final Logger log = LoggerFactory.getLogger(StressPanel.class.getName());
 
 	protected Convex peerConvex;
+
+	/** Most recently started test, cancelled on close */
+	private volatile StressTest currentTest;
 
 	private ActionPanel actionPanel;
 
@@ -70,7 +73,7 @@ public class StressPanel extends JPanel {
 	private JCheckBox syncCheckBox;
 	private JCheckBox distCheckBox;
 	private JCheckBox repeatCheckBox;
-	private JCheckBox queryCheckBox;
+	private JCheckBox simulateCheckBox;
 	private JCheckBox localCheckBox;
 	private JCheckBox preCompileCheckBox;
 
@@ -113,7 +116,8 @@ public class StressPanel extends JPanel {
 			btnRun.setEnabled(false);
 			Address address=peerConvex.getAddress();
 			AKeyPair kp=peerConvex.getKeyPair();
-			new StressTest(kp, address).execute();
+			currentTest=new StressTest(kp, address);
+			currentTest.execute();
 		});
 
 		splitPane = new JSplitPane();
@@ -174,10 +178,11 @@ public class StressPanel extends JPanel {
 		optionPanel.add(repeatCheckBox);
 		repeatCheckBox.setSelected(false);
 		
-		optionPanel.add(new JLabel("Query"));
-		queryCheckBox=new JCheckBox();
-		optionPanel.add(queryCheckBox);
-		queryCheckBox.setSelected(false);
+		optionPanel.add(new JLabel("Simulate"));
+		simulateCheckBox=new JCheckBox();
+		simulateCheckBox.setToolTipText("Simulate transactions without submitting, including balance checks and estimated costs.");
+		optionPanel.add(simulateCheckBox);
+		simulateCheckBox.setSelected(false);
 
 		optionPanel.add(new JLabel("Local (in-JVM)"));
 		localCheckBox=new JCheckBox();
@@ -221,6 +226,13 @@ public class StressPanel extends JPanel {
 		resultArea.setFont(Toolkit.MONO_FONT);
 	}
 
+	/** Stops any running (or repeating) stress test. Called when the owning window closes. */
+	@Override
+	public void close() {
+		StressTest test=currentTest;
+		if (test!=null) test.cancel(true);
+	}
+
 	NumberFormat formatter = new DecimalFormat("#0.000");
 
 	private final class StressTest extends SwingWorker<String, Object> {
@@ -242,26 +254,34 @@ public class StressPanel extends JPanel {
 			this.address = address;
 		}
 		
+		/** Runs off the EDT: progress goes through publish, the final text through done() */
 		@Override
 		protected String doInBackground() {
-			String result=null;
 			try {
+				String result=null;
 				boolean running=true;
 				while (running)  {
 					result=doStressRun();
-					running=repeatCheckBox.isSelected();
+					publish(result);
+					running=repeatCheckBox.isSelected()&&!isCancelled();
 					if (running) Thread.sleep(((Integer)(repeatTimeSpinner.getValue()))*1000);
 				};
+				return result;
 			} catch (ExecutionException e) {
 				log.info("Stress test worker terminated",e);
-				resultArea.setText("Test Error: "+e);
+				return "Test Error: "+e;
+			} catch (InterruptedException e) {
+				log.debug("Stress test stopped");
+				return "Stress test stopped";
 			} catch (Exception e) {
 				log.warn("Stress test worker terminated unexpectedly",e);
-				resultArea.setText("Test Error: "+e);
-			} finally {
-				btnRun.setEnabled(true);
+				return "Test Error: "+e;
 			}
-			return result;
+		}
+
+		@Override
+		protected void process(List<Object> progress) {
+			resultArea.setText(String.valueOf(progress.get(progress.size()-1)));
 		}
 
 		protected String doStressRun() throws Exception {
@@ -273,7 +293,7 @@ public class StressPanel extends JPanel {
 			errors = 0;
 			values = 0;
 
-			resultArea.setText("Connecting clients...");
+			publish("Connecting clients...");
 			boolean isLocal = localCheckBox.isSelected();
 			Server server = peerConvex.getLocalServer();
 
@@ -301,7 +321,7 @@ public class StressPanel extends JPanel {
 			setupClients();
 
 			// Pre-build transactions
-			resultArea.setText("Building transactions...");
+			publish("Building transactions...");
 			ATransaction[][] allTransactions = new ATransaction[clientCount][requestCount];
 			for (int c = 0; c < clientCount; c++) {
 				Address origin = clients.get(c).getAddress();
@@ -312,7 +332,7 @@ public class StressPanel extends JPanel {
 
 			// Pre-compile Invoke commands if enabled
 			if (preCompileCheckBox.isSelected() && !type.equals("Transfer")) {
-				resultArea.setText("Compiling...");
+				publish("Compiling...");
 				HashMap<ACell, ACell> compileCache = new HashMap<>();
 				for (int c = 0; c < clientCount; c++) {
 					for (int i = 0; i < requestCount; i++) {
@@ -335,11 +355,11 @@ public class StressPanel extends JPanel {
 				}
 			}
 
-			// Pre-sign transactions (skipped for query mode)
-			boolean isQuery = queryCheckBox.isSelected();
+			// Pre-sign transactions (skipped for simulation mode)
+			boolean isSimulation = simulateCheckBox.isSelected();
 			SignedData<ATransaction>[][] signedTransactions = null;
-			if (!isQuery) {
-				resultArea.setText("Signing transactions...");
+			if (!isSimulation) {
+				publish("Signing transactions...");
 				@SuppressWarnings("unchecked")
 				SignedData<ATransaction>[][] signed = new SignedData[clientCount][requestCount];
 				signedTransactions = signed;
@@ -351,12 +371,12 @@ public class StressPanel extends JPanel {
 				}
 			}
 
-			resultArea.setText("Syncing...");
+			publish("Syncing...");
 			// Make sure we are in consensus
 			pc.transactSync(Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, Strings.create("sync")));
 			long startTime = Utils.getCurrentTimestamp();
 
-			resultArea.setText("Sending transactions...");
+			publish("Sending transactions...");
 
 			// Per-client futures — no synchronisation needed
 			@SuppressWarnings("unchecked")
@@ -374,12 +394,12 @@ public class StressPanel extends JPanel {
 					Convex cc = clients.get(idx);
 					for (int i = 0; i < requestCount; i++) {
 						CompletableFuture<Result> fr;
-						if (isQuery) {
+						if (isSimulation) {
 							if (isSyncMode) {
-								Result r = cc.querySync(allTransactions[idx][i]);
+								Result r = cc.simulateSync(allTransactions[idx][i]);
 								fr = CompletableFuture.completedFuture(r);
 							} else {
-								fr = cc.query(allTransactions[idx][i]);
+								fr = cc.simulate(allTransactions[idx][i]);
 							}
 						} else {
 							if (isSyncMode) {
@@ -412,7 +432,7 @@ public class StressPanel extends JPanel {
 			}
 
 			int futureCount = frs.size();
-			resultArea.setText("Awaiting " + futureCount + " results...");
+			publish("Awaiting " + futureCount + " results...");
 
 			List<Result> results = ThreadUtils.completeAll(frs).get();
 			long endTime = Utils.getCurrentTimestamp();
@@ -531,6 +551,7 @@ public class StressPanel extends JPanel {
 
 		@Override
 		protected void done() {
+			btnRun.setEnabled(true);
 			try {
 				resultArea.setText(get());
 			} catch (Exception e) {

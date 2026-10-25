@@ -2,6 +2,7 @@ package convex.gui.wallet;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JLabel;
@@ -19,6 +20,7 @@ import convex.gui.components.BalanceLabel;
 import convex.gui.components.DecimalAmountField;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.models.ComboModel;
+import convex.gui.utils.Async;
 import convex.gui.utils.Toolkit;
 import convex.net.IPUtils;
 import net.miginfocom.swing.MigLayout;
@@ -64,19 +66,21 @@ public class TransferPanel extends AbstractGUI {
 		// Main action buttons
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.add(new ActionButton("Transfer!",0xe933,e->{
-			try {
-				Result done = executeTransfer();
-				if (done==null) {
-					return;
-				} else if (done.isError()) {
-					JOptionPane.showMessageDialog(this, "Transfer failed!\n"+done.getErrorCode()+"\n"+done.getValue());
+			AInteger amount=amountField.getAmount();
+			if (amount==null) {
+				JOptionPane.showMessageDialog(this, "Please specify a valid amount to transfer");
+				return;
+			}
+			Address target=addressCombo.getAddress();
+			Async.whileBusy(e, executeTransfer(amount,target).thenAcceptAsync(r->{
+				if (r.isError()) {
+					JOptionPane.showMessageDialog(this, Toolkit.plainMessage("Transfer failed!\n"+r.getErrorCode()+"\n"+r.getValue()));
 				} else {
+					model.ensureContains(target);
 					super.closeGUI();
 				}
-			} catch (InterruptedException e1) {
-				Thread.currentThread().interrupt();
-			}
-		})); 
+			}, Async.EDT));
+		}));
 		actionPanel.add(new ActionButton("Close",0xe5c9,e->{
 			super.closeGUI();
 		})); 
@@ -96,7 +100,7 @@ public class TransferPanel extends AbstractGUI {
 		panel.add(new JLabel("Balance:"),"span 2");
 		balanceLabel=new BalanceLabel();
 		balanceLabel.setDecimals(token.getDecimals());
-		balanceLabel.setBalance(token.getBalance(convex).join());
+		balanceLabel.show(token.getBalance(convex));
 		balanceLabel.setToolTipText("Current balance available in account "+address);
 		panel.add(balanceLabel,"span");
 
@@ -114,24 +118,14 @@ public class TransferPanel extends AbstractGUI {
 	}
 	
 	
-	protected Result executeTransfer() throws InterruptedException {
-		AInteger amount=amountField.getAmount();
-		if (amount==null) {
-			JOptionPane.showMessageDialog(this, "Please specify a valid amount to transfer");
-			return null;
-		}
-		Address target=addressCombo.getAddress();
+	protected CompletableFuture<Result> executeTransfer(AInteger amount, Address target) {
 		String qs;
 		if (token.isConvex()) {
 			qs="(transfer "+target+" "+amount+")";
 		} else {
 			qs="(@convex.asset/transfer "+target +" [ "+token.getID()+" "+amount+" ])";
 		}
-		System.out.println(qs);
-
-		Result r = convex.transactSync(qs);
-		if (!r.isError()) model.ensureContains(target);
-		return r;
+		return convex.transact(qs);
 	}
 
 	public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {

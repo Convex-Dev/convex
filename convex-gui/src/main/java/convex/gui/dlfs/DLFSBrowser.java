@@ -47,7 +47,7 @@ import convex.gui.state.StateExplorer;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSLattice;
@@ -59,6 +59,7 @@ import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -112,7 +113,7 @@ public class DLFSBrowser extends AbstractGUI {
 	private AccountKey ownerKey;
 
 	/** Cursor into the owner's unsigned drives map (writes re-sign via SignedCursor) */
-	private ALatticeCursor<AHashMap<AString, AVector<ACell>>> drivesCursor;
+	private AForkableCursor<AHashMap<AString, AVector<ACell>>> drivesCursor;
 
 	/** Active drives keyed by name (insertion ordered) */
 	private final Map<String, DLFSLocal> drives = new LinkedHashMap<>();
@@ -144,6 +145,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 	public DLFSBrowser(File storeFile) {
 		super("DLFS Browser");
+		own(this::shutdown);
 
 		// Launch NodeServer with Etch store
 		openStore(storeFile);
@@ -285,20 +287,18 @@ public class DLFSBrowser extends AbstractGUI {
 
 			// Local-only mode (port -1): persistence + cursor, no Netty network server
 			NodeConfig localConfig = NodeConfig.create(Maps.of(NodeConfig.PORT, CVMLong.create(-1)));
-			nodeServer = new NodeServer<>(OWNER_LATTICE, etchStore, localConfig);
 
-			// Set merge context with signing key for OwnerLattice verification
+			// The relay host's live application verifies owners and signs with this key;
+			// the node replicates; the browser saves through the host explicitly.
 			LatticeContext ctx = LatticeContext.create(null, keyPair);
-			nodeServer.setMergeContext(ctx);
+			nodeServer = new NodeServer<>(RelayHost.open(OWNER_LATTICE, etchStore, ctx), localConfig);
 			nodeServer.launch();
 
 			// Navigate to owner's signed entry, wrap in SignedCursor
-			ALatticeCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
+			AForkableCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
 				nodeServer.getCursor();
-			@SuppressWarnings("unchecked")
-			ALatticeCursor<SignedData<AHashMap<AString, AVector<ACell>>>> ownerEntry =
-				(ALatticeCursor<SignedData<AHashMap<AString, AVector<ACell>>>>) (ALatticeCursor<?>) rootCursor.path(ownerKey);
-			drivesCursor = SignedCursor.create(ownerEntry, DRIVES_MAP_LATTICE, ctx);
+			var rule=OWNER_LATTICE.signingFor(ownerKey);
+			drivesCursor = SignedCursor.create(rootCursor.path(ownerKey),v -> rule.sign(ctx,v));
 
 			// Rebuild drives from restored lattice state
 			drives.clear();
@@ -306,7 +306,7 @@ public class DLFSBrowser extends AbstractGUI {
 			if (driveMap != null && !driveMap.isEmpty()) {
 				for (Map.Entry<AString, AVector<ACell>> entry : driveMap.entrySet()) {
 					String name = entry.getKey().toString();
-					ALatticeCursor<AVector<ACell>> driveCursor = drivesCursor.path(entry.getKey());
+					AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.path(entry.getKey());
 					DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
 					drives.put(name, driveFS);
 				}
@@ -359,6 +359,7 @@ public class DLFSBrowser extends AbstractGUI {
 		if (nodeServer != null) {
 			try {
 				nodeServer.close();
+				nodeServer.getHost().close();
 			} catch (IOException e) {
 				log.warn("Error closing NodeServer: {}", e.getMessage());
 			}
@@ -381,8 +382,10 @@ public class DLFSBrowser extends AbstractGUI {
 		if (drives.containsKey(name)) return false;
 
 		AString cvmName = Strings.create(name);
-		ALatticeCursor<AVector<ACell>> driveCursor = drivesCursor.path(cvmName);
-		driveCursor.set(DLFSNode.createDirectory(CVMLong.ZERO));
+		AVector<ACell> initial=DLFSNode.createDirectory(CVMLong.ZERO);
+		drivesCursor.updateAndGet(current -> (current==null?DRIVES_MAP_LATTICE.zero():current)
+			.assoc(cvmName,initial));
+		AForkableCursor<AVector<ACell>> driveCursor = drivesCursor.path(cvmName);
 
 		DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
 		drives.put(name, driveFS);
@@ -425,7 +428,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 		// Clear from lattice
 		AString cvmName = Strings.create(name);
-		ALatticeCursor<AVector<ACell>> cursor = drivesCursor.path(cvmName);
+		AForkableCursor<AVector<ACell>> cursor = drivesCursor.path(cvmName);
 		cursor.set(null);
 
 		// Remove from WebDAV
@@ -637,24 +640,12 @@ public class DLFSBrowser extends AbstractGUI {
 
 	@Override
 	public void afterRun() {
-		getFrame().setJMenuBar(menuBar);
+		JFrame frame=getFrame();
+		if (frame!=null) frame.setJMenuBar(menuBar); // null if closed before shown
 		super.afterRun();
 	}
 
-	@Override
-	public void setupFrame(JFrame frame) {
-		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		frame.getContentPane().setLayout(new MigLayout());
-		frame.getContentPane().add(this, "dock center");
-		frame.addWindowListener(new java.awt.event.WindowAdapter() {
-			@Override
-			public void windowClosing(java.awt.event.WindowEvent e) {
-				shutdown();
-			}
-		});
-	}
-
-	/** Idempotent shutdown — safe to call from windowClosing, close(), etc. */
+	/** Stops the browser, WebDAV and the NodeServer (persisting state). Released on close. */
 	private void shutdown() {
 		if (panel != null) {
 			panel.close();
@@ -664,12 +655,6 @@ public class DLFSBrowser extends AbstractGUI {
 			webdavServer = null;
 		}
 		closeNodeServer();
-	}
-
-	@Override
-	public void close() {
-		shutdown();
-		super.close();
 	}
 
 	public static void main(String[] args) {

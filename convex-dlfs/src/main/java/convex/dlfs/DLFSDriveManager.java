@@ -10,7 +10,7 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.fs.DLFS;
 
 /**
@@ -35,9 +35,15 @@ public class DLFSDriveManager {
 	private final ConcurrentHashMap<String, FileSystem> drives = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<Object,DLFSDrives> componentRoutes=new ConcurrentHashMap<>();
 	private final boolean ephemeralFallback;
+	private final Runnable afterSync;
 
 	private DLFSDriveManager(boolean ephemeralFallback) {
+		this(ephemeralFallback,() -> {});
+	}
+
+	private DLFSDriveManager(boolean ephemeralFallback,Runnable afterSync) {
 		this.ephemeralFallback=ephemeralFallback;
+		this.afterSync=java.util.Objects.requireNonNull(afterSync);
 	}
 
 	/**
@@ -48,6 +54,15 @@ public class DLFSDriveManager {
 	 */
 	public static DLFSDriveManager createRouter() {
 		return new DLFSDriveManager(false);
+	}
+
+	/**
+	 * Creates a service router with an explicit completion policy. The service
+	 * owner may publish enclosing applications/hosts here after local sync, or
+	 * schedule that work itself. Components retain no link to this policy.
+	 */
+	public static DLFSDriveManager createRouter(Runnable afterSync) {
+		return new DLFSDriveManager(false,afterSync);
 	}
 
 	/**
@@ -65,19 +80,24 @@ public class DLFSDriveManager {
 	 *
 	 * @param drivesCursor Cursor over a {@code MapLattice<AString, DLFSLattice>}
 	 */
-	public DLFSDriveManager(ALatticeCursor<AHashMap<AString, AVector<ACell>>> drivesCursor) {
+	public DLFSDriveManager(AForkableCursor<AHashMap<AString, AVector<ACell>>> drivesCursor) {
 		this(DLFSDrives.wrap(drivesCursor));
 	}
 
 	/**
 	 * Creates a manager with one owner's component-backed drives mounted for
-	 * anonymous requests. Blob persistence delegates through the component's
-	 * physical region, application and root.
+	 * anonymous requests. Streamed blob data is checkpointed into the component's
+	 * store, if it has one.
 	 *
 	 * @param drives Component representing this owner's drives
 	 */
 	public DLFSDriveManager(DLFSDrives drives) {
-		this(false);
+		this(drives,() -> {});
+	}
+
+	/** Mounts one owner with a caller-defined service completion policy. */
+	public DLFSDriveManager(DLFSDrives drives,Runnable afterSync) {
+		this(false,afterSync);
 		mount(null,drives);
 	}
 
@@ -153,16 +173,12 @@ public class DLFSDriveManager {
 	public synchronized boolean createDrive(String identity, String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
-		if (componentDrives!=null) return createCursorDrive(componentDrives,driveName);
+		if (componentDrives!=null) return componentDrives.createDrive(driveName,MAX_DRIVES_PER_IDENTITY)!=null;
 		if (!ephemeralFallback) return false;
 		String key = driveKey(identity, driveName);
 		if (listDrives(identity).size() >= MAX_DRIVES_PER_IDENTITY) return false;
 		FileSystem existing = drives.putIfAbsent(key, DLFS.createLocal());
 		return existing == null;
-	}
-
-	private boolean createCursorDrive(DLFSDrives componentDrives, String driveName) {
-		return componentDrives.createDrive(driveName,MAX_DRIVES_PER_IDENTITY)!=null;
 	}
 
 	/**
@@ -175,13 +191,9 @@ public class DLFSDriveManager {
 	public synchronized boolean deleteDrive(String identity, String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
-		if (componentDrives!=null) return deleteCursorDrive(componentDrives,driveName);
+		if (componentDrives!=null) return componentDrives.deleteDrive(driveName);
 		if (!ephemeralFallback) return false;
 		return drives.remove(driveKey(identity, driveName)) != null;
-	}
-
-	private boolean deleteCursorDrive(DLFSDrives componentDrives, String driveName) {
-		return componentDrives.deleteDrive(driveName);
 	}
 
 	/**
@@ -216,7 +228,7 @@ public class DLFSDriveManager {
 	public synchronized boolean renameDrive(String identity, String oldName, String newName) {
 		if (!DLFSPathValidator.isValidDriveName(oldName) || !DLFSPathValidator.isValidDriveName(newName)) return false;
 		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
-		if (componentDrives!=null) return renameCursorDrive(componentDrives,oldName,newName);
+		if (componentDrives!=null) return componentDrives.renameDrive(oldName,newName);
 		if (!ephemeralFallback) return false;
 		if (oldName.equals(newName)) return getDrive(identity, oldName) != null;
 		String oldKey = driveKey(identity, oldName);
@@ -232,26 +244,31 @@ public class DLFSDriveManager {
 		return true;
 	}
 
-	private boolean renameCursorDrive(DLFSDrives componentDrives, String oldName, String newName) {
-		return componentDrives.renameDrive(oldName,newName);
-	}
-
 	/**
-	 * Synchronises every mounted component to its parent or hosted root. Detached
-	 * identities have no persistence boundary and do nothing.
+	 * Synchronises every mounted component to its immediate destination, then runs
+	 * the service's completion policy. The default policy does nothing.
 	 */
 	public void sync() {
 		for (DLFSDrives mounted:new HashSet<>(componentRoutes.values())) mounted.sync();
+		afterSync.run();
 	}
 
 	/**
-	 * Synchronises only the component mounted for one identity.
+	 * Synchronises the component mounted for one identity, then runs the service's
+	 * completion policy.
 	 *
 	 * @param identity External identity, or null for anonymous requests
 	 */
 	public void sync(String identity) {
 		DLFSDrives mounted=componentRoutes.get(identityKey(identity));
 		if (mounted!=null) mounted.sync();
+		afterSync.run();
+	}
+
+	/** Completes a file mutation through its local boundary and the service policy. */
+	public void syncDrive(FileSystem fileSystem) {
+		if (fileSystem instanceof convex.lattice.fs.DLFileSystem dlfs) dlfs.sync();
+		afterSync.run();
 	}
 
 	/**

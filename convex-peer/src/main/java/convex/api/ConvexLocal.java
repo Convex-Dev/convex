@@ -171,6 +171,12 @@ public class ConvexLocal extends AConvexConnected {
 	}
 
 	@Override
+	protected Long localSequence(Address origin) {
+		AccountStatus as=getState().getAccount(origin);
+		return (as==null)?null:as.getSequence();
+	}
+
+	@Override
 	public long getSequence(Address addr) {
 		if (Cells.equals(address, addr)) return getSequence();
 		return getState().getAccount(addr).getSequence();

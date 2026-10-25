@@ -28,7 +28,6 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ACell;
-import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -53,22 +52,21 @@ public class EtchStoreTest {
 	private static EtchStore store = Samples.TEST_STORE;
 
 	@Test
-	public void testEmptyStore() throws IOException {
+	public void testPersistNewValue() throws IOException {
 		assertNull(store.refForHash(BAD_HASH));
 
-		AMap<ACell, ACell> data = Maps.of(Keywords.FOO,Symbols.FOO);
-		Ref<AMap<ACell, ACell>> goodRef = data.getRef();
+		// The store is shared with concurrent tests: use fresh, non-embedded data.
+		Blob data = Blob.createRandom(new Random(),Format.MAX_EMBEDDED_LENGTH+1);
+		Ref<Blob> goodRef = data.getRef();
 		Hash goodHash = goodRef.getHash();
 		assertNull(store.refForHash(goodHash));
+		assertFalse(data.isEmbedded());
 
 		goodRef.persist(store);
 
-		if (!data.isEmbedded()) {
-			Ref<AMap<ACell, ACell>> recRef = store.refForHash(goodHash);
-			assertNotNull(recRef);
-
-			assertEquals(data, recRef.getValue());
-		}
+		Ref<Blob> recRef = store.refForHash(goodHash);
+		assertNotNull(recRef);
+		assertEquals(data, recRef.getValue());
 	}
 	
 	@Test public void testStoreTopRef() throws IOException {

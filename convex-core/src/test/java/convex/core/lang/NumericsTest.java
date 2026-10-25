@@ -7,21 +7,29 @@ import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+
+import java.math.BigInteger;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import convex.core.Constants;
 import convex.core.cvm.Context;
+import convex.core.cvm.Migrations;
+import convex.core.cvm.exception.ErrorValue;
+import convex.core.data.ACell;
 import convex.core.data.ObjectsTest;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.init.InitTest;
 
 /**
  * 
@@ -100,6 +108,28 @@ public class NumericsTest extends ACVMTest {
 		assertCastError(step("(- nil)"));
 		assertCastError(step("(- 1 [])"));
 	}
+
+	@ParameterizedTest
+	@ValueSource(longs = {0, 1})
+	public void testMinusIntermediateOverflow(long version) {
+		var minimum=CVMBigInteger.wrap(BigInteger.ONE
+			.shiftLeft(Constants.MAX_BIG_INTEGER_LENGTH*8-1).negate());
+		assertNotNull(minimum);
+		var state=Migrations.applyTo(InitTest.STATE,version);
+		ACell[][] cases={
+			{CVMLong.ONE,minimum,CVMLong.ZERO},
+			{minimum,CVMLong.ONE,CVMLong.ZERO},
+			{CVMLong.ONE,CVMLong.ZERO,minimum,CVMLong.ZERO},
+			{CVMLong.ONE,minimum,minimum}
+		};
+		for (ACell[] args:cases) {
+			assertNull(RT.minus(args));
+			var result=Core.MINUS.invoke(Context.create(state,HERO),args);
+			assertEquals(ErrorValue.INVALID_NUMERIC,result.getExceptional());
+		}
+		// The boundary itself remains valid when no intermediate result overflows.
+		assertEquals(minimum,RT.minus(new ACell[] {minimum,CVMLong.ZERO,CVMLong.ZERO}));
+	}
 	
 	@Test
 	public void testDivisionConsistency() {
@@ -143,17 +173,40 @@ public class NumericsTest extends ACVMTest {
 		doIntConsistencyChecks(CVMBigInteger.MIN_POSITIVE,Long.MAX_VALUE);
 		doIntConsistencyChecks(156756567568L,CVMBigInteger.MIN_NEGATIVE);
 	}
+
+	@ParameterizedTest
+	@ValueSource(longs = {0,1})
+	public void testModMinimumInteger(long version) {
+		BigInteger magnitude=BigInteger.ONE.shiftLeft(Constants.MAX_BIG_INTEGER_LENGTH*8-1);
+		var divisor=CVMBigInteger.wrap(magnitude.negate());
+		assertNotNull(divisor);
+		assertNull(divisor.negate()); // The positive magnitude cannot be a CVM integer.
+		var state=Migrations.applyTo(InitTest.STATE,version);
+		for (long value:new long[] {Long.MIN_VALUE,-7,-1,0,1,7,Long.MAX_VALUE}) {
+			var dividend=CVMLong.create(value);
+			// |dividend| < |divisor|: a negative dividend wraps once; others stay unchanged.
+			var expected=AInteger.create(value<0?magnitude.add(dividend.big()):dividend.big());
+			assertNotNull(expected);
+			assertEquals(expected,dividend.mod(divisor));
+			var result=Core.MOD.invoke(Context.create(state,HERO),new ACell[] {dividend,divisor});
+			assertNotError(result);
+			assertEquals(expected,result.getResult());
+			// Euclidean division identity and idempotence, including big remainders.
+			assertEquals(dividend.big(),divisor.big().multiply(dividend.div(divisor).big()).add(expected.big()));
+			assertEquals(expected,expected.mod(divisor));
+		}
+	}
 	
 	private void doIntConsistencyChecks(Object oa, Object ob) {
 		AInteger a=AInteger.parse(oa);
-		AInteger b=AInteger.parse(oa);
+		AInteger b=AInteger.parse(ob);
 		if (!b.isZero()) {
 			assertTrue(evalB("(let [a "+a+" b "+b+"] (== a (+ (* b (quot a b)) (rem a b))) )"));
 			assertTrue(evalB("(let [a "+a+" b "+b+"] (== (mod a b) (mod (mod a b) b)) )"));
-			assertTrue(evalB("(let [a "+a+" b "+b+"] (== (quot (* a b) b) ))"));
+			assertTrue(evalB("(let [a "+a+" b "+b+"] (== a (quot (* a b) b)))"));
 		}
 		
-		assertTrue(evalB("(let [a "+a+" b "+b+"] (== (- (+ a b) b) ))"));
+		assertTrue(evalB("(let [a "+a+" b "+b+"] (== a (- (+ a b) b)))"));
 		
 	}
 	

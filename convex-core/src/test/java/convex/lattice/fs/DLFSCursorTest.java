@@ -4,18 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.atomic.AtomicReference;
-
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -23,13 +23,17 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.LatticeHost;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.Root;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.impl.DLFSLocal;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
@@ -45,6 +49,27 @@ import convex.lattice.generic.OwnerLattice;
  * - Syncing changes back via lattice merge
  */
 public class DLFSCursorTest {
+
+	@Test void namedDriveNavigationDistinguishesAbsenceFromIncompatibleParents() throws Exception {
+		var root=new Root<ACell>();
+		var name=Strings.intern("home");
+		assertNull(DLFS.open(root,name));
+		assertNull(root.get(),"Opening must not initialise a drive map");
+		for (ACell bad:new ACell[] {CVMLong.ONE,Index.none()}) {
+			root.set(bad);
+			assertThrows(IllegalStateException.class,() -> DLFS.open(root,name));
+			assertThrows(IllegalStateException.class,() -> DLFS.connect(root,name));
+			assertSame(bad,root.get());
+		}
+		var other=Strings.intern("other");
+		root.set(Maps.of(other,CVMLong.ONE));
+		try (var created=DLFS.connect(root,name); var opened=DLFS.open(root,name)) {
+			assertNotNull(opened);
+			Files.writeString(created.getPath("/hello"),"hello");
+			assertEquals("hello",Files.readString(opened.getPath("/hello")));
+			assertSame(CVMLong.ONE,((AHashMap<?,?>)root.get()).get(other));
+		}
+	}
 
 	@Test
 	public void testStandaloneDLFS() throws Exception {
@@ -67,7 +92,7 @@ public class DLFSCursorTest {
 	public void testConnectedDLFS() throws Exception {
 		// Create a root lattice cursor simulating a drives map: {driveName -> DLFSNode}
 		MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> root = Cursors.createLattice(drivesLattice);
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> root = Cursors.root(drivesLattice.zero());
 
 		// Connect a named drive to the root
 		AString driveName = Strings.create("test");
@@ -123,33 +148,35 @@ public class DLFSCursorTest {
 	}
 
 	@Test
-	public void testSyncReachesRootCallback() throws Exception {
-		// Simulates what NodeServer does: root cursor with onSync callback
+	public void testLiveViewSyncDoesNotPublishHost() throws Exception {
+		// Simulates what NodeServer does: a host whose publication policy is observable
 		MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattice.INSTANCE);
-		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> root =
-			(RootLatticeCursor<AHashMap<AString, AVector<ACell>>>) Cursors.createLattice(drivesLattice);
+		LatticeHost<AHashMap<AString, AVector<ACell>>> host =
+			LatticeHost.create(drivesLattice.zero(), null);
 
-		// Track sync callbacks (like NodeServer's propagator trigger)
+		// Track publications (like NodeServer's propagator trigger)
 		AtomicReference<ACell> synced = new AtomicReference<>();
-		root.onSync(value -> { synced.set(value); return value; });
+		host.attachPublisher(value -> { synced.set(value); return value; });
 
 		// Connect a drive and write
 		AString driveName = Strings.create("vault");
-		DLFSLocal dlfs = DLFS.connect(root, driveName);
+		DLFSLocal dlfs = DLFS.connect(host.cursor(), driveName);
 		Files.writeString(dlfs.getPath("/test.txt"), "sync me!");
 
-		// Before sync: callback should not have been triggered
-		assertNull(synced.get(), "onSync should not fire until sync() is called");
+		// Before sync: publication should not have run
+		assertNull(synced.get(), "publication should not run until host.sync() is called");
 
 		// Sync from the drive level
 		dlfs.sync();
+		assertNull(synced.get(),"A live filesystem view must not publish its containing host");
+		host.sync();
 
-		// After sync: callback should have the full root value including file content
-		assertNotNull(synced.get(), "onSync should fire after sync()");
+		// After sync: the policy saw the full root value including file content
+		assertNotNull(synced.get(), "publication should run on host.sync()");
 
 		// Verify content survives a round-trip through the synced value
 		AHashMap<AString, AVector<ACell>> syncedMap = (AHashMap<AString, AVector<ACell>>) synced.get();
-		DLFSLocal restored = DLFS.connect(Cursors.createLattice(drivesLattice, syncedMap), driveName);
+		DLFSLocal restored = DLFS.connect(Cursors.root(syncedMap), driveName);
 		assertEquals("sync me!", Files.readString(restored.getPath("/test.txt")),
 			"File content should survive sync round-trip");
 	}
@@ -171,18 +198,18 @@ public class DLFSCursorTest {
 		AString driveName = Strings.create("health-vault");
 		Keyword DLFS_KW = Keyword.intern("dlfs");
 
-		OwnerLattice<?> dlfsUsersLattice = OwnerLattice.create(
+		OwnerLattice<AHashMap<AString, AVector<ACell>>> dlfsUsersLattice = OwnerLattice.create(
 			MapLattice.create(DLFSLattice.INSTANCE));
 		KeyedLattice rootLattice = KeyedLattice.create(DLFS_KW, dlfsUsersLattice);
 
 		LatticeContext ctx = LatticeContext.create(null, kp);
-		RootLatticeCursor<Index<Keyword, ACell>> rootCursor =
-			Cursors.createLattice(rootLattice, (Index<Keyword, ACell>) Index.EMPTY, ctx);
+		Root<Index<Keyword, ACell>> rootCursor =
+			Cursors.root((Index<Keyword, ACell>) Index.EMPTY);
 
-		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
-		dlfsCursor.setContext(ctx);
-		ALatticeCursor<?> userCursor = dlfsCursor.path(ak, Keywords.VALUE);
+		AForkableCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
+		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
 		DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
+		dlfs.setClock(ctx::currentTimestamp);
 
 		Files.createDirectory(dlfs.getPath("/tmp"));
 		Files.writeString(dlfs.getPath("/tmp/deleteme.txt"), "delete me");
@@ -209,21 +236,20 @@ public class DLFSCursorTest {
 		AccountKey owner=keyPair.getAccountKey();
 		AString driveName=Strings.create("sync-race");
 		Keyword dlfsKey=Keyword.intern("dlfs");
-		OwnerLattice<?> owners=OwnerLattice.create(MapLattice.create(DLFSLattice.INSTANCE));
+		OwnerLattice<AHashMap<AString,AVector<ACell>>> owners=OwnerLattice.create(MapLattice.create(DLFSLattice.INSTANCE));
 		KeyedLattice rootLattice=KeyedLattice.create(dlfsKey,owners);
 		LatticeContext context=LatticeContext.create(timestamp,keyPair);
-		RootLatticeCursor<Index<Keyword,ACell>> root=Cursors.createLattice(
-			rootLattice,(Index<Keyword,ACell>)Index.EMPTY,context);
-		ALatticeCursor<?> region=root.path(dlfsKey);
-		region.setContext(context);
-		DLFSLocal fileSystem=DLFS.connect(region.path(owner,Keywords.VALUE),driveName);
+		LatticeHost<Index<Keyword,ACell>> root=LatticeHost.create((Index<Keyword,ACell>)Index.EMPTY,null);
+		AForkableCursor<?> region=root.cursor().path(dlfsKey);
+		DLFSLocal fileSystem=DLFS.connect(convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(region,owners,owner), owners, owner, context),driveName);
+		fileSystem.setClock(context::currentTimestamp);
 		Path path=fileSystem.getPath("/recreated");
 		Files.write(path,new byte[] {1});
 		Files.delete(path);
 
 		CountDownLatch snapshotTaken=new CountDownLatch(1);
 		CountDownLatch continueSync=new CountDownLatch(1);
-		root.onSync(snapshot->{
+		root.attachPublisher(snapshot->{
 			snapshotTaken.countDown();
 			try {
 				continueSync.await();
@@ -245,7 +271,7 @@ public class DLFSCursorTest {
 		snapshotTaken.await();
 
 		// The local update clears the equal-time tombstone while sync still holds
-		// the older deleted snapshot. On CAS failure, current/local is the own value.
+		// the older deleted snapshot. The host's CAS fails and the local write stays.
 		Files.write(path,new byte[] {2});
 		continueSync.countDown();
 		syncThread.join();
@@ -271,18 +297,18 @@ public class DLFSCursorTest {
 		AString driveName = Strings.create("vault");
 		Keyword DLFS_KW = Keyword.intern("dlfs");
 
-		OwnerLattice<?> dlfsUsersLattice = OwnerLattice.create(
+		OwnerLattice<AHashMap<AString, AVector<ACell>>> dlfsUsersLattice = OwnerLattice.create(
 			MapLattice.create(DLFSLattice.INSTANCE));
 		KeyedLattice rootLattice = KeyedLattice.create(DLFS_KW, dlfsUsersLattice);
 
 		LatticeContext ctx = LatticeContext.create(null, kp);
-		RootLatticeCursor<Index<Keyword, ACell>> rootCursor =
-			Cursors.createLattice(rootLattice, (Index<Keyword, ACell>) Index.EMPTY, ctx);
+		Root<Index<Keyword, ACell>> rootCursor =
+			Cursors.root((Index<Keyword, ACell>) Index.EMPTY);
 
-		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
-		dlfsCursor.setContext(ctx);
-		ALatticeCursor<?> userCursor = dlfsCursor.path(ak, Keywords.VALUE);
+		AForkableCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
+		AForkableCursor<?> userCursor = convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(dlfsCursor,dlfsUsersLattice,ak), dlfsUsersLattice, ak, ctx);
 		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
+		dlfs.setClock(ctx::currentTimestamp);
 
 		String[] dirs = { "alpha", "beta", "gamma" };
 		java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);

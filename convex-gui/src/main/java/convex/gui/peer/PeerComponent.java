@@ -37,8 +37,8 @@ import convex.gui.components.CodeLabel;
 import convex.gui.components.DropdownMenu;
 import convex.gui.components.Identicon;
 import convex.gui.etch.EtchWindow;
-import convex.gui.keys.KeyRingPanel;
-import convex.gui.models.StateModel;
+import convex.gui.keys.KeyAccess;
+import convex.gui.keys.KeyRing;
 import convex.gui.repl.REPLClient;
 import convex.gui.server.PeerWindow;
 import convex.gui.state.StateExplorer;
@@ -49,9 +49,12 @@ import convex.peer.Server;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class PeerComponent extends BaseListComponent {
+public class PeerComponent extends BaseListComponent implements AutoCloseable {
 
 	public ConvexLocal convex;
+
+	/** Updates from the peer's server, stopped on close */
+	private final PeerStateUpdates updates;
 	CodeLabel description;
 	
 	private static final Logger log = LoggerFactory.getLogger(PeerComponent.class.getName());
@@ -61,6 +64,7 @@ public class PeerComponent extends BaseListComponent {
 		Server server=peer.getLocalServer();
 		ConvexLocal newConvex=connectLocalControllerWallet(server);
 		PeerWindow pw = new PeerWindow(newConvex);
+		pw.own(newConvex);
 		pw.run();
 	}
 
@@ -69,8 +73,9 @@ public class PeerComponent extends BaseListComponent {
 		Address controller=server.getPeerController();
 		if (controller!=null) try {
 			AccountKey key=server.getPeer().getConsensusState().getAccount(controller).getAccountKey();
-			AWalletEntry we=KeyRingPanel.getKeyRingEntry(key);
-			kp=we.getKeyPair();
+			// Asks for the controller key's password if locked; without it the window is read-only
+			AWalletEntry we=KeyRing.get().find(key);
+			kp=KeyAccess.unlockForUse(this, we);
 		} catch (Exception e) {
 			log.warn("Error getting controller details",e);
 		}
@@ -171,7 +176,10 @@ public class PeerComponent extends BaseListComponent {
 		
 		JMenuItem walletButton = new JMenuItem("Open controller Wallet",Toolkit.menuIcon(0xe850));
 		walletButton.addActionListener(e -> {
-			new WalletApp(connectLocalControllerWallet(server),true).run();
+			ConvexLocal walletConvex=connectLocalControllerWallet(server);
+			WalletApp wallet=new WalletApp(walletConvex);
+			wallet.own(walletConvex);
+			wallet.run();
 		});
 		popupMenu.add(walletButton);
 		
@@ -192,17 +200,10 @@ public class PeerComponent extends BaseListComponent {
 		// Block view at bottom
 		
 		JPanel blockView = new BlockViewComponent(convex);
-		StateModel<Peer> model=PeerGUI.getStateModel(convex);
-		if (model!=null) {
-			model.addPropertyChangeListener(e->{
-				blockView.repaint();
-				description.setText(getPeerDescription());
-			});
-			
-			model.addPropertyChangeListener(e->{
-				updateDescription();
-			});
-		}
+		updates=new PeerStateUpdates(server,()->{
+			blockView.repaint();
+			updateDescription();
+		});
 		add(blockView, "dock south");
 
 		
@@ -260,13 +261,21 @@ public class PeerComponent extends BaseListComponent {
 			}
 			
 			convex.setAddress(addr,kp);
-			new REPLClient(convex,true).run();
+			REPLClient client=new REPLClient(convex);
+			client.own(convex);
+			client.run();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
-	
+
+	/** Stops following the peer's server */
+	@Override
+	public void close() {
+		updates.close();
+	}
+
 	public String getPeerDescription() {
 		StringBuilder sb=new StringBuilder();
 		Server server=convex.getLocalServer();

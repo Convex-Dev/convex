@@ -7,6 +7,7 @@ import convex.core.data.ACell;
 import convex.core.data.AEncoder;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
+import convex.core.data.Format;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.SoftCache;
@@ -41,7 +42,7 @@ public abstract class ACachedStore extends AStore {
 	protected final SoftCache<Hash, ACell> softCache;
 
 	/**
-	 * Store-bound encoder. Manages thread-local store context during decode.
+	 * Encoder whose branch references resolve against this store.
 	 */
 	protected final CVMEncoder encoder=new CVMEncoder(this);
 
@@ -70,13 +71,21 @@ public abstract class ACachedStore extends AStore {
 	@Override
 	@SuppressWarnings("unchecked")
 	public final <T extends ACell> T decode(Blob encoding) throws BadFormatException {
-		Hash hash=encoding.getContentHash();
+		// Never hash embedded bytes just to probe the cache. Reuse an existing
+		// hash when available, including explicitly persisted embedded roots.
+		boolean embedded=encoding.count()<=Format.MAX_EMBEDDED_LENGTH;
+		Hash hash=embedded?encoding.cachedContentHash():encoding.getContentHash();
+		if (hash==null) {
+			ACell decoded=encoder.decode(encoding);
+			decodes.increment();
+			return (T) decoded;
+		}
 
 		// L1: array probe
 		Ref<?> cached= refCache.getCell(hash);
 		if (cached!=null) {
 			l1Hits.increment();
-			return (T) cached.getValue();
+			return (T) CVMEncoder.specialise(cached.getValue());
 		}
 
 		// L2: soft cache
@@ -85,13 +94,14 @@ public abstract class ACachedStore extends AStore {
 			if (hit != null) {
 				l2Hits.increment();
 				refCache.putDecoded(hit); // promote without importing foreign status
-				return (T) hit;
+				return (T) CVMEncoder.specialise(hit);
 			}
 		}
 
 		// Miss: full decode
 		ACell decoded = encoder.decode(encoding);
 		decodes.increment();
+		if (embedded) return (T) decoded; // no automatic admission of embedded values
 		refCache.putDecoded(decoded);
 		if (softCache != null) {
 			softCache.put(hash, decoded);

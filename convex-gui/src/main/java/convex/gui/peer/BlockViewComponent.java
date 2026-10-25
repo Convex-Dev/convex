@@ -51,7 +51,8 @@ public class BlockViewComponent extends JPanel {
 		int n = (int) blocks.count();
 
 		int W = 10;
-		long tw = W * PeerGUI.getMaxBlockCount();
+		// Show the most recent blocks of this peer's order
+		long tw = (long) W * n;
 		long offset = Math.max(0, tw - pw);
 
 		for (int i = (int) (offset / W); i < n; i++) {

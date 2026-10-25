@@ -211,14 +211,12 @@ public class DLFSWebDAV {
 	}
 
 	/**
-	 * Syncs the DLFS drive after a mutating operation to ensure lattice persistence.
+	 * Completes a mutation using the service owner's explicit publication policy.
 	 */
 	private void syncDrive(Context ctx, DrivePath dp) {
 		if (dp.driveName() == null) return;
 		FileSystem fs = driveManager.getDrive(getIdentity(ctx), dp.driveName());
-		if (fs instanceof DLFileSystem dlfs) {
-			dlfs.sync();
-		}
+		if (fs!=null) driveManager.syncDrive(fs);
 	}
 
 	private boolean writeCompleteFile(Path path, byte[] data) throws IOException {

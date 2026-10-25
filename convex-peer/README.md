@@ -78,6 +78,18 @@ Result result = convex.querySync("(balance #11)");
 `convex.api.Convex` also supports asynchronous queries (`query(...)` returning
 a future) and signed transactions once an address and key pair are set.
 
+Ordinary queries work with zero-balance accounts and use a balance-independent
+Juice allowance within the peer's execution limit. This is also the behaviour of
+the GUI's Query mode. Query results report execution Juice without charging coins
+or committing state.
+
+Use `simulate(transaction)` or `simulateSync(transaction)` for transaction
+accounting, including balance and memory checks and estimated costs. Supply the
+transaction's intended origin and sequence; simulation does not advance the client
+sequence or require a key. It does not validate signatures or sequence numbers,
+and the estimate reflects the peer snapshot and execution limit at that time.
+The existing transaction-payload query protocol remains supported for compatibility.
+
 ### Optional TLS Transport
 
 Unqualified addresses and `tcp://` use native TCP, the default transport.
@@ -150,7 +162,8 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 | `Convex` | Client API (`convex.api`) for queries and transactions against a peer |
 | `ConnectionManager` | Manages peer-to-peer network connections |
 | `BeliefPropagator` | Handles CPoS belief propagation protocol |
-| `NodeServer` | Authoritative lattice host (`convex.node`): merge, persistence and group notifications |
+| `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost` and notifies propagation groups |
+| `LatticeNode` | Optional TCP networking for a host: owns the server, listener and dynamic propagation groups |
 | `LatticeListener` | Application-owned inbound TCP transport and connection-to-group router |
 | `LatticePropagator` | Owns one filtered serving view, protocol endpoint and external route set |
 | `LatticeConnectionManager` | Maintains bounded connection intent and authenticated routes for one propagator; discovery schemas live in application modules |
@@ -159,17 +172,50 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 
 Alongside the consensus peer, this module provides a lightweight node server
 for lattice data regions — values that merge like CRDTs rather than passing
-through CPoS consensus. `NodeServer` (in `convex.node`) owns the authoritative
-value and persistence; `LatticePropagator` handles CAD036 messages and routes;
-and the application-owned `LatticeListener` provides the standard inbound TCP
-transport. None interprets application paths or records; the `convex-p2p`
-module layers node discovery, social selection and PoP routing on them.
+through CPoS consensus. `NodeServer` (in `convex.node`) replicates an assembled
+`LatticeHost`, which owns persistence and durability, while its applications own
+merge semantics; `LatticePropagator` handles CAD036 messages and routes; and the
+application-owned `LatticeListener` provides the standard inbound TCP transport.
+None interprets application paths or records; the `convex-p2p` module layers
+node discovery, social selection and PoP routing on them.
 
-- **Construction** - Create a `NodeServer` with a lattice (defining merge
-  semantics), a store and an optional `NodeConfig`, then call `launch()`.
+For ordinary TCP networking, wrap an assembled host in `LatticeNode`:
+
+```java
+host.addApplication(app);
+try (var network = new LatticeNode<>(host, NodeConfig.localNetwork()).launch()) {
+    network.setIdentity(nodeDID, nodeKey); // configured did:key and its signing key
+    var group = network.createPropagator();
+    network.serveAllInbound(group); // explicitly make this view available to inbound connections
+
+    // Use the application, connect peers, or add/remove groups while running.
+    app.sync();
+    host.sync();
+}
+```
+
+New groups inherit the configured node key; without an identity they have no
+transport key. For an indirect DID, supply the authoriser as the third argument
+to `setIdentity`. A group can override its own key. Changing the node default
+affects future groups only.
+
+The node closes its listener, groups and server, leaving the host and its
+caller-owned store usable. A host sync persists and schedules propagation;
+group announcement completes asynchronously. See the
+[reading-list example](src/test/java/convex/node/app/ReadingListApplicationTest.java)
+for a complete exchange with authenticated peer admission and staged publication,
+and the [mail example](src/test/java/convex/node/app/MailDeliveryTest.java) for
+path-specific pulls with separate node and user identities.
+
+The underlying components remain available for custom transport assembly:
+
+- **Construction** - Assemble a `LatticeHost` with its applications
+  (`RelayHost.open` covers the relay case: one live application over a whole
+  lattice), construct the `NodeServer` from it with an optional `NodeConfig`,
+  then call `launch()`.
 - **Transport composition** - Create `LatticeListener` separately, register the
   eligible propagators, install a selector, and close it before `NodeServer`.
-- **Configuration** - `NodeConfig` contains authoritative persistence, standard
+- **Configuration** - `NodeConfig` contains standard
   listener and application advertisement settings, but each component consumes
   only its own fields. Each independently
   constructed `LatticePropagatorConfig` controls one group's routes, protocol

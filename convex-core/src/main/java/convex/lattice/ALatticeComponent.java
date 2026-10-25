@@ -1,134 +1,152 @@
 package convex.lattice;
 
-import java.io.IOException;
+import java.util.Arrays;
+import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.store.AStore;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ForkedCursor;
 
 /**
- * Abstract base class for lattice application components that wrap a cursor.
+ * Domain operations over a cursor at one path.
  *
- * <p>A lattice component provides domain-specific access to a section of
- * lattice state. It wraps an {@link ALatticeCursor} and may have a parent
- * component representing its containing application policy. This relationship
- * need not be the cursor's logical parent: a fork, for example, keeps the same
- * containing component while its cursor synchronises to the original cursor.</p>
+ * <p>Lightweight components share a working cursor. Components with an independent
+ * publication boundary bind a {@link ForkedCursor} of their destination. Sync
+ * supplies this component's publication merge to that fork. Representation changes
+ * compose through destination cursor views, such as signing or projection.
+ * Publication uses ordinary cursor updates; there is no component parent link.
+ * The cursor knows nothing about lattices: the component declares the structure of
+ * the level it owns, supplying read/write functions for child views and binding
+ * the authoring functions of signing and stamping views.
+ * Merge and publication policy remain in components: {@link #merge} is a component's
+ * own behaviour for an incoming value at its level, delegating to a lattice or not.</p>
  *
- * <p>Implementations should create appropriate domain-specific getters
- * and setters rather than exposing raw {@code get()} / {@code set()}
- * on the cursor. This ensures type safety and encapsulates the
- * underlying lattice structure.</p>
+ * <p>No abstract lattice definition is required. Domain components may call lattice
+ * rules as implementation details. {@link LatticeComponent} adapts a supplied lattice
+ * when its generic merge and navigation are the intended component behaviour.</p>
+ *
+ * <p>Persistence belongs to the host ({@link LatticeHost}) and to components which
+ * explicitly own a store for their own data, such as DLFS drives.</p>
  *
  * @param <V> Value type of the wrapped cursor
  */
 public abstract class ALatticeComponent<V extends ACell> {
 
-	private final ALatticeComponent<?> parent;
-	protected final ALatticeCursor<V> cursor;
+	/** Working storage bound at construction; editing views do not move this boundary. */
+	protected final AForkableCursor<V> storage;
 
-	/**
-	 * Creates a standalone root component with no component parent.
-	 *
-	 * <p>Persistence fails unless the component overrides
-	 * {@link #persist(ACell)} with a concrete storage policy.</p>
-	 *
-	 * @param cursor Cursor wrapped by this component
-	 */
-	protected ALatticeComponent(ALatticeCursor<V> cursor) {
-		this(null,cursor);
+	/** Binds the supplied storage directly, without creating another fork. */
+	protected ALatticeComponent(AForkableCursor<V> cursor) {
+		this.storage=Objects.requireNonNull(cursor,"Component cursor must not be null");
 	}
 
 	/**
-	 * Creates a component nested under a parent component.
-	 *
-	 * @param parent Parent component providing containing application policy
-	 * @param cursor Cursor wrapped by this component
+	 * Binds the same domain operations and configuration to supplied working storage.
+	 * Recreate child and editing views against that storage; do not fork it or retain
+	 * children bound to this instance. Components supporting forks override this hook.
 	 */
-	protected ALatticeComponent(ALatticeComponent<?> parent, ALatticeCursor<V> cursor) {
-		if (cursor==null) throw new IllegalArgumentException("Component cursor must not be null");
-		this.parent=parent;
-		this.cursor = cursor;
+	protected ALatticeComponent<V> rebind(AForkableCursor<V> cursor) {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" does not support rebinding");
 	}
 
 	/**
-	 * Returns the containing policy component, if this is a nested component.
-	 *
-	 * @return Parent component, or {@code null} for a standalone root
+	 * Creates independent working state over this component's bound storage. Rebinding
+	 * reinstalls local editing policies around the new storage. Subclasses may refine
+	 * the return type; publication policy is supplied only when the fork syncs.
+	 * This is independent state with reconciliation, not a retrying transaction.
+	 * Use {@link TransactionalComponent} when domain operations must be rerun on
+	 * concurrent changes rather than selecting or merging competing results.
 	 */
-	protected final ALatticeComponent<?> parent() {
-		return parent;
+	public ALatticeComponent<V> fork() {
+		return rebind(storage.fork());
 	}
 
 	/**
-	 * Returns the physical store supplied by the containing host, if any.
-	 *
-	 * <p>This is an internal component resource: application factories should
-	 * continue to accept components rather than stores. Standalone components
-	 * which are not attached to a {@link RootComponent} return {@code null}.</p>
-	 *
-	 * @return Host store, or {@code null} when this component is not store-backed
+	 * Reconciles a working snapshot with a concurrently changed destination.
+	 * Called only when both sides changed, within the destination's atomic update.
+	 * Implementations must use the supplied values without mutating working state.
+	 * Staged components must define this operation; live views do not need it.
 	 */
-	protected AStore store() {
-		return (parent==null)?null:parent.store();
+	protected V mergePublication(V own,V other) {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no publication merge");
 	}
 
 	/**
-	 * Returns the underlying lattice cursor for direct operations.
-	 *
-	 * @return The cursor wrapped by this component
+	 * Returns the atomic editing view. Domain operations and children use this
+	 * accessor so an override can consistently apply policies such as timestamping.
+	 * A subclass can wrap {@code super.cursor()} during construction; constructors
+	 * must not invoke an override before its view is initialised. Updating this
+	 * cursor does not publish the component.
 	 */
-	public ALatticeCursor<V> cursor() {
-		return cursor;
+	public AForkableCursor<V> cursor() {
+		return storage;
 	}
 
 	/**
-	 * Persists a value using the policy supplied by the containing component.
-	 *
-	 * <p>The default implementation delegates to the parent component. A component
-	 * with no parent and no concrete storage policy fails rather than pretending
-	 * that the value was persisted. Hosting components may override this method to
-	 * persist into an underlying store.</p>
-	 *
-	 * <p>Persistence does not update or sync this component's cursor. Callers
-	 * that need store-backed references in their working state must install the
-	 * returned value explicitly.</p>
-	 *
-	 * @param <T> Cell type
-	 * @param value Value to persist
-	 * @return Persisted value, potentially containing store-backed references
-	 * @throws IOException If persistence fails
+	 * Returns the bound working storage, before this component's editing policies.
+	 * Lifecycle operations use this boundary; ordinary domain edits use {@link #cursor()}.
 	 */
-	protected <T extends ACell> T persist(T value) throws IOException {
-		if (parent==null) {
-			throw new IllegalStateException("No store-backed component available for persistence");
+	public final AForkableCursor<V> storage() {
+		return storage;
+	}
+
+	/**
+	 * Merges an incoming value at this component's level into its working state. This
+	 * is the component's own behaviour: a lattice offers a default merge for the shape
+	 * it declares, and the component delegates to it, in whole or in part, or applies
+	 * another rule. Merge is the acceptance boundary for incoming data, so it enforces
+	 * any ownership, validity or limits itself. A component that receives nothing need
+	 * not define one; the base refuses, so a delivery routed to it fails rather than vanishing.
+	 *
+	 * @param other Incoming value at this level
+	 * @return Current working value
+	 */
+	public V merge(V other) {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no merge for incoming values");
+	}
+
+	/**
+	 * Resolves this component's child component for one key below its level, or null
+	 * when it has none there. Unresolved paths go to {@link #mergeAtPath}.
+	 * A component with children overrides this to hand a delivery on to them.
+	 *
+	 * @param <T> Value type at the key
+	 * @param key Key below this level
+	 * @return Child component, or null
+	 */
+	protected <T extends ACell> ALatticeComponent<T> child(ACell key) {
+		return null;
+	}
+
+	/**
+	 * Delivers a complete value here, or routes a descendant delivery to a child.
+	 * Unresolved paths go to {@link #mergeAtPath}; no value shape is inferred.
+	 * Returns current working state, not a publication acknowledgement.
+	 */
+	@SuppressWarnings("unchecked")
+	public V mergeAt(ACell value, ACell... path) {
+		if (path.length==0) return merge((V)value);
+		ALatticeComponent<ACell> child=child(path[0]);
+		if (child!=null) {
+			child.mergeAt(value,Arrays.copyOfRange(path,1,path.length));
+			return cursor().get();
 		}
-		return parent.persist(value);
+		return mergeAtPath(value,path);
+	}
+
+	/** Handles a descendant path not claimed by a child. The default rejects unsupported routing. */
+	protected V mergeAtPath(ACell value,ACell... path) {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no delivery for this path");
 	}
 
 	/**
-	 * Persists this component's current value without changing its cursor.
-	 *
-	 * @return Persisted current value
-	 * @throws IOException If persistence fails
+	 * Syncs the bound storage with this component's reconciliation policy. A fork
+	 * publishes into its immediate destination; ordinary cursors return their value.
+	 * Editing-view overrides cannot hide this boundary, and descendant views never
+	 * publish enclosing storage. No host persistence is implied.
 	 */
-	public V persist() throws IOException {
-		return persist(cursor.get());
+	public V sync() {
+		return storage.sync(this::mergePublication);
 	}
 
-	/**
-	 * Synchronises this component's cursor through its immediate cursor boundary.
-	 *
-	 * <p>For a forked cursor this merges local changes into the cursor it was forked
-	 * from; it does not necessarily publish the complete application root. Call
-	 * the containing {@link ALatticeApplication application's} {@code sync()} when
-	 * the merged state should cross the host publication boundary.</p>
-	 *
-	 * <p>A sync invoked on an application or another live path reaches the hosted
-	 * root and runs its synchronous persistence and publication policy. Physical
-	 * durability remains the separate application {@code flush()} operation.</p>
-	 */
-	public void sync() {
-		cursor.sync();
-	}
 }

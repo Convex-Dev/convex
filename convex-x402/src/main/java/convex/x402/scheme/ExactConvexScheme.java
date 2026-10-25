@@ -108,7 +108,7 @@ public class ExactConvexScheme {
 	 * @return null if canonical, otherwise the payment error
 	 */
 	public static PaymentError checkStructure(SignedData<ATransaction> sd, PaymentRequirements req) {
-		ATransaction tx = sd.getValue();
+		ATransaction tx = RT.ensureTransaction(sd.getValue());
 		Address origin = tx.getOrigin();
 		if (origin == null) {
 			return PaymentError.of(ErrorReasons.INVALID_TRANSACTION,
@@ -193,7 +193,7 @@ public class ExactConvexScheme {
 	 */
 	public static PaymentError checkState(Convex convex, SignedData<ATransaction> sd,
 			PaymentRequirements req) throws InterruptedException {
-		ATransaction tx = sd.getValue();
+		ATransaction tx = RT.ensureTransaction(sd.getValue());
 		Address origin = tx.getOrigin();
 
 		AccountKey key = convex.getAccountKey(origin);

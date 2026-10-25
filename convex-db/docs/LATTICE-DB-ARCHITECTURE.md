@@ -6,7 +6,7 @@ A SQL database is a tree of lattice cursors. Each component navigates to its
 section of the tree via `cursor.path(key)`, which creates a descended cursor.
 
 ```
-NodeServer RootComponent       ← persistence and publication policy
+NodeServer LatticeHost       ← persistence and publication policy
   │
   └── ConvexDB / RootCursor    ← database-map application component
         │
@@ -27,7 +27,7 @@ up the chain to the root `AtomicReference`. No copies, no extra work — just
 Each component extends `ALatticeComponent<V>`, wrapping one cursor in the chain:
 
 ```
-RootComponent   cursor: AHashMap<AString, Index>    hosted root
+LatticeHost   cursor: AHashMap<AString, Index>    hosted root
   └── ConvexDB  cursor: AHashMap<AString, Index>    same cursor, application policy child
         └── SQLDatabase cursor: Index<Keyword, ACell>   path(database-name)
               └── SQLSchema cursor: Index<AString, AVector> path(:tables)
@@ -40,9 +40,9 @@ The returned component wraps the descended cursor. This is the same pattern as
 
 The component-parent chain is deliberately separate from the cursor-parent chain.
 Calling `persist()` delegates from `SQLTable` through `SQLSchema`, `SQLDatabase`
-and `ConvexDB` to `RootComponent` without changing or synchronising any cursor. A fork keeps the
-same containing component parent while its forked cursor synchronises to the live
-cursor it came from.
+and `ConvexDB` to `LatticeHost` without changing or synchronising any cursor. A fork is
+a component with its own working state; its sync reconciles that state into the live
+cursor it came from under the database lattice.
 
 ## Cursor Descent
 
@@ -80,14 +80,14 @@ reads see the snapshot at fork time, and all writes accumulate locally.
 
 ### Why this works
 
-The transaction uses a `ForkedLatticeCursor` — a separate `AtomicReference` that
-snapshots the database value at fork time. `sync()` calls
-`parent.merge(localValue)` which uses the lattice merge at each level of the
-tree. No locks, no conflict detection — the lattice algebra guarantees
-convergence.
+The transaction is a component fork: a `SQLDatabase` with its own working state,
+snapshotting the database value at fork time, whose destination is the live cursor.
+`sync()` merges the working value into the destination with the database lattice,
+which merges at each level of the tree. No locks, no conflict detection: the lattice
+algebra guarantees convergence.
 
 ```java
-ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+ConvexDB cdb = ConvexDB.connect(server.getHost());
 SQLDatabase db = cdb.database("mydb");
 
 // Transaction 1
@@ -102,7 +102,7 @@ tx2.sync();  // merge into db cursor (both rows now visible)
 
 // Publish the hosted application root, then request physical durability
 cdb.sync();
-server.getRootComponent().flush();
+server.getHost().flush();
 ```
 
 ## Lattice Merge at Each Level
@@ -118,7 +118,7 @@ Each cursor level has a lattice type that defines merge semantics for replicatio
 | row index | `TableLattice` (`IndexLattice`) | union of PKs, per-row merge |
 | row entry | `RowLattice` | LWW by timestamp |
 
-Merge happens when `sync()` reaches a `ForkedLatticeCursor` (local fork) or
+Merge happens when `sync()` on a fork converges into its parent (local fork) or
 when the NodeServer receives remote state (replication). The lattice guarantees
 convergence regardless of merge order.
 
@@ -128,7 +128,7 @@ convergence regardless of merge order.
 // Setup — ConvexDB is attached to the NodeServer policy root
 var server = ConvexDB.createNodeServer(store);
 server.launch();
-ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+ConvexDB cdb = ConvexDB.connect(server.getHost());
 SQLDatabase db = cdb.database("mydb");
 
 // DDL (directly on db, outside transaction)
@@ -143,7 +143,7 @@ tx.sync();    // commit: atomic merge into db cursor
 
 // Publish and flush through host policy
 cdb.sync();
-server.getRootComponent().flush();
+server.getHost().flush();
 ```
 
 Each component owns its cursor and delegates application policy through its

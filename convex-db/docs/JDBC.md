@@ -96,10 +96,11 @@ DriverManager.getConnection("jdbc:convex:file:/data/market.etch")
     ├── Looks up in open instances map
     │     ├── Found → return new Connection on existing cursor/store
     │     └── Not found:
-    │           ├── EtchStore.create(file)     — opens or creates Etch file
-    │           ├── NodeServer(lattice, store)  — manages cursor + persistence
-    │           ├── server.launch()             — restores from Etch if exists
-    │           ├── ConvexDB.connect(cursor)    — wraps the cursor chain
+    │           ├── EtchStore.create(file)          — opens or creates Etch file
+    │           ├── ConvexDB.createNodeServer(store) — RelayHost.open restores the
+    │           │                                     retained root; the node persists it
+    │           ├── server.launch()
+    │           ├── ConvexDB.connect(server.getHost()) — wraps the cursor chain
     │           └── Store in map, return Connection
     │
     └── Connection wraps Calcite + ConvexSchema backed by the cursor chain
@@ -134,7 +135,7 @@ Code that already holds a `ConvexDB` instance can get a Connection directly,
 bypassing URL parsing and the instances map entirely:
 
 ```java
-ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 ```
 
@@ -172,14 +173,15 @@ For advanced use cases (replication, custom NodeServer config):
 
 ```java
 EtchStore store = EtchStore.create(new File("/data/market.etch"));
-var server = new NodeServer<>(ConvexDB.DATABASE_MAP_LATTICE, store, config);
+var server = new NodeServer<>(RelayHost.open(ConvexDB.DATABASE_MAP_LATTICE, store), config);
 server.launch();
 
-ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 // ... use conn ...
 
-server.close();  // persists on shutdown
+server.close();  // stop replication
+server.getHost().close(); // save accepted host state
 store.close();
 ```
 

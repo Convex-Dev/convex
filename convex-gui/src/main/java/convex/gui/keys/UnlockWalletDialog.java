@@ -102,7 +102,10 @@ public class UnlockWalletDialog extends JDialog {
 	}
 
 	/**
-	 * Shows a dialog to ask the user to unlock a wallet entry
+	 * Shows a dialog to ask the user to unlock a wallet entry, leaving it
+	 * unlocked in the key ring. This is the key ring's own lock control: to
+	 * use a key elsewhere, call {@link KeyAccess#unlockForUse(Component, AWalletEntry)},
+	 * which leaves the key ring unchanged.
 	 * @param parent Parent component
 	 * @param walletEntry Wallet Entry to consider
 	 * @return True if unlocked, false otherwise

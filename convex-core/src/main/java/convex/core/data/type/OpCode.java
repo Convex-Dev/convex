@@ -3,6 +3,7 @@ package convex.core.data.type;
 import convex.core.cvm.AOp;
 import convex.core.cvm.ops.Do;
 import convex.core.data.ACell;
+import convex.core.cvm.Ops;
 
 /**
  * Type that represents CVM Long values
@@ -20,7 +21,7 @@ public final class OpCode extends AStandardType<AOp> {
 	
 	@Override
 	public boolean check(ACell value) {
-		return value instanceof AOp;
+		return Ops.ensureOp(value)!=null;
 	}
 	
 	@Override
@@ -35,8 +36,7 @@ public final class OpCode extends AStandardType<AOp> {
 
 	@Override
 	public AOp implicitCast(ACell a) {
-		if (a instanceof AOp) return (AOp)a;
-		return null;
+		return Ops.ensureOp(a);
 	}
 
 }

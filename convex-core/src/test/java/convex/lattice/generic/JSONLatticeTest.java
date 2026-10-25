@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -13,19 +13,18 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ProjectionCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.LatticeOps;
 
-/**
- * Spike for the structural {@link JSONLattice}: merge is an error, navigation is
- * recursive, and the write path ({@link LatticeOps#assocIn}) builds containers
- * from key shape.
- */
+/** JSON navigation requires explicit component construction and an enclosing merge. */
 public class JSONLatticeTest {
 
 	static final AString USERS = Strings.create("users");
@@ -42,30 +41,41 @@ public class JSONLatticeTest {
 			() -> JSONLattice.INSTANCE.merge(null, Maps.empty(), Maps.empty()));
 	}
 
-	@Test public void testStructuralAndRecursive() {
-		assertTrue(JSONLattice.INSTANCE.isStructural());
+	@Test public void testRecursiveNavigation() {
 		// path() recurses: structure continues at every depth
 		assertSame(JSONLattice.INSTANCE, JSONLattice.INSTANCE.path(USERS));
 		assertSame(JSONLattice.INSTANCE, JSONLattice.INSTANCE.path(Keywords.FOO));
 	}
 
-	// ===== Deep structural writes: container chosen by key shape =====
-
-	/** String keys → AHashMap (dynamic JSON object), created all the way down from null. */
-	@Test public void testDeepCreateMapFromNull() {
-		ACell result = LatticeOps.assocIn(null, BOB, JSONLattice.INSTANCE, USERS, ALICE, NAME);
-		// {"users" {"alice" {"name" "Bob"}}}
-		assertEquals(BOB, RT.getIn(result, USERS, ALICE, NAME));
-		assertInstanceOf(AHashMap.class, RT.getIn(result, USERS));
-		assertInstanceOf(AHashMap.class, RT.getIn(result, USERS, ALICE));
+	/** Example component writer: choose a map explicitly, regardless of key type. */
+	private static AForkableCursor<ACell> mapEntry(AForkableCursor<ACell> source, ACell key) {
+		return ProjectionCursor.create(source,
+			value -> RT.getIn(value, key),
+			(value, child) -> {
+				if (Utils.equals(RT.getIn(value, key), child)) return value;
+				AHashMap<ACell, ACell> map = value == null ? Maps.empty() : RT.ensureMap(value);
+				return map.assoc(key, child);
+			});
 	}
 
-	/** Keyword keys → Index (short internal keys; not JSON, but allowed). */
-	@Test public void testDeepCreateIndexForKeywords() {
-		ACell result = LatticeOps.assocIn(null, CVMLong.create(42),
-			JSONLattice.INSTANCE, Keywords.FOO, Keywords.BAR);
-		assertEquals(CVMLong.create(42), RT.getIn(result, Keywords.FOO, Keywords.BAR));
-		assertInstanceOf(Index.class, RT.getIn(result, Keywords.FOO));
+	@Test public void testComponentCreatesMapsOnWrite() {
+		Root<ACell> root = Root.create(null);
+		var name = mapEntry(mapEntry(mapEntry(root, USERS), ALICE), NAME);
+		assertNull(name.get());
+		name.set(null);
+		assertNull(root.get(), "A no-op must not materialise ancestors");
+		name.set(BOB);
+		assertEquals(BOB, RT.getIn(root.get(), USERS, ALICE, NAME));
+		assertInstanceOf(AHashMap.class, RT.getIn(root.get(), USERS));
+		assertInstanceOf(AHashMap.class, RT.getIn(root.get(), USERS, ALICE));
+	}
+
+	@Test public void testKeyDoesNotChooseContainerType() {
+		Root<ACell> root = Root.create(null);
+		mapEntry(mapEntry(root, Keywords.FOO), CVMLong.ZERO).set(BOB);
+		assertInstanceOf(AHashMap.class, root.get());
+		assertInstanceOf(AHashMap.class, RT.getIn(root.get(), Keywords.FOO));
+		assertEquals(BOB, RT.getIn(root.get(), Keywords.FOO, CVMLong.ZERO));
 	}
 
 	/** Reads below a JSON region work as plain navigation. */
@@ -94,19 +104,16 @@ public class JSONLatticeTest {
 		assertInstanceOf(AVector.class, RT.getIn(updated, ARR));
 	}
 
-	/**
-	 * Documents the constraint: creating a NEW vector element is impossible
-	 * through assoc (vectors can't be grown). containerForKey makes an empty
-	 * vector for the int key, but assoc(0) on an empty vector returns null —
-	 * so the write silently fails to materialise. Captured here so the
-	 * behaviour is explicit, not a surprise.
-	 */
-	@Test public void testVectorGrowthIsBroken() {
-		AString ARR = Strings.create("arr");
-		// container for int key 0 is an empty vector; assoc(0,..) on it returns null
-		assertEquals(Vectors.empty(), LatticeOps.containerForKey(CVMLong.ZERO));
-		ACell result = LatticeOps.assocIn(null, BOB, JSONLattice.INSTANCE, ARR, CVMLong.ZERO);
-		// The vector element never materialises — the "arr" entry ends up null.
-		assertEquals(null, RT.getIn(result, ARR, CVMLong.ZERO));
+	/** Missing vector storage must be constructed explicitly before navigation. */
+	@Test public void testMissingVectorRejectedWithoutChangingRoot() {
+		AString arr = Strings.create("arr");
+		Root<ACell> root = Root.create(Maps.empty());
+		assertThrows(IllegalStateException.class,
+			() -> root.updateAndGet(value -> LatticeOps.assocIn(value, BOB,
+				JSONLattice.INSTANCE, arr, CVMLong.ZERO)));
+		assertEquals(Maps.empty(), root.get());
+		mapEntry(root, arr).set(Vectors.of(BOB));
+		assertInstanceOf(AVector.class, RT.getIn(root.get(), arr));
+		assertEquals(BOB, RT.getIn(root.get(), arr, CVMLong.ZERO));
 	}
 }

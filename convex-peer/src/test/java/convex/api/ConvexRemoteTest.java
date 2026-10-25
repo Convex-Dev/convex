@@ -8,7 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -160,6 +167,42 @@ public class ConvexRemoteTest {
 			Result r = rs[i].get(10000, TimeUnit.MILLISECONDS);
 			final int ri=i;
 			assertNull(r.getErrorCode(), ()->"Error on result: "+ri+" = " + r.toString());
+		}
+	}
+
+	/**
+	 * Concurrent transactions queued behind an asynchronous sequence lookup must
+	 * reach the peer in sequence order, or all but one fail with :SEQUENCE.
+	 */
+	@Test
+	public void testConcurrentTransactionsAfterClearSequence() throws Exception {
+		TestNetwork network = TestNetwork.getInstance();
+		try (ConvexRemote convex = network.getClient()) {
+			Address address = convex.getAddress();
+			assertNull(convex.transactSync(Invoke.create(address, 0, Constant.of(0))).getErrorCode());
+			convex.clearSequence();
+
+			int n = 20;
+			CyclicBarrier start = new CyclicBarrier(n);
+			List<CompletableFuture<Result>> results = Collections.synchronizedList(new ArrayList<>());
+			try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+				for (int i = 0; i < n; i++) {
+					final int value = i;
+					executor.execute(() -> {
+						try {
+							start.await();
+						} catch (Exception e) {
+							throw new IllegalStateException(e);
+						}
+						results.add(convex.transact(Invoke.create(address, 0, Constant.of(value))));
+					});
+				}
+			}
+			assertEquals(n, results.size());
+			for (CompletableFuture<Result> r : results) {
+				Result result = r.get(10000, TimeUnit.MILLISECONDS);
+				assertNull(result.getErrorCode(), () -> "Error on result: " + result);
+			}
 		}
 	}
 }

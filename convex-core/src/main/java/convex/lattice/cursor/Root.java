@@ -1,4 +1,4 @@
- package convex.lattice.cursor;
+package convex.lattice.cursor;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BinaryOperator;
@@ -7,34 +7,26 @@ import java.util.function.UnaryOperator;
 import convex.core.data.ACell;
 
 /**
- * Root cursor for an atomically updatable CVM value.
+ * AtomicReference-backed value storage. A root retains only its current value and
+ * has no lock or callbacks; publication belongs to the component or host that
+ * owns it.
  *
- * <p>This is a lightweight CVM wrapper over {@link java.util.concurrent.atomic.AtomicReference},
- * providing thread-safe atomic operations on CVM values.</p>
- *
- * @param <V> Type of cursor values
+ * @param <V> Value type
  */
 public class Root<V extends ACell> extends AForkableCursor<V> {
 
 	final AtomicReference<V> value;
-	ACursor<V> parent;
-	
+
 	public Root() {
-		this((V)null);
+		this((V) null);
 	}
-	
+
 	public Root(V initialValue) {
-		super(initialValue);
-		value=new AtomicReference<V>(initialValue);
+		this.value = new AtomicReference<>(initialValue);
 	}
-	
-	public Root(ACursor<V> parent) {
-		this(parent.get());
-		this.parent=parent;
-	}
-	
+
 	/**
-	 * Create a new Root cursor with the given initial value and no parent
+	 * Create a new Root cursor with the given initial value
 	 * @param <V> Type of cursor values
 	 * @param value Initial value for cursor
 	 * @return Root cursor instance
@@ -42,16 +34,9 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 	public static <V extends ACell> Root<V> create(V value) {
 		return new Root<V>(value);
 	}
-	
-	/**
-	 * Create a new Root cursor based on the parent
-	 * @param <V> Type of cursor values
-	 * @param parent Parent cursor
-	 * @return Root cursor instance
-	 */
-	public static <V extends ACell> Root<V> create(ACursor<V> parent) {
-		return new Root<V>(parent);
-	}
+
+
+	// ===== Standard cursor operations =====
 
 	@Override
 	public V get() {

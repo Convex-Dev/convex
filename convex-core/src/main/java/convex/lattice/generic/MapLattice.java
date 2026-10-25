@@ -3,50 +3,25 @@ package convex.lattice.generic;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Maps;
-import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
 
 /**
- * A lattice representing a hash map that merges values
+ * A hash map whose entries all merge with one child lattice: a union of keys with the
+ * child merge per entry.
+ *
  * @param <K> Key type
  * @param <V> Value type
  */
-public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashMap<K,V>> {
+public class MapLattice<K extends ACell,V extends ACell> extends AUnionLattice<K,V,AHashMap<K,V>> {
 
 	protected final ALattice<V> valueNode;
-	
-	protected final MergeFunction<V> mergeFunction;
 
 	public MapLattice(ALattice<V> valueNode) {
 		this.valueNode=valueNode;
-		this.mergeFunction=(a,b)->{
-			return valueNode.merge(a, b);
-		};
 	}
 
 	public static <K extends ACell,V extends ACell> MapLattice<K,V> create(ALattice<V> valueNode) {
-		
 		return new MapLattice<K,V>(valueNode);
-	}
-
-	@Override
-	public AHashMap<K,V> merge(AHashMap<K, V> ownValue, AHashMap<K, V> otherValue) {
-		if (otherValue==null) return ownValue;
-		// #561: merge foreign values against an empty own rather than accepting the map
-		// wholesale, so each foreign value is validated through the child lattice merge.
-		if (ownValue==null) ownValue = zero();
-		return ownValue.mergeDifferences(otherValue, mergeFunction);
-	}
-
-	@Override
-	public AHashMap<K,V> merge(LatticeContext context, AHashMap<K, V> ownValue, AHashMap<K, V> otherValue) {
-		if (otherValue==null) return ownValue;
-		// #561: merge foreign values against an empty own rather than accepting the map
-		// wholesale, so each foreign value is validated through the child lattice merge.
-		if (ownValue==null) ownValue = zero();
-		MergeFunction<V> contextMergeFunction = (a, b) -> valueNode.merge(context, a, b);
-		return ownValue.mergeDifferences(otherValue, contextMergeFunction);
 	}
 
 	@Override
@@ -62,9 +37,7 @@ public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashM
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
-		// Any value should use child lattice
+		// Every key uses the one child lattice
 		return (ALattice<T>) valueNode;
 	}
-	
-
 }

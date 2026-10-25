@@ -1,5 +1,7 @@
 package convex.gui.models;
 
+import convex.core.lang.RT;
+
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 
@@ -67,7 +69,7 @@ public class TorusTableModel extends BaseTableModel {
 		MapEntry<ACell,ACell> me=markets.entryAt(rowIndex);
 		
 		ACell token=me.getKey();
-		Address marketAddr=(Address) me.getValue();
+		Address marketAddr=RT.ensureAddress(me.getValue());
 		
 		switch (columnIndex) {
 		case 0:

@@ -69,18 +69,18 @@ public class ConvexDBPersistenceTest {
 		}
 		server = ConvexDB.createNodeServer(store);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+		ConvexDB cdb = ConvexDB.connect(server.getHost());
 		cdb.database(DB_NAME); // ensure database path exists
 		cdb.register(DB_NAME);
 		return cdb;
 	}
 
-	/** Persists, unregisters, closes server and store. */
+	/** Unregisters, closes the server, then the host to save, then the store. */
 	private void persistAndClose() throws Exception {
-		server.persistSnapshot(server.getLocalValue());
 		ConvexDB cdb = ConvexDB.lookup(DB_NAME);
 		if (cdb != null) cdb.unregister(DB_NAME);
-		server.close(); server = null;
+		server.close();
+		server.getHost().close(); server = null;
 		store.close(); store = null;
 	}
 
@@ -135,6 +135,25 @@ public class ConvexDBPersistenceTest {
 	}
 
 	// ========== Tests ==========
+
+	/** Local persistence does not require a NodeServer or a network lifecycle. */
+	@Test public void testLocalHostSaveAndReopen() throws Exception {
+		File file;
+		// Closing the host saves, before its store closes.
+		try (var localStore=EtchStore.createTemp("db-local-host"); var host=ConvexDB.openHost(localStore)) {
+			file=localStore.getFile();
+			var db=ConvexDB.connect(host);
+			createTable(db.database(DB_NAME));
+			insertViaLattice(db.database(DB_NAME).tables(),0,10);
+		}
+		try (var reopenedStore=EtchStore.create(file)) {
+			var host=ConvexDB.openHost(reopenedStore);
+			var db=ConvexDB.connect(host);
+			db.register(DB_NAME);
+			try { verifyJdbcCount(10); verifyJdbcRow(9); }
+			finally { db.unregister(DB_NAME); }
+		}
+	}
 
 	/**
 	 * JDBC insert → persist → close → reopen → verify via JDBC.

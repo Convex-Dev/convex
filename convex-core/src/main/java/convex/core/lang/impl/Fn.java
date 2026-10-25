@@ -1,5 +1,6 @@
 package convex.core.lang.impl;
 
+import convex.core.ErrorCodes;
 import convex.core.cvm.AFn;
 import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
@@ -72,8 +73,10 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public boolean hasArity(int n) {
+		AVector<ACell> params=getParams();
+		if (params==null) return false;
 		long var=checkVariadic();
-		long pc=getParams().count();
+		long pc=params.count();
 		if (var>=0) return n>=(pc-2); // n must be at least number of params excluding [& more]
 		return (n==pc);
 	}
@@ -100,13 +103,15 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public Context invoke(Context context, ACell[] args) {
+		AVector<ACell> params=getParams();
+		if (params==null) return context.withError(ErrorCodes.FORMAT,"Function requires a parameter vector");
 		// update local bindings for the duration of this function call
 		final AVector<ACell> savedBindings = context.getLocalBindings();
 
 		// update to correct lexical environment, then bind function parameters
 		context = context.withLocalBindings(getLexicalEnvironment());
 
-		Context boundContext = context.updateBindings(getParams(), args);
+		Context boundContext = context.updateBindings(params, args);
 		if (boundContext.isExceptional()) return boundContext.withLocalBindings(savedBindings);
 
 		Context ctx = boundContext.execute(getBody());
@@ -134,6 +139,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		// Custom param printing, avoid printing Syntax metadata for now
 		sb.append('[');
 		AVector<ACell> params=getParams();
+		if (params==null) return RT.print(sb,data,limit);
 		long size = params.count();
 		for (long i = 0; i < size; i++) {
 			if (i > 0) sb.append(' ');
@@ -142,7 +148,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		sb.append(']');
 
 		sb.append(' ');
-		return getBody().print(sb,limit);
+		return RT.print(sb,getBody(),limit);
 	}
 
 	/**
@@ -167,9 +173,6 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AClosure<T> ensureFunction(ACell a) {
-		if (a instanceof AClosure) {
-			return (AClosure<T>)a;
-		}
-		return null;
+		return RT.ensureCVM(a,AClosure.class);
 	}
 }

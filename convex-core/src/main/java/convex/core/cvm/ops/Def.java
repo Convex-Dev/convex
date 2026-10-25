@@ -1,5 +1,6 @@
 package convex.core.cvm.ops;
 
+import convex.core.ErrorCodes;
 import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
@@ -73,8 +74,11 @@ public class Def<T extends ACell> extends ACodedOp<T,ACell,AOp<T>> {
 
 	@Override
 	public Context execute(Context ctx) {
-		AOp<T> op = Ops.ensureOp(this.value.getValue()); // note: may be null for declare with no value
+		ACell body=value.getValue();
+		AOp<T> op = Ops.ensureOp(body); // nil means declare with no value
+		if ((body!=null)&&(op==null)) return ctx.withError(ErrorCodes.FORMAT,"Def requires an operation");
 		ACell symbol=code.getValue();
+		if (!(Syntax.unwrap(symbol) instanceof Symbol)) return ctx.withError(ErrorCodes.FORMAT,"Def requires a symbol");
 		
 		ACell result;
 		if (op!=null) {
@@ -103,7 +107,7 @@ public class Def<T extends ACell> extends ACodedOp<T,ACell,AOp<T>> {
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("(def ");
-		code.getValue().print(sb,limit); // OK since constant size
+		if (!RT.print(sb,code.getValue(),limit)) return false;
 		sb.append(' ');
 		if (!RT.print(sb, value.getValue(),limit)) return false;
 		sb.append(')');
