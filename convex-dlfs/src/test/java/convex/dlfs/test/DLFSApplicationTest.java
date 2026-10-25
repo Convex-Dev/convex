@@ -152,4 +152,48 @@ public class DLFSApplicationTest {
 		assertNotNull(app.drives(OWNER.getAccountKey()).drive("remote"));
 		assertEquals(CVMLong.ONE,host.cursor().<Index<Keyword,ACell>>path(projects).get().get(UNRELATED));
 	}
+
+	@Test void directAndNestedApplicationsHonourRootCreationPolicy() {
+		for (Keyword[] path:List.of(new Keyword[0],new Keyword[] {Keyword.intern("projects"),Keywords.FS})) {
+			var host=LatticeHost.<Index<Keyword,ACell>>create(null,null);
+			var app=host.addApplication(new DLFSApplication(host,OWNER::signData,() -> CVMLong.create(100),
+				DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW,path) {
+				@Override protected Index<Keyword,ACell> createContainer() {
+					throw new UnsupportedOperationException("Explicit initialisation required");
+				}
+			});
+			var drives=app.drives(OWNER.getAccountKey());
+			assertNull(drives.drive("home"));
+			app.sync();
+			host.mergeAt(CVMLong.ONE,UNRELATED);
+			assertNull(host.cursor().get());
+			assertThrows(UnsupportedOperationException.class,() -> drives.createDrive("home"));
+			assertNull(host.cursor().get(),"A refused write must not leave partial containers or signed state");
+			host.cursor().set(Index.of(UNRELATED,CVMLong.TWO));
+			assertNotNull(drives.createDrive("home"),"The same view works after explicit initialisation");
+			assertEquals(CVMLong.TWO,host.cursor().get().get(UNRELATED));
+		}
+	}
+
+	@Test void seededRootPreservesOpaqueRegionsAndMalformedNestedStorageIsNotReplaced() {
+		var projects=Keyword.intern("projects");
+		var opaque=Strings.intern("future region");
+		var host=LatticeHost.<Index<Keyword,ACell>>create(null,null);
+		var app=host.addApplication(new DLFSApplication(host,OWNER::signData,() -> CVMLong.create(100),
+			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW,projects,Keywords.FS) {
+			@Override protected Index<Keyword,ACell> createContainer() {
+				return Index.of(UNRELATED,opaque);
+			}
+		});
+		var drives=app.drives(OWNER.getAccountKey());
+		assertNotNull(drives.createDrive("home"));
+		assertSame(opaque,host.cursor().get().get(UNRELATED));
+		for (ACell bad:List.<ACell>of(CVMLong.ONE,Maps.empty())) {
+			host.cursor().set(Index.of(projects,bad,UNRELATED,opaque));
+			var before=host.cursor().get();
+			assertThrows(IllegalStateException.class,() -> drives.drive("home"));
+			assertThrows(IllegalStateException.class,() -> drives.createDrive("other"));
+			assertSame(before,host.cursor().get());
+		}
+	}
 }

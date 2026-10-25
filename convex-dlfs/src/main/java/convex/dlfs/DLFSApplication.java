@@ -63,7 +63,9 @@ public class DLFSApplication extends Regions {
 
 	/**
 	 * Binds a live view to a root cursor, including a transaction draft.
-	 * Missing containing indexes are created only by a changed write.
+	 * Region construction uses the standard container policy: missing indexes are
+	 * created only by a changed write, and this application's {@link #createContainer()}
+	 * controls creation of an absent root.
 	 */
 	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,
 			Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
@@ -73,13 +75,12 @@ public class DLFSApplication extends Regions {
 		Keyword[] keys=path.length==0?new Keyword[]{Keywords.FS}:path.clone();
 		Regions parent=this;
 		for (int i=0;i<keys.length-1;i++) {
-			parent=parent.add(keys[i],new Regions(
-				parent.cursor().withDefault(Index.none()).path(keys[i])));
+			parent=parent.<Index<Keyword,ACell>,Regions>create(keys[i],Regions::new);
 		}
-		dlfs=parent.add(keys[keys.length-1],new DLFSRegion(
-			parent.cursor().withDefault(Index.none()).path(keys[keys.length-1]),store,
-			DLFSLocation.at(cursor,keys),DLFSRegion.KEY_OWNER,
-			signer==null?null:(owner,value) -> signer.apply(value),clock,maxFutureSkew));
+		dlfs=parent.create(keys[keys.length-1],
+			(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> destination) ->
+				new DLFSRegion(destination,store,DLFSLocation.at(cursor,keys),DLFSRegion.KEY_OWNER,
+					signer==null?null:(owner,value) -> signer.apply(value),clock,maxFutureSkew));
 	}
 
 	/**
