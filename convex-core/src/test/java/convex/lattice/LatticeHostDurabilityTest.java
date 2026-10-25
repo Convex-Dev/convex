@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -83,5 +84,36 @@ class LatticeHostDurabilityTest {
 		var host=LatticeHost.create();
 		assertThrows(IllegalArgumentException.class,() -> host.autoFlush(Duration.ZERO));
 		try (var resource=host.autoFlush(Duration.ofDays(1))) { }
+	}
+
+	@Test void interruptedOwnerStillDrainsTheWorkerBeforeReturningFromClose() throws Exception {
+		var flushing=new CountDownLatch(1);
+		var release=new CountDownLatch(1);
+		var closing=new CountDownLatch(1);
+		var attempts=new AtomicInteger();
+		try (var store=new MemoryStore() {
+			@Override public void flush() {
+				attempts.incrementAndGet();
+				flushing.countDown();
+				try { assertTrue(release.await(10,TimeUnit.SECONDS)); }
+				catch (InterruptedException e) { throw new AssertionError(e); }
+			}
+		}; var resource=LatticeHost.create(store).autoFlush(Duration.ofMillis(1))) {
+			assertTrue(flushing.await(10,TimeUnit.SECONDS));
+			var completed=new CompletableFuture<Boolean>();
+			Thread.ofVirtual().start(() -> {
+				Thread.currentThread().interrupt();
+				closing.countDown();
+				try {
+					resource.close();
+					completed.complete(Thread.currentThread().isInterrupted());
+				} catch (Throwable e) { completed.completeExceptionally(e); }
+			});
+			try {
+				assertTrue(closing.await(10,TimeUnit.SECONDS));
+			} finally { release.countDown(); }
+			assertTrue(completed.get(10,TimeUnit.SECONDS),"Preserve the owner's interrupt status");
+			assertTrue(attempts.get()>=2,"Drain the active flush and perform the final barrier");
+		}
 	}
 }
