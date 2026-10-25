@@ -303,11 +303,19 @@ compare-and-set that leaves a racing write pending for the next sync (entry 6).
 Without a store, persist returns its input and flush is a no-op; a networked node
 still requires a store.
 
+The host is the root of the component tree: its merge behaviour is delivery to its
+applications, and `mergeAt` hands a path delivery on the same way. A host fork,
+`fork()` or `fork(store)`, is a detached copy of the root with applications and a
+store of its own; its sync persists to that store, if any, then exchanges roots with
+its origin through ordinary delivery. A fork never writes its origin's store. The
+rationale is in [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md), *Forking a host*.
+
 CAD text affected:
 
 - CAD045 *Connecting to Node Infrastructure* and *Reference Implementation*: the root
   component holds the lattice and the store; a node is constructed from a lattice and
   a store.
+- CAD045 *Fork and Sync*: a host fork syncs by exchanging roots, not by reconciling.
 - CAD036 (*Lattice Node*): how the node restores and merges, to check.
 
 Proposed wording: the host is the authoritative local root: a published value, an

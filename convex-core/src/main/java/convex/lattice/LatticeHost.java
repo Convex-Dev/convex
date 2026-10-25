@@ -15,6 +15,7 @@ import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
+import convex.lattice.cursor.TransactionalRootCursor;
 
 /**
  * Generic host for lattice application components, with optional persistence.
@@ -26,11 +27,16 @@ import convex.lattice.cursor.Root;
  * a replication pipeline while attached. Neither operation
  * performs a durability barrier or owns the store lifecycle.</p>
  *
- * <p>All incoming values are delegated to configured applications. The host knows
- * no lattice or path structure and never independently merges incoming state.
- * Without applications, incoming values are ignored. Applications decide when
- * to publish into the host. Concurrent publications during host persistence stay
- * pending for the next sync.</p>
+ * <p>The host is the root of the component tree. Its behaviour for an incoming value
+ * is delivery: every value is handed to the configured applications, which take what
+ * they want. The host knows no lattice or path structure and never independently
+ * merges incoming state. Without applications, incoming values are ignored.
+ * Applications decide when to publish into the host. Concurrent publications during
+ * host persistence stay pending for the next sync.</p>
+ *
+ * <p>A host fork, {@link #fork()}, is a detached copy of the root with applications
+ * and a store of its own. It behaves as a second node would without the networking:
+ * its sync exchanges roots with its origin through ordinary delivery.</p>
  *
  * <p>With a null store, the host is purely in memory: persistence and flush are
  * no-ops, and sync returns the current snapshot unless a publication policy is
@@ -43,6 +49,7 @@ import convex.lattice.cursor.Root;
 public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 
 	private final AStore store;
+	private final LatticeHost<V> origin;
 	private final ReentrantLock syncLock=new ReentrantLock();
 	private Function<V,V> publisher;
 	private volatile List<ALatticeComponent<V>> applications=List.of();
@@ -59,8 +66,13 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * @param store Host store, or null for purely in-memory operation
 	 */
 	public LatticeHost(Root<V> cursor, AStore store) {
+		this(cursor,store,null);
+	}
+
+	private LatticeHost(Root<V> cursor, AStore store, LatticeHost<V> origin) {
 		super(cursor);
 		this.store=store;
+		this.origin=origin;
 	}
 
 	/** Creates an empty keyed root held directly in memory, with no store allocated. */
@@ -96,6 +108,40 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	/** Returns the host store, or null for in-memory operation. The caller owns its lifecycle. */
 	public AStore store() {
 		return store;
+	}
+
+	/** Returns the host this fork was taken from, or null for a host that is not a fork. */
+	public LatticeHost<V> origin() {
+		return origin;
+	}
+
+	/**
+	 * Forks this host: a detached copy of the current root with no store. The fork
+	 * starts with no applications; the caller builds its own over it and registers
+	 * them, since applications are bound to the cursor they were built over. Its
+	 * {@link #sync()} exchanges roots with this host through ordinary delivery, so
+	 * the fork behaves as a second node would without the networking. There is no
+	 * host-level merge: reconciliation is the applications' on each side.
+	 *
+	 * @return Detached host over a copy of the current root
+	 */
+	@Override
+	public LatticeHost<V> fork() {
+		return fork(null);
+	}
+
+	/**
+	 * Forks this host with a store of its own, which the fork's sync persists to
+	 * before exchanging roots. A fork never writes its origin's store.
+	 *
+	 * @param store Store for the fork, or null for an in-memory fork
+	 * @return Detached host over a copy of the current root
+	 */
+	public LatticeHost<V> fork(AStore store) {
+		V value=cursor().get();
+		Root<V> copy=cursor().supportsExclusiveTransactions()
+			?new TransactionalRootCursor<>(value):Cursors.root(value);
+		return new LatticeHost<>(copy,store,this);
 	}
 
 	/**
@@ -170,10 +216,22 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 		return persist(cursor().get());
 	}
 
-	/** Publishes one snapshot, persisting it if a store is present. */
+	/**
+	 * Publishes one snapshot, persisting it if a store is present. A fork then
+	 * exchanges roots with its origin: the fork's root is delivered to the origin's
+	 * applications and the origin's root to the fork's, each side taking what it
+	 * wants, as two nodes do. Neither side's publication is implied, and the fork's
+	 * own store receives the state the fork held before the exchange.
+	 *
+	 * @return The fork's current root after the exchange, or the published snapshot
+	 */
 	@Override
 	public V sync() {
-		return sync(this::publishRoot);
+		V published=sync(this::publishRoot);
+		if (origin==null) return published;
+		origin.merge(published);
+		merge(origin.cursor().get());
+		return cursor().get();
 	}
 
 	/**

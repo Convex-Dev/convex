@@ -849,6 +849,28 @@ because only there can a new payload be signed.
 These boundaries are not an access-control boundary between code sharing a process.
 Verification is bound to the lattice instances, configured before use.
 
+### Forking a host
+
+The host is the root of the component tree. Its behaviour for an incoming value is
+delivery: it hands the value to its applications, which take what they want, and a
+path delivery is handed on the same way. Forking a host follows from that. A host fork
+is a detached copy of the root with applications and, optionally, a store of its own,
+all built by the caller over the fork; it does not inherit the origin's applications,
+which are bound to the origin's cursor. Its sync persists to its own store, if any,
+then exchanges roots with its origin: the fork's root is delivered to the origin's
+applications and the origin's root to the fork's. That is the two-node exchange
+without the networking, through the one delivery path that already exists. There is
+no host-level merge to reconcile with, so a host fork does not sync the way a
+component fork does, and a fork never writes its origin's store.
+
+```java
+var staging = host.fork();                                  // a detached copy of the root
+var app = staging.addApplication(MyApplication.connect(staging));
+app.user(alice).add(42);
+app.sync();                                                 // into the fork's root
+staging.sync();                                             // exchange roots with the host
+```
+
 ### Batched signing
 
 A signed domain component can retain the same API for immediate editing and batching.
