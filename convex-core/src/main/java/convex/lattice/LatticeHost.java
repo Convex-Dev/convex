@@ -131,13 +131,20 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	/**
-	 * Forks this host with a store of its own, which the fork's sync persists to
-	 * before exchanging roots. A fork never writes its origin's store.
+	 * Forks this host with a store of its own, for staged work too large for the heap:
+	 * components over the fork checkpoint into that store, and the fork's sync persists
+	 * its root there before exchanging roots. The exchange carries each root's cells into
+	 * the receiving side's store, so the fork's store can be discarded once it has synced.
+	 * A fork may not share its origin's store, which its sync would otherwise overwrite.
 	 *
 	 * @param store Store for the fork, or null for an in-memory fork
 	 * @return Detached host over a copy of the current root
+	 * @throws IllegalArgumentException if the store is this host's own
 	 */
 	public LatticeHost<V> fork(AStore store) {
+		if (store!=null && store==this.store) {
+			throw new IllegalArgumentException("A fork must not share its origin's store");
+		}
 		V value=cursor().get();
 		Root<V> copy=cursor().supportsExclusiveTransactions()
 			?new TransactionalRootCursor<>(value):Cursors.root(value);
@@ -220,8 +227,11 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * Publishes one snapshot, persisting it if a store is present. A fork then
 	 * exchanges roots with its origin: the fork's root is delivered to the origin's
 	 * applications and the origin's root to the fork's, each side taking what it
-	 * wants, as two nodes do. Neither side's publication is implied, and the fork's
-	 * own store receives the state the fork held before the exchange.
+	 * wants, as two nodes do. Each root's cells are persisted into the receiving
+	 * side's store first, so neither host depends on the other's store afterwards;
+	 * root pointers move only on each host's own sync. Neither side's publication is
+	 * implied, and the fork's own store receives the state the fork held before the
+	 * exchange.
 	 *
 	 * @return The fork's current root after the exchange, or the published snapshot
 	 */
@@ -229,9 +239,18 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	public V sync() {
 		V published=sync(this::publishRoot);
 		if (origin==null) return published;
-		origin.merge(published);
-		merge(origin.cursor().get());
+		origin.merge(persistInto(origin,published));
+		merge(persistInto(this,origin.cursor().get()));
 		return cursor().get();
+	}
+
+	/** Persists a value's cells into a host's store, without moving its root. */
+	private static <V extends ACell> V persistInto(LatticeHost<V> host, V value) {
+		try {
+			return host.persist(value);
+		} catch (IOException e) {
+			throw new StoreException("Lattice host fork sync failed: persistence error",e);
+		}
 	}
 
 	/**

@@ -872,12 +872,17 @@ delivery: it hands the value to its applications, which take what they want, and
 path delivery is handed on the same way. Forking a host follows from that. A host fork
 is a detached copy of the root with applications and, optionally, a store of its own,
 all built by the caller over the fork; it does not inherit the origin's applications,
-which are bound to the origin's cursor. Its sync persists to its own store, if any,
+which are bound to the origin's cursor. Give a fork a store when the staged work is
+too large for the heap, such as a file import whose drives checkpoint their blobs;
+it may never be the origin's own store. Its sync persists to its own store, if any,
 then exchanges roots with its origin: the fork's root is delivered to the origin's
 applications and the origin's root to the fork's. That is the two-node exchange
 without the networking, through the one delivery path that already exists. There is
 no host-level merge to reconcile with, so a host fork does not sync the way a
-component fork does, and a fork never writes its origin's store.
+component fork does. The exchange persists each root's cells into the receiving
+side's store first, so neither host depends on the other's store afterwards and a
+fork's scratch store can be discarded once it has synced; root pointers move only on
+each host's own sync.
 
 ```java
 var staging = host.fork();                                  // a detached copy of the root

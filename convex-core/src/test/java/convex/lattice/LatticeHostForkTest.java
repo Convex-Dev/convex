@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
 import convex.core.data.ASet;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
@@ -95,6 +97,37 @@ class LatticeHostForkTest {
 
 			origin.sync();
 			assertEquals(origin.cursor().get(),store.getRootData(),"only the origin's own sync writes its store");
+		}
+	}
+
+	@Test void forkRefusesItsOriginsStore() throws Exception {
+		try (var store=new MemoryStore()) {
+			var origin=LatticeHost.create(store);
+			assertThrows(IllegalArgumentException.class,() -> origin.fork(store));
+			assertNotNull(origin.fork(),"an in-memory fork is always available");
+		}
+	}
+
+	/** Each side's store receives the other's cells at the exchange; root pointers move only on each host's own sync. */
+	@Test void exchangeCarriesCellsIntoEachSidesStore() throws Exception {
+		try (var store=new MemoryStore(); var scratch=new MemoryStore()) {
+			var origin=LatticeHost.create(store);
+			var originApp=live(origin);
+			var fork=origin.fork(scratch);
+			var forkApp=live(fork);
+			Blob forkBlob=Blobs.createRandom(400);
+			Blob originBlob=Blobs.createRandom(400);
+			forkApp.<ASet<ACell>>resolve(ITEMS).updateAndGet(items -> Sets.of(forkBlob));
+			originApp.<ASet<ACell>>resolve(ITEMS).updateAndGet(items -> Sets.of(originBlob));
+			assertNull(store.refForHash(forkBlob.getHash()));
+			assertNull(scratch.refForHash(originBlob.getHash()));
+
+			fork.sync();
+			assertNotNull(store.refForHash(forkBlob.getHash()),"the fork's cells reached the origin's store");
+			assertNotNull(scratch.refForHash(originBlob.getHash()),"the origin's cells reached the fork's store");
+			assertNull(store.getRootData(),"the origin's root pointer moves only on its own sync");
+			assertEquals(Sets.of(forkBlob,originBlob),items(origin));
+			assertEquals(Sets.of(forkBlob,originBlob),items(fork));
 		}
 	}
 

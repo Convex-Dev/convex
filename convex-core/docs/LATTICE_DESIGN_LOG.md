@@ -306,9 +306,11 @@ still requires a store.
 The host is the root of the component tree: its merge behaviour is delivery to its
 applications, and `mergeAt` hands a path delivery on the same way. A host fork,
 `fork()` or `fork(store)`, is a detached copy of the root with applications and a
-store of its own; its sync persists to that store, if any, then exchanges roots with
-its origin through ordinary delivery. A fork never writes its origin's store. The
-rationale is in [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md), *Forking a host*.
+store of its own, never its origin's; its sync persists to that store, if any, then
+exchanges roots with its origin through ordinary delivery, persisting each root's
+cells into the receiving side's store first. Root pointers move only on each host's
+own sync. The rationale is in [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md),
+*Forking a host*.
 
 CAD text affected:
 
