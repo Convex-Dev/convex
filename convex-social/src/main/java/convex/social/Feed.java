@@ -11,12 +11,12 @@ import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ALatticeComponent;
+import convex.lattice.IndexComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Cursor wrapper for a user's post feed.
+ * Index component for a user's post feed.
  *
  * <p>A {@code Feed} wraps a lattice cursor at the feed level
  * ({@code Index<Blob, ACell>} with timestamp-prefixed salted keys). All
@@ -29,7 +29,7 @@ import convex.lattice.cursor.AForkableCursor;
  * AHashMap<Keyword, ACell> post = feed.getPost(key);
  * }</pre>
  */
-public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements TransactionalComponent<Index<Blob, ACell>,Feed> {
+public class Feed extends IndexComponent<Blob, ACell> implements TransactionalComponent<Index<Blob, ACell>,Feed> {
 	private final Supplier<CVMLong> clock;
 
 
@@ -76,8 +76,8 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 		long timestamp=clock.get().longValue();
 		AHashMap<Keyword,ACell> entry=entryFn.apply(timestamp);
 		Blob key=SocialPost.createKey(timestamp);
-		cursor().updateAndGet(feed -> {
-			if (feed==null) feed=SocialLattice.FEED_LATTICE.zero();
+		cursor().update(feed -> {
+			if (feed==null) feed=createContainer();
 			// Even an exceptionally unlikely salt collision must never overwrite a post.
 			if (feed.containsKey(key)) throw new IllegalStateException("Post key already exists");
 			return feed.assoc(key,entry);
@@ -97,14 +97,10 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	@SuppressWarnings("unchecked")
 	public void delete(Blob postKey) {
 		CVMLong now = clock.get();
-		cursor().updateAndGet(feed -> {
-			if (feed == null) return feed;
-			ACell existing = feed.get(postKey);
-			if (existing==null) return feed;
+		path(postKey).update(existing -> {
+			if (existing==null) return null;
 			AHashMap<Keyword, ACell> post = (AHashMap<Keyword, ACell>) existing;
-			post = post.assoc(SocialPost.DELETED, now);
-			post = post.assoc(SocialPost.TIMESTAMP, now);
-			return feed.assoc(postKey, post);
+			return post.assoc(SocialPost.DELETED,now).assoc(SocialPost.TIMESTAMP,now);
 		});
 	}
 
@@ -113,14 +109,12 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 *
 	 * @param key timestamp-prefixed key
 	 * @return The post record, or null if not found
-	 * @throws ClassCastException If the stored feed or post has an incompatible type
+	 * @throws IllegalStateException If the stored feed is not an index
+	 * @throws ClassCastException If the stored post is not a hash map
 	 */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword, ACell> getPost(Blob key) {
-		Index<Blob, ACell> feed = cursor().get();
-		if (feed == null) return null;
-		ACell value = feed.get(key);
-		return (AHashMap<Keyword, ACell>)value;
+		return (AHashMap<Keyword,ACell>)get(key);
 	}
 
 	/**
@@ -129,14 +123,13 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * @return Entry count, or zero if the feed is absent
 	 */
 	public long count() {
-		Index<Blob, ACell> feed = cursor().get();
-		return feed==null?0:feed.count();
+		return size();
 	}
 
 	/**
-	 * Gets the author's account key.
+	 * Gets the author's stable DID.
 	 *
-	 * @return The feed owner's key
+	 * @return The feed owner's DID
 	 */
 	public AString getAuthor() {
 		return author;

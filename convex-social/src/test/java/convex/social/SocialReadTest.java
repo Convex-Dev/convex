@@ -103,8 +103,8 @@ class SocialReadTest {
 		assertThrows(ClassCastException.class,() -> SocialLattice.getFollowing(state));
 		assertThrows(ClassCastException.class,() -> SocialLattice.getFollows(state));
 		assertNotNull(SocialLattice.getProfile(state));
-		assertThrows(ClassCastException.class,() -> user.feed().getPost(POST));
-		assertThrows(ClassCastException.class,() -> user.feed().count());
+		assertThrows(IllegalStateException.class,() -> user.feed().getPost(POST));
+		assertThrows(IllegalStateException.class,() -> user.feed().count());
 		assertThrows(ClassCastException.class,() -> user.feed().post("hello"));
 		assertThrows(IllegalStateException.class,() -> user.follows().getActive());
 		assertThrows(IllegalStateException.class,() -> user.follows().follow(DID_ALICE));
