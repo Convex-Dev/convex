@@ -122,6 +122,9 @@ public class Toolkit {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
 		}
+
+		// Even if the look and feel failed: text from other parties must never render as HTML
+		PlainTextUI.install();
 	}
 
 	protected static void setupForApple() {
