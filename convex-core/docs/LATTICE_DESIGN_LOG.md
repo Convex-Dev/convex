@@ -178,14 +178,8 @@ so a fork reconciles with the policy of the component that owns it, resolved whe
 publishes. A composite application publishes each owned subtree through that
 subtree's own fork, so no baseline is ever handed to a merge function.
 
-Rationale: three layers. A cursor is a mutable pointer to one immutable value, with
-atomic update, navigation and private copies. A lattice is a pure rule over values. A
-component chooses which lattice applies at its level, what context the merge runs
-under and when to publish. The merge needs the third layer's knowledge, so the third
-layer supplies it; a fork carrying a merge function would be a cursor carrying
-semantics. A cursor may apply a component-supplied function to a write, as the
-signing and stamping views do, but no cursor holds a lattice, a merge rule or a
-context of its own.
+The rationale is in [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md), *Cursor
+boundary*.
 
 CAD text affected:
 

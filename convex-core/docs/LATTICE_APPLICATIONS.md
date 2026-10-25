@@ -54,9 +54,10 @@ not by the data or storage.
 **Cursors are the mutable layer, and only that.** A cursor is a reference to one
 immutable value. It offers atomic update, compare-and-set, navigation into
 sub-positions whose writes rebuild the enclosing value atomically, and private
-drafts for multi-step transactions. A cursor knows nothing about lattices,
-ownership, policy or persistence. It gives atomicity and navigation; meaning comes
-from whoever holds it.
+drafts for multi-step transactions. A fork is a cursor's private copy that remembers
+the destination value it was last reconciled against, and carries no merge of its
+own. A cursor knows nothing about lattices, ownership, policy or persistence. It
+gives atomicity and navigation; meaning comes from whoever holds it.
 
 **Components give positions their meaning.** A component holds one cursor at one
 path together with everything the cursor does not know: the merge rules at that level,
@@ -70,7 +71,7 @@ of decisions made when it is constructed:
 | Navigation | A component creates children at paths below its cursor, supplying known empty container types when needed. A supplied lattice can optionally provide these types. Boundaries are placed by the owning component, never discovered by navigation. |
 | Publication | **Live**: writes go straight through the cursor and there is nothing to publish. **Staged**: a private working copy and a destination; sync reconciles the copy with whatever the destination now holds and publishes the result. A fork is a staged component constructed at the same position. |
 | Boundary | For a level the component owns: none, stamp each write, sign each write, or sign once at publication. Signing once needs a staged component, and is the main reason to stage. |
-| Reconciliation | The lattice merge at that position, with local edits winning ties, applied only when both the copy and its destination changed since they were last reconciled. A keyed lattice publishes only the keys it declares; the rest adopt the destination. |
+| Reconciliation | The component's own merge, usually its lattice's merge under its policy, handed to its fork when the component publishes and applied only when both the copy and its destination changed since they were last reconciled, with local edits winning ties. A keyed lattice publishes only the keys it declares; the rest adopt the destination. |
 | Policy | Explicit clock, signer and admission rules owned by the component. The base classes and hosts carry no policy context. |
 | Incoming values | Whether the component is configured on the host to receive incoming values, and how it merges or routes what it accepts. Only a component at the root can be configured directly. |
 | Transactions | Whether it offers atomic multi-step operations, by supplying a factory that rebuilds it over a draft cursor. |
@@ -1040,10 +1041,10 @@ Shared clocks and signers must support concurrent use.
 
 ## Fork and sync
 
-A component fork is an independent working copy. Its sync merges the copy into the
-destination it was forked from, with lattice semantics: concurrent state is merged
-rather than treated as a conflict, though verification, signing or storage can still
-fail. This is separate from publication and durability:
+A component fork is an independent working copy. Its sync reconciles the copy with
+the destination it was forked from using the component's own merge, so concurrent
+state is merged rather than treated as a conflict, though verification, signing or
+storage can still fail. This is separate from publication and durability:
 
 ```java
 Social forked = social.fork();  // social is live in the host root
@@ -1055,7 +1056,8 @@ host.flush();    // optional physical durability barrier, a host operation
 ```
 
 Domain components expose a fork with their exact type when batching is a use case;
-sync is inherited from the component base.
+sync is inherited from the component base, which hands the component's reconciliation
+to its fork.
 
 | Operation | Meaning | Moves a cursor? |
 |---|---|---|
@@ -1092,14 +1094,25 @@ as it goes, and sign once on sync.
 ## Cursor boundary
 
 Cursors provide atomic access, navigation, transaction drafts and forks. They carry
-no context, perform no lattice merges and construct no containers. A fork takes its
-merge function when it is created and reconciles with its destination on sync; a
-staged component owns such a fork and supplies its lattice as the function. A plain
-path write requires its intermediate containers to exist, and
-update callbacks receive `null` for absent values. The component owning a level
-supplies what the cursor lacks: its lattice's empty value when creating a child
-position, and bound signing or stamping functions when wrapping a boundary. Cursor
-mechanics are in [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
+no context, perform no lattice merges and construct no containers. A fork remembers
+the destination value it was last reconciled against and, on sync, adopts whichever
+side changed alone or applies the merge it is handed when both changed; the staged
+component that owns it hands over its own merge at that moment. A cursor may apply a
+component-supplied function to a write, as the signing and stamping views do, but no
+cursor holds a lattice, a merge rule or a context of its own.
+
+The reason is the layering. A cursor gives atomicity and navigation over one
+immutable value. A lattice is a pure rule over values. A component chooses which
+lattice applies at its level, what context the merge runs under and when to publish.
+The merge needs the component's knowledge, a signer, a clock, an authoriser or a
+decision about what to accept, so the component supplies it; a fork carrying a merge
+would be a cursor carrying semantics.
+
+A plain path write requires its intermediate containers to exist, and update
+callbacks receive `null` for absent values. The component owning a level supplies
+what the cursor lacks: its lattice's empty value when creating a child position, and
+bound signing or stamping functions when wrapping a boundary. Cursor mechanics are in
+[LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
 
 ## Explicit write capabilities
 
