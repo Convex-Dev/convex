@@ -98,34 +98,41 @@ public class EtchTest {
 	
 	@Test 
 	public void testChainClash() throws IOException {
-		Etch etch = EtchStore.createTemp().getEtch();
-		// We fake writes with similar hashes, will cause chains.
-		Hash k1=Hash.fromHex("0000000000000001000000000000000000000000000000000000000000000000");
-		Hash k2=Hash.fromHex("0000000000000002000000000000000000000000000000000000000000000000");
-		Hash k3=Hash.fromHex("0000000000000003000000000000000000000000000000000000000000000000");
-		Hash kb=Hash.fromHex("0002000000000000000000000000000000000000000000000000000000000000");
+		Hash[] sharedHashes={CVMLong.ONE.getHash(),CVMLong.TWO.getHash(),CVMLong.create(3).getHash(),CVMLong.create(4).getHash()};
+		try (EtchStore store=EtchStore.createTemp()) {
+			Etch etch = store.getEtch();
+			// We fake writes with similar hashes, will cause chains.
+			Hash k1=Hash.fromHex("0000000000000001000000000000000000000000000000000000000000000000");
+			Hash k2=Hash.fromHex("0000000000000002000000000000000000000000000000000000000000000000");
+			Hash k3=Hash.fromHex("0000000000000003000000000000000000000000000000000000000000000000");
+			Hash kb=Hash.fromHex("0002000000000000000000000000000000000000000000000000000000000000");
 		
-		CVMLong v1=CVMLong.create(1);
-		CVMLong v2=CVMLong.create(2);
-		CVMLong v3=CVMLong.create(3);
-		CVMLong vb=CVMLong.create(4);
+			// Synthetic keys are not content hashes. Reading an interned integer here
+			// would attach a fake hash to shared state used by unrelated tests.
+			Blob v1=Blob.fromHex("0101");
+			Blob v2=Blob.fromHex("0202");
+			Blob v3=Blob.fromHex("0303");
+			Blob vb=Blob.fromHex("0404");
 	
-		// This value blocks a chain assuming there is nothing else in db
-		etch.write(kb, vb.getRef());
+			// This value blocks a chain assuming there is nothing else in db
+			etch.write(kb, vb.getRef());
 		
-		etch.write(k1, v1.getRef());
-		etch.write(k2, v2.getRef());
-		etch.write(k3, v3.getRef());
+			etch.write(k1, v1.getRef());
+			etch.write(k2, v2.getRef());
+			etch.write(k3, v3.getRef());
 		
-		assertEquals(v1,etch.read(k1).getValue());
-		assertEquals(v2,etch.read(k2).getValue());
-		assertEquals(v3,etch.read(k3).getValue());
-		assertEquals(vb,etch.read(kb).getValue());
+			assertEquals(v1,etch.read(k1).getValue());
+			assertEquals(v2,etch.read(k2).getValue());
+			assertEquals(v3,etch.read(k3).getValue());
+			assertEquals(vb,etch.read(kb).getValue());
+			assertArrayEquals(sharedHashes,new Hash[] {CVMLong.ONE.getHash(),CVMLong.TWO.getHash(),CVMLong.create(3).getHash(),CVMLong.create(4).getHash()},
+				"Synthetic index keys must not change the hashes of shared integers");
 
-		long rootIndex=etch.getIndexStart();
-		long childIndex=etch.rawPointer(etch.readSlot(rootIndex,0));
-		assertEquals(EtchConstants.POINTER_INDEX,etch.extractType(etch.readSlot(rootIndex,0)));
-		assertEquals(0L,childIndex&(EtchConstants.POINTER_SIZE-1),"New child index is not naturally aligned");
+			long rootIndex=etch.getIndexStart();
+			long childIndex=etch.rawPointer(etch.readSlot(rootIndex,0));
+			assertEquals(EtchConstants.POINTER_INDEX,etch.extractType(etch.readSlot(rootIndex,0)));
+			assertEquals(0L,childIndex&(EtchConstants.POINTER_SIZE-1),"New child index is not naturally aligned");
+		}
 	}
 
 	@Test
