@@ -237,7 +237,15 @@ signing-key passphrase. Do not add Maven's `-B` batch flag, which prevents that
 prompt. Unattended CI publishing must provide signing credentials through its
 secret environment rather than command-line properties.
 
+Deploy is the priority once the GitHub Release is live. Until Central confirms
+publication, keep the release checkout on `master` at the tag: do not switch
+branches, run `versions:set` or start step 9 in it. The deploy publishes whatever
+version the working tree holds, so a checkout already moved to the next snapshot
+would publish the wrong artifacts.
+
 ### 9. Prepare next development version
+
+Only after Central has confirmed publication:
 
 ```bash
 git checkout develop
