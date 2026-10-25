@@ -302,13 +302,12 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 		long[] removed = new long[1];
 		CVMLong now = now();
 		cursor().updateAndGet(state -> {
-			if (state == null) state = QueueLattice.INSTANCE.zero();
-
 			long currentStart = QueueLattice.getStartOffset(state);
 			if (newStartOffset <= currentStart) {
 				removed[0] = 0;
 				return state;
 			}
+			if (state == null) state = QueueLattice.INSTANCE.zero();
 
 			AVector<ACell> entries = QueueLattice.getEntries(state);
 			long trim = newStartOffset - currentStart;

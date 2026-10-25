@@ -83,9 +83,15 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 	 * A shared entry view, suitable for binding a domain child component.
 	 * A changed write uses {@link #createContainer()} only when the containing map is absent.
 	 * Setting an absent entry to null is a no-op; use {@link #put} to insert a nil value.
+	 * The caller declares the entry type for a heterogeneous map; this does not
+	 * validate the entry's representation. The child component owns that check.
+	 * @param <T> Entry type expected by the child
+	 * @param key Entry key
+	 * @return Shared entry cursor
 	 */
-	public AForkableCursor<V> path(K key) {
-		return ProjectionCursor.create(values(),stored -> entry(stored,key),
+	@SuppressWarnings("unchecked")
+	public <T extends V> AForkableCursor<T> path(K key) {
+		return ProjectionCursor.create(values(),stored -> (T)entry(stored,key),
 			(stored,value) -> associate(stored,key,value));
 	}
 }

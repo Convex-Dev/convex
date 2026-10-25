@@ -4,14 +4,13 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
-import convex.lattice.ALatticeComponent;
+import convex.lattice.IndexComponent;
+import convex.lattice.MapComponent;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -43,8 +42,10 @@ import convex.lattice.cursor.AForkableCursor;
  * topic.offer(Strings.create("user-42"), Strings.create("login"));
  * }</pre>
  */
-public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
+public class LatticeTopic extends IndexComponent<Keyword, ACell> {
 	private final Supplier<CVMLong> clock;
+	private final MapComponent<ACell,AVector<ACell>> partitions;
+	private final MapComponent<ACell,ACell> metadata;
 
 	public static final Keyword KEY_NUM_PARTITIONS = Keyword.intern("num-partitions");
 
@@ -60,6 +61,8 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	public LatticeTopic(AForkableCursor<Index<Keyword, ACell>> cursor,Supplier<CVMLong> clock) {
 		super(cursor);
 		this.clock=Objects.requireNonNull(clock);
+		partitions=new MapComponent<>(path(TopicLattice.KEY_PARTITIONS));
+		metadata=new MapComponent<>(path(TopicLattice.KEY_META));
 	}
 
 	/**
@@ -82,50 +85,42 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Queue for the specified partition
 	 */
 	public LatticeQueue partition(ACell id) {
-		AForkableCursor<AVector<ACell>> partCursor = cursor().withDefault(Index.none()).<AHashMap<ACell,AVector<ACell>>>path(TopicLattice.KEY_PARTITIONS)
-			.withDefault(Maps.empty()).path(id);
-		return new LatticeQueue(partCursor,clock);
+		return new LatticeQueue(partitions.path(id),clock);
 	}
 
 	// ===== Metadata =====
 
 	/**
-	 * Gets a topic metadata value by key.
+	 * Gets a topic metadata value by key, or null when absent.
 	 */
-	@SuppressWarnings("unchecked")
 	public ACell getMeta(ACell key) {
-		AForkableCursor<Index<Keyword, ACell>> c = cursor();
-		Index<Keyword, ACell> state = c.get();
-		AHashMap<ACell, ACell> meta = TopicLattice.getMeta(state);
-		return meta.get(key);
+		return metadata.get(key);
 	}
 
 	/**
 	 * Sets a topic metadata value.
 	 */
-	@SuppressWarnings("unchecked")
 	public void setMeta(ACell key, ACell value) {
-		AForkableCursor<Index<Keyword, ACell>> c = cursor();
-		c.updateAndGet(state -> {
-			if (state == null) state = TopicLattice.INSTANCE.zero();
-			AHashMap<ACell, ACell> meta = TopicLattice.getMeta(state);
-			return state.assoc(TopicLattice.KEY_META, meta.assoc(key, value));
-		});
+		metadata.put(key,value);
 	}
 
 	/**
-	 * Returns the configured number of partitions, or 0 if not set.
+	 * Returns the positive configured partition count, or 0 when absent.
+	 * Incompatible or non-positive stored values throw.
 	 */
 	public long getNumPartitions() {
 		ACell val = getMeta(KEY_NUM_PARTITIONS);
-		if (val instanceof CVMLong l) return l.longValue();
-		return 0;
+		if (val==null) return 0;
+		long n=((CVMLong)val).longValue();
+		if (n<=0) throw new IllegalStateException("Partition count must be positive");
+		return n;
 	}
 
 	/**
-	 * Configures the number of partitions for this topic.
+	 * Configures a positive number of partitions for this topic.
 	 */
 	public void setNumPartitions(long n) {
+		if (n<=0) throw new IllegalArgumentException("Partition count must be positive");
 		setMeta(KEY_NUM_PARTITIONS, CVMLong.create(n));
 	}
 
@@ -159,7 +154,7 @@ public class LatticeTopic extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * Creates a forked copy of this topic for independent operation.
 	 * All partitions within this topic are forked together.
 	 */
-	@SuppressWarnings("unchecked")
+	@Override
 	public LatticeTopic fork() {
 		return rebind(storage.fork());
 	}

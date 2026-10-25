@@ -18,7 +18,7 @@ public class IndexComponent<K extends ABlobLike<?>,V extends ACell> extends AMap
 	@Override protected Index<K,V> createContainer() { return Index.none(); }
 
 	/** Index keys must be blob-like; nil is not an index key. */
-	@Override public AForkableCursor<V> path(K key) {
+	@Override public <T extends V> AForkableCursor<T> path(K key) {
 		if (key==null) throw new IllegalArgumentException("Index key must not be nil");
 		return super.path(key);
 	}
