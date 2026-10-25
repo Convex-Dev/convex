@@ -58,7 +58,30 @@ Merge guards the container shapes of sections it examines. Unfamiliar sections
 are retained as opaque values; unknown fields are carried without interpretation.
 An incompatible incoming section does not replace an established section, and
 other compatible sections can still advance. Signature and DID authorisation
-checks remain mandatory. Timeline readers skip unfamiliar keys and post values.
+checks remain mandatory. Domain readers throw when a value they examine has an
+incompatible type; accepting an envelope does not guarantee every domain reader
+can interpret its contents.
+
+## Reading domain state
+
+Data accessors return the stored value, or `null` when it is absent. A stored empty
+collection remains an empty collection. Readers do not manufacture defaults,
+coerce incompatible fields, or change storage. `feed.count()` returns zero for an
+absent feed, and `follows.isFollowing(did)` returns false for an absent record.
+An existing follow record must contain a boolean `:active` flag.
+
+Timeline construction excludes explicit tombstones but throws on incompatible
+keys or post values that it examines. Follow-set construction similarly rejects
+incompatible records and target DIDs. Applications using untrusted or unfamiliar
+state must handle these exceptions at their own boundary; the helpers do not
+silently return partial results. Absent individual feeds and follow sections
+contribute no entries to an explicitly requested aggregation.
+
+Writes can initialise missing containers, but incompatible containers or records
+are not replaced with empty ones. Failed edits leave the signed state unchanged.
+These domain checks do not change the relay merge's treatment of opaque sections.
+
+## Timeline ordering
 
 Timestamp ties for revisions of the same record still prefer the established
 value. Salting distinguishes post identities; it does not change revision ordering.

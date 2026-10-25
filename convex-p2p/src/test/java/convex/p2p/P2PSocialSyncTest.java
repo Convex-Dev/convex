@@ -183,7 +183,7 @@ public class P2PSocialSyncTest {
 		assertMaterialised(carol,Set.of(carolDid));
 		assertEquals(Set.of(bobDid,carolDid),alice.user(aliceDid).follows().getActive());
 		assertEquals(Set.of(aliceDid),bob.user(bobDid).follows().getActive());
-		assertTrue(carol.user(carolDid).follows().getActive().isEmpty());
+		assertNull(carol.user(carolDid).follows().getActive());
 
 		// Dave is outbound-only, is told only about Bob, and follows Carol.
 		daveStore=EtchStore.createTemp("p2p-social-dave");

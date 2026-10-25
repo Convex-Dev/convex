@@ -212,7 +212,7 @@ public class SocialAppTest {
 		Follows follows = social.user(alice.getAccountKey()).follows();
 
 		// Initially not following anyone
-		assertTrue(follows.getActive().isEmpty());
+		assertNull(follows.getActive());
 		assertFalse(follows.isFollowing(bob.getAccountKey()));
 
 		// Follow Bob
@@ -346,7 +346,7 @@ public class SocialAppTest {
 		Blob post=work.feed().post("Hello from Alice");
 		work.follows().follow(bob.getAccountKey());
 		assertEquals(0,social.user(alice.getAccountKey()).feed().count());
-		assertTrue(social.user(alice.getAccountKey()).follows().getActive().isEmpty());
+		assertNull(social.user(alice.getAccountKey()).follows().getActive());
 		work.sync();
 
 		SignedData<Index<Keyword,ACell>> signed=

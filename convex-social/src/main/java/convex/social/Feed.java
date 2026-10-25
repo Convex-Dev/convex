@@ -11,7 +11,6 @@ import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.RT;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -101,7 +100,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 		cursor().updateAndGet(feed -> {
 			if (feed == null) return feed;
 			ACell existing = feed.get(postKey);
-			if (!(existing instanceof AHashMap<?,?>)) return feed;
+			if (existing==null) return feed;
 			AHashMap<Keyword, ACell> post = (AHashMap<Keyword, ACell>) existing;
 			post = post.assoc(SocialPost.DELETED, now);
 			post = post.assoc(SocialPost.TIMESTAMP, now);
@@ -114,23 +113,24 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 *
 	 * @param key timestamp-prefixed key
 	 * @return The post record, or null if not found
+	 * @throws ClassCastException If the stored feed or post has an incompatible type
 	 */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword, ACell> getPost(Blob key) {
-		Index<Blob, ACell> feed = RT.ensureIndex(cursor().get());
+		Index<Blob, ACell> feed = cursor().get();
 		if (feed == null) return null;
 		ACell value = feed.get(key);
-		return (value instanceof AHashMap) ? (AHashMap<Keyword, ACell>) value : null;
+		return (AHashMap<Keyword, ACell>)value;
 	}
 
 	/**
 	 * Returns the number of entries in the feed (including tombstones).
 	 *
-	 * @return Entry count
+	 * @return Entry count, or zero if the feed is absent
 	 */
 	public long count() {
-		Index<Blob, ACell> feed = RT.ensureIndex(cursor().get());
-		return (feed != null) ? feed.count() : 0;
+		Index<Blob, ACell> feed = cursor().get();
+		return feed==null?0:feed.count();
 	}
 
 	/**

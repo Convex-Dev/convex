@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Social data readers return null for absence and throw on incompatible values instead of substituting empty collections or skipping erroneous entries. Counts and predicates retain zero/false for missing data; writes no longer replace incompatible follow records with empty ones.
+
 - Social follow records no longer cache resolved signing keys. Receiving remote social data leaves local follow intent, timestamps and signatures unchanged; resolution caches remain local to the DID authoriser.
 
 - Social posts use timestamp-prefixed keys with a 64-bit random salt, preventing same-time posts on independent replicas from sharing an identity. Legacy timestamp-only keys remain readable. Social merges guard examined container shapes and preserve opaque fields without blocking unrelated updates.

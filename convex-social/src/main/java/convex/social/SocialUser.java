@@ -12,6 +12,7 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.cursor.StampedCursor;
 
 /**
@@ -49,7 +50,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return new Feed(cursor().withDefault(Index.none()).path(SocialLattice.KEY_FEED),ownerDid,clock);
+		return new Feed(section(cursor(),SocialLattice.KEY_FEED),ownerDid,clock);
 	}
 
 	/**
@@ -62,9 +63,17 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 */
 	public Follows follows() {
 		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
-			cursor().withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWING),
+			section(cursor(),SocialLattice.KEY_FOLLOWING),
 			clock,(value,time) -> value.assoc(convex.lattice.generic.LWWLattice.KEY_TIMESTAMP,time));
-		return new Follows(following.withDefault(Index.none()).path(SocialLattice.KEY_FOLLOWS),clock);
+		return new Follows(section(following,SocialLattice.KEY_FOLLOWS),clock);
+	}
+
+	/** Reads actual sections; only a changed write constructs a missing index. */
+	@SuppressWarnings("unchecked")
+	private static <V extends ACell> AForkableCursor<V> section(
+			AForkableCursor<Index<Keyword,ACell>> parent,Keyword key) {
+		return ProjectionCursor.create(parent,state -> state==null?null:(V)state.get(key),
+			(state,value) -> (state==null?Index.<Keyword,ACell>none():state).assoc(key,value));
 	}
 
 	/**

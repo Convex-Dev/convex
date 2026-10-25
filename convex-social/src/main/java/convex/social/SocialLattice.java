@@ -5,7 +5,6 @@ import convex.core.data.AHashMap;
 import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
@@ -150,40 +149,23 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 
 	// ===== Static helpers =====
 
-	/**
-	 * Gets the feed index from user state.
-	 */
+	/** Returns the stored feed, or null if absent. Incompatible values throw ClassCastException. */
 	@SuppressWarnings("unchecked")
 	public static Index<Blob, ACell> getFeed(Index<Keyword, ACell> state) {
-		if (state == null) return Index.none();
-		ACell feed = state.get(KEY_FEED);
-		if (feed == null) return Index.none();
-		Index<Blob,ACell> index=RT.ensureIndex(feed);
-		return index==null?Index.none():index;
+		return state==null?null:(Index<Blob,ACell>)state.get(KEY_FEED);
 	}
 
-	/**
-	 * Gets the profile from user state.
-	 */
+	/** Returns the stored profile, or null if absent. Incompatible values throw ClassCastException. */
 	@SuppressWarnings("unchecked")
 	public static AHashMap<Keyword, ACell> getProfile(Index<Keyword, ACell> state) {
-		if (state == null) return Maps.empty();
-		ACell profile = state.get(KEY_PROFILE);
-		if (profile == null) return Maps.empty();
-		AHashMap<Keyword,ACell> map=RT.ensureHashMap(profile);
-		return map==null?Maps.empty():map;
+		return state==null?null:(AHashMap<Keyword,ACell>)state.get(KEY_PROFILE);
 	}
 
-	/**
-	 * Gets the DID-keyed follows map from the {@code :following} section.
-	 */
+	/** Returns the stored follows map, or null if absent. Incompatible ancestors or values throw. */
 	@SuppressWarnings("unchecked")
 	public static AHashMap<ACell, ACell> getFollows(Index<Keyword, ACell> state) {
 		Index<Keyword,ACell> following=getFollowing(state);
-		ACell follows = following.get(KEY_FOLLOWS);
-		if (follows == null) return Maps.empty();
-		AHashMap<ACell,ACell> map=RT.ensureHashMap(follows);
-		return map==null?Maps.empty():map;
+		return following==null?null:(AHashMap<ACell,ACell>)following.get(KEY_FOLLOWS);
 	}
 
 	/** Returns true iff a value is already in the canonical social-state shape. */
@@ -203,12 +185,10 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 		return (Index<Keyword,ACell>)Index.EMPTY;
 	}
 
+	/** Returns the stored following section, or null if absent. Incompatible values throw. */
 	@SuppressWarnings("unchecked")
 	public static Index<Keyword,ACell> getFollowing(Index<Keyword,ACell> state) {
-		if (state==null) return zeroState();
-		ACell following=state.get(KEY_FOLLOWING);
-		if (!(following instanceof Index<?,?>)) return zeroState();
-		return (Index<Keyword,ACell>)following;
+		return state==null?null:(Index<Keyword,ACell>)state.get(KEY_FOLLOWING);
 	}
 
 	private static long followingTimestamp(Index<Keyword,ACell> following) {

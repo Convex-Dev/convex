@@ -5,7 +5,6 @@ import java.security.SecureRandom;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
-import convex.core.data.ASet;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -107,24 +106,24 @@ public class SocialPost {
 	 * @return true if the post has a :deleted field
 	 */
 	public static boolean isDeleted(AHashMap<Keyword, ACell> post) {
-		return post.get(DELETED) != null;
+		CVMLong deleted=post==null?null:(CVMLong)post.get(DELETED);
+		return deleted!=null;
 	}
 
 	/**
-	 * Gets the text content of a post.
+	 * Returns the text content, or null if absent. Incompatible values throw.
 	 */
 	public static String getText(AHashMap<Keyword, ACell> post) {
-		ACell text = post.get(TEXT);
-		return (text != null) ? text.toString() : null;
+		AString text=post==null?null:(AString)post.get(TEXT);
+		return text==null?null:text.toString();
 	}
 
 	/**
-	 * Gets the timestamp of a post.
+	 * Returns the timestamp, or null if absent. Incompatible values throw.
 	 */
-	public static long getTimestamp(AHashMap<Keyword, ACell> post) {
-		ACell ts = post.get(TIMESTAMP);
-		if (ts instanceof CVMLong l) return l.longValue();
-		return 0;
+	public static Long getTimestamp(AHashMap<Keyword, ACell> post) {
+		CVMLong timestamp=post==null?null:(CVMLong)post.get(TIMESTAMP);
+		return timestamp==null?null:timestamp.longValue();
 	}
 
 	// ===== Follow helpers =====
@@ -146,12 +145,12 @@ public class SocialPost {
 	}
 
 	/**
-	 * Checks if a follow record indicates an active follow.
+	 * Returns false for an absent record; an existing record must contain a boolean active flag.
 	 */
 	public static boolean isActiveFollow(AHashMap<Keyword, ACell> followRecord) {
-		if (followRecord == null) return false;
-		ACell active = followRecord.get(ACTIVE);
-		if (active instanceof CVMBool b) return b.booleanValue();
-		return false;
+		if (followRecord==null) return false;
+		CVMBool active=(CVMBool)followRecord.get(ACTIVE);
+		if (active==null) throw new IllegalStateException("Follow record requires an active flag");
+		return active.booleanValue();
 	}
 }

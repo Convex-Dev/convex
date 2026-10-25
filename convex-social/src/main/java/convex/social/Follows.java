@@ -12,7 +12,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.RT;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.MapComponent;
 import convex.lattice.TransactionalComponent;
@@ -67,7 +66,7 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	 * Checks if a user is actively followed.
 	 *
 	 * @param target canonical base DID to check
-	 * @return true if the user is actively followed
+	 * @return True if actively followed; false if the record is absent
 	 */
 	public boolean isFollowing(AString target) {
 		return SocialPost.isActiveFollow(getRecord(target));
@@ -76,10 +75,10 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	/**
 	 * Gets the set of actively followed DIDs.
 	 *
-	 * @return set of canonical base DIDs
+	 * @return Set of canonical base DIDs, or null if the follows map is absent
 	 */
 	public Set<AString> getActive() {
-		return SocialHelpers.getActiveFollows(records.get());
+		return SocialHelpers.getActiveFollows(cursor().get());
 	}
 
 	/** Convenience migration overload mapping an Ed25519 key to {@code did:key}. */
@@ -93,17 +92,18 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 		}
 	}
 
+	/** Returns the stored follow record, or null if absent. Incompatible values throw. */
 	@SuppressWarnings("unchecked")
-	private AHashMap<Keyword,ACell> getRecord(AString target) {
-		ACell record=records.get(target);
-		return (record instanceof AHashMap<?,?> map)
-			?(AHashMap<Keyword,ACell>)map:null;
+	public AHashMap<Keyword,ACell> getRecord(AString target) {
+		AHashMap<ACell,ACell> follows=cursor().get();
+		return follows==null?null:(AHashMap<Keyword,ACell>)follows.get(target);
 	}
 
+	@SuppressWarnings("unchecked")
 	private void writeField(AString target,Keyword key,ACell value) {
 		CVMLong timestamp=clock.get();
 		records.path(target).updateAndGet(existing -> {
-			AHashMap<Keyword,ACell> record=RT.ensureHashMap(existing);
+			AHashMap<Keyword,ACell> record=(AHashMap<Keyword,ACell>)existing;
 			if (record==null) record=Maps.empty();
 			return record.assoc(key,value).assoc(SocialPost.TIMESTAMP,timestamp);
 		});

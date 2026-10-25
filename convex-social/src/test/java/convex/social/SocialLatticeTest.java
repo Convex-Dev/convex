@@ -412,16 +412,16 @@ public class SocialLatticeTest {
 	@Test
 	public void testEmptyStateFunctions() {
 		Index<Keyword, ACell> empty = SocialLattice.INSTANCE.zero();
-		assertTrue(SocialLattice.getFeed(empty).isEmpty());
-		assertTrue(SocialLattice.getProfile(empty).isEmpty());
-		assertTrue(SocialLattice.getFollows(empty).isEmpty());
+		assertNull(SocialLattice.getFeed(empty));
+		assertNull(SocialLattice.getProfile(empty));
+		assertNull(SocialLattice.getFollows(empty));
 	}
 
 	@Test
 	public void testNullStateFunctions() {
-		assertTrue(SocialLattice.getFeed(null).isEmpty());
-		assertTrue(SocialLattice.getProfile(null).isEmpty());
-		assertTrue(SocialLattice.getFollows(null).isEmpty());
+		assertNull(SocialLattice.getFeed(null));
+		assertNull(SocialLattice.getProfile(null));
+		assertNull(SocialLattice.getFollows(null));
 	}
 
 	// ===== KeyedLattice.addLattice Integration =====

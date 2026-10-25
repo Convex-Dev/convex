@@ -32,9 +32,7 @@ class TimelinePaginationTest {
 		Index<Blob,ACell> feed=Index.none();
 		for (Blob key:KEYS) feed=feed.assoc(key,SocialPost.createPost("post",SocialPost.extractTimestamp(key)));
 		return feed.assoc(SocialPost.createKey(1000,2),SocialPost.createPost("deleted",1000)
-				.assoc(SocialPost.DELETED,CVMLong.ONE))
-			.assoc(SocialPost.createKey(1002,0),Strings.intern("future post format"))
-			.assoc(Blob.fromHex("ff"),SocialPost.createPost("unknown key",1003));
+				.assoc(SocialPost.DELETED,CVMLong.ONE));
 	}
 
 	@Test void everyPageSizeVisitsEachPositionOnceRegardlessOfAuthorIterationOrder() {

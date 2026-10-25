@@ -71,8 +71,7 @@ class SocialReplicationTest {
 			assertEquals(opaque,result.get(SocialLattice.KEY_FEED));
 			assertEquals(opaque,result.get(extension));
 			assertEquals(profile,result.get(SocialLattice.KEY_PROFILE));
-			assertTrue(SocialLattice.getFeed(result).isEmpty());
-			assertTrue(SocialHelpers.computeFollowSet(social.cursor().get(),java.util.Set.of(did)).isEmpty());
+			assertThrows(ClassCastException.class,() -> SocialLattice.getFeed(result));
 			// The opposite merge order is safe too; unfamiliar values are not cast to containers.
 			assertDoesNotThrow(() -> SocialLattice.INSTANCE.merge(update,foreign));
 		}
@@ -91,11 +90,11 @@ class SocialReplicationTest {
 		}
 	}
 
-	@Test void timelineReadsLegacyAndSaltedKeysAndSkipsUnfamiliarEntries() {
+	@Test void timelineReadsLegacyAndSaltedKeys() {
 		var legacy=Blob.fromHex("0000000000000064");
 		var modern=SocialPost.createKey(101,1);
 		Index<Blob,ACell> feed=Index.of(legacy,SocialPost.createPost("legacy",100),
-			modern,SocialPost.createPost("modern",101),Blob.fromHex("ff"),Strings.create("opaque"));
+			modern,SocialPost.createPost("modern",101));
 		var timeline=SocialHelpers.buildTimeline(Map.of(DID.forKey(ALICE.getAccountKey()),feed),0,10);
 		assertEquals(2,timeline.size());
 		assertEquals(modern,timeline.get(0).postKey());

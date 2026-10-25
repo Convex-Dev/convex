@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Set;
 
@@ -16,7 +17,6 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
-import convex.core.data.prim.CVMBool;
 
 /**
  * Helper methods for the social lattice.
@@ -47,26 +47,19 @@ public class SocialHelpers {
 	 * Gets the set of actively followed DIDs from a user's follows map.
 	 *
 	 * @param follows The follows map (key → {active, timestamp})
-	 * @return Set of canonical base DIDs
+	 * @return Set of canonical base DIDs, or null if the follows map is absent
 	 */
 	@SuppressWarnings("unchecked")
 	public static Set<AString> getActiveFollows(AHashMap<ACell, ACell> follows) {
-		Set<AString> result = new HashSet<>();
-		if (follows == null || follows.isEmpty()) return result;
-
-		long n = follows.count();
-		for (long i = 0; i < n; i++) {
-			MapEntry<ACell, ACell> entry = follows.entryAt(i);
-			ACell key = entry.getKey();
-			ACell value = entry.getValue();
-
-			if (value instanceof AHashMap<?,?> record) {
-				ACell active = ((AHashMap<Keyword, ACell>) record).get(SocialPost.ACTIVE);
-				if (CVMBool.TRUE.equals(active) && key instanceof AString did
-						&& convex.auth.did.DID.isCanonicalBase(did)) {
-					result.add(did);
-				}
+		if (follows==null) return null;
+		Set<AString> result=new HashSet<>();
+		for (var entry:follows.entrySet()) {
+			if (!(entry.getKey() instanceof AString did) || !convex.auth.did.DID.isCanonicalBase(did)) {
+				throw new IllegalArgumentException("Follow target must be a canonical base DID");
 			}
+			AHashMap<Keyword,ACell> record=(AHashMap<Keyword,ACell>)entry.getValue();
+			if (record==null) throw new IllegalStateException("Follow entry requires a record");
+			if (SocialPost.isActiveFollow(record)) result.add(did);
 		}
 		return result;
 	}
@@ -76,20 +69,20 @@ public class SocialHelpers {
 	 *
 	 * @param socialValue The social lattice value
 	 * @param localUserDids set of local user DIDs
-	 * @return combined set of all directly followed DIDs
+	 * @return Combined set of directly followed DIDs, or null if social state is absent
 	 */
 	@SuppressWarnings("unchecked")
 	public static Set<AString> computeFollowSet(
 			AHashMap<ACell, SignedData<Index<Keyword, ACell>>> socialValue,
 			Set<AString> localUserDids) {
 		Set<AString> result = new HashSet<>();
-		if (socialValue == null) return result;
+		if (socialValue == null) return null;
 
 		for (AString userDid : localUserDids) {
 			Index<Keyword, ACell> userState = getUserState(socialValue, userDid);
 			if (userState == null) continue;
 			AHashMap<ACell, ACell> follows = SocialLattice.getFollows(userState);
-			result.addAll(getActiveFollows(follows));
+			if (follows!=null) result.addAll(getActiveFollows(follows));
 		}
 		return result;
 	}
@@ -114,7 +107,7 @@ public class SocialHelpers {
 
 	/**
 	 * Builds a timeline in descending feed-key order, breaking ties by author DID.
-	 * Uses a K-way merge; tombstones and unfamiliar post/key shapes are skipped.
+	 * Uses a K-way merge; tombstones are excluded. Incompatible keys or post values throw.
 	 *
 	 * <p>Pass the last returned entry's position for exact continuation, or a
 	 * key-prefix position to skip a whole group. The bound need not exist in the
@@ -124,14 +117,16 @@ public class SocialHelpers {
 	 * @param feeds Map of author DID to feed index
 	 * @param before Exclusive position bound, or null to start at the newest entry
 	 * @param limit Maximum number of entries to return
-	 * @return Timeline entries in descending position order
+	 * @return Timeline entries in descending position order, or null if feeds is null
 	 */
 	@SuppressWarnings("unchecked")
 	public static List<TimelineEntry> buildTimeline(
 			Map<AString, Index<Blob, ACell>> feeds,
 			TimelinePosition before, int limit) {
 
-		if (feeds == null || feeds.isEmpty() || limit <= 0) {
+		if (limit<0) throw new IllegalArgumentException("Timeline limit must not be negative");
+		if (feeds==null) return null;
+		if (feeds.isEmpty() || limit == 0) {
 			return Collections.emptyList();
 		}
 
@@ -158,15 +153,14 @@ public class SocialHelpers {
 			FeedCursor cursor = heap.poll();
 
 			// Filter out tombstoned posts
-			ACell value = cursor.entry.getValue();
-			if (value instanceof AHashMap<?,?> post) {
-				AHashMap<Keyword, ACell> postMap = (AHashMap<Keyword, ACell>) post;
-				if (!SocialPost.isDeleted(postMap)) {
-					result.add(new TimelineEntry(
-						cursor.order.author(), cursor.order.postKey(),
-						SocialPost.extractTimestamp(cursor.order.postKey()), postMap));
-				}
+			AHashMap<Keyword,ACell> post=(AHashMap<Keyword,ACell>)cursor.entry.getValue();
+			Objects.requireNonNull(post,"Feed entry requires a post record");
+			if (!SocialPost.isDeleted(post)) {
+				result.add(new TimelineEntry(cursor.order.author(),cursor.order.postKey(),
+					SocialPost.extractTimestamp(cursor.order.postKey()),post));
 			}
+
+			if (result.size()==limit) break;
 
 			// Advance cursor to previous entry
 			FeedCursor previous=previousEntry(cursor.order.author(),cursor.feed,cursor.position-1,null);
@@ -176,12 +170,14 @@ public class SocialHelpers {
 		return result;
 	}
 
-	/** Skip unfamiliar keys before they can affect the timeline's chronological ordering. */
+	/** Finds the previous entry below the bound, requiring timestamp-prefixed blob keys. */
 	private static FeedCursor previousEntry(AString author,Index<Blob,ACell> feed,long position,TimelinePosition before) {
 		for (long i=position;i>=0;i--) {
 			MapEntry<Blob,ACell> entry=feed.entryAt(i);
 			ACell rawKey=entry.getKey();
-			if (!(rawKey instanceof Blob key) || key.count()<8) continue;
+			if (!(rawKey instanceof Blob key) || key.count()<8) {
+				throw new IllegalArgumentException("Feed key must be a timestamp-prefixed blob");
+			}
 			TimelinePosition order=new TimelinePosition(key,author);
 			if (before!=null && order.compareTo(before)>=0) continue;
 			return new FeedCursor(order,feed,i,entry);

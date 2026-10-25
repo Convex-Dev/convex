@@ -67,10 +67,10 @@ final class SocialReplicationPolicy {
 		HashSet<AString> desired=new HashSet<>(localUsers);
 		desired.addAll(pins);
 		ACell raw=application.cursor().get(Social.KEY_SOCIAL);
-		if (!(raw instanceof AHashMap<?,?> social)) return Set.copyOf(desired);
+		if (raw==null) return Set.copyOf(desired);
 		@SuppressWarnings("unchecked")
 		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> typed=
-			(AHashMap<ACell,SignedData<Index<Keyword,ACell>>>)social;
+			(AHashMap<ACell,SignedData<Index<Keyword,ACell>>>)raw;
 		desired.addAll(SocialHelpers.computeFollowSet(typed,localUsers));
 		return Set.copyOf(desired);
 	}

@@ -41,6 +41,11 @@ minimal and extensible — easy to layer applications and UI on top.
 
 ## Features
 
+Data getters return `null` for absence and throw on incompatible stored values.
+Empty collections are returned only when present in storage or produced by an
+explicit aggregation. Counts and predicates use zero/false for missing data.
+See [Reading domain state](docs/SOCIAL_DESIGN.md#reading-domain-state).
+
 - Owner-signed feeds — only a key authorised for the owner can post
 - Signed follow/unfollow records with per-target LWW merge
 - Timeline helper for merging selected feeds by timestamp
