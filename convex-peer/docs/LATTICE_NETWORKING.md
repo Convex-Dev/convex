@@ -99,9 +99,11 @@ transport.setSelector(connection -> publicGroup);
 node.launch();
 transport.launch();
 
-// Shutdown order: stop ingress before draining groups and persistence.
+// Shutdown order: stop ingress, drain groups, save through the host, close the store.
 transport.close();
 node.close();
+node.getHost().checkpoint();
+nodeStore.close();
 ```
 
 `NodeConfig` contains authoritative persistence, standard-listener and application
@@ -228,13 +230,15 @@ intermittent failures; `Status.isOperational()` describes lifecycle, while
 `Status.hasFailures()` describes observed degradation.
 
 Shutdown is composed in the opposite order: the application closes every
-transport, then `NodeServer.close()` asks each endpoint to drain, publishes the
-final host root, drains each group and completes the node-store durability
-barrier. Each group cleanup is independent. Endpoint cleanup also
+transport, then `NodeServer.close()` asks each endpoint to drain and drains and
+closes each group. Each group cleanup is independent. Endpoint cleanup also
 continues after a timed-out acquisition so one stuck resource does not suppress
-the remaining cleanup steps.
+the remaining cleanup steps. Closing neither publishes pending host state nor
+flushes the store: the owning service then saves through the host and closes
+its store, as described in [persistence](PERSISTENCE.md#lifecycle).
 
-Failures of the node store are surfaced by `NodeServer`. Listener failures are
+Store failures while the node runs are surfaced by `NodeServer` and host sync;
+saving failures by the host's `checkpoint()` or `flush()`. Listener failures are
 surfaced independently to the application that owns the transport.
 
 ### Removing a group while the node runs
