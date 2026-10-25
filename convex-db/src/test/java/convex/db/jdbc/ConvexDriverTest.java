@@ -204,6 +204,42 @@ public class ConvexDriverTest {
 		}
 
 		assertTrue(tempFile.exists(), "Etch file should exist after connection");
+
+		// Closing the connection saves auto-committed statements to the store root
+		ConvexDriver.ManagedInstance inst = ConvexDriver.instances.get("file:" + tempFile.getCanonicalPath());
+		assertEquals(inst.server.getHost().cursor().get(), inst.store.getRootData());
+
+		// Data survives closing and reopening the store
+		ConvexDriver.closeAll();
+		try (Connection conn = DriverManager.getConnection(url);
+				Statement stmt = conn.createStatement()) {
+			ResultSet rs = stmt.executeQuery("SELECT name FROM t WHERE id = 1");
+			assertTrue(rs.next());
+			assertEquals("Bob", rs.getString(1));
+		}
+	}
+
+	@Test
+	public void testFileCommitSaves() throws Exception {
+		File tempFile = File.createTempFile("convex-driver-commit", ".etch");
+		tempFile.delete();
+		tempFile.deleteOnExit();
+		String url = "jdbc:convex:file:" + tempFile.getAbsolutePath().replace('\\', '/');
+
+		try (Connection conn = DriverManager.getConnection(url)) {
+			try (Statement stmt = conn.createStatement()) {
+				stmt.executeUpdate("CREATE TABLE t (id INTEGER, name VARCHAR)");
+			}
+			conn.setAutoCommit(false);
+			try (Statement stmt = conn.createStatement()) {
+				stmt.executeUpdate("INSERT INTO t VALUES (2, 'Eve')");
+			}
+			conn.commit();
+
+			// Committed state is saved while the connection stays open
+			ConvexDriver.ManagedInstance inst = ConvexDriver.instances.get("file:" + tempFile.getCanonicalPath());
+			assertEquals(inst.server.getHost().cursor().get(), inst.store.getRootData());
+		}
 	}
 
 	// ========== Direct API ==========
