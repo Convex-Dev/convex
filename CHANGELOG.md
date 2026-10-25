@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `LatticeQueue` uses an overridable `createContainer()` for local initialisation, matching the collection component policy. Broader queue design review is tracked in [#770](https://github.com/Convex-Dev/convex/issues/770).
+
 - Queue topic and metadata views use standard collection components with overridable creation policy. Topic section readers return null for absence, malformed partition counts throw, and no-op truncation leaves an absent queue uncreated.
 
 - Standard map, index and set components return null for missing storage. Counts and predicates retain their natural empty results. An overridable `createContainer()` controls creation on writes, including map child views; applications can supply initial contents or reject implicit creation.

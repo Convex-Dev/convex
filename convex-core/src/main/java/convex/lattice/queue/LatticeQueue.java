@@ -46,6 +46,14 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	}
 
 	/**
+	 * Creates the state for a mutation of an absent queue. Override to supply initial
+	 * state or throw to require explicit initialisation. Return a non-null queue state.
+	 * This hook must be pure because atomic updates may retry it. Reads and no-op
+	 * truncation do not call it. Subclasses retain their policy through {@link #rebind}.
+	 */
+	protected AVector<ACell> createContainer() { return QueueLattice.INSTANCE.zero(); }
+
+	/**
 	 * Creates a new empty queue.
 	 */
 	public static LatticeQueue create() {
@@ -61,6 +69,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	/**
 	 * Creates a forked copy of this queue for independent operation.
 	 */
+	@Override
 	public LatticeQueue fork() {
 		return rebind(storage.fork());
 	}
@@ -106,12 +115,12 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 			throw new IllegalArgumentException("Queue value must not be null");
 		}
 
-		CVMLong now = now();
+		CVMLong now = clock.get();
 		AVector<ACell> entry = QueueEntry.create(key, value, now, headers);
 
 		long[] offset = new long[1];
 		cursor().updateAndGet(state -> {
-			if (state == null) state = QueueLattice.INSTANCE.zero();
+			if (state == null) state = createContainer();
 
 			AVector<ACell> entries = QueueLattice.getEntries(state);
 			long startOffset = QueueLattice.getStartOffset(state);
@@ -278,9 +287,9 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Sets a metadata value.
 	 */
 	public void setMeta(ACell key, ACell value) {
-		CVMLong now = now();
+		CVMLong now = clock.get();
 		cursor().updateAndGet(state -> {
-			if (state == null) state = QueueLattice.INSTANCE.zero();
+			if (state == null) state = createContainer();
 			AHashMap<ACell, ACell> meta = QueueLattice.getMeta(state);
 			AHashMap<ACell, ACell> newMeta = meta.assoc(key, value);
 			return state.assoc(QueueLattice.POS_META, newMeta).assoc(QueueLattice.POS_TIMESTAMP, now);
@@ -300,14 +309,14 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	public long truncate(long newStartOffset) {
 		long[] removed = new long[1];
-		CVMLong now = now();
+		CVMLong now = clock.get();
 		cursor().updateAndGet(state -> {
+			if (state == null && newStartOffset>0) state = createContainer();
 			long currentStart = QueueLattice.getStartOffset(state);
 			if (newStartOffset <= currentStart) {
 				removed[0] = 0;
 				return state;
 			}
-			if (state == null) state = QueueLattice.INSTANCE.zero();
 
 			AVector<ACell> entries = QueueLattice.getEntries(state);
 			long trim = newStartOffset - currentStart;
@@ -325,14 +334,6 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 			return Vectors.of(newEntries, meta, now, CVMLong.create(newStartOffset));
 		});
 		return removed[0];
-	}
-
-	// ===== Internal =====
-
-	// #561: resolve time through the component policy. The default policy uses runtime
-	// time; applications and tests may supply a fixed or otherwise dynamic clock.
-	private CVMLong now() {
-		return clock.get();
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
