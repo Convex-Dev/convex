@@ -2,11 +2,15 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.UnaryOperator;
+
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Maps;
@@ -36,10 +40,90 @@ class MapComponentTest {
 		return indexed?new IndexComponent<>(root.path()):new MapComponent<>(root.path());
 	}
 
+	private static AMapComponent<AString,ACell,?> creationPolicy(Root<ACell> root,boolean indexed,boolean allow) {
+		return indexed?new IndexComponent<AString,ACell>(root.path()) {
+			@Override protected Index<AString,ACell> createContainer() {
+				if (!allow) throw new UnsupportedOperationException("Explicit initialisation required");
+				return Index.of(A,CVMLong.ONE,B,CVMLong.TWO);
+			}
+		}:new MapComponent<AString,ACell>(root.path()) {
+			@Override protected AHashMap<AString,ACell> createContainer() {
+				if (!allow) throw new UnsupportedOperationException("Explicit initialisation required");
+				return Maps.of(A,CVMLong.ONE,B,CVMLong.TWO);
+			}
+		};
+	}
+
+	/** A domain can require explicit initialisation for both direct and child edits. */
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void creationCanBeForbiddenWithoutPreventingReadsOrExistingEdits(boolean indexed) {
+		var root=new Root<ACell>();
+		var map=creationPolicy(root,indexed,false);
+		assertNull(map.get());
+		assertNull(map.path(A).get());
+		assertEquals(0,map.size());
+		assertFalse(map.containsKey(A));
+		assertNull(map.remove(A));
+		map.clear();
+		map.path(A).set(null);
+		assertThrows(UnsupportedOperationException.class,() -> map.put(A,null));
+		assertThrows(UnsupportedOperationException.class,() -> map.path(A).set(CVMLong.ONE));
+		assertNull(root.get(),"failed creation must leave storage absent");
+		root.set(indexed?Index.none():Maps.empty());
+		map.put(A,CVMLong.ONE);
+		map.path(B).set(CVMLong.TWO);
+		assertEquals(2,map.size());
+		map.clear();
+		assertTrue(map.isEmpty());
+	}
+
+	/** Creation may supply initial entries, even the same entry being written. */
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void directAndChildWritesPreserveInitialEntries(boolean indexed) {
+		for (boolean child:new boolean[] {false,true}) {
+			var root=new Root<ACell>();
+			var map=creationPolicy(root,indexed,true);
+			if (child) map.path(A).set(CVMLong.ONE);
+			else assertNull(map.put(A,CVMLong.ONE),"previous value comes from storage, not initial entries");
+			assertEquals(CVMLong.ONE,map.get(A));
+			assertEquals(CVMLong.TWO,map.get(B));
+			assertEquals(indexed,root.get() instanceof Index<?,?>);
+			root.set(CVMLong.ONE);
+			assertThrows(IllegalStateException.class,() -> map.put(A,CVMLong.ONE));
+			assertThrows(IllegalStateException.class,() -> map.path(A).set(CVMLong.ONE));
+			assertSame(CVMLong.ONE,root.get(),"creation must not replace incompatible storage");
+		}
+	}
+
+	/** A losing creation attempt must use the winning container on its retry. */
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void concurrentCreationPreservesTheWinningContents(boolean indexed) {
+		for (boolean child:new boolean[] {false,true}) {
+			var attempts=new AtomicInteger();
+			ACell winner=indexed?Index.of(B,CVMLong.create(99)):Maps.of(B,CVMLong.create(99));
+			var root=new Root<ACell>() {
+				@Override public ACell getAndUpdate(UnaryOperator<ACell> update) {
+					return super.getAndUpdate(current -> {
+						ACell candidate=update.apply(current);
+						if (attempts.incrementAndGet()==1) set(winner);
+						return candidate;
+					});
+				}
+			};
+			var map=creationPolicy(root,indexed,true);
+			if (child) assertNull(map.path(A).getAndSet(CVMLong.ONE));
+			else assertNull(map.put(A,CVMLong.ONE));
+			assertEquals(CVMLong.ONE,map.get(A));
+			assertEquals(CVMLong.create(99),map.get(B));
+			assertTrue(attempts.get()>1,"the test must actually exercise a retry");
+		}
+	}
+
 	@ParameterizedTest @ValueSource(booleans={false,true})
 	void absentReadsAndNoOpEditsDoNotCreateStorage(boolean indexed) {
 		var root=new Root<ACell>();
 		var map=component(root,indexed);
+		assertNull(map.get());
 		assertTrue(map.isEmpty());
 		assertEquals(0,map.size());
 		assertNull(map.get(A));

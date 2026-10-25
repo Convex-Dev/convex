@@ -12,7 +12,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
-import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
@@ -146,8 +145,7 @@ public final class FavouritesExample {
 		/** Reads the relayed field without assuming the remote owner's item representation. */
 		ACell items(AccountKey user) {
 			var record=component().get(user);
-			ACell value=record==null?null:record.getValue().get(ITEMS);
-			return value==null?Sets.empty():value;
+			return record==null?null:record.getValue().get(ITEMS);
 		}
 	}
 
@@ -208,7 +206,7 @@ public final class FavouritesExample {
 		void add(long item) { itemSet.add(CVMLong.create(item)); }
 		void remove(long item) { itemSet.remove(CVMLong.create(item)); }
 
-		/** Set operations preserve unfamiliar members; an incompatible field remains available in the region. */
+		/** Returns null for missing items. Set operations preserve unfamiliar members. */
 		ASet<ACell> items() { return itemSet.get(); }
 	}
 

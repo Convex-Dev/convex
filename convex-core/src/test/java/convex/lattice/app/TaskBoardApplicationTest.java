@@ -102,9 +102,10 @@ class TaskBoardApplicationTest {
 
 		void plan(String id,String title) { task(id).create(title); }
 
-		/** Computes pending IDs from one immutable snapshot, independent of task titles. */
+		/** Computes pending IDs from one snapshot; null means the board is absent. */
 		ASet<ACell> pending() {
 			var snapshot=tasks.get();
+			if (snapshot==null) return null;
 			ASet<ACell> pending=Sets.empty();
 			for (var entry:snapshot.entrySet()) {
 				if (!CVMBool.TRUE.equals(entry.getValue().get(DONE))) pending=pending.include(entry.getKey());
@@ -145,6 +146,7 @@ class TaskBoardApplicationTest {
 	/** Completion does not require interpreting a remote title or unrelated fields. */
 	@Test void taskOperationsPreserveUnfamiliarFields() {
 		var board=new TaskBoardApp(LatticeHost.create(),() -> CVMLong.TWO).board();
+		assertNull(board.pending());
 		var title=Maps.of("text","A structured title","language","en");
 		var extra=Maps.of("version",2);
 		var extension=Keyword.intern("future-field");

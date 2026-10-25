@@ -59,12 +59,45 @@ class SetComponentTest {
 		var set=new SetComponent<>(root);
 		assertTrue(set.isEmpty());
 		assertEquals(0,set.size());
-		assertEquals(Sets.empty(),set.get());
+		assertNull(set.get());
 		assertFalse(set.contains(CVMLong.ONE));
 		assertFalse(set.remove(CVMLong.ONE));
 		set.clear();
 		set.sync();
 		assertNull(root.get());
+	}
+
+	@Test void creationPolicyCanRequireExplicitInitialisation() {
+		var root=new Root<ASet<CVMLong>>();
+		var set=new SetComponent<>(root) {
+			@Override protected ASet<CVMLong> createContainer() {
+				throw new UnsupportedOperationException("Explicit initialisation required");
+			}
+		};
+		assertNull(set.get());
+		assertFalse(set.contains(CVMLong.ONE));
+		assertFalse(set.remove(CVMLong.ONE));
+		set.clear();
+		assertThrows(UnsupportedOperationException.class,() -> set.add(CVMLong.ONE));
+		assertNull(root.get());
+		root.set(Sets.empty());
+		assertTrue(set.add(CVMLong.ONE));
+		assertTrue(set.remove(CVMLong.ONE));
+		set.clear();
+		assertEquals(Sets.empty(),set.get());
+	}
+
+	@Test void creationPreservesInitialMembersAndRejectsIncompatibleStorage() {
+		var root=new Root<ACell>();
+		var set=new SetComponent<CVMLong>(root.path()) {
+			@Override protected ASet<CVMLong> createContainer() { return Sets.of(1,2); }
+		};
+		assertTrue(set.add(CVMLong.ONE),"previous membership comes from storage, not initial members");
+		assertEquals(Sets.of(1,2),set.get());
+		assertFalse(set.add(CVMLong.ONE));
+		root.set(CVMLong.ONE);
+		assertThrows(IllegalStateException.class,() -> set.add(CVMLong.ONE));
+		assertSame(CVMLong.ONE,root.get());
 	}
 
 	@Test void componentsSharePathEditsWithoutChangingSiblings() {

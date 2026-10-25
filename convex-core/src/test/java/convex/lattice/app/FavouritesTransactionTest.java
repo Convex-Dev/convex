@@ -34,7 +34,7 @@ class FavouritesTransactionTest {
 			retained.set(draft.itemSet);
 			draft.add(42);
 			draft.itemSet.add(CVMLong.create(7));
-			assertTrue(live.items().isEmpty());
+			assertNull(live.items());
 			assertEquals(0,signatures.get());
 		});
 		assertEquals(Sets.of(42,7),live.items());

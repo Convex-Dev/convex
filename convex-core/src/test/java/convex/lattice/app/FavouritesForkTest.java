@@ -48,7 +48,8 @@ class FavouritesForkTest {
 		nested.add(99);
 		nested.sync();
 		assertEquals(Sets.of(7,99),draft.items());
-		assertTrue(live.items().isEmpty());
+		assertNull(live.items());
+		assertNull(app.items(ALICE.getAccountKey()));
 		assertEquals(0,signatures.get());
 		app.sync();
 		assertTrue(host.cursor().get().isEmpty(),"App sync does not publish outstanding user drafts");

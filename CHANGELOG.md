@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Standard map, index and set components return null for missing storage. Counts and predicates retain their natural empty results. An overridable `createContainer()` controls creation on writes, including map child views; applications can supply initial contents or reject implicit creation.
+
 - Social data readers return null for absence and throw on incompatible values instead of substituting empty collections or skipping erroneous entries. Counts and predicates retain zero/false for missing data; writes no longer replace incompatible follow records with empty ones.
 
 - Social follow records no longer cache resolved signing keys. Receiving remote social data leaves local follow intent, timestamps and signatures unchanged; resolution caches remain local to the DID authoriser.

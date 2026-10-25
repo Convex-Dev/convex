@@ -15,6 +15,8 @@ public class IndexComponent<K extends ABlobLike<?>,V extends ACell> extends AMap
 
 	public IndexComponent(AForkableCursor<Index<K,V>> cursor) { super(cursor); }
 
+	@Override protected Index<K,V> createContainer() { return Index.none(); }
+
 	/** Index keys must be blob-like; nil is not an index key. */
 	@Override public AForkableCursor<V> path(K key) {
 		if (key==null) throw new IllegalArgumentException("Index key must not be nil");
@@ -22,7 +24,7 @@ public class IndexComponent<K extends ABlobLike<?>,V extends ACell> extends AMap
 	}
 
 	@Override protected Index<K,V> requireMap(ACell value) {
-		if (value==null) return Index.none();
+		if (value==null) return null;
 		Index<K,V> index=RT.ensureIndex(value);
 		if (index==null) throw new IllegalStateException("Index operation requires an index at this path");
 		return index;

@@ -60,7 +60,7 @@ class ReadingListApplicationTest {
 		var initial=host.cursor().get();
 		var alice=host.addApplication(new ReadingListApp(host));
 		var bob=host.addApplication(new ReadingListApp(host));
-		assertTrue(alice.titles().isEmpty());
+		assertNull(alice.titles());
 		assertEquals(initial,host.cursor().get(),"reading an absent set must not create a region");
 
 		alice.recommend("The Dispossessed");
