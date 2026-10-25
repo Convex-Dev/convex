@@ -109,11 +109,15 @@ public class LatticeOps {
 	@SuppressWarnings("unchecked")
 	public static <V extends ACell> V mergePublication(ALattice<V> lattice,LatticeContext context,V own,V other) {
 		V merged=lattice.merge(context,own,other);
-		if (!(lattice instanceof AKeyedLattice<?,?> keyed) || !(other instanceof AMap<?,?>)) return merged;
+		if (!(lattice instanceof AKeyedLattice<?,?> keyed) || (other!=null && !(other instanceof AMap<?,?>))) return merged;
 		if (merged==null) return other;
 		AMap<ACell,ACell> result=(AMap<ACell,ACell>)other;
 		for (Map.Entry<ACell,ACell> entry:((AMap<ACell,ACell>)merged).entrySet()) {
-			if (keyed.path(entry.getKey())!=null) result=result.assoc(entry.getKey(),entry.getValue());
+			if (keyed.path(entry.getKey())!=null) {
+				// Rebuild an absent destination only for keys this component owns.
+				if (result==null) result=(AMap<ACell,ACell>)keyed.zero();
+				result=result.assoc(entry.getKey(),entry.getValue());
+			}
 		}
 		return (V)result;
 	}

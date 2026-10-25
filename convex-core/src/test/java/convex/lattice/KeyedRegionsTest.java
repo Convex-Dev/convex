@@ -22,6 +22,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.TransactionalRootCursor;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.OwnerKeyLattice;
 import convex.lattice.generic.OwnerLattice;
@@ -111,6 +112,44 @@ class KeyedRegionsTest {
 		}
 		assertSame(initial,host.merge(null));
 		assertNull(store.getRootData(),"application sync never persists the host");
+	}
+
+	@Test void emptyRegionsNeverPublishOrRefreshASuppliedFork() {
+		for (boolean moved:List.of(false,true)) {
+			var host=LatticeHost.create();
+			var draft=host.cursor().fork();
+			draft.assoc(B,CVMLong.ONE);
+			var app=new Regions(draft);
+			if (moved) host.cursor().assoc(UNKNOWN,CVMLong.TWO);
+			var published=host.cursor().get();
+			var pending=draft.get();
+			assertSame(pending,app.sync());
+			assertSame(published,host.cursor().get());
+			assertSame(pending,draft.get());
+		}
+	}
+
+	@Test void childrenPublishIntoSuppliedForkWithoutPublishingTheAggregate() {
+		var host=LatticeHost.create();
+		var draft=host.cursor().fork();
+		AtomicInteger preparations=new AtomicInteger();
+		var app=new TestRegions(draft) {
+			@Override protected void beforeSync() { preparations.incrementAndGet(); }
+		};
+		var child=app.counter(A);
+		child.cursor().set(CVMLong.ONE);
+		draft.assoc(B,CVMLong.TWO);
+		host.cursor().assoc(UNKNOWN,CVMLong.create(3));
+		var published=host.cursor().get();
+		assertEquals(Index.of(A,CVMLong.ONE,B,CVMLong.TWO),app.sync());
+		assertEquals(1,preparations.get());
+		assertEquals(CVMLong.ONE,draft.get().get(A));
+		assertSame(published,host.cursor().get(),"Only the enclosing owner may publish the aggregate");
+		assertThrows(IllegalStateException.class,() -> app.counter(UNKNOWN));
+		// The owner explicitly reconciles its complete aggregate, including unrelated destination keys.
+		var aggregate=new LatticeComponent<>(KeyedLattice.create(A,MaxLattice.INSTANCE,B,MaxLattice.INSTANCE),draft);
+		assertEquals(Index.of(A,CVMLong.ONE,B,CVMLong.TWO,UNKNOWN,CVMLong.create(3)),aggregate.sync());
+		assertEquals(aggregate.cursor().get(),host.cursor().get());
 	}
 
 	@Test void emptyAndUnusedNestedApplicationsDoNotCreateContainers() {

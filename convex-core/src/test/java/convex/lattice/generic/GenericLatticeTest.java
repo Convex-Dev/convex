@@ -63,6 +63,28 @@ public class GenericLatticeTest {
 		assertEquals(Maps.of(1,6,2,10), l.merge(Maps.of(1,3,2,10), Maps.of(1,6,2,5)));
 	}
 
+	@Test public void nilMapKeysUseTheChildMerge() {
+		MapLattice<ACell,AInteger> lattice=MapLattice.create(MaxLattice.INSTANCE);
+		AHashMap<ACell,AInteger> first=Maps.of(null,CVMLong.ONE);
+		AHashMap<ACell,AInteger> second=Maps.of(null,CVMLong.TWO);
+		for (LatticeContext context:new LatticeContext[]{null,LatticeContext.EMPTY}) {
+			java.util.function.BinaryOperator<AHashMap<ACell,AInteger>> merge=context==null
+				?lattice::merge:(own,other) -> lattice.merge(context,own,other);
+			assertEquals(first,merge.apply(Maps.empty(),first));
+			assertEquals(first,merge.apply(null,first));
+			assertEquals(first,merge.apply(first,Maps.empty()));
+			assertEquals(second,merge.apply(first,second));
+			assertEquals(second,merge.apply(second,first));
+		}
+	}
+
+	@Test public void nilMapKeysDoNotBypassChildPolicy() {
+		MapLattice<ACell,ACell> lattice=MapLattice.create(ReservedLattice.create("Not served"));
+		AHashMap<ACell,ACell> incoming=Maps.of(null,CVMLong.ONE);
+		assertEquals(Maps.empty(),lattice.merge(null,incoming));
+		assertEquals(Maps.empty(),lattice.merge(LatticeContext.EMPTY,null,incoming));
+	}
+
 	/**
 	 * #561: merging a foreign map into an absent (null) own must validate each child through
 	 * the value lattice, not accept the map wholesale. A wrong-typed grandchild is rejected

@@ -250,7 +250,10 @@ Application lifecycle methods explicitly add preparation and child publication.
 Extend `AKeyedRegions` for an application whose interests are named regions of an
 index. Register a child for each region. The same class works at the host root or
 inside another regions component; it has no whole-container working copy to merge
-or publish.
+or publish. If its supplied cursor is a fork, `sync()` prepares the application
+and publishes its children into that fork, leaving the aggregate private. The
+enclosing owner publishes the fork explicitly using its aggregate merge policy.
+An empty regions collection neither publishes nor refreshes the supplied fork.
 
 The concrete implementations cover ordinary assembly: `SingleRegion<C>` wraps one
 typed child and exposes it through `component()`; `Regions` collects several

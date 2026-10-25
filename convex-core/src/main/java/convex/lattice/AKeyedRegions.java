@@ -31,6 +31,10 @@ import convex.lattice.cursor.ProjectionCursor;
  * application changes them. Merge and sync are not atomic across children:
  * earlier successful work stands if a later child fails.</p>
  *
+ * <p>A supplied fork remains private working storage: syncing this container
+ * publishes children into it, but does not publish the fork itself. Its owner
+ * must explicitly publish the aggregate with the appropriate merge policy.</p>
+ *
  * <p>Register children during construction. The first merge, path delivery or
  * sync freezes this component's registrations. Explicit children may be shared
  * with other applications: registration neither rebinds them nor changes their
@@ -158,11 +162,13 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 		return cursor().get();
 	}
 
-	/** Freezes registrations before entering the application lifecycle. */
+	/** Freezes registrations, prepares and publishes children, then reads the container. */
 	@Override
 	public Index<Keyword,ACell> sync() {
 		regions();
-		return super.sync();
+		beforeSync();
+		syncChildren();
+		return storage.get();
 	}
 
 	/** Publishes children in registration order. The container has no staged snapshot. */

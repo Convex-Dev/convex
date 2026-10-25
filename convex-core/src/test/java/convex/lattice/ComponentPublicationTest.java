@@ -118,6 +118,34 @@ public class ComponentPublicationTest {
 	}
 
 	@Test
+	public void testClearedDestinationDoesNotRestoreUndeclaredKeys() {
+		Keyword record=Keyword.intern("record"), a=Keyword.intern("a"), b=Keyword.intern("b");
+		var initial=Index.<Keyword,ACell>of(a,Sets.of(1),b,Sets.of(2));
+		List<AForkableCursor<Index<Keyword,ACell>>> destinations=List.of(
+			Root.create(initial),Root.create(Index.of(record,initial)).path(record));
+		for (var destination:destinations) {
+			var component=new LatticeComponent<>(KeyedLattice.create(a,SETS),destination.fork());
+			component.cursor().assoc(a,Sets.of(1,3));
+			destination.set(null);
+			var expected=Index.of(a,Sets.of(1,3));
+			assertEquals(expected,component.sync());
+			assertEquals(expected,destination.get(),"An unrelated key stays removed when the whole destination is cleared");
+			assertEquals(expected,component.sync(),"The published value becomes the new baseline");
+		}
+	}
+
+	@Test
+	public void testClearedDestinationStaysAbsentWhenNoDeclaredKeysRemain() {
+		Keyword a=Keyword.intern("a"), b=Keyword.intern("b");
+		var destination=Root.<Index<Keyword,ACell>>create(Index.of(b,CVMLong.ONE));
+		var component=new LatticeComponent<>(KeyedLattice.create(a,SETS),destination.fork());
+		component.cursor().assoc(b,CVMLong.TWO);
+		destination.set(null);
+		assertNull(component.sync());
+		assertNull(destination.get(),"Filtering unrelated state must not create an empty container");
+	}
+
+	@Test
 	public void testUneditedComponentAdoptsParentInsteadOfWinningATie() {
 		var lattice=CompareLattice.<CVMLong>create((a,b) -> 0);
 		var destination=new Root<>(CVMLong.ONE);

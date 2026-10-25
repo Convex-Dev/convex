@@ -59,7 +59,9 @@ public abstract class AUnionLattice<K extends ACell, V extends ACell, M extends 
 			@Override
 			public V merge(Object key, V a, V b) {
 				if (b==null) return a;
-				if (!(key instanceof ACell cell) || !checkEntry(cell,b)) return a;
+				if (key!=null && !(key instanceof ACell)) return a;
+				ACell cell=(ACell)key; // nil is a valid hash-map key
+				if (!checkEntry(cell,b)) return a;
 				ALattice<V> child=path(cell);
 				if (child==null) return a;
 				return (context==null)?child.merge(a,b):child.merge(context,a,b);
