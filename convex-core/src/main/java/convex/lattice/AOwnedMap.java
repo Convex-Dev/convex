@@ -39,13 +39,36 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		extends ALatticeComponent<M> {
 
 	private final AOwnerLattice<K,V,M> owners;
+	private final AMapComponent<K,SignedData<V>,M> entries;
 
 	protected AOwnedMap(AOwnerLattice<K,V,M> owners,AForkableCursor<M> cursor) {
 		super(cursor);
 		this.owners=owners;
+		entries=new AMapComponent<>(cursor) {
+			@SuppressWarnings("unchecked")
+			@Override protected M requireMap(ACell value) {
+				if (value==null) return null;
+				try {
+					if (owners.checkForeign((M)value)) return (M)value;
+				} catch (ClassCastException e) {
+					throw new IllegalStateException("Incompatible owner map",e);
+				}
+				throw new IllegalStateException("Incompatible owner map");
+			}
+			@Override protected M createContainer() { return AOwnedMap.this.createContainer(); }
+		};
 	}
 
 	public final AOwnerLattice<K,V,M> getLattice() { return owners; }
+
+	/**
+	 * Creates storage for a changed local owner-slot write when the map is absent.
+	 * Return a non-null compatible map, optionally with initial entries, or throw to
+	 * require explicit initialisation. This hook must be pure: atomic updates may
+	 * retry it. Reads and unchanged writes do not call it. Incoming delivery and
+	 * publication continue to use the merge policy.
+	 */
+	protected M createContainer() { return owners.zero(); }
 
 	/** The same owner-bound rule used for delivery, publication and local authoring. */
 	public final SignedLattice<V> signingFor(K owner) { return rule(owner); }
@@ -125,15 +148,15 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		return merge((M)incoming.assoc(rule.getOwner(),value));
 	}
 
-	/** Returns the current signed entry, or null when absent. Does not create state. */
+	/** Returns the current signed entry, or null when absent. Rejects incompatible storage. */
 	public SignedData<V> get(K owner) {
-		M map=cursor().get();
-		return map==null?null:map.get(owner);
+		return entries.get(owner);
 	}
 
 	/**
 	 * Returns the signed storage path for an owner, for direct domain construction.
-	 * A missing containing map is created only on a changed write. Navigation does
+	 * A missing containing map uses {@link #createContainer()} only on a changed write.
+	 * Access rejects incompatible containers. Navigation does
 	 * not sign or grant authority; a signed component binds the owner rule separately.
 	 */
 	public AForkableCursor<SignedData<V>> path(K owner) {
@@ -166,7 +189,8 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		return rule;
 	}
 
+	@SuppressWarnings("unchecked")
 	private AForkableCursor<SignedData<V>> slot(SignedLattice<V> rule) {
-		return cursor().withDefault(owners.zero()).path(rule.getOwner());
+		return entries.path((K)rule.getOwner());
 	}
 }

@@ -3,10 +3,14 @@ package convex.lattice;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -36,9 +40,9 @@ class OwnedComponentsTest {
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(7400);
 	private static final AKeyPair BOB=AKeyPair.createSeeded(7401);
 	private static final AKeyPair DELEGATE=AKeyPair.createSeeded(7402);
-	private static final AString A=Strings.create("did:example:alice");
-	private static final AString B=Strings.create("did:example:bob");
-	private static final AString UNKNOWN=Strings.create("did:example:unknown");
+	private static final AString A=Strings.intern("did:example:alice");
+	private static final AString B=Strings.intern("did:example:bob");
+	private static final AString UNKNOWN=Strings.intern("did:example:unknown");
 	private static final BiPredicate<AString,AccountKey> VERIFIER=(owner,signer) ->
 		(A.equals(owner) && (ALICE.getAccountKey().equals(signer) || DELEGATE.getAccountKey().equals(signer)))
 		|| (B.equals(owner) && BOB.getAccountKey().equals(signer));
@@ -58,6 +62,90 @@ class OwnedComponentsTest {
 
 	private static ACell entry(boolean indexed,ACell owner,ACell value) {
 		return indexed?Index.of(owner,value):Maps.of(owner,value);
+	}
+
+	private static AOwnedMap<AString,AInteger,?> creationPolicy(Root<ACell> root,boolean indexed,boolean allow) {
+		return indexed?new OwnedIndex<AString,AInteger>(root.path(),MaxLattice.INSTANCE,VERIFIER) {
+			@Override protected Index<AString,SignedData<AInteger>> createContainer() {
+				if (!allow) throw new UnsupportedOperationException("Explicit initialisation required");
+				return Index.of(B,BOB.signData(CVMLong.ONE));
+			}
+		}:new OwnedMap<AString,AInteger>(root.path(),MaxLattice.INSTANCE,VERIFIER) {
+			@Override protected AHashMap<AString,SignedData<AInteger>> createContainer() {
+				if (!allow) throw new UnsupportedOperationException("Explicit initialisation required");
+				return Maps.of(B,BOB.signData(CVMLong.ONE));
+			}
+		};
+	}
+
+	/** Every local authoring route honours the same creation policy without partial writes. */
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void creationCanBeForbiddenWithoutPreventingReadsOrExistingEdits(boolean indexed) {
+		var root=new Root<ACell>();
+		var owners=creationPolicy(root,indexed,false);
+		var slot=owners.path(A);
+		var edits=owners.authoringCursor(A,ALICE::signData);
+		var draft=owners.draft(A,ALICE::signData);
+		assertNull(owners.get(A));
+		assertNull(slot.get());
+		assertNull(edits.get());
+		slot.set(null);
+		draft.sync();
+		assertNull(root.get());
+		assertThrows(UnsupportedOperationException.class,() -> slot.set(ALICE.signData(CVMLong.ONE)));
+		assertThrows(UnsupportedOperationException.class,() -> edits.set(CVMLong.ONE));
+		draft.cursor().set(CVMLong.TWO);
+		assertThrows(UnsupportedOperationException.class,draft::sync);
+		assertNull(root.get());
+		// An already open draft can publish after explicit initialisation.
+		root.set(indexed?Index.none():Maps.empty());
+		draft.sync();
+		assertEquals(CVMLong.TWO,owners.get(A).getValue());
+		assertTrue(owners.get(A).checkSignature());
+	}
+
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void creationPreservesInitialEntriesAndAccessRejectsIncompatibleContainers(boolean indexed) {
+		var root=new Root<ACell>();
+		var owners=creationPolicy(root,indexed,true);
+		var slot=owners.path(A);
+		owners.authoringCursor(A,ALICE::signData).set(CVMLong.TWO);
+		assertEquals(CVMLong.TWO,owners.get(A).getValue());
+		assertEquals(CVMLong.ONE,owners.get(B).getValue());
+		for (ACell bad:List.of(CVMLong.ONE,indexed?Maps.empty():Index.none())) {
+			root.set(bad);
+			assertThrows(IllegalStateException.class,() -> owners.get(A));
+			assertThrows(IllegalStateException.class,slot::get);
+			assertThrows(IllegalStateException.class,() -> slot.set(ALICE.signData(CVMLong.ONE)));
+			assertSame(bad,root.get());
+		}
+		// Unexamined sibling values remain opaque, even if not signed envelopes.
+		root.set(entry(indexed,B,CVMLong.ONE));
+		slot.set(ALICE.signData(CVMLong.TWO));
+		assertSame(CVMLong.ONE,((AMap<?,?>)root.get()).get(B));
+		assertThrows(ClassCastException.class,() -> owners.get(B));
+	}
+
+	/** A retry must preserve the winning owner's entry instead of recreating initial contents. */
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void concurrentCreationPreservesTheWinningContainer(boolean indexed) {
+		var attempts=new AtomicInteger();
+		var winner=BOB.signData(CVMLong.create(99));
+		var root=new Root<ACell>() {
+			@Override public ACell getAndUpdate(UnaryOperator<ACell> update) {
+				return super.getAndUpdate(current -> {
+					ACell candidate=update.apply(current);
+					if (attempts.incrementAndGet()==1) set(entry(indexed,B,winner));
+					return candidate;
+				});
+			}
+		};
+		var owners=creationPolicy(root,indexed,true);
+		owners.authoringCursor(A,ALICE::signData).set(CVMLong.TWO);
+		assertEquals(2,attempts.get());
+		assertSame(winner,owners.get(B));
+		assertEquals(CVMLong.TWO,owners.get(A).getValue());
+		assertTrue(owners.get(A).checkSignature());
 	}
 
 	@Test void standardAuthoringViewUsesTheSameOwnerRuleWithoutMaterialisingReads() {
