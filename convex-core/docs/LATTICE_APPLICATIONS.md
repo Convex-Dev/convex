@@ -301,8 +301,9 @@ snapshot. A failed barrier does not roll back publication already performed.
 The service chooses when to promise durability. It can checkpoint before
 acknowledging a durable request or batch flushes when delayed durability is
 acceptable. Background flushing processes already-retained state and must expose
-failures. Service shutdown stops writers and networking, completes its chosen
-saving policy, then closes the store.
+failures. Service shutdown stops writers and networking, syncs any drafts it
+wants kept, closes the host, which stops background flushing and saves a final
+checkpoint, then closes the store.
 
 Separating these boundaries avoids forcing every edit to pay for a disk barrier
 or a network round trip. It also makes completion precise: a local edit, retained

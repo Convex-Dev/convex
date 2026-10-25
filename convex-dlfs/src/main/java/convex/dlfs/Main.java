@@ -156,16 +156,16 @@ public final class Main {
 		Runnable shutdown=()->{
 			if (!closing.compareAndSet(false,true)) return;
 			server.close();
+			closeNode(transport,node);
 			try {
 				drives.sync();
 			} catch (Exception e) {
 				System.err.println("Failed to publish DLFS state: "+e.getMessage());
 			}
-			closeNode(transport,node);
 			try {
-				store.flush();
+				host.close();
 			} catch (Exception e) {
-				System.err.println("Failed to flush DLFS store: "+e.getMessage());
+				System.err.println("Failed to save DLFS state: "+e.getMessage());
 			}
 			store.close();
 			stopped.countDown();

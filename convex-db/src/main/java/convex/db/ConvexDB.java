@@ -156,8 +156,10 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	/**
 	 * Creates optional networking around a store-backed ConvexDB host.
-	 * Call {@code server.getHost().checkpoint()} to save durably; network close
-	 * does not save pending state. Local-only applications can use {@link #openHost}.
+	 * Call {@code server.getHost().checkpoint()} to save durably while running. At
+	 * shutdown, close the server, then {@code server.getHost()} to save, then the
+	 * store; network close does not save pending state. Local-only applications can
+	 * use {@link #openHost}.
 	 *
 	 * <p>Usage:
 	 * <pre>

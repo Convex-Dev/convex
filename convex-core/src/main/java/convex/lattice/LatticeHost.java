@@ -1,5 +1,6 @@
 package convex.lattice;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -45,15 +46,20 @@ import convex.lattice.cursor.TransactionalRootCursor;
  * default store or thread-local store is created or substituted. {@link #store()}
  * returns null. A store-backed host can also be hosted by a networked NodeServer.</p>
  *
+ * <p>{@link #close()} is the service's shutdown step for host state: it stops
+ * automatic flushing and saves a final checkpoint. The store stays open for the
+ * service that owns it.</p>
+ *
  * @param <V> Root lattice value type
  */
-public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
+public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> implements Closeable {
 
 	private final AStore store;
 	private final LatticeHost<V> origin;
 	private final ReentrantLock syncLock=new ReentrantLock();
 	private Function<V,V> publisher;
 	private AutoFlush autoFlush;
+	private boolean closed;
 	private volatile List<ALatticeComponent<V>> applications=List.of();
 
 	/**
@@ -328,6 +334,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 		Objects.requireNonNull(publish);
 		syncLock.lock();
 		try {
+			ensureOpen();
 			V snapshot=cursor().get();
 			V published=publish.apply(storeRoot(snapshot));
 			// Persisted references may replace the snapshot; concurrent edits stay pending.
@@ -352,6 +359,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 		Objects.requireNonNull(publish);
 		syncLock.lock();
 		try {
+			ensureOpen();
 			if (publisher!=null) throw new IllegalStateException("Host already has a publisher");
 			publisher=publish;
 		} finally {
@@ -381,6 +389,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	public void flush() throws IOException {
 		syncLock.lock();
 		try {
+			ensureOpen();
 			if (store!=null) store.flush();
 		} finally {
 			syncLock.unlock();
@@ -413,19 +422,65 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 
 	/**
 	 * Starts scoped periodic flushing of already-retained state. Neither application
-	 * publication nor host sync is automatic. Close the returned resource before the
-	 * borrowed store; it stops the worker and performs a final flush. Only one such
-	 * resource may be active on a host. Use {@link #checkpoint()} for durable requests.
+	 * publication nor host sync is automatic. Close the returned resource, or the host,
+	 * before the borrowed store; either stops the worker and performs a final flush.
+	 * Only one such resource may be active on a host. Use {@link #checkpoint()} for
+	 * durable requests.
 	 */
 	public AutoFlush autoFlush(Duration interval) {
 		syncLock.lock();
 		try {
+			ensureOpen();
 			if (autoFlush!=null) throw new IllegalStateException("Host already has an automatic flusher");
 			autoFlush=new AutoFlush(this,interval);
 			return autoFlush;
 		} finally {
 			syncLock.unlock();
 		}
+	}
+
+	/**
+	 * Closes the host: stops any automatic flushing, then retains and flushes a final
+	 * snapshot exactly as {@link #checkpoint()} does. Close any node first and the
+	 * store afterwards, as {@code try (store; host; node) {...}} does.
+	 *
+	 * <p>Like a checkpoint, closing does not sync applications or exchange a fork
+	 * with its origin. A publisher still attached receives the final snapshot. The
+	 * store stays open for the service that owns it. Without a store there is
+	 * nothing to retain, so closing only stops automatic flushing.</p>
+	 *
+	 * <p>Once closed, {@link #sync()}, {@link #sync(Function)}, {@link #checkpoint()},
+	 * {@link #flush()}, {@link #autoFlush(Duration)} and {@link #attachPublisher(Function)}
+	 * throw {@link IllegalStateException}. Reads still work. Incoming merges may still
+	 * change the in-memory value but cannot be retained, so a node still attached
+	 * fails its syncs. Closing again does nothing.</p>
+	 *
+	 * @throws IOException if the final checkpoint fails; the host stays open and a
+	 *         later close retries
+	 */
+	@Override
+	public void close() throws IOException {
+		for (;;) {
+			AutoFlush flusher;
+			syncLock.lock();
+			try {
+				if (closed) return;
+				flusher=autoFlush;
+				if (flusher==null) {
+					if (store!=null) checkpoint();
+					closed=true;
+					return;
+				}
+			} finally {
+				syncLock.unlock();
+			}
+			// Outside syncLock: the worker's flush takes it, and closing waits for the worker.
+			flusher.close();
+		}
+	}
+
+	private void ensureOpen() {
+		if (closed) throw new IllegalStateException("Lattice host is closed");
 	}
 
 	void releaseAutoFlush(AutoFlush resource) {

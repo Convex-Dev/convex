@@ -627,7 +627,7 @@ public class P2PNode implements Closeable {
 		return server.isRunning() && transport.isRunning();
 	}
 
-	/** Stops networking; the service saves explicitly through {@code getNodeServer().getHost()}. */
+	/** Stops networking; the service then saves by closing {@code getNodeServer().getHost()}. */
 	@Override
 	public void close() throws IOException {
 		transport.close();
@@ -652,14 +652,14 @@ public class P2PNode implements Closeable {
 
 		P2PNode node = P2PNode.create(store, NodeConfig.create(), keyPair).serveAllInbound();
 		var host=node.getNodeServer().getHost();
-		var durability=host.autoFlush(Duration.ofSeconds(30));
-		durability.failure().thenAcceptAsync(error -> log.warn("P2P store flush failed",error));
+		host.autoFlush(Duration.ofSeconds(30)).failure()
+			.thenAcceptAsync(error -> log.warn("P2P store flush failed",error));
 		var stopped=new CountDownLatch(1);
 		var closing=new AtomicBoolean();
 		Runnable shutdown=() -> {
 			if (!closing.compareAndSet(false,true)) return;
-			// Close replication, then drain/final-flush, then close the borrowed store.
-			try (store; durability; node) {
+			// Close replication, then the host (stops flushing, final checkpoint), then the store.
+			try (store; host; node) {
 				// Resource order defines the service's shutdown policy.
 			} catch (IOException e) {
 				log.warn("Unable to finish P2P service shutdown",e);

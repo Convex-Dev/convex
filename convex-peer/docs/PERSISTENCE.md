@@ -173,8 +173,14 @@ Shutdown order prevents new work racing store closure:
 
 1. the service stops requests and closes transports to stop admission;
 2. `NodeServer.close()` drains accepted messages and closes each group;
-3. the owning service explicitly saves any accepted host state it wants retained;
-4. the service closes its automatic-flush resource, if any, and then its store.
+3. the service syncs any application drafts it wants retained;
+4. `LatticeHost.close()` stops automatic flushing and saves a final checkpoint;
+5. the service closes its store.
+
+With try-with-resources, `try (store; host; node) {...}` closes the node, then
+the host, then the store. Closing the host neither syncs applications nor closes
+the store. A closed host refuses further syncs, checkpoints and flushes. If the
+final checkpoint fails, the host stays open and closing again retries.
 
 A service that shuts down from a JVM shutdown hook registers that work with
 `Shutdown.addHook(Shutdown.SERVICE, ...)`, not `Runtime.addShutdownHook`. The JVM
