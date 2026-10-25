@@ -127,8 +127,7 @@ public class DLFSComponentTest {
 	public void testCompleteNodeHostedServerStack() throws Exception {
 		AKeyPair keyPair=AKeyPair.generate();
 		try (EtchStore store=EtchStore.createTemp("dlfs-complete-stack");
-				NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(RelayHost.openHost(
-					Index.<Keyword,ACell>none(),store,NodeConfig.port(-1)),NodeConfig.port(-1))) {
+				NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(LatticeHost.open(store),NodeConfig.port(-1))) {
 			var application=node.getHost().addApplication(new DLFSApplication(node.getHost(),keyPair::signData));
 			node.launch();
 			DLFSDriveManager drives=new DLFSDriveManager(
@@ -173,8 +172,7 @@ public class DLFSComponentTest {
 	public void testRegionAtArbitraryRootPath() throws Exception {
 		AKeyPair keyPair=AKeyPair.generate();
 		try (EtchStore store=EtchStore.createTemp("dlfs-components");
-				NodeServer<Index<Keyword,ACell>> server=new NodeServer<>(RelayHost.openHost(
-					Index.<Keyword,ACell>none(),store,NodeConfig.port(-1)),NodeConfig.port(-1))) {
+				NodeServer<Index<Keyword,ACell>> server=new NodeServer<>(LatticeHost.open(store),NodeConfig.port(-1))) {
 			var application=server.getHost().addApplication(new DLFSApplication(server.getHost(),keyPair::signData,KEY_DOCUMENTS));
 			server.launch();
 			DLFSDrive drive=application.drives(keyPair.getAccountKey()).createDrive("home");

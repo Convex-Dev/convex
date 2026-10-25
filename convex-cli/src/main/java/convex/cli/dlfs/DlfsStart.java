@@ -35,7 +35,6 @@ import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeServer;
-import convex.node.RelayHost;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -137,7 +136,7 @@ public class DlfsStart extends ACommand {
 		NodeServer<Index<Keyword,ACell>> nodeServer;
 		DLFSApplication application;
 		try {
-			var host=RelayHost.openHost(Index.<Keyword,ACell>none(),store,config);
+			var host=LatticeHost.open(store);
 			application=host.addApplication(new DLFSApplication(host,keyPair::signData));
 			nodeServer=new NodeServer<>(host,config);
 		} catch (IOException e) {
@@ -245,7 +244,8 @@ public class DlfsStart extends ACommand {
 		DLFSDrives ownerDrives=application.drives(accountKey);
 		return DLFSDriveManager.createRouter(()->{
 			application.sync();
-			host.sync();
+			try { host.checkpoint(); }
+			catch (IOException e) { throw new java.io.UncheckedIOException(e); }
 		}).mountAnonymous(ownerDrives)
 			.mount(DID.forKey(accountKey).toString(),ownerDrives);
 	}

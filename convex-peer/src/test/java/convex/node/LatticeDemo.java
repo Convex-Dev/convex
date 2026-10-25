@@ -80,7 +80,7 @@ public class LatticeDemo {
 				// Give each demo node a stable identity. Real deployments load their own keys.
 				AKeyPair nodeKey=AKeyPair.createSeeded(8100+i);
 				NodeConfig config=NodeConfig.localNetwork();
-				var network=new LatticeNode<>(RelayHost.open(lattice,store,config),config);
+				var network=new LatticeNode<>(RelayHost.open(lattice,store),config);
 				// Retain ownership before starting anything, so finally also covers setup failures.
 				networks.add(network);
 				network.setIdentity(DID.forKey(nodeKey.getAccountKey()),nodeKey);

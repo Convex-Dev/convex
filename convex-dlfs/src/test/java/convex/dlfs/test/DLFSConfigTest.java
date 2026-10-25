@@ -45,7 +45,6 @@ public class DLFSConfigTest {
 			    port: 0,
 			    store: 'memory',
 			    keypair: '%s',
-			    persist: false,
 			    bootstrap: [{key: '%s', url: 'tcp://127.0.0.1:18888'}],
 			  },
 			  dlfs: {
@@ -67,7 +66,6 @@ public class DLFSConfigTest {
 
 		assertEquals(nodeKey,config.getKeyPair());
 		assertEquals("memory",config.getStorePath());
-		assertFalse(config.getNodeConfig().isPersist());
 		assertArrayEquals(new Keyword[] {Keyword.intern("apps"),Keyword.intern("documents")},
 			config.getRegionPath());
 		assertEquals("work",config.getDriveName());

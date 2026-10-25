@@ -120,7 +120,7 @@ public class NodeServerTest {
 		private static <V extends ACell> LatticeHost<V> relay(ALattice<V> lattice,AStore store,
 				NodeConfig config,LatticeContext context) {
 			try {
-				return RelayHost.open(lattice,store,config,context);
+				return RelayHost.open(lattice,store,context);
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}

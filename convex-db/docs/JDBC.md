@@ -173,14 +173,15 @@ For advanced use cases (replication, custom NodeServer config):
 
 ```java
 EtchStore store = EtchStore.create(new File("/data/market.etch"));
-var server = new NodeServer<>(RelayHost.open(ConvexDB.DATABASE_MAP_LATTICE, store, config), config);
+var server = new NodeServer<>(RelayHost.open(ConvexDB.DATABASE_MAP_LATTICE, store), config);
 server.launch();
 
 ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 // ... use conn ...
 
-server.close();  // persists on shutdown
+server.close();  // stop replication
+server.getHost().checkpoint(); // save accepted host state explicitly
 store.close();
 ```
 

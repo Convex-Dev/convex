@@ -2,6 +2,7 @@ package convex.dlfs;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
@@ -17,7 +18,7 @@ import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.core.util.Utils;
 import convex.node.NodeServer;
-import convex.node.RelayHost;
+import convex.lattice.LatticeHost;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -64,7 +65,7 @@ public final class Main {
 		Keyword[] regionPath=config.getRegionPath();
 		NodeConfig nodeConfig=config.getNodeConfig();
 
-		var host=RelayHost.openHost(Index.<Keyword,ACell>none(),store,nodeConfig);
+		var host=LatticeHost.open(store);
 		var application=host.addApplication(new DLFSApplication(host,keyPair::signData,Utils::getCurrentTimestampCell,
 			config.getMaxFutureTimestampSkew(),regionPath));
 		NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(host,nodeConfig);
@@ -98,7 +99,8 @@ public final class Main {
 		}
 		DLFSDriveManager drives=DLFSDriveManager.createRouter(()->{
 			application.sync();
-			node.getHost().sync();
+			try { host.checkpoint(); }
+			catch (IOException e) { throw new UncheckedIOException(e); }
 		});
 		for (DLFSConfig.DriveMount mount:config.getDriveMounts()) {
 			var owner=(mount.owner()==null)?keyPair.getAccountKey():mount.owner();

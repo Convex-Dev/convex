@@ -101,7 +101,7 @@ public class P2PNodeTest {
 			NodeConfig.URL,Strings.create("tcp://localhost:18888"),
 			NodeConfig.PORT,CVMLong.create(-1)));
 		try (NodeServer<Index<Keyword,ACell>> raw=
-				new NodeServer<>(RelayHost.open(P2PLattice.ROOT,store,config,
+				new NodeServer<>(RelayHost.open(P2PLattice.ROOT,store,
 					LatticeContext.create(null,keyPair)),config)) {
 			raw.launch();
 			ACell nodes=raw.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);

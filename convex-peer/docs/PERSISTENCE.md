@@ -1,57 +1,36 @@
-# Lattice node persistence
+# Lattice host persistence
 
-`NodeServer` is the sole writer of the node store's root. The host and its
-applications decide what that root contains; propagators materialise serving
-views of it. Neither the node nor a propagator decides what the root means.
+`LatticeHost` owns its retained root and durability operations. Applications
+choose when to publish working state into the host. `NodeServer` supplies optional
+replication notifications and inbound delivery; it does not control saving.
 
-This distinction prevents network policy from becoming an accidental second
-authority over application state.
+## Host state
 
-## Node state
-
-A node is constructed from an assembled `LatticeHost` and uses:
-
-- the host's root cursor, holding the current published value;
-- the host's `sync()`, which launch connects to the node's publication policy;
-- the host's store, which becomes the node store; and
-- one serialised root-publication/checkpoint pipeline of the node's own.
-
-The application publishes its working state to the host, then the caller syncs the host:
+The host retains one snapshot before invoking an attached publisher:
 
 ```text
 application working update and application.sync()
           |
           v
 LatticeHost.sync()
+  store.setRootData(snapshot)
           |
-          v
-NodeServer publication policy
-  Cells.announce(value, nodeStore)
-  nodeStore.setRootData(value)       when :persist is true
+          +-- return store-backed published snapshot
           |
-          +-- return store-backed published value
-          |
-          +-- non-blocking notification to each propagator
+          +-- NodeServer notification to each propagator, if attached
 ```
 
-A successful `sync()` after launch confirms logical publication to the node
-store. It does not confirm that any propagation group has announced or sent its
-view. Call `propagator.nextAnnounce()` before the update when that later boundary
-matters.
+A successful `sync()` confirms logical publication to the host store, if one is
+present. It does not confirm a physical durability barrier or that a propagation
+group has announced or sent its view. Subscribe to `propagator.nextAnnounce()`
+before triggering publication when that later boundary matters.
 
-## No propagator is required
+## Networking is optional
 
-The application decides whether networking exists. `NodeServer` never creates a
-default propagator. A zero-propagator node still:
-
-- hands incoming values to its host, which delegates them to the configured
-  applications;
-- announces store-backed cells;
-- retains the node root when persistence is enabled; and
-- performs configured durability barriers.
-
-This is the normal shape for a local database or application component that has
-not enabled replication.
+A local application needs a host and its components. Add a store for retained
+state; add `NodeServer` and propagators only when replication is needed. The same
+`host.checkpoint()` operation saves with or without networking. An ephemeral
+networked application uses `MemoryStore`; a purely local host can have no store.
 
 ## Propagator stores
 
@@ -63,45 +42,44 @@ Each `LatticePropagator` owns a serving store. The store is used for:
 - acquiring trusted partial values before they reach the host.
 
 A propagator never writes a store root. Even when a group uses a physically
-different persistent store, `NodeServer` remains the only writer of the node root
+different persistent store, `LatticeHost` remains the only writer of the host root
 pointer, and launch seeds each serving store from the host's current value.
 
 ## Logical publication and durability
 
-`AStore.setRootData` establishes the logical root. Persistent stores may still
-need `flush()` for a durability barrier. `NodeServer` tracks whether its store is
-dirty and flushes it:
+`AStore.setRootData` retains a root and its reachable tree. The store's `flush()`
+provides its physical durability barrier. The host exposes three boundaries:
 
-- at the end of launch after initial publication;
-- periodically when `persistInterval` is positive;
-- from an explicit `checkpoint()`;
-- from `persistSnapshot()`; and
-- during orderly shutdown.
+- `sync()` retains and offers one snapshot to attached replication.
+- `flush()` completes a barrier for already-retained data, without advancing the root.
+- `checkpoint()` retains, offers and flushes one snapshot under the host publication lock.
 
-`persistSnapshot(value)` hands the supplied snapshot to the host, which delegates
-it to its applications exactly as it would a network value, then publishes the
-already-published host state without notifying propagators and completes the
-durability barrier. The applications' lattices decide what the snapshot changes,
-and an application may keep its result private until its own sync. The method is
-intended for host-controlled persistence, not network ingress.
+Applications must publish their own staged changes first. A checkpoint never
+accepts private application drafts and never exchanges a forked host with its
+origin. Checkpointing a private host with a separate store therefore saves a
+private draft; explicit fork sync or delivery accepts it into another host.
 
-Persistence is the host's: a host with a store writes its root on every sync,
-whether or not a node is attached. When `persist` is false the node still
-publishes through the host, so the root pointer moves, but the node never
-checkpoints: no durability barrier runs on an interval, at close or from the
-shutdown hook, and `persistSnapshot` is a no-op. An ephemeral node uses a memory
-store. `restore` is honoured when the host is assembled: `RelayHost.openHost`
-adopts a retained root from any kind of store, and with `restore` false replaces
-it with the initial value at once. The node itself never reloads the store.
+A service can scope `host.autoFlush(Duration)` around its lifetime for periodic
+barriers. The resource exposes the first background failure through `failure()`,
+retries subsequent flushes, and drains its worker and performs a final flush on
+close. It never syncs applications or the host. Close it before the borrowed
+store. A request requiring durable completion calls `host.checkpoint()` before
+reporting success; an interval alone is not a completion guarantee.
+
+Host construction expresses opening intent: `create` rejects a retained root,
+`open` adopts one, and `replace` explicitly writes a replacement. Optional cursor
+coordination is supplied at host construction with `Cursors::transactionalRoot`.
+`RelayHost.open(lattice, store, context)` adds one live relay application using
+these ordinary host rules. Storage flags are not `NodeConfig` settings.
 
 ## Ordering
 
 All publication entry points run inside the host's ordered sync, which captures
 the current root, publishes it and installs the store-backed result by identity
-compare-and-set. Launch and shutdown publication use the same path. A separate
-`persistenceLock` excludes checkpoints from cell announcement and root-pointer
-writes; serialising store writes alone would not prevent a previously captured
-snapshot arriving late.
+compare-and-set. Launch seeds replication through this path. The same host lock
+serialises checkpoints and flushes with root publication; an older snapshot
+cannot arrive late and replace a newer retained root. Network close does not
+publish another snapshot.
 
 If a local write intervenes during publication, the store-backed result is not
 installed and the racing write stays pending for the next sync. The sync result
@@ -154,9 +132,10 @@ workers.
 
 Node-store failures are visible:
 
-- a node-store announce or root-write failure makes `sync()` fail;
+- a host-store root-write failure makes `sync()` fail;
 - a launch-time node-store failure aborts launch and unwinds node resources;
-- a shutdown checkpoint failure is returned from `close()`.
+- an explicit barrier failure is returned from host `checkpoint()` or `flush()`;
+- a final automatic-flush failure is returned from the durability resource's `close()`.
 
 The in-memory cursor is not rolled back after a publication failure. Recovery is
 an application/operator decision because the underlying store may have completed
@@ -178,24 +157,27 @@ stack overflow at untrusted decode or policy boundaries is contained and logged.
 
 Launch order protects serving consistency:
 
-1. install and freeze the node's publication policy on the host;
+1. attach the node's publication callback to the host;
 2. announce and retain the host's current root (restore, if any, happened when
    the host was assembled);
 3. seed every attached serving view independently;
-4. start propagator workers;
-5. start persistence maintenance.
+4. start propagator workers.
+
+The owning service chooses any initial checkpoint and starts automatic flushing
+explicitly. Networking does not install a durability worker or shutdown hook.
 
 The application opens any `LatticeListener` only after node launch has prepared
 the attached propagation endpoints.
 
 Shutdown order prevents new work racing store closure:
 
-1. the application closes its transports to stop admission and detach sockets;
-2. `NodeServer.close()` stops node maintenance;
-3. each endpoint stops acquisitions and drains accepted messages;
-4. the node publishes the final host root;
-5. each propagator drains and closes independently; and
-6. the node store is flushed.
+1. the service stops requests and closes transports to stop admission;
+2. `NodeServer.close()` drains accepted messages and closes each group;
+3. the owning service explicitly saves any accepted host state it wants retained;
+4. the service closes its automatic-flush resource, if any, and then its store.
+
+Network close does not publish pending host state or flush the store. The host
+and its applications remain usable after detachment.
 
 `NodeServer` does not close application-supplied stores. Store ownership remains
 with the caller that created them.

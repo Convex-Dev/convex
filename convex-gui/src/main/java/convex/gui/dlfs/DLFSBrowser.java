@@ -289,9 +289,9 @@ public class DLFSBrowser extends AbstractGUI {
 			NodeConfig localConfig = NodeConfig.create(Maps.of(NodeConfig.PORT, CVMLong.create(-1)));
 
 			// The relay host's live application verifies owners and signs with this key;
-			// the node only replicates and persists what the host publishes.
+			// the node replicates; the browser saves through the host explicitly.
 			LatticeContext ctx = LatticeContext.create(null, keyPair);
-			nodeServer = new NodeServer<>(RelayHost.open(OWNER_LATTICE, etchStore, localConfig, ctx), localConfig);
+			nodeServer = new NodeServer<>(RelayHost.open(OWNER_LATTICE, etchStore, ctx), localConfig);
 			nodeServer.launch();
 
 			// Navigate to owner's signed entry, wrap in SignedCursor
@@ -359,6 +359,7 @@ public class DLFSBrowser extends AbstractGUI {
 		if (nodeServer != null) {
 			try {
 				nodeServer.close();
+				nodeServer.getHost().checkpoint();
 			} catch (IOException e) {
 				log.warn("Error closing NodeServer: {}", e.getMessage());
 			}

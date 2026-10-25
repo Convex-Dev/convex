@@ -32,6 +32,27 @@ ResultSet rs = stmt.executeQuery("SELECT * FROM users WHERE id = 1");
 
 ## JDBC Usage
 
+For a durable local installation, open a host over an Etch store. Networking is
+optional and does not control saving:
+
+```java
+try (var store = EtchStore.create(file)) {
+    var host = ConvexDB.openHost(store);
+    var db = ConvexDB.connect(host);
+    db.database("mydb");
+    // Perform database operations through this live view.
+    host.checkpoint();
+}
+```
+
+`checkpoint()` retains the current host snapshot and completes the store's
+durability barrier. For batched saving, use `host.sync()` after accepted edits
+and scope `host.autoFlush(interval)` around the service lifetime. Stop request
+handling before the final save and close the store last. Closing an optional
+`NodeServer` does not save pending database edits. See the executable local and
+JDBC reopen scenarios in
+[`ConvexDBPersistenceTest`](src/test/java/convex/db/ConvexDBPersistenceTest.java).
+
 Convex DB provides a standard JDBC driver for SQL access.
 
 ### Connection URL

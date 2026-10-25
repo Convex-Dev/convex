@@ -581,38 +581,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Delivers a snapshot through root merge, then publishes and durably flushes
-	 * already-published host state through the normal replication policy. Configured
-	 * applications may retain the merged snapshot privately until their own sync;
-	 * this method never invokes application publication. Without applications,
-	 * current local state wins ties against the supplied snapshot.
-	 *
-	 * @param value snapshot candidate to persist; {@code null} is ignored
-	 * @throws IOException if publication or the durability barrier fails
-	 * @deprecated Deliver explicitly through the host, then call {@link LatticeHost#checkpoint()}.
-	 */
-	@Deprecated
-	@SuppressWarnings("unchecked")
-	public void persistSnapshot(ACell value) throws IOException {
-		if (value==null) return;
-		host.merge((V)value);
-		host.checkpoint();
-	}
-
-	/**
-	 * Completes the host store's durability barrier without publishing pending edits.
-	 *
-	 * @return {@code true} if the store was flushed
-	 * @throws IOException if the durability barrier fails
-	 * @deprecated Call {@link LatticeHost#flush()} or {@link LatticeHost#checkpoint()} explicitly.
-	 */
-	@Deprecated
-	public boolean checkpoint() throws IOException {
-		host.flush();
-		return store.isPersistent();
-	}
-
-	/**
 	 * Drains each group independently. Does not publish pending host edits or
 	 * flush its store; saving belongs to the owning host/service lifecycle.
 	 */

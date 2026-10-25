@@ -286,7 +286,7 @@ public class DLFSDriveManagerTest {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
 		try (EtchStore store=EtchStore.createTemp("dlfs-registry")) {
 			NodeServer<AHashMap<AString, AVector<ACell>>> first=
-				new NodeServer<>(RelayHost.open(lattice,store,NodeConfig.port(-1)),NodeConfig.port(-1));
+				new NodeServer<>(RelayHost.open(lattice,store),NodeConfig.port(-1));
 			first.launch();
 			try {
 				var drives=DLFSDrives.connect(first.getHost().cursor(),store);
@@ -294,12 +294,13 @@ public class DLFSDriveManagerTest {
 				assertTrue(manager.createDrive(null, "home"));
 				Files.writeString(manager.getDrive(null, "home").getPath("/hello.txt"), "after restart");
 				manager.sync();
+				first.getHost().checkpoint();
 			} finally {
 				first.close();
 			}
 
 			NodeServer<AHashMap<AString, AVector<ACell>>> restored=
-				new NodeServer<>(RelayHost.open(lattice,store,NodeConfig.port(-1)),NodeConfig.port(-1));
+				new NodeServer<>(RelayHost.open(lattice,store),NodeConfig.port(-1));
 			restored.launch();
 			try {
 				var drives=DLFSDrives.connect(restored.getHost().cursor(),store);

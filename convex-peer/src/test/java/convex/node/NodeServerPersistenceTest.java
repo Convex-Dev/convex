@@ -35,7 +35,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.RefSoft;
 import convex.core.exceptions.StoreException;
-import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
@@ -112,7 +111,7 @@ public class NodeServerPersistenceTest {
 	}
 
 	private static NodeServer<Index<Keyword,ACell>> node(AStore store,NodeConfig config) throws IOException {
-		return new NodeServer<>(RelayHost.open(Lattice.ROOT,store,config),config);
+		return new NodeServer<>(RelayHost.open(Lattice.ROOT,store),config);
 	}
 
 	/** Attaches the explicit identity-view group used by replication tests. */
@@ -338,10 +337,10 @@ public class NodeServerPersistenceTest {
 	}
 
 	/**
-	 * Test that restore=false gives a clean start even on a persistent store.
+	 * Test that explicit replacement gives a clean start even on a persistent store.
 	 */
 	@Test
-	public void testRestoreDisabled() throws Exception {
+	public void testExplicitRootReplacement() throws Exception {
 		// Write and persist some data
 		primary = node(primaryStore);
 		primary.launch();
@@ -349,24 +348,22 @@ public class NodeServerPersistenceTest {
 		primary.close();
 		primary = null;
 
-		// Restart with restore=false
-		NodeConfig noRestore = NodeConfig.create(Maps.of(NodeConfig.RESTORE, CVMBool.FALSE));
-		primary = node(primaryStore, noRestore);
+		// Restart with explicit replacement
+		convex.lattice.LatticeHost.replace(Lattice.ROOT.zero(),primaryStore);
+		primary = node(primaryStore);
 		primary.launch();
 
 		// Value should NOT be restored
 		assertNull(readDataValue(primary, 777),
-			"Value should not be restored when restore=false");
+			"Value should not be restored when explicit replacement");
 	}
 
 	/**
-	 * persist=false disables the node's checkpoints, not the host's persistence: the
-	 * host still writes its root on every sync, so the value survives a restart.
+	 * The host writes its root on sync and saves explicitly, independently of node configuration.
 	 */
 	@Test
-	public void testPersistDisabledSkipsCheckpointsOnly() throws Exception {
-		NodeConfig noPersist = NodeConfig.create(Maps.of(NodeConfig.PERSIST, CVMBool.FALSE));
-		primary = node(primaryStore, noPersist);
+	public void testHostDurabilityDoesNotNeedNodeConfiguration() throws Exception {
+		primary = node(primaryStore);
 		primary.launch();
 
 		writeDataValue(primary, 888);
@@ -376,7 +373,7 @@ public class NodeServerPersistenceTest {
 		primary.close();
 		primary = null;
 
-		// Restart with defaults (restore=true)
+		// Restart with defaults (retained-root opening)
 		primary = node(primaryStore);
 		primary.launch();
 
@@ -720,9 +717,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testPeriodicCheckpointUsesMaintenanceLoop() throws Exception {
-		NodeConfig config=NodeConfig.create(Maps.of(
-				NodeConfig.PORT,CVMLong.create(-1),
-				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
+		NodeConfig config=NodeConfig.port(-1);
 		primary=node(primaryStore,config);
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
@@ -742,9 +737,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testPeriodicCheckpointRetriesFailure() throws Exception {
-		NodeConfig config=NodeConfig.create(Maps.of(
-				NodeConfig.PORT,CVMLong.create(-1),
-				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
+		NodeConfig config=NodeConfig.port(-1);
 		primary=node(primaryStore,config);
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
@@ -766,9 +759,7 @@ public class NodeServerPersistenceTest {
 
 	@Test
 	public void testPeriodicCheckpointAppliesToCustomPrimary() throws Exception {
-		NodeConfig config=NodeConfig.create(Maps.of(
-				NodeConfig.PORT,CVMLong.create(-1),
-				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
+		NodeConfig config=NodeConfig.port(-1);
 		primary=node(primaryStore,config);
 		primary.addPropagator(new LatticePropagator(primaryStore,LatticePropagatorConfig.create()));
 		primary.launch();
@@ -854,7 +845,7 @@ public class NodeServerPersistenceTest {
 		});
 
 		IOException ex=assertThrows(IOException.class,
-				()->primary.persistSnapshot(primary.getLocalValue()));
+				()->primary.getHost().checkpoint());
 		assertEquals("simulated explicit flush failure",ex.getMessage());
 	}
 
@@ -951,12 +942,12 @@ public class NodeServerPersistenceTest {
 		final ACell v2 = primary.getCursor().get();
 
 		Thread t1 = new Thread(() -> {
-			try { primary.persistSnapshot(v1); }
+			try { primary.getHost().mergeAt(v1); primary.getHost().checkpoint(); }
 			catch (Throwable e) { failure.compareAndSet(null, e); }
 		}, "snapshot-A");
 		Thread t2 = new Thread(() -> {
 			secondStarted.countDown();
-			try { primary.persistSnapshot(v2); }
+			try { primary.getHost().mergeAt(v2); primary.getHost().checkpoint(); }
 			catch (Throwable e) { failure.compareAndSet(null, e); }
 		}, "snapshot-B");
 

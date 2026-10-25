@@ -23,10 +23,10 @@ import convex.core.lang.RT;
  * defaults. The underlying config map is immutable.</p>
  *
  * <p>Key names reuse {@link convex.peer.PeerConfig} constants where they
- * overlap (port, persist and restore) so configurations are consistent
+ * overlap (port) so configurations are consistent
  * across peer and lattice node servers.</p>
  *
- * <p>{@code NodeServer} consumes persistence and validation settings only.
+ * <p>{@code NodeServer} uses no host opening or durability settings.
  * {@code LatticeListener} independently consumes the port and physical inbound
  * limits. Passing this object to a server does not create, configure or own a
  * transport.</p>
@@ -49,25 +49,6 @@ public class NodeConfig {
 	 * disables the listener.
 	 */
 	public static final AString PORT = Strings.intern("port");
-
-	/**
-	 * @deprecated Durability belongs to the host/service. This setting is no longer consumed.
-	 */
-	@Deprecated
-	public static final AString PERSIST = Strings.intern("persist");
-
-	/**
-	 * Whether a retained root is adopted when the host is opened (Boolean, default
-	 * true); when false the retained root is replaced by the initial value.
-	 */
-	public static final AString RESTORE = Strings.intern("restore");
-
-	/** Enable coordinated root writes, exclusive transactions and serial fallback (default false). */
-	public static final AString TRANSACTIONAL_ROOT = Strings.intern("transactionalRoot");
-
-	/** @deprecated Use {@link convex.lattice.LatticeHost#autoFlush} in the owning service. */
-	@Deprecated
-	public static final AString PERSIST_INTERVAL = Strings.intern("persistInterval");
 
 	/** Optional advertised URL consumed by a discovery adapter (AString).
 	 *  {@link NodeServer} itself ignores this field. */
@@ -170,18 +151,14 @@ public class NodeConfig {
 
 	private final AMap<AString, ACell> config;
 
-	/** Whether the host should create a transactional root cursor. */
-	public boolean isTransactionalRoot() {
-		return RT.bool(config.get(TRANSACTIONAL_ROOT));
-	}
-
-	/** Selects the root coordination policy before the host is constructed. */
-	public NodeConfig withTransactionalRoot(boolean enabled) {
-		return new NodeConfig(config.assoc(TRANSACTIONAL_ROOT,CVMBool.create(enabled)));
-	}
-
 	private NodeConfig(AMap<AString, ACell> config) {
 		this.config = (config == null) ? Maps.empty() : config;
+		for (String key:new String[]{"persist","persistInterval","restore","transactionalRoot"}) {
+			if (this.config.containsKey(Strings.create(key))) {
+				throw new IllegalArgumentException("Host setting '"+key+"' is not a networking option; "
+					+"use LatticeHost create/open/replace, cursor coordination or autoFlush/checkpoint explicitly");
+			}
+		}
 	}
 
 	/**
@@ -249,37 +226,6 @@ public class NodeConfig {
 	public Integer getPort() {
 		CVMLong v = RT.ensureLong(config.get(PORT));
 		return (v != null) ? (int) v.longValue() : null;
-	}
-
-	/**
-	 * Returns whether the node checkpoints its store, completes the durability barrier
-	 * at close and persists snapshots. A host with a store writes its root on every
-	 * sync whatever this setting; an ephemeral node uses a memory store.
-	 *
-	 * @return {@code true} when node checkpoints are enabled
-	 */
-	public boolean isPersist() {
-		return getBool(PERSIST, true);
-	}
-
-	/**
-	 * Returns whether a retained root is adopted when the host is opened. When false,
-	 * host assembly replaces the retained root with the initial value at once.
-	 *
-	 * @return {@code true} when restoration is enabled
-	 */
-	public boolean isRestore() {
-		return getBool(RESTORE, true);
-	}
-
-	/**
-	 * Returns the interval between periodic persistence barriers.
-	 *
-	 * @return interval in milliseconds
-	 */
-	public long getPersistInterval() {
-		CVMLong v = RT.ensureLong(config.get(PERSIST_INTERVAL));
-		return (v != null) ? v.longValue() : 30_000L;
 	}
 
 	/**

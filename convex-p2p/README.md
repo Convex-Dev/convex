@@ -274,6 +274,13 @@ is the application the host hands incoming values to. It owns the P2P policy tha
 reads the lattice and imports nothing from the node package, so it can also be
 connected directly to a standalone `LatticeHost` for local use.
 
+The owning service chooses durability through `node.getNodeServer().getHost()`:
+call `checkpoint()` for a durable save, or publish with `sync()` and use a scoped
+`autoFlush(Duration)` for batched barriers. Stop request handling and networking
+before the final service save; close the durability resource before its store.
+`P2PNode.close()` stops replication without accepting pending host edits or
+flushing the borrowed store.
+
 ### The user area API
 
 One user has data in two independent regions. `P2PIdentity` represents

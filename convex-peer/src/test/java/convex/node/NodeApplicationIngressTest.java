@@ -83,7 +83,7 @@ class NodeApplicationIngressTest {
 				throw new IOException("unreadable retained root");
 			}
 		}) {
-			var failure=assertThrows(IOException.class,() -> RelayHost.open(LATTICE,store,null));
+			var failure=assertThrows(IOException.class,() -> RelayHost.open(LATTICE,store));
 			assertEquals("unreadable retained root",failure.getMessage());
 			assertNull(store.getRootHash());
 		}
@@ -96,7 +96,7 @@ class NodeApplicationIngressTest {
 			var root=LatticeHost.open(LATTICE.zero(),store);
 			// A supplied root is already initialised: launch must not reload the store.
 			store.setRootData(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));
-			try (var node=new NodeServer<>(root,NodeConfig.create().withTransactionalRoot(true))) {
+			try (var node=new NodeServer<>(root)) {
 				assertSame(root,node.getHost());
 				assertSame(root.cursor(),node.getCursor());
 				assertSame(store,node.getStore());
@@ -134,8 +134,9 @@ class NodeApplicationIngressTest {
 	@Test void relayHostRestoresRetainedRootBeforeLocalEdits() throws Exception {
 		try (var store=EtchStore.createTemp("root-prelaunch")) {
 			store.setRootData(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE)));
-			var config=NodeConfig.create().withTransactionalRoot(true);
-			try (var node=new NodeServer<>(RelayHost.open(LATTICE,store,config),config)) {
+			var host=LatticeHost.open(LATTICE.zero(),store,convex.lattice.cursor.Cursors::transactionalRoot);
+			host.addApplication(convex.lattice.LatticeApplication.live(LATTICE,host));
+			try (var node=new NodeServer<>(host)) {
 				node.mergeValue(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));
 				assertTrue(node.getCursor().supportsExclusiveTransactions());
 				node.launch();
@@ -184,7 +185,8 @@ class NodeApplicationIngressTest {
 			var incoming=LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE));
 			node.mergeValue(incoming);
 			node.mergeAt(Sets.of(CVMLong.ONE),ITEMS);
-			node.persistSnapshot(incoming);
+			node.getHost().merge(incoming);
+			node.getHost().checkpoint();
 			assertEquals(3,app.merges);
 			assertEquals(LATTICE.zero(),node.getLocalValue());
 			assertEquals(LATTICE.zero(),store.getRootData());

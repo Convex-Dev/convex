@@ -96,10 +96,17 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * @throws IllegalStateException if the store already holds a root
 	 */
 	public static <V extends ACell> LatticeHost<V> create(V initialValue, AStore store) {
+		return create(initialValue,store,Cursors::root);
+	}
+
+	/** Creates a fresh host with explicit cursor coordination. */
+	public static <V extends ACell> LatticeHost<V> create(V initialValue,AStore store,
+			Function<V,? extends Root<V>> rootFactory) {
+		Objects.requireNonNull(rootFactory);
 		if (store!=null && retainedRoot(store)!=null) {
 			throw new IllegalStateException("Store already holds a root: open it, or replace it explicitly");
 		}
-		return new LatticeHost<>(Cursors.root(initialValue),store);
+		return new LatticeHost<>(rootFactory.apply(initialValue),store);
 	}
 
 	/**
@@ -112,7 +119,14 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * @return Host over the initial value
 	 */
 	public static <V extends ACell> LatticeHost<V> replace(V initialValue, AStore store) {
+		return replace(initialValue,store,Cursors::root);
+	}
+
+	/** Replaces the retained root using explicit cursor coordination. */
+	public static <V extends ACell> LatticeHost<V> replace(V initialValue,AStore store,
+			Function<V,? extends Root<V>> rootFactory) {
 		Objects.requireNonNull(initialValue,"Replacement root must not be null");
+		Root<V> root=Objects.requireNonNull(rootFactory.apply(initialValue));
 		if (store!=null) {
 			try {
 				store.setRootData(initialValue);
@@ -120,7 +134,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 				throw new StoreException("Lattice host could not replace the retained root",e);
 			}
 		}
-		return new LatticeHost<>(Cursors.root(initialValue),store);
+		return new LatticeHost<>(root,store);
 	}
 
 	private static <T extends ACell> T retainedRoot(AStore store) {

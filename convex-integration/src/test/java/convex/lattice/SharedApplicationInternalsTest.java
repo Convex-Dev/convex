@@ -655,7 +655,7 @@ public class SharedApplicationInternalsTest {
 				MemoryStore remoteStore=new MemoryStore();
 				MemoryStore reverseStore=new MemoryStore();
 				NodeServer<Index<Keyword,ACell>> remote=new NodeServer<>(
-					RelayHost.open(HOST_ROOT,remoteStore,NodeConfig.port(-1),VERIFY),NodeConfig.port(-1));
+					RelayHost.open(HOST_ROOT,remoteStore,VERIFY),NodeConfig.port(-1));
 				LatticeListener socialListener=listener(f.socialGroup);
 				LatticeListener filesListener=listener(f.filesGroup)) {
 			LatticePropagator receiver=new LatticePropagator(remoteStore,LatticePropagatorConfig.create());

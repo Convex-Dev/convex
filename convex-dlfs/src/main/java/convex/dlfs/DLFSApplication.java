@@ -1,10 +1,13 @@
 package convex.dlfs;
 
 import java.util.function.Function;
+import java.util.function.BiPredicate;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -62,6 +65,18 @@ public class DLFSApplication extends Regions {
 	}
 
 	/**
+	 * Creates a live application at an arbitrary path with explicit owner authority.
+	 * Verification uses local authority data; the signer may return null for owners
+	 * it cannot author. Neither node identity nor HTTP authentication supplies these policies.
+	 */
+	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,
+			BiPredicate<ACell,AccountKey> verifier,
+			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
+		this(host.cursor(),host.store(),verifier,signer,clock,maxFutureSkew,path);
+	}
+
+	/**
 	 * Binds a live view to a root cursor, including a transaction draft.
 	 * Region construction uses the standard container policy: missing indexes are
 	 * created only by a changed write, and this application's {@link #createContainer()}
@@ -69,6 +84,15 @@ public class DLFSApplication extends Regions {
 	 */
 	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,
 			Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
+		this(cursor,store,DLFSRegion.KEY_OWNER,signer==null?null:(owner,value) -> signer.apply(value),
+			clock,maxFutureSkew,path);
+	}
+
+	/** Binds custom owner authority to an explicit working cursor, including a transaction draft. */
+	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,
+			BiPredicate<ACell,AccountKey> verifier,
+			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
 			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
 		super(cursor);
 		this.store=store;
@@ -79,8 +103,8 @@ public class DLFSApplication extends Regions {
 		}
 		dlfs=parent.create(keys[keys.length-1],
 			(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> destination) ->
-				new DLFSRegion(destination,store,DLFSLocation.at(cursor,keys),DLFSRegion.KEY_OWNER,
-					signer==null?null:(owner,value) -> signer.apply(value),clock,maxFutureSkew));
+				new DLFSRegion(destination,store,DLFSLocation.at(cursor,keys),verifier,
+					signer,clock,maxFutureSkew));
 	}
 
 	/**

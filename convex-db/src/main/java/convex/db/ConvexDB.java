@@ -155,9 +155,9 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	}
 
 	/**
-	 * Creates a persisted ConvexDB backed by a local-only {@link NodeServer}.
-	 * The NodeServer handles Etch persistence; call {@code server.close()} to
-	 * flush and shut down.
+	 * Creates optional networking around a store-backed ConvexDB host.
+	 * Call {@code server.getHost().checkpoint()} to save durably; network close
+	 * does not save pending state. Local-only applications can use {@link #openHost}.
 	 *
 	 * <p>Usage:
 	 * <pre>
@@ -173,7 +173,12 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @throws IOException if the store's retained root cannot be read
 	 */
 	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) throws IOException {
-		return new NodeServer<>(RelayHost.open(DATABASE_MAP_LATTICE,store,null));
+		return new NodeServer<>(openHost(store));
+	}
+
+	/** Opens a retained database host for local use, without constructing networking. */
+	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store) throws IOException {
+		return RelayHost.open(DATABASE_MAP_LATTICE,store);
 	}
 
 	/**

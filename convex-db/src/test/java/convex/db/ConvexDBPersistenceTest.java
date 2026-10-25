@@ -77,7 +77,7 @@ public class ConvexDBPersistenceTest {
 
 	/** Persists, unregisters, closes server and store. */
 	private void persistAndClose() throws Exception {
-		server.persistSnapshot(server.getLocalValue());
+		server.getHost().checkpoint();
 		ConvexDB cdb = ConvexDB.lookup(DB_NAME);
 		if (cdb != null) cdb.unregister(DB_NAME);
 		server.close(); server = null;
@@ -135,6 +135,26 @@ public class ConvexDBPersistenceTest {
 	}
 
 	// ========== Tests ==========
+
+	/** Local persistence does not require a NodeServer or a network lifecycle. */
+	@Test public void testLocalHostSaveAndReopen() throws Exception {
+		File file;
+		try (var localStore=EtchStore.createTemp("db-local-host")) {
+			file=localStore.getFile();
+			var host=ConvexDB.openHost(localStore);
+			var db=ConvexDB.connect(host);
+			createTable(db.database(DB_NAME));
+			insertViaLattice(db.database(DB_NAME).tables(),0,10);
+			host.checkpoint();
+		}
+		try (var reopenedStore=EtchStore.create(file)) {
+			var host=ConvexDB.openHost(reopenedStore);
+			var db=ConvexDB.connect(host);
+			db.register(DB_NAME);
+			try { verifyJdbcCount(10); verifyJdbcRow(9); }
+			finally { db.unregister(DB_NAME); }
+		}
+	}
 
 	/**
 	 * JDBC insert → persist → close → reopen → verify via JDBC.

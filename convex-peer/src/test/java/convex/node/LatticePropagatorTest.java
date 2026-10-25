@@ -78,9 +78,9 @@ public class LatticePropagatorTest {
 		// Peer connections below use getHostAddress(), which reflects the actual ports.
 		AKeyPair nodeKey1=AKeyPair.generate();
 		AKeyPair nodeKey2=AKeyPair.generate();
-		server1 = new NodeServer<>(RelayHost.open(lattice, store1, NodeConfig.port(0),
+		server1 = new NodeServer<>(RelayHost.open(lattice, store1,
 			LatticeContext.create(null,nodeKey1)), NodeConfig.port(0));
-		server2 = new NodeServer<>(RelayHost.open(lattice, store2, NodeConfig.port(0),
+		server2 = new NodeServer<>(RelayHost.open(lattice, store2,
 			LatticeContext.create(null,nodeKey2)), NodeConfig.port(0));
 		propagator1=new LatticePropagator(store1,LatticePropagatorConfig.create());
 		propagator2=new LatticePropagator(store2,LatticePropagatorConfig.create());
@@ -425,7 +425,7 @@ public class LatticePropagatorTest {
 			CVMLong old = CVMLong.create(10_011);
 			CVMLong authoritative = CVMLong.create(10_012);
 			try (NodeServer<CVMLong> node=new NodeServer<>(
-					RelayHost.open(lww,primaryStore,NodeConfig.port(-1)),NodeConfig.port(-1))) {
+					RelayHost.open(lww,primaryStore),NodeConfig.port(-1))) {
 				node.getCursor().set(old);
 				node.launch();
 				node.getCursor().set(authoritative);
@@ -445,7 +445,7 @@ public class LatticePropagatorTest {
 		try (MemoryStore primaryStore = new MemoryStore();
 				MemoryStore publicStore = new MemoryStore();
 				NodeServer<ASet<ACell>> node = new NodeServer<>(
-					RelayHost.open(setLattice, primaryStore, NodeConfig.port(-1)), NodeConfig.port(-1))) {
+					RelayHost.open(setLattice, primaryStore), NodeConfig.port(-1))) {
 			LatticePropagator primary = new LatticePropagator(primaryStore);
 			LatticePropagator publicView = new LatticePropagator(publicStore);
 			publicView.<ASet<ACell>>setPublicationFilter(value -> value.exclude(hidden));

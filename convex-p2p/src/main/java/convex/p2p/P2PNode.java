@@ -211,10 +211,10 @@ public class P2PNode implements Closeable {
 		LatticePropagatorConfig effectivePropagatorConfig=(propagatorConfig==null)
 			? LatticePropagatorConfig.create() : propagatorConfig;
 
-		// Assembly up to the root: the host restores as configured and knows no lattice.
+		// Host opening is independent of transport configuration.
 		LatticeHost<Index<Keyword,ACell>> host;
 		try {
-			host=RelayHost.openHost(root.zero(),store,effectiveConfig);
+			host=LatticeHost.open(root.zero(),store);
 		} catch (IOException e) {
 			throw new UncheckedIOException("Unable to read the node's retained root",e);
 		}
@@ -624,6 +624,7 @@ public class P2PNode implements Closeable {
 		return server.isRunning() && transport.isRunning();
 	}
 
+	/** Stops networking; the service saves explicitly through {@code getNodeServer().getHost()}. */
 	@Override
 	public void close() throws IOException {
 		transport.close();

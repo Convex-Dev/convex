@@ -1045,8 +1045,8 @@ independent transactional working storage, whatever the host policy:
 | Transactional root | Optimistic, with serial fallback under contention | Callback runs once under root exclusion | Commits coordinate through a root lock |
 
 ```java
-// When creating a node:
-NodeConfig config = NodeConfig.create().withTransactionalRoot(true);
+// Choose root coordination when opening the host, independently of networking:
+var host = LatticeHost.open(initial, store, Cursors::transactionalRoot);
 ```
 
 The lock belongs to the shared root and covers every view and write on it, including
@@ -1466,6 +1466,26 @@ They cover local saving, reopening, shared applications, automatic flushing,
 private draft storage and explicit replacement. The host failure and concurrency
 contracts are exercised in
 [`LatticeHostDurabilityTest`](../src/test/java/convex/lattice/LatticeHostDurabilityTest.java).
+
+The application scenarios are covered across modules:
+
+| Implementer scenario | Executable example |
+|---|---|
+| Local edits, explicit drafts and signing | `FavouritesExample` and `FavouritesApplicationTest` |
+| Durable save, reopening and shared applications | `FavouritesPersistenceTest` and `FavouritesLifecycleTest` |
+| Scoped periodic flushing and visible failures | `FavouritesLifecycleTest` and `LatticeHostDurabilityTest` |
+| Private draft storage and explicit acceptance | `FavouritesLifecycleTest` |
+| Memory/disk replication, private receipt and network detachment | [`ReadingListApplicationTest`](../../convex-peer/src/test/java/convex/node/app/ReadingListApplicationTest.java) |
+| Custom file path, DID authority and reading without a signer | [`DLFSLifecycleExampleTest`](../../convex-dlfs/src/test/java/convex/dlfs/test/DLFSLifecycleExampleTest.java) |
+| HTTP durable completion, failed flush and retry | `DLFSLifecycleExampleTest` |
+| Local and JDBC database save/reopen | [`ConvexDBPersistenceTest`](../../convex-db/src/test/java/convex/db/ConvexDBPersistenceTest.java) |
+
+Networking configuration contains no storage flags. Replace `persist=false` with
+a memory store when restart durability is unwanted; otherwise choose explicit
+host barriers or automatic flushing. Replace `restore=false` with an explicit
+`LatticeHost.replace`, and supply cursor coordination to host construction.
+Incoming snapshot delivery is `host.merge(value)` followed by whatever application
+publication is intended, then `host.checkpoint()` when durable completion is needed.
 
 ## Lifecycle and subscriptions (open)
 

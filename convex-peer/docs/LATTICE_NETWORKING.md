@@ -84,7 +84,7 @@ For custom serving stores, limits or transports, the application can assemble gr
 NodeConfig nodeConfig = NodeConfig.port(0);
 // The host and its applications own merge policy; the node replicates what the host publishes.
 NodeServer<MyValue> node = new NodeServer<>(
-    RelayHost.open(lattice, nodeStore, nodeConfig, nodeContext), nodeConfig);
+    RelayHost.open(lattice, nodeStore, nodeContext), nodeConfig);
 
 LatticePropagatorConfig groupConfig = LatticePropagatorConfig.create();
 LatticePropagator publicGroup = new LatticePropagator(servingStore, groupConfig);

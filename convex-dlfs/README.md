@@ -203,13 +203,13 @@ if (drive == null) throw new IllegalStateException("Cannot open home drive");
 FileSystem home = drive.fileSystem();
 Files.writeString(home.getPath("/hello.txt"), "Hello");
 app.sync();   // complete this application's preparation/publication
-root.sync();  // persist and publish the host root
-store.flush(); // separate physical durability barrier
+root.checkpoint(); // retain the host root and complete its durability barrier
 
 // Optional HTTP access uses a manager for identity routing
 DLFSServer server = DLFSServer.create(new DLFSDriveManager(myDrives, () -> {
     app.sync();
-    root.sync();
+    try { root.checkpoint(); }
+    catch (IOException e) { throw new UncheckedIOException(e); }
 }));
 server.start(0);
 ```
@@ -226,7 +226,7 @@ Networked bootstrap supplies the host; the DLFS component API is unchanged:
 
 ```java
 NodeConfig nodeConfig = NodeConfig.port(0);
-var host = RelayHost.openHost(Index.<Keyword, ACell>none(), store, nodeConfig);
+var host = LatticeHost.open(store);
 var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
     Utils::getCurrentTimestampCell, 30_000,
     Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
@@ -238,7 +238,8 @@ try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPai
     DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
     DLFSDriveManager routes = DLFSDriveManager.createRouter(() -> {
         networkedApp.sync();
-        host.sync();
+        try { host.checkpoint(); }
+        catch (IOException e) { throw new UncheckedIOException(e); }
     })
         .mountAnonymous(ownerDrives)
         .mount(did.toString(), ownerDrives);
@@ -246,7 +247,7 @@ try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPai
         throw new IllegalStateException("Cannot open home drive");
     }
     networkedApp.sync();
-    host.sync();
+    host.checkpoint();
 
     try (var networkedServer = DLFSServer.createWithAudience(routes, myKeyPair)) {
         networkedServer.start(0);
@@ -258,6 +259,29 @@ try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPai
 The propagator inherits the node's identity key and can be configured with peers
 while running. An empty peer list is safe. Closing the network stops its listener
 and propagators; the caller retains ownership of the store.
+
+The callbacks above promise durable completion by calling `checkpoint()` before
+returning. A callback using `host.sync()` instead retains and offers the root to
+replication but leaves the physical barrier to the service's policy, for example
+a scoped `host.autoFlush(Duration.ofSeconds(1))`. Close the HTTP service first,
+then networking, then the durability resource, then the store. A failed checkpoint
+must fail the request; it does not undo a file write already made locally.
+
+Custom owner authority and region placement can be supplied together:
+
+```java
+var files = host.addApplication(new DLFSApplication(host,
+    ownerVerifier, ownerSigner, clock, 30_000,
+    Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
+var home = files.drives(ownerDid).getOrCreateDrive("home");
+```
+
+`ownerVerifier` checks an owner cell and signing public key using locally available
+authority data. `ownerSigner` receives the owner and payload, returning a signed
+payload or null if it cannot author for that owner. Passing null as signer opens a
+relay/reader. The transport identity does not supply either authority policy.
+The complete assembly, reopen and failed-HTTP-barrier scenarios run in
+[`DLFSLifecycleExampleTest`](src/test/java/convex/dlfs/test/DLFSLifecycleExampleTest.java).
 
 The standard assembly is `LatticeHost` → `DLFSApplication` → `DLFSRegion`
 → `DLFSDrives` → `DLFSDrive`. The application is not owner-scoped: it can obtain

@@ -61,7 +61,7 @@ public class KVReplicationDemo {
 				stores.add(store);
 
 				NodeConfig config=NodeConfig.localNetwork();
-				var network=new LatticeNode<>(RelayHost.open(Lattice.ROOT,store,config),config);
+				var network=new LatticeNode<>(RelayHost.open(Lattice.ROOT,store),config);
 				// Retain ownership before starting anything, so finally also covers setup failures.
 				networks.add(network);
 				network.setIdentity(DID.forKey(kp.getAccountKey()),kp);
