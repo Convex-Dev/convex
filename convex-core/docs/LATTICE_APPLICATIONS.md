@@ -385,6 +385,26 @@ A component that needs an atomic aggregate should own that aggregate's
 publication boundary and supply its complete merge rule. Declaring a partial
 lattice does not move a component's cursor to a narrower boundary.
 
+`Mail`, `Mailbox`, `LatticeKV`, `LatticeMQ`, `LatticeTopic` and `LatticeQueue`
+provide local domain operations and fork reconciliation, but do not implement
+incoming `merge` or descendant delivery. Registering one directly as a receiving
+region therefore fails on delivery. An enclosing component can own that policy,
+or a `LatticeComponent` can receive values over the same working cursor:
+
+| Domain view | Lattice for an explicit delivery adapter |
+|---|---|
+| `Mail` | The view's `getLattice()`, retaining its configured DID verifier |
+| `Mailbox` | The corresponding `MailLattice.forMailbox(did)` |
+| `LatticeKV` | `KVStoreLattice.INSTANCE` |
+| `LatticeMQ` | `MapLattice.create(TopicLattice.INSTANCE)` |
+| `LatticeTopic` | `TopicLattice.INSTANCE` |
+| `LatticeQueue` | `QueueLattice.INSTANCE` |
+
+Register the receiving component and bind the domain view to its working cursor.
+Keep any enclosing signed-owner boundary responsible for verifying envelopes;
+an unsigned payload adapter must not provide an alternate route around it.
+Domain `sync()` still publishes only its bound fork and never persists a host.
+
 `ALatticeApplication` extends `ALatticeComponent` and adds lifecycle, with no
 required lattice definition. Its `sync()` runs `beforeSync()`, `syncChildren()`,
 then publication of its own working boundary. Failure stops subsequent stages;
