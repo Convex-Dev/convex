@@ -9,20 +9,19 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ALatticeComponent;
+import convex.lattice.IndexComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.cursor.StampedCursor;
 
 /**
- * Cursor wrapper for a single user's social state.
+ * Index component for a single user's social state.
  *
  * <p>A {@code SocialUser} wraps a cursor at the {@link SocialLattice} level
  * (through the signing boundary). Writes are automatically signed by the
  * {@code SignedCursor} in the cursor chain. This component owns the per-user
- * level, so it declares the shape of each section it hands out from
- * {@link SocialLattice}.</p>
+ * level. Standard index paths preserve missing values on reads and apply
+ * {@link #createContainer()} when a child edit needs to create this level.</p>
  *
  * <p>Provides domain-specific accessors:</p>
  * <ul>
@@ -32,7 +31,7 @@ import convex.lattice.cursor.StampedCursor;
  *
  * @see Social#user(AccountKey)
  */
-public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> implements TransactionalComponent<Index<Keyword, ACell>,SocialUser> {
+public class SocialUser extends IndexComponent<Keyword, ACell> implements TransactionalComponent<Index<Keyword, ACell>,SocialUser> {
 	private final Supplier<CVMLong> clock;
 
 
@@ -50,7 +49,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return new Feed(section(cursor(),SocialLattice.KEY_FEED),ownerDid,clock);
+		return new Feed(path(SocialLattice.KEY_FEED),ownerDid,clock);
 	}
 
 	/**
@@ -63,17 +62,9 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 */
 	public Follows follows() {
 		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
-			section(cursor(),SocialLattice.KEY_FOLLOWING),
+			path(SocialLattice.KEY_FOLLOWING),
 			clock,(value,time) -> value.assoc(convex.lattice.generic.LWWLattice.KEY_TIMESTAMP,time));
-		return new Follows(section(following,SocialLattice.KEY_FOLLOWS),clock);
-	}
-
-	/** Reads actual sections; only a changed write constructs a missing index. */
-	@SuppressWarnings("unchecked")
-	private static <V extends ACell> AForkableCursor<V> section(
-			AForkableCursor<Index<Keyword,ACell>> parent,Keyword key) {
-		return ProjectionCursor.create(parent,state -> state==null?null:(V)state.get(key),
-			(state,value) -> (state==null?Index.<Keyword,ACell>none():state).assoc(key,value));
+		return new Follows(new IndexComponent<>(following).path(SocialLattice.KEY_FOLLOWS),clock);
 	}
 
 	/**
@@ -84,7 +75,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 *
 	 * @return isolated working copy for this user
 	 */
-	public SocialUser fork() {
+	@Override public SocialUser fork() {
 		return rebind(storage.fork());
 	}
 

@@ -21,6 +21,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.Root;
 
 /** Reads distinguish absence, empty values and incompatible data without modifying storage. */
 class SocialReadTest {
@@ -49,6 +50,31 @@ class SocialReadTest {
 		assertNull(SocialHelpers.getActiveFollows(null));
 		assertNull(SocialHelpers.computeFollowSet(null,Set.of(DID_ALICE)));
 		assertNull(SocialHelpers.buildTimeline(null,0,10));
+	}
+
+	@Test void childEditsRespectUserCreationPolicyAndPreserveOtherSections() {
+		var root=new Root<Index<Keyword,ACell>>();
+		var user=new SocialUser(root,DID_ALICE,() -> CVMLong.ONE) {
+			@Override protected Index<Keyword,ACell> createContainer() {
+				throw new UnsupportedOperationException("Initialise the user explicitly");
+			}
+		};
+		var feed=user.feed();
+		var follows=user.follows();
+		assertEquals(0,feed.count());
+		assertNull(follows.getActive());
+		assertThrows(UnsupportedOperationException.class,() -> feed.post("hello"));
+		assertThrows(UnsupportedOperationException.class,() -> follows.follow(DID_ALICE));
+		assertNull(root.get(),"failed child edits must not leave partial user state");
+		var future=Keyword.intern("future");
+		var opaque=Vectors.of("unfamiliar",CVMLong.ONE);
+		root.set(Index.of(future,opaque));
+		var post=feed.post("hello");
+		follows.follow(DID_ALICE);
+		assertNotNull(feed.getPost(post));
+		assertTrue(follows.isFollowing(DID_ALICE));
+		assertSame(opaque,user.get(future));
+		assertEquals(CVMLong.ONE,SocialLattice.getFollowing(root.get()).get(SocialPost.TIMESTAMP));
 	}
 
 	@Test void storedEmptyCollectionsAreReturnedUnchanged() {
@@ -80,8 +106,8 @@ class SocialReadTest {
 		assertThrows(ClassCastException.class,() -> user.feed().getPost(POST));
 		assertThrows(ClassCastException.class,() -> user.feed().count());
 		assertThrows(ClassCastException.class,() -> user.feed().post("hello"));
-		assertThrows(ClassCastException.class,() -> user.follows().getActive());
-		assertThrows(ClassCastException.class,() -> user.follows().follow(DID_ALICE));
+		assertThrows(IllegalStateException.class,() -> user.follows().getActive());
+		assertThrows(IllegalStateException.class,() -> user.follows().follow(DID_ALICE));
 		assertSame(before,social.cursor().get());
 	}
 
