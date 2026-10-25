@@ -1,17 +1,22 @@
 package convex.lattice.kv;
 
+import java.util.Objects;
+import java.util.function.BiPredicate;
+
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.MapLattice;
-import convex.lattice.generic.OwnerLattice;
+import convex.lattice.generic.OwnerMapLattice;
 
 /**
  * A named KV database within the global lattice, with per-owner signed replicas.
@@ -20,7 +25,7 @@ import convex.lattice.generic.OwnerLattice;
  * <ul>
  *   <li>Signing this node's database map with its key pair</li>
  *   <li>Merging remote replicas into the local store (absorption merge)</li>
- *   <li>Rejecting replicas with invalid signatures via {@link OwnerLattice}</li>
+ *   <li>Rejecting replicas with invalid signatures or unauthorised signers</li>
  * </ul>
  *
  * <p>Lattice path structure:
@@ -33,7 +38,7 @@ import convex.lattice.generic.OwnerLattice;
  * <ul>
  *   <li><b>Standalone</b> ({@link #create}): owns its own cursor, manual export/merge</li>
  *   <li><b>Connected</b> ({@link #connect}): connected to a parent cursor chain,
- *       signing and replication handled by the chain</li>
+ *       signing supplied by that cursor's owner boundary and publication by its host</li>
  * </ul>
  *
  * <p>Usage:
@@ -54,22 +59,31 @@ import convex.lattice.generic.OwnerLattice;
 public class KVDatabase {
 
 	/**
-	 * The OwnerLattice structure for KV databases in the global lattice.
-	 * Structure: OwnerLattice → SignedLattice → MapLattice → KVStoreLattice
+	 * Default ownership rule for KV replicas: direct keys and self-certifying
+	 * {@code did:key} owners only. Indirect owners require an explicit verifier.
+	 * Structure: owner map → signed database map → KV store.
 	 */
-	public static final OwnerLattice<AHashMap<AString, Index<AString, AVector<ACell>>>>
-		OWNER_LATTICE = OwnerLattice.create(MapLattice.create(KVStoreLattice.INSTANCE));
+	public static final OwnerMapLattice<ACell,AHashMap<AString, Index<AString, AVector<ACell>>>>
+		OWNER_LATTICE = OwnerMapLattice.create(MapLattice.create(KVStoreLattice.INSTANCE),
+			(owner,key) -> key.equals(LatticeContext.ownerAccountKey(owner)));
 
 	private final AString dbName;
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
 	private final LatticeKV kv;
+	private final OwnerMapLattice<ACell,AHashMap<AString,Index<AString,AVector<ACell>>>> owners;
 
 	private KVDatabase(AString dbName, AKeyPair keyPair, ACell ownerKey, LatticeKV kv) {
+		this(dbName,keyPair,ownerKey,kv,OWNER_LATTICE);
+	}
+
+	private KVDatabase(AString dbName,AKeyPair keyPair,ACell ownerKey,LatticeKV kv,
+			OwnerMapLattice<ACell,AHashMap<AString,Index<AString,AVector<ACell>>>> owners) {
 		this.dbName = dbName;
 		this.keyPair = keyPair;
 		this.ownerKey = ownerKey;
 		this.kv = kv;
+		this.owners = owners;
 	}
 
 	/**
@@ -100,7 +114,8 @@ public class KVDatabase {
 	/**
 	 * Creates a new empty database with the given name, signing key pair, owner key, and replica ID.
 	 * The owner key determines the identity under which this replica is published in the OwnerLattice.
-	 * It may be an AccountKey, Address, or DID string.
+	 * The default rule accepts a direct account key or self-certifying {@code did:key}.
+	 * Use the verifier overload for account addresses or other DID methods.
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
@@ -110,7 +125,23 @@ public class KVDatabase {
 	 */
 	public static KVDatabase create(String name, AKeyPair keyPair, ACell ownerKey, AString replicaID) {
 		LatticeKV kv = LatticeKV.create(replicaID);
-		return new KVDatabase(Strings.create(name), keyPair, ownerKey, kv);
+		return new KVDatabase(Strings.create(name), Objects.requireNonNull(keyPair),
+			Objects.requireNonNull(ownerKey), kv);
+	}
+
+	/**
+	 * Creates a standalone database with an explicit owner/signing-key rule, used
+	 * for both exported state and incoming replicas. This supports DID or account
+	 * ownership and key rotation through a shared, updatable authority view.
+	 * The verifier must be thread-safe and use locally available authority data.
+	 * A signing key is a capability; exports fail if this rule no longer authorises it.
+	 */
+	public static KVDatabase create(String name,AKeyPair keyPair,ACell ownerKey,AString replicaID,
+			BiPredicate<ACell,AccountKey> verifier) {
+		var owners=OwnerMapLattice.create(MapLattice.<AString,Index<AString,AVector<ACell>>>create(
+			KVStoreLattice.INSTANCE),Objects.requireNonNull(verifier));
+		return new KVDatabase(Strings.create(name),Objects.requireNonNull(keyPair),
+			Objects.requireNonNull(ownerKey),LatticeKV.create(replicaID),owners);
 	}
 
 	/**
@@ -191,14 +222,16 @@ public class KVDatabase {
 	 * <p>Only available in standalone mode (created via {@link #create}).
 	 *
 	 * @return SignedData wrapping a map of {dbName → KV store state}
-	 * @throws IllegalStateException if no signing key is available (connected mode)
+	 * @throws IllegalStateException if no authorised signing key is available
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> getSignedState() {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 		AHashMap<AString, Index<AString, AVector<ACell>>> dbMap =
 			(AHashMap) Maps.of(dbName, kv.cursor().get());
-		return keyPair.signData(dbMap);
+		var signed=owners.signingFor(ownerKey).sign(dbMap,keyPair::signData);
+		if (signed==null) throw new IllegalStateException("Signing key is not authorised for KV owner");
+		return signed;
 	}
 
 	/**
@@ -218,7 +251,7 @@ public class KVDatabase {
 
 	/**
 	 * Merges replicas from a remote owner map into this node's local store.
-	 * Uses {@link OwnerLattice} to verify signatures and owner-key matching,
+	 * Uses the bound owner rule to verify signatures and owner-key matching,
 	 * then absorbs verified remote data into the local KV store.
 	 *
 	 * <p>Only available in standalone mode (created via {@link #create}).
@@ -231,9 +264,9 @@ public class KVDatabase {
 		if (remoteOwnerMap == null || remoteOwnerMap.isEmpty()) return 0;
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 
-		// Use OwnerLattice to verify signatures and owner-key matching
+		// The same bound rule verifies remote replicas and local exports.
 		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> verified =
-			OWNER_LATTICE.merge(Maps.empty(),remoteOwnerMap);
+			owners.merge(Maps.empty(),remoteOwnerMap);
 
 		// Absorb verified remote data into local store
 		long merged = 0;

@@ -117,6 +117,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Standalone KV replica verification now rejects unresolved owners by default. An explicit owner/key verifier supports indirect DIDs and account addresses and governs both incoming replicas and signed exports, including key rotation.
+
 - Opening a connected KV database no longer writes empty state or overwrites concurrent creation. Missing database containers are created atomically on the first changed write.
 
 - DLFS CLI service mutations and initial drive creation now publish the host root for persistence and replication. Closed DLFS filesystem views reject further I/O through existing paths and channels, without closing other views or publishing drafts.

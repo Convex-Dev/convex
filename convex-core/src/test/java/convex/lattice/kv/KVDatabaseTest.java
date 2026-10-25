@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -23,6 +25,71 @@ import convex.lattice.generic.MapLattice;
  * Tests for KVDatabase — signed, replicated KV stores in the global lattice.
  */
 public class KVDatabaseTest {
+
+	@Test
+	public void testDefaultReplicaRuleRejectsUnresolvedOwners() {
+		var attacker=AKeyPair.createSeeded(9291);
+		var recipient=AKeyPair.createSeeded(9292);
+		var source=KVDatabase.create("db",attacker);
+		source.kv().set("injected",Strings.create("unrelated signer"));
+		for (ACell claimed:new ACell[]{Strings.create("did:web:victim.example"),
+				Strings.create("did:convex:1337"),Address.create(1337)}) {
+			var local=KVDatabase.create("db",recipient);
+			var remote=source.exportReplica().dissoc(attacker.getAccountKey())
+				.assoc(claimed,source.getSignedState());
+			var before=local.kv().cursor().get();
+			assertEquals(0,local.mergeReplicas(remote),"unknown owners must fail closed");
+			assertSame(before,local.kv().cursor().get());
+			var unauthorised=KVDatabase.create("db",attacker,claimed,Strings.create("replica"));
+			assertThrows(IllegalStateException.class,unauthorised::exportReplica);
+		}
+	}
+
+	@Test
+	public void testDefaultReplicaRuleAcceptsSelfCertifyingDID() {
+		var key=AKeyPair.createSeeded(9293);
+		var did=DID.forKey(key.getAccountKey());
+		var source=KVDatabase.create("db",key,did,Strings.create("source"));
+		source.kv().set("key",Strings.create("value"));
+		var local=KVDatabase.create("db",AKeyPair.createSeeded(9294));
+		assertEquals(1,local.mergeReplicas(source.exportReplica()));
+		assertEquals(Strings.create("value"),local.kv().get("key"));
+		var wrongKey=KVDatabase.create("db",AKeyPair.createSeeded(9295),did,Strings.create("wrong"));
+		assertThrows(IllegalStateException.class,wrongKey::exportReplica);
+	}
+
+	@Test
+	public void testExplicitOwnerRuleAppliesToMergeExportAndRotation() {
+		var localKey=AKeyPair.createSeeded(9296);
+		var original=AKeyPair.createSeeded(9297);
+		var rotated=AKeyPair.createSeeded(9298);
+		var did=Strings.create("did:web:owner.example");
+		var authority=new java.util.concurrent.atomic.AtomicReference<>(original.getAccountKey());
+		java.util.function.BiPredicate<ACell,convex.core.data.AccountKey> verifier=(owner,key)->
+			owner.equals(localKey.getAccountKey())?key.equals(localKey.getAccountKey()):
+				did.equals(owner)&&key.equals(authority.get());
+		var local=KVDatabase.create("db",localKey,localKey.getAccountKey(),Strings.create("local"),verifier);
+		var source=KVDatabase.create("db",original,did,Strings.create("remote"),verifier);
+		source.kv().set("first",Strings.create("authorised"));
+		var originalExport=source.exportReplica();
+		assertEquals(1,local.mergeReplicas(originalExport));
+		assertTrue(local.exportReplica().get(localKey.getAccountKey()).checkSignature());
+
+		var attacker=KVDatabase.create("db",rotated);
+		attacker.kv().set("injected",Strings.create("unauthorised"));
+		var forged=attacker.exportReplica().dissoc(rotated.getAccountKey()).assoc(did,attacker.getSignedState());
+		assertEquals(0,local.mergeReplicas(forged));
+		assertNull(local.kv().get("injected"));
+
+		authority.set(rotated.getAccountKey());
+		assertEquals(0,local.mergeReplicas(originalExport),"revocation must affect subsequent delivery");
+		assertThrows(IllegalStateException.class,source::exportReplica);
+		var replacement=KVDatabase.create("db",rotated,did,Strings.create("rotated"),verifier);
+		replacement.kv().set("next",Strings.create("new key"));
+		assertEquals(1,local.mergeReplicas(replacement.exportReplica()));
+		assertEquals(Strings.create("new key"),local.kv().get("next"));
+		assertEquals(Strings.create("authorised"),local.kv().get("first"),"revocation does not erase accepted state");
+	}
 
 	@Test
 	public void testConnectingAbsentDatabaseDoesNotWrite() {
