@@ -5,10 +5,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -648,9 +650,33 @@ public class P2PNode implements Closeable {
 		log.info("Node key: {}", keyPair.getAccountKey().toChecksumHex());
 
 		P2PNode node = P2PNode.create(store, NodeConfig.create(), keyPair).serveAllInbound();
-		node.launch();
-
-		// Stub: park until the JVM shuts down. A real node will run a control loop here.
-		new CountDownLatch(1).await();
+		var host=node.getNodeServer().getHost();
+		var durability=host.autoFlush(Duration.ofSeconds(30));
+		durability.failure().thenAcceptAsync(error -> log.warn("P2P store flush failed",error));
+		var stopped=new CountDownLatch(1);
+		var closing=new AtomicBoolean();
+		Runnable shutdown=() -> {
+			if (!closing.compareAndSet(false,true)) return;
+			// Close replication, then drain/final-flush, then close the borrowed store.
+			try (store; durability; node) {
+				// Resource order defines the service's shutdown policy.
+			} catch (IOException e) {
+				log.warn("Unable to finish P2P service shutdown",e);
+			} finally {
+				stopped.countDown();
+			}
+		};
+		Thread hook=new Thread(shutdown,"convex-p2p-service-shutdown");
+		try {
+			node.launch();
+			host.checkpoint();
+			Runtime.getRuntime().addShutdownHook(hook);
+			// A real service can run its control loop here.
+			stopped.await();
+		} finally {
+			shutdown.run();
+			try { Runtime.getRuntime().removeShutdownHook(hook); }
+			catch (IllegalStateException e) { /* JVM shutdown is already in progress. */ }
+		}
 	}
 }
