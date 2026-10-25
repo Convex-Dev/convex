@@ -791,7 +791,7 @@ The `:local` subtree may live in the peer's main Etch store or in a separate sto
 └── ...
 ```
 
-**`:local`** uses `OwnerLattice` — each peer writes only to its own slot, signed with its peer key. Within each peer's slot, a `MapLattice` merges per-keyword using `LWWLattice` (timestamp-based last-write-wins with hash tiebreaker for commutativity). Each service (`:signing`, etc.) bumps a `:timestamp` key on every mutation; during merge, the higher-timestamp version wins. Different services merge independently — updating `:signing` does not clobber a sibling service. This enables:
+**`:local`** uses `OwnerLattice` — each peer writes only to its own slot, signed with its peer key. Within each peer's slot, a `MapLattice` merges per-keyword using `LWWLattice` (timestamp-based last-write-wins; on equal timestamps the value already held is kept). Each service (`:signing`, etc.) bumps a `:timestamp` key on every mutation; during merge, the higher-timestamp version wins. Different services merge independently — updating `:signing` does not clobber a sibling service. This enables:
 
 - **Shared store** — multiple peers coexist in the same Etch store without conflict
 - **Safe replication** — `:local` can be replicated between peers for fault tolerance; each peer's data is signed and can't be tampered with by others
@@ -942,7 +942,7 @@ Crypto and lattice primitives used by the service layer. These exist (or will be
 | AES-256-GCM | Symmetric authenticated encryption | `convex.core.crypto.AESGCM` — `encrypt(key, plaintext)`, `decrypt(key, data)` |
 | OwnerLattice | Per-owner signed data | `convex.lattice.generic.OwnerLattice` |
 | LocalLattice | `:local` OwnerLattice convention | `convex.lattice.LocalLattice` — registered in `Lattice.ROOT`, helpers for per-peer slot access, MapLattice(LWWLattice) value merge |
-| LWWLattice | Timestamp-based last-write-wins register | `convex.lattice.generic.LWWLattice` — hash tiebreaker for commutativity |
+| LWWLattice | Timestamp-based last-write-wins register | `convex.lattice.generic.LWWLattice` — equal timestamps keep the value already held |
 | ACursor | Atomic mutable reference | `convex.lattice.cursor.ACursor` — `get()`, `set()`, `updateAndGet()`, `path()` |
 | Etch storage | Content-addressed persistence | `convex.etch.EtchStore`, `convex.core.store.Stores` |
 
