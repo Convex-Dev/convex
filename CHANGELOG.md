@@ -145,6 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keyed component publication preserves removal of unrelated keys when the destination is cleared to nil. Region collections publish only their children, leaving a supplied aggregate fork for its owner to publish explicitly.
 
 - `mod` handles the minimum supported integer divisor without overflowing an intermediate negation or throwing a Java exception.
+- GUI labels, tables, tooltips and dialogs show text from other parties literally. Registry names, actor error messages and DLFS file names containing `<html>` were rendered as HTML, which could fetch remote URLs and disguise what the GUI showed; transaction error dialogs also dropped the text around it. ([#765](https://github.com/Convex-Dev/convex/issues/765))
 
 - Replacing a keyed lattice region with `addLattice` now installs one rule for both navigation and merge, rather than leaving the old merge active alongside the new rule.
 

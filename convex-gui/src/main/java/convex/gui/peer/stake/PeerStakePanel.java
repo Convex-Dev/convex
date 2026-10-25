@@ -14,6 +14,7 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.DecimalAmountField;
 import convex.gui.utils.Async;
 import convex.gui.utils.SymbolIcon;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class PeerStakePanel extends JPanel {
@@ -55,7 +56,7 @@ public class PeerStakePanel extends JPanel {
 				}
 				Async.whileBusy(e, convex.transact("(set-stake "+peerKey+" "+amt+")").thenAcceptAsync(r->{
 					if (r.isError()) {
-						JOptionPane.showMessageDialog(this,"Stake setting failed: "+r,"Staking problem",JOptionPane.ERROR_MESSAGE);
+						JOptionPane.showMessageDialog(this,Toolkit.plainMessage("Stake setting failed: "+r),"Staking problem",JOptionPane.ERROR_MESSAGE);
 					}
 					peerTable.refresh();
 				}, Async.EDT));

@@ -122,6 +122,9 @@ public class Toolkit {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
 		}
+
+		// Even if the look and feel failed: text from other parties must never render as HTML
+		PlainTextUI.install();
 	}
 
 	protected static void setupForApple() {
@@ -405,11 +408,29 @@ public class Toolkit {
 	}
 
 	public static void showMessge(Component parent, Object message) {
+		if (message instanceof String s) message=plainMessage(s);
 		JOptionPane.showMessageDialog(parent, message);
 	}
 
 	public static void showErrorMessage(Component parent, String attemptFailure, Exception e) {
-		JOptionPane.showMessageDialog(parent, attemptFailure + "\n" + e.getMessage());
+		JOptionPane.showMessageDialog(parent, plainMessage(attemptFailure + "\n" + e.getMessage()));
+	}
+
+	/**
+	 * Makes a dialog message that shows text literally and in full, for text that
+	 * may come from other parties such as transaction errors. A String message
+	 * containing {@code <html>} makes JOptionPane drop everything outside the
+	 * HTML, and its line breaks if the HTML is unclosed.
+	 * @param text Message text, lines separated by '\n'
+	 * @return Read-only component to pass to JOptionPane as the message
+	 */
+	public static JComponent plainMessage(String text) {
+		JTextArea ta = new JTextArea(text);
+		ta.setEditable(false); // selectable, so errors can be copied
+		ta.setOpaque(false);
+		ta.setBorder(null);
+		ta.setFont(UIManager.getFont("Label.font"));
+		return ta;
 	}
 
 	public static Component wrapPasswordField(JPasswordField passArea) {
