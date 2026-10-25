@@ -47,7 +47,7 @@ class DLFSLifecycleExampleTest {
 			assertNotNull(drive);
 			Files.writeString(drive.fileSystem().getPath("/hello.txt"),"Hello");
 			files.sync();
-			host.checkpoint();
+			host.close(); // Final checkpoint, before the store closes.
 		}
 		try (var store=EtchStore.create(file)) {
 			var host=LatticeHost.open(store);

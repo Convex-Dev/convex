@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Simplify lattice host, node and cursor APIs around the application model; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading. Services save with explicit checkpoints, as closing a node no longer saves.
+- Simplify lattice host, node and cursor APIs around the application model; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading. Services save by closing the host, as closing a node no longer saves.
 - Extend DLFS data with modification times as a one-way upgrade: back up stores and upgrade all replicas together. ([#688](https://github.com/Convex-Dev/convex/issues/688))
 - Improve responsiveness of Java client transactions and the GUI.
 

@@ -181,7 +181,7 @@ Connection conn = cdb.getConnection("market");
 // ... use conn ...
 
 server.close();  // stop replication
-server.getHost().checkpoint(); // save accepted host state explicitly
+server.getHost().close(); // save accepted host state
 store.close();
 ```
 

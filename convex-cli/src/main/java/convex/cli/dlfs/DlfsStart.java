@@ -223,9 +223,9 @@ public class DlfsStart extends ACommand {
 					log.warn("Error closing NodeServer", e);
 				}
 				try {
-					store.flush();
+					nodeServer.getHost().close();
 				} catch (Exception e) {
-					log.warn("Error flushing DLFS store",e);
+					log.warn("Error saving DLFS state",e);
 				}
 				store.close();
 			} finally {

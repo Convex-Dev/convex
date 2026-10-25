@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * A host's scoped durability worker. Flushes already-retained state; never syncs
  * applications or advances the retained root. The store remains caller-owned.
+ * Closing the host closes this resource.
  */
 public final class AutoFlush implements Closeable {
 	private final LatticeHost<?> host;

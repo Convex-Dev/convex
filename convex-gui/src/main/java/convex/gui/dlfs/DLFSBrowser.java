@@ -359,7 +359,7 @@ public class DLFSBrowser extends AbstractGUI {
 		if (nodeServer != null) {
 			try {
 				nodeServer.close();
-				nodeServer.getHost().checkpoint();
+				nodeServer.getHost().close();
 			} catch (IOException e) {
 				log.warn("Error closing NodeServer: {}", e.getMessage());
 			}

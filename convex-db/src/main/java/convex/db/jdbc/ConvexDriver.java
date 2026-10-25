@@ -383,13 +383,13 @@ public class ConvexDriver extends Driver {
 			}
 		}
 
-		/** Stops the node, saves, then closes the store; no-op for an in-memory instance. */
+		/** Stops the node, closes the host to save, then closes the store; no-op for an in-memory instance. */
 		void close() throws IOException {
 			if (server == null) return;
 			Shutdown.removeHook(Shutdown.SERVICE, shutdownHook);
 			try {
 				server.close();
-				server.getHost().checkpoint();
+				server.getHost().close();
 			} finally {
 				store.close();
 			}

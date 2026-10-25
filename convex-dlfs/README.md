@@ -264,7 +264,8 @@ The callbacks above promise durable completion by calling `checkpoint()` before
 returning. A callback using `host.sync()` instead retains and offers the root to
 replication but leaves the physical barrier to the service's policy, for example
 a scoped `host.autoFlush(Duration.ofSeconds(1))`. Close the HTTP service first,
-then networking, then the durability resource, then the store. A failed checkpoint
+then networking, then the host, which stops the durability resource and saves a
+final checkpoint, then the store. A failed checkpoint
 must fail the request; it does not undo a file write already made locally.
 
 Custom owner authority and region placement can be supplied together:
