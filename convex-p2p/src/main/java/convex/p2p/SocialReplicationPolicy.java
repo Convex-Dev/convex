@@ -9,14 +9,12 @@ import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
-import convex.social.Follows;
 import convex.social.Social;
 import convex.social.SocialHelpers;
 
@@ -89,14 +87,6 @@ final class SocialReplicationPolicy {
 		return root.assoc(Social.KEY_SOCIAL,(filtered==null)?Maps.empty():filtered);
 	}
 
-	/** Records the validated signer of each wanted owner whose slot a projected root carried. */
-	void recordOwners(Index<Keyword,ACell> projected) {
-		if (projected==null || !(projected.get(Social.KEY_SOCIAL) instanceof AMap<?,?> owners)) return;
-		for (ACell did:owners.keySet()) {
-			if (did instanceof AString s) cacheCurrentOwner(s);
-		}
-	}
-
 	@SuppressWarnings("unchecked")
 	private ACell filterOwners(ACell value,Set<AString> desired) {
 		if (!(value instanceof AHashMap<?,?> raw)) return null;
@@ -104,7 +94,7 @@ final class SocialReplicationPolicy {
 		AHashMap<ACell,ACell> filtered=Maps.empty();
 		for (AString did:desired) {
 			ACell slot=owners.get(did);
-			if (slot!=null && validOwnerSlot(did,slot,false)) {
+			if (slot!=null && validOwnerSlot(did,slot)) {
 				filtered=filtered.assoc(did,slot);
 			}
 		}
@@ -112,37 +102,12 @@ final class SocialReplicationPolicy {
 		return filtered;
 	}
 
-	private boolean validOwnerSlot(AString did,ACell value,
-			boolean cacheValidatedSigner) {
+	private boolean validOwnerSlot(AString did,ACell value) {
 		if (!(value instanceof SignedData<?> signed) || !signed.checkSignature()) return false;
 		// Relaying an owner's envelope does not require understanding all its fields.
 		if (!(signed.getValue() instanceof Index<?,?>)) return false;
 		AccountKey signer=signed.getAccountKey();
-		// A remembered signer is a hint, not authority after rotation or revocation.
-		if (!authorizer.safeAuthorises(did,signer)) return false;
-		if (cacheValidatedSigner) cacheFollowKey(did,signer);
-		return true;
-	}
-
-	/** Records the validated signer of a desired owner's slot after it has merged. */
-	void cacheCurrentOwner(AString did) {
-		ACell value=application.cursor().get(Social.KEY_SOCIAL,did);
-		if (value!=null) validOwnerSlot(did,value,true);
-	}
-
-	private void cacheFollowKey(AString target,AccountKey signer) {
-		boolean changed=false;
-		for (AString localDid:localSigners.keySet()) {
-			Follows follows=social.user(localDid).follows();
-			AccountKey existing=follows.getCachedAccountKey(target);
-			if (!follows.isFollowing(target)
-					|| (existing!=null && signer.equals(existing))) continue;
-			follows.cacheValidatedKey(target,signer);
-			changed=true;
-		}
-		// A delivery may be a replay which does not otherwise change its target cursor, so
-		// the node's post-merge sync would not run: the application publishes its edit.
-		if (changed) application.syncHost();
+		return authorizer.safeAuthorises(did,signer);
 	}
 
 	private static void requireDID(AString did) {

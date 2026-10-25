@@ -227,19 +227,14 @@ public class SocialAppTest {
 	}
 
 	@Test
-	public void testValidatedFollowKeyCachePreservesIntent() throws Exception {
+	public void testFollowIntentRoundTrip() throws Exception {
 		AKeyPair alice=AKeyPair.generate();
-		AKeyPair bob=AKeyPair.generate();
 		AString bobDid=convex.core.data.Strings.create("did:web:bob.example");
 		Social social=Social.create(alice);
 		Follows follows=social.user(alice.getAccountKey()).follows();
 
-		assertThrows(IllegalStateException.class,
-			() -> follows.cacheValidatedKey(bobDid,bob.getAccountKey()));
 		follows.follow(bobDid);
-		follows.cacheValidatedKey(bobDid,bob.getAccountKey());
 		assertTrue(follows.isFollowing(bobDid));
-		assertEquals(bob.getAccountKey(),follows.getCachedAccountKey(bobDid));
 
 		SignedData<?> signed=social.cursor().get().get(DID.forKey(alice.getAccountKey()));
 		SignedData<?> decoded=(SignedData<?>)CVMEncoder.INSTANCE.decodeMultiCell(
@@ -247,9 +242,9 @@ public class SocialAppTest {
 		@SuppressWarnings("unchecked")
 		AHashMap<ACell,ACell> encodedFollows=SocialLattice.getFollows(
 			(Index<Keyword,ACell>)decoded.getValue());
-		ACell encodedKey=((AHashMap<?,?>)encodedFollows.get(bobDid))
-			.get(Follows.KEY_ACCOUNT_KEY);
-		assertEquals(bob.getAccountKey(),AccountKey.parse(encodedKey));
+		AHashMap<?,?> record=(AHashMap<?,?>)encodedFollows.get(bobDid);
+		assertEquals(Set.of(SocialPost.ACTIVE,SocialPost.TIMESTAMP),record.keySet());
+		assertEquals(convex.core.data.prim.CVMBool.TRUE,record.get(SocialPost.ACTIVE));
 	}
 
 	@Test

@@ -256,6 +256,18 @@ public class SocialLatticeTest {
 			((AHashMap<?,?>)follows.get(bob)).get(SocialPost.ACTIVE));
 	}
 
+	@Test void legacyKeyCacheIsAnOpaqueFollowExtension() {
+		var bob=DID.forKey(AKeyPair.createSeeded(7813).getAccountKey());
+		var keyField=Keyword.intern("account-key");
+		// An unfamiliar cached value cannot invalidate an otherwise compatible record.
+		var record=SocialPost.createFollowRecord(2000L,false).assoc(keyField,CVMLong.ONE);
+		var earlier=followingState(1000L,Maps.of(bob,SocialPost.createFollowRecord(1000L,true)));
+		var later=followingState(2000L,Maps.of(bob,record));
+		var merged=SocialLattice.INSTANCE.merge(earlier,later);
+		assertEquals(record,SocialLattice.getFollows(merged).get(bob));
+		assertTrue(SocialHelpers.getActiveFollows(SocialLattice.getFollows(merged)).isEmpty());
+	}
+
 	// ===== Owner Lattice Integration =====
 
 	@Test

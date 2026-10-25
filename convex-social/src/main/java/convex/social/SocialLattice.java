@@ -239,8 +239,7 @@ public class SocialLattice extends ALattice<Index<Keyword, ACell>> {
 			AHashMap<Keyword,ACell> typed=(AHashMap<Keyword,ACell>)record;
 			if (!(typed.get(SocialPost.ACTIVE) instanceof CVMBool)
 					|| !(typed.get(LWWLattice.KEY_TIMESTAMP) instanceof CVMLong)) return false;
-			ACell cached=typed.get(Follows.KEY_ACCOUNT_KEY);
-			return cached==null || convex.core.data.AccountKey.parse(cached)!=null;
+			return true; // Other fields, including legacy key caches, are opaque.
 		}
 	}
 }

@@ -149,7 +149,8 @@ Tests cover:
 
 - `did:key`, pinned `did:convex`, and authenticated `did:web` authorisation;
 - DID/key separation and rejection of a wrong social signer;
-- disjoint follow edits, same-target LWW and cached-key encoding;
+- disjoint follow edits, same-target LWW and follow-intent encoding;
+- receiving and replaying remote owners leaves local signed intent unchanged;
 - Alice, Bob and Carol with different direct-follow sets;
 - Dave joining late through one rendezvous node without an inbound listener;
 - authenticated reverse-route upgrade on the original full-duplex socket;

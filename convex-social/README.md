@@ -30,7 +30,7 @@ SocialLattice (per-user, signed by an authorised DID key):
   :feed      → IndexLattice<Blob, ACell>    last-writer-wins per entry
   :profile   → LWWLattice                   display name, bio, avatar, etc.
   :following → LWPLattice
-    :follows → MapLattice<DID, LWW record>  active intent and cached validated signer
+    :follows → MapLattice<DID, LWW record>  active intent and timestamp
 ```
 
 Each user's complete data is wrapped in `SignedData` via an `OwnerLattice`. DID ownership

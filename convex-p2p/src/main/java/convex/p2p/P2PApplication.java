@@ -48,7 +48,7 @@ import convex.social.Social;
  * node coordination component.</p>
  *
  * <p>The application publishes what it writes. When its policy edits local state,
- * such as this node's own record or a follow key validated during admission, it
+ * such as this node's own record, it
  * syncs its host so the edit is persisted and announced.</p>
  */
 public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
@@ -98,16 +98,13 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	/**
 	 * Merges an incoming root projected to what this node wants: every region as
 	 * declared, the social region reduced to the owners this node wants. The lattice
-	 * merge does the rest, verifying each owner's slot, and the validated signer of
-	 * each wanted owner whose slot arrived is then recorded. A path delivery arrives
+	 * merge does the rest, verifying each owner's slot. A path delivery arrives
 	 * here reduced to its path, so the same projection selects it.
 	 */
 	@Override
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 		Index<Keyword,ACell> wanted=socialPolicy.projectRoot(other);
-		Index<Keyword,ACell> result=cursor().updateAndGet(own -> getLattice().merge(own,wanted));
-		socialPolicy.recordOwners(wanted);
-		return result;
+		return cursor().updateAndGet(own -> getLattice().merge(own,wanted));
 	}
 
 	/** Registers and opens a local {@code did:key} social user. */
@@ -149,7 +146,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	/**
 	 * Paths a node pulls from a newly admitted peer, in order: the infrastructure
 	 * regions, then each currently wanted social owner's slot. Each arrives through
-	 * {@link #merge}, which records validated signers itself.
+	 * {@link #merge}, which verifies the owner envelopes without editing local intent.
 	 */
 	List<ACell[]> bootstrapPaths() {
 		List<ACell[]> paths=new ArrayList<>();

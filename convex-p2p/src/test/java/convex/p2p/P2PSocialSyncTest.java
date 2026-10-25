@@ -170,12 +170,9 @@ public class P2PSocialSyncTest {
 
 		CompletableFuture<Void> aliceReady=awaitCondition(aliceNode,
 			() -> hasPost(alice,aliceDid,alicePost)&&hasPost(alice,bobDid,bobPost)
-				&&hasPost(alice,carolDid,carolPost)
-				&&hasCachedKey(alice,aliceDid,bobDid,bobUserKey)
-				&&hasCachedKey(alice,aliceDid,carolDid,carolUserKey));
+				&&hasPost(alice,carolDid,carolPost));
 		CompletableFuture<Void> bobReady=awaitCondition(bobNode,
-			() -> hasPost(bob,aliceDid,alicePost)&&hasPost(bob,bobDid,bobPost)
-				&&hasCachedKey(bob,bobDid,aliceDid,aliceUserKey));
+			() -> hasPost(bob,aliceDid,alicePost)&&hasPost(bob,bobDid,bobPost));
 		aliceNode.getApplication().sync();
 		bobNode.getApplication().sync();
 		carolNode.getApplication().sync();
@@ -187,12 +184,6 @@ public class P2PSocialSyncTest {
 		assertEquals(Set.of(bobDid,carolDid),alice.user(aliceDid).follows().getActive());
 		assertEquals(Set.of(aliceDid),bob.user(bobDid).follows().getActive());
 		assertTrue(carol.user(carolDid).follows().getActive().isEmpty());
-		assertEquals(bobUserKey.getAccountKey(),
-			alice.user(aliceDid).follows().getCachedAccountKey(bobDid));
-		assertEquals(carolUserKey.getAccountKey(),
-			alice.user(aliceDid).follows().getCachedAccountKey(carolDid));
-		assertEquals(aliceUserKey.getAccountKey(),
-			bob.user(bobDid).follows().getCachedAccountKey(aliceDid));
 
 		// Dave is outbound-only, is told only about Bob, and follows Carol.
 		daveStore=EtchStore.createTemp("p2p-social-dave");
@@ -219,15 +210,12 @@ public class P2PSocialSyncTest {
 		awaitCondition(daveNode,() -> knowsAllInitialNodes(daveNode)).get(5,TimeUnit.SECONDS);
 		daveNode.whenConnected(carolNodeKey.getAccountKey()).get(5,TimeUnit.SECONDS);
 		CompletableFuture<Void> daveHasCarol=awaitCondition(daveNode,
-			() -> hasPost(dave,carolDid,carolPost)
-				&&hasCachedKey(dave,daveDid,carolDid,carolUserKey));
+			() -> hasPost(dave,carolDid,carolPost));
 		carolNode.getApplication().sync();
 		daveHasCarol.get(5,TimeUnit.SECONDS);
 
 		assertMaterialised(dave,Set.of(daveDid,carolDid));
 		assertTrue(hasPost(dave,daveDid,davePost));
-		assertEquals(carolUserKey.getAccountKey(),
-			dave.user(daveDid).follows().getCachedAccountKey(carolDid));
 		assertFalse(hasPost(dave,bobDid,bobPost));
 		assertFalse(hasPost(dave,aliceDid,alicePost));
 		assertFalse(hasPost(alice,daveDid,davePost));
@@ -277,12 +265,6 @@ public class P2PSocialSyncTest {
 
 	private static boolean hasPost(Social social,AString did,Blob post) {
 		return social.user(did).feed().getPost(post)!=null;
-	}
-
-	private static boolean hasCachedKey(Social social,AString localDid,
-			AString targetDid,AKeyPair targetKey) {
-		var cached=social.user(localDid).follows().getCachedAccountKey(targetDid);
-		return cached!=null && targetKey.getAccountKey().equals(cached);
 	}
 
 	private boolean knowsAllInitialNodes(P2PNode node) {

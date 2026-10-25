@@ -37,8 +37,6 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	private final Supplier<CVMLong> clock;
 	private final MapComponent<ACell,ACell> records;
 
-	public static final Keyword KEY_ACCOUNT_KEY=Keyword.intern("account-key");
-
 	Follows(AForkableCursor<AHashMap<ACell, ACell>> cursor, Supplier<CVMLong> clock) {
 		super(cursor);
 		this.clock=clock;
@@ -82,21 +80,6 @@ public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> implement
 	 */
 	public Set<AString> getActive() {
 		return SocialHelpers.getActiveFollows(records.get());
-	}
-
-	/** Stores a signer already validated for this target DID without changing intent. */
-	public void cacheValidatedKey(AString target,AccountKey accountKey) {
-		requireDID(target);
-		if (accountKey==null) throw new IllegalArgumentException("Account key must not be null");
-		if (getRecord(target)==null) throw new IllegalStateException(
-			"Cannot cache a key before a follow record exists");
-		writeField(target,KEY_ACCOUNT_KEY,accountKey);
-	}
-
-	/** Gets the last validated signer cached in the winning target record. */
-	public AccountKey getCachedAccountKey(AString target) {
-		AHashMap<Keyword,ACell> record=getRecord(target);
-		return (record==null)?null:AccountKey.parse(record.get(KEY_ACCOUNT_KEY));
 	}
 
 	/** Convenience migration overload mapping an Ed25519 key to {@code did:key}. */
