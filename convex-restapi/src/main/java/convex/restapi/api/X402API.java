@@ -1,6 +1,7 @@
 package convex.restapi.api;
 
 import convex.api.ContentTypes;
+import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -51,7 +52,11 @@ public class X402API extends ABaseAPI {
 		super(restServer);
 		NetworkId networkId = NetworkId.create(server.getPeer().getNetworkID());
 		this.facilitator = new ConvexFacilitator(restServer.getConvex(), networkId,
-				hash -> server.getPeer().getTransaction(hash) != null);
+				hash -> {
+					// History includes failed transactions; inclusion alone is not payment.
+					Result result = server.getPeer().getTransactionResult(hash);
+					return result != null && !result.isError();
+				});
 	}
 
 	public ConvexFacilitator getFacilitator() {

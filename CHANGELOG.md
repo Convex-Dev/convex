@@ -119,6 +119,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- X402 replay confirmation requires a successful recorded transaction result. Failed transactions in history no longer grant paid access or report successful settlement.
+
 - Standalone KV replica verification now rejects unresolved owners by default. An explicit owner/key verifier supports indirect DIDs and account addresses and governs both incoming replicas and signed exports, including key rotation.
 
 - Opening a connected KV database no longer writes empty state or overwrites concurrent creation. Missing database containers are created atomically on the first changed write.
