@@ -101,7 +101,6 @@ class FavouritesForkTest {
 			() -> { throw new AssertionError("Do not stamp incoming values"); }).fork();
 		AHashMap<Keyword,ACell> payload=Maps.of(TIMESTAMP,CVMLong.ONE,ITEMS,Maps.of("future","items"));
 		var envelope=ALICE.signData(payload);
-		assertNotNull(draft.checkValue(envelope),"Diagnostics may be stricter than relay acceptance");
 		assertSame(payload,draft.merge(envelope));
 		var newer=payload.assoc(TIMESTAMP,CVMLong.TWO);
 		draft.merge(BOB.signData(newer));

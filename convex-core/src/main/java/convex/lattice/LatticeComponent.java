@@ -3,7 +3,6 @@ package convex.lattice;
 import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.data.AString;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
@@ -56,11 +55,6 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 	public static <V extends ACell> LatticeComponent<V> live(ALattice<V> lattice,
 			AForkableCursor<V> cursor,LatticeContext context) {
 		return new LatticeComponent<>(lattice,cursor,context);
-	}
-
-	/** Uses the supplied lattice's precheck; merge may impose stronger rules. Nil is absent state. */
-	@Override public AString checkValue(ACell value) {
-		return LatticeOps.checkValue(lattice,value);
 	}
 
 	/** Returns the optional lattice implementation used by this adapter. */

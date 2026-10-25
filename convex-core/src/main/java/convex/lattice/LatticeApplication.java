@@ -3,7 +3,6 @@ package convex.lattice;
 import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.data.AString;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
@@ -43,11 +42,6 @@ public class LatticeApplication<V extends ACell> extends ALatticeApplication<V> 
 	/** Creates a live application; the caller configures it on the host explicitly. */
 	public static <V extends ACell> LatticeApplication<V> live(ALattice<V> lattice,LatticeHost<V> host) {
 		return new LatticeApplication<>(lattice,host.cursor());
-	}
-
-	/** Uses the supplied lattice's precheck; merge may impose stronger rules. Nil is absent state. */
-	@Override public AString checkValue(ACell value) {
-		return LatticeOps.checkValue(lattice,value);
 	}
 
 	/** Delegates to the lattice merge under this application's context. */

@@ -37,26 +37,6 @@ import convex.lattice.LatticeHost;
  */
 class FavouritesApplicationTest {
 
-	/** Domain compatibility composes the same timestamp and set components used for editing. */
-	@Test void compatibilityChecksCandidateWithoutAuthoringIt() {
-		var host=LatticeHost.create();
-		var appClock=new AtomicReference<>(CVMLong.ZERO);
-		var app=new FavouritesApp(host,appClock::get);
-		var favourites=app.user(ALICE);
-		var items=Keyword.intern("items");
-		AHashMap<Keyword,ACell> candidate=Maps.of(TIMESTAMP,CVMLong.ONE,items,Sets.of(1,2));
-		assertNull(favourites.checkValue(null));
-		assertNull(favourites.checkValue(ALICE.signData(null)));
-		assertNotNull(favourites.checkValue(candidate));
-		assertNotNull(favourites.checkValue(ALICE.signData(CVMLong.ONE)));
-		assertNull(favourites.checkValue(ALICE.signData(candidate)));
-		assertNotNull(favourites.checkValue(ALICE.signData(candidate.assoc(items,CVMLong.ONE))));
-		assertNull(favourites.checkValue(ALICE.signData(candidate.assoc(items,Sets.of("future-id")))));
-		assertNotNull(favourites.checkValue(ALICE.signData(candidate.assoc(TIMESTAMP,Sets.empty()))));
-		assertNull(app.component().get(ALICE.getAccountKey()));
-		assertTrue(host.cursor().get().isEmpty());
-	}
-
 	/** Relay policy understands ordering and authorship, not every field in the signed payload. */
 	@Test void unfamiliarPayloadsRelayIntactThroughRootAndOwnerDeliveries() {
 		var items=Keyword.intern("items");
@@ -205,8 +185,8 @@ class FavouritesApplicationTest {
 		assertSame(record,app.component().get(ALICE.getAccountKey()));
 	}
 
-	/** Domain diagnostics do not tighten the separate signed relay contract. */
-	@Test void signedDeliveryPreservesPayloadWithoutRunningDomainChecksOrClock() {
+	/** Signed delivery accepts a payload the domain view cannot interpret, without authoring a timestamp. */
+	@Test void signedDeliveryPreservesUnfamiliarPayloadWithoutRunningTheClock() {
 		var host=LatticeHost.create();
 		var app=new FavouritesApp(host,() -> {
 			throw new AssertionError("Incoming delivery must not author a timestamp");
@@ -216,7 +196,6 @@ class FavouritesApplicationTest {
 		AHashMap<Keyword,ACell> payload=Maps.of(TIMESTAMP,CVMLong.ONE,
 			Keyword.intern("items"),Maps.of("future","representation"));
 		var envelope=ALICE.signData(payload);
-		assertNotNull(alice.checkValue(envelope));
 		assertSame(payload,alice.merge(envelope));
 		assertSame(envelope,region.get(ALICE.getAccountKey()));
 		assertSame(payload,alice.sync());

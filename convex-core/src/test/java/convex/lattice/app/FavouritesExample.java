@@ -7,7 +7,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
-import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -195,13 +194,6 @@ public final class FavouritesExample {
 
 		/** Direct local edits use the same timestamped path as the embedded set. */
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record.cursor(); }
-
-		/** Domain checks inspect the payload; the base handles the signed envelope. */
-		@Override protected AString checkPayload(ACell payload) {
-			AString error=record.checkValue(payload);
-			if (error!=null || payload==null) return error;
-			return itemSet.checkValue(((AHashMap<?,?>)payload).get(ITEMS));
-		}
 
 		void add(long item) { itemSet.add(CVMLong.create(item)); }
 		void remove(long item) { itemSet.remove(CVMLong.create(item)); }

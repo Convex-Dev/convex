@@ -279,11 +279,11 @@ timestamp creates a tie rather than an implicit increment. This keeps time
 policy explicit and reproducible; applications needing ordered delete and
 recreate operations must supply timestamps that express that order.
 
-Compatibility diagnostics are not authorisation. A component may recognise the
-shape of a candidate without accepting its signature, owner or contents. Merge
-must enforce acceptance even if no diagnostic was called. Raw cursor access
-remains trusted application code; component boundaries are not a sandbox between
-code sharing a process.
+Merge is the acceptance boundary for incoming data. Recognising the shape of a
+candidate accepts neither its signature, its owner nor its contents, so each
+component's merge enforces its own rules. Raw cursor access remains trusted
+application code; component boundaries are not a sandbox between code sharing a
+process.
 
 ## Retention, durability and networking
 

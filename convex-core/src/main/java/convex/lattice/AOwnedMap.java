@@ -5,9 +5,7 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.data.AString;
 import convex.core.data.SignedData;
-import convex.core.data.Strings;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.AOwnerLattice;
@@ -72,28 +70,6 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 
 	/** The same owner-bound rule used for delivery, publication and local authoring. */
 	public final SignedLattice<V> signingFor(K owner) { return rule(owner); }
-
-	/**
-	 * Checks container and envelope shape. Signature, owner authorisation and
-	 * payload acceptance remain the merge rule's responsibility.
-	 */
-	@SuppressWarnings("unchecked")
-	@Override public AString checkValue(ACell value) {
-		if (value==null) return null;
-		if (!(value instanceof AMap<?,?> map)) return Strings.create("Expected an owner map");
-		try {
-			if (!owners.checkForeign((M)value)) return Strings.create("Incompatible owner map");
-		} catch (ClassCastException e) {
-			return Strings.create("Incompatible owner map type");
-		}
-		for (var entry:map.entrySet()) {
-			ACell envelope=entry.getValue();
-			if (envelope!=null && !(envelope instanceof SignedData<?>)) {
-				return Strings.create("Expected a signed envelope at "+entry.getKey());
-			}
-		}
-		return null;
-	}
 
 	/** Merges verified envelopes using this component's merge policy. */
 	@Override
