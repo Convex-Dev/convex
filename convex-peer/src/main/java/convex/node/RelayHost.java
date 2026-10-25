@@ -70,25 +70,28 @@ public final class RelayHost {
 
 	/**
 	 * Opens a host over a store as node configuration directs, with no applications
-	 * configured. When configuration permits restore and the store is persistent, the
-	 * retained root is adopted as the initial value; otherwise the host starts at
-	 * {@code initial}. The root supports exclusive transactions when configured.
+	 * configured. With restore enabled, a retained root is adopted as the initial value
+	 * whatever kind of store holds it; with restore disabled, the retained root is
+	 * replaced by {@code initial} at once. The root supports exclusive transactions
+	 * when configured.
 	 *
 	 * @param <V> root value type
-	 * @param initial value used when nothing is restored
+	 * @param initial value used when nothing is restored, or that replaces the retained root
 	 * @param store authoritative cell store
 	 * @param config node configuration, or {@code null} for defaults
 	 * @return host with no applications configured
-	 * @throws IOException if the retained root cannot be read
+	 * @throws IOException if the retained root cannot be read or replaced
 	 */
 	public static <V extends ACell> LatticeHost<V> openHost(V initial,AStore store,
 			NodeConfig config) throws IOException {
 		if (store==null) throw new IllegalArgumentException("Store must not be null");
 		NodeConfig settings=(config==null)?NodeConfig.create():config;
 		V value=initial;
-		if (settings.isRestore() && store.isPersistent()) {
+		if (settings.isRestore()) {
 			V retained=store.getRootData();
 			if (retained!=null) value=retained;
+		} else if (initial!=null) {
+			store.setRootData(initial);
 		}
 		Root<V> storage=settings.isTransactionalRoot()
 			?Cursors.transactionalRoot(value)

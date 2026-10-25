@@ -542,10 +542,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 		synchronized (persistenceLock) {
 			V candidate=(V)value;
 			announced=Cells.announce(candidate,ignored -> {},store);
-			if (config.isPersist()) {
-				store.setRootData(announced);
-				storeDirty=true;
-			}
+			// Persistence is the host's: a host with a store writes its root on every sync,
+			// attached or not. The node's persist setting governs only checkpoints and
+			// snapshot persistence.
+			store.setRootData(announced);
+			storeDirty=true;
 		}
 		if (notify) notifyPropagators(announced);
 		return announced;

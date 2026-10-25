@@ -693,10 +693,15 @@ that store and flush is its durability barrier; persist writes reachable cells
 without selecting a root or moving the cursor. The caller owns and closes the store.
 A node requires a host with a store, because it serves cells to peers from it.
 
-Opening a host restores the retained root, or starts at the supplied initial value,
-by default an empty keyed index, if the store has none. Creating a host deliberately
-starts a fresh root; its first publication replaces any retained root. Applications
-accept a host rather than a store, so this choice belongs to host assembly. Each
+Opening a host adopts the retained root, whatever kind of store holds it, or starts at
+the supplied initial value, by default an empty keyed index, if the store has none.
+Creating a host is for a store that holds no root yet; over a store that already does,
+it is refused rather than allowed to overwrite retained state on its first
+publication. Starting again over such a store is explicit: `replace` writes the
+initial value as the store root at once. Persistence itself is the host's: a host with
+a store writes its root on every sync, whether or not a node is attached, and node
+configuration decides only when the node checkpoints. Applications accept a host
+rather than a store, so these choices belong to host assembly. Each
 application supplies its own component behaviour. An application may override `merge` to hand
 subtrees to components with their own merge rules and discard the rest; verification
 must still use the owner-bound rules for the paths it publishes. Merging keeps the

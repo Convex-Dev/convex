@@ -301,7 +301,12 @@ of applications that receive incoming values. It has no lattice: it never merges
 its own, an unconfigured host ignores incoming values, and its sync is a plain
 compare-and-set that leaves a racing write pending for the next sync (entry 6).
 Without a store, persist returns its input and flush is a no-op; a networked node
-still requires a store.
+still requires a store. Persistence is the host's: a host with a store writes its
+root on every sync, attached to a node or not, and the node's `persist` setting
+governs only checkpoints and snapshot persistence. One restore rule: `open` adopts a
+retained root from any kind of store, `create` refuses a store that already holds a
+root, and `replace` discards one explicitly by writing the initial value at once;
+the relay assembly maps `restore=false` to that replacement.
 
 The host is the root of the component tree: its merge behaviour is delivery to its
 applications, and `mergeAt` hands a path delivery on the same way. A host fork,

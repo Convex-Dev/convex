@@ -50,10 +50,16 @@ public class NodeConfig {
 	 */
 	public static final AString PORT = Strings.intern("port");
 
-	/** Whether to persist state to store (Boolean, default true). */
+	/**
+	 * Whether the node checkpoints its store and persists snapshots (Boolean, default
+	 * true). The host writes its root on every sync whatever this setting.
+	 */
 	public static final AString PERSIST = Strings.intern("persist");
 
-	/** Whether to restore the retained root from the store when the host is opened (Boolean, default true). */
+	/**
+	 * Whether a retained root is adopted when the host is opened (Boolean, default
+	 * true); when false the retained root is replaced by the initial value.
+	 */
 	public static final AString RESTORE = Strings.intern("restore");
 
 	/** Enable coordinated root writes, exclusive transactions and serial fallback (default false). */
@@ -245,16 +251,19 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Returns whether authoritative state is persisted to the node store.
+	 * Returns whether the node checkpoints its store, completes the durability barrier
+	 * at close and persists snapshots. A host with a store writes its root on every
+	 * sync whatever this setting; an ephemeral node uses a memory store.
 	 *
-	 * @return {@code true} when persistence is enabled
+	 * @return {@code true} when node checkpoints are enabled
 	 */
 	public boolean isPersist() {
 		return getBool(PERSIST, true);
 	}
 
 	/**
-	 * Returns whether the retained root is restored from the node store when the host is opened.
+	 * Returns whether a retained root is adopted when the host is opened. When false,
+	 * host assembly replaces the retained root with the initial value at once.
 	 *
 	 * @return {@code true} when restoration is enabled
 	 */

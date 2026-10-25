@@ -85,11 +85,14 @@ durability barrier. The applications' lattices decide what the snapshot changes,
 and an application may keep its result private until its own sync. The method is
 intended for host-controlled persistence, not network ingress.
 
-When `persist` is false, node publication still announces cells to the store so
-the current cursor has valid store-backed references, but does not retain the
-root pointer or schedule durability work. `restore` is honoured when the host is
-assembled: `RelayHost.open` adopts an existing persistent root as the initial
-value. The node itself never reloads the store.
+Persistence is the host's: a host with a store writes its root on every sync,
+whether or not a node is attached. When `persist` is false the node still
+publishes through the host, so the root pointer moves, but the node never
+checkpoints: no durability barrier runs on an interval, at close or from the
+shutdown hook, and `persistSnapshot` is a no-op. An ephemeral node uses a memory
+store. `restore` is honoured when the host is assembled: `RelayHost.openHost`
+adopts a retained root from any kind of store, and with `restore` false replaces
+it with the initial value at once. The node itself never reloads the store.
 
 ## Ordering
 

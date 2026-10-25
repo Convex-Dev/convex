@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -100,6 +101,37 @@ public class HostStoresTest {
 		assertSame(store,root.store());
 	}
 
+	/** One restore rule: open adopts, create refuses a retained root, replace discards it explicitly. */
+	@Test
+	public void testCreateRefusesAStoreThatHoldsARoot() throws Exception {
+		try (MemoryStore store=new MemoryStore()) {
+			LatticeHost<ASet<ACell>> first=LatticeHost.create(SetLattice.create().zero(),store);
+			first.cursor().updateAndGet(values->values.include(CVMLong.ONE));
+			first.sync();
+			assertEquals(Sets.of(1),store.getRootData(),"the first host wrote its root on sync");
+			assertThrows(IllegalStateException.class,
+				() -> LatticeHost.create(SetLattice.create().zero(),store),
+				"a host is never created over a retained root");
+			assertThrows(IllegalStateException.class,() -> LatticeHost.create(store));
+			assertEquals(Sets.of(1),LatticeHost.open(SetLattice.create().zero(),store).cursor().get(),
+				"open adopts the retained root, from a memory store too");
+		}
+	}
+
+	@Test
+	public void testReplaceDiscardsTheRetainedRootAtOnce() throws Exception {
+		try (MemoryStore store=new MemoryStore()) {
+			LatticeHost<ASet<ACell>> first=LatticeHost.create(SetLattice.create().zero(),store);
+			first.cursor().updateAndGet(values->values.include(CVMLong.ONE));
+			first.sync();
+			LatticeHost<ASet<CVMLong>> fresh=LatticeHost.replace(Sets.of(CVMLong.TWO),store);
+			assertEquals(Sets.of(2),store.getRootData(),"replace writes the new root immediately");
+			assertEquals(Sets.of(2),fresh.cursor().get());
+			assertEquals(Sets.of(2),LatticeHost.open(SetLattice.create().zero(),store).cursor().get());
+			assertThrows(NullPointerException.class,() -> LatticeHost.replace(null,store));
+		}
+	}
+
 	@Test
 	public void testFlushDelegatesToStore() throws Exception {
 		try (FlushStore store=new FlushStore()) {
@@ -154,7 +186,7 @@ public class HostStoresTest {
 
 	@ParameterizedTest
 	@EnumSource(StoreType.class)
-	void createOpenPersistAndSyncHaveDistinctEffects(StoreType type) throws Exception {
+	void openReplacePersistAndSyncHaveDistinctEffects(StoreType type) throws Exception {
 		try (var store=type.open()) {
 			var initial=Sets.<ACell>of(CVMLong.ONE);
 			var retained=Sets.<ACell>of(CVMLong.TWO);
@@ -165,9 +197,11 @@ public class HostStoresTest {
 			assertSame(store,restored.store());
 			assertEquals(retained,restored.cursor().get(),"Open restores instead of using the fallback");
 
-			var fresh=LatticeHost.create(initial,store);
+			assertThrows(IllegalStateException.class,() -> LatticeHost.create(initial,store),
+				"Create refuses a store that already holds a root");
+			var fresh=LatticeHost.replace(initial,store);
 			assertEquals(initial,fresh.cursor().get());
-			assertEquals(retained,store.getRootData(),"Create does not overwrite until sync");
+			assertEquals(initial,store.getRootData(),"Replace writes the new root at once");
 			var blob=Blobs.createRandom(new Random(7310),5000);
 			var updated=initial.include(blob);
 			fresh.cursor().set(updated);
@@ -175,7 +209,7 @@ public class HostStoresTest {
 			assertSame(updated,fresh.cursor().get(),"Persist does not replace the working cursor");
 			var branch=blob.getRef(0);
 			assertEquals(branch.getValue(),store.refForHash(branch.getHash()).getValue());
-			assertEquals(retained,store.getRootData(),"Persist stores cells without selecting the root");
+			assertEquals(initial,store.getRootData(),"Persist stores cells without selecting the root");
 			assertEquals(updated,fresh.sync());
 			assertEquals(updated,store.getRootData());
 			fresh.flush();

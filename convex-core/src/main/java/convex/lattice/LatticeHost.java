@@ -80,14 +80,53 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 		return create(null);
 	}
 
-	/** Creates a fresh global host with an empty keyed root. Does not restore the store. */
+	/** Creates a fresh global host with an empty keyed root over a store that holds no root yet. */
 	public static LatticeHost<Index<Keyword,ACell>> create(AStore store) {
 		return create(Index.none(),store);
 	}
 
-	/** Creates a fresh host with an explicit initial value, including non-map local roots. */
+	/**
+	 * Creates a fresh host with an explicit initial value, including non-map local
+	 * roots. The store, if any, must hold no root yet: a retained root is adopted with
+	 * {@link #open(ACell, AStore)} or discarded explicitly with
+	 * {@link #replace(ACell, AStore)}, never overwritten by accident.
+	 *
+	 * @throws IllegalStateException if the store already holds a root
+	 */
 	public static <V extends ACell> LatticeHost<V> create(V initialValue, AStore store) {
+		if (store!=null && retainedRoot(store)!=null) {
+			throw new IllegalStateException("Store already holds a root: open it, or replace it explicitly");
+		}
 		return new LatticeHost<>(Cursors.root(initialValue),store);
+	}
+
+	/**
+	 * Starts a fresh host over a store, discarding any retained root: the initial value
+	 * is written as the store root at once. This is the one way to start again over a
+	 * store that already holds state.
+	 *
+	 * @param initialValue Root the host starts from and the store now holds; not null
+	 * @param store Store whose retained root is replaced, or null for in-memory operation
+	 * @return Host over the initial value
+	 */
+	public static <V extends ACell> LatticeHost<V> replace(V initialValue, AStore store) {
+		Objects.requireNonNull(initialValue,"Replacement root must not be null");
+		if (store!=null) {
+			try {
+				store.setRootData(initialValue);
+			} catch (IOException e) {
+				throw new StoreException("Lattice host could not replace the retained root",e);
+			}
+		}
+		return new LatticeHost<>(Cursors.root(initialValue),store);
+	}
+
+	private static <T extends ACell> T retainedRoot(AStore store) {
+		try {
+			return store.getRootData();
+		} catch (IOException e) {
+			throw new StoreException("Lattice host could not read the retained root",e);
+		}
 	}
 
 	/** Opens the retained global root, or an empty keyed root if none is retained. */
@@ -102,7 +141,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 */
 	public static <V extends ACell> LatticeHost<V> open(V initialValue, AStore store) throws IOException {
 		V retained=(store==null)?null:store.getRootData();
-		return create(retained==null?initialValue:retained,store);
+		return new LatticeHost<>(Cursors.root(retained==null?initialValue:retained),store);
 	}
 
 	/** Returns the host store, or null for in-memory operation. The caller owns its lifecycle. */

@@ -357,17 +357,19 @@ public class NodeServerPersistenceTest {
 	}
 
 	/**
-	 * Test that persist=false prevents writing to store.
+	 * persist=false disables the node's checkpoints, not the host's persistence: the
+	 * host still writes its root on every sync, so the value survives a restart.
 	 */
 	@Test
-	public void testPersistDisabled() throws Exception {
-		// Launch with persist=false
+	public void testPersistDisabledSkipsCheckpointsOnly() throws Exception {
 		NodeConfig noPersist = NodeConfig.create(Maps.of(NodeConfig.PERSIST, CVMBool.FALSE));
 		primary = node(primaryStore, noPersist);
 		primary.launch();
 
-		// Write data
 		writeDataValue(primary, 888);
+		primary.getHost().sync();
+		assertEquals(primary.getLocalValue(), primaryStore.getRootData(), "the host wrote its root on sync");
+		assertFalse(primary.checkpoint(), "persist=false means the node never checkpoints");
 		primary.close();
 		primary = null;
 
@@ -375,16 +377,18 @@ public class NodeServerPersistenceTest {
 		primary = node(primaryStore);
 		primary.launch();
 
-		// Value should NOT be there (was never persisted)
-		assertNull(readDataValue(primary, 888),
-			"Value should not survive restart when persist=false");
+		assertEquals(CVMLong.create(888), readDataValue(primary, 888),
+			"Persistence is the host's; the value survives a restart");
 	}
 
+
 	/**
-	 * Test with MemoryStore — persist/restore are no-ops, no errors.
+	 * A memory store holds its root like any other store while it exists: a node
+	 * reopened over the same store adopts it. The store simply does not survive the
+	 * process, and the node never checkpoints a store that is not persistent.
 	 */
 	@Test
-	public void testMemoryStoreNoPersistence() throws Exception {
+	public void testMemoryStoreRetainsWithinTheProcess() throws Exception {
 		primaryStore = new MemoryStore();
 
 		primary = node(primaryStore);
@@ -392,15 +396,15 @@ public class NodeServerPersistenceTest {
 
 		writeDataValue(primary, 555);
 		assertEquals(CVMLong.create(555), readDataValue(primary, 555));
+		assertFalse(primary.checkpoint(), "a memory store is never checkpointed");
 
-		// Close and restart — value should be gone
 		primary.close();
 		primary = null;
 
 		primary = node(primaryStore);
 		primary.launch();
-		assertNull(readDataValue(primary, 555),
-			"MemoryStore should not persist data across restarts");
+		assertEquals(CVMLong.create(555), readDataValue(primary, 555),
+			"the same memory store still holds the root, so reopening adopts it");
 	}
 
 	/**
