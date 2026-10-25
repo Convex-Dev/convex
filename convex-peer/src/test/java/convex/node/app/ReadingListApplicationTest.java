@@ -126,6 +126,31 @@ class ReadingListApplicationTest {
 		}
 	}
 
+	/** Adding and removing TCP networking does not change what saving means. */
+	@Test void applicationSavesBeforeDuringAndAfterNetworkAttachment() throws Exception {
+		try (var store=EtchStore.createTemp("reading-list-lifecycle")) {
+			var host=LatticeHost.open(store);
+			var app=host.addApplication(new ReadingListApp(host));
+			app.recommend("The Dispossessed");
+			app.sync();
+			host.checkpoint();
+			try (var network=new LatticeNode<>(host,NodeConfig.port(0)).launch()) {
+				app.recommend("A Wizard of Earthsea");
+				app.sync();
+				host.checkpoint();
+				app.recommend("The Left Hand of Darkness");
+				app.sync(); // Published to the host, but not saved or shared yet.
+			}
+			var retained=LatticeHost.open(store);
+			var reader=retained.addApplication(new ReadingListApp(retained));
+			assertEquals(Sets.of("The Dispossessed","A Wizard of Earthsea"),reader.titles(),
+				"Closing networking must not accept a pending host save");
+			host.checkpoint();
+			var reopened=LatticeHost.open(store);
+			assertEquals(app.titles(),new ReadingListApp(reopened).titles());
+		}
+	}
+
 	/** Waits for this exact snapshot; this scenario makes no further edits while waiting. */
 	private static void awaitAnnounced(LatticePropagator group,ACell expected) throws Exception {
 		long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);

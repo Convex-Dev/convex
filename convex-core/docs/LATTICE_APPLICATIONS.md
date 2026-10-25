@@ -703,8 +703,8 @@ Creating a host is for a store that holds no root yet; over a store that already
 it is refused rather than allowed to overwrite retained state on its first
 publication. Starting again over such a store is explicit: `replace` writes the
 initial value as the store root at once. Persistence itself is the host's: a host with
-a store writes its root on every sync, whether or not a node is attached, and node
-configuration decides only when the node checkpoints. Applications accept a host
+a store writes its root on every sync, whether or not a node is attached. The
+owning service chooses host checkpoints or scoped automatic flushing. Applications accept a host
 rather than a store, so these choices belong to host assembly. Each
 application supplies its own component behaviour. An application may override `merge` to hand
 subtrees to components with their own merge rules and discard the rest; verification
@@ -1486,8 +1486,9 @@ A basic installation should need only the application setup, a store and optiona
 network settings: standard setup assembles the host, the receiving applications and
 ordinary propagation, restores the retained root before constructing applications,
 configures receivers before accepting traffic and starts transports last. Shutdown
-stops incoming traffic, publishes and flushes already-published host state and never
-forces private drafts to publish. `RelayHost.open` is the first step in that
+stops incoming traffic and explicitly saves accepted host state before closing the
+store. Closing networking neither publishes pending host state nor flushes the
+store, and never forces private drafts to publish. `RelayHost.open` is the first step in that
 direction.
 
 **Design decision:** applications always initiate their own publication. Incoming

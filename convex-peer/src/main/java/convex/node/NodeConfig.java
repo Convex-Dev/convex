@@ -51,9 +51,9 @@ public class NodeConfig {
 	public static final AString PORT = Strings.intern("port");
 
 	/**
-	 * Whether the node checkpoints its store and persists snapshots (Boolean, default
-	 * true). The host writes its root on every sync whatever this setting.
+	 * @deprecated Durability belongs to the host/service. This setting is no longer consumed.
 	 */
+	@Deprecated
 	public static final AString PERSIST = Strings.intern("persist");
 
 	/**
@@ -65,7 +65,8 @@ public class NodeConfig {
 	/** Enable coordinated root writes, exclusive transactions and serial fallback (default false). */
 	public static final AString TRANSACTIONAL_ROOT = Strings.intern("transactionalRoot");
 
-	/** Interval between periodic persistence runs in milliseconds (Long, default 30000). */
+	/** @deprecated Use {@link convex.lattice.LatticeHost#autoFlush} in the owning service. */
+	@Deprecated
 	public static final AString PERSIST_INTERVAL = Strings.intern("persistInterval");
 
 	/** Optional advertised URL consumed by a discovery adapter (AString).

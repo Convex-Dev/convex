@@ -162,7 +162,7 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 | `Convex` | Client API (`convex.api`) for queries and transactions against a peer |
 | `ConnectionManager` | Manages peer-to-peer network connections |
 | `BeliefPropagator` | Handles CPoS belief propagation protocol |
-| `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost`, owning node-root persistence and group notifications |
+| `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost` and notifies propagation groups |
 | `LatticeNode` | Optional TCP networking for a host: owns the server, listener and dynamic propagation groups |
 | `LatticeListener` | Application-owned inbound TCP transport and connection-to-group router |
 | `LatticePropagator` | Owns one filtered serving view, protocol endpoint and external route set |
@@ -173,7 +173,7 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 Alongside the consensus peer, this module provides a lightweight node server
 for lattice data regions — values that merge like CRDTs rather than passing
 through CPoS consensus. `NodeServer` (in `convex.node`) replicates an assembled
-`LatticeHost` and owns node-root persistence, while the host's applications own
+`LatticeHost`, which owns persistence and durability, while its applications own
 merge semantics; `LatticePropagator` handles CAD036 messages and routes; and the
 application-owned `LatticeListener` provides the standard inbound TCP transport.
 None interprets application paths or records; the `convex-p2p` module layers
@@ -215,7 +215,7 @@ The underlying components remain available for custom transport assembly:
   then call `launch()`.
 - **Transport composition** - Create `LatticeListener` separately, register the
   eligible propagators, install a selector, and close it before `NodeServer`.
-- **Configuration** - `NodeConfig` contains node persistence, standard
+- **Configuration** - `NodeConfig` contains standard
   listener and application advertisement settings, but each component consumes
   only its own fields. Each independently
   constructed `LatticePropagatorConfig` controls one group's routes, protocol

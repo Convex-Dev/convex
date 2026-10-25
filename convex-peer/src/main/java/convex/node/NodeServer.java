@@ -16,24 +16,22 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.data.ACell;
-import convex.core.data.Cells;
 import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.util.Shutdown;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Replicates one host's published root and keeps it durable.
+ * Replicates one host's published root.
  *
  * <p>{@code NodeServer} is replication only. It hands incoming values to its
  * {@link LatticeHost}, which delegates them to the applications configured to
  * receive them, and it publishes the host's root to its propagation groups. It
  * holds no lattice, no merge policy and no applications of its own: assemble the
  * host and its applications first, for example with {@link RelayHost}, then
- * construct the node from the host. The node owns host-root publication,
- * persistence and update notification. It does not own peer sets, connection
+ * construct the node from the host. The host owns retention and durability;
+ * the node owns replication notification. It does not own peer sets, connection
  * trust, protocol decoding, missing-cell acquisition, publication filtering,
  * sockets or transport lifecycle. Those are policies and
  * resources of {@link LatticePropagator} and application-owned transports such as
@@ -55,7 +53,7 @@ import convex.lattice.cursor.AForkableCursor;
  * <p><b>Failure isolation.</b> Host-root publication is the mandatory part of a
  * host sync. Propagator initialisation, notification, worker and shutdown
  * failures are contained and logged independently; one propagation policy group
- * cannot fail a host sync, the server maintenance loop or another group. Only
+ * cannot fail a host sync or another group. Only
  * failures of the node store are surfaced by this class; transport failures
  * remain visible to their application owner.</p>
  *
@@ -73,15 +71,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private volatile List<LatticePropagator> propagators=List.of();
 	private final Set<LatticePropagator> attachedPropagators=ConcurrentHashMap.newKeySet();
 
-	/** Serialises all authoritative cell announcement, root-pointer and flush work. */
-	private final Object persistenceLock=new Object();
-	private boolean storeDirty;
-
 	private final Function<V,V> publisher=this::publishApplicationRoot;
-	private Thread maintenanceThread;
-	private final Object maintenanceSignal=new Object();
-	private final Runnable shutdownHook=this::shutdownPersist;
-	private boolean shutdownHookRegistered;
 
 	/** Complete lifecycle for resources owned by the node host. */
 	enum LifecycleState {
@@ -100,7 +90,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * callback, leaving the host available for local use or another server.
 	 *
 	 * @param host assembled host with a non-null cell store
-	 * @param config node persistence configuration, or {@code null} for defaults
+	 * @param config node transport configuration, or {@code null} for defaults
 	 */
 	public NodeServer(LatticeHost<V> host,NodeConfig config) {
 		this.host=Objects.requireNonNull(host,"Host must not be null");
@@ -116,7 +106,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Publishes the host's current root, starts every attached policy group
-	 * independently, then starts persistence maintenance.
+	 * independently. The host owner decides when to flush the retained state.
 	 *
 	 * @throws IOException if node store initialisation fails
 	 */
@@ -127,8 +117,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			configurePublicationPipeline();
 			seedPropagationViews();
 			startPropagationServices();
-			startMaintenanceService();
-			registerShutdownPersistenceHook();
 			lifecycleState=LifecycleState.RUNNING;
 			log.debug("NodeServer started with {} propagation group(s)",
 				propagators.size());
@@ -157,7 +145,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			runIsolated(propagator,"initial view materialisation",
 				() -> propagator.processSnapshot(announced));
 		}
-		if (config.isPersist()) checkpoint();
 	}
 
 	private void startPropagationServices() {
@@ -168,7 +155,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private void abortFailedLaunch(Throwable failure) {
 		lifecycleState=LifecycleState.STOPPING;
-		stopMaintenance();
 		for (LatticePropagator propagator:propagators) {
 			try {
 				propagator.close();
@@ -177,7 +163,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			}
 		}
 		lifecycleState=LifecycleState.STOPPED;
-		removeShutdownHook();
 		host.detachPublisher(publisher);
 	}
 
@@ -513,13 +498,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	private V publishApplicationRoot(V value,boolean notify) {
-		try {
-			@SuppressWarnings("unchecked")
-			V announced=(V)publishAuthoritativeRoot(value,notify);
-			return announced;
-		} catch (IOException e) {
-			throw new StoreException("NodeServer sync failed: persistence error",e);
-		}
+		if (notify) notifyPropagators(value);
+		return value;
 	}
 
 	/** Publishes already-installed host state through the same ordered sync as
@@ -532,24 +512,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			if (e.getCause() instanceof IOException cause) throw cause;
 			throw e;
 		}
-	}
-
-	/** Called within the host's ordered sync. The persistence lock also
-	 * excludes checkpoints from cell announcement and the root-pointer write. */
-	@SuppressWarnings("unchecked")
-	private ACell publishAuthoritativeRoot(ACell value,boolean notify) throws IOException {
-		ACell announced;
-		synchronized (persistenceLock) {
-			V candidate=(V)value;
-			announced=Cells.announce(candidate,ignored -> {},store);
-			// Persistence is the host's: a host with a store writes its root on every sync,
-			// attached or not. The node's persist setting governs only checkpoints and
-			// snapshot persistence.
-			store.setRootData(announced);
-			storeDirty=true;
-		}
-		if (notify) notifyPropagators(announced);
-		return announced;
 	}
 
 	private void notifyPropagators(ACell value) {
@@ -620,110 +582,39 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Delivers a snapshot through root merge, then publishes and durably flushes
-	 * already-published host state without notifying propagation groups. Configured
+	 * already-published host state through the normal replication policy. Configured
 	 * applications may retain the merged snapshot privately until their own sync;
 	 * this method never invokes application publication. Without applications,
 	 * current local state wins ties against the supplied snapshot.
 	 *
 	 * @param value snapshot candidate to persist; {@code null} is ignored
 	 * @throws IOException if publication or the durability barrier fails
+	 * @deprecated Deliver explicitly through the host, then call {@link LatticeHost#checkpoint()}.
 	 */
+	@Deprecated
 	@SuppressWarnings("unchecked")
 	public void persistSnapshot(ACell value) throws IOException {
-		if (!config.isPersist() || value==null) return;
+		if (value==null) return;
 		host.merge((V)value);
-		syncSnapshot(false);
-		checkpoint();
+		host.checkpoint();
 	}
 
 	/**
-	 * Completes a durability barrier for a dirty persistent node store.
+	 * Completes the host store's durability barrier without publishing pending edits.
 	 *
 	 * @return {@code true} if the store was flushed
 	 * @throws IOException if the durability barrier fails
+	 * @deprecated Call {@link LatticeHost#flush()} or {@link LatticeHost#checkpoint()} explicitly.
 	 */
+	@Deprecated
 	public boolean checkpoint() throws IOException {
-		if (!config.isPersist() || !store.isPersistent()) return false;
-		synchronized (persistenceLock) {
-			if (!storeDirty) return false;
-			store.flush();
-			storeDirty=false;
-			return true;
-		}
-	}
-
-	private void startMaintenanceService() {
-		if (!config.isPersist() || !store.isPersistent() || config.getPersistInterval()<=0L) return;
-		maintenanceThread=Thread.ofVirtual().name("NodeServer persistence maintenance")
-			.start(this::maintenanceLoop);
-	}
-
-	private void maintenanceLoop() {
-		long interval=config.getPersistInterval();
-		while (lifecycleState==LifecycleState.STARTING || lifecycleState==LifecycleState.RUNNING) {
-			try {
-				synchronized (maintenanceSignal) {
-					if (lifecycleState==LifecycleState.STARTING
-							|| lifecycleState==LifecycleState.RUNNING) {
-						maintenanceSignal.wait(interval);
-					}
-				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return;
-			}
-			if (lifecycleState!=LifecycleState.STARTING && lifecycleState!=LifecycleState.RUNNING) return;
-			try {
-				checkpoint();
-			} catch (IOException e) {
-				log.warn("Periodic authoritative-store checkpoint failed; will retry",e);
-			} catch (RuntimeException | StackOverflowError e) {
-				log.warn("Contained authoritative-store maintenance failure; will retry",e);
-			}
-		}
-	}
-
-	private void stopMaintenance() {
-		Thread maintenance=maintenanceThread;
-		if (maintenance==null) return;
-		synchronized (maintenanceSignal) {
-			maintenanceSignal.notifyAll();
-		}
-		try {
-			maintenance.join();
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			log.warn("Interrupted while stopping NodeServer persistence maintenance",e);
-		}
-		maintenanceThread=null;
-	}
-
-	private void registerShutdownPersistenceHook() {
-		Shutdown.addHook(Shutdown.SERVER,shutdownHook);
-		shutdownHookRegistered=true;
-	}
-
-	private void removeShutdownHook() {
-		if (!shutdownHookRegistered) return;
-		Shutdown.removeHook(Shutdown.SERVER,shutdownHook);
-		shutdownHookRegistered=false;
-	}
-
-	private void shutdownPersist() {
-		LifecycleState state=lifecycleState;
-		if (state==LifecycleState.NEW || state==LifecycleState.STOPPED) return;
-		try {
-			close();
-		} catch (IOException e) {
-			log.warn("Error during NodeServer shutdown persistence",e);
-		}
+		host.flush();
+		return store.isPersistent();
 	}
 
 	/**
-	 * Drains each group independently, publishes the final host root and
-	 * completes the node-store durability barrier.
-	 *
-	 * @throws IOException if final publication or persistence fails
+	 * Drains each group independently. Does not publish pending host edits or
+	 * flush its store; saving belongs to the owning host/service lifecycle.
 	 */
 	@Override
 	public synchronized void close() throws IOException {
@@ -751,35 +642,16 @@ public class NodeServer<V extends ACell> implements Closeable {
 				"Cannot close NodeServer re-entrantly while launch is in progress");
 		}
 		lifecycleState=LifecycleState.STOPPING;
-		stopMaintenance();
 
 		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"ingress drain",propagator::stopIngress);
 		}
 
-		IOException nodeFailure=null;
-		ACell finalRoot=cursor.get();
-		try {
-			finalRoot=syncSnapshot(true);
-		} catch (IOException e) {
-			nodeFailure=new IOException("Unable to publish final host root",e);
-		}
-
-		ACell snapshot=finalRoot;
 		for (LatticePropagator propagator:propagators) {
-			runIsolated(propagator,"shutdown",() -> propagator.triggerAndClose(snapshot));
-		}
-
-		try {
-			checkpoint();
-		} catch (IOException e) {
-			if (nodeFailure==null) nodeFailure=e;
-			else nodeFailure.addSuppressed(e);
+			runIsolated(propagator,"shutdown",propagator::close);
 		}
 
 		lifecycleState=LifecycleState.STOPPED;
-		removeShutdownHook();
 		log.debug("NodeServer closed");
-		if (nodeFailure!=null) throw nodeFailure;
 	}
 }

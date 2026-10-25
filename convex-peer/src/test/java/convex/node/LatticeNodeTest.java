@@ -176,7 +176,7 @@ class LatticeNodeTest {
 		}
 	}
 
-	/** Failures during initial or final root publication must release the attachment too. */
+	/** Failed publication releases attachments; network close needs no working store. */
 	@Test void persistenceFailuresReleaseTheHost() throws Exception {
 		class FailingStore extends MemoryStore {
 			boolean fail;
@@ -197,7 +197,7 @@ class LatticeNodeTest {
 				assertThrows(StoreException.class,() -> server.addPropagator(rejected));
 				assertTrue(server.getPropagators().isEmpty(),"Failed dynamic attachment does not leave an orphan group");
 				assertFalse(rejected.isRunning());
-				assertThrows(IOException.class,server::close);
+				server.close();
 				store.fail=false;
 				try (var replacement=new NodeServer<>(host)) {
 					replacement.launch();

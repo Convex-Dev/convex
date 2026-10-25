@@ -123,7 +123,7 @@ public class NodePublicationTest {
 	}
 
 	@Test
-	public void testExplicitSnapshotInstallsEtchRefsWithoutNotification() throws Exception {
+	public void testCheckpointInstallsEtchRefsAndNotifiesReplication() throws Exception {
 		try (EtchStore store=EtchStore.createTemp("node-explicit-refs");
 				MemoryStore viewStore=new MemoryStore();
 				NodeServer<ASet<Blob>> node=new NodeServer<>(RelayHost.open(SetLattice.<Blob>create(),store,null))) {
@@ -140,10 +140,10 @@ public class NodePublicationTest {
 			ACell published=store.getRootData();
 			assertSame(published,node.getLocalValue());
 			assertTrue(assertSoftBranches(published,store)>0);
-			assertEquals(0,notifications.get());
+			assertEquals(1,notifications.get());
 
 			assertSame(published,node.getHost().sync());
-			assertEquals(1,notifications.get(),"explicit persistence must not replace the normal sync policy");
+			assertEquals(2,notifications.get(),"checkpoint keeps the normal host publication policy");
 		}
 	}
 

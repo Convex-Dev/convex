@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -259,7 +260,7 @@ public class NodeServerPersistenceTest {
 	 * Helper: explicitly persist the current value.
 	 */
 	private void persistCurrent(NodeServer<?> server) throws IOException {
-		server.persistSnapshot(server.getLocalValue());
+		server.getHost().checkpoint();
 	}
 
 	/** Adds enough small values to ensure the {@code :data} child is non-embedded. */
@@ -311,7 +312,9 @@ public class NodeServerPersistenceTest {
 		assertEquals(CVMLong.create(42), readDataValue(backup, 42));
 		assertEquals(CVMLong.create(99), readDataValue(backup, 99));
 
-		// Close both (triggers final persist)
+		// The service saves explicitly before closing its networking.
+		primary.getHost().checkpoint();
+		backup.getHost().checkpoint();
 		primary.close();
 		backup.close();
 		primary = null;
@@ -369,7 +372,7 @@ public class NodeServerPersistenceTest {
 		writeDataValue(primary, 888);
 		primary.getHost().sync();
 		assertEquals(primary.getLocalValue(), primaryStore.getRootData(), "the host wrote its root on sync");
-		assertFalse(primary.checkpoint(), "persist=false means the node never checkpoints");
+		primary.getHost().checkpoint(); // Node configuration cannot disable an explicit host barrier.
 		primary.close();
 		primary = null;
 
@@ -396,7 +399,7 @@ public class NodeServerPersistenceTest {
 
 		writeDataValue(primary, 555);
 		assertEquals(CVMLong.create(555), readDataValue(primary, 555));
-		assertFalse(primary.checkpoint(), "a memory store is never checkpointed");
+		primary.getHost().checkpoint(); // Retains state for this process only.
 
 		primary.close();
 		primary = null;
@@ -418,6 +421,7 @@ public class NodeServerPersistenceTest {
 		primary.launch();
 		writeDataValue(primary, 100);
 		writeDataValue(primary, 200);
+		primary.getHost().checkpoint();
 		primary.close();
 		primary = null;
 
@@ -672,18 +676,20 @@ public class NodeServerPersistenceTest {
 	}
 
 	@Test
-	public void testLaunchCompletesInitialCheckpoint() throws Exception {
+	public void testLaunchLeavesDurabilityToTheHostOwner() throws Exception {
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
 		primary=node(primaryStore,NodeConfig.port(-1));
 
 		primary.launch();
 
-		assertEquals(1,flushes.get(),"launch must checkpoint the initial published root");
+		assertEquals(0,flushes.get(),"network launch does not choose a durability policy");
+		primary.getHost().checkpoint();
+		assertEquals(1,flushes.get());
 	}
 
 	@Test
-	public void testExplicitCheckpointCoalescesCleanStore() throws Exception {
+	public void testExplicitHostCheckpointFlushesItsSnapshot() throws Exception {
 		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		AtomicInteger flushes=new AtomicInteger();
@@ -691,8 +697,7 @@ public class NodeServerPersistenceTest {
 		writeDataValue(primary,102);
 		primary.getHost().sync();
 
-		assertTrue(primary.checkpoint());
-		assertFalse(primary.checkpoint(),"a clean store must not be flushed again");
+		assertEquals(primary.getLocalValue(),primary.getHost().checkpoint());
 		assertEquals(1,flushes.get());
 	}
 
@@ -707,10 +712,9 @@ public class NodeServerPersistenceTest {
 			if (attempts.incrementAndGet()==1) throw new IOException("simulated checkpoint failure");
 		});
 
-		IOException failure=assertThrows(IOException.class,primary::checkpoint);
+		IOException failure=assertThrows(IOException.class,primary.getHost()::checkpoint);
 		assertEquals("simulated checkpoint failure",failure.getMessage());
-		assertTrue(primary.checkpoint(),"a failed barrier must leave the store dirty");
-		assertFalse(primary.checkpoint());
+		primary.getHost().checkpoint();
 		assertEquals(2,attempts.get());
 	}
 
@@ -730,8 +734,10 @@ public class NodeServerPersistenceTest {
 		writeDataValue(primary,104);
 		primary.getHost().sync();
 
-		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint signal not received");
-		assertEquals(1,flushes.get());
+		try (var durability=primary.getHost().autoFlush(Duration.ofMillis(20))) {
+			assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint signal not received");
+		}
+		assertTrue(flushes.get()>=2,"periodic flush and final barrier both complete");
 	}
 
 	@Test
@@ -750,8 +756,12 @@ public class NodeServerPersistenceTest {
 		writeDataValue(primary,107);
 		primary.getHost().sync();
 
-		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint retry not received");
-		assertEquals(2,attempts.get());
+		try (var durability=primary.getHost().autoFlush(Duration.ofMillis(20))) {
+			assertEquals("simulated periodic failure",durability.failure().toCompletableFuture()
+				.get(2,TimeUnit.SECONDS).getMessage());
+			assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint retry not received");
+		}
+		assertTrue(attempts.get()>=3,"failed attempt, retry and final barrier");
 	}
 
 	@Test
@@ -767,11 +777,13 @@ public class NodeServerPersistenceTest {
 		writeDataValue(primary,108);
 		primary.getHost().sync();
 
-		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"custom primary was not checkpointed");
+		try (var durability=primary.getHost().autoFlush(Duration.ofMillis(20))) {
+			assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"custom primary was not checkpointed");
+		}
 	}
 
 	@Test
-	public void testCloseCompletesFinalCheckpoint() throws Exception {
+	public void testCloseDoesNotPublishOrFlushPendingHostState() throws Exception {
 		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		AtomicInteger flushes=new AtomicInteger();
@@ -780,13 +792,15 @@ public class NodeServerPersistenceTest {
 
 		primary.close();
 
-		assertEquals(1,flushes.get());
+		assertEquals(0,flushes.get());
 		assertNotNull(readDataValue(primary,105));
-		assertNotNull(RT.getIn(primaryStore.getRootData(),Keyword.intern("data"),Hash.get(CVMLong.create(105))));
+		assertNull(RT.getIn(primaryStore.getRootData(),Keyword.intern("data"),Hash.get(CVMLong.create(105))));
+		primary.getHost().checkpoint();
+		assertEquals(1,flushes.get());
 	}
 
 	@Test
-	public void testCloseSurfacesFinalCheckpointFailureAfterStopping() throws Exception {
+	public void testServiceCanReportFinalCheckpointFailureAfterStoppingNetworking() throws Exception {
 		primary=node(primaryStore,NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary,106);
@@ -794,7 +808,8 @@ public class NodeServerPersistenceTest {
 			throw new IOException("simulated final checkpoint failure");
 		});
 
-		IOException failure=assertThrows(IOException.class,primary::close);
+		primary.close();
+		IOException failure=assertThrows(IOException.class,primary.getHost()::checkpoint);
 		sharedPrimaryStore.setFlushHook(null);
 		assertEquals("simulated final checkpoint failure",failure.getMessage());
 		assertFalse(primary.isRunning(),"resources must be stopped even when the final barrier fails");

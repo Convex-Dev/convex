@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Lattice networking no longer chooses durability policy: `NodeServer` does not flush on launch or close, run a flush timer, or publish pending host state on shutdown. Services must save explicitly with their host. The host now retains its root before invoking any replication publisher.
+
 - `LatticeHost.checkpoint()` saves and flushes one host snapshot without accepting private application drafts. Scoped `autoFlush(Duration)` provides periodic durability independently of networking, exposes background failures and performs a final flush on close. Forked hosts can checkpoint private drafts without exchanging them with their origin.
 
 - `JWT.validateTimeBounds(Instant)` checks optional expiry and not-before bounds at an explicit time, returning null on success or an interned `AString` failure reason. It rejects malformed bounds, including explicit null, and applies no clock-skew policy; existing `validateClaims` behaviour is unchanged.

@@ -142,8 +142,15 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	 * The caller owns the store lifecycle. A null store uses the supplied initial value.
 	 */
 	public static <V extends ACell> LatticeHost<V> open(V initialValue, AStore store) throws IOException {
+		return open(initialValue,store,Cursors::root);
+	}
+
+	/** Opens a host with explicit cursor coordination, e.g. {@code Cursors::transactionalRoot}. */
+	public static <V extends ACell> LatticeHost<V> open(V initialValue, AStore store,
+			Function<V,? extends Root<V>> rootFactory) throws IOException {
+		Objects.requireNonNull(rootFactory);
 		V retained=(store==null)?null:store.getRootData();
-		return new LatticeHost<>(Cursors.root(retained==null?initialValue:retained),store);
+		return new LatticeHost<>(rootFactory.apply(retained==null?initialValue:retained),store);
 	}
 
 	/** Returns the host store, or null for in-memory operation. The caller owns its lifecycle. */
@@ -295,8 +302,9 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	/**
-	 * Publishes through an explicit host operation, serialised with ordinary sync.
-	 * The callback runs once outside atomic update callbacks. Concurrent writes
+	 * Retains a snapshot, then publishes through an explicit host operation,
+	 * serialised with ordinary sync. The callback receives store-backed state and
+	 * runs once outside atomic update callbacks. Concurrent writes
 	 * remain pending; the returned value is the snapshot actually published.
 	 * This is a host integration point, not a component-to-parent link.
 	 * The publisher must preserve the snapshot's value; only its storage references
@@ -307,7 +315,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 		syncLock.lock();
 		try {
 			V snapshot=cursor().get();
-			V published=publish.apply(snapshot);
+			V published=publish.apply(storeRoot(snapshot));
 			// Persisted references may replace the snapshot; concurrent edits stay pending.
 			cursor().compareAndSet(snapshot,published);
 			return published;
@@ -417,7 +425,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> {
 
 	private V publishRoot(V value) {
 		Function<V,V> policy=publisher;
-		return (policy==null)?storeRoot(value):policy.apply(value);
+		return (policy==null)?value:policy.apply(value);
 	}
 
 	private V storeRoot(V value) {
