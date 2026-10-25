@@ -9,176 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `DLFSApplication` accepts an explicit owner verifier and owner-aware signer together with an arbitrary region path. DLFS service entry points checkpoint before acknowledging writes. `ConvexDB.openHost(store)` opens local durable databases without networking.
-
-- Lattice networking no longer chooses durability policy: `NodeServer` does not flush on launch or close, run a flush timer, or publish pending host state on shutdown. Services must save explicitly with their host. The host now retains its root before invoking any replication publisher.
-
-- `LatticeHost.checkpoint()` saves and flushes one host snapshot without accepting private application drafts. Scoped `autoFlush(Duration)` provides periodic durability independently of networking, exposes background failures and performs a final flush on close. Forked hosts can checkpoint private drafts without exchanging them with their origin.
-
-- `JWT.validateTimeBounds(Instant)` checks optional expiry and not-before bounds at an explicit time, returning null on success or an interned `AString` failure reason. It rejects malformed bounds, including explicit null, and applies no clock-skew policy; existing `validateClaims` behaviour is unchanged.
-
-- `Index.concat(right)` joins strictly ordered key ranges by sharing subtrees, with stack-safe work bounded by tree depth. Empty indexes are identities; overlapping or reversed ranges throw `IllegalArgumentException`, including aliases at the effective 255-byte key limit.
-
-- Social timelines support exact continuation by full post key and author DID, with optional key-prefix bounds for coarse cutoffs. Ordering is deterministic for simultaneous posts across authors. Page continuation seeks directly to each feed's bound instead of scanning newer posts.
-
-- `MapComponent` and `IndexComponent` provide atomic local collection operations and child views, without imposing replication, signing or timestamp policy. Social and DLFS share standard owned-map delivery and authoring views while retaining explicit signing strategies.
-
-- `LatticeNode` supports an optional primary DID and authorised signing key. New propagators default to that key, or null for an unidentified node, with explicit per-group overrides. Indirect DIDs use a supplied `DIDKeyAuthorizer`; no transient identities are generated.
-
-- `LatticeNode` assembles optional TCP networking around an existing host, with one closeable lifecycle. `createPropagator()` creates and starts a managed group; groups, identity, filters and inbound selection can change while running. `serveAllInbound(group)` explicitly selects public serving. `NodeServer` detaches its publisher on shutdown or failed launch, leaving the host usable locally or with a replacement server. Host publisher attachment replaces the permanent publication-policy freeze.
-
-- `LatticeHost.addApplication(app)` registers and returns an existing root application without rebinding it or publishing state. Applications own region paths and can be added incrementally; each incoming delivery uses a stable registration snapshot. The one-time `configureApplications` API has been removed.
-
-- Lattice components expose explicit `checkValue` compatibility diagnostics returning an error reason or nil. Region checks compose existing children; set components check set shape, with domain constraints supplied by overrides. Checks do not run automatically on local edits or publication and may be less strict than merge acceptance.
-
-- `Timestamped` combines atomic timestamping of local edits with whole-record ordering. Its standard map factory handles `:timestamp`, and enclosing signed or staged components share its merge rule. Incoming records retain their timestamps, while no-op edits preserve existing timestamps and signatures.
-- Cursors support explicit `withDefault(value)` views. Absent storage remains absent on reads and unchanged writes, while descendant edits can construct a container of the supplied type.
-- `UnionSet<V>` supplies standard union delivery and publication for set domain components, with explicit forks. Local removal has no replicated deletion semantics.
-- `SetComponent<V>` provides atomic set operations over a shared cursor, including embedded sets inside signed domain records. Enclosing components retain control of merge, timestamp and publication policy.
-- Component bases and hosts no longer carry `LatticeContext`. Region factories receive only a cursor; KV, queues and DLFS use explicit clocks, and Mail accepts an owner-aware receipt signer. `DLFSLocal` exposes `getClock`/`setClock` in place of its context accessors. Optional `ALattice` adapters retain local context support.
-- `AKeyedRegions` composes application roots and nested regions from standard or shared components, with `SingleRegion` and `Regions` implementations for ordinary assembly. Incoming values reach only registered children; publication preserves unrelated regions. `LatticeComponent` supplies standard lattice-backed merging and staged or live storage.
-- `OwnedMap`, `OwnedIndex` and `KeyOwnedIndex` supply verified owner-map merging without a signing context, including during publication conflicts. Domain components extend `ASignedComponent` at signed storage paths and supply a signer function such as `user::signData`; independent signed drafts also take an explicit signer. Signer results must contain the requested payload and a valid authorised signature. Indirect identities require an explicit verifier. Owner merges ignore unsigned entries, and signed values are checked against the payload lattice's validator on acceptance and authoring.
-- `LatticeHost.create()` supports purely in-memory applications. Hosts accept a null store; persistence and flush become no-ops, while configured publication policies still run.
-- Persistence belongs to the host: a host with a store writes its root on every `sync()`, whether or not a `NodeServer` is attached. Durability is chosen through host checkpointing or scoped automatic flushing; an ephemeral node uses a memory store. One restore rule: `LatticeHost.open` adopts a retained root from any kind of store, `LatticeHost.create` refuses a store that already holds a root instead of overwriting it on first sync, and the new `LatticeHost.replace(initial, store)` discards a retained root explicitly by writing the initial value at once. Node storage flags (`persist`, `persistInterval`, `restore`, `transactionalRoot`) and `NodeServer.persistSnapshot`/`checkpoint` are removed; callers use explicit host opening and durability operations.
-- `LatticeHost.fork()` and `fork(store)` create a detached copy of the hosted root with applications and a store of its own, built by the caller over the fork; a fork may not share its origin's store. A fork's `sync()` persists to its own store, if any, then exchanges roots with its origin through ordinary delivery, as two nodes do, persisting each root's cells into the receiving side's store first so the fork's store can be discarded once it has synced. `origin()` returns the host a fork was taken from.
-- NodeServer hosts an assembled `LatticeHost`, with applications configured before node launch. Incoming roots and paths delegate to configured applications without forcing publication; applications explicitly opt into handling non-empty paths. `RelayHost.open` assembles the common relay host: one live application over a whole lattice, with opening and cursor coordination owned by the host and merge policy supplied explicitly.
-- DLFS supports a separate optional content modification time, basic NIO attribute updates and preservation of unknown future node fields. Legacy nodes remain readable without rewriting. **Upgrading DLFS data is one-way:** the first write extends nodes up to the drive root, after which 0.8.17 and earlier cannot open the drive and, as replicas, ignore its updates. Back up DLFS stores before upgrading, upgrade every replica of a drive together, and roll back only by restoring that backup. ([#688](https://github.com/Convex-Dev/convex/issues/688))
-- DLFS owner components provide atomic `getOrCreateDrive`, with optional live-drive limits, so applications can open or initialise a drive safely under concurrent creation.
-- Typed lattice component transactions stage domain operations atomically, with async completion and an opt-in transactional root for exclusive execution and contention fallback. Ordinary roots retain their existing write path.
-- REST `POST /api/v1/simulate` accepts source or binary transactions without signing credentials, returning transaction accounting results under public query limits, including `JUICE` errors for zero-balance accounts.
-- Java clients expose `simulate` and `simulateSync` for transaction accounting and cost estimates; the GUI stress tool labels this mode "Simulate" to distinguish it from ordinary queries.
-- Lattice applications attach to an explicitly created or opened root host and define incoming merge policy through their domain components or an optional lattice adapter.
-- Lattice applications support private working state and an application-defined `beforeSync` hook. `SignedComponent` batches unsigned domain edits into signed publications, reusing prepared signatures across unrelated CAS conflicts. Applications needing immediate visibility share the host cursor directly.
-- Root components can delegate incoming values to a fixed application list, retaining only application publication results. Applications may supply their own lattices, and a signed subtree is published by the component that owns it through that component's own fork, so sequential and racing edits to the same signed subtree combine without giving the root a signer.
-- Typed ownership lattices for hash maps and indexes, including DID verification bound to each lattice instance and a public-key index specialisation. Existing `OwnerLattice<V>` callers remain supported.
+- Support lattice applications composed from reusable components, with signed ownership, timestamped records, forks and atomic transactions. ([Design](convex-core/docs/LATTICE_APPLICATIONS.md))
+- Allow `LatticeNode` to manage lattice networking for an application, with optional DID identity. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md))
+- Allow services to choose their durability with host checkpoints and scoped automatic flushing. ([Persistence](convex-peer/docs/PERSISTENCE.md))
+- Support DLFS file modification times and safe concurrent drive creation. ([DLFS](convex-dlfs/docs/DLFS_DESIGN.md))
+- Allow transaction simulation as an alternative to query execution, for cost estimates through REST and the Java client.
+- Support fast `Index` seek, slice and concat.
 
 ### Changed
 
-- Social, Mail, KV and DLFS entry views use standard collection navigation: absent reads leave storage untouched, changed writes create the declared container type, and incompatible containers throw without replacing existing data.
-
-- Mailbox receipt batches commit atomically. All receipts are prepared and verified before any state changes; failed signing leaves the batch unapplied and commit retries preserve concurrent deposits without signing unchanged receipts again.
-
-- `LatticeQueue` uses an overridable `createContainer()` for local initialisation, matching the collection component policy. Broader queue design review is tracked in [#770](https://github.com/Convex-Dev/convex/issues/770).
-
-- Queue topic and metadata views use standard collection components with overridable creation policy. Topic section readers return null for absence, malformed partition counts throw, and no-op truncation leaves an absent queue uncreated.
-
-- Standard map, index and set components return null for missing storage. Counts and predicates retain their natural empty results. An overridable `createContainer()` controls creation on writes, including map child views; applications can supply initial contents or reject implicit creation.
-
-- Social data readers return null for absence and throw on incompatible values instead of substituting empty collections or skipping erroneous entries. Counts and predicates retain zero/false for missing data; writes no longer replace incompatible follow records with empty ones.
-
-- Social follow records no longer cache resolved signing keys. Receiving remote social data leaves local follow intent, timestamps and signatures unchanged; resolution caches remain local to the DID authoriser.
-
-- Social posts use timestamp-prefixed keys with a 64-bit random salt, preventing same-time posts on independent replicas from sharing an identity. Legacy timestamp-only keys remain readable. Social merges guard examined container shapes and preserve opaque fields without blocking unrelated updates.
-
-- Signed domain components can rebind their existing API to unsigned forks, batching edits into one signed publication without re-stamping. `SignedComponent` shares verification and reconciliation through `ASignedComponent`; nested drafts sign only at the original envelope boundary.
-
-- Owned collections bind supplied cursors directly; use `.fork()` to stage them explicitly. Forks retain owner verification policy. Signed components retain deliberate unsigned staging and support nested drafts that sign only at the envelope publication boundary. Component transactions commit through bound `storage()`, avoiding duplicate application of editing policies.
-
-- Future-timestamp admission belongs to the application or component. Removed node-wide and `LatticeContext` skew settings; standalone DLFS now reads `dlfs.maxFutureTimestampSkew` (previously `node.maxFutureTimestampSkew`). `DLFSLattice.withClock(clock, skew)` binds explicit admission policy, while the unconfigured lattice merges solely by value. P2P no longer supplies an ambient merge context.
-
-- Social components take an owner-aware signer, DID authoriser and timestamp supplier; one signer can serve multiple DIDs and key rotation reaches existing views. P2P identity and node registries bind direct-key ownership independently of context, and local authoring takes an explicit multi-owner signer. Registered social users share one component. Relay admission preserves unfamiliar signed social fields and rechecks current DID authority instead of treating cached keys as continuing authority.
-
-- DLFS components take explicit signer functions and timestamp suppliers instead of inheriting authoring policy from `LatticeContext`. Applications without a signer act as relays. Custom owner identities use one verifier for incoming envelopes and local signatures; forks and transaction views retain the same policies. Owner lattices also expose `mergeAndSign` for explicit authoring of combined values.
-
-- `DLFSApplication` now composes registered regions without a root `ALattice`. Construct it with a host (default `:fs`), a path of region keys, or an explicitly shared/staged `DLFSRegion`; the old lattice-taking `connect` factory and `region()` override are removed. DLFS and social regions handle incoming owner envelopes directly, and staged regions reconcile incoming data without publishing pending edits. DLFS server entry points register their application before transport starts and accept only their configured DLFS region.
-
-- Lattice components use `cursor()` as the single editing access point; bound `storage()` is separate from the editing view, so lifecycle operations preserve their boundary while domain operations honour cursor wrappers. `ASignedComponent.checkPayload` supports optional unsigned domain diagnostics, and owned maps expose `signingFor(owner)` directly.
-
-- `PathCursor` shares atomic operations with other transforming cursor views. Update-and-return operations now return the stored path value after enclosing write policies such as stamping.
-
-- Projection, signing, stamping and default cursor views share atomic operations through `ATransformCursor`. Forks now publish through ordinary cursor views; removed the fork's read/prepare overload and the corresponding component constructor. Compose `SignedCursor.create(destination, signer).fork()` for unsigned working state with signed publication.
-
-- Fork publication callbacks rely on the documented side-effect contract; removed thread tracking and defensive re-entrancy checks. Concurrent edits and sync still coordinate through the working-state lock.
-
-- Lattice transaction drafts use standard thread-safe root storage without thread ownership or closing guards. Callbacks may coordinate worker edits before returning; later edits to retained drafts remain isolated from live state.
-
-- `Mail.send` now holds all send state in one atomic recipient-mailbox deposit. Removed the separate in-memory outbox, `outbox()`, `redeposit()` and automatic redeposit on sync. Inspect mailbox deposits and receipts for delivery state; sends now have no extra mutable state outside transactions and forks.
-
-- `SetComponent` reports non-set storage with an explicit state error and leaves it unchanged. Set edits preserve unfamiliar members without imposing a runtime element schema.
-
-- Fork sync completes reconciliation and signing before its publication commit. Concurrent working edits are ordered around sync, and a failed merge or preparation leaves the fork value and baseline unchanged without publishing. Forks now always support exclusive transactions over their private working state.
-
-- `LatticeHost` no longer requires a lattice: it holds published state, delegates all incoming values to configured applications and persists snapshots. Applications declare their own lattices. `LatticeApplication` supports ordinary or live relay use, and `SignedComponent` can be extended by domain components.
-- `NodeServer` is replication only and is constructed from an assembled `LatticeHost`. The lattice-taking constructors, the application-factory launch overload, the lattice accessor and the merge-context accessors (`setMergeContext`, `getMergeContext`) are removed; policy belongs to the host and its applications, and the relay case is assembled by `RelayHost`. Restoring a retained root now adopts it when the host is opened rather than merging it at launch. `ConvexDB.createNodeServer` now declares `IOException`, and `P2PNode.create` fails at creation with an `UncheckedIOException` when the retained root cannot be read, where it previously failed at launch.
-
-- `LatticePropagator` no longer takes a lattice or a merge context and keeps no working view of its own: it announces exactly what the host publishes, through its publication filter, and never writes a store root. The lattice-taking constructors, the deprecated constructor taking a combined `NodeConfig`, `setMergeContext`, `setPersistenceEnabled` and `restore()` are removed; construct a group from its serving store and optional `LatticePropagatorConfig` and set filters through the setters.
-- Renamed the application host to `LatticeHost`; NodeServer exposes it through `getHost()`. Application constructors and host factories use the new type.
-- Domain components receive the cursor for their level and no longer navigate from a root: the root-cursor factories on `Social`, `DLFSRegion`, `DLFSDrives` and `P2PUser` are removed. The application-level entry points (`Social.connect(application)`, `DLFSApplication.dlfs()`, `P2PApplication.p2p()`) resolve region paths with the application's own lattice, and P2P node discovery takes its policy from the P2P application rather than the node. `P2PNode` now assembles only the host, the replicating node server and the transport; `P2PApplication` is the application the host hands incoming values to, merging each through its lattice after projecting the social region to the owners this node wants, and owns the node directory, social selection and bootstrap paths. A node writes its own record through its node-record component, replacing any retained record. `RelayHost.openHost` opens a configured host without applications for nodes that configure their own. `DLFSApplication` can retain an explicitly supplied staged region.
-- NodeServer aborts startup if its retained root cannot be read, avoiding publication of a replacement root after failed restoration.
-- `ALatticeApplication` now supplies lifecycle independently of `ALattice`: preparation, managed-child publication, then its own publication boundary. `AKeyedRegions`, `Regions` and `SingleRegion` share this lifecycle. `LatticeApplication` is the explicit adapter for supplied root lattices; lattice access and navigation are no longer required on every application.
-- `ALatticeApplication.merge` is abstract: an application states how it merges an incoming root, typically by delegating to its lattice as `LatticeApplication` does. `mergeAt` belongs to every component: it hands the delivery to `child(key)` when one is registered, and otherwise calls the component's `mergeAtPath`. The optional lattice adapter reduces unmatched paths through its declared shape before merging. Every `ALatticeComponent` has a `merge` for an incoming value at its level, refused unless the component defines one. `ALattice` is optional: `LatticeComponent` supplies the lattice-backed adapter, including `getLattice()`, path reduction and lattice-directed `resolve`. Plain components route to children or define `mergeAtPath`; their base class no longer requires a parallel lattice tree.
-- Component constructors bind supplied storage directly. `fork()` uses a protected `rebind(cursor)` hook to reconstruct domain components and child views with their existing configuration. Removed `ForkTarget`, `forkOf` and separate component fork ownership. `sync()` publishes bound storage even when `cursor()` exposes an editing view; wrappers sharing a fork share publication, while path and transformed views never publish enclosing forks. `LatticeComponent` constructors now bind storage; pass a fork explicitly for staged operation.
-- Cursor `fork()` creates independent working storage without retaining merge policy. `ForkedCursor.sync(merge)` supplies reconciliation per publication and retains the existing atomic failure and retry guarantees. Ordinary writable cursors implement `sync(merge)` as a read-only no-op. Components supply their own `mergePublication` rule at sync time; host persistence remains explicit.
-- Ordinary cursors no longer retain creation-time values or publication locks. `Root.view()`, cursor `detach()`/`merge()` and `getForkPoint()` are removed. Domain forks own their publication policy directly, so changing a fork's context also changes its publication context. `StampingLattice` is removed; components supply stamping functions to `StampedCursor`.
-
-- Removed lattice capability interfaces and cursor shapes. Cursors require existing containers and expose actual null values; components construct missing state atomically through explicit update functions or read/write views.
-
-- Lattice policy now belongs to components: cursors no longer carry or inherit `LatticeContext`. Component forks reconcile on publication. Signing and stamping views take explicit functions, and transaction views preserve component policy.
-
-- Removed the ambiguous lattice-and-store application constructor; use `LatticeHost.open` to restore retained state or `LatticeHost.create` to deliberately start fresh.
-- Lightweight lattice components hold a working cursor; independent publication boundaries also retain a destination cursor and baseline, with no component-parent links. The base application host constructor creates working state; existing node adapters explicitly retain live views. Cursors carry no persistence API: `LatticeHost` owns the host store, publication and `flush()`, and DLFS components take the store they need for blob checkpoints explicitly.
-- Cursor navigation no longer inserts signing or stamping cursors, and the virtual `:value` path key is gone. The component that owns an owner-keyed or stamped level wraps its cursor with `SignedCursor.create` or `StampedCursor.create`; lattices declare boundaries but construct no cursors, and a plain write through a signed envelope is refused.
-- Cursors no longer carry a lattice. `ALatticeCursor`, `RootLatticeCursor`, `DescendedCursor` and `ForkedLatticeCursor` are replaced by `Root`, `PathCursor` and a `ForkedCursor` that takes its merge function at sync time: components supply construction for missing child values, and lattice merge and fork reconciliation belong to components. Components own merge policy; the optional `LatticeApplication.resolve(path)` adapter navigates using a supplied lattice, and `NodeServer.mergeAt(value, path...)` delivers a path-addressed value to the host's applications. Subtree transactions on a bare cursor use `Transactions.transact`.
-- GUI windows that use a locked key (Wallet, Terminal, peer launch, peer controller wallet, Hacker Tools, Show seed) ask for its password once for that use and leave it locked in the key ring; only the key ring's lock button changes a key's lock state. Opening a Wallet or Terminal asks at most once, and declining gives a single read-only message instead of a second prompt or an error.
-- GUI windows refresh balances and status only while they are showing, so hidden tabs and minimised windows stop querying peers. Peer Manager follows consensus updates as they happen instead of polling ten times a second.
-- Index operations on long keys, such as DLFS file names, stay on the fast recursive path; the stack-safe fallback now engages only on an actual stack overflow. ([#727](https://github.com/Convex-Dev/convex/issues/727))
-- `Index.seek(key)` now returns the lower-bound position for a key or prefix using direct radix descent, including absent keys and existing long-key aliases, instead of throwing an unimplemented-operation exception.
-- `Index.slice(start,end)` now shares whole subtrees and rebuilds only boundary paths, replacing per-entry deletion. Slicing and seek-based cuts take work bounded by tree depth and remain stack-safe for maximum-length keys.
-- Embedded store decodes avoid hashing for cache lookup and automatic cache admission, while reusing already-cached values when their hash is available; non-embedded branches still use the cache on demand.
-- CVM map operations recognise only known maplike records; generic CAD3 records no longer qualify as maps solely through their Java representation.
-- Java client `transact` calls no longer block while the account's sequence number is looked up or code is pre-compiled: the transaction is queued and submitted in call order, still with distinct sequence numbers. `transactSync(String)` no longer holds the client's lock for the whole round trip, so concurrent calls on one client, such as the REST faucet, overlap. Cancelling a queued transaction before it is submitted withdraws it.
+- Simplify lattice host, node and cursor APIs around the application model; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading. Services save with explicit checkpoints, as closing a node no longer saves.
+- Extend DLFS data with modification times as a one-way upgrade: back up stores and upgrade all replicas together. ([#688](https://github.com/Convex-Dev/convex/issues/688))
+- Improve responsiveness of Java client transactions and the GUI.
 
 ### Fixed
 
-- `LatticeHost.replace` rejects a null replacement root before changing retained state.
-
-- X402 replay confirmation requires a successful recorded transaction result. Failed transactions in history no longer grant paid access or report successful settlement.
-
-- Standalone KV replica verification now rejects unresolved owners by default. An explicit owner/key verifier supports indirect DIDs and account addresses and governs both incoming replicas and signed exports, including key rotation.
-
-- Opening a connected KV database no longer writes empty state or overwrites concurrent creation. Missing database containers are created atomically on the first changed write.
-
-- DLFS CLI service mutations and initial drive creation now publish the host root for persistence and replication. Closed DLFS filesystem views reject further I/O through existing paths and channels, without closing other views or publishing drafts.
-
-- Hash-map lattice merges retain and reconcile entries with nil keys using the child merge rule.
-
-- Keyed component publication preserves removal of unrelated keys when the destination is cleared to nil. Region collections publish only their children, leaving a supplied aggregate fork for its owner to publish explicitly.
-
-- `mod` handles the minimum supported integer divisor without overflowing an intermediate negation or throwing a Java exception.
-- GUI labels, tables, tooltips and dialogs show text from other parties literally. Registry names, actor error messages and DLFS file names containing `<html>` were rendered as HTML, which could fetch remote URLs and disguise what the GUI showed; transaction error dialogs also dropped the text around it. ([#765](https://github.com/Convex-Dev/convex/issues/765))
-
-- Replacing a keyed lattice region with `addLattice` now installs one rule for both navigation and merge, rather than leaving the old merge active alongside the new rule.
-
-- `SignedComponent` checks owner authorisation for context-verified owner lattices before accepting an incoming payload, including delivery through a keyed region.
-- A staged component whose keyed lattice declares only some of a container's keys no longer overwrites or removes the other keys when it publishes; undeclared keys adopt the destination. This holds at any level, including an application staged at the host root.
-- Merging a value at one owner's slot of an `OwnerLattice` now verifies the signer for that owner through the context, as merging through the owner map always did, and the context-free merge binds a direct-key owner to its signer. The lattice tree ends at a signed envelope: `SignedLattice.path` no longer continues to the unsigned value, so a path inside an envelope is outside the served lattice. Applications that accept incoming values at declared paths no longer re-apply signing rules along the path; the lattices do.
-- Reading an unset store root handles a null root hash, including explicitly supplied `NullStore` instances.
-- Big-integer sign queries handle empty zero representations and positive values with a leading sign byte consistently before and after Java value materialisation.
-- DLFS copies and moves work across drives and with other NIO providers; separate views of the same working drive support atomic rename and same-file detection.
-- Directly hosted DLFS drive collections inherit the host's component context, including its mutation clock.
-- CVM booleans and equal generic byte flags use consistent Java hash codes, preserving lookups and duplicate detection in Java hash maps and sets across representations and decoding.
-- Casting a blob of more than 8 bytes to an integer keeps its value when the blob starts with redundant sign bytes; for example `(int 0x00008000000000000000)` returned `0` instead of `9223372036854775808`.
-- Multiplying a big integer by zero returns an ordinary integer zero, and integers behave the same whatever their internal representation. Previously `(get [10 20 30] (* 9223372036854775808 0) :none)` returned `:none` instead of `10`, and `split` rejected such a value as a character code, so peers holding the value in different forms could disagree.
-- PostgreSQL JDBC queries no longer fail on a duplicate column description during extended-query execution.
-- Java clients give an auto-sequenced transaction for another account that account's next sequence number, instead of the client's own next number or the account's last one. A transaction refused for a missing key pair no longer consumes a sequence number, and `prepareTransaction` with pre-compile gives up after the client timeout instead of waiting indefinitely.
-- PostgreSQL prepared statements decode binary numeric parameters by their declared type, including the full unsigned OID range, and reject invalid fixed-width parameter lengths.
-- Scheduled execution respects the 100-operation limit across timestamp buckets and retains unprocessed entries, preventing oversized buckets from exhausting peer memory.
-- Variadic subtraction reports a numeric error when an intermediate result exceeds the integer limit, instead of throwing a Java exception.
-- HTTP message requests use independent correlation IDs on the shared peer connection, and rejecting a duplicate client request ID no longer discards the original pending response.
-- Replies from an old connection cannot complete requests after reconnecting, and disconnects finish pending client and lattice requests without waiting for a timeout.
-- Request timeout cleanup completes before notifying callers; cancelling client request and lattice response futures releases their underlying pending requests.
-- Duplicate pending transactions are rejected without displacing the original caller; the rejection includes the transaction hash for subsequent result lookup.
-- Concurrent DLFS views preserve disjoint writes and truncation updates to the same file; competing file creation cannot overwrite an existing file.
-- Lattice stamped updates retain one operation timestamp across retries. Social posts and deletion use the application clock, with collision-free post keys independent of the record timestamp.
-- Ordinary queries work with zero-balance accounts and use a balance-independent Juice allowance within the peer's execution limit. Transaction cost estimation remains available by querying an explicit transaction payload.
-- From protocol v1, scheduling charges the 800-Juice base cost in addition to the existing delay cost, including immediate and past-dated requests. Protocol v0 retains its original accounting.
-- Typed CVM access now accepts equivalent generic CAD3 representations of addresses, operations, functions and records, including values retained in store caches. Default store decoding continues to produce CVM representations on cache hits.
-- Closing a GUI window now releases what it runs instead of hiding it: Peer Manager stops its local peers and REST server, Wallet and Terminal close their connections, and peer windows opened from the tray stop their background refresh. Closing Convex Desktop closes the apps launched from it first, so the DLFS browser persists its final state.
-- Closing a Peer Manager removes the temporary genesis and peer keys it added to the key ring; keys already in the key ring are kept. Key ring changes now reach every window on the UI thread, and choosing a key in one key picker no longer disturbs the others.
-- Wallets open on different networks in the same process no longer share tracked tokens or token library addresses, which could make the second network's balances query the wrong address. Wallets on the same network still share their tracked tokens.
-- The GUI no longer freezes while connecting, launching an extra peer, transferring, trading, setting stake, tracking tokens or running account operations. Buttons are disabled while their work runs, and failures that were silently ignored now show a message.
-- The Desktop Explorer button opens the most recently launched local network that is still running, and peer windows opened from the tray show their most recent blocks instead of the oldest.
-- The GUI account menu's "Set sequence..." takes effect: the next transaction uses the number entered, where previously the entry was discarded and the sequence looked up again.
+- Make CVM integer behaviour consistent across internal representations.
+- Improve robustness of shutdown and persistence for lattice services, P2P nodes, DLFS and JDBC file databases.
+- Improve reliability of client requests across reconnects, timeouts and duplicate transactions.
+- Harden scheduled execution, owner verification and X402 payment confirmation.
+- Show text from other parties safely in the GUI, and keep it responsive during network operations. ([#765](https://github.com/Convex-Dev/convex/issues/765))
+- Improve PostgreSQL wire protocol handling in Convex DB.
 
 ## [0.8.17] - 2026-10-09
 
