@@ -74,7 +74,7 @@ public class TransferPanel extends AbstractGUI {
 			Address target=addressCombo.getAddress();
 			Async.whileBusy(e, executeTransfer(amount,target).thenAcceptAsync(r->{
 				if (r.isError()) {
-					JOptionPane.showMessageDialog(this, "Transfer failed!\n"+r.getErrorCode()+"\n"+r.getValue());
+					JOptionPane.showMessageDialog(this, Toolkit.plainMessage("Transfer failed!\n"+r.getErrorCode()+"\n"+r.getValue()));
 				} else {
 					model.ensureContains(target);
 					super.closeGUI();

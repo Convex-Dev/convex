@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `mod` handles the minimum supported integer divisor without overflowing an intermediate negation or throwing a Java exception.
-- GUI labels, tables, tooltips and dialogs show text from other parties literally. Registry names, actor error messages and DLFS file names containing `<html>` were rendered as HTML, which could fetch remote URLs and disguise what the GUI showed. ([#765](https://github.com/Convex-Dev/convex/issues/765))
+- GUI labels, tables, tooltips and dialogs show text from other parties literally. Registry names, actor error messages and DLFS file names containing `<html>` were rendered as HTML, which could fetch remote URLs and disguise what the GUI showed; transaction error dialogs also dropped the text around it. ([#765](https://github.com/Convex-Dev/convex/issues/765))
 
 - Big-integer sign queries handle empty zero representations and positive values with a leading sign byte consistently before and after Java value materialisation.
 - Casting a blob of more than 8 bytes to an integer keeps its value when the blob starts with redundant sign bytes; for example `(int 0x00008000000000000000)` returned `0` instead of `9223372036854775808`.

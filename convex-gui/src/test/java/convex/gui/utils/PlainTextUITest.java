@@ -20,6 +20,7 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
 import javax.swing.JToolTip;
 import javax.swing.JTree;
 import javax.swing.UIManager;
@@ -155,7 +156,7 @@ public class PlainTextUITest {
 			// JOptionPane gives the <html>...</html> part of a message a label of its own
 			JOptionPane pane=new JOptionPane("Transfer failed!\n"+HTML+"</html>");
 			List<JLabel> htmlLabels=new ArrayList<>();
-			for (JLabel label: labels(pane)) {
+			for (JLabel label: components(pane,JLabel.class)) {
 				if (BasicHTML.isHTMLString(label.getText())) htmlLabels.add(label);
 			}
 			assertEquals(1,htmlLabels.size());
@@ -163,11 +164,27 @@ public class PlainTextUITest {
 		});
 	}
 
-	static List<JLabel> labels(Container c) {
-		List<JLabel> result=new ArrayList<>();
+	@Test
+	public void testPlainMessage() throws Exception {
+		String text="Transfer failed!\n:ASSERT\n"+HTML+"</html>";
+		onEDT(()->{
+			// As a String message, JOptionPane would keep only the <html>...</html> part
+			JOptionPane pane=new JOptionPane(Toolkit.plainMessage(text));
+			List<JTextArea> areas=components(pane,JTextArea.class);
+			assertEquals(1,areas.size());
+			assertEquals(text,areas.get(0).getText());
+			assertFalse(areas.get(0).isEditable());
+			for (JLabel label: components(pane,JLabel.class)) {
+				assertFalse(BasicHTML.isHTMLString(label.getText()));
+			}
+		});
+	}
+
+	static <T> List<T> components(Container c, Class<T> type) {
+		List<T> result=new ArrayList<>();
 		for (Component child: c.getComponents()) {
-			if (child instanceof JLabel label) result.add(label);
-			if (child instanceof Container cc) result.addAll(labels(cc));
+			if (type.isInstance(child)) result.add(type.cast(child));
+			if (child instanceof Container cc) result.addAll(components(cc,type));
 		}
 		return result;
 	}

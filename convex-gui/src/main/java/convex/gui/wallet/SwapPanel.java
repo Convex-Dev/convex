@@ -69,7 +69,7 @@ public class SwapPanel extends AbstractGUI {
 			}
 			Async.whileBusy(e, trade.thenAcceptAsync(r->{
 				if (r.isError()) {
-					JOptionPane.showMessageDialog(this, "Trade failed!\n"+r.getErrorCode()+"\n"+r.getValue());
+					JOptionPane.showMessageDialog(this, Toolkit.plainMessage("Trade failed!\n"+r.getErrorCode()+"\n"+r.getValue()));
 				} else {
 					super.closeGUI();
 				}
