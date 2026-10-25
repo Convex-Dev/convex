@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `LatticeHost.addApplication(app)` registers and returns an existing root application without rebinding it or publishing state. Applications own region paths and can be added incrementally; each incoming delivery uses a stable registration snapshot. The one-time `configureApplications` API has been removed.
 
-- Lattice components expose explicit `checkValue` compatibility diagnostics returning an error reason or nil. Region checks compose existing children, and set components support optional runtime element types. Checks do not run automatically on local edits or publication and may be less strict than merge acceptance.
+- Lattice components expose explicit `checkValue` compatibility diagnostics returning an error reason or nil. Region checks compose existing children; set components check set shape, with domain constraints supplied by overrides. Checks do not run automatically on local edits or publication and may be less strict than merge acceptance.
 
 - `Timestamped` combines atomic timestamping of local edits with whole-record ordering. Its standard map factory handles `:timestamp`, and enclosing signed or staged components share its merge rule. Incoming records retain their timestamps, while no-op edits preserve existing timestamps and signatures.
 - Cursors support explicit `withDefault(value)` views. Absent storage remains absent on reads and unchanged writes, while descendant edits can construct a container of the supplied type.
@@ -118,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the ambiguous lattice-and-store application constructor; use `LatticeHost.open` to restore retained state or `LatticeHost.create` to deliberately start fresh.
 - Lightweight lattice components hold a working cursor; independent publication boundaries also retain a destination cursor and baseline, with no component-parent links. The base application host constructor creates working state; existing node adapters explicitly retain live views. Cursors carry no persistence API: `LatticeHost` owns the host store, publication and `flush()`, and DLFS components take the store they need for blob checkpoints explicitly.
 - Cursor navigation no longer inserts signing or stamping cursors, and the virtual `:value` path key is gone. The component that owns an owner-keyed or stamped level wraps its cursor with `SignedCursor.create` or `StampedCursor.create`; lattices declare boundaries but construct no cursors, and a plain write through a signed envelope is refused.
-- Cursors no longer carry a lattice. `ALatticeCursor`, `RootLatticeCursor`, `DescendedCursor` and `ForkedLatticeCursor` are replaced by `Root`, `PathCursor` and a `ForkedCursor` that takes its merge function at sync time: components supply construction for missing child values, and lattice merge and fork reconciliation belong to components. Components and applications hold the lattice; `ALatticeApplication.resolve(path)` navigates an application root by its lattice, and `NodeServer.mergeAt(value, path...)` delivers a path-addressed value to the host's applications. Subtree transactions on a bare cursor use `Transactions.transact`.
+- Cursors no longer carry a lattice. `ALatticeCursor`, `RootLatticeCursor`, `DescendedCursor` and `ForkedLatticeCursor` are replaced by `Root`, `PathCursor` and a `ForkedCursor` that takes its merge function at sync time: components supply construction for missing child values, and lattice merge and fork reconciliation belong to components. Components own merge policy; the optional `LatticeApplication.resolve(path)` adapter navigates using a supplied lattice, and `NodeServer.mergeAt(value, path...)` delivers a path-addressed value to the host's applications. Subtree transactions on a bare cursor use `Transactions.transact`.
 - GUI windows that use a locked key (Wallet, Terminal, peer launch, peer controller wallet, Hacker Tools, Show seed) ask for its password once for that use and leave it locked in the key ring; only the key ring's lock button changes a key's lock state. Opening a Wallet or Terminal asks at most once, and declining gives a single read-only message instead of a second prompt or an error.
 - GUI windows refresh balances and status only while they are showing, so hidden tabs and minimised windows stop querying peers. Peer Manager follows consensus updates as they happen instead of polling ten times a second.
 - Index operations on long keys, such as DLFS file names, stay on the fast recursive path; the stack-safe fallback now engages only on an actual stack overflow. ([#727](https://github.com/Convex-Dev/convex/issues/727))
@@ -130,7 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Opening a relay host with restoration disabled rejects a null replacement root, preserving any retained state instead of creating a host whose root disagrees with its store.
+- `LatticeHost.replace` rejects a null replacement root before changing retained state.
 
 - X402 replay confirmation requires a successful recorded transaction result. Failed transactions in history no longer grant paid access or report successful settlement.
 

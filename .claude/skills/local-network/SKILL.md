@@ -61,9 +61,10 @@ replication, use `NodeServer`; for the bundled P2P and social regions, use
 and `convex-p2p/src/test/java/convex/p2p/P2PSocialSyncTest.java`.
 
 `NodeServer` is schema-independent and replicates an assembled `LatticeHost`. It
-owns node-root persistence, attached-propagator lifecycle and isolated update
+owns attached-propagator lifecycle and isolated update
 notification, but no lattice, merge policy, socket or transport: the host's
-applications own merge semantics, and `RelayHost.open` assembles the relay case
+applications own merge semantics. The host owns root retention and durability;
+`RelayHost.open` assembles the relay case
 of one live application over a whole lattice. It does not publish or interpret
 `NodeInfo`, inspect `:p2p` / `:social` paths, or implement discovery policy. The
 calling application explicitly creates each `LatticePropagator`; there is no
@@ -121,7 +122,7 @@ LatticePropagatorConfig groupConfig = LatticePropagatorConfig.create();
 // The relay host's live application admits incoming values under nodeContext;
 // the node only replicates what the host publishes.
 NodeServer<V> node = new NodeServer<>(
-    RelayHost.open(lattice, nodeStore, nodeConfig, nodeContext), nodeConfig);
+    RelayHost.open(lattice, nodeStore, nodeContext), nodeConfig);
 LatticePropagator group = new LatticePropagator(nodeStore, groupConfig);
 group.setTransportKeyPair(nodeKey);
 node.addPropagator(group);
@@ -196,7 +197,7 @@ the node merely to treat the first group as a privileged "primary" group.
 7. Close listeners before nodes, then close their stores.
 
 Host and propagation configuration are deliberately independent. Use
-`NodeConfig` for authoritative persistence and the standard listener, supplying
+`NodeConfig` for the standard listener, supplying
 it independently to each component; passing it to `NodeServer` never creates a
 transport. Use
 `LatticePropagatorConfig` for each group's routes, protocol queue and publication
