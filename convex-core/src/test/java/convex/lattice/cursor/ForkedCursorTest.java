@@ -91,6 +91,41 @@ public class ForkedCursorTest {
 		assertEquals(1,merges.get(),"The next sync sees an unchanged destination");
 	}
 
+	/**
+	 * A transaction drafts against the fork's working value without holding its lock,
+	 * so a sync can publish in between. The commit then fails against the published
+	 * value and the action reruns on it; the fork keeps both the merge and the edit,
+	 * and the transaction publishes nothing.
+	 */
+	@Test public void transactionCommittingAcrossASyncRerunsOnTheMergedValue() throws Exception {
+		var root=Root.<ASet<CVMLong>>create(Sets.empty());
+		var fork=root.fork();
+		fork.set(Sets.of(CVMLong.ONE));
+		root.set(Sets.of(CVMLong.TWO));
+		CountDownLatch drafted=new CountDownLatch(1), published=new CountDownLatch(1);
+		AtomicInteger attempts=new AtomicInteger(), merges=new AtomicInteger();
+		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+			var transaction=executor.submit(() -> Transactions.transact(fork,draft -> {
+				if (attempts.incrementAndGet()==1) {
+					drafted.countDown(); // the first attempt has read {1} and is mid-flight
+					await(published);    // the sync publishes before this attempt commits
+				}
+				draft.updateAndGet(value -> value.include(CVMLong.create(3)));
+			}));
+			await(drafted);
+			assertEquals(Sets.of(1,2),fork.sync((own,other) -> {
+				merges.incrementAndGet();
+				return union(own,other);
+			}));
+			published.countDown();
+			transaction.get(10,TimeUnit.SECONDS);
+		}
+		assertEquals(2,attempts.get(),"the first commit failed against the published value and the action reran");
+		assertEquals(1,merges.get());
+		assertEquals(Sets.of(1,2,3),fork.get(),"the fork holds the merge and the transaction's edit");
+		assertEquals(Sets.of(1,2),root.get(),"a transaction on the fork publishes nothing");
+	}
+
 	@Test public void failedPreparationLeavesWorkingValueDestinationAndBaselineUntouched() {
 		var root=Root.<ASet<CVMLong>>create(Sets.empty());
 		AtomicBoolean reject=new AtomicBoolean(true);
