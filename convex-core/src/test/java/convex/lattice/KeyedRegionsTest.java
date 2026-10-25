@@ -14,6 +14,7 @@ import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -21,6 +22,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
@@ -168,6 +170,63 @@ class KeyedRegionsTest {
 		assertEquals(CVMLong.TWO,counter.cursor().get());
 		app.sync();
 		assertEquals(Index.of(NESTED,Index.of(A,CVMLong.TWO)),host.cursor().get());
+	}
+
+	@Test void creationCanBeRefusedWithoutPreventingInertUseOrLosingPendingEdits() {
+		var root=new Root<Index<Keyword,ACell>>();
+		var app=new TestRegions(root) {
+			@Override protected Index<Keyword,ACell> createContainer() {
+				throw new UnsupportedOperationException("Explicit initialisation required");
+			}
+		};
+		var child=app.counter(A);
+		assertNull(child.cursor().get());
+		child.cursor().set(null);
+		app.merge(Index.of(UNKNOWN,CVMLong.ONE));
+		app.mergeAt(CVMLong.ONE,UNKNOWN);
+		assertNull(app.sync());
+		app.mergeAt(CVMLong.TWO,A);
+		assertThrows(UnsupportedOperationException.class,app::sync);
+		assertNull(root.get());
+		assertEquals(CVMLong.TWO,child.cursor().get(),"Failed publication retains the pending child value");
+		root.set(Index.of(UNKNOWN,CVMLong.ONE));
+		assertEquals(Index.of(A,CVMLong.TWO,UNKNOWN,CVMLong.ONE),app.sync());
+	}
+
+	@Test void nestedChildWritesPreserveBothContainersInitialEntries() {
+		var root=new Root<Index<Keyword,ACell>>();
+		var opaque=Strings.intern("future region");
+		var app=new Regions(root) {
+			@Override protected Index<Keyword,ACell> createContainer() {
+				return Index.of(UNKNOWN,opaque);
+			}
+		};
+		var nested=app.create(NESTED,(AForkableCursor<Index<Keyword,ACell>> cursor) -> new Regions(cursor) {
+			@Override protected Index<Keyword,ACell> createContainer() {
+				return Index.of(A,CVMLong.ONE,B,opaque);
+			}
+		});
+		var child=nested.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		assertNull(root.get());
+		assertNull(child.cursor().get());
+		child.cursor().set(CVMLong.ONE); // Even an entry matching the initial value must retain its siblings.
+		assertEquals(Index.of(UNKNOWN,opaque,NESTED,Index.of(A,CVMLong.ONE,B,opaque)),root.get());
+		var before=root.get();
+		child.cursor().set(CVMLong.ONE);
+		assertSame(before,app.sync());
+	}
+
+	@Test void childAccessRejectsIncompatibleContainersWithoutReplacement() {
+		var root=new Root<ACell>();
+		var app=new Regions(root.path());
+		var nested=app.<Index<Keyword,ACell>,Regions>create(NESTED,Regions::new);
+		var child=nested.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		for (ACell bad:List.of(CVMLong.ONE,Maps.empty(),Index.of(NESTED,CVMLong.ONE),Index.of(NESTED,Maps.empty()))) {
+			root.set(bad);
+			assertThrows(IllegalStateException.class,() -> child.cursor().get());
+			assertThrows(IllegalStateException.class,() -> child.cursor().set(CVMLong.TWO));
+			assertSame(bad,root.get());
+		}
 	}
 
 	@Test void projectingIncomingDataToInterestsDoesNotChangeTheResult() {

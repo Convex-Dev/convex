@@ -12,9 +12,7 @@ import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
-import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.ProjectionCursor;
 
 /**
  * A component composed of named regions, at a host root or any nested index.
@@ -45,6 +43,7 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 
 	private final Map<Keyword,ALatticeComponent<?>> registrations=new LinkedHashMap<>();
 	private volatile Map<Keyword,ALatticeComponent<?>> regions;
+	private final IndexComponent<Keyword,ACell> entries;
 
 	/** Constructs a root application using the host's cursor. */
 	protected AKeyedRegions(LatticeHost<Index<Keyword,ACell>> host) {
@@ -54,7 +53,21 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 	/** Constructs a container view without changing or publishing its destination. */
 	protected AKeyedRegions(AForkableCursor<Index<Keyword,ACell>> cursor) {
 		super(cursor);
+		entries=new IndexComponent<>(cursor) {
+			@Override protected Index<Keyword,ACell> createContainer() {
+				return AKeyedRegions.this.createContainer();
+			}
+		};
 	}
+
+	/**
+	 * Creates an absent containing index for a changed write through a constructed
+	 * child's region cursor. Return a non-null index, optionally with initial entries,
+	 * or throw to require explicit initialisation. This hook must be pure because
+	 * atomic writes may retry it. Construction, reads and unchanged writes never call
+	 * it. Explicitly registered children retain their own storage and creation policy.
+	 */
+	protected Index<Keyword,ACell> createContainer() { return Index.none(); }
 
 	/**
 	 * Constructs a child with its region cursor. The stored
@@ -79,22 +92,15 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 
 	/**
 	 * Constructs and registers a child at this key. A missing containing index is
-	 * created on the first changed write, never on construction or read. The factory
-	 * binds any domain policy explicitly.
+	 * created through {@link #createContainer()} on the first changed write, never on
+	 * construction or read. Access rejects incompatible containers. The factory binds
+	 * any domain policy explicitly.
 	 */
-	@SuppressWarnings("unchecked")
 	protected final synchronized <V extends ACell,C extends ALatticeComponent<?>> C createRegion(
 			Keyword key,RegionFactory<V,C> factory) {
 		checkRegistration(key);
 		Objects.requireNonNull(factory,"Region factory must not be null");
-		AForkableCursor<V> destination=ProjectionCursor.create(cursor(),
-			value -> value==null?null:(V)value.get(key),
-			(value,child) -> {
-				ACell previous=value==null?null:value.get(key);
-				if (Utils.equals(previous,child)) return value;
-				return (value==null?Index.<Keyword,ACell>none():value).assoc(key,child);
-			});
-		return region(key,factory.create(destination));
+		return region(key,factory.create(entries.path(key)));
 	}
 
 	private void checkRegistration(Keyword key) {
