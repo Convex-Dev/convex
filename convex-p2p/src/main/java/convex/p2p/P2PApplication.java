@@ -9,21 +9,20 @@ import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
+import convex.lattice.IndexComponent;
 import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeHost;
+import convex.lattice.OwnedMap;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.social.Social;
 
@@ -172,25 +171,23 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	}
 
 	/**
-	 * Cursor at {@code [:id owner :value]}. The application navigates to the
-	 * {@code :id} level through the known index root; this component owns that level,
-	 * so it wraps the owner's slot in the signing boundary bound to the
-	 * application's policy.
+	 * Unsigned view at {@code [:id owner :value]}. Container components create missing
+	 * ancestors only on a changed write and reject incompatible storage on access.
+	 * The owned map binds local signing to the same rule as incoming delivery.
 	 */
 	static AForkableCursor<ACell> identitySlot(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey,
 			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> ids=application.cursor().withDefault(Index.none()).path(P2PLattice.KEY_ID);
-		var rule=P2PLattice.ID_LATTICE.signingFor(userKey);
-		return SignedCursor.create(ids.withDefault(Maps.empty()).path(userKey),v -> signer==null?null:rule.sign(v,value -> signer.apply(userKey,value)));
+		var root=new IndexComponent<>(application.cursor());
+		var ids=new OwnedMap<>(P2PLattice.ID_LATTICE,root.path(P2PLattice.KEY_ID));
+		return ids.authoringCursor(userKey,value -> signer==null?null:signer.apply(userKey,value));
 	}
 
 	/** Cursor at {@code [:p2p :nodes owner :value]}, navigated and signed the same way. */
 	static AForkableCursor<ACell> nodeSlot(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey,
 			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		AForkableCursor<AHashMap<ACell,SignedData<ACell>>> nodes=
-			application.cursor().withDefault(Index.none()).<Index<Keyword,ACell>>path(P2PLattice.KEY_P2P)
-				.withDefault(Index.none()).path(P2PLattice.KEY_NODES);
-		var rule=P2PLattice.NODES_LATTICE.signingFor(userKey);
-		return SignedCursor.create(nodes.withDefault(Maps.empty()).path(userKey),v -> signer==null?null:rule.sign(v,value -> signer.apply(userKey,value)));
+		var root=new IndexComponent<>(application.cursor());
+		var p2p=new IndexComponent<Keyword,ACell>(root.path(P2PLattice.KEY_P2P));
+		var nodes=new OwnedMap<>(P2PLattice.NODES_LATTICE,p2p.path(P2PLattice.KEY_NODES));
+		return nodes.authoringCursor(userKey,value -> signer==null?null:signer.apply(userKey,value));
 	}
 }

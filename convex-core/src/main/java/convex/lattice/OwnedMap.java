@@ -19,7 +19,8 @@ public class OwnedMap<K extends ACell,V extends ACell> extends AOwnedMap<K,V,AHa
 		this(OwnerMapLattice.create(values,verifier),destination);
 	}
 
-	protected OwnedMap(AOwnerLattice<K,V,AHashMap<K,SignedData<V>>> owners,
+	/** Binds storage to an existing owner rule, shared by delivery and local authoring. */
+	public OwnedMap(AOwnerLattice<K,V,AHashMap<K,SignedData<V>>> owners,
 			AForkableCursor<AHashMap<K,SignedData<V>>> cursor) {
 		super(owners,cursor);
 	}
