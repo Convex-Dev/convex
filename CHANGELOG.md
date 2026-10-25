@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `JWT.validateTimeBounds(Instant)` checks optional expiry and not-before bounds at an explicit time, returning null on success or an interned `AString` failure reason. It rejects malformed bounds, including explicit null, and applies no clock-skew policy; existing `validateClaims` behaviour is unchanged.
+
 - `Index.concat(right)` joins strictly ordered key ranges by sharing subtrees, with stack-safe work bounded by tree depth. Empty indexes are identities; overlapping or reversed ranges throw `IllegalArgumentException`, including aliases at the effective 255-byte key limit.
 
 - Social timelines support exact continuation by full post key and author DID, with optional key-prefix bounds for coarse cutoffs. Ordering is deterministic for simultaneous posts across authors. Page continuation seeks directly to each feed's bound instead of scanning newer posts.
