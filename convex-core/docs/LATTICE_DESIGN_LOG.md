@@ -25,25 +25,25 @@ CAD036 covers delivery and replication; CAD053 registers shared region names.
 The affected sections now describe explicit component boundaries, owned-map
 verification, construction and signing views, and fork reconciliation without
 automatic cursor policy inheritance. These are local CAD source changes, not a
-claim that the published documentation has been deployed. Earlier entries below
-remain the history of design decisions; this note does not close unrelated open
-questions or assert that every older CAD discrepancy has been resolved.
+claim that the published documentation has been deployed. This note does not close
+unrelated open questions or assert that every older CAD discrepancy has been resolved.
 
-The entries below record earlier design steps and may name APIs superseded by the
-current branch. See [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) and
+Each entry states the design as it currently stands, with its rationale. The history
+of how it got there is in the branch's git log. See
+[LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md) and
 [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md) for the current API:
 
-- Cursors carry no lattice, context or container-construction policy. Components
-  supply read/write functions and explicit signing/stamping functions.
-- Ordinary roots hold only current atomic state. A fork takes its merge function
-  when created and is the only cursor with a `sync()`; `LatticeHost.sync()` publishes
-  host storage under its own lock. The old `Root.onSync`, `Root.view` and
-  `PublishingCursor` are removed.
-- `detach`/cursor `merge` and creation-time snapshots are removed. Transactions
-  retain their attempt input; component publication retains its own baseline.
-- Domain forks own their publication boundary directly. There is no hidden
-  component with a separate context behind a domain fork's cursor.
-- `StampingLattice` is removed. `StampedCursor` takes the component's stamp function.
+- Cursors carry no lattice, context, merge rule or container-construction policy.
+  Components supply read/write functions and explicit signing and stamping functions.
+- Roots hold only current atomic state. A fork is a working copy with a baseline;
+  `sync(merge)` publishes it with the merge its owning component supplies, and on any
+  other cursor publishes nothing. `LatticeHost.sync()` publishes host storage under
+  its own lock.
+- Transactions retain their attempt input; component publication retains its own
+  baseline.
+- Domain forks own their publication boundary directly: a domain fork is the same
+  component class rebound over a forked cursor.
+- `StampedCursor` takes the component's stamp function.
 
 These are application API changes; encoding and CVM execution are unchanged.
 
@@ -156,39 +156,36 @@ substitution and typed creation follow from the declaration, not from a lattice 
 by the cursor; an undeclared level is navigated untyped and cannot be created on
 write unless its shape is structural.
 
-## 5. Forks take their merge function at fork time
+## 5. Forks are bookkeeping; the component supplies the merge when it publishes
 
-**Status:** Implemented (16 October 2026). Forks take their merge function at fork
-time: `AForkableCursor.fork(merge)` returns a `ForkedCursor` whose `sync()` publishes
-by compare-and-set and reconciles through the supplied function when the destination
-has moved. The merge-less `fork()`, cursor-level `sync()` elsewhere and
-`PublishingCursor` are gone; a component with a publication boundary owns such a
-fork and supplies its lattice merge, under its context, as the function. The merge
-function is two-way: the fork alone tracks the value it last reconciled against and
-decides when a merge is needed. A composite application publishes each owned subtree
-through that subtree's own fork of the host rather than reconciling subtrees inside
-the root's merge, so no baseline is ever handed to a merge function.
+**Status:** Implemented.
 
-Before this decision two forks existed. A component fork (`Social.fork()`,
-`LatticeKV.fork()`, a `DLFSDrive` fork) was a new component whose private working
-root published into the parent's cursor through a publication inner class on the
-component base. A bare cursor fork, `AForkableCursor.fork()`, returned a working copy
-whose `sync()` wrote the fork's snapshot over the parent unconditionally: a parent
-that changed in between was overwritten, with no signal. Before Stage B the cursor
-carried its lattice and `fork()` could merge; Stage B moved reconciliation to
-components and left `fork()` with overwrite semantics only. The decision moves the
-one real mechanism into the cursor layer, parameterised by a function the owner
-supplies, and the component fork becomes a cursor fork the component owns.
+A fork is a private working copy of a destination cursor together with the
+destination value it was last reconciled against. `AForkableCursor.fork()` creates
+one and `sync(merge)` publishes it. On sync the fork adopts whichever side changed
+alone, calls the supplied merge only when both the copy and the destination moved
+since the baseline, and installs the result by compare-and-set, retrying while the
+destination moves. The fork holds no lattice, no merge rule and no context. Every
+forkable cursor accepts `sync(merge)`; on a cursor that is not a fork it returns the
+current value and publishes nothing, so a live view and a staged component share one
+sync.
 
-Evidence at the time (16 October 2026, from a compiler probe over the whole tree): no
-main code called the bare form; every `.fork()` in main was a component fork or the
-unrelated CVM `Context.fork`. Three tests called it and none depended on overwriting
-a changed parent. Decision 15 sharpened the question: every publisher must assume its
-destination changed under it, and the bare fork was the one publish path that did
-not. Chosen: the fork keeps its name and takes its merge function at fork time, so a
-forgotten lattice cannot pass for a merge; the three tests moved to component working
-state or a detached root. Adopting a value the destination view prepared, such as a
-stamp, is now a property of the fork's own publish loop (`StampedCursorTest`).
+The merge is the component's. `ALatticeComponent.sync()` hands its own
+`mergePublication(own, other)` to its storage, closed over whatever policy that
+component holds: its lattice, signer, clock or authoriser. A component fork,
+`rebind(storage.fork())`, is a new component of the same class over a forked cursor,
+so a fork reconciles with the policy of the component that owns it, resolved when it
+publishes. A composite application publishes each owned subtree through that
+subtree's own fork, so no baseline is ever handed to a merge function.
+
+Rationale: three layers. A cursor is a mutable pointer to one immutable value, with
+atomic update, navigation and private copies. A lattice is a pure rule over values. A
+component chooses which lattice applies at its level, what context the merge runs
+under and when to publish. The merge needs the third layer's knowledge, so the third
+layer supplies it; a fork carrying a merge function would be a cursor carrying
+semantics. A cursor may apply a component-supplied function to a write, as the
+signing and stamping views do, but no cursor holds a lattice, a merge rule or a
+context of its own.
 
 CAD text affected:
 
@@ -198,35 +195,28 @@ CAD text affected:
 - CAD045 *Fork and Sync*: "`cursor.fork()` creates an isolated working copy"; "Sync
   always succeeds when a lattice is present."
 
-Proposed wording: a fork is created with the merge function of its position and
-sync on such a fork always succeeds; a merge-less fork does not exist. The
-fork-modify-sync pattern survives with the merge supplied at fork time rather than
-carried by the cursor. CAD035 *Forkable Cursor* (initial value, compare-and-set
-merge, lattice-aware sync) and CAD024 *Cursor Sync Guarantees* (`onSync`,
-`ForkedLatticeCursor.sync()`) describe the removed cursor-lattice model.
+Proposed wording: a fork is an isolated working copy with a baseline; its sync takes
+the owning component's merge and reconciles only when both sides changed; a cursor
+holds no lattice, merge or context.
 
-## 6. Root publication seam needs a merge to absorb a racing write
+## 6. Host publication takes one snapshot and remerges nothing
 
-**Status:** Superseded. Publication now belongs to components. `LatticeHost` has
-no lattice: it persists one snapshot and retains concurrent application writes for
-its next sync. It does not remerge the persisted snapshot over a newer publication.
-The discussion below records the earlier cursor-based proposal.
+**Status:** Implemented.
 
-`Root.onSync(publish, merge)` installs the host's publication callback and the merge
-used when a write lands during publication. The earlier root component installed its
-lattice. A root with a publication callback and no merge throws on that race, where
-the old root fell back to its own lattice. Alternative: require the merge whenever a
-callback is installed, so the race can never throw.
+`LatticeHost.sync()` publishes the current snapshot through its attached publisher,
+or its store, and installs the published value only if the root is still that
+snapshot; a concurrent application publication stays pending for the next sync. The
+host has no lattice and no merge of its own. Reconciliation belongs to the component
+that publishes, through its fork (entry 5).
 
 CAD text affected:
 
 - CAD024 *Cursor Sync Guarantees*: `sync()` "fires the cursor's `onSync` callback";
   item 2 names `ForkedLatticeCursor`.
-- CAD035 has no text on publication; the seam is an addition.
+- CAD035 has no text on publication.
 
-Proposed wording: publication is a host service installed at the root together with
-the merge that reconciles a concurrent write; a fork's sync never reaches it; the
-host calls the root's sync explicitly when merged state should be published.
+Proposed wording: publication is a host service over one snapshot; a fork's sync
+never reaches it; the host publishes when asked.
 
 ## 7. Merge results are installed unstamped
 
@@ -252,18 +242,16 @@ are gone (`ResolveTest` became `ResolvePathTest`).
 CAD text affected: CAD035 *Lattice-Aware Cursors*, "Canonical vs logical keys —
 `path` vs `resolve`".
 
-## 9. Hosts merge path-addressed values with the served sub-lattice
+## 9. Path deliveries go to applications, not to a host merge
 
-**Status:** Implemented (`c1bfed931`); superseded 17 October, see entry 16.
+**Status:** Implemented.
 
-`NodeServer` built a plain root and merged inbound path values with
-`lattice.path(path)`; `mergeAt(value, path...)` was the public form. The node now
-holds no lattice: a path delivery goes to each application's `mergeAt`, which walks
-the path through the components that resolve, and the deepest merges the value reduced
-to its path with its own behaviour.
+A node holds no lattice. A path-addressed delivery reaches the host as
+`mergeAt(value, path...)` and the host hands it unchanged to each application. The
+application's `mergeAt` walks the path through the components that resolve, and the
+deepest component that resolves handles the delivery itself (entries 16, 24 and 25).
 
-CAD text affected: none found in CAD024/035/045; CAD036 (*Lattice Node*) should be
-checked for how pull-path merges are described.
+CAD text affected: CAD036 (*Lattice Node*), how pull-path merges are described.
 
 ## 10. Transactions over a draft cursor
 
@@ -317,9 +305,9 @@ CAD045 *Connecting to Node Infrastructure* and CAD024 *Cursor Sync Guarantees*
 optional store, the publication policy that runs on its sync, and an immutable list
 of applications that receive incoming values. It has no lattice: it never merges on
 its own, an unconfigured host ignores incoming values, and its sync is a plain
-compare-and-set that leaves a racing write pending for the next sync (this is what
-superseded entry 6). Without a store, persist returns its input and flush is a
-no-op; a networked node still requires a store.
+compare-and-set that leaves a racing write pending for the next sync (entry 6).
+Without a store, persist returns its input and flush is a no-op; a networked node
+still requires a store.
 
 CAD text affected:
 
@@ -408,26 +396,17 @@ syncs the host for edits its policy makes during admission, the one place it tou
 publication, because the node's post-merge sync runs only when the merge itself changed
 the root.
 
-Later on 17 October the application merge took its intended shape. Mike's statement:
-the lattice is a shape definition plus a default merge function; it is up to the
-component implementation to delegate to it or not, and nothing assumes it as the
-default. `ALatticeApplication.merge` is therefore abstract: every application states
-how it merges an incoming root, `LatticeApplication` and `DLFSApplication` by
-delegating whole, `P2PApplication` by delegating the root projected to the social
-owners it wants and then recording their validated signers. A path delivery is every
-component's business, through `mergeAt` on the component base: a component with a
-child component for the first key (`child(key)`, none by default) hands the rest of
-the path to it, and the deepest component that resolves merges the value reduced to
-its path, siblings ignored, built from the empty containers its lattice declares,
-through its own `merge`, whether that delegates to a lattice or does otherwise. Every
-component has a `merge` (the base refuses, so a misrouted delivery fails rather than
-vanishing), and a path the lattice does not declare delivers nothing, as an undeclared
-key in a root does. Three cuts the same day converged here, one making `mergeAt` final
-over a partial root, one merging with the lattice at the path, one resolving a whole
-path to a component; Mike's rule each time was that the behaviour at a path is the
-component's, and that the walk falls back to the last component that resolves. The
-base helper `mergeDeclaredPath`, the path-ignoring default, the "declared path does
-not imply interest" rule and the bootstrap after-merge steps went.
+The lattice is a shape definition plus a default merge function; the component
+implementation decides whether to delegate to it, and nothing assumes it as the
+default. `ALatticeApplication.merge` is abstract: every application states how it
+merges an incoming root. The P2P application delegates the root, projected to the
+social owners it wants, to its lattice and then records their validated signers. A
+path delivery is every component's business through `mergeAt`: a component with a
+child for the first key (`child(key)`, none by default) hands the rest of the path to
+it, and the deepest component that resolves handles the delivery with its own
+behaviour. Every component has a `merge`; the base refuses, so a misrouted delivery
+fails rather than vanishing. Entries 24 and 25 give the rule for a path no child
+claims.
 
 CAD text affected:
 
@@ -639,19 +618,21 @@ reduction and publication reconciliation are shared with `LatticeComponent` thro
 region entry points navigate their known index/map types without a root lattice.
 This preserves CAD045's component boundaries and CAD035's fork semantics.
 
-## 26. Default sync follows explicit publication ownership
+## 26. Sync publishes the component's bound storage
 
-Implemented 21 October 2026. `ALatticeComponent` no longer overloads live and
-staged construction on `AForkableCursor` versus `ACursor`. `super(cursor)` shares
-storage; `super(forkOf(destination))` explicitly creates an owned fork. Component
-copying and stored-representation conversion retain their explicit fork semantics.
+Implemented. A component binds the storage it is given, `super(cursor)`. A staged
+component is one constructed over a fork of its destination, `destination.fork()`,
+and a component fork is `rebind(storage.fork())`, the same class over a forked
+cursor. There is no second constructor form and no ownership flag.
 
-Default sync publishes only the owned fork, or reads the current value when there
-is none. It never publishes or refreshes a caller-owned fork through a view, nor
-signs, stamps or creates default state. Nested publication stops at its immediate
-destination. Application preparation and managed-child sync remain explicit
-lifecycle extensions. Regression tests cover these ownership boundaries, cursor
-declaration independence and no-op identity through authoring views.
+`sync()` publishes the bound storage with the component's own reconciliation,
+`storage.sync(this::mergePublication)`. On a fork that reconciles and publishes into
+the fork's destination; on any other cursor it returns the current value and
+publishes nothing, so a live view has no publication work. Sync never publishes a
+caller-owned fork through a view, nor signs, stamps or creates default state. Nested
+publication stops at its immediate destination. Application preparation and
+managed-child sync remain explicit lifecycle extensions. Regression tests cover these
+boundaries and no-op identity through authoring views.
 
 ## 27. Fork reconciliation completes before publication commits
 
@@ -663,14 +644,11 @@ post-publication reconciliation loop and separate sync lock are removed.
 
 A failed merge or preparation leaves the fork value and baseline unchanged and
 publishes nothing. CAS retries still account for independent destination changes
-and reuse preparation for an unchanged candidate. Re-entrant writes or syncs from
-publication callbacks are rejected. Regression tests exercise concurrent edits,
-failure on retry, failed signing, baseline preservation and nested publication.
-This implements CAD035's atomic cursor and failure-before-publication semantics.
-
-Updated 22 October 2026: removed thread tracking and re-entrancy guards. Publication
-callbacks must still avoid mutating or syncing the same fork; this is a caller
-contract. Working-state locking continues to coordinate concurrent edits and sync.
+and reuse preparation for an unchanged candidate. A publication callback must not
+mutate or sync the same fork; that is a caller contract, not a runtime guard.
+Regression tests exercise concurrent edits, failure on retry, failed signing,
+baseline preservation and nested publication. This implements CAD035's atomic
+cursor and failure-before-publication semantics.
 
 ## 28. Component bases carry no context
 
@@ -694,43 +672,20 @@ views and forks, multi-DID receipt signing, and failed authoring leaving state
 unchanged. Existing publication and integration tests continue to cover routing,
 transaction atomicity and shared application composition.
 
-## 28. Networking is optional, dynamic and detachable; a node's DID is optional
-
-**Status:** Implemented 23 October 2026 (`e87af7ebc`, `d2dad4b32`, `a14716eec`);
-decided 23 October 2026.
-
-`LatticeNode` wraps a `NodeServer`, a `LatticeListener` and dynamically created
-propagation groups in one lifecycle around an existing host. The node attaches itself
-as the host's one publisher and detaches on close, so a host outlives its networking.
-Groups, their transport keys, filters, handlers and inbound selection can change while
-the node runs; the configure-before-attach rule is gone. The node may carry a primary
-DID and an authorised key as the default transport identity of new groups.
-
-Mike's decisions: dynamic is the default unless something genuinely cannot change; a
-DID is optional, and more capable nodes will almost certainly want one; the
-hand-assembled node setups (the P2P node, the CLI and DLFS servers, ConvexDB and the
-GUI browser) port to `LatticeNode` as the standard assembly, with the wrapper's own
-design left open (Convex-Dev/convex#769). The networking narrative has one home,
-`convex-peer/docs/LATTICE_NETWORKING.md`; the applications manual points there.
-
-CAD text affected: CAD036 (*Lattice Node*) node construction, propagation group
-lifecycle and node identity.
-
 ## 29. Rebinding separates construction, working storage and publication
 
-Implemented 23 October 2026. Component constructors bind supplied storage;
-`rebind(cursor)` reconstructs the domain component with its configuration and fresh
-child views. Forks rebind to a fork of bound storage. The base retains that storage
-independently of an overridden editing `cursor()`, so timestamping views neither
-hide nor move the publication boundary. `ForkTarget`, `forkOf` and the separate
-owned-fork field are removed. Wrappers sharing a fork share publication; ordinary
-cursor views never publish enclosing state. This supersedes entry 26's ownership
-selection and the earlier fork-time merge API.
+Implemented. Component constructors bind supplied storage; `rebind(cursor)`
+reconstructs the domain component with its configuration and fresh child views.
+Forks rebind to a fork of bound storage. The base retains that storage independently
+of an overridden editing `cursor()`, so timestamping views neither hide nor move the
+publication boundary. There is no separate owned-fork field or fork-target
+construction. Wrappers sharing a fork share publication; ordinary cursor views never
+publish enclosing state (entries 5 and 26).
 
-Cursor `fork()` retains only destination, working state and baseline. The merge
+A cursor fork holds only its destination, working state and baseline. The merge
 function is supplied to each `sync(merge)`; atomic reconciliation, failure handling
-and working-state coordination are unchanged. `AForkableCursor` remains distinct
-from the read-only view hierarchy. The lattice adapter's constructors now bind;
+and working-state coordination are as entry 27 describes. `AForkableCursor` remains
+distinct from the read-only view hierarchy. The lattice adapter's constructors bind;
 callers explicitly choose a fork when staging is intended.
 
 CAD035 describes fork/sync mechanics; CAD045 describes bound storage, editing views
@@ -779,6 +734,27 @@ are unchanged. Tests cover signature counts, preserved timestamps, newer whole-r
 selection, incoming verification, nested drafts, signer recovery and unchanged fork
 baselines after failed publication.
 
+## 32. Networking is optional, dynamic and detachable; a node's DID is optional
+
+**Status:** Implemented; agreed.
+
+`LatticeNode` wraps a `NodeServer`, a `LatticeListener` and dynamically created
+propagation groups in one lifecycle around an existing host. The node attaches itself
+as the host's one publisher and detaches on close, so a host outlives its networking.
+Groups, their transport keys, filters, handlers and inbound selection can change while
+the node runs: dynamic is the default unless something genuinely cannot change. The
+node may carry a primary DID and an authorised key as the default transport identity
+of new groups; the DID is optional, and more capable nodes will want one.
+
+`LatticeNode` is the standard TCP assembly. The hand-assembled node setups (the P2P
+node, the CLI and DLFS servers, ConvexDB and the GUI browser) port to it
+(Convex-Dev/convex#769); the wrapper's own design stays open. The networking
+narrative has one home, `convex-peer/docs/LATTICE_NETWORKING.md`; the applications
+manual points there.
+
+CAD text affected: CAD036 (*Lattice Node*) node construction, propagation group
+lifecycle and node identity.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |
@@ -786,5 +762,5 @@ baselines after failed publication.
 | CAD024 Data Lattice | *Cursors*, *Signed Lattice*, *Cursor Sync Guarantees*, implementation note on cursor types | 1, 3, 5, 6, 13, 15 |
 | CAD035 Lattice Cursors | *Path Cursor*, *Forkable Cursor*, *Cursor Hierarchy*, *Lattice-Aware Cursors*, *Lattice Context*, *Reference Implementation*, Java example | 2, 3, 4, 5, 6, 7, 8, 10 |
 | CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 |
-| CAD036 Lattice Node | pull-path merge description, node construction and restore, group lifecycle, node identity | 9, 14, 16, 28 |
+| CAD036 Lattice Node | pull-path merge description, node construction and restore, group lifecycle, node identity | 9, 14, 16, 32 |
 | CAD038 Lattice Authentication | *Owner Verifier*, indirect-owner default policy, explicit authoring | 19, 20, 21, 22 |
