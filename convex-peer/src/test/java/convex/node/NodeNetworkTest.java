@@ -102,9 +102,8 @@ public class NodeNetworkTest {
 			// port, avoiding bind collisions on busy CI runners; peer wiring below
 			// uses getHostAddress() which reflects the actual port.
 			NodeConfig config=NodeConfig.port(0);
-			NodeServer<?> server = new NodeServer<>(commonLattice, store, config);
-			LatticePropagator propagator=new LatticePropagator(
-				store,commonLattice,value -> value,LatticePropagatorConfig.create());
+			NodeServer<?> server = new NodeServer<>(RelayHost.open(commonLattice, store), config);
+			LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.create());
 			server.addPropagator(propagator);
 			LatticeListener transport=new LatticeListener(config);
 			transport.registerPropagator(propagator);
@@ -215,7 +214,7 @@ public class NodeNetworkTest {
 
 		// Sync so the propagator has the value for LATTICE_QUERY responses.
 		// Synchronous commit: announce completes on this thread before return.
-		server0.getCursor().sync();
+		server0.getHost().sync();
 
 		// Create the query path [:data valueHash] for reuse
 		AVector<ACell> queryPath = Vectors.create(dataKeyword, valueHash);

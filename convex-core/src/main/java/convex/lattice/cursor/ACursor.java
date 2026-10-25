@@ -1,46 +1,49 @@
 package convex.lattice.cursor;
 
+import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
-import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.lattice.LatticeOps;
 
 /**
- * A cursor is a mutable reference to a CVM value with atomic update operations.
+ * Atomic read/write access to one immutable CVM value.
+ * Paths update existing nested containers atomically through their base cursor.
+ * Components construct missing containers. Cursors carry no lattice policy,
+ * signing context or clock; components own those concerns.
  *
- * <h2>Semantic Model</h2>
- * <p>A cursor represents a "location" that holds a value. The value can be read,
- * written, and atomically updated. Cursors provide the same atomic guarantees as
- * {@link java.util.concurrent.atomic.AtomicReference}:</p>
- * <ul>
- *   <li><b>Visibility:</b> Writes are visible to subsequent reads</li>
- *   <li><b>Atomicity:</b> Update operations (CAS, updateAndGet, etc.) are atomic</li>
- *   <li><b>Ordering:</b> Operations on a single cursor are sequentially consistent</li>
- * </ul>
- *
- * <h2>Path Navigation</h2>
- * <p>Cursors support navigating into nested data structures via {@link #path(ACell...)}.
- * A path cursor provides a view into a specific location within the parent's value.
- * Modifications through a path cursor atomically update the parent's entire value.</p>
- *
- * <h2>Cursor Hierarchy</h2>
- * <ul>
- *   <li>{@link ACursor} - Base class with atomic read/write operations</li>
- *   <li>{@link AForkableCursor} - Adds detach/merge for optimistic concurrency (CAS-based)</li>
- *   <li>{@link ALatticeCursor} - Adds fork/sync with lattice merge (always succeeds)</li>
- * </ul>
- *
- * @param <V> Type of value held by this cursor
- * @see AForkableCursor for optimistic concurrency with CAS-based merge
- * @see ALatticeCursor for CRDT-style merge that always succeeds
+ * @param <V> Value type
  */
 public abstract class ACursor<V extends ACell> {
 
-	protected ACursor() {
+	// ===== Exclusive transactions =====
+
+	/**
+	 * Returns the lock which serialises writes to this cursor's shared state, or null
+	 * when that state lives in an ordinary optimistic root. Derived cursors resolve
+	 * this through their existing links; {@link TransactionalRootCursor} supplies its
+	 * write lock. This is the only root-owned capability a cursor exposes, and it
+	 * supports {@link Transactions} and atomic fork publication.
+	 *
+	 * @return Shared write lock, or null when exclusive transactions are unsupported
+	 */
+	protected Lock exclusiveLock() {
+		return null;
 	}
+
+	/**
+	 * Whether this cursor's shared state supports exclusive transactions. Ordinary
+	 * roots support optimistic transactions only.
+	 *
+	 * @return true if {@link Transactions#transactLocked} is available
+	 */
+	public final boolean supportsExclusiveTransactions() {
+		return exclusiveLock() != null;
+	}
+
+	// ===== Reads =====
 
 	/**
 	 * Returns the current value at this cursor location.
@@ -77,46 +80,37 @@ public abstract class ACursor<V extends ACell> {
 		return RT.getIn(get(), path);
 	}
 
+	// ===== Writes =====
+
 	/**
 	 * Atomically associates a value at a single key within this cursor's value.
 	 *
-	 * <p>Throws if the current value is null — callers must initialise the
-	 * structure first. {@link ALatticeCursor} overrides this to auto-initialise
-	 * from the lattice's zero value.</p>
+	 * <p>The current value must be an existing container.</p>
 	 *
 	 * @param key Key to write at
 	 * @param value Value to associate
 	 */
 	@SuppressWarnings("unchecked")
 	public void assoc(ACell key, ACell value) {
-		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, null, key));
+		getAndUpdate(bv -> (V) LatticeOps.assocExisting(bv, value, key));
 	}
 
 	/**
 	 * Atomically associates a value at a nested path within this cursor's value.
 	 *
-	 * <p>Throws if any intermediate value is null — callers must initialise the
-	 * structure first. {@link ALatticeCursor} overrides this to auto-initialise
-	 * from the lattice hierarchy.</p>
+	 * <p>All intermediate containers must already exist. Components which need to
+	 * create them can supply an explicit update function or a {@link ProjectionCursor}.</p>
 	 *
 	 * @param value Value to set at the end of the path
 	 * @param keys Path of keys to navigate
 	 */
 	@SuppressWarnings("unchecked")
 	public void assocIn(ACell value, ACell... keys) {
-		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, null, keys));
+		getAndUpdate(bv -> (V) LatticeOps.assocExisting(bv, value, keys));
 	}
 
 	/**
 	 * Atomically sets the cursor to the new value and returns the old value.
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V old = get();
-	 * set(newValue);
-	 * return old;
-	 * }</pre>
-	 * but executed atomically.</p>
 	 *
 	 * @param newValue New value to set
 	 * @return Previous value before the update
@@ -130,16 +124,6 @@ public abstract class ACursor<V extends ACell> {
 	 * the current value is identical (==) to the expected value. This enables optimistic
 	 * concurrency: read a value, compute a new value, and attempt to write it back,
 	 * failing if another thread modified it in between.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * if (get() == expected) {
-	 *     set(newValue);
-	 *     return true;
-	 * }
-	 * return false;
-	 * }</pre>
-	 * but executed atomically.</p>
 	 *
 	 * @param expected The value expected to be present
 	 * @param newValue The new value to set if expectation holds
@@ -180,15 +164,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * <p>The update function is applied to the current value to produce the new value.
 	 * The function may be called multiple times if concurrent updates cause CAS failures,
-	 * so it should be side-effect free.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V old = get();
-	 * set(updateFunction.apply(old));
-	 * return old;
-	 * }</pre>
-	 * but executed atomically.</p>
+	 * so it should be side-effect free. An absent value is passed as null.</p>
 	 *
 	 * @param updateFunction Function to compute new value from current value
 	 * @return Value before the update was applied
@@ -200,15 +176,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * <p>The update function is applied to the current value to produce the new value.
 	 * The function may be called multiple times if concurrent updates cause CAS failures,
-	 * so it should be side-effect free.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V newVal = updateFunction.apply(get());
-	 * set(newVal);
-	 * return newVal;
-	 * }</pre>
-	 * but executed atomically.</p>
+	 * so it should be side-effect free. An absent value is passed as null.</p>
 	 *
 	 * @param updateFunction Function to compute new value from current value
 	 * @return Value after the update was applied
@@ -229,18 +197,6 @@ public abstract class ACursor<V extends ACell> {
 	/**
 	 * Atomically accumulates a value and returns the old value.
 	 *
-	 * <p>The accumulator function combines the current value with x to produce
-	 * the new value. Useful for reduction operations like adding to a counter
-	 * or appending to a collection.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V old = get();
-	 * set(accumulatorFunction.apply(old, x));
-	 * return old;
-	 * }</pre>
-	 * but executed atomically.</p>
-	 *
 	 * @param x Value to accumulate
 	 * @param accumulatorFunction Function combining current value with x
 	 * @return Value before accumulation
@@ -250,33 +206,11 @@ public abstract class ACursor<V extends ACell> {
 	/**
 	 * Atomically accumulates a value and returns the new value.
 	 *
-	 * <p>The accumulator function combines the current value with x to produce
-	 * the new value.</p>
-	 *
-	 * <p>Semantically equivalent to:
-	 * <pre>{@code
-	 * V newVal = accumulatorFunction.apply(get(), x);
-	 * set(newVal);
-	 * return newVal;
-	 * }</pre>
-	 * but executed atomically.</p>
-	 *
 	 * @param x Value to accumulate
 	 * @param accumulatorFunction Function combining current value with x
 	 * @return Value after accumulation
 	 */
 	public abstract V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction);
-
-	/**
-	 * Whether this cursor supports exclusive transactions, inherited from its
-	 * state-owning root. Ordinary cursors support optimistic transactions only.
-	 */
-	public boolean supportsExclusiveTransactions() { return false; }
-
-	/** Executes under this cursor's shared root write exclusion, when supported. */
-	protected <T> T exclusive(Supplier<T> action) {
-		throw new UnsupportedOperationException("Cursor does not support exclusive transactions");
-	}
 
 	@Override
 	public String toString() {
@@ -285,46 +219,19 @@ public abstract class ACursor<V extends ACell> {
 		return v.toString();
 	}
 
+	// ===== Navigation =====
+
 	/**
-	 * Creates a path cursor navigating into a nested location within this cursor.
+	 * Creates a cursor navigating into a nested location within this cursor.
 	 *
-	 * <p>A path cursor provides a view into a specific key path within the parent's
-	 * value. Reading from the path cursor returns the nested value; writing to it
-	 * atomically updates the parent's entire value with the nested change.</p>
-	 *
-	 * <p>Path cursors are useful for working with nested data structures without
-	 * manually reading, modifying, and writing back the entire structure.</p>
-	 *
-	 * <pre>{@code
-	 * Root<AMap> root = Root.create(Maps.of("user", Maps.of("name", "Alice")));
-	 * ACursor<AString> nameCursor = root.path(Strings.create("user"), Strings.create("name"));
-	 * nameCursor.set(Strings.create("Bob"));  // Atomically updates root
-	 * }</pre>
+	 * <p>Reading from the path cursor returns the nested value; writing to it
+	 * atomically updates this cursor's entire value with the nested change. A write
+	 * through an absent intermediate fails; components supply any construction logic.</p>
 	 *
 	 * @param <T> Type of value at the path
 	 * @param path Keys to navigate through nested data structures
 	 * @return A cursor positioned at the nested path
 	 */
 	public abstract <T extends ACell> ACursor<T> path(ACell... path);
-
-	/**
-	 * Creates an independent copy of this cursor for isolated modifications.
-	 *
-	 * <p>The detached cursor starts with a snapshot of the current value and can be
-	 * modified without affecting this cursor. Use {@link AForkableCursor#merge(AForkableCursor)}
-	 * to attempt merging changes back (will fail if this cursor changed).</p>
-	 *
-	 * <p>For lattice-aware forking where merge always succeeds, use
-	 * {@link ALatticeCursor#fork()} instead.</p>
-	 *
-	 * @param <T> Type of the detached cursor value
-	 * @return A new independent Root cursor with the current value
-	 * @see AForkableCursor#merge(AForkableCursor) for CAS-based merge (can fail)
-	 * @see ALatticeCursor#fork() for lattice-aware fork (merge always succeeds)
-	 */
-	@SuppressWarnings("unchecked")
-	public <T extends ACell> AForkableCursor<T> detach() {
-		return (AForkableCursor<T>) Root.create(get());
-	}
 
 }

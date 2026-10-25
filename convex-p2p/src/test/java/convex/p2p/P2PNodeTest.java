@@ -3,7 +3,6 @@ package convex.p2p;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,6 +32,7 @@ import convex.etch.EtchStore;
 import convex.lattice.LatticeContext;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 import convex.social.Social;
 
 /**
@@ -63,6 +63,21 @@ public class P2PNodeTest {
 		assertFalse(node.isRunning());
 	}
 
+	/** The host hands incoming values to the P2P application, which merges a path delivery at its level. */
+	@Test
+	public void testIncomingRegistryValueReachesApplication() {
+		AKeyPair keyPair=AKeyPair.generate();
+		AKeyPair remote=AKeyPair.generate();
+		node=P2PNode.create(store,NodeConfig.create(),keyPair);
+		AHashMap<Keyword,ACell> info=convex.lattice.p2p.P2PLattice.createNodeInfo(
+			Vectors.empty(),Strings.create("test"),Strings.create("0"),Vectors.empty(),false,
+			System.currentTimeMillis());
+		node.getNodeServer().mergeAt(convex.lattice.p2p.P2PLattice.createSignedEntry(remote,info),
+			P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		assertEquals(info,node.getApplication().node(remote.getAccountKey()).getNodeInfo());
+		assertEquals(info,nodeInfo(remote.getAccountKey()));
+	}
+
 	@Test
 	public void testCreateRequiresStore() {
 		assertThrows(IllegalArgumentException.class,
@@ -86,8 +101,8 @@ public class P2PNodeTest {
 			NodeConfig.URL,Strings.create("tcp://localhost:18888"),
 			NodeConfig.PORT,CVMLong.create(-1)));
 		try (NodeServer<Index<Keyword,ACell>> raw=
-				new NodeServer<>(P2PLattice.ROOT,store,config)) {
-			raw.setMergeContext(LatticeContext.create(null,keyPair));
+				new NodeServer<>(RelayHost.open(P2PLattice.ROOT,store,
+					LatticeContext.create(null,keyPair)),config)) {
 			raw.launch();
 			ACell nodes=raw.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 			assertTrue(nodes==null || (nodes instanceof AHashMap<?,?> map && map.isEmpty()),
@@ -172,13 +187,14 @@ public class P2PNodeTest {
 	public void testDefaultNodeServesApplicationRegions() {
 		node = P2PNode.create(store, NodeConfig.port(-1), AKeyPair.generate());
 
-		var root=node.getNodeServer().getRootComponent().cursor();
+		var host=node.getNodeServer().getHost();
+		var root=host.cursor();
 		var application=node.getApplication().cursor();
-		assertNotSame(root,application);
-		assertSame(root.getLattice(),application.getLattice());
+		assertSame(root,application);
+		assertNotNull(node.getApplication().getLattice());
 		assertSame(root.get(),application.get());
-		assertNotNull(node.getNodeServer().getLattice().path(Social.KEY_SOCIAL));
-		assertNotNull(node.getNodeServer().getLattice().path(Keywords.P2P, Keywords.NODES));
+		assertNotNull(node.getApplication().getLattice().path(Social.KEY_SOCIAL));
+		assertNotNull(node.getApplication().getLattice().path(Keywords.P2P, Keywords.NODES));
 	}
 
 	/**
@@ -192,7 +208,7 @@ public class P2PNodeTest {
 		node.launch();
 
 		assertTrue(node.isRunning());
-		assertNull(node.getNodeServer().getLattice().path(Social.KEY_SOCIAL));
+		assertNull(node.getApplication().getLattice().path(Social.KEY_SOCIAL));
 
 		// Full P2P capability: identity and node registry both writable
 		assertNotNull(node.p2p().cursor());
@@ -207,6 +223,6 @@ public class P2PNodeTest {
 	private AHashMap<Keyword,ACell> nodeInfo(AccountKey key) {
 		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap<ACell,SignedData<ACell>>)
 			(ACell)node.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		return convex.lattice.P2PLattice.getNodeInfo(nodes,key);
+		return convex.lattice.p2p.P2PLattice.getNodeInfo(nodes,key);
 	}
 }

@@ -23,10 +23,10 @@ import convex.core.lang.RT;
  * defaults. The underlying config map is immutable.</p>
  *
  * <p>Key names reuse {@link convex.peer.PeerConfig} constants where they
- * overlap (port, persist and restore) so configurations are consistent
+ * overlap (port) so configurations are consistent
  * across peer and lattice node servers.</p>
  *
- * <p>{@code NodeServer} consumes persistence and validation settings only.
+ * <p>{@code NodeServer} uses no host opening or durability settings.
  * {@code LatticeListener} independently consumes the port and physical inbound
  * limits. Passing this object to a server does not create, configure or own a
  * transport.</p>
@@ -49,18 +49,6 @@ public class NodeConfig {
 	 * disables the listener.
 	 */
 	public static final AString PORT = Strings.intern("port");
-
-	/** Whether to persist state to store (Boolean, default true). */
-	public static final AString PERSIST = Strings.intern("persist");
-
-	/** Whether to restore state from store on startup (Boolean, default true). */
-	public static final AString RESTORE = Strings.intern("restore");
-
-	/** Enable coordinated root writes, exclusive transactions and serial fallback (default false). */
-	public static final AString TRANSACTIONAL_ROOT = Strings.intern("transactionalRoot");
-
-	/** Interval between periodic persistence runs in milliseconds (Long, default 30000). */
-	public static final AString PERSIST_INTERVAL = Strings.intern("persistInterval");
 
 	/** Optional advertised URL consumed by a discovery adapter (AString).
 	 *  {@link NodeServer} itself ignores this field. */
@@ -123,9 +111,6 @@ public class NodeConfig {
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT =
 		LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT;
 
-	/** Maximum accepted wall-clock lead for timestamp-ordered lattice values. */
-	public static final AString MAX_FUTURE_TIMESTAMP_SKEW = Strings.intern("maxFutureTimestampSkew");
-
 	/** Conservative public-node default: large lattice trees are transferred via DATA_REQUEST. */
 	public static final int DEFAULT_MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
 
@@ -162,25 +147,18 @@ public class NodeConfig {
 	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT =
 		LatticePropagatorConfig.DEFAULT_INBOUND_SHUTDOWN_TIMEOUT;
 
-	/** Default wall-clock lead accepted from timestamp-ordered lattice values. */
-	public static final long DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW = 30_000L;
-
 	// ========== Instance ==========
 
 	private final AMap<AString, ACell> config;
 
-	/** Whether the host should create a transactional root cursor. */
-	public boolean isTransactionalRoot() {
-		return RT.bool(config.get(TRANSACTIONAL_ROOT));
-	}
-
-	/** Selects the root coordination policy before the host is constructed. */
-	public NodeConfig withTransactionalRoot(boolean enabled) {
-		return new NodeConfig(config.assoc(TRANSACTIONAL_ROOT,CVMBool.create(enabled)));
-	}
-
 	private NodeConfig(AMap<AString, ACell> config) {
 		this.config = (config == null) ? Maps.empty() : config;
+		for (String key:new String[]{"persist","persistInterval","restore","transactionalRoot"}) {
+			if (this.config.containsKey(Strings.create(key))) {
+				throw new IllegalArgumentException("Host setting '"+key+"' is not a networking option; "
+					+"use LatticeHost create/open/replace, cursor coordination or autoFlush/checkpoint explicitly");
+			}
+		}
 	}
 
 	/**
@@ -248,34 +226,6 @@ public class NodeConfig {
 	public Integer getPort() {
 		CVMLong v = RT.ensureLong(config.get(PORT));
 		return (v != null) ? (int) v.longValue() : null;
-	}
-
-	/**
-	 * Returns whether authoritative state is persisted to the node store.
-	 *
-	 * @return {@code true} when persistence is enabled
-	 */
-	public boolean isPersist() {
-		return getBool(PERSIST, true);
-	}
-
-	/**
-	 * Returns whether authoritative state is restored from the node store at launch.
-	 *
-	 * @return {@code true} when restoration is enabled
-	 */
-	public boolean isRestore() {
-		return getBool(RESTORE, true);
-	}
-
-	/**
-	 * Returns the interval between periodic persistence barriers.
-	 *
-	 * @return interval in milliseconds
-	 */
-	public long getPersistInterval() {
-		CVMLong v = RT.ensureLong(config.get(PERSIST_INTERVAL));
-		return (v != null) ? v.longValue() : 30_000L;
 	}
 
 	/**
@@ -456,22 +406,6 @@ public class NodeConfig {
 	@Deprecated
 	public long getInboundShutdownTimeout() {
 		return LatticePropagatorConfig.from(this).getInboundShutdownTimeout();
-	}
-
-	/**
-	 * Returns the maximum accepted lead over the local clock for lattice values
-	 * that use wall-clock conflict ordering. Zero requires timestamps no later
-	 * than the local clock.
-	 *
-	 * @return non-negative future timestamp allowance in milliseconds
-	 */
-	public long getMaxFutureTimestampSkew() {
-		CVMLong v = RT.ensureLong(config.get(MAX_FUTURE_TIMESTAMP_SKEW));
-		long value = (v != null) ? v.longValue() : DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW;
-		if (value < 0) {
-			throw new IllegalArgumentException(MAX_FUTURE_TIMESTAMP_SKEW + " must not be negative: " + value);
-		}
-		return value;
 	}
 
 	// ========== URL validation ==========

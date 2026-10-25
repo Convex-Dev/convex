@@ -1,6 +1,7 @@
 package convex.cli.dlfs;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -14,8 +15,10 @@ import convex.cli.Main;
 import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
@@ -24,10 +27,9 @@ import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSServer;
+import convex.lattice.LatticeHost;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
-import convex.lattice.Lattice;
-import convex.lattice.LatticeContext;
 import convex.node.NodeConfig;
 import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
@@ -130,13 +132,18 @@ public class DlfsStart extends ACommand {
 		// Build NodeConfig
 		NodeConfig config = buildNodeConfig();
 
-		// Create and configure NodeServer
-		NodeServer<?> nodeServer = new NodeServer<>(Lattice.ROOT, store, config);
-		LatticeContext context=LatticeContext.create(null,keyPair);
-		nodeServer.setMergeContext(context);
-		LatticePropagator propagator=new LatticePropagator(
-			store,Lattice.ROOT,value -> value,LatticePropagatorConfig.from(config));
-		propagator.setMergeContext(context);
+		// Register DLFS before starting any incoming delivery.
+		NodeServer<Index<Keyword,ACell>> nodeServer;
+		DLFSApplication application;
+		try {
+			var host=LatticeHost.open(store);
+			application=host.addApplication(new DLFSApplication(host,keyPair::signData));
+			nodeServer=new NodeServer<>(host,config);
+		} catch (IOException e) {
+			store.close();
+			throw new CLIError(ExitCodes.CONFIG, "Failed to open node store: " + e.getMessage(), e);
+		}
+		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(config));
 		propagator.setTransportKeyPair(keyPair);
 		nodeServer.addPropagator(propagator);
 		LatticeListener latticeTransport=new LatticeListener(config);
@@ -160,15 +167,9 @@ public class DlfsStart extends ACommand {
 		// Connect to remote peers
 		connectPeers(propagator);
 
-		// Attach the user's drives component at :fs → accountKey → :value.
-		// This traverses OwnerLattice → SignedLattice → MapLattice<DLFSLattice>
+		// Serve the local owner's drives through the application's registered region.
 		AccountKey accountKey = keyPair.getAccountKey();
-		DLFSApplication<?> application=DLFSApplication.connect(
-			nodeServer.getRootComponent(),Keywords.FS);
-		DLFSDrives ownerDrives=application.drives(accountKey);
-		DLFSDriveManager driveManager=DLFSDriveManager.createRouter()
-			.mountAnonymous(ownerDrives)
-			.mount(DID.forKey(accountKey).toString(),ownerDrives);
+		DLFSDriveManager driveManager=createDriveManager(nodeServer.getHost(),application,accountKey);
 		DLFSServer dlfsServer = DLFSServer.createWithAudience(driveManager,keyPair);
 		// The CLI currently exposes shared anonymous drives on the loopback-only server.
 		// Authentication-aware per-user drive provisioning is a separate product concern.
@@ -182,7 +183,7 @@ public class DlfsStart extends ACommand {
 				}
 				inform("Drive '" + driveName + "' connected to lattice at :fs/" + accountKey.toHexString(6) + ".../" + driveName);
 			}
-			application.sync();
+			driveManager.sync();
 			dlfsServer.start(port);
 		} catch (RuntimeException e) {
 			dlfsServer.close();
@@ -213,7 +214,7 @@ public class DlfsStart extends ACommand {
 				log.warn("Error closing NodeServer", e);
 			}
 			try {
-				application.flush();
+				store.flush();
 			} catch (Exception e) {
 				log.warn("Error flushing DLFS store",e);
 			}
@@ -235,6 +236,18 @@ public class DlfsStart extends ACommand {
 			if (trayInstalled) TrayManager.remove();
 			shutdown.run();
 		}
+	}
+
+	/** Composes local routing with the CLI's explicit publication policy. */
+	static DLFSDriveManager createDriveManager(LatticeHost<Index<Keyword,ACell>> host,
+			DLFSApplication application,AccountKey accountKey) {
+		DLFSDrives ownerDrives=application.drives(accountKey);
+		return DLFSDriveManager.createRouter(()->{
+			application.sync();
+			try { host.checkpoint(); }
+			catch (IOException e) { throw new java.io.UncheckedIOException(e); }
+		}).mountAnonymous(ownerDrives)
+			.mount(DID.forKey(accountKey).toString(),ownerDrives);
 	}
 
 	private AKeyPair resolveKeyPair() {

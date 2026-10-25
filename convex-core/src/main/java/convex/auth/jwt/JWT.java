@@ -1,12 +1,15 @@
 package convex.auth.jwt;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Signature;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Instant;
 import java.util.Base64;
+import java.util.Objects;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -23,7 +26,9 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.lang.RT;
@@ -68,6 +73,15 @@ public class JWT {
 	public static final AString JTI = Strings.intern("jti");
 	public static final AString CLIENT_ID = Strings.intern("client_id");
 	public static final AString SCOPE = Strings.intern("scope");
+
+	/** A present exp claim is not a finite NumericDate (including explicit null). */
+	public static final AString INVALID_EXP = Strings.intern("invalid-exp");
+	/** A present nbf claim is not a finite NumericDate (including explicit null). */
+	public static final AString INVALID_NBF = Strings.intern("invalid-nbf");
+	/** The supplied time is at or after exp. */
+	public static final AString EXPIRED = Strings.intern("expired");
+	/** The supplied time is before nbf. */
+	public static final AString NOT_YET_VALID = Strings.intern("not-yet-valid");
 
 	private static final AString[] ACCESS_TOKEN_RESERVED = {
 		ISS, SUB, AUD, EXP, NBF, IAT, JTI, CLIENT_ID, SCOPE
@@ -240,7 +254,65 @@ public class JWT {
 	}
 
 	/**
+	 * Validate the optional exp and nbf bounds at an explicit time, following
+	 * <a href="https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.4">RFC 7519
+	 * sections 4.1.4 and 4.1.5</a> without clock-skew leeway.
+	 *
+	 * <p>Absent claims impose no bound. Present claims must be finite NumericDate
+	 * numbers (seconds since the Unix epoch, ignoring leap seconds); explicit null
+	 * and non-numeric values are invalid. Expiry requires {@code now < exp};
+	 * not-before requires {@code now >= nbf}. Both absent means success.</p>
+	 *
+	 * <p>Integers are compared exactly. Fractional/exponent JSON numbers use the
+	 * parser's binary64 representation; comparisons preserve that represented value
+	 * exactly against the supplied instant's seconds and nanoseconds. No further
+	 * rounding or conversion of claim values to bounded Java timestamps occurs.
+	 * Values that overflow binary64 to infinity are invalid.</p>
+	 *
+	 * <p>Failure precedence is {@link #INVALID_EXP}, {@link #INVALID_NBF},
+	 * {@link #EXPIRED}, then {@link #NOT_YET_VALID}. All reasons are interned.
+	 * This only checks time bounds: success does not verify a signature, identity,
+	 * audience or application policy. It does not inspect iat, require expiry,
+	 * impose a lifetime cap or read the wall clock.</p>
+	 *
+	 * @param now Evaluation time, for example {@code clock.instant()}
+	 * @return null on success, otherwise one of the four documented failure reasons
+	 * @throws NullPointerException if now is null
+	 */
+	public AString validateTimeBounds(Instant now) {
+		Objects.requireNonNull(now, "now");
+		BigDecimal exp = null;
+		if (claims.containsKey(EXP)) {
+			exp = numericDate(claims.get(EXP));
+			if (exp == null) return INVALID_EXP;
+		}
+		BigDecimal nbf = null;
+		if (claims.containsKey(NBF)) {
+			nbf = numericDate(claims.get(NBF));
+			if (nbf == null) return INVALID_NBF;
+		}
+		BigDecimal seconds = BigDecimal.valueOf(now.getEpochSecond())
+			.add(BigDecimal.valueOf(now.getNano(), 9));
+		if (exp != null && seconds.compareTo(exp) >= 0) return EXPIRED;
+		if (nbf != null && seconds.compareTo(nbf) < 0) return NOT_YET_VALID;
+		return null;
+	}
+
+	/** Convert a parsed NumericDate without losing integer or binary64 precision. */
+	private static BigDecimal numericDate(ACell value) {
+		if (value instanceof AInteger integer) return new BigDecimal(integer.big());
+		if (value instanceof CVMDouble number) {
+			double d = number.doubleValue();
+			// Deliberately preserve the exact binary value, not its shortest decimal text.
+			if (Double.isFinite(d)) return new BigDecimal(d);
+		}
+		return null;
+	}
+
+	/**
 	 * Validate standard JWT claims: exp, iss, aud.
+	 * Uses the wall clock, treats exp:null as omitted and does not check nbf.
+	 * Use {@link #validateTimeBounds(Instant)} for strict, explicit-time bounds.
 	 *
 	 * @param expectedIssuer Expected issuer, or null to skip issuer check
 	 * @param expectedAudience Expected audience (e.g. server DID), or null to skip
@@ -254,6 +326,8 @@ public class JWT {
 
 	/**
 	 * Validate standard JWT claims: exp, iss, aud.
+	 * Uses the wall clock, treats exp:null as omitted and does not check nbf.
+	 * Use {@link #validateTimeBounds(Instant)} for strict, explicit-time bounds.
 	 *
 	 * @param expectedIssuer Expected issuer, or null to skip issuer check
 	 * @param expectedAudience Expected audience (e.g. server DID), or null to skip

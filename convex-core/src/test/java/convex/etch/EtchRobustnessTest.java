@@ -234,33 +234,32 @@ public class EtchRobustnessTest {
 		int NTHREADS = 8;
 		int PER = 100;
 
-		List<Callable<Hash>> tasks = new ArrayList<>();
+		List<Callable<AVector<ACell>>> tasks = new ArrayList<>();
 		for (int t = 0; t < NTHREADS; t++) {
 			for (int i = 0; i < PER; i++) {
 				final int seed = 1000 + t * PER + i;
 				tasks.add(() -> {
 					AVector<ACell> v = Vectors.of(CVMLong.create(seed), nonEmbedded(seed));
-					Ref<ACell> r = store.storeTopRef(v.getRef(), Ref.PERSISTED, null);
-					return r.getHash();
+					store.storeTopRef(v.getRef(), Ref.PERSISTED, null);
+					return v;
 				});
 			}
 		}
 
 		ExecutorService ex = Executors.newFixedThreadPool(NTHREADS);
 		try {
-			List<Future<Hash>> results = ex.invokeAll(tasks);
-			for (Future<Hash> fr : results) {
-				Hash h = fr.get(); // propagates any worker exception
-				assertNotNull(store.refForHash(h));
+			List<Future<AVector<ACell>>> results = ex.invokeAll(tasks);
+			for (Future<AVector<ACell>> fr : results) {
+				AVector<ACell> expected = fr.get(); // propagates any worker exception
+				// Read each committed value from disk, bypassing the reference cache.
+				assertEquals(expected,store.getEtch().read(expected.getHash()).getValue());
 			}
 		} finally {
 			ex.shutdown();
 		}
 
-		// Structural integrity after concurrent writes
-		EtchVerifier.IndexVisitor vd = new EtchVerifier.IndexVisitor();
-		store.getEtch().visitIndex(vd);
-		assertTrue(vd.values >= NTHREADS * PER);
+		// A whole-index visit requires a quiescent store. Other tests can still be
+		// writing to this shared store, so verify our writes instead of scanning it.
 	}
 
 	/**

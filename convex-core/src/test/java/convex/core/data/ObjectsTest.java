@@ -106,8 +106,8 @@ public class ObjectsTest {
 			assertEquals(b.getHash(),Hashing.sha3(encoding.getBytes()));
 			assertEquals(a,b);
 
-			b.attachEncoding(null);
-			assertEquals(encoding,b.getEncoding());
+			// Recompute without clearing a cache on a possibly interned/shared cell.
+			assertEquals(encoding,b.createEncoding());
 
 			// DecodeState round-trip: verify read(DecodeState) produces equal
 			// result with identical re-encoding for both encoder types
@@ -322,7 +322,7 @@ public class ObjectsTest {
 		}
 
 		assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
-		assertSame(encoding,a.getEncoding()); // should be same cached encoding
+		assertEquals(encoding,a.getEncoding()); // concurrent decoding may attach an equal encoding
 		assertEquals(encoding.count,a.getEncodingLength());
 		assertEquals(encoding.count,a.getEncodingLength((int) encoding.count));
 		assertEquals(0,a.getEncodingLength((int) encoding.count-1));
@@ -376,8 +376,9 @@ public class ObjectsTest {
 	private static void doHashTests(ACell a) {
 		Hash h=a.getHash();
 		assertNotNull(h);
-		assertSame(h,a.getHash());
-		assertSame(h,a.getEncoding().getContentHash(),()->"Inconsistent Hash on "+a);
+		// Cache identity is not a value property: concurrent decoding can replace it.
+		assertEquals(h,a.getHash());
+		assertEquals(h,a.getEncoding().getContentHash(),()->"Inconsistent Hash on "+a);
 		assertEquals(h,a.getRef().getHash());
 
 	}

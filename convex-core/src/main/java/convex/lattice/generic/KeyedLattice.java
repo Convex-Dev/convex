@@ -59,7 +59,7 @@ public class KeyedLattice extends AKeyedLattice<Keyword, Index<Keyword, ACell>> 
 	}
 
 	/**
-	 * Returns a new KeyedLattice with an additional key/lattice pair.
+	 * Returns a new KeyedLattice with a key/lattice pair, replacing any existing rule.
 	 *
 	 * @param key Keyword for the new section
 	 * @param lattice Lattice for the new section's values

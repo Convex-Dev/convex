@@ -76,12 +76,14 @@ public class PFXTest {
 		assertThrows(FileNotFoundException.class,()->PFXTools.loadStore(new File("bloooooobiug"), null));
 	}
 
-	@Test public void testKeySaltIsRandom() throws IOException, GeneralSecurityException {
+	@Test public void testKeyProtectionParameters() throws IOException, GeneralSecurityException {
 		ArrayList<KDFParams> params=pbkdf2Params(storeWithHeroKey());
 		assertEquals(1,params.size());
 
 		Blob salt=params.get(0).salt();
 		assertEquals(SALT_LENGTH,salt.count());
+		// Verify the production iteration count in the same exported store.
+		assertEquals(Constants.PBE_ITERATIONS,params.get(0).iterations());
 		assertNotEquals(Blob.create(new byte[SALT_LENGTH]),salt);
 
 		// A second store for the same key and passphrases must not reuse the salt, otherwise
@@ -91,13 +93,6 @@ public class PFXTest {
 		assertNotEquals(salt,params2.get(0).salt());
 	}
 
-	@Test public void testIterationCount() throws IOException, GeneralSecurityException {
-		// Confirms the requested protection parameters reach the file, rather than the
-		// key store falling back to a default iteration count
-		ArrayList<KDFParams> params=pbkdf2Params(storeWithHeroKey());
-		assertEquals(1,params.size());
-		assertEquals(Constants.PBE_ITERATIONS,params.get(0).iterations());
-	}
 
 	@Test public void testLegacyZeroSaltStore() throws IOException, GeneralSecurityException {
 		// Key stores written before the salt fix used a fixed all-zero salt. The salt is

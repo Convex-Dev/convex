@@ -1,124 +1,64 @@
 package convex.lattice;
 
-import java.io.IOException;
+import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.store.AStore;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Base class for an application participating in a lattice root.
+ * Application lifecycle over a component's working state and managed children.
  *
- * <p>An application component works at the same cursor position as its
- * {@link RootComponent} parent. The supplied lattice defines the complete root
- * merge, including which regions participate. Merging requires no domain
- * components or component registry. Subclasses may expose lightweight components
- * at paths within that root, while persistence delegates to the host.</p>
+ * <p>Applications define incoming merge and routing through their domain components.
+ * No abstract lattice or parallel structure declaration is required. A host-bound
+ * application owns a staged copy of the host value; a cursor-bound application
+ * shares the supplied working state. Children may share that state or own separate
+ * publication boundaries.</p>
  *
- * <p>Each application has a live cursor view with an independent context override.
- * Setting its cursor context affects its descendants, not the host or other
- * applications. Without an override it inherits the host's context live. All views
- * share the same atomic state; only an explicit fork creates a working copy.</p>
+ * <p>Sync prepares the application, syncs its managed children, then publishes its
+ * own working boundary. Publication stops at the destination cursor. The host owns
+ * storage and replication; host sync and physical durability remain separate.
+ * Failures stop later stages without rolling back completed child publications.</p>
  *
- * <p>Applications on the global lattice use its keyed map root and compose the
- * region lattices they understand. The base also accepts other lattice value
- * types for local applications and tests.</p>
- *
- * <p>The application does not own the root, store or replication lifecycle.
- * Calling {@link #sync()} invokes the host's root publication policy;
- * {@link #flush()} remains a distinct durability boundary.</p>
- *
- * @param <V> Complete application root value type
+ * @param <V> Value managed by the application
  */
 public abstract class ALatticeApplication<V extends ACell> extends ALatticeComponent<V> {
 
-	private final RootComponent<V> host;
+	/** Creates private working state over a host. */
+	protected ALatticeApplication(LatticeHost<V> host) {
+		super(Objects.requireNonNull(host,"Application host must not be null").cursor().fork());
+	}
 
-	/**
-	 * Creates an application over an existing lattice host.
-	 *
-	 * @param host Root component providing shared state, lattice and host policy
-	 */
-	protected ALatticeApplication(RootComponent<V> host) {
-		this(host,requireHost(host).cursor().view());
+	/** Shares working storage, for live applications, nested containers and transaction views. */
+	protected ALatticeApplication(AForkableCursor<V> cursor) {
+		super(cursor);
 	}
 
 	/**
-	 * Binds an application view to an explicit working cursor, retaining its host's
-	 * storage policy. Subclass transaction factories use this constructor and must
-	 * rebuild their child components against this cursor.
+	 * Prepares application state before children or the application publish.
+	 * Failure prevents subsequent publication stages. This hook can be called
+	 * concurrently and must use thread-safe component APIs. Individual component
+	 * syncs do not invoke the containing application's lifecycle.
 	 */
-	protected ALatticeApplication(RootComponent<V> host,ALatticeCursor<V> cursor) {
-		super(requireHost(host),cursor);
-		this.host=host;
+	protected void beforeSync() {
 	}
 
 	/**
-	 * Creates a local application at the supplied lattice's zero value.
-	 *
-	 * <p>The caller owns the store. Construction does not restore its retained
-	 * root; {@link #sync()} publishes the new application state. To restore an
-	 * existing root, pass a host created with
-	 * {@link RootComponent#open(ALattice, AStore)} instead.</p>
-	 *
-	 * @param lattice Root merge and navigation semantics
-	 * @param store Store providing persistence and publication
+	 * Publishes managed children after preparation and before this application's
+	 * own boundary. The default has none. Implementations define child order;
+	 * completed child publications stand if a later child fails.
 	 */
-	protected ALatticeApplication(ALattice<V> lattice, AStore store) {
-		this(RootComponent.create(lattice,store));
+	protected void syncChildren() {
 	}
 
-	private static <V extends ACell> RootComponent<V> requireHost(RootComponent<V> host) {
-		if (host==null) throw new IllegalArgumentException("Application host must not be null");
-		return host;
+	/** Prepares, publishes managed children, then publishes this application's own boundary. */
+	@Override
+	public V sync() {
+		beforeSync();
+		syncChildren();
+		return super.sync();
 	}
 
-	/**
-	 * Returns the application host for specialised application infrastructure.
-	 *
-	 * @return Hosted root component
-	 */
-	protected final RootComponent<V> host() {
-		return host;
-	}
-
-	/**
-	 * Returns the root lattice used by both the application and its host.
-	 *
-	 * @return Root merge and navigation semantics
-	 */
-	public final ALattice<V> getLattice() {
-		return cursor.getLattice();
-	}
-
-	/**
-	 * Atomically merges an incoming root value into the live application state.
-	 *
-	 * <p>Delegates to the root cursor with its effective context and the current
-	 * local value in the own position. The lattice handles all region dispatch
-	 * and verification; no components need to have been constructed. Concurrent
-	 * writes are reconciled by retrying against the latest root. If merge throws,
-	 * this operation installs no state.</p>
-	 *
-	 * <p>This changes local state only. Call {@link #sync()} to persist and publish
-	 * it through the host, and {@link #flush()} for physical durability.</p>
-	 *
-	 * @param other Incoming root value
-	 * @return Root value installed by this merge
-	 */
-	public V merge(V other) {
-		return cursor.merge(other);
-	}
-
-	/**
-	 * Requests the host store's physical durability barrier.
-	 *
-	 * <p>Call {@link #sync()} first when working state must become the selected,
-	 * published root. Flush deliberately does not move or merge any cursor.</p>
-	 *
-	 * @throws IOException If the store flush fails
-	 */
-	public void flush() throws IOException {
-		host.flush();
-	}
+	/** Accepts incoming state according to this application's domain policy, without publishing it. */
+	@Override
+	public abstract V merge(V incoming);
 }

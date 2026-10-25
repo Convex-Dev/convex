@@ -203,7 +203,7 @@ public class InsertDemo {
 
 	static void syncToStorage(NodeServer<?> server) throws Exception {
 		long start = System.nanoTime();
-		server.persistSnapshot(server.getLocalValue());
+		server.getHost().checkpoint();
 		long elapsed = System.nanoTime() - start;
 		System.out.printf("  Sync to Etch:          %,.1f ms%n", elapsed / 1_000_000.0);
 	}

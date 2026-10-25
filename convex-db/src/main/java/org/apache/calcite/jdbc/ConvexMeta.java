@@ -11,16 +11,16 @@ import convex.db.lattice.SQLDatabase;
  *
  * <p>Adds JDBC transaction support by overriding CalciteMetaImpl (which throws
  * UnsupportedOperationException for commit/rollback). Transaction isolation
- * uses Convex's lattice cursor fork/sync model:
+ * uses Convex's lattice component fork/sync model:
  * <ul>
- *   <li><b>BEGIN</b> (setAutoCommit(false)): forks the SQLDatabase cursor</li>
- *   <li><b>COMMIT</b>: syncs the fork back to the parent</li>
+ *   <li><b>BEGIN</b> (setAutoCommit(false)): forks the SQLDatabase component</li>
+ *   <li><b>COMMIT</b>: syncs the fork back into the live database</li>
  *   <li><b>ROLLBACK</b>: discards the fork</li>
  * </ul>
  *
  * <p>During a transaction, the connection's ConvexSchema is swapped to one
- * backed by the forked cursor, so SELECT queries read from the fork. Other
- * connections continue to read from the original cursor.
+ * backed by the fork's working cursor, so SELECT queries read from the fork. Other
+ * connections continue to read from the live cursor.
  *
  * <p>Must live in {@code org.apache.calcite.jdbc} to access the package-private
  * CalciteConnectionImpl.

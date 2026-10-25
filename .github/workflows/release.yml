@@ -51,7 +51,7 @@ jobs:
           fi
 
       - name: Build with tests
-        run: ./mvnw -B clean install
+        run: ./mvnw -B -Dconvex.test.extended=true clean install
 
       # Keep the tag workflow self-contained: the ordinary Build workflow runs
       # independently and must not be the only guard for Central-bound artifacts.

@@ -116,16 +116,17 @@ public class P2PSocialSyncTest {
 		// Bob also publishes an infrastructure-only view from a separate serving
 		// store. A third transiently broken view proves failure containment and
 		// recovery without replacing the real follow-aware propagation group.
-		bobInfrastructureView=new LatticePropagator(new MemoryStore(),P2PLattice.NODE_ROOT,
-			value -> value.dissoc(Social.KEY_SOCIAL),LatticePropagatorConfig.create());
+		bobInfrastructureView=new LatticePropagator(new MemoryStore(),LatticePropagatorConfig.create());
+		bobInfrastructureView.<Index<Keyword,ACell>>setPublicationFilter(
+			value -> value.dissoc(Social.KEY_SOCIAL));
 		AtomicBoolean failBrokenViewOnce=new AtomicBoolean();
-		bobBrokenView=new LatticePropagator(new MemoryStore(),P2PLattice.NODE_ROOT,
-			value -> {
-				if (failBrokenViewOnce.compareAndSet(false,true)) {
-					throw new IllegalStateException("simulated filtered-view failure");
-				}
-				return value.dissoc(Social.KEY_SOCIAL);
-			},LatticePropagatorConfig.create());
+		bobBrokenView=new LatticePropagator(new MemoryStore(),LatticePropagatorConfig.create());
+		bobBrokenView.<Index<Keyword,ACell>>setPublicationFilter(value -> {
+			if (failBrokenViewOnce.compareAndSet(false,true)) {
+				throw new IllegalStateException("simulated filtered-view failure");
+			}
+			return value.dissoc(Social.KEY_SOCIAL);
+		});
 		bobNode.getNodeServer().addPropagator(bobInfrastructureView);
 		bobNode.getNodeServer().addPropagator(bobBrokenView);
 		CompletableFuture<LatticePropagator.Failure> brokenViewFailure=
@@ -169,12 +170,9 @@ public class P2PSocialSyncTest {
 
 		CompletableFuture<Void> aliceReady=awaitCondition(aliceNode,
 			() -> hasPost(alice,aliceDid,alicePost)&&hasPost(alice,bobDid,bobPost)
-				&&hasPost(alice,carolDid,carolPost)
-				&&hasCachedKey(alice,aliceDid,bobDid,bobUserKey)
-				&&hasCachedKey(alice,aliceDid,carolDid,carolUserKey));
+				&&hasPost(alice,carolDid,carolPost));
 		CompletableFuture<Void> bobReady=awaitCondition(bobNode,
-			() -> hasPost(bob,aliceDid,alicePost)&&hasPost(bob,bobDid,bobPost)
-				&&hasCachedKey(bob,bobDid,aliceDid,aliceUserKey));
+			() -> hasPost(bob,aliceDid,alicePost)&&hasPost(bob,bobDid,bobPost));
 		aliceNode.getApplication().sync();
 		bobNode.getApplication().sync();
 		carolNode.getApplication().sync();
@@ -185,13 +183,7 @@ public class P2PSocialSyncTest {
 		assertMaterialised(carol,Set.of(carolDid));
 		assertEquals(Set.of(bobDid,carolDid),alice.user(aliceDid).follows().getActive());
 		assertEquals(Set.of(aliceDid),bob.user(bobDid).follows().getActive());
-		assertTrue(carol.user(carolDid).follows().getActive().isEmpty());
-		assertEquals(bobUserKey.getAccountKey(),
-			alice.user(aliceDid).follows().getCachedAccountKey(bobDid));
-		assertEquals(carolUserKey.getAccountKey(),
-			alice.user(aliceDid).follows().getCachedAccountKey(carolDid));
-		assertEquals(aliceUserKey.getAccountKey(),
-			bob.user(bobDid).follows().getCachedAccountKey(aliceDid));
+		assertNull(carol.user(carolDid).follows().getActive());
 
 		// Dave is outbound-only, is told only about Bob, and follows Carol.
 		daveStore=EtchStore.createTemp("p2p-social-dave");
@@ -218,15 +210,12 @@ public class P2PSocialSyncTest {
 		awaitCondition(daveNode,() -> knowsAllInitialNodes(daveNode)).get(5,TimeUnit.SECONDS);
 		daveNode.whenConnected(carolNodeKey.getAccountKey()).get(5,TimeUnit.SECONDS);
 		CompletableFuture<Void> daveHasCarol=awaitCondition(daveNode,
-			() -> hasPost(dave,carolDid,carolPost)
-				&&hasCachedKey(dave,daveDid,carolDid,carolUserKey));
+			() -> hasPost(dave,carolDid,carolPost));
 		carolNode.getApplication().sync();
 		daveHasCarol.get(5,TimeUnit.SECONDS);
 
 		assertMaterialised(dave,Set.of(daveDid,carolDid));
 		assertTrue(hasPost(dave,daveDid,davePost));
-		assertEquals(carolUserKey.getAccountKey(),
-			dave.user(daveDid).follows().getCachedAccountKey(carolDid));
 		assertFalse(hasPost(dave,bobDid,bobPost));
 		assertFalse(hasPost(dave,aliceDid,alicePost));
 		assertFalse(hasPost(alice,daveDid,davePost));
@@ -245,7 +234,9 @@ public class P2PSocialSyncTest {
 		assertNull(finalInfrastructure.get(Social.KEY_SOCIAL));
 
 		// A public, unverified connection may offer complete data, but possession
-		// of an unrelated key cannot mutate Alice's DID-owned feed.
+		// of an unrelated key cannot mutate Alice's DID-owned feed. The delivery
+		// completes: the application takes nothing from it, and that is not an
+		// error the transport reports.
 		AKeyPair attackerKey=AKeyPair.generate();
 		Blob forgedPost=SocialPost.createKey(Long.MAX_VALUE-1);
 		Index<Blob,ACell> forgedFeed=Index.<Blob,ACell>none().assoc(forgedPost,
@@ -259,8 +250,8 @@ public class P2PSocialSyncTest {
 			MessageTag.LATTICE_VALUE,null,Vectors.of(Social.KEY_SOCIAL),forgedOwners));
 		try (Convex attacker=Convex.connect(aliceNode.getHostAddress(),
 				null,attackerKey)) {
-			Result rejected=attacker.request(forgedUpdate).get(5,TimeUnit.SECONDS);
-			assertTrue(rejected.isError());
+			Result delivered=attacker.request(forgedUpdate).get(5,TimeUnit.SECONDS);
+			assertFalse(delivered.isError());
 		}
 		assertNull(alice.user(aliceDid).feed().getPost(forgedPost));
 	}
@@ -274,12 +265,6 @@ public class P2PSocialSyncTest {
 
 	private static boolean hasPost(Social social,AString did,Blob post) {
 		return social.user(did).feed().getPost(post)!=null;
-	}
-
-	private static boolean hasCachedKey(Social social,AString localDid,
-			AString targetDid,AKeyPair targetKey) {
-		var cached=social.user(localDid).follows().getCachedAccountKey(targetDid);
-		return cached!=null && targetKey.getAccountKey().equals(cached);
 	}
 
 	private boolean knowsAllInitialNodes(P2PNode node) {

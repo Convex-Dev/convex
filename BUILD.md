@@ -25,6 +25,26 @@ Reserve `./mvnw -B clean install` for final verification and releases. Ordinary
 builds do not generate source/Javadoc jars or load Maven Central publishing;
 `-Prelease` enables those release-only artifacts and services.
 
+### Core test execution
+
+Core tests run in one JVM. Jupiter runs classes and methods concurrently with
+separate test instances; classes that need shared setup declare `PER_CLASS`
+explicitly. Vintage runs the existing JUnit 4/quickcheck classes concurrently.
+Ordinary persistence tests reuse `Samples.TEST_STORE` and `TEST_STORE2`; private
+stores are reserved for lifecycle, GC, configuration and exact-content tests.
+
+The everyday run covers representative Etch lifecycle configurations and a
+complete rebuild. Exhaustive lifecycle and physical-rebuild format matrices run
+in CI and release builds. To include them locally:
+
+```bash
+./mvnw -B test -pl convex-core -am -Dconvex.test.extended=true
+```
+
+In Eclipse, add `-Dconvex.test.extended=true` to the JUnit launch's VM arguments
+for the exhaustive run; omit it for everyday testing. No tests are forked into
+separate processes to obtain concurrency.
+
 ### Property tests
 
 Core property tests use the existing `junit-quickcheck` generators and runners,

@@ -28,6 +28,7 @@ public class DLFSConfigTest {
 		assertEquals(DLFSConfig.DEFAULT_HTTP_PORT,config.getHTTPPort());
 		assertEquals("127.0.0.1",config.getHTTPBindHost());
 		assertEquals(DLFSConfig.DEFAULT_DRIVE,config.getDriveName());
+		assertEquals(30_000,config.getMaxFutureTimestampSkew());
 		assertArrayEquals(new Keyword[] {Keywords.FS},config.getRegionPath());
 		assertFalse(config.isPublicLatticeInbound());
 		assertEquals(DLFSConfig.WRITE_AUTH_NONE,config.getWriteAuthentication());
@@ -44,10 +45,10 @@ public class DLFSConfigTest {
 			    port: 0,
 			    store: 'memory',
 			    keypair: '%s',
-			    persist: false,
 			    bootstrap: [{key: '%s', url: 'tcp://127.0.0.1:18888'}],
 			  },
 			  dlfs: {
+			    maxFutureTimestampSkew: 1234,
 			    path: ['apps', 'documents'],
 			    drive: 'work',
 			    mounts: [
@@ -65,10 +66,10 @@ public class DLFSConfigTest {
 
 		assertEquals(nodeKey,config.getKeyPair());
 		assertEquals("memory",config.getStorePath());
-		assertFalse(config.getNodeConfig().isPersist());
 		assertArrayEquals(new Keyword[] {Keyword.intern("apps"),Keyword.intern("documents")},
 			config.getRegionPath());
 		assertEquals("work",config.getDriveName());
+		assertEquals(1234,config.getMaxFutureTimestampSkew());
 		assertEquals(2,config.getDriveMounts().size());
 		assertEquals(DLFSConfig.LOCAL_IDENTITY,config.getDriveMounts().get(0).identity());
 		assertEquals(seedKey.getAccountKey(),config.getDriveMounts().get(1).owner());
@@ -78,6 +79,15 @@ public class DLFSConfigTest {
 		var peer=config.getBootstrapPeers().get(0);
 		assertEquals(seedKey.getAccountKey(),peer.key());
 		assertEquals(InetSocketAddress.createUnresolved("127.0.0.1",18888),peer.address());
+	}
+
+	@Test
+	public void testTimestampAdmissionIsDLFSConfiguration() {
+		assertEquals(0,DLFSConfig.parse("{dlfs:{maxFutureTimestampSkew:0}}").getMaxFutureTimestampSkew());
+		for (String value:new String[] {"-1","'30'","true","1.5"}) {
+			assertThrows(IllegalArgumentException.class,() -> DLFSConfig.parse(
+				"{dlfs:{maxFutureTimestampSkew:"+value+"}}").validate());
+		}
 	}
 
 	@Test

@@ -2,10 +2,10 @@ package convex.social;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 
 import org.junit.jupiter.api.Test;
 
@@ -23,49 +23,60 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ALatticeComponent;
+import convex.core.util.Utils;
 import convex.lattice.Lattice;
+import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
-import convex.lattice.generic.OwnerLattice;
+import convex.lattice.generic.OwnerMapLattice;
 
 /**
  * Tests for the cursor-based Social application API.
  */
 public class SocialAppTest {
-	private static LatticeContext wallet(AKeyPair primary,AKeyPair... additional) {
-		return new LatticeContext() {
-			@Override public AKeyPair getSigningKey() {
-				return primary;
-			}
+	@Test void componentDeliveryUsesTheSameOwnerPolicyAtEveryDepth() {
+		var owner=AKeyPair.createSeeded(823);
+		var other=AKeyPair.createSeeded(824);
+		var source=Social.create(owner);
+		var post=source.user(owner.getAccountKey()).feed().post("incoming");
+		var did=DID.forKey(owner.getAccountKey());
+		var signed=source.cursor().get().get(did);
+		for (boolean whole:new boolean[]{false,true}) {
+			var destination=Social.create(owner);
+			var working=destination.fork();
+			if (whole) working.mergeAt(source.cursor().get());
+			else working.mergeAt(signed,did);
+			assertNotNull(working.user(owner.getAccountKey()).feed().getPost(post));
+			assertNull(destination.user(owner.getAccountKey()).feed().getPost(post));
+			var before=working.cursor().get();
+			working.mergeAt(signed,DID.forKey(other.getAccountKey()));
+			working.mergeAt(Maps.of(DID.forKey(other.getAccountKey()),signed));
+			working.mergeAt(CVMLong.ONE);
+			working.mergeAt(signed.getValue(),did);
+			working.mergeAt(Maps.empty(),did,convex.core.cvm.Keywords.VALUE);
+			assertSame(before,working.cursor().get());
+			working.sync();
+			assertNotNull(destination.user(owner.getAccountKey()).feed().getPost(post));
+		}
+	}
 
-			@Override public <T extends ACell> SignedData<T> sign(AccountKey accountKey,T value) {
-				if (accountKey==null || accountKey.equals(primary.getAccountKey())) {
-					return primary.signData(value);
-				}
-				for (AKeyPair keyPair:additional) {
-					if (accountKey.equals(keyPair.getAccountKey())) return keyPair.signData(value);
-				}
-				return null;
-			}
+	private static BiFunction<ACell,Index<Keyword,ACell>,SignedData<Index<Keyword,ACell>>> wallet(AKeyPair... keys) {
+		return (owner,value) -> {
+			for (AKeyPair key:keys) if (DID.forKey(key.getAccountKey()).equals(owner)) return key.signData(value);
+			return null;
 		};
 	}
 
-	private static class TestRoot extends ALatticeComponent<Index<Keyword, ACell>> {
-
-		private int persistCount;
-
+	/** An application at the root level over an in-memory root. */
+	private static class TestRoot extends LatticeApplication<Index<Keyword, ACell>> {
 		TestRoot(KeyedLattice lattice) {
-			super(Cursors.createLattice(lattice));
+			super(lattice,Cursors.root(lattice.zero()));
 		}
-
-		@Override
-		protected <T extends ACell> T persist(T value) {
-			persistCount++;
-			return value;
+		@Override public Index<Keyword, ACell> merge(Index<Keyword, ACell> other) {
+			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
 		}
 	}
 
@@ -78,7 +89,7 @@ public class SocialAppTest {
 		Blob key = feed.post("Hello, lattice world!");
 
 		assertNotNull(key);
-		assertEquals(8, key.count());
+		assertEquals(16, key.count());
 
 		AHashMap<Keyword, ACell> post = feed.getPost(key);
 		assertNotNull(post);
@@ -94,7 +105,7 @@ public class SocialAppTest {
 		Feed feed = social.user(kp.getAccountKey()).feed();
 
 		// No delay between posts: same-millisecond posts must still get
-		// distinct keys (Feed increments the key on collision)
+		// distinct keys through their independent salts
 		Blob k1 = feed.post("First");
 		Blob k2 = feed.post("Second");
 		Blob k3 = feed.post("Third");
@@ -109,7 +120,7 @@ public class SocialAppTest {
 	public void testReply() {
 		AKeyPair alice = AKeyPair.generate();
 		AKeyPair bob = AKeyPair.generate();
-		Social social=Social.create(wallet(alice,bob));
+		Social social=Social.create(wallet(alice,bob),Utils::getCurrentTimestampCell);
 
 		Feed aliceFeed = social.user(alice.getAccountKey()).feed();
 		Blob parentKey = aliceFeed.post("Original post");
@@ -125,17 +136,19 @@ public class SocialAppTest {
 	}
 
 	@Test
-	public void testFeedUsesContextTimeWithoutBumpingRecordTimestamps() {
+	public void testFeedUsesSuppliedTimeWithoutBumpingRecordTimestamps() {
 		AKeyPair key=AKeyPair.createSeeded(7307);
-		Social social=Social.create(LatticeContext.create(CVMLong.create(100),key));
+		var time=new AtomicReference<>(CVMLong.create(100));
+		Social social=Social.create(wallet(key),time::get);
 		Feed feed=social.user(key.getAccountKey()).feed();
 		Blob first=feed.post("first");
 		Blob reply=feed.reply("reply",first,key.getAccountKey());
-		assertEquals(SocialPost.createKey(100),first);
-		assertEquals(SocialPost.createKey(101),reply);
+		assertEquals(100,SocialPost.extractTimestamp(first));
+		assertEquals(100,SocialPost.extractTimestamp(reply));
+		assertNotEquals(first,reply);
 		assertEquals(CVMLong.create(100),feed.getPost(first).get(SocialPost.TIMESTAMP));
 		assertEquals(CVMLong.create(100),feed.getPost(reply).get(SocialPost.TIMESTAMP));
-		social.cursor().setContext(LatticeContext.create(CVMLong.create(200),key));
+		time.set(CVMLong.create(200));
 		feed.delete(first);
 		assertEquals(CVMLong.create(200),feed.getPost(first).get(SocialPost.TIMESTAMP));
 		assertEquals(CVMLong.create(200),feed.getPost(first).get(SocialPost.DELETED));
@@ -146,38 +159,34 @@ public class SocialAppTest {
 		AKeyPair key=AKeyPair.createSeeded(7309);
 		AtomicInteger clocks=new AtomicInteger();
 		AtomicReference<Runnable> beforeSign=new AtomicReference<>();
-		Social social=Social.create(new LatticeContext() {
-			@Override public AKeyPair getSigningKey() { return key; }
-			@Override public CVMLong currentTimestamp() { return CVMLong.create(100+clocks.getAndIncrement()); }
-			@Override public <T extends ACell> SignedData<T> sign(AccountKey owner,T value) {
-				Runnable action=beforeSign.getAndSet(null);
-				if (action!=null) action.run();
-				return super.sign(owner,value);
-			}
-		});
+		Social social=Social.create((owner,value) -> {
+			Runnable action=beforeSign.getAndSet(null);
+			if (action!=null) action.run();
+			return key.signData(value);
+		},() -> CVMLong.create(100+clocks.getAndIncrement()));
 		Feed feed=social.user(key.getAccountKey()).feed();
 		Feed other=social.user(key.getAccountKey()).feed();
 		AtomicReference<Blob> second=new AtomicReference<>();
 		beforeSign.set(() -> second.set(other.post("installed first")));
 		Blob first=feed.post("retried");
 		assertEquals(2,clocks.get(),"Each logical post resolves its clock once");
-		assertEquals(SocialPost.createKey(100),first);
-		assertEquals(SocialPost.createKey(101),second.get());
+		assertEquals(100,SocialPost.extractTimestamp(first));
+		assertEquals(101,SocialPost.extractTimestamp(second.get()));
 		assertEquals(CVMLong.create(100),feed.getPost(first).get(SocialPost.TIMESTAMP));
 		assertEquals(CVMLong.create(101),feed.getPost(second.get()).get(SocialPost.TIMESTAMP));
 		assertEquals(2,feed.count());
 	}
 
 	@Test
-	public void testPostKeyExhaustionDoesNotOverwriteOrWrap() {
+	public void testPostKeysDoNotNeedToAdvanceTheClock() {
 		AKeyPair key=AKeyPair.createSeeded(7308);
-		Social social=Social.create(LatticeContext.create(CVMLong.create(Long.MAX_VALUE),key));
+		Social social=Social.create(wallet(key),() -> CVMLong.create(Long.MAX_VALUE));
 		Feed feed=social.user(key.getAccountKey()).feed();
-		Blob first=feed.post("last key");
-		var before=social.cursor().get();
-		assertThrows(IllegalStateException.class,() -> feed.post("cannot allocate"));
-		assertSame(before,social.cursor().get());
-		assertEquals("last key",SocialPost.getText(feed.getPost(first)));
+		Blob first=feed.post("first");
+		Blob second=feed.post("second");
+		assertNotEquals(first,second);
+		assertEquals(Long.MAX_VALUE,SocialPost.extractTimestamp(second));
+		assertEquals(2,feed.count());
 	}
 
 	@Test
@@ -204,7 +213,7 @@ public class SocialAppTest {
 		Follows follows = social.user(alice.getAccountKey()).follows();
 
 		// Initially not following anyone
-		assertTrue(follows.getActive().isEmpty());
+		assertNull(follows.getActive());
 		assertFalse(follows.isFollowing(bob.getAccountKey()));
 
 		// Follow Bob
@@ -219,19 +228,43 @@ public class SocialAppTest {
 	}
 
 	@Test
-	public void testValidatedFollowKeyCachePreservesIntent() throws Exception {
+	public void followTransactionSignsOnceAndFailedEditsLeaveStateUntouched() {
+		var alice=AKeyPair.createSeeded(8200);
+		var bob=Strings.intern("did:web:bob.example");
+		var carol=Strings.intern("did:web:carol.example");
+		var signatures=new AtomicInteger();
+		var social=Social.create((owner,value) -> {
+			signatures.incrementAndGet();
+			return alice.signData(value);
+		},() -> CVMLong.ONE);
+		var follows=social.user(alice.getAccountKey()).follows();
+		follows.transact(draft -> {
+			draft.follow(bob);
+			draft.follow(carol);
+			assertNull(follows.getActive());
+			assertEquals(0,signatures.get());
+		});
+		assertEquals(Set.of(bob,carol),follows.getActive());
+		assertEquals(1,signatures.get());
+		var before=social.cursor().get();
+		assertTrue(before.get(DID.forKey(alice.getAccountKey())).checkSignature());
+		assertThrows(IllegalStateException.class,() -> follows.transact(draft -> {
+			draft.unfollow(bob);
+			throw new IllegalStateException("Abort the edit");
+		}));
+		assertSame(before,social.cursor().get());
+		assertEquals(1,signatures.get());
+	}
+
+	@Test
+	public void testFollowIntentRoundTrip() throws Exception {
 		AKeyPair alice=AKeyPair.generate();
-		AKeyPair bob=AKeyPair.generate();
 		AString bobDid=convex.core.data.Strings.create("did:web:bob.example");
 		Social social=Social.create(alice);
 		Follows follows=social.user(alice.getAccountKey()).follows();
 
-		assertThrows(IllegalStateException.class,
-			() -> follows.cacheValidatedKey(bobDid,bob.getAccountKey()));
 		follows.follow(bobDid);
-		follows.cacheValidatedKey(bobDid,bob.getAccountKey());
 		assertTrue(follows.isFollowing(bobDid));
-		assertEquals(bob.getAccountKey(),follows.getCachedAccountKey(bobDid));
 
 		SignedData<?> signed=social.cursor().get().get(DID.forKey(alice.getAccountKey()));
 		SignedData<?> decoded=(SignedData<?>)CVMEncoder.INSTANCE.decodeMultiCell(
@@ -239,9 +272,9 @@ public class SocialAppTest {
 		@SuppressWarnings("unchecked")
 		AHashMap<ACell,ACell> encodedFollows=SocialLattice.getFollows(
 			(Index<Keyword,ACell>)decoded.getValue());
-		ACell encodedKey=((AHashMap<?,?>)encodedFollows.get(bobDid))
-			.get(Follows.KEY_ACCOUNT_KEY);
-		assertEquals(bob.getAccountKey(),AccountKey.parse(encodedKey));
+		AHashMap<?,?> record=(AHashMap<?,?>)encodedFollows.get(bobDid);
+		assertEquals(Set.of(SocialPost.ACTIVE,SocialPost.TIMESTAMP),record.keySet());
+		assertEquals(convex.core.data.prim.CVMBool.TRUE,record.get(SocialPost.ACTIVE));
 	}
 
 	@Test
@@ -270,8 +303,7 @@ public class SocialAppTest {
 		// Post in the original
 		social.user(key).feed().post("Before fork");
 
-		// Fork, post in fork (fork copies the feed, so a same-millisecond post
-		// gets a bumped key rather than colliding with "Before fork")
+		// The fork retains earlier posts; the new post gets its own salted identity.
 		Social forked = social.fork();
 		Blob forkedKey = forked.user(key).feed().post("In fork");
 
@@ -292,7 +324,7 @@ public class SocialAppTest {
 	public void testForkAndSyncMultipleUsers() {
 		AKeyPair alice = AKeyPair.generate();
 		AKeyPair bob = AKeyPair.generate();
-		Social social=Social.create(wallet(alice,bob));
+		Social social=Social.create(wallet(alice,bob),Utils::getCurrentTimestampCell);
 
 		// Alice posts
 		social.user(alice.getAccountKey()).feed().post("Alice original");
@@ -309,6 +341,31 @@ public class SocialAppTest {
 	}
 
 	@Test
+	public void testForkPublicationRetainsSignerAndClock() {
+		AKeyPair key=AKeyPair.createSeeded(7421);
+		var time=new AtomicReference<>(CVMLong.create(100));
+		AtomicInteger signatures=new AtomicInteger();
+		Social live=Social.create((owner,value) -> {
+			signatures.incrementAndGet();
+			return key.signData(value);
+		},time::get);
+		live.user(key.getAccountKey()).feed().post("Baseline");
+		Social fork=live.fork();
+		time.set(CVMLong.create(200));
+		fork.user(key.getAccountKey()).feed().post("Local edit");
+		time.set(CVMLong.create(300));
+		live.user(key.getAccountKey()).feed().post("Concurrent destination edit");
+		signatures.set(0);
+
+		fork.sync();
+
+		assertEquals(1,signatures.get(),"Publication must retain the explicit signer");
+		assertEquals(3,live.user(key.getAccountKey()).feed().count());
+		assertEquals(live.cursor().get(),fork.cursor().get());
+		assertTrue(live.cursor().get().get(DID.forKey(key.getAccountKey())).checkSignature());
+	}
+
+	@Test
 	@SuppressWarnings("unchecked")
 	public void testUserForkBatchedValueSurvivesEncodingRoundTrip() throws Exception {
 		AKeyPair alice=AKeyPair.generate();
@@ -319,7 +376,7 @@ public class SocialAppTest {
 		Blob post=work.feed().post("Hello from Alice");
 		work.follows().follow(bob.getAccountKey());
 		assertEquals(0,social.user(alice.getAccountKey()).feed().count());
-		assertTrue(social.user(alice.getAccountKey()).follows().getActive().isEmpty());
+		assertNull(social.user(alice.getAccountKey()).follows().getActive());
 		work.sync();
 
 		SignedData<Index<Keyword,ACell>> signed=
@@ -339,11 +396,11 @@ public class SocialAppTest {
 	public void testConnectToRootCursor() {
 		AKeyPair kp = AKeyPair.generate();
 
-		// Simulate a root lattice with :social
+		// An application at the root declares :social and hands the region its cursor
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		ALatticeCursor<?> rootCursor = Cursors.createLattice(root);
+		TestRoot application = new TestRoot(root);
 
-		Social social = Social.connect(rootCursor, kp);
+		Social social = Social.connect(application, kp);
 
 		Feed feed = social.user(kp.getAccountKey()).feed();
 		Blob key = feed.post("Connected post");
@@ -358,60 +415,43 @@ public class SocialAppTest {
 		AKeyPair kp = AKeyPair.generate();
 
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		ALatticeCursor<?> rootCursor = Cursors.createLattice(root);
+		TestRoot application = new TestRoot(root);
 
-		Social social = Social.connect(rootCursor, kp);
+		Social social = Social.connect(application, kp);
 		social.user(kp.getAccountKey()).feed().post("Propagated");
 
-		// Root cursor should have the data
-		ACell rootValue = rootCursor.get();
+		// The application's root should have the data
+		ACell rootValue = application.cursor().get();
 		assertNotNull(rootValue, "Root cursor should contain data after post");
 	}
 
 	@Test
-	public void testComponentPersistenceDelegatesToContainingRoot() throws IOException {
+	public void testComponentConnectionDoesNotInheritSigningAuthority() {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
 		TestRoot root=new TestRoot(lattice);
-		Social social=Social.connect(root,kp);
-		Feed feed=social.user(kp.getAccountKey()).feed();
-		feed.post("Persist through component parents");
-
-		Index<Blob, ACell> before=feed.cursor().get();
-		Index<Blob, ACell> persisted=feed.persist();
-
-		assertSame(before,persisted);
-		assertSame(before,feed.cursor().get());
-		assertEquals(1,root.persistCount);
-	}
-
-	@Test
-	public void testComponentConnectionInheritsRootContext() {
-		AKeyPair kp=AKeyPair.generate();
-		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
-		TestRoot root=new TestRoot(lattice);
-		root.cursor().setContext(LatticeContext.create(null,kp));
+		root.setContext(LatticeContext.create(null,kp));
 		Social social=Social.connect(root);
 
-		social.user(kp.getAccountKey()).feed().post("Inherited context");
-
-		assertEquals(1,social.user(kp.getAccountKey()).feed().count());
+		assertThrows(IllegalStateException.class,() -> social.user(kp.getAccountKey()).feed().post("No authority"));
+		assertEquals(0,social.user(kp.getAccountKey()).feed().count());
 	}
 
 	@Test
-	public void testForkRetainsComponentPersistenceParent() throws IOException {
+	public void testForkBeneathComponentStaysIsolatedUntilSync() {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
 		TestRoot root=new TestRoot(lattice);
 		Social social=Social.connect(root,kp);
 		Social fork=social.fork();
 		Feed forkFeed=fork.user(kp.getAccountKey()).feed();
-		forkFeed.post("Persisted but not synced");
+		forkFeed.post("Not yet synced");
 
-		forkFeed.persist();
-
-		assertEquals(1,root.persistCount);
+		assertEquals(1,forkFeed.count());
 		assertEquals(0,social.user(kp.getAccountKey()).feed().count());
+
+		fork.sync();
+		assertEquals(1,social.user(kp.getAccountKey()).feed().count());
 	}
 
 	@Test
@@ -429,7 +469,7 @@ public class SocialAppTest {
 		Feed feed = social.user(kp.getAccountKey()).feed();
 
 		assertEquals(0, feed.count());
-		assertNull(feed.getPost(SocialPost.createKey(1000L)));
+		assertNull(feed.getPost(SocialPost.createKey(1000L,0)));
 	}
 
 	@Test
@@ -450,12 +490,12 @@ public class SocialAppTest {
 	// ===== Adversarial: posting to another user's feed =====
 
 	/**
-	 * Core adversarial test: forgery is rejected at the OwnerLattice merge
+	 * Core adversarial test: forgery is rejected at the owner-map merge
 	 * boundary (the network merge point between nodes).
 	 *
 	 * Attack: Alice signs data and places it under Bob's owner key.
-	 * Defence: OwnerLattice.merge(context, ...) checks verifyOwner(ownerKey,
-	 * signerKey) — rejects because Alice's key != Bob's key.
+	 * Defence: the bound DID verifier rejects Alice's key for Bob's DID,
+	 * independently of the supplied context.
 	 */
 	@Test
 	public void testForgeryRejectedAtOwnerLatticeMerge() {
@@ -465,7 +505,7 @@ public class SocialAppTest {
 		// Build legitimate state: Alice posts to her own feed
 		AHashMap<Keyword, ACell> alicePost = SocialPost.createPost("Alice legit", 1000L);
 		Index<Blob, ACell> aliceFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(1000L), alicePost);
+			.assoc(SocialPost.createKey(1000L,0), alicePost);
 		Index<Keyword, ACell> aliceState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, aliceFeed);
 		SignedData<Index<Keyword, ACell>> aliceSigned = alice.signData(aliceState);
@@ -473,7 +513,7 @@ public class SocialAppTest {
 		// Build forged state: Alice signs a post but places it under Bob's key
 		AHashMap<Keyword, ACell> forgedPost = SocialPost.createPost("Forged by Alice!", 2000L);
 		Index<Blob, ACell> forgedFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(2000L), forgedPost);
+			.assoc(SocialPost.createKey(2000L,0), forgedPost);
 		Index<Keyword, ACell> forgedState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, forgedFeed);
 		// Signed by Alice — but placed under Bob's owner key
@@ -489,7 +529,7 @@ public class SocialAppTest {
 		// Bob's node: contains Bob's legitimate data
 		AHashMap<Keyword, ACell> bobPost = SocialPost.createPost("Bob legit", 3000L);
 		Index<Blob, ACell> bobFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(3000L), bobPost);
+			.assoc(SocialPost.createKey(3000L,0), bobPost);
 		Index<Keyword, ACell> bobState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, bobFeed);
 		SignedData<Index<Keyword, ACell>> bobSigned = bob.signData(bobState);
@@ -498,7 +538,7 @@ public class SocialAppTest {
 			bobDid, bobSigned);
 
 		// Network merge: Bob's node receives Alice's node state
-		OwnerLattice<Index<Keyword, ACell>> ownerLattice = Social.SOCIAL_LATTICE;
+		OwnerMapLattice<ACell,Index<Keyword, ACell>> ownerLattice = Social.SOCIAL_LATTICE;
 		LatticeContext ctx = LatticeContext.create(null, bob);
 
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> merged =
@@ -520,8 +560,8 @@ public class SocialAppTest {
 		Index<Blob, ACell> bobResultFeed = SocialLattice.getFeed(bobResult.getValue());
 		assertEquals(1, bobResultFeed.count());
 		assertEquals("Bob legit",
-			SocialPost.getText((AHashMap<Keyword, ACell>) bobResultFeed.get(SocialPost.createKey(3000L))));
-		assertNull(bobResultFeed.get(SocialPost.createKey(2000L)),
+			SocialPost.getText((AHashMap<Keyword, ACell>) bobResultFeed.get(SocialPost.createKey(3000L,0))));
+		assertNull(bobResultFeed.get(SocialPost.createKey(2000L,0)),
 			"Forged post (t=2000, signed by Alice) should be rejected under Bob's key");
 	}
 
@@ -537,7 +577,7 @@ public class SocialAppTest {
 		// Alice forges a post under Bob's key — Bob has no data on the receiving node
 		AHashMap<Keyword, ACell> forgedPost = SocialPost.createPost("Forged!", 1000L);
 		Index<Blob, ACell> forgedFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(1000L), forgedPost);
+			.assoc(SocialPost.createKey(1000L,0), forgedPost);
 		Index<Keyword, ACell> forgedState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, forgedFeed);
 		SignedData<Index<Keyword, ACell>> forgedSigned = alice.signData(forgedState);
@@ -548,7 +588,7 @@ public class SocialAppTest {
 		// Receiving node has nothing
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> emptyNode = Maps.empty();
 
-		OwnerLattice<Index<Keyword, ACell>> ownerLattice = Social.SOCIAL_LATTICE;
+		OwnerMapLattice<ACell,Index<Keyword, ACell>> ownerLattice = Social.SOCIAL_LATTICE;
 		LatticeContext ctx = LatticeContext.create(null, bob);
 
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> merged =
@@ -576,15 +616,13 @@ public class SocialAppTest {
 		DIDKeyAuthorizer aliases=DIDKeyAuthorizer.fromAlsoKnownAs(did ->
 			did.equals(webDid)?java.util.List.of(DID.forKey(signer.getAccountKey()))
 				:java.util.List.of());
-		LatticeContext authorised=LatticeContext.create(
-			null,null,aliases::verifiesOwner);
 		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> accepted=
-			Social.SOCIAL_LATTICE.merge(authorised,Maps.empty(),update);
+			Social.ownerLattice(aliases).merge(Maps.empty(),update);
 		assertNotNull(accepted.get(webDid));
 	}
 
 	/**
-	 * The owner-aware signing boundary must reject a local write when the context
+	 * The owner-aware signing boundary must reject a local write when the signer
 	 * cannot provide the requested owner's key.
 	 */
 	@Test

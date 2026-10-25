@@ -39,6 +39,22 @@ See the [CLI documentation](../convex-cli/README.md) for full command reference.
 
 ## Integration Tests
 
+`SharedApplicationsExample` is a runnable social + P2P + DLFS example in
+`src/test/java/convex/lattice`. It registers P2P infrastructure once, composes
+social and DLFS as independent region components, then replicates between two
+local nodes. Incoming data reconciles with pending domain edits; each application
+chooses when to publish its region. The example also shows streamed file access
+through the standard Java filesystem API.
+
+After `./mvnw -B clean install`, run it on Windows with:
+
+```powershell
+java -cp "convex-integration/target/test-classes;convex-integration/target/convex.jar" convex.lattice.SharedApplicationsExample
+```
+
+On Linux/macOS, use `:` instead of `;` between the classpath entries.
+`SharedApplicationsTest` tests this example without an external network.
+
 Run live integration tests against a running network:
 
 ```bash

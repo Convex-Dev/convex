@@ -1,568 +1,152 @@
 package convex.lattice;
 
+import static convex.lattice.SharedApplicationsExample.ALICE;
+import static convex.lattice.SharedApplicationsExample.BOB;
+import static convex.lattice.SharedApplicationsExample.nodeInfo;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.StandardOpenOption;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
-import convex.api.Convex;
-import convex.api.ConvexRemote;
 import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
-import convex.core.data.AccountKey;
 import convex.core.data.Blob;
-import convex.core.data.Index;
-import convex.core.data.Keyword;
 import convex.core.data.SignedData;
-import convex.core.data.Strings;
-import convex.core.data.Vectors;
-import convex.core.data.prim.CVMBool;
-import convex.core.data.prim.CVMLong;
-import convex.core.store.MemoryStore;
-import convex.dlfs.DLFSApplication;
-import convex.dlfs.DLFSDrive;
-import convex.dlfs.DLFSRegion;
-import convex.lattice.generic.KeyedLattice;
-import convex.lattice.cursor.ALatticeCursor;
-import convex.node.LatticeListener;
-import convex.node.LatticePropagator;
-import convex.node.LatticePropagatorConfig;
-import convex.node.NodeConfig;
-import convex.node.NodeServer;
-import convex.p2p.P2PApplication;
-import convex.p2p.P2PLattice;
+import convex.core.lang.RT;
+import convex.etch.EtchStore;
+import convex.lattice.SharedApplicationsExample.Node;
 import convex.p2p.P2PUser;
 import convex.social.Social;
-import convex.social.SocialPost;
 
-/**
- * Two compound applications, Social + P2P and DLFS + P2P, share one host.
- * Uses explicit region assembly and propagation groups: application subscription
- * registration and automatic interest lifecycle are not implemented yet.
- */
+/** What an embedder can rely on; {@link SharedApplicationsExample} assembles the nodes. */
 public class SharedApplicationsTest {
+	private static final AKeyPair SOURCE_NODE=AKeyPair.createSeeded(7304);
+	private static final AKeyPair TARGET_NODE=AKeyPair.createSeeded(7305);
+	private static final String TEXT="A lattice-backed file.\n".repeat(500); // Large enough to replicate as a separate blob.
 
-	private static final AKeyPair SOCIAL_KEY=AKeyPair.createSeeded(7301);
-	private static final AKeyPair FILES_KEY=AKeyPair.createSeeded(7302);
-	private static final AKeyPair COMMON_KEY=AKeyPair.createSeeded(7303);
-	private static final AKeyPair SOCIAL_TRANSPORT=AKeyPair.createSeeded(7304);
-	private static final AKeyPair FILES_TRANSPORT=AKeyPair.createSeeded(7305);
-	private static final Keyword SOCIAL_FLAG=Keyword.intern("social-enabled");
-	private static final Keyword FILES_FLAG=Keyword.intern("files-enabled");
-
-	private static final KeyedLattice SOCIAL_ROOT=P2PLattice.ROOT
-		.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
-	private static final KeyedLattice FILES_ROOT=P2PLattice.ROOT
-		.addLattice(Keywords.FS,DLFSRegion.LATTICE);
-	private static final KeyedLattice HOST_ROOT=SOCIAL_ROOT
-		.addLattice(Keywords.FS,DLFSRegion.LATTICE);
-	private static final LatticeContext VERIFY=LatticeContext.EMPTY.withOwnerVerifier(
-		(owner,signer) -> owner.equals(DID.forKey(signer)));
-
-	/** Each application has its own user key and deliberately shares one node owner. */
-	private static LatticeContext context(AKeyPair primary) {
-		return context(primary,() -> {});
+	@Test void theRunnableExampleTellsItsStory() throws Exception {
+		var output=new ByteArrayOutputStream();
+		SharedApplicationsExample.run(new PrintStream(output,true,StandardCharsets.UTF_8));
+		String story=output.toString(StandardCharsets.UTF_8);
+		assertTrue(story.contains("Target has Alice's post: true"),story);
+		assertTrue(story.contains("Target's pending post is still private: true"),story);
+		assertTrue(story.contains("Target has Bob's file: Hello from Bob"),story);
+		assertTrue(story.contains("Alice's feed has 2 posts"),story);
 	}
 
-	/** Test hook pauses signing before an atomic write can install its candidate. */
-	private static LatticeContext context(AKeyPair primary,Runnable beforeSign) {
-		return new LatticeContext() {
-			@Override public AKeyPair getSigningKey() { return primary; }
-			@Override public CVMLong currentTimestamp() { return CVMLong.create(100); }
-			@Override public <T extends ACell> SignedData<T> sign(AccountKey key,T value) {
-				beforeSign.run();
-				if (COMMON_KEY.getAccountKey().equals(key)) return COMMON_KEY.signData(value);
-				return super.sign(key,value);
-			}
-		}.withOwnerVerifier(VERIFY.getOwnerVerifier());
-	}
+	@Test void alicesPostAndBobsFileReachTheOtherNode() throws Exception {
+		try (var sourceStore=EtchStore.createTemp("shared-apps-source");
+				var targetStore=EtchStore.createTemp("shared-apps-target");
+				var source=Node.open(sourceStore,SOURCE_NODE,100);
+				var target=Node.open(targetStore,TARGET_NODE,200)) {
+			Blob post=source.social.feed(ALICE).post("Hello from Social + P2P");
+			Files.writeString(source.files.drives(BOB.getAccountKey()).createDrive("home")
+				.fileSystem().getPath("/hello.txt"),TEXT);
+			source.social.p2p(ALICE).node().setNodeInfo(nodeInfo("social node",100));
+			assertNull(source.root().get(Social.KEY_SOCIAL),"staged edits are not in the host until published");
+			source.publish();
 
-	private static final class SocialWithP2P extends P2PApplication
-			implements TransactionalComponent<Index<Keyword,ACell>,SocialWithP2P> {
-		final Social social;
-		SocialWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host,host.cursor().view().setContext(context(SOCIAL_KEY)));
-		}
-		SocialWithP2P(RootComponent<Index<Keyword,ACell>> host,ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			super(host,cursor);
-			social=Social.connect(this);
-		}
-		@Override public SocialWithP2P withCursor(ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			return new SocialWithP2P(host(),cursor);
+			target.pullFrom(source);
+			// Each domain application admitted its region; P2P infrastructure remains live.
+			assertNull(target.root().get(Keywords.FS),"incoming files remain staged until application sync");
+			assertNull(target.root().get(Social.KEY_SOCIAL),"incoming social data follows the same policy");
+			assertNotNull(target.social.feed(ALICE).getPost(post));
+			assertEquals(TEXT,Files.readString(target.files.drives(BOB.getAccountKey())
+				.drive("home").fileSystem().getPath("/hello.txt")));
+			assertNotNull(target.social.p2p(ALICE).node().getNodeInfo());
 		}
 	}
 
-	private static final class FilesWithP2P extends DLFSApplication<Index<Keyword,ACell>>
-			implements TransactionalComponent<Index<Keyword,ACell>,FilesWithP2P> {
-		FilesWithP2P(RootComponent<Index<Keyword,ACell>> host) {
-			this(host,host.cursor().view().setContext(context(FILES_KEY)));
-		}
-		FilesWithP2P(RootComponent<Index<Keyword,ACell>> host,ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			super(host,cursor,Keywords.FS);
-		}
-		@Override public FilesWithP2P withCursor(ALatticeCursor<Index<Keyword,ACell>> cursor) {
-			return new FilesWithP2P(host(),cursor);
-		}
-		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner); }
-	}
+	@Test void pendingEditsStayPrivateUntilTheirOwnerPublishes() throws Exception {
+		try (var sourceStore=EtchStore.createTemp("shared-apps-source");
+				var targetStore=EtchStore.createTemp("shared-apps-target");
+				var source=Node.open(sourceStore,SOURCE_NODE,100);
+				var target=Node.open(targetStore,TARGET_NODE,200)) {
+			Blob remotePost=source.social.feed(ALICE).post("Published elsewhere");
+			Files.writeString(source.files.drives(BOB.getAccountKey()).createDrive("home")
+				.fileSystem().getPath("/hello.txt"),TEXT);
+			source.publish();
 
-	/** Explicit allow-list projection; a selective lattice merge is not projection. */
-	private static Index<Keyword,ACell> project(Index<Keyword,ACell> root,Keyword domain) {
-		Index<Keyword,ACell> result=Index.none();
-		for (Keyword key:new Keyword[]{Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD,domain}) {
-			ACell value=root.get(key);
-			if (value!=null) result=result.assoc(key,value);
-		}
-		return result;
-	}
+			// Local edits on the target, not yet published.
+			var feed=target.social.feed(ALICE);
+			Blob localPost=feed.post("Not published yet");
+			var localDrive=target.files.drives(BOB.getAccountKey()).createDrive("home");
+			Files.writeString(localDrive.fileSystem().getPath("/local.txt"),"A pending local file");
 
-	private static final class Fixture implements AutoCloseable {
-		final MemoryStore store=new MemoryStore();
-		final MemoryStore socialStore=new MemoryStore();
-		final MemoryStore filesStore=new MemoryStore();
-		final NodeServer<Index<Keyword,ACell>> node;
-		final SocialWithP2P social;
-		final FilesWithP2P files;
-		final LatticePropagator socialGroup=new LatticePropagator(socialStore,SOCIAL_ROOT,
-			root -> project(root,Social.KEY_SOCIAL),LatticePropagatorConfig.create());
-		final LatticePropagator filesGroup=new LatticePropagator(filesStore,FILES_ROOT,
-			root -> project(root,Keywords.FS),LatticePropagatorConfig.create());
-		Fixture() { this(false); }
-		Fixture(boolean coordinated) {
-			node=new NodeServer<>(HOST_ROOT,store,NodeConfig.port(-1).withTransactionalRoot(coordinated));
-			social=new SocialWithP2P(node.getRootComponent());
-			files=new FilesWithP2P(node.getRootComponent());
-			node.setMergeContext(VERIFY);
-			socialGroup.setMergeContext(VERIFY);
-			filesGroup.setMergeContext(VERIFY);
-			socialGroup.setTransportKeyPair(SOCIAL_TRANSPORT);
-			filesGroup.setTransportKeyPair(FILES_TRANSPORT);
-			node.addPropagator(socialGroup);
-			node.addPropagator(filesGroup);
-		}
-		@Override public void close() throws Exception {
-			node.close();
-			filesStore.close();
-			socialStore.close();
-			store.close();
+			target.pullFrom(source);
+			var published=target.social.publishedFeed(ALICE);
+			assertNull(published.getPost(remotePost),"incoming data has not been published");
+			assertNull(published.getPost(localPost),"the pending post is not");
+			assertNotNull(feed.getPost(remotePost),"incoming data reconciles in the working region");
+			assertTrue(Files.exists(localDrive.fileSystem().getPath("/hello.txt")),"the working drive reconciles too");
+
+			// Each owner reconciles at its own boundary. Publishing one region leaves the other alone.
+			ACell receivedFiles=target.root().get(Keywords.FS);
+			target.social.sync();
+			assertEquals(2,feed.count(),"the staged feed now holds both posts");
+			assertNotNull(published.getPost(localPost));
+			assertEquals(receivedFiles,target.root().get(Keywords.FS));
+			target.files.sync();
+			assertEquals(TEXT,Files.readString(localDrive.fileSystem().getPath("/hello.txt")));
+			assertEquals("A pending local file",Files.readString(localDrive.fileSystem().getPath("/local.txt")));
+
+			// The reconciled regions are signed by their owners, not by the host or node.
+			SignedData<?> signedSocial=RT.getIn(target.root(),Social.KEY_SOCIAL,DID.forKey(ALICE.getAccountKey()));
+			SignedData<?> signedFiles=RT.getIn(target.root(),Keywords.FS,BOB.getAccountKey());
+			assertTrue(signedSocial.checkSignature());
+			assertTrue(signedFiles.checkSignature());
 		}
 	}
 
-	private record Data(Blob post,DLFSDrive drive) {}
+	@Test void applicationsShareP2PLiveAndNeverDisturbEachOthersRegions() throws Exception {
+		try (var store=EtchStore.createTemp("shared-apps-single");
+				var node=Node.open(store,SOURCE_NODE,100)) {
+			node.social.feed(ALICE).post("A post");
+			Files.writeString(node.files.drives(BOB.getAccountKey()).createDrive("home")
+				.fileSystem().getPath("/hello.txt"),"A file");
+			P2PUser.create(node.files,BOB.getAccountKey(),(owner,value) -> BOB.signData(value)).node().setNodeInfo(nodeInfo("files node",100));
+			assertNotNull(node.social.p2p(BOB).node().getNodeInfo(),"the P2P region is live and shared");
+			assertNull(node.root().get(Social.KEY_SOCIAL));
+			assertNull(node.root().get(Keywords.FS));
 
-	private static Data populate(Fixture f) throws Exception {
-		Blob post=f.social.social.user(SOCIAL_KEY.getAccountKey()).feed().post("Shared host, social data");
-		DLFSDrive drive=f.files.drives(FILES_KEY.getAccountKey()).createDrive("home");
-		Files.writeString(drive.fileSystem().getPath("/hello.txt"),"Shared host, private file");
-		f.social.p2p(SOCIAL_KEY.getAccountKey()).identity()
-			.setIdentity(Strings.create("social user"),Vectors.empty(),100);
-		f.files.p2p(FILES_KEY.getAccountKey()).identity()
-			.setIdentity(Strings.create("files user"),Vectors.empty(),100);
-		f.social.p2p(COMMON_KEY.getAccountKey()).node().setNodeInfo(convex.lattice.P2PLattice.createNodeInfo(
-			Vectors.empty(),Strings.create("shared node"),Strings.create("test"),Vectors.empty(),100));
-		return new Data(post,drive);
-	}
-
-	@Test public void testTypedTransactionsOnOrdinaryHost() throws Exception {
-		testTypedTransactionsAcrossSharedApplicationRegions(false);
-	}
-
-	@Test public void testTypedTransactionsOnTransactionalHost() throws Exception {
-		testTypedTransactionsAcrossSharedApplicationRegions(true);
-	}
-
-	private void testTypedTransactionsAcrossSharedApplicationRegions(boolean coordinated) throws Exception {
-		try (Fixture f=new Fixture(coordinated)) {
-			var root=f.node.getRootComponent().cursor();
-			assertEquals(coordinated,root.supportsExclusiveTransactions());
-			assertEquals(coordinated,f.social.social.user(SOCIAL_KEY.getAccountKey()).cursor().supportsExclusiveTransactions());
-			var before=root.get();
-			f.social.transact(app -> {
-				var user=app.social.user(SOCIAL_KEY.getAccountKey());
-				user.feed().post("Atomic post and follow");
-				user.follows().follow(FILES_KEY.getAccountKey());
-				app.node(COMMON_KEY.getAccountKey()).setNodeInfo(convex.lattice.P2PLattice.createNodeInfo(
-					Vectors.empty(),Strings.create("transactional node"),Strings.create("test"),Vectors.empty(),100));
-				assertSame(before,root.get());
-			});
-			var user=f.social.social.user(SOCIAL_KEY.getAccountKey());
-			assertEquals(1,user.feed().count());
-			assertTrue(user.follows().isFollowing(FILES_KEY.getAccountKey()));
-			assertNotNull(f.social.node(COMMON_KEY.getAccountKey()).getNodeInfo());
-			var socialState=root.get().get(Social.KEY_SOCIAL);
-			f.files.transactAsync(app -> {
-				var drive=app.drives(FILES_KEY.getAccountKey()).createDrive("transaction");
-				try {
-					Files.writeString(drive.fileSystem().getPath("/one.txt"),"one");
-					Files.writeString(drive.fileSystem().getPath("/two.txt"),"two");
-				} catch (IOException e) { throw new UncheckedIOException(e); }
-				app.p2p(FILES_KEY.getAccountKey()).identity().setIdentity(
-					Strings.create("files transaction"),Vectors.empty(),100);
-				assertNull(f.files.drives(FILES_KEY.getAccountKey()).drive("transaction"));
-			}).get(10,TimeUnit.SECONDS);
-			var drive=f.files.drives(FILES_KEY.getAccountKey()).drive("transaction");
-			assertEquals("one",Files.readString(drive.fileSystem().getPath("/one.txt")));
-			assertEquals("two",Files.readString(drive.fileSystem().getPath("/two.txt")));
-			assertSame(socialState,root.get().get(Social.KEY_SOCIAL));
-			var committed=root.get();
-			assertThrows(IllegalArgumentException.class,() -> f.files.transact(app -> {
-				app.drives(FILES_KEY.getAccountKey()).deleteDrive("transaction");
-				throw new IllegalArgumentException("abort");
-			}));
-			assertSame(committed,root.get());
+			node.social.sync();
+			ACell social=node.root().get(Social.KEY_SOCIAL);
+			assertNotNull(social);
+			assertNull(node.root().get(Keywords.FS),"publishing the social region publishes nothing else");
+			node.files.sync();
+			assertEquals(social,node.root().get(Social.KEY_SOCIAL),"publishing files leaves social untouched");
+			assertNotNull(node.root().get(Keywords.FS));
+			node.social.sync();
+			assertNotNull(node.root().get(Keywords.FS),"and vice versa");
 		}
 	}
 
-	@Test
-	public void testAtomicDomainUpdatesWhileSocialPostIsInFlight() throws Exception {
-		try (Fixture f=new Fixture()) {
-			f.node.launch();
-			DLFSDrive drive=f.files.drives(FILES_KEY.getAccountKey()).createDrive("home");
-			var observer=new SocialWithP2P(f.node.getRootComponent());
-			var feed=f.social.social.user(SOCIAL_KEY.getAccountKey()).feed();
-			var otherFeed=observer.social.user(SOCIAL_KEY.getAccountKey()).feed();
-			CountDownLatch signing=new CountDownLatch(1);
-			CountDownLatch resume=new CountDownLatch(1);
-			AtomicInteger signatures=new AtomicInteger();
-			f.social.cursor().setContext(context(SOCIAL_KEY,() -> {
-				if (signatures.incrementAndGet()==1) {
-					signing.countDown();
-					try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
-					catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
-				}
-			}));
-			var beforePost=f.node.getCursor().get();
-			try (var executor=Executors.newSingleThreadExecutor()) {
-				var posting=executor.submit(() -> feed.post("First post, delayed before installation"));
-				Blob second;
-				try {
-					assertTrue(signing.await(10,TimeUnit.SECONDS));
-					assertSame(beforePost,f.node.getCursor().get());
-					assertEquals(0,otherFeed.count());
-					second=otherFeed.post("Second post, installed first");
-
-					// Register a new peer in lattice state; opening a connection is a separate effect.
-					var peer=f.files.p2p(COMMON_KEY.getAccountKey()).node();
-					assertNull(observer.p2p(COMMON_KEY.getAccountKey()).node().getNodeInfo());
-					var info=convex.lattice.P2PLattice.createNodeInfo(Vectors.empty(),
-						Strings.create("new peer"),Strings.create("test"),Vectors.empty(),100);
-					peer.setNodeInfo(info);
-					assertEquals(info,observer.p2p(COMMON_KEY.getAccountKey()).node().getNodeInfo());
-					assertSigned(f,COMMON_KEY.getAccountKey(),info,
-						Keywords.P2P,Keywords.NODES,COMMON_KEY.getAccountKey());
-
-					// Several channel writes become one visible file update at fork.sync().
-					try (DLFSDrive writing=drive.fork()) {
-						var beforeFile=f.node.getCursor().get();
-						var file=writing.fileSystem().getPath("/atomic.txt");
-						try (var channel=Files.newByteChannel(file,
-							StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE)) {
-							channel.write(ByteBuffer.wrap("complete ".getBytes(StandardCharsets.UTF_8)));
-							assertFalse(Files.exists(drive.fileSystem().getPath("/atomic.txt")));
-							channel.write(ByteBuffer.wrap("file".getBytes(StandardCharsets.UTF_8)));
-						}
-						assertSame(beforeFile,f.node.getCursor().get(),"Staged file writes must not change live state");
-						// A sibling file written after the fork must survive its merge-back.
-						Files.writeString(drive.fileSystem().getPath("/sibling.txt"),"concurrent file");
-						writing.sync();
-					}
-					assertEquals("complete file",Files.readString(drive.fileSystem().getPath("/atomic.txt")));
-					assertEquals("concurrent file",Files.readString(drive.fileSystem().getPath("/sibling.txt")));
-				} finally { resume.countDown(); }
-				Blob first=posting.get(10,TimeUnit.SECONDS);
-				assertTrue(signatures.get()>=2,"The post must retry and sign the feed containing the concurrent post");
-				assertNotEquals(first,second);
-				assertEquals(2,otherFeed.count());
-				assertEquals(Strings.create("First post, delayed before installation"),otherFeed.getPost(first).get(SocialPost.TEXT));
-				assertEquals(Strings.create("Second post, installed first"),otherFeed.getPost(second).get(SocialPost.TEXT));
-			}
-			assertNotNull(observer.p2p(COMMON_KEY.getAccountKey()).node().getNodeInfo());
-			assertEquals("complete file",Files.readString(drive.fileSystem().getPath("/atomic.txt")));
-			assertEquals("concurrent file",Files.readString(drive.fileSystem().getPath("/sibling.txt")));
-			assertSigned(f,SOCIAL_KEY.getAccountKey(),f.social.social.user(SOCIAL_KEY.getAccountKey()).cursor().get(),
-				Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
-			assertSigned(f,FILES_KEY.getAccountKey(),f.files.drives(FILES_KEY.getAccountKey()).cursor().get(),
-				Keywords.FS,FILES_KEY.getAccountKey());
-			f.files.sync();
-			assertEquals(f.node.getCursor().get(),f.store.getRootData());
+	@Test void everythingSurvivesReopeningTheStore() throws Exception {
+		File file;
+		Blob post;
+		try (var store=EtchStore.createTemp("shared-apps-reopen");
+				var node=Node.open(store,SOURCE_NODE,100)) {
+			file=store.getFile();
+			post=node.social.feed(ALICE).post("Durable");
+			Files.writeString(node.files.drives(BOB.getAccountKey()).createDrive("home")
+				.fileSystem().getPath("/hello.txt"),TEXT);
+			node.social.p2p(ALICE).node().setNodeInfo(nodeInfo("durable node",100));
+			node.publish();
+			node.flush();
 		}
-	}
-
-	@Test
-	public void testConcurrentLiveFileWritesAndTruncation() throws Exception {
-		for (boolean truncate:new boolean[]{false,true}) {
-			try (Fixture f=new Fixture()) {
-				DLFSDrive first=f.files.drives(FILES_KEY.getAccountKey()).createDrive("home");
-				Files.writeString(first.fileSystem().getPath("/same.txt"),"0000");
-				var other=new FilesWithP2P(f.node.getRootComponent());
-				DLFSDrive second=other.drives(FILES_KEY.getAccountKey()).drive("home");
-				CountDownLatch signing=new CountDownLatch(1);
-				CountDownLatch resume=new CountDownLatch(1);
-				AtomicInteger attempts=new AtomicInteger();
-				f.files.cursor().setContext(context(FILES_KEY,() -> {
-					if (attempts.incrementAndGet()==1) {
-						signing.countDown();
-						try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
-						catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
-					}
-				}));
-				try (var executor=Executors.newSingleThreadExecutor();
-						var a=Files.newByteChannel(first.fileSystem().getPath("/same.txt"),StandardOpenOption.WRITE);
-						var b=Files.newByteChannel(second.fileSystem().getPath("/same.txt"),StandardOpenOption.WRITE)) {
-					var writing=executor.submit(() -> {
-						if (truncate) a.truncate(3);
-						else a.write(ByteBuffer.wrap(new byte[]{'A'}));
-						return null;
-					});
-					try {
-						assertTrue(signing.await(10,TimeUnit.SECONDS));
-						b.position(truncate?0:3);
-						b.write(ByteBuffer.wrap(new byte[]{'B'}));
-					} finally { resume.countDown(); }
-					writing.get(10,TimeUnit.SECONDS);
-				}
-				assertTrue(attempts.get()>=2,"The stale file update must retry against the latest bytes");
-				assertEquals(truncate?"B00":"A00B",Files.readString(second.fileSystem().getPath("/same.txt")));
-				assertSigned(f,FILES_KEY.getAccountKey(),other.drives(FILES_KEY.getAccountKey()).cursor().get(),
-					Keywords.FS,FILES_KEY.getAccountKey());
-			}
-		}
-	}
-
-	@Test
-	public void testConcurrentFileCreationDoesNotReplaceTheWinner() throws Exception {
-		try (Fixture f=new Fixture()) {
-			DLFSDrive first=f.files.drives(FILES_KEY.getAccountKey()).createDrive("home");
-			var other=new FilesWithP2P(f.node.getRootComponent());
-			DLFSDrive second=other.drives(FILES_KEY.getAccountKey()).drive("home");
-			CountDownLatch signing=new CountDownLatch(1);
-			CountDownLatch resume=new CountDownLatch(1);
-			AtomicInteger attempts=new AtomicInteger();
-			f.files.cursor().setContext(context(FILES_KEY,() -> {
-				if (attempts.incrementAndGet()==1) {
-					signing.countDown();
-					try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
-					catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
-				}
-			}));
-			try (var executor=Executors.newSingleThreadExecutor()) {
-				var creating=executor.submit(() -> Files.createFile(first.fileSystem().getPath("/new.txt")));
-				try {
-					assertTrue(signing.await(10,TimeUnit.SECONDS));
-					Files.writeString(second.fileSystem().getPath("/new.txt"),"winner",
-						StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE);
-				} finally { resume.countDown(); }
-				ExecutionException failure=assertThrows(ExecutionException.class,() -> creating.get(10,TimeUnit.SECONDS));
-				assertInstanceOf(FileAlreadyExistsException.class,failure.getCause());
-			}
-			assertEquals("winner",Files.readString(first.fileSystem().getPath("/new.txt")));
-		}
-	}
-
-	@Test
-	public void testSocialBatchAndAbandonedFileWork() throws Exception {
-		try (Fixture f=new Fixture()) {
-			var user=f.social.social.user(SOCIAL_KEY.getAccountKey());
-			var batch=user.fork();
-			var before=f.node.getCursor().get();
-			Blob post=batch.feed().post("Post and follow in one signed update");
-			batch.follows().follow(FILES_KEY.getAccountKey());
-			assertSame(before,f.node.getCursor().get());
-			assertNull(user.feed().getPost(post));
-			assertFalse(user.follows().isFollowing(FILES_KEY.getAccountKey()));
-
-			DLFSDrive drive=f.files.drives(FILES_KEY.getAccountKey()).createDrive("home");
-			var filesBefore=f.node.getCursor().get().get(Keywords.FS);
-			batch.sync();
-			assertEquals(batch.cursor().get(),user.cursor().get());
-			assertNotNull(user.feed().getPost(post));
-			assertTrue(user.follows().isFollowing(FILES_KEY.getAccountKey()));
-			assertSame(filesBefore,f.node.getCursor().get().get(Keywords.FS));
-			assertSigned(f,SOCIAL_KEY.getAccountKey(),user.cursor().get(),
-				Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
-
-			var beforeAbandon=f.node.getCursor().get();
-			try (DLFSDrive abandoned=drive.fork()) {
-				Files.writeString(abandoned.fileSystem().getPath("/abandoned.txt"),"unfinished work");
-				assertTrue(Files.exists(abandoned.fileSystem().getPath("/abandoned.txt")));
-			}
-			assertSame(beforeAbandon,f.node.getCursor().get());
-			assertFalse(Files.exists(drive.fileSystem().getPath("/abandoned.txt")));
-		}
-	}
-
-	private static void assertSigned(Fixture f,AccountKey owner,ACell value,ACell... path) {
-		SignedData<ACell> signed=f.node.getCursor().<SignedData<ACell>>path(path).get();
-		assertNotNull(signed);
-		assertEquals(owner,signed.getAccountKey());
-		assertTrue(signed.checkSignature());
-		assertEquals(value,signed.getValue());
-	}
-
-	@Test
-	public void testConcurrentUpdatesToCommonSignedRegion() throws Exception {
-		try (Fixture f=new Fixture()) {
-			f.node.launch();
-			LatticeContext hostContext=f.node.getCursor().getContext();
-			Data data=populate(f);
-			var socialNode=f.social.p2p(COMMON_KEY.getAccountKey()).node();
-			var filesNode=f.files.p2p(COMMON_KEY.getAccountKey()).node();
-			assertNotSame(socialNode,filesNode);
-			assertSame(socialNode.getNodeInfo(),filesNode.getNodeInfo());
-			assertSame(SOCIAL_ROOT.path(Keywords.P2P),FILES_ROOT.path(Keywords.P2P));
-
-			CountDownLatch reading=new CountDownLatch(1);
-			CountDownLatch resume=new CountDownLatch(1);
-			AtomicInteger attempts=new AtomicInteger();
-			try (var executor=Executors.newSingleThreadExecutor()) {
-				var writing=executor.submit(() -> socialNode.cursor().updateAndGet(value -> {
-					if (attempts.incrementAndGet()==1) {
-						reading.countDown();
-						try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
-						catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
-					}
-					return withFlag(value,SOCIAL_FLAG);
-				}));
-				try {
-					assertTrue(reading.await(10,TimeUnit.SECONDS));
-					filesNode.cursor().updateAndGet(value -> withFlag(value,FILES_FLAG));
-				} finally { resume.countDown(); }
-				writing.get(10,TimeUnit.SECONDS);
-			}
-			assertTrue(attempts.get()>=2,"The signed update must retry against the other application's write");
-			assertEquals(CVMBool.TRUE,socialNode.getNodeInfo().get(SOCIAL_FLAG));
-			assertEquals(CVMBool.TRUE,filesNode.getNodeInfo().get(FILES_FLAG));
-			SignedData<?> signed=f.node.getCursor().<SignedData<ACell>>path(
-				Keywords.P2P,Keywords.NODES,COMMON_KEY.getAccountKey()).get();
-			assertTrue(signed.checkSignature());
-			assertEquals(COMMON_KEY.getAccountKey(),signed.getAccountKey());
-
-			// The shared node signer does not grant access to the other application's user key.
-			var before=f.node.getCursor().get();
-			assertThrows(IllegalStateException.class,() -> f.files.p2p(SOCIAL_KEY.getAccountKey()).identity()
-				.setIdentity(Strings.create("forged"),Vectors.empty(),200));
-			assertSame(before,f.node.getCursor().get());
-			assertNotNull(f.social.social.user(SOCIAL_KEY.getAccountKey()).feed().getPost(data.post()));
-			assertEquals("Shared host, private file",Files.readString(data.drive().fileSystem().getPath("/hello.txt")));
-			assertSame(hostContext,f.node.getCursor().getContext());
-			assertNull(hostContext.getSigningKey());
-			f.files.sync();
-			assertEquals(f.node.getCursor().get(),f.store.getRootData());
-		}
-	}
-
-	@SuppressWarnings("unchecked")
-	private static AHashMap<Keyword,ACell> withFlag(ACell value,Keyword flag) {
-		return ((AHashMap<Keyword,ACell>)value).assoc(flag,CVMBool.TRUE);
-	}
-
-	private static LatticeListener listener(LatticePropagator group) {
-		LatticeListener listener=new LatticeListener(NodeConfig.localNetwork());
-		listener.registerPropagator(group);
-		listener.setSelector(connection -> group);
-		return listener;
-	}
-
-	/** Subscribe before reading to avoid losing an announcement between the two. */
-	@SuppressWarnings("unchecked")
-	private static Index<Keyword,ACell> awaitView(LatticePropagator group,
-			Predicate<Index<Keyword,ACell>> ready) throws Exception {
-		long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
-		while (true) {
-			var next=group.nextAnnounce();
-			var value=(Index<Keyword,ACell>)group.getLastAnnouncedValue();
-			if (value!=null && ready.test(value)) return value;
-			next.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
-		}
-	}
-
-	@Test
-	public void testSeparatePeerViewsAndRemovalOfOnePropagationGroup() throws Exception {
-		try (Fixture f=new Fixture();
-				MemoryStore remoteStore=new MemoryStore();
-				MemoryStore reverseStore=new MemoryStore();
-				NodeServer<Index<Keyword,ACell>> remote=new NodeServer<>(HOST_ROOT,remoteStore,NodeConfig.port(-1));
-				LatticeListener socialListener=listener(f.socialGroup);
-				LatticeListener filesListener=listener(f.filesGroup)) {
-			LatticePropagator receiver=new LatticePropagator(remoteStore,HOST_ROOT,
-				value -> value,LatticePropagatorConfig.create());
-			receiver.setTransportKeyPair(AKeyPair.createSeeded(7306));
-			receiver.setMergeContext(VERIFY);
-			remote.setMergeContext(VERIFY);
-			remote.addPropagator(receiver);
-			f.node.launch();
-			remote.launch();
-			socialListener.launch();
-			filesListener.launch();
-			Data data=populate(f);
-			f.social.sync();
-			var socialView=awaitView(f.socialGroup,v -> v.get(Social.KEY_SOCIAL)!=null);
-			var filesView=awaitView(f.filesGroup,v -> v.get(Keywords.FS)!=null);
-			assertNull(socialView.get(Keywords.FS));
-			assertNull(filesView.get(Social.KEY_SOCIAL));
-			assertEquals(socialView.get(Keywords.P2P),filesView.get(Keywords.P2P));
-			assertEquals(socialView.get(Keywords.ID),filesView.get(Keywords.ID));
-			// Independent receiver sees the partial roots in reverse order, with the same result.
-			var reverse=P2PApplication.connect(RootComponent.create(HOST_ROOT,reverseStore));
-			reverse.cursor().setContext(VERIFY);
-			reverse.merge(filesView);
-			reverse.merge(socialView);
-			assertEquals(f.node.getCursor().get(),reverse.cursor().get());
-			assertSame(reverse.cursor().get(),reverse.merge(socialView),"Repeated shared-region delivery is idempotent");
-
-			try (Convex socialPeer=ConvexRemote.connect(socialListener.getHostAddress());
-					Convex filesPeer=ConvexRemote.connect(filesListener.getHostAddress())) {
-				receiver.addPeer(SOCIAL_TRANSPORT.getAccountKey(),socialPeer).get(10,TimeUnit.SECONDS);
-				receiver.addPeer(FILES_TRANSPORT.getAccountKey(),filesPeer).get(10,TimeUnit.SECONDS);
-				remote.pull(receiver,socialPeer).get(10,TimeUnit.SECONDS);
-				assertNotNull(remote.getCursor().get().get(Social.KEY_SOCIAL));
-				assertNull(remote.getCursor().get().get(Keywords.FS),"Social route must not disclose file state");
-				remote.pull(receiver,filesPeer).get(10,TimeUnit.SECONDS);
-				assertEquals(f.node.getCursor().get(),remote.getCursor().get(),"Overlapping P2P values merge once into the root");
-				SocialWithP2P remoteSocial=new SocialWithP2P(remote.getRootComponent());
-				FilesWithP2P remoteFiles=new FilesWithP2P(remote.getRootComponent());
-				assertNotNull(remoteSocial.social.user(SOCIAL_KEY.getAccountKey()).feed().getPost(data.post()));
-				assertEquals("Shared host, private file",Files.readString(remoteFiles.drives(FILES_KEY.getAccountKey())
-					.drive("home").fileSystem().getPath("/hello.txt")));
-
-				// Explicit group removal is the existing lifecycle API, not application.close().
-				socialListener.close();
-				assertTrue(f.node.removePropagator(f.socialGroup));
-				assertFalse(f.socialGroup.isRunning());
-				assertTrue(f.node.isRunning());
-				assertTrue(f.filesGroup.isRunning());
-				var retainedSocial=f.node.getCursor().get().get(Social.KEY_SOCIAL);
-				f.files.p2p(COMMON_KEY.getAccountKey()).identity()
-					.setIdentity(Strings.create("files still running"),Vectors.empty(),200);
-				Files.writeString(data.drive().fileSystem().getPath("/later.txt"),"Still available");
-				f.files.sync();
-				var expected=project(f.node.getCursor().get(),Keywords.FS);
-				awaitView(f.filesGroup,expected::equals);
-				remote.pull(receiver,filesPeer).get(10,TimeUnit.SECONDS);
-				assertEquals("Still available",Files.readString(remoteFiles.drives(FILES_KEY.getAccountKey())
-					.drive("home").fileSystem().getPath("/later.txt")));
-				assertEquals(Strings.create("files still running"),remoteSocial.p2p(COMMON_KEY.getAccountKey())
-					.identity().getIdentity().get(P2PLattice.ID_NAME));
-				assertEquals(retainedSocial,f.node.getCursor().get().get(Social.KEY_SOCIAL));
-				assertEquals(retainedSocial,remote.getCursor().get().get(Social.KEY_SOCIAL));
-				assertFalse(f.filesGroup.getStatus().hasFailures());
-			}
+		try (var store=EtchStore.create(file);
+				var node=Node.open(store,SOURCE_NODE,300)) {
+			assertNotNull(node.social.feed(ALICE).getPost(post));
+			assertEquals(TEXT,Files.readString(node.files.drives(BOB.getAccountKey())
+				.drive("home").fileSystem().getPath("/hello.txt")));
+			assertNotNull(P2PUser.create(node.files,ALICE.getAccountKey()).node().getNodeInfo());
 		}
 	}
 }

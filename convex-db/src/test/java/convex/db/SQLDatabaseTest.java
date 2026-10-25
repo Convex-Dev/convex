@@ -25,7 +25,7 @@ import convex.db.ConvexDB;
 import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
 /**
@@ -237,7 +237,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testConnectedDatabase() throws Exception {
 		// Set up a cursor chain using DATABASE_MAP_LATTICE
-		ALatticeCursor<?> root = Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE);
+		AForkableCursor<?> root = Cursors.root(ConvexDB.DATABASE_MAP_LATTICE.zero());
 
 		// Connect a named database
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -287,7 +287,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testForkAndSyncConnected() throws Exception {
 		// Set up cursor chain
-		ALatticeCursor<?> root = Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE);
+		AForkableCursor<?> root = Cursors.root(ConvexDB.DATABASE_MAP_LATTICE.zero());
 
 		// Connect and populate
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -432,7 +432,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testConnectedModeRejectsStandaloneOps() {
 		// Connected databases should not have signing capability
-		ALatticeCursor<?> root = Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE);
+		AForkableCursor<?> root = Cursors.root(ConvexDB.DATABASE_MAP_LATTICE.zero());
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
 
 		assertNull(db.getKeyPair());

@@ -40,12 +40,73 @@ social user. Use `did:convex` or `did:web` when key rotation is required.
 
 Each owner has one signed social value, but that value is not a whole-value LWW
 register. Feed, profile and following merge independently. Concurrent edits from
-separate authorised devices therefore merge structurally. An authorised local
-context re-signs a synthesised merged value; a relay without an authorised owner
+separate authorised devices therefore merge structurally. An explicit owner-aware
+signer re-signs a synthesised merged value; a relay without an authorised owner
 key can retain an existing valid version but cannot forge a synthesis.
 
 The following encoding and merge rules are specified in
 [FOLLOWING.md](FOLLOWING.md).
+
+New post keys contain an eight-byte big-endian timestamp followed by eight random
+bytes. Distinct devices can post at the same millisecond without allocating the
+same key. Identity and record time are selected once per post operation, before
+the atomic update, and retained on retries. Existing eight-byte timestamp-only
+keys remain readable, including reply references and timelines. Explicit salted
+keys can be constructed with `SocialPost.createKey(timestamp, salt)`.
+
+Merge guards the container shapes of sections it examines. Unfamiliar sections
+are retained as opaque values; unknown fields are carried without interpretation.
+An incompatible incoming section does not replace an established section, and
+other compatible sections can still advance. Signature and DID authorisation
+checks remain mandatory. Domain readers throw when a value they examine has an
+incompatible type; accepting an envelope does not guarantee every domain reader
+can interpret its contents.
+
+## Reading domain state
+
+Data accessors return the stored value, or `null` when it is absent. A stored empty
+collection remains an empty collection. Readers do not manufacture defaults,
+coerce incompatible fields, or change storage. `feed.count()` returns zero for an
+absent feed, and `follows.isFollowing(did)` returns false for an absent record.
+An existing follow record must contain a boolean `:active` flag.
+
+Timeline construction excludes explicit tombstones but throws on incompatible
+keys or post values that it examines. Follow-set construction similarly rejects
+incompatible records and target DIDs. Applications using untrusted or unfamiliar
+state must handle these exceptions at their own boundary; the helpers do not
+silently return partial results. Absent individual feeds and follow sections
+contribute no entries to an explicitly requested aggregation.
+
+Writes can initialise missing containers, but incompatible containers or records
+are not replaced with empty ones. Failed edits leave the signed state unchanged.
+These domain checks do not change the relay merge's treatment of opaque sections.
+
+## Timeline ordering
+
+Timestamp ties for revisions of the same record still prefer the established
+value. Salting distinguishes post identities; it does not change revision ordering.
+
+Timelines use descending `(postKey, author DID)` order, comparing key bytes in the
+same order as the feed index. Continue a page with its last entry's `position()`:
+
+```java
+var first = SocialHelpers.buildTimeline(feeds, null, 20);
+if (!first.isEmpty()) {
+    var next = SocialHelpers.buildTimeline(feeds, first.getLast().position(), 20);
+}
+```
+
+The exclusive bound includes the full key and author, so simultaneous posts and
+identical keys belonging to different authors are not skipped or repeated.
+`new TimelinePosition(keyOrPrefix)` omits the author and excludes the whole key
+or prefix group. `TimelinePosition.atTimestamp(time)` supplies the eight-byte
+timestamp prefix; the existing timestamp overload keeps this coarse behaviour
+(zero means unbounded). A bound need not identify an existing entry. Reusing the
+same immutable feeds gives stable pagination; changing feeds between requests
+does not imply snapshot isolation.
+
+Each feed uses `Index.seek` to locate the bound directly, then the timeline heap
+merges entries below it. Continuing a deep page does not scan all newer posts.
 
 ## Default replication policy
 
@@ -69,12 +130,14 @@ logical retention is defined by the projected root.
 Every admitted owner slot must:
 
 1. be a complete value within the configured inbound size bound;
-2. have the canonical signed social-state shape;
+2. contain a signed social index, without requiring known schemas for every field;
 3. have a valid Ed25519 signature;
 4. use a signer authorised for the path DID.
 
-The policy first reuses a matching validated signer cache. If the signer changes,
-it resolves the DID through `DIDKeyAuthorizer` and rejects the value on failure.
+The policy checks the current `DIDKeyAuthorizer` authority view and rejects the
+value on failure. A remembered key cannot override rotation or revocation.
+An authoriser may cache bindings for an immutable authenticated snapshot, refreshed
+outside merge callbacks. Unfamiliar fields remain covered by the original signature.
 
 ## Network trust boundary
 
@@ -109,7 +172,8 @@ Tests cover:
 
 - `did:key`, pinned `did:convex`, and authenticated `did:web` authorisation;
 - DID/key separation and rejection of a wrong social signer;
-- disjoint follow edits, same-target LWW and cached-key encoding;
+- disjoint follow edits, same-target LWW and follow-intent encoding;
+- receiving and replaying remote owners leaves local signed intent unchanged;
 - Alice, Bob and Carol with different direct-follow sets;
 - Dave joining late through one rendezvous node without an inbound listener;
 - authenticated reverse-route upgrade on the original full-duplex socket;

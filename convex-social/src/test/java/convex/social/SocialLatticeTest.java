@@ -22,10 +22,9 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeContext;
 import convex.lattice.Lattice;
+import convex.lattice.LatticeContext;
 import convex.lattice.generic.KeyedLattice;
-import convex.lattice.generic.OwnerLattice;
 
 public class SocialLatticeTest {
 
@@ -35,7 +34,7 @@ public class SocialLatticeTest {
 	public void testFeedPostCreation() {
 		long ts = 1708444800000L;
 		Blob key = SocialPost.createKey(ts);
-		assertEquals(8, key.count());
+		assertEquals(16, key.count());
 		assertEquals(ts, SocialPost.extractTimestamp(key));
 
 		AHashMap<Keyword, ACell> post = SocialPost.createPost("Hello world", ts);
@@ -47,9 +46,9 @@ public class SocialLatticeTest {
 	@Test
 	public void testFeedKeyOrdering() {
 		// Earlier timestamps should sort before later ones
-		Blob key1 = SocialPost.createKey(1000L);
-		Blob key2 = SocialPost.createKey(2000L);
-		Blob key3 = SocialPost.createKey(3000L);
+		Blob key1 = SocialPost.createKey(1000L,0);
+		Blob key2 = SocialPost.createKey(2000L,0);
+		Blob key3 = SocialPost.createKey(3000L,0);
 
 		assertTrue(key1.compareTo(key2) < 0);
 		assertTrue(key2.compareTo(key3) < 0);
@@ -63,9 +62,9 @@ public class SocialLatticeTest {
 		AHashMap<Keyword, ACell> post2 = SocialPost.createPost("Post 2", 2000L);
 
 		Index<Blob, ACell> feedA = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(1000L), post1);
+			.assoc(SocialPost.createKey(1000L,0), post1);
 		Index<Blob, ACell> feedB = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(2000L), post2);
+			.assoc(SocialPost.createKey(2000L,0), post2);
 
 		Index<Keyword, ACell> stateA = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, feedA);
@@ -81,7 +80,7 @@ public class SocialLatticeTest {
 	@Test
 	public void testFeedMergeLWW() {
 		// Same key, different timestamps: LWW should pick the later one
-		Blob key = SocialPost.createKey(1000L);
+		Blob key = SocialPost.createKey(1000L,0);
 		AHashMap<Keyword, ACell> postOld = SocialPost.createPost("Old text", 1000L);
 		AHashMap<Keyword, ACell> postNew = SocialPost.createPost("New text", 2000L);
 
@@ -117,7 +116,7 @@ public class SocialLatticeTest {
 	@Test
 	public void testReplyPost() {
 		AKeyPair kp = AKeyPair.generate();
-		Blob parentKey = SocialPost.createKey(1000L);
+		Blob parentKey = SocialPost.createKey(1000L,0);
 		AHashMap<Keyword, ACell> reply = SocialPost.createReply(
 			"Great post!", 2000L, parentKey, DID.forKey(kp.getAccountKey()));
 
@@ -202,7 +201,7 @@ public class SocialLatticeTest {
 		AKeyPair carol=AKeyPair.generate();
 
 		Index<Blob,ACell> feed=Index.<Blob,ACell>none().assoc(
-			SocialPost.createKey(1000L),SocialPost.createPost("Hello",1000L));
+			SocialPost.createKey(1000L,0),SocialPost.createPost("Hello",1000L));
 		Index<Keyword,ACell> postOnly=Index.<Keyword,ACell>none()
 			.assoc(SocialLattice.KEY_FEED,feed);
 		AHashMap<ACell,ACell> follows=Maps.of(
@@ -257,6 +256,18 @@ public class SocialLatticeTest {
 			((AHashMap<?,?>)follows.get(bob)).get(SocialPost.ACTIVE));
 	}
 
+	@Test void legacyKeyCacheIsAnOpaqueFollowExtension() {
+		var bob=DID.forKey(AKeyPair.createSeeded(7813).getAccountKey());
+		var keyField=Keyword.intern("account-key");
+		// An unfamiliar cached value cannot invalidate an otherwise compatible record.
+		var record=SocialPost.createFollowRecord(2000L,false).assoc(keyField,CVMLong.ONE);
+		var earlier=followingState(1000L,Maps.of(bob,SocialPost.createFollowRecord(1000L,true)));
+		var later=followingState(2000L,Maps.of(bob,record));
+		var merged=SocialLattice.INSTANCE.merge(earlier,later);
+		assertEquals(record,SocialLattice.getFollows(merged).get(bob));
+		assertTrue(SocialHelpers.getActiveFollows(SocialLattice.getFollows(merged)).isEmpty());
+	}
+
 	// ===== Owner Lattice Integration =====
 
 	@Test
@@ -264,12 +275,12 @@ public class SocialLatticeTest {
 		AKeyPair alice = AKeyPair.generate();
 		AKeyPair bob = AKeyPair.generate();
 
-		OwnerLattice<Index<Keyword, ACell>> socialLattice = Social.SOCIAL_LATTICE;
+		var socialLattice = Social.SOCIAL_LATTICE;
 
 		// Alice creates a post
 		AHashMap<Keyword, ACell> alicePost = SocialPost.createPost("Hello from Alice", 1000L);
 		Index<Blob, ACell> aliceFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(1000L), alicePost);
+			.assoc(SocialPost.createKey(1000L,0), alicePost);
 		Index<Keyword, ACell> aliceState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, aliceFeed);
 		SignedData<Index<Keyword, ACell>> aliceSigned = alice.signData(aliceState);
@@ -277,7 +288,7 @@ public class SocialLatticeTest {
 		// Bob creates a post
 		AHashMap<Keyword, ACell> bobPost = SocialPost.createPost("Hello from Bob", 2000L);
 		Index<Blob, ACell> bobFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(2000L), bobPost);
+			.assoc(SocialPost.createKey(2000L,0), bobPost);
 		Index<Keyword, ACell> bobState = Index.<Keyword, ACell>none()
 			.assoc(SocialLattice.KEY_FEED, bobFeed);
 		SignedData<Index<Keyword, ACell>> bobSigned = bob.signData(bobState);
@@ -315,13 +326,13 @@ public class SocialLatticeTest {
 
 		// Alice: posts at t=1000, t=3000
 		Index<Blob, ACell> aliceFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(1000L), SocialPost.createPost("Alice first", 1000L))
-			.assoc(SocialPost.createKey(3000L), SocialPost.createPost("Alice second", 3000L));
+			.assoc(SocialPost.createKey(1000L,0), SocialPost.createPost("Alice first", 1000L))
+			.assoc(SocialPost.createKey(3000L,0), SocialPost.createPost("Alice second", 3000L));
 
 		// Bob: posts at t=2000, t=4000
 		Index<Blob, ACell> bobFeed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(2000L), SocialPost.createPost("Bob first", 2000L))
-			.assoc(SocialPost.createKey(4000L), SocialPost.createPost("Bob second", 4000L));
+			.assoc(SocialPost.createKey(2000L,0), SocialPost.createPost("Bob first", 2000L))
+			.assoc(SocialPost.createKey(4000L,0), SocialPost.createPost("Bob second", 4000L));
 
 		Map<AString, Index<Blob, ACell>> feeds = new HashMap<>();
 		feeds.put(DID.forKey(alice.getAccountKey()), aliceFeed);
@@ -342,10 +353,10 @@ public class SocialLatticeTest {
 		AKeyPair alice = AKeyPair.generate();
 
 		Index<Blob, ACell> feed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(1000L), SocialPost.createPost("Post 1", 1000L))
-			.assoc(SocialPost.createKey(2000L), SocialPost.createPost("Post 2", 2000L))
-			.assoc(SocialPost.createKey(3000L), SocialPost.createPost("Post 3", 3000L))
-			.assoc(SocialPost.createKey(4000L), SocialPost.createPost("Post 4", 4000L));
+			.assoc(SocialPost.createKey(1000L,0), SocialPost.createPost("Post 1", 1000L))
+			.assoc(SocialPost.createKey(2000L,0), SocialPost.createPost("Post 2", 2000L))
+			.assoc(SocialPost.createKey(3000L,0), SocialPost.createPost("Post 3", 3000L))
+			.assoc(SocialPost.createKey(4000L,0), SocialPost.createPost("Post 4", 4000L));
 
 		Map<AString, Index<Blob, ACell>> feeds = Map.of(DID.forKey(alice.getAccountKey()), feed);
 
@@ -371,8 +382,8 @@ public class SocialLatticeTest {
 			.assoc(SocialPost.TIMESTAMP, CVMLong.create(3000L));
 
 		Index<Blob, ACell> feed = Index.<Blob, ACell>none()
-			.assoc(SocialPost.createKey(1000L), SocialPost.createPost("Visible", 1000L))
-			.assoc(SocialPost.createKey(2000L), deletedPost);
+			.assoc(SocialPost.createKey(1000L,0), SocialPost.createPost("Visible", 1000L))
+			.assoc(SocialPost.createKey(2000L,0), deletedPost);
 
 		Map<AString, Index<Blob, ACell>> feeds = Map.of(DID.forKey(alice.getAccountKey()), feed);
 		List<TimelineEntry> timeline = SocialHelpers.buildTimeline(feeds, 0, 10);
@@ -395,22 +406,22 @@ public class SocialLatticeTest {
 			.assoc(SocialLattice.KEY_FEED, Index.none());
 
 		assertSame(state, SocialLattice.INSTANCE.merge(state, null));
-		assertEquals(SocialLattice.INSTANCE.zero(),SocialLattice.INSTANCE.merge(null,state));
+		assertEquals(state,SocialLattice.INSTANCE.merge(null,state));
 	}
 
 	@Test
 	public void testEmptyStateFunctions() {
 		Index<Keyword, ACell> empty = SocialLattice.INSTANCE.zero();
-		assertTrue(SocialLattice.getFeed(empty).isEmpty());
-		assertTrue(SocialLattice.getProfile(empty).isEmpty());
-		assertTrue(SocialLattice.getFollows(empty).isEmpty());
+		assertNull(SocialLattice.getFeed(empty));
+		assertNull(SocialLattice.getProfile(empty));
+		assertNull(SocialLattice.getFollows(empty));
 	}
 
 	@Test
 	public void testNullStateFunctions() {
-		assertTrue(SocialLattice.getFeed(null).isEmpty());
-		assertTrue(SocialLattice.getProfile(null).isEmpty());
-		assertTrue(SocialLattice.getFollows(null).isEmpty());
+		assertNull(SocialLattice.getFeed(null));
+		assertNull(SocialLattice.getProfile(null));
+		assertNull(SocialLattice.getFollows(null));
 	}
 
 	// ===== KeyedLattice.addLattice Integration =====

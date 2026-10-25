@@ -11,15 +11,21 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
+import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.Root;
 import convex.lattice.generic.IndexLattice;
+import convex.lattice.generic.JSONLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.MapLattice;
 
 /**
- * Tests for {@link LatticeOps#assocIn}.
+ * Tests for {@link LatticeOps#assocIn}: the write engine creates an absent base from
+ * the {@link ALattice} it is given and never invents a container below it. Typed intermediates come from the component that
+ * owns each level, which declares them with {@code LatticeComponent.resolve}.
  */
 public class LatticeOpsTest {
 
@@ -54,21 +60,39 @@ public class LatticeOpsTest {
 		assertEquals(CVMLong.create(7), map.get(KEY_A));
 	}
 
+	/**
+	 * The engine knows only the lattice of the base. An absent intermediate below it has
+	 * no declared type here, so a deep write through it fails rather than guessing;
+	 * the owning component declares each level with {@code LatticeComponent.resolve} and the
+	 * same write then creates every container with its correct type.
+	 */
 	@SuppressWarnings("unchecked")
 	@Test
-	public void testDeepPathWithMultipleNullIntermediates() {
+	public void testDeepPathWithMissingIntermediate() {
 		// KeyedLattice(:a -> KeyedLattice(:b -> LWW))
 		KeyedLattice inner = KeyedLattice.create("b", LWWLattice.INSTANCE);
 		KeyedLattice outer = KeyedLattice.create("a", inner);
 
-		ACell result = LatticeOps.assocIn(null, CVMLong.create(99), outer, KEY_A, KEY_B);
+		assertThrows(IllegalStateException.class,
+			() -> LatticeOps.assocIn(null, CVMLong.create(99), outer, KEY_A, KEY_B));
 
-		assertTrue(result instanceof Index);
-		Index<Keyword, ACell> outerIdx = (Index<Keyword, ACell>) result;
+		Root<Index<Keyword, ACell>> root = Cursors.root((Index<Keyword, ACell>) null);
+		LatticeComponent.resolve(root,outer,KEY_A,KEY_B).set(CVMLong.create(99));
+
+		Index<Keyword, ACell> outerIdx = root.get();
+		assertNotNull(outerIdx);
 		ACell innerVal = outerIdx.get(KEY_A);
 		assertTrue(innerVal instanceof Index, ()->"Inner should be Index, got " + Utils.getClassName(innerVal));
 		Index<Keyword, ACell> innerIdx = (Index<Keyword, ACell>) innerVal;
 		assertEquals(CVMLong.create(99), innerIdx.get(KEY_B));
+	}
+
+	/** A navigable JSON lattice does not specify missing container types. */
+	@Test
+	public void testJSONRequiresExplicitContainers() {
+		assertThrows(IllegalStateException.class,
+			() -> LatticeOps.assocIn(null, CVMLong.create(3), JSONLattice.INSTANCE,
+				Strings.create("a"), Strings.create("b")));
 	}
 
 	@Test
@@ -113,9 +137,8 @@ public class LatticeOpsTest {
 	}
 
 	@Test
-	public void testNullLatticeAtMidDepthWithNullDataThrows() {
-		// KeyedLattice with unknown key returns null from path()
-		// So at depth 1 we have lat=null and data=null -> throw
+	public void testMissingIntermediateWithNullDataThrows() {
+		// The base is created from the lattice, but :a's lattice is not known to the engine
 		KeyedLattice kl = KeyedLattice.create("a", LWWLattice.INSTANCE);
 
 		assertThrows(IllegalStateException.class, () -> {

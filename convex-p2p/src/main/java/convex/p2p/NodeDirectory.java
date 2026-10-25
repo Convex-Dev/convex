@@ -1,14 +1,15 @@
 package convex.p2p;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -16,84 +17,70 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
-import convex.core.message.AConnection;
 import convex.core.util.Utils;
-import convex.node.LatticeConnectionManager;
-import convex.node.LatticeListener;
-import convex.node.LatticePropagator;
-import convex.node.NodeConfig;
-import convex.node.NodeServer;
 
 /**
- * Owns the P2P node registry policy layered over a generic {@link NodeServer}.
+ * The P2P application's validated view of the node registry at {@code [:p2p :nodes]}.
  *
- * <p>This class is the only bridge between the application-specific
- * {@code [:p2p :nodes]} lattice and generic connection intent. It publishes this
- * node's signed {@code NodeInfo}, validates and indexes remote records, translates
- * their transport declarations into {@link LatticeConnectionManager} intent, and
- * asks the propagation group to authenticate an inbound route only after a valid
- * owned NodeInfo update has been accepted by the lattice.</p>
+ * <p>This is the only class that reads the NodeInfo schema. It publishes this node's
+ * own signed record through the node-record component, validates and indexes the
+ * records of other nodes, and recognises the one update shape that may claim an
+ * identity for inbound route authentication. It reads and writes the lattice only.
+ * A {@link P2PNode} turns the indexed records into connection intent and asks its
+ * propagation group to authenticate routes; nothing here opens a socket, marks a
+ * connection trusted or merges a foreign value.</p>
  *
- * <p>It deliberately does not open sockets itself, mark connections trusted or
- * merge lattice values. Socket admission and trust remain propagation-group
- * concerns; authoritative merge remains a NodeServer concern. Conversely, none
- * of those generic replication components knows the registry path or NodeInfo
- * schema.</p>
- *
- * <p>The in-memory index is bounded by the propagation group's
- * {@link LatticeConnectionManager#getMaxDesiredPeers()} and additive/update-only.
- * Lattice absence is not interpreted as revocation because the current Owner/LWW
- * registry has no deletion contract.</p>
+ * <p>The in-memory index is bounded by {@link #setMaxRecords} and is
+ * additive/update-only. Lattice absence is not interpreted as revocation because
+ * the current Owner/LWW registry has no deletion contract.</p>
  */
 final class NodeDirectory {
 
 	private static final Logger log=LoggerFactory.getLogger(NodeDirectory.class);
 
-	private final NodeServer<?> server;
-	private final LatticePropagator propagator;
-	private final LatticeListener transport;
-	private final NodeConfig config;
-	private final AKeyPair keyPair;
-	private final AccountKey ownKey;
+	/** Bound on indexed remote records until a node supplies its own. */
+	static final int DEFAULT_MAX_RECORDS=256;
+
+	/** The registry path within the application root, as a message path. */
+	static final AVector<ACell> REGISTRY_PATH=Vectors.of(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+
+	private final P2PApplication application;
 	private final ConcurrentHashMap<AccountKey,NodeRecord> records=
 		new ConcurrentHashMap<>();
+	private volatile int maxRecords=DEFAULT_MAX_RECORDS;
 
 	private AVector<AccountKey> pointsOfPresence=Vectors.empty();
 	private boolean relay;
 
-	NodeDirectory(NodeServer<?> server,LatticePropagator propagator,
-			LatticeListener transport,NodeConfig config,AKeyPair keyPair) {
-		this.server=server;
-		this.propagator=propagator;
-		this.transport=transport;
-		this.config=config;
-		this.keyPair=keyPair;
-		this.ownKey=(keyPair==null) ? null : keyPair.getAccountKey();
+	NodeDirectory(P2PApplication application) {
+		this.application=application;
 	}
 
-	/** Validates P2P advertisement settings before the generic server opens resources. */
-	void validateLaunchConfiguration() {
-		AString configured=config.getURL();
-		if (configured==null) return;
-		String reason=NodeConfig.validatePublicURL(
-			configured.toString(),config.isAllowPrivateURL());
-		if (reason!=null) {
-			throw new IllegalStateException("Invalid node URL configuration: "+reason);
-		}
+	/** This node's key, supplied explicitly by the application, or null for a keyless node. */
+	private AccountKey ownKey() {
+		return application.ownKey();
+	}
+
+	/** Bounds the number of remote records indexed; a node sets this to its peer bound. */
+	void setMaxRecords(int maxRecords) {
+		if (maxRecords<0) throw new IllegalArgumentException("Record bound must not be negative");
+		this.maxRecords=maxRecords;
 	}
 
 	/** Sets the bounded PoP declarations used by the next NodeInfo publication. */
 	void setPointsOfPresence(AVector<AccountKey> pops) {
 		AVector<AccountKey> value=(pops==null) ? Vectors.empty() : pops;
-		if (value.count()>convex.lattice.P2PLattice.MAX_POINTS_OF_PRESENCE) {
+		if (value.count()>convex.lattice.p2p.P2PLattice.MAX_POINTS_OF_PRESENCE) {
 			throw new IllegalArgumentException("Too many Points of Presence: "+value.count());
 		}
+		AccountKey ownKey=ownKey();
 		HashSet<AccountKey> unique=new HashSet<>();
 		for (long i=0; i<value.count(); i++) {
 			AccountKey pop=value.get(i);
@@ -111,60 +98,75 @@ final class NodeDirectory {
 	}
 
 	/**
-	 * Publishes this node's complete signed NodeInfo after the listener has bound and
-	 * therefore knows its actual port. A keyless node deliberately publishes nothing.
+	 * Publishes this node's complete signed NodeInfo advertising {@code url}, or no
+	 * transport when {@code url} is null, then syncs the host. The record is written
+	 * through the node-record component, so it replaces any retained own record
+	 * rather than merging with it: a node always advertises its current record. A
+	 * keyless application publishes nothing.
+	 *
+	 * @param url advertised transport, or null when this node accepts no inbound connections
 	 */
-	void publishOwnRecord() {
-		if (keyPair==null) return;
-		if (server.getLattice().path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES)==null) {
-			throw new IllegalStateException("P2PNode root does not contain [:p2p :nodes]");
+	void publishOwnRecord(AString url) {
+		AccountKey ownKey=ownKey();
+		if (ownKey==null) return;
+		if (application.getLattice().path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES)==null) {
+			throw new IllegalStateException("P2P application root does not contain [:p2p :nodes]");
 		}
 
-		AString url=config.getAdvertisedURL(transport.getPort());
 		AVector<AString> transports=(url==null) ? Vectors.empty() : Vectors.of(url);
 		AString type=Strings.create("Convex Lattice Node");
 		String currentVersion=Utils.getVersion();
 		AString version=Strings.create(currentVersion==null ? "unknown" : currentVersion);
-		long timestamp=server.getCursor().getContext().currentTimestampValue();
-		AHashMap<Keyword,ACell> info=convex.lattice.P2PLattice.createNodeInfo(
+		long timestamp=application.clock().get().longValue();
+		AHashMap<Keyword,ACell> info=convex.lattice.p2p.P2PLattice.createNodeInfo(
 			transports,type,version,null,pointsOfPresence,relay,timestamp);
-		AHashMap<ACell,SignedData<ACell>> entry=
-			convex.lattice.P2PLattice.createSignedEntry(keyPair,info);
 
-		server.getCursor().path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES).merge(entry);
-		server.getCursor().sync();
-		refresh();
+		application.node(ownKey).setNodeInfo(info);
+		application.syncHost();
 		log.debug("Published NodeInfo: transports={}, pops={}, relay={}, type={}, version={}",
 			transports,pointsOfPresence,relay,type,version);
 	}
 
-	/**
-	 * Handles a propagation group's notification for one accepted inbound value.
-	 * Root, {@code :p2p} and exact registry merges can refresh discovery; only a
-	 * strict one-record update at the exact registry path can claim the identity
-	 * used to start inbound possession proof.
-	 */
-	void onAcceptedInbound(AConnection connection,LatticePropagator propagator,
-			ACell[] path,ACell value,boolean changed) {
-		if (!mayAffectNodeRegistry(path)) return;
-		AccountKey claimedKey=isNodeRegistryPath(path)
-			? singleValidatedOwner(value) : null;
-		refresh();
-		if (connection!=null && claimedKey!=null) {
-			propagator.authenticateInboundRoute(connection,claimedKey);
-		}
+	/** The signed registry entry this node has published, as a one-entry owner map, or null. */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	AHashMap<ACell,SignedData<ACell>> ownEntry() {
+		AccountKey ownKey=ownKey();
+		if (ownKey==null) return null;
+		ACell raw=application.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		if (!(raw instanceof AHashMap<?,?> nodes)) return null;
+		ACell signed=((AHashMap<ACell,ACell>)nodes).get(ownKey);
+		if (!(signed instanceof SignedData<?>)) return null;
+		return (AHashMap) Maps.of(ownKey,signed);
+	}
+
+	/** Root and {@code :p2p} merges may both carry a newer nested registry value. */
+	static boolean mayAffectRegistry(ACell[] path) {
+		return path!=null && (path.length==0
+			|| (path.length>0 && P2PLattice.KEY_P2P.equals(path[0])));
 	}
 
 	/**
-	 * Rebuilds the bounded validated index from the merged registry and translates
-	 * accepted transport metadata into this application's propagation group.
+	 * Returns the owner of one valid complete NodeInfo update delivered at exactly
+	 * the registry path, otherwise null. Only this shape may claim the identity used
+	 * to start inbound possession proof.
+	 */
+	AccountKey claimedOwner(ACell[] path,ACell value) {
+		return isRegistryPath(path) ? singleValidatedOwner(value) : null;
+	}
+
+	/**
+	 * Rebuilds the bounded validated index from the current registry and returns
+	 * the remote records that are new or newer than before, for the node to turn
+	 * into connection intent.
 	 */
 	@SuppressWarnings("unchecked")
-	synchronized void refresh() {
-		ACell value=server.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		if (!(value instanceof AHashMap<?,?> rawNodes)) return;
+	synchronized List<NodeRecord> refresh() {
+		List<NodeRecord> changed=new ArrayList<>();
+		ACell value=application.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		if (!(value instanceof AHashMap<?,?> rawNodes)) return changed;
 		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap<ACell,SignedData<ACell>>)rawNodes;
-		int limit=propagator.getConnectionManager().getMaxDesiredPeers();
+		AccountKey ownKey=ownKey();
+		int limit=maxRecords;
 		for (Map.Entry<ACell,SignedData<ACell>> entry:nodes.entrySet()) {
 			AccountKey peerKey=RT.ensureAccountKey(entry.getKey());
 			if (peerKey==null) continue;
@@ -173,13 +175,12 @@ final class NodeDirectory {
 
 			NodeRecord existing=records.get(peerKey);
 			if (existing!=null && updated.timestamp()<=existing.timestamp()) continue;
-			if (existing==null && !peerKey.equals(ownKey)
-					&& remoteRecordCount()>=limit) continue;
+			boolean own=peerKey.equals(ownKey);
+			if (existing==null && !own && remoteRecordCount(ownKey)>=limit) continue;
 			records.put(peerKey,updated);
-			if (peerKey.equals(ownKey)) continue;
-			propagator.getConnectionManager().updateDiscoveredPeer(
-				peerKey,updated.transports(),updated.timestamp());
+			if (!own) changed.add(updated);
 		}
+		return changed;
 	}
 
 	/** Returns a defensive snapshot used by the transient PoP route planner. */
@@ -187,21 +188,15 @@ final class NodeDirectory {
 		return new HashMap<>(records);
 	}
 
-	private int remoteRecordCount() {
+	private int remoteRecordCount(AccountKey ownKey) {
 		int size=records.size();
 		return ownKey!=null && records.containsKey(ownKey) ? size-1 : size;
 	}
 
-	private static boolean isNodeRegistryPath(ACell[] path) {
+	private static boolean isRegistryPath(ACell[] path) {
 		return path!=null && path.length==2
 			&& P2PLattice.KEY_P2P.equals(path[0])
 			&& P2PLattice.KEY_NODES.equals(path[1]);
-	}
-
-	/** Root and {@code :p2p} merges may both carry a newer nested registry value. */
-	private static boolean mayAffectNodeRegistry(ACell[] path) {
-		return path!=null && (path.length==0
-			|| (path.length>0 && P2PLattice.KEY_P2P.equals(path[0])));
 	}
 
 	/** Returns the owner of one valid complete NodeInfo update, otherwise null. */
@@ -238,7 +233,7 @@ final class NodeDirectory {
 
 		AVector<?> rawPops=RT.ensureVector(info.get(Keywords.POPS));
 		if (rawPops==null) rawPops=Vectors.empty();
-		if (rawPops.count()>convex.lattice.P2PLattice.MAX_POINTS_OF_PRESENCE) return null;
+		if (rawPops.count()>convex.lattice.p2p.P2PLattice.MAX_POINTS_OF_PRESENCE) return null;
 		HashSet<AccountKey> unique=new HashSet<>();
 		AVector<AccountKey> pops=Vectors.empty();
 		for (long i=0; i<rawPops.count(); i++) {

@@ -11,8 +11,59 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Root;
 
 public class LatticeQueueTest {
+
+	/** A domain policy stays with its rebound component, including private drafts. */
+	private static final class ExistingQueue extends LatticeQueue {
+		ExistingQueue(AForkableCursor<AVector<ACell>> cursor) { super(cursor,() -> CVMLong.ONE); }
+		@Override protected AVector<ACell> createContainer() {
+			throw new UnsupportedOperationException("Queue must already exist");
+		}
+		@Override protected ExistingQueue rebind(AForkableCursor<AVector<ACell>> cursor) {
+			return new ExistingQueue(cursor);
+		}
+	}
+
+	@Test void creationPolicyAppliesToEveryMutationAndReboundDraft() {
+		var root=new Root<AVector<ACell>>();
+		var live=new ExistingQueue(root);
+		for (var queue:new LatticeQueue[] {live,live.fork()}) {
+			assertEquals(0,queue.size());
+			assertNull(queue.getMeta(CVMLong.ONE));
+			assertEquals(0,queue.truncate(0));
+			assertThrows(UnsupportedOperationException.class,() -> queue.offer(CVMLong.ONE));
+			assertThrows(UnsupportedOperationException.class,() -> queue.setMeta(CVMLong.ONE,CVMLong.TWO));
+			assertThrows(UnsupportedOperationException.class,() -> queue.truncate(1));
+			assertNull(queue.cursor().get());
+		}
+		assertNull(root.get());
+		root.set(QueueLattice.INSTANCE.zero());
+		assertEquals(0,live.offer(CVMLong.ONE));
+		live.setMeta(CVMLong.ONE,CVMLong.TWO);
+		assertEquals(1,live.truncate(1));
+		assertEquals(CVMLong.TWO,live.getMeta(CVMLong.ONE));
+	}
+
+	@Test void creationPolicySuppliesInitialState() {
+		var initial=QueueLattice.INSTANCE.zero()
+			.assoc(QueueLattice.POS_START_OFFSET,CVMLong.create(10))
+			.assoc(QueueLattice.POS_META,Maps.of(CVMLong.ONE,CVMLong.TWO));
+		var root=new Root<AVector<ACell>>();
+		var queue=new LatticeQueue(root,() -> CVMLong.ONE) {
+			@Override protected AVector<ACell> createContainer() { return initial; }
+		};
+		assertNull(root.get());
+		assertEquals(10,queue.offer(CVMLong.ONE));
+		assertEquals(CVMLong.TWO,queue.getMeta(CVMLong.ONE));
+		assertEquals(CVMLong.ONE,queue.peek(10));
+		root.set(null);
+		assertEquals(0,queue.truncate(1));
+		assertEquals(10,queue.startOffset(),"truncation must not move a supplied initial offset backwards");
+		assertEquals(CVMLong.TWO,queue.getMeta(CVMLong.ONE));
+	}
 
 	// ===== Empty Queue =====
 

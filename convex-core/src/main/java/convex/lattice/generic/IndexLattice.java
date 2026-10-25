@@ -3,13 +3,11 @@ package convex.lattice.generic;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.Index;
-import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
 
 /**
- * A lattice representing an Index (sorted radix-tree map) that merges values
- * using a child value lattice.
+ * An Index (sorted radix-tree map) whose entries all merge with one child lattice: a
+ * union of keys with the child merge per entry.
  *
  * Analogous to {@link MapLattice} but for {@link Index}, providing lexicographic
  * key ordering.
@@ -17,41 +15,16 @@ import convex.lattice.LatticeContext;
  * @param <K> Key type (must extend ABlobLike)
  * @param <V> Value type
  */
-public class IndexLattice<K extends ABlobLike<?>, V extends ACell> extends ALattice<Index<K,V>> {
+public class IndexLattice<K extends ABlobLike<?>, V extends ACell> extends AUnionLattice<K,V,Index<K,V>> {
 
 	protected final ALattice<V> valueNode;
 
-	protected final MergeFunction<V> mergeFunction;
-
 	public IndexLattice(ALattice<V> valueNode) {
 		this.valueNode=valueNode;
-		this.mergeFunction=(a,b)->{
-			return valueNode.merge(a, b);
-		};
 	}
 
 	public static <K extends ABlobLike<?>, V extends ACell> IndexLattice<K,V> create(ALattice<V> valueNode) {
 		return new IndexLattice<K,V>(valueNode);
-	}
-
-	@Override
-	public Index<K,V> merge(Index<K, V> ownValue, Index<K, V> otherValue) {
-		if (otherValue==null) return ownValue;
-		// #561: merge foreign values against an empty own rather than accepting the Index
-		// wholesale, so each foreign value is validated through the child lattice merge.
-		if (ownValue==null) ownValue = zero();
-		return ownValue.mergeDifferences(otherValue, mergeFunction);
-	}
-
-	@Override
-	public Index<K,V> merge(LatticeContext context, Index<K, V> ownValue, Index<K, V> otherValue) {
-		if (otherValue==null) return ownValue;
-		// #561: merge foreign values against an empty own rather than accepting the Index
-		// wholesale, so each foreign value is validated through the child lattice merge.
-		if (ownValue==null) ownValue = zero();
-		// Thread context to child merges so signing / owner verification is not dropped
-		MergeFunction<V> contextMergeFunction = (a, b) -> valueNode.merge(context, a, b);
-		return ownValue.mergeDifferences(otherValue, contextMergeFunction);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -68,7 +41,7 @@ public class IndexLattice<K extends ABlobLike<?>, V extends ACell> extends ALatt
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
+		// Every key uses the one child lattice
 		return (ALattice<T>) valueNode;
 	}
-
 }

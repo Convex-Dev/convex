@@ -15,11 +15,12 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeComponent;
 import convex.lattice.generic.MaxLattice;
 
 class TransactionalRootCursorTest {
 
-	private static Arguments writer(String name,Consumer<RootLatticeCursor<AInteger>> action) {
+	private static Arguments writer(String name,Consumer<Root<AInteger>> action) {
 		return Arguments.of(name,action);
 	}
 
@@ -32,15 +33,18 @@ class TransactionalRootCursorTest {
 			writer("getAndUpdate",r -> r.getAndUpdate(v -> CVMLong.TWO)),
 			writer("accumulateAndGet",r -> r.accumulateAndGet(CVMLong.TWO,(a,b) -> b)),
 			writer("getAndAccumulate",r -> r.getAndAccumulate(CVMLong.TWO,(a,b) -> b)),
-			writer("view write",r -> r.view().set(CVMLong.TWO)),
-			writer("incoming merge",r -> r.merge(CVMLong.TWO)),
-			writer("publication write-back",r -> r.sync(v -> CVMLong.TWO)));
+			writer("incoming merge",r -> convex.lattice.ComponentTestSupport.merge(r,MaxLattice.INSTANCE,CVMLong.TWO)),
+			writer("component publication",r -> {
+				var working=new LatticeComponent<>(MaxLattice.INSTANCE,r.fork(),convex.lattice.LatticeContext.EMPTY);
+				working.cursor().set(CVMLong.TWO);
+				working.sync();
+			}));
 	}
 
 	@ParameterizedTest(name="{0}")
 	@MethodSource("writers")
-	void everyWriterHonoursRootExclusion(String name,Consumer<RootLatticeCursor<AInteger>> action) throws Exception {
-		var root=new TransactionalRootCursor<AInteger>(MaxLattice.INSTANCE,CVMLong.ZERO);
+	void everyWriterHonoursRootExclusion(String name,Consumer<Root<AInteger>> action) throws Exception {
+		var root=new TransactionalRootCursor<AInteger>(CVMLong.ZERO);
 		CountDownLatch inCallback=new CountDownLatch(1), writerStarted=new CountDownLatch(1);
 		AtomicBoolean callbackRunning=new AtomicBoolean();
 		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
@@ -50,7 +54,7 @@ class TransactionalRootCursorTest {
 				action.accept(root);
 				assertFalse(callbackRunning.get(),name+" completed during the exclusive callback");
 			});
-			root.view().transactLocked(draft -> {
+			Transactions.transactLocked(root,draft -> {
 				callbackRunning.set(true);
 				try {
 					inCallback.countDown();

@@ -2,17 +2,18 @@ package convex.lattice.generic;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.function.BiPredicate;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiPredicate;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
@@ -21,19 +22,21 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
-import convex.core.cvm.CVMEncoder;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
 /** Ownership rules survive container choice, navigation, contexts and fork/sync. */
 public class OwnershipHierarchyTest {
+	private final java.util.concurrent.atomic.AtomicReference<LatticeContext> policy=new java.util.concurrent.atomic.AtomicReference<>(LatticeContext.EMPTY);
 
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(4101);
 	private static final AKeyPair BOB=AKeyPair.createSeeded(4102);
@@ -72,24 +75,25 @@ public class OwnershipHierarchyTest {
 			Ref.get((AInteger)CVMLong.TWO));
 		assertEquals(lattice.zero(),lattice.merge(null,entry(lattice.zero(),DID,forged)));
 
-		ALatticeCursor<M> root=Cursors.createLattice(lattice);
-		root.setContext(allowAll);
-		ALatticeCursor<SignedData<AInteger>> slot=root.path(DID);
-		assertNull(slot.merge(bad));
-		assertSame(good,slot.merge(good));
-		ALatticeCursor<AInteger> value=slot.path(Keywords.VALUE);
+		AForkableCursor<M> root=Cursors.root(lattice.zero());
+		policy.set(allowAll);
+		AForkableCursor<SignedData<AInteger>> slot=root.path(DID);
+		assertNull(convex.lattice.ComponentTestSupport.merge(slot,lattice.signingFor(DID),bad));
+		assertSame(good,convex.lattice.ComponentTestSupport.merge(slot,lattice.signingFor(DID),good));
+		AForkableCursor<AInteger> value=convex.lattice.ComponentTestSupport.signed(slot, lattice, DID, policy::get);
 		M before=root.get();
 		assertThrows(IllegalStateException.class,() -> value.set(CVMLong.TWO));
 		assertSame(before,root.get());
 
-		root.setContext(denyAll);
+		policy.set(denyAll);
 		value.set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,root.get().get(DID).getValue());
 		assertTrue(root.get().get(DID).checkSignature());
-		ALatticeCursor<AInteger> fork=value.fork();
+		var forkComponent=new LatticeComponent<>(lattice.getValueLattice(),value.fork(),convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<AInteger> fork=forkComponent.cursor();
 		fork.set(CVMLong.create(3));
 		assertEquals(CVMLong.TWO,value.get());
-		fork.sync();
+		forkComponent.sync();
 		assertEquals(CVMLong.create(3),value.get());
 		assertTrue(root.get().get(DID).checkSignature());
 		assertEquals(DID,lattice.resolveKey(DID));
@@ -101,11 +105,38 @@ public class OwnershipHierarchyTest {
 		checkSynthesis(OwnerIndexLattice.create(SetLattice.create(),ALICE_RULE));
 	}
 
+	@SuppressWarnings({"unchecked","rawtypes"})
 	private <M extends AMap<AString,SignedData<ASet<CVMLong>>>> void checkSynthesis(
 			AOwnerLattice<AString,ASet<CVMLong>,M> lattice) {
 		M own=entry(lattice.zero(),DID,ALICE.signData(Sets.of(1)));
 		M other=entry(lattice.zero(),DID,ALICE.signData(Sets.of(2)));
 		assertSame(own,lattice.merge(own,other)); // A relay cannot author the union.
+		M unsigned=(M)((AMap)lattice.zero()).assoc(DID,CVMLong.ONE);
+		assertSame(own,lattice.mergeAndSign(own,unsigned,(owner,value) -> {
+			fail("Unsigned incoming entries must be ignored before authoring");
+			return null;
+		}));
+		assertSame(own,lattice.mergeAndSign(own,other,(owner,value) -> null));
+		assertSame(own,lattice.mergeAndSign(own,other,(owner,value) -> BOB.signData(value)));
+		var authored=lattice.mergeAndSign(own,other,(owner,value) -> {
+			assertEquals(DID,owner);
+			return ALICE.signData(value);
+		});
+		assertEquals(Sets.of(1,2),authored.get(DID).getValue());
+		assertTrue(authored.get(DID).checkSignature());
+		assertSame(authored,lattice.mergeAndSign(authored,own,(owner,value) -> {
+			fail("Selecting an existing envelope must not sign");
+			return null;
+		}));
+		assertSame(own.get(DID),lattice.mergeAndSign(null,own,(owner,value) -> {
+			fail("Adopting an incoming envelope must not sign");
+			return null;
+		}).get(DID));
+		assertThrows(IllegalArgumentException.class,() ->
+			lattice.mergeAndSign(own,other,(owner,value) -> ALICE.signData(Sets.of(3))));
+		assertThrows(IllegalArgumentException.class,() ->
+			lattice.mergeAndSign(own,other,(owner,value) -> SignedData.create(
+				ALICE.getAccountKey(),own.get(DID).getSignature(),Ref.get(value))));
 		assertSame(own,lattice.merge(LatticeContext.create(null,BOB,(o,k) -> true),own,other));
 		M combined=lattice.merge(LatticeContext.create(null,ALICE,(o,k) -> false),own,other);
 		assertEquals(Sets.of(1,2),combined.get(DID).getValue());
@@ -120,14 +151,14 @@ public class OwnershipHierarchyTest {
 		var aliceRegion=OwnerMapLattice.create(MaxLattice.INSTANCE,ALICE_RULE);
 		var bobRegion=OwnerIndexLattice.<AString,AInteger>create(MaxLattice.INSTANCE,
 			(owner,key) -> DID.equals(owner) && BOB.getAccountKey().equals(key));
-		var root=Cursors.createLattice(KeyedLattice.create(left,aliceRegion,right,bobRegion));
-		root.setContext(LatticeContext.create(null,ALICE));
-		ALatticeCursor<AInteger> alice=root.path(left,DID,Keywords.VALUE);
-		ALatticeCursor<AInteger> bob=root.path(right,DID,Keywords.VALUE);
+		var root=Cursors.root(KeyedLattice.create(left,aliceRegion,right,bobRegion).zero());
+		policy.set(LatticeContext.create(null,ALICE));
+		AForkableCursor<AInteger> alice=convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(root,KeyedLattice.create(left,aliceRegion),left,DID), aliceRegion, DID, policy::get);
+		AForkableCursor<AInteger> bob=convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(root,KeyedLattice.create(right,bobRegion),right,DID), bobRegion, DID, policy::get);
 		alice.set(CVMLong.ONE);
 		assertThrows(IllegalStateException.class,() -> bob.set(CVMLong.ONE));
 		var before=root.get();
-		bob.setContext(LatticeContext.create(null,BOB));
+		policy.set(LatticeContext.create(null,BOB));
 		bob.set(CVMLong.TWO);
 		assertEquals(CVMLong.ONE,alice.get());
 		assertEquals(CVMLong.TWO,bob.get());
@@ -151,13 +182,13 @@ public class OwnershipHierarchyTest {
 		// Decoding an account key can yield its ordinary blob representation.
 		Blob encodedKey=Blob.fromHex(owner.toHexString());
 		assertEquals(owner,lattice.resolveKey(encodedKey));
-		var root=Cursors.createLattice(lattice);
-		root.setContext(LatticeContext.create(null,ALICE));
-		root.<AInteger>path(encodedKey,Keywords.VALUE).set(CVMLong.ONE);
+		var root=Cursors.root(lattice.zero());
+		policy.set(LatticeContext.create(null,ALICE));
+		convex.lattice.ComponentTestSupport.signed(root.path(encodedKey), lattice, encodedKey, policy::get).set(CVMLong.ONE);
 		assertEquals(good,root.get());
-		root.setContext(LatticeContext.create(null,BOB));
+		policy.set(LatticeContext.create(null,BOB));
 		assertThrows(IllegalStateException.class,
-			() -> root.<AInteger>path(owner,Keywords.VALUE).set(CVMLong.TWO));
+			() -> convex.lattice.ComponentTestSupport.signed(root.path(owner), lattice, owner, policy::get).set(CVMLong.TWO));
 	}
 
 	@Test
@@ -172,11 +203,11 @@ public class OwnershipHierarchyTest {
 		assertEquals(didIndex.zero(),didIndex.merge(null,wrongDIDType));
 		assertNull(didIndex.path(CVMLong.ONE));
 		AOwnerLattice raw=didIndex;
-		assertThrows(ClassCastException.class,() -> raw.merge(null,convex.core.data.Maps.of(DID,signed)));
-		ALatticeCursor root=Cursors.createLattice(didIndex);
+		assertThrows(ClassCastException.class,() -> raw.merge(null,Maps.of(DID,signed)));
+		AForkableCursor root=Cursors.root(didIndex.zero());
 		ACell before=root.get();
-		assertThrows(ClassCastException.class,() -> root.merge(Index.of(DID,CVMLong.ONE)));
-		assertSame(before,root.get(),"Malformed values must not partially update the root");
+		convex.lattice.ComponentTestSupport.merge(root,didIndex,Index.of(DID,CVMLong.ONE));
+		assertSame(before,root.get(),"Unsigned entries are ignored before the typed signed merge");
 	}
 
 	@Test
@@ -197,8 +228,9 @@ public class OwnershipHierarchyTest {
 		AccountKey mergedOwner=lattice.resolveKey(merged.entryAt(0).getKey());
 		assertEquals(owner,mergedOwner);
 		assertSame(merged,lattice.merge(merged,decoded));
-		var root=Cursors.createLattice(lattice,decoded,LatticeContext.create(null,ALICE));
-		root.<AInteger>path(ALICE.getAccountKey(),Keywords.VALUE).set(CVMLong.TWO);
+		var root=Cursors.root(decoded);
+		policy.set(LatticeContext.create(null,ALICE));
+		convex.lattice.ComponentTestSupport.signed(root.path(ALICE.getAccountKey()), lattice, ALICE.getAccountKey(), policy::get).set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,root.get().get(ALICE.getAccountKey()).getValue());
 		assertTrue(root.get().get(ALICE.getAccountKey()).checkSignature());
 		// Key blobs still cannot impersonate a different signing key.
@@ -212,13 +244,16 @@ public class OwnershipHierarchyTest {
 	public void testNestedOwnershipBoundaries() {
 		var inner=OwnerKeyLattice.create(MaxLattice.INSTANCE);
 		var outer=OwnerKeyLattice.create(inner);
-		var root=Cursors.createLattice(outer);
-		root.setContext(LatticeContext.create(null,BOB));
-		ALatticeCursor<AInteger> value=root.path(ALICE.getAccountKey(),Keywords.VALUE,
-			BOB.getAccountKey(),Keywords.VALUE);
+		var root=Cursors.root(outer.zero());
+		policy.set(LatticeContext.create(null,BOB));
+		// Each owner level wraps its own boundary: outer rule first, then the inner one
+		AForkableCursor<Index<AccountKey,SignedData<AInteger>>> aliceValue=
+			convex.lattice.ComponentTestSupport.signed(root.path(ALICE.getAccountKey()), outer, ALICE.getAccountKey(), policy::get);
+		AForkableCursor<AInteger> value=
+			convex.lattice.ComponentTestSupport.signed(LatticeComponent.resolve(aliceValue,inner,BOB.getAccountKey()), inner, BOB.getAccountKey(), policy::get);
 		assertThrows(IllegalStateException.class,() -> value.set(CVMLong.ONE));
 		assertEquals(outer.zero(),root.get(),"Inner authority must not waive the outer rule");
-		root.setContext(new LatticeContext() {
+		policy.set(new LatticeContext() {
 			@Override public <T extends ACell> SignedData<T> sign(AccountKey key,T data) {
 				if (ALICE.getAccountKey().equals(key)) return ALICE.signData(data);
 				if (BOB.getAccountKey().equals(key)) return BOB.signData(data);
@@ -235,12 +270,13 @@ public class OwnershipHierarchyTest {
 	@Test
 	public void testConcurrentSignedFieldUpdates() throws Exception {
 		var lattice=OwnerIndexLattice.create(MapLattice.<Keyword,AInteger>create(MaxLattice.INSTANCE),ALICE_RULE);
-		var root=Cursors.createLattice(lattice);
-		root.setContext(LatticeContext.create(null,ALICE));
+		var root=Cursors.root(lattice.zero());
+		policy.set(LatticeContext.create(null,ALICE));
 		Keyword left=Keyword.intern("left");
 		Keyword right=Keyword.intern("right");
-		ALatticeCursor<AInteger> a=root.path(DID,Keywords.VALUE,left);
-		ALatticeCursor<AInteger> b=root.path(DID,Keywords.VALUE,right);
+		AForkableCursor<AHashMap<Keyword,AInteger>> record=convex.lattice.ComponentTestSupport.signed(root.path(DID), lattice, DID, policy::get);
+		AForkableCursor<AInteger> a=LatticeComponent.resolve(record,lattice.getValueLattice(),left);
+		AForkableCursor<AInteger> b=LatticeComponent.resolve(record,lattice.getValueLattice(),right);
 		CountDownLatch entered=new CountDownLatch(2);
 		try (var executor=Executors.newFixedThreadPool(2)) {
 			var one=executor.submit(() -> concurrentWrite(a,entered));
@@ -253,7 +289,7 @@ public class OwnershipHierarchyTest {
 		assertTrue(root.get().get(DID).checkSignature());
 	}
 
-	private static void concurrentWrite(ALatticeCursor<AInteger> cursor,CountDownLatch entered) {
+	private static void concurrentWrite(AForkableCursor<AInteger> cursor,CountDownLatch entered) {
 		AtomicBoolean first=new AtomicBoolean(true);
 		cursor.updateAndGet(previous -> {
 			if (first.getAndSet(false)) {
@@ -274,18 +310,18 @@ public class OwnershipHierarchyTest {
 		Keyword owner=Keyword.intern("team");
 		OwnerIndexLattice<Keyword,AInteger> lattice=OwnerIndexLattice.create(MaxLattice.INSTANCE,
 			(key,signer) -> owner.equals(key) && BOB.getAccountKey().equals(signer));
-		var root=Cursors.createLattice(lattice);
-		root.setContext(LatticeContext.create(null,BOB,(o,k) -> false));
-		root.<AInteger>path(owner,Keywords.VALUE).set(CVMLong.ONE);
+		var root=Cursors.root(lattice.zero());
+		policy.set(LatticeContext.create(null,BOB,(o,k) -> false));
+		convex.lattice.ComponentTestSupport.signed(root.path(owner), lattice, owner, policy::get).set(CVMLong.ONE);
 		assertEquals(CVMLong.ONE,root.get().get(owner).getValue());
 		assertEquals(root.get(),lattice.merge(null,root.get()));
 
 		// A custom policy can authorise a delegate even for a public-key owner.
 		var delegated=OwnerMapLattice.<AccountKey,AInteger>create(MaxLattice.INSTANCE,
 			(key,signer) -> ALICE.getAccountKey().equals(key) && BOB.getAccountKey().equals(signer));
-		var delegatedRoot=Cursors.createLattice(delegated);
-		delegatedRoot.setContext(LatticeContext.create(null,BOB));
-		delegatedRoot.<AInteger>path(ALICE.getAccountKey(),Keywords.VALUE).set(CVMLong.TWO);
+		var delegatedRoot=Cursors.root(delegated.zero());
+		policy.set(LatticeContext.create(null,BOB));
+		convex.lattice.ComponentTestSupport.signed(delegatedRoot.path(ALICE.getAccountKey()), delegated, ALICE.getAccountKey(), policy::get).set(CVMLong.TWO);
 		assertEquals(BOB.getAccountKey(),delegatedRoot.get().get(ALICE.getAccountKey()).getAccountKey());
 		assertEquals(delegatedRoot.get(),delegated.merge(null,delegatedRoot.get()));
 	}

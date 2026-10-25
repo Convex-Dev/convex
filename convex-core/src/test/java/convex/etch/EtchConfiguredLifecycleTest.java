@@ -418,7 +418,18 @@ public class EtchConfiguredLifecycleTest {
 	}
 
 	private static Stream<Arguments> gcCases() {
-		return matrixCases().stream().flatMap(c->Stream.of(Arguments.of(c,false),Arguments.of(c,true)));
+		boolean extended=Boolean.getBoolean("convex.test.extended");
+		boolean defaultIsMBB=EtchConfig.create().getMappingMode()==EtchConfig.MappingMode.MAPPED_BYTE_BUFFER;
+		return matrixCases().stream()
+				// Eclipse/Java 21 may already use MBB; do not repeat identical configurations.
+				.filter(c->!defaultIsMBB || !(c.name().equals("v2-mbb") || c.name().equals("v3-mbb")))
+				// Everyday coverage spans all versions, both ciphers and index encryption.
+				// CI additionally exercises every format/mapper/cipher combination.
+				.filter(c->extended || switch (c.name()) {
+					case "v1", "v2", "v3-aes-index", "v3-chacha-data" -> true;
+					default -> false;
+				})
+				.flatMap(c->Stream.of(Arguments.of(c,false),Arguments.of(c,true)));
 	}
 
 	private static List<MatrixCase> matrixCases() {

@@ -1,12 +1,17 @@
 package convex.lattice.queue;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.core.util.Utils;
+import convex.lattice.IndexComponent;
+import convex.lattice.MapComponent;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Represents a single topic in the lattice message queue system.
@@ -37,17 +42,27 @@ import convex.lattice.cursor.ALatticeCursor;
  * topic.offer(Strings.create("user-42"), Strings.create("login"));
  * }</pre>
  */
-public class LatticeTopic {
+public class LatticeTopic extends IndexComponent<Keyword, ACell> {
+	private final Supplier<CVMLong> clock;
+	private final MapComponent<ACell,AVector<ACell>> partitions;
+	private final MapComponent<ACell,ACell> metadata;
 
 	public static final Keyword KEY_NUM_PARTITIONS = Keyword.intern("num-partitions");
 
-	private final ALatticeCursor<?> cursor;
 
 	/**
 	 * Wraps an existing cursor at the TopicLattice level.
 	 */
-	LatticeTopic(ALatticeCursor<?> cursor) {
-		this.cursor = cursor;
+	LatticeTopic(AForkableCursor<Index<Keyword, ACell>> cursor) {
+		this(cursor,Utils::getCurrentTimestampCell);
+	}
+
+	/** Binds the mutation clock retained by children and forks. */
+	public LatticeTopic(AForkableCursor<Index<Keyword, ACell>> cursor,Supplier<CVMLong> clock) {
+		super(cursor);
+		this.clock=Objects.requireNonNull(clock);
+		partitions=new MapComponent<>(path(TopicLattice.KEY_PARTITIONS));
+		metadata=new MapComponent<>(path(TopicLattice.KEY_META));
 	}
 
 	/**
@@ -63,62 +78,49 @@ public class LatticeTopic {
 	/**
 	 * Returns a partition by CVM key.
 	 *
-	 * <p>Ensures the topic state is initialised as an {@code Index} before
-	 * descending, so that {@code RT.assocIn} preserves the correct type on
-	 * writeback through the cursor hierarchy.</p>
+	 * <p>The component write functions construct missing topic and partition
+	 * containers atomically on the first edit. Obtaining a view changes no state.</p>
 	 *
 	 * @param id Partition key (typically CVMLong)
 	 * @return Queue for the specified partition
 	 */
 	public LatticeQueue partition(ACell id) {
-		// Ensure topic state is Index before descended cursors write through it.
-		// RT.assocIn creates MapLeaf for null intermediaries; by initialising to
-		// Index.EMPTY first, subsequent assoc() calls preserve the Index type.
-		ensureInitialised();
-
-		ALatticeCursor<AVector<ACell>> partCursor = cursor.path(TopicLattice.KEY_PARTITIONS, id);
-		return new LatticeQueue(partCursor);
+		return new LatticeQueue(partitions.path(id),clock);
 	}
 
 	// ===== Metadata =====
 
 	/**
-	 * Gets a topic metadata value by key.
+	 * Gets a topic metadata value by key, or null when absent.
 	 */
-	@SuppressWarnings("unchecked")
 	public ACell getMeta(ACell key) {
-		ALatticeCursor<Index<Keyword, ACell>> c = (ALatticeCursor<Index<Keyword, ACell>>) cursor;
-		Index<Keyword, ACell> state = c.get();
-		AHashMap<ACell, ACell> meta = TopicLattice.getMeta(state);
-		return meta.get(key);
+		return metadata.get(key);
 	}
 
 	/**
 	 * Sets a topic metadata value.
 	 */
-	@SuppressWarnings("unchecked")
 	public void setMeta(ACell key, ACell value) {
-		ALatticeCursor<Index<Keyword, ACell>> c = (ALatticeCursor<Index<Keyword, ACell>>) cursor;
-		c.updateAndGet(state -> {
-			if (state == null) state = TopicLattice.INSTANCE.zero();
-			AHashMap<ACell, ACell> meta = TopicLattice.getMeta(state);
-			return state.assoc(TopicLattice.KEY_META, meta.assoc(key, value));
-		});
+		metadata.put(key,value);
 	}
 
 	/**
-	 * Returns the configured number of partitions, or 0 if not set.
+	 * Returns the positive configured partition count, or 0 when absent.
+	 * Incompatible or non-positive stored values throw.
 	 */
 	public long getNumPartitions() {
 		ACell val = getMeta(KEY_NUM_PARTITIONS);
-		if (val instanceof CVMLong l) return l.longValue();
-		return 0;
+		if (val==null) return 0;
+		long n=((CVMLong)val).longValue();
+		if (n<=0) throw new IllegalStateException("Partition count must be positive");
+		return n;
 	}
 
 	/**
-	 * Configures the number of partitions for this topic.
+	 * Configures a positive number of partitions for this topic.
 	 */
 	public void setNumPartitions(long n) {
+		if (n<=0) throw new IllegalArgumentException("Partition count must be positive");
 		setMeta(KEY_NUM_PARTITIONS, CVMLong.create(n));
 	}
 
@@ -152,36 +154,19 @@ public class LatticeTopic {
 	 * Creates a forked copy of this topic for independent operation.
 	 * All partitions within this topic are forked together.
 	 */
-	@SuppressWarnings("unchecked")
+	@Override
 	public LatticeTopic fork() {
-		return new LatticeTopic(((ALatticeCursor<ACell>) cursor).fork());
+		return rebind(storage.fork());
 	}
 
-	/**
-	 * Syncs this forked topic back to its parent, merging all partition changes.
-	 */
-	@SuppressWarnings("unchecked")
-	public void sync() {
-		((ALatticeCursor<ACell>) cursor).sync();
+	@Override
+	protected LatticeTopic rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+		return new LatticeTopic(cursor,clock);
 	}
 
-	/**
-	 * Returns the underlying lattice cursor.
-	 */
-	public ALatticeCursor<?> cursor() {
-		return cursor;
-	}
-
-	/**
-	 * Ensures the topic cursor is initialised to an Index so that
-	 * descended cursors (which write back via RT.assocIn) preserve the type.
-	 */
-	@SuppressWarnings("unchecked")
-	private void ensureInitialised() {
-		ALatticeCursor<Index<Keyword, ACell>> c = (ALatticeCursor<Index<Keyword, ACell>>) cursor;
-		c.updateAndGet(state -> {
-			if (state == null) return TopicLattice.INSTANCE.zero();
-			return state;
-		});
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+		return TopicLattice.INSTANCE.merge(own,other);
 	}
 }

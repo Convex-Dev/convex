@@ -16,7 +16,7 @@ import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.Lattice;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.Root;
 
 /**
  * Runnable demonstration of the Lattice Queue system — Kafka-style message
@@ -36,7 +36,7 @@ public class QueueDemo {
 
 	private static AKeyPair keyPair;
 	private static AccountKey owner;
-	private static RootLatticeCursor<Index<Keyword, ACell>> root;
+	private static Root<Index<Keyword, ACell>> root;
 	private static EtchStore store;
 
 	public static void main(String[] args) throws IOException, InterruptedException {
@@ -54,7 +54,7 @@ public class QueueDemo {
 		store = EtchStore.createTemp("queue-demo");
 		System.out.println("Created EtchStore at: " + store.getFileName());
 
-		root = Cursors.createLattice(Lattice.ROOT);
+		root = Cursors.root(Lattice.ROOT.zero());
 		System.out.println("Created lattice root cursor (hierarchy: :queue -> owner -> :value -> topic -> partition)");
 
 		// Create a standalone LatticeMQ for all demo operations
@@ -322,7 +322,7 @@ public class QueueDemo {
 	@SuppressWarnings("unchecked")
 	private static void syncToStore(LatticeMQ mq) throws IOException {
 		// Get the unsigned topic-map data
-		ACell topicMapData = ((convex.lattice.cursor.ALatticeCursor<ACell>) mq.cursor()).get();
+		ACell topicMapData = mq.cursor().get();
 
 		// Sign with the owner's keypair (Ed25519)
 		SignedData<ACell> signed = keyPair.signData(topicMapData);

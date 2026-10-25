@@ -25,7 +25,7 @@ import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.ReservedLattice;
@@ -87,8 +87,8 @@ public class P2PLatticeTest {
 		AHashMap<Keyword, ACell> identity = P2PLattice.createIdentity(
 			Strings.create("alice"), Vectors.of(KEY), null, 1000L);
 
-		RootLatticeCursor<Index<Keyword, ACell>> cursor = Cursors.createLattice(P2PLattice.ROOT);
-		cursor.path(P2PLattice.KEY_ID).merge(P2PLattice.createSignedIdentity(KP, identity));
+		Root<Index<Keyword, ACell>> cursor = Cursors.root(P2PLattice.ROOT.zero());
+		cursor.<convex.core.data.AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP, identity)));
 
 		AHashMap<ACell, SignedData<ACell>> merged = ownerMap(cursor.get(P2PLattice.KEY_ID));
 
@@ -103,18 +103,18 @@ public class P2PLatticeTest {
 
 	@Test
 	public void testIdentityLWWByTimestamp() {
-		RootLatticeCursor<Index<Keyword, ACell>> cursor = Cursors.createLattice(P2PLattice.ROOT);
+		Root<Index<Keyword, ACell>> cursor = Cursors.root(P2PLattice.ROOT.zero());
 
-		cursor.path(P2PLattice.KEY_ID).merge(P2PLattice.createSignedIdentity(KP,
-			P2PLattice.createIdentity(Strings.create("old"), null, null, 1000L)));
+		cursor.<convex.core.data.AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP,
+			P2PLattice.createIdentity(Strings.create("old"), null, null, 1000L))));
 
 		// Newer timestamp wins
-		cursor.path(P2PLattice.KEY_ID).merge(P2PLattice.createSignedIdentity(KP,
-			P2PLattice.createIdentity(Strings.create("new"), null, null, 2000L)));
+		cursor.<convex.core.data.AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP,
+			P2PLattice.createIdentity(Strings.create("new"), null, null, 2000L))));
 
 		// Older timestamp is ignored
-		cursor.path(P2PLattice.KEY_ID).merge(P2PLattice.createSignedIdentity(KP,
-			P2PLattice.createIdentity(Strings.create("stale"), null, null, 500L)));
+		cursor.<convex.core.data.AHashMap<ACell,SignedData<ACell>>>path(P2PLattice.KEY_ID).updateAndGet(own -> P2PLattice.ID_LATTICE.merge(own, P2PLattice.createSignedIdentity(KP,
+			P2PLattice.createIdentity(Strings.create("stale"), null, null, 500L))));
 
 		AHashMap<ACell, SignedData<ACell>> merged = ownerMap(cursor.get(P2PLattice.KEY_ID));
 		assertEquals(Strings.create("new"),
@@ -147,14 +147,14 @@ public class P2PLatticeTest {
 	 */
 	@Test
 	public void testCoreRootIgnoresUnknownTopLevelRegions() {
-		AHashMap<Keyword, ACell> nodeInfo = convex.lattice.P2PLattice.createNodeInfo(
+		AHashMap<Keyword, ACell> nodeInfo = convex.lattice.p2p.P2PLattice.createNodeInfo(
 			Vectors.of(Strings.create("tcp://example.com:18888")),
 			Strings.create("Convex Lattice Node"), Strings.create("test"), null, 1000L);
 
 		@SuppressWarnings("unchecked")
 		Index<Keyword, ACell> incoming = (Index<Keyword, ACell>) Index.EMPTY
 			.assoc(P2PLattice.KEY_P2P, Index.EMPTY.assoc(P2PLattice.KEY_NODES,
-				convex.lattice.P2PLattice.createSignedEntry(KP, nodeInfo)))
+				convex.lattice.p2p.P2PLattice.createSignedEntry(KP, nodeInfo)))
 			.assoc(P2PLattice.KEY_ID, P2PLattice.createSignedIdentity(KP,
 				P2PLattice.createIdentity(Strings.create("carol"), null, null, 1000L)))
 			.assoc(P2PLattice.KEY_KAD, Vectors.of(1, 2, 3));
@@ -198,14 +198,14 @@ public class P2PLatticeTest {
 	 */
 	@Test
 	public void testSocialOffNodeStillMergesP2PRegions() {
-		AHashMap<Keyword, ACell> nodeInfo = convex.lattice.P2PLattice.createNodeInfo(
+		AHashMap<Keyword, ACell> nodeInfo = convex.lattice.p2p.P2PLattice.createNodeInfo(
 			Vectors.of(Strings.create("tcp://example.com:18888")),
 			Strings.create("Convex Lattice Node"), Strings.create("test"), null, 1000L);
 
 		@SuppressWarnings("unchecked")
 		Index<Keyword, ACell> incoming = (Index<Keyword, ACell>) Index.EMPTY
 			.assoc(P2PLattice.KEY_P2P, Index.EMPTY.assoc(P2PLattice.KEY_NODES,
-				convex.lattice.P2PLattice.createSignedEntry(KP, nodeInfo)))
+				convex.lattice.p2p.P2PLattice.createSignedEntry(KP, nodeInfo)))
 			.assoc(Social.KEY_SOCIAL, Maps.empty());
 
 		Index<Keyword, ACell> merged = P2PLattice.ROOT.merge(

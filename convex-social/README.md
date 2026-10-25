@@ -30,7 +30,7 @@ SocialLattice (per-user, signed by an authorised DID key):
   :feed      → IndexLattice<Blob, ACell>    last-writer-wins per entry
   :profile   → LWWLattice                   display name, bio, avatar, etc.
   :following → LWPLattice
-    :follows → MapLattice<DID, LWW record>  active intent and cached validated signer
+    :follows → MapLattice<DID, LWW record>  active intent and timestamp
 ```
 
 Each user's complete data is wrapped in `SignedData` via an `OwnerLattice`. DID ownership
@@ -40,6 +40,11 @@ changes; a relay cannot forge a synthesised owner value. The base layer is inten
 minimal and extensible — easy to layer applications and UI on top.
 
 ## Features
+
+Data getters return `null` for absence and throw on incompatible stored values.
+Empty collections are returned only when present in storage or produced by an
+explicit aggregation. Counts and predicates use zero/false for missing data.
+See [Reading domain state](docs/SOCIAL_DESIGN.md#reading-domain-state).
 
 - Owner-signed feeds — only a key authorised for the owner can post
 - Signed follow/unfollow records with per-target LWW merge
@@ -88,6 +93,41 @@ work.feed().post("Post 1");
 work.feed().post("Post 2");
 work.sync();
 ```
+
+One component can author several DIDs. Supply an owner-aware signer and a clock;
+keep key resolution separate from the rule which authorises those keys:
+
+```java
+var keys = new ConcurrentHashMap<ACell, AKeyPair>();
+keys.put(aliceDid, aliceKeyPair);
+keys.put(bobDid, bobKeyPair);
+
+Social social = Social.create(authoriser, (did, value) -> {
+    AKeyPair key = keys.get(did);
+    return key == null ? null : key.signData(value);
+}, Utils::getCurrentTimestampCell);
+
+social.user(aliceDid).feed().post("Alice's post");
+social.user(bobDid).feed().post("Bob's post");
+```
+
+`authoriser` is a `DIDKeyAuthorizer` using an authenticated authority view.
+`DIDKeyAuthorizer.CONVEX` handles self-certifying `did:key` identities; indirect
+DIDs require an explicit resolver. The signer may use a wallet, keystore or signing
+service instead of a map. Returning null means it cannot author that owner.
+Every signature must cover the requested value and pass the same DID rule as
+incoming delivery. A signing exception aborts the atomic edit or fork sync.
+
+Forks, user views and transaction views retain these functions, so existing views
+can observe key rotation through the supplied resolver. Callbacks must support
+concurrent use and retries; refresh external authority outside atomic updates.
+A null signer creates a relay, which reuses existing envelopes and keeps its own
+value when synthesis would need a new signature. No component inherits signing
+authority or timestamps from `LatticeContext`.
+
+For an embedded region, pass the cursor directly to
+`Social.connect(cursor, authoriser, signer, clock)`. The no-policy
+`Social.connect(cursor)` and `Social.connect(application)` overloads are relay views.
 
 ### Node integration
 
@@ -141,6 +181,9 @@ application.sync();
 `P2PNode.social` also registers the DID as local, so its own slot and direct active
 follows form the default replicated social view. `Social.connect(parent, keyPair)` is
 available for lower-level hosting when follow-driven P2P policy is not required.
+Registering several DIDs on one P2P application returns the same social component;
+its signer selects each registered DID's key. Registering a replacement authorised
+key updates existing views without replacing the DID.
 
 ## Design
 

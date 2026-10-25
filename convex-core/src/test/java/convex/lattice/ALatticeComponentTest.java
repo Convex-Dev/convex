@@ -2,110 +2,113 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.io.IOException;
-import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Blob;
-import convex.core.data.Blobs;
-import convex.core.data.Cells;
-import convex.core.data.RefSoft;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Sets;
-import convex.etch.EtchStore;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.core.store.MemoryStore;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.generic.SetLattice;
 
 public class ALatticeComponentTest {
 
+	/** A component is a cursor plus domain operations; nothing else is inherited. */
 	private static class TestComponent extends ALatticeComponent<ASet<ACell>> {
 
-		TestComponent(ALatticeCursor<ASet<ACell>> cursor) {
+		TestComponent(AForkableCursor<ASet<ACell>> cursor) {
 			super(cursor);
 		}
 
-		TestComponent(ALatticeComponent<?> parent, ALatticeCursor<ASet<ACell>> cursor) {
-			super(parent,cursor);
+		public TestComponent fork() {
+			return rebind(storage.fork());
 		}
 
-		void add(ACell value) {
-			cursor.updateAndGet(set->set.include(value));
-		}
-	}
+		@Override protected TestComponent rebind(AForkableCursor<ASet<ACell>> cursor) { return new TestComponent(cursor); }
 
-	private static class StoredComponent extends TestComponent {
-
-		private final EtchStore store;
-		private int persistCount;
-
-		StoredComponent(ALatticeCursor<ASet<ACell>> cursor, EtchStore store) {
-			super(cursor);
-			this.store=store;
+		@Override
+		protected ASet<ACell> mergePublication(ASet<ACell> own,ASet<ACell> other) {
+			return own.includeAll(other);
 		}
 
 		@Override
-		protected <T extends ACell> T persist(T value) throws IOException {
-			persistCount++;
-			return Cells.persist(value,store);
+		public ASet<ACell> merge(ASet<ACell> incoming) {
+			return cursor().updateAndGet(own -> own.includeAll(incoming));
+		}
+
+		void add(ACell value) {
+			cursor().updateAndGet(set->set.include(value));
 		}
 	}
 
-	private static ALatticeCursor<ASet<ACell>> createCursor() {
-		return Cursors.createLattice(SetLattice.create(),Sets.empty());
-	}
-
 	@Test
-	public void testStandalonePersistenceFailsWithoutStore() {
-		TestComponent component=new TestComponent(createCursor());
+	public void testStandaloneComponentOverCursor() {
+		TestComponent component=new TestComponent(Cursors.root(Sets.<ACell>empty()));
 		Blob value=Blob.fromHex("cafebabe");
 		component.add(value);
-
-		assertThrows(IllegalStateException.class,component::persist);
+		assertTrue(component.cursor().get().contains(value));
 	}
 
 	@Test
-	public void testPersistenceDelegatesToParentWithoutChangingCursor() throws IOException {
-		try (EtchStore store=EtchStore.createTemp("lattice-component")) {
-			StoredComponent root=new StoredComponent(createCursor(),store);
-			TestComponent child=new TestComponent(root,root.cursor().fork());
-			ABlob value=Blobs.createRandom(new Random(1234),5000);
-			child.add(value);
+	public void testForkPublishesOnlyThroughComponentSync() throws Exception {
+		MemoryStore store=new MemoryStore();
+		var host=LatticeHost.<ASet<ACell>>create(Sets.empty(),store);
+		TestComponent live=new TestComponent(host.cursor());
+		TestComponent fork=live.fork();
+		Blob value=Blob.fromHex("cafebabe");
+		fork.add(value);
 
-			ASet<ACell> before=child.cursor().get();
-			ASet<ACell> persisted=child.persist();
+		assertTrue(fork.cursor().get().contains(value));
+		assertFalse(host.cursor().get().contains(value));
 
-			assertEquals(1,root.persistCount);
-			assertSame(before,child.cursor().get());
-			assertEquals(before,persisted);
-			ABlob persistedBlob=(ABlob)persisted.getRef(0).getValue();
-			assertInstanceOf(RefSoft.class,persistedBlob.getRef(0));
-		}
+		new TestComponent(fork.cursor()).sync();
+		assertTrue(host.cursor().get().contains(value),"Wrappers share the bound fork publication boundary");
+		fork.sync();
+		assertTrue(host.cursor().get().contains(value));
+		assertNull(store.getRootData(),"Merging a fork into the live cursor must not publish the root");
 	}
 
+	/** Component-defined reconciliation combines concurrent edits without any ALattice implementation. */
 	@Test
-	public void testForkCanPersistWithoutSyncing() throws IOException {
-		try (EtchStore store=EtchStore.createTemp("lattice-component-fork")) {
-			StoredComponent root=new StoredComponent(createCursor(),store);
-			TestComponent fork=new TestComponent(root,root.cursor().fork());
-			Blob value=Blob.fromHex("cafebabe");
-			fork.add(value);
+	public void independentDraftsReconcileAndRepeatedSyncIsInert() {
+		var live=new TestComponent(Cursors.root(Sets.empty()));
+		var first=live.fork();
+		var second=live.fork();
+		var a=Blob.fromHex("aa");
+		var b=Blob.fromHex("bb");
+		first.add(a);
+		second.add(b);
+		first.sync();
+		second.sync();
+		assertEquals(Sets.of(a,b),live.cursor().get());
+		var published=live.cursor().get();
+		assertSame(published,second.sync());
+		assertSame(published,live.cursor().get());
+	}
 
-			ASet<ACell> persisted=fork.persist();
-
-			assertTrue(persisted.contains(value));
-			assertFalse(root.cursor().get().contains(value));
-
-			fork.sync();
-			assertTrue(root.cursor().get().contains(value));
-		}
+	/** Region routing depends only on the child's behaviour, not a parallel lattice tree. */
+	@Test
+	public void regionsRouteToPlainComponentsAndPreserveUnknownState() {
+		var key=Keyword.intern("values");
+		var unrelated=Keyword.intern("unrelated");
+		var marker=Blob.fromHex("abcd");
+		var host=LatticeHost.create(Index.<Keyword,ACell>none().assoc(unrelated,marker),null);
+		var live=new TestComponent(host.cursor().<ASet<ACell>>path(key).withDefault(Sets.empty()));
+		var draft=live.fork();
+		var regions=new Regions(host);
+		regions.add(key,draft);
+		regions.mergeAt(Sets.of(marker),key);
+		assertNull(host.cursor().get().get(key));
+		regions.mergeAt(Sets.of(marker),unrelated);
+		regions.sync();
+		assertEquals(Sets.of(marker),host.cursor().get().get(key));
+		assertSame(marker,host.cursor().get().get(unrelated));
 	}
 }

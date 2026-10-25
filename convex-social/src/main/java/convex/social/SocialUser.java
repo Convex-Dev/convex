@@ -1,21 +1,27 @@
 package convex.social;
 
+import java.util.function.Supplier;
+
 import convex.auth.did.DID;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.lattice.ALatticeComponent;
+import convex.core.data.prim.CVMLong;
+import convex.lattice.IndexComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.StampedCursor;
 
 /**
- * Cursor wrapper for a single user's social state.
+ * Index component for a single user's social state.
  *
  * <p>A {@code SocialUser} wraps a cursor at the {@link SocialLattice} level
  * (through the signing boundary). Writes are automatically signed by the
- * {@code SignedCursor} in the cursor chain.</p>
+ * {@code SignedCursor} in the cursor chain. This component owns the per-user
+ * level. Standard index paths preserve missing values on reads and apply
+ * {@link #createContainer()} when a child edit needs to create this level.</p>
  *
  * <p>Provides domain-specific accessors:</p>
  * <ul>
@@ -25,13 +31,16 @@ import convex.lattice.cursor.ALatticeCursor;
  *
  * @see Social#user(AccountKey)
  */
-public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> implements TransactionalComponent<Index<Keyword, ACell>,SocialUser> {
+public class SocialUser extends IndexComponent<Keyword, ACell> implements TransactionalComponent<Index<Keyword, ACell>,SocialUser> {
+	private final Supplier<CVMLong> clock;
+
 
 	private final AString ownerDid;
 
-	SocialUser(Social parent, ALatticeCursor<Index<Keyword, ACell>> cursor, AString ownerDid) {
-		super(parent,cursor);
+	SocialUser(AForkableCursor<Index<Keyword, ACell>> cursor, AString ownerDid, Supplier<CVMLong> clock) {
+		super(cursor);
 		this.ownerDid = ownerDid;
+		this.clock=clock;
 	}
 
 	/**
@@ -40,28 +49,34 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return new Feed(this,cursor.path(SocialLattice.KEY_FEED),ownerDid);
+		return new Feed(path(SocialLattice.KEY_FEED),ownerDid,clock);
 	}
 
 	/**
-	 * Gets this user's follow list.
+	 * Gets this user's follow list. The {@code :following} section is a stamped
+	 * layer, so this component wraps it before descending: every follow change
+	 * re-stamps the section with the write clock, which is what lets its
+	 * last-write-wins merge pick the freshest.
 	 *
 	 * @return Follows cursor wrapper
 	 */
 	public Follows follows() {
-		return new Follows(this,cursor.path(
-			SocialLattice.KEY_FOLLOWING,SocialLattice.KEY_FOLLOWS));
+		AForkableCursor<Index<Keyword, ACell>> following=StampedCursor.create(
+			path(SocialLattice.KEY_FOLLOWING),
+			clock,(value,time) -> value.assoc(convex.lattice.generic.LWWLattice.KEY_TIMESTAMP,time));
+		return new Follows(new IndexComponent<>(following).path(SocialLattice.KEY_FOLLOWS),clock);
 	}
 
 	/**
 	 * Creates an isolated working copy of this user's unsigned social value.
 	 * Multiple feed, profile and follow actions can be applied to the fork and
-	 * {@link #sync() synced} through the owner boundary as one signed value.
+	 * {@link #sync() synced} through the owner boundary as one signed value,
+	 * merged with {@link SocialLattice}.
 	 *
 	 * @return isolated working copy for this user
 	 */
-	public SocialUser fork() {
-		return new SocialUser((Social) parent(),cursor.fork(),ownerDid);
+	@Override public SocialUser fork() {
+		return rebind(storage.fork());
 	}
 
 	// TODO: public Profile profile() { ... }
@@ -81,8 +96,18 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> impleme
 	}
 
 	@Override
-	public SocialUser withCursor(ALatticeCursor<Index<Keyword, ACell>> cursor) {
-		return new SocialUser((Social) parent(),cursor,ownerDid);
+	public SocialUser withCursor(AForkableCursor<Index<Keyword, ACell>> cursor) {
+		return rebind(cursor);
 	}
 
+	@Override
+	protected SocialUser rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+		return new SocialUser(cursor,ownerDid,clock);
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+		return SocialLattice.INSTANCE.merge(own,other);
+	}
 }

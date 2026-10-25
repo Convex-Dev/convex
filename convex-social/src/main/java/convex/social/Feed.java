@@ -1,6 +1,7 @@
 package convex.social;
 
 import java.util.function.LongFunction;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -10,15 +11,15 @@ import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.ALatticeComponent;
+import convex.lattice.IndexComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Cursor wrapper for a user's post feed.
+ * Index component for a user's post feed.
  *
  * <p>A {@code Feed} wraps a lattice cursor at the feed level
- * ({@code Index<Blob, ACell>} with 8-byte timestamp keys). All
+ * ({@code Index<Blob, ACell>} with timestamp-prefixed salted keys). All
  * writes propagate through the cursor chain and are automatically
  * signed at the {@code SignedCursor} boundary.</p>
  *
@@ -28,12 +29,15 @@ import convex.lattice.cursor.ALatticeCursor;
  * AHashMap<Keyword, ACell> post = feed.getPost(key);
  * }</pre>
  */
-public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements TransactionalComponent<Index<Blob, ACell>,Feed> {
+public class Feed extends IndexComponent<Blob, ACell> implements TransactionalComponent<Index<Blob, ACell>,Feed> {
+	private final Supplier<CVMLong> clock;
+
 
 	private final AString author;
 
-	Feed(SocialUser parent, ALatticeCursor<Index<Blob, ACell>> cursor, AString author) {
-		super(parent,cursor);
+	Feed(AForkableCursor<Index<Blob, ACell>> cursor, AString author, Supplier<CVMLong> clock) {
+		super(cursor);
+		this.clock=clock;
 		this.author = author;
 	}
 
@@ -41,7 +45,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * Posts a new entry to the feed.
 	 *
 	 * @param text Post text content
-	 * @return The 8-byte timestamp key assigned to the post
+	 * @return The timestamp-prefixed key assigned to the post
 	 */
 	public Blob post(String text) {
 		return addEntry(ts -> SocialPost.createPost(text, ts));
@@ -51,9 +55,9 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * Posts a reply to another post.
 	 *
 	 * @param text Reply text content
-	 * @param parentKey 8-byte key of the parent post
+	 * @param parentKey key of the parent post
 	 * @param parentAuthor Account key of the parent post's author
-	 * @return The 8-byte timestamp key assigned to this reply
+	 * @return The timestamp-prefixed key assigned to this reply
 	 */
 	public Blob reply(String text, Blob parentKey, AccountKey parentAuthor) {
 		return reply(text,parentKey,convex.auth.did.DID.forKey(parentAuthor));
@@ -67,36 +71,18 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 		return addEntry(ts -> SocialPost.createReply(text, ts, parentKey, parentAuthor));
 	}
 
-	/**
-	 * Adds a new entry to the feed under a unique timestamp key.
-	 *
-	 * <p>Keys start at the operation's millisecond timestamp, so two entries created
-	 * with the same time would otherwise collide and the later one silently overwrite
-	 * the earlier (LWW data loss). On collision the key is incremented until a
-	 * free key is found — a new entry never replaces an existing one. The check
-	 * runs inside the atomic cursor update, so it holds across Feed instances
-	 * and concurrent posts on the same cursor. The record's timestamp remains the
-	 * unmodified context time, resolved once for the operation.
-	 *
-	 * @param entryFn Creates the entry record for the operation timestamp
-	 * @return The 8-byte timestamp key assigned to the entry
-	 */
+	/** Allocates identity and time once, preserving both across atomic update retries. */
 	private Blob addEntry(LongFunction<AHashMap<Keyword, ACell>> entryFn) {
-		long timestamp=cursor.getContext().currentTimestampValue();
+		long timestamp=clock.get().longValue();
 		AHashMap<Keyword,ACell> entry=entryFn.apply(timestamp);
-		Blob[] keyHolder = new Blob[1];
-		cursor.updateAndGet(feed -> {
-			long ts = timestamp;
-			Blob key = SocialPost.createKey(ts);
-			while (feed != null && feed.get(key) != null) {
-				if (ts==Long.MAX_VALUE) throw new IllegalStateException("Post key range exhausted");
-				ts++;
-				key = SocialPost.createKey(ts);
-			}
-			keyHolder[0] = key;
-			return feed.assoc(key, entry);
+		Blob key=SocialPost.createKey(timestamp);
+		cursor().update(feed -> {
+			if (feed==null) feed=createContainer();
+			// Even an exceptionally unlikely salt collision must never overwrite a post.
+			if (feed.containsKey(key)) throw new IllegalStateException("Post key already exists");
+			return feed.assoc(key,entry);
 		});
-		return keyHolder[0];
+		return key;
 	}
 
 	/**
@@ -106,58 +92,52 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> implements Trans
 	 * and the {@code :timestamp} is updated so LWW merge picks the
 	 * deletion. Timeline construction filters out tombstoned posts.</p>
 	 *
-	 * @param postKey 8-byte key of the post to delete
+	 * @param postKey key of the post to delete
 	 */
 	@SuppressWarnings("unchecked")
 	public void delete(Blob postKey) {
-		CVMLong now = cursor.getContext().currentTimestamp();
-		cursor.updateAndGet(feed -> {
-			if (feed == null) return feed;
-			ACell existing = feed.get(postKey);
-			if (existing == null) return feed;
+		CVMLong now = clock.get();
+		path(postKey).update(existing -> {
+			if (existing==null) return null;
 			AHashMap<Keyword, ACell> post = (AHashMap<Keyword, ACell>) existing;
-			post = post.assoc(SocialPost.DELETED, now);
-			post = post.assoc(SocialPost.TIMESTAMP, now);
-			return feed.assoc(postKey, post);
+			return post.assoc(SocialPost.DELETED,now).assoc(SocialPost.TIMESTAMP,now);
 		});
 	}
 
 	/**
 	 * Gets a post by key.
 	 *
-	 * @param key 8-byte timestamp key
+	 * @param key timestamp-prefixed key
 	 * @return The post record, or null if not found
+	 * @throws IllegalStateException If the stored feed is not an index
+	 * @throws ClassCastException If the stored post is not a hash map
 	 */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword, ACell> getPost(Blob key) {
-		Index<Blob, ACell> feed = cursor.get();
-		if (feed == null) return null;
-		ACell value = feed.get(key);
-		return (value instanceof AHashMap) ? (AHashMap<Keyword, ACell>) value : null;
+		return (AHashMap<Keyword,ACell>)get(key);
 	}
 
 	/**
 	 * Returns the number of entries in the feed (including tombstones).
 	 *
-	 * @return Entry count
+	 * @return Entry count, or zero if the feed is absent
 	 */
 	public long count() {
-		Index<Blob, ACell> feed = cursor.get();
-		return (feed != null) ? feed.count() : 0;
+		return size();
 	}
 
 	/**
-	 * Gets the author's account key.
+	 * Gets the author's stable DID.
 	 *
-	 * @return The feed owner's key
+	 * @return The feed owner's DID
 	 */
 	public AString getAuthor() {
 		return author;
 	}
 
 	@Override
-	public Feed withCursor(ALatticeCursor<Index<Blob, ACell>> cursor) {
-		return new Feed((SocialUser) parent(),cursor,author);
+	public Feed withCursor(AForkableCursor<Index<Blob, ACell>> cursor) {
+		return new Feed(cursor,author,clock);
 	}
 
 }

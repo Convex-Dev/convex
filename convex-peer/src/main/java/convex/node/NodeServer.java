@@ -4,42 +4,45 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.data.ACell;
-import convex.core.data.Cells;
 import convex.core.exceptions.StoreException;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.util.Shutdown;
-import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
-import convex.lattice.RootComponent;
-import convex.lattice.cursor.ALatticeCursor;
-import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.LatticeHost;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Hosts one authoritative lattice value and its durable root.
+ * Replicates one host's published root.
  *
- * <p>{@code NodeServer} owns application-state merge, root publication,
- * persistence and update notification. It does not own peer sets, connection
- * trust, protocol decoding, missing-cell
- * acquisition, ingress filtering, publication filtering, sockets or transport
- * lifecycle. Those are policies and resources of {@link LatticePropagator} and
- * application-owned transports such as {@link LatticeListener}.</p>
+ * <p>{@code NodeServer} is replication only. It hands incoming values to its
+ * {@link LatticeHost}, which delegates them to the applications configured to
+ * receive them, and it publishes the host's root to its propagation groups. It
+ * holds no lattice, no merge policy and no applications of its own: assemble the
+ * host and its applications first, for example with {@link RelayHost}, then
+ * construct the node from the host. The host owns retention and durability;
+ * the node owns replication notification. It does not own peer sets, connection
+ * trust, protocol decoding, missing-cell acquisition, publication filtering,
+ * sockets or transport lifecycle. Those are policies and
+ * resources of {@link LatticePropagator} and application-owned transports such as
+ * {@link LatticeListener}.</p>
  *
- * <p>The calling application constructs and completely configures each
- * propagator before attaching it with {@link #addPropagator(LatticePropagator)}.
- * Attaching establishes only the authoritative merge target. It does not copy
- * the node lattice, merge context, transport key or filters into the group. A
- * node with no propagators is a valid local, store-backed lattice host.</p>
+ * <p>The calling application explicitly adds each
+ * propagator with {@link #addPropagator(LatticePropagator)}.
+ * Attaching connects the group to this node for publication and inbound
+ * delivery. It does not copy a transport key or filters into the group. A node
+ * with no propagators is a valid local, store-backed node. Groups may be added,
+ * configured and removed while running.</p>
  *
  * <p>The calling application separately owns transport composition. It may
  * register one or more attached groups with a shared {@link LatticeListener},
@@ -47,38 +50,28 @@ import convex.lattice.cursor.RootLatticeCursor;
  * Transports must be closed before this server so no new ingress reaches groups
  * while they drain.</p>
  *
- * <p><b>Failure isolation.</b> Authoritative root publication is the mandatory
- * part of a root sync. Propagator initialisation, notification, worker and
- * shutdown failures are contained and logged independently; one propagation
- * policy group cannot fail a cursor sync, the server maintenance loop or another
- * group. Only failures of the authoritative store are surfaced by this class;
- * transport failures remain visible to their application owner.</p>
+ * <p><b>Failure isolation.</b> Host-root publication is the mandatory part of a
+ * host sync. Propagator initialisation, notification, worker and shutdown
+ * failures are contained and logged independently; one propagation policy group
+ * cannot fail a host sync or another group. Only
+ * failures of the node store are surfaced by this class; transport failures
+ * remain visible to their application owner.</p>
  *
- * @param <V> authoritative lattice value type
+ * @param <V> host root value type
  */
 public class NodeServer<V extends ACell> implements Closeable {
 
 	private static final Logger log=LoggerFactory.getLogger(NodeServer.class);
 
-	private final ALattice<V> lattice;
 	private final AStore store;
 	private final NodeConfig config;
-	private final RootLatticeCursor<V> cursor;
-	private final RootComponent<V> rootComponent;
+	private final AForkableCursor<V> cursor;
+	private final LatticeHost<V> host;
 	/** Immutable snapshots let publication proceed independently of group removal. */
 	private volatile List<LatticePropagator> propagators=List.of();
 	private final Set<LatticePropagator> attachedPropagators=ConcurrentHashMap.newKeySet();
 
-	/** Serialises all authoritative cell announcement, root-pointer and flush work. */
-	private final Object persistenceLock=new Object();
-	private boolean storeDirty;
-
-	private LatticeContext mergeContext;
-	private boolean rootPublicationConfigured;
-	private Thread maintenanceThread;
-	private final Object maintenanceSignal=new Object();
-	private final Runnable shutdownHook=this::shutdownPersist;
-	private boolean shutdownHookRegistered;
+	private final Function<V,V> publisher=this::publishApplicationRoot;
 
 	/** Complete lifecycle for resources owned by the node host. */
 	enum LifecycleState {
@@ -88,53 +81,42 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private volatile LifecycleState lifecycleState=LifecycleState.NEW;
 
 	/**
-	 * Creates a local lattice host. Propagation policy groups, if any, must be
-	 * supplied separately by the calling application before launch.
+	 * Replicates an already-assembled host. Its state, policy and applications
+	 * remain as supplied; launch does not reload the store. Open or create the host
+	 * and configure its applications first; {@link RelayHost} assembles the common
+	 * case of a host with one live application over a whole lattice. The node
+	 * installs its publication pipeline at launch and owns attached propagation
+	 * resources, not the store. Closing or failed launch detaches its publication
+	 * callback, leaving the host available for local use or another server.
 	 *
-	 * @param lattice authoritative merge semantics
-	 * @param store authoritative cell store
-	 * @param config authoritative persistence and validation configuration, or {@code null}
+	 * @param host assembled host with a non-null cell store
+	 * @param config node transport configuration, or {@code null} for defaults
 	 */
-	public NodeServer(ALattice<V> lattice,AStore store,NodeConfig config) {
-		if (lattice==null) throw new IllegalArgumentException("Lattice must not be null");
-		if (store==null) throw new IllegalArgumentException("Store must not be null");
-		this.lattice=lattice;
-		this.store=store;
+	public NodeServer(LatticeHost<V> host,NodeConfig config) {
+		this.host=Objects.requireNonNull(host,"Host must not be null");
+		this.store=Objects.requireNonNull(host.store(),"NodeServer requires a host cell store");
+		this.cursor=host.cursor();
 		this.config=(config==null) ? NodeConfig.create() : config;
-		this.mergeContext=LatticeContext.EMPTY.withMaxFutureTimestampSkew(
-			this.config.getMaxFutureTimestampSkew());
-		this.cursor=this.config.isTransactionalRoot()
-			? Cursors.createTransactionalLattice(lattice,lattice.zero(),mergeContext)
-			: Cursors.createLattice(lattice,lattice.zero(),mergeContext);
-		this.rootComponent=new RootComponent<>(cursor,store);
+	}
+
+	/** Replicates an already-assembled host with default node configuration. */
+	public NodeServer(LatticeHost<V> host) {
+		this(host,null);
 	}
 
 	/**
-	 * Creates a lattice host with default persistence and validation configuration.
+	 * Publishes the host's current root, starts every attached policy group
+	 * independently. The host owner decides when to flush the retained state.
 	 *
-	 * @param lattice authoritative merge semantics
-	 * @param store authoritative cell store
-	 */
-	public NodeServer(ALattice<V> lattice,AStore store) {
-		this(lattice,store,null);
-	}
-
-	/**
-	 * Restores and publishes the authoritative root, starts every attached policy
-	 * group independently, then starts authoritative persistence maintenance.
-	 *
-	 * @throws IOException if authoritative store initialisation fails
+	 * @throws IOException if node store initialisation fails
 	 */
 	public synchronized void launch() throws IOException,InterruptedException {
 		validateLaunchRequest();
 		lifecycleState=LifecycleState.STARTING;
 		try {
 			configurePublicationPipeline();
-			restorePersistedRoot();
 			seedPropagationViews();
 			startPropagationServices();
-			startMaintenanceService();
-			registerShutdownPersistenceHook();
 			lifecycleState=LifecycleState.RUNNING;
 			log.debug("NodeServer started with {} propagation group(s)",
 				propagators.size());
@@ -154,34 +136,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	private void configurePublicationPipeline() {
-		if (rootPublicationConfigured) return;
-		rootComponent.setPublicationPolicy(this::publishApplicationRoot);
-		rootComponent.freezePublicationPolicy();
-		rootPublicationConfigured=true;
-	}
-
-	@SuppressWarnings("unchecked")
-	private void restorePersistedRoot() {
-		if (!config.isRestore() || !store.isPersistent()) return;
-		try {
-			ACell restored=store.getRootData();
-			if (restored!=null) {
-				// Pre-launch local edits take precedence over replicated/persisted ties.
-				cursor.merge((V)restored);
-				log.info("Restored authoritative lattice value from node store");
-			}
-		} catch (IOException e) {
-			log.warn("Unable to restore authoritative lattice root",e);
-		}
+		host.attachPublisher(publisher);
 	}
 
 	private void seedPropagationViews() throws IOException {
-		ACell announced=syncSnapshot(null,false);
+		ACell announced=syncSnapshot(false);
 		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"initial view materialisation",
 				() -> propagator.processSnapshot(announced));
 		}
-		if (config.isPersist()) checkpoint();
 	}
 
 	private void startPropagationServices() {
@@ -192,7 +155,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private void abortFailedLaunch(Throwable failure) {
 		lifecycleState=LifecycleState.STOPPING;
-		stopMaintenance();
 		for (LatticePropagator propagator:propagators) {
 			try {
 				propagator.close();
@@ -201,7 +163,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			}
 		}
 		lifecycleState=LifecycleState.STOPPED;
-		removeShutdownHook();
+		host.detachPublisher(publisher);
 	}
 
 	private static void addCleanupFailure(Throwable failure,Throwable cleanupFailure) {
@@ -210,29 +172,33 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Pulls a complete root through an explicitly chosen propagation group and
-	 * merges it into the authoritative node.
+	 * delivers it to the host. Configured applications may keep their
+	 * results private; only already-published host state is persisted and propagated.
 	 *
 	 * @param source group whose serving store receives acquired cells
 	 * @param peer manager-owned peer client to query through {@code source}
-	 * @return future containing the authoritative value after merge and sync
+	 * @return future containing host state after delivery and host sync; this does
+	 *         not acknowledge publication of private application results
 	 */
 	public CompletableFuture<V> pull(LatticePropagator source,Convex peer) {
 		requireAttached(source);
 		return source.pull(peer).thenApply(acquired -> {
 			requireAttached(source);
 			mergePulledValue(acquired);
-			cursor.sync();
+			host.sync();
 			return cursor.get();
 		});
 	}
 
 	/**
 	 * Pulls one path through an explicitly chosen propagation group.
+	 * Path selection and handling belong to configured applications. A successful
+	 * pull does not force application publication.
 	 *
 	 * @param source group whose serving store receives acquired cells
 	 * @param peer manager-owned peer client to query through {@code source}
 	 * @param path path within remote and local roots; empty selects the root
-	 * @return future containing the authoritative value at {@code path}
+	 * @return future containing the host value at {@code path}
 	 */
 	public CompletableFuture<ACell> pullPath(LatticePropagator source,Convex peer,ACell... path) {
 		return pullPath(source,peer,false,path);
@@ -244,10 +210,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		requireAttached(source);
 		return source.pullPath(peer,background,path).thenApply(acquired -> {
 			requireAttached(source);
-			ALatticeCursor<ACell> target=cursor.path(path);
-			if (acquired!=null) mergeIncoming(target,acquired);
-			cursor.sync();
-			return target.get();
+			if (acquired!=null) mergeIncoming(acquired,path);
+			host.sync();
+			return RT.getIn(cursor.get(),path);
 		});
 	}
 
@@ -259,7 +224,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @deprecated Retain the application-constructed group and use
 	 * {@link #pull(LatticePropagator, Convex)}.
 	 * @param peer manager-owned peer client to query
-	 * @return future containing the authoritative value after merge and sync
+	 * @return future containing the host value after delivery and sync
 	 */
 	@Deprecated
 	public CompletableFuture<V> pull(Convex peer) {
@@ -275,7 +240,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @deprecated Use {@link #pullPath(LatticePropagator, Convex, ACell...)}.
 	 * @param peer manager-owned peer client to query
 	 * @param path path within remote and local roots; empty selects the root
-	 * @return future containing the authoritative value at {@code path}
+	 * @return future containing the host value at {@code path}
 	 */
 	@Deprecated
 	public CompletableFuture<ACell> pullPath(Convex peer,ACell... path) {
@@ -287,7 +252,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Pulls roots from every current manager-owned peer client in an explicit
-	 * propagation group and publishes the combined authoritative value.
+	 * propagation group and publishes the resulting host root.
 	 *
 	 * @param source application-selected attached group
 	 * @return {@code true} if every pull completed successfully
@@ -299,7 +264,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 				requireAttached(source);
 				mergePulledValue(acquired);
 			}
-			cursor.sync();
+			host.sync();
 			return true;
 		} catch (Exception e) {
 			log.warn("Pull through propagation group failed",e);
@@ -324,7 +289,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @deprecated Use {@link #pull(Convex)}.
 	 * @param peer manager-owned peer client to query
-	 * @return future containing the authoritative value after merge and sync
+	 * @return future containing the host value after delivery and sync
 	 */
 	@Deprecated
 	public CompletableFuture<V> syncWithPeer(Convex peer) {
@@ -334,63 +299,63 @@ public class NodeServer<V extends ACell> implements Closeable {
 	@SuppressWarnings("unchecked")
 	private void mergePulledValue(ACell acquired) {
 		if (acquired==null) return;
-		cursor.updateAndGet(current -> lattice.merge(mergeContext,current,(V)acquired));
+		host.merge((V)acquired);
 	}
 
 	/**
-	 * Merges an application-supplied value into memory. Call {@link ALatticeCursor#sync()}
+	 * Merges an application-supplied value into memory. Call {@link LatticeHost#sync()}
 	 * when the update should be published and persisted.
 	 *
 	 * @param receivedValue complete foreign lattice value
-	 * @return merged value, or {@code null} if the fast foreign-value check rejects it
+	 * @return Current host value, which may exclude private application changes;
+	 *         null for null input
 	 */
 	public V mergeValue(V receivedValue) {
-		if (receivedValue==null || !lattice.checkForeign(receivedValue)) return null;
-		return cursor.merge(receivedValue);
+		if (receivedValue==null) return null;
+		return host.merge(receivedValue);
 	}
 
 	/**
-	 * Returns the current authoritative in-memory value.
+	 * Delivers a value at a path within the host root to the host's configured
+	 * applications; each walks the path through its child components, and the deepest
+	 * that resolves merges the value, reduced to its path, with its own behaviour. Call
+	 * {@link LatticeHost#sync()} on {@link #getHost()} when the update should be
+	 * published and persisted.
 	 *
-	 * @return current authoritative value
+	 * @param <T> value type at the path
+	 * @param value value to merge
+	 * @param path path within the host root
+	 * @return Current host value at the path; application changes may remain private
+	 */
+	public <T extends ACell> T mergeAt(T value, ACell... path) {
+		return RT.getIn(host.mergeAt(value,path),path);
+	}
+
+	/**
+	 * Returns the host's current in-memory root value.
+	 *
+	 * @return current host root value
 	 */
 	public V getLocalValue() {
 		return cursor.get();
 	}
 
 	/**
-	 * Returns the authoritative root cursor.
+	 * Returns the host's root cursor.
 	 *
-	 * @return authoritative cursor
+	 * @return host root cursor
 	 */
-	public ALatticeCursor<V> getCursor() {
+	public AForkableCursor<V> getCursor() {
 		return cursor;
 	}
 
 	/**
-	 * Returns the application-facing root component hosted by this node.
+	 * Returns the application-facing host hosted by this node.
 	 *
-	 * @return hosted root component
+	 * @return hosted host
 	 */
-	public RootComponent<V> getRootComponent() {
-		return rootComponent;
-	}
-
-	/**
-	 * Configures only the authoritative node merge context. Calling applications
-	 * configure each propagator's view context independently before attaching it.
-	 *
-	 * @param context authoritative validation and merge context
-	 */
-	public synchronized void setMergeContext(LatticeContext context) {
-		if (context==null) throw new IllegalArgumentException(
-			"Use LatticeContext.EMPTY instead of null");
-		requireNewLifecycle("setMergeContext");
-		long configuredSkew=config.getMaxFutureTimestampSkew();
-		long effectiveSkew=config.getMap().containsKey(NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW)
-			? configuredSkew : context.getMaxFutureTimestampSkew(configuredSkew);
-		mergeContext=context.withMaxFutureTimestampSkew(effectiveSkew);
-		cursor.setContext(mergeContext);
+	public LatticeHost<V> getHost() {
+		return host;
 	}
 
 	/**
@@ -411,14 +376,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return config;
 	}
 
-	/**
-	 * Returns the authoritative lattice definition.
-	 *
-	 * @return authoritative lattice
-	 */
-	public ALattice<V> getLattice() {
-		return lattice;
-	}
 
 	/**
 	 * Returns whether launch completed and shutdown has not begun.
@@ -457,19 +414,21 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Attaches an already-configured propagation policy group.
+	 * Attaches a propagation policy group, starting it if the server is running.
 	 *
 	 * <p>This operation deliberately performs no policy configuration. In
-	 * particular it does not supply a lattice, merge context, identity, filters,
-	 * handlers or peer routes. The application must set those directly on the
-	 * propagator before calling this method. Attachment transfers lifecycle
-	 * ownership: the node starts and closes the group with its own resources.</p>
+	 * particular it does not supply an identity, filters, handlers or peer routes.
+	 * The application sets those directly on the propagator. Attachment transfers
+	 * lifecycle ownership: the node starts and
+	 * closes the group with its own resources.</p>
 	 *
-	 * @param propagator lattice-configured policy group to attach
+	 * @param propagator configured policy group to attach
 	 */
 	public synchronized void addPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
-		requireNewLifecycle("addPropagator");
+		if (lifecycleState!=LifecycleState.NEW && lifecycleState!=LifecycleState.RUNNING) {
+			throw new IllegalStateException("Cannot add a propagator while the node is starting or stopped");
+		}
 		if (attachedPropagators.contains(propagator)) {
 			throw new IllegalArgumentException("Propagator is already attached to this node");
 		}
@@ -478,6 +437,20 @@ public class NodeServer<V extends ACell> implements Closeable {
 		updated.add(propagator);
 		propagators=List.copyOf(updated);
 		attachedPropagators.add(propagator);
+		if (isRunning()) {
+			// Seed and start under the host publication lock so no newer notification
+			// can be lost between the initial snapshot and starting the worker.
+			try {
+				host.sync(snapshot -> {
+					runIsolated(propagator,"initial view materialisation",() -> propagator.processSnapshot(snapshot));
+					runIsolated(propagator,"launch",propagator::start);
+					return publishApplicationRoot(snapshot);
+				});
+			} catch (RuntimeException | Error failure) {
+				removePropagator(propagator);
+				throw failure;
+			}
+		}
 	}
 
 	/**
@@ -487,7 +460,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * drains its accepted work and closes its routes, including assigned inbound
 	 * sockets. Work already accepted may still merge while shutdown drains it;
 	 * outstanding pulls that complete after removal are rejected before merge.
-	 * Other groups and the authoritative value are unaffected. The caller retains
+	 * Other groups and the host root are unaffected. The caller retains
 	 * ownership of all stores; this operation neither closes nor erases them.</p>
 	 *
 	 * <p>Unregister the group from its application-owned listeners first with
@@ -520,54 +493,25 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 	}
 
-	private void requireNewLifecycle(String operation) {
-		if (lifecycleState!=LifecycleState.NEW) {
-			throw new IllegalStateException(
-				operation+" is configuration-only and must precede first launch");
-		}
-	}
-
 	private V publishApplicationRoot(V value) {
 		return publishApplicationRoot(value,true);
 	}
 
 	private V publishApplicationRoot(V value,boolean notify) {
-		try {
-			@SuppressWarnings("unchecked")
-			V announced=(V)publishAuthoritativeRoot(value,notify);
-			return announced;
-		} catch (IOException e) {
-			throw new StoreException("NodeServer sync failed: persistence error",e);
-		}
+		if (notify) notifyPropagators(value);
+		return value;
 	}
 
-	/** Publishes an optional snapshot candidate through the same ordered sync as
-	 * application publication. Current local state is always the own argument. */
-	private V syncSnapshot(V candidate,boolean notify) throws IOException {
+	/** Publishes already-installed host state through the same ordered sync as
+	 * explicit host publication. Private application state remains private. */
+	private V syncSnapshot(boolean notify) throws IOException {
 		try {
-			return cursor.sync(current -> publishApplicationRoot(
-				(candidate==null) ? current : lattice.merge(mergeContext,current,candidate),notify));
+			return host.sync(current -> publishApplicationRoot(
+				current,notify));
 		} catch (StoreException e) {
 			if (e.getCause() instanceof IOException cause) throw cause;
 			throw e;
 		}
-	}
-
-	/** Called within the root cursor's ordered sync. The persistence lock also
-	 * excludes checkpoints from cell announcement and the root-pointer write. */
-	@SuppressWarnings("unchecked")
-	private ACell publishAuthoritativeRoot(ACell value,boolean notify) throws IOException {
-		ACell announced;
-		synchronized (persistenceLock) {
-			V candidate=(V)value;
-			announced=Cells.announce(candidate,ignored -> {},store);
-			if (config.isPersist()) {
-				store.setRootData(announced);
-				storeDirty=true;
-			}
-		}
-		if (notify) notifyPropagators(announced);
-		return announced;
 	}
 
 	private void notifyPropagators(ACell value) {
@@ -600,7 +544,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		void run() throws Exception;
 	}
 
-	/** Result of one complete foreign-value merge at the authoritative boundary. */
+	/** Completed delivery; changed describes host state, not private application edits.
+	 * An ignored value is still a completed delivery. Exceptions reject the delivery. */
 	static record MergeOutcome(boolean accepted,boolean changed) {
 		static final MergeOutcome REJECTED=new MergeOutcome(false,false);
 	}
@@ -610,25 +555,17 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * acquisition or filtering concern crosses this boundary.
 	 */
 	MergeOutcome mergeInbound(ACell[] path,ACell value) {
-		ALatticeCursor<ACell> target;
-		try {
-			target=cursor.path(path);
-		} catch (RuntimeException | StackOverflowError e) {
-			log.debug("Rejected invalid inbound lattice path",e);
-			return MergeOutcome.REJECTED;
-		}
-		ACell before=target.get();
-		if (!mergeIncoming(target,value)) return MergeOutcome.REJECTED;
-		ACell after=target.get();
+		ACell before=cursor.get();
+		if (!mergeIncoming(value,path)) return MergeOutcome.REJECTED;
+		ACell after=cursor.get();
 		boolean changed=before!=after && (before==null || !before.equals(after));
-		if (changed) cursor.sync();
+		if (changed) host.sync();
 		return new MergeOutcome(true,changed);
 	}
 
-	@SuppressWarnings("unchecked")
-	<T extends ACell> boolean mergeIncoming(ALatticeCursor<T> target,ACell value) {
+	boolean mergeIncoming(ACell value,ACell... path) {
 		try {
-			target.merge((T)value);
+			host.mergeAt(value,path);
 			return true;
 		} catch (ClassCastException e) {
 			log.warn("Rejected inbound lattice value of wrong type: {}",
@@ -644,111 +581,19 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Merges a snapshot into the current local root, publishes and durably flushes
-	 * the result without notifying propagation groups. Current local state wins
-	 * ties; an older supplied snapshot cannot replace the established root.
-	 *
-	 * @param value snapshot candidate to persist; {@code null} is ignored
-	 * @throws IOException if publication or the durability barrier fails
-	 */
-	@SuppressWarnings("unchecked")
-	public void persistSnapshot(ACell value) throws IOException {
-		if (!config.isPersist() || value==null) return;
-		syncSnapshot((V)value,false);
-		checkpoint();
-	}
-
-	/**
-	 * Completes a durability barrier for a dirty persistent authoritative store.
-	 *
-	 * @return {@code true} if the store was flushed
-	 * @throws IOException if the durability barrier fails
-	 */
-	public boolean checkpoint() throws IOException {
-		if (!config.isPersist() || !store.isPersistent()) return false;
-		synchronized (persistenceLock) {
-			if (!storeDirty) return false;
-			store.flush();
-			storeDirty=false;
-			return true;
-		}
-	}
-
-	private void startMaintenanceService() {
-		if (!config.isPersist() || !store.isPersistent() || config.getPersistInterval()<=0L) return;
-		maintenanceThread=Thread.ofVirtual().name("NodeServer persistence maintenance")
-			.start(this::maintenanceLoop);
-	}
-
-	private void maintenanceLoop() {
-		long interval=config.getPersistInterval();
-		while (lifecycleState==LifecycleState.STARTING || lifecycleState==LifecycleState.RUNNING) {
-			try {
-				synchronized (maintenanceSignal) {
-					if (lifecycleState==LifecycleState.STARTING
-							|| lifecycleState==LifecycleState.RUNNING) {
-						maintenanceSignal.wait(interval);
-					}
-				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return;
-			}
-			if (lifecycleState!=LifecycleState.STARTING && lifecycleState!=LifecycleState.RUNNING) return;
-			try {
-				checkpoint();
-			} catch (IOException e) {
-				log.warn("Periodic authoritative-store checkpoint failed; will retry",e);
-			} catch (RuntimeException | StackOverflowError e) {
-				log.warn("Contained authoritative-store maintenance failure; will retry",e);
-			}
-		}
-	}
-
-	private void stopMaintenance() {
-		Thread maintenance=maintenanceThread;
-		if (maintenance==null) return;
-		synchronized (maintenanceSignal) {
-			maintenanceSignal.notifyAll();
-		}
-		try {
-			maintenance.join();
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			log.warn("Interrupted while stopping NodeServer persistence maintenance",e);
-		}
-		maintenanceThread=null;
-	}
-
-	private void registerShutdownPersistenceHook() {
-		Shutdown.addHook(Shutdown.SERVER,shutdownHook);
-		shutdownHookRegistered=true;
-	}
-
-	private void removeShutdownHook() {
-		if (!shutdownHookRegistered) return;
-		Shutdown.removeHook(Shutdown.SERVER,shutdownHook);
-		shutdownHookRegistered=false;
-	}
-
-	private void shutdownPersist() {
-		LifecycleState state=lifecycleState;
-		if (state==LifecycleState.NEW || state==LifecycleState.STOPPED) return;
-		try {
-			close();
-		} catch (IOException e) {
-			log.warn("Error during NodeServer shutdown persistence",e);
-		}
-	}
-
-	/**
-	 * Drains each group independently, publishes the
-	 * final authoritative root and completes the node-store durability barrier.
-	 *
-	 * @throws IOException if final authoritative publication or persistence fails
+	 * Drains each group independently. Does not publish pending host edits or
+	 * flush its store; saving belongs to the owning host/service lifecycle.
 	 */
 	@Override
 	public synchronized void close() throws IOException {
+		try {
+			closeResources();
+		} finally {
+			host.detachPublisher(publisher);
+		}
+	}
+
+	private void closeResources() throws IOException {
 		if (lifecycleState==LifecycleState.STOPPED) return;
 		if (lifecycleState==LifecycleState.NEW) {
 			// Attachment transfers lifecycle ownership even before launch. This matters
@@ -765,35 +610,16 @@ public class NodeServer<V extends ACell> implements Closeable {
 				"Cannot close NodeServer re-entrantly while launch is in progress");
 		}
 		lifecycleState=LifecycleState.STOPPING;
-		stopMaintenance();
 
 		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"ingress drain",propagator::stopIngress);
 		}
 
-		IOException nodeFailure=null;
-		ACell finalRoot=cursor.get();
-		try {
-			finalRoot=syncSnapshot(null,true);
-		} catch (IOException e) {
-			nodeFailure=new IOException("Unable to publish final authoritative lattice root",e);
-		}
-
-		ACell snapshot=finalRoot;
 		for (LatticePropagator propagator:propagators) {
-			runIsolated(propagator,"shutdown",() -> propagator.triggerAndClose(snapshot));
-		}
-
-		try {
-			checkpoint();
-		} catch (IOException e) {
-			if (nodeFailure==null) nodeFailure=e;
-			else nodeFailure.addSuppressed(e);
+			runIsolated(propagator,"shutdown",propagator::close);
 		}
 
 		lifecycleState=LifecycleState.STOPPED;
-		removeShutdownHook();
 		log.debug("NodeServer closed");
-		if (nodeFailure!=null) throw nodeFailure;
 	}
 }

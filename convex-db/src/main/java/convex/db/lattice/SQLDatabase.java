@@ -11,8 +11,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.db.ConvexDB;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.OwnerLattice;
 
@@ -55,15 +54,9 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
 
-	private SQLDatabase(ALatticeCursor<Index<Keyword, ACell>> cursor,
+	private SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor,
 			AString dbName, AKeyPair keyPair, ACell ownerKey) {
-		this(null,cursor,dbName,keyPair,ownerKey);
-	}
-
-	private SQLDatabase(ALatticeComponent<?> parent,
-			ALatticeCursor<Index<Keyword, ACell>> cursor,
-			AString dbName, AKeyPair keyPair, ACell ownerKey) {
-		super(parent,cursor);
+		super(cursor);
 		this.dbName = dbName;
 		this.keyPair = keyPair;
 		this.ownerKey = ownerKey;
@@ -91,8 +84,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return New SQLDatabase instance
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
-		ALatticeCursor<Index<Keyword, ACell>> cursor =
-			Cursors.createLattice(ConvexDB.DATABASE_LATTICE);
+		AForkableCursor<Index<Keyword, ACell>> cursor =
+			Cursors.root(ConvexDB.DATABASE_LATTICE.zero());
 		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey);
 	}
 
@@ -104,9 +97,11 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @param name Database name to connect to
 	 * @return New SQLDatabase connected to the cursor chain
 	 */
-	public static SQLDatabase connect(ALatticeCursor<?> parent, String name) {
+	@SuppressWarnings("unchecked")
+	public static SQLDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		ALatticeCursor<Index<Keyword, ACell>> cursor = parent.path(dbName);
+		var databases=(AForkableCursor<AHashMap<AString,Index<Keyword,ACell>>>)parent;
+		AForkableCursor<Index<Keyword, ACell>> cursor = databases.withDefault(Maps.empty()).path(dbName);
 		if (cursor.get() == null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
@@ -114,21 +109,21 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Connects to a database nested beneath a ConvexDB component.
-	 * Component policy delegates through the ConvexDB parent.
+	 * Connects to a database nested beneath a ConvexDB component, navigating from
+	 * its cursor.
 	 *
 	 * @param parent Containing ConvexDB component
 	 * @param name Database name to connect to
-	 * @return New SQLDatabase in the component hierarchy
+	 * @return New SQLDatabase over the containing component's cursor chain
 	 */
 	public static SQLDatabase connect(ConvexDB parent,String name) {
 		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
 		AString dbName=Strings.create(name);
-		ALatticeCursor<Index<Keyword,ACell>> cursor=parent.cursor().path(dbName);
+		AForkableCursor<Index<Keyword,ACell>> cursor=parent.cursor().withDefault(Maps.empty()).path(dbName);
 		if (cursor.get()==null) {
 			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
-		return new SQLDatabase(parent,cursor,dbName,null,null);
+		return new SQLDatabase(cursor,dbName,null,null);
 	}
 
 	/**
@@ -140,7 +135,12 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Forked SQLDatabase instance
 	 */
 	public SQLDatabase fork() {
-		return new SQLDatabase(parent(),cursor.fork(),dbName,keyPair,ownerKey);
+		return rebind(storage.fork());
+	}
+
+	@Override
+	protected SQLDatabase rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+		return new SQLDatabase(cursor,dbName,keyPair,ownerKey);
 	}
 
 	/**
@@ -149,7 +149,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return new SQLSchema(this,cursor.path(ConvexDB.KEY_TABLES));
+		return new SQLSchema(cursor().withDefault(Index.none()).path(ConvexDB.KEY_TABLES));
 	}
 
 	/**
@@ -192,7 +192,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	public SignedData<AHashMap<AString, Index<Keyword, ACell>>> getSignedState() {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 		AHashMap<AString, Index<Keyword, ACell>> dbMap =
-			(AHashMap) Maps.of(dbName, cursor.get());
+			(AHashMap) Maps.of(dbName, cursor().get());
 		return keyPair.signData(dbMap);
 	}
 
@@ -227,9 +227,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 
 		// Use OwnerLattice to verify signatures and owner-key matching
-		LatticeContext ctx = LatticeContext.create(null, keyPair);
 		AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> verified =
-			OWNER_LATTICE.merge(ctx, Maps.empty(), remoteOwnerMap);
+			OWNER_LATTICE.merge( Maps.empty(), remoteOwnerMap);
 
 		// Absorb verified remote data into local store
 		long merged = 0;
@@ -240,10 +239,21 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 			@SuppressWarnings("unchecked")
 			Index<Keyword, ACell> remoteState = (Index<Keyword, ACell>) dbMap.get(dbName);
 			if (remoteState != null) {
-				cursor.merge(remoteState);
+				cursor().updateAndGet(own -> ConvexDB.DATABASE_LATTICE.merge(own,remoteState));
 				merged++;
 			}
 		}
 		return merged;
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
+		var merged=ConvexDB.DATABASE_LATTICE.merge(own,other);
+		if (other==null) return merged;
+		// Only tables belong to this component; retain current unrelated keys,
+		// including removal of a key still present in our stale working snapshot.
+		return merged!=null && merged.containsKey(ConvexDB.KEY_TABLES)
+			?other.assoc(ConvexDB.KEY_TABLES,merged.get(ConvexDB.KEY_TABLES)):other;
 	}
 }

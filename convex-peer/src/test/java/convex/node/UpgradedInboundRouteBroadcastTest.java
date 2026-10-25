@@ -30,8 +30,8 @@ public class UpgradedInboundRouteBroadcastTest {
 		var aliceStore=new MemoryStore();
 		var bobStore=new MemoryStore();
 		var lattice=MaxLattice.create();
-		var aliceGroup=new LatticePropagator(aliceStore,lattice,value -> value,LatticePropagatorConfig.create());
-		var bobGroup=new LatticePropagator(bobStore,lattice,value -> value,LatticePropagatorConfig.create());
+		var aliceGroup=new LatticePropagator(aliceStore,LatticePropagatorConfig.create());
+		var bobGroup=new LatticePropagator(bobStore,LatticePropagatorConfig.create());
 		aliceGroup.setTransportKeyPair(aliceKey);
 		bobGroup.setTransportKeyPair(bobKey);
 		var incoming=new CompletableFuture<AConnection>();
@@ -41,8 +41,8 @@ public class UpgradedInboundRouteBroadcastTest {
 			if (CVMLong.create(1).equals(value)) firstReceived.complete(value);
 			if (CVMLong.create(2).equals(value)) secondReceived.complete(value);
 		});
-		try (var alice=new NodeServer<>(lattice,aliceStore,NodeConfig.port(-1));
-			var bob=new NodeServer<>(lattice,bobStore,NodeConfig.localNetwork());
+		try (var alice=new NodeServer<>(RelayHost.open(lattice,aliceStore),NodeConfig.port(-1));
+			var bob=new NodeServer<>(RelayHost.open(lattice,bobStore),NodeConfig.localNetwork());
 			var listener=new LatticeListener(NodeConfig.localNetwork())) {
 			alice.addPropagator(aliceGroup);
 			bob.addPropagator(bobGroup);
@@ -73,7 +73,7 @@ public class UpgradedInboundRouteBroadcastTest {
 		long broadcasts=group.getBroadcastCount();
 		var announced=group.nextAnnounce();
 		bob.getCursor().set(value);
-		bob.getCursor().sync();
+		bob.getHost().sync();
 		assertEquals(value,announced.get(5,TimeUnit.SECONDS));
 		assertTrue(group.getBroadcastCount()>broadcasts,
 			"publication must trigger a delta broadcast, independent of periodic root sync");

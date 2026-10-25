@@ -16,13 +16,14 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.JSONLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.SetLattice;
 import convex.lattice.generic.SignedLattice;
 
-/** Tests cursor-controlled argument ordering during fork sync. */
+/** Tests component-controlled policy and argument ordering during fork sync. */
 public class ForkedContextSyncTest {
 
 	private static final AKeyPair ALICE_KEY = AKeyPair.createSeeded(4101);
@@ -31,19 +32,18 @@ public class ForkedContextSyncTest {
 	private static final Keyword TIMESTAMP = Keyword.intern("timestamp");
 
 	@Test
-	public void syncUsesCurrentParentContextForSynthesisedSignedValue() {
+	public void syncUsesPublishingComponentContextForSynthesisedSignedValue() {
 		SignedLattice<ASet<CVMLong>> lattice = SignedLattice.create(SetLattice.create());
-		RootLatticeCursor<SignedData<ASet<CVMLong>>> root = Cursors.createLattice(
-			lattice, ALICE_KEY.signData(Sets.of(CVMLong.ONE)));
-		root.setContext(LatticeContext.create(null, ALICE_KEY));
+		Root<SignedData<ASet<CVMLong>>> root = Cursors.root(ALICE_KEY.signData(Sets.of(CVMLong.ONE)));
+		var component=new LatticeComponent<>(lattice,root.fork(),LatticeContext.create(null,ALICE_KEY));
 
-		ALatticeCursor<SignedData<ASet<CVMLong>>> fork = root.fork();
+		AForkableCursor<SignedData<ASet<CVMLong>>> fork = component.cursor();
 		fork.set(ALICE_KEY.signData(Sets.of(CVMLong.ONE, CVMLong.create(2))));
 
 		root.set(ALICE_KEY.signData(Sets.of(CVMLong.ONE, CVMLong.create(3))));
-		root.setContext(LatticeContext.create(null, BOB_KEY));
+		component.setContext(LatticeContext.create(null, BOB_KEY));
 
-		SignedData<ASet<CVMLong>> result = fork.sync();
+		SignedData<ASet<CVMLong>> result = component.sync();
 		assertEquals(BOB, result.getAccountKey());
 		assertEquals(Sets.of(CVMLong.ONE, CVMLong.create(2), CVMLong.create(3)), result.getValue());
 		assertEquals(result, root.get());
@@ -54,14 +54,15 @@ public class ForkedContextSyncTest {
 		LWWLattice<ACell> lattice = LWWLattice.create(JSONLattice.INSTANCE,
 			ForkedContextSyncTest::timestamp);
 		AHashMap<Keyword, ACell> initial = value(1, "initial");
-		RootLatticeCursor<ACell> root = Cursors.createLattice(lattice, initial);
-		ALatticeCursor<ACell> fork = root.fork();
+		Root<ACell> root = Cursors.root(initial);
+		var forkComponent=new LatticeComponent<>(lattice,root.fork(),convex.lattice.LatticeContext.EMPTY);
+		AForkableCursor<ACell> fork=forkComponent.cursor();
 
 		fork.set(value(2, "fork"));
 		AHashMap<Keyword, ACell> parentValue = value(3, "parent");
 		root.set(parentValue);
 
-		assertSame(parentValue, fork.sync());
+		assertSame(parentValue, forkComponent.sync());
 		assertSame(parentValue, root.get());
 	}
 

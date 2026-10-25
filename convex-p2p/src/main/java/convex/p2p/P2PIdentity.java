@@ -8,16 +8,15 @@ import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /** Component at one user's {@code [:id owner :value]} lattice path. */
 public final class P2PIdentity extends ALatticeComponent<ACell> implements TransactionalComponent<ACell,P2PIdentity> {
 
 	private final AccountKey owner;
 
-	P2PIdentity(ALatticeComponent<?> parent, ALatticeCursor<ACell> cursor,
-			AccountKey owner) {
-		super(parent,cursor);
+	P2PIdentity(AForkableCursor<ACell> cursor, AccountKey owner) {
+		super(cursor);
 		this.owner=owner;
 	}
 
@@ -29,12 +28,12 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 	/** Returns the published identity record, or {@code null}. */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword,ACell> getIdentity() {
-		return (AHashMap<Keyword,ACell>) cursor.get();
+		return (AHashMap<Keyword,ACell>) cursor().get();
 	}
 
 	/** Replaces the identity record in this component's working cursor. */
 	public void setIdentity(AHashMap<Keyword,ACell> identity) {
-		cursor.set(identity);
+		cursor().set(identity);
 	}
 
 	/** Publishes name and operated-node keys with an explicit timestamp. */
@@ -42,13 +41,24 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 		setIdentity(P2PLattice.createIdentity(name,nodes,null,timestamp));
 	}
 
-	/** Creates an isolated working component at the same logical path. */
+	/** Creates an isolated working component at the same logical path, merging on sync with the identity value lattice. */
 	public P2PIdentity fork() {
-		return new P2PIdentity(parent(),cursor.fork(),owner);
-	}
-	@Override
-	public P2PIdentity withCursor(ALatticeCursor<ACell> cursor) {
-		return new P2PIdentity(parent(),cursor,owner);
+		return rebind(storage.fork());
 	}
 
+	@Override
+	public P2PIdentity withCursor(AForkableCursor<ACell> cursor) {
+		return rebind(cursor);
+	}
+
+	@Override
+	protected P2PIdentity rebind(AForkableCursor<ACell> cursor) {
+		return new P2PIdentity(cursor,owner);
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected ACell mergePublication(ACell own,ACell other) {
+		return P2PLattice.ID_LATTICE.getValueLattice().merge(own,other);
+	}
 }

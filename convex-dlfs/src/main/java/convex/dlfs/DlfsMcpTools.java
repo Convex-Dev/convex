@@ -138,8 +138,8 @@ public class DlfsMcpTools {
 		return fs.getPath("/" + canonical);
 	}
 
-	private static void sync(FileSystem fs) {
-		if (fs instanceof convex.lattice.fs.DLFileSystem dlfs) dlfs.sync();
+	private void sync(FileSystem fs) {
+		driveManager.syncDrive(fs);
 	}
 
 	// ==================== UCAN Drive Resolution ====================

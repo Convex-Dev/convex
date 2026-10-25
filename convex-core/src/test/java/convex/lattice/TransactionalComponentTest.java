@@ -11,7 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,9 +23,11 @@ import convex.core.data.AHashMap;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ALatticeCursor;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ForkedCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
+import convex.lattice.cursor.Transactions;
 
 class TransactionalComponentTest {
 
@@ -33,14 +36,14 @@ class TransactionalComponentTest {
 
 	private static final class Counter extends ALatticeComponent<AHashMap<Keyword,ACell>>
 			implements TransactionalComponent<AHashMap<Keyword,ACell>,Counter> {
-		Counter(ALatticeCursor<AHashMap<Keyword,ACell>> cursor) { super(cursor); }
-		@Override public Counter withCursor(ALatticeCursor<AHashMap<Keyword,ACell>> cursor) {
+		Counter(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { super(cursor); }
+		@Override public Counter withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Counter(cursor);
 		}
 		void increment() {
-			cursor.updateAndGet(m -> m.assoc(COUNT,CVMLong.create(count(m)+1)));
+			cursor().updateAndGet(m -> m.assoc(COUNT,CVMLong.create(count(m)+1)));
 		}
-		long count() { return count(cursor.get()); }
+		long count() { return count(cursor().get()); }
 		static long count(AHashMap<Keyword,ACell> map) {
 			return ((CVMLong)map.get(COUNT)).longValue();
 		}
@@ -49,8 +52,8 @@ class TransactionalComponentTest {
 	private static AHashMap<Keyword,ACell> initial() { return Maps.of(COUNT,CVMLong.ZERO); }
 	private static Counter counter() { return counter(false); }
 	private static Counter counter(boolean coordinated) {
-		return new Counter(coordinated?new TransactionalRootCursor<>(null,initial())
-			:new RootLatticeCursor<>(null,initial()));
+		return new Counter(coordinated?new TransactionalRootCursor<>(initial())
+			:new Root<>(initial()));
 	}
 
 	@ParameterizedTest
@@ -66,13 +69,58 @@ class TransactionalComponentTest {
 			throw new IllegalArgumentException("abort");
 		}));
 		assertSame(before,live.cursor().get());
-		assertThrows(IllegalStateException.class,() -> escaped.get().increment());
+		escaped.get().increment();
+		assertEquals(2,escaped.get().count());
+		assertSame(before,live.cursor().get());
 		live.transact(draft -> {
 			draft.increment();
 			draft.transact(nested -> nested.increment());
 			assertSame(before,live.cursor().get());
 		});
 		assertEquals(2,live.count());
+	}
+
+	@Test void retainedDraftAndForkCannotChangeCommittedState() {
+		var live=new Root<>(CVMLong.ZERO);
+		AtomicReference<AForkableCursor<CVMLong>> retained=new AtomicReference<>();
+		AtomicReference<ForkedCursor<CVMLong>> fork=new AtomicReference<>();
+		Transactions.transact(live,draft -> {
+			retained.set(draft);
+			draft.set(CVMLong.ONE);
+			fork.set(draft.fork());
+		});
+		assertEquals(CVMLong.ONE,live.get());
+		retained.get().set(CVMLong.TWO);
+		fork.get().set(CVMLong.create(3));
+		fork.get().sync((a,b) -> a.longValue()>=b.longValue()?a:b);
+		assertEquals(CVMLong.create(3),retained.get().get());
+		fork.get().set(CVMLong.create(4));
+		fork.get().sync((a,b) -> a.longValue()>=b.longValue()?a:b);
+		assertEquals(CVMLong.create(4),retained.get().get());
+		assertEquals(CVMLong.ONE,live.get());
+	}
+
+	@Test void callbackCanJoinConcurrentDraftEditsBeforeCommit() {
+		Counter live=counter();
+		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+			live.transact(draft -> {
+				CountDownLatch start=new CountDownLatch(1);
+				List<CompletableFuture<Void>> work=new ArrayList<>();
+				for (int i=0;i<2;i++) {
+					work.add(CompletableFuture.runAsync(() -> {
+						await(start);
+						for (int j=0;j<32;j++) draft.increment();
+					},executor));
+				}
+				start.countDown();
+				CompletableFuture.allOf(work.toArray(CompletableFuture[]::new))
+					.orTimeout(10,TimeUnit.SECONDS).join();
+				draft.transactLocked(Counter::increment);
+				assertEquals(65,draft.count());
+				assertEquals(0,live.count());
+			});
+		}
+		assertEquals(65,live.count());
 	}
 
 	@ParameterizedTest
@@ -124,7 +172,7 @@ class TransactionalComponentTest {
 
 	@Test void identicalConcurrentResultDoesNotCoalesceOperations() {
 		AtomicInteger commits=new AtomicInteger();
-		var root=new RootLatticeCursor<AHashMap<Keyword,ACell>>(null,initial()) {
+		var root=new Root<AHashMap<Keyword,ACell>>(initial()) {
 			@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> next) {
 				if (commits.incrementAndGet()==1) {
 					super.set(next); // another increment computes the same value
@@ -142,10 +190,18 @@ class TransactionalComponentTest {
 
 	@Test void conflictingAttemptsFallBackToExclusiveExecution() {
 		AtomicInteger exclusiveCalls=new AtomicInteger(), commits=new AtomicInteger(), callbacks=new AtomicInteger();
-		var root=new TransactionalRootCursor<AHashMap<Keyword,ACell>>(null,initial()) {
-			@Override protected <T> T exclusive(Supplier<T> action) {
-				exclusiveCalls.incrementAndGet();
-				return super.exclusive(action);
+		var root=new TransactionalRootCursor<AHashMap<Keyword,ACell>>(initial()) {
+			// Count acquisitions of the real root lock; a substitute lock would not exclude writes.
+			@Override protected Lock exclusiveLock() {
+				Lock real=super.exclusiveLock();
+				return new Lock() {
+					@Override public void lock() { exclusiveCalls.incrementAndGet(); real.lock(); }
+					@Override public void unlock() { real.unlock(); }
+					@Override public void lockInterruptibly() throws InterruptedException { real.lockInterruptibly(); }
+					@Override public boolean tryLock() { return real.tryLock(); }
+					@Override public boolean tryLock(long time,TimeUnit unit) throws InterruptedException { return real.tryLock(time,unit); }
+					@Override public Condition newCondition() { return real.newCondition(); }
+				};
 			}
 			@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> next) {
 				if (commits.incrementAndGet()<=3) {
@@ -163,7 +219,7 @@ class TransactionalComponentTest {
 	}
 
 	@Test void unrelatedPathChangesReuseTheDraft() throws Exception {
-		var root=new RootLatticeCursor<AHashMap<Keyword,ACell>>(null,
+		var root=new Root<AHashMap<Keyword,ACell>>(
 			Maps.of(COUNT,initial(),OTHER,CVMLong.ZERO));
 		Counter child=new Counter(root.path(COUNT));
 		CountDownLatch read=new CountDownLatch(1), changed=new CountDownLatch(1);
@@ -216,19 +272,21 @@ class TransactionalComponentTest {
 		assertEquals(coordinated?200:0,lockedCallbacks.get());
 	}
 
-	@Test void transactionOnForkDoesNotTouchLiveState() {
+	@Test void transactionOnDetachedDraftDoesNotTouchLiveState() {
 		Counter live=counter(true);
-		Counter fork=live.withCursor(live.cursor().fork());
-		fork.transactLocked(Counter::increment);
+		Counter draft=live.withCursor(new TransactionalRootCursor<>(live.cursor().get()));
+		draft.transactLocked(Counter::increment);
 		assertEquals(0,live.count());
-		assertEquals(1,fork.count());
-		fork.sync();
+		assertEquals(1,draft.count());
+		draft.sync();
+		assertEquals(0,live.count(),"A view does not publish a caller-owned detached cursor");
+		live.cursor().set(draft.cursor().get());
 		assertEquals(1,live.count());
 	}
 
 	@Test void ordinaryRootRetriesBeyondTheFallbackThreshold() {
 		AtomicInteger commits=new AtomicInteger();
-		var root=new RootLatticeCursor<AHashMap<Keyword,ACell>>(null,initial()) {
+		var root=new Root<AHashMap<Keyword,ACell>>(initial()) {
 			@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> next) {
 				if (commits.incrementAndGet()<=5) return false;
 				return super.compareAndSet(expected,next);
@@ -256,17 +314,19 @@ class TransactionalComponentTest {
 		var before=live.cursor().get();
 		live.transact(draft -> draft.cursor().set(initial()));
 		assertSame(before,live.cursor().get());
-		live.cursor().path(OTHER).transact(draft -> assertNull(draft.get()));
+		Transactions.transact(live.cursor().path(OTHER),draft -> assertNull(draft.get()));
 		assertSame(before,live.cursor().get());
 	}
 
-	@Test void capabilitiesFollowViewsPathsAndForks() {
+	@Test void capabilitiesFollowPathsAndComponentWorkingState() {
 		for (boolean coordinated:new boolean[]{false,true}) {
-			var root=coordinated?new TransactionalRootCursor<>(null,initial())
-				:new RootLatticeCursor<>(null,initial());
-			assertEquals(coordinated,root.view().supportsExclusiveTransactions());
+			var root=coordinated?new TransactionalRootCursor<>(initial())
+				:new Root<>(initial());
 			assertEquals(coordinated,root.path(COUNT).supportsExclusiveTransactions());
-			assertEquals(coordinated,root.view().fork().supportsExclusiveTransactions());
+			var working=new LatticeComponent<>(
+				convex.lattice.generic.MapLattice.<Keyword,ACell>create(convex.lattice.generic.JSONLattice.INSTANCE),
+				root.fork(),LatticeContext.EMPTY);
+			assertTrue(working.cursor().supportsExclusiveTransactions(),"Forks coordinate their own working state independently of the destination");
 		}
 	}
 

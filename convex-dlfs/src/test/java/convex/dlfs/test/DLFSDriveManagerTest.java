@@ -25,10 +25,10 @@ import convex.core.data.AVector;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
-import convex.lattice.cursor.ALatticeCursor;
-import convex.lattice.LatticeContext;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.generic.MapLattice;
@@ -36,17 +36,19 @@ import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSDrives;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.RelayHost;
 
 public class DLFSDriveManagerTest {
 
-	private static ALatticeCursor<AHashMap<AString, AVector<ACell>>> createCursor() {
-		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
-		return Cursors.createLattice(lattice);
+	private static final MapLattice<AString, AVector<ACell>> LATTICE=MapLattice.create(DLFSLattice.INSTANCE);
+
+	private static AForkableCursor<AHashMap<AString, AVector<ACell>>> createCursor() {
+		return Cursors.root(LATTICE.zero());
 	}
 
 	@Test
 	public void testCursorBackedRegistrySurvivesManagerReconstruction() throws Exception {
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
 		DLFSDriveManager first=new DLFSDriveManager(cursor);
 
 		assertTrue(first.createDrive(null, "home"));
@@ -91,8 +93,9 @@ public class DLFSDriveManagerTest {
 
 	@Test
 	public void testCursorBackedRenameAndDeleteChangeCanonicalRegistry() throws Exception {
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
-		DLFSDriveManager manager=new DLFSDriveManager(cursor);
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
+		var component=convex.dlfs.DLFSDrives.wrap(cursor);
+		DLFSDriveManager manager=new DLFSDriveManager(component);
 		assertTrue(manager.createDrive(null, "before"));
 		Files.writeString(manager.getDrive(null, "before").getPath("/data"), "kept");
 
@@ -111,36 +114,37 @@ public class DLFSDriveManagerTest {
 	@Test
 	public void testDriveDeleteAndRenameDoNotResurrectFromStaleReplica() throws Exception {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
-		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> deleted=Cursors.createLattice(lattice);
+		Root<AHashMap<AString, AVector<ACell>>> deleted=Cursors.root(lattice.zero());
 		DLFSDriveManager deleteManager=new DLFSDriveManager(deleted);
 		assertTrue(deleteManager.createDrive(null,"home"));
 		AHashMap<AString,AVector<ACell>> staleHome=deleted.get();
 		assertTrue(deleteManager.deleteDrive(null,"home"));
-		deleted.merge(staleHome);
+		deleted.updateAndGet(own -> lattice.merge(own,staleHome));
 		assertNull(deleteManager.getDrive(null,"home"));
 		assertTrue(deleteManager.listDrives(null).isEmpty());
 
-		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> renamed=Cursors.createLattice(lattice);
+		Root<AHashMap<AString, AVector<ACell>>> renamed=Cursors.root(lattice.zero());
 		DLFSDriveManager renameManager=new DLFSDriveManager(renamed);
 		assertTrue(renameManager.createDrive(null,"before"));
 		Files.writeString(renameManager.getDrive(null,"before").getPath("/data"),"kept");
 		AHashMap<AString,AVector<ACell>> staleBefore=renamed.get();
 		assertTrue(renameManager.renameDrive(null,"before","after"));
-		renamed.merge(staleBefore);
+		renamed.updateAndGet(own -> lattice.merge(own,staleBefore));
 		assertNull(renameManager.getDrive(null,"before"));
 		assertEquals("kept",Files.readString(renameManager.getDrive(null,"after").getPath("/data")));
 	}
 
 	@Test
 	public void testDeletedDriveCanBeRecreatedWithNewerTimestamp() {
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
-		DLFSDriveManager manager=new DLFSDriveManager(cursor);
-		cursor.setContext(LatticeContext.create(CVMLong.create(100),null));
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
+		var time=new java.util.concurrent.atomic.AtomicReference<>(CVMLong.create(100));
+		var component=DLFSDrives.wrap(cursor,time::get);
+		DLFSDriveManager manager=new DLFSDriveManager(component);
 		assertTrue(manager.createDrive(null,"home"));
-		cursor.setContext(LatticeContext.create(CVMLong.create(200),null));
+		time.set(CVMLong.create(200));
 		assertTrue(manager.deleteDrive(null,"home"));
 		CVMLong deletionTime=DLFSNode.getUTime(cursor.get().get(Strings.create("home")));
-		cursor.setContext(LatticeContext.create(CVMLong.create(300),null));
+		time.set(CVMLong.create(300));
 		assertTrue(manager.createDrive(null,"home"));
 		AVector<ACell> recreated=cursor.get().get(Strings.create("home"));
 		assertTrue(DLFSNode.isDirectory(recreated));
@@ -150,9 +154,9 @@ public class DLFSDriveManagerTest {
 
 	@Test
 	public void testEqualTimestampLocalRegistryMutationRemainsOwn() {
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
-		cursor.setContext(LatticeContext.create(CVMLong.create(100),null));
-		DLFSDriveManager manager=new DLFSDriveManager(cursor);
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
+		var component=DLFSDrives.wrap(cursor,() -> CVMLong.create(100));
+		DLFSDriveManager manager=new DLFSDriveManager(component);
 		assertTrue(manager.createDrive(null,"home"));
 		assertTrue(manager.deleteDrive(null,"home"));
 		AHashMap<AString,AVector<ACell>> deleted=cursor.get();
@@ -161,7 +165,7 @@ public class DLFSDriveManagerTest {
 		assertEquals(CVMLong.create(100),
 			DLFSNode.getUTime(cursor.get().get(Strings.create("home"))));
 
-		cursor.merge(deleted);
+		cursor.updateAndGet(own -> LATTICE.merge(own,deleted));
 		assertNotNull(manager.getDrive(null,"home"),
 			"the local recreated drive is own and must win an equal-timestamp stale tombstone");
 	}
@@ -176,16 +180,14 @@ public class DLFSDriveManagerTest {
 	}
 
 	@Test
-	public void testDriveMutationUsesExactContextTimestamp() {
-		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
+	public void testDriveMutationUsesExactSuppliedTimestamp() {
 		AString home=Strings.create("home");
 		AHashMap<AString,AVector<ACell>> initial=convex.core.data.Maps.of(
 			home,DLFSNode.createDirectory(CVMLong.create(1_031)));
-		LatticeContext context=LatticeContext.create(CVMLong.create(1_000),null)
-			.withMaxFutureTimestampSkew(30);
-		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=
-			Cursors.createLattice(lattice,initial,context);
-		DLFSDriveManager manager=new DLFSDriveManager(cursor);
+		Root<AHashMap<AString, AVector<ACell>>> cursor=
+			Cursors.root(initial);
+		var component=DLFSDrives.wrap(cursor,() -> CVMLong.create(1_000));
+		DLFSDriveManager manager=new DLFSDriveManager(component);
 
 		assertTrue(manager.deleteDrive(null,"home"));
 		AVector<ACell> tombstone=cursor.get().get(home);
@@ -195,20 +197,19 @@ public class DLFSDriveManagerTest {
 
 	@Test
 	public void testDriveMergeRejectsDistantFutureTombstones() {
-		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
+		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(
+			DLFSLattice.withClock(() -> CVMLong.create(1_000),30));
 		AString home=Strings.create("home");
 		AString untracked=Strings.create("untracked");
 		AHashMap<AString,AVector<ACell>> initial=convex.core.data.Maps.of(
 			home,DLFSNode.createDirectory(CVMLong.create(900)));
-		LatticeContext context=LatticeContext.create(CVMLong.create(1_000),null)
-			.withMaxFutureTimestampSkew(30);
-		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=
-			Cursors.createLattice(lattice,initial,context);
+		Root<AHashMap<AString, AVector<ACell>>> cursor=
+			Cursors.root(initial);
 
 		AHashMap<AString,AVector<ACell>> foreign=convex.core.data.Maps.of(
 			home,DLFSNode.createEmptyFile(CVMLong.create(1_031)),
 			untracked,DLFSNode.createEmptyFile(CVMLong.create(1_031)));
-		cursor.merge(foreign);
+		cursor.updateAndGet(own -> lattice.merge(own,foreign));
 
 		assertTrue(DLFSNode.isDirectory(cursor.get().get(home)));
 		assertNull(cursor.get().get(untracked));
@@ -216,12 +217,13 @@ public class DLFSDriveManagerTest {
 
 	@Test
 	public void testCursorBackedRegistryDiscoversMergedUntrackedDrive() {
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
-		DLFSDriveManager manager=new DLFSDriveManager(cursor);
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
+		var component=convex.dlfs.DLFSDrives.wrap(cursor);
+		DLFSDriveManager manager=new DLFSDriveManager(component);
 		AString remote=Strings.create("remote");
 
-		cursor.merge(convex.core.data.Maps.of(
-			remote,DLFSNode.createDirectory(convex.core.data.prim.CVMLong.ZERO)));
+		cursor.updateAndGet(own -> LATTICE.merge(own,convex.core.data.Maps.of(
+			remote,DLFSNode.createDirectory(convex.core.data.prim.CVMLong.ZERO))));
 
 		assertEquals(List.of("remote"), manager.listDrives(null));
 		assertNotNull(manager.getDrive(null, "remote"));
@@ -246,7 +248,7 @@ public class DLFSDriveManagerTest {
 
 	@Test
 	public void testConcurrentCreateHasSingleWinner() throws Exception {
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
+		AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
 		DLFSDriveManager first=new DLFSDriveManager(cursor);
 		DLFSDriveManager second=new DLFSDriveManager(cursor);
 		CountDownLatch start=new CountDownLatch(1);
@@ -264,11 +266,11 @@ public class DLFSDriveManagerTest {
 	@SuppressWarnings("unchecked")
 	public void testRegistrySyncIsExplicit() {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
-		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=
-			(RootLatticeCursor<AHashMap<AString, AVector<ACell>>>)Cursors.createLattice(lattice);
+		LatticeHost<AHashMap<AString, AVector<ACell>>> host=LatticeHost.create(lattice.zero(),null);
 		AtomicReference<ACell> synced=new AtomicReference<>();
-		cursor.onSync(value->{ synced.set(value); return value; });
-		DLFSDriveManager manager=new DLFSDriveManager(cursor);
+		host.attachPublisher(value->{ synced.set(value); return value; });
+		var component=convex.dlfs.DLFSDrives.wrap(host.cursor());
+		DLFSDriveManager manager=new DLFSDriveManager(component,host::sync);
 
 		assertTrue(manager.createDrive(null, "home"));
 		assertNull(synced.get(), "in-memory registry mutation must not perform I/O implicitly");
@@ -284,22 +286,25 @@ public class DLFSDriveManagerTest {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
 		try (EtchStore store=EtchStore.createTemp("dlfs-registry")) {
 			NodeServer<AHashMap<AString, AVector<ACell>>> first=
-				new NodeServer<>(lattice,store,NodeConfig.port(-1));
+				new NodeServer<>(RelayHost.open(lattice,store),NodeConfig.port(-1));
 			first.launch();
 			try {
-				DLFSDriveManager manager=new DLFSDriveManager(DLFSDrives.connect(first.getRootComponent()));
+				var drives=DLFSDrives.connect(first.getHost().cursor(),store);
+				DLFSDriveManager manager=new DLFSDriveManager(drives);
 				assertTrue(manager.createDrive(null, "home"));
 				Files.writeString(manager.getDrive(null, "home").getPath("/hello.txt"), "after restart");
 				manager.sync();
+				first.getHost().checkpoint();
 			} finally {
 				first.close();
 			}
 
 			NodeServer<AHashMap<AString, AVector<ACell>>> restored=
-				new NodeServer<>(lattice,store,NodeConfig.port(-1));
+				new NodeServer<>(RelayHost.open(lattice,store),NodeConfig.port(-1));
 			restored.launch();
 			try {
-				DLFSDriveManager manager=new DLFSDriveManager(DLFSDrives.connect(restored.getRootComponent()));
+				var drives=DLFSDrives.connect(restored.getHost().cursor(),store);
+				DLFSDriveManager manager=new DLFSDriveManager(drives);
 				assertEquals(List.of("home"), manager.listDrives(null));
 				assertEquals("after restart",
 					Files.readString(manager.getDrive(null, "home").getPath("/hello.txt")));

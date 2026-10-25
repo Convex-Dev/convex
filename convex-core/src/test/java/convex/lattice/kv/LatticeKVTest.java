@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
@@ -17,7 +19,6 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeContext;
 import convex.lattice.cursor.Cursors;
 
 /**
@@ -41,19 +42,36 @@ public class LatticeKVTest {
 	}
 
 	/**
-	 * #561: time is injected via the LatticeContext, not read from the system clock — so a
-	 * write with a fixed-timestamp context stamps that exact time (deterministic).
+	 * A supplied clock controls mutation timestamps independently of the system clock.
 	 */
 	@Test
 	public void testInjectedTimestamp() {
 		CVMLong fixed = CVMLong.create(123456789L);
-		var cursor = Cursors.createLattice(KVStoreLattice.INSTANCE);
-		cursor.setContext(LatticeContext.create(fixed, null));
-		LatticeKV kv = LatticeKV.connect(cursor);
+		var cursor = Cursors.root(KVStoreLattice.INSTANCE.zero());
+
+		LatticeKV kv = new LatticeKV(cursor,Strings.create("test"),() -> fixed);
 
 		kv.set("a", Strings.create("v"));
 		AVector<ACell> entry = cursor.get().get(Strings.create("a"));
-		assertEquals(fixed, KVEntry.getUTime(entry), "utime should be the injected context timestamp");
+		assertEquals(fixed, KVEntry.getUTime(entry), "utime should be the injected clock timestamp");
+	}
+
+	@Test public void forksRetainTheClockForWritesAndExpiry() {
+		var time=new AtomicReference<>(CVMLong.create(100));
+		var kv=LatticeKV.create(Strings.create("replica"),time::get);
+		var draft=kv.fork();
+		draft.set("a",Strings.create("value"),50);
+		assertNull(kv.get("a"));
+		time.set(CVMLong.create(120));
+		assertEquals(30,draft.ttl("a"));
+		draft.set("b",Strings.create("second"));
+		assertEquals(time.get(),KVEntry.getUTime(draft.cursor().get().get(Strings.create("b"))));
+		// Publication reconciles state without consulting a mutation clock.
+		time.set(null);
+		draft.sync();
+		time.set(CVMLong.create(151));
+		assertNull(kv.get("a"));
+		assertEquals(Strings.create("second"),kv.get("b"));
 	}
 
 	/**
@@ -447,8 +465,8 @@ public class LatticeKVTest {
 		LatticeKV root = LatticeKV.create(Strings.create("root"));
 
 		// Create forks with different replica IDs for PN-counter
-		LatticeKV fork1 = new LatticeKV(root.cursor().fork(), Strings.create("replica-1"));
-		LatticeKV fork2 = new LatticeKV(root.cursor().fork(), Strings.create("replica-2"));
+		LatticeKV fork1 = root.fork(Strings.create("replica-1"));
+		LatticeKV fork2 = root.fork(Strings.create("replica-2"));
 
 		// Both increment independently
 		fork1.incrby("counter", 5);

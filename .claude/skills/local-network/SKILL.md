@@ -60,26 +60,35 @@ replication, use `NodeServer`; for the bundled P2P and social regions, use
 `P2PNode`. See `convex-peer/src/test/java/convex/node/LatticeNetworkTest.java`
 and `convex-p2p/src/test/java/convex/p2p/P2PSocialSyncTest.java`.
 
-`NodeServer` is the schema-independent authoritative lattice host. It owns
-merge, node-root persistence, attached-propagator lifecycle and isolated update
-notification, but no socket or transport. It does not publish or interpret
+`NodeServer` is schema-independent and replicates an assembled `LatticeHost`. It
+owns attached-propagator lifecycle and isolated update
+notification, but no lattice, merge policy, socket or transport: the host's
+applications own merge semantics. The host owns root retention and durability;
+`RelayHost.open` assembles the relay case
+of one live application over a whole lattice. It does not publish or interpret
 `NodeInfo`, inspect `:p2p` / `:social` paths, or implement discovery policy. The
-calling application must construct and configure every `LatticePropagator`
-before attaching it; there is no implicit/default group. A zero-propagator node
-is a valid local persistent host. Each propagator owns its connection manager,
-transport identity, trust, bounded protocol endpoint, filters and serving store.
+calling application explicitly creates each `LatticePropagator`; there is no
+implicit/default group. `LatticeNode.createPropagator()` creates and registers a
+group using the host store, starting it if running. Identity, filters and handlers
+may be configured dynamically. A zero-propagator node
+is a valid local persistent node. Each propagator owns its connection manager,
+transport identity, trust, bounded protocol endpoint, filters and serving store,
+and merges nothing.
 
 The calling application separately owns any `LatticeListener`: register every
-eligible propagator, install a one-time connection selector, launch the listener
+eligible propagator, install a connection selector, launch the listener
 after the node, and close it before the node. One listener may route connections
 to several groups, and groups may instead use independent listeners or custom
-transports. `P2PNode` performs this composition; its `NodeDirectory` owns
+transports. Registrations and selectors can change while running; existing sockets
+keep their assignment until closed or the group is unregistered. `LatticeNode`
+supplies the standard TCP assembly, and `serveAllInbound(group)` explicitly selects
+a group for new inbound assignments. `P2PNode` performs its own composition; its `NodeDirectory` owns
 signed `[:p2p :nodes]` publication, validation, discovery translation and PoP
 metadata. Keep tests for those behaviours in `convex-p2p`, not `convex-peer`.
 `P2PNode` also configures its node key explicitly as both its transport challenge
 identity and its signed `NodeInfo` owner. A generic `NodeServer` does not infer a
-transport key or propagator merge context from `LatticeContext`; direct tests
-must set these on the propagator itself before `addPropagator`. Social user DIDs
+transport key from the host; direct tests set it on the
+propagator itself before opening connections. Social user DIDs
 and their account keys remain a separate application concern.
 
 For a small lattice network test:
@@ -110,11 +119,11 @@ For a direct `NodeServer` network test, the minimum composition is explicit:
 ```java
 NodeConfig nodeConfig = NodeConfig.localNetwork();
 LatticePropagatorConfig groupConfig = LatticePropagatorConfig.create();
-NodeServer<V> node = new NodeServer<>(lattice, nodeStore, nodeConfig);
-node.setMergeContext(nodeContext);
-LatticePropagator group = new LatticePropagator(
-    servingStore, lattice, value -> value, groupConfig);
-group.setMergeContext(groupContext);
+// The relay host's live application admits incoming values under nodeContext;
+// the node only replicates what the host publishes.
+NodeServer<V> node = new NodeServer<>(
+    RelayHost.open(lattice, nodeStore, nodeContext), nodeConfig);
+LatticePropagator group = new LatticePropagator(nodeStore, groupConfig);
 group.setTransportKeyPair(nodeKey);
 node.addPropagator(group);
 LatticeListener transport = new LatticeListener(nodeConfig);
@@ -179,8 +188,8 @@ the node merely to treat the first group as a privileged "primary" group.
 6. Automatic gossip is fire-and-forget. To verify it without sleeping, capture
    `nextAnnounce()` before publishing and re-arm it until the expected application
    state is present. The announce signals that this propagation group has
-   materialised its served view after the authoritative merge and node-root
-   publication. `cursor.sync()` itself guarantees only the authoritative node
+   materialised its served view after the host has merged the value and the
+   node has published the root. A host sync itself guarantees only node
    publication; do not assume it completed group fan-out. Use an explicit
    `receivingServer.pull(group, connection).get(timeout)`
    only when the test is specifically about pull synchronisation. A ping only
@@ -188,7 +197,7 @@ the node merely to treat the first group as a privileged "primary" group.
 7. Close listeners before nodes, then close their stores.
 
 Host and propagation configuration are deliberately independent. Use
-`NodeConfig` for authoritative persistence and the standard listener, supplying
+`NodeConfig` for the standard listener, supplying
 it independently to each component; passing it to `NodeServer` never creates a
 transport. Use
 `LatticePropagatorConfig` for each group's routes, protocol queue and publication

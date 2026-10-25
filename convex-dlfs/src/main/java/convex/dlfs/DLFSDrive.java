@@ -1,39 +1,58 @@
 package convex.dlfs;
 
 import java.io.IOException;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.store.AStore;
+import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.Cursors;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.TransactionalComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFSLattice;
+import convex.lattice.fs.DLFSLocation;
 import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.impl.DLFSLocal;
 
 /**
  * Component for one named DLFS drive.
  *
- * <p>The component supplies its cursor and host store to a local NIO adapter.
- * {@link #fork()} creates a temporary working component whose changes remain
- * isolated until explicitly synced.</p>
+ * <p>The component supplies its cursor and store to a local NIO adapter. Streamed
+ * writes checkpoint blob branches into the store, if one was supplied, so large
+ * files do not accumulate on the heap; without a store file data stays in memory
+ * until the containing root is published. {@link #fork()} creates a temporary
+ * working component, sharing the store, whose changes remain isolated until
+ * explicitly synced.</p>
  */
 public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implements AutoCloseable, TransactionalComponent<AVector<ACell>,DLFSDrive> {
 
 	private final AString name;
+	private final AStore store;
+	private final DLFSLattice lattice;
+	private final DLFSLocation location;
 	private final HostedFileSystem fileSystem;
 
-	DLFSDrive(ALatticeComponent<?> parent, AString name, ALatticeCursor<AVector<ACell>> cursor) {
-		super(parent,cursor);
+	DLFSDrive(AString name, AForkableCursor<AVector<ACell>> cursor, AStore store, DLFSLocation location,
+			Supplier<CVMLong> clock,DLFSLattice lattice) {
+		super(cursor);
 		this.name=name;
-		this.fileSystem=new HostedFileSystem(this);
+		this.store=store;
+		this.location=location;
+		this.lattice=lattice;
+		this.fileSystem=new HostedFileSystem(this,clock);
 	}
 
 	/** Returns this drive's name within its owner's drive map. */
 	public String name() {
 		return name.toString();
 	}
+
+	/** This component's working root and logical region/owner/drive path. */
+	public DLFSLocation location() { return location; }
 
 	/** Returns the NIO filesystem view backed by this component's cursor. */
 	public DLFileSystem fileSystem() {
@@ -46,12 +65,12 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	}
 
 	/**
-	 * Creates an isolated temporary drive component. The filesystem still uses the
-	 * containing host's store, while logical changes require explicit {@link #sync()}
-	 * to reach the long-lived drive cursor.
+	 * Creates an isolated temporary drive component. The filesystem still checkpoints
+	 * into the same store, while logical changes require explicit {@link #sync()},
+	 * which merges with {@link DLFSLattice}, to reach the long-lived drive cursor.
 	 */
 	public DLFSDrive fork() {
-		return new DLFSDrive(parent(),name,cursor.fork());
+		return rebind(storage.fork());
 	}
 
 	@Override
@@ -63,19 +82,44 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	private static final class HostedFileSystem extends DLFSLocal {
 		private final DLFSDrive drive;
 
-		HostedFileSystem(DLFSDrive drive) {
-			super(DLFS.provider(),drive.name(),drive.cursor(),drive.store());
+		HostedFileSystem(DLFSDrive drive,Supplier<CVMLong> clock) {
+			super(DLFS.provider(),drive.name(),drive.cursor(),drive.store,drive.location,clock);
 			this.drive=drive;
+		}
+
+		@Override public void merge(AVector<ACell> incoming) {
+			checkOpen();
+			drive.cursor().updateAndGet(own -> drive.lattice.merge(own,incoming));
+		}
+		@Override public DLFSLocal clone() {
+			checkOpen();
+			return drive.withCursor(Cursors.root(drive.cursor().get())).fileSystem;
+		}
+		@Override public void sync() {
+			checkOpen();
+			drive.sync();
 		}
 
 		@Override
 		public DLFSLocal fork() {
+			checkOpen();
 			return drive.fork().fileSystem;
 		}
 	}
+
 	@Override
-	public DLFSDrive withCursor(ALatticeCursor<AVector<ACell>> cursor) {
-		return new DLFSDrive(parent(),name,cursor);
+	public DLFSDrive withCursor(AForkableCursor<AVector<ACell>> cursor) {
+		return rebind(cursor);
 	}
 
+	@Override
+	protected DLFSDrive rebind(AForkableCursor<AVector<ACell>> cursor) {
+		return new DLFSDrive(name,cursor,store,DLFSLocation.at(cursor),fileSystem.getClock(),lattice);
+	}
+
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AVector<ACell> mergePublication(AVector<ACell> own,AVector<ACell> other) {
+		return lattice.merge(own,other);
+	}
 }

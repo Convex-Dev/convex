@@ -3,6 +3,7 @@ package convex.lattice.fs;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -27,39 +28,39 @@ import convex.lattice.fs.impl.DLFSLocal;
  * tombstones (name to deletion timestamp) in the optional POS_TOMBS index.
  */
 public class DLFSTombstoneTest {
-	private static void setContextTime(DLFSLocal fs, long timestamp) {
-		fs.getCursor().setContext(fs.getCursor().getContext().withTimestamp(CVMLong.create(timestamp)));
+	private static void setTime(DLFSLocal fs, long timestamp) {
+		fs.setClock(() -> CVMLong.create(timestamp));
 	}
 
-	/** A directory node carries the POS_TOMBS element if and only if it has tombstones. */
+	/** Extended directories retain null tombstone padding when there are no deletions. */
 	@Test
 	public void testCanonicalNodeShape() throws IOException {
 		DLFSLocal fs = DLFS.create();
-		setContextTime(fs,100);
+		setTime(fs,100);
 		DLPath root = fs.getRoot();
 		Path f = Files.createFile(root.resolve("f.txt"));
 
-		// No deletions yet: plain 4-element directory node
+		// Namespace updates materialise mtime, with an empty tombstone slot.
 		AVector<ACell> r0 = fs.getNode(root);
-		assertEquals(DLFSNode.NODE_LENGTH, r0.count());
+		assertEquals(6L, r0.count());
 		assertTrue(DLFSNode.getTombstones(r0).isEmpty());
 
-		// Delete records a tombstone with the deletion timestamp; node grows to 5 elements
-		setContextTime(fs,200);
+		// Delete records a tombstone with the deletion timestamp.
+		setTime(fs,200);
 		Files.delete(f);
 		AVector<ACell> r1 = fs.getNode(root);
-		assertEquals(5L, r1.count());
+		assertEquals(6L, r1.count());
 		Index<AString, CVMLong> tombs = DLFSNode.getTombstones(r1);
 		assertEquals(1L, tombs.count());
 		assertEquals(CVMLong.create(200), tombs.get(Strings.create("f.txt")));
 		assertTrue(DLFSNode.isEmpty(r1));        // no live children
 		assertFalse(Files.exists(f));
 
-		// Recreating clears the tombstone, returning the node to canonical 4-element form
-		setContextTime(fs,300);
+		// Recreating clears the tombstone while retaining the modification time.
+		setTime(fs,300);
 		Files.createFile(root.resolve("f.txt"));
 		AVector<ACell> r2 = fs.getNode(root);
-		assertEquals(DLFSNode.NODE_LENGTH, r2.count());
+		assertEquals(6L, r2.count());
 		assertTrue(DLFSNode.getTombstones(r2).isEmpty());
 		assertTrue(Files.exists(root.resolve("f.txt")));
 	}
@@ -71,13 +72,13 @@ public class DLFSTombstoneTest {
 		DLFSLocal b = DLFS.create();
 
 		// A holds a fresh file created at t=200
-		setContextTime(a,200);
+		setTime(a,200);
 		Files.write(a.getPath("/x"), new byte[] { 9 });
 
 		// B created then deleted the same name earlier: it holds only a tombstone at t=100
-		setContextTime(b,50);
+		setTime(b,50);
 		Files.write(b.getPath("/x"), new byte[] { 1 });
-		setContextTime(b,100);
+		setTime(b,100);
 		Files.delete(b.getPath("/x"));
 
 		a.replicate(b);
@@ -96,13 +97,13 @@ public class DLFSTombstoneTest {
 		DLFSLocal b = DLFS.create();
 
 		// A holds a file created at t=100
-		setContextTime(a,100);
+		setTime(a,100);
 		Files.write(a.getPath("/y"), new byte[] { 9 });
 
 		// B deleted the name at t=200
-		setContextTime(b,50);
+		setTime(b,50);
 		Files.write(b.getPath("/y"), new byte[] { 1 });
-		setContextTime(b,200);
+		setTime(b,200);
 		Files.delete(b.getPath("/y"));
 
 		a.replicate(b);
@@ -132,22 +133,22 @@ public class DLFSTombstoneTest {
 		assertEquals(timestamp,DLFSNode.getTombstones(deletedOwn).get(Strings.create("x")));
 	}
 
-	/** Merge order does not matter: bidirectional replication converges to one canonical tree. */
+	/** Distinct mutation timestamps converge, including directory modification times. */
 	@Test
 	public void testMergeConverges() throws IOException {
 		DLFSLocal a = DLFS.create();
 		DLFSLocal b = DLFS.create();
 
-		setContextTime(a,10);
+		setTime(a,10);
 		Files.createDirectory(a.getPath("/d"));
 		Files.write(a.getPath("/d/keep"), new byte[] { 1 });
 		Files.write(a.getPath("/gone"), new byte[] { 2 });
 
 		b.replicate(a); // both share the baseline
 
-		setContextTime(a,20);
+		setTime(a,20);
 		Files.delete(a.getPath("/gone"));       // A deletes gone
-		setContextTime(b,20);
+		setTime(b,21);
 		Files.write(b.getPath("/d/added"), new byte[] { 3 }); // B adds a file concurrently
 
 		a.replicate(b);
@@ -187,19 +188,18 @@ public class DLFSTombstoneTest {
 
 	@Test
 	public void testFutureUpdatesAndTombstonesAreRejectedAtMergeFrontier() {
-		LatticeContext context=LatticeContext.create(CVMLong.create(1_000),null)
-			.withMaxFutureTimestampSkew(30);
+		DLFSLattice lattice=DLFSLattice.withClock(() -> CVMLong.create(1_000),30);
 		AVector<ACell> own=DLFSNode.createDirectory(CVMLong.create(900));
 
 		AVector<ACell> tooFar=DLFSNode.createDirectory(CVMLong.create(1_031));
-		assertSame(own,DLFSLattice.INSTANCE.merge(context,own,tooFar));
+		assertSame(own,lattice.merge(own,tooFar));
 		AVector<ACell> boundary=DLFSNode.createDirectory(CVMLong.create(1_030));
-		assertSame(boundary,DLFSLattice.INSTANCE.merge(context,own,boundary));
+		assertSame(boundary,lattice.merge(own,boundary));
 
 		AVector<ACell> futureChild=DLFSNode.createEmptyFile(CVMLong.create(1_031));
 		AVector<ACell> hiddenChild=DLFSNode.createDirectory(CVMLong.create(1_000)).assoc(
 			DLFSNode.POS_DIR,Index.of(Strings.create("future"),futureChild));
-		assertSame(own,DLFSLattice.INSTANCE.merge(context,own,hiddenChild));
+		assertSame(own,lattice.merge(own,hiddenChild));
 
 		AVector<ACell> live=DLFSNode.createEmptyFile(CVMLong.create(900));
 		AVector<ACell> ownWithFile=DLFSNode.createDirectory(CVMLong.create(900)).assoc(
@@ -207,6 +207,25 @@ public class DLFSTombstoneTest {
 		AVector<ACell> futureDelete=DLFSNode.deleteNode(ownWithFile,
 			new DLPath(null,new AString[] {Strings.create("deleted")},false),CVMLong.create(1_031))
 			.assoc(DLFSNode.POS_UTIME,CVMLong.create(1_000));
-		assertSame(ownWithFile,DLFSLattice.INSTANCE.merge(context,ownWithFile,futureDelete));
+		assertSame(ownWithFile,lattice.merge(ownWithFile,futureDelete));
+	}
+
+	@Test
+	public void testAdmissionClockIsBoundToTheLattice() {
+		var time=new java.util.concurrent.atomic.AtomicReference<>(CVMLong.create(1_000));
+		var strict=DLFSLattice.withClock(time::get,0);
+		var tolerant=DLFSLattice.withClock(time::get,30);
+		var own=DLFSNode.createDirectory(CVMLong.create(900));
+		var incoming=DLFSNode.createDirectory(CVMLong.create(1_030));
+		var ambient=LatticeContext.create(CVMLong.create(Long.MAX_VALUE),null);
+		assertSame(own,strict.merge(ambient,own,incoming));
+		assertSame(incoming,tolerant.merge(LatticeContext.create(CVMLong.ZERO,null),own,incoming));
+		assertSame(incoming,DLFSLattice.INSTANCE.merge(LatticeContext.create(CVMLong.ZERO,null),own,incoming),
+			"An unconfigured value lattice has no clock-dependent admission rule");
+		time.set(CVMLong.create(1_030));
+		assertSame(incoming,strict.merge(own,incoming));
+		assertThrows(IllegalArgumentException.class,() -> DLFSLattice.withClock(time::get,-1));
+		assertSame(incoming,DLFSLattice.withClock(() -> CVMLong.create(Long.MAX_VALUE),30).merge(own,incoming),
+			"The admission ceiling must not overflow");
 	}
 }

@@ -44,7 +44,7 @@ public class PEMToolsTest {
 	private static final char[] PASS="test-password".toCharArray();
 
 	@Test
-	public void testPEMPrivateKey() throws Exception {
+	public void testPEMRoundTripAndProtection() throws Exception {
 		AKeyPair keyPair = KP;
 
 		String testPassword = "test-password";
@@ -62,11 +62,9 @@ public class PEMToolsTest {
 	    Blob seed1 = keyPair.getSeed();
 		Blob seed2 = importKeyPair.getSeed();
 		assertEquals(seed1,seed2);
-	}
 
-	@Test
-	public void testPEMEncryptionScheme() throws Exception {
-		PBES2Parameters pbes2=pbes2Params(PEMTools.encryptPrivateKeyToPEM(KP, PASS));
+		// Inspect the export already round-tripped above; only salt randomness needs a second export.
+		PBES2Parameters pbes2=pbes2Params(pemText);
 
 		assertEquals(PKCS8Generator.AES_256_CBC,pbes2.getEncryptionScheme().getAlgorithm());
 		assertEquals(PKCSObjectIdentifiers.id_PBKDF2,pbes2.getKeyDerivationFunc().getAlgorithm());

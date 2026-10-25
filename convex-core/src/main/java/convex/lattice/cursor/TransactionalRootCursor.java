@@ -1,45 +1,37 @@
 package convex.lattice.cursor;
 
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BinaryOperator;
-import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
-import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
 
 /**
  * Opt-in root supporting exclusive transactions and optimistic-to-serial fallback.
  * All mutation entry points coordinate their commits through one root-owned lock.
  * Ordinary update functions still execute optimistically outside the lock, while
- * reads remain lock-free. Live views inherit this policy; forks get independent
- * roots with the same capability. No background workers are created.
+ * root reads remain lock-free. Live views inherit this policy. Forks always use
+ * this root for their independent working state so sync can exclude working writes;
+ * fork reads also coordinate with sync. No background workers are created.
  *
  * <p>Choose this variant when constructing the shared host. A locking wrapper
  * around a path cannot exclude writes through other views of an ordinary root.</p>
  *
  * @param <V> Root value type
  */
-public class TransactionalRootCursor<V extends ACell> extends RootLatticeCursor<V> {
+public class TransactionalRootCursor<V extends ACell> extends Root<V> {
 
 	private final ReentrantLock writeLock=new ReentrantLock();
 
-	public TransactionalRootCursor(ALattice<V> lattice,V initialValue,LatticeContext context) {
-		super(lattice,initialValue,context);
+	public TransactionalRootCursor(V initialValue) {
+		super(initialValue);
 	}
 
-	public TransactionalRootCursor(ALattice<V> lattice,V initialValue) {
-		this(lattice,initialValue,LatticeContext.EMPTY);
-	}
 
 	@Override
-	public boolean supportsExclusiveTransactions() { return true; }
-
-	@Override
-	protected <T> T exclusive(Supplier<T> action) {
-		writeLock.lock();
-		try { return action.get(); } finally { writeLock.unlock(); }
+	protected Lock exclusiveLock() {
+		return writeLock;
 	}
 
 	@Override

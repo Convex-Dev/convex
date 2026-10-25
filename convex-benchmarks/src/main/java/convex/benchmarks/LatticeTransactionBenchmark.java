@@ -18,8 +18,8 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.ACursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
-import convex.lattice.cursor.RootLatticeCursor;
 
 /** Isolates the cost of root write coordination, without signing or persistence. */
 @State(Scope.Thread)
@@ -30,11 +30,11 @@ import convex.lattice.cursor.RootLatticeCursor;
 @Fork(2)
 public class LatticeTransactionBenchmark {
 
-	private final RootLatticeCursor<CVMLong> plain=new RootLatticeCursor<>(null,CVMLong.ZERO);
-	private final TransactionalRootCursor<CVMLong> coordinated=new TransactionalRootCursor<>(null,CVMLong.ZERO);
+	private final Root<CVMLong> plain=new Root<>(CVMLong.ZERO);
+	private final TransactionalRootCursor<CVMLong> coordinated=new TransactionalRootCursor<>(CVMLong.ZERO);
 	private static final Keyword REGION=Keyword.intern("region"), OWNER=Keyword.intern("owner"), VALUE=Keyword.intern("value");
-	private final ACursor<CVMLong> plainPath=new RootLatticeCursor<>(null,initial()).path(REGION,OWNER,VALUE);
-	private final ACursor<CVMLong> coordinatedPath=new TransactionalRootCursor<>(null,initial()).path(REGION,OWNER,VALUE);
+	private final ACursor<CVMLong> plainPath=new Root<>(initial()).path(REGION,OWNER,VALUE);
+	private final ACursor<CVMLong> coordinatedPath=new TransactionalRootCursor<>(initial()).path(REGION,OWNER,VALUE);
 
 	private static AHashMap<ACell,ACell> initial() {
 		AHashMap<ACell,ACell> entries=Maps.empty();

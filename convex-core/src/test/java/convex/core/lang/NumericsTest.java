@@ -199,14 +199,14 @@ public class NumericsTest extends ACVMTest {
 	
 	private void doIntConsistencyChecks(Object oa, Object ob) {
 		AInteger a=AInteger.parse(oa);
-		AInteger b=AInteger.parse(oa);
+		AInteger b=AInteger.parse(ob);
 		if (!b.isZero()) {
 			assertTrue(evalB("(let [a "+a+" b "+b+"] (== a (+ (* b (quot a b)) (rem a b))) )"));
 			assertTrue(evalB("(let [a "+a+" b "+b+"] (== (mod a b) (mod (mod a b) b)) )"));
-			assertTrue(evalB("(let [a "+a+" b "+b+"] (== (quot (* a b) b) ))"));
+			assertTrue(evalB("(let [a "+a+" b "+b+"] (== a (quot (* a b) b)))"));
 		}
 		
-		assertTrue(evalB("(let [a "+a+" b "+b+"] (== (- (+ a b) b) ))"));
+		assertTrue(evalB("(let [a "+a+" b "+b+"] (== a (- (+ a b) b)))"));
 		
 	}
 	

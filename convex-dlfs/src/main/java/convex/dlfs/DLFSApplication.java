@@ -1,104 +1,134 @@
 package convex.dlfs;
 
-import java.io.IOException;
+import java.util.function.Function;
+import java.util.function.BiPredicate;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
-import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
+import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.store.AStore;
-import convex.lattice.ALatticeApplication;
-import convex.lattice.Lattice;
-import convex.lattice.LatticeContext;
-import convex.lattice.RootComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.core.util.Utils;
+import convex.lattice.fs.DLFSLattice;
+import convex.lattice.LatticeHost;
+import convex.lattice.Regions;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.fs.DLFSLocation;
 
 /**
- * Application-level component for a lattice application providing DLFS.
+ * Root application serving a multi-owner DLFS region, normally at {@code :fs}.
  *
- * <p>The application works at the complete hosted lattice root and composes a
- * physical {@link DLFSRegion} at a configured path. It is not scoped to one
- * owner: callers select any owner's {@link DLFSDrives} component as needed.
- * Subclasses may attach further application facilities, such as P2P discovery,
- * beneath this same application component.</p>
+ * <p>The registered region defines delivery and publication policy; no separate
+ * root lattice is required. The default region is a live view of the supplied
+ * cursor. Supply an explicit region to share it with another application or to
+ * stage edits in a {@link DLFSRegion#fork() fork}. In either case {@link #dlfs()}
+ * and {@link #drives} use that same component, and sync follows its boundary.</p>
  *
- * <p>The application owns neither its host nor store lifecycle. {@link #sync()}
- * publishes the complete application root through host policy, while
- * {@link #flush()} is the separate durability boundary.</p>
+ * <p>Authoring is explicit, normally {@code new DLFSApplication(host, keyPair::signData)}.
+ * Without a signer the application is a relay. Host and application contexts do
+ * not confer signing authority or replace the region's clock and owner rule.</p>
  *
- * @param <V> Complete application root value type
+ * <p>The host's store is passed to drives for incremental blob checkpoints.
+ * The application owns neither the host nor the store lifecycle. Host sync
+ * persists and announces the root; host flush makes it durable.</p>
  */
-public class DLFSApplication<V extends ACell> extends ALatticeApplication<V> {
+public class DLFSApplication extends Regions {
 
+	private final AStore store;
 	private final DLFSRegion dlfs;
 
-	/**
-	 * Creates an extensible DLFS application over a host.
-	 *
-	 * @param host Generic lattice application host
-	 * @param regionPath Path from the application root to the physical DLFS region
-	 */
-	protected DLFSApplication(RootComponent<V> host, ACell... regionPath) {
-		this(host,host.cursor().view(),regionPath);
+	/** Creates a live DLFS relay at {@code :fs}, or an explicit path, without signing authority. */
+	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword... path) {
+		this(host,null,Utils::getCurrentTimestampCell,DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW,path);
 	}
 
-	/** Binds a subclass's private working view and its DLFS region to a cursor. */
-	protected DLFSApplication(RootComponent<V> host,ALatticeCursor<V> cursor,ACell... regionPath) {
-		super(host,cursor);
-		if (regionPath==null) throw new IllegalArgumentException("DLFS region path must not be null");
-		this.dlfs=DLFSRegion.connect(this,regionPath);
+	/** Creates a direct-key application with one explicit candidate signer. */
+	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,
+			Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+			Keyword... path) {
+		this(host,signer,Utils::getCurrentTimestampCell,DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW,path);
 	}
 
-	/**
-	 * Opens a local application with DLFS in the standard {@code :fs} region.
-	 *
-	 * <p>An existing retained root is restored from the supplied store. An empty
-	 * store starts at {@link Lattice#ROOT}'s zero value. The supplied key pair is
-	 * installed as the root merge context for owner-signed writes made by this
-	 * application instance.</p>
-	 *
-	 * @param store Store used for persistence and retained root publication
-	 * @param keyPair Application signing key pair
-	 * @return Local DLFS application
-	 * @throws IOException If the retained root cannot be read
-	 */
-	public static DLFSApplication<Index<Keyword,ACell>> open(AStore store,
-			AKeyPair keyPair) throws IOException {
-		if (keyPair==null) throw new IllegalArgumentException("Application key pair must not be null");
-		RootComponent<Index<Keyword,ACell>> root=RootComponent.open(Lattice.ROOT,store);
-		root.cursor().setContext(LatticeContext.create(null,keyPair));
-		return connect(root,Keywords.FS);
+	/** Creates an application with explicit authoring and timestamp admission policy. */
+	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,
+			Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
+		this(host.cursor(),host.store(),signer,clock,maxFutureSkew,path);
 	}
 
 	/**
-	 * Connects a DLFS application to a region at an arbitrary path beneath an
-	 * existing hosted lattice root.
-	 *
-	 * @param <V> Complete application root value type
-	 * @param host Generic lattice application host
-	 * @param regionPath Path from the application root to the physical DLFS region
-	 * @return Connected DLFS application
+	 * Creates a live application at an arbitrary path with explicit owner authority.
+	 * Verification uses local authority data; the signer may return null for owners
+	 * it cannot author. Neither node identity nor HTTP authentication supplies these policies.
 	 */
-	public static <V extends ACell> DLFSApplication<V> connect(RootComponent<V> host,
-			ACell... regionPath) {
-		return new DLFSApplication<>(host,regionPath);
+	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,
+			BiPredicate<ACell,AccountKey> verifier,
+			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
+		this(host.cursor(),host.store(),verifier,signer,clock,maxFutureSkew,path);
 	}
 
-	/** Returns the physical multi-owner DLFS region. */
-	public DLFSRegion dlfs() {
+	/**
+	 * Binds a live view to a root cursor, including a transaction draft.
+	 * Region construction uses the standard container policy: missing indexes are
+	 * created only by a changed write, and this application's {@link #createContainer()}
+	 * controls creation of an absent root.
+	 */
+	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,
+			Function<AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
+		this(cursor,store,DLFSRegion.KEY_OWNER,signer==null?null:(owner,value) -> signer.apply(value),
+			clock,maxFutureSkew,path);
+	}
+
+	/** Binds custom owner authority to an explicit working cursor, including a transaction draft. */
+	public DLFSApplication(AForkableCursor<Index<Keyword,ACell>> cursor,AStore store,
+			BiPredicate<ACell,AccountKey> verifier,
+			BiFunction<ACell,AHashMap<AString,AVector<ACell>>,SignedData<AHashMap<AString,AVector<ACell>>>> signer,
+			Supplier<CVMLong> clock,long maxFutureSkew,Keyword... path) {
+		super(cursor);
+		this.store=store;
+		Keyword[] keys=path.length==0?new Keyword[]{Keywords.FS}:path.clone();
+		Regions parent=this;
+		for (int i=0;i<keys.length-1;i++) {
+			parent=parent.<Index<Keyword,ACell>,Regions>create(keys[i],Regions::new);
+		}
+		dlfs=parent.create(keys[keys.length-1],
+			(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> destination) ->
+				new DLFSRegion(destination,store,DLFSLocation.at(cursor,keys),verifier,
+					signer,clock,maxFutureSkew));
+	}
+
+	/**
+	 * Registers an existing region at a root key, retaining its cursor, policy and
+	 * publication boundary. The caller binds the region to its intended destination.
+	 */
+	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword key,DLFSRegion files) {
+		super(host);
+		store=host.store();
+		dlfs=add(key,files);
+	}
+
+	/** Returns the store available for new components' blob checkpoints. */
+	protected AStore store() {
+		return store;
+	}
+
+	/** Returns the exact registered region, for both domain edits and incoming merges. */
+	public final DLFSRegion dlfs() {
 		return dlfs;
 	}
 
-	/**
-	 * Returns the component representing one owner's named drives.
-	 *
-	 * @param owner Drive owner
-	 * @return Owner-scoped drives component
-	 */
-	public DLFSDrives drives(AccountKey owner) {
+	/** Returns one owner's named drives in this application's working region. */
+	public DLFSDrives drives(ACell owner) {
 		return dlfs.drives(owner);
 	}
-
 }

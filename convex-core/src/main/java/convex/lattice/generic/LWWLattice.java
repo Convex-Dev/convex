@@ -22,15 +22,15 @@ import convex.lattice.LatticeContext;
  * <p>The equal-timestamp rule is intentionally directional. For distinct values
  * with the same timestamp, {@code merge(a, b) == a} and
  * {@code merge(b, a) == b}. Callers must put the value that should survive an
- * unresolved tie in the {@code own} position. In particular, cursor fork/sync
+ * unresolved tie in the {@code own} position. In particular, component fork/sync
  * reconciliation treats the local edit as own, while an external merge normally
  * treats the current local value as own and the received value as other.</p>
  *
  * <p>As an {@link ADelegatingLattice} it owns only the merge concern — navigation
- * and write-interception are delegated to an optional inner lattice (terminal
+ * and validation are delegated to an optional inner lattice (terminal
  * register when none). It is the sibling of {@link LWPLattice}, which instead
- * <em>delegates</em> merge to the inner lattice. For stamp-on-write, wrap with a
- * {@link StampingLattice}: {@code StampingLattice.create(LWWLattice.create(inner, ts), stamp)}.</p>
+ * <em>delegates</em> merge to the inner lattice. Components may compose a
+ * {@code StampedCursor} with their storage to timestamp local updates.</p>
  *
  * @param <V> Type of lattice values
  */

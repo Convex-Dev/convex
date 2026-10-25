@@ -1,10 +1,17 @@
 package convex.lattice.queue;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
+import convex.lattice.MapComponent;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.MapLattice;
 
@@ -16,7 +23,8 @@ import convex.lattice.generic.MapLattice;
  * ({@link LatticeQueue}).</p>
  *
  * <p>In the full lattice hierarchy, the path from root is:
- * {@code [:queue, <owner>, :value, <topic-name>, <partition-id>]}</p>
+ * {@code [:queue, <owner>]}, then inside the signed topic map:
+ * {@code [<topic-name>, :partitions, <partition-id>]}</p>
  *
  * <h2>Lattice Hierarchy</h2>
  * <pre>
@@ -37,7 +45,8 @@ import convex.lattice.generic.MapLattice;
  * mq.partition("user-events", 0).offer(Strings.create("event data"));
  * }</pre>
  */
-public class LatticeMQ {
+public class LatticeMQ extends MapComponent<ACell, Index<Keyword, ACell>> {
+	private final Supplier<CVMLong> clock;
 
 	/**
 	 * The lattice definition for the topic map level:
@@ -46,23 +55,33 @@ public class LatticeMQ {
 	static final MapLattice<ACell, Index<Keyword, ACell>> TOPIC_MAP =
 		MapLattice.create(TopicLattice.INSTANCE);
 
-	private final ALatticeCursor<?> cursor;
 
 	/**
 	 * Wraps an existing cursor at the topic-map level.
 	 */
-	public LatticeMQ(ALatticeCursor<?> cursor) {
-		this.cursor = cursor;
+	public LatticeMQ(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor) {
+		this(cursor,Utils::getCurrentTimestampCell);
+	}
+
+	/** Binds the mutation clock retained by children and forks. */
+	public LatticeMQ(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor,Supplier<CVMLong> clock) {
+		super(cursor);
+		this.clock=Objects.requireNonNull(clock);
 	}
 
 	/**
 	 * Creates a new standalone message queue system.
 	 *
 	 * <p>For use within the full lattice hierarchy, obtain a cursor descended to
-	 * {@code [:queue, <owner>, :value]} and pass it to the constructor instead.</p>
+	 * the owner's unsigned topic map and pass it to the constructor instead.</p>
 	 */
 	public static LatticeMQ create() {
-		return new LatticeMQ(Cursors.createLattice(TOPIC_MAP));
+		return create(Utils::getCurrentTimestampCell);
+	}
+
+	/** Creates a standalone topic map with an explicit mutation clock. */
+	public static LatticeMQ create(Supplier<CVMLong> clock) {
+		return new LatticeMQ(Cursors.root(TOPIC_MAP.zero()),clock);
 	}
 
 	/**
@@ -82,7 +101,7 @@ public class LatticeMQ {
 	 * @return Topic handle
 	 */
 	public LatticeTopic topic(ACell name) {
-		return new LatticeTopic(cursor.path(name));
+		return new LatticeTopic(path(name),clock);
 	}
 
 	/**
@@ -100,24 +119,21 @@ public class LatticeMQ {
 	 * Creates a forked copy of this MQ system for independent operation.
 	 * All topics and partitions are forked together.
 	 */
-	@SuppressWarnings("unchecked")
+	@Override
 	public LatticeMQ fork() {
-		return new LatticeMQ(((ALatticeCursor<ACell>) cursor).fork());
+		return rebind(storage.fork());
 	}
 
-	/**
-	 * Syncs this forked MQ system back to its parent, merging all changes
-	 * across all topics and partitions.
-	 */
-	@SuppressWarnings("unchecked")
-	public void sync() {
-		((ALatticeCursor<ACell>) cursor).sync();
+	@Override
+	protected LatticeMQ rebind(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor) {
+		return new LatticeMQ(cursor,clock);
 	}
 
-	/**
-	 * Returns the underlying lattice cursor.
-	 */
-	public ALatticeCursor<?> cursor() {
-		return cursor;
+	/** Reconciles this component's draft using its domain merge rule. */
+	@Override
+	protected AHashMap<ACell, Index<Keyword, ACell>> mergePublication(
+			AHashMap<ACell, Index<Keyword, ACell>> own,
+			AHashMap<ACell, Index<Keyword, ACell>> other) {
+		return TOPIC_MAP.merge(own,other);
 	}
 }

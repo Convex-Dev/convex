@@ -304,7 +304,7 @@ public class EtchTest {
 
 	@Test
 	public void testLargeStore() throws IOException {
-		EtchStore store=EtchStore.createTemp();
+		EtchStore store=Samples.TEST_STORE;
 		Etch etch = store.getEtch();
 
 		// this gets the data saved over 1GB
@@ -331,11 +331,12 @@ public class EtchTest {
 	
 	@Test 
 	public void testCopyAcrossStores() throws IOException {
-		EtchStore store=EtchStore.createTemp();
-		EtchStore store2=EtchStore.createTemp();
+		EtchStore store=Samples.TEST_STORE;
+		EtchStore store2=Samples.TEST_STORE2;
 		AString nestedString=Samples.NON_EMBEDDED_STRING;
 		ABlob nestedBlob=Samples.NON_EMBEDDED_BLOB;
-		ACell v=Vectors.of(1,nestedString,Vectors.of(2,nestedBlob));
+		// A test-specific root can be absent in both shared stores without requiring empty files.
+		ACell v=Vectors.of("etch-copy-across-stores",nestedString,Vectors.of(2,nestedBlob));
 		assertTrue(v.isEmbedded());
 		assertFalse(v.getRef(1).isEmbedded());
 		

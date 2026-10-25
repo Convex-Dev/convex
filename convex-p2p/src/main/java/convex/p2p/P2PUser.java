@@ -1,21 +1,24 @@
 package convex.p2p;
 
-import java.io.IOException;
+import java.util.function.BiFunction;
 
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.SignedData;
+import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AForkableCursor;
 
 /**
  * Convenience facade over a single P2P user's independently located components.
  *
- * <p>Obtained from {@link P2PNode#p2p(AccountKey)}. {@link #cursor()} returns a cursor
+ * <p>Obtained from {@link P2PApplication#p2p(AccountKey)} or
+ * {@link P2PNode#p2p(AccountKey)}. {@link #cursor()} returns a cursor
  * rooted at that user's identity slot — {@code [:id <userKey> :value]} — already through
  * the signing boundary. {@link #identity()} and {@link #node()} expose the two
  * path-specific components. This facade deliberately is not an
@@ -27,22 +30,23 @@ import convex.lattice.cursor.ALatticeCursor;
  * me.sync();   // push back to the lattice root
  * }</pre>
  *
- * <h2>Signing is the lattice machinery's job</h2>
+ * <h2>Signing is the owning component's job</h2>
  *
- * <p>Navigating {@code :value} crosses {@code SignedLattice}'s write boundary, so the
- * cursor chain contains a {@code SignedCursor}. That cursor projects the unsigned value
- * on read and signs on write through its {@code LatticeContext}, which is asked for a
- * signer authorised for the owner the path selected. Applications read and write plain
- * values and never touch {@code SignedData}. {@link #sync()} pushes the result up to
- * the root (and, on a launched node, into persistence and propagation).
+ * <p>The P2P application owns the owner-keyed {@code :id} and {@code :nodes} levels, so
+ * it wraps each user's slot in a {@code SignedCursor} bound to that owner. That cursor
+ * projects the unsigned value on read and signs on write through its
+ * explicit authoring function, bound by the component to an authorised signer.
+ * Applications read and write plain values and never touch {@code SignedData}.
+ * {@link #sync()} pushes the result up to the root (and, on a launched node, into
+ * persistence and propagation).
  *
  * <h2>Writing an owned area</h2>
  *
  * <p>{@code p2p(someoneElse)} is always a valid read view. A write succeeds only when
- * the context signing policy can supply a signer authorised for that user — the same
+ * the explicit signer can supply a signer authorised for that user — the same
  * rule {@code OwnerLattice} applies to data arriving on merge, so a write that would
  * be rejected by every peer fails here instead of entering local state. A wallet or
- * key-store-backed context can therefore manage several identities without treating
+ * key-store-backed signer can therefore manage several identities without treating
  * one as primary.
  */
 public class P2PUser {
@@ -58,41 +62,26 @@ public class P2PUser {
 	}
 
 	/**
-	 * Creates a user view over a P2P root cursor.
+	 * Creates a user facade over an application whose root lattice includes the P2P
+	 * regions. This overload opens a read view without signing capability.
 	 *
-	 * <p>Both cursors inherit the root cursor's {@code LatticeContext} live, so writes
-	 * request {@code userKey} from that policy when signed.
-	 *
-	 * @param rootCursor Cursor at the {@link P2PLattice#ROOT} level
-	 * @param userKey The P2P user's account key
-	 * @return A view of that user's owned area
+	 * @param application Application at the root whose lattice declares the P2P regions
+	 * @param userKey P2P user key
+	 * @return P2P user facade
 	 */
-	public static P2PUser create(ALatticeCursor<?> rootCursor, AccountKey userKey) {
-		if (rootCursor == null) throw new IllegalArgumentException("Root cursor must not be null");
-		if (userKey == null) throw new IllegalArgumentException("User key must not be null");
-
-		return new P2PUser(
-			new P2PIdentity(null,rootCursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey),
-			new P2PNodeRecord(null,rootCursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,
-				userKey,Keywords.VALUE),userKey),userKey);
+	public static P2PUser create(ALatticeApplication<Index<Keyword,ACell>> application,AccountKey userKey) {
+		return create(application,userKey,null);
 	}
 
-	/**
-	 * Creates a user facade beneath a containing application component.
-	 * Persistence and other containing policy delegate through the parent.
-	 *
-	 * @param parent Containing application component
-	 * @param userKey P2P user key
-	 * @return Hosted P2P user facade
-	 */
-	public static P2PUser create(ALatticeComponent<?> parent, AccountKey userKey) {
-		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
+	/** Opens both owned slots with one owner-aware signer, which may serve multiple keys. */
+	public static P2PUser create(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey,
+			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
+		if (application==null) throw new IllegalArgumentException("Application must not be null");
 		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
-		ALatticeCursor<?> rootCursor=parent.cursor();
 		return new P2PUser(
-			new P2PIdentity(parent,rootCursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey),
-			new P2PNodeRecord(parent,rootCursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,
-				userKey,Keywords.VALUE),userKey),userKey);
+			new P2PIdentity(P2PApplication.identitySlot(application,userKey,signer),userKey),
+			new P2PNodeRecord(P2PApplication.nodeSlot(application,userKey,signer),userKey),
+			userKey);
 	}
 
 	/** Returns the path-specific identity component. */
@@ -106,7 +95,7 @@ public class P2PUser {
 	}
 
 	/** Compatibility shortcut for {@code identity().cursor()}. */
-	public ALatticeCursor<ACell> cursor() {
+	public AForkableCursor<ACell> cursor() {
 		return identity.cursor();
 	}
 
@@ -130,7 +119,7 @@ public class P2PUser {
 	 *
 	 * @return Cursor at this user's NodeInfo record
 	 */
-	public ALatticeCursor<ACell> nodeCursor() {
+	public AForkableCursor<ACell> nodeCursor() {
 		return node.cursor();
 	}
 
@@ -148,7 +137,7 @@ public class P2PUser {
 	 * to push it up to the lattice root.
 	 *
 	 * @param identity IdentityInfo map, typically from {@link P2PLattice#createIdentity}
-	 * @throws IllegalStateException if the user's signer is unavailable in context
+	 * @throws IllegalStateException if the user's signer is unavailable
 	 */
 	public void setIdentity(AHashMap<Keyword, ACell> identity) {
 		this.identity.setIdentity(identity);
@@ -161,7 +150,7 @@ public class P2PUser {
 	 * @param name Display name (may be null)
 	 * @param nodes Node keys this user operates (may be null)
 	 * @param timestamp Timestamp in millis, used for LWW ordering
-	 * @throws IllegalStateException if the user's signer is unavailable in context
+	 * @throws IllegalStateException if the user's signer is unavailable
 	 */
 	public void setIdentity(AString name, AVector<ACell> nodes, long timestamp) {
 		identity.setIdentity(name,nodes,timestamp);
@@ -170,11 +159,6 @@ public class P2PUser {
 	/** Synchronises identity changes to this facade's live parent path. */
 	public void sync() {
 		identity.sync();
-	}
-
-	/** Persists the current identity value without moving either cursor. */
-	public ACell persist() throws IOException {
-		return identity.persist();
 	}
 
 	/**

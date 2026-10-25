@@ -69,8 +69,10 @@ public class Samples {
 	 * Uses a temp EtchStore so tests don't depend on a global thread-local store.
 	 *
 	 * Tests should re-use this store (with values unique to the test) rather than
-	 * creating their own temp stores, unless the test is specifically about store
-	 * lifecycle, configuration or exact store contents.
+	 * creating their own temp stores. Do not close it, change its retained root or
+	 * run GC on it: unrelated tests may be using it concurrently. Private stores
+	 * are for tests of creation/reopening, GC, configuration, retained roots or
+	 * exact store contents.
 	 */
 	public static final EtchStore TEST_STORE = createTestStore("test-store");
 

@@ -32,12 +32,29 @@ import convex.lattice.generic.SetLattice;
 public class LatticeTest {
 
 	/**
-	 * Generic property tests for any lattice
+	 * Properties for value pairs whose merge is a join: either input can accept
+	 * the merged result. Use {@link #doMergeTest} for directional policies such
+	 * as last-write-wins with distinct equal-timestamp values.
 	 * @param v1 First valid lattice value
 	 * @param v2 Second valid lattice value
 	 * @param lattice Lattice consistent with values
 	 */
 	public static <V extends ACell> void doLatticeTest(ALattice<V> lattice, V v1, V v2, Object... path) {
+		doMergeTest(lattice,v1,v2,path);
+		V merged=lattice.merge(v1,v2);
+		assertEquals(merged,lattice.merge(v1,merged));
+		assertEquals(merged,lattice.merge(v2,merged));
+	}
+
+	/**
+	 * Checks empty-state identity, idempotence and replay stability without
+	 * requiring a directional policy to resolve conflicts commutatively.
+	 * @param lattice Merge policy consistent with the supplied values
+	 * @param v1 First valid value
+	 * @param v2 Second valid value
+	 * @param path Optional independently mergeable child path
+	 */
+	public static <V extends ACell> void doMergeTest(ALattice<V> lattice, V v1, V v2, Object... path) {
 		V zero=lattice.zero();
 		
 		// Merges with zero
@@ -56,12 +73,10 @@ public class LatticeTest {
 		assertEquals(v2,lattice.merge(zero,v2));
 		assertSame(v2,lattice.merge(v2,zero));
 
-		// Merge of both values should be idempotent (lattice join)
+		// Replaying either input must leave the result unchanged.
 		V merged=lattice.merge(v1, v2);
 		assertEquals(merged,lattice.merge(zero,merged));
 		assertSame(merged,lattice.merge(merged,zero));
-		assertEquals(merged,lattice.merge(v1,merged));
-		assertEquals(merged,lattice.merge(v2,merged));
 		assertSame(merged,lattice.merge(merged,v1));
 		assertSame(merged,lattice.merge(merged,v2));
 		

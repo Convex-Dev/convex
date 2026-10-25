@@ -10,9 +10,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
-import java.util.List;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -26,10 +28,14 @@ import convex.core.util.Utils;
 public class EtchRebuilderTest {
 	private static final byte[] SECRET=sequence(0x50,32);
 
-	@Test
-	public void testCompleteRebuildMatrix() throws Exception {
+	static Stream<EtchConfig> rebuildConfigs() {
 		EtchConfig.MappingMode mapped=EtchConfig.MappingMode.MAPPED_BYTE_BUFFER;
-		List<EtchConfig> configs=List.of(
+		// One complete rebuild plus the damaged/tail cases runs every time. The
+		// physical-file scan across every legacy/encrypted format is an integration matrix.
+		if (!Boolean.getBoolean("convex.test.extended")) {
+			return Stream.of(EtchConfig.create(EtchConstants.VERSION_2,mapped,true));
+		}
+		return Stream.of(
 				EtchConfig.create(EtchConstants.VERSION_1,mapped,true),
 				EtchConfig.create(EtchConstants.VERSION_2,mapped,true),
 				EtchConfig.createV3(mapped,true,EtchConfig.CipherMode.NONE,false,null,null),
@@ -38,37 +44,41 @@ public class EtchRebuilderTest {
 				EtchConfig.createV3(mapped,true,EtchConfig.CipherMode.CHACHA20,
 						true,null,hint->SECRET.clone()));
 
-		for (EtchConfig config:configs) {
-			File source=tempFile("etch-rebuild-source-v"+config.getVersion());
-			File destination=tempFile("etch-rebuild-destination-v"+config.getVersion());
-			AString first=largeString("root-first-"+config.getCipherMode().configName());
-			AString second=largeString("root-second-"+config.getCipherMode().configName());
-			ACell root=Vectors.of(first,second);
-			AString extra=largeString("unreachable-extra-"+config.getCipherMode().configName());
+	}
 
-			EtchStore sourceStore=new EtchStore(Etch.create(source,config));
-			sourceStore.storeTopRef(extra.getRef(),Ref.STORED,null);
-			sourceStore.setRootData(root);
-			sourceStore.flush();
-			sourceStore.close();
-			if (config.getVersion()==EtchConstants.VERSION_3) markV3Open(source,config);
-			byte[] originalSource=Files.readAllBytes(source.toPath());
+	/** Independent files let each format/cipher case run concurrently. */
+	@ParameterizedTest
+	@MethodSource("rebuildConfigs")
+	public void testCompleteRebuildMatrix(EtchConfig config) throws Exception {
+		File source=tempFile("etch-rebuild-source-v"+config.getVersion());
+		File destination=tempFile("etch-rebuild-destination-v"+config.getVersion());
+		AString first=largeString("root-first-"+config.getCipherMode().configName());
+		AString second=largeString("root-second-"+config.getCipherMode().configName());
+		ACell root=Vectors.of(first,second);
+		AString extra=largeString("unreachable-extra-"+config.getCipherMode().configName());
 
-			EtchRebuilder.Result result=EtchRebuilder.rebuild(source,config,destination,null);
-			assertArrayEquals(originalSource,Files.readAllBytes(source.toPath()),config.toString());
-			assertEquals(EtchRebuilder.Status.COMPLETE,result.status(),config.toString());
-			assertTrue(result.isRootComplete());
-			assertTrue(result.exhaustiveScan());
-			assertTrue(result.scannedRecordsAccepted()>0L,config.toString());
-			assertTrue(result.destinationValues()>0L);
+		EtchStore sourceStore=new EtchStore(Etch.create(source,config));
+		sourceStore.storeTopRef(extra.getRef(),Ref.STORED,null);
+		sourceStore.setRootData(root);
+		sourceStore.flush();
+		sourceStore.close();
+		if (config.getVersion()==EtchConstants.VERSION_3) markV3Open(source,config);
+		byte[] originalSource=Files.readAllBytes(source.toPath());
 
-			EtchStore rebuilt=new EtchStore(Etch.create(destination,config));
-			try {
-				assertEquals(root,rebuilt.getRootData());
-				assertNotNull(rebuilt.getEtch().read(extra.getHash()));
-			} finally {
-				rebuilt.close();
-			}
+		EtchRebuilder.Result result=EtchRebuilder.rebuild(source,config,destination,null);
+		assertArrayEquals(originalSource,Files.readAllBytes(source.toPath()),config.toString());
+		assertEquals(EtchRebuilder.Status.COMPLETE,result.status(),config.toString());
+		assertTrue(result.isRootComplete());
+		assertTrue(result.exhaustiveScan());
+		assertTrue(result.scannedRecordsAccepted()>0L,config.toString());
+		assertTrue(result.destinationValues()>0L);
+
+		EtchStore rebuilt=new EtchStore(Etch.create(destination,config));
+		try {
+			assertEquals(root,rebuilt.getRootData());
+			assertNotNull(rebuilt.getEtch().read(extra.getHash()));
+		} finally {
+			rebuilt.close();
 		}
 	}
 
