@@ -20,8 +20,11 @@ import convex.lattice.ALattice;
  * the map. {@link #checkForeign} only validates structure.</p>
  *
  * <p>This one-parameter API resolves owner authorisation from the context at merge
- * time. New applications should use {@link OwnerMapLattice}, {@link OwnerIndexLattice}
- * or {@link OwnerKeyLattice} to bind the verification rule to the lattice instance.</p>
+ * time, by {@link convex.lattice.LatticeContext#verifyOwner(ACell, convex.core.data.AccountKey)}:
+ * without a context owner verifier, only owners that are account keys are accepted,
+ * each signed by its own key. New applications should use {@link OwnerMapLattice},
+ * {@link OwnerIndexLattice} or {@link OwnerKeyLattice} to bind the verification rule
+ * to the lattice instance.</p>
  *
  * @param <V> Type of the underlying signed value
  */

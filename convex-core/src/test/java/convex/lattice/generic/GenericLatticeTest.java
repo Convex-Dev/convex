@@ -567,13 +567,12 @@ public class GenericLatticeTest {
 	}
 
 	@Test
-	public void testOwnerVerificationNoVerifierLenient() {
-		// No verifier set → lenient mode, string owners accepted
+	public void testOwnerVerificationNoVerifierRefusesIndirectOwner() {
+		// No verifier set → only key owners are accepted, so a string owner is refused
 		AKeyPair kp = AKeyPair.createSeeded(8124);
 
 		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
 
-		// Use string owner with no verifier (lenient)
 		ACell ownerKey = Strings.create("anyone");
 		SignedData<AInteger> signed = kp.signData(CVMLong.create(99));
 		AHashMap<ACell, SignedData<AInteger>> incoming = Maps.of(ownerKey, signed);
@@ -582,7 +581,7 @@ public class GenericLatticeTest {
 		LatticeContext ctx = LatticeContext.create(null, kp);
 		AHashMap<ACell, SignedData<AInteger>> result = ownerLattice.merge(ctx, Maps.empty(), incoming);
 
-		assertNotNull(result.get(ownerKey), "Lenient mode should accept any string owner");
+		assertNull(result.get(ownerKey), "A string owner without a verifier must be refused");
 	}
 
 }

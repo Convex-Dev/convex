@@ -83,8 +83,9 @@ public class SharedApplicationInternalsTest {
 		.addLattice(Keywords.FS,DLFSRegion.LATTICE);
 	private static final KeyedLattice HOST_ROOT=SOCIAL_ROOT
 		.addLattice(Keywords.FS,DLFSRegion.LATTICE);
+	/** The application's owner rule decides for every owner: keys and did:key DIDs, each signed by its own key. */
 	private static final LatticeContext VERIFY=LatticeContext.EMPTY.withOwnerVerifier(
-		(owner,signer) -> owner.equals(DID.forKey(signer)));
+		(owner,signer) -> owner.equals(signer) || owner.equals(DID.forKey(signer)));
 
 	/** A live view of the whole host root, as a root application holds it. */
 	private static LatticeApplication<Index<Keyword,ACell>> view(LatticeHost<Index<Keyword,ACell>> host) {

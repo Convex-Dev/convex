@@ -206,12 +206,12 @@ combined-map callers; do not use it in new tests merely because both objects use
 the same underlying CAD map representation.
 
 Treat a node key as its P2P/transport signer, not automatically as an
-application user's identity or signing key. For an `OwnerLattice` keyed by an
-indirect owner such as a DID, install a fail-closed owner verifier in the
-`LatticeContext`; without one, indirect owners use the compatibility-lenient
-fallback. Give identity-sensitive tests separate node keys and application
-owner/signing keys. The social cursor API accepts canonical base DIDs and uses
-`DIDKeyAuthorizer` for the signer binding. Cover `did:key`, `did:convex` and
+application user's identity or signing key. Without an owner verifier, an owner
+lattice accepts only owners that are account keys (or `did:key`), each signed by
+its own key; for an indirect owner such as an address or another DID, supply a
+verifier, which then decides for every owner. Give identity-sensitive tests
+separate node keys and application owner/signing keys. The social cursor API
+accepts canonical base DIDs and uses `DIDKeyAuthorizer` for the signer binding. Cover `did:key`, `did:convex` and
 `did:web` with pinned local state or deterministic resolver fixtures—never depend
 on public web resolution in a unit test. `serveAllInbound()` controls network
 access and does not replace DID owner authorisation.

@@ -290,7 +290,7 @@ public class SQLDatabaseTest {
 		assertEquals(3, db1.tables().getRowCount("t"));
 	}
 
-	// ========== Replica ownership (CAD038) ==========
+	// ========== Replica ownership ==========
 
 	/** Creates table t holding one row. */
 	private static SQLDatabase withRow(SQLDatabase db, long id) {
@@ -315,14 +315,32 @@ public class SQLDatabaseTest {
 		AKeyPair localKey = AKeyPair.createSeeded(7803);
 		SQLDatabase source = withRow(SQLDatabase.create("db", attacker), 1);
 		for (ACell claimed : new ACell[] {owner.getAccountKey(), DID.forKey(owner.getAccountKey())}) {
-			// A verifier is never consulted for an owner that denotes a key directly
-			SQLDatabase local = SQLDatabase.create("db", localKey, localKey.getAccountKey(), (o, k) -> true);
+			SQLDatabase local = SQLDatabase.create("db", localKey);
 			var before = local.cursor().get();
 			assertEquals(0, local.mergeReplicas(claim(source, claimed)));
 			assertSame(before, local.cursor().get());
 			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed)::exportReplica);
-			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed, (o, k) -> true)::exportReplica);
 		}
+	}
+
+	@Test
+	public void testOwnerVerifierDecidesForEveryOwner() {
+		AKeyPair owner = AKeyPair.createSeeded(7814);
+		AKeyPair delegate = AKeyPair.createSeeded(7815);
+		AKeyPair localKey = AKeyPair.createSeeded(7816);
+		BiPredicate<ACell, AccountKey> delegation = (o, k) -> owner.getAccountKey().equals(o) && delegate.getAccountKey().equals(k);
+		SQLDatabase local = SQLDatabase.create("db", localKey, localKey.getAccountKey(), delegation);
+
+		// A verifier may authorise a delegate for an account key owner
+		SQLDatabase source = withRow(SQLDatabase.create("db", delegate, owner.getAccountKey(), delegation), 1);
+		assertEquals(1, local.mergeReplicas(source.exportReplica()));
+		assertTrue(hasRow(local, 1));
+
+		// It replaces the default rule, so it may also refuse a key signing its own replica
+		SQLDatabase selfSigned = withRow(SQLDatabase.create("db", owner), 2);
+		assertEquals(0, local.mergeReplicas(selfSigned.exportReplica()));
+		assertFalse(hasRow(local, 2));
+		assertThrows(IllegalStateException.class, local::exportReplica);
 	}
 
 	@Test

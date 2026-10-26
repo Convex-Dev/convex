@@ -71,7 +71,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @param dbName Database name
 	 * @param keyPair Key pair for signing this node's replica, or null when connected
 	 * @param ownerKey Owner identity of this node's replica, or null when connected
-	 * @param ownerVerifier Rule authorising signers for indirect owners, or null to refuse them
+	 * @param ownerVerifier Rule authorising signers for owners, or null for the default rule
 	 * @param clock Clock that stamps writes to this database's tables
 	 */
 	protected SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor, AString dbName, AKeyPair keyPair,
@@ -129,12 +129,12 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Creates a new empty standalone SQL database whose indirect owners (Address, or a
-	 * DID that is not {@code did:key}) are authorised by the given rule, stamping writes
-	 * with the runtime clock. The rule governs both incoming replicas and this node's own
-	 * export, and supports multi-key owners and key rotation through an updatable
-	 * authority view. It must be thread-safe and use locally available authority data.
-	 * Direct key owners are always checked by equality.
+	 * Creates a new empty standalone SQL database whose owners are authorised by the
+	 * given rule, stamping writes with the runtime clock. The rule replaces the default
+	 * and decides for every owner, including account keys, so it supports Address and
+	 * DID owners, multi-key owners and key rotation through an updatable authority view.
+	 * It governs both incoming replicas and this node's own export, and must be
+	 * thread-safe and use locally available authority data.
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
@@ -278,9 +278,9 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Returns the rule authorising signers for indirect owners.
+	 * Returns the rule authorising signers for owners.
 	 *
-	 * @return Owner verifier, or null if indirect owners are refused
+	 * @return Owner verifier, or null for the default rule (account key owners only)
 	 */
 	public BiPredicate<ACell, AccountKey> getOwnerVerifier() {
 		return ownerVerifier;
@@ -358,9 +358,10 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	/**
 	 * Whether a replica is accepted from an owner, applied to incoming replicas and to
 	 * this node's own export. Its signer must be authorised for the owner and its
-	 * signature must verify. An owner that denotes an account key directly (AccountKey,
-	 * {@code did:key}) must be that signer. Any other owner (Address, other DIDs) is
-	 * authorised only by the owner verifier, and refused when there is none. Override to
+	 * signature must verify. The owner verifier, if supplied, decides who is authorised.
+	 * Otherwise an owner that denotes an account key directly (AccountKey,
+	 * {@code did:key}) must be that signer, and any other owner is refused (see
+	 * {@link LatticeContext#verifyOwner(ACell, AccountKey, BiPredicate)}). Override to
 	 * apply another ownership rule or to replicate selectively.
 	 *
 	 * @param owner Owner identity the replica was published under
@@ -368,12 +369,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return true if the replica may be merged
 	 */
 	protected boolean acceptsReplica(ACell owner, SignedData<?> replica) {
-		if (owner == null) return false;
-		AccountKey signer = replica.getAccountKey();
-		AccountKey direct = LatticeContext.ownerAccountKey(owner);
-		boolean authorised = (direct != null) ? direct.equals(signer)
-			: (ownerVerifier != null) && ownerVerifier.test(owner, signer);
-		return authorised && replica.checkSignature();
+		return owner != null && LatticeContext.verifyOwner(owner, replica.getAccountKey(), ownerVerifier)
+			&& replica.checkSignature();
 	}
 
 	/**

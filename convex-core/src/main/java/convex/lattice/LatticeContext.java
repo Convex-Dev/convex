@@ -33,7 +33,7 @@ import convex.core.util.Utils;
  */
 public abstract class LatticeContext {
 
-	/** Default policy: runtime time, no signer, lenient non-key owner verification. */
+	/** Default policy: runtime time, no signer, and only key owners verified (see {@link #verifyOwner}). */
 	public static final LatticeContext EMPTY = new LatticeContext() { };
 
 	/** Constructor for application-defined policy implementations. */
@@ -133,10 +133,8 @@ public abstract class LatticeContext {
 	 *
 	 * <p>This is the single authorisation rule for <em>authoring</em> owned data, and
 	 * it is exactly the rule {@link #verifyOwner} applies to data arriving on merge.
-	 * An owner which directly denotes an account key requires that key; an indirect
-	 * owner (Address, DID, ...) is resolved by the owner verifier, so a policy with no
-	 * verifier stays lenient. Callers therefore never author a slot locally in a form
-	 * that a peer would reject.</p>
+	 * Callers therefore never author a slot locally in a form that a peer would
+	 * reject.</p>
 	 *
 	 * @param <T> value type
 	 * @param owner Owner identity, or null to sign with the primary signer
@@ -144,10 +142,16 @@ public abstract class LatticeContext {
 	 * @return Signed value, or null when no authorised signer is available
 	 */
 	public final <T extends ACell> SignedData<T> signAs(ACell owner, T value) {
-		SignedData<T> signed=sign(ownerAccountKey(owner),value);
-		if (signed==null) return null;
-		if (owner!=null && !verifyOwner(owner,signed.getAccountKey())) return null;
-		return signed;
+		if (owner==null) return sign(null,value);
+		AccountKey direct=ownerAccountKey(owner);
+		SignedData<T> signed=sign(direct,value);
+		if (signed!=null && verifyOwner(owner,signed.getAccountKey())) return signed;
+		// A verifier may authorise a delegate even for an owner that is an account key
+		if (direct!=null && getOwnerVerifier()!=null) {
+			signed=sign(null,value);
+			if (signed!=null && verifyOwner(owner,signed.getAccountKey())) return signed;
+		}
+		return null;
 	}
 
 	/**
@@ -159,21 +163,32 @@ public abstract class LatticeContext {
 		return null;
 	}
 
-	/** Gets an application-defined owner verifier, or null for lenient mode. */
+	/** Gets an application-defined owner verifier, or null for the default owner rule. */
 	public BiPredicate<ACell, AccountKey> getOwnerVerifier() {
 		return null;
 	}
 
-	/** Verifies that a signer is authorised for an owner. */
+	/** Verifies that a signer is authorised for an owner, by this policy's owner verifier. */
 	public boolean verifyOwner(ACell ownerKey, AccountKey signerKey) {
 		return verifyOwner(ownerKey,signerKey,getOwnerVerifier());
 	}
 
-	private static boolean verifyOwner(ACell ownerKey, AccountKey signerKey,
+	/**
+	 * Verifies that a signer is authorised for an owner. A supplied verifier decides
+	 * for every owner. Without one, an owner which directly denotes an account key
+	 * must be that signer, and any other owner (Address, DID other than
+	 * {@code did:key}, ...) is refused.
+	 *
+	 * @param ownerKey Owner identity
+	 * @param signerKey Signer's account key
+	 * @param ownerVerifier Application-defined rule, or null for the default
+	 * @return true if the signer is authorised for the owner
+	 */
+	public static boolean verifyOwner(ACell ownerKey, AccountKey signerKey,
 			BiPredicate<ACell, AccountKey> ownerVerifier) {
+		if (ownerVerifier!=null) return ownerVerifier.test(ownerKey,signerKey);
 		AccountKey direct=ownerAccountKey(ownerKey);
-		if (direct!=null) return direct.equals(signerKey);
-		return (ownerVerifier==null)||ownerVerifier.test(ownerKey,signerKey);
+		return direct!=null && direct.equals(signerKey);
 	}
 
 	/**

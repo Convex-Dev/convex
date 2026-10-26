@@ -497,10 +497,10 @@ prevent unrelated valid entries merging. A malformed containing value can still
 abort the atomic merge. Value lattices remain responsible for domain validation.
 
 CAD038 *Owner Verifier* describes context-based verification; these components use
-the instance-bound verifier already introduced by the typed owner lattices. Its
-fail-closed guidance and legacy permissive fallback conflict for indirect owners:
-the new components require an explicit verifier, as agreed, while the legacy
-`OwnerLattice` authorisation fallback remains unchanged. CAD043 governs identity
+the instance-bound verifier already introduced by the typed owner lattices. Every
+owner rule fails closed: without a verifier, an owner must be an account key that
+signed its own value, and any other owner is refused. A verifier, bound or in a
+context, decides for every owner. CAD043 governs identity
 resolution and CAD004 distinguishes account identity, keys and controllers; this
 change supplies no new DID method or account-authorisation rules. Applications
 provide local resolver data, and a changed resolver governs future verification

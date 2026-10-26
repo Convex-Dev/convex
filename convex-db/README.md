@@ -285,9 +285,10 @@ db2.mergeReplicas(db1.exportReplica());
 
 `mergeReplicas` accepts a replica when its signer is authorised for the owner it is
 published under and its signature verifies ([CAD038](https://docs.convex.world/docs/cad/038_lattice_auth)).
-An owner that is an account key, or a self-certifying `did:key`, must be the signer. Any
-other owner, such as an account address or a `did:web`, is refused unless an owner
-verifier authorises the signer:
+By default, an owner that is an account key, or a self-certifying `did:key`, must be the
+signer, and any other owner, such as an account address or a `did:web`, is refused. To
+support other owners, supply an owner verifier. It replaces the default and decides for
+every owner, account keys included:
 
 ```java
 // (owner, signer key) -> whether that key may sign for the owner
