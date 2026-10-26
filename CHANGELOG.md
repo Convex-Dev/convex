@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Assemble Convex DB hosts with `ConvexDB.openHost`, which replaces the static Convex DB lattices; connecting to a database no longer creates it. ([#779](https://github.com/Convex-Dev/convex/issues/779))
 - Creating a Convex DB `ConvexDB` or `SQLDatabase` takes its merge policy, such as `RowLWW::merge`; transactions fork a whole database. ([#784](https://github.com/Convex-Dev/convex/issues/784))
+- Speed up prepared statements over the Convex DB PostgreSQL wire protocol: a statement with parameters is planned once per connection and reused for every execution. ([#767](https://github.com/Convex-Dev/convex/pull/767))
 
 ### Fixed
 
