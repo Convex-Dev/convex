@@ -124,13 +124,27 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	/** Actual bound address, or null when listening is disabled. */
 	public InetSocketAddress getHostAddress() { return listener.getHostAddress(); }
 
-	/** Stops acceptance before draining publication, then detaches the server from the host. */
+	/**
+	 * Stops acceptance before draining publication, then detaches the server from the
+	 * host. Both steps always run; the first failure is thrown, with any later one
+	 * suppressed.
+	 */
 	@Override
 	public synchronized void close() throws IOException {
+		Throwable failure=null;
 		try {
 			listener.close();
-		} finally {
-			server.close();
+		} catch (RuntimeException | Error e) {
+			failure=e;
 		}
+		try {
+			server.close();
+		} catch (IOException | RuntimeException | Error e) {
+			// Report the first failure; a later one must not hide it
+			if (failure==null) throw e;
+			failure.addSuppressed(e);
+		}
+		if (failure instanceof RuntimeException e) throw e;
+		if (failure instanceof Error e) throw e;
 	}
 }
