@@ -3,6 +3,7 @@ package convex.db.lattice;
 import java.util.Objects;
 
 import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -32,6 +33,11 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p>Obtained from {@link SQLSchema#getTable(String)} as a cursor-backed component
  * in the hierarchy: ConvexDB → SQLDatabase → SQLSchema → SQLTable.
+ *
+ * <p>The table is the merge boundary: {@link #mergeValues} merges whole entries, rows
+ * included, and there is no row component below it. An application changes how a
+ * table merges by overriding that rule and supplying the subclass from
+ * {@link SQLSchema#table(AString)}.
  */
 public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 
@@ -49,8 +55,15 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	/** Highest table format version this implementation reads and writes */
 	public static final long SUPPORTED_VERSION = 0;
 
-	SQLTable(AForkableCursor<AVector<ACell>> cursor) {
+	/** Binds a table to the cursor of its entry. Construction reads and writes nothing. */
+	protected SQLTable(AForkableCursor<AVector<ACell>> cursor) {
 		super(cursor);
+	}
+
+	/** Subclasses override this to return their own type, so forks keep their rule. */
+	@Override
+	protected SQLTable rebind(AForkableCursor<AVector<ACell>> cursor) {
+		return new SQLTable(cursor);
 	}
 
 	// ========== Static State Factories ==========
@@ -308,12 +321,68 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 		return count[0];
 	}
 
-	// ========== Static Merge (used by lattice layer) ==========
+	// ========== Merge ==========
 
 	/**
-	 * Merges two table state vectors.
-	 * Schema uses LWW (latest timestamp wins).
-	 * Rows merge using TableLattice.
+	 * This table's merge rule. It is a pure function of two entries that reads and
+	 * writes no state, so incoming merges, publication and the containing schema's
+	 * rule all use it. The standard rule is {@link #merge(AVector, AVector)}. Override
+	 * it, together with {@link #rebind}, to change how this table merges.
+	 *
+	 * <p>{@code other} may be a rows-only partial entry from row delivery, with no
+	 * schema and no timestamp. Such an entry is only merged into a live table.</p>
+	 *
+	 * @param own Established entry, kept on ties; null if absent
+	 * @param other Entry to merge in; null if absent
+	 * @return Merged entry
+	 */
+	public AVector<ACell> mergeValues(AVector<ACell> own, AVector<ACell> other) {
+		return merge(own, other);
+	}
+
+	@Override
+	public AVector<ACell> merge(AVector<ACell> incoming) {
+		return cursor().updateAndGet(own -> mergeValues(own, incoming));
+	}
+
+	@Override
+	protected AVector<ACell> mergePublication(AVector<ACell> own, AVector<ACell> other) {
+		return mergeValues(own, other);
+	}
+
+	/**
+	 * Delivers rows below this entry: {@code [1]} with a row index, or {@code [1, key]}
+	 * with one row entry, position 1 being the entry's rows. The rows are lifted into
+	 * a rows-only partial entry and merged with this table's rule, so a row delivery
+	 * cannot change the schema. A table that is absent or dropped receives nothing.
+	 * Other paths are refused.
+	 */
+	@Override
+	protected AVector<ACell> mergeAtPath(ACell value, ACell... path) {
+		if (!isRowsPath(path)) return super.mergeAtPath(value, path);
+		Index<ABlob, AVector<ACell>> rows = deliveredRows(value, path);
+		if (rows == null) return cursor().get();
+		AVector<ACell> partial = Vectors.of(null, rows, null, CVMLong.create(computeLiveCount(rows)));
+		return cursor().updateAndGet(own -> isLiveState(own) ? mergeValues(own, partial) : own);
+	}
+
+	private static boolean isRowsPath(ACell[] path) {
+		if (path.length > 2 || !(path[0] instanceof CVMLong pos) || pos.longValue() != POS_ROWS) return false;
+		return path.length == 1 || path[1] instanceof ABlobLike;
+	}
+
+	/** The delivered rows as a row index, or null when the value is not rows. */
+	@SuppressWarnings("unchecked")
+	private static Index<ABlob, AVector<ACell>> deliveredRows(ACell value, ACell[] path) {
+		if (path.length == 1) return (value instanceof Index) ? (Index<ABlob, AVector<ACell>>) value : null;
+		if (!(value instanceof AVector)) return null;
+		return Index.of(((ABlobLike<?>) path[1]).toBlob(), (AVector<ACell>) value);
+	}
+
+	/**
+	 * The standard table rule. The schema is last-writer-wins on utime, with the
+	 * own entry kept on a tie; a dropped table's tombstone wins in the same way.
+	 * While the winner is live, rows merge by key with {@link TableLattice}.
 	 */
 	@SuppressWarnings("unchecked")
 	public static AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b) {

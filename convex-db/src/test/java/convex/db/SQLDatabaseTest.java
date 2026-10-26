@@ -18,13 +18,13 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
-import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -226,7 +226,7 @@ public class SQLDatabaseTest {
 		// Create tampered export - must match expected generic type
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> tamperedExport =
-			(AHashMap) convex.core.data.Maps.of(kp2.getAccountKey(), tamperedSigned);
+			(AHashMap) Maps.of(kp2.getAccountKey(), tamperedSigned);
 
 		// Should reject - signature doesn't match owner key
 		long merged = db1.mergeReplicas(tamperedExport);
@@ -236,8 +236,8 @@ public class SQLDatabaseTest {
 
 	@Test
 	public void testConnectedDatabase() throws Exception {
-		// Set up a cursor chain using DATABASE_MAP_LATTICE
-		AForkableCursor<?> root = Cursors.root(ConvexDB.DATABASE_MAP_LATTICE.zero());
+		// Set up a cursor chain at the database-map level
+		AForkableCursor<?> root = Cursors.root(Maps.empty());
 
 		// Connect a named database
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -260,34 +260,33 @@ public class SQLDatabaseTest {
 	}
 
 	@Test
-	public void testOwnerLatticeConstant() {
-		// Verify OWNER_LATTICE can verify and merge signed data correctly
+	public void testReplicasFromSeveralOwners() {
 		AKeyPair kp1 = AKeyPair.generate();
 		AKeyPair kp2 = AKeyPair.generate();
+		AKeyPair kp3 = AKeyPair.generate();
 
 		SQLDatabase db1 = SQLDatabase.create("test", kp1);
 		SQLDatabase db2 = SQLDatabase.create("test", kp2);
+		SQLDatabase db3 = SQLDatabase.create("test", kp3);
 
 		db1.tables().createTable("t", new String[]{"id"});
 		db2.tables().createTable("t", new String[]{"id"});
+		db3.tables().createTable("t", new String[]{"id"});
 		db1.tables().insert("t", 1);
 		db2.tables().insert("t", 2);
+		db3.tables().insert("t", 3);
 
-		// Merge both exports through OWNER_LATTICE
-		LatticeContext ctx = LatticeContext.create(null, kp1);
-		var merged = SQLDatabase.OWNER_LATTICE.merge(ctx,
-			db1.exportReplica(), db2.exportReplica());
-
-		// Should contain both owners
-		assertEquals(2, merged.count());
-		assertTrue(merged.containsKey(kp1.getAccountKey()));
-		assertTrue(merged.containsKey(kp2.getAccountKey()));
+		// Each owner's replica is verified separately; this node's own entry is skipped
+		var remote = db2.exportReplica().assoc(kp3.getAccountKey(), db3.getSignedState())
+			.assoc(kp1.getAccountKey(), db1.getSignedState());
+		assertEquals(2, db1.mergeReplicas(remote));
+		assertEquals(3, db1.tables().getRowCount("t"));
 	}
 
 	@Test
 	public void testForkAndSyncConnected() throws Exception {
 		// Set up cursor chain
-		AForkableCursor<?> root = Cursors.root(ConvexDB.DATABASE_MAP_LATTICE.zero());
+		AForkableCursor<?> root = Cursors.root(Maps.empty());
 
 		// Connect and populate
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -432,7 +431,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testConnectedModeRejectsStandaloneOps() {
 		// Connected databases should not have signing capability
-		AForkableCursor<?> root = Cursors.root(ConvexDB.DATABASE_MAP_LATTICE.zero());
+		AForkableCursor<?> root = Cursors.root(Maps.empty());
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
 
 		assertNull(db.getKeyPair());

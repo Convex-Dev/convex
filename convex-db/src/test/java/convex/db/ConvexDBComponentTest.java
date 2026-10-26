@@ -13,6 +13,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.db.lattice.SQLDatabase;
@@ -27,7 +28,7 @@ public class ConvexDBComponentTest {
 	private static final String TABLE_NAME="items";
 
 	private static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host() {
-		return LatticeHost.create(ConvexDB.DATABASE_MAP_LATTICE.zero(),new MemoryStore());
+		return LatticeHost.create(Maps.empty(),new MemoryStore());
 	}
 
 	private static SQLDatabase createDatabase(ConvexDB cdb) {

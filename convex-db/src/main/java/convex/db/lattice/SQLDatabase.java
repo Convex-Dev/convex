@@ -1,19 +1,22 @@
 package convex.db.lattice;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.util.Utils;
 import convex.db.ConvexDB;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.LatticeContext;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.generic.OwnerLattice;
 
 /**
  * A named SQL database within the lattice, with per-owner signed replicas.
@@ -27,6 +30,12 @@ import convex.lattice.generic.OwnerLattice;
  *   <li><b>Connected</b> ({@link #connect}): connected to a parent cursor chain
  *       (e.g. from a {@link ConvexDB}), signing and replication handled by the chain</li>
  * </ul>
+ *
+ * <p>The database's tables are its {@code :tables} section, merged by the rule of
+ * the {@link SQLSchema} that {@link #tables()} supplies. Other sections belong to
+ * other components: incoming ones are ignored and those already held are kept.
+ * Connecting to a database and reading it create nothing; the first changed write
+ * creates it.
  *
  * <p>Usage:
  * <pre>
@@ -43,18 +52,19 @@ import convex.lattice.generic.OwnerLattice;
  */
 public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 
-	/**
-	 * The OwnerLattice structure for SQL databases in the global lattice.
-	 * Structure: OwnerLattice → SignedLattice → MapLattice → DatabaseLattice
-	 */
-	public static final OwnerLattice<AHashMap<AString, Index<Keyword, ACell>>>
-		OWNER_LATTICE = OwnerLattice.create(ConvexDB.DATABASE_MAP_LATTICE);
-
 	private final AString dbName;
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
 
-	private SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor,
+	/**
+	 * Binds a database to its cursor. Construction reads and writes nothing.
+	 *
+	 * @param cursor Cursor of the database's state, which may be absent
+	 * @param dbName Database name
+	 * @param keyPair Key pair for signing this node's replica, or null when connected
+	 * @param ownerKey Owner identity of this node's replica, or null when connected
+	 */
+	protected SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor,
 			AString dbName, AKeyPair keyPair, ACell ownerKey) {
 		super(cursor);
 		this.dbName = dbName;
@@ -84,14 +94,14 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return New SQLDatabase instance
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
-		AForkableCursor<Index<Keyword, ACell>> cursor =
-			Cursors.root(ConvexDB.DATABASE_LATTICE.zero());
+		AForkableCursor<Index<Keyword, ACell>> cursor = Cursors.root(Index.none());
 		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey);
 	}
 
 	/**
-	 * Connects to a database within an existing cursor chain (e.g. from a ConvexDB).
-	 * Signing and replication are handled by the cursor chain.
+	 * Connects to a database within an existing cursor chain at the database-map
+	 * level. Signing and replication are handled by the cursor chain. Connecting
+	 * creates nothing.
 	 *
 	 * @param parent Parent lattice cursor at the database-map level
 	 * @param name Database name to connect to
@@ -100,30 +110,32 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	@SuppressWarnings("unchecked")
 	public static SQLDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		var databases=(AForkableCursor<AHashMap<AString,Index<Keyword,ACell>>>)parent;
-		AForkableCursor<Index<Keyword, ACell>> cursor = databases.withDefault(Maps.empty()).path(dbName);
-		if (cursor.get() == null) {
-			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
-		}
-		return new SQLDatabase(cursor, dbName, null, null);
+		var databases = (AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>>) parent;
+		return new SQLDatabase(databases.withDefault(Maps.empty()).path(dbName), dbName, null, null);
 	}
 
 	/**
-	 * Connects to a database nested beneath a ConvexDB component, navigating from
-	 * its cursor.
+	 * Connects to a database nested beneath a ConvexDB component, at
+	 * {@link ConvexDB#path(AString)}. Connecting creates nothing.
 	 *
 	 * @param parent Containing ConvexDB component
 	 * @param name Database name to connect to
 	 * @return New SQLDatabase over the containing component's cursor chain
 	 */
-	public static SQLDatabase connect(ConvexDB parent,String name) {
+	public static SQLDatabase connect(ConvexDB parent, AString name) {
 		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
-		AString dbName=Strings.create(name);
-		AForkableCursor<Index<Keyword,ACell>> cursor=parent.cursor().withDefault(Maps.empty()).path(dbName);
-		if (cursor.get()==null) {
-			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
-		}
-		return new SQLDatabase(cursor,dbName,null,null);
+		return new SQLDatabase(parent.path(name), name, null, null);
+	}
+
+	/**
+	 * Connects to a database nested beneath a ConvexDB component. Connecting creates nothing.
+	 *
+	 * @param parent Containing ConvexDB component
+	 * @param name Database name to connect to
+	 * @return New SQLDatabase over the containing component's cursor chain
+	 */
+	public static SQLDatabase connect(ConvexDB parent, String name) {
+		return connect(parent, Strings.create(name));
 	}
 
 	/**
@@ -138,18 +150,31 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		return rebind(storage.fork());
 	}
 
+	/** Subclasses override this to return their own type, so forks keep their tables. */
 	@Override
 	protected SQLDatabase rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
 		return new SQLDatabase(cursor,dbName,keyPair,ownerKey);
 	}
 
 	/**
-	 * Returns the SQLSchema facade for performing table operations.
+	 * Returns the cursor of this database's {@code :tables} section, for constructing
+	 * the table store. A missing database is created only by a changed write.
 	 *
-	 * @return SQLSchema instance for this database
+	 * @return Cursor of the table store, which may be absent
+	 */
+	public AForkableCursor<Index<AString, AVector<ACell>>> tablesPath() {
+		return cursor().withDefault(Index.none()).path(ConvexDB.KEY_TABLES);
+	}
+
+	/**
+	 * Returns the table store. Construction reads and writes nothing. Merge, delivery
+	 * and table operations all use this component, so an override supplying another
+	 * {@link SQLSchema} changes how the tables merge.
+	 *
+	 * @return SQLSchema instance for this database, bound to {@link #tablesPath()}
 	 */
 	public SQLSchema tables() {
-		return new SQLSchema(cursor().withDefault(Index.none()).path(ConvexDB.KEY_TABLES));
+		return new SQLSchema(tablesPath());
 	}
 
 	/**
@@ -213,8 +238,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 
 	/**
 	 * Merges replicas from a remote owner map into this node's local store.
-	 * Uses {@link OwnerLattice} to verify signatures and owner-key matching,
-	 * then absorbs verified remote data into the local database state.
+	 * Each replica must pass {@link #acceptsReplica}; its state for this database
+	 * is then merged with this database's own rule.
 	 *
 	 * <p>Only available in standalone mode (created via {@link #create}).
 	 *
@@ -222,38 +247,92 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Number of replicas successfully merged
 	 * @throws IllegalStateException if no signing key is available (connected mode)
 	 */
+	@SuppressWarnings("unchecked")
 	public long mergeReplicas(AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> remoteOwnerMap) {
 		if (remoteOwnerMap == null || remoteOwnerMap.isEmpty()) return 0;
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 
-		// Use OwnerLattice to verify signatures and owner-key matching
-		AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> verified =
-			OWNER_LATTICE.merge( Maps.empty(), remoteOwnerMap);
-
-		// Absorb verified remote data into local store
 		long merged = 0;
-		for (var entry : verified.entrySet()) {
-			if (ownerKey.equals(entry.getKey())) continue; // skip self
-			AHashMap<AString, Index<Keyword, ACell>> dbMap = entry.getValue().getValue();
-			if (dbMap == null) continue;
-			@SuppressWarnings("unchecked")
-			Index<Keyword, ACell> remoteState = (Index<Keyword, ACell>) dbMap.get(dbName);
-			if (remoteState != null) {
-				cursor().updateAndGet(own -> ConvexDB.DATABASE_LATTICE.merge(own,remoteState));
-				merged++;
-			}
+		for (var entry : remoteOwnerMap.entrySet()) {
+			ACell owner = entry.getKey();
+			if (ownerKey.equals(owner)) continue; // skip self
+			// Foreign entries stay untyped until the replica is accepted
+			ACell replica = entry.getValue();
+			if (!(replica instanceof SignedData<?> signed) || !acceptsReplica(owner, signed)) continue;
+			if (!(signed.getValue() instanceof AHashMap<?, ?> dbMap)) continue;
+			if (!(dbMap.get(dbName) instanceof Index<?, ?> remoteState)) continue;
+			cursor().updateAndGet(own -> mergeValues(own, (Index<Keyword, ACell>) remoteState));
+			merged++;
 		}
 		return merged;
 	}
 
-	/** Reconciles this component's draft using its domain merge rule. */
+	/**
+	 * Whether a remote replica is accepted from an owner. Its signature must verify, and
+	 * an owner that denotes an account key directly must be that signer. An indirect
+	 * owner (Address, DID) has no resolver here, so any valid signature is accepted for
+	 * it. Override to apply another ownership rule.
+	 *
+	 * @param owner Owner identity the replica was published under
+	 * @param replica Signed replica
+	 * @return true if the replica may be merged
+	 */
+	protected boolean acceptsReplica(ACell owner, SignedData<?> replica) {
+		return owner != null && replica.checkSignature()
+			&& LatticeContext.EMPTY.verifyOwner(owner, replica.getAccountKey());
+	}
+
+	/**
+	 * This database's merge rule: its {@code :tables} section merges with the rule of
+	 * {@link #tables()}, other incoming sections are ignored and those of {@code own} kept.
+	 * It is a pure function that reads and writes no state, and an absent database stays
+	 * absent when nothing is accepted.
+	 *
+	 * @param own Established database state, kept on ties; null if absent
+	 * @param other Database state to merge in; null if absent
+	 * @return Merged database state
+	 */
+	@SuppressWarnings("unchecked")
+	public Index<Keyword, ACell> mergeValues(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
+		ACell incoming = other;
+		if (!(incoming instanceof Index<?, ?> index) || !(index.get(ConvexDB.KEY_TABLES) instanceof Index<?, ?> tables)) return own;
+		ACell current = (own == null) ? null : own.get(ConvexDB.KEY_TABLES);
+		if (current != null && !(current instanceof Index)) return own;
+		Index<AString, AVector<ACell>> merged = tables().mergeValues(
+			(Index<AString, AVector<ACell>>) current, (Index<AString, AVector<ACell>>) tables);
+		if (Utils.equals(merged, current)) return own;
+		return ((own == null) ? Index.<Keyword, ACell>none() : own).assoc(ConvexDB.KEY_TABLES, merged);
+	}
+
 	@Override
-	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own,Index<Keyword, ACell> other) {
-		var merged=ConvexDB.DATABASE_LATTICE.merge(own,other);
-		if (other==null) return merged;
-		// Only tables belong to this component; retain current unrelated keys,
-		// including removal of a key still present in our stale working snapshot.
-		return merged!=null && merged.containsKey(ConvexDB.KEY_TABLES)
-			?other.assoc(ConvexDB.KEY_TABLES,merged.get(ConvexDB.KEY_TABLES)):other;
+	public Index<Keyword, ACell> merge(Index<Keyword, ACell> incoming) {
+		return cursor().updateAndGet(own -> mergeValues(own, incoming));
+	}
+
+	/**
+	 * Reconciles this component's draft with this database's rule. Only the tables
+	 * belong to this component, so the destination's other sections are kept as they
+	 * are, including the removal of one still present in the draft's stale snapshot.
+	 */
+	@Override
+	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
+		var merged = mergeValues(own, other);
+		if (other == null) return merged;
+		ACell tables = (merged == null) ? null : merged.get(ConvexDB.KEY_TABLES);
+		return (tables == null) ? other : other.assoc(ConvexDB.KEY_TABLES, tables);
+	}
+
+	/** The {@code :tables} section resolves to {@link #tables()}, matched as the index matches keys. */
+	@SuppressWarnings("unchecked")
+	@Override
+	protected <T extends ACell> ALatticeComponent<T> child(ACell key) {
+		if (!(key instanceof ABlobLike<?> blob) || !ConvexDB.KEY_TABLES.toBlob().equals(blob.toBlob())) return null;
+		return (ALatticeComponent<T>) (ALatticeComponent<?>) tables();
+	}
+
+	/** Deliveries to other sections are ignored: they belong to other components. */
+	@Override
+	protected Index<Keyword, ACell> mergeAtPath(ACell value, ACell... path) {
+		return cursor().get();
 	}
 }

@@ -9,6 +9,7 @@ import convex.core.data.Index;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.MergeFunction;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.lattice.ALatticeComponent;
@@ -43,9 +44,14 @@ import convex.lattice.cursor.Cursors;
  * // Drop table
  * schema.dropTable("users");
  * </pre>
+ *
+ * <p>{@link #table(AString)} supplies the component for each table name. Its rule
+ * merges that table's entries within {@link #mergeValues}, and the same component
+ * receives delivery to the table's path and serves table operations.
  */
 public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
+	/** Binds a table store to its cursor. Construction reads and writes nothing. */
 	public SQLSchema(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
 		super(cursor);
 	}
@@ -56,8 +62,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return New SQLSchema instance
 	 */
 	public static SQLSchema create() {
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
-			Cursors.root(TableStoreLattice.INSTANCE.zero());
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = Cursors.root(Index.none());
 		return new SQLSchema(cursor);
 	}
 
@@ -80,9 +85,87 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return rebind(storage.fork());
 	}
 
+	/** Subclasses override this to return their own type, so forks keep their tables. */
 	@Override
 	protected SQLSchema rebind(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
 		return new SQLSchema(cursor);
+	}
+
+	// ========== Tables and Merge ==========
+
+	/**
+	 * Returns the cursor of a named table's entry, for constructing table components.
+	 * A missing table store is created only by a changed write.
+	 *
+	 * @param name Table name
+	 * @return Cursor of the table's entry, which may be absent
+	 */
+	public AForkableCursor<AVector<ACell>> path(AString name) {
+		return cursor().withDefault(Index.none()).path(name);
+	}
+
+	/**
+	 * Returns the component for a named table, which may be absent. Construction reads
+	 * and writes nothing. Merge, delivery and table operations all use this component,
+	 * so an override supplying another {@link SQLTable} changes how that table merges.
+	 *
+	 * @param name Table name
+	 * @return Table component bound to {@link #path(AString)}
+	 */
+	protected SQLTable table(AString name) {
+		return new SQLTable(path(name));
+	}
+
+	/**
+	 * This table store's merge rule: a union of table names, with each table's entries
+	 * merged by the rule of its {@link #table(AString)} component. It is a pure function
+	 * that reads and writes no state. Entries that are not table entries are ignored, and
+	 * an absent store stays absent when nothing is accepted.
+	 *
+	 * @param own Established table store, kept on ties; null if absent
+	 * @param other Table store to merge in; null if absent
+	 * @return Merged table store
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public Index<AString, AVector<ACell>> mergeValues(Index<AString, AVector<ACell>> own,
+			Index<AString, AVector<ACell>> other) {
+		ACell incoming = other;
+		if (!(incoming instanceof Index)) return own;
+		// Foreign entries stay untyped until they are checked as table entries
+		Index<AString, ACell> base = (own == null) ? Index.none() : (Index) own;
+		Index<AString, ACell> merged = base.mergeDifferences((Index<AString, ACell>) incoming, new MergeFunction<ACell>() {
+			@Override
+			public ACell merge(ACell a, ACell b) {
+				throw new IllegalStateException("Table merge requires the table name");
+			}
+
+			@Override
+			public ACell merge(Object key, ACell a, ACell b) {
+				if (!(key instanceof AString name) || !(b instanceof AVector)) return a;
+				if (a != null && !(a instanceof AVector)) return a;
+				return table(name).mergeValues((AVector<ACell>) a, (AVector<ACell>) b);
+			}
+		});
+		return (own == null && merged.isEmpty()) ? null : (Index) merged;
+	}
+
+	@Override
+	public Index<AString, AVector<ACell>> merge(Index<AString, AVector<ACell>> incoming) {
+		return cursor().updateAndGet(own -> mergeValues(own, incoming));
+	}
+
+	@Override
+	protected Index<AString, AVector<ACell>> mergePublication(
+			Index<AString, AVector<ACell>> own,
+			Index<AString, AVector<ACell>> other) {
+		return mergeValues(own, other);
+	}
+
+	/** Each table name resolves to its {@link #table(AString)} component. */
+	@SuppressWarnings("unchecked")
+	@Override
+	protected <T extends ACell> ALatticeComponent<T> child(ACell key) {
+		return (key instanceof AString name) ? (ALatticeComponent<T>) (ALatticeComponent<?>) table(name) : null;
 	}
 
 	// ========== Internal Helpers ==========
@@ -95,9 +178,8 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Gets a cursor-backed table by name, returning null if not found.
 	 */
 	public SQLTable getTable(AString name) {
-		AForkableCursor<AVector<ACell>> tableCursor = cursor().withDefault(Index.none()).path(name);
-		if (tableCursor.get() == null) return null;
-		return new SQLTable(tableCursor);
+		SQLTable table = table(name);
+		return (table.getState() == null) ? null : table;
 	}
 
 	/** Convenience overload. */
@@ -209,8 +291,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		}
 
 		// Set state on the table's cursor path
-		AForkableCursor<AVector<ACell>> tableCursor = cursor().withDefault(Index.none()).path(name);
-		tableCursor.set(SQLTable.createState((AVector<AVector<ACell>>) schema, now()));
+		path(name).set(SQLTable.createState((AVector<AVector<ACell>>) schema, now()));
 		return true;
 	}
 
@@ -221,8 +302,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	public boolean dropTable(AString name) {
 		if (getLiveTable(name) == null) return false;
-		AForkableCursor<AVector<ACell>> tableCursor = cursor().withDefault(Index.none()).path(name);
-		tableCursor.set(SQLTable.createTombstoneState(now()));
+		path(name).set(SQLTable.createTombstoneState(now()));
 		return true;
 	}
 
@@ -415,13 +495,5 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(name);
 		if (table == null) return 0;
 		return (int) table.getColumnCount();
-	}
-
-	/** Reconciles this component's draft using its domain merge rule. */
-	@Override
-	protected Index<AString, AVector<ACell>> mergePublication(
-			Index<AString, AVector<ACell>> own,
-			Index<AString, AVector<ACell>> other) {
-		return TableStoreLattice.INSTANCE.merge(own,other);
 	}
 }

@@ -3,6 +3,9 @@ package convex.db;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Collections;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import convex.core.data.ACell;
@@ -10,18 +13,17 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
+import convex.core.data.Strings;
 import convex.core.store.AStore;
+import convex.core.util.MergeFunction;
 import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
-import convex.db.lattice.TableStoreLattice;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.generic.KeyedLattice;
-import convex.lattice.generic.MapLattice;
 import convex.node.NodeServer;
-import convex.node.RelayHost;
 
 /**
  * Root lattice component for the Convex DB SQL database system.
@@ -31,12 +33,27 @@ import convex.node.RelayHost;
  * for creating, connecting, and registering databases for JDBC and PostgreSQL
  * wire protocol access.
  *
- * <p>Lattice structure:
+ * <p>Component structure, each level merging with its own rule:
  * <pre>
- * ConvexDB (MapLattice: db-name → database-state)
- *   └─ SQLDatabase (KeyedLattice: :tables → TableStoreLattice)
- *        └─ SQLSchema / SQLTable / SQLRow
+ * ConvexDB      db name → database state
+ *   └─ SQLDatabase   :tables → table store
+ *        └─ SQLSchema     table name → table entry
+ *             └─ SQLTable      [schema, rows, utime, live-count, version?]
  * </pre>
+ *
+ * <p>Merges are executed by these components: each level's {@code mergeValues} is a
+ * pure rule that calls the rule of the child component for every key, down to the
+ * table, which merges its rows. Incoming merges, delivery to a path, publication of
+ * forks and replica merges all use the same rules. An application changes them by
+ * extending a component and supplying it from the factory above it:
+ * {@link #database(AString)}, {@link SQLDatabase#tables()} and
+ * {@code SQLSchema.table(AString)}. Subclasses also override {@code rebind} so that
+ * forks keep their type.
+ *
+ * <p>A ConvexDB takes the cursor for the database map and assumes nothing about where
+ * that lies: an application can root it anywhere in its own state, and registers it
+ * with its host to receive incoming values. {@link #openHost} is a convenience that
+ * assembles a host whose root is the database map.
  *
  * <p>Usage:
  * <pre>
@@ -50,7 +67,7 @@ import convex.node.RelayHost;
  *     ConvexDB.createNodeServer(store);
  * server.launch();
  * ConvexDB cdb = ConvexDB.connect(server.getHost());
- * cdb.register();
+ * cdb.register("mydb");
  *
  * // JDBC access (after register)
  * Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
@@ -63,28 +80,16 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 */
 	public static final String VERSION = "0.8.4-SNAPSHOT";
 
-	// ========== Lattice structure ==========
-
 	/** Keyword for the tables section within a database. */
 	public static final Keyword KEY_TABLES = Keyword.intern("tables");
-
-	/**
-	 * The lattice type for a single database.
-	 * Structure: KeyedLattice { :tables → TableStoreLattice }
-	 */
-	public static final KeyedLattice DATABASE_LATTICE =
-		KeyedLattice.create(KEY_TABLES, TableStoreLattice.INSTANCE);
-
-	/**
-	 * The lattice type for the database map (db name → database state).
-	 */
-	public static final MapLattice<AString, Index<Keyword, ACell>>
-		DATABASE_MAP_LATTICE = MapLattice.create(DATABASE_LATTICE);
 
 	// ========== Named instance registry ==========
 
 	/** Registry of ConvexDB instances available for JDBC/PG access. */
 	private static final ConcurrentHashMap<String, ConvexDB> registry = new ConcurrentHashMap<>();
+
+	/** The application each host assembled by {@link #openHost} has registered. */
+	private static final Map<LatticeHost<?>, ConvexDB> hosted = Collections.synchronizedMap(new WeakHashMap<>());
 
 	/**
 	 * Looks up a registered ConvexDB by database name.
@@ -109,7 +114,14 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	// ========== Instance ==========
 
-	private ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
+	/**
+	 * Binds a ConvexDB to the cursor of a database map, wherever that lies.
+	 * Construction reads and writes nothing. Register the instance with a host as an
+	 * application for it to receive incoming values.
+	 *
+	 * @param cursor Cursor of the database map, which may be absent
+	 */
+	public ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
 		super(cursor);
 	}
 
@@ -119,16 +131,12 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return New ConvexDB instance
 	 */
 	public static ConvexDB create() {
-		AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor =
-			Cursors.root(DATABASE_MAP_LATTICE.zero());
-		return new ConvexDB(cursor);
+		return new ConvexDB(Cursors.root(Maps.empty()));
 	}
 
 	/**
-	 * Connects directly to an existing cursor chain without a containing
-	 * component policy. This form is retained for standalone and compatibility
-	 * use; hosted applications should use {@link #connect(ALatticeComponent)}
-	 * with {@link NodeServer#getHost()}.
+	 * Connects directly to an existing cursor chain at the database-map level,
+	 * without registering for incoming values.
 	 *
 	 * @param parent Parent lattice cursor at the database-map level
 	 * @return ConvexDB connected to the cursor chain
@@ -138,20 +146,19 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	}
 
 	/**
-	 * Connects to a containing component at the database-map level.
+	 * Connects to a containing component at the database-map level. For a host
+	 * assembled by {@link #openHost} or {@link #createNodeServer}, this returns the
+	 * ConvexDB registered with it; otherwise it returns a live view of the
+	 * component's cursor, which receives no incoming values.
 	 *
-	 * <p>This is the preferred hosted form: cursor writes share the containing
-	 * component's atomic state and context at the same database-map position. A
-	 * {@link LatticeHost} obtained from a {@link NodeServer} can be supplied
-	 * directly.</p>
-	 *
-	 * @param parent Containing database-map component
-	 * @return ConvexDB connected to the containing component's cursor
+	 * @param parent Containing database-map component, such as a host
+	 * @return ConvexDB over the containing component's cursor
 	 */
 	public static ConvexDB connect(
 			ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		return new ConvexDB(parent.cursor());
+		ConvexDB registered = (parent instanceof LatticeHost<?> host) ? hosted.get(host) : null;
+		return (registered != null) ? registered : new ConvexDB(parent.cursor());
 	}
 
 	/**
@@ -171,28 +178,124 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * </pre>
 	 *
 	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
-	 * @return NodeServer replicating a relay host over the SQL database lattice (local-only, no network)
+	 * @return NodeServer over a host assembled by {@link #openHost}
 	 * @throws IOException if the store's retained root cannot be read
 	 */
 	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) throws IOException {
 		return new NodeServer<>(openHost(store));
 	}
 
-	/** Opens a retained database host for local use, without constructing networking. */
+	/**
+	 * Opens a host whose root is a database map, restoring the root the store retains,
+	 * and registers a live ConvexDB with it as its application, so incoming values are
+	 * merged by the Convex DB components. {@link #connect(ALatticeComponent)} returns
+	 * that instance. This is a convenience: an application that roots its databases
+	 * elsewhere, or extends the components, assembles its own host.
+	 *
+	 * @param store Store for persistence, or null for an in-memory host
+	 * @return Host with a registered ConvexDB
+	 * @throws IOException if the store's retained root cannot be read
+	 */
 	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store) throws IOException {
-		return RelayHost.open(DATABASE_MAP_LATTICE,store);
+		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host = LatticeHost.open(Maps.empty(), store);
+		hosted.put(host, host.addApplication(new ConvexDB(host.cursor())));
+		return host;
+	}
+
+	/** Subclasses override this to return their own type, so forks keep their databases. */
+	@Override
+	protected ConvexDB rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
+		return new ConvexDB(cursor);
+	}
+
+	@Override
+	public ConvexDB fork() {
+		return rebind(storage.fork());
 	}
 
 	/**
-	 * Gets or creates a named database within this ConvexDB.
-	 * Navigates the cursor tree to the named database path; initialises
-	 * it with a zero value if it doesn't exist yet.
+	 * Returns the cursor of a named database's state, for constructing database
+	 * components. A missing database map is created only by a changed write.
+	 *
+	 * @param name Database name
+	 * @return Cursor of the database's state, which may be absent
+	 */
+	public AForkableCursor<Index<Keyword, ACell>> path(AString name) {
+		return cursor().withDefault(Maps.empty()).path(name);
+	}
+
+	/**
+	 * Returns the component for a named database, which may be absent. Connecting
+	 * and reading create nothing; the first changed write creates the database.
+	 * Merge, delivery and database operations all use this component, so an override
+	 * supplying another {@link SQLDatabase} changes how that database merges.
+	 *
+	 * @param name Database name
+	 * @return SQLDatabase bound to {@link #path(AString)}
+	 */
+	public SQLDatabase database(AString name) {
+		return SQLDatabase.connect(this, name);
+	}
+
+	/**
+	 * Returns the component for a named database, as {@link #database(AString)}.
 	 *
 	 * @param name Database name
 	 * @return SQLDatabase connected to the cursor chain
 	 */
 	public SQLDatabase database(String name) {
-		return SQLDatabase.connect(this,name);
+		return database(Strings.create(name));
+	}
+
+	/**
+	 * This database map's merge rule: a union of database names, with each database's
+	 * state merged by the rule of its {@link #database(AString)} component. It is a pure
+	 * function that reads and writes no state. Entries that are not database states are
+	 * ignored, and an absent map stays absent when nothing is accepted.
+	 *
+	 * @param own Established database map, kept on ties; null if absent
+	 * @param other Database map to merge in; null if absent
+	 * @return Merged database map
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public AHashMap<AString, Index<Keyword, ACell>> mergeValues(AHashMap<AString, Index<Keyword, ACell>> own,
+			AHashMap<AString, Index<Keyword, ACell>> other) {
+		ACell incoming = other;
+		if (!(incoming instanceof AHashMap)) return own;
+		// Foreign entries stay untyped until they are checked as database states
+		AHashMap<AString, ACell> base = (own == null) ? Maps.empty() : (AHashMap) own;
+		AHashMap<AString, ACell> merged = base.mergeDifferences((AHashMap<AString, ACell>) incoming, new MergeFunction<ACell>() {
+			@Override
+			public ACell merge(ACell a, ACell b) {
+				throw new IllegalStateException("Database merge requires the database name");
+			}
+
+			@Override
+			public ACell merge(Object key, ACell a, ACell b) {
+				if (!(key instanceof AString name) || !(b instanceof Index)) return a;
+				if (a != null && !(a instanceof Index)) return a;
+				return database(name).mergeValues((Index<Keyword, ACell>) a, (Index<Keyword, ACell>) b);
+			}
+		});
+		return (own == null && merged.isEmpty()) ? null : (AHashMap) merged;
+	}
+
+	@Override
+	public AHashMap<AString, Index<Keyword, ACell>> merge(AHashMap<AString, Index<Keyword, ACell>> incoming) {
+		return cursor().updateAndGet(own -> mergeValues(own, incoming));
+	}
+
+	@Override
+	protected AHashMap<AString, Index<Keyword, ACell>> mergePublication(AHashMap<AString, Index<Keyword, ACell>> own,
+			AHashMap<AString, Index<Keyword, ACell>> other) {
+		return mergeValues(own, other);
+	}
+
+	/** Each database name resolves to its {@link #database(AString)} component. */
+	@SuppressWarnings("unchecked")
+	@Override
+	protected <T extends ACell> ALatticeComponent<T> child(ACell key) {
+		return (key instanceof AString name) ? (ALatticeComponent<T>) (ALatticeComponent<?>) database(name) : null;
 	}
 
 	/**
