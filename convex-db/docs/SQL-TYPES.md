@@ -171,6 +171,3 @@ numerically when negative or longer than 8 bytes.
   converted by value class alone.
 - Commit the CAD039 column-type amendment that specifies the entry version and identifiers.
 - `DATE`, `TIME`, `TIMESTAMP WITH TIME ZONE`, `UUID` and `INTERVAL` are not supported.
-- Rows written before a `DROP TABLE` reappear in a table later created under the same name
-  when it merges with the entry of a node that never saw the drop: merge unions the rows of
-  both live entries, whichever creation they belong to.

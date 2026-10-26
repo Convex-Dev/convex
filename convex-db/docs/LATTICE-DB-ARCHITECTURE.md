@@ -150,6 +150,13 @@ Merges that accept nothing create nothing: a database or table store that is abs
 stays absent. Equal timestamps keep the established value, as described in the
 [lattice application design](../../convex-core/docs/LATTICE_APPLICATIONS.md).
 
+Who may change a table's schema, drop it or create it again, and how those changes
+are ordered between writers, is application policy. The standard table rule orders
+schema changes by `utime` alone and merges rows by key whichever creation of the table
+they were written to, so rows written before a `DROP TABLE` can reappear in a table
+created again under the same name. An application with several writers changing
+schemas sequences those changes itself, or supplies its own table rule.
+
 ### Extending the rules
 
 An application changes a rule by extending a component and supplying it from the
