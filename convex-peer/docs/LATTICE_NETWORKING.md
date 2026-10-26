@@ -233,7 +233,10 @@ Shutdown is composed in the opposite order: the application closes every
 transport, then `NodeServer.close()` asks each endpoint to drain and drains and
 closes each group. Each group cleanup is independent. Endpoint cleanup also
 continues after a timed-out acquisition so one stuck resource does not suppress
-the remaining cleanup steps. Closing neither publishes pending host state nor
+the remaining cleanup steps. After the drain the node stops accepting deliveries:
+an ingress worker that overran its timeout, or a pull that completes later, is
+rejected rather than merged, so nothing from networking changes the host once
+`close()` returns. Closing neither publishes pending host state nor
 flushes the store: the owning service then closes the host, which saves, and
 closes its store, as described in [persistence](PERSISTENCE.md#lifecycle).
 

@@ -172,7 +172,9 @@ the attached propagation endpoints.
 Shutdown order prevents new work racing store closure:
 
 1. the service stops requests and closes transports to stop admission;
-2. `NodeServer.close()` drains accepted messages and closes each group;
+2. `NodeServer.close()` drains accepted messages and closes each group; once it
+   returns, a worker that overran the drain or a late pull is rejected rather
+   than merged, so networking no longer changes the host;
 3. the service syncs any application drafts it wants retained;
 4. `LatticeHost.close()` stops automatic flushing and saves a final checkpoint;
 5. the service closes its store.

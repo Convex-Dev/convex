@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -1281,7 +1282,9 @@ public class NodeServerTest {
 	/**
 	 * Closing a node must not interrupt an ingress worker inside a store write: an
 	 * interrupt during Etch channel I/O closes the file channel for every user of
-	 * the store (#776). The worker outlives the drain timeout and is left to finish.
+	 * the store (#776). The worker outlives the drain timeout and is left to finish,
+	 * but its late merge is rejected: nothing from networking changes the host once
+	 * close returns (#777).
 	 */
 	@Test
 	public void testCloseDoesNotInterruptIngressStoreWrite() throws Exception {
@@ -1299,6 +1302,7 @@ public class NodeServerTest {
 			receiver.addPropagator(ingress);
 			selectInboundPropagator(receiver,connection -> ingress);
 			receiver.launch();
+			ACell rootBefore = primaryStore.getRootData();
 
 			// A complete, embedded value is accepted from an unverified connection and
 			// persisted into the group's store by the ingress worker.
@@ -1316,12 +1320,43 @@ public class NodeServerTest {
 			ingressStore.release();
 			assertTrue(ingressStore.finished.await(5, TimeUnit.SECONDS));
 			assertFalse(ingressStore.wasInterrupted(), "node close must never interrupt store I/O");
+
+			ingressStore.heldThread().join(5000);
+			assertFalse(ingressStore.heldThread().isAlive(), "the ingress worker should finish its message");
+			assertTrue(receiver.getLocalValue().isEmpty(), "a merge after close must not reach the host");
+			assertEquals(rootBefore, primaryStore.getRootData(), "a merge after close must not be saved");
 		} finally {
 			ingressStore.release();
 			if (receiver != null) receiver.close();
 			if (source != null) source.close();
 			ingressStore.close();
 			primaryStore.close();
+		}
+	}
+
+	/** A pull that completes after close must not merge into the host (#777). */
+	@Test
+	public void testPullCompletingAfterCloseDoesNotMerge() throws Exception {
+		CompletableFuture<ACell> remote = new CompletableFuture<>();
+		try (MemoryStore store = new MemoryStore()) {
+			LatticePropagator group = new LatticePropagator(store) {
+				@Override
+				public CompletableFuture<ACell> pullPath(Convex peer, boolean background, ACell... path) {
+					return remote;
+				}
+			};
+			NodeServer<ASet<ACell>> node = new TestNode<>(SetLattice.create(), store, NodeConfig.port(0));
+			node.addPropagator(group);
+			node.launch();
+			CompletableFuture<ACell> pulled = node.pullPath(group, null);
+
+			node.close();
+			remote.complete(Sets.of(CVMLong.create(777)));
+
+			ExecutionException failure = assertThrows(ExecutionException.class,
+				() -> pulled.get(5, TimeUnit.SECONDS));
+			assertInstanceOf(IllegalStateException.class, failure.getCause());
+			assertTrue(node.getLocalValue().isEmpty(), "a pull after close must not reach the host");
 		}
 	}
 

@@ -9,7 +9,9 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,6 +75,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private final Function<V,V> publisher=this::publishApplicationRoot;
 
+	/**
+	 * Admits deliveries from networking: inbound merges and pull results, each with
+	 * its host sync. Close shuts it after the ingress drain and waits for a delivery
+	 * in progress, so nothing from networking changes the host once close returns.
+	 */
+	private final ReentrantReadWriteLock deliveryGate=new ReentrantReadWriteLock();
+	private boolean acceptingDeliveries=true; // guarded by deliveryGate
+
 	/** Complete lifecycle for resources owned by the node host. */
 	enum LifecycleState {
 		NEW, STARTING, RUNNING, STOPPING, STOPPED
@@ -113,6 +123,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public synchronized void launch() throws IOException,InterruptedException {
 		validateLaunchRequest();
 		lifecycleState=LifecycleState.STARTING;
+		setAcceptingDeliveries(true);
 		try {
 			configurePublicationPipeline();
 			seedPropagationViews();
@@ -155,6 +166,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private void abortFailedLaunch(Throwable failure) {
 		lifecycleState=LifecycleState.STOPPING;
+		setAcceptingDeliveries(false);
 		for (LatticePropagator propagator:propagators) {
 			try {
 				propagator.close();
@@ -182,12 +194,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	public CompletableFuture<V> pull(LatticePropagator source,Convex peer) {
 		requireAttached(source);
-		return source.pull(peer).thenApply(acquired -> {
+		return source.pull(peer).thenApply(acquired -> deliver(() -> {
 			requireAttached(source);
 			mergePulledValue(acquired);
 			host.sync();
 			return cursor.get();
-		});
+		},NodeServer::stopped));
 	}
 
 	/**
@@ -208,12 +220,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public CompletableFuture<ACell> pullPath(LatticePropagator source,Convex peer,
 			boolean background,ACell... path) {
 		requireAttached(source);
-		return source.pullPath(peer,background,path).thenApply(acquired -> {
+		return source.pullPath(peer,background,path).thenApply(acquired -> deliver(() -> {
 			requireAttached(source);
 			if (acquired!=null) mergeIncoming(acquired,path);
 			host.sync();
-			return RT.getIn(cursor.get(),path);
-		});
+			return RT.<ACell>getIn(cursor.get(),path);
+		},NodeServer::stopped));
 	}
 
 	/**
@@ -260,12 +272,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public boolean pull(LatticePropagator source) {
 		requireAttached(source);
 		try {
-			for (ACell acquired:source.pullAll().get(30,TimeUnit.SECONDS)) {
-				requireAttached(source);
-				mergePulledValue(acquired);
-			}
-			host.sync();
-			return true;
+			List<ACell> values=source.pullAll().get(30,TimeUnit.SECONDS);
+			return deliver(() -> {
+				for (ACell acquired:values) {
+					requireAttached(source);
+					mergePulledValue(acquired);
+				}
+				host.sync();
+				return true;
+			},NodeServer::stopped);
 		} catch (Exception e) {
 			log.warn("Pull through propagation group failed",e);
 			return false;
@@ -555,12 +570,41 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * acquisition or filtering concern crosses this boundary.
 	 */
 	MergeOutcome mergeInbound(ACell[] path,ACell value) {
-		ACell before=cursor.get();
-		if (!mergeIncoming(value,path)) return MergeOutcome.REJECTED;
-		ACell after=cursor.get();
-		boolean changed=before!=after && (before==null || !before.equals(after));
-		if (changed) host.sync();
-		return new MergeOutcome(true,changed);
+		return deliver(() -> {
+			ACell before=cursor.get();
+			if (!mergeIncoming(value,path)) return MergeOutcome.REJECTED;
+			ACell after=cursor.get();
+			boolean changed=before!=after && (before==null || !before.equals(after));
+			if (changed) host.sync();
+			return new MergeOutcome(true,changed);
+		},() -> MergeOutcome.REJECTED);
+	}
+
+	/**
+	 * Runs one delivery from networking with its host sync, or {@code stopped} once
+	 * close has stopped deliveries. See {@link #deliveryGate}.
+	 */
+	private <T> T deliver(Supplier<T> delivery,Supplier<T> stopped) {
+		deliveryGate.readLock().lock();
+		try {
+			return acceptingDeliveries ? delivery.get() : stopped.get();
+		} finally {
+			deliveryGate.readLock().unlock();
+		}
+	}
+
+	private static <T> T stopped() {
+		throw new IllegalStateException("NodeServer is not running");
+	}
+
+	/** Waits for any delivery in progress when stopping deliveries. */
+	private void setAcceptingDeliveries(boolean accepting) {
+		deliveryGate.writeLock().lock();
+		try {
+			acceptingDeliveries=accepting;
+		} finally {
+			deliveryGate.writeLock().unlock();
+		}
 	}
 
 	boolean mergeIncoming(ACell value,ACell... path) {
@@ -582,7 +626,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Drains each group independently. Does not publish pending host edits or
-	 * flush its store; saving belongs to the owning host/service lifecycle.
+	 * flush its store; saving belongs to the owning host/service lifecycle. Once
+	 * close returns, no inbound merge or pull result changes the host until the
+	 * next launch.
 	 */
 	@Override
 	public synchronized void close() throws IOException {
@@ -599,6 +645,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// Attachment transfers lifecycle ownership even before launch. This matters
 			// when an application has already supplied manager-owned peer connections.
 			lifecycleState=LifecycleState.STOPPING;
+			setAcceptingDeliveries(false);
 			for (LatticePropagator propagator:propagators) {
 				runIsolated(propagator,"pre-launch shutdown",propagator::close);
 			}
@@ -614,6 +661,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"ingress drain",propagator::stopIngress);
 		}
+		// Work accepted before the drain has landed. An ingress worker that overran
+		// the drain timeout, or a late pull, is now rejected rather than merged.
+		setAcceptingDeliveries(false);
 
 		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"shutdown",propagator::close);
