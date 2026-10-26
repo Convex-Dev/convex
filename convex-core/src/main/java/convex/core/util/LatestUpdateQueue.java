@@ -19,7 +19,8 @@ import convex.core.exceptions.TODOException;
  */
 public class LatestUpdateQueue<E> implements BlockingQueue<E> {
 	private volatile E item;
-	
+	private boolean closed;
+
 	@Override
 	public synchronized boolean offer(E e) {
 		if (e==null) throw new IllegalArgumentException("Cannot offer a null value");
@@ -50,18 +51,39 @@ public class LatestUpdateQueue<E> implements BlockingQueue<E> {
 		wait();
 	}
 
+	/** Timed wait boundary, called with this queue's monitor held. */
+	void awaitUpdate(long nanos) throws InterruptedException {
+		TimeUnit.NANOSECONDS.timedWait(this,nanos);
+	}
+
 	@Override
 	public synchronized E poll(long timeout, TimeUnit unit) throws InterruptedException {
 		long remaining=unit.toNanos(timeout);
 		long start=System.nanoTime();
 		while (item==null) {
-			if (remaining<=0) return null;
-			TimeUnit.NANOSECONDS.timedWait(this,remaining);
+			if (closed || remaining<=0) return null;
+			awaitUpdate(remaining);
 			long now=System.nanoTime();
 			remaining-=now-start;
 			start=now;
 		}
 		return poll();
+	}
+
+	/**
+	 * Wakes the consumer and stops timed polls from waiting: while closed, a timed
+	 * poll with no item queued returns {@code null} at once, so the consumer can stop
+	 * without being interrupted. Offers are still accepted, so an owner can hand
+	 * over a final item after closing. {@link #take()} is unaffected.
+	 */
+	public synchronized void close() {
+		closed=true;
+		notifyAll();
+	}
+
+	/** Lets timed polls wait again after {@link #close()}, for example when a service restarts. */
+	public synchronized void open() {
+		closed=false;
 	}
 	
 	@Override

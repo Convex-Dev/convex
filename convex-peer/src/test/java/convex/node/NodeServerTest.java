@@ -1278,6 +1278,53 @@ public class NodeServerTest {
 		}
 	}
 
+	/**
+	 * Closing a node must not interrupt an ingress worker inside a store write: an
+	 * interrupt during Etch channel I/O closes the file channel for every user of
+	 * the store (#776). The worker outlives the drain timeout and is left to finish.
+	 */
+	@Test
+	public void testCloseDoesNotInterruptIngressStoreWrite() throws Exception {
+		MemoryStore primaryStore = new MemoryStore();
+		BlockingWriteStore ingressStore = new BlockingWriteStore("Lattice propagator ingress");
+		NodeServer<ASet<ACell>> receiver = null;
+		ConvexRemote source = null;
+		try {
+			LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+				LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.create(100)));
+			LatticePropagator primary = new LatticePropagator(primaryStore,groupConfig);
+			LatticePropagator ingress = new LatticePropagator(ingressStore,groupConfig);
+			receiver = new TestNode<>(SetLattice.create(), primaryStore, NodeConfig.port(0));
+			receiver.addPropagator(primary);
+			receiver.addPropagator(ingress);
+			selectInboundPropagator(receiver,connection -> ingress);
+			receiver.launch();
+
+			// A complete, embedded value is accepted from an unverified connection and
+			// persisted into the group's store by the ingress worker.
+			source = ConvexRemote.connect(address(receiver));
+			AVector<?> payload = Vectors.create(
+				MessageTag.LATTICE_VALUE, null, Vectors.empty(), Sets.of(CVMLong.create(776)));
+			assertTrue(source.trySend(Message.create(
+				MessageType.LATTICE_VALUE, payload, payload.getEncoding())));
+			assertTrue(ingressStore.entered.await(5, TimeUnit.SECONDS),
+				"the ingress worker should enter the controlled store write");
+
+			receiver.close();
+			assertEquals(NodeServer.LifecycleState.STOPPED,receiver.getLifecycleState());
+
+			ingressStore.release();
+			assertTrue(ingressStore.finished.await(5, TimeUnit.SECONDS));
+			assertFalse(ingressStore.wasInterrupted(), "node close must never interrupt store I/O");
+		} finally {
+			ingressStore.release();
+			if (receiver != null) receiver.close();
+			if (source != null) source.close();
+			ingressStore.close();
+			primaryStore.close();
+		}
+	}
+
 	// ===== #567: public URL validation =====
 
 	/**

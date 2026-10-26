@@ -57,7 +57,7 @@ public final class LatticePropagatorConfig {
 	/** Maximum encoded bytes retained by this group's inbound queue. */
 	public static final AString MAX_INBOUND_QUEUE_BYTES=Strings.intern("maxInboundQueueBytes");
 
-	/** Time allowed for this group's endpoint to drain during shutdown. */
+	/** Time allowed for each of this group's workers, ingress and publication, to drain during shutdown. */
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT=Strings.intern("inboundShutdownTimeout");
 
 	/** Conservative public-route message limit. */
@@ -216,7 +216,7 @@ public final class LatticePropagatorConfig {
 		return value;
 	}
 
-	/** Returns the endpoint shutdown timeout in milliseconds. */
+	/** Returns the per-worker shutdown drain timeout in milliseconds. */
 	public long getInboundShutdownTimeout() {
 		CVMLong configured=RT.ensureLong(config.get(INBOUND_SHUTDOWN_TIMEOUT));
 		long value=(configured==null) ? DEFAULT_INBOUND_SHUTDOWN_TIMEOUT : configured.longValue();

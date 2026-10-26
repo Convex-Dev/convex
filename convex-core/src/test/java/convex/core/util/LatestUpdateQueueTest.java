@@ -90,6 +90,43 @@ class LatestUpdateQueueTest {
 			assertNull(queue.poll(1,TimeUnit.NANOSECONDS)));
 	}
 
+	/** Close is how an owner stops its consumer without interrupting it (#776). */
+	@Test
+	void closeWakesWaitingTimedPoll() throws Exception {
+		CountDownLatch waiting=new CountDownLatch(1);
+		LatestUpdateQueue<Integer> queue=new LatestUpdateQueue<>() {
+			@Override
+			void awaitUpdate(long nanos) throws InterruptedException {
+				waiting.countDown();
+				super.awaitUpdate(nanos);
+			}
+		};
+		try (var executor=Executors.newSingleThreadExecutor()) {
+			var result=executor.submit(() -> queue.poll(1,TimeUnit.HOURS));
+			try {
+				assertTrue(waiting.await(10,TimeUnit.SECONDS));
+				queue.close();
+				assertNull(result.get(10,TimeUnit.SECONDS),"close must end a waiting timed poll");
+			} finally {
+				result.cancel(true);
+			}
+		}
+	}
+
+	@Test
+	void closedQueueHandsOverFinalItemThenStopsWaiting() throws Exception {
+		LatestUpdateQueue<Integer> queue=new LatestUpdateQueue<>();
+		queue.close();
+		assertTrue(queue.offer(7),"offers are still accepted after close");
+		assertTimeoutPreemptively(Duration.ofSeconds(10),() -> {
+			assertEquals(7,queue.poll(1,TimeUnit.HOURS));
+			assertNull(queue.poll(1,TimeUnit.HOURS));
+		});
+
+		queue.open();
+		assertNull(queue.poll(1,TimeUnit.MILLISECONDS),"an open queue waits for its timeout");
+	}
+
 	@Test
 	void timedPollReceivesOfferedValue() throws Exception {
 		LatestUpdateQueue<Integer> queue=new LatestUpdateQueue<>();

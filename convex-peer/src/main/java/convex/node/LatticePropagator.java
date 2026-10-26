@@ -701,6 +701,7 @@ public class LatticePropagator implements Closeable {
 			connectionManager.start();
 			if (protocol!=null) protocol.start();
 
+			triggerQueue.open();
 			running = true;
 			lastBroadcastTime = 0L;
 			lastRootSyncTime = 0L;
@@ -755,19 +756,17 @@ public class LatticePropagator implements Closeable {
 			// holding a node snapshot must not enqueue after shutdown has finished.
 			running = false;
 			if (finalValue != null) triggerQueue.offer(finalValue);
-		}
-
-		if (finalValue == null && propagationThread != null) {
-			propagationThread.interrupt(); // wake thread from poll wait
+			// Wakes a waiting worker. Never interrupt it: it may be inside store
+			// I/O, and NIO closes an interrupted thread's file channel for every
+			// user of the store (#776).
+			triggerQueue.close();
 		}
 
 		if (propagationThread != null) {
 			try {
-				propagationThread.join(10_000);
+				propagationThread.join(config.getInboundShutdownTimeout());
 				if (propagationThread.isAlive()) {
-					log.warn("LatticePropagator thread did not drain within timeout, interrupting");
-					propagationThread.interrupt();
-					propagationThread.join(2000);
+					log.warn("LatticePropagator thread did not drain within timeout, leaving it to finish");
 				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();

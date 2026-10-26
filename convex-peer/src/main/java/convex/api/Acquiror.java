@@ -31,8 +31,10 @@ import convex.core.util.Utils;
  * One-shot, lifecycle-aware acquisition of a complete CAD3 value tree.
  *
  * <p>An Acquiror owns its virtual worker. Cancelling its future or calling
- * {@link #close()} interrupts that worker and its current request. Callers that must
- * know the worker can no longer touch its destination store can additionally use
+ * {@link #close()} cancels the current request, and the worker stops at its next
+ * step. The worker is never interrupted: it may be inside store I/O, which an
+ * interrupt can break for every user of the store. Callers that must know the
+ * worker can no longer touch its destination store can additionally use
  * {@link #awaitTermination(long, TimeUnit)}.
  *
  * <p>The request transport is deliberately abstract. Ordinary clients use the
@@ -55,7 +57,6 @@ public final class Acquiror implements AutoCloseable {
 	private final CompletableFuture<ACell> future = new CompletableFuture<>();
 	private final CompletableFuture<Void> termination = new CompletableFuture<>();
 
-	private volatile Thread worker;
 	private volatile CompletableFuture<Result> currentRequest;
 	private volatile boolean closed;
 	private boolean started;
@@ -112,9 +113,7 @@ public final class Acquiror implements AutoCloseable {
 		if (!started && !closed) {
 			started = true;
 			log.trace("Trying to acquire remotely: {}", hash);
-			Thread thread = Thread.ofVirtual().name("Acquiror").unstarted(this::run);
-			worker = thread;
-			thread.start();
+			Thread.ofVirtual().name("Acquiror").start(this::run);
 		}
 		if (closed && !future.isDone()) future.cancel(false);
 		return (CompletableFuture<T>) (CompletableFuture<?>) future;
@@ -204,6 +203,7 @@ public final class Acquiror implements AutoCloseable {
 		}
 
 		for (int i = 0; i < requested.length; i++) {
+			if (closed) throw new CancellationException("Acquisition closed");
 			ACell value = values.get(i);
 			if (value == null) {
 				throw new MissingDataException(store, requested[i]);
@@ -244,7 +244,7 @@ public final class Acquiror implements AutoCloseable {
 		}
 	}
 
-	/** Cancels the current request and interrupts this Acquiror's owned worker. */
+	/** Cancels the current request. The owned worker stops at its next step. */
 	@Override
 	public void close() {
 		cancelOwnedWork();
@@ -253,14 +253,10 @@ public final class Acquiror implements AutoCloseable {
 
 	private synchronized void cancelOwnedWork() {
 		closed = true;
+		// Cancelling the request wakes a worker waiting for it. The worker checks
+		// closed after publishing each request, so one of the two always sees the other.
 		CompletableFuture<Result> request = currentRequest;
 		if (request != null) request.cancel(true);
-		interruptWorker();
 		if (!started) termination.complete(null);
-	}
-
-	private void interruptWorker() {
-		Thread thread = worker;
-		if (thread != null) thread.interrupt();
 	}
 }

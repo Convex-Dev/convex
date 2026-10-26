@@ -125,6 +125,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	synchronized void start() {
 		if (inboundRunning) return;
 		if (inboundThread!=null) throw new IllegalStateException("Previous ingress worker is still active");
+		inboundQueue.open();
 		inboundRunning=true;
 		acceptingInbound=true;
 		synchronized (acquisitionLifecycleLock) {
@@ -836,10 +837,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 		// Continue every independent cleanup step even when one acquisition or
 		// worker refuses to stop. NodeServer isolates the eventual group failure,
 		// but the group should still release everything else that it can.
-		inboundQueue.signalAll();
+		// Closing the queue wakes the worker once it has drained. Never interrupt
+		// it: it may be inside store I/O, and NIO closes an interrupted thread's
+		// file channel for every user of the store (#776).
+		inboundQueue.close();
 		Thread worker=inboundThread;
 		if (worker!=null) {
-			worker.interrupt();
 			try {
 				worker.join(config.getInboundShutdownTimeout());
 			} catch (InterruptedException e) {

@@ -35,6 +35,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
@@ -535,6 +536,48 @@ public class LatticePropagatorTest {
 		propagator.triggerAndClose(finalValue);
 		assertEquals(finalValue, propagator.getLastAnnouncedValue(),
 			"Final value must be announced even when the loop exited before the offer");
+	}
+
+	/**
+	 * Closing must not interrupt the publication worker inside a store write: an
+	 * interrupt during Etch channel I/O closes the file channel for every user of
+	 * the store (#776). The worker outlives the drain timeout and is left to finish.
+	 */
+	@Test
+	public void testCloseDoesNotInterruptPublicationStoreWrite() throws Exception {
+		try (BlockingWriteStore store = new BlockingWriteStore("Lattice propagator thread")) {
+			LatticePropagator propagator = new LatticePropagator(store, LatticePropagatorConfig.create(
+				Maps.of(LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.create(100))));
+			propagator.start();
+			try {
+				propagator.triggerBroadcast(CVMLong.create(776));
+				assertTrue(store.entered.await(5, TimeUnit.SECONDS),
+					"the publication worker should enter the controlled store write");
+				propagator.close();
+				assertEquals(LatticePropagator.State.STOPPED, propagator.getStatus().state());
+			} finally {
+				store.release();
+			}
+			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
+			assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
+		}
+	}
+
+	/** Close wakes an idle publication worker without interrupting it (#776). */
+	@Test
+	public void testCloseEndsIdlePublicationWorker() throws Exception {
+		try (BlockingWriteStore store = new BlockingWriteStore("Lattice propagator thread")) {
+			store.release();
+			LatticePropagator propagator = new LatticePropagator(store);
+			propagator.start();
+			propagator.triggerBroadcast(CVMLong.create(776));
+			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
+			Thread worker = store.heldThread();
+
+			propagator.close();
+			assertFalse(worker.isAlive(), "close must end an idle worker within the drain timeout");
+			assertFalse(store.wasInterrupted());
+		}
 	}
 
 	/**

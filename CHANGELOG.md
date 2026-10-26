@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep a lattice node's Etch store usable when the node closes or a peer disconnects mid-acquisition. ([#776](https://github.com/Convex-Dev/convex/issues/776))
+
 ## [0.8.18] - 2026-10-25
 
 ### Added
