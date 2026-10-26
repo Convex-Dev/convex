@@ -223,6 +223,10 @@ writes begin, a crash may preserve any mixture of them; exact rollback to the la
 generation is not guaranteed, because in-place index pages can be written back by the
 operating system before `sync`.
 
+Interrupting a thread does not abort its `sync` or file growth, or close the file
+for other threads: both complete, and the thread keeps its interrupt status for its
+next blocking call.
+
 Normal access trusts synced bytes without recomputing content hashes, but still
 bounds every access and fails on structural errors it meets. Full content
 verification belongs to `etch validate`, migration verification and repair.

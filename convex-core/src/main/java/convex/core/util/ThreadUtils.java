@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -111,6 +112,83 @@ public class ThreadUtils {
 		getVirtualExecutor().execute(() -> {
 			Thread.currentThread().setName(name);
 			task.run();
+		});
+	}
+
+	/**
+	 * Daemon platform threads for blocking calls that must not be interrupted. Threads
+	 * start on demand and expire when idle; the pool is never shut down and its tasks
+	 * are never cancelled, so nothing interrupts them. Platform threads, because callers
+	 * may wait while holding a monitor: on JDK 21 to 23, virtual threads queued on that
+	 * monitor pin their carriers and could leave a virtual worker no carrier to run on.
+	 */
+	private static final ExecutorService UNINTERRUPTIBLE=Executors.newCachedThreadPool(r -> {
+		Thread t=new Thread(r,"convex-uninterruptible");
+		t.setDaemon(true);
+		return t;
+	});
+
+	/** A blocking call returning a value. */
+	@FunctionalInterface
+	public interface BlockingCall<T,E extends Exception> {
+		T call() throws E;
+	}
+
+	/** A blocking call returning nothing. */
+	@FunctionalInterface
+	public interface BlockingAction<E extends Exception> {
+		void run() throws E;
+	}
+
+	/**
+	 * Runs a blocking call to completion on a pooled thread that nothing interrupts.
+	 * The caller waits without being interruptible, then restores its own interrupt
+	 * status. Use this for calls that an interrupt would break for other threads, such
+	 * as operations on a shared {@code FileChannel}, which Java closes when a thread
+	 * using it is interrupted. The call must not wait on the calling thread, or on
+	 * locks it holds.
+	 *
+	 * @param <T> Result type
+	 * @param <E> Checked exception the call may throw
+	 * @param call Blocking call
+	 * @return Result of the call
+	 * @throws E If the call throws it
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T,E extends Exception> T callUninterruptibly(BlockingCall<T,E> call) throws E {
+		Future<T> future=UNINTERRUPTIBLE.submit(call::call);
+		boolean interrupted=false;
+		try {
+			while (true) {
+				try {
+					return future.get();
+				} catch (InterruptedException e) {
+					interrupted=true;
+				} catch (ExecutionException e) {
+					Throwable cause=e.getCause();
+					if (cause instanceof RuntimeException runtime) throw runtime;
+					if (cause instanceof Error error) throw error;
+					// The call declares no other checked exception
+					throw (E)cause;
+				}
+			}
+		} finally {
+			if (interrupted) Thread.currentThread().interrupt();
+		}
+	}
+
+	/**
+	 * Runs a blocking action to completion on a pooled thread that nothing interrupts,
+	 * as {@link #callUninterruptibly}.
+	 *
+	 * @param <E> Checked exception the action may throw
+	 * @param action Blocking action
+	 * @throws E If the action throws it
+	 */
+	public static <E extends Exception> void runUninterruptibly(BlockingAction<E> action) throws E {
+		ThreadUtils.<Void,E>callUninterruptibly(() -> {
+			action.run();
+			return null;
 		});
 	}
 }

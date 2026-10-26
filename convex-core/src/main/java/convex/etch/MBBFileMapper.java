@@ -8,6 +8,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.ArrayList;
 
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 
 /**
@@ -188,7 +189,7 @@ final class MBBFileMapper extends AFileMapper {
 		long position=((long)regionIndex)*EtchConstants.MAX_REGION_SIZE;
 		int length;
 		if (!writable) {
-			long fileSize=channel.size();
+			long fileSize=ThreadUtils.callUninterruptibly(channel::size);
 			if (requiredEnd>fileSize) {
 				throw new IOException("Read beyond physical Etch file: end="+requiredEnd+" size="+fileSize);
 			}
@@ -204,7 +205,9 @@ final class MBBFileMapper extends AFileMapper {
 			length=(int)EtchConstants.MAX_REGION_SIZE;
 		}
 
-		MappedByteBuffer mapped=channel.map(readOnly?MapMode.READ_ONLY:MapMode.READ_WRITE,position,length);
+		MapMode mode=readOnly?MapMode.READ_ONLY:MapMode.READ_WRITE;
+		int mappedLength=length;
+		MappedByteBuffer mapped=ThreadUtils.callUninterruptibly(() -> channel.map(mode,position,mappedLength));
 		regionMap.set(regionIndex,mapped);
 		return mapped;
 	}
@@ -215,7 +218,7 @@ final class MBBFileMapper extends AFileMapper {
 		for (MappedByteBuffer mapped: regionMap) {
 			if (mapped!=null) mapped.force();
 		}
-		channel.force(false);
+		ThreadUtils.runUninterruptibly(() -> channel.force(false));
 	}
 
 	@Override
