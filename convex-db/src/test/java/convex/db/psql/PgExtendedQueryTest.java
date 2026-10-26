@@ -39,6 +39,9 @@ public class PgExtendedQueryTest {
 	private SQLDatabase db;
 	private String dbName;
 	private EmbeddedChannel channel;
+	/** JDBC statements prepared on the handler's connection, and how many of them are still open */
+	private final AtomicInteger prepares = new AtomicInteger();
+	private final AtomicInteger openStatements = new AtomicInteger();
 
 	@BeforeEach
 	public void setUp() {
@@ -56,7 +59,7 @@ public class PgExtendedQueryTest {
 
 		channel = new EmbeddedChannel(new PgProtocolHandler(() -> {
 			try {
-				return DriverManager.getConnection("jdbc:convex:database=" + dbName);
+				return tracked(DriverManager.getConnection("jdbc:convex:database=" + dbName));
 			} catch (SQLException e) {
 				throw new RuntimeException(e);
 			}
@@ -138,7 +141,76 @@ public class PgExtendedQueryTest {
 		assertEquals("12D[Bob]CZ", query("SELECT name FROM users WHERE id = $1", PgType.INT8, "2"));
 	}
 
+	// ========== Prepared statement reuse ==========
+
+	/** A failed execution, in binding or in executing, leaves the statement working after Sync. */
+	@Test
+	public void testStatementWorksAfterError() {
+		parse("s1", "SELECT 10 / $1 FROM users WHERE id = 2", PgType.INT8);
+		assertEquals("2D[2]CZ", run("s1", "5"));
+		assertEquals("2E(XX000)Z", run("s1", "0"), "division by zero fails in executing");
+		assertEquals("2D[5]CZ", run("s1", "2"));
+		assertEquals("2E(22P02)Z", run("s1", "abc"), "invalid text fails in binding");
+		assertEquals("2D[10]CZ", run("s1", "1"));
+		assertEquals(1, prepares.get(), "every execution uses the statement's one JDBC statement");
+	}
+
+	/** A Parse under the name of an open statement replaces it, and Close closes it. */
+	@Test
+	public void testParseReplacesStatement() {
+		parse("s1", "SELECT name FROM users WHERE id = $1", PgType.INT8);
+		assertEquals("2D[Bob]CZ", run("s1", "2"));
+		parse("s1", "SELECT email FROM users WHERE id = $1", PgType.INT8);
+		assertEquals("2D[bob@example.com]CZ", run("s1", "2"));
+		assertEquals("2D[alice@example.com]CZ", run("s1", "1"));
+		assertEquals(2, prepares.get());
+		assertEquals(1, openStatements.get(), "the replaced statement's JDBC statement is closed");
+
+		channel.writeInbound(new PgMessageDecoder.Close((byte) 'S', "s1"));
+		channel.writeInbound(PgMessageDecoder.Sync.INSTANCE);
+		assertEquals("3Z", responses());
+		assertEquals(0, openStatements.get());
+	}
+
+	/** A later execution binds only its own values: a parameter it does not supply is not the previous one. */
+	@Test
+	public void testParametersClearedBetweenExecutions() {
+		parse("s1", "SELECT name FROM users WHERE id = $1 OR email = $2", PgType.INT8, PgType.VARCHAR);
+		assertEquals("2D[Alice]D[Bob]CZ", run("s1", "1", "bob@example.com"));
+		assertEquals("2E(42000)Z", run("s1", "1"), "the second parameter is unbound, not bob@example.com");
+		assertEquals("2D[Alice]D[Bob]CZ", run("s1", "2", "alice@example.com"));
+	}
+
+	/** Every JDBC statement kept for a statement is closed when the connection ends, also after an error. */
+	@Test
+	public void testConnectionEndClosesStatements() {
+		parse("s1", "SELECT name FROM users WHERE id = $1", PgType.INT8);
+		parse("s2", "SELECT 10 / $1 FROM users WHERE id = 2", PgType.INT8);
+		assertEquals("2D[Bob]CZ", run("s1", "2"));
+		assertEquals("2E(XX000)Z", run("s2", "0"));
+		assertEquals("12D[Alice]CZ", query("SELECT name FROM users WHERE id = $1", PgType.INT8, "1"));
+		assertEquals(3, openStatements.get());
+
+		channel.close();
+		assertEquals(0, openStatements.get());
+	}
+
 	// ========== Helpers ==========
+
+	/** Parses a statement, then syncs. */
+	private void parse(String name, String sql, int... types) {
+		channel.writeInbound(new PgMessageDecoder.Parse(name, sql, types));
+		channel.writeInbound(PgMessageDecoder.Sync.INSTANCE);
+		assertEquals("1Z", responses());
+	}
+
+	/** Binds and executes a parsed statement with text parameters, then syncs. */
+	private String run(String statement, String... values) {
+		bind(statement, values);
+		channel.writeInbound(new PgMessageDecoder.Execute("", 0));
+		channel.writeInbound(PgMessageDecoder.Sync.INSTANCE);
+		return responses();
+	}
 
 	/** Parses, binds and executes a query with one text parameter, then syncs. */
 	private String query(String sql, int type, String value) {
@@ -173,6 +245,33 @@ public class PgExtendedQueryTest {
 			});
 		PgProtocolHandler.bindTextParameter(statement, 1, text, oid);
 		return value[0];
+	}
+
+	/** The connection, counting the statements prepared on it and keeping track of which are closed. */
+	private java.sql.Connection tracked(java.sql.Connection connection) {
+		return (java.sql.Connection) java.lang.reflect.Proxy.newProxyInstance(
+			PgExtendedQueryTest.class.getClassLoader(), new Class<?>[] {java.sql.Connection.class},
+			(proxy, method, args) -> {
+				Object result = invoke(connection, method, args);
+				if (!method.getName().equals("prepareStatement")) return result;
+				prepares.incrementAndGet();
+				openStatements.incrementAndGet();
+				java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
+				return java.lang.reflect.Proxy.newProxyInstance(
+					PgExtendedQueryTest.class.getClassLoader(), new Class<?>[] {java.sql.PreparedStatement.class},
+					(p, m, a) -> {
+						if (m.getName().equals("close") && closed.compareAndSet(false, true)) openStatements.decrementAndGet();
+						return invoke(result, m, a);
+					});
+			});
+	}
+
+	private static Object invoke(Object target, java.lang.reflect.Method method, Object[] args) throws Throwable {
+		try {
+			return method.invoke(target, args);
+		} catch (java.lang.reflect.InvocationTargetException e) {
+			throw e.getCause();
+		}
 	}
 
 	/** Reads and summarises everything the handler has written since the last call. */
