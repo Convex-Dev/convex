@@ -2,6 +2,7 @@ package convex.db.calcite;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -12,6 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
+import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -129,7 +134,36 @@ public class PlanBindingTest {
 		assertEquals(List.of("[3, three]", "[4, four]"), rows(scan));
 	}
 
+	/**
+	 * A plan's binding is taken a moment after its row type was validated. If the table
+	 * changed in between, the binding is refused rather than paired with the old row type.
+	 */
+	@Test
+	void testBindRefusesTableChangedSinceValidation() {
+		ConvexTable table = new ConvexSchema(db, dbName).getConvexTable("T");
+		RelDataTypeFactory typeFactory = new JavaTypeFactoryImpl(ConvexTypeSystem.INSTANCE);
+		RelOptTable validated = validatedAs(table.getRowType(typeFactory));
+		assertEquals(db.tables().getBinding("T"), table.bind(validated, typeFactory));
+
+		assertTrue(db.tables().dropTable("T"));
+		db.tables().createTable("T", new String[] {"ID", "N", "V"}, new ConvexColumnType[] {
+			ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.of(ConvexType.VARCHAR)});
+		assertThrows(StalePlanException.class, () -> table.bind(validated, typeFactory));
+
+		assertTrue(db.tables().dropTable("T"));
+		assertThrows(StalePlanException.class, () -> table.bind(validated, typeFactory));
+	}
+
 	// ========== Helpers ==========
+
+	/** A table as the validator saw it, of which binding asks only the row type. */
+	private static RelOptTable validatedAs(RelDataType rowType) {
+		return (RelOptTable) Proxy.newProxyInstance(PlanBindingTest.class.getClassLoader(),
+			new Class<?>[] {RelOptTable.class}, (proxy, method, args) -> {
+				if (method.getName().equals("getRowType")) return rowType;
+				throw new UnsupportedOperationException(method.getName());
+			});
+	}
 
 	private void execute(String sql) throws SQLException {
 		try (Statement stmt = conn.createStatement()) {

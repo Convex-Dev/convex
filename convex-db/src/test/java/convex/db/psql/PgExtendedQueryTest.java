@@ -230,6 +230,22 @@ public class PgExtendedQueryTest {
 		assertEquals(1, openStatements.get());
 	}
 
+	/** A join fails on its changed table before it sends any row, so it is prepared again cleanly. */
+	@Test
+	public void testJoinPreparedAgainAfterTableChange() {
+		db.tables().insert("items", 2L, 2.5, true);
+		parse("s1", "SELECT u.name, i.price FROM users u JOIN items i ON u.id = i.id WHERE i.price > $1", PgType.FLOAT8);
+		assertEquals("2D[Bob, 2.5]CZ", run("s1", "0"));
+
+		assertTrue(db.tables().dropTable("items"));
+		db.tables().createTable("items", new String[]{"id", "active", "price"}, new ConvexColumnType[] {
+			ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.of(ConvexType.BOOLEAN), ConvexColumnType.of(ConvexType.DOUBLE)});
+		db.tables().insert("items", 1L, true, 1.5);
+		db.tables().insert("items", 2L, false, 3.5);
+		assertEquals("2D[Alice, 1.5]D[Bob, 3.5]CZ", run("s1", "0"));
+		assertEquals(2, prepares.get());
+	}
+
 	/** A kept statement fails while its table is dropped, and works again once the table is back as it was. */
 	@Test
 	public void testStatementAfterTableDropped() {
