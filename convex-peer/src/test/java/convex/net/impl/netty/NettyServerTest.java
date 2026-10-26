@@ -38,6 +38,18 @@ import io.netty.channel.embedded.EmbeddedChannel;
 @TestInstance(Lifecycle.PER_CLASS)
 public class NettyServerTest {
 
+	/**
+	 * Netty's event loop threads must be daemon threads: the shutdown hook that
+	 * stops them only runs once the JVM begins to exit, which a live non-daemon
+	 * thread prevents, so a program that returns from main would hang (#777).
+	 */
+	@Test public void testEventLoopThreadsAreDaemon() throws Exception {
+		Thread boss=NettyServer.getEventLoopGroup().next().submit(Thread::currentThread).get(5,TimeUnit.SECONDS);
+		assertTrue(boss.isDaemon(), "non-daemon boss event loop thread: "+boss.getName());
+		Thread worker=NettyConnection.getEventLoopGroup().next().submit(Thread::currentThread).get(5,TimeUnit.SECONDS);
+		assertTrue(worker.isDaemon(), "non-daemon worker event loop thread: "+worker.getName());
+	}
+
 	@Test public void testServerSetup() throws IOException, InterruptedException, TimeoutException, BadFormatException {
 		try (NettyServer server = new NettyServer(0)) {
 			server.launch();

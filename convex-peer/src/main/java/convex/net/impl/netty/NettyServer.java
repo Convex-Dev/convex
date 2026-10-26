@@ -35,6 +35,7 @@ import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.GlobalEventExecutor;
 
 public class NettyServer extends AServer {
@@ -73,8 +74,11 @@ public class NettyServer extends AServer {
 
 	protected synchronized static EventLoopGroup getEventLoopGroup() {
 		if (bossGroup!=null) return bossGroup;
-		// Boss group only accepts inbound connections — 1 thread is sufficient
-		bossGroup=new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+		// Boss group only accepts inbound connections — 1 thread is sufficient.
+		// Daemon, like the worker group: the shutdown hook that stops it only runs
+		// once the JVM begins to exit, which a live non-daemon thread prevents.
+		DefaultThreadFactory tf = new DefaultThreadFactory("convex-netty-boss", true);
+		bossGroup=new MultiThreadIoEventLoopGroup(1, tf, NioIoHandler.newFactory());
 		Shutdown.addHook(Shutdown.SERVER,()->{
 			EventLoopGroup bg=bossGroup;
 			if (bg!=null) {
