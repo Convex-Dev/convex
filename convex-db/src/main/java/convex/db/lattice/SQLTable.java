@@ -1,5 +1,7 @@
 package convex.db.lattice;
 
+import java.util.Objects;
+
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -13,13 +15,18 @@ import convex.lattice.cursor.AForkableCursor;
 /**
  * A single SQL table within the lattice table store.
  *
- * <p>Wraps a lattice cursor pointing at the table's state vector: [schema, rows, utime, liveCount]
+ * <p>Wraps a lattice cursor pointing at the table's state vector: [schema, rows, utime, liveCount, version]
  * <ul>
  *   <li>schema (AVector) - Column definitions: [[name, type, precision, scale], ...]</li>
  *   <li>rows (Index) - Row data: primary-key (ABlob) → row entry</li>
  *   <li>utime (CVMLong) - Schema update timestamp for LWW</li>
  *   <li>liveCount (CVMLong) - Number of live (non-tombstone) rows</li>
+ *   <li>version (CVMLong) - Format version (CAD039); absent in version 0 entries</li>
  * </ul>
+ *
+ * <p>This implementation reads and writes version 0. Entries without a version field
+ * keep exactly their four fields; merges and row updates carry a version field when
+ * there is one, and tables of a higher version are refused rather than misread.
  *
  * <p>Schema is immutable after creation (for now). Row data merges independently.
  *
@@ -36,6 +43,11 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	static final int POS_UTIME = 2;
 	/** Position of live row count */
 	static final int POS_LIVE_COUNT = 3;
+	/** Position of the format version, absent in version 0 entries */
+	static final int POS_VERSION = 4;
+
+	/** Highest table format version this implementation reads and writes */
+	public static final long SUPPORTED_VERSION = 0;
 
 	SQLTable(AForkableCursor<AVector<ACell>> cursor) {
 		super(cursor);
@@ -72,6 +84,22 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 */
 	static boolean isLiveState(AVector<ACell> state) {
 		return state != null && state.get(POS_SCHEMA) != null;
+	}
+
+	/**
+	 * Gets the format version of a raw table state: 0 when it has no version field,
+	 * and -1, which no implementation supports, when the field is not an integer.
+	 */
+	static long getVersion(AVector<ACell> state) {
+		if (state == null || state.count() <= POS_VERSION) return 0;
+		ACell version = state.get(POS_VERSION);
+		if (version == null) return 0;
+		return (version instanceof CVMLong v) ? v.longValue() : -1;
+	}
+
+	/** Whether this implementation can read and write tables of the given version. */
+	static boolean isSupportedVersion(long version) {
+		return version >= 0 && version <= SUPPORTED_VERSION;
 	}
 
 	// ========== Cursor-backed Instance Methods ==========
@@ -114,6 +142,13 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
 		return (CVMLong) state.get(POS_UTIME);
+	}
+
+	/**
+	 * Gets the table's format version: 0 for an entry without a version field.
+	 */
+	public long getVersion() {
+		return getVersion(cursor().get());
 	}
 
 	/**
@@ -187,6 +222,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 		boolean[] result = new boolean[1];
 		cursor().updateAndGet(state -> {
 			if (state == null || state.get(POS_SCHEMA) == null) return state;
+			requireSupportedVersion(state);
 			Index<ABlob, AVector<ACell>> rows = (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
 			if (rows == null) rows = TableLattice.INSTANCE.zero();
 			// Check if this insert adds a new live row
@@ -195,7 +231,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			rows = rows.assoc(pk, SQLRow.create(values, timestamp));
 			long liveCount = getLiveCount(state) + (addsLive ? 1 : 0);
 			result[0] = true;
-			return Vectors.of(state.get(POS_SCHEMA), rows, timestamp, CVMLong.create(liveCount));
+			return entry(state.get(POS_SCHEMA), rows, timestamp, liveCount, versionField(state));
 		});
 		return result[0];
 	}
@@ -212,6 +248,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 		boolean[] result = new boolean[1];
 		cursor().updateAndGet(state -> {
 			if (state == null || state.get(POS_SCHEMA) == null) return state;
+			requireSupportedVersion(state);
 			Index<ABlob, AVector<ACell>> rows = (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
 			if (rows == null) return state;
 			AVector<ACell> row = rows.get(key);
@@ -219,12 +256,35 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			rows = rows.assoc(key, SQLRow.createTombstone(timestamp));
 			long liveCount = getLiveCount(state) - 1;
 			result[0] = true;
-			return Vectors.of(state.get(POS_SCHEMA), rows, timestamp, CVMLong.create(liveCount));
+			return entry(state.get(POS_SCHEMA), rows, timestamp, liveCount, versionField(state));
 		});
 		return result[0];
 	}
 
 	// ========== Helpers ==========
+
+	/**
+	 * Builds a live table state, with a version field only when there is one to carry,
+	 * so that version 0 entries keep exactly their four fields.
+	 */
+	private static AVector<ACell> entry(ACell schema, ACell rows, ACell utime, long liveCount, ACell version) {
+		CVMLong count = CVMLong.create(liveCount);
+		if (version == null) return Vectors.of(schema, rows, utime, count);
+		return Vectors.of(schema, rows, utime, count, version);
+	}
+
+	/** The version field of a state, or null when it has none. */
+	private static ACell versionField(AVector<ACell> state) {
+		return (state.count() > POS_VERSION) ? state.get(POS_VERSION) : null;
+	}
+
+	private static void requireSupportedVersion(AVector<ACell> state) {
+		long version = getVersion(state);
+		if (!isSupportedVersion(version)) {
+			throw new IllegalStateException("Table uses format version " + version
+				+ ", which this version of Convex DB cannot read or write");
+		}
+	}
 
 	/**
 	 * Extracts the live count from a state vector, handling legacy format.
@@ -297,7 +357,21 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			liveCount = computeLiveCount(mergedRows);
 		}
 
+		// The schema winner's version. On a tie of timestamp and schema the higher version
+		// is kept, restoring a version that an older implementation dropped when it
+		// rebuilt the entry from four fields (CAD039).
+		ACell version = versionField(schemaWinner);
+		if (Objects.equals(timeA, timeB) && Objects.equals(a.get(POS_SCHEMA), b.get(POS_SCHEMA))) {
+			long versionA = getVersion(a);
+			long versionB = getVersion(b);
+			if (versionA != versionB) {
+				version = (versionA > versionB) ? versionField(a) : versionField(b);
+			} else if (versionField(a) == null || versionField(b) == null) {
+				version = null; // equal versions: prefer the form without a field
+			}
+		}
+
 		// Return merged table with schema winner's schema
-		return Vectors.of(schemaWinner.get(POS_SCHEMA), mergedRows, schemaWinner.get(POS_UTIME), CVMLong.create(liveCount));
+		return entry(schemaWinner.get(POS_SCHEMA), mergedRows, schemaWinner.get(POS_UTIME), liveCount, version);
 	}
 }

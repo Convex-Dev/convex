@@ -1,8 +1,9 @@
 # Convex DB: SQL Column Types
 
-**Status: proposed design, not yet implemented**
-([#757](https://github.com/Convex-Dev/convex/issues/757)). Today every table is read as
-version 0, and the gaps this design closes are listed under [Remaining Work](#remaining-work).
+**Status: proposed design, partly implemented**
+([#757](https://github.com/Convex-Dev/convex/issues/757)). The table entry's format
+version is in place (see [Format Version](#format-version)); tables are still written as
+version 0, and the remaining gaps are listed under [Remaining Work](#remaining-work).
 
 How Convex DB binds the SQL types users declare to the values stored in the lattice, and
 how it presents them through JDBC and the PostgreSQL wire protocol.
@@ -23,6 +24,21 @@ column holds 40-digit integers; a `BIGINT` column holds 64-bit ones, as in any S
 The binding is the table entry: its schema lists each column's declared type, and its
 version says how to read the schema, the row values and the keys. Every node reads a table
 through that entry, so the code reads it through one place too.
+
+## Format Version
+
+`SQLTable` reads the entry's version from index 4; an entry without that field is version 0.
+`SQLTable.SUPPORTED_VERSION` is the highest version this implementation reads and writes.
+
+- Version 0 entries keep exactly their four fields: creation, row updates and merges of
+  version 0 entries add no version field, so their encoding is unchanged and older nodes
+  read them as before.
+- Row updates and merges carry a version field when one is present. A merge takes the schema
+  winner's version, and on a tie of timestamp and schema keeps the higher one, restoring a
+  version that an older node dropped.
+- `SQLSchema.getLiveTable`, through which every SQL and direct access goes, refuses a table
+  of an unsupported version with `IllegalStateException`, and `getTableNames` leaves such
+  tables out so that listings and catalog queries keep working. Merge never refuses.
 
 ## Column Codec
 
@@ -148,10 +164,11 @@ numerically when negative or longer than 8 bytes.
 
 ## Remaining Work
 
-- Implement the codec, the type system and version 1 tables as described here. Until then,
-  schemas record type identifiers only partly (DDL collapses `SMALLINT` and `INTEGER` to
-  64-bit, and drops a `NUMERIC` scale of 0), reads ignore the declared type, and filter values
-  and keys are converted by value class alone.
+- Implement the codec, the type system and version 1 tables as described here, then raise
+  `SUPPORTED_VERSION` and write new tables as version 1. Until then, schemas record type
+  identifiers only partly (DDL collapses `SMALLINT` and `INTEGER` to 64-bit, and drops a
+  `NUMERIC` scale of 0), reads ignore the declared type, and filter values and keys are
+  converted by value class alone.
 - Commit the CAD039 column-type amendment that specifies the entry version and identifiers.
 - `DATE`, `TIME`, `TIMESTAMP WITH TIME ZONE`, `UUID` and `INTERVAL` are not supported.
 - `SQLTable.merge` and `SQLRow.merge` return their first argument on equal timestamps, so

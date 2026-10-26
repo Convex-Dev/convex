@@ -107,10 +107,19 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	/**
 	 * Gets a live (non-tombstone) table, returning null if not found or dropped.
+	 *
+	 * @throws IllegalStateException if the table uses a format version this implementation
+	 *         does not support
 	 */
 	public SQLTable getLiveTable(AString name) {
 		SQLTable table = getTable(name);
 		if (table == null || !table.isLive()) return null;
+		// Never read or write a table of an unknown format version as if it were another
+		long version = table.getVersion();
+		if (!SQLTable.isSupportedVersion(version)) {
+			throw new IllegalStateException("Table '" + name + "' uses format version " + version
+				+ ", which this version of Convex DB cannot read or write");
+		}
 		return table;
 	}
 
@@ -387,7 +396,10 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 		java.util.List<String> names = new java.util.ArrayList<>();
 		for (var entry : store.entrySet()) {
-			if (SQLTable.isLiveState(entry.getValue())) {
+			// Tables of an unsupported format version are left out, so listings and
+			// catalog queries keep working; accessing one by name is an error
+			AVector<ACell> state = entry.getValue();
+			if (SQLTable.isLiveState(state) && SQLTable.isSupportedVersion(SQLTable.getVersion(state))) {
 				names.add(entry.getKey().toString());
 			}
 		}
