@@ -2,6 +2,7 @@ package convex.gui.dlfs;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -148,7 +149,11 @@ public class DLFSBrowser extends AbstractGUI {
 		own(this::shutdown);
 
 		// Launch NodeServer with Etch store
-		openStore(storeFile);
+		try {
+			openStore(storeFile);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 
 		// Start WebDAV, seeding with existing drives
 		startWebDAV();
@@ -250,8 +255,9 @@ public class DLFSBrowser extends AbstractGUI {
 	/**
 	 * Opens an Etch store and launches a NodeServer for the DLFS lattice.
 	 * Restores drives from the store if data exists, otherwise creates a demo drive.
+	 * On failure, closes whatever it opened.
 	 */
-	private void openStore(File file) {
+	private void openStore(File file) throws IOException {
 		this.storeFile = file;
 		try {
 			etchStore = EtchStore.create(FileUtils.ensureFilePath(file));
@@ -264,20 +270,12 @@ public class DLFSBrowser extends AbstractGUI {
 				JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE,
 				null, new String[]{"Use Temp Store", "Cancel"}, "Use Temp Store");
 			if (choice == 0) {
-				try {
-					etchStore = EtchStore.createTemp("dlfs-temp");
-					this.storeFile = new File(etchStore.getFileName());
-					log.info("Using temporary store: {}", storeFile);
-				} catch (IOException e2) {
-					log.error("Failed to create temporary store", e2);
-					throw new RuntimeException("Failed to create temporary DLFS store", e2);
-				}
+				etchStore = EtchStore.createTemp("dlfs-temp");
+				this.storeFile = new File(etchStore.getFileName());
+				log.info("Using temporary store: {}", storeFile);
 			} else {
-				throw new RuntimeException("Store is locked: " + file);
+				throw new IOException("Store is locked: " + file);
 			}
-		} catch (Exception e) {
-			log.error("Failed to open store: {}", file, e);
-			throw new RuntimeException("Failed to open DLFS store: " + file, e);
 		}
 
 		try {
@@ -318,28 +316,34 @@ public class DLFSBrowser extends AbstractGUI {
 				log.info("Created new DLFS store with demo drive: {}", file);
 			}
 		} catch (Exception e) {
-			log.error("Failed to launch NodeServer: {}", file, e);
-			throw new RuntimeException("Failed to open DLFS store: " + file, e);
+			closeNodeServer();
+			throw new IOException("Failed to open DLFS store: " + file, e);
 		}
 	}
 
 	/**
-	 * Closes the current NodeServer (persisting state) and opens a new store.
+	 * Switches to another store. WebDAV stops before the store it serves closes,
+	 * and the current host saves as it closes. If the new store cannot be opened,
+	 * the previous one is reopened and the failure is thrown for the caller to report.
 	 */
-	private void switchStore(File newFile) {
-		// Close current NodeServer — persists final state
+	void switchStore(File newFile) throws IOException {
+		File previous = storeFile;
+		stopWebDAV();
 		closeNodeServer();
 
-		// Close WebDAV
-		if (webdavServer != null) {
-			webdavServer.close();
-			webdavServer = null;
+		IOException failure = null;
+		try {
+			openStore(newFile);
+		} catch (IOException e) {
+			failure = e;
+			try {
+				openStore(previous);
+			} catch (IOException restore) {
+				failure.addSuppressed(restore);
+			}
 		}
 
-		// Open new store
-		openStore(newFile);
-
-		// Restart WebDAV with new drives
+		// Restart WebDAV with the drives now open
 		startWebDAV();
 
 		// Refresh UI
@@ -353,21 +357,35 @@ public class DLFSBrowser extends AbstractGUI {
 			currentDriveName = null;
 		}
 		updateStatusBar();
+		if (failure != null) throw failure;
 	}
 
+	/** Closes the node, then the host (which saves), then the store. Drives close with them. */
 	private void closeNodeServer() {
 		if (nodeServer != null) {
 			try {
 				nodeServer.close();
-				nodeServer.getHost().close();
 			} catch (IOException e) {
 				log.warn("Error closing NodeServer: {}", e.getMessage());
 			}
+			try {
+				nodeServer.getHost().close();
+			} catch (IOException e) {
+				log.warn("Error saving DLFS store: {}", e.getMessage());
+			}
 			nodeServer = null;
 		}
+		drives.clear();
 		if (etchStore != null) {
 			etchStore.close();
 			etchStore = null;
+		}
+	}
+
+	private void stopWebDAV() {
+		if (webdavServer != null) {
+			webdavServer.close();
+			webdavServer = null;
 		}
 	}
 
@@ -502,7 +520,14 @@ public class DLFSBrowser extends AbstractGUI {
 			return;
 		}
 
-		switchStore(selected);
+		try {
+			switchStore(selected);
+		} catch (IOException e) {
+			log.warn("Failed to open DLFS store: {}", selected, e);
+			JOptionPane.showMessageDialog(this,
+				"Could not open store:\n" + selected.getAbsolutePath() + "\n\n" + e.getMessage(),
+				"Error", JOptionPane.ERROR_MESSAGE);
+		}
 	}
 
 	private void refreshDriveList() {
@@ -650,10 +675,7 @@ public class DLFSBrowser extends AbstractGUI {
 		if (panel != null) {
 			panel.close();
 		}
-		if (webdavServer != null) {
-			webdavServer.close();
-			webdavServer = null;
-		}
+		stopWebDAV();
 		closeNodeServer();
 	}
 
