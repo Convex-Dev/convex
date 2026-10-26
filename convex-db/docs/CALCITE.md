@@ -29,7 +29,7 @@ SQL "SELECT name FROM t WHERE id = 1"
 - **TranslatableTable**: `ConvexTable.toRel()` returns `ConvexTableScan` directly — Calcite never creates `EnumerableTableScan`. This ensures all queries go through our pipeline.
 - **No EnumerableTableScan**: We don't implement `ScannableTable` or `FilterableTable`. The ConvexConvention pipeline handles everything.
 - **DataContext threading**: `ConvexRel.execute(DataContext)` passes context through the operator tree so `ConvexFilter` can resolve PreparedStatement `?` parameters at runtime.
-- **Plan reuse**: `ConvexRelExecutor` registers plans once at compile time. PreparedStatements reuse the plan across executions — no re-planning overhead.
+- **Plan reuse**: PreparedStatements reuse the plan across executions — no re-planning overhead. A plan is valid only for the binding of each table it reads or writes, its schema and format version (CAD039): `ConvexTableScan` and `ConvexTableModify` capture it when planned, and `ConvexTable.boundTable()` checks it before any row is read or written. Once a table is dropped or changed, execution fails with `StalePlanException` and the statement must be prepared again.
 - **Type-correct output**: `ConvexToEnumerableConverter` selects SCALAR format (single column) or ARRAY format (multi-column) matching Calcite's `JavaRowFormat` contract, calling `executeScalar()` or `execute()` respectively.
 
 ## Components

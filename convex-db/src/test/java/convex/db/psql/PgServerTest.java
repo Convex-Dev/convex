@@ -596,6 +596,53 @@ public class PgServerTest {
 	}
 
 	/**
+	 * A table changes under statements the driver keeps on the server. One whose rows are
+	 * described as before runs on; the other gets PostgreSQL's 0A000 from
+	 * RevalidateCachedQuery, on which the driver prepares it again and retries. Either way
+	 * the application reads the new table.
+	 */
+	@Test
+	public void testPostgresJDBCTableChangedUnderPreparedStatement() throws Exception {
+		// prepareThreshold=1: the driver names the statements from their first execution on
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser&prepareThreshold=1";
+		try (Connection conn = DriverManager.getConnection(url);
+			 java.sql.PreparedStatement byId = conn.prepareStatement("SELECT name FROM users WHERE id = ?");
+			 java.sql.PreparedStatement all = conn.prepareStatement("SELECT * FROM users WHERE id = ?")) {
+			for (int i = 0; i < 2; i++) {
+				byId.setLong(1, 2L);
+				try (ResultSet rs = byId.executeQuery()) {
+					assertTrue(rs.next());
+					assertEquals("Bob", rs.getString(1));
+				}
+				all.setLong(1, 2L);
+				try (ResultSet rs = all.executeQuery()) {
+					assertTrue(rs.next());
+					assertEquals(3, rs.getMetaData().getColumnCount());
+				}
+			}
+
+			db.tables().dropTable("users");
+			db.tables().createTable("users", new String[] {"id", "age", "name", "email"}, new ConvexColumnType[] {
+				ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.of(ConvexType.INTEGER),
+				ConvexColumnType.varchar(50), ConvexColumnType.varchar(100)});
+			db.tables().insert("users", 2L, 42L, "Robert", "robert@example.com");
+
+			byId.setLong(1, 2L);
+			try (ResultSet rs = byId.executeQuery()) {
+				assertTrue(rs.next());
+				assertEquals("Robert", rs.getString(1));
+			}
+			all.setLong(1, 2L);
+			try (ResultSet rs = all.executeQuery()) {
+				assertTrue(rs.next());
+				assertEquals(4, rs.getMetaData().getColumnCount());
+				assertEquals(42, rs.getInt("age"));
+				assertEquals("Robert", rs.getString("name"));
+			}
+		}
+	}
+
+	/**
 	 * Tests aggregation via PostgreSQL JDBC driver.
 	 */
 	@Test

@@ -1,5 +1,6 @@
 package convex.db.psql;
 
+import convex.db.calcite.StalePlanException;
 import convex.db.psql.msg.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -563,6 +564,16 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			}
 
 			executeWithParameters(ctx, portal.stmt(), portal.paramValues(), portal.paramFormats());
+		} catch (ResultTypeChanged e) {
+			log.debug("Execute error: {}", e.getMessage());
+			// PostgreSQL's routine for this error, by which clients such as pgjdbc know to
+			// prepare the statement again
+			writeExtendedError(ctx, ErrorResponse.builder()
+				.severity("ERROR")
+				.code(e.getSQLState())
+				.message(e.getMessage())
+				.routine("RevalidateCachedQuery")
+				.build());
 		} catch (SQLException e) {
 			log.warn("Execute error: {}", e.getMessage(), e);
 			writeExtendedError(ctx, ErrorResponse.fromException(e));
@@ -610,13 +621,42 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		String jdbcSql = sql.replaceAll("\\$\\d+", "?");
 
 		PreparedStatement pstmt = jdbcStatements.get(stmt);
-		if (pstmt == null) {
+		boolean kept = (pstmt != null);
+		if (!kept) {
 			pstmt = connection.prepareStatement(jdbcSql);
 			jdbcStatements.put(stmt, pstmt);
-		} else {
-			pstmt.clearParameters();
 		}
-		// Bind parameters
+		boolean hasResultSet;
+		try {
+			hasResultSet = bindAndExecute(pstmt, paramValues, paramFormats, paramTypes);
+		} catch (SQLException | RuntimeException e) {
+			// A table the kept statement uses has changed since it was prepared
+			if (!kept || !isStalePlan(e)) throw e;
+			pstmt = prepareAgain(stmt, pstmt, jdbcSql);
+			hasResultSet = bindAndExecute(pstmt, paramValues, paramFormats, paramTypes);
+		}
+		if (hasResultSet) {
+			try (ResultSet rs = pstmt.getResultSet()) {
+				sendResultSet(ctx, rs, false);
+			}
+		} else {
+			int updateCount = pstmt.getUpdateCount();
+			String upperSql = sql.toUpperCase().trim();
+			if (upperSql.startsWith("INSERT")) {
+				write(ctx, CommandComplete.insert(updateCount));
+			} else if (upperSql.startsWith("UPDATE")) {
+				write(ctx, CommandComplete.update(updateCount));
+			} else if (upperSql.startsWith("DELETE")) {
+				write(ctx, CommandComplete.delete(updateCount));
+			} else {
+				write(ctx, new CommandComplete("OK"));
+			}
+		}
+	}
+
+	/** Binds the parameters of one execution to a statement, replacing those of the last, and executes it. */
+	private static boolean bindAndExecute(PreparedStatement pstmt, byte[][] paramValues, short[] paramFormats, int[] paramTypes) throws SQLException {
+		pstmt.clearParameters();
 		ParameterMetaData inferred = null;
 		for (int i = 0; i < paramValues.length; i++) {
 			byte[] value = paramValues[i];
@@ -643,24 +683,45 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				}
 			}
 		}
+		return pstmt.execute();
+	}
 
-		boolean hasResultSet = pstmt.execute();
-		if (hasResultSet) {
-			try (ResultSet rs = pstmt.getResultSet()) {
-				sendResultSet(ctx, rs, false);
-			}
-		} else {
-			int updateCount = pstmt.getUpdateCount();
-			String upperSql = sql.toUpperCase().trim();
-			if (upperSql.startsWith("INSERT")) {
-				write(ctx, CommandComplete.insert(updateCount));
-			} else if (upperSql.startsWith("UPDATE")) {
-				write(ctx, CommandComplete.update(updateCount));
-			} else if (upperSql.startsWith("DELETE")) {
-				write(ctx, CommandComplete.delete(updateCount));
-			} else {
-				write(ctx, new CommandComplete("OK"));
-			}
+	/**
+	 * Prepares a kept statement again after a table it uses changed (CAD039). Like PostgreSQL,
+	 * the new JDBC statement replaces the old one only if it returns rows of the same
+	 * description, since the client may decode rows by the old one. Otherwise the old one
+	 * stays, so every execution fails with 0A000 until the client parses the statement again.
+	 */
+	private PreparedStatement prepareAgain(PreparedStmt stmt, PreparedStatement old, String jdbcSql) throws SQLException {
+		PreparedStatement fresh = connection.prepareStatement(jdbcSql);
+		if (!java.util.Objects.equals(describe(old), describe(fresh))) {
+			fresh.close();
+			throw new ResultTypeChanged();
+		}
+		jdbcStatements.put(stmt, fresh);
+		old.close();
+		return fresh;
+	}
+
+	/** The RowDescription of a statement's rows, or null if it returns none. */
+	private static RowDescription describe(PreparedStatement pstmt) throws SQLException {
+		ResultSetMetaData meta = pstmt.getMetaData();
+		return (meta == null) ? null : RowDescription.fromMetaData(meta);
+	}
+
+	private static boolean isStalePlan(Throwable e) {
+		for (Throwable c = e; c != null; c = (c.getCause() == c) ? null : c.getCause()) {
+			if (c instanceof StalePlanException) return true;
+		}
+		return false;
+	}
+
+	/** A kept statement, prepared again after its table changed, returns rows of another description. */
+	private static final class ResultTypeChanged extends SQLException {
+		private static final long serialVersionUID = 1L;
+
+		ResultTypeChanged() {
+			super("cached plan must not change result type", "0A000");
 		}
 	}
 

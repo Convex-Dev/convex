@@ -74,6 +74,17 @@ public class RowDescription extends PgMessage {
 		return columns[index];
 	}
 
+	/** Equal when it describes the same columns, so a client decodes rows by either alike. */
+	@Override
+	public boolean equals(Object o) {
+		return (o instanceof RowDescription other) && java.util.Arrays.equals(columns, other.columns);
+	}
+
+	@Override
+	public int hashCode() {
+		return java.util.Arrays.hashCode(columns);
+	}
+
 	/**
 	 * Describes a single column in a row.
 	 */
@@ -95,6 +106,18 @@ public class RowDescription extends PgMessage {
 			this.typeLen = typeLen;
 			this.typeMod = typeMod;
 			this.formatCode = (short) formatCode;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			return (o instanceof Column c) && name.equals(c.name) && tableOid == c.tableOid
+				&& columnAttr == c.columnAttr && typeOid == c.typeOid && typeLen == c.typeLen
+				&& typeMod == c.typeMod && formatCode == c.formatCode;
+		}
+
+		@Override
+		public int hashCode() {
+			return java.util.Objects.hash(name, tableOid, columnAttr, typeOid, typeLen, typeMod, formatCode);
 		}
 
 		int encodedLength() {

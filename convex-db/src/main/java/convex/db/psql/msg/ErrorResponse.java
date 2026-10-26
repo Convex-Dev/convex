@@ -106,6 +106,14 @@ public class ErrorResponse extends PgMessage {
 			return this;
 		}
 
+		/** The name of the server routine reporting the error, as PostgreSQL gives it. */
+		public Builder routine(String routine) {
+			if (routine != null) {
+				fields.put(ROUTINE, routine);
+			}
+			return this;
+		}
+
 		public ErrorResponse build() {
 			return new ErrorResponse(fields);
 		}

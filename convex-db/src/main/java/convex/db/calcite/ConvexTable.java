@@ -28,7 +28,6 @@ import convex.core.data.ACell;
 import convex.core.data.Vectors;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.rel.ConvexTableScan;
-import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLTable;
 
 /**
@@ -55,19 +54,20 @@ public class ConvexTable extends AbstractQueryableTable
 
 	@Override
 	public RelDataType getRowType(RelDataTypeFactory typeFactory) {
+		return rowType(schema.getTables().getBinding(tableName), typeFactory);
+	}
+
+	/** The row type of a table with the given binding: no columns if it has none. */
+	private static RelDataType rowType(SQLTable.Binding binding, RelDataTypeFactory typeFactory) {
 		RelDataTypeFactory.Builder builder = typeFactory.builder();
-
-		SQLSchema tables = schema.getTables();
-		String[] columnNames = tables.getColumnNames(tableName);
-		ConvexColumnType[] columnTypes = tables.getColumnTypes(tableName);
-
-		if (columnNames != null && columnTypes != null) {
+		if (binding != null) {
+			String[] columnNames = binding.columnNames();
+			ConvexColumnType[] columnTypes = binding.columnTypes();
 			for (int i = 0; i < columnNames.length; i++) {
 				RelDataType type = columnTypes[i].toRelDataType(typeFactory);
 				builder.add(columnNames[i], typeFactory.createTypeWithNullability(type, true));
 			}
 		}
-
 		return builder.build();
 	}
 
@@ -83,7 +83,53 @@ public class ConvexTable extends AbstractQueryableTable
 		// operators properly propagate collation traits through the plan.
 		// Currently the planner elides sorts at the Enumerable boundary.
 		RelTraitSet traitSet = cluster.traitSetOf(ConvexConvention.INSTANCE);
-		return new ConvexTableScan(cluster, traitSet, relOptTable);
+		return new ConvexTableScan(cluster, traitSet, relOptTable, bind(relOptTable, cluster.getTypeFactory()));
+	}
+
+	// ========== Plan binding (CAD039) ==========
+
+	/**
+	 * The binding a plan over this table is built for: its schema and format version now.
+	 * The plan's row type was validated a moment earlier, so this checks the two agree.
+	 *
+	 * @param planned The table as the plan sees it
+	 * @param typeFactory Type factory of the plan
+	 * @throws StalePlanException if the table changed while the statement was planned
+	 */
+	public SQLTable.Binding bind(RelOptTable planned, RelDataTypeFactory typeFactory) {
+		SQLTable.Binding binding = schema.getTables().getBinding(tableName);
+		if (binding == null || !rowType(binding, typeFactory).equals(planned.getRowType())) {
+			throw new StalePlanException(tableName);
+		}
+		return binding;
+	}
+
+	/**
+	 * The live table, provided it still has the binding a plan over it was built for.
+	 * Every read of the table's rows by a plan goes through this: rows read under another
+	 * schema or version would be misread, so the plan fails instead.
+	 *
+	 * @param planned Binding the plan was built for
+	 * @throws StalePlanException if the table has been dropped, or its schema or version changed
+	 */
+	public SQLTable boundTable(SQLTable.Binding planned) {
+		SQLTable table = schema.getTables().getLiveTable(tableName);
+		if (table == null || !planned.equals(table.getBinding())) {
+			throw new StalePlanException(tableName);
+		}
+		return table;
+	}
+
+	/**
+	 * This table, provided it still has the binding a plan over it was built for. Called
+	 * from the generated code of a plan that writes the table, before any row is written.
+	 *
+	 * @param planned Binding the plan was built for
+	 * @throws StalePlanException if the table has been dropped, or its schema or version changed
+	 */
+	public ConvexTable bound(SQLTable.Binding planned) {
+		boundTable(planned);
+		return this;
 	}
 
 	public ConvexColumnType[] getColumnTypes() {

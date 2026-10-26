@@ -30,7 +30,8 @@ import io.netty.channel.embedded.EmbeddedChannel;
 /**
  * Tests the extended query protocol message by message, driving the handler through an
  * EmbeddedChannel. Each response is summarised as its message types, with the values of
- * DataRows in brackets and the SQLSTATE of ErrorResponses in parentheses: "12D[Bob]CZ".
+ * DataRows in brackets and the SQLSTATE of ErrorResponses in parentheses, followed by the
+ * routine when one is given: "12D[Bob]CZ".
  */
 public class PgExtendedQueryTest {
 
@@ -195,7 +196,70 @@ public class PgExtendedQueryTest {
 		assertEquals(0, openStatements.get());
 	}
 
+	// ========== A table changed under a kept statement ==========
+
+	/** A kept statement whose table changed is prepared again, and runs on if its rows are described alike. */
+	@Test
+	public void testStatementPreparedAgainAfterTableChange() {
+		parse("s1", "SELECT name FROM users WHERE id = $1", PgType.INT8);
+		assertEquals("2D[Bob]CZ", run("s1", "2"));
+
+		// The name column, now in another position
+		recreateUsers(new String[] {"id", "email", "name"}, ConvexColumnType.varchar(100), ConvexColumnType.varchar(50));
+		db.tables().insert("users", 2L, "robert@example.com", "Robert");
+		assertEquals("2D[Robert]CZ", run("s1", "2"));
+		assertEquals(2, prepares.get());
+		assertEquals(1, openStatements.get(), "the old JDBC statement is closed");
+	}
+
+	/** Rows of another description fail with 0A000, as in PostgreSQL, until the statement is parsed again. */
+	@Test
+	public void testResultTypeChangedUntilParsedAgain() {
+		parse("s1", "SELECT * FROM users WHERE id = $1", PgType.INT8);
+		assertEquals("2D[2, Bob, bob@example.com]CZ", run("s1", "2"));
+
+		recreateUsers(new String[] {"id", "age", "name", "email"},
+			ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.varchar(50), ConvexColumnType.varchar(100));
+		db.tables().insert("users", 2L, 42L, "Bob", "bob@example.com");
+		assertEquals("2E(0A000 RevalidateCachedQuery)Z", run("s1", "2"));
+		assertEquals("2E(0A000 RevalidateCachedQuery)Z", run("s1", "2"), "the statement keeps failing");
+		assertEquals(1, openStatements.get(), "only the old JDBC statement stays open");
+
+		parse("s1", "SELECT * FROM users WHERE id = $1", PgType.INT8);
+		assertEquals("2D[2, 42, Bob, bob@example.com]CZ", run("s1", "2"));
+		assertEquals(1, openStatements.get());
+	}
+
+	/** A kept statement fails while its table is dropped, and works again once the table is back as it was. */
+	@Test
+	public void testStatementAfterTableDropped() {
+		parse("s1", "SELECT name FROM users WHERE id = $1", PgType.INT8);
+		assertEquals("2D[Bob]CZ", run("s1", "2"));
+
+		assertTrue(db.tables().dropTable("users"));
+		assertEquals("2E(42000)Z", run("s1", "2"), "preparing the statement again finds no table");
+
+		createUsers(new String[] {"id", "name", "email"}, ConvexColumnType.varchar(50), ConvexColumnType.varchar(100));
+		db.tables().insert("users", 2L, "Robert", "robert@example.com");
+		assertEquals("2D[Robert]CZ", run("s1", "2"));
+		assertEquals(1, prepares.get(), "the table has the binding the kept statement was planned for");
+	}
+
 	// ========== Helpers ==========
+
+	/** Drops the users table and creates it again with an integer id followed by the given columns. */
+	private void recreateUsers(String[] columns, ConvexColumnType... types) {
+		assertTrue(db.tables().dropTable("users"));
+		createUsers(columns, types);
+	}
+
+	/** Creates the users table with an integer id followed by the given columns. */
+	private void createUsers(String[] columns, ConvexColumnType... types) {
+		ConvexColumnType[] all = new ConvexColumnType[types.length + 1];
+		all[0] = ConvexColumnType.of(ConvexType.INTEGER);
+		System.arraycopy(types, 0, all, 1, types.length);
+		assertTrue(db.tables().createTable("users", columns, all));
+	}
 
 	/** Parses a statement, then syncs. */
 	private void parse(String name, String sql, int... types) {
@@ -286,7 +350,10 @@ public class PgExtendedQueryTest {
 				buf.readBytes(body);
 				sb.append(type);
 				if (type == 'D') sb.append(dataRow(body));
-				if (type == 'E') sb.append('(').append(errorField(body, 'C')).append(')');
+				if (type == 'E') {
+					String routine = errorField(body, 'R');
+					sb.append('(').append(errorField(body, 'C')).append((routine == null) ? "" : " " + routine).append(')');
+				}
 			}
 			buf.release();
 		}

@@ -222,7 +222,7 @@ SQL → Calcite Parser → Logical Plan → ConvexConvention operators → Conve
 
 Key optimisations:
 - **PK filter pushdown**: `WHERE id = ?` → O(log n) Index lookup via `selectByKey()`
-- **Plan caching**: PreparedStatements reuse compiled plans across executions
+- **Plan caching**: PreparedStatements reuse compiled plans across executions, while their tables keep the schema they were planned for. Once a table is dropped or its columns change, executing the statement fails, with a `StalePlanException` as the cause of the `SQLException`: prepare it again
 - **No materialisation**: full scans use `forEach` for single-pass O(n) traversal
 
 ## Persistence
@@ -244,6 +244,7 @@ and Calcite pipeline as the JDBC driver, but adds:
 
 - Network transport (Netty)
 - PG message framing (Parse/Bind/Execute/Describe)
+- Prepared statements kept for each connection. One whose table changed is prepared again, or, if its rows would now be described differently, fails with SQLSTATE `0A000` until the client prepares it again, as in PostgreSQL
 - `pg_catalog` virtual schema for client tool compatibility
 - Optional password authentication
 

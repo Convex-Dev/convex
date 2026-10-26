@@ -10,6 +10,7 @@ import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.db.calcite.ConvexColumnType;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 
@@ -169,6 +170,47 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 */
 	public long getVersion() {
 		return getVersion(cursor().get());
+	}
+
+	/**
+	 * The schema and format version of a live table, which together determine how its rows
+	 * are read (CAD039). Row writes leave them unchanged. A reader built for one binding,
+	 * such as a query plan, must not read rows under another.
+	 *
+	 * @param schema Column definitions
+	 * @param version Format version
+	 */
+	public record Binding(AVector<AVector<ACell>> schema, long version) {
+
+		/** The column names, in column order. */
+		public String[] columnNames() {
+			String[] result = new String[(int) schema.count()];
+			for (int i = 0; i < result.length; i++) {
+				result[i] = schema.get(i).get(0).toString();
+			}
+			return result;
+		}
+
+		/** The column types, with precision and scale, in column order. */
+		public ConvexColumnType[] columnTypes() {
+			ConvexColumnType[] result = new ConvexColumnType[(int) schema.count()];
+			for (int i = 0; i < result.length; i++) {
+				result[i] = ConvexColumnType.fromSchema(schema.get(i), (int) version);
+			}
+			return result;
+		}
+	}
+
+	/**
+	 * Gets the table's binding, read from one state of its entry.
+	 *
+	 * @return Schema and version, or null if the table is absent or dropped
+	 */
+	@SuppressWarnings("unchecked")
+	public Binding getBinding() {
+		AVector<ACell> state = cursor().get();
+		if (!isLiveState(state)) return null;
+		return new Binding((AVector<AVector<ACell>>) state.get(POS_SCHEMA), getVersion(state));
 	}
 
 	/**

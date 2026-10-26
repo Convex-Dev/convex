@@ -298,13 +298,8 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public String[] getColumnNames(AString name) {
-		AVector<AVector<ACell>> schema = getSchema(name);
-		if (schema == null) return null;
-		String[] result = new String[(int) schema.count()];
-		for (int i = 0; i < result.length; i++) {
-			result[i] = schema.get(i).get(0).toString();
-		}
-		return result;
+		SQLTable.Binding binding = getBinding(name);
+		return (binding == null) ? null : binding.columnNames();
 	}
 
 	/** Gets the column types for a table (with precision/scale). */
@@ -313,15 +308,18 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public ConvexColumnType[] getColumnTypes(AString name) {
+		SQLTable.Binding binding = getBinding(name);
+		return (binding == null) ? null : binding.columnTypes();
+	}
+
+	/** Gets the binding (schema and format version) of a live table, or null if it is absent or dropped. */
+	public SQLTable.Binding getBinding(String name) {
+		return getBinding(Strings.create(name));
+	}
+
+	public SQLTable.Binding getBinding(AString name) {
 		SQLTable table = getLiveTable(name);
-		if (table == null) return null;
-		AVector<AVector<ACell>> schema = table.getSchema();
-		int version = (int) table.getVersion();
-		ConvexColumnType[] result = new ConvexColumnType[(int) schema.count()];
-		for (int i = 0; i < result.length; i++) {
-			result[i] = ConvexColumnType.fromSchema(schema.get(i), version);
-		}
-		return result;
+		return (table == null) ? null : table.getBinding();
 	}
 
 	/** Gets the row count for a table. */
