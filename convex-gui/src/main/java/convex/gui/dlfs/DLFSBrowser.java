@@ -360,18 +360,22 @@ public class DLFSBrowser extends AbstractGUI {
 		if (failure != null) throw failure;
 	}
 
-	/** Closes the node, then the host (which saves), then the store. Drives close with them. */
+	/**
+	 * Stops ingress, closes the host (which saves, publishing through the node), then
+	 * the node and the store. Drives close with them.
+	 */
 	private void closeNodeServer() {
 		if (nodeServer != null) {
-			try {
-				nodeServer.close();
-			} catch (IOException e) {
-				log.warn("Error closing NodeServer: {}", e.getMessage());
-			}
+			nodeServer.stopIngress();
 			try {
 				nodeServer.getHost().close();
 			} catch (IOException e) {
 				log.warn("Error saving DLFS store: {}", e.getMessage());
+			}
+			try {
+				nodeServer.close();
+			} catch (IOException e) {
+				log.warn("Error closing NodeServer: {}", e.getMessage());
 			}
 			nodeServer = null;
 		}

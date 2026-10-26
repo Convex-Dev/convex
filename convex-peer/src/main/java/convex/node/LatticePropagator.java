@@ -737,19 +737,22 @@ public class LatticePropagator implements Closeable {
 	 * Triggers a final value and shuts down gracefully.
 	 *
 	 * <p>The propagator processes any remaining queued values (including the
-	 * final value if non-null) before stopping. This is the only blocking
-	 * handoff in the group — used during shutdown to finish serving-store
-	 * materialisation before routes close.</p>
+	 * final value if non-null) before stopping, then waits for the resulting
+	 * broadcasts to be written to its routes before closing them. This is the only
+	 * blocking handoff in the group. Both waits share the group's shutdown timeout;
+	 * delivery to peers stays best effort.</p>
 	 *
 	 * @param finalValue final value to process before stopping, or {@code null}
 	 */
 	public void triggerAndClose(ACell finalValue) {
 		transition(State.STOPPING);
 		if (!running && propagationThread == null) {
-			closeRoutes();
+			closeRoutes(0L);
 			transition(State.STOPPED);
 			return;
 		}
+		long timeout=config.getInboundShutdownTimeout();
+		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(timeout);
 
 		synchronized (triggerQueue) {
 			// Seal ordinary offers before the final drain. A notification already
@@ -764,7 +767,7 @@ public class LatticePropagator implements Closeable {
 
 		if (propagationThread != null) {
 			try {
-				propagationThread.join(config.getInboundShutdownTimeout());
+				propagationThread.join(timeout);
 				if (propagationThread.isAlive()) {
 					log.warn("LatticePropagator thread did not drain within timeout, leaving it to finish");
 				}
@@ -786,7 +789,9 @@ public class LatticePropagator implements Closeable {
 			processSnapshotSafe(remaining);
 		}
 
-		closeRoutes();
+		// Let the final broadcasts leave: closing a route discards what it still queues
+		long left=Math.max(0L,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));
+		closeRoutes(left);
 
 		transition(State.STOPPED);
 		log.debug("LatticePropagator closed (sent {} delta broadcasts, {} root syncs)",
@@ -824,10 +829,13 @@ public class LatticePropagator implements Closeable {
 		triggerAndClose(null);
 	}
 
-	/** Closes manager-owned routes even when the group was never started. */
-	private void closeRoutes() {
+	/**
+	 * Closes manager-owned routes, even when the group was never started, once their
+	 * sent messages are written or the timeout passes.
+	 */
+	private void closeRoutes(long timeout) {
 		try {
-			connectionManager.close();
+			connectionManager.close(timeout);
 		} catch (RuntimeException | StackOverflowError e) {
 			recordFailure("route shutdown",e);
 			log.warn("Unable to close propagation routes cleanly",e);

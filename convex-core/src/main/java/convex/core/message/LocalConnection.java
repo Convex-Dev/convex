@@ -1,6 +1,7 @@
 package convex.core.message;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 /**
@@ -132,6 +133,12 @@ public class LocalConnection extends AConnection {
 	@Override
 	public boolean trySendMessage(Message msg) {
 		return sendMessage(msg);
+	}
+
+	/** Messages are handed to the paired end as they are sent, so none is ever pending. */
+	@Override
+	public CompletableFuture<Void> flushOutbound() {
+		return CompletableFuture.completedFuture(null);
 	}
 
 	/**

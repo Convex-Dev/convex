@@ -216,16 +216,24 @@ public class DlfsStart extends ACommand {
 			}
 			try {
 				dlfsServer.close();
+				// Stop ingress first, so drafts synced next include every accepted merge
 				latticeTransport.close();
+				nodeServer.stopIngress();
+				try {
+					driveManager.sync();
+				} catch (Exception e) {
+					log.warn("Error publishing DLFS state",e);
+				}
+				try {
+					// Final checkpoint, published through the node, which sends it as it closes
+					nodeServer.getHost().close();
+				} catch (Exception e) {
+					log.warn("Error saving DLFS state",e);
+				}
 				try {
 					nodeServer.close();
 				} catch (Exception e) {
 					log.warn("Error closing NodeServer", e);
-				}
-				try {
-					nodeServer.getHost().close();
-				} catch (Exception e) {
-					log.warn("Error saving DLFS state",e);
 				}
 				store.close();
 			} finally {

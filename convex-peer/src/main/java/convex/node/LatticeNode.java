@@ -125,9 +125,24 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	public InetSocketAddress getHostAddress() { return listener.getHostAddress(); }
 
 	/**
-	 * Stops acceptance before draining publication, then detaches the server from the
-	 * host. Both steps always run; the first failure is thrown, with any later one
-	 * suppressed.
+	 * Stops networking changing the host: closes the listener, then drains the
+	 * server's accepted inbound work. Publication continues to outbound routes, so
+	 * sync the application drafts to keep and close the host next; its final
+	 * checkpoint reaches peers when this node closes. See
+	 * {@link NodeServer#stopIngress()}.
+	 */
+	public synchronized void stopIngress() {
+		try {
+			listener.close();
+		} finally {
+			server.stopIngress();
+		}
+	}
+
+	/**
+	 * Stops acceptance and ingress, sends what the host has published, then detaches
+	 * the server from the host. Both steps always run; the first failure is thrown,
+	 * with any later one suppressed.
 	 */
 	@Override
 	public synchronized void close() throws IOException {

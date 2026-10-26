@@ -627,7 +627,25 @@ public class P2PNode implements Closeable {
 		return server.isRunning() && transport.isRunning();
 	}
 
-	/** Stops networking; the service then saves by closing {@code getNodeServer().getHost()}. */
+	/**
+	 * Stops networking changing the host while publication continues: closes the
+	 * listener, then drains accepted inbound work. The service then closes the host,
+	 * whose final checkpoint reaches peers when this node closes. See
+	 * {@link NodeServer#stopIngress()}.
+	 */
+	public void stopIngress() {
+		try {
+			transport.close();
+		} finally {
+			server.stopIngress();
+		}
+	}
+
+	/**
+	 * Stops networking, sending what the host has published to connected peers first.
+	 * For a final checkpoint that peers receive, call {@link #stopIngress()} and close
+	 * the host before this node, as {@code try (store; node; host)} does.
+	 */
 	@Override
 	public void close() throws IOException {
 		transport.close();
@@ -658,9 +676,10 @@ public class P2PNode implements Closeable {
 		var closing=new AtomicBoolean();
 		Runnable shutdown=() -> {
 			if (!closing.compareAndSet(false,true)) return;
-			// Close replication, then the host (stops flushing, final checkpoint), then the store.
-			try (store; host; node) {
-				// Resource order defines the service's shutdown policy.
+			// Stop ingress, then close the host (stops flushing, final checkpoint published
+			// through the node), then the node (sends it to peers), then the store.
+			try (store; node; host) {
+				node.stopIngress();
 			} catch (IOException e) {
 				log.warn("Unable to finish P2P service shutdown",e);
 			} finally {

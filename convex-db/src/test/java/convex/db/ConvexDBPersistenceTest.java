@@ -75,12 +75,13 @@ public class ConvexDBPersistenceTest {
 		return cdb;
 	}
 
-	/** Unregisters, closes the server, then the host to save, then the store. */
+	/** Unregisters, stops ingress, closes the host to save, then the server, then the store. */
 	private void persistAndClose() throws Exception {
 		ConvexDB cdb = ConvexDB.lookup(DB_NAME);
 		if (cdb != null) cdb.unregister(DB_NAME);
-		server.close();
-		server.getHost().close(); server = null;
+		server.stopIngress();
+		server.getHost().close();
+		server.close(); server = null;
 		store.close(); store = null;
 	}
 

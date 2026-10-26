@@ -276,10 +276,11 @@ connected directly to a standalone `LatticeHost` for local use.
 
 The owning service chooses durability through `node.getNodeServer().getHost()`:
 call `checkpoint()` for a durable save, or publish with `sync()` and use a scoped
-`autoFlush(Duration)` for batched barriers. Stop request handling and networking
-before the final service save; close the durability resource before its store.
-`P2PNode.close()` stops replication without accepting pending host edits or
-flushing the borrowed store.
+`autoFlush(Duration)` for batched barriers. Stop request handling, then
+`node.stopIngress()`, before the final service save; closing the host then saves
+a final checkpoint that the node sends to its peers as it closes, so
+`try (store; node; host)` closes them in the right order. `P2PNode.close()` stops
+replication without accepting pending host edits or flushing the borrowed store.
 
 ### The user area API
 

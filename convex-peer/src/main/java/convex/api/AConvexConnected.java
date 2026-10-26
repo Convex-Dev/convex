@@ -1,5 +1,6 @@
 package convex.api;
 
+import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.RejectedExecutionException;
@@ -249,6 +250,13 @@ public abstract class AConvexConnected extends Convex {
 		AConnection conn = connection;
 		if (conn == null) return false;
 		return conn.trySendMessage(msg);
+	}
+
+	@Override
+	public CompletableFuture<Void> flushOutbound() {
+		AConnection conn = connection;
+		if (conn == null) return CompletableFuture.failedFuture(new IOException("Not connected"));
+		return conn.flushOutbound();
 	}
 
 	/** Outbound bounds to apply to the current and any later connection; zero if unset. */

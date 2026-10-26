@@ -975,6 +975,20 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
+	 * Returns a future completing once the messages sent so far with
+	 * {@link #trySend(Message)} have been written to the transport, for example so a
+	 * final broadcast can leave before the connection closes. No acknowledgement
+	 * from the remote end is implied. Fails if the connection closes first, or by
+	 * default, where completion cannot be reported.
+	 *
+	 * @return future for sent messages written
+	 */
+	public CompletableFuture<Void> flushOutbound() {
+		return CompletableFuture.failedFuture(
+			new UnsupportedOperationException("Client cannot report written messages"));
+	}
+
+	/**
 	 * Sets the bounds of the outbound queue behind this connection, if it has one.
 	 * A peer raises them for its connections to other peers. No effect by default.
 	 *

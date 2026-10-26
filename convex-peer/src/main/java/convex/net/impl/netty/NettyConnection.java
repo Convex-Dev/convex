@@ -3,6 +3,10 @@ package convex.net.impl.netty;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -64,6 +68,12 @@ public class NettyConnection extends AConnection {
 	 */
 	private final BoundedMessageQueue outbound = new BoundedMessageQueue(
 		Config.OUTBOUND_QUEUE_SIZE, Config.OUTBOUND_QUEUE_BYTE_LIMIT, true);
+
+	/** Future of the last message handed to the channel. Event loop only. */
+	private ChannelFuture lastWrite;
+
+	/** Flush requests waiting for the outbound queue to empty. Event loop only. */
+	private final ArrayList<CompletableFuture<Void>> flushWaiters = new ArrayList<>();
 
 	private NettyConnection(Channel channel, NettyInboundHandler inbound) {
 		this.channel = channel;
@@ -179,6 +189,7 @@ public class NettyConnection extends AConnection {
 						public void channelInactive(ChannelHandlerContext ctx) {
 							// Clear queue to wake any threads blocked on offer(timeout)
 							client.clearOutbound();
+							client.failFlushWaiters();
 							ctx.fireChannelInactive();
 						}
 					},
@@ -300,12 +311,63 @@ public class NettyConnection extends AConnection {
 		while (ch.isWritable() && ch.isActive()) {
 			Message m=outbound.poll();
 			if (m == null) break;
-			ch.write(m);
+			lastWrite=ch.write(m);
 			count++;
 		}
 		if (count > 0) {
 			ch.flush();
 		}
+		if (!flushWaiters.isEmpty() && outbound.isEmpty()) completeFlushWaiters();
+	}
+
+	/**
+	 * Completes once every message queued before this call has been written to the
+	 * socket. Waits for the queue to drain while the channel is unwritable; fails if
+	 * the channel closes first.
+	 */
+	@Override
+	public CompletableFuture<Void> flushOutbound() {
+		Channel ch = channel;
+		if (ch == null) return CompletableFuture.failedFuture(new IOException("Connection is closed"));
+		CompletableFuture<Void> written = new CompletableFuture<>();
+		try {
+			ch.eventLoop().execute(() -> {
+				if (!ch.isActive()) {
+					written.completeExceptionally(new IOException("Connection is closed"));
+					return;
+				}
+				flushWaiters.add(written);
+				doFlush();
+			});
+		} catch (RejectedExecutionException e) {
+			written.completeExceptionally(e);
+		}
+		return written;
+	}
+
+	/** Netty completes writes in order, so the last write's completion covers every waiter. */
+	private void completeFlushWaiters() {
+		List<CompletableFuture<Void>> waiting = List.copyOf(flushWaiters);
+		flushWaiters.clear();
+		ChannelFuture written = lastWrite;
+		if (written == null) {
+			waiting.forEach(w -> w.complete(null));
+			return;
+		}
+		written.addListener(f -> {
+			for (CompletableFuture<Void> w : waiting) {
+				if (f.isSuccess()) w.complete(null);
+				else w.completeExceptionally(f.cause());
+			}
+		});
+	}
+
+	/** Fails flush requests when the channel goes inactive. Event loop only. */
+	private void failFlushWaiters() {
+		if (flushWaiters.isEmpty()) return;
+		IOException closed = new IOException("Connection closed before queued messages were written");
+		flushWaiters.forEach(w -> w.completeExceptionally(closed));
+		flushWaiters.clear();
 	}
 
 	@Override

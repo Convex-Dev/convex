@@ -156,17 +156,21 @@ public final class Main {
 		Runnable shutdown=()->{
 			if (!closing.compareAndSet(false,true)) return;
 			server.close();
-			closeNode(transport,node);
+			// Stop ingress first, so drafts synced next include every accepted merge
+			transport.close();
+			node.stopIngress();
 			try {
 				drives.sync();
 			} catch (Exception e) {
 				System.err.println("Failed to publish DLFS state: "+e.getMessage());
 			}
 			try {
+				// Final checkpoint, published through the node, which sends it as it closes
 				host.close();
 			} catch (Exception e) {
 				System.err.println("Failed to save DLFS state: "+e.getMessage());
 			}
+			closeNode(node);
 			store.close();
 			stopped.countDown();
 		};

@@ -253,6 +253,9 @@ try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPai
         networkedServer.start(0);
         // Run the application's service loop here, until shutdown is requested.
     }
+    network.stopIngress(); // no merge lands after the drafts below sync
+    routes.sync();
+    host.close(); // final checkpoint, sent to peers as the network closes
 }
 ```
 
@@ -264,8 +267,9 @@ The callbacks above promise durable completion by calling `checkpoint()` before
 returning. A callback using `host.sync()` instead retains and offers the root to
 replication but leaves the physical barrier to the service's policy, for example
 a scoped `host.autoFlush(Duration.ofSeconds(1))`. Close the HTTP service first,
-then networking, then the host, which stops the durability resource and saves a
-final checkpoint, then the store. A failed checkpoint
+then stop the network's ingress and sync remaining drafts. Close the host next: it
+stops the durability resource and saves a final checkpoint, which the network sends
+to its peers as it closes. Close the store last. A failed checkpoint
 must fail the request; it does not undo a file write already made locally.
 
 Custom owner authority and region placement can be supplied together:

@@ -169,20 +169,36 @@ explicitly. Networking does not install a durability worker or shutdown hook.
 The application opens any `LatticeListener` only after node launch has prepared
 the attached propagation endpoints.
 
-Shutdown order prevents new work racing store closure:
+Shutdown order prevents new work racing store closure and sends the final state
+to peers:
 
 1. the service stops requests and closes transports to stop admission;
-2. `NodeServer.close()` drains accepted messages and closes each group; once it
-   returns, a worker that overran the drain or a late pull is rejected rather
-   than merged, so networking no longer changes the host;
-3. the service syncs any application drafts it wants retained;
-4. `LatticeHost.close()` stops automatic flushing and saves a final checkpoint;
-5. the service closes its store.
+2. `NodeServer.stopIngress()` drains accepted messages; once it returns, a worker
+   that overran the drain or a late pull is rejected rather than merged, so
+   networking no longer changes the host. Publication continues;
+3. the service syncs any application drafts it wants retained, now including
+   every merge networking accepted;
+4. `LatticeHost.close()` stops automatic flushing and saves a final checkpoint,
+   which the still-attached node publishes;
+5. `NodeServer.close()` drains each group's publication, waits within the group's
+   shutdown timeout for its broadcasts to be written to each route, then closes
+   the routes;
+6. the service closes its store.
 
-With try-with-resources, `try (store; host; node) {...}` closes the node, then
-the host, then the store. Closing the host neither syncs applications nor closes
-the store. A closed host refuses further syncs, checkpoints and flushes. If the
-final checkpoint fails, the host stays open and closing again retries.
+With try-with-resources, `node.stopIngress(); try (store; node; host) {...}`
+closes the host, then the node, then the store. `close()` stops ingress itself
+if needed, so the older order (node, then host) still shuts down safely, but
+peers then miss the final checkpoint. Closing the host neither syncs applications
+nor closes the store. A closed host refuses further syncs, checkpoints and
+flushes. If the final checkpoint fails, the host stays open and closing again
+retries.
+
+The final broadcast is best effort. It reaches outbound routes only: closing the
+listener has already closed connections that peers opened to this node. Written
+to a socket is not acknowledged by the peer, and once ingress has stopped this
+node no longer answers data requests, so a peer receives a complete final value
+only when it fits one delta broadcast. Peers converge on anything missed at their
+next exchange.
 
 Only the service that owns the host closes it. A component running on a host it
 was given, such as an embedded engine, syncs its own drafts at shutdown and leaves
@@ -193,8 +209,9 @@ A service that shuts down from a JVM shutdown hook registers that work with
 runs separate hooks concurrently, so a separate hook races Convex's own hook,
 which closes transports and every Etch file. The `SERVICE` level completes first.
 
-Network close does not publish pending host state or flush the store. The host
-and its applications remain usable after detachment.
+Network close does not publish pending host state or flush the store; it sends
+only what the host has already published. The host and its applications remain
+usable after detachment.
 
 `NodeServer` does not close application-supplied stores. Store ownership remains
 with the caller that created them.

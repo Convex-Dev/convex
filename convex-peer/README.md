@@ -200,7 +200,9 @@ to `setIdentity`. A group can override its own key. Changing the node default
 affects future groups only.
 
 The node closes its listener, groups and server, leaving the host and its
-caller-owned store usable. A host sync persists and schedules propagation;
+caller-owned store usable. To send a final checkpoint to peers at shutdown, call
+`network.stopIngress()`, sync drafts and close the host before the node closes.
+A host sync persists and schedules propagation;
 group announcement completes asynchronously. See the
 [reading-list example](src/test/java/convex/node/app/ReadingListApplicationTest.java)
 for a complete exchange with authenticated peer admission and staged publication,

@@ -301,9 +301,10 @@ snapshot. A failed barrier does not roll back publication already performed.
 The service chooses when to promise durability. It can checkpoint before
 acknowledging a durable request or batch flushes when delayed durability is
 acceptable. Background flushing processes already-retained state and must expose
-failures. Service shutdown stops writers and networking, syncs any drafts it
-wants kept, closes the host, which stops background flushing and saves a final
-checkpoint, then closes the store.
+failures. Service shutdown stops writers and networking ingress, syncs any drafts
+it wants kept, closes the host, which stops background flushing and saves a final
+checkpoint, then closes networking, which sends that checkpoint to peers, and
+finally the store.
 
 Separating these boundaries avoids forcing every edit to pay for a disk barrier
 or a network round trip. It also makes completion precise: a local edit, retained
@@ -312,7 +313,8 @@ that every replica is globally up to date. Failure in replication cannot undo
 an already completed local publication.
 
 Networking does not decide that saving policy. Attaching or closing replication
-neither publishes application drafts nor supplies a durability guarantee. A host
+neither publishes application drafts nor supplies a durability guarantee; closing
+sends only what the host has already published. A host
 and its applications remain usable after networking closes. Propagation groups
 choose what to serve and whom to exchange with; delivery still passes through
 the application's acceptance rules.

@@ -10,11 +10,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -432,6 +434,40 @@ public class LatticeConnectionManager extends AConnectionManager {
 		closeAllConnections();
 		workers.shutdownNow();
 		log.debug("LatticeConnectionManager closed");
+	}
+
+	/**
+	 * Closes as {@link #close()} does once the messages already sent on every route
+	 * have been written to its socket, or the timeout has passed. A route that cannot
+	 * report written messages closes without waiting. Delivery stays best effort:
+	 * written is not acknowledged.
+	 *
+	 * @param timeout maximum milliseconds to wait for sent messages to be written;
+	 *        zero or less closes at once
+	 */
+	public void close(long timeout) {
+		if (timeout>0) awaitWritten(timeout);
+		close();
+	}
+
+	private void awaitWritten(long timeout) {
+		ArrayList<CompletableFuture<?>> written=new ArrayList<>();
+		for (Convex peer:connections.values()) {
+			if (peer!=null) written.add(peer.flushOutbound().exceptionally(e -> null));
+		}
+		for (AConnection route:getSupplementalInboundRoutes()) {
+			written.add(route.flushOutbound().exceptionally(e -> null));
+		}
+		try {
+			CompletableFuture.allOf(written.toArray(CompletableFuture[]::new))
+				.get(timeout,TimeUnit.MILLISECONDS);
+		} catch (TimeoutException e) {
+			log.debug("Lattice messages not written to every route within {} ms; closing",timeout);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (ExecutionException e) {
+			// Unreachable: each failure was mapped to completion above
+		}
 	}
 
 	/**

@@ -57,7 +57,11 @@ public final class LatticePropagatorConfig {
 	/** Maximum encoded bytes retained by this group's inbound queue. */
 	public static final AString MAX_INBOUND_QUEUE_BYTES=Strings.intern("maxInboundQueueBytes");
 
-	/** Time allowed for each of this group's workers, ingress and publication, to drain during shutdown. */
+	/**
+	 * Time allowed for each of this group's workers, ingress and publication, to drain
+	 * during shutdown. Publication's allowance includes writing its final broadcasts
+	 * to each route before the routes close.
+	 */
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT=Strings.intern("inboundShutdownTimeout");
 
 	/** Conservative public-route message limit. */

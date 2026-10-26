@@ -298,6 +298,20 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * Returns a future completing once every message this connection has accepted
+	 * for sending has been written to its transport, for example so a final message
+	 * can leave before the connection closes. Written is not delivered: no
+	 * acknowledgement from the remote end is implied. The future fails if the
+	 * connection closes first. Unsupported connections fail explicitly.
+	 *
+	 * @return future for queued messages written
+	 */
+	public CompletableFuture<Void> flushOutbound() {
+		return CompletableFuture.failedFuture(
+			new UnsupportedOperationException("Connection cannot report written messages"));
+	}
+
+	/**
 	 * Updates the encoded inbound message limit. Wire transports must enforce this
 	 * before allocating a frame. Unsupported connections fail explicitly.
 	 * @param limit maximum encoded message bytes

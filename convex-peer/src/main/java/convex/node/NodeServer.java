@@ -77,8 +77,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Admits deliveries from networking: inbound merges and pull results, each with
-	 * its host sync. Close shuts it after the ingress drain and waits for a delivery
-	 * in progress, so nothing from networking changes the host once close returns.
+	 * its host sync. {@link #stopIngress()} shuts it after the ingress drain and waits
+	 * for a delivery in progress, so nothing from networking changes the host after.
 	 */
 	private final ReentrantReadWriteLock deliveryGate=new ReentrantReadWriteLock();
 	private boolean acceptingDeliveries=true; // guarded by deliveryGate
@@ -625,7 +625,38 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Drains each group independently. Does not publish pending host edits or
+	 * Stops networking changing the host while publication continues. Each group
+	 * stops admitting protocol work and drains what it has accepted; then deliveries
+	 * close, so an ingress worker that overran the drain, or a late pull, is rejected
+	 * rather than merged. Host syncs still reach every group until {@link #close()},
+	 * which sends them to peers before closing routes.
+	 *
+	 * <p>This is the first step of service shutdown: stop ingress, sync the
+	 * application drafts to keep, close the host, whose final checkpoint is published
+	 * through this node, then close this node. Calling it again, before launch or
+	 * after close does nothing; {@link #close()} calls it first. Group failures are
+	 * isolated, and groups can no longer be added or removed, as in close.</p>
+	 */
+	public synchronized void stopIngress() {
+		if (lifecycleState==LifecycleState.STARTING) {
+			throw new IllegalStateException(
+				"Cannot stop NodeServer re-entrantly while launch is in progress");
+		}
+		if (lifecycleState!=LifecycleState.RUNNING) return;
+		lifecycleState=LifecycleState.STOPPING;
+
+		for (LatticePropagator propagator:propagators) {
+			runIsolated(propagator,"ingress drain",propagator::stopIngress);
+		}
+		// Work accepted before the drain has landed. An ingress worker that overran
+		// the drain timeout, or a late pull, is now rejected rather than merged.
+		setAcceptingDeliveries(false);
+	}
+
+	/**
+	 * Stops ingress, if not already stopped, then drains each group's publication,
+	 * sending what the host has published to connected peers within the group's
+	 * shutdown timeout, and closes its routes. Does not publish pending host edits or
 	 * flush its store; saving belongs to the owning host/service lifecycle. Once
 	 * close returns, no inbound merge or pull result changes the host until the
 	 * next launch.
@@ -656,14 +687,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			throw new IllegalStateException(
 				"Cannot close NodeServer re-entrantly while launch is in progress");
 		}
-		lifecycleState=LifecycleState.STOPPING;
-
-		for (LatticePropagator propagator:propagators) {
-			runIsolated(propagator,"ingress drain",propagator::stopIngress);
-		}
-		// Work accepted before the drain has landed. An ingress worker that overran
-		// the drain timeout, or a late pull, is now rejected rather than merged.
-		setAcceptingDeliveries(false);
+		stopIngress();
 
 		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"shutdown",propagator::close);
