@@ -345,15 +345,33 @@ adoption, so a wrong key or mismatched policy changes nothing on disk. Then:
 - **Abandoned cycles are rolled back.** A target with neither marker reference nor
   tombstone holds writes that exist nowhere else; its entries are migrated into the
   live file, tolerating a torn tail from the crash, and the root advances only if its
-  tree then verifies complete.
+  tree then verifies complete. An abandoned v3 target that was never checkpointed is
+  deleted instead (see below).
 
-**Etch v3 differs on unclean crashes.** Recovery requires a valid `CLEAN_CLOSED`
-checkpoint, published by a successful sync or close. A subsequent mutation first
-publishes `OPEN`; a crash before the next clean checkpoint makes ordinary
-`EtchStore.create` stop before changing the GC layout. The operator must then
-deliberately select the maintenance and repair workflow described in
-[ETCHv3.md](ETCHv3.md). V1 and v2 files have no clean-close state and keep the
-best-effort rollback behaviour above.
+**Etch v3 on unclean crashes.** Recovery reads only files with a valid
+`CLEAN_CLOSED` checkpoint, published by a successful sync or close; a subsequent
+mutation first publishes `OPEN`. Recovery makes one exception. A target is created
+with headers at generations 0 and 1 in `OPEN` state and an unset root, and every
+later header commit increments the generation. A target still in that state has
+never been checkpointed, so it records no committed root and nothing in it can be
+restored, by recovery or by [repair](ETCHv3.md#explicit-repair). Recovery deletes
+such a target unread when no marker names it and it has no tombstone, after
+authenticating every file. The live file was not written during the cycle, so it
+holds the last committed root.
+
+| Crash point | Live file | Target | Next normal open |
+|---|---|---|---|
+| Before the target's first checkpoint (for a start-up cycle, the whole sweep) | clean | never checkpointed | Deletes the target; opens the root of the last checkpoint |
+| Mid-cycle, after the target has checkpointed (online cycles) | clean | dirty | Refused: repair |
+| After cutover, before any later write (start-up cycles, until close) | superseded or deleted | clean, named by the marker | Adopts the target: collected root |
+| After cutover, once later writes began (online cycles) | superseded or deleted | dirty, named by the marker | Refused: repair |
+| Live file dirty, for example a crash during cancel | dirty | any | Refused: repair, as without GC |
+
+`completeGC()` syncs the target before writing the tombstone and marker, so a
+cycle with no writes after cutover is clean at every crash point from then on.
+A refused open changes nothing on disk; the operator then deliberately selects the
+maintenance and repair workflow described in [ETCHv3.md](ETCHv3.md). V1 and v2
+files have no clean-close state and keep the best-effort rollback behaviour above.
 
 If recovery cannot identify an existing live store, it fails before changing the
 layout, rather than creating an empty store beside recoverable targets. Filesystem

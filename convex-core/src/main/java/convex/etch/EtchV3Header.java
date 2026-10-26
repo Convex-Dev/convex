@@ -492,6 +492,15 @@ final class EtchV3Header extends AEtchHeader {
 		return closeState==V3_CLEAN_CLOSED;
 	}
 
+	/**
+	 * Whether this file has never completed a sync since creation. Creation commits
+	 * generations 0 and 1 in {@code OPEN} state with an unset root, and every later
+	 * commit increments the generation, so such a file records no committed root.
+	 */
+	boolean isNeverCheckpointed() {
+		return (closeState==V3_OPEN)&&(Long.compareUnsigned(generation,1L)<=0);
+	}
+
 	byte[] fileSalt() {
 		return fileSalt.clone();
 	}

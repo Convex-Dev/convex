@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.data.Refs;
@@ -333,6 +335,91 @@ public class EtchConfiguredLifecycleTest {
 		markRelatedForDeletion(base);
 	}
 
+	/**
+	 * A cycle that crashes before its target's first checkpoint, such as a start-up
+	 * collection crashed mid-sweep, leaves a target that records no committed root.
+	 * Normal open deletes it unread and keeps the live file's last checkpoint (#748).
+	 */
+	@ParameterizedTest
+	@MethodSource("v3Configs")
+	public void testNeverCheckpointedTargetIsDiscarded(EtchConfig config) throws IOException {
+		File base=File.createTempFile("etch-config-uncheckpointed",".etch");
+		base.deleteOnExit();
+		AVector<ACell> expected=EtchGCLifecycleTest.tree(2000);
+		File target=crashBeforeTargetCheckpoint(base,config,expected);
+
+		Map<String,byte[]> before=snapshotRelated(base);
+		try (EtchStore recovered=EtchStore.create(base,config)) {
+			assertEquals(base.getCanonicalFile(),recovered.getFile().getCanonicalFile());
+			assertEquals(expected.getHash(),recovered.getRootHash());
+			assertEquals(expected,recovered.getRootData());
+		}
+		assertFalse(target.exists(),"a never-checkpointed target holds no committed root");
+		before.remove(target.getName());
+		assertSnapshotsEqual(before,snapshotRelated(base));
+		markRelatedForDeletion(base);
+	}
+
+	@Test
+	public void testWrongKeyDoesNotDiscardNeverCheckpointedTarget() throws IOException {
+		EtchConfig config=encryptedConfig(EtchConfig.CipherMode.AES_256_CTR,true,SECRET);
+		EtchConfig wrong=encryptedConfig(EtchConfig.CipherMode.AES_256_CTR,true,WRONG_SECRET);
+		File base=File.createTempFile("etch-config-uncheckpointed-key",".etch");
+		base.deleteOnExit();
+		AVector<ACell> expected=EtchGCLifecycleTest.tree(2000);
+		File target=crashBeforeTargetCheckpoint(base,config,expected);
+
+		Map<String,byte[]> before=snapshotRelated(base);
+		assertThrows(IOException.class,()->EtchStore.create(base,wrong));
+		assertSnapshotsEqual(before,snapshotRelated(base));
+
+		try (EtchStore recovered=EtchStore.create(base,config)) {
+			assertEquals(expected.getHash(),recovered.getRootHash());
+		}
+		assertFalse(target.exists());
+		markRelatedForDeletion(base);
+	}
+
+	/** A target that has checkpointed may hold the only copy of a committed root. */
+	@Test
+	public void testCheckpointedDirtyTargetStillRefused() throws IOException {
+		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
+		File base=File.createTempFile("etch-config-checkpointed-dirty",".etch");
+		base.deleteOnExit();
+		try (EtchStore initial=EtchStore.create(base,config)) {
+			initial.setRootData(EtchGCLifecycleTest.tree(2000));
+		}
+		File target;
+		try (EtchStore collecting=EtchStore.create(base,config)) {
+			collecting.startGC();
+			target=collecting.getTargetEtch().getFile();
+			target.deleteOnExit();
+			collecting.setRootData(EtchGCLifecycleTest.tree(2100));
+			collecting.flush(); // commits the new root in the target only
+		}
+		markV3Open(target,config);
+
+		Map<String,byte[]> before=snapshotRelated(base);
+		assertThrows(IOException.class,()->EtchStore.create(base,config));
+		assertSnapshotsEqual(before,snapshotRelated(base));
+		markRelatedForDeletion(base);
+	}
+
+	/** A dirty live file is an ordinary v3 crash; recovery changes nothing. */
+	@Test
+	public void testDirtyLiveFileRefusedWithNeverCheckpointedTarget() throws IOException {
+		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
+		File base=File.createTempFile("etch-config-dirty-live",".etch");
+		base.deleteOnExit();
+		crashBeforeTargetCheckpoint(base,config,EtchGCLifecycleTest.tree(2000));
+		markV3Open(base,config);
+
+		Map<String,byte[]> before=snapshotRelated(base);
+		assertThrows(IOException.class,()->EtchStore.create(base,config));
+		assertSnapshotsEqual(before,snapshotRelated(base));
+		markRelatedForDeletion(base);
+	}
+
 	@Test
 	public void testConfiguredTemporaryStoreOverloads() throws IOException {
 		EtchConfig config=encryptedConfig(EtchConfig.CipherMode.AES_256_CTR,false,SECRET);
@@ -475,7 +562,56 @@ public class EtchConfiguredLifecycleTest {
 		}
 	}
 
+	private static Stream<EtchConfig> v3Configs() {
+		return Stream.of(EtchConfig.create(EtchConstants.VERSION_3),
+				encryptedConfig(EtchConfig.CipherMode.CHACHA20,true,SECRET));
+	}
+
+	/**
+	 * Leaves the files of a cycle that crashed before its target's first checkpoint:
+	 * the live file at its last checkpoint, and a target with the headers creation
+	 * wrote. A root set during the cycle is never committed.
+	 *
+	 * @return the target file
+	 */
+	private static File crashBeforeTargetCheckpoint(File base, EtchConfig config, ACell root)
+			throws IOException {
+		try (EtchStore initial=EtchStore.create(base,config)) {
+			initial.setRootData(root);
+		}
+		File target;
+		try (EtchStore collecting=EtchStore.create(base,config)) {
+			collecting.startGC();
+			target=collecting.getTargetEtch().getFile();
+			target.deleteOnExit();
+			collecting.transferGC();
+			collecting.setRootData(EtchGCLifecycleTest.tree(2100));
+		}
+		markV3Created(target,config);
+		return target;
+	}
+
 	private static void markV3Open(File file, EtchConfig config) throws IOException {
+		rewriteV3Headers(file,config,header -> new byte[][] {
+			header.encode(header.generation()+1L,header.syncedFileEnd(),
+					header.getRootHash(),EtchConstants.V3_OPEN),
+			header.encode(header.generation()+2L,header.syncedFileEnd(),
+					header.getRootHash(),EtchConstants.V3_OPEN)});
+	}
+
+	/** Rewrites both headers as creation leaves them: generations 0 and 1, OPEN, unset root. */
+	private static void markV3Created(File file, EtchConfig config) throws IOException {
+		rewriteV3Headers(file,config,header -> {
+			long createdEnd=header.indexStart()
+					+(long)EtchConstants.ROOT_INDEX_SIZE*EtchConstants.POINTER_SIZE;
+			return new byte[][] {
+				header.encode(0L,createdEnd,Hash.UNSET_HASH,EtchConstants.V3_OPEN),
+				header.encode(1L,createdEnd,Hash.UNSET_HASH,EtchConstants.V3_OPEN)};
+		});
+	}
+
+	private static void rewriteV3Headers(File file, EtchConfig config,
+			Function<EtchV3Header,byte[][]> copies) throws IOException {
 		byte[] secret=(config.getCipherMode()==EtchConfig.CipherMode.NONE)?null
 				:config.resolveKey(config.getPublicKeyHint());
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
@@ -483,10 +619,9 @@ public class EtchConfiguredLifecycleTest {
 			try (AFileMapper mapper=new MBBFileMapper(data.getChannel(),true)) {
 				header=(EtchV3Header)AEtchHeader.open(mapper,file.getName(),secret);
 			}
-			byte[] copyA=header.encode(header.generation()+1L,header.syncedFileEnd(),
-					header.getRootHash(),EtchConstants.V3_OPEN);
-			byte[] copyB=header.encode(header.generation()+2L,header.syncedFileEnd(),
-					header.getRootHash(),EtchConstants.V3_OPEN);
+			byte[][] encoded=copies.apply(header);
+			byte[] copyA=encoded[0];
+			byte[] copyB=encoded[1];
 			data.seek(EtchConstants.V3_HEADER_A_OFFSET);
 			data.write(copyA);
 			data.seek(EtchConstants.V3_HEADER_B_OFFSET);
