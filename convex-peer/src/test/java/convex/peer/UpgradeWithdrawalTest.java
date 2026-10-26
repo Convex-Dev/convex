@@ -6,11 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -20,10 +22,13 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
-import convex.core.cvm.Peer;
 import convex.core.cvm.State;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AccountKey;
+import convex.core.data.Keyword;
+import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
@@ -48,16 +53,45 @@ public class UpgradeWithdrawalTest {
 		return servers.get(0);
 	}
 
-	private CompletableFuture<Peer> awaitNextState(Server server) {
-		long currentPosition=server.getPeer().getStatePosition();
-		CompletableFuture<Peer> future=new CompletableFuture<>();
-		Consumer<Peer> observer=peer-> {
-			if (peer.getStatePosition()>currentPosition) future.complete(peer);
-		};
-		server.addStateUpdateObserver(observer);
-		future.orTimeout(20,TimeUnit.SECONDS)
-			.whenComplete((peer,error)->server.removeStateUpdateObserver(observer));
-		return future;
+	/**
+	 * Launches an isolated single peer that reads the given clock from the outset, so no
+	 * block or self-management decision ever sees the wall clock. Like launchLocalPeers it
+	 * sets the peer's hostname, which the peer registers with its own transaction in its
+	 * first block.
+	 */
+	private Server launchIsolatedPeer(State genesis, LongSupplier clock) throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR, PEER_KP);
+		config.put(Keywords.STATE, genesis);
+		config.put(Keywords.PORT, 0);
+		config.put(Keywords.AUTO_MANAGE, true);
+		Server s=Server.create(config);
+		s.setTimeSource(clock);
+		s.launch();
+		s.setHostname("localhost:"+s.getPort());
+		return s;
+	}
+
+	/**
+	 * Confirms a transaction in a block dated {@code time}. The peer publishes at most one
+	 * block per minimum block time of its clock, so once a block exists at the current
+	 * instant the transaction cannot be included until the clock moves. Queuing it before
+	 * moving the clock puts it in the first block at {@code time}, together with anything
+	 * the peer decides to transact itself at that time.
+	 */
+	private Result transactAt(Server s, Convex convex, AtomicLong clock, long time, String source) throws Exception {
+		TransactionHandler handler=s.getTransactionHandler();
+		CompletableFuture<SignedData<ATransaction>> queued=new CompletableFuture<>();
+		handler.setRequestObserver(queued::complete);
+		try {
+			CompletableFuture<Result> result=convex.transact(source);
+			// An intake error completes the result without queuing the transaction
+			CompletableFuture.anyOf(queued,result).get(5,TimeUnit.SECONDS);
+			clock.set(time);
+			return result.get(5,TimeUnit.SECONDS);
+		} finally {
+			handler.setRequestObserver(null);
+		}
 	}
 
 	@Test
@@ -114,14 +148,11 @@ public class UpgradeWithdrawalTest {
 		State genesis = upgraded.withProtocolGlobals(supported,
 				upgraded.getUpgradeVector().conj(CVMLong.create(activation)));
 
-		List<Server> servers = API.launchLocalPeers(List.of(PEER_KP), genesis);
-		Server s = servers.get(0);
+		// The peer reads this clock from launch. Start comfortably before the
+		// activation so the peer operates normally.
+		AtomicLong clock = new AtomicLong(t0 + 1000);
+		Server s = launchIsolatedPeer(genesis, clock::get);
 		try {
-			// Take control of time BEFORE any block is produced. Start comfortably
-			// before the activation so the peer operates normally.
-			java.util.concurrent.atomic.AtomicLong clock = new java.util.concurrent.atomic.AtomicLong(t0 + 1000);
-			s.setTimeSource(clock::get);
-
 			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
 
 			// Early detection: the peer already knows an unsupported upgrade is
@@ -130,11 +161,11 @@ public class UpgradeWithdrawalTest {
 			assertEquals(unsupported, warn.version);
 			assertEquals(activation, warn.activation);
 
+			// The peer's first block registers its hostname at the start instant
+			s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
+
 			// Normal operation before the boundary: a transaction confirms, version unchanged
-			CompletableFuture<Peer> stateAdvanced=awaitNextState(s);
-			CompletableFuture<Result> transaction=convex.transact("(def a 1)");
-			stateAdvanced.get();
-			Result r=transaction.get(5,TimeUnit.SECONDS);
+			Result r=transactAt(s, convex, clock, t0 + 2000, "(def a 1)");
 			assertFalse(r.isError(), () -> "pre-boundary transaction failed: " + r);
 			assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
 			assertFalse(s.isConsensusHalted());
@@ -176,21 +207,20 @@ public class UpgradeWithdrawalTest {
 		long activation = t0 + 60L*60*1000; // 60 min ahead, so the 5-10 min pre-window fits
 		State genesis = upgraded.withProtocolGlobals(supported, upgraded.getUpgradeVector().conj(CVMLong.create(activation)));
 
-		List<Server> servers = API.launchLocalPeers(List.of(PEER_KP), genesis);
-		Server s = servers.get(0);
+		AtomicLong clock = new AtomicLong(t0 + 1000);
+		Server s = launchIsolatedPeer(genesis, clock::get);
 		try {
-			java.util.concurrent.atomic.AtomicLong clock = new java.util.concurrent.atomic.AtomicLong(t0 + 1000);
-			s.setTimeSource(clock::get);
 			long stake0 = s.getPeer().getConsensusState().getPeer(myKey).getPeerStake();
 			assertTrue(stake0 > 0);
 
 			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
-			// Move deep into the withdrawal window (past any randomised instant, before the boundary)
-			clock.set(activation - 60*1000);
-			CompletableFuture<Peer> stateAdvanced=awaitNextState(s);
-			CompletableFuture<Result> transaction=convex.transact("(def a 1)");
-			stateAdvanced.get();
-			Result r=transaction.get(5,TimeUnit.SECONDS);
+			// The peer's first block registers its hostname at the start instant
+			s.awaitStatePosition(1).get(20, TimeUnit.SECONDS);
+
+			// Confirm a transaction deep in the withdrawal window (past any randomised instant,
+			// before the boundary). The peer decides whether to withdraw before filling the
+			// block, so any withdrawal would be in the same block as this transaction.
+			Result r=transactAt(s, convex, clock, activation - 60*1000, "(def a 1)");
 			assertFalse(r.isError(), () -> "in-window transaction failed: " + r);
 
 			// The last viable peer did NOT withdraw: still fully staked (a withdrawal would
