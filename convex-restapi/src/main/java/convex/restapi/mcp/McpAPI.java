@@ -5,6 +5,7 @@ import static convex.restapi.mcp.McpProtocol.*;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.security.SecureRandom;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -192,7 +193,14 @@ public class McpAPI extends ABaseAPI {
 	 * Stops peer-state observation for this API instance.
 	 */
 	public void shutdown() {
+		// Ends each stream's keep-alive loop, so a graceful server stop need not wait for it
+		closeConnections(connections);
 		stateWatcher.shutdown();
+	}
+
+	/** Closes every registered stream; each stream's request then completes. */
+	static void closeConnections(Map<String, McpConnection> connections) {
+		for (McpConnection conn : connections.values()) conn.close();
 	}
 
 	/**

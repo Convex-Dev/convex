@@ -11,6 +11,7 @@ import convex.core.data.Maps;
 import convex.core.util.Utils;
 import convex.peer.auth.PeerAuth;
 import convex.restapi.auth.AuthMiddleware;
+import convex.restapi.handler.GracefulStop;
 import convex.restapi.handler.HttpMethodFilter;
 import convex.restapi.mcp.McpServer;
 import io.javalin.Javalin;
@@ -132,6 +133,7 @@ public class DLFSServer implements Closeable {
 			config.concurrency.useVirtualThreads = true;
 
 			HttpMethodFilter.install(config);
+			GracefulStop.install(config);
 
 			// Configure Jetty connector with minimal platform threads.
 			// Request handling uses virtual threads (useVirtualThreads=true above),

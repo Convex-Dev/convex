@@ -74,4 +74,19 @@ public class McpConnectionRegistryTest {
 		// Every retained connection is exactly an OK result — no orphans, no double-count
 		assertEquals(conns.size(), ok.get(), "retained connections must equal OK registrations");
 	}
+
+	/** Shutdown ends every stream, so a graceful server stop need not wait for them (#777). */
+	@Test
+	public void testCloseConnectionsEndsEveryStream() {
+		ConcurrentHashMap<String, McpConnection> conns = new ConcurrentHashMap<>();
+		McpConnection first = conn();
+		McpConnection second = conn();
+		McpAPI.registerConnection(conns, "a", first, 10);
+		McpAPI.registerConnection(conns, "b", second, 10);
+
+		McpAPI.closeConnections(conns);
+
+		assertTrue(first.isClosed());
+		assertTrue(second.isClosed());
+	}
 }
