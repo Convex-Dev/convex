@@ -24,20 +24,29 @@ import convex.db.ConvexDB;
  *   <li>Database: the {@code :tables} section merges with {@link #mergeTables}; other
  *       incoming sections are ignored and those already held are kept</li>
  *   <li>Table store: a union of table names, each entry merged with {@link #mergeTable}</li>
- *   <li>Table entry: the schema is last-writer-wins on utime, the schema timestamp, with
- *       the own entry kept on a tie; a dropped table's tombstone wins in the same way.
- *       While the winner is live, rows merge by key with {@link #mergeRow}</li>
+ *   <li>Table entry: the schema is last-writer-wins on utime, the time the table was
+ *       created or dropped, with the own entry kept on a tie; a dropped table's tombstone
+ *       wins in the same way. Rows merge by key with {@link #mergeRows}, whichever schema
+ *       wins</li>
  *   <li>Row: the latest timestamp wins; on equal timestamps a deletion wins, otherwise
- *       the own row is kept</li>
+ *       the own row is kept. A row held on one side only survives if it was written at
+ *       or after the other side's utime: a row written before a table was created
+ *       belongs to an earlier table of that name</li>
  * </ul>
  *
- * <p>A table entry without a utime carries only rows, from a delivery below the entry
- * (see {@link SQLDatabase}). Its rows merge into a live table; an absent or dropped
- * table takes nothing.
+ * <p>So rows written before a table is dropped and created again never return, and the
+ * copies of a single writer's tables converge to the writer's own. Two creations of a
+ * table by different writers are different tables: rows written to the earlier one
+ * before the later creation are dropped. Ordering schema changes between writers is
+ * application policy.
  *
- * <p>Each piece is a pure function of two values, so an application can compose a
- * variant from them, for example keeping its own entry for one table and using
- * {@link #mergeTable} for the others.
+ * <p>A table entry without a utime carries only rows, from a delivery below the entry
+ * (see {@link SQLDatabase}). Its rows merge into a table that exists, live or dropped,
+ * as those of a whole entry would; an absent table takes nothing.
+ *
+ * <p>Each piece is a pure function, so an application can compose a variant from them,
+ * for example keeping its own entry for one table and using {@link #mergeTable} for the
+ * others.
  */
 public class RowLWW {
 
@@ -94,10 +103,12 @@ public class RowLWW {
 	}
 
 	/**
-	 * Merges two entries of one table. The schema is last-writer-wins on utime, with the
-	 * own entry kept on a tie; a dropped table's tombstone wins in the same way. While the
-	 * winner is live, rows merge by key with {@link #mergeRow}. An entry without a utime
-	 * carries only rows, which merge into a live table and are otherwise ignored.
+	 * Merges two entries of one table. The schema is last-writer-wins on utime, the time
+	 * the table was created or dropped, with the own entry kept on a tie; a dropped table's
+	 * tombstone wins in the same way. Rows merge by key with {@link #mergeRows}, whichever
+	 * schema wins, so a dropped table holds the rows written after it was dropped. An entry
+	 * without a utime carries only rows, which merge into a table that exists, live or
+	 * dropped; an absent table takes nothing.
 	 *
 	 * @param own Established entry, kept on ties; null if absent
 	 * @param other Entry to merge in; null if absent
@@ -105,12 +116,10 @@ public class RowLWW {
 	 */
 	@SuppressWarnings("unchecked")
 	public static AVector<ACell> mergeTable(AVector<ACell> own, AVector<ACell> other) {
-		if (other != null && other.get(SQLTable.POS_UTIME) == null && !SQLTable.isLiveState(own)) return own;
-		if (own == null) return other;
 		if (other == null) return own;
-
-		CVMLong timeA = (CVMLong) own.get(SQLTable.POS_UTIME);
 		CVMLong timeB = (CVMLong) other.get(SQLTable.POS_UTIME);
+		if (own == null) return (timeB == null) ? null : other;
+		CVMLong timeA = (CVMLong) own.get(SQLTable.POS_UTIME);
 
 		// Determine schema winner (LWW)
 		AVector<ACell> schemaWinner;
@@ -126,15 +135,13 @@ public class RowLWW {
 			schemaWinner = own;
 		}
 
-		// If schema winner is tombstone, return tombstone
-		if (schemaWinner.get(SQLTable.POS_SCHEMA) == null) {
-			return schemaWinner;
-		}
-
-		// Merge rows
+		// Merge rows, whichever schema wins
 		Index<ABlob, AVector<ACell>> rowsA = (Index<ABlob, AVector<ACell>>) own.get(SQLTable.POS_ROWS);
 		Index<ABlob, AVector<ACell>> rowsB = (Index<ABlob, AVector<ACell>>) other.get(SQLTable.POS_ROWS);
-		Index<ABlob, AVector<ACell>> mergedRows = mergeRows(rowsA, rowsB);
+		Index<ABlob, AVector<ACell>> mergedRows = mergeRows(rowsA, rowsB, timeA, timeB);
+		if (mergedRows != null && mergedRows.isEmpty() && schemaWinner.get(SQLTable.POS_ROWS) == null) {
+			mergedRows = null; // a tombstone holding no rows keeps its form
+		}
 
 		// Compute live count for merged result
 		long liveCount;
@@ -166,17 +173,37 @@ public class RowLWW {
 	}
 
 	/**
-	 * Merges two row indexes by primary key, each row with {@link #mergeRow}.
+	 * Merges the rows of two entries of one table by primary key. A row held on both sides
+	 * merges with {@link #mergeRow}. A row held on one side only survives if it was written
+	 * at or after the other side's utime: written before that table was created, it belongs
+	 * to an earlier table of the same name, or before it was dropped, to the dropped table.
 	 *
 	 * @param own Established rows; null if absent
 	 * @param other Rows to merge in; null if absent
-	 * @return Merged rows
+	 * @param ownTime Utime of the entry holding {@code own}; null if it carries only rows
+	 * @param otherTime Utime of the entry holding {@code other}; null if it carries only rows
+	 * @return Merged rows; null if both are absent
 	 */
 	public static Index<ABlob, AVector<ACell>> mergeRows(Index<ABlob, AVector<ACell>> own,
-			Index<ABlob, AVector<ACell>> other) {
-		if (other == null) return own;
+			Index<ABlob, AVector<ACell>> other, CVMLong ownTime, CVMLong otherTime) {
+		if (own == null && other == null) return null;
 		Index<ABlob, AVector<ACell>> base = (own == null) ? Index.none() : own;
-		return base.mergeDifferences(other, RowLWW::mergeRow);
+		Index<ABlob, AVector<ACell>> incoming = (other == null) ? Index.none() : other;
+		return base.mergeDifferences(incoming, new MergeFunction<AVector<ACell>>() {
+			@Override
+			public AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b) {
+				if (a == null) return writtenSince(b, ownTime) ? b : null;
+				if (b == null) return writtenSince(a, otherTime) ? a : null;
+				return mergeRow(a, b);
+			}
+		});
+	}
+
+	/** Whether a row was written at or after a table's utime; always so when there is none. */
+	private static boolean writtenSince(AVector<ACell> row, CVMLong time) {
+		if (time == null) return true;
+		CVMLong written = SQLRow.getTimestamp(row);
+		return written != null && written.longValue() >= time.longValue();
 	}
 
 	/**

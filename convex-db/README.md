@@ -262,11 +262,16 @@ update row by row:
 - **Tables**: Last-write-wins (LWW) for schema changes
 - **Rows**: LWW with row-level granularity
 - **Conflicts**: Latest timestamp wins; equal timestamps favour deletions
+- **Re-creation**: Rows written before a table was created belong to an earlier table
+  of that name, so rows from before a `DROP TABLE` never return
 
 An application that serialises its updates, schema changes included, supplies its
 own policy, or composes one from the `RowLWW` functions.
 
 ### Replicating Between Nodes
+
+A table is created once and replicated; if each node created it, the later creation
+would be a different table, without the rows written to the earlier one before it.
 
 ```java
 // Node 1: Create and populate
@@ -274,15 +279,13 @@ SQLDatabase db1 = SQLDatabase.create("shared", keyPair1, RowLWW::merge);
 db1.tables().createTable("data", new String[]{"id", "value"});
 db1.tables().insert("data", 1, "hello");  // first column is the primary key
 
-// Node 2: Create same structure
+// Node 2: Receive the table from Node 1, then write
 SQLDatabase db2 = SQLDatabase.create("shared", keyPair2, RowLWW::merge);
-db2.tables().createTable("data", new String[]{"id", "value"});
+db2.mergeReplicas(db1.exportReplica());
+db2.tables().insert("data", 2, "world");
 
 // Merge Node 2's changes into Node 1
 db1.mergeReplicas(db2.exportReplica());
-
-// Merge Node 1's changes into Node 2
-db2.mergeReplicas(db1.exportReplica());
 ```
 
 ### Replica Ownership

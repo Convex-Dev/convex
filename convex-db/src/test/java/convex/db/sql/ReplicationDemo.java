@@ -109,16 +109,20 @@ public class ReplicationDemo {
 
 			section("3. SQL databases connected to node cursors");
 
-			// ── 4. Create table and insert data independently ───────────
+			// ── 4. Create the table once, then insert data independently ─
+			// Under RowLWW a table is identified by its creation, so London
+			// creates it and Tokyo receives it before writing.
 
 			dbLondon.tables().createTable("products", new String[]{"id", "name", "price", "stock"});
+			serverLondon.getHost().sync();
+			serverTokyo.pull(propagatorTokyo);
+
 			dbLondon.tables().insert("products", 1, "Widget",    9.99, 100);
 			dbLondon.tables().insert("products", 2, "Gadget",   24.99,  50);
 			dbLondon.tables().insert("products", 3, "Sprocket", 14.99,  75);
 			// Sync so the propagator sees the changes
 			serverLondon.getHost().sync();
 
-			dbTokyo.tables().createTable("products", new String[]{"id", "name", "price", "stock"});
 			dbTokyo.tables().insert("products", 4, "Connector",  4.99, 200);
 			dbTokyo.tables().insert("products", 5, "Capacitor",  1.99, 500);
 			dbTokyo.tables().insert("products", 6, "Transistor", 0.49, 1000);

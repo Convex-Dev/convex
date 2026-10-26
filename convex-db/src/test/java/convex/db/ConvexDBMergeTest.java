@@ -83,7 +83,11 @@ public class ConvexDBMergeTest {
 
 	/** Registers a ConvexDB with the composed policy, as an application assembles its own host. */
 	private static ConvexDB install(LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host) {
-		return host.addApplication(new ConvexDB(host.cursor(), ConvexDBMergeTest::keepFrozen, counter()));
+		return install(host, counter());
+	}
+
+	private static ConvexDB install(LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host, Supplier<CVMLong> clock) {
+		return host.addApplication(new ConvexDB(host.cursor(), ConvexDBMergeTest::keepFrozen, clock));
 	}
 
 	/** Creates both tables, each holding row 1. */
@@ -177,10 +181,12 @@ public class ConvexDBMergeTest {
 	@Test
 	public void testHostForkSyncUsesThePolicy() {
 		var origin = host();
-		SQLDatabase db = install(origin).database(DB);
+		ConvexDB application = install(origin);
+		SQLDatabase db = application.database(DB);
 		populate(db);
 		var fork = origin.fork();
-		SQLDatabase forked = install(fork).database(DB);
+		// The fork continues the same application, so it writes with the same clock
+		SQLDatabase forked = install(fork, application.getClock()).database(DB);
 
 		insert(forked, 2);
 		insert(db, 3);
@@ -243,9 +249,11 @@ public class ConvexDBMergeTest {
 		assertNotSame(ConvexDB.connect(plain, RowLWW::merge), ConvexDB.connect(plain, RowLWW::merge));
 	}
 
+	/** Delivered rows merge as those of a whole entry would: only rows written since the table was created or dropped. */
 	@Test
 	public void testRowDeliveryIntoLiveDroppedAndAbsentTables() throws Exception {
-		var host = ConvexDB.openHost(null, RowLWW::merge);
+		// Tables created at 1 and 3, with rows at 2 and 4; delivered rows are stamped 5 and later
+		var host = ConvexDB.openHost(null, RowLWW::merge, counter());
 		SQLDatabase db = ConvexDB.connect(host).database(DB);
 		populate(db);
 		AVector<ACell> row = SQLRow.create(Vectors.of(CVMLong.create(2), Strings.create("two")), CVMLong.create(5));
@@ -263,12 +271,22 @@ public class ConvexDBMergeTest {
 		host.mergeAt(Index.of(key(3), row), DB_NAME, ConvexDB.KEY_TABLES, PLAIN, CVMLong.ONE);
 		assertEquals(3, db.tables().getRowCount(PLAIN));
 
-		assertTrue(db.tables().dropTable(FROZEN));
+		assertTrue(db.tables().dropTable(FROZEN)); // dropped at 5
 		var before = host.cursor().get();
-		host.mergeAt(row, DB_NAME, ConvexDB.KEY_TABLES, FROZEN, CVMLong.ONE, key(2));
+		AVector<ACell> beforeCreation = SQLRow.create(Vectors.of(CVMLong.create(4), Strings.create("four")), CVMLong.create(2));
+		AVector<ACell> beforeDrop = SQLRow.create(Vectors.of(CVMLong.create(4), Strings.create("four")), CVMLong.create(4));
+		host.mergeAt(beforeCreation, DB_NAME, ConvexDB.KEY_TABLES, PLAIN, CVMLong.ONE, key(4));
+		host.mergeAt(beforeDrop, DB_NAME, ConvexDB.KEY_TABLES, FROZEN, CVMLong.ONE, key(4));
 		host.mergeAt(row, DB_NAME, ConvexDB.KEY_TABLES, Strings.create("absent"), CVMLong.ONE, key(2));
 		host.mergeAt(row, Strings.create("absent"), ConvexDB.KEY_TABLES, PLAIN, CVMLong.ONE, key(2));
-		assertSame(before, host.cursor().get(), "dropped and absent tables receive nothing");
+		assertSame(before, host.cursor().get(), "rows from before a table's creation or drop, and absent tables, take nothing");
+
+		// A row written after the drop is held, but a dropped table shows nothing
+		AVector<ACell> afterDrop = SQLRow.create(Vectors.of(CVMLong.create(9), Strings.create("nine")), CVMLong.create(9));
+		host.mergeAt(afterDrop, DB_NAME, ConvexDB.KEY_TABLES, FROZEN, CVMLong.ONE, key(9));
+		assertFalse(db.tables().tableExists(FROZEN));
+		assertEquals(0, db.tables().getRowCount(FROZEN));
+		before = host.cursor().get();
 
 		// Paths into the entry other than its rows are refused
 		assertThrows(UnsupportedOperationException.class,

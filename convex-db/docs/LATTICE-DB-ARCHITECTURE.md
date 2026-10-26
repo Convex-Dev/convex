@@ -166,22 +166,32 @@ Every route by which state arrives reaches the policy:
 |-------|----------|------|
 | database | `merge` | `:tables` by `mergeTables`; other sections are ignored on receipt and kept where held |
 | table store | `mergeTables` | union of table names; each entry by `mergeTable` |
-| table entry | `mergeTable` | LWW schema on `utime`, own on a tie; a dropped table's tombstone wins in the same way; while live, rows merge by key |
+| table entry | `mergeTable` | LWW schema on `utime`, own on a tie; a dropped table's tombstone wins in the same way; rows by `mergeRows`, whichever schema wins |
+| rows | `mergeRows` | by key; a row held on one side only survives if written at or after the other side's `utime` |
 | row entry | `mergeRow` | LWW by timestamp; equal timestamps favour deletion, otherwise own |
 
-A table entry without a `utime` carries only rows, from a delivery below the entry:
-its rows merge into a live table, and an absent or dropped table takes nothing. Row
-writes leave the entry's `utime` unchanged: it is the schema timestamp. Merges that
-accept nothing create nothing: a database or table store that is absent stays absent.
-Equal timestamps keep the established value, as described in the
+An entry's `utime` is the time the table was created or dropped: row writes leave it
+unchanged. A row written before a table was created belongs to an earlier table of
+that name, so when one side holds a row the other lacks, the row survives only if it
+was written at or after the other side's `utime`. Rows written before a `DROP TABLE`
+therefore never return, whether a copy missed the drop or the table was created again,
+and every copy of a single writer's tables converges to the writer's own. `DROP TABLE`
+writes only the tombstone: a dropped table holds just the rows written after it was
+dropped, which no reader sees.
+
+A table entry without a `utime` carries only rows, from a delivery below the entry: its
+rows merge into a table that exists, live or dropped, as those of a whole entry would,
+and an absent table takes nothing. Merges that accept nothing create nothing: a
+database or table store that is absent stays absent. Equal timestamps keep the
+established value, as described in the
 [lattice application design](../../convex-core/docs/LATTICE_APPLICATIONS.md).
 
 Who may change a table's schema, drop it or create it again, and how those changes
-are ordered between writers, is application policy. `RowLWW` orders schema changes by
-`utime` alone and merges rows by key whichever creation of the table they were
-written to, so rows written before a `DROP TABLE` can reappear in a table created
-again under the same name. An application with several writers changing schemas
-sequences those changes itself, or supplies another policy.
+are ordered between writers, is application policy. Under `RowLWW`, two creations of a
+table by different writers are different tables: rows written to the earlier one
+before the later creation are dropped, while rows written after it still merge. A
+table is therefore created once and replicated. An application with several writers
+changing schemas sequences those changes itself, or supplies another policy.
 
 ### Composing a policy
 
