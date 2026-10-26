@@ -231,7 +231,8 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			rows = rows.assoc(pk, SQLRow.create(values, timestamp));
 			long liveCount = getLiveCount(state) + (addsLive ? 1 : 0);
 			result[0] = true;
-			return entry(state.get(POS_SCHEMA), rows, timestamp, liveCount, versionField(state));
+			// utime is the schema timestamp: row writes leave it unchanged (CAD039)
+			return entry(state.get(POS_SCHEMA), rows, state.get(POS_UTIME), liveCount, versionField(state));
 		});
 		return result[0];
 	}
@@ -256,7 +257,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			rows = rows.assoc(key, SQLRow.createTombstone(timestamp));
 			long liveCount = getLiveCount(state) - 1;
 			result[0] = true;
-			return entry(state.get(POS_SCHEMA), rows, timestamp, liveCount, versionField(state));
+			return entry(state.get(POS_SCHEMA), rows, state.get(POS_UTIME), liveCount, versionField(state));
 		});
 		return result[0];
 	}

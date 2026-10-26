@@ -171,6 +171,6 @@ numerically when negative or longer than 8 bytes.
   converted by value class alone.
 - Commit the CAD039 column-type amendment that specifies the entry version and identifiers.
 - `DATE`, `TIME`, `TIMESTAMP WITH TIME ZONE`, `UUID` and `INTERVAL` are not supported.
-- Row writes set the table entry's `utime`, which merge uses as the schema timestamp, so a
-  row written on a node that has not seen a later schema change or `DROP TABLE` makes the
-  older schema win, or brings the dropped table back.
+- Rows written before a `DROP TABLE` reappear in a table later created under the same name
+  when it merges with the entry of a node that never saw the drop: merge unions the rows of
+  both live entries, whichever creation they belong to.
