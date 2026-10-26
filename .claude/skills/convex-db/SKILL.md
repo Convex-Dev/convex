@@ -108,7 +108,8 @@ conn.commit();    // atomic merge — all changes become visible
 
 | SQL Type | CVM Type | Notes |
 |----------|----------|-------|
-| BIGINT / INTEGER | CVMLong | 64-bit signed integer |
+| BIGINT | AInteger | Any CVM integer; read as NUMERIC (`BigDecimal`) |
+| INTEGER | CVMLong | 64-bit signed integer; read as BIGINT |
 | DOUBLE | CVMDouble | 64-bit float |
 | VARCHAR | AString | Unicode string |
 | BOOLEAN | CVMBool | true/false |

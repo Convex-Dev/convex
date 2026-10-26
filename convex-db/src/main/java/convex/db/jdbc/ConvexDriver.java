@@ -127,6 +127,8 @@ public class ConvexDriver extends Driver {
 		if (!info.containsKey("parserFactory")) {
 			info.setProperty("parserFactory", "convex.db.calcite.ConvexDdlExecutor#PARSER_FACTORY");
 		}
+		// Column types are presented in this type system, so it is not optional
+		info.setProperty("typeSystem", "convex.db.calcite.ConvexTypeSystem#INSTANCE");
 
 		// Resolve the ConvexDB instance
 		ManagedInstance file = (parsed.mode == ParsedURL.Mode.FILE) ? resolveFileInstance(parsed.identifier) : null;

@@ -11,6 +11,7 @@ import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
@@ -235,15 +236,15 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	/**
 	 * Converts an ACell to ABlob for use as primary key.
-	 * Supports: ABlob (direct), CVMLong (8-byte encoding), AString (UTF-8 bytes).
+	 * Supports: ABlob (direct), an integer in the 64-bit range (8-byte encoding of its
+	 * value, whatever its representation), AString (UTF-8 bytes).
 	 *
 	 * @param key The key to convert
-	 * @return ABlob representation
-	 * @throws IllegalArgumentException if key type not supported
+	 * @return ABlob representation, or null if the value has no key encoding
 	 */
-	private ABlob toKey(ACell key) {
+	private static ABlob toKey(ACell key) {
 		if (key instanceof ABlob blob) return blob;
-		if (key instanceof CVMLong n) {
+		if (key instanceof AInteger n && n.isLong()) {
 			// Encode as 8-byte big-endian
 			long v = n.longValue();
 			byte[] bytes = new byte[8];
@@ -256,7 +257,21 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		if (key instanceof AString s) {
 			return Blob.wrap(s.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
 		}
-		throw new IllegalArgumentException("Unsupported primary key type: " + key.getClass().getSimpleName());
+		return null;
+	}
+
+	/**
+	 * Converts a primary key value for writing a row.
+	 *
+	 * @throws IllegalArgumentException if the value has no key encoding
+	 */
+	private static ABlob toWriteKey(ACell key) {
+		ABlob blob = toKey(key);
+		if (blob == null) {
+			String type = (key == null) ? "null" : (key instanceof AInteger) ? "integer beyond 64 bits" : key.getClass().getSimpleName();
+			throw new IllegalArgumentException("Unsupported primary key type: " + type);
+		}
+		return blob;
 	}
 
 	// ========== Table Operations ==========
@@ -370,37 +385,13 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public ConvexColumnType[] getColumnTypes(AString name) {
-		AVector<AVector<ACell>> schema = getSchema(name);
-		if (schema == null) return null;
+		SQLTable table = getLiveTable(name);
+		if (table == null) return null;
+		AVector<AVector<ACell>> schema = table.getSchema();
+		int version = (int) table.getVersion();
 		ConvexColumnType[] result = new ConvexColumnType[(int) schema.count()];
 		for (int i = 0; i < result.length; i++) {
-			AVector<ACell> colDef = schema.get(i);
-			ACell typeCell = colDef.get(1);
-
-			ConvexType baseType;
-			if (typeCell == null) {
-				baseType = ConvexType.ANY;
-			} else {
-				baseType = ConvexType.fromName(typeCell.toString());
-			}
-
-			// Read precision and scale (may be null or missing for old schemas)
-			int precision = -1;
-			int scale = -1;
-			if (colDef.count() > 2 && colDef.get(2) instanceof CVMLong p) {
-				precision = (int) p.longValue();
-			}
-			if (colDef.count() > 3 && colDef.get(3) instanceof CVMLong s) {
-				scale = (int) s.longValue();
-			}
-
-			if (scale >= 0) {
-				result[i] = ConvexColumnType.withScale(baseType, precision, scale);
-			} else if (precision >= 0) {
-				result[i] = ConvexColumnType.withPrecision(baseType, precision);
-			} else {
-				result[i] = ConvexColumnType.of(baseType);
-			}
+			result[i] = ConvexColumnType.fromSchema(schema.get(i), version);
 		}
 		return result;
 	}
@@ -426,7 +417,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	public boolean insert(AString tableName, AVector<ACell> row) {
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return false;
-		ABlob pk = toKey(row.get(0));
+		ABlob pk = toWriteKey(row.get(0));
 		return table.insertRow(pk, row);
 	}
 
@@ -440,6 +431,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return selectByKey(Strings.create(tableName), primaryKey);
 	}
 
+	/** Selects a row by primary key. A value with no key encoding selects no row, since no row can have it as its key. */
 	public AVector<ACell> selectByKey(AString tableName, ACell primaryKey) {
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return null;
@@ -448,6 +440,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		if (rows == null) return null;
 
 		ABlob key = toKey(primaryKey);
+		if (key == null) return null;
 		AVector<ACell> row = rows.get(key);
 		if (row == null || !SQLRow.isLive(row)) return null;
 		return SQLRow.getValues(row);
@@ -462,6 +455,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return false;
 		ABlob key = toKey(primaryKey);
+		if (key == null) return false;
 		return table.deleteRow(key);
 	}
 

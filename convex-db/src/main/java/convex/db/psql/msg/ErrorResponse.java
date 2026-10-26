@@ -141,10 +141,16 @@ public class ErrorResponse extends PgMessage {
 			builder.detail("Caused by: " + root.getClass().getSimpleName() + ": " + rootMessage);
 		}
 
-		// Set SQL state code
-		if (t instanceof SQLException sqlEx) {
-			String sqlState = sqlEx.getSQLState();
-			builder.code(sqlState != null ? sqlState : "42000");
+		// Set SQL state code: the first one in the cause chain, since Calcite wraps the
+		// exceptions raised while executing a statement
+		String sqlState = null;
+		for (Throwable c = t; c != null && sqlState == null; c = (c.getCause() == c) ? null : c.getCause()) {
+			if (c instanceof SQLException sqlEx) sqlState = sqlEx.getSQLState();
+		}
+		if (sqlState != null) {
+			builder.code(sqlState);
+		} else if (t instanceof SQLException) {
+			builder.code("42000");
 		} else {
 			builder.code("XX000"); // Internal error
 		}

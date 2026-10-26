@@ -2,7 +2,8 @@
 
 **Status: proposed design, partly implemented**
 ([#757](https://github.com/Convex-Dev/convex/issues/757)). The table entry's format
-version is in place (see [Format Version](#format-version)); tables are still written as
+version (see [Format Version](#format-version)), the [Calcite type system](#calcite-type-system)
+and the presentation of version 0 integer columns are in place; tables are still written as
 version 0, and the remaining gaps are listed under [Remaining Work](#remaining-work).
 
 How Convex DB binds the SQL types users declare to the values stored in the lattice, and
@@ -108,9 +109,10 @@ every row in the version 1 representation.
 ## Calcite Type System
 
 Calcite's default type system caps `DECIMAL` precision at 19 digits. Convex DB installs its
-own `RelDataTypeSystem` on every connection, with a maximum `DECIMAL` precision equal to the
-largest CVM integer (`Constants.MAX_BIG_INTEGER_LENGTH` bytes, about 9,864 digits), so that
-`max` above is that limit.
+own `RelDataTypeSystem`, `ConvexTypeSystem`, on every connection, with a maximum `DECIMAL`
+precision equal to the largest CVM integer (`Constants.MAX_BIG_INTEGER_LENGTH` bytes, 9,864
+digits), so that `max` above is that limit. A `DECIMAL` declared without precision keeps
+Calcite's default precision of 19, which version 0 DDL records.
 
 Result types follow PostgreSQL. The type system's `deriveSumType` makes `SUM` over
 `SMALLINT` and `INTEGER` a `BIGINT`, and over `BIGINT` and `NUMERIC` a `NUMERIC`, so a sum
@@ -164,10 +166,24 @@ numerically when negative or longer than 8 bytes.
 
 ## Remaining Work
 
-- Implement the codec, the type system and version 1 tables as described here, then raise
-  `SUPPORTED_VERSION` and write new tables as version 1. Until then, schemas record type
-  identifiers only partly (DDL collapses `SMALLINT` and `INTEGER` to 64-bit, and drops a
-  `NUMERIC` scale of 0), reads ignore the declared type, and filter values and keys are
-  converted by value class alone.
+- Implement the codec and version 1 tables as described here, then raise `SUPPORTED_VERSION`
+  and write new tables as version 1. Until then, schemas record type identifiers only partly
+  (DDL collapses `SMALLINT` and `INTEGER` to 64-bit, and drops a `NUMERIC` scale of 0), writes
+  convert values by the column's identifier without enforcing its range or length, and filter
+  values are converted by value class alone. Version 1 DDL also needs a `NUMERIC` declared
+  without precision to mean the maximum precision.
+- Version 0 `DECIMAL`, `DOUBLE`, `CHAR`, `VARCHAR` and `TIMESTAMP` columns are presented as
+  declared, not as in the version 0 table above. Calcite converts the values that SQL writes
+  to the presented type, so presenting these columns as their stored values would stop SQL
+  writes truncating, padding and rounding to the declared length, scale and precision.
+- Reads convert each value by its result column's Calcite type, not through the column's
+  codec: integers keep their exact value, and a stored integer outside an integer type's range
+  is reported as `22003` rather than `22000`; other values convert by their CVM type.
+- `RowDescription` takes OIDs from the result's JDBC type names, and type modifiers from its
+  precision, encoded for `numeric` only.
+- An `AVG` over the exact types is exact when it is an integer; otherwise the CVM computes it
+  as a double.
+- Integer primary keys beyond 64 bits have no key encoding: writing a row with one is refused,
+  and looking one up finds no row.
 - Commit the CAD039 column-type amendment that specifies the entry version and identifiers.
 - `DATE`, `TIME`, `TIMESTAMP WITH TIME ZONE`, `UUID` and `INTERVAL` are not supported.

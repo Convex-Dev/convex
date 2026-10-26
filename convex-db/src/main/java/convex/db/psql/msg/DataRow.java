@@ -3,6 +3,7 @@ package convex.db.psql.msg;
 import convex.db.psql.PgMessage;
 import io.netty.buffer.ByteBuf;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -46,6 +47,8 @@ public class DataRow extends PgMessage {
 		String text;
 		if (obj instanceof Boolean b) {
 			text = b ? "t" : "f";
+		} else if (obj instanceof BigDecimal d) {
+			text = d.toPlainString();
 		} else if (obj instanceof byte[] bytes) {
 			// Format as hex with \x prefix
 			StringBuilder sb = new StringBuilder("\\x");

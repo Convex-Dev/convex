@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve the PostgreSQL wire protocol in Convex DB: text parameters are parsed by their type, and a failed batch stops at the error. ([#772](https://github.com/Convex-Dev/convex/issues/772))
 - Keep dropped tables and schema changes in Convex DB when a replica that missed them writes rows later. ([#779](https://github.com/Convex-Dev/convex/issues/779))
 - Accept Convex DB replicas under an account address or DID only from signers an owner verifier authorises, as KV databases do. ([Replica Ownership](convex-db/README.md#replica-ownership), [#780](https://github.com/Convex-Dev/convex/issues/780))
+- Read integers beyond 64 bits in Convex DB: `BIGINT` columns and integer sums are presented as `NUMERIC`, through JDBC and the PostgreSQL wire protocol. ([Types](convex-db/docs/SQL-TYPES.md), [#757](https://github.com/Convex-Dev/convex/issues/757))
 
 ## [0.8.18] - 2026-10-25
 

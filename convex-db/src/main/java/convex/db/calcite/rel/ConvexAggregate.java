@@ -20,6 +20,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 
 import convex.core.data.ACell;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -218,13 +219,13 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 	}
 
 	/**
-	 * AVG — returns type matching the declared return type.
-	 * Calcite declares AVG(BIGINT) as BIGINT, AVG(DOUBLE) as DOUBLE.
+	 * AVG — {@code DOUBLE PRECISION} over the approximate types, and {@code NUMERIC}
+	 * over the exact types (see {@link convex.db.calcite.ConvexTypeSystem}). The sum is
+	 * exact, so an average of integers that divides exactly is an exact integer; any
+	 * other average is a double.
 	 */
 	private ACell computeAvg(List<ACell[]> rows, int colIndex, RelDataType returnType) {
-		if (rows.isEmpty()) return null;
-
-		double sum = 0;
+		ANumeric sum = null;
 		long count = 0;
 		for (ACell[] row : rows) {
 			ACell val = colIndex < row.length ? row[colIndex] : null;
@@ -232,20 +233,17 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 
 			ANumeric num = RT.ensureNumber(val);
 			if (num != null) {
-				sum += num.doubleValue();
+				sum = (sum == null) ? num : RT.plus(new ACell[]{sum, num});
 				count++;
 			}
 		}
 
 		if (count == 0) return null;
-		double avg = sum / count;
-
-		// Match Calcite's declared return type (AVG(BIGINT) → BIGINT)
-		if (returnType.getSqlTypeName() == SqlTypeName.BIGINT
-				|| returnType.getSqlTypeName() == SqlTypeName.INTEGER) {
-			return CVMLong.create((long) avg);
+		if (returnType.getSqlTypeName() == SqlTypeName.DECIMAL && sum instanceof AInteger s) {
+			AInteger n = CVMLong.create(count);
+			if (s.rem(n).isZero()) return s.quot(n);
 		}
-		return CVMDouble.create(avg);
+		return CVMDouble.create(sum.doubleValue() / count);
 	}
 
 	/**

@@ -32,6 +32,7 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.data.ABlob;
+import convex.db.calcite.ConvexType;
 
 /**
  * Evaluates RexNode expressions against ACell[] rows using CVM operations.
@@ -88,27 +89,12 @@ public class ConvexExpressionEvaluator {
 
 		SqlTypeName typeName = literal.getTypeName();
 		return switch (typeName) {
-			case INTEGER, SMALLINT, TINYINT -> {
+			case INTEGER, SMALLINT, TINYINT, BIGINT -> {
 				Number n = (Number) literal.getValue();
 				yield CVMLong.create(n.longValue());
 			}
-			case BIGINT -> {
-				Number n = (Number) literal.getValue();
-				yield CVMLong.create(n.longValue()); // TODO: Use CVMBigInteger for large values
-			}
-			case DECIMAL -> {
-				BigDecimal bd = literal.getValueAs(BigDecimal.class);
-				// If it's a whole number that fits in a long, use CVMLong
-				if (bd.scale() <= 0 || bd.stripTrailingZeros().scale() <= 0) {
-					try {
-						yield CVMLong.create(bd.longValueExact());
-					} catch (ArithmeticException e) {
-						// Doesn't fit in long, use double
-						yield CVMDouble.create(bd.doubleValue());
-					}
-				}
-				yield CVMDouble.create(bd.doubleValue());
-			}
+			// Whole numbers become CVM integers of the same value, others doubles
+			case DECIMAL -> ConvexType.toNumeric(literal.getValueAs(BigDecimal.class));
 			case DOUBLE, FLOAT, REAL -> {
 				Number n = (Number) literal.getValue();
 				yield CVMDouble.create(n.doubleValue());
@@ -276,10 +262,11 @@ public class ConvexExpressionEvaluator {
 			if (range.hasUpperBound()) { sargType = range.upperEndpoint().getClass(); break; }
 		}
 
-		Object jvm = RT.jvm(cell);
-		if (sargType == BigDecimal.class && jvm instanceof Number n) {
-			return BigDecimal.valueOf(n.doubleValue());
+		if (sargType == BigDecimal.class) {
+			if (cell instanceof AInteger i) return new BigDecimal(i.big());
+			if (cell instanceof ANumeric n) return BigDecimal.valueOf(n.doubleValue());
 		}
+		Object jvm = RT.jvm(cell);
 		if (jvm instanceof Long l) return BigDecimal.valueOf(l);
 		if (jvm instanceof Integer i) return BigDecimal.valueOf(i);
 		if (jvm instanceof String s) return new NlsString(s, null, null);

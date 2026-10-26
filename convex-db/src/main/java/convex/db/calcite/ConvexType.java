@@ -1,5 +1,7 @@
 package convex.db.calcite;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Map;
 
@@ -13,7 +15,7 @@ import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
-import convex.core.data.prim.CVMBigInteger;
+import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -22,13 +24,15 @@ import convex.core.lang.RT;
 /**
  * Defines the mapping between SQL types and Convex CVM types.
  *
- * <p>Each ConvexType represents a column type that can be used in a ConvexTable.
+ * <p>Each ConvexType represents a column type that can be used in a ConvexTable,
+ * named by the type identifier a version 0 table records in its schema. Its SQL type
+ * is the type a version 0 column of that identifier is presented as.
  * The ANY type allows dynamic typing (any CVM value).
  */
 public enum ConvexType {
 
-	/** Arbitrary precision integer. SQL: BIGINT, Convex: AInteger */
-	BIGINT(SqlTypeName.BIGINT, AInteger.class),
+	/** Arbitrary precision integer. SQL: NUMERIC with scale 0, Convex: AInteger */
+	BIGINT(SqlTypeName.DECIMAL, AInteger.class),
 
 	/** 64-bit signed integer. SQL: BIGINT, Convex: CVMLong */
 	INTEGER(SqlTypeName.BIGINT, CVMLong.class),
@@ -99,8 +103,7 @@ public enum ConvexType {
 
 		return switch (this) {
 			case BIGINT -> {
-				if (value instanceof java.math.BigInteger bi) yield CVMBigInteger.wrap(bi);
-				if (value instanceof Number n) yield CVMBigInteger.wrap(java.math.BigInteger.valueOf(n.longValue()));
+				if (value instanceof Number n) yield toInteger(n);
 				throw new IllegalArgumentException("Cannot convert " + value.getClass().getSimpleName() + " to " + this);
 			}
 			case INTEGER -> {
@@ -161,15 +164,65 @@ public enum ConvexType {
 		};
 	}
 
+	/**
+	 * Converts a Java number to a CVM number of the same value. Integers, and decimals
+	 * without a fractional part, become canonical CVM integers; other numbers, and
+	 * integers beyond the range of CVM integers, become doubles.
+	 *
+	 * @param n Java number
+	 * @return CVM number
+	 */
+	public static ANumeric toNumeric(Number n) {
+		if (n instanceof Double || n instanceof Float) return CVMDouble.create(n.doubleValue());
+		BigInteger bi;
+		if (n instanceof BigInteger b) {
+			bi = b;
+		} else if (n instanceof BigDecimal bd) {
+			if (!isIntegral(bd) || integerDigits(bd) > ConvexTypeSystem.MAX_DECIMAL_PRECISION) {
+				return CVMDouble.create(bd.doubleValue());
+			}
+			bi = bd.toBigIntegerExact();
+		} else {
+			return CVMLong.create(n.longValue());
+		}
+		AInteger result = AInteger.create(bi);
+		return (result != null) ? result : CVMDouble.create(bi.doubleValue());
+	}
+
+	/** Converts a Java number to a canonical CVM integer, dropping any fractional part. */
+	private ACell toInteger(Number n) {
+		BigInteger bi;
+		if (n instanceof BigInteger b) {
+			bi = b;
+		} else if (n instanceof BigDecimal bd) {
+			if (integerDigits(bd) > ConvexTypeSystem.MAX_DECIMAL_PRECISION) throw tooLarge(n);
+			bi = bd.toBigInteger();
+		} else {
+			return CVMLong.create(n.longValue());
+		}
+		AInteger result = AInteger.create(bi);
+		if (result == null) throw tooLarge(n);
+		return result;
+	}
+
+	private IllegalArgumentException tooLarge(Number n) {
+		return new IllegalArgumentException("Cannot convert " + n + " to " + this + ": beyond the range of CVM integers");
+	}
+
+	private static boolean isIntegral(BigDecimal bd) {
+		return bd.signum() == 0 || bd.stripTrailingZeros().scale() <= 0;
+	}
+
+	/** Digits before the decimal point, computed without expanding the value. */
+	private static long integerDigits(BigDecimal bd) {
+		return (long) bd.precision() - bd.scale();
+	}
+
 	/** Converts any Java value to a CVM cell (for ANY type). */
 	private static ACell convertAny(Object value) {
 		if (value == null) return null;
 		if (value instanceof ACell c) return c;
-		if (value instanceof Long l) return CVMLong.create(l);
-		if (value instanceof Integer i) return CVMLong.create(i);
-		if (value instanceof Number n) return CVMLong.create(n.longValue());
-		if (value instanceof Double d) return CVMDouble.create(d);
-		if (value instanceof Float f) return CVMDouble.create(f);
+		if (value instanceof Number n) return toNumeric(n);
 		if (value instanceof String s) return Strings.create(s);
 		if (value instanceof Boolean b) return CVMBool.create(b);
 		if (value instanceof byte[] b) return Blob.wrap(b);

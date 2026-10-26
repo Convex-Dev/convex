@@ -314,11 +314,12 @@ protected boolean acceptsReplica(ACell owner, SignedData<?> replica) {
 
 ## Data Types
 
-Convex DB maps between SQL types and Convex lattice types:
+Convex DB maps between SQL types and Convex lattice types (see [SQL-TYPES.md](docs/SQL-TYPES.md)):
 
 | SQL Type | Convex Type | Notes |
 |----------|-------------|-------|
-| BIGINT | CVMLong | 64-bit signed integer |
+| BIGINT | AInteger | Any CVM integer; read as `NUMERIC` with scale 0 |
+| INTEGER | CVMLong | 64-bit signed integer; read as `BIGINT` |
 | DOUBLE | CVMDouble | 64-bit floating point |
 | VARCHAR | AString | Unicode string |
 | BOOLEAN | CVMBool | true/false |

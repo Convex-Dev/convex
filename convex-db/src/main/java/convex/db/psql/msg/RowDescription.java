@@ -35,8 +35,11 @@ public class RowDescription extends PgMessage {
 			int typeOid = PgType.fromSqlType(typeName);
 			int typeLen = PgType.typeLength(typeOid);
 			int precision = meta.getPrecision(colIndex);
+			int typeMod = (typeOid == PgType.NUMERIC)
+				? PgType.numericTypeModifier(precision, meta.getScale(colIndex))
+				: precision;
 
-			columns[i] = new Column(name, 0, 0, typeOid, (short) typeLen, precision, 0);
+			columns[i] = new Column(name, 0, 0, typeOid, (short) typeLen, typeMod, 0);
 		}
 		return new RowDescription(columns);
 	}

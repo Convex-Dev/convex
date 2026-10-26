@@ -677,10 +677,46 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			case PgType.FLOAT4 -> { requireLength(value, 4, "float4"); pstmt.setDouble(index, buf.getFloat()); }
 			case PgType.FLOAT8 -> { requireLength(value, 8, "float8"); pstmt.setDouble(index, buf.getDouble()); }
 			case PgType.BOOL -> { requireLength(value, 1, "bool"); pstmt.setBoolean(index, value[0] != 0); }
+			case PgType.NUMERIC -> pstmt.setBigDecimal(index, decodeNumeric(value));
 			case PgType.TEXT, PgType.VARCHAR, PgType.CHAR, PgType.NAME ->
 				pstmt.setString(index, new String(value, java.nio.charset.StandardCharsets.UTF_8));
 			default -> pstmt.setBytes(index, value);
 		}
+	}
+
+	/**
+	 * Decodes PostgreSQL's binary numeric: digit count, weight, sign and display scale as
+	 * 16-bit integers, then the base 10000 digits, most significant first. The first digit
+	 * is worth 10000^weight. NaN and infinities have no exact value, so are invalid.
+	 */
+	static java.math.BigDecimal decodeNumeric(byte[] value) throws SQLException {
+		if (value.length < 8) {
+			throw new SQLException("Binary numeric parameter has " + value.length + " bytes, expected at least 8", "08P01");
+		}
+		java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(value);
+		int ndigits = buf.getShort();
+		int weight = buf.getShort();
+		int sign = buf.getShort() & 0xffff;
+		int dscale = buf.getShort();
+		if (ndigits < 0) throw new SQLException("Binary numeric parameter has a negative digit count", "08P01");
+		requireLength(value, 8 + 2 * ndigits, "numeric");
+		if ((sign != 0x0000 && sign != 0x4000) || dscale < 0) {
+			throw new SQLException("Binary numeric parameter is not a finite number", "22P02");
+		}
+		StringBuilder digits = new StringBuilder(4 * ndigits + 1).append('0');
+		for (int i = 0; i < ndigits; i++) {
+			int digit = buf.getShort();
+			if (digit < 0 || digit > 9999) {
+				throw new SQLException("Binary numeric parameter has an invalid digit", "22P02");
+			}
+			String s = Integer.toString(digit);
+			digits.append("0000", s.length(), 4).append(s);
+		}
+		java.math.BigDecimal result = new java.math.BigDecimal(new java.math.BigInteger(digits.toString()))
+			.scaleByPowerOfTen(4 * (weight - ndigits + 1));
+		// The display scale only adds trailing zeros
+		if (result.scale() < dscale) result = result.setScale(dscale);
+		return (sign == 0x4000) ? result.negate() : result;
 	}
 
 	private static void requireLength(byte[] value, int expected, String type) throws SQLException {
@@ -703,6 +739,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			case PgType.OID -> pstmt.setLong(index, parseInteger(value, 0L, 0xffffffffL, "oid"));
 			case PgType.FLOAT4 -> pstmt.setDouble(index, parseFloat(value, true));
 			case PgType.FLOAT8 -> pstmt.setDouble(index, parseFloat(value, false));
+			case PgType.NUMERIC -> pstmt.setBigDecimal(index, parseNumeric(value));
 			case PgType.BOOL -> pstmt.setBoolean(index, parseBoolean(value));
 			default -> pstmt.setString(index, value);
 		}
@@ -716,6 +753,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			case java.sql.Types.BIGINT -> PgType.INT8;
 			case java.sql.Types.REAL -> PgType.FLOAT4;
 			case java.sql.Types.FLOAT, java.sql.Types.DOUBLE -> PgType.FLOAT8;
+			case java.sql.Types.DECIMAL, java.sql.Types.NUMERIC -> PgType.NUMERIC;
 			case java.sql.Types.BOOLEAN -> PgType.BOOL;
 			default -> PgType.UNKNOWN;
 		};
@@ -751,6 +789,18 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			throw new SQLException("\"" + text + "\" is out of range for type " + type, "22003");
 		}
 		return v;
+	}
+
+	/** A decimal number, with an optional exponent. NaN and infinities have no exact value, so are invalid. */
+	private static java.math.BigDecimal parseNumeric(String text) throws SQLException {
+		String s = text.strip();
+		if (!FLOAT_TEXT.matcher(s).matches()) throw invalidInput("numeric", text);
+		try {
+			return new java.math.BigDecimal(s);
+		} catch (NumberFormatException e) {
+			// The exponent is beyond the range of a BigDecimal scale
+			throw new SQLException("value \"" + text + "\" is out of range for type numeric", "22003");
+		}
 	}
 
 	/** PostgreSQL's boolean spellings: true, yes, on, 1 and their opposites, or unique prefixes. */

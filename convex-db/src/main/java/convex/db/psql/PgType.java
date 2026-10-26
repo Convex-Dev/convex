@@ -1,5 +1,7 @@
 package convex.db.psql;
 
+import convex.db.calcite.ConvexTypeSystem;
+
 /**
  * PostgreSQL type OIDs for the wire protocol.
  *
@@ -66,6 +68,16 @@ public final class PgType {
 			case "UUID" -> UUID;
 			default -> UNKNOWN;
 		};
+	}
+
+	/**
+	 * Returns the type modifier of a {@code numeric(precision, scale)} column, as PostgreSQL
+	 * encodes it, or -1 for an unconstrained {@code numeric}: one of the maximum precision,
+	 * which holds any CVM integer.
+	 */
+	public static int numericTypeModifier(int precision, int scale) {
+		if (precision <= 0 || precision >= ConvexTypeSystem.MAX_DECIMAL_PRECISION) return -1;
+		return ((precision << 16) | scale) + 4;
 	}
 
 	/**
