@@ -5,17 +5,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.function.BiPredicate;
+
 import org.junit.jupiter.api.Test;
 
+import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -281,6 +287,114 @@ public class SQLDatabaseTest {
 			.assoc(kp1.getAccountKey(), db1.getSignedState());
 		assertEquals(2, db1.mergeReplicas(remote));
 		assertEquals(3, db1.tables().getRowCount("t"));
+	}
+
+	// ========== Replica ownership (CAD038) ==========
+
+	/** Creates table t holding one row. */
+	private static SQLDatabase withRow(SQLDatabase db, long id) {
+		db.tables().createTable("t", new String[]{"id"});
+		db.tables().insert("t", id);
+		return db;
+	}
+
+	/** Files the signer's own signed state under another owner, as a forger would. */
+	private static AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> claim(SQLDatabase signer, ACell owner) {
+		return signer.exportReplica().dissoc(signer.getOwnerKey()).assoc(owner, signer.getSignedState());
+	}
+
+	private static boolean hasRow(SQLDatabase db, long id) {
+		return db.tables().tableExists("t") && db.tables().selectByKey("t", CVMLong.create(id)) != null;
+	}
+
+	@Test
+	public void testDirectOwnerMustBeSigner() {
+		AKeyPair owner = AKeyPair.createSeeded(7801);
+		AKeyPair attacker = AKeyPair.createSeeded(7802);
+		AKeyPair localKey = AKeyPair.createSeeded(7803);
+		SQLDatabase source = withRow(SQLDatabase.create("db", attacker), 1);
+		for (ACell claimed : new ACell[] {owner.getAccountKey(), DID.forKey(owner.getAccountKey())}) {
+			// A verifier is never consulted for an owner that denotes a key directly
+			SQLDatabase local = SQLDatabase.create("db", localKey, localKey.getAccountKey(), (o, k) -> true);
+			var before = local.cursor().get();
+			assertEquals(0, local.mergeReplicas(claim(source, claimed)));
+			assertSame(before, local.cursor().get());
+			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed)::exportReplica);
+			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed, (o, k) -> true)::exportReplica);
+		}
+	}
+
+	@Test
+	public void testDefaultRuleAcceptsSelfCertifyingDID() {
+		AKeyPair key = AKeyPair.createSeeded(7804);
+		SQLDatabase source = withRow(SQLDatabase.create("db", key, DID.forKey(key.getAccountKey())), 1);
+		SQLDatabase local = SQLDatabase.create("db", AKeyPair.createSeeded(7805));
+		assertEquals(1, local.mergeReplicas(source.exportReplica()));
+		assertTrue(hasRow(local, 1));
+	}
+
+	@Test
+	public void testDefaultRuleRefusesIndirectOwners() {
+		AKeyPair attacker = AKeyPair.createSeeded(7806);
+		AKeyPair localKey = AKeyPair.createSeeded(7807);
+		SQLDatabase source = withRow(SQLDatabase.create("db", attacker), 1);
+		for (ACell claimed : new ACell[] {Address.create(1337), Strings.create("did:web:victim.example"),
+				Strings.create("did:convex:1337")}) {
+			SQLDatabase local = SQLDatabase.create("db", localKey);
+			var before = local.cursor().get();
+			assertEquals(0, local.mergeReplicas(claim(source, claimed)), "unverified owners must fail closed");
+			assertSame(before, local.cursor().get());
+			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed)::exportReplica);
+		}
+	}
+
+	@Test
+	public void testOwnerVerifierAuthorisesIndirectOwners() {
+		AKeyPair localKey = AKeyPair.createSeeded(7808);
+		AKeyPair authorised = AKeyPair.createSeeded(7809);
+		AKeyPair attacker = AKeyPair.createSeeded(7810);
+		Address owner = Address.create(1337);
+		BiPredicate<ACell, AccountKey> verifier = (o, k) -> owner.equals(o) && authorised.getAccountKey().equals(k);
+		SQLDatabase local = SQLDatabase.create("db", localKey, localKey.getAccountKey(), verifier);
+
+		SQLDatabase source = withRow(SQLDatabase.create("db", authorised, owner, verifier), 1);
+		var export = source.exportReplica();
+		assertEquals(1, local.fork().mergeReplicas(export), "forks keep the verifier");
+		assertEquals(1, local.mergeReplicas(export));
+		assertTrue(hasRow(local, 1));
+
+		SQLDatabase forger = withRow(SQLDatabase.create("db", attacker), 2);
+		assertEquals(0, local.mergeReplicas(claim(forger, owner)));
+		assertFalse(hasRow(local, 2));
+		assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, owner, verifier)::exportReplica);
+	}
+
+	/** A database whose override resolves one Address owner to one authorised key. */
+	private static SQLDatabase resolving(AKeyPair keyPair, ACell ownerKey, Address address, AccountKey authorised) {
+		return new SQLDatabase(Cursors.root(Index.none()), Strings.create("db"), keyPair, ownerKey, null) {
+			@Override protected boolean acceptsReplica(ACell owner, SignedData<?> replica) {
+				if (!address.equals(owner)) return super.acceptsReplica(owner, replica);
+				return authorised.equals(replica.getAccountKey()) && replica.checkSignature();
+			}
+		};
+	}
+
+	@Test
+	public void testAcceptsReplicaOverrideGovernsMergeAndExport() {
+		AKeyPair localKey = AKeyPair.createSeeded(7811);
+		AKeyPair authorised = AKeyPair.createSeeded(7812);
+		AKeyPair attacker = AKeyPair.createSeeded(7813);
+		Address owner = Address.create(42);
+		SQLDatabase local = resolving(localKey, localKey.getAccountKey(), owner, authorised.getAccountKey());
+
+		SQLDatabase source = withRow(resolving(authorised, owner, owner, authorised.getAccountKey()), 1);
+		assertEquals(1, local.mergeReplicas(source.exportReplica()));
+		assertTrue(hasRow(local, 1));
+
+		SQLDatabase forger = withRow(SQLDatabase.create("db", attacker), 2);
+		assertEquals(0, local.mergeReplicas(claim(forger, owner)));
+		assertFalse(hasRow(local, 2));
+		assertThrows(IllegalStateException.class, resolving(attacker, owner, owner, authorised.getAccountKey())::exportReplica);
 	}
 
 	@Test

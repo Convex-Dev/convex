@@ -1,11 +1,15 @@
 package convex.db.lattice;
 
+import java.util.Objects;
+import java.util.function.BiPredicate;
+
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -55,6 +59,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	private final AString dbName;
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
+	private final BiPredicate<ACell, AccountKey> ownerVerifier;
 
 	/**
 	 * Binds a database to its cursor. Construction reads and writes nothing.
@@ -63,13 +68,15 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @param dbName Database name
 	 * @param keyPair Key pair for signing this node's replica, or null when connected
 	 * @param ownerKey Owner identity of this node's replica, or null when connected
+	 * @param ownerVerifier Rule authorising signers for indirect owners, or null to refuse them
 	 */
 	protected SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor,
-			AString dbName, AKeyPair keyPair, ACell ownerKey) {
+			AString dbName, AKeyPair keyPair, ACell ownerKey, BiPredicate<ACell, AccountKey> ownerVerifier) {
 		super(cursor);
 		this.dbName = dbName;
 		this.keyPair = keyPair;
 		this.ownerKey = ownerKey;
+		this.ownerVerifier = ownerVerifier;
 	}
 
 	/**
@@ -86,16 +93,37 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 
 	/**
 	 * Creates a new empty standalone SQL database with the given name,
-	 * signing key pair, and owner key.
+	 * signing key pair, and owner key. With no owner verifier, an owner must denote
+	 * an account key directly (an AccountKey or self-certifying {@code did:key}); use
+	 * the verifier overload for an Address or another DID method.
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
-	 * @param ownerKey Owner identity (AccountKey, Address, or AString DID)
+	 * @param ownerKey Owner identity (AccountKey or {@code did:key})
 	 * @return New SQLDatabase instance
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
 		AForkableCursor<Index<Keyword, ACell>> cursor = Cursors.root(Index.none());
-		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey);
+		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey, null);
+	}
+
+	/**
+	 * Creates a new empty standalone SQL database whose indirect owners (Address, or a
+	 * DID that is not {@code did:key}) are authorised by the given rule. The rule governs
+	 * both incoming replicas and this node's own export, and supports multi-key owners and
+	 * key rotation through an updatable authority view. It must be thread-safe and use
+	 * locally available authority data. Direct key owners are always checked by equality.
+	 *
+	 * @param name Database name
+	 * @param keyPair Key pair for signing this node's replica
+	 * @param ownerKey Owner identity (AccountKey, Address, or AString DID)
+	 * @param ownerVerifier Rule taking (owner, signer key), true if that key may sign for the owner
+	 * @return New SQLDatabase instance
+	 */
+	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey,
+			BiPredicate<ACell, AccountKey> ownerVerifier) {
+		AForkableCursor<Index<Keyword, ACell>> cursor = Cursors.root(Index.none());
+		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey, Objects.requireNonNull(ownerVerifier));
 	}
 
 	/**
@@ -111,7 +139,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	public static SQLDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
 		var databases = (AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>>) parent;
-		return new SQLDatabase(databases.withDefault(Maps.empty()).path(dbName), dbName, null, null);
+		return new SQLDatabase(databases.withDefault(Maps.empty()).path(dbName), dbName, null, null, null);
 	}
 
 	/**
@@ -124,7 +152,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	public static SQLDatabase connect(ConvexDB parent, AString name) {
 		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
-		return new SQLDatabase(parent.path(name), name, null, null);
+		return new SQLDatabase(parent.path(name), name, null, null, null);
 	}
 
 	/**
@@ -153,7 +181,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	/** Subclasses override this to return their own type, so forks keep their tables. */
 	@Override
 	protected SQLDatabase rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
-		return new SQLDatabase(cursor,dbName,keyPair,ownerKey);
+		return new SQLDatabase(cursor,dbName,keyPair,ownerKey,ownerVerifier);
 	}
 
 	/**
@@ -205,20 +233,34 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
+	 * Returns the rule authorising signers for indirect owners.
+	 *
+	 * @return Owner verifier, or null if indirect owners are refused
+	 */
+	public BiPredicate<ACell, AccountKey> getOwnerVerifier() {
+		return ownerVerifier;
+	}
+
+	/**
 	 * Returns this owner's signed database map containing this database.
-	 * The signed value is a map of database names to database state.
+	 * The signed value is a map of database names to database state. It must pass
+	 * {@link #acceptsReplica}, so this node never exports a replica that it would
+	 * refuse from a peer.
 	 *
 	 * <p>Only available in standalone mode (created via {@link #create}).
 	 *
 	 * @return SignedData wrapping a map of {dbName → database state}
-	 * @throws IllegalStateException if no signing key is available (connected mode)
+	 * @throws IllegalStateException if no signing key is available (connected mode),
+	 *         or the key is not authorised for this node's owner
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public SignedData<AHashMap<AString, Index<Keyword, ACell>>> getSignedState() {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 		AHashMap<AString, Index<Keyword, ACell>> dbMap =
 			(AHashMap) Maps.of(dbName, cursor().get());
-		return keyPair.signData(dbMap);
+		SignedData<AHashMap<AString, Index<Keyword, ACell>>> signed = keyPair.signData(dbMap);
+		if (!acceptsReplica(ownerKey, signed)) throw new IllegalStateException("Signing key is not authorised for database owner");
+		return signed;
 	}
 
 	/**
@@ -229,7 +271,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * <p>Only available in standalone mode (created via {@link #create}).
 	 *
 	 * @return Owner map with this node's signed contribution
-	 * @throws IllegalStateException if no signing key is available (connected mode)
+	 * @throws IllegalStateException if no signing key is available (connected mode),
+	 *         or the key is not authorised for this node's owner
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> exportReplica() {
@@ -268,18 +311,24 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Whether a remote replica is accepted from an owner. Its signature must verify, and
-	 * an owner that denotes an account key directly must be that signer. An indirect
-	 * owner (Address, DID) has no resolver here, so any valid signature is accepted for
-	 * it. Override to apply another ownership rule.
+	 * Whether a replica is accepted from an owner, applied to incoming replicas and to
+	 * this node's own export. Its signer must be authorised for the owner and its
+	 * signature must verify. An owner that denotes an account key directly (AccountKey,
+	 * {@code did:key}) must be that signer. Any other owner (Address, other DIDs) is
+	 * authorised only by the owner verifier, and refused when there is none. Override to
+	 * apply another ownership rule or to replicate selectively.
 	 *
 	 * @param owner Owner identity the replica was published under
 	 * @param replica Signed replica
 	 * @return true if the replica may be merged
 	 */
 	protected boolean acceptsReplica(ACell owner, SignedData<?> replica) {
-		return owner != null && replica.checkSignature()
-			&& LatticeContext.EMPTY.verifyOwner(owner, replica.getAccountKey());
+		if (owner == null) return false;
+		AccountKey signer = replica.getAccountKey();
+		AccountKey direct = LatticeContext.ownerAccountKey(owner);
+		boolean authorised = (direct != null) ? direct.equals(signer)
+			: (ownerVerifier != null) && ownerVerifier.test(owner, signer);
+		return authorised && replica.checkSignature();
 	}
 
 	/**

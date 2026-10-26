@@ -281,11 +281,29 @@ db1.mergeReplicas(db2.exportReplica());
 db2.mergeReplicas(db1.exportReplica());
 ```
 
+### Replica Ownership
+
+`mergeReplicas` accepts a replica when its signer is authorised for the owner it is
+published under and its signature verifies ([CAD038](https://docs.convex.world/docs/cad/038_lattice_auth)).
+An owner that is an account key, or a self-certifying `did:key`, must be the signer. Any
+other owner, such as an account address or a `did:web`, is refused unless an owner
+verifier authorises the signer:
+
+```java
+// (owner, signer key) -> whether that key may sign for the owner
+BiPredicate<ACell, AccountKey> verifier = (owner, key) -> authority.isAuthorised(owner, key);
+SQLDatabase db = SQLDatabase.create("shared", keyPair, Address.create(1337), verifier);
+```
+
+The verifier must be thread-safe and use authority data already held locally. The same
+rule applies to `exportReplica`, which throws if this node's key is not authorised for
+its owner, so a node never publishes a replica that its peers would refuse.
+
 ### Selective Replication
 
-`mergeReplicas` accepts a replica when its signature verifies and, for an owner that is
-an account key, that key signed it. To apply another rule, such as trusting only known keys,
-override `acceptsReplica` in a subclass of `SQLDatabase`:
+To apply another rule, such as trusting only known keys, override `acceptsReplica` in a
+subclass of `SQLDatabase`. The override also governs this node's own export, so a set of
+trusted keys includes the node's own:
 
 ```java
 @Override

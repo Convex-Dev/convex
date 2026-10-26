@@ -78,7 +78,7 @@ public class ConvexDBMergeTest {
 
 	static class Database extends SQLDatabase {
 		Database(AForkableCursor<Index<Keyword, ACell>> cursor, AString name, AKeyPair keyPair, ACell owner) {
-			super(cursor, name, keyPair, owner);
+			super(cursor, name, keyPair, owner, null);
 		}
 
 		@Override public SQLSchema tables() { return new Schema(tablesPath()); }
