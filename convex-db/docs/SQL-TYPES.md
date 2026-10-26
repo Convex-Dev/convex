@@ -1,5 +1,9 @@
 # Convex DB: SQL Column Types
 
+**Status: proposed design, not yet implemented**
+([#757](https://github.com/Convex-Dev/convex/issues/757)). Today every table is read as
+version 0, and the gaps this design closes are listed under [Remaining Work](#remaining-work).
+
 How Convex DB binds the SQL types users declare to the values stored in the lattice, and
 how it presents them through JDBC and the PostgreSQL wire protocol.
 
@@ -144,7 +148,11 @@ numerically when negative or longer than 8 bytes.
 
 ## Remaining Work
 
-- Implement the codec, the type system and version 1 tables as described here.
+- Implement the codec, the type system and version 1 tables as described here. Until then,
+  schemas record type identifiers only partly (DDL collapses `SMALLINT` and `INTEGER` to
+  64-bit, and drops a `NUMERIC` scale of 0), reads ignore the declared type, and filter values
+  and keys are converted by value class alone.
+- Commit the CAD039 column-type amendment that specifies the entry version and identifiers.
 - `DATE`, `TIME`, `TIMESTAMP WITH TIME ZONE`, `UUID` and `INTERVAL` are not supported.
 - `SQLTable.merge` and `SQLRow.merge` return their first argument on equal timestamps, so
   merge is not commutative for differing entries with the same timestamp.
