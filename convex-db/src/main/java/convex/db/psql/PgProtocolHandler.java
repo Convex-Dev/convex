@@ -52,8 +52,18 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		this.secretKey = ThreadLocalRandom.current().nextInt();
 	}
 
+	/**
+	 * Set by an error in the extended query protocol. Like PostgreSQL, the handler then
+	 * discards every message until Sync, so no later message of a failed batch executes.
+	 */
+	private boolean discardUntilSync = false;
+
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+		if (discardUntilSync && isDiscardable(msg)) {
+			log.debug("Discarding {} until Sync after an error", msg.getClass().getSimpleName());
+			return;
+		}
 		if (msg instanceof PgMessageDecoder.SSLRequest) {
 			handleSSLRequest(ctx);
 		} else if (msg instanceof PgMessageDecoder.StartupMessage startup) {
@@ -417,7 +427,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			write(ctx, ParseComplete.INSTANCE);
 		} catch (Exception e) {
 			log.warn("Parse error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
 
@@ -435,7 +445,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			// Find the prepared statement
 			PreparedStmt stmt = statements.get(stmtName);
 			if (stmt == null) {
-				write(ctx, ErrorResponse.builder()
+				writeExtendedError(ctx, ErrorResponse.builder()
 					.severity("ERROR")
 					.code("26000") // invalid_sql_statement_name
 					.message("prepared statement \"" + stmtName + "\" does not exist")
@@ -452,7 +462,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			write(ctx, BindComplete.INSTANCE);
 		} catch (Exception e) {
 			log.warn("Bind error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
 
@@ -469,7 +479,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				// Describe prepared statement
 				PreparedStmt stmt = statements.get(describe.name());
 				if (stmt == null) {
-					write(ctx, ErrorResponse.builder()
+					writeExtendedError(ctx, ErrorResponse.builder()
 						.severity("ERROR")
 						.code("26000")
 						.message("prepared statement \"" + describe.name() + "\" does not exist")
@@ -498,7 +508,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				// Describe portal
 				Portal portal = portals.get(describe.name());
 				if (portal == null) {
-					write(ctx, ErrorResponse.builder()
+					writeExtendedError(ctx, ErrorResponse.builder()
 						.severity("ERROR")
 						.code("34000") // invalid_cursor_name
 						.message("portal \"" + describe.name() + "\" does not exist")
@@ -521,7 +531,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			}
 		} catch (Exception e) {
 			log.warn("Describe error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
 
@@ -537,7 +547,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		try {
 			Portal portal = portals.get(portalName);
 			if (portal == null) {
-				write(ctx, ErrorResponse.builder()
+				writeExtendedError(ctx, ErrorResponse.builder()
 					.severity("ERROR")
 					.code("34000")
 					.message("portal \"" + portalName + "\" does not exist")
@@ -554,14 +564,14 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			executeWithParameters(ctx, query, portal.paramValues(), portal.paramFormats(), portal.stmt().paramTypes());
 		} catch (SQLException e) {
 			log.warn("Execute error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		} catch (RuntimeException e) {
 			// Runtime exceptions from Calcite (type coercion, etc.) are query errors
 			log.warn("Query execution error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		} catch (Exception e) {
 			log.error("Unexpected error during execute", e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
 
@@ -599,6 +609,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 		try (PreparedStatement pstmt = connection.prepareStatement(jdbcSql)) {
 			// Bind parameters
+			ParameterMetaData inferred = null;
 			for (int i = 0; i < paramValues.length; i++) {
 				byte[] value = paramValues[i];
 				if (value == null) {
@@ -608,14 +619,18 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 					short format = (paramFormats != null && paramFormats.length > 0)
 						? (paramFormats.length == 1 ? paramFormats[0] : paramFormats[i])
 						: 0;
+					int oid = (paramTypes != null && i < paramTypes.length) ? paramTypes[i] : 0;
 
 					if (format == 0) {
-						// Text format - convert bytes to string
+						// Text format - parse by the declared type, or the type the query implies
+						if (oid == 0 || oid == PgType.UNKNOWN) {
+							if (inferred == null) inferred = pstmt.getParameterMetaData();
+							oid = inferredType(inferred, i + 1);
+						}
 						String strValue = new String(value, java.nio.charset.StandardCharsets.UTF_8);
-						pstmt.setString(i + 1, strValue);
+						bindTextParameter(pstmt, i + 1, strValue, oid);
 					} else {
 						// Binary format - decode by the type the client declared in Parse
-						int oid = (paramTypes != null && i < paramTypes.length) ? paramTypes[i] : 0;
 						bindBinaryParameter(pstmt, i + 1, value, oid);
 					}
 				}
@@ -672,6 +687,84 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		if (value.length != expected) {
 			throw new SQLException("Binary " + type + " parameter has " + value.length + " bytes, expected " + expected, "08P01");
 		}
+	}
+
+	/**
+	 * Binds a parameter that arrived in text format, parsing it as the given type the way
+	 * PostgreSQL's input functions do: invalid input is 22P02 and out-of-range input 22003.
+	 * Text that compares as a string is bound as one, and so are types without a parser
+	 * here, as for binary format.
+	 */
+	static void bindTextParameter(PreparedStatement pstmt, int index, String value, int oid) throws SQLException {
+		switch (oid) {
+			case PgType.INT2 -> pstmt.setLong(index, parseInteger(value, Short.MIN_VALUE, Short.MAX_VALUE, "smallint"));
+			case PgType.INT4 -> pstmt.setLong(index, parseInteger(value, Integer.MIN_VALUE, Integer.MAX_VALUE, "integer"));
+			case PgType.INT8 -> pstmt.setLong(index, parseInteger(value, Long.MIN_VALUE, Long.MAX_VALUE, "bigint"));
+			case PgType.OID -> pstmt.setLong(index, parseInteger(value, 0L, 0xffffffffL, "oid"));
+			case PgType.FLOAT4 -> pstmt.setDouble(index, parseFloat(value, true));
+			case PgType.FLOAT8 -> pstmt.setDouble(index, parseFloat(value, false));
+			case PgType.BOOL -> pstmt.setBoolean(index, parseBoolean(value));
+			default -> pstmt.setString(index, value);
+		}
+	}
+
+	/** The type the query implies for an undeclared parameter, as PostgreSQL infers it. */
+	private static int inferredType(ParameterMetaData metaData, int index) throws SQLException {
+		return switch (metaData.getParameterType(index)) {
+			case java.sql.Types.TINYINT, java.sql.Types.SMALLINT -> PgType.INT2;
+			case java.sql.Types.INTEGER -> PgType.INT4;
+			case java.sql.Types.BIGINT -> PgType.INT8;
+			case java.sql.Types.REAL -> PgType.FLOAT4;
+			case java.sql.Types.FLOAT, java.sql.Types.DOUBLE -> PgType.FLOAT8;
+			case java.sql.Types.BOOLEAN -> PgType.BOOL;
+			default -> PgType.UNKNOWN;
+		};
+	}
+
+	private static final Pattern INTEGER_TEXT = Pattern.compile("[+-]?\\d+");
+	private static final Pattern FLOAT_TEXT = Pattern.compile("[+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?");
+
+	private static long parseInteger(String text, long min, long max, String type) throws SQLException {
+		String s = text.strip();
+		if (!INTEGER_TEXT.matcher(s).matches()) throw invalidInput(type, text);
+		java.math.BigInteger v = new java.math.BigInteger(s);
+		if (v.bitLength() > 63 || v.longValue() < min || v.longValue() > max) {
+			throw new SQLException("value \"" + text + "\" is out of range for type " + type, "22003");
+		}
+		return v.longValue();
+	}
+
+	private static double parseFloat(String text, boolean single) throws SQLException {
+		String type = single ? "real" : "double precision";
+		String s = text.strip();
+		switch (s.toLowerCase(java.util.Locale.ROOT)) {
+			case "nan": return Double.NaN;
+			case "infinity", "+infinity", "inf", "+inf": return Double.POSITIVE_INFINITY;
+			case "-infinity", "-inf": return Double.NEGATIVE_INFINITY;
+			default: break;
+		}
+		if (!FLOAT_TEXT.matcher(s).matches()) throw invalidInput(type, text);
+		double v = single ? Float.parseFloat(s) : Double.parseDouble(s);
+		// Overflow to infinity, or a non-zero value that underflows to zero
+		boolean nonZero = s.replaceFirst("[eE].*", "").matches(".*[1-9].*");
+		if (Double.isInfinite(v) || (v == 0.0 && nonZero)) {
+			throw new SQLException("\"" + text + "\" is out of range for type " + type, "22003");
+		}
+		return v;
+	}
+
+	/** PostgreSQL's boolean spellings: true, yes, on, 1 and their opposites, or unique prefixes. */
+	private static boolean parseBoolean(String text) throws SQLException {
+		String s = text.strip().toLowerCase(java.util.Locale.ROOT);
+		if (!s.isEmpty()) {
+			if ("true".startsWith(s) || "yes".startsWith(s) || s.equals("1") || (s.length() >= 2 && "on".startsWith(s))) return true;
+			if ("false".startsWith(s) || "no".startsWith(s) || s.equals("0") || (s.length() >= 2 && "off".startsWith(s))) return false;
+		}
+		throw invalidInput("boolean", text);
+	}
+
+	private static SQLException invalidInput(String type, String text) {
+		return new SQLException("invalid input syntax for type " + type + ": \"" + text + "\"", "22P02");
 	}
 
 	/**
@@ -755,8 +848,22 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	private void handleSync(ChannelHandlerContext ctx) {
+		discardUntilSync = false;
 		write(ctx, ReadyForQuery.IDLE_INSTANCE);
 		ctx.flush();
+	}
+
+	/** Reports an error from an extended query message, discarding messages until Sync. */
+	private void writeExtendedError(ChannelHandlerContext ctx, ErrorResponse error) {
+		write(ctx, error);
+		discardUntilSync = true;
+	}
+
+	private static boolean isDiscardable(Object msg) {
+		return msg instanceof PgMessageDecoder.Parse || msg instanceof PgMessageDecoder.Bind
+			|| msg instanceof PgMessageDecoder.Describe || msg instanceof PgMessageDecoder.Execute
+			|| msg instanceof PgMessageDecoder.Close || msg instanceof PgMessageDecoder.Flush
+			|| msg instanceof PgMessageDecoder.Query;
 	}
 
 	private void handleTerminate(ChannelHandlerContext ctx) {

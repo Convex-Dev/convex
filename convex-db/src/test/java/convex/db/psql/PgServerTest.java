@@ -491,6 +491,48 @@ public class PgServerTest {
 	}
 
 	/**
+	 * With stringtype=unspecified the driver sends setString as text with no declared type,
+	 * leaving the server to type it from the query, as clients such as node-postgres do for
+	 * every parameter. A number in that text compares as a number; text that is not one is
+	 * an error.
+	 */
+	@Test
+	public void testPostgresJDBCUntypedTextParameter() throws Exception {
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser&stringtype=unspecified";
+		try (Connection conn = DriverManager.getConnection(url);
+			 java.sql.PreparedStatement select = conn.prepareStatement("SELECT name FROM users WHERE id = ?")) {
+			select.setString(1, "2");
+			try (ResultSet rs = select.executeQuery()) {
+				assertTrue(rs.next());
+				assertEquals("Bob", rs.getString("name"));
+				assertFalse(rs.next());
+			}
+
+			select.setString(1, "not-a-number");
+			java.sql.SQLException e = assertThrows(java.sql.SQLException.class, select::executeQuery);
+			assertEquals("22P02", e.getSQLState());
+		}
+	}
+
+	/**
+	 * pgjdbc sends a batch as one pipeline ending in a single Sync. After a statement
+	 * fails, the server must discard the rest until Sync, so no later statement runs.
+	 */
+	@Test
+	public void testPostgresJDBCBatchStopsAtError() throws Exception {
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url);
+			 Statement stmt = conn.createStatement()) {
+			stmt.addBatch("INSERT INTO users VALUES (10, 'Ten', 'ten@example.com')");
+			stmt.addBatch("INSERT INTO no_such_table VALUES (1)");
+			stmt.addBatch("INSERT INTO users VALUES (11, 'Eleven', 'eleven@example.com')");
+			assertThrows(java.sql.BatchUpdateException.class, stmt::executeBatch);
+		}
+		assertNull(db.tables().selectByKey("users", convex.core.data.prim.CVMLong.create(11)),
+			"a statement after the failed one must not run");
+	}
+
+	/**
 	 * Tests aggregation via PostgreSQL JDBC driver.
 	 */
 	@Test

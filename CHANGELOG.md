@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep a lattice node's Etch store usable when the node closes or a peer disconnects mid-acquisition. ([#776](https://github.com/Convex-Dev/convex/issues/776))
 - Reopen Etch v3 stores without manual repair after a crash during a start-up garbage collection. ([#748](https://github.com/Convex-Dev/convex/issues/748))
 - Harden shutdown of lattice nodes and HTTP servers: no merges after close, in-flight requests finish, and servers no longer keep the JVM alive. ([#777](https://github.com/Convex-Dev/convex/issues/777))
+- Improve the PostgreSQL wire protocol in Convex DB: text parameters are parsed by their type, and a failed batch stops at the error. ([#772](https://github.com/Convex-Dev/convex/issues/772))
 
 ## [0.8.18] - 2026-10-25
 
