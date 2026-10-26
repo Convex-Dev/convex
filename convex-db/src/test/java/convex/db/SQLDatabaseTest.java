@@ -28,6 +28,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.db.ConvexDB;
 import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
@@ -371,7 +372,8 @@ public class SQLDatabaseTest {
 
 	/** A database whose override resolves one Address owner to one authorised key. */
 	private static SQLDatabase resolving(AKeyPair keyPair, ACell ownerKey, Address address, AccountKey authorised) {
-		return new SQLDatabase(Cursors.root(Index.none()), Strings.create("db"), keyPair, ownerKey, null) {
+		return new SQLDatabase(Cursors.root(Index.none()), Strings.create("db"), keyPair, ownerKey, null,
+				Utils::getCurrentTimestampCell) {
 			@Override protected boolean acceptsReplica(ACell owner, SignedData<?> replica) {
 				if (!address.equals(owner)) return super.acceptsReplica(owner, replica);
 				return authorised.equals(replica.getAccountKey()) && replica.checkSignature();

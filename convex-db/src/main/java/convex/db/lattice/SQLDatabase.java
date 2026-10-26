@@ -2,6 +2,7 @@ package convex.db.lattice;
 
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.Supplier;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlobLike;
@@ -15,6 +16,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.db.ConvexDB;
 import convex.lattice.ALatticeComponent;
@@ -39,7 +41,7 @@ import convex.lattice.cursor.Cursors;
  * the {@link SQLSchema} that {@link #tables()} supplies. Other sections belong to
  * other components: incoming ones are ignored and those already held are kept.
  * Connecting to a database and reading it create nothing; the first changed write
- * creates it.
+ * creates it. Writes are stamped with the clock this database passes to its tables.
  *
  * <p>Usage:
  * <pre>
@@ -60,6 +62,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
 	private final BiPredicate<ACell, AccountKey> ownerVerifier;
+	private final Supplier<CVMLong> clock;
 
 	/**
 	 * Binds a database to its cursor. Construction reads and writes nothing.
@@ -69,19 +72,22 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @param keyPair Key pair for signing this node's replica, or null when connected
 	 * @param ownerKey Owner identity of this node's replica, or null when connected
 	 * @param ownerVerifier Rule authorising signers for indirect owners, or null to refuse them
+	 * @param clock Clock that stamps writes to this database's tables
 	 */
-	protected SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor,
-			AString dbName, AKeyPair keyPair, ACell ownerKey, BiPredicate<ACell, AccountKey> ownerVerifier) {
+	protected SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor, AString dbName, AKeyPair keyPair,
+			ACell ownerKey, BiPredicate<ACell, AccountKey> ownerVerifier, Supplier<CVMLong> clock) {
 		super(cursor);
 		this.dbName = dbName;
 		this.keyPair = keyPair;
 		this.ownerKey = ownerKey;
 		this.ownerVerifier = ownerVerifier;
+		this.clock = Objects.requireNonNull(clock, "Clock must not be null");
 	}
 
 	/**
 	 * Creates a new empty standalone SQL database with the given name and signing key pair.
-	 * The owner key defaults to the key pair's AccountKey.
+	 * The owner key defaults to the key pair's AccountKey, and writes are stamped with
+	 * the runtime clock.
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
@@ -93,9 +99,10 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 
 	/**
 	 * Creates a new empty standalone SQL database with the given name,
-	 * signing key pair, and owner key. With no owner verifier, an owner must denote
-	 * an account key directly (an AccountKey or self-certifying {@code did:key}); use
-	 * the verifier overload for an Address or another DID method.
+	 * signing key pair, and owner key, stamping writes with the runtime clock. With no
+	 * owner verifier, an owner must denote an account key directly (an AccountKey or
+	 * self-certifying {@code did:key}); use the verifier overload for an Address or
+	 * another DID method.
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
@@ -103,16 +110,31 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return New SQLDatabase instance
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
+		return create(name, keyPair, ownerKey, Utils::getCurrentTimestampCell);
+	}
+
+	/**
+	 * Creates a new empty standalone SQL database with the given name, signing key
+	 * pair, owner key and clock, and no owner verifier.
+	 *
+	 * @param name Database name
+	 * @param keyPair Key pair for signing this node's replica
+	 * @param ownerKey Owner identity (AccountKey or {@code did:key})
+	 * @param clock Clock that stamps writes to this database's tables
+	 * @return New SQLDatabase instance
+	 */
+	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey, Supplier<CVMLong> clock) {
 		AForkableCursor<Index<Keyword, ACell>> cursor = Cursors.root(Index.none());
-		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey, null);
+		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey, null, clock);
 	}
 
 	/**
 	 * Creates a new empty standalone SQL database whose indirect owners (Address, or a
-	 * DID that is not {@code did:key}) are authorised by the given rule. The rule governs
-	 * both incoming replicas and this node's own export, and supports multi-key owners and
-	 * key rotation through an updatable authority view. It must be thread-safe and use
-	 * locally available authority data. Direct key owners are always checked by equality.
+	 * DID that is not {@code did:key}) are authorised by the given rule, stamping writes
+	 * with the runtime clock. The rule governs both incoming replicas and this node's own
+	 * export, and supports multi-key owners and key rotation through an updatable
+	 * authority view. It must be thread-safe and use locally available authority data.
+	 * Direct key owners are always checked by equality.
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
@@ -122,14 +144,31 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey,
 			BiPredicate<ACell, AccountKey> ownerVerifier) {
+		return create(name, keyPair, ownerKey, ownerVerifier, Utils::getCurrentTimestampCell);
+	}
+
+	/**
+	 * Creates a new empty standalone SQL database with an owner verifier and a clock,
+	 * as {@link #create(String, AKeyPair, ACell, BiPredicate)}.
+	 *
+	 * @param name Database name
+	 * @param keyPair Key pair for signing this node's replica
+	 * @param ownerKey Owner identity (AccountKey, Address, or AString DID)
+	 * @param ownerVerifier Rule taking (owner, signer key), true if that key may sign for the owner
+	 * @param clock Clock that stamps writes to this database's tables
+	 * @return New SQLDatabase instance
+	 */
+	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey,
+			BiPredicate<ACell, AccountKey> ownerVerifier, Supplier<CVMLong> clock) {
 		AForkableCursor<Index<Keyword, ACell>> cursor = Cursors.root(Index.none());
-		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey, Objects.requireNonNull(ownerVerifier));
+		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey,
+			Objects.requireNonNull(ownerVerifier), clock);
 	}
 
 	/**
 	 * Connects to a database within an existing cursor chain at the database-map
-	 * level. Signing and replication are handled by the cursor chain. Connecting
-	 * creates nothing.
+	 * level, stamping writes with the runtime clock. Signing and replication are
+	 * handled by the cursor chain. Connecting creates nothing.
 	 *
 	 * @param parent Parent lattice cursor at the database-map level
 	 * @param name Database name to connect to
@@ -139,12 +178,13 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	public static SQLDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
 		var databases = (AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>>) parent;
-		return new SQLDatabase(databases.withDefault(Maps.empty()).path(dbName), dbName, null, null, null);
+		return new SQLDatabase(databases.withDefault(Maps.empty()).path(dbName), dbName, null, null, null,
+			Utils::getCurrentTimestampCell);
 	}
 
 	/**
 	 * Connects to a database nested beneath a ConvexDB component, at
-	 * {@link ConvexDB#path(AString)}. Connecting creates nothing.
+	 * {@link ConvexDB#path(AString)} and with its clock. Connecting creates nothing.
 	 *
 	 * @param parent Containing ConvexDB component
 	 * @param name Database name to connect to
@@ -152,7 +192,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	public static SQLDatabase connect(ConvexDB parent, AString name) {
 		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
-		return new SQLDatabase(parent.path(name), name, null, null, null);
+		return new SQLDatabase(parent.path(name), name, null, null, null, parent.getClock());
 	}
 
 	/**
@@ -178,10 +218,15 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		return rebind(storage.fork());
 	}
 
-	/** Subclasses override this to return their own type, so forks keep their tables. */
+	/** Subclasses override this to return their own type, so forks keep their tables and clock. */
 	@Override
 	protected SQLDatabase rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
-		return new SQLDatabase(cursor,dbName,keyPair,ownerKey,ownerVerifier);
+		return new SQLDatabase(cursor,dbName,keyPair,ownerKey,ownerVerifier,clock);
+	}
+
+	/** Returns the clock that stamps writes to this database's tables. */
+	public Supplier<CVMLong> getClock() {
+		return clock;
 	}
 
 	/**
@@ -199,10 +244,10 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * and table operations all use this component, so an override supplying another
 	 * {@link SQLSchema} changes how the tables merge.
 	 *
-	 * @return SQLSchema instance for this database, bound to {@link #tablesPath()}
+	 * @return SQLSchema instance for this database, bound to {@link #tablesPath()}, with its clock
 	 */
 	public SQLSchema tables() {
-		return new SQLSchema(tablesPath());
+		return new SQLSchema(tablesPath(), clock);
 	}
 
 	/**

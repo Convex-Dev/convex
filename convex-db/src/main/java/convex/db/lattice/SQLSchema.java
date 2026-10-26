@@ -1,5 +1,8 @@
 package convex.db.lattice;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -10,6 +13,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.MergeFunction;
+import convex.core.util.Utils;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.lattice.ALatticeComponent;
@@ -48,16 +52,33 @@ import convex.lattice.cursor.Cursors;
  * <p>{@link #table(AString)} supplies the component for each table name. Its rule
  * merges that table's entries within {@link #mergeValues}, and the same component
  * receives delivery to the table's path and serves table operations.
+ *
+ * <p>Writes are stamped with an explicit clock, read once per write and passed on to
+ * the tables. Merges never read it. The application supplies the clock; how it orders
+ * a writer's writes, for example strictly increasing stamps, is the application's policy.
  */
 public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
-	/** Binds a table store to its cursor. Construction reads and writes nothing. */
+	private final Supplier<CVMLong> clock;
+
+	/** Binds a table store to its cursor, stamping writes with the runtime clock. */
 	public SQLSchema(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
-		super(cursor);
+		this(cursor, Utils::getCurrentTimestampCell);
 	}
 
 	/**
-	 * Creates a new empty table store.
+	 * Binds a table store to its cursor. Construction reads and writes nothing.
+	 *
+	 * @param cursor Cursor of the table store, which may be absent
+	 * @param clock Clock that stamps writes to this store and its tables
+	 */
+	public SQLSchema(AForkableCursor<Index<AString, AVector<ACell>>> cursor, Supplier<CVMLong> clock) {
+		super(cursor);
+		this.clock = Objects.requireNonNull(clock, "Clock must not be null");
+	}
+
+	/**
+	 * Creates a new empty table store, stamping writes with the runtime clock.
 	 *
 	 * @return New SQLSchema instance
 	 */
@@ -67,13 +88,19 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	/**
-	 * Connects to an existing cursor for cursor chain integration.
+	 * Connects to an existing cursor for cursor chain integration, stamping writes with
+	 * the runtime clock.
 	 *
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
 	 * @return New SQLSchema instance connected to the cursor
 	 */
 	public static SQLSchema connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
 		return new SQLSchema(cursor);
+	}
+
+	/** Returns the clock that stamps writes to this store and its tables. */
+	public Supplier<CVMLong> getClock() {
+		return clock;
 	}
 
 	/**
@@ -85,10 +112,10 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return rebind(storage.fork());
 	}
 
-	/** Subclasses override this to return their own type, so forks keep their tables. */
+	/** Subclasses override this to return their own type, so forks keep their tables and clock. */
 	@Override
 	protected SQLSchema rebind(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
-		return new SQLSchema(cursor);
+		return new SQLSchema(cursor, clock);
 	}
 
 	// ========== Tables and Merge ==========
@@ -110,10 +137,10 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * so an override supplying another {@link SQLTable} changes how that table merges.
 	 *
 	 * @param name Table name
-	 * @return Table component bound to {@link #path(AString)}
+	 * @return Table component bound to {@link #path(AString)}, with this store's clock
 	 */
 	protected SQLTable table(AString name) {
-		return new SQLTable(path(name));
+		return new SQLTable(path(name), clock);
 	}
 
 	/**
@@ -169,10 +196,6 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	// ========== Internal Helpers ==========
-
-	private CVMLong now() {
-		return CVMLong.create(System.currentTimeMillis());
-	}
 
 	/**
 	 * Gets a cursor-backed table by name, returning null if not found.
@@ -291,7 +314,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		}
 
 		// Set state on the table's cursor path
-		path(name).set(SQLTable.createState((AVector<AVector<ACell>>) schema, now()));
+		path(name).set(SQLTable.createState((AVector<AVector<ACell>>) schema, clock.get()));
 		return true;
 	}
 
@@ -302,7 +325,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	public boolean dropTable(AString name) {
 		if (getLiveTable(name) == null) return false;
-		path(name).set(SQLTable.createTombstoneState(now()));
+		path(name).set(SQLTable.createTombstoneState(clock.get()));
 		return true;
 	}
 
@@ -404,7 +427,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return false;
 		ABlob pk = toKey(row.get(0));
-		return table.insertRow(pk, row, now());
+		return table.insertRow(pk, row);
 	}
 
 	/** Inserts a row with auto-conversion from Java types. First value is primary key. */
@@ -439,7 +462,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return false;
 		ABlob key = toKey(primaryKey);
-		return table.deleteRow(key, now());
+		return table.deleteRow(key);
 	}
 
 	/** Returns all live rows in a table. */

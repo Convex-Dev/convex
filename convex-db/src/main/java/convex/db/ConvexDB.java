@@ -5,8 +5,10 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -15,8 +17,10 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.util.MergeFunction;
+import convex.core.util.Utils;
 import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.ALatticeComponent;
@@ -54,6 +58,11 @@ import convex.node.NodeServer;
  * that lies: an application can root it anywhere in its own state, and registers it
  * with its host to receive incoming values. {@link #openHost} is a convenience that
  * assembles a host whose root is the database map.
+ *
+ * <p>The application also supplies the clock that stamps writes, defaulting to the
+ * runtime clock. Factories pass it down to every database and table, forks keep it,
+ * and each write reads it once; merges never read it. How it orders a writer's writes,
+ * for example with strictly increasing stamps, is the application's policy.
  *
  * <p>Usage:
  * <pre>
@@ -114,29 +123,54 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	// ========== Instance ==========
 
+	private final Supplier<CVMLong> clock;
+
+	/**
+	 * Binds a ConvexDB to the cursor of a database map, stamping writes with the
+	 * runtime clock.
+	 *
+	 * @param cursor Cursor of the database map, which may be absent
+	 */
+	public ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
+		this(cursor, Utils::getCurrentTimestampCell);
+	}
+
 	/**
 	 * Binds a ConvexDB to the cursor of a database map, wherever that lies.
 	 * Construction reads and writes nothing. Register the instance with a host as an
 	 * application for it to receive incoming values.
 	 *
 	 * @param cursor Cursor of the database map, which may be absent
+	 * @param clock Clock that stamps writes to every database and table below
 	 */
-	public ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
+	public ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor, Supplier<CVMLong> clock) {
 		super(cursor);
+		this.clock = Objects.requireNonNull(clock, "Clock must not be null");
+	}
+
+	/**
+	 * Creates a new standalone ConvexDB (in-memory, no persistence), stamping writes
+	 * with the runtime clock.
+	 *
+	 * @return New ConvexDB instance
+	 */
+	public static ConvexDB create() {
+		return create(Utils::getCurrentTimestampCell);
 	}
 
 	/**
 	 * Creates a new standalone ConvexDB (in-memory, no persistence).
 	 *
+	 * @param clock Clock that stamps writes
 	 * @return New ConvexDB instance
 	 */
-	public static ConvexDB create() {
-		return new ConvexDB(Cursors.root(Maps.empty()));
+	public static ConvexDB create(Supplier<CVMLong> clock) {
+		return new ConvexDB(Cursors.root(Maps.empty()), clock);
 	}
 
 	/**
 	 * Connects directly to an existing cursor chain at the database-map level,
-	 * without registering for incoming values.
+	 * without registering for incoming values, stamping writes with the runtime clock.
 	 *
 	 * @param parent Parent lattice cursor at the database-map level
 	 * @return ConvexDB connected to the cursor chain
@@ -148,8 +182,9 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	/**
 	 * Connects to a containing component at the database-map level. For a host
 	 * assembled by {@link #openHost} or {@link #createNodeServer}, this returns the
-	 * ConvexDB registered with it; otherwise it returns a live view of the
-	 * component's cursor, which receives no incoming values.
+	 * ConvexDB registered with it, with its clock; otherwise it returns a live view of
+	 * the component's cursor, which receives no incoming values and stamps writes with
+	 * the runtime clock.
 	 *
 	 * @param parent Containing database-map component, such as a host
 	 * @return ConvexDB over the containing component's cursor
@@ -182,7 +217,33 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @throws IOException if the store's retained root cannot be read
 	 */
 	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) throws IOException {
-		return new NodeServer<>(openHost(store));
+		return createNodeServer(store, Utils::getCurrentTimestampCell);
+	}
+
+	/**
+	 * Creates optional networking around a store-backed ConvexDB host whose writes are
+	 * stamped with the given clock, as {@link #createNodeServer(AStore)}.
+	 *
+	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
+	 * @param clock Clock that stamps writes
+	 * @return NodeServer over a host assembled by {@link #openHost(AStore, Supplier)}
+	 * @throws IOException if the store's retained root cannot be read
+	 */
+	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store,
+			Supplier<CVMLong> clock) throws IOException {
+		return new NodeServer<>(openHost(store, clock));
+	}
+
+	/**
+	 * Opens a host whose root is a database map, as {@link #openHost(AStore, Supplier)},
+	 * stamping writes with the runtime clock.
+	 *
+	 * @param store Store for persistence, or null for an in-memory host
+	 * @return Host with a registered ConvexDB
+	 * @throws IOException if the store's retained root cannot be read
+	 */
+	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store) throws IOException {
+		return openHost(store, Utils::getCurrentTimestampCell);
 	}
 
 	/**
@@ -193,19 +254,26 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * elsewhere, or extends the components, assembles its own host.
 	 *
 	 * @param store Store for persistence, or null for an in-memory host
+	 * @param clock Clock that stamps writes
 	 * @return Host with a registered ConvexDB
 	 * @throws IOException if the store's retained root cannot be read
 	 */
-	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store) throws IOException {
+	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store,
+			Supplier<CVMLong> clock) throws IOException {
 		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host = LatticeHost.open(Maps.empty(), store);
-		hosted.put(host, host.addApplication(new ConvexDB(host.cursor())));
+		hosted.put(host, host.addApplication(new ConvexDB(host.cursor(), clock)));
 		return host;
 	}
 
-	/** Subclasses override this to return their own type, so forks keep their databases. */
+	/** Subclasses override this to return their own type, so forks keep their databases and clock. */
 	@Override
 	protected ConvexDB rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-		return new ConvexDB(cursor);
+		return new ConvexDB(cursor, clock);
+	}
+
+	/** Returns the clock that stamps writes to every database and table below. */
+	public Supplier<CVMLong> getClock() {
+		return clock;
 	}
 
 	@Override

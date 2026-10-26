@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Let applications change how Convex DB tables and databases merge by extending its components. ([Architecture](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-at-each-level), [#779](https://github.com/Convex-Dev/convex/issues/779))
+- Let applications supply the clock that stamps Convex DB writes. ([Clock](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#clock), [#781](https://github.com/Convex-Dev/convex/issues/781))
 
 ### Changed
 

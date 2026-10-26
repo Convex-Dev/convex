@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 
@@ -57,45 +59,60 @@ public class ConvexDBMergeTest {
 
 	/** A table whose entry, once held, is kept by every merge. */
 	static class FrozenTable extends SQLTable {
-		FrozenTable(AForkableCursor<AVector<ACell>> cursor) { super(cursor); }
+		FrozenTable(AForkableCursor<AVector<ACell>> cursor, Supplier<CVMLong> clock) { super(cursor, clock); }
 
 		@Override public AVector<ACell> mergeValues(AVector<ACell> own, AVector<ACell> other) {
 			return (own != null) ? own : super.mergeValues(own, other);
 		}
 
-		@Override protected FrozenTable rebind(AForkableCursor<AVector<ACell>> cursor) { return new FrozenTable(cursor); }
+		@Override protected FrozenTable rebind(AForkableCursor<AVector<ACell>> cursor) {
+			return new FrozenTable(cursor, getClock());
+		}
 	}
 
 	static class Schema extends SQLSchema {
-		Schema(AForkableCursor<Index<AString, AVector<ACell>>> cursor) { super(cursor); }
+		Schema(AForkableCursor<Index<AString, AVector<ACell>>> cursor, Supplier<CVMLong> clock) { super(cursor, clock); }
 
 		@Override protected SQLTable table(AString name) {
-			return FROZEN.equals(name) ? new FrozenTable(path(name)) : super.table(name);
+			return FROZEN.equals(name) ? new FrozenTable(path(name), getClock()) : super.table(name);
 		}
 
-		@Override protected Schema rebind(AForkableCursor<Index<AString, AVector<ACell>>> cursor) { return new Schema(cursor); }
+		@Override protected Schema rebind(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
+			return new Schema(cursor, getClock());
+		}
 	}
 
 	static class Database extends SQLDatabase {
-		Database(AForkableCursor<Index<Keyword, ACell>> cursor, AString name, AKeyPair keyPair, ACell owner) {
-			super(cursor, name, keyPair, owner, null);
+		Database(AForkableCursor<Index<Keyword, ACell>> cursor, AString name, AKeyPair keyPair, ACell owner,
+				Supplier<CVMLong> clock) {
+			super(cursor, name, keyPair, owner, null, clock);
 		}
 
-		@Override public SQLSchema tables() { return new Schema(tablesPath()); }
+		@Override public SQLSchema tables() { return new Schema(tablesPath(), getClock()); }
 
 		@Override protected Database rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
-			return new Database(cursor, getName(), getKeyPair(), getOwnerKey());
+			return new Database(cursor, getName(), getKeyPair(), getOwnerKey(), getClock());
 		}
 	}
 
 	static class Databases extends ConvexDB {
-		Databases(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) { super(cursor); }
+		Databases(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor, Supplier<CVMLong> clock) {
+			super(cursor, clock);
+		}
 
-		@Override public SQLDatabase database(AString name) { return new Database(path(name), name, null, null); }
+		@Override public SQLDatabase database(AString name) {
+			return new Database(path(name), name, null, null, getClock());
+		}
 
 		@Override protected Databases rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-			return new Databases(cursor);
+			return new Databases(cursor, getClock());
 		}
+	}
+
+	/** A strictly increasing clock, so no outcome depends on the runtime clock. */
+	static Supplier<CVMLong> counter() {
+		AtomicLong time = new AtomicLong();
+		return () -> CVMLong.create(time.incrementAndGet());
 	}
 
 	private static LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host() {
@@ -104,7 +121,7 @@ public class ConvexDBMergeTest {
 
 	/** Registers the overriding application with a host, as an application assembles its own. */
 	private static Databases install(LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host) {
-		return host.addApplication(new Databases(host.cursor()));
+		return host.addApplication(new Databases(host.cursor(), counter()));
 	}
 
 	/** Creates both tables, each holding row 1. */
@@ -243,7 +260,7 @@ public class ConvexDBMergeTest {
 	public void testReplicaMergeUsesTableRules() {
 		AKeyPair local = AKeyPair.generate();
 		AKeyPair other = AKeyPair.generate();
-		SQLDatabase db = new Database(Cursors.root(Index.none()), DB_NAME, local, local.getAccountKey());
+		SQLDatabase db = new Database(Cursors.root(Index.none()), DB_NAME, local, local.getAccountKey(), counter());
 		populate(db);
 		SQLDatabase remote = SQLDatabase.create(DB, other);
 		remote.cursor().set(db.cursor().get());

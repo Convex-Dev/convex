@@ -1,6 +1,7 @@
 package convex.db.lattice;
 
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
@@ -38,6 +39,9 @@ import convex.lattice.cursor.AForkableCursor;
  * included, and there is no row component below it. An application changes how a
  * table merges by overriding that rule and supplying the subclass from
  * {@link SQLSchema#table(AString)}.
+ *
+ * <p>Row writes are stamped with the clock the containing schema supplies, read once
+ * per write. Merges never read the clock.
  */
 public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 
@@ -55,15 +59,28 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	/** Highest table format version this implementation reads and writes */
 	public static final long SUPPORTED_VERSION = 0;
 
-	/** Binds a table to the cursor of its entry. Construction reads and writes nothing. */
-	protected SQLTable(AForkableCursor<AVector<ACell>> cursor) {
+	private final Supplier<CVMLong> clock;
+
+	/**
+	 * Binds a table to the cursor of its entry. Construction reads and writes nothing.
+	 *
+	 * @param cursor Cursor of the table's entry, which may be absent
+	 * @param clock Clock that stamps row writes
+	 */
+	protected SQLTable(AForkableCursor<AVector<ACell>> cursor, Supplier<CVMLong> clock) {
 		super(cursor);
+		this.clock = Objects.requireNonNull(clock, "Clock must not be null");
 	}
 
 	/** Subclasses override this to return their own type, so forks keep their rule. */
 	@Override
 	protected SQLTable rebind(AForkableCursor<AVector<ACell>> cursor) {
-		return new SQLTable(cursor);
+		return new SQLTable(cursor, clock);
+	}
+
+	/** Returns the clock that stamps this table's row writes. */
+	public Supplier<CVMLong> getClock() {
+		return clock;
 	}
 
 	// ========== Static State Factories ==========
@@ -223,7 +240,28 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	// ========== Mutation Methods ==========
 
 	/**
-	 * Inserts a row into this table.
+	 * Inserts a row into this table, stamped with this table's clock.
+	 *
+	 * @param pk Primary key (blob-encoded)
+	 * @param values Full row values (including PK as first element)
+	 * @return true if inserted successfully
+	 */
+	public boolean insertRow(ABlob pk, AVector<ACell> values) {
+		return insertRow(pk, values, clock.get());
+	}
+
+	/**
+	 * Deletes a row by primary key, stamped with this table's clock.
+	 *
+	 * @param key Primary key (blob-encoded)
+	 * @return true if a live row was deleted
+	 */
+	public boolean deleteRow(ABlob key) {
+		return deleteRow(key, clock.get());
+	}
+
+	/**
+	 * Inserts a row into this table with an explicit timestamp.
 	 *
 	 * @param pk Primary key (blob-encoded)
 	 * @param values Full row values (including PK as first element)
@@ -251,7 +289,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	}
 
 	/**
-	 * Deletes a row by primary key.
+	 * Deletes a row by primary key with an explicit timestamp.
 	 *
 	 * @param key Primary key (blob-encoded)
 	 * @param timestamp Deletion timestamp

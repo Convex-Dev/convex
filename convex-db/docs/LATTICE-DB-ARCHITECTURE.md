@@ -52,6 +52,20 @@ connecting to a database that does not exist, or reading it, creates no state. T
 first changed write creates the database, and the table store within it, through
 the cursor defaults.
 
+## Clock
+
+Writes are stamped with a clock the application supplies, a `Supplier<CVMLong>`
+given to `ConvexDB` (or to a standalone `SQLDatabase` or `SQLSchema`), defaulting to
+the runtime clock. The factories pass it down to every database and table, and forks
+and transactions keep it. Each write reads it once: creating or dropping a table
+stamps the table entry, and inserting or deleting a row stamps the row. Merges never
+read it, and incoming values keep their timestamps.
+
+The clock is how a writer orders its writes, so it is the application's policy. A
+single writer that needs every later write to win supplies strictly increasing
+stamps; otherwise two writes in the same millisecond tie, and a tie keeps the value
+already held.
+
 ## Cursor Descent
 
 Each child component retains its descended cursor rather than repeatedly reading
@@ -162,23 +176,25 @@ schemas sequences those changes itself, or supplies its own table rule.
 An application changes a rule by extending a component and supplying it from the
 factory above it: `ConvexDB.database(name)`, `SQLDatabase.tables()` or
 `SQLSchema.table(name)`. Each subclass also overrides `rebind`, so that forks and
-transactions keep its type. The override then holds for every route above, for
-example a reference table whose entry, once held, no merge changes:
+transactions keep its type, and passes on the clock. The override then holds for
+every route above, for example a reference table whose entry, once held, no merge
+changes:
 
 ```java
 class ReferenceTable extends SQLTable {
-    ReferenceTable(AForkableCursor<AVector<ACell>> cursor) { super(cursor); }
+    ReferenceTable(AForkableCursor<AVector<ACell>> cursor, Supplier<CVMLong> clock) { super(cursor, clock); }
     @Override public AVector<ACell> mergeValues(AVector<ACell> own, AVector<ACell> other) {
         return (own != null) ? own : super.mergeValues(own, other);
     }
     @Override protected ReferenceTable rebind(AForkableCursor<AVector<ACell>> cursor) {
-        return new ReferenceTable(cursor);
+        return new ReferenceTable(cursor, getClock());
     }
 }
 ```
 
 The containing `SQLSchema` subclass returns it from `table(name)` for the names it
-covers, and so on up to the `ConvexDB` the application registers with its host.
+covers, constructed with `path(name)` and `getClock()`, and so on up to the
+`ConvexDB` the application registers with its host.
 `ConvexDBMergeTest` exercises this across every route.
 
 ## Target API
