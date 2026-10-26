@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -16,8 +17,8 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
-import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLTable;
 import convex.lattice.LatticeHost;
 
@@ -40,20 +41,20 @@ public class ConvexDBComponentTest {
 	@Test
 	public void testHostedComponentsShareRootState() {
 		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> root=host();
-		ConvexDB cdb=ConvexDB.connect(root);
+		ConvexDB cdb=ConvexDB.connect(root,RowLWW::merge);
 		SQLDatabase db=createDatabase(cdb);
 		SQLTable table=db.tables().getTable(TABLE_NAME);
 
 		assertNotNull(table);
 		assertSame(root.cursor().get(),cdb.cursor().get());
 		assertEquals(1,root.cursor().get().count());
-		assertTrue(ConvexDB.connect(root).database(DB_NAME).tables().tableExists(TABLE_NAME));
+		assertTrue(ConvexDB.connect(root,RowLWW::merge).database(DB_NAME).tables().tableExists(TABLE_NAME));
 	}
 
 	@Test
 	public void testDatabaseForkSyncsToOriginal() {
 		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> root=host();
-		SQLDatabase original=createDatabase(ConvexDB.connect(root));
+		SQLDatabase original=createDatabase(ConvexDB.connect(root,RowLWW::merge));
 		SQLDatabase fork=original.fork();
 
 		assertTrue(fork.tables().insert(TABLE_NAME,1,"forked"));
@@ -67,7 +68,7 @@ public class ConvexDBComponentTest {
 	/** Publishing table edits preserves unrelated current fields, including their deletion. */
 	@Test
 	public void testDatabasePublicationPreservesConcurrentChanges() {
-		SQLDatabase original=createDatabase(ConvexDB.connect(host()));
+		SQLDatabase original=createDatabase(ConvexDB.connect(host(),RowLWW::merge));
 		Keyword retained=Keyword.intern("external");
 		Keyword removed=Keyword.intern("removed");
 		original.cursor().update(db -> db.assoc(retained,CVMLong.ONE).assoc(removed,CVMLong.ONE));
@@ -87,17 +88,11 @@ public class ConvexDBComponentTest {
 		assertSame(published,original.cursor().get());
 	}
 
+	/** A database is the unit of forking: its table store and tables are live views. */
 	@Test
-	public void testSchemaForkSyncsToOriginal() {
-		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> root=host();
-		SQLSchema original=ConvexDB.connect(root).database(DB_NAME).tables();
-		SQLSchema fork=original.fork();
-
-		assertTrue(fork.createTable(TABLE_NAME,new String[] {"id"}));
-		assertNotNull(fork.getTable(TABLE_NAME));
-		assertFalse(original.tableExists(TABLE_NAME));
-
-		fork.sync();
-		assertTrue(original.tableExists(TABLE_NAME));
+	public void testTablesAreNotForkedSeparately() {
+		SQLDatabase db=createDatabase(ConvexDB.connect(host(),RowLWW::merge));
+		assertThrows(UnsupportedOperationException.class,() -> db.tables().fork());
+		assertThrows(UnsupportedOperationException.class,() -> db.tables().getTable(TABLE_NAME).fork());
 	}
 }

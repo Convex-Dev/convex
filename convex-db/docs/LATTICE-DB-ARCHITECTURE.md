@@ -27,9 +27,9 @@ lies. Where the databases live is the application's choice: it can root the map 
 the host root, under a region of its own or inside another application, and it
 registers the `ConvexDB` with its host to receive incoming values. By convention,
 an application's own databases live under `:app`; `:sql` is intended for publicly
-shared data such as reference tables. `ConvexDB.openHost(store)` is a convenience that assembles a host
-whose root is the database map, with a `ConvexDB` registered; `ConvexDB.connect(host)`
-returns that instance.
+shared data such as reference tables. `ConvexDB.openHost(store, policy)` is a convenience that
+assembles a host whose root is the database map, with a `ConvexDB` registered;
+`ConvexDB.connect(host)` returns that instance.
 
 ## Component ↔ Cursor Mapping
 
@@ -44,7 +44,7 @@ LatticeHost   cursor: AHashMap<AString, Index>    hosted root
 ```
 
 `database()`, `tables()` and `table()` each construct the child component over
-`cursor.path(key)`, one level down. This is the same pattern as
+`cursor.path(key)`, one level down, passing on the merge policy and clock. This is the same pattern as
 `SocialUser.feed()` and `SocialUser.follows()` in convex-social.
 
 Components hold no link to their parent. Constructing one reads and writes nothing:
@@ -92,20 +92,20 @@ Each transaction forks from the database cursor. Within a transaction, all
 reads see the snapshot at fork time, and all writes accumulate locally.
 
 - **Commit**: `tx.sync()` merges the transaction fork back into the DB cursor
-  with the database's merge rule. This is atomic and in-memory — just a
+  with the database's merge policy. This is atomic and in-memory — just a
   `compareAndSet` on the DB cursor's `AtomicReference`.
 - **Rollback**: discard the transaction cursor. The DB cursor is untouched.
-- **Conflict resolution**: the table rules handle concurrent transactions. Two
-  transactions inserting different rows merge cleanly. Two transactions updating
-  the same row resolve via LWW (last timestamp wins).
+- **Conflict resolution**: the policy reconciles concurrent transactions, and is
+  consulted only when both have changed the database. Under `RowLWW`, two
+  transactions inserting different rows merge cleanly, and two updating the same
+  row resolve by the later timestamp.
 
 ### Why this works
 
 The transaction is a component fork: a `SQLDatabase` with its own working state,
 snapshotting the database value at fork time, whose destination is the live cursor.
-`sync()` merges the working value into the destination with the database's rule,
-which calls each table's rule. No locks, no conflict detection: the transaction's
-changes merge with any made concurrently.
+`sync()` merges the working value into the destination with the database's policy
+and publishes the tables; the destination's other sections stay as they are.
 
 ```java
 ConvexDB cdb = ConvexDB.connect(server.getHost());
@@ -126,82 +126,88 @@ cdb.sync();
 server.getHost().flush();
 ```
 
-## Merge at Each Level
+## Merge Policy
 
-Merges are executed by the components. Each has a merge rule, `mergeValues(own, other)`:
-a pure function of two values that reads and writes no state. A container's rule calls
-the rule of the child component for each key, so no merge of Convex DB state bypasses
-a child's rule:
+How a database merges is not built into Convex DB: whatever constructs a database
+supplies its merge policy, a pure function of the own and incoming database states
+(`BinaryOperator<Index<Keyword, ACell>>`), and there is no default. An application
+whose tables several writers update row by row can use the per-row last-write-wins
+policy Convex DB provides, `RowLWW::merge`; one that serialises its updates, schema
+changes included, supplies a policy that follows its own ordering.
 
-| Level | Component | Merge rule |
-|-------|-----------|------------|
-| database map | `ConvexDB` | union of database names; each database by its `database(name)` component |
-| database | `SQLDatabase` | `:tables` by its `tables()` component; other sections are ignored on receipt and kept where held |
-| table store | `SQLSchema` | union of table names; each entry by its `table(name)` component |
-| table entry | `SQLTable` | LWW schema on `utime`; while live, rows merge by key with `TableLattice` |
-| row entry | (within `SQLTable`) | LWW by timestamp; equal timestamps favour deletion |
+The database is the unit of merging, as it is of transactions. `ConvexDB` passes its
+policy to each database through `database(name)`, and merges the database map by name,
+each database with that policy: nothing spans databases. The table store and tables
+are live views for table operations, with no merge of their own, so they are not
+forked separately: a transaction forks the database.
 
-The same rules serve every route by which state arrives:
+Every route by which state arrives reaches the policy:
 
-- **Incoming values**: the host delivers them to its registered `ConvexDB`, whose
-  `merge` applies its rule.
-- **Path delivery**: `mergeAt` resolves the path through `child(key)`, which returns
-  the same components the rules use, and the deepest component merges the value.
-- **Fork publication**: `sync()` reconciles a fork with its destination through
-  `mergePublication`, which uses the rule. `SQLDatabase` publishes only its tables:
-  the destination's other sections stay as they are.
+- **Incoming values**: the host delivers them to its registered `ConvexDB`, which
+  merges each database with its policy.
+- **Path delivery**: a delivery below a database is lifted to a database state holding
+  only what was delivered, then merged with the policy, so a delivery and a
+  whole-value merge agree. The table store (`[database, :tables]`), a table entry
+  (`[database, :tables, table]`), its rows (`[database, :tables, table, 1]`) or one row
+  (`[database, :tables, table, 1, key]`) can be delivered; rows are lifted into a table
+  entry without a `utime`. Deliveries to other sections are ignored, and other paths
+  are refused.
+- **Fork publication**: `sync()` reconciles a fork with its destination through the
+  policy. `SQLDatabase` publishes only its tables: the destination's other sections
+  stay as they are.
 - **Replicas**: `SQLDatabase.mergeReplicas` verifies each signed replica with
-  `acceptsReplica`, then merges its state with the database's rule.
+  `acceptsReplica`, then merges its state with the policy.
 
-`SQLTable` is the merge boundary; there is no row component. A delivery to a row path
-(`[database, :tables, table, 1, key]`, or `[database, :tables, table, 1]` with a row
-index) is lifted into a rows-only partial entry and merged with the table's rule, so it
-cannot change the schema. A table that is absent or dropped receives nothing, and other
-paths into an entry are refused. Row writes leave the entry's `utime` unchanged: it is
-the schema timestamp.
+### Per-row last-write-wins
 
-Merges that accept nothing create nothing: a database or table store that is absent
-stays absent. Equal timestamps keep the established value, as described in the
+`RowLWW` is a set of pure functions, one for each level:
+
+| Level | Function | Rule |
+|-------|----------|------|
+| database | `merge` | `:tables` by `mergeTables`; other sections are ignored on receipt and kept where held |
+| table store | `mergeTables` | union of table names; each entry by `mergeTable` |
+| table entry | `mergeTable` | LWW schema on `utime`, own on a tie; a dropped table's tombstone wins in the same way; while live, rows merge by key |
+| row entry | `mergeRow` | LWW by timestamp; equal timestamps favour deletion, otherwise own |
+
+A table entry without a `utime` carries only rows, from a delivery below the entry:
+its rows merge into a live table, and an absent or dropped table takes nothing. Row
+writes leave the entry's `utime` unchanged: it is the schema timestamp. Merges that
+accept nothing create nothing: a database or table store that is absent stays absent.
+Equal timestamps keep the established value, as described in the
 [lattice application design](../../convex-core/docs/LATTICE_APPLICATIONS.md).
 
 Who may change a table's schema, drop it or create it again, and how those changes
-are ordered between writers, is application policy. The standard table rule orders
-schema changes by `utime` alone and merges rows by key whichever creation of the table
-they were written to, so rows written before a `DROP TABLE` can reappear in a table
-created again under the same name. An application with several writers changing
-schemas sequences those changes itself, or supplies its own table rule.
+are ordered between writers, is application policy. `RowLWW` orders schema changes by
+`utime` alone and merges rows by key whichever creation of the table they were
+written to, so rows written before a `DROP TABLE` can reappear in a table created
+again under the same name. An application with several writers changing schemas
+sequences those changes itself, or supplies another policy.
 
-### Extending the rules
+### Composing a policy
 
-An application changes a rule by extending a component and supplying it from the
-factory above it: `ConvexDB.database(name)`, `SQLDatabase.tables()` or
-`SQLSchema.table(name)`. Each subclass also overrides `rebind`, so that forks and
-transactions keep its type, and passes on the clock. The override then holds for
-every route above, for example a reference table whose entry, once held, no merge
-changes:
+The `RowLWW` functions are public, so an application can compose a variant from them.
+For example, a policy that keeps the entry it holds for a reference table, so that no
+merge changes it, and merges the other tables row by row:
 
 ```java
-class ReferenceTable extends SQLTable {
-    ReferenceTable(AForkableCursor<AVector<ACell>> cursor, Supplier<CVMLong> clock) { super(cursor, clock); }
-    @Override public AVector<ACell> mergeValues(AVector<ACell> own, AVector<ACell> other) {
-        return (own != null) ? own : super.mergeValues(own, other);
-    }
-    @Override protected ReferenceTable rebind(AForkableCursor<AVector<ACell>> cursor) {
-        return new ReferenceTable(cursor, getClock());
-    }
+static Index<Keyword, ACell> keepReference(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
+    Index<Keyword, ACell> merged = RowLWW.merge(own, other);
+    AVector<ACell> held = reference(own);   // the "reference" entry of own's :tables, or null
+    if (held == null || held.equals(reference(merged))) return merged;
+    Index<AString, AVector<ACell>> tables = (Index<AString, AVector<ACell>>) merged.get(ConvexDB.KEY_TABLES);
+    return merged.assoc(ConvexDB.KEY_TABLES, tables.assoc(REFERENCE, held));
 }
+
+ConvexDB cdb = ConvexDB.create(MyApp::keepReference);
 ```
 
-The containing `SQLSchema` subclass returns it from `table(name)` for the names it
-covers, constructed with `path(name)` and `getClock()`, and so on up to the
-`ConvexDB` the application registers with its host.
-`ConvexDBMergeTest` exercises this across every route.
+`ConvexDBMergeTest` exercises such a policy across every route.
 
 ## Target API
 
 ```java
 // Setup — the host's registered ConvexDB merges incoming values
-var server = ConvexDB.createNodeServer(store);
+var server = ConvexDB.createNodeServer(store, RowLWW::merge);
 server.launch();
 ConvexDB cdb = ConvexDB.connect(server.getHost());
 SQLDatabase db = cdb.database("mydb");
@@ -221,6 +227,6 @@ cdb.sync();
 server.getHost().flush();
 ```
 
-Each component owns its cursor and its merge rule. The transaction fork gives atomic
-commit, free rollback and conflict-free concurrent merges without confusing
-persistence with cursor sync.
+Each component owns its cursor, and each database merges with the policy its wrapper
+supplies. The transaction fork gives atomic commit, free rollback and concurrent
+merges by that policy without confusing persistence with cursor sync.

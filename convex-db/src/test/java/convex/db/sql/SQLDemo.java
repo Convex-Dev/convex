@@ -8,6 +8,7 @@ import java.sql.Statement;
 
 import convex.db.ConvexDB;
 
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -19,7 +20,7 @@ public class SQLDemo {
 		System.out.println("=== Convex SQL Demo ===\n");
 
 		// 1. Create and register database
-		ConvexDB cdb = ConvexDB.create();
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 		SQLDatabase db = cdb.database("demo");
 		cdb.register("demo");
 		System.out.println("Database: " + db.getName());

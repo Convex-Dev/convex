@@ -18,6 +18,7 @@ import convex.db.calcite.ConvexColumnType;
 
 import convex.db.calcite.ConvexType;
 import convex.db.calcite.rel.ConvexResultConverter;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -36,7 +37,7 @@ class ConvexConventionIntegrationTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		// Create test database
-		cdb = ConvexDB.create();
+		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database("convex_conv_test");
 		cdb.register("convex_conv_test");
 

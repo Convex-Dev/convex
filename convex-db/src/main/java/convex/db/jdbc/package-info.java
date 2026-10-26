@@ -6,7 +6,7 @@
  * <p>Usage:
  * <pre>
  * // 1. Create and register database
- * ConvexDB cdb = ConvexDB.create();
+ * ConvexDB cdb = ConvexDB.create(RowLWW::merge);
  * cdb.database("mydb");
  * cdb.register("mydb");
  *

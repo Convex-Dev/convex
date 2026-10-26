@@ -17,8 +17,8 @@ import convex.lattice.cursor.Root;
 
 /**
  * The table entry's utime is its schema timestamp (CAD039): row writes leave it
- * unchanged, so a later row write on a node that has not seen a schema change or
- * a DROP TABLE cannot make the older schema win.
+ * unchanged, so under {@link RowLWW} a later row write on a node that has not seen a
+ * schema change or a DROP TABLE cannot make the older schema win.
  */
 public class SQLTableTimestampTest {
 
@@ -51,8 +51,8 @@ public class SQLTableTimestampTest {
 		stale.insertRow(PK, Vectors.of(1L), WRITTEN);
 		AVector<ACell> dropped = SQLTable.createTombstoneState(CHANGED);
 
-		assertFalse(SQLTable.isLiveState(SQLTable.merge(stale.getState(), dropped)));
-		assertFalse(SQLTable.isLiveState(SQLTable.merge(dropped, stale.getState())));
+		assertFalse(SQLTable.isLiveState(RowLWW.mergeTable(stale.getState(), dropped)));
+		assertFalse(SQLTable.isLiveState(RowLWW.mergeTable(dropped, stale.getState())));
 	}
 
 	/** A node that never saw the schema change writes a row later; the newer schema still wins. */
@@ -62,8 +62,8 @@ public class SQLTableTimestampTest {
 		stale.insertRow(PK, Vectors.of(1L), WRITTEN);
 		AVector<ACell> altered = SQLTable.createState(ALTERED, CHANGED);
 
-		assertEquals(ALTERED, SQLTable.merge(stale.getState(), altered).get(SQLTable.POS_SCHEMA));
-		assertEquals(ALTERED, SQLTable.merge(altered, stale.getState()).get(SQLTable.POS_SCHEMA));
+		assertEquals(ALTERED, RowLWW.mergeTable(stale.getState(), altered).get(SQLTable.POS_SCHEMA));
+		assertEquals(ALTERED, RowLWW.mergeTable(altered, stale.getState()).get(SQLTable.POS_SCHEMA));
 	}
 
 	private static SQLTable table(AVector<ACell> state) {

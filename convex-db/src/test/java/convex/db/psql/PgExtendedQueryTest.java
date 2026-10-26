@@ -22,6 +22,7 @@ import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -42,7 +43,7 @@ public class PgExtendedQueryTest {
 	@BeforeEach
 	public void setUp() {
 		dbName = "pgext_" + DB_COUNTER.getAndIncrement();
-		cdb = ConvexDB.create();
+		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
 		cdb.register(dbName);
 

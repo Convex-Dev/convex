@@ -23,6 +23,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLSchema;
 import convex.etch.EtchStore;
@@ -67,7 +68,7 @@ public class ConvexDBPersistenceTest {
 		if (store == null) {
 			store = EtchStore.create(etchFile);
 		}
-		server = ConvexDB.createNodeServer(store);
+		server = ConvexDB.createNodeServer(store, RowLWW::merge);
 		server.launch();
 		ConvexDB cdb = ConvexDB.connect(server.getHost());
 		cdb.register(DB_NAME);
@@ -139,14 +140,14 @@ public class ConvexDBPersistenceTest {
 	@Test public void testLocalHostSaveAndReopen() throws Exception {
 		File file;
 		// Closing the host saves, before its store closes.
-		try (var localStore=EtchStore.createTemp("db-local-host"); var host=ConvexDB.openHost(localStore)) {
+		try (var localStore=EtchStore.createTemp("db-local-host"); var host=ConvexDB.openHost(localStore, RowLWW::merge)) {
 			file=localStore.getFile();
 			var db=ConvexDB.connect(host);
 			createTable(db.database(DB_NAME));
 			insertViaLattice(db.database(DB_NAME).tables(),0,10);
 		}
 		try (var reopenedStore=EtchStore.create(file)) {
-			var host=ConvexDB.openHost(reopenedStore);
+			var host=ConvexDB.openHost(reopenedStore, RowLWW::merge);
 			var db=ConvexDB.connect(host);
 			db.register(DB_NAME);
 			try { verifyJdbcCount(10); verifyJdbcRow(9); }

@@ -2,9 +2,11 @@ package convex.db.lattice;
 
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.BinaryOperator;
 import java.util.function.Supplier;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -16,6 +18,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.db.ConvexDB;
@@ -37,21 +40,35 @@ import convex.lattice.cursor.Cursors;
  *       (e.g. from a {@link ConvexDB}), signing and replication handled by the chain</li>
  * </ul>
  *
- * <p>The database's tables are its {@code :tables} section, merged by the rule of
- * the {@link SQLSchema} that {@link #tables()} supplies. Other sections belong to
- * other components: incoming ones are ignored and those already held are kept.
- * Connecting to a database and reading it create nothing; the first changed write
- * creates it. Writes are stamped with the clock this database passes to its tables.
+ * <p>The database is the unit of merging. Whatever constructs it supplies its merge
+ * policy, a pure function of two database states, and there is no default: a
+ * {@link ConvexDB} passes its own policy to each of its databases, and a standalone
+ * database takes one at creation. The policy merges incoming values, deliveries below
+ * the database, the publication of forks (and so JDBC transactions) and replicas.
+ * {@link RowLWW#merge} is the per-row last-write-wins policy that Convex DB provides.
+ *
+ * <p>Deliveries below the database are lifted to a database state holding only what
+ * was delivered, then merged with the policy, so that a delivery and a whole-value
+ * merge agree. The table store ({@code [:tables]}), a table entry
+ * ({@code [:tables, name]}), a table's rows ({@code [:tables, name, 1]}) and one row
+ * ({@code [:tables, name, 1, key]}) can be delivered; rows are lifted into a table
+ * entry without a utime. Deliveries to other sections are ignored, and other paths
+ * refused.
+ *
+ * <p>The table store and tables ({@link #tables()}) are live views for table
+ * operations, with no merge of their own. Connecting to a database and reading it
+ * create nothing; the first changed write creates it. Writes are stamped with the
+ * clock this database passes to its tables.
  *
  * <p>Usage:
  * <pre>
  * // Via ConvexDB (preferred)
- * ConvexDB cdb = ConvexDB.create();
+ * ConvexDB cdb = ConvexDB.create(RowLWW::merge);
  * SQLDatabase db = cdb.database("mydb");
  * db.tables().createTable("users", new String[]{"id", "name", "email"});
  *
  * // Standalone (for replication)
- * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
+ * SQLDatabase db = SQLDatabase.create("mydb", keyPair, RowLWW::merge);
  * db.tables().insert("users", 1, "Alice", "alice@example.com");
  * db.mergeReplicas(remoteOwnerMap);
  * </pre>
@@ -62,6 +79,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
 	private final BiPredicate<ACell, AccountKey> ownerVerifier;
+	private final BinaryOperator<Index<Keyword, ACell>> policy;
 	private final Supplier<CVMLong> clock;
 
 	/**
@@ -72,15 +90,18 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @param keyPair Key pair for signing this node's replica, or null when connected
 	 * @param ownerKey Owner identity of this node's replica, or null when connected
 	 * @param ownerVerifier Rule authorising signers for owners, or null for the default rule
+	 * @param policy Merge policy: a pure function of the own and incoming database states
 	 * @param clock Clock that stamps writes to this database's tables
 	 */
 	protected SQLDatabase(AForkableCursor<Index<Keyword, ACell>> cursor, AString dbName, AKeyPair keyPair,
-			ACell ownerKey, BiPredicate<ACell, AccountKey> ownerVerifier, Supplier<CVMLong> clock) {
+			ACell ownerKey, BiPredicate<ACell, AccountKey> ownerVerifier,
+			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) {
 		super(cursor);
 		this.dbName = dbName;
 		this.keyPair = keyPair;
 		this.ownerKey = ownerKey;
 		this.ownerVerifier = ownerVerifier;
+		this.policy = Objects.requireNonNull(policy, "Merge policy must not be null");
 		this.clock = Objects.requireNonNull(clock, "Clock must not be null");
 	}
 
@@ -91,10 +112,11 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
+	 * @param policy Merge policy, for example {@code RowLWW::merge}
 	 * @return New SQLDatabase instance
 	 */
-	public static SQLDatabase create(String name, AKeyPair keyPair) {
-		return create(name, keyPair, keyPair.getAccountKey());
+	public static SQLDatabase create(String name, AKeyPair keyPair, BinaryOperator<Index<Keyword, ACell>> policy) {
+		return create(name, keyPair, keyPair.getAccountKey(), policy);
 	}
 
 	/**
@@ -107,25 +129,29 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
 	 * @param ownerKey Owner identity (AccountKey or {@code did:key})
+	 * @param policy Merge policy, for example {@code RowLWW::merge}
 	 * @return New SQLDatabase instance
 	 */
-	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
-		return create(name, keyPair, ownerKey, Utils::getCurrentTimestampCell);
+	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey,
+			BinaryOperator<Index<Keyword, ACell>> policy) {
+		return create(name, keyPair, ownerKey, policy, Utils::getCurrentTimestampCell);
 	}
 
 	/**
 	 * Creates a new empty standalone SQL database with the given name, signing key
-	 * pair, owner key and clock, and no owner verifier.
+	 * pair, owner key, merge policy and clock, and no owner verifier.
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
 	 * @param ownerKey Owner identity (AccountKey or {@code did:key})
+	 * @param policy Merge policy, for example {@code RowLWW::merge}
 	 * @param clock Clock that stamps writes to this database's tables
 	 * @return New SQLDatabase instance
 	 */
-	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey, Supplier<CVMLong> clock) {
+	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey,
+			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) {
 		AForkableCursor<Index<Keyword, ACell>> cursor = Cursors.root(Index.none());
-		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey, null, clock);
+		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey, null, policy, clock);
 	}
 
 	/**
@@ -140,29 +166,32 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @param keyPair Key pair for signing this node's replica
 	 * @param ownerKey Owner identity (AccountKey, Address, or AString DID)
 	 * @param ownerVerifier Rule taking (owner, signer key), true if that key may sign for the owner
+	 * @param policy Merge policy, for example {@code RowLWW::merge}
 	 * @return New SQLDatabase instance
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey,
-			BiPredicate<ACell, AccountKey> ownerVerifier) {
-		return create(name, keyPair, ownerKey, ownerVerifier, Utils::getCurrentTimestampCell);
+			BiPredicate<ACell, AccountKey> ownerVerifier, BinaryOperator<Index<Keyword, ACell>> policy) {
+		return create(name, keyPair, ownerKey, ownerVerifier, policy, Utils::getCurrentTimestampCell);
 	}
 
 	/**
 	 * Creates a new empty standalone SQL database with an owner verifier and a clock,
-	 * as {@link #create(String, AKeyPair, ACell, BiPredicate)}.
+	 * as {@link #create(String, AKeyPair, ACell, BiPredicate, BinaryOperator)}.
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
 	 * @param ownerKey Owner identity (AccountKey, Address, or AString DID)
 	 * @param ownerVerifier Rule taking (owner, signer key), true if that key may sign for the owner
+	 * @param policy Merge policy, for example {@code RowLWW::merge}
 	 * @param clock Clock that stamps writes to this database's tables
 	 * @return New SQLDatabase instance
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey,
-			BiPredicate<ACell, AccountKey> ownerVerifier, Supplier<CVMLong> clock) {
+			BiPredicate<ACell, AccountKey> ownerVerifier, BinaryOperator<Index<Keyword, ACell>> policy,
+			Supplier<CVMLong> clock) {
 		AForkableCursor<Index<Keyword, ACell>> cursor = Cursors.root(Index.none());
 		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey,
-			Objects.requireNonNull(ownerVerifier), clock);
+			Objects.requireNonNull(ownerVerifier), policy, clock);
 	}
 
 	/**
@@ -172,19 +201,22 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 *
 	 * @param parent Parent lattice cursor at the database-map level
 	 * @param name Database name to connect to
+	 * @param policy Merge policy, for example {@code RowLWW::merge}
 	 * @return New SQLDatabase connected to the cursor chain
 	 */
 	@SuppressWarnings("unchecked")
-	public static SQLDatabase connect(AForkableCursor<?> parent, String name) {
+	public static SQLDatabase connect(AForkableCursor<?> parent, String name,
+			BinaryOperator<Index<Keyword, ACell>> policy) {
 		AString dbName = Strings.create(name);
 		var databases = (AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>>) parent;
 		return new SQLDatabase(databases.withDefault(Maps.empty()).path(dbName), dbName, null, null, null,
-			Utils::getCurrentTimestampCell);
+			policy, Utils::getCurrentTimestampCell);
 	}
 
 	/**
 	 * Connects to a database nested beneath a ConvexDB component, at
-	 * {@link ConvexDB#path(AString)} and with its clock. Connecting creates nothing.
+	 * {@link ConvexDB#path(AString)} and with its merge policy and clock. Connecting
+	 * creates nothing.
 	 *
 	 * @param parent Containing ConvexDB component
 	 * @param name Database name to connect to
@@ -192,7 +224,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	public static SQLDatabase connect(ConvexDB parent, AString name) {
 		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
-		return new SQLDatabase(parent.path(name), name, null, null, null, parent.getClock());
+		return new SQLDatabase(parent.path(name), name, null, null, null, parent.getPolicy(), parent.getClock());
 	}
 
 	/**
@@ -218,10 +250,15 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		return rebind(storage.fork());
 	}
 
-	/** Subclasses override this to return their own type, so forks keep their tables and clock. */
+	/** Subclasses override this to return their own type, so forks keep their policy and clock. */
 	@Override
 	protected SQLDatabase rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
-		return new SQLDatabase(cursor,dbName,keyPair,ownerKey,ownerVerifier,clock);
+		return new SQLDatabase(cursor,dbName,keyPair,ownerKey,ownerVerifier,policy,clock);
+	}
+
+	/** Returns this database's merge policy. */
+	public BinaryOperator<Index<Keyword, ACell>> getPolicy() {
+		return policy;
 	}
 
 	/** Returns the clock that stamps writes to this database's tables. */
@@ -240,9 +277,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Returns the table store. Construction reads and writes nothing. Merge, delivery
-	 * and table operations all use this component, so an override supplying another
-	 * {@link SQLSchema} changes how the tables merge.
+	 * Returns the table store, a live view for table operations. Construction reads and
+	 * writes nothing.
 	 *
 	 * @return SQLSchema instance for this database, bound to {@link #tablesPath()}, with its clock
 	 */
@@ -327,7 +363,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	/**
 	 * Merges replicas from a remote owner map into this node's local store.
 	 * Each replica must pass {@link #acceptsReplica}; its state for this database
-	 * is then merged with this database's own rule.
+	 * is then merged with this database's policy.
 	 *
 	 * <p>Only available in standalone mode (created via {@link #create}).
 	 *
@@ -374,25 +410,15 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * This database's merge rule: its {@code :tables} section merges with the rule of
-	 * {@link #tables()}, other incoming sections are ignored and those of {@code own} kept.
-	 * It is a pure function that reads and writes no state, and an absent database stays
-	 * absent when nothing is accepted.
+	 * Merges two states of this database with its policy, a pure function that reads
+	 * and writes no state.
 	 *
-	 * @param own Established database state, kept on ties; null if absent
+	 * @param own Established database state; null if absent
 	 * @param other Database state to merge in; null if absent
 	 * @return Merged database state
 	 */
-	@SuppressWarnings("unchecked")
 	public Index<Keyword, ACell> mergeValues(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
-		ACell incoming = other;
-		if (!(incoming instanceof Index<?, ?> index) || !(index.get(ConvexDB.KEY_TABLES) instanceof Index<?, ?> tables)) return own;
-		ACell current = (own == null) ? null : own.get(ConvexDB.KEY_TABLES);
-		if (current != null && !(current instanceof Index)) return own;
-		Index<AString, AVector<ACell>> merged = tables().mergeValues(
-			(Index<AString, AVector<ACell>>) current, (Index<AString, AVector<ACell>>) tables);
-		if (Utils.equals(merged, current)) return own;
-		return ((own == null) ? Index.<Keyword, ACell>none() : own).assoc(ConvexDB.KEY_TABLES, merged);
+		return policy.apply(own, other);
 	}
 
 	@Override
@@ -401,9 +427,10 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Reconciles this component's draft with this database's rule. Only the tables
-	 * belong to this component, so the destination's other sections are kept as they
-	 * are, including the removal of one still present in the draft's stale snapshot.
+	 * Reconciles this database's draft with the destination using its policy, and
+	 * publishes the tables. Table operations change only the tables, so the
+	 * destination's other sections are kept as they are, including the removal of one
+	 * still present in the draft's stale snapshot.
 	 */
 	@Override
 	protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
@@ -413,17 +440,45 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		return (tables == null) ? other : other.assoc(ConvexDB.KEY_TABLES, tables);
 	}
 
-	/** The {@code :tables} section resolves to {@link #tables()}, matched as the index matches keys. */
-	@SuppressWarnings("unchecked")
-	@Override
-	protected <T extends ACell> ALatticeComponent<T> child(ACell key) {
-		if (!(key instanceof ABlobLike<?> blob) || !ConvexDB.KEY_TABLES.toBlob().equals(blob.toBlob())) return null;
-		return (ALatticeComponent<T>) (ALatticeComponent<?>) tables();
-	}
-
-	/** Deliveries to other sections are ignored: they belong to other components. */
+	/**
+	 * Lifts a delivery below this database to a database state holding only what was
+	 * delivered, and merges it with the policy. The {@code :tables} key is matched as
+	 * the index matches keys.
+	 */
 	@Override
 	protected Index<Keyword, ACell> mergeAtPath(ACell value, ACell... path) {
-		return cursor().get();
+		if (!(path[0] instanceof ABlobLike<?> key) || !ConvexDB.KEY_TABLES.toBlob().equals(key.toBlob())) {
+			return cursor().get(); // other sections are not delivered
+		}
+		ACell tables = value;
+		if (path.length > 1) {
+			if (!(path[1] instanceof AString name) || !isEntryPath(path)) return super.mergeAtPath(value, path);
+			ACell entry = (path.length == 2) ? value : rowsEntry(value, path);
+			if (entry == null) return cursor().get();
+			tables = Index.of(name, entry);
+		}
+		Index<Keyword, ACell> incoming = Index.of(ConvexDB.KEY_TABLES, tables);
+		return cursor().updateAndGet(own -> mergeValues(own, incoming));
+	}
+
+	/** Whether a path below {@code :tables} names an entry, its rows ({@code 1}) or one row. */
+	private static boolean isEntryPath(ACell[] path) {
+		if (path.length == 2) return true;
+		if (path.length > 4 || !(path[2] instanceof CVMLong pos) || pos.longValue() != SQLTable.POS_ROWS) return false;
+		return path.length == 3 || path[3] instanceof ABlobLike;
+	}
+
+	/** Delivered rows as an entry without a utime, or null when the value is not rows. */
+	@SuppressWarnings("unchecked")
+	private static AVector<ACell> rowsEntry(ACell value, ACell[] path) {
+		Index<ABlob, AVector<ACell>> rows;
+		if (path.length == 3) {
+			if (!(value instanceof Index)) return null;
+			rows = (Index<ABlob, AVector<ACell>>) value;
+		} else {
+			if (!(value instanceof AVector)) return null;
+			rows = Index.of(((ABlobLike<?>) path[3]).toBlob(), (AVector<ACell>) value);
+		}
+		return Vectors.of(null, rows, null, CVMLong.create(SQLTable.computeLiveCount(rows)));
 	}
 }

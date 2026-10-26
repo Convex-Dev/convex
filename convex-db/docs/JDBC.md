@@ -97,7 +97,8 @@ DriverManager.getConnection("jdbc:convex:file:/data/market.etch")
     │     ├── Found → return new Connection on existing cursor/store
     │     └── Not found:
     │           ├── EtchStore.create(file)          — opens or creates Etch file
-    │           ├── ConvexDB.createNodeServer(store) — ConvexDB.openHost restores the
+    │           ├── ConvexDB.createNodeServer(store, RowLWW::merge)
+    │           │                                   — ConvexDB.openHost restores the
     │           │                                     retained root and registers a
     │           │                                     ConvexDB; the node persists it
     │           ├── server.launch()
@@ -113,13 +114,16 @@ A `ConvexDB` instance wraps a single lattice cursor at the database-map level.
 It can host multiple named databases within that cursor:
 
 ```java
-ConvexDB cdb = ConvexDB.create();
+ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 SQLDatabase db1 = cdb.database("market");    // cursor path: /market/:tables/...
 SQLDatabase db2 = cdb.database("analytics"); // cursor path: /analytics/:tables/...
 ```
 
 Each `database()` call navigates the cursor tree — it does not create a copy, and
-creates no state until the first write.
+creates no state until the first write. Every database merges with the policy the
+`ConvexDB` was given; the driver's `mem:` and `file:` instances use the per-row
+last-write-wins policy, `RowLWW::merge`, which also reconciles concurrent
+transactions.
 
 In the URL, a `ConvexDB` maps to the store/instance, and the database name
 selects which path within the cursor tree:
@@ -175,7 +179,7 @@ For advanced use cases (replication, custom NodeServer config):
 
 ```java
 EtchStore store = EtchStore.create(new File("/data/market.etch"));
-var server = new NodeServer<>(ConvexDB.openHost(store), config);
+var server = new NodeServer<>(ConvexDB.openHost(store, RowLWW::merge), config);
 server.launch();
 
 ConvexDB cdb = ConvexDB.connect(server.getHost());

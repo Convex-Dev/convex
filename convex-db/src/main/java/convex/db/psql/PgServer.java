@@ -24,7 +24,7 @@ import java.util.function.Supplier;
  * <p>Usage:
  * <pre>
  * // Create and register a Convex database
- * ConvexDB cdb = ConvexDB.create();
+ * ConvexDB cdb = ConvexDB.create(RowLWW::merge);
  * cdb.database("mydb");
  * cdb.register("mydb");
  *

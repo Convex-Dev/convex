@@ -9,12 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Let applications change how Convex DB tables and databases merge by extending its components. ([Architecture](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-at-each-level), [#779](https://github.com/Convex-Dev/convex/issues/779))
+- Let applications choose how each Convex DB database merges, with per-row last-write-wins provided as one policy. ([Merge Policy](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-policy), [#779](https://github.com/Convex-Dev/convex/issues/779), [#784](https://github.com/Convex-Dev/convex/issues/784))
 - Let applications supply the clock that stamps Convex DB writes. ([Clock](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#clock), [#781](https://github.com/Convex-Dev/convex/issues/781))
 
 ### Changed
 
 - Assemble Convex DB hosts with `ConvexDB.openHost`, which replaces the static Convex DB lattices; connecting to a database no longer creates it. ([#779](https://github.com/Convex-Dev/convex/issues/779))
+- Creating a Convex DB `ConvexDB` or `SQLDatabase` takes its merge policy, such as `RowLWW::merge`; transactions fork a whole database. ([#784](https://github.com/Convex-Dev/convex/issues/784))
 
 ### Fixed
 

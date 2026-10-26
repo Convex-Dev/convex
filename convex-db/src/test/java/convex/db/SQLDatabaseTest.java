@@ -30,6 +30,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.db.ConvexDB;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.cursor.AForkableCursor;
@@ -43,7 +44,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testCreateDatabase() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 
 		assertNotNull(db);
 		assertEquals("testdb", db.getName().toString());
@@ -54,7 +55,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testCreateTable() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		SQLSchema tables = db.tables();
 
 		// Create table
@@ -74,7 +75,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testDropTable() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		SQLSchema tables = db.tables();
 
 		tables.createTable("temp", new String[]{"data"});
@@ -92,7 +93,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testInsertAndSelect() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		SQLSchema tables = db.tables();
 
 		tables.createTable("users", new String[]{"id", "name", "email"});
@@ -117,7 +118,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testDelete() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		SQLSchema tables = db.tables();
 
 		tables.createTable("items", new String[]{"id", "name"});
@@ -137,7 +138,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testSelectAll() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		SQLSchema tables = db.tables();
 
 		tables.createTable("products", new String[]{"id", "name"});
@@ -152,7 +153,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testTableNames() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		SQLSchema tables = db.tables();
 
 		tables.createTable("alpha", new String[]{"a"});
@@ -166,19 +167,19 @@ public class SQLDatabaseTest {
 	@Test
 	public void testForkAndSync() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		SQLSchema tables = db.tables();
 
 		tables.createTable("data", new String[]{"id", "value"});
 		tables.insert("data", 1, "original");
 
 		// Fork
-		SQLSchema forked = tables.fork();
-		forked.insert("data", 2, "forked");
+		SQLDatabase forked = db.fork();
+		forked.tables().insert("data", 2, "forked");
 
 		// Original unchanged
 		assertEquals(1, tables.getRowCount("data"));
-		assertEquals(2, forked.getRowCount("data"));
+		assertEquals(2, forked.tables().getRowCount("data"));
 
 		// Sync back
 		forked.sync();
@@ -190,8 +191,8 @@ public class SQLDatabaseTest {
 		AKeyPair kp1 = AKeyPair.generate();
 		AKeyPair kp2 = AKeyPair.generate();
 
-		SQLDatabase db1 = SQLDatabase.create("shared", kp1);
-		SQLDatabase db2 = SQLDatabase.create("shared", kp2);
+		SQLDatabase db1 = SQLDatabase.create("shared", kp1, RowLWW::merge);
+		SQLDatabase db2 = SQLDatabase.create("shared", kp2, RowLWW::merge);
 
 		// Both create same table, both insert
 		db1.tables().createTable("counter", new String[]{"id", "count"});
@@ -218,8 +219,8 @@ public class SQLDatabaseTest {
 		AKeyPair kp2 = AKeyPair.generate();
 		AKeyPair kpEvil = AKeyPair.generate();
 
-		SQLDatabase db1 = SQLDatabase.create("shared", kp1);
-		SQLDatabase db2 = SQLDatabase.create("shared", kp2);
+		SQLDatabase db1 = SQLDatabase.create("shared", kp1, RowLWW::merge);
+		SQLDatabase db2 = SQLDatabase.create("shared", kp2, RowLWW::merge);
 
 		db1.tables().createTable("secure", new String[]{"id"});
 		db2.tables().createTable("secure", new String[]{"id"});
@@ -247,7 +248,7 @@ public class SQLDatabaseTest {
 		AForkableCursor<?> root = Cursors.root(Maps.empty());
 
 		// Connect a named database
-		SQLDatabase db = SQLDatabase.connect(root, "mydb");
+		SQLDatabase db = SQLDatabase.connect(root, "mydb", RowLWW::merge);
 		assertNotNull(db);
 		assertEquals("mydb", db.getName().toString());
 
@@ -261,7 +262,7 @@ public class SQLDatabaseTest {
 		assertTrue(rootMap.containsKey(Strings.create("mydb")));
 
 		// Connect a second database to the same root
-		SQLDatabase db2 = SQLDatabase.connect(root, "mydb");
+		SQLDatabase db2 = SQLDatabase.connect(root, "mydb", RowLWW::merge);
 		assertEquals(1, db2.tables().getRowCount("users"));
 		assertNotNull(db2.tables().selectByKey("users", CVMLong.create(1)));
 	}
@@ -272,9 +273,9 @@ public class SQLDatabaseTest {
 		AKeyPair kp2 = AKeyPair.generate();
 		AKeyPair kp3 = AKeyPair.generate();
 
-		SQLDatabase db1 = SQLDatabase.create("test", kp1);
-		SQLDatabase db2 = SQLDatabase.create("test", kp2);
-		SQLDatabase db3 = SQLDatabase.create("test", kp3);
+		SQLDatabase db1 = SQLDatabase.create("test", kp1, RowLWW::merge);
+		SQLDatabase db2 = SQLDatabase.create("test", kp2, RowLWW::merge);
+		SQLDatabase db3 = SQLDatabase.create("test", kp3, RowLWW::merge);
 
 		db1.tables().createTable("t", new String[]{"id"});
 		db2.tables().createTable("t", new String[]{"id"});
@@ -313,13 +314,13 @@ public class SQLDatabaseTest {
 		AKeyPair owner = AKeyPair.createSeeded(7801);
 		AKeyPair attacker = AKeyPair.createSeeded(7802);
 		AKeyPair localKey = AKeyPair.createSeeded(7803);
-		SQLDatabase source = withRow(SQLDatabase.create("db", attacker), 1);
+		SQLDatabase source = withRow(SQLDatabase.create("db", attacker, RowLWW::merge), 1);
 		for (ACell claimed : new ACell[] {owner.getAccountKey(), DID.forKey(owner.getAccountKey())}) {
-			SQLDatabase local = SQLDatabase.create("db", localKey);
+			SQLDatabase local = SQLDatabase.create("db", localKey, RowLWW::merge);
 			var before = local.cursor().get();
 			assertEquals(0, local.mergeReplicas(claim(source, claimed)));
 			assertSame(before, local.cursor().get());
-			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed)::exportReplica);
+			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed, RowLWW::merge)::exportReplica);
 		}
 	}
 
@@ -329,15 +330,15 @@ public class SQLDatabaseTest {
 		AKeyPair delegate = AKeyPair.createSeeded(7815);
 		AKeyPair localKey = AKeyPair.createSeeded(7816);
 		BiPredicate<ACell, AccountKey> delegation = (o, k) -> owner.getAccountKey().equals(o) && delegate.getAccountKey().equals(k);
-		SQLDatabase local = SQLDatabase.create("db", localKey, localKey.getAccountKey(), delegation);
+		SQLDatabase local = SQLDatabase.create("db", localKey, localKey.getAccountKey(), delegation, RowLWW::merge);
 
 		// A verifier may authorise a delegate for an account key owner
-		SQLDatabase source = withRow(SQLDatabase.create("db", delegate, owner.getAccountKey(), delegation), 1);
+		SQLDatabase source = withRow(SQLDatabase.create("db", delegate, owner.getAccountKey(), delegation, RowLWW::merge), 1);
 		assertEquals(1, local.mergeReplicas(source.exportReplica()));
 		assertTrue(hasRow(local, 1));
 
 		// It replaces the default rule, so it may also refuse a key signing its own replica
-		SQLDatabase selfSigned = withRow(SQLDatabase.create("db", owner), 2);
+		SQLDatabase selfSigned = withRow(SQLDatabase.create("db", owner, RowLWW::merge), 2);
 		assertEquals(0, local.mergeReplicas(selfSigned.exportReplica()));
 		assertFalse(hasRow(local, 2));
 		assertThrows(IllegalStateException.class, local::exportReplica);
@@ -346,8 +347,8 @@ public class SQLDatabaseTest {
 	@Test
 	public void testDefaultRuleAcceptsSelfCertifyingDID() {
 		AKeyPair key = AKeyPair.createSeeded(7804);
-		SQLDatabase source = withRow(SQLDatabase.create("db", key, DID.forKey(key.getAccountKey())), 1);
-		SQLDatabase local = SQLDatabase.create("db", AKeyPair.createSeeded(7805));
+		SQLDatabase source = withRow(SQLDatabase.create("db", key, DID.forKey(key.getAccountKey()), RowLWW::merge), 1);
+		SQLDatabase local = SQLDatabase.create("db", AKeyPair.createSeeded(7805), RowLWW::merge);
 		assertEquals(1, local.mergeReplicas(source.exportReplica()));
 		assertTrue(hasRow(local, 1));
 	}
@@ -356,14 +357,14 @@ public class SQLDatabaseTest {
 	public void testDefaultRuleRefusesIndirectOwners() {
 		AKeyPair attacker = AKeyPair.createSeeded(7806);
 		AKeyPair localKey = AKeyPair.createSeeded(7807);
-		SQLDatabase source = withRow(SQLDatabase.create("db", attacker), 1);
+		SQLDatabase source = withRow(SQLDatabase.create("db", attacker, RowLWW::merge), 1);
 		for (ACell claimed : new ACell[] {Address.create(1337), Strings.create("did:web:victim.example"),
 				Strings.create("did:convex:1337")}) {
-			SQLDatabase local = SQLDatabase.create("db", localKey);
+			SQLDatabase local = SQLDatabase.create("db", localKey, RowLWW::merge);
 			var before = local.cursor().get();
 			assertEquals(0, local.mergeReplicas(claim(source, claimed)), "unverified owners must fail closed");
 			assertSame(before, local.cursor().get());
-			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed)::exportReplica);
+			assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, claimed, RowLWW::merge)::exportReplica);
 		}
 	}
 
@@ -374,24 +375,24 @@ public class SQLDatabaseTest {
 		AKeyPair attacker = AKeyPair.createSeeded(7810);
 		Address owner = Address.create(1337);
 		BiPredicate<ACell, AccountKey> verifier = (o, k) -> owner.equals(o) && authorised.getAccountKey().equals(k);
-		SQLDatabase local = SQLDatabase.create("db", localKey, localKey.getAccountKey(), verifier);
+		SQLDatabase local = SQLDatabase.create("db", localKey, localKey.getAccountKey(), verifier, RowLWW::merge);
 
-		SQLDatabase source = withRow(SQLDatabase.create("db", authorised, owner, verifier), 1);
+		SQLDatabase source = withRow(SQLDatabase.create("db", authorised, owner, verifier, RowLWW::merge), 1);
 		var export = source.exportReplica();
 		assertEquals(1, local.fork().mergeReplicas(export), "forks keep the verifier");
 		assertEquals(1, local.mergeReplicas(export));
 		assertTrue(hasRow(local, 1));
 
-		SQLDatabase forger = withRow(SQLDatabase.create("db", attacker), 2);
+		SQLDatabase forger = withRow(SQLDatabase.create("db", attacker, RowLWW::merge), 2);
 		assertEquals(0, local.mergeReplicas(claim(forger, owner)));
 		assertFalse(hasRow(local, 2));
-		assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, owner, verifier)::exportReplica);
+		assertThrows(IllegalStateException.class, SQLDatabase.create("db", attacker, owner, verifier, RowLWW::merge)::exportReplica);
 	}
 
 	/** A database whose override resolves one Address owner to one authorised key. */
 	private static SQLDatabase resolving(AKeyPair keyPair, ACell ownerKey, Address address, AccountKey authorised) {
 		return new SQLDatabase(Cursors.root(Index.none()), Strings.create("db"), keyPair, ownerKey, null,
-				Utils::getCurrentTimestampCell) {
+				RowLWW::merge, Utils::getCurrentTimestampCell) {
 			@Override protected boolean acceptsReplica(ACell owner, SignedData<?> replica) {
 				if (!address.equals(owner)) return super.acceptsReplica(owner, replica);
 				return authorised.equals(replica.getAccountKey()) && replica.checkSignature();
@@ -411,7 +412,7 @@ public class SQLDatabaseTest {
 		assertEquals(1, local.mergeReplicas(source.exportReplica()));
 		assertTrue(hasRow(local, 1));
 
-		SQLDatabase forger = withRow(SQLDatabase.create("db", attacker), 2);
+		SQLDatabase forger = withRow(SQLDatabase.create("db", attacker, RowLWW::merge), 2);
 		assertEquals(0, local.mergeReplicas(claim(forger, owner)));
 		assertFalse(hasRow(local, 2));
 		assertThrows(IllegalStateException.class, resolving(attacker, owner, owner, authorised.getAccountKey())::exportReplica);
@@ -423,17 +424,17 @@ public class SQLDatabaseTest {
 		AForkableCursor<?> root = Cursors.root(Maps.empty());
 
 		// Connect and populate
-		SQLDatabase db = SQLDatabase.connect(root, "mydb");
+		SQLDatabase db = SQLDatabase.connect(root, "mydb", RowLWW::merge);
 		db.tables().createTable("data", new String[]{"id", "value"});
 		db.tables().insert("data", 1, "original");
 
-		// Fork the tables
-		SQLSchema forked = db.tables().fork();
-		forked.insert("data", 2, "forked");
+		// Fork the database
+		SQLDatabase forked = db.fork();
+		forked.tables().insert("data", 2, "forked");
 
 		// Original unchanged
 		assertEquals(1, db.tables().getRowCount("data"));
-		assertEquals(2, forked.getRowCount("data"));
+		assertEquals(2, forked.tables().getRowCount("data"));
 
 		// Sync back
 		forked.sync();
@@ -445,7 +446,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testDatabaseForkNotVisibleUntilCommitted() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		db.tables().createTable("users", new String[]{"id", "name"});
 		db.tables().insert("users", 1, "Alice");
 
@@ -464,7 +465,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testDatabaseForkVisibleAfterCommit() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		db.tables().createTable("users", new String[]{"id", "name"});
 		db.tables().insert("users", 1, "Alice");
 
@@ -481,7 +482,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testDatabaseForkRollbackDiscardsChanges() {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		db.tables().createTable("users", new String[]{"id", "name"});
 		db.tables().insert("users", 1, "Alice");
 
@@ -499,7 +500,7 @@ public class SQLDatabaseTest {
 	public void testDatabaseForkAcrossSchemas() {
 		// Transaction should be ACID across all sections of the database
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		SQLDatabase db = SQLDatabase.create("testdb", kp, RowLWW::merge);
 		db.tables().createTable("orders", new String[]{"id", "item"});
 		db.tables().createTable("items", new String[]{"id", "name"});
 
@@ -521,7 +522,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testMultipleDatabaseRegistry() throws Exception {
 		// Create and register two databases via ConvexDB
-		ConvexDB cdb = ConvexDB.create();
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 		SQLDatabase db1 = cdb.database("db_alpha");
 		SQLDatabase db2 = cdb.database("db_beta");
 		db1.tables().createTable("t1", new String[]{"id", "val"});
@@ -566,7 +567,7 @@ public class SQLDatabaseTest {
 	public void testConnectedModeRejectsStandaloneOps() {
 		// Connected databases should not have signing capability
 		AForkableCursor<?> root = Cursors.root(Maps.empty());
-		SQLDatabase db = SQLDatabase.connect(root, "mydb");
+		SQLDatabase db = SQLDatabase.connect(root, "mydb", RowLWW::merge);
 
 		assertNull(db.getKeyPair());
 		assertNull(db.getOwnerKey());
@@ -575,7 +576,7 @@ public class SQLDatabaseTest {
 
 		// mergeReplicas with non-empty map should also throw
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase standalone = SQLDatabase.create("mydb", kp);
+		SQLDatabase standalone = SQLDatabase.create("mydb", kp, RowLWW::merge);
 		standalone.tables().createTable("t", new String[]{"id"});
 		var export = standalone.exportReplica();
 		assertThrows(IllegalStateException.class, () -> db.mergeReplicas(export));

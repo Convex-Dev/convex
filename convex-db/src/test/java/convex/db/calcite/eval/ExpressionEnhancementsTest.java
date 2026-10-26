@@ -15,6 +15,7 @@ import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -29,7 +30,7 @@ class ExpressionEnhancementsTest {
 
 	@BeforeEach
 	void setUp() throws Exception {
-		cdb = ConvexDB.create();
+		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database("expr_test");
 		cdb.register("expr_test");
 

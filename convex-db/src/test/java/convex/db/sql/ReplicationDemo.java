@@ -12,6 +12,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.db.ConvexDB;
 import convex.etch.EtchStore;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
@@ -53,9 +54,9 @@ public class ReplicationDemo {
 		NodeConfig configLondon=NodeConfig.port(0);
 		NodeConfig configTokyo=NodeConfig.port(0);
 		NodeServer<?> serverLondon = new NodeServer<>(
-				ConvexDB.openHost(storeLondon),configLondon);
+				ConvexDB.openHost(storeLondon, RowLWW::merge),configLondon);
 		NodeServer<?> serverTokyo  = new NodeServer<>(
-				ConvexDB.openHost(storeTokyo),configTokyo);
+				ConvexDB.openHost(storeTokyo, RowLWW::merge),configTokyo);
 		LatticePropagator propagatorLondon=new LatticePropagator(storeLondon,LatticePropagatorConfig.create());
 		LatticePropagator propagatorTokyo=new LatticePropagator(storeTokyo,LatticePropagatorConfig.create());
 		serverLondon.addPropagator(propagatorLondon);
@@ -100,8 +101,8 @@ public class ReplicationDemo {
 			// Each ConvexDB wraps the NodeServer's live cursor, so SQL
 			// operations flow through the lattice and into the propagator.
 
-			ConvexDB cdbLondon = ConvexDB.connect(serverLondon.getCursor());
-			ConvexDB cdbTokyo  = ConvexDB.connect(serverTokyo.getCursor());
+			ConvexDB cdbLondon = ConvexDB.connect(serverLondon.getCursor(), RowLWW::merge);
+			ConvexDB cdbTokyo  = ConvexDB.connect(serverTokyo.getCursor(), RowLWW::merge);
 
 			SQLDatabase dbLondon = cdbLondon.database("inventory");
 			SQLDatabase dbTokyo  = cdbTokyo.database("inventory");

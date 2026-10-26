@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BinaryOperator;
 import java.util.function.Supplier;
 
 import convex.core.data.ACell;
@@ -37,7 +38,7 @@ import convex.node.NodeServer;
  * for creating, connecting, and registering databases for JDBC and PostgreSQL
  * wire protocol access.
  *
- * <p>Component structure, each level merging with its own rule:
+ * <p>Component structure:
  * <pre>
  * ConvexDB      db name → database state
  *   └─ SQLDatabase   :tables → table store
@@ -45,14 +46,13 @@ import convex.node.NodeServer;
  *             └─ SQLTable      [schema, rows, utime, live-count, version?]
  * </pre>
  *
- * <p>Merges are executed by these components: each level's {@code mergeValues} is a
- * pure rule that calls the rule of the child component for every key, down to the
- * table, which merges its rows. Incoming merges, delivery to a path, publication of
- * forks and replica merges all use the same rules. An application changes them by
- * extending a component and supplying it from the factory above it:
- * {@link #database(AString)}, {@link SQLDatabase#tables()} and
- * {@code SQLSchema.table(AString)}. Subclasses also override {@code rebind} so that
- * forks keep their type.
+ * <p>How databases merge is the application's policy, supplied when a ConvexDB is
+ * constructed, with no default. A database is the unit of merging: the ConvexDB
+ * passes its policy to each database through {@link #database(AString)}, and merges
+ * the database map by name, each database with that policy. Incoming merges, delivery
+ * to a path, publication of forks and replica merges all use it.
+ * {@link convex.db.lattice.RowLWW#merge} is the per-row last-write-wins policy that
+ * Convex DB provides; an application that serialises its updates supplies its own.
  *
  * <p>A ConvexDB takes the cursor for the database map and assumes nothing about where
  * that lies: an application can root it anywhere in its own state, and registers it
@@ -67,13 +67,13 @@ import convex.node.NodeServer;
  * <p>Usage:
  * <pre>
  * // Standalone (in-memory)
- * ConvexDB cdb = ConvexDB.create();
+ * ConvexDB cdb = ConvexDB.create(RowLWW::merge);
  * SQLDatabase db = cdb.database("mydb");
  * db.tables().createTable("users", new String[]{"id", "name"});
  *
  * // With persistence
  * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
- *     ConvexDB.createNodeServer(store);
+ *     ConvexDB.createNodeServer(store, RowLWW::merge);
  * server.launch();
  * ConvexDB cdb = ConvexDB.connect(server.getHost());
  * cdb.register("mydb");
@@ -123,6 +123,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	// ========== Instance ==========
 
+	private final BinaryOperator<Index<Keyword, ACell>> policy;
 	private final Supplier<CVMLong> clock;
 
 	/**
@@ -130,9 +131,11 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * runtime clock.
 	 *
 	 * @param cursor Cursor of the database map, which may be absent
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
 	 */
-	public ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-		this(cursor, Utils::getCurrentTimestampCell);
+	public ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor,
+			BinaryOperator<Index<Keyword, ACell>> policy) {
+		this(cursor, policy, Utils::getCurrentTimestampCell);
 	}
 
 	/**
@@ -141,10 +144,13 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * application for it to receive incoming values.
 	 *
 	 * @param cursor Cursor of the database map, which may be absent
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
 	 * @param clock Clock that stamps writes to every database and table below
 	 */
-	public ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor, Supplier<CVMLong> clock) {
+	public ConvexDB(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor,
+			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) {
 		super(cursor);
+		this.policy = Objects.requireNonNull(policy, "Merge policy must not be null");
 		this.clock = Objects.requireNonNull(clock, "Clock must not be null");
 	}
 
@@ -152,20 +158,22 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * Creates a new standalone ConvexDB (in-memory, no persistence), stamping writes
 	 * with the runtime clock.
 	 *
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
 	 * @return New ConvexDB instance
 	 */
-	public static ConvexDB create() {
-		return create(Utils::getCurrentTimestampCell);
+	public static ConvexDB create(BinaryOperator<Index<Keyword, ACell>> policy) {
+		return create(policy, Utils::getCurrentTimestampCell);
 	}
 
 	/**
 	 * Creates a new standalone ConvexDB (in-memory, no persistence).
 	 *
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
 	 * @param clock Clock that stamps writes
 	 * @return New ConvexDB instance
 	 */
-	public static ConvexDB create(Supplier<CVMLong> clock) {
-		return new ConvexDB(Cursors.root(Maps.empty()), clock);
+	public static ConvexDB create(BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) {
+		return new ConvexDB(Cursors.root(Maps.empty()), policy, clock);
 	}
 
 	/**
@@ -173,27 +181,43 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * without registering for incoming values, stamping writes with the runtime clock.
 	 *
 	 * @param parent Parent lattice cursor at the database-map level
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
 	 * @return ConvexDB connected to the cursor chain
 	 */
-	public static ConvexDB connect(AForkableCursor<?> parent) {
-		return new ConvexDB(parent.path());
+	public static ConvexDB connect(AForkableCursor<?> parent, BinaryOperator<Index<Keyword, ACell>> policy) {
+		return new ConvexDB(parent.path(), policy);
 	}
 
 	/**
-	 * Connects to a containing component at the database-map level. For a host
-	 * assembled by {@link #openHost} or {@link #createNodeServer}, this returns the
-	 * ConvexDB registered with it, with its clock; otherwise it returns a live view of
-	 * the component's cursor, which receives no incoming values and stamps writes with
-	 * the runtime clock.
+	 * Returns the ConvexDB registered with a host assembled by {@link #openHost} or
+	 * {@link #createNodeServer}, with its policy and clock. For any other containing
+	 * component, use {@link #connect(ALatticeComponent, BinaryOperator)} and supply the
+	 * policy.
 	 *
-	 * @param parent Containing database-map component, such as a host
-	 * @return ConvexDB over the containing component's cursor
+	 * @param parent Host assembled by {@link #openHost}
+	 * @return The registered ConvexDB
+	 * @throws IllegalArgumentException if no ConvexDB is registered with the component
 	 */
-	public static ConvexDB connect(
-			ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent) {
+	public static ConvexDB connect(ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
 		ConvexDB registered = (parent instanceof LatticeHost<?> host) ? hosted.get(host) : null;
-		return (registered != null) ? registered : new ConvexDB(parent.cursor());
+		if (registered == null) throw new IllegalArgumentException("No ConvexDB is registered with this component; supply a merge policy");
+		return registered;
+	}
+
+	/**
+	 * Connects to a containing component at the database-map level, as a live view of
+	 * the component's cursor that receives no incoming values and stamps writes with the
+	 * runtime clock.
+	 *
+	 * @param parent Containing database-map component
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
+	 * @return ConvexDB over the containing component's cursor
+	 */
+	public static ConvexDB connect(ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent,
+			BinaryOperator<Index<Keyword, ACell>> policy) {
+		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
+		return new ConvexDB(parent.cursor(), policy);
 	}
 
 	/**
@@ -207,68 +231,80 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * <pre>
 	 * EtchStore store = EtchStore.createTemp();
 	 * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
-	 *     ConvexDB.createNodeServer(store);
+	 *     ConvexDB.createNodeServer(store, RowLWW::merge);
 	 * server.launch();
 	 * ConvexDB cdb = ConvexDB.connect(server.getHost());
 	 * </pre>
 	 *
 	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
 	 * @return NodeServer over a host assembled by {@link #openHost}
 	 * @throws IOException if the store's retained root cannot be read
 	 */
-	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) throws IOException {
-		return createNodeServer(store, Utils::getCurrentTimestampCell);
+	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store,
+			BinaryOperator<Index<Keyword, ACell>> policy) throws IOException {
+		return createNodeServer(store, policy, Utils::getCurrentTimestampCell);
 	}
 
 	/**
 	 * Creates optional networking around a store-backed ConvexDB host whose writes are
-	 * stamped with the given clock, as {@link #createNodeServer(AStore)}.
+	 * stamped with the given clock, as {@link #createNodeServer(AStore, BinaryOperator)}.
 	 *
 	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
 	 * @param clock Clock that stamps writes
-	 * @return NodeServer over a host assembled by {@link #openHost(AStore, Supplier)}
+	 * @return NodeServer over a host assembled by {@link #openHost(AStore, BinaryOperator, Supplier)}
 	 * @throws IOException if the store's retained root cannot be read
 	 */
 	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store,
-			Supplier<CVMLong> clock) throws IOException {
-		return new NodeServer<>(openHost(store, clock));
+			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) throws IOException {
+		return new NodeServer<>(openHost(store, policy, clock));
 	}
 
 	/**
-	 * Opens a host whose root is a database map, as {@link #openHost(AStore, Supplier)},
-	 * stamping writes with the runtime clock.
+	 * Opens a host whose root is a database map, as
+	 * {@link #openHost(AStore, BinaryOperator, Supplier)}, stamping writes with the
+	 * runtime clock.
 	 *
 	 * @param store Store for persistence, or null for an in-memory host
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
 	 * @return Host with a registered ConvexDB
 	 * @throws IOException if the store's retained root cannot be read
 	 */
-	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store) throws IOException {
-		return openHost(store, Utils::getCurrentTimestampCell);
+	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store,
+			BinaryOperator<Index<Keyword, ACell>> policy) throws IOException {
+		return openHost(store, policy, Utils::getCurrentTimestampCell);
 	}
 
 	/**
 	 * Opens a host whose root is a database map, restoring the root the store retains,
 	 * and registers a live ConvexDB with it as its application, so incoming values are
-	 * merged by the Convex DB components. {@link #connect(ALatticeComponent)} returns
-	 * that instance. This is a convenience: an application that roots its databases
-	 * elsewhere, or extends the components, assembles its own host.
+	 * merged with the given policy. {@link #connect(ALatticeComponent)} returns that
+	 * instance. This is a convenience: an application that roots its databases
+	 * elsewhere assembles its own host.
 	 *
 	 * @param store Store for persistence, or null for an in-memory host
+	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
 	 * @param clock Clock that stamps writes
 	 * @return Host with a registered ConvexDB
 	 * @throws IOException if the store's retained root cannot be read
 	 */
 	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store,
-			Supplier<CVMLong> clock) throws IOException {
+			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) throws IOException {
 		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host = LatticeHost.open(Maps.empty(), store);
-		hosted.put(host, host.addApplication(new ConvexDB(host.cursor(), clock)));
+		hosted.put(host, host.addApplication(new ConvexDB(host.cursor(), policy, clock)));
 		return host;
 	}
 
-	/** Subclasses override this to return their own type, so forks keep their databases and clock. */
+	/** Subclasses override this to return their own type, so forks keep their databases, policy and clock. */
 	@Override
 	protected ConvexDB rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-		return new ConvexDB(cursor, clock);
+		return new ConvexDB(cursor, policy, clock);
+	}
+
+	/** Returns the merge policy passed to each database. */
+	public BinaryOperator<Index<Keyword, ACell>> getPolicy() {
+		return policy;
 	}
 
 	/** Returns the clock that stamps writes to every database and table below. */
@@ -293,10 +329,11 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	}
 
 	/**
-	 * Returns the component for a named database, which may be absent. Connecting
-	 * and reading create nothing; the first changed write creates the database.
-	 * Merge, delivery and database operations all use this component, so an override
-	 * supplying another {@link SQLDatabase} changes how that database merges.
+	 * Returns the component for a named database, which may be absent, with this
+	 * ConvexDB's policy and clock. Connecting and reading create nothing; the first
+	 * changed write creates the database. Merge, delivery and database operations all
+	 * use this component, so an override supplying a database with another policy
+	 * changes how that database merges.
 	 *
 	 * @param name Database name
 	 * @return SQLDatabase bound to {@link #path(AString)}
@@ -316,10 +353,11 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	}
 
 	/**
-	 * This database map's merge rule: a union of database names, with each database's
-	 * state merged by the rule of its {@link #database(AString)} component. It is a pure
-	 * function that reads and writes no state. Entries that are not database states are
-	 * ignored, and an absent map stays absent when nothing is accepted.
+	 * This database map's merge: a union of database names, with each database's state
+	 * merged by the policy of its {@link #database(AString)} component. Databases merge
+	 * independently, since nothing spans them. It is a pure function that reads and
+	 * writes no state. Entries that are not database states are ignored, and an absent
+	 * map stays absent when nothing is accepted.
 	 *
 	 * @param own Established database map, kept on ties; null if absent
 	 * @param other Database map to merge in; null if absent

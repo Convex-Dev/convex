@@ -27,6 +27,7 @@ import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexType;
 import convex.db.calcite.ConvexTypeSystem;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.psql.PgServer;
 import convex.db.psql.PgType;
@@ -57,7 +58,7 @@ public class IntegerColumnsTest {
 	@BeforeEach
 	public void setUp() throws Exception {
 		dbName = "integers_" + DB_COUNTER.getAndIncrement();
-		cdb = ConvexDB.create();
+		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
 		cdb.register(dbName);
 

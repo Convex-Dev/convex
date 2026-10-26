@@ -18,7 +18,8 @@ import convex.lattice.cursor.Root;
 /**
  * The table entry's format version (CAD039). Entries without a version field are
  * version 0 and keep exactly their four fields; a version field is carried through
- * merges and row updates; tables of an unsupported version are refused, not misread.
+ * {@link RowLWW} merges and row updates; tables of an unsupported version are refused,
+ * not misread.
  */
 public class SQLTableVersionTest {
 
@@ -39,7 +40,7 @@ public class SQLTableVersionTest {
 		assertEquals(4, stateA.count(), "a new table is a version 0 entry");
 		assertEquals(0, SQLTable.getVersion(stateA));
 
-		AVector<ACell> merged = SQLTable.merge(stateA, b.getTable("t").getState());
+		AVector<ACell> merged = RowLWW.mergeTable(stateA, b.getTable("t").getState());
 		assertEquals(4, merged.count(), "merging version 0 entries adds no version field");
 		assertEquals(2, ((Index<?, ?>) merged.get(SQLTable.POS_ROWS)).count());
 	}
@@ -50,10 +51,10 @@ public class SQLTableVersionTest {
 		AVector<ACell> version1 = withVersion(SQLTable.createState(SCHEMA, CVMLong.create(2)), 1);
 		AVector<ACell> later0 = SQLTable.createState(SCHEMA, CVMLong.create(3));
 
-		assertEquals(1, SQLTable.getVersion(SQLTable.merge(earlier0, version1)));
-		assertEquals(1, SQLTable.getVersion(SQLTable.merge(version1, earlier0)));
+		assertEquals(1, SQLTable.getVersion(RowLWW.mergeTable(earlier0, version1)));
+		assertEquals(1, SQLTable.getVersion(RowLWW.mergeTable(version1, earlier0)));
 
-		AVector<ACell> merged = SQLTable.merge(version1, later0);
+		AVector<ACell> merged = RowLWW.mergeTable(version1, later0);
 		assertEquals(0, SQLTable.getVersion(merged));
 		assertEquals(4, merged.count(), "a version 0 winner keeps four fields");
 	}
@@ -64,8 +65,8 @@ public class SQLTableVersionTest {
 		AVector<ACell> versioned = withVersion(SQLTable.createState(SCHEMA, CVMLong.create(5)), 1);
 		AVector<ACell> dropped = versioned.slice(0, SQLTable.POS_VERSION);
 
-		AVector<ACell> ab = SQLTable.merge(dropped, versioned);
-		AVector<ACell> ba = SQLTable.merge(versioned, dropped);
+		AVector<ACell> ab = RowLWW.mergeTable(dropped, versioned);
+		AVector<ACell> ba = RowLWW.mergeTable(versioned, dropped);
 		assertEquals(1, SQLTable.getVersion(ab));
 		assertEquals(ab, ba, "the tie is resolved the same way in either order");
 	}
@@ -95,7 +96,7 @@ public class SQLTableVersionTest {
 		assertEquals(state, tables.getTable("t").getState(), "a refused table is left unchanged");
 
 		// Merge never refuses: it carries the version for implementations that support it
-		AVector<ACell> merged = SQLTable.merge(state, SQLTable.createState(SCHEMA, CVMLong.create(0)));
+		AVector<ACell> merged = RowLWW.mergeTable(state, SQLTable.createState(SCHEMA, CVMLong.create(0)));
 		assertEquals(1, SQLTable.getVersion(merged));
 	}
 

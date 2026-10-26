@@ -26,6 +26,7 @@ import convex.db.calcite.ConvexSchemaFactory;
 import convex.db.calcite.ConvexLogicalTableModifyRule;
 import convex.db.calcite.ConvexTableModifyRule;
 import convex.db.calcite.rules.ConvexRules;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.etch.EtchStore;
 import convex.node.NodeServer;
@@ -55,6 +56,11 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  * <p>A file-backed database is saved durably on each commit, when a connection
  * closes, by {@link #closeAll()} and at JVM shutdown. Auto-committed statements
  * on a connection that stays open are saved when it closes.
+ *
+ * <p>The in-memory and file-backed instances this driver creates merge with the
+ * per-row last-write-wins policy, {@link RowLWW#merge}, which also reconciles
+ * concurrent transactions. An application that needs another policy constructs its
+ * own {@link ConvexDB} and connects with {@link ConvexDB#getConnection(String)}.
  *
  * <p>Usage:
  * <pre>
@@ -299,7 +305,7 @@ public class ConvexDriver extends Driver {
 	private ConvexDB resolveMemInstance(String name) {
 		String key = "mem:" + name;
 		return instances.computeIfAbsent(key, k -> {
-			ConvexDB cdb = ConvexDB.create();
+			ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 			return new ManagedInstance(cdb, null, null);
 		}).cdb;
 	}
@@ -318,7 +324,7 @@ public class ConvexDriver extends Driver {
 			try {
 				File file = new File(path);
 				EtchStore store = EtchStore.create(file);
-				var server = ConvexDB.createNodeServer(store);
+				var server = ConvexDB.createNodeServer(store, RowLWW::merge);
 				server.launch();
 				ConvexDB cdb = ConvexDB.connect(server.getHost());
 				ManagedInstance created = new ManagedInstance(cdb, server, store);

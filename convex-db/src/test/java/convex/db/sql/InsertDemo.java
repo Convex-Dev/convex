@@ -13,6 +13,7 @@ import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.etch.EtchStore;
 import convex.node.NodeServer;
@@ -58,7 +59,7 @@ public class InsertDemo {
 	 */
 	static void benchmarkStandalone() throws Exception {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create(DB_NAME, kp);
+		SQLDatabase db = SQLDatabase.create(DB_NAME, kp, RowLWW::merge);
 		createTable(db);
 
 		long start = System.nanoTime();
@@ -76,9 +77,9 @@ public class InsertDemo {
 	 */
 	static void benchmarkDirectLattice() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = ConvexDB.createNodeServer(store);
+		NodeServer<?> server = ConvexDB.createNodeServer(store, RowLWW::merge);
 		server.launch();
-		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
+		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME, RowLWW::merge);
 		createTable(db);
 
 		long start = System.nanoTime();
@@ -99,9 +100,9 @@ public class InsertDemo {
 	 */
 	static void benchmarkJdbcIndividual() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = ConvexDB.createNodeServer(store);
+		NodeServer<?> server = ConvexDB.createNodeServer(store, RowLWW::merge);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getCursor());
+		ConvexDB cdb = ConvexDB.connect(server.getCursor(), RowLWW::merge);
 		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
 		cdb.register(DB_NAME);
@@ -132,9 +133,9 @@ public class InsertDemo {
 	 */
 	static void benchmarkJdbcPrepared() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = ConvexDB.createNodeServer(store);
+		NodeServer<?> server = ConvexDB.createNodeServer(store, RowLWW::merge);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getCursor());
+		ConvexDB cdb = ConvexDB.connect(server.getCursor(), RowLWW::merge);
 		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
 		cdb.register(DB_NAME);
@@ -165,9 +166,9 @@ public class InsertDemo {
 	 */
 	static void benchmarkJdbcPreparedBatch() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = ConvexDB.createNodeServer(store);
+		NodeServer<?> server = ConvexDB.createNodeServer(store, RowLWW::merge);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getCursor());
+		ConvexDB cdb = ConvexDB.connect(server.getCursor(), RowLWW::merge);
 		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
 		cdb.register(DB_NAME);

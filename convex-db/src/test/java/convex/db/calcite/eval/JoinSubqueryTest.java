@@ -15,6 +15,7 @@ import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -28,7 +29,7 @@ class JoinSubqueryTest {
 
 	@BeforeEach
 	void setUp() throws Exception {
-		cdb = ConvexDB.create();
+		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database("join_test");
 		cdb.register("join_test");
 

@@ -13,7 +13,6 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
-import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
@@ -25,7 +24,8 @@ import convex.lattice.cursor.Cursors;
  * A SQL-like table store built on Convex lattice technology.
  *
  * <p>Provides basic table operations (CREATE TABLE, DROP TABLE, INSERT, SELECT, DELETE)
- * with lattice merge replication for conflict-free distributed operation.
+ * over a live view of a database's table store. It defines no merge: the containing
+ * {@link SQLDatabase} merges with the policy its wrapper supplies.
  *
  * <p>Primary keys must be blob-like types (Blob, AString, AccountKey, etc.) as
  * required by the Index data structure for ordering.
@@ -50,13 +50,9 @@ import convex.lattice.cursor.Cursors;
  * schema.dropTable("users");
  * </pre>
  *
- * <p>{@link #table(AString)} supplies the component for each table name. Its rule
- * merges that table's entries within {@link #mergeValues}, and the same component
- * receives delivery to the table's path and serves table operations.
- *
  * <p>Writes are stamped with an explicit clock, read once per write and passed on to
- * the tables. Merges never read it. The application supplies the clock; how it orders
- * a writer's writes, for example strictly increasing stamps, is the application's policy.
+ * the tables. The application supplies the clock; how it orders a writer's writes, for
+ * example strictly increasing stamps, is the application's policy.
  */
 public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
@@ -104,22 +100,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return clock;
 	}
 
-	/**
-	 * Creates a forked copy of this store for independent operation.
-	 *
-	 * @return Forked SQLSchema instance
-	 */
-	public SQLSchema fork() {
-		return rebind(storage.fork());
-	}
-
-	/** Subclasses override this to return their own type, so forks keep their tables and clock. */
-	@Override
-	protected SQLSchema rebind(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
-		return new SQLSchema(cursor, clock);
-	}
-
-	// ========== Tables and Merge ==========
+	// ========== Tables ==========
 
 	/**
 	 * Returns the cursor of a named table's entry, for constructing table components.
@@ -134,66 +115,13 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	/**
 	 * Returns the component for a named table, which may be absent. Construction reads
-	 * and writes nothing. Merge, delivery and table operations all use this component,
-	 * so an override supplying another {@link SQLTable} changes how that table merges.
+	 * and writes nothing; table operations use this component.
 	 *
 	 * @param name Table name
 	 * @return Table component bound to {@link #path(AString)}, with this store's clock
 	 */
 	protected SQLTable table(AString name) {
 		return new SQLTable(path(name), clock);
-	}
-
-	/**
-	 * This table store's merge rule: a union of table names, with each table's entries
-	 * merged by the rule of its {@link #table(AString)} component. It is a pure function
-	 * that reads and writes no state. Entries that are not table entries are ignored, and
-	 * an absent store stays absent when nothing is accepted.
-	 *
-	 * @param own Established table store, kept on ties; null if absent
-	 * @param other Table store to merge in; null if absent
-	 * @return Merged table store
-	 */
-	@SuppressWarnings({"unchecked", "rawtypes"})
-	public Index<AString, AVector<ACell>> mergeValues(Index<AString, AVector<ACell>> own,
-			Index<AString, AVector<ACell>> other) {
-		ACell incoming = other;
-		if (!(incoming instanceof Index)) return own;
-		// Foreign entries stay untyped until they are checked as table entries
-		Index<AString, ACell> base = (own == null) ? Index.none() : (Index) own;
-		Index<AString, ACell> merged = base.mergeDifferences((Index<AString, ACell>) incoming, new MergeFunction<ACell>() {
-			@Override
-			public ACell merge(ACell a, ACell b) {
-				throw new IllegalStateException("Table merge requires the table name");
-			}
-
-			@Override
-			public ACell merge(Object key, ACell a, ACell b) {
-				if (!(key instanceof AString name) || !(b instanceof AVector)) return a;
-				if (a != null && !(a instanceof AVector)) return a;
-				return table(name).mergeValues((AVector<ACell>) a, (AVector<ACell>) b);
-			}
-		});
-		return (own == null && merged.isEmpty()) ? null : (Index) merged;
-	}
-
-	@Override
-	public Index<AString, AVector<ACell>> merge(Index<AString, AVector<ACell>> incoming) {
-		return cursor().updateAndGet(own -> mergeValues(own, incoming));
-	}
-
-	@Override
-	protected Index<AString, AVector<ACell>> mergePublication(
-			Index<AString, AVector<ACell>> own,
-			Index<AString, AVector<ACell>> other) {
-		return mergeValues(own, other);
-	}
-
-	/** Each table name resolves to its {@link #table(AString)} component. */
-	@SuppressWarnings("unchecked")
-	@Override
-	protected <T extends ACell> ALatticeComponent<T> child(ACell key) {
-		return (key instanceof AString name) ? (ALatticeComponent<T>) (ALatticeComponent<?>) table(name) : null;
 	}
 
 	// ========== Internal Helpers ==========

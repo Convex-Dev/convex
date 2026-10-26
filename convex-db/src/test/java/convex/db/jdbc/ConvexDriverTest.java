@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.node.NodeServer;
 
 /**
@@ -246,7 +247,7 @@ public class ConvexDriverTest {
 
 	@Test
 	public void testDirectGetConnection() throws Exception {
-		ConvexDB cdb = ConvexDB.create();
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 		cdb.database("direct_test").tables().createTable("t",
 				new String[]{"id", "name"},
 				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR});
@@ -266,7 +267,7 @@ public class ConvexDriverTest {
 
 	@Test
 	public void testLegacyFormatWithRegistry() throws Exception {
-		ConvexDB cdb = ConvexDB.create();
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 		cdb.database("legacy_test").tables().createTable("t",
 				new String[]{"id", "name"},
 				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR});

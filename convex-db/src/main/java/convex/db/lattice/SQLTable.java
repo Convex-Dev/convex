@@ -4,7 +4,6 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 import convex.core.data.ABlob;
-import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -30,18 +29,15 @@ import convex.lattice.cursor.AForkableCursor;
  * keep exactly their four fields; merges and row updates carry a version field when
  * there is one, and tables of a higher version are refused rather than misread.
  *
- * <p>Schema is immutable after creation (for now). Row data merges independently.
+ * <p>Schema is immutable after creation (for now).
  *
  * <p>Obtained from {@link SQLSchema#getTable(String)} as a cursor-backed component
- * in the hierarchy: ConvexDB → SQLDatabase → SQLSchema → SQLTable.
- *
- * <p>The table is the merge boundary: {@link #mergeValues} merges whole entries, rows
- * included, and there is no row component below it. An application changes how a
- * table merges by overriding that rule and supplying the subclass from
- * {@link SQLSchema#table(AString)}.
+ * in the hierarchy: ConvexDB → SQLDatabase → SQLSchema → SQLTable. It is a live view
+ * for table operations and defines no merge: the containing {@link SQLDatabase}
+ * merges with the policy its wrapper supplies.
  *
  * <p>Row writes are stamped with the clock the containing schema supplies, read once
- * per write. Merges never read the clock.
+ * per write.
  */
 public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 
@@ -70,12 +66,6 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	protected SQLTable(AForkableCursor<AVector<ACell>> cursor, Supplier<CVMLong> clock) {
 		super(cursor);
 		this.clock = Objects.requireNonNull(clock, "Clock must not be null");
-	}
-
-	/** Subclasses override this to return their own type, so forks keep their rule. */
-	@Override
-	protected SQLTable rebind(AForkableCursor<AVector<ACell>> cursor) {
-		return new SQLTable(cursor, clock);
 	}
 
 	/** Returns the clock that stamps this table's row writes. */
@@ -275,7 +265,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			if (state == null || state.get(POS_SCHEMA) == null) return state;
 			requireSupportedVersion(state);
 			Index<ABlob, AVector<ACell>> rows = (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
-			if (rows == null) rows = TableLattice.INSTANCE.zero();
+			if (rows == null) rows = Index.none();
 			// Check if this insert adds a new live row
 			AVector<ACell> existing = rows.get(pk);
 			boolean addsLive = (existing == null || !SQLRow.isLive(existing));
@@ -319,14 +309,14 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Builds a live table state, with a version field only when there is one to carry,
 	 * so that version 0 entries keep exactly their four fields.
 	 */
-	private static AVector<ACell> entry(ACell schema, ACell rows, ACell utime, long liveCount, ACell version) {
+	static AVector<ACell> entry(ACell schema, ACell rows, ACell utime, long liveCount, ACell version) {
 		CVMLong count = CVMLong.create(liveCount);
 		if (version == null) return Vectors.of(schema, rows, utime, count);
 		return Vectors.of(schema, rows, utime, count, version);
 	}
 
 	/** The version field of a state, or null when it has none. */
-	private static ACell versionField(AVector<ACell> state) {
+	static ACell versionField(AVector<ACell> state) {
 		return (state.count() > POS_VERSION) ? state.get(POS_VERSION) : null;
 	}
 
@@ -348,7 +338,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	}
 
 	/**
-	 * Computes live row count by scanning an Index. Used only during merge.
+	 * Computes live row count by scanning an Index.
 	 */
 	static long computeLiveCount(Index<ABlob, AVector<ACell>> rows) {
 		if (rows == null) return 0;
@@ -357,129 +347,5 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			if (SQLRow.isLive(v)) count[0]++;
 		});
 		return count[0];
-	}
-
-	// ========== Merge ==========
-
-	/**
-	 * This table's merge rule. It is a pure function of two entries that reads and
-	 * writes no state, so incoming merges, publication and the containing schema's
-	 * rule all use it. The standard rule is {@link #merge(AVector, AVector)}. Override
-	 * it, together with {@link #rebind}, to change how this table merges.
-	 *
-	 * <p>{@code other} may be a rows-only partial entry from row delivery, with no
-	 * schema and no timestamp. Such an entry is only merged into a live table.</p>
-	 *
-	 * @param own Established entry, kept on ties; null if absent
-	 * @param other Entry to merge in; null if absent
-	 * @return Merged entry
-	 */
-	public AVector<ACell> mergeValues(AVector<ACell> own, AVector<ACell> other) {
-		return merge(own, other);
-	}
-
-	@Override
-	public AVector<ACell> merge(AVector<ACell> incoming) {
-		return cursor().updateAndGet(own -> mergeValues(own, incoming));
-	}
-
-	@Override
-	protected AVector<ACell> mergePublication(AVector<ACell> own, AVector<ACell> other) {
-		return mergeValues(own, other);
-	}
-
-	/**
-	 * Delivers rows below this entry: {@code [1]} with a row index, or {@code [1, key]}
-	 * with one row entry, position 1 being the entry's rows. The rows are lifted into
-	 * a rows-only partial entry and merged with this table's rule, so a row delivery
-	 * cannot change the schema. A table that is absent or dropped receives nothing.
-	 * Other paths are refused.
-	 */
-	@Override
-	protected AVector<ACell> mergeAtPath(ACell value, ACell... path) {
-		if (!isRowsPath(path)) return super.mergeAtPath(value, path);
-		Index<ABlob, AVector<ACell>> rows = deliveredRows(value, path);
-		if (rows == null) return cursor().get();
-		AVector<ACell> partial = Vectors.of(null, rows, null, CVMLong.create(computeLiveCount(rows)));
-		return cursor().updateAndGet(own -> isLiveState(own) ? mergeValues(own, partial) : own);
-	}
-
-	private static boolean isRowsPath(ACell[] path) {
-		if (path.length > 2 || !(path[0] instanceof CVMLong pos) || pos.longValue() != POS_ROWS) return false;
-		return path.length == 1 || path[1] instanceof ABlobLike;
-	}
-
-	/** The delivered rows as a row index, or null when the value is not rows. */
-	@SuppressWarnings("unchecked")
-	private static Index<ABlob, AVector<ACell>> deliveredRows(ACell value, ACell[] path) {
-		if (path.length == 1) return (value instanceof Index) ? (Index<ABlob, AVector<ACell>>) value : null;
-		if (!(value instanceof AVector)) return null;
-		return Index.of(((ABlobLike<?>) path[1]).toBlob(), (AVector<ACell>) value);
-	}
-
-	/**
-	 * The standard table rule. The schema is last-writer-wins on utime, with the
-	 * own entry kept on a tie; a dropped table's tombstone wins in the same way.
-	 * While the winner is live, rows merge by key with {@link TableLattice}.
-	 */
-	@SuppressWarnings("unchecked")
-	public static AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b) {
-		if (a == null) return b;
-		if (b == null) return a;
-
-		CVMLong timeA = (CVMLong) a.get(POS_UTIME);
-		CVMLong timeB = (CVMLong) b.get(POS_UTIME);
-
-		// Determine schema winner (LWW)
-		AVector<ACell> schemaWinner;
-		if (timeA == null && timeB == null) {
-			schemaWinner = a;
-		} else if (timeA == null) {
-			schemaWinner = b;
-		} else if (timeB == null) {
-			schemaWinner = a;
-		} else if (timeB.longValue() > timeA.longValue()) {
-			schemaWinner = b;
-		} else {
-			schemaWinner = a;
-		}
-
-		// If schema winner is tombstone, return tombstone
-		if (schemaWinner.get(POS_SCHEMA) == null) {
-			return schemaWinner;
-		}
-
-		// Merge rows
-		Index<ABlob, AVector<ACell>> rowsA = (Index<ABlob, AVector<ACell>>) a.get(POS_ROWS);
-		Index<ABlob, AVector<ACell>> rowsB = (Index<ABlob, AVector<ACell>>) b.get(POS_ROWS);
-		Index<ABlob, AVector<ACell>> mergedRows = TableLattice.INSTANCE.merge(rowsA, rowsB);
-
-		// Compute live count for merged result
-		long liveCount;
-		if (mergedRows == rowsA) {
-			liveCount = getLiveCount(a);
-		} else if (mergedRows == rowsB) {
-			liveCount = getLiveCount(b);
-		} else {
-			// Rows actually merged — recompute
-			liveCount = computeLiveCount(mergedRows);
-		}
-
-		// The schema winner's version. On a tie of timestamp and schema the higher version
-		// is kept, restoring a version that an older implementation dropped when it
-		// rebuilt the entry from four fields (CAD039).
-		ACell version = versionField(schemaWinner);
-		if (Objects.equals(timeA, timeB) && Objects.equals(a.get(POS_SCHEMA), b.get(POS_SCHEMA))) {
-			long versionA = getVersion(a);
-			long versionB = getVersion(b);
-			if (versionA != versionB) {
-				version = (versionA > versionB) ? versionField(a) : versionField(b);
-			} else if (versionField(a) == null || versionField(b) == null) {
-				version = null; // equal versions: prefer the form without a field
-			}
-		}
-
-		// Return merged table with schema winner's schema
-		return entry(schemaWinner.get(POS_SCHEMA), mergedRows, schemaWinner.get(POS_UTIME), liveCount, version);
 	}
 }

@@ -13,8 +13,8 @@ Convex DB provides SQL query capabilities over lattice data structures, built on
 ## Quick Start
 
 ```java
-// 1. Create a ConvexDB and a named database
-ConvexDB cdb = ConvexDB.create();
+// 1. Create a ConvexDB, choosing how its databases merge, and a named database
+ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 SQLDatabase db = cdb.database("mydb");
 
 // 2. Register for JDBC/PostgreSQL access
@@ -36,7 +36,7 @@ For a durable local installation, open a host over an Etch store. Networking is
 optional and does not control saving:
 
 ```java
-try (var store = EtchStore.create(file); var host = ConvexDB.openHost(store)) {
+try (var store = EtchStore.create(file); var host = ConvexDB.openHost(store, RowLWW::merge)) {
     SQLDatabase db = ConvexDB.connect(host).database("mydb");
     // Perform database operations through this live view.
     host.checkpoint();
@@ -134,7 +134,7 @@ Connect to Convex DB using any PostgreSQL client.
 
 ```java
 // Create and register database
-ConvexDB cdb = ConvexDB.create();
+ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 cdb.database("mydb");
 cdb.register("mydb");
 
@@ -197,7 +197,7 @@ For direct programmatic access without SQL overhead.
 ### Creating Tables
 
 ```java
-SQLDatabase db = SQLDatabase.create("mydb", keyPair);
+SQLDatabase db = SQLDatabase.create("mydb", keyPair, RowLWW::merge);
 SQLSchema schema = db.tables();
 
 // Create table with column names
@@ -249,29 +249,33 @@ int count = schema.getColumnCount("users");
 
 ## Replication
 
-Tables support lattice-based replication with conflict-free merging.
+Databases replicate by lattice merge. How two copies of a database merge is a policy
+the application supplies when it creates a `ConvexDB` or `SQLDatabase`; there is no
+default. The policy merges incoming values, deliveries, transactions and replicas
+alike; see [Merge Policy](docs/LATTICE-DB-ARCHITECTURE.md#merge-policy).
 
-### Merge Semantics
+### Per-row last-write-wins
+
+`RowLWW::merge` is the policy Convex DB provides for tables that several writers
+update row by row:
 
 - **Tables**: Last-write-wins (LWW) for schema changes
 - **Rows**: LWW with row-level granularity
 - **Conflicts**: Latest timestamp wins; equal timestamps favour deletions
 
-Merges are executed by the components (`ConvexDB`, `SQLDatabase`, `SQLSchema`,
-`SQLTable`), each with its own rule. An application can change a rule, for one table or
-a whole database, by extending the component; see
-[Merge at Each Level](docs/LATTICE-DB-ARCHITECTURE.md#merge-at-each-level).
+An application that serialises its updates, schema changes included, supplies its
+own policy, or composes one from the `RowLWW` functions.
 
 ### Replicating Between Nodes
 
 ```java
 // Node 1: Create and populate
-SQLDatabase db1 = SQLDatabase.create("shared", keyPair1);
+SQLDatabase db1 = SQLDatabase.create("shared", keyPair1, RowLWW::merge);
 db1.tables().createTable("data", new String[]{"id", "value"});
 db1.tables().insert("data", 1, "hello");  // first column is the primary key
 
 // Node 2: Create same structure
-SQLDatabase db2 = SQLDatabase.create("shared", keyPair2);
+SQLDatabase db2 = SQLDatabase.create("shared", keyPair2, RowLWW::merge);
 db2.tables().createTable("data", new String[]{"id", "value"});
 
 // Merge Node 2's changes into Node 1
@@ -293,7 +297,7 @@ every owner, account keys included:
 ```java
 // (owner, signer key) -> whether that key may sign for the owner
 BiPredicate<ACell, AccountKey> verifier = (owner, key) -> authority.isAuthorised(owner, key);
-SQLDatabase db = SQLDatabase.create("shared", keyPair, Address.create(1337), verifier);
+SQLDatabase db = SQLDatabase.create("shared", keyPair, Address.create(1337), verifier, RowLWW::merge);
 ```
 
 The verifier must be thread-safe and use authority data already held locally. The same
@@ -356,7 +360,7 @@ Index<ABlob, AVector>
 
 ```
 convex.db             - ConvexDB root lattice component
-convex.db.lattice     - SQLDatabase, SQLSchema, SQLTable, SQLRow
+convex.db.lattice     - SQLDatabase, SQLSchema, SQLTable, SQLRow, RowLWW
 convex.db.calcite     - Apache Calcite integration
 convex.db.jdbc        - JDBC driver
 convex.db.psql        - PostgreSQL wire protocol server

@@ -15,7 +15,8 @@ import convex.core.data.prim.CVMLong;
  *   <li>deleted (CVMLong) - Deletion timestamp, or null if live</li>
  * </ul>
  *
- * <p>Merge semantics: Latest timestamp wins. If timestamps equal, deletion wins.
+ * <p>How row entries merge is the database's policy; {@link RowLWW#mergeRow} is the
+ * per-row last-write-wins rule.
  */
 public class SQLRow {
 
@@ -114,35 +115,5 @@ public class SQLRow {
 	 */
 	public static AVector<ACell> withValues(AVector<ACell> row, AVector<ACell> values, CVMLong timestamp) {
 		return Vectors.of(values, timestamp, null);
-	}
-
-	/**
-	 * Merges two row entries using LWW semantics.
-	 * Latest timestamp wins. If equal, deletion wins.
-	 *
-	 * @param a First row entry
-	 * @param b Second row entry
-	 * @return Merged row entry
-	 */
-	public static AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b) {
-		if (a == null) return b;
-		if (b == null) return a;
-
-		CVMLong timeA = getTimestamp(a);
-		CVMLong timeB = getTimestamp(b);
-
-		if (timeA == null && timeB == null) return a;
-		if (timeA == null) return b;
-		if (timeB == null) return a;
-
-		long ta = timeA.longValue();
-		long tb = timeB.longValue();
-
-		if (ta > tb) return a;
-		if (tb > ta) return b;
-
-		// Equal timestamps: deletion wins
-		if (isTombstone(b)) return b;
-		return a;
 	}
 }

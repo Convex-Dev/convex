@@ -122,7 +122,8 @@ conn.commit();    // atomic merge — all changes become visible
 For programmatic access without SQL overhead:
 
 ```java
-ConvexDB cdb = ConvexDB.create();
+// The merge policy is the application's choice; RowLWW merges rows by last write
+ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 SQLDatabase db = cdb.database("mydb");
 
 // Create table

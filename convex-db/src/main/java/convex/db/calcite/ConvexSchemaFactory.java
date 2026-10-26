@@ -18,7 +18,7 @@ import convex.db.lattice.SQLDatabase;
  *
  * <p>Usage:
  * <pre>
- * ConvexDB cdb = ConvexDB.create();
+ * ConvexDB cdb = ConvexDB.create(RowLWW::merge);
  * SQLDatabase db = cdb.database("mydb");
  * cdb.register("mydb");
  *

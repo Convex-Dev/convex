@@ -28,25 +28,23 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLRow;
-import convex.db.lattice.SQLSchema;
-import convex.db.lattice.SQLTable;
 import convex.lattice.LatticeHost;
-import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 
 /**
- * Merges are executed by the Convex DB components: every route by which state
- * arrives reaches the rule of the table it is for, so an application that overrides
- * one table's rule has it honoured by host delivery, path delivery, forks,
- * transactions and replica merges alike.
+ * Merges use the policy whatever wraps a database supplies: every route by which
+ * state arrives reaches that policy, so it is honoured by host delivery, path
+ * delivery, forks, transactions and replica merges alike.
  *
- * <p>The fixture overrides one table, {@code frozen}, with a rule that keeps the
- * entry it holds, as for reference data fixed on first receipt. The {@code plain}
- * table beside it keeps the standard rule, which merges rows by key. Row keys are
- * distinct, so no outcome depends on clock timestamps.</p>
+ * <p>The fixture's policy is composed from {@link RowLWW}: it keeps the entry it holds
+ * for one table, {@code frozen}, as for reference data fixed on first receipt, and
+ * merges the others row by row. The {@code plain} table beside it shows the per-row
+ * rule. Row keys are distinct, so no outcome depends on clock timestamps.</p>
  */
 public class ConvexDBMergeTest {
 
@@ -55,58 +53,22 @@ public class ConvexDBMergeTest {
 	private static final AString FROZEN = Strings.create("frozen");
 	private static final AString PLAIN = Strings.create("plain");
 
-	// ========== Fixture: one overridden table ==========
+	// ========== Fixture: a composed policy ==========
 
-	/** A table whose entry, once held, is kept by every merge. */
-	static class FrozenTable extends SQLTable {
-		FrozenTable(AForkableCursor<AVector<ACell>> cursor, Supplier<CVMLong> clock) { super(cursor, clock); }
-
-		@Override public AVector<ACell> mergeValues(AVector<ACell> own, AVector<ACell> other) {
-			return (own != null) ? own : super.mergeValues(own, other);
-		}
-
-		@Override protected FrozenTable rebind(AForkableCursor<AVector<ACell>> cursor) {
-			return new FrozenTable(cursor, getClock());
-		}
+	/** {@link RowLWW}, except that a held {@code frozen} entry is kept by every merge. */
+	@SuppressWarnings("unchecked")
+	static Index<Keyword, ACell> keepFrozen(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
+		Index<Keyword, ACell> merged = RowLWW.merge(own, other);
+		AVector<ACell> held = frozen(own);
+		if (held == null || Utils.equals(held, frozen(merged))) return merged;
+		Index<AString, AVector<ACell>> tables = (Index<AString, AVector<ACell>>) merged.get(ConvexDB.KEY_TABLES);
+		return merged.assoc(ConvexDB.KEY_TABLES, tables.assoc(FROZEN, held));
 	}
 
-	static class Schema extends SQLSchema {
-		Schema(AForkableCursor<Index<AString, AVector<ACell>>> cursor, Supplier<CVMLong> clock) { super(cursor, clock); }
-
-		@Override protected SQLTable table(AString name) {
-			return FROZEN.equals(name) ? new FrozenTable(path(name), getClock()) : super.table(name);
-		}
-
-		@Override protected Schema rebind(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
-			return new Schema(cursor, getClock());
-		}
-	}
-
-	static class Database extends SQLDatabase {
-		Database(AForkableCursor<Index<Keyword, ACell>> cursor, AString name, AKeyPair keyPair, ACell owner,
-				Supplier<CVMLong> clock) {
-			super(cursor, name, keyPair, owner, null, clock);
-		}
-
-		@Override public SQLSchema tables() { return new Schema(tablesPath(), getClock()); }
-
-		@Override protected Database rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
-			return new Database(cursor, getName(), getKeyPair(), getOwnerKey(), getClock());
-		}
-	}
-
-	static class Databases extends ConvexDB {
-		Databases(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor, Supplier<CVMLong> clock) {
-			super(cursor, clock);
-		}
-
-		@Override public SQLDatabase database(AString name) {
-			return new Database(path(name), name, null, null, getClock());
-		}
-
-		@Override protected Databases rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-			return new Databases(cursor, getClock());
-		}
+	@SuppressWarnings("unchecked")
+	private static AVector<ACell> frozen(Index<Keyword, ACell> db) {
+		if (db == null || !(db.get(ConvexDB.KEY_TABLES) instanceof Index<?, ?> tables)) return null;
+		return ((Index<AString, AVector<ACell>>) tables).get(FROZEN);
 	}
 
 	/** A strictly increasing clock, so no outcome depends on the runtime clock. */
@@ -119,9 +81,9 @@ public class ConvexDBMergeTest {
 		return LatticeHost.create(Maps.empty(), null);
 	}
 
-	/** Registers the overriding application with a host, as an application assembles its own. */
-	private static Databases install(LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host) {
-		return host.addApplication(new Databases(host.cursor(), counter()));
+	/** Registers a ConvexDB with the composed policy, as an application assembles its own host. */
+	private static ConvexDB install(LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host) {
+		return host.addApplication(new ConvexDB(host.cursor(), ConvexDBMergeTest::keepFrozen, counter()));
 	}
 
 	/** Creates both tables, each holding row 1. */
@@ -145,7 +107,7 @@ public class ConvexDBMergeTest {
 
 	/** The state of a remote node that started from the same root, then wrote row 2. */
 	private static AHashMap<AString, Index<Keyword, ACell>> remoteWithRow2(AHashMap<AString, Index<Keyword, ACell>> root) {
-		ConvexDB remote = ConvexDB.connect(Cursors.root(root));
+		ConvexDB remote = ConvexDB.connect(Cursors.root(root), RowLWW::merge);
 		insert(remote.database(DB), 2);
 		return remote.cursor().get();
 	}
@@ -155,10 +117,10 @@ public class ConvexDBMergeTest {
 		return Blob.fromHex(String.format("%016x", id));
 	}
 
-	// ========== Overridden table rule ==========
+	// ========== A supplied policy ==========
 
 	@Test
-	public void testHostDeliveryUsesTableRules() {
+	public void testHostDeliveryUsesThePolicy() {
 		var host = host();
 		SQLDatabase db = install(host).database(DB);
 		populate(db);
@@ -169,12 +131,12 @@ public class ConvexDBMergeTest {
 	}
 
 	@Test
-	public void testPathDeliveryUsesTableRules() {
+	public void testPathDeliveryUsesThePolicy() {
 		var host = host();
 		SQLDatabase db = install(host).database(DB);
 		populate(db);
 		var remote = remoteWithRow2(host.cursor().get());
-		var remoteTables = ConvexDB.connect(Cursors.root(remote)).database(DB).tables();
+		var remoteTables = ConvexDB.connect(Cursors.root(remote), RowLWW::merge).database(DB).tables();
 
 		// One row, below the table entry
 		AVector<ACell> row = SQLRow.create(Vectors.of(CVMLong.create(3), Strings.create("three")), CVMLong.create(5));
@@ -196,9 +158,9 @@ public class ConvexDBMergeTest {
 		assertSame(before, host.cursor().get());
 	}
 
-	/** A fork's publication reconciles with concurrent changes through the table rules. */
+	/** A fork's publication reconciles with concurrent changes through the policy. */
 	@Test
-	public void testForkSyncUsesTableRules() {
+	public void testForkSyncUsesThePolicy() {
 		SQLDatabase db = install(host()).database(DB);
 		populate(db);
 
@@ -209,20 +171,11 @@ public class ConvexDBMergeTest {
 		assertTrue(has(db, PLAIN, 2) && has(db, PLAIN, 3));
 		assertTrue(has(db, FROZEN, 2), "the fork's own entry is kept");
 		assertFalse(has(db, FROZEN, 3));
-
-		SQLSchema tables = db.tables().fork();
-		assertTrue(tables.insert(PLAIN, Vectors.of(CVMLong.create(4), Strings.create("four"))));
-		assertTrue(tables.insert(FROZEN, Vectors.of(CVMLong.create(4), Strings.create("four"))));
-		insert(db, 5);
-		tables.sync();
-		assertTrue(has(db, PLAIN, 4) && has(db, PLAIN, 5));
-		assertTrue(has(db, FROZEN, 4));
-		assertFalse(has(db, FROZEN, 5));
 	}
 
-	/** A host fork exchanges roots with its origin by delivery, each side applying its own rules. */
+	/** A host fork exchanges roots with its origin by delivery, each side applying its own policy. */
 	@Test
-	public void testHostForkSyncUsesTableRules() {
+	public void testHostForkSyncUsesThePolicy() {
 		var origin = host();
 		SQLDatabase db = install(origin).database(DB);
 		populate(db);
@@ -237,9 +190,9 @@ public class ConvexDBMergeTest {
 		assertFalse(has(forked, FROZEN, 3));
 	}
 
-	/** A JDBC transaction is a fork of the database the connection resolved, with its rules. */
+	/** A JDBC transaction is a fork of the database the connection resolved, with its policy. */
 	@Test
-	public void testTransactionUsesTableRules() throws Exception {
+	public void testTransactionUsesThePolicy() throws Exception {
 		ConvexDB cdb = install(host());
 		SQLDatabase db = cdb.database(DB);
 		populate(db);
@@ -257,12 +210,12 @@ public class ConvexDBMergeTest {
 	}
 
 	@Test
-	public void testReplicaMergeUsesTableRules() {
+	public void testReplicaMergeUsesThePolicy() {
 		AKeyPair local = AKeyPair.generate();
 		AKeyPair other = AKeyPair.generate();
-		SQLDatabase db = new Database(Cursors.root(Index.none()), DB_NAME, local, local.getAccountKey(), counter());
+		SQLDatabase db = SQLDatabase.create(DB, local, local.getAccountKey(), ConvexDBMergeTest::keepFrozen, counter());
 		populate(db);
-		SQLDatabase remote = SQLDatabase.create(DB, other);
+		SQLDatabase remote = SQLDatabase.create(DB, other, RowLWW::merge);
 		remote.cursor().set(db.cursor().get());
 		insert(remote, 2);
 
@@ -271,27 +224,28 @@ public class ConvexDBMergeTest {
 		assertFalse(has(db, FROZEN, 2));
 	}
 
-	// ========== Standard components ==========
+	// ========== Per-row last-write-wins ==========
 
 	@Test
 	public void testOpenHostRegistersConvexDB() throws Exception {
-		var host = ConvexDB.openHost(null);
+		var host = ConvexDB.openHost(null, RowLWW::merge);
 		ConvexDB cdb = ConvexDB.connect(host);
 		assertSame(cdb, ConvexDB.connect(host));
 		populate(cdb.database(DB));
 
 		host.merge(remoteWithRow2(host.cursor().get()));
-		assertTrue(has(cdb.database(DB), FROZEN, 2), "the standard table rule merges rows by key");
+		assertTrue(has(cdb.database(DB), FROZEN, 2), "RowLWW merges rows by key");
 		assertTrue(has(cdb.database(DB), PLAIN, 2));
 
-		// A host assembled elsewhere has no registered ConvexDB: connect gives a live view
+		// A host assembled elsewhere has no registered ConvexDB: a view needs its policy
 		var plain = host();
-		assertNotSame(ConvexDB.connect(plain), ConvexDB.connect(plain));
+		assertThrows(IllegalArgumentException.class, () -> ConvexDB.connect(plain));
+		assertNotSame(ConvexDB.connect(plain, RowLWW::merge), ConvexDB.connect(plain, RowLWW::merge));
 	}
 
 	@Test
 	public void testRowDeliveryIntoLiveDroppedAndAbsentTables() throws Exception {
-		var host = ConvexDB.openHost(null);
+		var host = ConvexDB.openHost(null, RowLWW::merge);
 		SQLDatabase db = ConvexDB.connect(host).database(DB);
 		populate(db);
 		AVector<ACell> row = SQLRow.create(Vectors.of(CVMLong.create(2), Strings.create("two")), CVMLong.create(5));
@@ -326,7 +280,7 @@ public class ConvexDBMergeTest {
 
 	@Test
 	public void testMissingDatabaseIsNotCreated() throws Exception {
-		var host = ConvexDB.openHost(null);
+		var host = ConvexDB.openHost(null, RowLWW::merge);
 		ConvexDB cdb = ConvexDB.connect(host);
 		var empty = host.cursor().get();
 
@@ -337,13 +291,12 @@ public class ConvexDBMergeTest {
 		assertTrue(db.tables().selectAll("t").isEmpty());
 		assertFalse(db.tables().insert("t", 1, "one"), "no table to write to");
 		db.fork().sync();
-		db.tables().fork().sync();
 		try (Connection conn = cdb.getConnection("missing")) {
 			conn.getMetaData().getTables(null, null, null, null).close();
 		}
-		assertEquals(0, SQLDatabase.connect(host.cursor(), "missing").tables().getTableNames().length);
+		assertEquals(0, SQLDatabase.connect(host.cursor(), "missing", RowLWW::merge).tables().getTableNames().length);
 
-		// Deliveries that carry nothing a component accepts create nothing either
+		// Deliveries that carry nothing the policy accepts create nothing either
 		host.merge(Maps.of(Strings.create("missing"), Index.of(Keyword.intern("other"), CVMLong.ONE)));
 		host.merge(Maps.of(Strings.create("missing"), Index.of(ConvexDB.KEY_TABLES, Index.none())));
 		host.mergeAt(CVMLong.ONE, Strings.create("missing"), Keyword.intern("other"));
