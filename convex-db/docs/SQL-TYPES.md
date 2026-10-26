@@ -91,16 +91,19 @@ For version 1 tables. Identifiers, stored values and constraints are as in CAD03
 A `NUMERIC` value is stored as an integer scaled by 10^*s*; the codec scales by the column's
 declared scale in both directions, so a `BigDecimal` never leaves the codec rounded.
 
-Version 0 tables keep their stored values and are presented as the type those values
-actually have:
+Version 0 tables keep their stored values. Their integer columns are presented as the type
+those values actually have. Other columns are presented as declared: Calcite converts the
+values that SQL writes to the presented type, and that conversion is what keeps those writes
+within the declared length, scale and precision until version 1 enforces them.
 
 | Version 0 identifier | Presented as |
 |----------------------|--------------|
 | `BIGINT` | `NUMERIC` with scale 0 (`DECIMAL(max,0)`) |
 | `INTEGER` | `BIGINT` |
-| `DECIMAL`, `DOUBLE` | `DOUBLE PRECISION` |
-| `CHAR`, `VARCHAR` | `VARCHAR` |
-| `TIMESTAMP` | `TIMESTAMP(3)`, stored in milliseconds |
+| `DOUBLE` | `DOUBLE PRECISION` |
+| `DECIMAL(p,s)` | `DECIMAL(p,s)`, holding doubles |
+| `CHAR(n)`, `VARCHAR(n)` | as declared |
+| `TIMESTAMP(p)` | as declared, stored in milliseconds; DDL records `TIMESTAMP` without precision as precision 0 |
 | others | as for version 1 |
 
 A version 0 table becomes version 1 only when its schema changes, when the writer rewrites
@@ -169,13 +172,9 @@ numerically when negative or longer than 8 bytes.
 - Implement the codec and version 1 tables as described here, then raise `SUPPORTED_VERSION`
   and write new tables as version 1. Until then, schemas record type identifiers only partly
   (DDL collapses `SMALLINT` and `INTEGER` to 64-bit, and drops a `NUMERIC` scale of 0), writes
-  convert values by the column's identifier without enforcing its range or length, and filter
-  values are converted by value class alone. Version 1 DDL also needs a `NUMERIC` declared
+  outside a column's declared length or scale are truncated or rounded rather than refused,
+  and filter values are converted by value class alone. Version 1 DDL also needs a `NUMERIC` declared
   without precision to mean the maximum precision.
-- Version 0 `DECIMAL`, `DOUBLE`, `CHAR`, `VARCHAR` and `TIMESTAMP` columns are presented as
-  declared, not as in the version 0 table above. Calcite converts the values that SQL writes
-  to the presented type, so presenting these columns as their stored values would stop SQL
-  writes truncating, padding and rounding to the declared length, scale and precision.
 - Reads convert each value by its result column's Calcite type, not through the column's
   codec: integers keep their exact value, and a stored integer outside an integer type's range
   is reported as `22003` rather than `22000`; other values convert by their CVM type.
