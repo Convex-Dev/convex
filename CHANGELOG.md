@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Let applications change how Convex DB tables and databases merge by extending its components. ([Architecture](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-at-each-level), [#779](https://github.com/Convex-Dev/convex/issues/779))
+
 ### Changed
+
+- Assemble Convex DB hosts with `ConvexDB.openHost`, which replaces the static Convex DB lattices; connecting to a database no longer creates it. ([#779](https://github.com/Convex-Dev/convex/issues/779))
 
 ### Fixed
 

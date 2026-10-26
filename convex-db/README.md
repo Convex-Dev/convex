@@ -37,8 +37,7 @@ optional and does not control saving:
 
 ```java
 try (var store = EtchStore.create(file); var host = ConvexDB.openHost(store)) {
-    var db = ConvexDB.connect(host);
-    db.database("mydb");
+    SQLDatabase db = ConvexDB.connect(host).database("mydb");
     // Perform database operations through this live view.
     host.checkpoint();
 }
@@ -258,6 +257,11 @@ Tables support lattice-based replication with conflict-free merging.
 - **Rows**: LWW with row-level granularity
 - **Conflicts**: Latest timestamp wins; equal timestamps favour deletions
 
+Merges are executed by the components (`ConvexDB`, `SQLDatabase`, `SQLSchema`,
+`SQLTable`), each with its own rule. An application can change a rule, for one table or
+a whole database, by extending the component; see
+[Merge at Each Level](docs/LATTICE-DB-ARCHITECTURE.md#merge-at-each-level).
+
 ### Replicating Between Nodes
 
 ```java
@@ -279,10 +283,15 @@ db2.mergeReplicas(db1.exportReplica());
 
 ### Selective Replication
 
+`mergeReplicas` accepts a replica when its signature verifies and, for an owner that is
+an account key, that key signed it. To apply another rule, such as trusting only known keys,
+override `acceptsReplica` in a subclass of `SQLDatabase`:
+
 ```java
-// Only merge replicas from trusted keys
-Predicate<AccountKey> trustFilter = key -> trustedKeys.contains(key);
-db1.mergeReplicas(remoteReplicas, trustFilter);
+@Override
+protected boolean acceptsReplica(ACell owner, SignedData<?> replica) {
+    return trustedKeys.contains(replica.getAccountKey()) && super.acceptsReplica(owner, replica);
+}
 ```
 
 ## Data Types
@@ -302,16 +311,20 @@ Convex DB maps between SQL types and Convex lattice types:
 
 ### Lattice Structure
 
+A database map, held wherever the application roots it:
 ```
-:sql → OwnerLattice → SignedLattice → MapLattice → TableStoreLattice
-        owner-key → signed(db-name → table-store)
+AHashMap<AString, Index>
+  db-name → {:tables table-store}
 ```
 
 Where table-store is:
 ```
 Index<AString, AVector>
-  table-name → [schema, rows, utime]
+  table-name → [schema, rows, utime, live-count]
 ```
+
+A replica exported by `SQLDatabase.exportReplica` is
+`owner-key → signed(db-name → database)`.
 
 And rows is:
 ```

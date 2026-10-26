@@ -97,10 +97,11 @@ DriverManager.getConnection("jdbc:convex:file:/data/market.etch")
     │     ├── Found → return new Connection on existing cursor/store
     │     └── Not found:
     │           ├── EtchStore.create(file)          — opens or creates Etch file
-    │           ├── ConvexDB.createNodeServer(store) — RelayHost.open restores the
-    │           │                                     retained root; the node persists it
+    │           ├── ConvexDB.createNodeServer(store) — ConvexDB.openHost restores the
+    │           │                                     retained root and registers a
+    │           │                                     ConvexDB; the node persists it
     │           ├── server.launch()
-    │           ├── ConvexDB.connect(server.getHost()) — wraps the cursor chain
+    │           ├── ConvexDB.connect(server.getHost()) — the registered ConvexDB
     │           └── Store in map, return Connection
     │
     └── Connection wraps Calcite + ConvexSchema backed by the cursor chain
@@ -117,7 +118,8 @@ SQLDatabase db1 = cdb.database("market");    // cursor path: /market/:tables/...
 SQLDatabase db2 = cdb.database("analytics"); // cursor path: /analytics/:tables/...
 ```
 
-Each `database()` call navigates the cursor tree — it does not create a copy.
+Each `database()` call navigates the cursor tree — it does not create a copy, and
+creates no state until the first write.
 
 In the URL, a `ConvexDB` maps to the store/instance, and the database name
 selects which path within the cursor tree:
@@ -173,7 +175,7 @@ For advanced use cases (replication, custom NodeServer config):
 
 ```java
 EtchStore store = EtchStore.create(new File("/data/market.etch"));
-var server = new NodeServer<>(RelayHost.open(ConvexDB.DATABASE_MAP_LATTICE, store), config);
+var server = new NodeServer<>(ConvexDB.openHost(store), config);
 server.launch();
 
 ConvexDB cdb = ConvexDB.connect(server.getHost());
@@ -199,8 +201,8 @@ Connection conn2 = DriverManager.getConnection(
 
 JDBC transactions use the lattice fork/sync model:
 
-- `setAutoCommit(false)` → forks the cursor (snapshot isolation)
-- `commit()` → syncs the fork back (lattice merge into parent)
+- `setAutoCommit(false)` → forks the `SQLDatabase` (snapshot isolation)
+- `commit()` → syncs the fork back, merging with the database's rule
 - `rollback()` → discards the fork
 
 Implementation: `ConvexMeta` (in `org.apache.calcite.jdbc` package).

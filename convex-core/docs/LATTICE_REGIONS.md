@@ -63,7 +63,7 @@ Regions that are designed but not registered in `Lattice.ROOT`:
 | Region | Path | Lattice | Purpose |
 |---|---|---|---|
 | `:convex` | `[:convex <genesis-hash> :peers]` | `BeliefLattice` (CPoS merge) | Consensus beliefs scoped by network; see `convex-peer/docs/P2P_DESIGN.md`. |
-| `:sql` | `[:sql <ownerKey> :value <tableName>]` | `OwnerLattice(MapLattice(TableStoreLattice))` | Relational data for `convex-db` ([CAD039](https://docs.convex.world/docs/cad/convex_sql)). |
+| `:sql` | `[:sql <dbName> :tables <tableName>]` | Convex DB components (`ConvexDB`), which execute the merges | Publicly shared relational data for `convex-db`, such as reference tables ([CAD039](https://docs.convex.world/docs/cad/convex_sql)). The components take the cursor for their level and assume no fixed region, so an application roots its own databases where it chooses, conventionally under `:app`. |
 
 ## Selective attention
 
