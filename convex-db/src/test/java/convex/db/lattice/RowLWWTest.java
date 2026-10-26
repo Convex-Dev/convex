@@ -13,10 +13,15 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.Index;
+import convex.core.data.MapEntry;
+import convex.core.data.Ref;
+import convex.core.data.RefSoft;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.NullStore;
 
 /**
  * The per-row last-write-wins policy. Rows merge by key whichever schema wins, and a row
@@ -140,6 +145,41 @@ public class RowLWWTest {
 		assertEquals(1, visible(RowLWW.mergeTable(live, rowsOnly(fresh))));
 		assertEquals(0, visible(RowLWW.mergeTable(live, rowsOnly(stale))));
 		assertNull(RowLWW.mergeTable(null, rowsOnly(fresh)), "an absent table takes nothing");
+	}
+
+	/**
+	 * A row delivery reads only the delivered rows' paths. Rows elsewhere in the table are
+	 * hash-only here and would fail if read, as a persisted table would load them.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testRowDeliveryDoesNotReadTheRestOfTheTable() {
+		ABlob nearKey = Blob.fromHex("ab10");
+		Index<ABlob, AVector<ACell>> g1 = Index.of(Blob.fromHex("ab1010"), row("g1", 2));
+		Index<ABlob, AVector<ACell>> g2 = Index.of(Blob.fromHex("ab1020"), row("g2", 2));
+		Ref[] unread = { notLoaded(g1), notLoaded(g2) };
+		Index<ABlob, AVector<ACell>> sibling = Index.unsafeCreate(4, MapEntry.create(nearKey, row("near", 2)),
+			unread, (1 << 1) | (1 << 2), 3);
+		Index<ABlob, AVector<ACell>> resident = Index.of(Blob.fromHex("ab20"), row("resident", 2));
+		Index<ABlob, AVector<ACell>> rows = Index.unsafeCreate(2, MapEntry.create(Blob.fromHex("ab"), row("root", 2)),
+			new Ref[] { sibling.getRef(), resident.getRef() }, (1 << 1) | (1 << 2), 5);
+		AVector<ACell> table = Vectors.of(SCHEMA, rows, CVMLong.create(1), CVMLong.create(5));
+
+		// A new row, a newer version of a held row, and a deletion
+		AVector<ACell> added = RowLWW.mergeTable(table, rowsOnly(Index.of(Blob.fromHex("ab25"), row("new", 3))));
+		assertEquals(6, SQLTable.getLiveCount(added));
+		AVector<ACell> updated = RowLWW.mergeTable(table, rowsOnly(Index.of(Blob.fromHex("ab20"), row("newer", 3))));
+		assertEquals(5, SQLTable.getLiveCount(updated));
+		assertEquals(row("newer", 3), rows(updated).get(Blob.fromHex("ab20")));
+		AVector<ACell> deleted = RowLWW.mergeTable(table, rowsOnly(Index.of(Blob.fromHex("ab20"), SQLRow.createTombstone(CVMLong.create(3)))));
+		assertEquals(4, SQLTable.getLiveCount(deleted));
+		// A row from before the table's creation is refused, still without reading the rest
+		assertEquals(table, RowLWW.mergeTable(table, rowsOnly(Index.of(Blob.fromHex("ab25"), row("old", 0)))));
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private static Ref notLoaded(Index<ABlob, AVector<ACell>> node) {
+		return RefSoft.createForHash(node.getHash(), NullStore.INSTANCE).markEmbedded(false);
 	}
 
 	// ========== Lattice laws ==========

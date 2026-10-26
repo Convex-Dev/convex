@@ -149,6 +149,9 @@ public class RowLWW {
 			liveCount = SQLTable.getLiveCount(own);
 		} else if (mergedRows == rowsB) {
 			liveCount = SQLTable.getLiveCount(other);
+		} else if (timeB == null && hasLiveCount(own)) {
+			// Delivered rows only: adjust the count held without reading the rest of the table
+			liveCount = SQLTable.getLiveCount(own) + liveChange(rowsA, mergedRows, rowsB);
 		} else {
 			// Rows actually merged — recompute
 			liveCount = SQLTable.computeLiveCount(mergedRows);
@@ -178,6 +181,10 @@ public class RowLWW {
 	 * at or after the other side's utime: written before that table was created, it belongs
 	 * to an earlier table of the same name, or before it was dropped, to the dropped table.
 	 *
+	 * <p>When {@code other} carries only rows, as a delivery below an entry does, every row
+	 * held only by {@code own} survives, so those rows are not visited: the cost is
+	 * proportional to the delivered rows, not to the table.</p>
+	 *
 	 * @param own Established rows; null if absent
 	 * @param other Rows to merge in; null if absent
 	 * @param ownTime Utime of the entry holding {@code own}; null if it carries only rows
@@ -189,14 +196,33 @@ public class RowLWW {
 		if (own == null && other == null) return null;
 		Index<ABlob, AVector<ACell>> base = (own == null) ? Index.none() : own;
 		Index<ABlob, AVector<ACell>> incoming = (other == null) ? Index.none() : other;
-		return base.mergeDifferences(incoming, new MergeFunction<AVector<ACell>>() {
+		MergeFunction<AVector<ACell>> rule = new MergeFunction<AVector<ACell>>() {
 			@Override
 			public AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b) {
 				if (a == null) return writtenSince(b, ownTime) ? b : null;
 				if (b == null) return writtenSince(a, otherTime) ? a : null;
 				return mergeRow(a, b);
 			}
+		};
+		return (otherTime == null) ? base.merge(incoming, rule) : base.mergeDifferences(incoming, rule);
+	}
+
+	/** Whether an entry holds a live row count, which entries written before the field existed lack. */
+	private static boolean hasLiveCount(AVector<ACell> entry) {
+		return entry.count() > SQLTable.POS_LIVE_COUNT && entry.get(SQLTable.POS_LIVE_COUNT) instanceof CVMLong;
+	}
+
+	/** The change in live rows from merging {@code delivered} into {@code before}, giving {@code after}. */
+	private static long liveChange(Index<ABlob, AVector<ACell>> before, Index<ABlob, AVector<ACell>> after,
+			Index<ABlob, AVector<ACell>> delivered) {
+		if (delivered == null) return 0;
+		long[] change = {0};
+		delivered.forEach((key, row) -> {
+			boolean was = (before != null) && SQLRow.isLive(before.get(key));
+			boolean is = (after != null) && SQLRow.isLive(after.get(key));
+			change[0] += (is ? 1 : 0) - (was ? 1 : 0);
 		});
+		return change[0];
 	}
 
 	/** Whether a row was written at or after a table's utime; always so when there is none. */

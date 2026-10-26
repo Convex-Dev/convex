@@ -1325,6 +1325,11 @@ public class IndexTest {
 			assertEquals(m.mergeDifferences(changed,(a,b) -> b),Index.mergeDeep(m,changed,(a,b) -> b));
 			assertEquals(m.mergeDifferences(changed,(a,b) -> (a==null)?b:a),Index.mergeDeep(m,changed,(a,b) -> (a==null)?b:a));
 			assertEquals(m.mergeDifferences(changed,(a,b) -> null),Index.mergeDeep(m,changed,(a,b) -> null));
+
+			assertSame(m,Index.mergeIntoDeep(m,m,(a,b) -> b));
+			assertEquals(m.merge(changed,(a,b) -> b),Index.mergeIntoDeep(m,changed,(a,b) -> b));
+			assertEquals(m.merge(changed,(a,b) -> (a==null)?b:a),Index.mergeIntoDeep(m,changed,(a,b) -> (a==null)?b:a));
+			assertEquals(m.merge(changed,(a,b) -> null),Index.mergeIntoDeep(m,changed,(a,b) -> null));
 		}
 	}
 }

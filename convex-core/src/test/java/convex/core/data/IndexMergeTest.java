@@ -275,6 +275,117 @@ public class IndexMergeTest {
 		}
 	}
 
+	// ---- merge: entries only the receiver holds are kept without calling the function ----
+
+	/** Reference for {@link Index#merge(Index, MergeFunction)}: each key of b in turn; keys only in a untouched. */
+	static Index<ABlob, CVMLong> naiveInto(Index<ABlob, CVMLong> a, Index<ABlob, CVMLong> b, MergeFunction<CVMLong> func) {
+		Index<ABlob, CVMLong> result = a;
+		long nb = b.count();
+		for (long i = 0; i < nb; i++) {
+			MapEntry<ABlob, CVMLong> me = b.entryAt(i);
+			MapEntry<ABlob, CVMLong> ae = a.getEntry(me.getKey());
+			CVMLong av = (ae == null) ? null : ae.getValue();
+			if (Utils.equals(av, me.getValue())) continue;
+			CVMLong nv = func.merge(me.getKey(), av, me.getValue());
+			if (nv == null) result = result.dissoc(me.getKey());
+			else if (!Utils.equals(av, nv)) result = result.assoc(me.getKey(), nv);
+		}
+		return result;
+	}
+
+	@Test
+	public void testMergeMatchesNaive() {
+		for (int seed = 3000; seed < 3300; seed++) {
+			Random r = new Random(seed);
+			Index<ABlob, CVMLong> a = Index.none();
+			Index<ABlob, CVMLong> b = Index.none();
+			int np = 1 + r.nextInt(40);
+			for (int i = 0; i < np; i++) {
+				ABlob k = randomKey(r);
+				CVMLong va = CVMLong.create(r.nextInt(100));
+				CVMLong vb = CVMLong.create(r.nextInt(100));
+				switch (r.nextInt(4)) { // 0:a-only 1:b-only 2:both-equal 3:both-different
+					case 0 -> a = a.assoc(k, va);
+					case 1 -> b = b.assoc(k, vb);
+					case 2 -> { a = a.assoc(k, va); b = b.assoc(k, va); }
+					default -> { a = a.assoc(k, va); b = b.assoc(k, vb); }
+				}
+			}
+			for (MergeFunction<CVMLong> f : FUNCS) {
+				String ctx = "seed=" + seed + " func=" + FUNCS.indexOf(f);
+				Index<ABlob, CVMLong> exp = naiveInto(a, b, f);
+				Index<ABlob, CVMLong> got = a.merge(b, f);
+				assertEquals(exp, got, ctx);
+				assertEquals(exp.getHash(), got.getHash(), ctx);
+				assertEquals(exp, Index.mergeIntoDeep(a, b, f), "deep " + ctx);
+				try {
+					got.validate();
+				} catch (InvalidDataException e) {
+					fail(ctx + " produced non-canonical Index: " + e.getMessage());
+				}
+
+				// Merging a subset, or nothing, is a no-op for every function: a's own entries are not touched
+				assertSame(a, a.merge(subsetOf(a, r), f), "subset " + ctx);
+				assertSame(a, a.merge(Index.none(), f), "empty " + ctx);
+				assertSame(a, Index.mergeIntoDeep(a, subsetOf(a, r), f), "deep subset " + ctx);
+			}
+		}
+	}
+
+	private static ABlob longKey(long i) {
+		return Blob.fromHex(String.format("%016x", i));
+	}
+
+	/** The function is called once per key of the merged index, however large the receiver. */
+	@Test
+	public void testMergeCallsFunctionOnlyForMergedKeys() {
+		Index<ABlob, CVMLong> a = Index.none();
+		for (long i = 0; i < 10_000; i++) a = a.assoc(longKey(i), CVMLong.create(i));
+		long[] calls = {0};
+		MergeFunction<CVMLong> counting = (x, y) -> { calls[0]++; return y; };
+
+		Index<ABlob, CVMLong> added = a.merge(Index.of(longKey(20_000), CVMLong.ONE), counting);
+		assertEquals(1, calls[0]);
+		assertEquals(10_001, added.count());
+
+		calls[0] = 0;
+		Index<ABlob, CVMLong> updated = a.merge(Index.of(longKey(5_000), CVMLong.create(-1)), counting);
+		assertEquals(1, calls[0]);
+		assertEquals(CVMLong.create(-1), updated.get(longKey(5_000)));
+		assertEquals(10_000, updated.count());
+
+		calls[0] = 0;
+		assertSame(a, a.merge(Index.of(longKey(7), CVMLong.create(7)), counting), "an equal value needs no call");
+		assertEquals(0, calls[0]);
+	}
+
+	/**
+	 * Sub-tries of the receiver off the paths to the merged keys are not traversed. Rebuilding a
+	 * node on a path reads its direct children, so the sibling here is resident, but its own
+	 * children are hash-only and would fail if resolved.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testMergeDoesNotTraverseUnreachedSubtries() {
+		Index<ABlob, CVMLong> g1 = Index.of(Blob.fromHex("ab1010"), CVMLong.create(11));
+		Index<ABlob, CVMLong> g2 = Index.of(Blob.fromHex("ab1020"), CVMLong.create(12));
+		Ref<Index<ABlob, CVMLong>>[] siblingChildren = new Ref[] { missingChildRef(g1), missingChildRef(g2) };
+		Index<ABlob, CVMLong> sibling = Index.unsafeCreate(4, MapEntry.create(Blob.fromHex("ab10"), CVMLong.ONE),
+			(Ref[]) siblingChildren, (1 << 1) | (1 << 2), 3);
+		Index<ABlob, CVMLong> resident = Index.of(Blob.fromHex("ab20"), CVMLong.create(2));
+		Ref<Index<ABlob, CVMLong>>[] rootChildren = new Ref[] { sibling.getRef(), resident.getRef() };
+		Index<ABlob, CVMLong> a = Index.unsafeCreate(2, MapEntry.create(Blob.fromHex("ab"), CVMLong.ZERO),
+			(Ref[]) rootChildren, (1 << 1) | (1 << 2), 5);
+
+		for (MergeFunction<CVMLong> f : FUNCS) {
+			Index<ABlob, CVMLong> merged = a.merge(Index.of(Blob.fromHex("ab25"), CVMLong.create(5)), f);
+			assertEquals(6, merged.count());
+			assertEquals(CVMLong.ZERO, merged.get(Blob.fromHex("ab")), "own entries are kept, even by DROP_EVEN");
+		}
+		// A key under no existing child
+		assertEquals(6, a.merge(Index.of(Blob.fromHex("ab35"), CVMLong.create(3)), PICK_B).count());
+	}
+
 	@Test
 	public void testDisjointAndNested() {
 		// Disjoint prefixes (different first digit).
