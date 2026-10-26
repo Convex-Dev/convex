@@ -171,5 +171,6 @@ numerically when negative or longer than 8 bytes.
   converted by value class alone.
 - Commit the CAD039 column-type amendment that specifies the entry version and identifiers.
 - `DATE`, `TIME`, `TIMESTAMP WITH TIME ZONE`, `UUID` and `INTERVAL` are not supported.
-- `SQLTable.merge` and `SQLRow.merge` return their first argument on equal timestamps, so
-  merge is not commutative for differing entries with the same timestamp.
+- Row writes set the table entry's `utime`, which merge uses as the schema timestamp, so a
+  row written on a node that has not seen a later schema change or `DROP TABLE` makes the
+  older schema win, or brings the dropped table back.
