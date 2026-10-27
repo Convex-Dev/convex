@@ -186,10 +186,10 @@ the node merely to treat the first group as a privileged "primary" group.
    `SocialUser`, apply its feed and follow actions, sync that fork once, then
    sync the application root. A `Social` fork is outside the owner boundary and
    therefore still signs each user edit inside the unpublished fork.
-6. Automatic gossip is fire-and-forget. To verify it without sleeping, capture
-   `nextAnnounce()` before publishing and re-arm it until the expected application
-   state is present. The announce signals that this propagation group has
-   materialised its served view after the host has merged the value and the
+6. Automatic gossip is fire-and-forget. To verify it without sleeping, wait on
+   `group.whenAnnounced(condition)` for the expected application state. It
+   completes once this propagation group serves a value satisfying the condition
+   and has queued its broadcast, after the host has merged the value and the
    node has published the root. A host sync itself guarantees only node
    publication; do not assume it completed group fan-out. Use an explicit
    `receivingServer.pull(group, connection).get(timeout)`

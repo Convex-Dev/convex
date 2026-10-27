@@ -637,17 +637,11 @@ public class SharedApplicationInternalsTest {
 		return listener;
 	}
 
-	/** Subscribe before reading to avoid losing an announcement between the two. */
 	@SuppressWarnings("unchecked")
 	private static Index<Keyword,ACell> awaitView(LatticePropagator group,
 			Predicate<Index<Keyword,ACell>> ready) throws Exception {
-		long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
-		while (true) {
-			var next=group.nextAnnounce();
-			var value=(Index<Keyword,ACell>)group.getLastAnnouncedValue();
-			if (value!=null && ready.test(value)) return value;
-			next.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
-		}
+		return (Index<Keyword,ACell>)group.whenAnnounced(
+			value -> ready.test((Index<Keyword,ACell>)value)).get(10,TimeUnit.SECONDS);
 	}
 
 	@Test

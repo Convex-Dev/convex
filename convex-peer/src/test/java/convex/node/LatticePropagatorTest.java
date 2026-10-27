@@ -17,6 +17,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -200,7 +201,7 @@ public class LatticePropagatorTest {
 		}
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		server2.getCursor().assoc(dataKeyword, updatedDataIndex);
-		CompletableFuture<ACell> published=Announcements.nextMatching(propagator2,
+		CompletableFuture<ACell> published=propagator2.whenAnnounced(
 			value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
 		// Synchronous commit persists the authoritative node root; propagation-view
 		// materialisation completes independently on the future above.
@@ -224,12 +225,14 @@ public class LatticePropagatorTest {
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
 		values = values.assoc(expectedHash, expected);
-		CompletableFuture<ACell> received=Announcements.nextMatching(propagator2,
-			value -> expected.equals(RT.getIn(value,dataKeyword,expectedHash)));
+		Predicate<ACell> holdsExpected=value -> expected.equals(RT.getIn(value,dataKeyword,expectedHash));
+		CompletableFuture<ACell> received=propagator2.whenAnnounced(holdsExpected);
 		server1.getCursor().assoc(dataKeyword, values);
 		server1.getHost().sync();
 
 		received.get(5,TimeUnit.SECONDS);
+		// The receiver can merge before the sender counts its broadcast, so wait for the sender too
+		propagator1.whenAnnounced(holdsExpected).get(5,TimeUnit.SECONDS);
 		assertEquals(1L, propagator1.getBroadcastCount(),
 			"source should send one delta broadcast");
 		ACell merged = server2.getLocalValue();
@@ -250,7 +253,7 @@ public class LatticePropagatorTest {
 
 		propagator1.setMaxDeltaMessageSize(700);
 		Index<Hash,ACell> expectedValues=values;
-		CompletableFuture<ACell> received=Announcements.nextMatching(propagator2,
+		CompletableFuture<ACell> received=propagator2.whenAnnounced(
 			value -> expectedValues.equals(RT.getIn(value,dataKeyword)));
 		server1.getCursor().assoc(dataKeyword,values);
 		server1.getHost().sync();
@@ -295,11 +298,8 @@ public class LatticePropagatorTest {
 		ACell second = CVMLong.create(4302);
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
-		CompletableFuture<ACell> firstMerge=propagator2.nextAnnounce();
-		CompletableFuture<ACell> secondMerge=firstMerge.thenCompose(
-			value -> second.equals(RT.getIn(value,dataKeyword,second.getHash()))
-				? CompletableFuture.completedFuture(value)
-				: propagator2.nextAnnounce());
+		Predicate<ACell> holdsSecond=value -> second.equals(RT.getIn(value,dataKeyword,second.getHash()));
+		CompletableFuture<ACell> secondMerge=propagator2.whenAnnounced(holdsSecond);
 
 		server1.getCursor().assoc(dataKeyword, values.assoc(first.getHash(), first));
 		server1.getHost().sync();
@@ -308,6 +308,8 @@ public class LatticePropagatorTest {
 		server1.getHost().sync();
 
 		secondMerge.get(5,TimeUnit.SECONDS);
+		// The receiver can merge before the sender counts its broadcast, so wait for the sender too
+		propagator1.whenAnnounced(holdsSecond).get(5,TimeUnit.SECONDS);
 		assertTrue(propagator1.getBroadcastCount()>=1,
 			"the coalesced latest value must be broadcast");
 		assertEquals(second, RT.getIn(server2.getLocalValue(), dataKeyword, second.getHash()));
@@ -585,7 +587,7 @@ public class LatticePropagatorTest {
 			}
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 			server1.getCursor().assoc(dataKeyword, updatedDataIndex);
-			CompletableFuture<ACell> published=Announcements.nextMatching(propagator1,
+			CompletableFuture<ACell> published=propagator1.whenAnnounced(
 				value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
 			// Synchronous commit persists the authoritative node root; wait for the
 			// source group to expose that exact root before pulling it.

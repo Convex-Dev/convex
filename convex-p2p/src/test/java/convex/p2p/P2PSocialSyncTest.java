@@ -275,9 +275,7 @@ public class P2PSocialSyncTest {
 
 	/** Waits on real root-announcement signals, never elapsed time. */
 	private static CompletableFuture<Void> awaitCondition(P2PNode node,BooleanSupplier condition) {
-		if (condition.getAsBoolean()) return CompletableFuture.completedFuture(null);
-		CompletableFuture<ACell> next=node.propagationGroup().nextAnnounce();
-		if (condition.getAsBoolean()) return CompletableFuture.completedFuture(null);
-		return next.thenCompose(value -> awaitCondition(node,condition));
+		return node.propagationGroup().whenAnnounced(value -> condition.getAsBoolean())
+			.thenApply(value -> null);
 	}
 }

@@ -302,6 +302,7 @@ public class LatticePropagator implements Closeable {
 			Status current=status;
 			status=new Status(state,current.failureCount(),current.lastFailure());
 		}
+		if (state==State.STOPPED) failAnnounceWaits();
 	}
 
 	/** Records a contained component failure without throwing into the node host. */
@@ -633,17 +634,107 @@ public class LatticePropagator implements Closeable {
 	public ACell getLastAnnouncedValue() { return announcedCursor.get(); }
 
 	/**
-	 * Future completing with the next value announced by this propagator.
-	 *
-	 * <p>Gives callers something to wait on for propagation: capture the future
-	 * <em>before</em> triggering the change, then {@code get(timeout)} — no
-	 * sleep-polling on {@link #getLastAnnouncedValue()} required. Each announce
-	 * completes the current future and installs a fresh one, so the returned
-	 * future always reflects an announce that happens after the call.
+	 * Future completing with the next value announced by this propagator, whatever
+	 * it is. Capture it <em>before</em> triggering the change. An announcement
+	 * already in progress completes it, possibly with an older value; to wait for a
+	 * particular state, use {@link #whenAnnounced(Predicate)}. Completes, like
+	 * {@code whenAnnounced}, once the value is served and its broadcast queued.
 	 *
 	 * @return future for the next announced store-backed value
 	 */
 	public CompletableFuture<ACell> nextAnnounce() { return nextAnnounceFuture; }
+
+	/**
+	 * Future completing with a value this group has announced that satisfies the
+	 * condition: the latest announced value if it already does, otherwise the first
+	 * later one that does. Each announced value is tested; consecutive updates may
+	 * coalesce, so test for the state wanted rather than for one exact value.
+	 *
+	 * <p>Completes only once that value is served from this group's store and its
+	 * delta broadcast, if the group has routes, is queued, so
+	 * {@link #getBroadcastCount()} and the served view already include it. Delivery
+	 * to peers is not implied.</p>
+	 *
+	 * <p>The condition runs on the announcing thread, which may hold the host's
+	 * publication lock: keep it to a quick, non-blocking test. A condition that
+	 * throws fails this future only. A wait still pending when the group stops fails;
+	 * cancel the future to stop waiting earlier.</p>
+	 *
+	 * @param condition test of an announced value
+	 * @return future for the first announced value satisfying the condition
+	 */
+	public CompletableFuture<ACell> whenAnnounced(Predicate<? super ACell> condition) {
+		if (condition==null) throw new IllegalArgumentException("Condition must not be null");
+		AnnounceWait wait=new AnnounceWait(condition,new CompletableFuture<>());
+		ACell current;
+		synchronized (announceWaits) {
+			announceWaits.add(wait);
+			current=completedAnnounce;
+		}
+		wait.future.whenComplete((value,error) -> {
+			synchronized (announceWaits) { announceWaits.remove(wait); }
+		});
+		if (current!=null) wait.offer(current);
+		// After registering, so a stop between the two still fails this wait
+		if (getStatus().state()==State.STOPPED) wait.fail();
+		return wait.future;
+	}
+
+	/**
+	 * Future completing with the latest value this group has announced, or the
+	 * first one if it has announced none yet, as {@link #whenAnnounced(Predicate)}
+	 * does with a condition every value satisfies.
+	 *
+	 * @return future for an announced value
+	 */
+	public CompletableFuture<ACell> whenAnnounced() {
+		return whenAnnounced(value -> true);
+	}
+
+	/** A pending {@link #whenAnnounced(Predicate)}. */
+	private record AnnounceWait(Predicate<? super ACell> condition,CompletableFuture<ACell> future) {
+		void offer(ACell value) {
+			if (future.isDone()) return;
+			boolean matched;
+			try {
+				matched=condition.test(value);
+			} catch (VirtualMachineError e) {
+				throw e;
+			} catch (Throwable e) {
+				future.completeExceptionally(e);
+				return;
+			}
+			if (matched) future.complete(value);
+		}
+
+		void fail() {
+			future.completeExceptionally(new IllegalStateException("Propagation group stopped"));
+		}
+	}
+
+	/** Records an announcement whose broadcast is queued, and offers it to pending waits. */
+	private void completeAnnounce(long sequence,ACell value) {
+		List<AnnounceWait> waiting;
+		synchronized (announceWaits) {
+			// Announcements complete outside the publication lock, possibly out of order
+			if (sequence>completedSequence) {
+				completedSequence=sequence;
+				completedAnnounce=value;
+			}
+			if (announceWaits.isEmpty()) return;
+			waiting=List.copyOf(announceWaits);
+		}
+		for (AnnounceWait wait:waiting) wait.offer(value);
+	}
+
+	/** Fails waits still pending once the group has stopped. */
+	private void failAnnounceWaits() {
+		List<AnnounceWait> waiting;
+		synchronized (announceWaits) {
+			waiting=List.copyOf(announceWaits);
+		}
+		for (AnnounceWait wait:waiting) wait.fail();
+	}
 
 	/**
 	 * Future for the next announce. Swapped under {@link #writeLock} in
@@ -651,6 +742,16 @@ public class LatticePropagator implements Closeable {
 	 * not run while holding the pipeline lock).
 	 */
 	private volatile CompletableFuture<ACell> nextAnnounceFuture = new CompletableFuture<>();
+
+	/** Pending {@link #whenAnnounced(Predicate)} waits; also guards the two fields below. */
+	private final ArrayList<AnnounceWait> announceWaits=new ArrayList<>();
+
+	/** Latest announced value whose broadcast is queued, or null before the first. */
+	private ACell completedAnnounce;
+	private long completedSequence;
+
+	/** Orders announcements; guarded by {@link #writeLock}. */
+	private long announceSequence;
 	/**
 	 * Cursor holding the last value announced by this propagator. See
 	 * {@link #announcedCursor} for ownership and security semantics.
@@ -954,6 +1055,7 @@ public class LatticePropagator implements Closeable {
 	/** A replacement filter reprojects the latest source under the same publication lock. */
 	private ACell processSnapshot(ACell value,LatticeFilter<ACell> replacement) throws IOException {
 		CompletableFuture<ACell> announceFuture;
+		long sequence;
 		synchronized (writeLock) {
 			if (replacement!=null) {
 				value=lastSource;
@@ -983,6 +1085,7 @@ public class LatticePropagator implements Closeable {
 			announcedCursor.set(value);
 			announceFuture = nextAnnounceFuture;
 			nextAnnounceFuture = new CompletableFuture<>();
+			sequence = ++announceSequence;
 
 			// 2. Broadcast to peers. Background triggers are already coalesced by
 			// LatestUpdateQueue; an explicitly processed snapshot must not be dropped.
@@ -994,6 +1097,7 @@ public class LatticePropagator implements Closeable {
 				}
 			}
 		}
+		completeAnnounce(sequence,value);
 		announceFuture.complete(value);
 		return value;
 	}

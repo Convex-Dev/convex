@@ -146,13 +146,7 @@ public final class SharedApplicationsExample {
 		}
 
 		private void awaitServed() throws Exception {
-			ACell expected=host.cursor().get();
-			long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
-			while (true) {
-				var next=propagation.nextAnnounce();
-				if (expected.equals(propagation.getLastAnnouncedValue())) return;
-				next.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
-			}
+			propagation.whenAnnounced(host.cursor().get()::equals).get(10,TimeUnit.SECONDS);
 		}
 
 		@Override public void close() throws Exception {

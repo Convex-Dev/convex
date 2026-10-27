@@ -73,7 +73,7 @@ class NodeShutdownTest {
 					"networking must not change the host after stopIngress");
 
 				// Primary may still be announcing the 778 merge, so wait for 780 itself
-				CompletableFuture<ACell> announced=Announcements.nextMatching(primary,
+				CompletableFuture<ACell> announced=primary.whenAnnounced(
 					value -> ((ASet<?>)value).contains(CVMLong.create(780)));
 				host.cursor().updateAndGet(set -> set.include(CVMLong.create(780)));
 				host.sync();

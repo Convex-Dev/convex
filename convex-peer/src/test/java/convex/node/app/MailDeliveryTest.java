@@ -83,12 +83,7 @@ class MailDeliveryTest {
 
 		/** Waits until the propagator has announced the host's current root. */
 		void awaitAnnounced() throws Exception {
-			long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
-			while (true) {
-				var next=group.nextAnnounce();
-				if (host.cursor().get().equals(group.getLastAnnouncedValue())) break;
-				next.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
-			}
+			group.whenAnnounced(host.cursor().get()::equals).get(10,TimeUnit.SECONDS);
 		}
 
 		/** Pulls one mailbox path from another running node and waits for the merge. */

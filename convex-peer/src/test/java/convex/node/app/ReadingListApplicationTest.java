@@ -23,7 +23,6 @@ import convex.lattice.UnionSet;
 import convex.lattice.SingleRegion;
 import convex.lattice.cursor.AForkableCursor;
 import convex.node.LatticeNode;
-import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
 
 /** Two reading-list applications exchange published recommendations over a real connection. */
@@ -100,7 +99,7 @@ class ReadingListApplicationTest {
 				// Alice publishes her recommendation and waits until it can be served.
 				alice.recommend("The Dispossessed");
 				alice.sync();
-				awaitAnnounced(aliceGroup,aliceHost.sync());
+				aliceGroup.whenAnnounced(aliceHost.sync()::equals).get(10,TimeUnit.SECONDS);
 
 				// Receiving Alice's list preserves Bob's pending recommendation.
 				bob.recommend("A Wizard of Earthsea");
@@ -148,17 +147,6 @@ class ReadingListApplicationTest {
 			host.checkpoint();
 			var reopened=LatticeHost.open(store);
 			assertEquals(app.titles(),new ReadingListApp(reopened).titles());
-		}
-	}
-
-	/** Waits for this exact snapshot; this scenario makes no further edits while waiting. */
-	private static void awaitAnnounced(LatticePropagator group,ACell expected) throws Exception {
-		long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
-		while (true) {
-			// Subscribe before inspecting the view so a concurrent announcement cannot be missed.
-			var next=group.nextAnnounce();
-			if (expected.equals(group.getLastAnnouncedValue())) return;
-			next.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
 		}
 	}
 }

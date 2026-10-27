@@ -205,8 +205,10 @@ nothing. Its worker:
 
 The update queue may coalesce consecutive monotonic snapshots. The latest value
 must converge; there is no requirement for one network frame per application
-action. `nextAnnounce()` is the deterministic signal for callers that need to
-wait until a group has materialised its next served view.
+action. `whenAnnounced(condition)` is the deterministic signal for callers that
+need to wait until a group serves a state: it completes once an announced value
+satisfies the condition and that value's broadcast is queued. See
+[persistence](PERSISTENCE.md#waiting-in-tests-and-applications).
 
 A propagator never writes a store root. Its store is a serving and novelty
 boundary; launch seeds each one from the host's current root.

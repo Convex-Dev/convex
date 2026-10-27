@@ -221,8 +221,7 @@ public class NodeServerPersistenceTest {
 	private void syncBackupFromPrimary() throws Exception {
 		// Sync primary so propagator has the latest value for query responses.
 		ACell expected=primary.getCursor().get();
-		CompletableFuture<ACell> announced=Announcements.nextMatching(
-			propagationGroup(primary),expected::equals);
+		CompletableFuture<ACell> announced=propagationGroup(primary).whenAnnounced(expected::equals);
 		primary.getHost().sync();
 		announced.get(5,TimeUnit.SECONDS);
 

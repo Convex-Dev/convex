@@ -22,8 +22,8 @@ LatticeHost.sync()
 
 A successful `sync()` confirms logical publication to the host store, if one is
 present. It does not confirm a physical durability barrier or that a propagation
-group has announced or sent its view. Subscribe to `propagator.nextAnnounce()`
-before triggering publication when that later boundary matters.
+group has announced or sent its view. Wait on `propagator.whenAnnounced(condition)`
+when that later boundary matters.
 
 ## Networking is optional
 
@@ -175,15 +175,22 @@ does; see [shutdown](SHUTDOWN.md).
 
 ## Waiting in tests and applications
 
-Do not sleep or assume that a host sync completed propagation. Capture the
-appropriate signal before triggering work:
+Do not sleep or assume that a host sync completed propagation. Wait for the
+state you need:
 
 ```java
-CompletableFuture<ACell> served = propagator.nextAnnounce();
 app.sync();                     // the application publishes into the host root
-node.getHost().sync();          // the host root is now published to the node store
-served.get(timeout, unit);      // this group's served view is now materialised
+ACell published = node.getHost().sync(); // the host root is now published to the node store
+propagator.whenAnnounced(published::equals).get(timeout, unit);
+                                // this group serves it, and its broadcast is queued
 ```
+
+`whenAnnounced(condition)` completes with the group's latest announced value if
+it already satisfies the condition, otherwise with the first later one that does,
+so an announcement already in flight cannot satisfy it early. Announcements
+coalesce, so test for the state wanted rather than one exact value when other
+writes may follow. `whenAnnounced()` waits for any announcement, and
+`nextAnnounce()` for the next one, whatever its value.
 
 For network convergence, wait on the pull future, correlated protocol result or
 an application-level future/latch that represents the condition being tested.
