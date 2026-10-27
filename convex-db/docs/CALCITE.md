@@ -24,7 +24,7 @@ SQL "SELECT name FROM t WHERE id = 1"
     Calcite Avatica JDBC ResultSet
 ```
 
-`INSERT`, `UPDATE` and `DELETE` plan to `ConvexTableModify` in the Enumerable convention, whose generated code calls the table's insert, update and delete methods.
+`INSERT`, `UPDATE` and `DELETE` plan to `ConvexTableModify` in the Enumerable convention, whose generated code calls the table's insert, update and delete methods. Operators with no CONVEX implementation, such as `UNION`, `INTERSECT` and `EXCEPT`, run in the Enumerable convention on rows converted at the boundary.
 
 ### Key Design Points
 
@@ -161,9 +161,4 @@ At 10,000 rows:
 
 JDBC PK lookups are O(log n) index lookups, so their cost barely grows with table size.
 
-## Open Questions
-
-1. **Hash join**: Equi-joins sort both inputs before merging, which costs O(n log n) when an input is not already in key order; a hash join would avoid that. Other joins are nested-loop O(n*m).
-2. **Query plan caching**: Plans are reused per PreparedStatement but not across statements with the same SQL text.
-3. **Secondary indexes**: Only PK (column 0) pushdown is supported. See issue #537.
-4. **Window functions**: Not yet implemented.
+Planned work is tracked in GitHub issues labelled `convex-db`.

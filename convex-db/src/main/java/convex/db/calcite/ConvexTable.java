@@ -79,9 +79,7 @@ public class ConvexTable extends AbstractQueryableTable
 	@Override
 	public RelNode toRel(RelOptTable.ToRelContext context, RelOptTable relOptTable) {
 		RelOptCluster cluster = context.getCluster();
-		// TODO: declare PK collation on trait set once ConvexConvention
-		// operators properly propagate collation traits through the plan.
-		// Currently the planner elides sorts at the Enumerable boundary.
+		// No PK collation is declared: CONVEX operators do not propagate collation traits (#795)
 		RelTraitSet traitSet = cluster.traitSetOf(ConvexConvention.INSTANCE);
 		return new ConvexTableScan(cluster, traitSet, relOptTable, bind(relOptTable, cluster.getTypeFactory()));
 	}
@@ -141,10 +139,10 @@ public class ConvexTable extends AbstractQueryableTable
 	 *
 	 * <p>Provides:
 	 * <ul>
-	 *   <li>Row count from the Index (O(1), may include tombstones)
+	 *   <li>Row count from the table's live count (O(1))
 	 *   <li>Primary key declaration (column 0 is unique)
-	 *   <li>Sort order (rows are sorted by PK via the radix tree Index)
 	 * </ul>
+	 * Neither the PK sort order nor column cardinality is declared (#795).
 	 */
 	@Override
 	public Statistic getStatistic() {
@@ -158,8 +156,6 @@ public class ConvexTable extends AbstractQueryableTable
 		// PK is column 0
 		List<ImmutableBitSet> keys = List.of(ImmutableBitSet.of(0));
 
-		// TODO: declare PK collation once trait propagation is implemented
-		// TODO: add column cardinality for selectivity estimation
 		return Statistics.of(rowCount, keys);
 	}
 

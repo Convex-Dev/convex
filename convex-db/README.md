@@ -109,6 +109,7 @@ Convex DB supports standard SQL via Apache Calcite:
 - **DML**: `INSERT`, `UPDATE`, `DELETE`
 - **Queries**: `SELECT`, `WHERE`, `ORDER BY`, `LIMIT`, `OFFSET`
 - **Joins**: `INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN`, `FULL OUTER JOIN`, `CROSS JOIN`
+- **Set operations and subqueries**: `UNION [ALL]`, `INTERSECT`, `EXCEPT`, `IN` and `EXISTS` subqueries
 - **Aggregations**: `GROUP BY`, `HAVING`, `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`
 - **Expressions**: Arithmetic, string functions, `CASE`, `COALESCE`, `CAST`
 

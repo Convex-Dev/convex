@@ -1,10 +1,10 @@
 # Convex DB: SQL Column Types
 
-**Status: proposed design, partly implemented**
-([#757](https://github.com/Convex-Dev/convex/issues/757)). The table entry's format
+**Status: proposed design, partly implemented.** The table entry's format
 version (see [Format Version](#format-version)), the [Calcite type system](#calcite-type-system)
 and the presentation of version 0 integer columns are in place; tables are still written as
-version 0, and the remaining gaps are listed under [Remaining Work](#remaining-work).
+version 0. The rest is tracked in [#793](https://github.com/Convex-Dev/convex/issues/793), and
+types not yet supported in [#796](https://github.com/Convex-Dev/convex/issues/796).
 
 How Convex DB binds the SQL types users declare to the values stored in the lattice, and
 how it presents them through JDBC and the PostgreSQL wire protocol.
@@ -166,23 +166,3 @@ numerically when negative or longer than 8 bytes.
 - Version 0 tables: existing schemas read with their original meanings and presented as above.
 - Primary keys beyond 64 bits, and equal integers held in different representations.
 - A non-conforming value delivered by merge: kept intact, and reported as `22000` when read.
-
-## Remaining Work
-
-- Implement the codec and version 1 tables as described here, then raise `SUPPORTED_VERSION`
-  and write new tables as version 1. Until then, schemas record type identifiers only partly
-  (DDL collapses `SMALLINT` and `INTEGER` to 64-bit, and drops a `NUMERIC` scale of 0), writes
-  outside a column's declared length or scale are truncated or rounded rather than refused,
-  and filter values are converted by value class alone. Version 1 DDL also needs a `NUMERIC` declared
-  without precision to mean the maximum precision.
-- Reads convert each value by its result column's Calcite type, not through the column's
-  codec: integers keep their exact value, and a stored integer outside an integer type's range
-  is reported as `22003` rather than `22000`; other values convert by their CVM type.
-- `RowDescription` takes OIDs from the result's JDBC type names, and type modifiers from its
-  precision, encoded for `numeric` only.
-- An `AVG` over the exact types is exact when it is an integer; otherwise the CVM computes it
-  as a double.
-- Integer primary keys beyond 64 bits have no key encoding: writing a row with one is refused,
-  and looking one up finds no row.
-- Commit the CAD039 column-type amendment that specifies the entry version and identifiers.
-- `DATE`, `TIME`, `TIMESTAMP WITH TIME ZONE`, `UUID` and `INTERVAL` are not supported.
