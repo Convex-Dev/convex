@@ -11,13 +11,14 @@ behaviour in [CAD036](https://docs.convex.world/docs/cad/lattice_node).
 
 - A region is a keyword key on the root lattice; its value type and merge function are
   fixed by the lattice registered under that key.
-- Regions are independent. A node participates in any subset and propagates only the
-  regions it has registered (selective attention).
-- Owner-scoped regions share one shape: `[:<region> <ownerKey> :value <name>]`, with an
-  `OwnerLattice` enforcing that each owner's slot is signed by that owner.
-- Adding a region is `Lattice.ROOT.addLattice(keyword, lattice)`; the keyword becomes
-  the first path element from the root.
-- `:local` is the one region that is never propagated.
+- Applications receive incoming values through components registered with their
+  host. Each component decides which regions to accept and when to publish.
+- Owner-scoped regions hold a complete signed envelope at `[:<region> <ownerKey>]`.
+  Local domain views unwrap it explicitly; remote paths cannot cross the signing boundary.
+- Application-specific state belongs under `[:app <application-name>]`, as specified
+  by CAD045. Shared root names are allocated by CAD053.
+- Serving and disclosure are configured separately through propagation-group
+  projections. Registering merge rules does not restrict what a node serves.
 
 ## Root structure
 
@@ -29,7 +30,7 @@ Lattice.ROOT (KeyedLattice)
 ├── :queue → OwnerLattice(MapLattice(TopicLattice))         Message queues
 ├── :p2p   → P2PLattice (KeyedLattice)                      Peer discovery metadata
 │   └── :nodes → OwnerLattice(LWWLattice)                     Signed NodeInfo per peer
-└── :local → LocalLattice                                   Peer-local state (not propagated)
+└── :local → LocalLattice                                   Signed per-peer configuration
 ```
 
 Source of truth: `convex.lattice.Lattice.ROOT`.
@@ -43,20 +44,26 @@ Source of truth: `convex.lattice.Lattice.ROOT`.
 | `:kv` | `OwnerLattice(MapLattice(KVStoreLattice))` | `[:kv <ownerKey> :value <storeName>]` | Per-owner key-value stores with entry-level merge ([CAD037](https://docs.convex.world/docs/cad/kv_database)). |
 | `:queue` | `OwnerLattice(MapLattice(TopicLattice))` | `[:queue <ownerKey> :value <topicName>]` | Per-owner message topics with partitions and metadata ([CAD040](https://docs.convex.world/docs/cad/lattice_queue)). |
 | `:p2p :nodes` | `OwnerLattice(LWWLattice)` | `[:p2p :nodes <accountKey>]` | Each node publishes `SignedData<NodeInfo>`: transport URIs, relay willingness, served regions, protocol version, timestamp. Latest timestamp wins. |
-| `:local` | `LocalLattice` | `[:local ...]` | Node-private configuration and state; never propagated. |
+| `:local` | `LocalLattice` | `[:local <peerKey>]` | Signed per-peer configuration. A serving projection must exclude any state intended to remain private. |
+
+The `:value` paths in the table describe local unsigned views only. Deliver the
+complete owner's envelope when replicating these regions.
 
 The `:p2p` region and its use for discovery are designed in
 `convex-peer/docs/P2P_DESIGN.md`.
 
-## Extending the root
+## Adding application state
 
 ```java
-KeyedLattice root = Lattice.ROOT.addLattice(Keyword.intern("myapp"), myAppLattice);
+KeyedLattice applications = KeyedLattice.create(Keyword.intern("myapp"), myAppLattice);
+KeyedLattice root = Lattice.ROOT.addLattice(Keyword.intern("app"), applications);
 ```
 
-A node opts in to hosting an application's data by registering its lattice under a
-keyword. Design guidance for the lattice itself, and for the components that sit over
-it, is in [LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md).
+This declares merge semantics at `[:app :myapp]`; it does not register a receiving
+application or configure networking. Register the corresponding root component
+with `host.addApplication(...)`. Components can also compose `Regions` directly,
+without a monolithic root lattice definition. See
+[LATTICE_APPLICATIONS.md](LATTICE_APPLICATIONS.md) for assembly and publication.
 
 Regions that are designed but not registered in `Lattice.ROOT`:
 
@@ -67,16 +74,17 @@ Regions that are designed but not registered in `Lattice.ROOT`:
 
 ## Selective attention
 
-Nodes propagate only the regions they participate in: a data node need not carry
-consensus beliefs, and a consensus peer need not carry file systems. The node registry
-under `:p2p :nodes` advertises which regions each peer serves, so propagation can
-target the right neighbours. `NodeServer` propagators transmit deltas only for paths
-that changed, and a node merges values only for lattice types it has registered.
+A host delivers incoming state to its registered application components. They can
+ignore unknown regions while retaining unknown data already held locally. This is
+an acceptance policy, not a disclosure policy. Configure each propagation group's
+serving projection to select what peers may receive; omitted data is not a deletion.
+See [lattice networking](../../convex-peer/docs/LATTICE_NETWORKING.md).
 
 ## Where the code lives
 
 - `convex.lattice.Lattice` — the root definition.
-- `convex.lattice.KeyedLattice`, `OwnerLattice`, `MapLattice`, `LWWLattice`,
+- `convex.lattice.generic` — `KeyedLattice`, `OwnerLattice`, `MapLattice`, `LWWLattice`.
+- Domain packages —
   `DataLattice`, `DLFSLattice`, `KVStoreLattice`, `TopicLattice`, `P2PLattice`,
   `LocalLattice` — the region lattices.
 - `convex.node.NodeServer` (`convex-peer`) — hosting and propagation.

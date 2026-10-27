@@ -1,7 +1,9 @@
 package convex.lattice.kv;
 
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.data.ASet;
@@ -27,19 +29,19 @@ import convex.lattice.cursor.Cursors;
  * Built with lattice merge replication: use {@link #fork()} and {@link #sync()}
  * for conflict-free distributed operation.
  */
-public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>> {
+public class LatticeKV extends ALatticeComponent<ACell> {
 
 	private static final AString DEFAULT_REPLICA = Strings.create("default");
 
 	private final AString replicaID;
 	private final Supplier<CVMLong> clock;
 
-	public LatticeKV(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
+	public LatticeKV(AForkableCursor<ACell> cursor, AString replicaID) {
 		this(cursor,replicaID,Utils::getCurrentTimestampCell);
 	}
 
 	/** Binds the clock used for writes and expiry checks; forks retain it. */
-	public LatticeKV(AForkableCursor<Index<AString,AVector<ACell>>> cursor,AString replicaID,Supplier<CVMLong> clock) {
+	public LatticeKV(AForkableCursor<ACell> cursor,AString replicaID,Supplier<CVMLong> clock) {
 		super(cursor);
 		this.replicaID=replicaID;
 		this.clock=Objects.requireNonNull(clock);
@@ -61,7 +63,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	/** Creates a store with an explicit clock, which may advance independently of state. */
 	public static LatticeKV create(AString replicaID,Supplier<CVMLong> clock) {
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
+		AForkableCursor<ACell> cursor =
 			Cursors.root(KVStoreLattice.INSTANCE.zero());
 		return new LatticeKV(cursor,replicaID,clock);
 	}
@@ -72,7 +74,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
 	 * @return New LatticeKV instance connected to the cursor
 	 */
-	public static LatticeKV connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
+	public static LatticeKV connect(AForkableCursor<ACell> cursor) {
 		return new LatticeKV(cursor, DEFAULT_REPLICA);
 	}
 
@@ -83,7 +85,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @param replicaID Replica ID for PN-counter operations
 	 * @return New LatticeKV instance connected to the cursor
 	 */
-	public static LatticeKV connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
+	public static LatticeKV connect(AForkableCursor<ACell> cursor, AString replicaID) {
 		return new LatticeKV(cursor,replicaID);
 	}
 
@@ -106,7 +108,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	@Override
-	protected LatticeKV rebind(AForkableCursor<Index<AString,AVector<ACell>>> cursor) {
+	protected LatticeKV rebind(AForkableCursor<ACell> cursor) {
 		return new LatticeKV(cursor,replicaID,clock);
 	}
 
@@ -127,7 +129,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	private AVector<ACell> getEntry(String key) {
-		Index<AString, AVector<ACell>> store = cursor().get();
+		Index<AString, AVector<ACell>> store = entries();
 		if (store == null) return null;
 		return store.get(key(key));
 	}
@@ -141,10 +143,52 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	private void putEntry(String key, AVector<ACell> entry) {
 		AString k = key(key);
-		cursor().updateAndGet(store -> {
-			if (store == null) store = KVStoreLattice.INSTANCE.zero();
-			return store.assoc(k, entry);
+		cursor().updateAndGet(state -> {
+			checkWriteTime(state,KVEntry.getUTime(entry));
+			var store=KVStoreLattice.entries(state);
+			if (store==null) store=Index.none();
+			return KVStoreLattice.withEntries(state,store.assoc(k,entry));
 		});
+	}
+
+	/** Immutable entry snapshot; the replication state also contains the GC cutoff. */
+	public Index<AString,AVector<ACell>> entries() { return KVStoreLattice.entries(cursor().get()); }
+
+	/** Latest replicated collection cutoff, or null before the first collection. */
+	public CVMLong getGCTimestamp() { return KVStoreLattice.cutoff(cursor().get()); }
+
+	private static void checkWriteTime(ACell state,CVMLong timestamp) {
+		CVMLong cutoff=KVStoreLattice.cutoff(state);
+		if (cutoff!=null && timestamp.longValue()<=cutoff.longValue()) {
+			throw new IllegalStateException("KV write timestamp must be later than the GC cutoff");
+		}
+	}
+
+	/** An absent replacement leaves storage unchanged, including expired entries and tombstones. */
+	private record Edit<R>(AVector<ACell> entry,R result) {}
+
+	/** Reads, checks and replaces one live entry atomically, using one timestamp across retries. */
+	private <R> R edit(String key,long type,String operation,
+			BiFunction<AVector<ACell>,CVMLong,Edit<R>> action) {
+		AString k=key(key);
+		CVMLong timestamp=now();
+		class Update implements UnaryOperator<ACell> {
+			R result;
+			@Override public ACell apply(ACell state) {
+				var store=KVStoreLattice.entries(state);
+				AVector<ACell> entry=store==null?null:store.get(k);
+				if (entry!=null && !KVEntry.isLive(entry,timestamp.longValue())) entry=null;
+				if (type>=0) checkType(entry,type,operation);
+				Edit<R> change=action.apply(entry,timestamp);
+				result=change.result();
+				if (change.entry()==null) return state;
+				checkWriteTime(state,timestamp);
+				return KVStoreLattice.withEntries(state,(store==null?Index.<AString,AVector<ACell>>none():store).assoc(k,change.entry()));
+			}
+		}
+		Update update=new Update();
+		cursor().updateAndGet(update);
+		return update.result;
 	}
 
 	private void checkType(AVector<ACell> entry, long expectedType, String operation) {
@@ -188,10 +232,8 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Deletes a key by creating a tombstone
 	 */
 	public boolean del(String key) {
-		AVector<ACell> entry = getLiveEntry(key);
-		if (entry == null) return false;
-		putEntry(key, KVEntry.createTombstone(now()));
-		return true;
+		return edit(key,-1,"DEL",(entry,ts) ->
+			new Edit<>(entry==null?null:KVEntry.createTombstone(ts),entry!=null));
 	}
 
 	/**
@@ -205,7 +247,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Returns all live keys
 	 */
 	public ASet<AString> keys() {
-		Index<AString, AVector<ACell>> store = cursor().get();
+		Index<AString, AVector<ACell>> store = entries();
 		if (store == null) return Sets.empty();
 		long now = nowMs();
 		ASet<AString> result = Sets.empty();
@@ -222,11 +264,8 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Sets expiry on an existing key. Returns 1 if set, 0 if key not found.
 	 */
 	public long expire(String key, long ttlMillis) {
-		AVector<ACell> entry = getLiveEntry(key);
-		if (entry == null) return 0;
-		CVMLong expire = CVMLong.create(nowMs() + ttlMillis);
-		putEntry(key, KVEntry.withExpiry(entry, expire));
-		return 1;
+		return edit(key,-1,"EXPIRE",(entry,ts) -> new Edit<>(entry==null?null:
+			KVEntry.withExpiry(entry,CVMLong.create(ts.longValue()+ttlMillis)),entry==null?0L:1L));
 	}
 
 	/**
@@ -253,11 +292,8 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	// ========== Hash Operations ==========
 
 	public void hset(String key, String field, ACell value) {
-		AVector<ACell> entry = getLiveEntry(key);
-		checkType(entry, KVEntry.TYPE_HASH, "HSET");
-		ACell hashValue = (entry != null) ? KVEntry.getValue(entry) : null;
-		ACell newHash = KVHash.setField(hashValue, field, value, now());
-		putEntry(key, KVEntry.create(newHash, KVEntry.TYPE_HASH, now()));
+		edit(key,KVEntry.TYPE_HASH,"HSET",(entry,ts) -> new Edit<>(
+			KVEntry.create(KVHash.setField(KVEntry.getValue(entry),field,value,ts),KVEntry.TYPE_HASH,ts),null));
 	}
 
 	public ACell hget(String key, String field) {
@@ -268,13 +304,11 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public boolean hdel(String key, String field) {
-		AVector<ACell> entry = getLiveEntry(key);
-		if (entry == null) return false;
-		checkType(entry, KVEntry.TYPE_HASH, "HDEL");
-		if (!KVHash.fieldExists(KVEntry.getValue(entry), field)) return false;
-		ACell newHash = KVHash.deleteField(KVEntry.getValue(entry), field, now());
-		putEntry(key, KVEntry.create(newHash, KVEntry.TYPE_HASH, now()));
-		return true;
+		return edit(key,KVEntry.TYPE_HASH,"HDEL",(entry,ts) -> {
+			if (entry==null || !KVHash.fieldExists(KVEntry.getValue(entry),field)) return new Edit<>(null,false);
+			ACell value=KVHash.deleteField(KVEntry.getValue(entry),field,ts);
+			return new Edit<>(KVEntry.create(value,KVEntry.TYPE_HASH,ts),true);
+		});
 	}
 
 	public boolean hexists(String key, String field) {
@@ -313,32 +347,28 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	// ========== Set Operations ==========
 
 	public long sadd(String key, ACell... members) {
-		AVector<ACell> entry = getLiveEntry(key);
-		checkType(entry, KVEntry.TYPE_SET, "SADD");
-		ACell setValue = (entry != null) ? KVEntry.getValue(entry) : null;
-		CVMLong ts = now();
-		long added = 0;
-		for (ACell member : members) {
-			if (!KVSet.isMember(setValue, member)) added++;
-			setValue = KVSet.addMember(setValue, member, ts);
-		}
-		putEntry(key, KVEntry.create(setValue, KVEntry.TYPE_SET, ts));
-		return added;
+		return edit(key,KVEntry.TYPE_SET,"SADD",(entry,ts) -> {
+			ACell value=KVEntry.getValue(entry);
+			long added=0;
+			for (ACell member:members) {
+				if (!KVSet.isMember(value,member)) added++;
+				value=KVSet.addMember(value,member,ts);
+			}
+			return new Edit<>(KVEntry.create(value,KVEntry.TYPE_SET,ts),added);
+		});
 	}
 
 	public long srem(String key, ACell... members) {
-		AVector<ACell> entry = getLiveEntry(key);
-		if (entry == null) return 0;
-		checkType(entry, KVEntry.TYPE_SET, "SREM");
-		ACell setValue = KVEntry.getValue(entry);
-		CVMLong ts = now();
-		long removed = 0;
-		for (ACell member : members) {
-			if (KVSet.isMember(setValue, member)) removed++;
-			setValue = KVSet.removeMember(setValue, member, ts);
-		}
-		putEntry(key, KVEntry.create(setValue, KVEntry.TYPE_SET, ts));
-		return removed;
+		return edit(key,KVEntry.TYPE_SET,"SREM",(entry,ts) -> {
+			if (entry==null) return new Edit<>(null,0L);
+			ACell value=KVEntry.getValue(entry);
+			long removed=0;
+			for (ACell member:members) {
+				if (KVSet.isMember(value,member)) removed++;
+				value=KVSet.removeMember(value,member,ts);
+			}
+			return new Edit<>(KVEntry.create(value,KVEntry.TYPE_SET,ts),removed);
+		});
 	}
 
 	public boolean sismember(String key, ACell member) {
@@ -378,29 +408,25 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	// ========== Sorted Set Operations ==========
 
 	public long zadd(String key, double score, ACell member) {
-		AVector<ACell> entry = getLiveEntry(key);
-		checkType(entry, KVEntry.TYPE_SORTED_SET, "ZADD");
-		ACell zsetValue = (entry != null) ? KVEntry.getValue(entry) : null;
-		CVMLong ts = now();
-		long added = (KVSortedSet.getScore(zsetValue, member) == null) ? 1 : 0;
-		zsetValue = KVSortedSet.addMember(zsetValue, member, CVMDouble.create(score), ts);
-		putEntry(key, KVEntry.create(zsetValue, KVEntry.TYPE_SORTED_SET, ts));
-		return added;
+		return edit(key,KVEntry.TYPE_SORTED_SET,"ZADD",(entry,ts) -> {
+			ACell value=KVEntry.getValue(entry);
+			long added=KVSortedSet.getScore(value,member)==null?1:0;
+			value=KVSortedSet.addMember(value,member,CVMDouble.create(score),ts);
+			return new Edit<>(KVEntry.create(value,KVEntry.TYPE_SORTED_SET,ts),added);
+		});
 	}
 
 	public long zrem(String key, ACell... members) {
-		AVector<ACell> entry = getLiveEntry(key);
-		if (entry == null) return 0;
-		checkType(entry, KVEntry.TYPE_SORTED_SET, "ZREM");
-		ACell zsetValue = KVEntry.getValue(entry);
-		CVMLong ts = now();
-		long removed = 0;
-		for (ACell member : members) {
-			if (KVSortedSet.getScore(zsetValue, member) != null) removed++;
-			zsetValue = KVSortedSet.removeMember(zsetValue, member, ts);
-		}
-		putEntry(key, KVEntry.create(zsetValue, KVEntry.TYPE_SORTED_SET, ts));
-		return removed;
+		return edit(key,KVEntry.TYPE_SORTED_SET,"ZREM",(entry,ts) -> {
+			if (entry==null) return new Edit<>(null,0L);
+			ACell value=KVEntry.getValue(entry);
+			long removed=0;
+			for (ACell member:members) {
+				if (KVSortedSet.getScore(value,member)!=null) removed++;
+				value=KVSortedSet.removeMember(value,member,ts);
+			}
+			return new Edit<>(KVEntry.create(value,KVEntry.TYPE_SORTED_SET,ts),removed);
+		});
 	}
 
 	public CVMDouble zscore(String key, ACell member) {
@@ -427,43 +453,33 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	// ========== List Operations ==========
 
 	public long lpush(String key, ACell... values) {
-		AVector<ACell> entry = getLiveEntry(key);
-		checkType(entry, KVEntry.TYPE_LIST, "LPUSH");
-		ACell listValue = (entry != null) ? KVEntry.getValue(entry) : null;
-		listValue = KVList.lpush(listValue, values);
-		putEntry(key, KVEntry.create(listValue, KVEntry.TYPE_LIST, now()));
-		return KVList.length(listValue);
+		return edit(key,KVEntry.TYPE_LIST,"LPUSH",(entry,ts) -> {
+			ACell value=KVList.lpush(KVEntry.getValue(entry),values);
+			return new Edit<>(KVEntry.create(value,KVEntry.TYPE_LIST,ts),KVList.length(value));
+		});
 	}
 
 	public long rpush(String key, ACell... values) {
-		AVector<ACell> entry = getLiveEntry(key);
-		checkType(entry, KVEntry.TYPE_LIST, "RPUSH");
-		ACell listValue = (entry != null) ? KVEntry.getValue(entry) : null;
-		listValue = KVList.rpush(listValue, values);
-		putEntry(key, KVEntry.create(listValue, KVEntry.TYPE_LIST, now()));
-		return KVList.length(listValue);
+		return edit(key,KVEntry.TYPE_LIST,"RPUSH",(entry,ts) -> {
+			ACell value=KVList.rpush(KVEntry.getValue(entry),values);
+			return new Edit<>(KVEntry.create(value,KVEntry.TYPE_LIST,ts),KVList.length(value));
+		});
 	}
 
 	public ACell lpop(String key) {
-		AVector<ACell> entry = getLiveEntry(key);
-		if (entry == null) return null;
-		checkType(entry, KVEntry.TYPE_LIST, "LPOP");
-		ACell listValue = KVEntry.getValue(entry);
-		ACell popped = KVList.lpop(listValue);
-		ACell newList = KVList.afterLpop(listValue);
-		putEntry(key, KVEntry.create(newList, KVEntry.TYPE_LIST, now()));
-		return popped;
+		return edit(key,KVEntry.TYPE_LIST,"LPOP",(entry,ts) -> {
+			if (entry==null) return new Edit<>(null,null);
+			ACell value=KVEntry.getValue(entry);
+			return new Edit<>(KVEntry.create(KVList.afterLpop(value),KVEntry.TYPE_LIST,ts),KVList.lpop(value));
+		});
 	}
 
 	public ACell rpop(String key) {
-		AVector<ACell> entry = getLiveEntry(key);
-		if (entry == null) return null;
-		checkType(entry, KVEntry.TYPE_LIST, "RPOP");
-		ACell listValue = KVEntry.getValue(entry);
-		ACell popped = KVList.rpop(listValue);
-		ACell newList = KVList.afterRpop(listValue);
-		putEntry(key, KVEntry.create(newList, KVEntry.TYPE_LIST, now()));
-		return popped;
+		return edit(key,KVEntry.TYPE_LIST,"RPOP",(entry,ts) -> {
+			if (entry==null) return new Edit<>(null,null);
+			ACell value=KVEntry.getValue(entry);
+			return new Edit<>(KVEntry.create(KVList.afterRpop(value),KVEntry.TYPE_LIST,ts),KVList.rpop(value));
+		});
 	}
 
 	public AVector<ACell> lrange(String key, long start, long stop) {
@@ -487,12 +503,10 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public long incrby(String key, long amount) {
-		AVector<ACell> entry = getLiveEntry(key);
-		checkType(entry, KVEntry.TYPE_COUNTER, "INCRBY");
-		ACell counterValue = (entry != null) ? KVEntry.getValue(entry) : null;
-		counterValue = KVCounter.increment(counterValue, replicaID, amount);
-		putEntry(key, KVEntry.create(counterValue, KVEntry.TYPE_COUNTER, now()));
-		return KVCounter.getValue(counterValue);
+		return edit(key,KVEntry.TYPE_COUNTER,"INCRBY",(entry,ts) -> {
+			ACell value=KVCounter.increment(KVEntry.getValue(entry),replicaID,amount);
+			return new Edit<>(KVEntry.create(value,KVEntry.TYPE_COUNTER,ts),KVCounter.getValue(value));
+		});
 	}
 
 	public long decr(String key) {
@@ -506,31 +520,49 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	// ========== Maintenance ==========
 
 	/**
-	 * Removes expired entries and old tombstones. Returns count of entries removed.
+	 * Collects through the current clock time. Replicas reject entries at or before
+	 * this cutoff unless explicitly retained by collection. New writes must use a
+	 * later timestamp. Returns the number of entries physically removed.
 	 */
 	public long gc() {
-		long now = nowMs();
+		return gc(nowMs());
+	}
+
+	/**
+	 * Advances the replicated cutoff and removes tombstones and expired entries
+	 * through that time. Retains older live records without changing their write
+	 * timestamps. A cutoff behind the current one is a no-op. Choosing the cutoff
+	 * is application policy: previously unseen older offline writes are discarded.
+	 */
+	public long gc(long timestamp) {
+		CVMLong cutoff=CVMLong.create(timestamp);
 		long[] removed = {0};
-		cursor().updateAndGet(store -> {
-			if (store == null) return store;
-			Index<AString, AVector<ACell>> result = store;
+		cursor().updateAndGet(state -> {
+			removed[0]=0;
+			CVMLong previous=KVStoreLattice.cutoff(state);
+			if (previous!=null && timestamp<=previous.longValue()) return state;
+			var store=KVStoreLattice.entries(state);
+			if (store==null) store=Index.none();
+			Index<AString,AVector<ACell>> result=store;
 			for (var e : store.entrySet()) {
 				AVector<ACell> entry = e.getValue();
-				if (KVEntry.isTombstone(entry) || KVEntry.isExpired(entry, now)) {
-					result = result.dissoc(e.getKey());
-					removed[0]++;
+				if (KVEntry.getUTime(entry).longValue()<=timestamp) {
+					if (KVEntry.isTombstone(entry) || KVEntry.isExpired(entry,timestamp)) {
+						result=result.dissoc(e.getKey());
+						removed[0]++;
+					} else {
+						result=result.assoc(e.getKey(),KVEntry.retain(entry,cutoff));
+					}
 				}
 			}
-			return result;
+			return Vectors.of(result,cutoff);
 		});
 		return removed[0];
 	}
 
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected Index<AString, AVector<ACell>> mergePublication(
-			Index<AString, AVector<ACell>> own,
-			Index<AString, AVector<ACell>> other) {
+	protected ACell mergePublication(ACell own,ACell other) {
 		return KVStoreLattice.INSTANCE.merge(own,other);
 	}
 }

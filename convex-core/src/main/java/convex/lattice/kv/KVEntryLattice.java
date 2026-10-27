@@ -96,7 +96,11 @@ public class KVEntryLattice extends ALattice<AVector<ACell>> {
 			mergedExpire = (expA.longValue() >= expB.longValue()) ? expA : expB;
 		}
 
-		return KVEntry.create(mergedValue, type, mergedTime).assoc(KVEntry.POS_EXPIRE, mergedExpire);
+		AVector<ACell> result=KVEntry.create(mergedValue,type,mergedTime).assoc(KVEntry.POS_EXPIRE,mergedExpire);
+		CVMLong retainedA=KVEntry.getRetainedAt(a),retainedB=KVEntry.getRetainedAt(b);
+		if (retainedA!=null) result=KVEntry.retain(result,retainedA);
+		if (retainedB!=null) result=KVEntry.retain(result,retainedB);
+		return result;
 	}
 
 	@Override

@@ -52,7 +52,7 @@ public class LatticeKVTest {
 		LatticeKV kv = new LatticeKV(cursor,Strings.create("test"),() -> fixed);
 
 		kv.set("a", Strings.create("v"));
-		AVector<ACell> entry = cursor.get().get(Strings.create("a"));
+		AVector<ACell> entry = kv.entries().get(Strings.create("a"));
 		assertEquals(fixed, KVEntry.getUTime(entry), "utime should be the injected clock timestamp");
 	}
 
@@ -65,7 +65,7 @@ public class LatticeKVTest {
 		time.set(CVMLong.create(120));
 		assertEquals(30,draft.ttl("a"));
 		draft.set("b",Strings.create("second"));
-		assertEquals(time.get(),KVEntry.getUTime(draft.cursor().get().get(Strings.create("b"))));
+		assertEquals(time.get(),KVEntry.getUTime(draft.entries().get(Strings.create("b"))));
 		// Publication reconciles state without consulting a mutation clock.
 		time.set(null);
 		draft.sync();

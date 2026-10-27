@@ -1094,7 +1094,7 @@ public class LatticeCursorTest {
 		// === Step 4: Merge database owner-map replica into cursor at :kv ===
 		// exportReplica returns {accountKey → signed({dbName → kvStore})}
 		// This is the OwnerLattice value shape
-		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> replicaA =
+		AHashMap<ACell, SignedData<AHashMap<AString, ACell>>> replicaA =
 			dbA.exportReplica();
 		convex.lattice.ComponentTestSupport.merge(kvCursor,kvLattice, replicaA);
 
@@ -1106,15 +1106,15 @@ public class LatticeCursorTest {
 		ACell kvValue = rootState.get(Keywords.KV);
 		assertNotNull(kvValue, "Owner map should exist at :kv");
 
-		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> ownerMap =
-			(AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>>) kvValue;
-		SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> signedA =
+		AHashMap<ACell, SignedData<AHashMap<AString, ACell>>> ownerMap =
+			(AHashMap<ACell, SignedData<AHashMap<AString, ACell>>>) kvValue;
+		SignedData<AHashMap<AString, ACell>> signedA =
 			ownerMap.get(nodeA.getAccountKey());
 		assertNotNull(signedA, "Owner map should contain node A's signed state");
 		assertTrue(signedA.checkSignature(), "Signed state should have valid signature");
 
 		// The signed value contains {dbName → kvStore}
-		AHashMap<AString, Index<AString, AVector<ACell>>> dbMapA = signedA.getValue();
+		AHashMap<AString, ACell> dbMapA = signedA.getValue();
 		assertNotNull(dbMapA.get(Strings.create("mydb")), "Signed value should contain 'mydb' database");
 
 		// === Step 6: A second node reads data from the root cursor ===
@@ -1132,7 +1132,7 @@ public class LatticeCursorTest {
 
 		// === Step 7: Node B adds data and merges back into root ===
 		dbB.kv().set("source", Strings.create("nodeB"));
-		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> replicaB =
+		AHashMap<ACell, SignedData<AHashMap<AString, ACell>>> replicaB =
 			dbB.exportReplica();
 		convex.lattice.ComponentTestSupport.merge(kvCursor,kvLattice, replicaB);
 

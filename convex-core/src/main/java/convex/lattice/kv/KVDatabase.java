@@ -7,9 +7,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
-import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -64,7 +62,7 @@ public class KVDatabase {
 	 * {@code did:key} owners only. Indirect owners require an explicit verifier.
 	 * Structure: owner map → signed database map → KV store.
 	 */
-	public static final OwnerMapLattice<ACell,AHashMap<AString, Index<AString, AVector<ACell>>>>
+	public static final OwnerMapLattice<ACell,AHashMap<AString, ACell>>
 		OWNER_LATTICE = OwnerMapLattice.create(MapLattice.create(KVStoreLattice.INSTANCE),
 			(owner,key) -> key.equals(LatticeContext.ownerAccountKey(owner)));
 
@@ -72,14 +70,14 @@ public class KVDatabase {
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
 	private final LatticeKV kv;
-	private final OwnerMapLattice<ACell,AHashMap<AString,Index<AString,AVector<ACell>>>> owners;
+	private final OwnerMapLattice<ACell,AHashMap<AString,ACell>> owners;
 
 	private KVDatabase(AString dbName, AKeyPair keyPair, ACell ownerKey, LatticeKV kv) {
 		this(dbName,keyPair,ownerKey,kv,OWNER_LATTICE);
 	}
 
 	private KVDatabase(AString dbName,AKeyPair keyPair,ACell ownerKey,LatticeKV kv,
-			OwnerMapLattice<ACell,AHashMap<AString,Index<AString,AVector<ACell>>>> owners) {
+			OwnerMapLattice<ACell,AHashMap<AString,ACell>> owners) {
 		this.dbName = dbName;
 		this.keyPair = keyPair;
 		this.ownerKey = ownerKey;
@@ -139,7 +137,7 @@ public class KVDatabase {
 	 */
 	public static KVDatabase create(String name,AKeyPair keyPair,ACell ownerKey,AString replicaID,
 			BiPredicate<ACell,AccountKey> verifier) {
-		var owners=OwnerMapLattice.create(MapLattice.<AString,Index<AString,AVector<ACell>>>create(
+		var owners=OwnerMapLattice.create(MapLattice.<AString,ACell>create(
 			KVStoreLattice.INSTANCE),Objects.requireNonNull(verifier));
 		return new KVDatabase(Strings.create(name),Objects.requireNonNull(keyPair),
 			Objects.requireNonNull(ownerKey),LatticeKV.create(replicaID),owners);
@@ -159,8 +157,8 @@ public class KVDatabase {
 	@SuppressWarnings("unchecked")
 	public static KVDatabase connect(AForkableCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = new MapComponent<>(databases).path(dbName);
+		var databases=(AForkableCursor<AHashMap<AString,ACell>>)parent;
+		AForkableCursor<ACell> cursor = new MapComponent<>(databases).path(dbName);
 		LatticeKV kv = LatticeKV.connect(cursor);
 		return new KVDatabase(dbName, null, null, kv);
 	}
@@ -177,8 +175,8 @@ public class KVDatabase {
 	@SuppressWarnings("unchecked")
 	public static KVDatabase connect(AForkableCursor<?> parent, String name, AString replicaID) {
 		AString dbName = Strings.create(name);
-		var databases=(AForkableCursor<AHashMap<AString,Index<AString, AVector<ACell>>>>)parent;
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor = new MapComponent<>(databases).path(dbName);
+		var databases=(AForkableCursor<AHashMap<AString,ACell>>)parent;
+		AForkableCursor<ACell> cursor = new MapComponent<>(databases).path(dbName);
 		LatticeKV kv = LatticeKV.connect(cursor, replicaID);
 		return new KVDatabase(dbName, null, null, kv);
 	}
@@ -226,9 +224,9 @@ public class KVDatabase {
 	 * @throws IllegalStateException if no authorised signing key is available
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> getSignedState() {
+	public SignedData<AHashMap<AString, ACell>> getSignedState() {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
-		AHashMap<AString, Index<AString, AVector<ACell>>> dbMap =
+		AHashMap<AString, ACell> dbMap =
 			(AHashMap) Maps.of(dbName, kv.cursor().get());
 		var signed=owners.signingFor(ownerKey).sign(dbMap,keyPair::signData);
 		if (signed==null) throw new IllegalStateException("Signing key is not authorised for KV owner");
@@ -246,7 +244,7 @@ public class KVDatabase {
 	 * @throws IllegalStateException if no signing key is available (connected mode)
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> exportReplica() {
+	public AHashMap<ACell, SignedData<AHashMap<AString, ACell>>> exportReplica() {
 		return (AHashMap) Maps.of(ownerKey, getSignedState());
 	}
 
@@ -261,22 +259,22 @@ public class KVDatabase {
 	 * @return Number of replicas successfully merged
 	 * @throws IllegalStateException if no signing key is available (connected mode)
 	 */
-	public long mergeReplicas(AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> remoteOwnerMap) {
+	public long mergeReplicas(AHashMap<ACell, SignedData<AHashMap<AString, ACell>>> remoteOwnerMap) {
 		if (remoteOwnerMap == null || remoteOwnerMap.isEmpty()) return 0;
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 
 		// The same bound rule verifies remote replicas and local exports.
-		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> verified =
+		AHashMap<ACell, SignedData<AHashMap<AString, ACell>>> verified =
 			owners.merge(Maps.empty(),remoteOwnerMap);
 
 		// Absorb verified remote data into local store
 		long merged = 0;
 		for (var entry : verified.entrySet()) {
 			if (ownerKey.equals(entry.getKey())) continue; // skip self
-			AHashMap<AString, Index<AString, AVector<ACell>>> dbMap = entry.getValue().getValue();
+			AHashMap<AString, ACell> dbMap = entry.getValue().getValue();
 			if (dbMap == null) continue;
 
-			Index<AString, AVector<ACell>> remoteState = (Index<AString, AVector<ACell>>) dbMap.get(dbName);
+			ACell remoteState = (ACell) dbMap.get(dbName);
 			if (remoteState != null) {
 				kv.cursor().updateAndGet(own -> KVStoreLattice.INSTANCE.merge(own,remoteState));
 				merged++;
