@@ -9,8 +9,9 @@ behaviour in [CAD036](https://docs.convex.world/docs/cad/lattice_node).
 
 ## Key points
 
-- A region is a keyword key on the root lattice; its value type and merge function are
-  fixed by the lattice registered under that key.
+- A region is a keyword key at the root, with one meaning allocated by CAD053.
+  `Lattice.ROOT` registers a lattice for each core region; which regions a node
+  merges, and how, is for the applications it runs.
 - Applications receive incoming values through components registered with their
   host. Each component decides which regions to accept and when to publish.
 - Owner-scoped regions hold a complete signed envelope at `[:<region> <ownerKey>]`.
@@ -70,7 +71,7 @@ Regions that are designed but not registered in `Lattice.ROOT`:
 | Region | Path | Lattice | Purpose |
 |---|---|---|---|
 | `:convex` | `[:convex <genesis-hash> :peers]` | `BeliefLattice` (CPoS merge) | Consensus beliefs scoped by network; see `convex-peer/docs/P2P_DESIGN.md`. |
-| `:sql` | `[:sql <dbName> :tables <tableName>]` | Convex DB components (`ConvexDB`), which execute the merges | Publicly shared relational data for `convex-db`, such as reference tables ([CAD039](https://docs.convex.world/docs/cad/convex_sql)). The components take the cursor for their level and assume no fixed region, so an application roots its own databases where it chooses, conventionally under `:app`. |
+| `:sql` | `[:sql <ownerKey> ...]` | Not yet defined | Reserved by [CAD053](https://docs.convex.world/docs/cad/lattice_regions) for databases published for many applications to read, such as reference tables: each owner's signed databases, as in the replica format of [CAD039](https://docs.convex.world/docs/cad/convex_sql). Convex DB components take the cursor for their level and assume no fixed region, so an application roots its own databases where it chooses, conventionally under `:app`. |
 
 ## Selective attention
 
