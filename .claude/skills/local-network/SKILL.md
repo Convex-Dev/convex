@@ -68,8 +68,9 @@ applications own merge semantics. The host owns root retention and durability;
 of one live application over a whole lattice. It does not publish or interpret
 `NodeInfo`, inspect `:p2p` / `:social` paths, or implement discovery policy. The
 calling application explicitly creates each `LatticePropagator`; there is no
-implicit/default group. `LatticeNode.createPropagator()` creates and registers a
-group using the host store, starting it if running. Identity, filters and handlers
+implicit/default group. `LatticeNode.createPropagator(groupConfig)` creates and
+registers a group using the host store, starting it if running; the no-argument
+form uses default limits, not the node's config. Identity, filters and handlers
 may be configured dynamically. A zero-propagator node
 is a valid local persistent node. Each propagator owns its connection manager,
 transport identity, trust, bounded protocol endpoint, filters and serving store,

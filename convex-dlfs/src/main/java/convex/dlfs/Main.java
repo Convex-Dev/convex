@@ -18,20 +18,19 @@ import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
-import convex.node.NodeServer;
 import convex.lattice.LatticeHost;
-import convex.node.LatticeListener;
+import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeConfig;
 
 /**
- * Standalone entry point demonstrating a complete NodeServer-hosted DLFS stack
- * with an independently composed lattice transport.
+ * Standalone entry point demonstrating a complete DLFS stack on a
+ * {@link LatticeNode}.
  *
- * <p>This boots {@link NodeServer}, attaches {@link DLFSApplication} at its
- * configured lattice path, routes one owner's drives and starts the HTTP
- * transport. JSON5 configuration controls persistent identity/storage,
+ * <p>This attaches {@link DLFSApplication} at its configured lattice path, puts the
+ * host on TCP with a {@link LatticeNode}, routes one owner's drives and starts the
+ * HTTP transport. JSON5 configuration controls persistent identity/storage,
  * identity-aware bootstrap peers and explicit network exposure policy.
  *
  * <pre>{@code
@@ -69,19 +68,14 @@ public final class Main {
 		var host=LatticeHost.open(store);
 		var application=host.addApplication(new DLFSApplication(host,keyPair::signData,Utils::getCurrentTimestampCell,
 			config.getMaxFutureTimestampSkew(),regionPath));
-		NodeServer<Index<Keyword,ACell>> node=new NodeServer<>(host,nodeConfig);
-		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(nodeConfig));
-		propagator.setTransportKeyPair(keyPair);
-		node.addPropagator(propagator);
-		LatticeListener transport=new LatticeListener(nodeConfig);
-		transport.registerPropagator(propagator);
-		if (config.isPublicLatticeInbound()) transport.setSelector(connection->propagator);
+		LatticeNode<Index<Keyword,ACell>> node=new LatticeNode<>(host,nodeConfig)
+			.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
+		// The config file's node section also carries the group limits
+		LatticePropagator propagator=node.createPropagator(LatticePropagatorConfig.from(nodeConfig));
+		if (config.isPublicLatticeInbound()) node.serveAllInbound(propagator);
 		try {
-			node.launch();
-			transport.launch();
+			node.launch(); // closes the node if it fails
 		} catch (IOException | InterruptedException | RuntimeException e) {
-			transport.close();
-			closeNode(node);
 			store.close();
 			throw e;
 		}
@@ -94,7 +88,7 @@ public final class Main {
 		DLFSDrives localDrives=application.drives(keyPair.getAccountKey());
 		String driveName=config.getDriveName();
 		if (localDrives.getOrCreateDrive(driveName)==null) {
-			closeNode(transport,node);
+			closeNode(node);
 			store.close();
 			throw new IllegalStateException("Could not open or create drive: "+driveName);
 		}
@@ -119,7 +113,7 @@ public final class Main {
 		try {
 			drives.sync();
 		} catch (RuntimeException e) {
-			closeNode(transport,node);
+			closeNode(node);
 			store.close();
 			throw e;
 		}
@@ -136,7 +130,7 @@ public final class Main {
 		try {
 			server.start(config.getHTTPPort());
 		} catch (RuntimeException e) {
-			closeNode(transport,node);
+			closeNode(node);
 			store.close();
 			throw e;
 		}
@@ -145,7 +139,7 @@ public final class Main {
 		System.out.println("DLFS region: "+Arrays.toString(regionPath));
 		System.out.println("DLFS drive: http://"+config.getHTTPBindHost()+":"+server.getPort()+
 			"/dlfs/"+driveName+"/");
-		System.out.println("Lattice node port: "+transport.getPort()+
+		System.out.println("Lattice node port: "+node.getListener().getPort()+
 			(config.isPublicLatticeInbound()?" (public propagation view)":" (inbound denied)"));
 		System.out.println("Bootstrap peers: "+config.getBootstrapPeers().size());
 		System.out.println("Store: "+config.getStorePath());
@@ -155,24 +149,21 @@ public final class Main {
 		AtomicBoolean closing=new AtomicBoolean();
 		Runnable shutdown=()->{
 			if (!closing.compareAndSet(false,true)) return;
-			server.close();
-			// Stop ingress first, so drafts synced next include every accepted merge
-			transport.close();
-			node.stopIngress();
-			try {
-				drives.sync();
+			// Closes the host (final checkpoint, sent to peers), then the node, then the store
+			try (store; node; host) {
+				server.close();
+				node.stopIngress();
+				try {
+					drives.sync();
+				} catch (RuntimeException e) {
+					System.err.println("Failed to publish DLFS state: "+e.getMessage());
+				}
 			} catch (Exception e) {
-				System.err.println("Failed to publish DLFS state: "+e.getMessage());
+				// The first close to fail is the host's final save, if that failed
+				System.err.println("DLFS shutdown failed: "+e.getMessage());
+			} finally {
+				stopped.countDown();
 			}
-			try {
-				// Final checkpoint, published through the node, which sends it as it closes
-				host.close();
-			} catch (Exception e) {
-				System.err.println("Failed to save DLFS state: "+e.getMessage());
-			}
-			closeNode(node);
-			store.close();
-			stopped.countDown();
 		};
 
 		// Runs in Convex's shutdown order, before transports and Etch files close
@@ -266,17 +257,12 @@ public final class Main {
 		return port;
 	}
 
-	private static void closeNode(NodeServer<?> node) {
+	private static void closeNode(LatticeNode<?> node) {
 		try {
 			node.close();
 		} catch (Exception e) {
 			System.err.println("Failed to close lattice node: "+e.getMessage());
 		}
-	}
-
-	private static void closeNode(LatticeListener transport,NodeServer<?> node) {
-		transport.close();
-		closeNode(node);
 	}
 
 	private static void printUsage() {

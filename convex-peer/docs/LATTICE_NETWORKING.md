@@ -31,8 +31,14 @@ try (var network = new LatticeNode<>(host, config).launch()) {
 
 `createPropagator()` creates and registers a group using the host store and starts
 it when the network is running. No separate add or activation call is needed.
-New groups have no peers or assigned inbound sockets. `removePropagator(group)`
-revokes inbound assignments and closes that group without stopping other groups.
+New groups have no peers or assigned inbound sockets. A group reads its limits from
+its own configuration, never the node's: `createPropagator(groupConfig)` supplies
+one, and the no-argument form uses defaults. `removePropagator(group)` revokes
+inbound assignments and closes that group without stopping other groups.
+
+`LatticeNode` is the standard TCP assembly: the DLFS server, `convex dlfs start` and
+`P2PNode` use it. A host replicated without a listener, such as a Convex DB managed
+instance or the GUI DLFS browser, uses `NodeServer` directly.
 
 The node may configure a primary DID and an authorised key pair with `setIdentity`.
 The two-argument overload validates `did:key`; other methods require an explicit
@@ -78,7 +84,7 @@ internals.
 
 ## Application composition
 
-For custom serving stores, limits or transports, the application can assemble groups directly:
+For custom serving stores or transports, the application can assemble groups directly:
 
 ```java
 NodeConfig nodeConfig = NodeConfig.port(0);
@@ -115,9 +121,12 @@ neither object and does not copy keys, filters or handlers into the group. An
 application with several groups retains their references and selects the
 intended group explicitly for pulls and connection assignment.
 
-`LatticePropagatorConfig.from(NodeConfig)` preserves combined-map callers during
-migration. New composition should construct the two configurations separately;
-matching key names do not imply inheritance.
+Both configurations are CVM maps; the Java classes are typed views of them.
+`LatticePropagatorConfig.from(NodeConfig)` reads the node's map as a group's, which
+is how the DLFS server and `P2PNode` let one config section carry both. A key is then
+read by every component that reads that name: `maxConnections` caps both the
+listener's sockets and each group's tracked connections. New composition gives
+the node and each group a map of its own.
 
 ## Connection capabilities
 

@@ -57,8 +57,8 @@ implementation 'world.convex:convex-dlfs:0.8.18'
 
 ### Run a WebDAV server
 
-The module has a standalone entry point which composes the full NodeServer-hosted
-lattice application stack without the Convex CLI:
+The module has a standalone entry point which composes the full lattice application
+stack on a `LatticeNode` without the Convex CLI:
 
 ```bash
 java -cp convex.jar convex.dlfs.Main \

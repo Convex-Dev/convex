@@ -755,11 +755,12 @@ the node runs: dynamic is the default unless something genuinely cannot change. 
 node may carry a primary DID and an authorised key as the default transport identity
 of new groups; the DID is optional, and more capable nodes will want one.
 
-`LatticeNode` is the standard TCP assembly. The hand-assembled node setups (the P2P
-node, the CLI and DLFS servers, ConvexDB and the GUI browser) port to it
-(Convex-Dev/convex#769); the wrapper's own design stays open. The networking
-narrative has one home, `convex-peer/docs/LATTICE_NETWORKING.md`; the applications
-manual points there.
+`LatticeNode` is the standard TCP assembly: the P2P node and the CLI and DLFS servers
+use it (Convex-Dev/convex#769). ConvexDB and the GUI browser replicate without a
+listener, so they use `NodeServer` directly. A group reads its limits from its own
+configuration map, never the node's; `createPropagator(groupConfig)` supplies one and
+the no-argument form uses defaults. The networking narrative has one home,
+`convex-peer/docs/LATTICE_NETWORKING.md`; the applications manual points there.
 
 CAD text affected: CAD036 (*Lattice Node*) node construction, propagation group
 lifecycle and node identity.

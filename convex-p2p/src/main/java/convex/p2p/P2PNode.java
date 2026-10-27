@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -43,11 +44,11 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.LatticeConnectionManager;
 import convex.node.LatticeListener;
+import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
-import convex.node.RelayHost;
 import convex.social.Social;
 
 /**
@@ -56,9 +57,9 @@ import convex.social.Social;
  * <p>This is the main entry point for convex-p2p — a rollup package, so this is the
  * <em>only</em> node server, with no separate social or per-application node. It
  * assembles the node up to the lattice root: a host opened from the store as
- * configured, the replicating {@link NodeServer}, one propagation group and an
- * application-owned {@link LatticeListener}. From the root down, the
- * {@link P2PApplication} configured on the host owns the lattice and the P2P policy.</p>
+ * configured, and a {@link LatticeNode} with one propagation group. From the root
+ * down, the {@link P2PApplication} configured on the host owns the lattice and the
+ * P2P policy.</p>
  *
  * <p><b>Regions are configuration.</b> {@link #create(AStore, NodeConfig, AKeyPair)}
  * serves {@link P2PLattice#NODE_ROOT} — the P2P regions plus the bundled application
@@ -100,9 +101,10 @@ public class P2PNode implements Closeable {
 
 	private static final Logger log = LoggerFactory.getLogger(P2PNode.class.getName());
 
+	private final LatticeNode<Index<Keyword, ACell>> network;
+	/** The network's server, which replicates the host. */
 	private final NodeServer<Index<Keyword, ACell>> server;
 	private final LatticePropagator propagator;
-	private final LatticeListener transport;
 	private final P2PApplication application;
 	private final NodeConfig config;
 	private final AKeyPair keyPair;
@@ -112,12 +114,12 @@ public class P2PNode implements Closeable {
 	/** Freezes P2P application configuration at the same boundary as NodeServer. */
 	private boolean launchStarted;
 
-	private P2PNode(NodeServer<Index<Keyword, ACell>> server,P2PApplication application,
-			LatticePropagator propagator,LatticeListener transport,NodeConfig config,AKeyPair keyPair) {
-		this.server=server;
+	private P2PNode(LatticeNode<Index<Keyword, ACell>> network,P2PApplication application,
+			LatticePropagator propagator,NodeConfig config,AKeyPair keyPair) {
+		this.network=network;
+		this.server=network.getServer();
 		this.application=application;
 		this.propagator=propagator;
-		this.transport=transport;
 		this.config=config;
 		this.keyPair=keyPair;
 		NodeDirectory directory=application.directory();
@@ -228,15 +230,11 @@ public class P2PNode implements Closeable {
 			Utils::getCurrentTimestampCell,didAuthorizer);
 		host.addApplication(application);
 
-		NodeServer<Index<Keyword, ACell>> server=new NodeServer<>(host,effectiveConfig);
-		LatticeConnectionManager manager=new LatticeConnectionManager(store);
-		LatticePropagator propagator=new LatticePropagator(store,manager,effectivePropagatorConfig);
-		propagator.setTransportKeyPair(keyPair);
-		LatticeListener transport=new LatticeListener(effectiveConfig);
-		transport.registerPropagator(propagator);
-		P2PNode node=new P2PNode(server,application,propagator,transport,effectiveConfig,keyPair);
-		server.addPropagator(propagator);
-		return node;
+		// The node key is the transport identity of the group created next
+		LatticeNode<Index<Keyword,ACell>> network=new LatticeNode<>(host,effectiveConfig);
+		if (keyPair!=null) network.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
+		LatticePropagator propagator=network.createPropagator(effectivePropagatorConfig);
+		return new P2PNode(network,application,propagator,effectiveConfig,keyPair);
 	}
 
 	/** Registers and opens this node's local {@code did:key} social user. */
@@ -296,7 +294,7 @@ public class P2PNode implements Closeable {
 	 * @return this node, for chaining
 	 */
 	public P2PNode serveAllInbound() {
-		transport.setSelector(connection -> propagator);
+		network.serveAllInbound(propagator);
 		return this;
 	}
 
@@ -386,24 +384,23 @@ public class P2PNode implements Closeable {
 				log.debug("Unable to initialise admitted peer {}: {}",peerKey,error.getMessage());
 				return null;
 			}));
-		server.launch();
+		// A failed launch closes the network itself
+		network.launch();
 		try {
-			transport.launch();
 			// The transport knows its port now, so the application can publish the node's record.
-			application.directory().publishOwnRecord(config.getAdvertisedURL(transport.getPort()));
+			Integer port = getPort();
+			application.directory().publishOwnRecord(config.getAdvertisedURL(port));
 			refreshDiscovery();
 			for (Convex peer:manager.getPeers()) initialisePeer(peer);
-			Integer port = transport.getPort();
 			if (port != null && port >= 0) {
 				log.info("Convex P2P node listening on port {}", port);
 			} else {
 				log.info("Convex P2P node started in local-only mode");
 			}
-		} catch (IOException | InterruptedException | RuntimeException | Error e) {
-			transport.close();
+		} catch (RuntimeException | Error e) {
 			try {
-				server.close();
-			} catch (IOException closeFailure) {
+				network.close();
+			} catch (IOException | RuntimeException | Error closeFailure) {
 				e.addSuppressed(closeFailure);
 			}
 			throw e;
@@ -595,7 +592,7 @@ public class P2PNode implements Closeable {
 	 * @return application-owned lattice listener
 	 */
 	public LatticeListener getTransport() {
-		return transport;
+		return network.getListener();
 	}
 
 	/** Package test hook for this wrapper's application-owned propagation group. */
@@ -610,12 +607,12 @@ public class P2PNode implements Closeable {
 	 * @return configured or bound port, or {@code null} when unspecified
 	 */
 	public Integer getPort() {
-		return transport.getPort();
+		return network.getListener().getPort();
 	}
 
 	/** Returns the bound inbound TCP address, or {@code null} when none is open. */
 	public InetSocketAddress getHostAddress() {
-		return transport.getHostAddress();
+		return network.getHostAddress();
 	}
 
 	/**
@@ -624,20 +621,15 @@ public class P2PNode implements Closeable {
 	 * @return true if the node has been launched and not closed
 	 */
 	public boolean isRunning() {
-		return server.isRunning() && transport.isRunning();
+		return server.isRunning() && network.getListener().isRunning();
 	}
 
 	/**
-	 * Stops networking changing the host: closes the listener, then drains accepted
-	 * inbound work, as {@link NodeServer#stopIngress()} does. Publication continues;
-	 * see convex-peer/docs/SHUTDOWN.md for the service order.
+	 * Stops networking changing the host, as {@link LatticeNode#stopIngress()} does.
+	 * Publication continues; see convex-peer/docs/SHUTDOWN.md for the service order.
 	 */
 	public void stopIngress() {
-		try {
-			transport.close();
-		} finally {
-			server.stopIngress();
-		}
+		network.stopIngress();
 	}
 
 	/**
@@ -646,8 +638,7 @@ public class P2PNode implements Closeable {
 	 */
 	@Override
 	public void close() throws IOException {
-		transport.close();
-		server.close();
+		network.close();
 	}
 
 	/**

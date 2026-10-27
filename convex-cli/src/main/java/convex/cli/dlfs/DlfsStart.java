@@ -33,10 +33,9 @@ import convex.lattice.LatticeHost;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
 import convex.node.NodeConfig;
-import convex.node.LatticeListener;
+import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
-import convex.node.NodeServer;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -135,43 +134,34 @@ public class DlfsStart extends ACommand {
 		NodeConfig config = buildNodeConfig();
 
 		// Register DLFS before starting any incoming delivery.
-		NodeServer<Index<Keyword,ACell>> nodeServer;
+		LatticeHost<Index<Keyword,ACell>> host;
 		DLFSApplication application;
 		try {
-			var host=LatticeHost.open(store);
+			host=LatticeHost.open(store);
 			application=host.addApplication(new DLFSApplication(host,keyPair::signData));
-			nodeServer=new NodeServer<>(host,config);
 		} catch (IOException e) {
 			store.close();
 			throw new CLIError(ExitCodes.CONFIG, "Failed to open node store: " + e.getMessage(), e);
 		}
-		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(config));
-		propagator.setTransportKeyPair(keyPair);
-		nodeServer.addPropagator(propagator);
-		LatticeListener latticeTransport=new LatticeListener(config);
-		latticeTransport.registerPropagator(propagator);
+		LatticeNode<Index<Keyword,ACell>> node=new LatticeNode<>(host,config)
+			.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
+		// The command's node config also carries the group limits
+		LatticePropagator propagator=node.createPropagator(LatticePropagatorConfig.from(config));
 
 		try {
-			nodeServer.launch();
-			latticeTransport.launch();
+			node.launch(); // closes the node if it fails
 		} catch (Exception e) {
-			latticeTransport.close();
-			try {
-				nodeServer.close();
-			} catch (Exception closeError) {
-				e.addSuppressed(closeError);
-			}
 			store.close();
-			throw new CLIError(ExitCodes.CONFIG, "Failed to launch NodeServer: " + e.getMessage(), e);
+			throw new CLIError(ExitCodes.CONFIG, "Failed to launch lattice node: " + e.getMessage(), e);
 		}
-		inform("Lattice transport started on port " + latticeTransport.getPort());
+		inform("Lattice transport started on port " + node.getListener().getPort());
 
 		// Connect to remote peers
 		connectPeers(propagator);
 
 		// Serve the local owner's drives through the application's registered region.
 		AccountKey accountKey = keyPair.getAccountKey();
-		DLFSDriveManager driveManager=createDriveManager(nodeServer.getHost(),application,accountKey);
+		DLFSDriveManager driveManager=createDriveManager(host,application,accountKey);
 		DLFSServer dlfsServer = DLFSServer.createWithAudience(driveManager,keyPair);
 		// The CLI currently exposes shared anonymous drives on the loopback-only server.
 		// Authentication-aware per-user drive provisioning is a separate product concern.
@@ -189,9 +179,8 @@ public class DlfsStart extends ACommand {
 			dlfsServer.start(port);
 		} catch (RuntimeException e) {
 			dlfsServer.close();
-			latticeTransport.close();
 			try {
-				nodeServer.close();
+				node.close();
 			} catch (Exception closeError) {
 				e.addSuppressed(closeError);
 			}
@@ -214,28 +203,18 @@ public class DlfsStart extends ACommand {
 				try { closed.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
 				return;
 			}
-			try {
+			// Closes the host (final checkpoint, sent to peers), then the node, then the store
+			try (store; node; host) {
 				dlfsServer.close();
-				// Stop ingress first, so drafts synced next include every accepted merge
-				latticeTransport.close();
-				nodeServer.stopIngress();
+				node.stopIngress();
 				try {
 					driveManager.sync();
-				} catch (Exception e) {
+				} catch (RuntimeException e) {
 					log.warn("Error publishing DLFS state",e);
 				}
-				try {
-					// Final checkpoint, published through the node, which sends it as it closes
-					nodeServer.getHost().close();
-				} catch (Exception e) {
-					log.warn("Error saving DLFS state",e);
-				}
-				try {
-					nodeServer.close();
-				} catch (Exception e) {
-					log.warn("Error closing NodeServer", e);
-				}
-				store.close();
+			} catch (Exception e) {
+				// The first close to fail is the host's final save, if that failed
+				log.warn("Error shutting down DLFS",e);
 			} finally {
 				closed.countDown();
 			}
@@ -250,7 +229,7 @@ public class DlfsStart extends ACommand {
 
 		try {
 			// Block until node server shuts down
-			while (nodeServer.isRunning()) {
+			while (node.getServer().isRunning()) {
 				Thread.sleep(1000);
 			}
 		} finally {

@@ -66,12 +66,24 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	public synchronized AKeyPair getKeyPair() { return keyPair; }
 
 	/**
-	 * Creates and registers a group over the host store, starting it if already running.
-	 * Its transport key defaults to the node's configured key, or null without an identity.
-	 * The group can override this default through {@link LatticePropagator#setTransportKeyPair(AKeyPair)}.
+	 * Creates and registers a group with default limits, as
+	 * {@link #createPropagator(LatticePropagatorConfig)} does. The node's configuration
+	 * is not inherited: a node and its groups read separate configurations.
 	 */
-	public synchronized LatticePropagator createPropagator() {
-		var propagator=new LatticePropagator(server.getStore());
+	public LatticePropagator createPropagator() {
+		return createPropagator(LatticePropagatorConfig.create());
+	}
+
+	/**
+	 * Creates and registers a group over the host store with the given limits,
+	 * starting it if already running. Its transport key defaults to the node's
+	 * configured key, or null without an identity. The group can override this
+	 * default through {@link LatticePropagator#setTransportKeyPair(AKeyPair)}.
+	 *
+	 * @param config the group's route, queue and publication limits
+	 */
+	public synchronized LatticePropagator createPropagator(LatticePropagatorConfig config) {
+		var propagator=new LatticePropagator(server.getStore(),config);
 		propagator.setTransportKeyPair(keyPair);
 		server.addPropagator(propagator);
 		listener.registerPropagator(propagator);

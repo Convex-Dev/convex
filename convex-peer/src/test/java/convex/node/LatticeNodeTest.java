@@ -14,6 +14,7 @@ import convex.core.ErrorCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
@@ -30,6 +31,20 @@ import convex.lattice.generic.SetLattice;
 
 /** Optional networking preserves the existing host, application boundaries and store ownership. */
 class LatticeNodeTest {
+
+	/** A group reads its own configuration map; a key in the node's map is not inherited (#769). */
+	@Test void groupLimitsComeFromTheGroupConfig() throws Exception {
+		var nodeConfig=NodeConfig.create(Maps.of(NodeConfig.PORT,CVMLong.create(-1),
+			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(3)));
+		var groupConfig=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(5)));
+		try (var store=new MemoryStore();
+				var network=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),nodeConfig).launch()) {
+			assertEquals(LatticePropagatorConfig.DEFAULT_MAX_DESIRED_PEERS,
+				network.createPropagator().getConnectionManager().getMaxDesiredPeers());
+			assertEquals(5,network.createPropagator(groupConfig).getConnectionManager().getMaxDesiredPeers());
+		}
+	}
 
 	/** Node identity supplies group defaults without inventing keys or replacing group overrides. */
 	@Test void primaryIdentityIsValidatedAndUsedAsTheGroupDefault() throws Exception {
