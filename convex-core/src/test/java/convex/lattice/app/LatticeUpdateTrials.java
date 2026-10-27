@@ -17,9 +17,10 @@ import convex.lattice.cursor.AForkableCursor;
  * update each, and the draft is published once a second. Publication hashes the changed
  * counters, so the draft pays that once per publication rather than per add. The draft is
  * the region's only writer, so publication never needs to merge. One thread adds and
- * publishes; the run checks that every add reached the host. Run with:</p>
+ * publishes; the run checks that every add reached the host. Run with, optionally
+ * giving the length of the run in seconds:</p>
  * <pre>
- * ./mvnw -q -pl convex-core test-compile exec:java -Dexec.mainClass=convex.lattice.app.LatticeUpdateTrials -Dexec.classpathScope=test
+ * ./mvnw -q -pl convex-core test-compile exec:java -Dexec.mainClass=convex.lattice.app.LatticeUpdateTrials -Dexec.classpathScope=test -Dexec.args=120
  * </pre>
  */
 public final class LatticeUpdateTrials {
@@ -52,11 +53,12 @@ public final class LatticeUpdateTrials {
 	}
 
 	public static void main(String... args) {
+		int seconds=(args.length==0)?SECONDS:Integer.parseInt(args[0]);
 		var host=LatticeHost.create();
 		var counters=new Counters(host.cursor().path(COUNTERS)).fork();
 		long total=0;
 		long next=System.nanoTime();
-		for (int second=1;second<=SECONDS;second++) {
+		for (int second=1;second<=seconds;second++) {
 			next+=1_000_000_000L;
 			long adds=0;
 			while (System.nanoTime()<next) {
@@ -69,7 +71,7 @@ public final class LatticeUpdateTrials {
 			total+=adds;
 			System.out.printf("second %2d %,12d adds %,9d ns publish%n",second,adds,publish);
 		}
-		System.out.printf("average   %,12d adds/s%n",total/SECONDS);
+		System.out.printf("average   %,12d adds/s%n",total/seconds);
 
 		long published=0;
 		for (CVMLong count:new Counters(host.cursor().path(COUNTERS)).get().values()) published+=count.longValue();
