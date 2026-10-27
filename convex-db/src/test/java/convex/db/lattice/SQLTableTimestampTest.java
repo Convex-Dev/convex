@@ -19,9 +19,9 @@ import convex.lattice.cursor.Root;
 
 /**
  * The table entry's ctime is the time the table was created (CAD039). Row writes leave it
- * unchanged and are stamped no earlier than it, so under {@link RowLWW} a later row write
- * on a node that has not seen a DROP TABLE or a re-creation cannot make the older table
- * win, and a writer whose clock is behind the ctime keeps its rows.
+ * unchanged, so under {@link RowLWW} a later row write on a node that has not seen a DROP
+ * TABLE or a re-creation cannot make the older table win. Rows carry the clock's reading
+ * as it is: how a writer timestamps its writes is the application's choice.
  */
 public class SQLTableTimestampTest {
 
@@ -48,20 +48,18 @@ public class SQLTableTimestampTest {
 		assertEquals(CREATED, table.getTimestamp());
 	}
 
-	/** A writer whose clock is behind the ctime stamps rows at the ctime, so other copies keep them (#802). */
+	/**
+	 * A row is stamped with the clock's reading even when that is before the table's ctime.
+	 * Under RowLWW such a row belongs to an earlier table and is dropped on merge (#802).
+	 */
 	@Test
-	public void testLaggingClockStampsRowsAtCtime() {
+	public void testRowStampIsTheClockReading() {
 		SQLTable table = table(SQLTable.createState(SCHEMA, CREATED), () -> BEHIND);
 		AVector<ACell> created = table.getState();
 
 		assertTrue(table.insertRow(PK, Vectors.of(1L)));
-		assertEquals(CREATED, SQLRow.getTimestamp(table.getRows().get(PK)));
-		AVector<ACell> written = table.getState();
-		assertEquals(1, SQLTable.getLiveCount(RowLWW.mergeTable(created, written)));
-		assertEquals(1, SQLTable.getLiveCount(RowLWW.mergeTable(written, created)));
-
-		assertTrue(table.deleteRow(PK));
-		assertEquals(CREATED, SQLRow.getTimestamp(table.getRows().get(PK)));
+		assertEquals(BEHIND, SQLRow.getTimestamp(table.getRows().get(PK)));
+		assertEquals(0, SQLTable.getLiveCount(RowLWW.mergeTable(created, table.getState())));
 	}
 
 	/** A node that never saw the drop writes a row later; the drop still wins. */

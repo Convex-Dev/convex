@@ -59,13 +59,14 @@ given to `ConvexDB` (or to a standalone `SQLDatabase` or `SQLSchema`), defaultin
 the runtime clock. The factories pass it down to every database and table, and forks
 and transactions keep it. Each write reads it once: creating or dropping a table
 stamps the table entry with its `ctime`, and inserting or deleting a row stamps the
-row, never earlier than the table's `ctime`. Merges never read it, and incoming
-values keep their timestamps.
+row. Merges never read it, and incoming values keep their timestamps.
 
-The clock is how a writer orders its writes, so it is the application's policy. A
-single writer that needs every later write to win supplies strictly increasing
-stamps; otherwise two writes in the same millisecond tie, and a tie keeps the value
-already held.
+The clock is how a writer orders its writes, so it is the application's policy, and
+the merge policy takes the stamps as written. A single writer that needs every later
+write to win supplies strictly increasing stamps; otherwise two writes in the same
+millisecond tie, and a tie keeps the value already held. Under `RowLWW`, a row
+stamped before its table's `ctime` belongs to an earlier table and is dropped on
+merge, so a clock that reads behind a table's creation loses the rows it stamps.
 
 ## Cursor Descent
 
@@ -171,12 +172,12 @@ Every route by which state arrives reaches the policy:
 | row entry | `mergeRow` | LWW by timestamp; equal timestamps favour deletion, otherwise own |
 
 An entry's `ctime` is the time the table was created, or dropped for a tombstone: row
-writes leave it unchanged and are stamped no earlier than it. A row written before a
-table was created belongs to an earlier table of that name, so when one side holds a
-row the other lacks, the row survives only if it was written at or after the other
-side's `ctime`. Rows written before a `DROP TABLE`
-therefore never return, whether a copy missed the drop or the table was created again,
-and every copy of a single writer's tables converges to the writer's own. `DROP TABLE`
+writes leave it unchanged. A row written before a table was created belongs to an
+earlier table of that name, so when one side holds a row the other lacks, the row
+survives only if it was written at or after the other side's `ctime`. Rows written
+before a `DROP TABLE` therefore never return, whether a copy missed the drop or the
+table was created again, and every copy of a single writer's tables converges to the
+writer's own while its clock stamps each write at or after the table's `ctime`. `DROP TABLE`
 writes only the tombstone: a dropped table holds just the rows written after it was
 dropped, which no reader sees.
 

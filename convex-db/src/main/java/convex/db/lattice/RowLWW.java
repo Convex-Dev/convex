@@ -35,7 +35,9 @@ import convex.db.ConvexDB;
  * </ul>
  *
  * <p>So rows written before a table is dropped and created again never return, and the
- * copies of a single writer's tables converge to the writer's own. Two creations of a
+ * copies of a single writer's tables converge to the writer's own, as long as its clock
+ * stamps each row at or after its table's ctime: a row stamped earlier is dropped, on the
+ * writer's own copy too. Timestamping is the writer's choice. Two creations of a
  * table by different writers are different tables: rows written to the earlier one
  * before the later creation are dropped. Ordering schema changes between writers is
  * application policy.
