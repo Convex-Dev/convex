@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Accept lattice data, including Convex DB replicas, under an account address or DID only from signers an owner verifier authorises; without one, an account key must sign its own data. ([Replica Ownership](convex-db/README.md#replica-ownership), [#780](https://github.com/Convex-Dev/convex/issues/780), [#782](https://github.com/Convex-Dev/convex/issues/782))
 - Read integers beyond 64 bits in Convex DB: `BIGINT` columns and integer sums are presented as `NUMERIC`, through JDBC and the PostgreSQL wire protocol. ([Types](convex-db/docs/SQL-TYPES.md), [#757](https://github.com/Convex-Dev/convex/issues/757))
 - Keep Convex DB prepared statements correct when their table is dropped or re-created with other columns: JDBC reports the change, and the PostgreSQL wire protocol prepares them again. ([#785](https://github.com/Convex-Dev/convex/issues/785))
+- Bind `ConvexDB.getConnection` to the application's own database, under any name, leaving `jdbc:convex:` URLs of the same name untouched. ([#789](https://github.com/Convex-Dev/convex/issues/789))
 
 ## [0.8.18] - 2026-10-25
 

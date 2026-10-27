@@ -146,9 +146,8 @@ Connection conn = cdb.getConnection("market");
 ```
 
 This is the preferred API when you manage the `NodeServer` lifecycle yourself.
-The driver keeps the instance in its map as `mem:market`, where the code that
-`INSERT`, `UPDATE` and `DELETE` generate finds it, so it replaces any in-memory
-instance of that name.
+The connection is bound to that database alone: no URL reaches it, the driver's
+instances are untouched, and the name may be any string.
 
 ### Registered Databases
 

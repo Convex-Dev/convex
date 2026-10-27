@@ -443,8 +443,9 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	}
 
 	/**
-	 * Gets a JDBC Connection for a named database within this ConvexDB.
-	 * Bypasses DriverManager and the static registry entirely.
+	 * Gets a JDBC Connection bound to a named database within this ConvexDB.
+	 * The database is reached through the connection only: neither the registry
+	 * nor the driver's URL instances see it, and the name may be any string.
 	 *
 	 * <p>This is the preferred API when you already hold a ConvexDB instance
 	 * (e.g. from {@link #connect(ALatticeComponent)}).

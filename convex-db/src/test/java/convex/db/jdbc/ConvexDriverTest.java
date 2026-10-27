@@ -15,6 +15,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.RowLWW;
@@ -263,6 +265,38 @@ public class ConvexDriverTest {
 		}
 	}
 
+	/** A direct connection leaves the driver's in-memory database of the same name in place (#789). */
+	@Test
+	public void testDirectConnectionLeavesDriverDatabase() throws Exception {
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:direct_shared");
+				Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("CREATE TABLE driver_t (id INTEGER)");
+		}
+
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
+		cdb.database("direct_shared").tables().createTable("APP_T", new String[]{"ID"});
+		try (Connection conn = cdb.getConnection("direct_shared")) {
+			assertEquals(List.of("APP_T"), tableNames(conn));
+		}
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:direct_shared")) {
+			assertEquals(List.of("DRIVER_T"), tableNames(conn), "the URL still reaches the driver's database");
+		}
+	}
+
+	/** A direct connection's database name is never read as a URL (#789). */
+	@Test
+	public void testDirectConnectionTakesAnyName() throws Exception {
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
+		for (String name : new String[] {"direct;b", "file:direct_any.etch", "database=direct_any", "direct=any"}) {
+			cdb.database(name).tables().createTable("T", new String[]{"ID", "V"},
+					new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR});
+			try (Connection conn = cdb.getConnection(name); Statement stmt = conn.createStatement()) {
+				stmt.executeUpdate("INSERT INTO t VALUES (1, 'one')");
+			}
+			assertEquals(Vectors.of(1L, "one"), cdb.database(name).tables().selectByKey("T", CVMLong.create(1)), name);
+		}
+	}
+
 	// ========== Legacy Format ==========
 
 	@Test
@@ -284,5 +318,15 @@ public class ConvexDriverTest {
 		} finally {
 			cdb.unregister("legacy_test");
 		}
+	}
+
+	// ========== Helpers ==========
+
+	private static List<String> tableNames(Connection conn) throws Exception {
+		List<String> names = new ArrayList<>();
+		try (ResultSet rs = conn.getMetaData().getTables(null, null, "%", new String[]{"TABLE"})) {
+			while (rs.next()) names.add(rs.getString("TABLE_NAME"));
+		}
+		return names;
 	}
 }

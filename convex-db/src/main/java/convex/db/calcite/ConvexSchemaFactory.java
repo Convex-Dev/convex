@@ -42,25 +42,6 @@ public class ConvexSchemaFactory implements SchemaFactory {
 	// ========== Table lookup for generated code ==========
 
 	/**
-	 * Gets a ConvexTable by schema and table name.
-	 * Called from generated code in ConvexTableModify.
-	 * Navigates the database's cursor tree each time, so it always
-	 * reflects the current lattice state.
-	 *
-	 * @param schemaName Schema name (maps to a database)
-	 * @param tableName Table name
-	 * @return The ConvexTable
-	 */
-	public static ConvexTable getTable(String schemaName, String tableName) {
-		SQLDatabase db = ConvexDB.lookupDatabase(schemaName);
-		if (db == null) {
-			throw new IllegalStateException(
-				"No database found for '" + schemaName + "'.");
-		}
-		return new ConvexSchema(db, schemaName).getConvexTable(tableName);
-	}
-
-	/**
 	 * Gets a table from the schema attached to the current connection's data context.
 	 * This preserves instance and transaction isolation without a global name lookup.
 	 *
