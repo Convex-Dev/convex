@@ -202,10 +202,10 @@ ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 // ... use conn ...
 
-server.stopIngress();     // replication no longer changes the host
-server.getHost().close(); // save accepted host state, published through the node
-server.close();           // send it to peers, then stop replication
-store.close();
+// Shutdown (see convex-peer/docs/SHUTDOWN.md): closes the host, the server, the store
+try (store; server; var host = server.getHost()) {
+    server.stopIngress(); // replication no longer changes the host
+}
 ```
 
 ### Multiple Databases in One Store

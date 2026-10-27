@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.AfterEach;
@@ -350,6 +351,43 @@ public class LatticeConnectionManagerTest {
 		assertTrue(inbound.isClosed());
 	}
 
+	/** A maintenance pass during the final write must not retire the route and discard it (#778). */
+	@Test public void testCloseKeepsRoutesOpenUntilWritten() throws Exception {
+		manager.setPeerTargets(1,0);
+		candidate(1);
+		fill(1);
+		StubPeer peer=(StubPeer)manager.getConnections().values().iterator().next();
+		manager.setPeerTargets(0,0); // the next pass would retire this route
+
+		CompletableFuture<Void> closing=CompletableFuture.runAsync(() -> manager.close(60_000));
+		peer.flushRequested.get(5,TimeUnit.SECONDS);
+		manager.maintainConnections();
+		assertTrue(peer.isConnected(),"no route is retired while close waits for its messages");
+		peer.written.complete(null);
+		closing.get(5,TimeUnit.SECONDS);
+		assertFalse(peer.isConnected());
+	}
+
+	/** A route that never finishes writing is closed at the timeout. */
+	@Test public void testCloseStopsWaitingAtTimeout() {
+		candidate(1);
+		fill(1);
+		StubPeer peer=(StubPeer)manager.getConnections().values().iterator().next();
+		manager.close(1);
+		assertTrue(peer.flushRequested.isDone());
+		assertFalse(peer.isConnected());
+	}
+
+	/** close() closes routes without waiting for their messages. */
+	@Test public void testCloseWithoutTimeoutDoesNotWait() {
+		candidate(1);
+		fill(1);
+		StubPeer peer=(StubPeer)manager.getConnections().values().iterator().next();
+		manager.close();
+		assertFalse(peer.flushRequested.isDone());
+		assertFalse(peer.isConnected());
+	}
+
 	private static class TestManager extends LatticeConnectionManager {
 		final Map<AccountKey,CompletableFuture<Convex>> dials=new LinkedHashMap<>();
 		final Map<Object,CompletableFuture<Void>> probes=new HashMap<>();
@@ -377,10 +415,16 @@ public class LatticeConnectionManagerTest {
 	}
 
 	private static class StubPeer extends Convex {
-		boolean connected=true;
+		volatile boolean connected=true;
+		final CompletableFuture<Void> flushRequested=new CompletableFuture<>();
+		final CompletableFuture<Void> written=new CompletableFuture<>();
 		StubPeer(AccountKey key) { super(null,null); setVerifiedPeer(key); }
 		@Override public boolean isConnected() { return connected; }
 		@Override public boolean trySend(Message message) { return connected; }
+		@Override public CompletableFuture<Void> flushOutbound() {
+			flushRequested.complete(null);
+			return written;
+		}
 		@Override public void close() { connected=false; }
 		@Override public void reconnect() { connected=true; }
 		@Override public InetSocketAddress getHostAddress() { return null; }

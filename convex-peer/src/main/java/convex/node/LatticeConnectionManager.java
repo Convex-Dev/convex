@@ -406,10 +406,35 @@ public class LatticeConnectionManager extends AConnectionManager {
 	}
 
 	/**
-	 * Stops the maintenance thread and closes all connections.
+	 * Stops admission and maintenance, then closes all connections at once.
 	 */
 	@Override
 	public synchronized void close() {
+		stopMaintenance();
+		closeAllConnections();
+		workers.shutdownNow();
+		log.debug("LatticeConnectionManager closed");
+	}
+
+	/**
+	 * Closes as {@link #close()} does, once the messages already sent on each
+	 * manager-owned route have been written to its socket. Admission and maintenance
+	 * stop before the wait, so no route is retired or replaced while its last
+	 * messages leave. The wait ends at the timeout, or at once if the caller is
+	 * interrupted. A route that cannot report written messages is not waited for.
+	 * Delivery stays best effort: written is not acknowledged.
+	 *
+	 * @param timeout maximum milliseconds to wait for sent messages to be written;
+	 *        zero or less closes at once
+	 */
+	public synchronized void close(long timeout) {
+		stopMaintenance();
+		if (timeout>0) awaitWritten(timeout);
+		close();
+	}
+
+	/** Stops admission and the maintenance thread, waiting for a pass in progress. */
+	private void stopMaintenance() {
 		accepting = false;
 		running = false;
 		maintenanceSignal.release();
@@ -430,43 +455,21 @@ public class LatticeConnectionManager extends AConnectionManager {
 			}
 			maintenanceThread = null;
 		}
-
-		closeAllConnections();
-		workers.shutdownNow();
-		log.debug("LatticeConnectionManager closed");
-	}
-
-	/**
-	 * Closes as {@link #close()} does once the messages already sent on every route
-	 * have been written to its socket, or the timeout has passed. A route that cannot
-	 * report written messages closes without waiting. Delivery stays best effort:
-	 * written is not acknowledged.
-	 *
-	 * @param timeout maximum milliseconds to wait for sent messages to be written;
-	 *        zero or less closes at once
-	 */
-	public void close(long timeout) {
-		if (timeout>0) awaitWritten(timeout);
-		close();
 	}
 
 	private void awaitWritten(long timeout) {
 		ArrayList<CompletableFuture<?>> written=new ArrayList<>();
 		for (Convex peer:connections.values()) {
-			if (peer!=null) written.add(peer.flushOutbound().exceptionally(e -> null));
-		}
-		for (AConnection route:getSupplementalInboundRoutes()) {
-			written.add(route.flushOutbound().exceptionally(e -> null));
+			written.add(peer.flushOutbound().exceptionally(e -> null));
 		}
 		try {
+			// Failures complete normally above, so only the timeout ends the wait early
 			CompletableFuture.allOf(written.toArray(CompletableFuture[]::new))
 				.get(timeout,TimeUnit.MILLISECONDS);
-		} catch (TimeoutException e) {
+		} catch (TimeoutException | ExecutionException e) {
 			log.debug("Lattice messages not written to every route within {} ms; closing",timeout);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-		} catch (ExecutionException e) {
-			// Unreachable: each failure was mapped to completion above
 		}
 	}
 

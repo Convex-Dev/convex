@@ -231,7 +231,7 @@ var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::sign
     Utils::getCurrentTimestampCell, 30_000,
     Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
 var did = DID.forKey(myKeyPair.getAccountKey());
-try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPair).launch()) {
+try (store; var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPair).launch(); host) {
     var group = network.createPropagator();
     network.serveAllInbound(group); // explicitly allow inbound access to this view
 
@@ -255,22 +255,19 @@ try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPai
     }
     network.stopIngress(); // no merge lands after the drafts below sync
     routes.sync();
-    host.close(); // final checkpoint, sent to peers as the network closes
-}
+} // closes the host (final checkpoint, sent to peers), the network, then the store
 ```
 
 The propagator inherits the node's identity key and can be configured with peers
 while running. An empty peer list is safe. Closing the network stops its listener
-and propagators; the caller retains ownership of the store.
+and propagators; it never closes the store.
 
 The callbacks above promise durable completion by calling `checkpoint()` before
 returning. A callback using `host.sync()` instead retains and offers the root to
 replication but leaves the physical barrier to the service's policy, for example
-a scoped `host.autoFlush(Duration.ofSeconds(1))`. Close the HTTP service first,
-then stop the network's ingress and sync remaining drafts. Close the host next: it
-stops the durability resource and saves a final checkpoint, which the network sends
-to its peers as it closes. Close the store last. A failed checkpoint
-must fail the request; it does not undo a file write already made locally.
+a scoped `host.autoFlush(Duration.ofSeconds(1))`. A failed checkpoint must fail
+the request; it does not undo a file write already made locally. Shutdown follows
+the [standard order](../convex-peer/docs/SHUTDOWN.md).
 
 Custom owner authority and region placement can be supplied together:
 

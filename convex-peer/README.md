@@ -200,8 +200,9 @@ to `setIdentity`. A group can override its own key. Changing the node default
 affects future groups only.
 
 The node closes its listener, groups and server, leaving the host and its
-caller-owned store usable. To send a final checkpoint to peers at shutdown, call
-`network.stopIngress()`, sync drafts and close the host before the node closes.
+caller-owned store usable. A service shuts down with
+`try (store; network; host) { network.stopIngress(); app.sync(); }`, so peers
+receive its final checkpoint; see [shutdown](docs/SHUTDOWN.md).
 A host sync persists and schedules propagation;
 group announcement completes asynchronously. See the
 [reading-list example](src/test/java/convex/node/app/ReadingListApplicationTest.java)
@@ -245,6 +246,7 @@ The underlying components remain available for custom transport assembly:
 - [Lattice Networking Responsibilities and Trust Boundaries](docs/LATTICE_NETWORKING.md)
 - [Delta Propagation, Backpressure and Memory Bounds](docs/PROPAGATION.md)
 - [Lattice Persistence and Node Configuration](docs/PERSISTENCE.md)
+- [Lattice Service Shutdown](docs/SHUTDOWN.md)
 - [Javadoc API Reference](https://javadoc.io/doc/world.convex/convex-peer)
 - [Convex Documentation](https://docs.convex.world)
 - [Running a Peer](https://docs.convex.world/docs/convex-peer)

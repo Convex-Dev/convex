@@ -99,14 +99,11 @@ transport.setSelector(connection -> publicGroup);
 node.launch();
 transport.launch();
 
-// Shutdown order: stop ingress and drain it, sync any application drafts, close the
-// host to save (the node publishes its final checkpoint), close the node to send it,
-// close the store.
-transport.close();
-node.stopIngress();
-node.getHost().close();
-node.close();
-nodeStore.close();
+// Shutdown (see SHUTDOWN.md): closes the host, then the node, then the store
+try (nodeStore; node; var host = node.getHost()) {
+    transport.close();
+    node.stopIngress();
+}
 ```
 
 `NodeConfig` contains authoritative persistence, standard-listener and application
@@ -232,21 +229,10 @@ coupling recovery policy to `NodeServer`. A running group may report prior or
 intermittent failures; `Status.isOperational()` describes lifecycle, while
 `Status.hasFailures()` describes observed degradation.
 
-Shutdown is composed in the opposite order: the application closes every
-transport, then `NodeServer.stopIngress()` asks each endpoint to drain. Each group
-cleanup is independent. Endpoint cleanup also continues after a timed-out
-acquisition so one stuck resource does not suppress the remaining cleanup steps.
-After the drain the node stops accepting deliveries: an ingress worker that
-overran its timeout, or a pull that completes later, is rejected rather than
-merged, so nothing from networking changes the host once `stopIngress()` returns.
-Publication continues. The service syncs its application drafts and closes the
-host, which saves a final checkpoint and publishes it through the node. Then
-`NodeServer.close()` drains each group's publication, waits within the group's
-`inboundShutdownTimeout` for the broadcasts to be written to each outbound route,
-and closes the routes. Closing neither publishes pending host state nor flushes the
-store. See [persistence](PERSISTENCE.md#lifecycle) for the full order and the
-limits of the final broadcast. `LatticeNode.stopIngress()` closes its listener and
-stops the server's ingress in one step.
+Shutdown runs in the opposite order; [shutdown](SHUTDOWN.md) gives the full
+sequence. Each group's cleanup is independent, and endpoint cleanup continues
+after a timed-out acquisition, so one stuck resource does not suppress the
+remaining steps.
 
 Store failures while the node runs are surfaced by `NodeServer` and host sync;
 saving failures by the host's `checkpoint()` or `flush()`. Listener failures are

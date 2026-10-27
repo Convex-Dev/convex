@@ -126,10 +126,8 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 
 	/**
 	 * Stops networking changing the host: closes the listener, then drains the
-	 * server's accepted inbound work. Publication continues to outbound routes, so
-	 * sync the application drafts to keep and close the host next; its final
-	 * checkpoint reaches peers when this node closes. See
-	 * {@link NodeServer#stopIngress()}.
+	 * server's accepted inbound work, as {@link NodeServer#stopIngress()} does.
+	 * Publication continues; see convex-peer/docs/SHUTDOWN.md for the service order.
 	 */
 	public synchronized void stopIngress() {
 		try {

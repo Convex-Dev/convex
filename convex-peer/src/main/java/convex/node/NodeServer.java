@@ -631,11 +631,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * rather than merged. Host syncs still reach every group until {@link #close()},
 	 * which sends them to peers before closing routes.
 	 *
-	 * <p>This is the first step of service shutdown: stop ingress, sync the
-	 * application drafts to keep, close the host, whose final checkpoint is published
-	 * through this node, then close this node. Calling it again, before launch or
-	 * after close does nothing; {@link #close()} calls it first. Group failures are
-	 * isolated, and groups can no longer be added or removed, as in close.</p>
+	 * <p>This is the first step of service shutdown; see convex-peer/docs/SHUTDOWN.md.
+	 * Calling it again, before launch or after close does nothing; {@link #close()}
+	 * calls it first. Group failures are isolated, and groups can no longer be added
+	 * or removed, as in close.</p>
 	 */
 	public synchronized void stopIngress() {
 		if (lifecycleState==LifecycleState.STARTING) {

@@ -321,9 +321,10 @@ public class NettyConnection extends AConnection {
 	}
 
 	/**
-	 * Completes once every message queued before this call has been written to the
-	 * socket. Waits for the queue to drain while the channel is unwritable; fails if
-	 * the channel closes first.
+	 * Completes once the outbound queue is empty and the last message taken from it
+	 * has been written to the socket, so every message queued before this call is
+	 * covered. Messages queued meanwhile are waited for too, so continuous sending
+	 * delays completion. Fails if the channel closes first.
 	 */
 	@Override
 	public CompletableFuture<Void> flushOutbound() {

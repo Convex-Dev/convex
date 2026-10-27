@@ -628,10 +628,9 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * Stops networking changing the host while publication continues: closes the
-	 * listener, then drains accepted inbound work. The service then closes the host,
-	 * whose final checkpoint reaches peers when this node closes. See
-	 * {@link NodeServer#stopIngress()}.
+	 * Stops networking changing the host: closes the listener, then drains accepted
+	 * inbound work, as {@link NodeServer#stopIngress()} does. Publication continues;
+	 * see convex-peer/docs/SHUTDOWN.md for the service order.
 	 */
 	public void stopIngress() {
 		try {
@@ -643,8 +642,7 @@ public class P2PNode implements Closeable {
 
 	/**
 	 * Stops networking, sending what the host has published to connected peers first.
-	 * For a final checkpoint that peers receive, call {@link #stopIngress()} and close
-	 * the host before this node, as {@code try (store; node; host)} does.
+	 * Neither publishes pending host edits nor flushes the borrowed store.
 	 */
 	@Override
 	public void close() throws IOException {
