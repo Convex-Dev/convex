@@ -257,6 +257,60 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return assocEntry(MapEntry.create((K)key, (V)value));
 	}
 
+	/**
+	 * Updates the value for a key, equivalent in value to
+	 * {@code assoc(key, function.apply(get(key), arg))}. A present key takes one
+	 * descent; an absent key is inserted with {@link #assoc}. The function receives
+	 * null for an absent key. If it returns the current value instance, this Index
+	 * is returned unchanged. The function must be pure: it may be applied again.
+	 *
+	 * @param <A> Type of the function argument
+	 * @param key Key to update
+	 * @param function Function of the current value and the argument
+	 * @param arg Argument passed to the function
+	 * @return Updated Index, or null if the key is null
+	 */
+	public <A> Index<K, V> update(K key, BiFunction<? super V, ? super A, ? extends V> function, A arg) {
+		if (key==null) return null;
+		Index<K,V> updated;
+		try {
+			updated=updatePresent(key,key.hexLength(),function,arg);
+		} catch (StackOverflowError e) {
+			// Fully unwound; the structure is immutable, so use the two stack-safe descents.
+			return assoc(key,function.apply(get(key),arg));
+		}
+		if (updated!=null) return updated;
+		return assoc(key,function.apply(null,arg));
+	}
+
+	/**
+	 * Replaces the value of a present key in one descent, following {@link #getEntry}.
+	 * Builds the same cells as {@link #assoc} for that key.
+	 *
+	 * @return Updated Index, or null if the key is absent
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private <A> Index<K, V> updatePresent(K key, long kl, BiFunction<? super V, ? super A, ? extends V> function, A arg) {
+		long pl=getDepth();
+		if (kl<pl) return null;
+		if ((kl==pl)||(pl==MAX_DEPTH)) {
+			if (!entryKeyMatch(key,entry)) return null;
+			V value=entry.getValue();
+			V newValue=function.apply(value,arg);
+			if (newValue==value) return this;
+			MapEntry<K,V> e=MapEntry.create(key,newValue);
+			return (count==1)?create(e):new Index<K,V>(getDepth(),e,(Ref[])children,mask,count);
+		}
+		int digit=key.getHexDigit(pl);
+		Index<K,V> child=getChild(digit);
+		if (child==null) return null;
+		if (child.getDepth()<=pl) return null; // malformed: descent must make progress
+		Index<K,V> newChild=child.updatePresent(key,kl,function,arg);
+		if (newChild==null) return null;
+		if (newChild==child) return this;
+		return withChild(digit,child,newChild);
+	}
+
 	@Override
 	public Index<K, V> dissoc(K k) {
 		try {

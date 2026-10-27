@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wait until a lattice propagation group serves the state you need with `whenAnnounced(condition)`. ([Waiting](convex-peer/docs/PERSISTENCE.md#waiting-in-tests-and-applications), [#805](https://github.com/Convex-Dev/convex/issues/805))
 - Give each `LatticeNode` propagation group its own limits with `createPropagator(groupConfig)`. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md), [#769](https://github.com/Convex-Dev/convex/issues/769))
 - Merge a small delta into a large `Index` without visiting the rest of it, with `Index.merge`; Convex DB row deliveries now cost the rows delivered, not the table. ([#786](https://github.com/Convex-Dev/convex/issues/786))
+- Update an `Index` entry from its current value in one step with `Index.update(key, function, arg)`, about a third faster than `get` then `assoc`.
 - Encrypt Convex DB's PostgreSQL wire connections with TLS: clients connect with `sslmode=require` up to `verify-full` (proposed by @trsb-standards). ([TLS](convex-db/README.md#tls), [#756](https://github.com/Convex-Dev/convex/issues/756))
 
 ### Changed

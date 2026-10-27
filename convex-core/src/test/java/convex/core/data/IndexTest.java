@@ -22,9 +22,11 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 
 import org.junit.jupiter.api.Test;
 
@@ -545,6 +547,7 @@ public class IndexTest {
 				Index<Blob,CVMLong> updated=index.assoc(zero,CVMLong.create(999));
 				assertEquals(CVMLong.create(999),updated.get(zero));
 				assertEquals(Index.MAX_DEPTH,updated.dissoc(zero).count());
+				assertEquals(updated,index.update(zero,(v,a) -> a,CVMLong.create(999)));
 
 				long[] visited=new long[1];
 				index.forEach((k,v) -> visited[0]++);
@@ -562,6 +565,49 @@ public class IndexTest {
 		worker.start();
 		worker.join();
 		if (failure.get()!=null) throw new AssertionError("Maximum-depth Index operation failed",failure.get());
+	}
+
+	/** Update matches get then assoc for present, absent, prefix, nil-valued and aliased keys. */
+	@Test
+	public void testUpdate() throws InvalidDataException {
+		Random r=new Random(7312);
+		byte[] alphabet={0x00,0x01,0x10,(byte)0xFF};
+		List<ABlob> keys=new ArrayList<>();
+		for (int i=0;i<200;i++) {
+			// Short keys over a small alphabet are often prefixes of one another
+			byte[] bytes=new byte[r.nextInt(7)];
+			for (int j=0;j<bytes.length;j++) bytes[j]=alphabet[r.nextInt(alphabet.length)];
+			keys.add(Blob.wrap(bytes));
+			keys.add(Blob.createRandom(r,16));
+		}
+		byte[] base=new byte[300];
+		Arrays.fill(base,(byte)0x51);
+		byte[] aliasBytes=Arrays.copyOf(base,400);
+		aliasBytes[399]=0x77;
+		keys.add(Blob.wrap(base));
+		keys.add(Blob.wrap(aliasBytes)); // aliases the previous key on its first 255 bytes
+
+		Index<ABlob,CVMLong> index=Index.none();
+		for (int i=0;i<keys.size();i+=2) index=index.assoc(keys.get(i),CVMLong.create(i));
+		Blob nil=Blob.fromHex("0110");
+		index=index.assoc(nil,null); // present with a nil value
+		keys.add(nil);
+		index.validate();
+
+		BiFunction<CVMLong,CVMLong,CVMLong> plus=(count,delta) -> (count==null)?delta:CVMLong.create(count.longValue()+delta.longValue());
+		CVMLong delta=CVMLong.create(5);
+		for (ABlob key:keys) {
+			Index<ABlob,CVMLong> updated=index.update(key,plus,delta);
+			assertEquals(index.assoc(key,plus.apply(index.get(key),delta)),updated);
+			updated.validate();
+			if (index.containsKey(key)) assertSame(index,index.update(key,(v,a) -> v,null));
+		}
+		assertNull(index.update(null,plus,delta));
+
+		AString shorter=Strings.create("counter-7"), longer=Strings.create("counter-70");
+		Index<AString,CVMLong> names=Index.of(shorter,CVMLong.ONE,longer,CVMLong.ONE);
+		assertEquals(Index.of(shorter,CVMLong.create(6),longer,CVMLong.ONE),names.update(shorter,plus,delta));
+		assertEquals(Index.of(shorter,CVMLong.ONE,longer,CVMLong.create(6)),names.update(longer,plus,delta));
 	}
 
 	@Test
