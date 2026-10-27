@@ -2,6 +2,7 @@ package convex.lattice.app;
 
 import convex.core.data.AString;
 import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.IndexComponent;
@@ -9,12 +10,14 @@ import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 
 /**
- * Performance trial for atomic adds to named counters held in a {@link LatticeHost}.
+ * Performance trial for atomic adds to named counters, published to a {@link LatticeHost}
+ * once a second.
  *
- * <p>The counters index is the host root, so each add is one atomic update of the root.
- * Writer threads share that root: extra threads add contention, not throughput. Each run
- * checks that no add was lost. Rounds repeat the runs on fresh hosts, so JIT warm-up
- * shows in the first. Run with:</p>
+ * <p>The counters are a region of the host root. Adds go to a private draft, one atomic
+ * update each, and the draft is published once a second. Publication hashes the changed
+ * counters, so the draft pays that once per publication rather than per add. The draft is
+ * the region's only writer, so publication never needs to merge. One thread adds and
+ * publishes; the run checks that every add reached the host. Run with:</p>
  * <pre>
  * ./mvnw -q -pl convex-core test-compile exec:java -Dexec.mainClass=convex.lattice.app.LatticeUpdateTrials -Dexec.classpathScope=test
  * </pre>
@@ -22,10 +25,9 @@ import convex.lattice.cursor.AForkableCursor;
 public final class LatticeUpdateTrials {
 	private LatticeUpdateTrials() {}
 
-	static final int ROUNDS=3;
-	static final int ADDS=1_000_000;
-	static final int[] THREADS={1,2,4,8};
-	static final AString[] NAMES=new AString[1_000];
+	static final Keyword COUNTERS=Keyword.intern("counters");
+	static final int SECONDS=10;
+	static final AString[] NAMES=new AString[100];
 	static {
 		for (int i=0;i<NAMES.length;i++) NAMES[i]=Strings.create("counter-"+i);
 	}
@@ -49,33 +51,28 @@ public final class LatticeUpdateTrials {
 		}
 	}
 
-	public static void main(String... args) throws InterruptedException {
-		for (int round=1;round<=ROUNDS;round++) {
-			System.out.println("Round "+round);
-			for (int threads:THREADS) concurrentAdds(threads);
-		}
-	}
-
-	/** Each thread adds one to every counter in turn, starting at a different counter. */
-	static void concurrentAdds(int threads) throws InterruptedException {
-		var host=LatticeHost.create(Index.<AString,CVMLong>none(),null);
-		var counters=new Counters(host.cursor());
-		int perThread=ADDS/threads;
-		var workers=new Thread[threads];
-		long start=System.nanoTime();
-		for (int t=0;t<threads;t++) {
-			int offset=t*NAMES.length/threads;
-			workers[t]=Thread.ofPlatform().start(() -> {
-				for (int i=0;i<perThread;i++) counters.add(NAMES[(offset+i)%NAMES.length],1);
-			});
-		}
-		for (Thread worker:workers) worker.join();
-		long nanos=System.nanoTime()-start;
-
+	public static void main(String... args) {
+		var host=LatticeHost.create();
+		var counters=new Counters(host.cursor().path(COUNTERS)).fork();
 		long total=0;
-		for (CVMLong count:host.cursor().get().values()) total+=count.longValue();
-		if (total!=ADDS) throw new IllegalStateException("Counters total "+total+", expected "+ADDS);
-		System.out.printf("%d thread(s) %,12d adds %,9.1f ms %,6d ns/add %,12d adds/s%n",
-			threads,ADDS,nanos/1e6,nanos/ADDS,ADDS*1_000_000_000L/nanos);
+		long next=System.nanoTime();
+		for (int second=1;second<=SECONDS;second++) {
+			next+=1_000_000_000L;
+			long adds=0;
+			while (System.nanoTime()<next) {
+				for (AString name:NAMES) counters.add(name,1);
+				adds+=NAMES.length;
+			}
+			long start=System.nanoTime();
+			counters.sync();
+			long publish=System.nanoTime()-start;
+			total+=adds;
+			System.out.printf("second %2d %,12d adds %,9d ns publish%n",second,adds,publish);
+		}
+		System.out.printf("average   %,12d adds/s%n",total/SECONDS);
+
+		long published=0;
+		for (CVMLong count:new Counters(host.cursor().path(COUNTERS)).get().values()) published+=count.longValue();
+		if (published!=total) throw new IllegalStateException("Host holds "+published+" adds, expected "+total);
 	}
 }
