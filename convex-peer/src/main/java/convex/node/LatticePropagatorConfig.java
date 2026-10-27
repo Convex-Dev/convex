@@ -39,7 +39,11 @@ public final class LatticePropagatorConfig {
 	/** Maximum encoded message size on a cryptographically verified route. */
 	public static final AString MAX_TRUSTED_MESSAGE_SIZE=Strings.intern("maxTrustedMessageSize");
 
-	/** Maximum physical inbound connections tracked by this group. */
+	/**
+	 * Connections this group expects to keep statistics for; it sweeps the
+	 * statistics of closed connections beyond this. Caps nothing: the listener caps
+	 * sockets with the node's {@code maxConnections}.
+	 */
 	public static final AString MAX_CONNECTIONS=Strings.intern("maxConnections");
 
 	/** Maximum desired peers retained by this group. */
@@ -78,7 +82,7 @@ public final class LatticePropagatorConfig {
 	public static final int DEFAULT_AMBIENT_PEERS=16;
 	public static final int DEFAULT_ACTIVE_PEERS=16;
 
-	/** Conservative cap on physical inbound connections tracked by one group. */
+	/** Default connections one group expects to keep statistics for. */
 	public static final int DEFAULT_MAX_CONNECTIONS=256;
 
 	/** Default number of decoded messages awaiting ordered processing. */
@@ -172,7 +176,7 @@ public final class LatticePropagatorConfig {
 		return getMessageSize(MAX_TRUSTED_MESSAGE_SIZE,DEFAULT_MAX_TRUSTED_MESSAGE_SIZE);
 	}
 
-	/** Returns the physical inbound connection cap for this group. */
+	/** Returns the connections this group keeps statistics for before sweeping closed ones. */
 	public int getMaxConnections() {
 		return getPositiveInt(MAX_CONNECTIONS,DEFAULT_MAX_CONNECTIONS);
 	}

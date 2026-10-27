@@ -9,8 +9,6 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -79,7 +77,7 @@ import convex.social.Social;
  * lattice traffic until an operator assigns inbound connections to a propagator.
  * {@link #create} leaves that policy unset (deny-by-default); use
  * {@link #serveAllInbound()} for an intentionally public single-view node, or
- * configure the listener returned by {@link #getTransport()} before {@link #launch()}.
+ * configure the listener returned by {@link #getTransport()}.
  * Assignment permits zero-trust public access but does not authenticate or upgrade the
  * connection. Complete social values still pass follow-aware DID admission before
  * persistence.</p>
@@ -289,7 +287,9 @@ public class P2PNode implements Closeable {
 	 * single lattice view.
 	 * The connection remains untrusted unless the independent node-key challenge
 	 * succeeds, and the application still takes only the social owners it wants.
-	 * Must be called before {@link #launch()}.
+	 * May be called while running: connections accepted afterwards use the group,
+	 * and established sockets keep their assignment, as
+	 * {@link LatticeNode#serveAllInbound(LatticePropagator)} does.
 	 *
 	 * @return this node, for chaining
 	 */
@@ -657,31 +657,33 @@ public class P2PNode implements Closeable {
 		AKeyPair keyPair = AKeyPair.generate();
 		log.info("Node key: {}", keyPair.getAccountKey().toChecksumHex());
 
-		P2PNode node = P2PNode.create(store, NodeConfig.create(), keyPair).serveAllInbound();
+		P2PNode node;
+		try {
+			node = P2PNode.create(store, NodeConfig.create(), keyPair).serveAllInbound();
+		} catch (RuntimeException e) {
+			store.close();
+			throw e;
+		}
 		var host=node.getNodeServer().getHost();
-		host.autoFlush(Duration.ofSeconds(30)).failure()
-			.thenAcceptAsync(error -> log.warn("P2P store flush failed",error));
-		var stopped=new CountDownLatch(1);
-		var closing=new AtomicBoolean();
-		Runnable shutdown=() -> {
-			if (!closing.compareAndSet(false,true)) return;
+		// Runs once; a second caller waits until it has finished
+		Shutdown.Once shutdown=Shutdown.once(() -> {
 			// Stop ingress, then close the host (stops flushing, final checkpoint published
 			// through the node), then the node (sends it to peers), then the store.
 			try (store; node; host) {
 				node.stopIngress();
-			} catch (IOException e) {
+			} catch (IOException | RuntimeException e) {
 				log.warn("Unable to finish P2P service shutdown",e);
-			} finally {
-				stopped.countDown();
 			}
-		};
+		});
 		try {
+			host.autoFlush(Duration.ofSeconds(30)).failure()
+				.thenAcceptAsync(error -> log.warn("P2P store flush failed",error));
 			node.launch();
 			host.checkpoint();
 			// Runs in Convex's shutdown order, before transports and Etch files close
 			Shutdown.addHook(Shutdown.SERVICE,shutdown);
 			// A real service can run its control loop here.
-			stopped.await();
+			shutdown.await();
 		} finally {
 			Shutdown.removeHook(Shutdown.SERVICE,shutdown);
 			shutdown.run();

@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
@@ -61,77 +59,77 @@ public final class Main {
 			System.err.println("Generated an ephemeral DLFS node identity; configure node.keypair "
 				+"before relying on restart or peer identity.");
 		}
-		AStore store=openStore(config,keyPair);
 		Keyword[] regionPath=config.getRegionPath();
 		NodeConfig nodeConfig=config.getNodeConfig();
+		String driveName=config.getDriveName();
+		AStore store=openStore(config,keyPair);
 
-		var host=LatticeHost.open(store);
-		var application=host.addApplication(new DLFSApplication(host,keyPair::signData,Utils::getCurrentTimestampCell,
-			config.getMaxFutureTimestampSkew(),regionPath));
+		LatticeHost<Index<Keyword,ACell>> host;
+		DLFSApplication application;
+		try {
+			host=LatticeHost.open(store);
+			application=host.addApplication(new DLFSApplication(host,keyPair::signData,Utils::getCurrentTimestampCell,
+				config.getMaxFutureTimestampSkew(),regionPath));
+		} catch (IOException | RuntimeException e) {
+			store.close();
+			throw e;
+		}
 		LatticeNode<Index<Keyword,ACell>> node=new LatticeNode<>(host,nodeConfig)
 			.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
 		// The config file's node section also carries the group limits
 		LatticePropagator propagator=node.createPropagator(LatticePropagatorConfig.from(nodeConfig));
 		if (config.isPublicLatticeInbound()) node.serveAllInbound(propagator);
-		try {
-			node.launch(); // closes the node if it fails
-		} catch (IOException | InterruptedException | RuntimeException e) {
-			store.close();
-			throw e;
-		}
-		for (DLFSConfig.BootstrapPeer peer:config.getBootstrapPeers()) {
-			if (!keyPair.getAccountKey().equals(peer.key())) {
-				propagator.getConnectionManager().addPeer(peer.key(),peer.address());
-			}
-		}
 
-		DLFSDrives localDrives=application.drives(keyPair.getAccountKey());
-		String driveName=config.getDriveName();
-		if (localDrives.getOrCreateDrive(driveName)==null) {
-			closeNode(node);
-			store.close();
-			throw new IllegalStateException("Could not open or create drive: "+driveName);
-		}
-		DLFSDriveManager drives=DLFSDriveManager.createRouter(()->{
-			application.sync();
-			try { host.checkpoint(); }
-			catch (IOException e) { throw new UncheckedIOException(e); }
-		});
-		for (DLFSConfig.DriveMount mount:config.getDriveMounts()) {
-			var owner=(mount.owner()==null)?keyPair.getAccountKey():mount.owner();
-			DLFSDrives ownerDrives=application.drives(owner);
-			String identity=mount.identity();
-			if (DLFSConfig.LOCAL_IDENTITY.equals(identity)) {
-				identity=DID.forKey(keyPair.getAccountKey()).toString();
-			}
-			if (identity==null) {
-				drives.mountAnonymous(ownerDrives);
-			} else {
-				drives.mount(identity,ownerDrives);
-			}
-		}
+		// Starting the HTTP server is the last step, so a failure leaves nothing of it open
+		DLFSDriveManager drives;
+		DLFSServer server;
 		try {
+			node.launch();
+			for (DLFSConfig.BootstrapPeer peer:config.getBootstrapPeers()) {
+				if (!keyPair.getAccountKey().equals(peer.key())) {
+					propagator.getConnectionManager().addPeer(peer.key(),peer.address());
+				}
+			}
+			if (application.drives(keyPair.getAccountKey()).getOrCreateDrive(driveName)==null) {
+				throw new IllegalStateException("Could not open or create drive: "+driveName);
+			}
+			drives=DLFSDriveManager.createRouter(()->{
+				application.sync();
+				try { host.checkpoint(); }
+				catch (IOException e) { throw new UncheckedIOException(e); }
+			});
+			for (DLFSConfig.DriveMount mount:config.getDriveMounts()) {
+				var owner=(mount.owner()==null)?keyPair.getAccountKey():mount.owner();
+				DLFSDrives ownerDrives=application.drives(owner);
+				String identity=mount.identity();
+				if (DLFSConfig.LOCAL_IDENTITY.equals(identity)) {
+					identity=DID.forKey(keyPair.getAccountKey()).toString();
+				}
+				if (identity==null) {
+					drives.mountAnonymous(ownerDrives);
+				} else {
+					drives.mount(identity,ownerDrives);
+				}
+			}
 			drives.sync();
-		} catch (RuntimeException e) {
-			closeNode(node);
-			store.close();
-			throw e;
-		}
 
-		String writeAuth=config.getWriteAuthentication();
-		DLFSServer server=DLFSConfig.WRITE_AUTH_NODE_KEY.equals(writeAuth)
-			?DLFSServer.createWithAudience(drives,keyPair)
-			:DLFSServer.create(drives);
-		if (DLFSConfig.WRITE_AUTH_DENY.equals(writeAuth)) {
-			server.setRequireAuthForWrites(true);
-		}
-		server.setBindHost(config.getHTTPBindHost());
-		server.setMaxRequestSize(config.getMaxRequestBytes());
-		try {
+			String writeAuth=config.getWriteAuthentication();
+			server=DLFSConfig.WRITE_AUTH_NODE_KEY.equals(writeAuth)
+				?DLFSServer.createWithAudience(drives,keyPair)
+				:DLFSServer.create(drives);
+			if (DLFSConfig.WRITE_AUTH_DENY.equals(writeAuth)) {
+				server.setRequireAuthForWrites(true);
+			}
+			server.setBindHost(config.getHTTPBindHost());
+			server.setMaxRequestSize(config.getMaxRequestBytes());
 			server.start(config.getHTTPPort());
-		} catch (RuntimeException e) {
-			closeNode(node);
-			store.close();
+		} catch (IOException | InterruptedException | RuntimeException e) {
+			// A failed start closes what it opened, in shutdown order
+			try (store; node; host) {
+				// Closing the host saves what it retains
+			} catch (Exception closeFailure) {
+				e.addSuppressed(closeFailure);
+			}
 			throw e;
 		}
 
@@ -145,10 +143,8 @@ public final class Main {
 		System.out.println("Store: "+config.getStorePath());
 		System.out.println("Press Ctrl+C to stop.");
 
-		CountDownLatch stopped=new CountDownLatch(1);
-		AtomicBoolean closing=new AtomicBoolean();
-		Runnable shutdown=()->{
-			if (!closing.compareAndSet(false,true)) return;
+		// Runs once; a second caller waits until it has finished
+		Shutdown.Once shutdown=Shutdown.once(()->{
 			// Closes the host (final checkpoint, sent to peers), then the node, then the store
 			try (store; node; host) {
 				try {
@@ -166,15 +162,13 @@ public final class Main {
 				// The first close to fail is the host's final save, if that failed
 				System.err.println("DLFS shutdown failed: "+e.getMessage());
 				for (Throwable also:e.getSuppressed()) System.err.println("  also: "+also.getMessage());
-			} finally {
-				stopped.countDown();
 			}
-		};
+		});
 
 		// Runs in Convex's shutdown order, before transports and Etch files close
 		Shutdown.addHook(Shutdown.SERVICE,shutdown);
 		try {
-			stopped.await();
+			shutdown.await();
 		} finally {
 			shutdown.run();
 		}
@@ -260,14 +254,6 @@ public final class Main {
 		}
 		if (port<0 || port>65535) throw new IllegalArgumentException("Invalid port: "+value);
 		return port;
-	}
-
-	private static void closeNode(LatticeNode<?> node) {
-		try {
-			node.close();
-		} catch (Exception e) {
-			System.err.println("Failed to close lattice node: "+e.getMessage());
-		}
 	}
 
 	private static void printUsage() {

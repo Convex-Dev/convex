@@ -2,7 +2,10 @@ package convex.core.util;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * So the JVM doesn't give us a nice way to run shutdown hooks in a defined order.
@@ -120,5 +123,64 @@ public class Shutdown {
 			me.getValue().runHooks();
 		}
 		order.clear();
+	}
+
+	/**
+	 * Returns a task that runs a service's shutdown once, however many callers run
+	 * it: a hook registered with {@link #addHook}, a tray menu, the service's main
+	 * thread. A caller finding it already started waits for it to finish, so neither
+	 * process exit nor a later shutdown level overtakes a save in progress.
+	 *
+	 * @param action the service's shutdown
+	 * @return task to register and to run from any other caller
+	 */
+	public static Once once(Runnable action) {
+		return new Once(action);
+	}
+
+	/** A service shutdown that runs once; see {@link Shutdown#once(Runnable)}. */
+	public static final class Once implements Runnable {
+		private final Runnable action;
+		private final AtomicBoolean started=new AtomicBoolean();
+		private final CountDownLatch done=new CountDownLatch(1);
+		private volatile Thread runner;
+
+		private Once(Runnable action) {
+			this.action=Objects.requireNonNull(action,"Shutdown action must not be null");
+		}
+
+		/**
+		 * Runs the action if no caller has yet; otherwise waits until it has finished.
+		 * A waiting caller that is interrupted stops waiting and keeps its interrupt.
+		 * A call from within the action returns at once.
+		 */
+		@Override
+		public void run() {
+			if (!started.compareAndSet(false,true)) {
+				if (runner==Thread.currentThread()) return;
+				try {
+					done.await();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+				return;
+			}
+			runner=Thread.currentThread();
+			try {
+				action.run();
+			} finally {
+				runner=null;
+				done.countDown();
+			}
+		}
+
+		/**
+		 * Waits until the action has run, without starting it.
+		 *
+		 * @throws InterruptedException if interrupted while waiting
+		 */
+		public void await() throws InterruptedException {
+			done.await();
+		}
 	}
 }

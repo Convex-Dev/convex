@@ -2,8 +2,6 @@ package convex.cli.dlfs;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,11 +125,8 @@ public class DlfsStart extends ACommand {
 		AKeyPair keyPair = resolveKeyPair();
 		inform("Key: " + keyPair.getAccountKey().toChecksumHex());
 
-		// Create store
-		AStore store = createStore();
-
-		// Build NodeConfig
 		NodeConfig config = buildNodeConfig();
+		AStore store = createStore();
 
 		// Register DLFS before starting any incoming delivery.
 		LatticeHost<Index<Keyword,ACell>> host;
@@ -142,6 +137,9 @@ public class DlfsStart extends ACommand {
 		} catch (IOException e) {
 			store.close();
 			throw new CLIError(ExitCodes.CONFIG, "Failed to open node store: " + e.getMessage(), e);
+		} catch (RuntimeException e) {
+			store.close();
+			throw e;
 		}
 		LatticeNode<Index<Keyword,ACell>> node=new LatticeNode<>(host,config)
 			.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
@@ -149,25 +147,24 @@ public class DlfsStart extends ACommand {
 		LatticePropagator propagator=node.createPropagator(LatticePropagatorConfig.from(config));
 
 		try {
-			node.launch(); // closes the node if it fails
+			node.launch();
+		} catch (InterruptedException e) {
+			closeFailedStart(e,store,node,host);
+			throw e;
 		} catch (Exception e) {
-			store.close();
+			closeFailedStart(e,store,node,host);
 			throw new CLIError(ExitCodes.CONFIG, "Failed to launch lattice node: " + e.getMessage(), e);
 		}
 		inform("Lattice transport started on port " + node.getListener().getPort());
 
-		// Connect to remote peers
-		connectPeers(propagator);
-
 		// Serve the local owner's drives through the application's registered region.
+		// Starting the HTTP server is the last step, so a failure leaves nothing of it open.
 		AccountKey accountKey = keyPair.getAccountKey();
-		DLFSDriveManager driveManager=createDriveManager(host,application,accountKey);
-		DLFSServer dlfsServer = DLFSServer.createWithAudience(driveManager,keyPair);
-		// The CLI currently exposes shared anonymous drives on the loopback-only server.
-		// Authentication-aware per-user drive provisioning is a separate product concern.
-		dlfsServer.setRequireAuthForWrites(false);
-
+		DLFSDriveManager driveManager;
+		DLFSServer dlfsServer;
 		try {
+			connectPeers(propagator);
+			driveManager=createDriveManager(host,application,accountKey);
 			for (String driveName : driveNames) {
 				boolean created=driveManager.createDrive(null, driveName);
 				if (!created && driveManager.getDrive(null, driveName)==null) {
@@ -176,15 +173,13 @@ public class DlfsStart extends ACommand {
 				inform("Drive '" + driveName + "' connected to lattice at :fs/" + accountKey.toHexString(6) + ".../" + driveName);
 			}
 			driveManager.sync();
+			dlfsServer = DLFSServer.createWithAudience(driveManager,keyPair);
+			// The CLI currently exposes shared anonymous drives on the loopback-only server.
+			// Authentication-aware per-user drive provisioning is a separate product concern.
+			dlfsServer.setRequireAuthForWrites(false);
 			dlfsServer.start(port);
 		} catch (RuntimeException e) {
-			dlfsServer.close();
-			try {
-				node.close();
-			} catch (Exception closeError) {
-				e.addSuppressed(closeError);
-			}
-			store.close();
+			closeFailedStart(e,store,node,host);
 			throw e;
 		}
 		informSuccess("DLFS WebDAV server running on http://localhost:" + dlfsServer.getPort() + "/dlfs/");
@@ -194,15 +189,9 @@ public class DlfsStart extends ACommand {
 
 		cli().notifyStartup();
 
-		AtomicBoolean closing=new AtomicBoolean();
-		CountDownLatch closed=new CountDownLatch(1);
-		Runnable shutdown=()->{
-			if (!closing.compareAndSet(false,true)) {
-				// Another thread is closing: wait, so neither process exit nor the
-				// Etch shutdown hook can overtake its final flush.
-				try { closed.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-				return;
-			}
+		// Runs once; a second caller, such as the JVM hook after the tray, waits until
+		// it has finished, so neither process exit nor Etch closing overtakes the save
+		Shutdown.Once shutdown=Shutdown.once(()->{
 			// Closes the host (final checkpoint, sent to peers), then the node, then the store
 			try (store; node; host) {
 				try {
@@ -219,27 +208,32 @@ public class DlfsStart extends ACommand {
 			} catch (Exception e) {
 				// The first close to fail is the host's final save, if that failed
 				log.warn("Error shutting down DLFS",e);
-			} finally {
-				closed.countDown();
 			}
-		};
+		});
 
-		// JVM and tray shutdown use the same idempotent close path. Registered in
-		// Convex's shutdown order so it completes before transports and Etch files close.
+		// JVM and tray shutdown use the same close path. Registered in Convex's
+		// shutdown order so it completes before transports and Etch files close.
 		Shutdown.addHook(Shutdown.SERVICE,shutdown);
 		String webUrl="http://localhost:"+dlfsServer.getPort()+"/dlfs/";
 		boolean trayInstalled=!noTray&&TrayManager.install(
 			"Convex DLFS on port "+dlfsServer.getPort(),"Open Web",()->Toolkit.launchBrowser(webUrl),shutdown);
 
 		try {
-			// Block until node server shuts down
-			while (node.getServer().isRunning()) {
-				Thread.sleep(1000);
-			}
+			shutdown.await();
 		} finally {
 			if (trayInstalled) TrayManager.remove();
 			Shutdown.removeHook(Shutdown.SERVICE,shutdown);
 			shutdown.run();
+		}
+	}
+
+	/** Closes what a failed start opened, in shutdown order, behind the start failure. */
+	private static void closeFailedStart(Exception failure,AStore store,
+			LatticeNode<?> node,LatticeHost<?> host) {
+		try (store; node; host) {
+			// Closing the host saves what it retains
+		} catch (Exception closeFailure) {
+			failure.addSuppressed(closeFailure);
 		}
 	}
 

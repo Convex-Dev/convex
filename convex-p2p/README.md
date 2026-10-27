@@ -358,8 +358,8 @@ acquisition. Complete values are handed to the P2P application, which takes the
 infrastructure regions whole and, from the social region, only the owners it wants:
 locally registered social DIDs, explicit pins and their direct active follows. The
 same set bounds what the node publishes. Every social slot must have a valid signature
-from a key authorised for its DID. `maxConnections` bounds inbound
-sockets and `maxDesiredPeers` bounds explicit plus discovery-driven peers.
+from a key authorised for its DID. The node's `maxConnections` bounds inbound
+sockets and the group's `maxDesiredPeers` bounds explicit plus discovery-driven peers.
 
 ## License
 
