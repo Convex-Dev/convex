@@ -18,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- KV garbage collection retains a replicated cutoff so stale replicas cannot restore collected records. Upgrade all replicas before collecting; legacy flat stores remain readable. ([GC and compatibility](convex-core/docs/KV_GC.md))
 - Assemble Convex DB hosts with `ConvexDB.openHost`, which replaces the static Convex DB lattices; connecting to a database no longer creates it. ([#779](https://github.com/Convex-Dev/convex/issues/779))
 - Creating a Convex DB `ConvexDB` or `SQLDatabase` takes its merge policy, such as `RowLWW::merge`; transactions fork a whole database. ([#784](https://github.com/Convex-Dev/convex/issues/784))
 - Speed up prepared statements over the Convex DB PostgreSQL wire protocol: a statement with parameters is planned once per connection and reused for every execution. ([#767](https://github.com/Convex-Dev/convex/pull/767))
@@ -28,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Preserve concurrent KV updates and return the result of the committed edit.
+- Keep KV deletes: tombstones persist, so a stale replica can no longer restore a deleted key, and `LatticeKV.gc()` is removed. ([#807](https://github.com/Convex-Dev/convex/issues/807))
 - Reject malformed queue states before installation, and report concurrent queue worker failures to producers, flush callers and shutdown.
 - Keep Etch stores usable when a thread using them is interrupted, including when a lattice node closes or a peer disconnects mid-acquisition. ([#776](https://github.com/Convex-Dev/convex/issues/776))
 - Reopen Etch v3 stores without manual repair after a crash during a start-up garbage collection. ([#748](https://github.com/Convex-Dev/convex/issues/748))

@@ -14,7 +14,6 @@ import convex.core.data.prim.CVMLong;
  *   <li>POS_TYPE (1) - CVMLong type tag</li>
  *   <li>POS_UTIME (2) - Last modification timestamp (epoch millis)</li>
  *   <li>POS_EXPIRE (3) - Expiry timestamp (nil = no expiry)</li>
- *   <li>POS_RETAINED_AT (4, optional) - Collection that retained this entry</li>
  * </ul>
  *
  * A tombstone is an entry with nil value and nil type, preserving the timestamp.
@@ -29,8 +28,6 @@ public class KVEntry {
 	public static final int POS_TYPE = 1;
 	public static final int POS_UTIME = 2;
 	public static final int POS_EXPIRE = 3;
-	/** Optional collection checkpoint; independent of the logical write timestamp. */
-	public static final int POS_RETAINED_AT = 4;
 
 	// Type tags
 	public static final long TYPE_VALUE = 0;
@@ -112,18 +109,6 @@ public class KVEntry {
 		return (CVMLong) entry.get(POS_EXPIRE);
 	}
 
-	/** Returns the collection that retained this entry, or null for an ordinary entry. */
-	public static CVMLong getRetainedAt(AVector<ACell> entry) {
-		return entry==null || entry.count()<=POS_RETAINED_AT?null:(CVMLong)entry.get(POS_RETAINED_AT);
-	}
-
-	/** Retains an entry across a collection without changing its logical write time. */
-	public static AVector<ACell> retain(AVector<ACell> entry,CVMLong cutoff) {
-		CVMLong previous=getRetainedAt(entry);
-		if (previous!=null && previous.longValue()>=cutoff.longValue()) return entry;
-		return entry.count()==ENTRY_LENGTH?entry.append(cutoff):entry.assoc(POS_RETAINED_AT,cutoff);
-	}
-
 	/**
 	 * Returns true if the entry is a tombstone (deleted)
 	 */
@@ -173,7 +158,7 @@ public class KVEntry {
 	 * <p>Validates the structural type of every positionally-cast field, not just the
 	 * timestamp: {@code getType}, {@code getExpire} and {@code getUTime} all blindly cast to
 	 * {@link CVMLong}, so a wrong-typed value at POS_TYPE / POS_UTIME / POS_EXPIRE would pass
-	 * an incoming entry only to throw later on {@code keys()}/{@code gc()}/reads, poisoning
+	 * an incoming entry only to throw later on {@code keys()}/reads, poisoning
 	 * store-wide operations. POS_VALUE stays opaque here — its shape (per the type tag) is
 	 * validated by the type-specific CRDT merge.</p>
 	 */
@@ -187,7 +172,6 @@ public class KVEntry {
 		if (type != null && !(type instanceof CVMLong)) return false;
 		ACell expire = entry.get(POS_EXPIRE);
 		if (expire != null && !(expire instanceof CVMLong)) return false;
-		if (entry.count()>ENTRY_LENGTH && !(entry.get(POS_RETAINED_AT) instanceof CVMLong)) return false;
 		return true;
 	}
 

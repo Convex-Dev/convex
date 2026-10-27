@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
@@ -24,13 +26,13 @@ import convex.lattice.cursor.Root;
 class KVConcurrencyTest {
 
 	/** Both writers attempt an update of the same snapshot, forcing a real CAS conflict. */
-	private static final class RacingRoot extends Root<ACell> {
+	private static final class RacingRoot extends Root<Index<AString,AVector<ACell>>> {
 		private final CountDownLatch writers=new CountDownLatch(2);
 		boolean racing;
 
 		RacingRoot() { super(Index.none()); }
 
-		@Override public ACell updateAndGet(UnaryOperator<ACell> action) {
+		@Override public Index<AString,AVector<ACell>> updateAndGet(UnaryOperator<Index<AString,AVector<ACell>>> action) {
 			AtomicBoolean first=new AtomicBoolean(racing);
 			return super.updateAndGet(value -> {
 				if (first.getAndSet(false)) {
@@ -89,15 +91,5 @@ class KVConcurrencyTest {
 			() -> kv.sadd("set",Strings.create("member")));
 		assertEquals(1,results.stream().mapToLong(Long::longValue).sum());
 		assertEquals(1,kv.scard("set"));
-	}
-
-	@Test void concurrentCollectorsCountEachRemovalOnlyOnce() throws Exception {
-		var root=new RacingRoot();
-		var kv=new LatticeKV(root,Strings.create("replica"),() -> CVMLong.ONE);
-		kv.set("key",CVMLong.ONE);
-		kv.del("key");
-		var results=race(root,() -> kv.gc(200),() -> kv.gc(200));
-		assertEquals(1,results.stream().mapToLong(Long::longValue).sum());
-		assertTrue(kv.entries().isEmpty());
 	}
 }

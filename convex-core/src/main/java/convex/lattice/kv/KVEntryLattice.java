@@ -32,6 +32,7 @@ public class KVEntryLattice extends ALattice<AVector<ACell>> {
 		}
 		if (otherValue == null) return ownValue;
 		if (Utils.equals(ownValue, otherValue)) return ownValue;
+		if (!checkForeign(otherValue)) return ownValue;
 
 		long timeA = KVEntry.getUTime(ownValue).longValue();
 		long timeB = KVEntry.getUTime(otherValue).longValue();
@@ -96,11 +97,7 @@ public class KVEntryLattice extends ALattice<AVector<ACell>> {
 			mergedExpire = (expA.longValue() >= expB.longValue()) ? expA : expB;
 		}
 
-		AVector<ACell> result=KVEntry.create(mergedValue,type,mergedTime).assoc(KVEntry.POS_EXPIRE,mergedExpire);
-		CVMLong retainedA=KVEntry.getRetainedAt(a),retainedB=KVEntry.getRetainedAt(b);
-		if (retainedA!=null) result=KVEntry.retain(result,retainedA);
-		if (retainedB!=null) result=KVEntry.retain(result,retainedB);
-		return result;
+		return KVEntry.create(mergedValue, type, mergedTime).assoc(KVEntry.POS_EXPIRE, mergedExpire);
 	}
 
 	@Override

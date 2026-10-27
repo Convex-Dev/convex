@@ -111,7 +111,7 @@ public class KVDatabaseTest {
 	@Test
 	public void testConnectingAbsentDatabaseDoesNotWrite() {
 		for (boolean explicitReplica:new boolean[]{false,true}) {
-			var parent=Root.<AHashMap<AString,ACell>>create(null);
+			var parent=Root.<AHashMap<AString,Index<AString,AVector<ACell>>>>create(null);
 			var db=explicitReplica?KVDatabase.connect(parent,"db",Strings.create("replica")):
 				KVDatabase.connect(parent,"db");
 			assertNull(parent.get(),"connecting must not initialise or sign state");
@@ -129,19 +129,19 @@ public class KVDatabaseTest {
 	public void testConnectPreservesConcurrentCreation() {
 		var content=LatticeKV.create();
 		content.set("valuable",Strings.create("concurrent write"));
-		AHashMap<AString,ACell> populated=
+		AHashMap<AString,Index<AString,AVector<ACell>>> populated=
 			Maps.of(Strings.create("db"),content.cursor().get());
 		for (boolean explicitReplica:new boolean[]{false,true}) {
 			// Deterministically publish another writer's database just after a read of
 			// absent state. A read-then-set initialisation would erase that writer.
-			var parent=new Root<AHashMap<AString,ACell>>(Maps.empty()) {
+			var parent=new Root<AHashMap<AString,Index<AString,AVector<ACell>>>>(Maps.empty()) {
 				boolean pending=true;
 				void publish() {
 					if (!pending) return;
 					pending=false;
 					super.set(populated);
 				}
-				@Override public AHashMap<AString,ACell> get() {
+				@Override public AHashMap<AString,Index<AString,AVector<ACell>>> get() {
 					var observed=super.get();
 					publish();
 					return observed;
@@ -237,8 +237,8 @@ public class KVDatabaseTest {
 		dbB.kv().set("key-b", Strings.create("b"));
 
 		// Both merge each other
-		AHashMap<ACell, SignedData<AHashMap<AString, ACell>>> exportA = dbA.exportReplica();
-		AHashMap<ACell, SignedData<AHashMap<AString, ACell>>> exportB = dbB.exportReplica();
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> exportA = dbA.exportReplica();
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> exportB = dbB.exportReplica();
 
 		dbA.mergeReplicas(exportB);
 		dbB.mergeReplicas(exportA);
@@ -262,15 +262,15 @@ public class KVDatabaseTest {
 		dbB.kv().set("legit", Strings.create("data"));
 
 		// Export B's data but tamper: sign with a different key
-		ACell bState = dbB.kv().cursor().get();
+		Index<AString, AVector<ACell>> bState = dbB.kv().cursor().get();
 		@SuppressWarnings({"unchecked", "rawtypes"})
-		AHashMap<AString, ACell> bDbMap =
+		AHashMap<AString, Index<AString, AVector<ACell>>> bDbMap =
 			(AHashMap) Maps.of(Strings.create("secure"), bState);
-		SignedData<AHashMap<AString, ACell>> forged = keyFake.signData(bDbMap);
+		SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> forged = keyFake.signData(bDbMap);
 
 		// Forge an owner map claiming to be from keyB but signed by keyFake
 		@SuppressWarnings({"unchecked", "rawtypes"})
-		AHashMap<ACell, SignedData<AHashMap<AString, ACell>>> forgedMap =
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> forgedMap =
 			(AHashMap) Maps.of(keyB.getAccountKey(), forged);
 
 		// OwnerLattice rejects: signer (keyFake) doesn't match owner key (keyB)
@@ -336,9 +336,9 @@ public class KVDatabaseTest {
 	@Test
 	public void testConnectedDatabase() {
 		// Set up a cursor chain: MapLattice<dbName → KVStore>
-		MapLattice<AString, ACell> dbMapLattice =
+		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
 			MapLattice.create(KVStoreLattice.INSTANCE);
-		AForkableCursor<AHashMap<AString, ACell>> root =
+		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
 			Cursors.root(dbMapLattice.zero());
 
 		// Connect a named database
@@ -351,7 +351,7 @@ public class KVDatabaseTest {
 		assertEquals(Strings.create("hello"), db.kv().get("greeting"));
 
 		// Verify the root cursor received the update
-		AHashMap<AString, ACell> rootMap = root.get();
+		AHashMap<AString, Index<AString, AVector<ACell>>> rootMap = root.get();
 		assertTrue(rootMap.containsKey(Strings.create("mydb")));
 
 		// Connect a second instance to the same root — sees same data
@@ -385,9 +385,9 @@ public class KVDatabaseTest {
 	@Test
 	public void testForkAndSyncConnected() {
 		// Set up cursor chain
-		MapLattice<AString, ACell> dbMapLattice =
+		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
 			MapLattice.create(KVStoreLattice.INSTANCE);
-		AForkableCursor<AHashMap<AString, ACell>> root =
+		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
 			Cursors.root(dbMapLattice.zero());
 
 		// Connect and populate
@@ -411,9 +411,9 @@ public class KVDatabaseTest {
 
 	@Test
 	public void testConnectedModeRejectsStandaloneOps() {
-		MapLattice<AString, ACell> dbMapLattice =
+		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
 			MapLattice.create(KVStoreLattice.INSTANCE);
-		AForkableCursor<AHashMap<AString, ACell>> root =
+		AForkableCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
 			Cursors.root(dbMapLattice.zero());
 		KVDatabase db = KVDatabase.connect(root, "mydb");
 

@@ -29,19 +29,19 @@ import convex.lattice.cursor.Cursors;
  * Built with lattice merge replication: use {@link #fork()} and {@link #sync()}
  * for conflict-free distributed operation.
  */
-public class LatticeKV extends ALatticeComponent<ACell> {
+public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
 	private static final AString DEFAULT_REPLICA = Strings.create("default");
 
 	private final AString replicaID;
 	private final Supplier<CVMLong> clock;
 
-	public LatticeKV(AForkableCursor<ACell> cursor, AString replicaID) {
+	public LatticeKV(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
 		this(cursor,replicaID,Utils::getCurrentTimestampCell);
 	}
 
 	/** Binds the clock used for writes and expiry checks; forks retain it. */
-	public LatticeKV(AForkableCursor<ACell> cursor,AString replicaID,Supplier<CVMLong> clock) {
+	public LatticeKV(AForkableCursor<Index<AString,AVector<ACell>>> cursor,AString replicaID,Supplier<CVMLong> clock) {
 		super(cursor);
 		this.replicaID=replicaID;
 		this.clock=Objects.requireNonNull(clock);
@@ -63,7 +63,7 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 
 	/** Creates a store with an explicit clock, which may advance independently of state. */
 	public static LatticeKV create(AString replicaID,Supplier<CVMLong> clock) {
-		AForkableCursor<ACell> cursor =
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
 			Cursors.root(KVStoreLattice.INSTANCE.zero());
 		return new LatticeKV(cursor,replicaID,clock);
 	}
@@ -74,7 +74,7 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
 	 * @return New LatticeKV instance connected to the cursor
 	 */
-	public static LatticeKV connect(AForkableCursor<ACell> cursor) {
+	public static LatticeKV connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
 		return new LatticeKV(cursor, DEFAULT_REPLICA);
 	}
 
@@ -85,7 +85,7 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 	 * @param replicaID Replica ID for PN-counter operations
 	 * @return New LatticeKV instance connected to the cursor
 	 */
-	public static LatticeKV connect(AForkableCursor<ACell> cursor, AString replicaID) {
+	public static LatticeKV connect(AForkableCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
 		return new LatticeKV(cursor,replicaID);
 	}
 
@@ -108,7 +108,7 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 	}
 
 	@Override
-	protected LatticeKV rebind(AForkableCursor<ACell> cursor) {
+	protected LatticeKV rebind(AForkableCursor<Index<AString,AVector<ACell>>> cursor) {
 		return new LatticeKV(cursor,replicaID,clock);
 	}
 
@@ -129,7 +129,7 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 	}
 
 	private AVector<ACell> getEntry(String key) {
-		Index<AString, AVector<ACell>> store = entries();
+		Index<AString, AVector<ACell>> store = cursor().get();
 		if (store == null) return null;
 		return store.get(key(key));
 	}
@@ -143,25 +143,10 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 
 	private void putEntry(String key, AVector<ACell> entry) {
 		AString k = key(key);
-		cursor().updateAndGet(state -> {
-			checkWriteTime(state,KVEntry.getUTime(entry));
-			var store=KVStoreLattice.entries(state);
-			if (store==null) store=Index.none();
-			return KVStoreLattice.withEntries(state,store.assoc(k,entry));
+		cursor().updateAndGet(store -> {
+			if (store == null) store = KVStoreLattice.INSTANCE.zero();
+			return store.assoc(k, entry);
 		});
-	}
-
-	/** Immutable entry snapshot; the replication state also contains the GC cutoff. */
-	public Index<AString,AVector<ACell>> entries() { return KVStoreLattice.entries(cursor().get()); }
-
-	/** Latest replicated collection cutoff, or null before the first collection. */
-	public CVMLong getGCTimestamp() { return KVStoreLattice.cutoff(cursor().get()); }
-
-	private static void checkWriteTime(ACell state,CVMLong timestamp) {
-		CVMLong cutoff=KVStoreLattice.cutoff(state);
-		if (cutoff!=null && timestamp.longValue()<=cutoff.longValue()) {
-			throw new IllegalStateException("KV write timestamp must be later than the GC cutoff");
-		}
 	}
 
 	/** An absent replacement leaves storage unchanged, including expired entries and tombstones. */
@@ -172,18 +157,16 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 			BiFunction<AVector<ACell>,CVMLong,Edit<R>> action) {
 		AString k=key(key);
 		CVMLong timestamp=now();
-		class Update implements UnaryOperator<ACell> {
+		class Update implements UnaryOperator<Index<AString,AVector<ACell>>> {
 			R result;
-			@Override public ACell apply(ACell state) {
-				var store=KVStoreLattice.entries(state);
+			@Override public Index<AString,AVector<ACell>> apply(Index<AString,AVector<ACell>> store) {
 				AVector<ACell> entry=store==null?null:store.get(k);
 				if (entry!=null && !KVEntry.isLive(entry,timestamp.longValue())) entry=null;
 				if (type>=0) checkType(entry,type,operation);
 				Edit<R> change=action.apply(entry,timestamp);
 				result=change.result();
-				if (change.entry()==null) return state;
-				checkWriteTime(state,timestamp);
-				return KVStoreLattice.withEntries(state,(store==null?Index.<AString,AVector<ACell>>none():store).assoc(k,change.entry()));
+				if (change.entry()==null) return store;
+				return (store==null?KVStoreLattice.INSTANCE.zero():store).assoc(k,change.entry());
 			}
 		}
 		Update update=new Update();
@@ -229,7 +212,8 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 	}
 
 	/**
-	 * Deletes a key by creating a tombstone
+	 * Deletes a key by creating a tombstone. Tombstones persist, so a replica
+	 * holding an older value cannot restore the key.
 	 */
 	public boolean del(String key) {
 		return edit(key,-1,"DEL",(entry,ts) ->
@@ -247,7 +231,7 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 	 * Returns all live keys
 	 */
 	public ASet<AString> keys() {
-		Index<AString, AVector<ACell>> store = entries();
+		Index<AString, AVector<ACell>> store = cursor().get();
 		if (store == null) return Sets.empty();
 		long now = nowMs();
 		ASet<AString> result = Sets.empty();
@@ -517,52 +501,11 @@ public class LatticeKV extends ALatticeComponent<ACell> {
 		return incrby(key, -amount);
 	}
 
-	// ========== Maintenance ==========
-
-	/**
-	 * Collects through the current clock time. Replicas reject entries at or before
-	 * this cutoff unless explicitly retained by collection. New writes must use a
-	 * later timestamp. Returns the number of entries physically removed.
-	 */
-	public long gc() {
-		return gc(nowMs());
-	}
-
-	/**
-	 * Advances the replicated cutoff and removes tombstones and expired entries
-	 * through that time. Retains older live records without changing their write
-	 * timestamps. A cutoff behind the current one is a no-op. Choosing the cutoff
-	 * is application policy: previously unseen older offline writes are discarded.
-	 */
-	public long gc(long timestamp) {
-		CVMLong cutoff=CVMLong.create(timestamp);
-		long[] removed = {0};
-		cursor().updateAndGet(state -> {
-			removed[0]=0;
-			CVMLong previous=KVStoreLattice.cutoff(state);
-			if (previous!=null && timestamp<=previous.longValue()) return state;
-			var store=KVStoreLattice.entries(state);
-			if (store==null) store=Index.none();
-			Index<AString,AVector<ACell>> result=store;
-			for (var e : store.entrySet()) {
-				AVector<ACell> entry = e.getValue();
-				if (KVEntry.getUTime(entry).longValue()<=timestamp) {
-					if (KVEntry.isTombstone(entry) || KVEntry.isExpired(entry,timestamp)) {
-						result=result.dissoc(e.getKey());
-						removed[0]++;
-					} else {
-						result=result.assoc(e.getKey(),KVEntry.retain(entry,cutoff));
-					}
-				}
-			}
-			return Vectors.of(result,cutoff);
-		});
-		return removed[0];
-	}
-
 	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected ACell mergePublication(ACell own,ACell other) {
+	protected Index<AString, AVector<ACell>> mergePublication(
+			Index<AString, AVector<ACell>> own,
+			Index<AString, AVector<ACell>> other) {
 		return KVStoreLattice.INSTANCE.merge(own,other);
 	}
 }

@@ -52,7 +52,7 @@ public class LatticeKVTest {
 		LatticeKV kv = new LatticeKV(cursor,Strings.create("test"),() -> fixed);
 
 		kv.set("a", Strings.create("v"));
-		AVector<ACell> entry = kv.entries().get(Strings.create("a"));
+		AVector<ACell> entry = cursor.get().get(Strings.create("a"));
 		assertEquals(fixed, KVEntry.getUTime(entry), "utime should be the injected clock timestamp");
 	}
 
@@ -65,7 +65,7 @@ public class LatticeKVTest {
 		time.set(CVMLong.create(120));
 		assertEquals(30,draft.ttl("a"));
 		draft.set("b",Strings.create("second"));
-		assertEquals(time.get(),KVEntry.getUTime(draft.entries().get(Strings.create("b"))));
+		assertEquals(time.get(),KVEntry.getUTime(draft.cursor().get().get(Strings.create("b"))));
 		// Publication reconciles state without consulting a mutation clock.
 		time.set(null);
 		draft.sync();
@@ -176,6 +176,29 @@ public class LatticeKVTest {
 		AVector<ACell> entry = KVEntry.createValue(Strings.create("a"), CVMLong.create(1000));
 		assertEquals(entry, KVEntryLattice.INSTANCE.merge(entry, null));
 		assertEquals(entry, KVEntryLattice.INSTANCE.merge(null, entry));
+	}
+
+	/** A malformed foreign entry is ignored, not merged, when the key already exists locally. */
+	@Test
+	public void testMergeIgnoresInvalidForeignEntry() {
+		AVector<ACell> own = KVEntry.createValue(Strings.create("a"), CVMLong.create(1000));
+		AVector<ACell> bad = Vectors.of(Strings.create("v"), Strings.create("not-a-long"), CVMLong.create(2000), null);
+		assertEquals(own, KVEntryLattice.INSTANCE.merge(own, bad));
+	}
+
+	/** Tombstones persist, so a stale replica merged in either direction cannot restore a deleted key. */
+	@Test
+	public void testDeleteSurvivesStaleReplica() {
+		var time = new AtomicReference<>(CVMLong.create(100));
+		LatticeKV kv = LatticeKV.create(Strings.create("replica"), time::get);
+		kv.set("a", Strings.create("1"));
+		Index<AString, AVector<ACell>> stale = kv.cursor().get();
+		time.set(CVMLong.create(200));
+		assertTrue(kv.del("a"));
+		Index<AString, AVector<ACell>> current = kv.cursor().get();
+
+		assertEquals(current, KVStoreLattice.INSTANCE.merge(current, stale));
+		assertEquals(current, KVStoreLattice.INSTANCE.merge(stale, current));
 	}
 
 	// ===== Core KV Operations =====
@@ -478,17 +501,5 @@ public class LatticeKVTest {
 
 		// PN-Counter merge: both replica contributions preserved
 		assertEquals(8, root.incrby("counter", 0));
-	}
-
-	@Test
-	public void testGc() {
-		LatticeKV kv = LatticeKV.create();
-		kv.set("a", Strings.create("1"));
-		kv.set("b", Strings.create("2"));
-		kv.del("a");
-		long removed = kv.gc();
-		assertEquals(1, removed);
-		assertFalse(kv.exists("a"));
-		assertTrue(kv.exists("b"));
 	}
 }

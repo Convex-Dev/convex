@@ -394,9 +394,6 @@ These executable assemblies and tests exercise the design boundaries.
 
 ## References
 
-- [KV collection and replica cutoffs](KV_GC.md), including the stored format and
-  upgrade requirements for timestamp-based collection.
-
 - [Component Javadocs](../src/main/java/convex/lattice/ALatticeComponent.java),
   [application Javadocs](../src/main/java/convex/lattice/ALatticeApplication.java)
   and [host Javadocs](../src/main/java/convex/lattice/LatticeHost.java).
