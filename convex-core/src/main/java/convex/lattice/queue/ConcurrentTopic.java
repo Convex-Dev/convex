@@ -1,303 +1,272 @@
 package convex.lattice.queue;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 
 /**
- * Concurrent wrapper for a {@link LatticeTopic} that provides per-partition
- * worker threads with bounded inbound queues for backpressure.
+ * Bounded, batched producers over a topic, with one worker per partition.
+ * Workers edit private topic forks and publish after each batch. Offers apply
+ * backpressure until space is available. A worker failure wakes blocked producers
+ * and flush callers; subsequent operations report the original cause.
  *
- * <p>Each partition has:</p>
- * <ul>
- *   <li>A <b>forked</b> LatticeTopic — independent state, zero CAS contention</li>
- *   <li>A dedicated <b>worker thread</b> — single-writer, no locks</li>
- *   <li>A bounded <b>ArrayBlockingQueue</b> — backpressure when full</li>
- * </ul>
+ * <p>Call {@link #start()} before offering records or flushing. {@link #close()}
+ * stops admission, drains accepted records and joins all workers. It reports any
+ * worker failure and preserves the caller's interrupt status. A closed topic
+ * cannot be restarted. Closing this wrapper does not close its primary topic.</p>
  *
- * <p>Workers drain their inbox in batches and sync back to the primary topic
- * once per batch. The lattice merge handles composition correctly since workers
- * modify disjoint partitions.</p>
- *
- * <h2>Usage</h2>
  * <pre>{@code
- * LatticeTopic topic = mq.topic("events");
- * try (ConcurrentTopic ct = ConcurrentTopic.create(topic, 4, 4096)) {
+ * try (ConcurrentTopic ct = ConcurrentTopic.create(mq.topic("events"), 4, 4096)) {
  *     ct.start();
- *     ct.offer(key, value);       // hash-based dispatch
- *     ct.offer(value, 2);         // direct to partition 2
- *     ct.flush();                 // drain + sync all workers
- *     topic.partition(0).peek(0); // read from primary
+ *     ct.offer(key, value);
+ *     ct.flush(); // accepted records are now published to the primary topic
  * }
  * }</pre>
  */
 public class ConcurrentTopic implements AutoCloseable {
 
-	public static final int DEFAULT_QUEUE_CAPACITY = 4096;
-	public static final int DEFAULT_BATCH_SIZE = 1000;
+	public static final int DEFAULT_QUEUE_CAPACITY=4096;
+	public static final int DEFAULT_BATCH_SIZE=1000;
 
-	private static final long POLL_TIMEOUT_MS = 100L;
-	private static final long JOIN_TIMEOUT_MS = 5000L;
-
+	private enum State { NEW, RUNNING, CLOSING, CLOSED }
 	private final LatticeTopic primary;
 	private final int numPartitions;
 	private final int queueCapacity;
 	private final int batchSize;
-
-	private final ArrayBlockingQueue<InboundRecord>[] inboxes;
-	private Worker[] workers;
+	private final AtomicReference<Throwable> failure=new AtomicReference<>();
+	private final CompletableFuture<Void> failed=new CompletableFuture<>();
+	private volatile State state=State.NEW;
+	private volatile Worker[] workers;
 	private Thread[] threads;
-	private volatile boolean running = false;
 
-	// ===== Construction =====
-
-	@SuppressWarnings("unchecked")
-	private ConcurrentTopic(LatticeTopic primary, int numPartitions, int queueCapacity, int batchSize) {
-		this.primary = primary;
-		this.numPartitions = numPartitions;
-		this.queueCapacity = queueCapacity;
-		this.batchSize = batchSize;
-		this.inboxes = new ArrayBlockingQueue[numPartitions];
-		for (int i = 0; i < numPartitions; i++) {
-			inboxes[i] = new ArrayBlockingQueue<>(queueCapacity);
-		}
+	private ConcurrentTopic(LatticeTopic primary,int numPartitions,int queueCapacity,int batchSize) {
+		this.primary=primary;
+		this.numPartitions=numPartitions;
+		this.queueCapacity=queueCapacity;
+		this.batchSize=batchSize;
 	}
 
-	/**
-	 * Creates a ConcurrentTopic wrapping the given primary topic.
-	 * Sets the topic's partition count metadata automatically.
-	 * Call {@link #start()} to begin processing.
-	 */
-	public static ConcurrentTopic create(LatticeTopic primary, int numPartitions, int queueCapacity, int batchSize) {
+	/** Creates an inert worker wrapper and sets the topic's partition-count metadata. */
+	public static ConcurrentTopic create(LatticeTopic primary,int numPartitions,int queueCapacity,int batchSize) {
+		Objects.requireNonNull(primary,"Primary topic must not be null");
+		if (numPartitions<1 || queueCapacity<1 || batchSize<1) {
+			throw new IllegalArgumentException("Partition count, queue capacity and batch size must be positive");
+		}
 		primary.setNumPartitions(numPartitions);
-		return new ConcurrentTopic(primary, numPartitions, queueCapacity, batchSize);
+		return new ConcurrentTopic(primary,numPartitions,queueCapacity,batchSize);
 	}
 
-	public static ConcurrentTopic create(LatticeTopic primary, int numPartitions, int queueCapacity) {
-		return create(primary, numPartitions, queueCapacity, DEFAULT_BATCH_SIZE);
+	public static ConcurrentTopic create(LatticeTopic primary,int numPartitions,int queueCapacity) {
+		return create(primary,numPartitions,queueCapacity,DEFAULT_BATCH_SIZE);
 	}
 
-	public static ConcurrentTopic create(LatticeTopic primary, int numPartitions) {
-		return create(primary, numPartitions, DEFAULT_QUEUE_CAPACITY, DEFAULT_BATCH_SIZE);
+	public static ConcurrentTopic create(LatticeTopic primary,int numPartitions) {
+		return create(primary,numPartitions,DEFAULT_QUEUE_CAPACITY,DEFAULT_BATCH_SIZE);
 	}
 
-	// ===== Lifecycle =====
-
-	/**
-	 * Starts worker threads. Each worker gets a forked topic cursor.
-	 */
+	/** Starts the workers once; repeated calls while running are harmless. */
 	public synchronized void start() {
-		if (running) return;
-		running = true;
-		workers = new Worker[numPartitions];
-		threads = new Thread[numPartitions];
-
-		for (int i = 0; i < numPartitions; i++) {
-			LatticeTopic fork = primary.fork();
-			workers[i] = new Worker(fork, i, inboxes[i], batchSize);
-			threads[i] = new Thread(workers[i], "lattice-partition-" + i);
-			threads[i].setDaemon(true);
-			threads[i].start();
+		checkFailure();
+		if (state==State.RUNNING) return;
+		if (state!=State.NEW) throw new IllegalStateException("Concurrent topic is closed");
+		Worker[] prepared=new Worker[numPartitions];
+		Thread[] preparedThreads=new Thread[numPartitions];
+		for (int i=0;i<numPartitions;i++) {
+			prepared[i]=new Worker(primary.fork(),i);
+			preparedThreads[i]=new Thread(prepared[i],"lattice-partition-"+i);
+			preparedThreads[i].setDaemon(true);
 		}
-	}
-
-	/**
-	 * Flushes all workers: drains all inboxes and syncs to primary.
-	 * Returns when all previously offered records are committed.
-	 */
-	public void flush() throws InterruptedException {
-		CountDownLatch latch = new CountDownLatch(numPartitions);
-		for (int i = 0; i < numPartitions; i++) {
-			inboxes[i].put(InboundRecord.flush(latch));
-		}
-		latch.await();
-	}
-
-	/**
-	 * Flushes all pending records, stops workers, and joins threads.
-	 */
-	@Override
-	public void close() {
-		if (!running) return;
+		workers=prepared;
+		threads=preparedThreads;
+		state=State.RUNNING;
 		try {
-			flush();
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
+			for (Thread thread:threads) thread.start();
+		} catch (RuntimeException | Error e) {
+			fail(e);
+			throw e;
 		}
-		running = false;
-		for (Thread t : threads) {
-			if (t != null) {
-				t.interrupt();
-				try {
-					t.join(JOIN_TIMEOUT_MS);
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
+	}
+
+	/** Waits for all previously offered records to publish, or reports a worker failure. */
+	public void flush() throws InterruptedException {
+		ensureRunning();
+		CompletableFuture<?>[] markers=new CompletableFuture<?>[numPartitions];
+		for (int i=0;i<numPartitions;i++) {
+			CompletableFuture<Void> marker=new CompletableFuture<>();
+			markers[i]=marker;
+			workers[i].enqueue(new InboundRecord(null,null,null,marker));
+		}
+		try {
+			CompletableFuture.anyOf(CompletableFuture.allOf(markers),failed).get();
+		} catch (ExecutionException e) {
+			throw new IllegalStateException("Concurrent topic worker failed",e.getCause());
+		}
+	}
+
+	/** Stops admission and waits for accepted work, including when the caller is interrupted. */
+	@Override
+	public synchronized void close() {
+		if (state==State.CLOSED) return;
+		if (state==State.NEW) {
+			state=State.CLOSED;
+			return;
+		}
+		state=State.CLOSING;
+		for (Worker worker:workers) worker.wake();
+		boolean interrupted=false;
+		try {
+			for (Thread thread:threads) {
+				while (thread.isAlive()) {
+					try { thread.join(); }
+					catch (InterruptedException e) { interrupted=true; }
 				}
 			}
+		} finally {
+			state=State.CLOSED;
+			if (interrupted) Thread.currentThread().interrupt();
+		}
+		checkFailure();
+	}
+
+	/** Offers a non-null keyed value, blocking only while the running worker's inbox is full. */
+	public void offer(ACell key,ACell value) throws InterruptedException {
+		offer(key,value,null);
+	}
+
+	/** Offers a non-null keyed value with optional headers. */
+	public void offer(ACell key,ACell value,AHashMap<ACell,ACell> headers) throws InterruptedException {
+		Objects.requireNonNull(key,"Partition key must not be null");
+		int partition=(int)Math.floorMod(key.getHash().longValue(),(long)numPartitions);
+		enqueue(partition,key,value,headers);
+	}
+
+	/** Offers a non-null value directly to a partition. */
+	public void offer(ACell value,int partition) throws InterruptedException {
+		enqueue(partition,null,value,null);
+	}
+
+	private void enqueue(int partition,ACell key,ACell value,AHashMap<ACell,ACell> headers)
+			throws InterruptedException {
+		if (value==null) throw new IllegalArgumentException("Queue value must not be null");
+		Objects.checkIndex(partition,numPartitions);
+		ensureRunning();
+		workers[partition].enqueue(new InboundRecord(key,value,headers,null));
+	}
+
+	private void ensureRunning() {
+		checkFailure();
+		if (state!=State.RUNNING) throw new IllegalStateException("Concurrent topic is not running");
+	}
+
+	private void checkFailure() {
+		Throwable cause=failure.get();
+		if (cause!=null) throw new IllegalStateException("Concurrent topic worker failed",cause);
+	}
+
+	private void fail(Throwable cause) {
+		if (failure.compareAndSet(null,cause)) {
+			failed.completeExceptionally(cause);
+			for (Worker worker:workers) worker.wake();
 		}
 	}
-
-	// ===== Produce =====
-
-	/**
-	 * Offers a keyed record, dispatched to a partition by key hash.
-	 * The key is also stored in the queue entry.
-	 * Blocks if the target partition's inbox is full (backpressure).
-	 */
-	public void offer(ACell key, ACell value) throws InterruptedException {
-		// #561: floorMod avoids the negative index Math.abs(Long.MIN_VALUE) would produce.
-		int partition = (int) Math.floorMod(key.getHash().longValue(), (long) numPartitions);
-		inboxes[partition].put(InboundRecord.data(key, value, null));
-	}
-
-	/**
-	 * Offers a keyed record with headers, dispatched by key hash.
-	 */
-	public void offer(ACell key, ACell value, AHashMap<ACell, ACell> headers) throws InterruptedException {
-		// #561: floorMod avoids the negative index Math.abs(Long.MIN_VALUE) would produce.
-		int partition = (int) Math.floorMod(key.getHash().longValue(), (long) numPartitions);
-		inboxes[partition].put(InboundRecord.data(key, value, headers));
-	}
-
-	/**
-	 * Offers a record directly to a specific partition.
-	 */
-	public void offer(ACell value, int partition) throws InterruptedException {
-		inboxes[partition].put(InboundRecord.data(null, value, null));
-	}
-
-	// ===== Info =====
 
 	public LatticeTopic primary() { return primary; }
 	public int getNumPartitions() { return numPartitions; }
 
 	public int queueDepth(int partition) {
-		return inboxes[partition].size();
+		Objects.checkIndex(partition,numPartitions);
+		Worker[] snapshot=workers;
+		return snapshot==null?0:snapshot[partition].depth();
 	}
 
 	public long totalRecords() {
-		long total = 0;
-		if (workers != null) {
-			for (Worker w : workers) total += w.totalRecords.get();
-		}
+		long total=0;
+		Worker[] snapshot=workers;
+		if (snapshot!=null) for (Worker worker:snapshot) total+=worker.totalRecords.get();
 		return total;
 	}
 
 	public long totalSyncs() {
-		long total = 0;
-		if (workers != null) {
-			for (Worker w : workers) total += w.totalSyncs.get();
-		}
+		long total=0;
+		Worker[] snapshot=workers;
+		if (snapshot!=null) for (Worker worker:snapshot) total+=worker.totalSyncs.get();
 		return total;
 	}
 
-	// ===== InboundRecord =====
+	private record InboundRecord(ACell key,ACell value,AHashMap<ACell,ACell> headers,
+			CompletableFuture<Void> flushed) {}
 
-	static final class InboundRecord {
-		final ACell key;
-		final ACell value;
-		final AHashMap<ACell, ACell> headers;
-		final CountDownLatch flushLatch;
-
-		private InboundRecord(ACell key, ACell value, AHashMap<ACell, ACell> headers, CountDownLatch latch) {
-			this.key = key;
-			this.value = value;
-			this.headers = headers;
-			this.flushLatch = latch;
-		}
-
-		static InboundRecord data(ACell key, ACell value, AHashMap<ACell, ACell> headers) {
-			return new InboundRecord(key, value, headers, null);
-		}
-
-		static InboundRecord flush(CountDownLatch latch) {
-			return new InboundRecord(null, null, null, latch);
-		}
-
-		boolean isFlush() { return flushLatch != null; }
-	}
-
-	// ===== Worker =====
-
-	static final class Worker implements Runnable {
+	private final class Worker implements Runnable {
 		private final LatticeTopic fork;
-		private final int partitionId;
-		private final ArrayBlockingQueue<InboundRecord> inbox;
-		private final int batchSize;
-		volatile boolean running = true;
+		private final int partition;
+		private final ArrayDeque<InboundRecord> inbox=new ArrayDeque<>();
+		private final AtomicLong totalRecords=new AtomicLong();
+		private final AtomicLong totalSyncs=new AtomicLong();
 
-		final AtomicLong totalRecords = new AtomicLong();
-		final AtomicLong totalSyncs = new AtomicLong();
-
-		Worker(LatticeTopic fork, int partitionId, ArrayBlockingQueue<InboundRecord> inbox, int batchSize) {
-			this.fork = fork;
-			this.partitionId = partitionId;
-			this.inbox = inbox;
-			this.batchSize = batchSize;
+		Worker(LatticeTopic fork,int partition) {
+			this.fork=fork;
+			this.partition=partition;
 		}
 
-		@Override
-		public void run() {
-			LatticeQueue queue = fork.partition(partitionId);
+		synchronized void enqueue(InboundRecord record) throws InterruptedException {
+			ensureRunning();
+			while (inbox.size()>=queueCapacity) {
+				wait();
+				ensureRunning();
+			}
+			inbox.addLast(record);
+			notifyAll();
+		}
+
+		synchronized void wake() { notifyAll(); }
+		synchronized int depth() { return inbox.size(); }
+
+		private synchronized boolean takeBatch(List<InboundRecord> batch) throws InterruptedException {
+			while (inbox.isEmpty() && state==State.RUNNING && failure.get()==null) wait();
+			if (failure.get()!=null || inbox.isEmpty()) return false;
+			for (int i=0;i<batchSize && !inbox.isEmpty();i++) batch.add(inbox.removeFirst());
+			notifyAll();
+			return true;
+		}
+
+		@Override public void run() {
 			try {
-				while (running) {
-					InboundRecord first = inbox.poll(POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-					if (first == null) continue;
-
-					List<InboundRecord> batch = new ArrayList<>(batchSize);
-					batch.add(first);
-					inbox.drainTo(batch, batchSize - 1);
-
-					processBatch(queue, batch);
+				LatticeQueue queue=fork.partition(partition);
+				List<InboundRecord> batch=new ArrayList<>(Math.min(batchSize,queueCapacity));
+				while (takeBatch(batch)) {
+					boolean dirty=false;
+					for (InboundRecord record:batch) {
+						if (record.flushed()!=null) {
+							publish();
+							dirty=false;
+							record.flushed().complete(null);
+						} else {
+							queue.offer(record.key(),record.value(),record.headers());
+							totalRecords.incrementAndGet();
+							dirty=true;
+						}
+					}
+					if (dirty) publish();
+					batch.clear();
 				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-			// Final drain on shutdown
-			drainRemaining(queue);
-		}
-
-		private void processBatch(LatticeQueue queue, List<InboundRecord> batch) {
-			boolean dirty = false;
-			for (InboundRecord r : batch) {
-				if (r.isFlush()) {
-					// Sync pending data, then signal flush complete
-					fork.sync();
-					totalSyncs.incrementAndGet();
-					dirty = false;
-					r.flushLatch.countDown();
-				} else {
-					offerRecord(queue, r);
-					dirty = true;
-				}
-			}
-			if (dirty) {
-				fork.sync();
-				totalSyncs.incrementAndGet();
+			} catch (Throwable e) {
+				fail(e);
+				if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+				if (e instanceof Error error) throw error;
 			}
 		}
 
-		private void drainRemaining(LatticeQueue queue) {
-			List<InboundRecord> remaining = new ArrayList<>();
-			inbox.drainTo(remaining);
-			if (!remaining.isEmpty()) {
-				processBatch(queue, remaining);
-			}
-		}
-
-		private void offerRecord(LatticeQueue queue, InboundRecord r) {
-			if (r.key != null) {
-				queue.offer(r.key, r.value, r.headers);
-			} else {
-				queue.offer(r.value);
-			}
-			totalRecords.incrementAndGet();
+		private void publish() {
+			fork.sync();
+			totalSyncs.incrementAndGet();
 		}
 	}
 }

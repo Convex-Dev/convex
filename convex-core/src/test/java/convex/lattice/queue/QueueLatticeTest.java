@@ -129,6 +129,35 @@ public class QueueLatticeTest {
 		assertNull(L.path(Keyword.create("anything")));
 	}
 
+	@Test
+	public void malformedStateIsRejectedBeforeInstallation() {
+		AVector<ACell> good=makeState(2,0,100);
+		var malformed=java.util.List.of(
+			good.assoc(QueueLattice.POS_ENTRIES,CVMLong.ONE),
+			good.assoc(QueueLattice.POS_META,CVMLong.ONE),
+			good.assoc(QueueLattice.POS_START_OFFSET,CVMLong.create(-1)),
+			good.assoc(QueueLattice.POS_START_OFFSET,CVMLong.MAX_VALUE),
+			good.assoc(QueueLattice.POS_ENTRIES,Vectors.of(CVMLong.ONE)),
+			good.assoc(QueueLattice.POS_ENTRIES,Vectors.of(Vectors.of(null,CVMLong.ONE,CVMLong.ONE,CVMLong.ONE))),
+			good.assoc(QueueLattice.POS_ENTRIES,QueueLattice.getEntries(good).append(CVMLong.ONE)));
+		for (AVector<ACell> bad:malformed) {
+			assertFalse(L.checkForeign(bad));
+			assertEquals(L.zero(),L.merge(null,bad));
+			assertSame(good,L.merge(good,bad));
+		}
+	}
+
+	@Test
+	public void validAppendAndTruncationStillMerge() {
+		var queue=LatticeQueue.create(() -> CVMLong.ONE);
+		for (int i=0;i<100;i++) queue.offer(CVMLong.create(i));
+		var before=queue.cursor().get();
+		queue.offer(CVMLong.create(100));
+		assertEquals(queue.cursor().get(),L.merge(before,queue.cursor().get()));
+		queue.truncate(50);
+		assertEquals(queue.cursor().get(),L.merge(before,queue.cursor().get()));
+	}
+
 	// ===== Helpers =====
 
 	/**

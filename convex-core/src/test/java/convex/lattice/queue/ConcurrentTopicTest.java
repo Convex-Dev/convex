@@ -5,14 +5,87 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import convex.core.data.Strings;
+import convex.core.data.Index;
+import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.Cursors;
 
 @Timeout(value = 10, unit = TimeUnit.SECONDS)
 public class ConcurrentTopicTest {
+
+	@Test
+	public void validatesBeforeStartingOrChangingMetadata() throws Exception {
+		var topic=LatticeMQ.create().topic("events");
+		assertThrows(IllegalArgumentException.class,() -> ConcurrentTopic.create(topic,0,8));
+		assertThrows(IllegalArgumentException.class,() -> ConcurrentTopic.create(topic,1,0));
+		assertThrows(IllegalArgumentException.class,() -> ConcurrentTopic.create(topic,1,8,0));
+		assertNull(topic.cursor().get());
+		try (var ct=ConcurrentTopic.create(topic,1,8)) {
+			assertThrows(IllegalStateException.class,ct::flush);
+			assertThrows(IllegalStateException.class,() -> ct.offer(CVMLong.ONE,0));
+			ct.start();
+			assertThrows(IllegalArgumentException.class,() -> ct.offer(null,0));
+			assertThrows(IndexOutOfBoundsException.class,() -> ct.offer(CVMLong.ONE,1));
+			ct.offer(CVMLong.ONE,0);
+			ct.flush();
+			assertEquals(1,topic.partition(0).size());
+		}
+	}
+
+	@Test
+	public void workerFailureReleasesFlushAndBlockedOffers() throws Exception {
+		var entered=new CountDownLatch(1);
+		var release=new CountDownLatch(1);
+		var cause=new IllegalStateException("signing unavailable");
+		var topic=new LatticeTopic(Cursors.root(Index.none()),() -> {
+			entered.countDown();
+			try { assertTrue(release.await(5,TimeUnit.SECONDS)); }
+			catch (InterruptedException e) { throw new AssertionError(e); }
+			throw cause;
+		});
+		var ct=ConcurrentTopic.create(topic,1,1,1);
+		ct.start();
+		try (var executor=Executors.newFixedThreadPool(2)) {
+			ct.offer(CVMLong.ONE,0);
+			assertTrue(entered.await(5,TimeUnit.SECONDS));
+			ct.offer(CVMLong.ONE,0); // fill the inbox while the worker is inside the clock
+			var producer=executor.submit(() -> assertThrows(IllegalStateException.class,() -> ct.offer(CVMLong.ONE,0)));
+			var flush=executor.submit(() -> assertThrows(IllegalStateException.class,ct::flush));
+			release.countDown();
+			assertSame(cause,producer.get(5,TimeUnit.SECONDS).getCause());
+			assertSame(cause,flush.get(5,TimeUnit.SECONDS).getCause());
+			assertSame(cause,assertThrows(IllegalStateException.class,ct::close).getCause());
+			ct.close();
+		} finally {
+			release.countDown();
+			try { ct.close(); } catch (IllegalStateException expected) { assertSame(cause,expected.getCause()); }
+		}
+	}
+
+	@Test
+	public void interruptedCloseStillPublishesAcceptedRecords() throws Exception {
+		var topic=LatticeMQ.create().topic("events");
+		var ct=ConcurrentTopic.create(topic,2,8);
+		ct.start();
+		ct.offer(CVMLong.ONE,0);
+		ct.offer(CVMLong.ONE,1);
+		Thread.currentThread().interrupt();
+		try {
+			ct.close();
+			assertTrue(Thread.currentThread().isInterrupted());
+		} finally { Thread.interrupted(); }
+		assertEquals(1,topic.partition(0).size());
+		assertEquals(1,topic.partition(1).size());
+		assertThrows(IllegalStateException.class,ct::start);
+		assertThrows(IllegalStateException.class,ct::flush);
+		assertThrows(IllegalStateException.class,() -> ct.offer(CVMLong.ONE,0));
+	}
 
 	@Test
 	public void testOfferAndFlush() throws Exception {
