@@ -55,6 +55,10 @@ jdbc:convex:file:/data/mydb.etch;caseSensitive=false
 | `caseSensitive` | `false` | SQL identifier case sensitivity |
 | `database` | file stem or instance name | Database within the instance (see [One ConvexDB, Many Databases](#one-convexdb-many-databases)) |
 
+These are the only parameters: a URL with any other is refused, and other
+connection properties are ignored. Calcite's own connection properties are set by
+the driver alone.
+
 ### Database Identification
 
 The URL uniquely identifies the database — no separate registration step needed.

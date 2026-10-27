@@ -1,16 +1,21 @@
 package convex.db.jdbc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +40,7 @@ public class ConvexDriverTest {
 	// ========== URL Parsing ==========
 
 	@Test
-	public void testParseMemExplicit() {
+	public void testParseMemExplicit() throws Exception {
 		ConvexDriver driver = new ConvexDriver();
 		var parsed = driver.parseURL("jdbc:convex:mem:mydb", new java.util.Properties());
 		assertEquals(ConvexDriver.ParsedURL.Mode.MEM, parsed.mode);
@@ -44,7 +49,7 @@ public class ConvexDriverTest {
 	}
 
 	@Test
-	public void testParseMemShorthand() {
+	public void testParseMemShorthand() throws Exception {
 		ConvexDriver driver = new ConvexDriver();
 		var parsed = driver.parseURL("jdbc:convex:mydb", new java.util.Properties());
 		assertEquals(ConvexDriver.ParsedURL.Mode.MEM, parsed.mode);
@@ -53,7 +58,7 @@ public class ConvexDriverTest {
 	}
 
 	@Test
-	public void testParseFile() {
+	public void testParseFile() throws Exception {
 		ConvexDriver driver = new ConvexDriver();
 		var parsed = driver.parseURL("jdbc:convex:file:/data/mydb.etch", new java.util.Properties());
 		assertEquals(ConvexDriver.ParsedURL.Mode.FILE, parsed.mode);
@@ -62,7 +67,7 @@ public class ConvexDriverTest {
 	}
 
 	@Test
-	public void testParseFileWithDatabaseParam() {
+	public void testParseFileWithDatabaseParam() throws Exception {
 		ConvexDriver driver = new ConvexDriver();
 		var parsed = driver.parseURL("jdbc:convex:file:/data/store.etch;database=market", new java.util.Properties());
 		assertEquals(ConvexDriver.ParsedURL.Mode.FILE, parsed.mode);
@@ -71,12 +76,79 @@ public class ConvexDriverTest {
 	}
 
 	@Test
-	public void testParseLegacy() {
+	public void testParseLegacy() throws Exception {
 		ConvexDriver driver = new ConvexDriver();
 		var parsed = driver.parseURL("jdbc:convex:database=mydb", new java.util.Properties());
 		assertEquals(ConvexDriver.ParsedURL.Mode.LEGACY, parsed.mode);
 		assertEquals("mydb", parsed.identifier);
 		assertEquals("mydb", parsed.database);
+	}
+
+	// ========== Connection Parameters ==========
+
+	/** Set once a class that a caller named is initialised. */
+	static final AtomicBoolean CANARY_LOADED = new AtomicBoolean();
+
+	/** A class callers name in the tests below; initialising it sets {@link #CANARY_LOADED}. */
+	public static class Canary {
+		static {
+			CANARY_LOADED.set(true);
+		}
+	}
+
+	private static final String CANARY = Canary.class.getName();
+
+	/** A URL carries only the driver's own parameters, so nothing in it can name a class. */
+	@Test
+	public void testUrlRefusesOtherParameters() {
+		for (String param : new String[] {"schemaFactory=" + CANARY, "parserFactory=" + CANARY,
+				"model=" + CANARY, "lex=JAVA", "database", "caseSensitive=maybe"}) {
+			assertThrows(SQLException.class, () -> DriverManager.getConnection("jdbc:convex:params_test;" + param), param);
+		}
+		assertFalse(CANARY_LOADED.get());
+	}
+
+	/** Only the driver's own connection properties are read: the rest never reach Calcite. */
+	@Test
+	public void testOtherPropertiesIgnored() throws Exception {
+		Properties props = new Properties();
+		props.setProperty("schemaFactory", CANARY);
+		props.setProperty("parserFactory", "org.apache.calcite.sql.parser.impl.SqlParserImpl#FACTORY");
+		props.setProperty("database", "props_db");
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:mem:props_test", props);
+				Statement stmt = conn.createStatement()) {
+			assertEquals("props_db", conn.getSchema());
+			// Parsed by the driver's own DDL parser, not the one the properties named
+			stmt.executeUpdate("CREATE TABLE t (id INTEGER)");
+		}
+		assertFalse(CANARY_LOADED.get());
+	}
+
+	@Test
+	public void testCaseSensitiveParameter() throws Exception {
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:case_test;caseSensitive=true");
+				Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("CREATE TABLE t (id INTEGER)");
+			assertThrows(SQLException.class, () -> stmt.executeQuery("SELECT * FROM \"t\""));
+		}
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:case_test");
+				Statement stmt = conn.createStatement();
+				ResultSet rs = stmt.executeQuery("SELECT * FROM \"t\"")) {
+			assertFalse(rs.next(), "identifiers match regardless of case by default");
+		}
+	}
+
+	/** SQL cannot name a class either: DDL other than for tables is refused. */
+	@Test
+	public void testDdlCannotNameClasses() throws Exception {
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:ddl_test");
+				Statement stmt = conn.createStatement()) {
+			for (String sql : new String[] {"CREATE FUNCTION f AS '" + CANARY + "'",
+					"CREATE FOREIGN SCHEMA s LIBRARY '" + CANARY + "'"}) {
+				assertThrows(SQLException.class, () -> stmt.execute(sql), sql);
+			}
+		}
+		assertFalse(CANARY_LOADED.get());
 	}
 
 	// ========== In-Memory Connections ==========
