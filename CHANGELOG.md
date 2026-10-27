@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Let applications choose how each Convex DB database merges, with per-row last-write-wins provided as one policy. ([Merge Policy](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-policy), [#779](https://github.com/Convex-Dev/convex/issues/779), [#784](https://github.com/Convex-Dev/convex/issues/784))
 - Let applications supply the clock that stamps Convex DB writes. ([Clock](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#clock), [#781](https://github.com/Convex-Dev/convex/issues/781))
-- Give each `LatticeNode` propagation group its own limits with `createPropagator(groupConfig)`; the DLFS server, `convex dlfs start` and `P2PNode` now run on `LatticeNode`. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md), [#769](https://github.com/Convex-Dev/convex/issues/769))
+- Give each `LatticeNode` propagation group its own limits with `createPropagator(groupConfig)`. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md), [#769](https://github.com/Convex-Dev/convex/issues/769))
 - Merge a small delta into a large `Index` without visiting the rest of it, with `Index.merge`; Convex DB row deliveries now cost the rows delivered, not the table. ([#786](https://github.com/Convex-Dev/convex/issues/786))
 
 ### Changed

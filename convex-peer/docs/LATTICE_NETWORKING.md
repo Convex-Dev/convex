@@ -124,9 +124,9 @@ intended group explicitly for pulls and connection assignment.
 Both configurations are CVM maps; the Java classes are typed views of them.
 `LatticePropagatorConfig.from(NodeConfig)` reads the node's map as a group's, which
 is how the DLFS server and `P2PNode` let one config section carry both. A key is then
-read by every component that reads that name: `maxConnections` caps both the
-listener's sockets and each group's tracked connections. New composition gives
-the node and each group a map of its own.
+read by every component that reads that name: `maxConnections` caps the listener's
+sockets and also sets when each group sweeps its per-connection statistics. New
+composition gives the node and each group a map of its own.
 
 ## Connection capabilities
 

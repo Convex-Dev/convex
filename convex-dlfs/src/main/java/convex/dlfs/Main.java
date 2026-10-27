@@ -151,7 +151,11 @@ public final class Main {
 			if (!closing.compareAndSet(false,true)) return;
 			// Closes the host (final checkpoint, sent to peers), then the node, then the store
 			try (store; node; host) {
-				server.close();
+				try {
+					server.close();
+				} catch (RuntimeException e) {
+					System.err.println("Failed to stop DLFS HTTP server: "+e.getMessage());
+				}
 				node.stopIngress();
 				try {
 					drives.sync();
@@ -161,6 +165,7 @@ public final class Main {
 			} catch (Exception e) {
 				// The first close to fail is the host's final save, if that failed
 				System.err.println("DLFS shutdown failed: "+e.getMessage());
+				for (Throwable also:e.getSuppressed()) System.err.println("  also: "+also.getMessage());
 			} finally {
 				stopped.countDown();
 			}

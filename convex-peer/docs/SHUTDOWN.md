@@ -32,7 +32,9 @@ try (store; node; host) {
 ```
 
 Keep `stopIngress()` inside the block, so a failure there still closes all three
-resources. A service without drafts leaves out the sync.
+resources. A front-end close or drafts sync that can fail catches its own failure,
+so it neither skips stopping ingress nor loses the drafts. A service without drafts
+leaves out the sync.
 
 `LatticeNode.stopIngress()` and `P2PNode.stopIngress()` close their listener
 first. A node assembled from `NodeServer` and `LatticeListener` closes the

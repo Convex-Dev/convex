@@ -42,10 +42,10 @@ import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Mixin;
 
 /**
- * Starts a DLFS WebDAV server backed by lattice replication via NodeServer.
+ * Starts a DLFS WebDAV server backed by lattice replication on a {@link LatticeNode}.
  *
- * <p>Drives are connected to the NodeServer's cursor at {@code :fs},
- * so changes propagate to peers automatically.
+ * <p>Drives belong to the DLFS application on the node's host at {@code :fs}, so
+ * synced changes propagate to peers.
  *
  * <p>Usage:
  * <pre>
@@ -54,7 +54,7 @@ import picocli.CommandLine.Mixin;
  */
 @Command(name="start",
 	mixinStandardHelpOptions=true,
-	description="Starts a DLFS WebDAV server with lattice replication via NodeServer.")
+	description="Starts a DLFS WebDAV server with lattice replication.")
 public class DlfsStart extends ACommand {
 
 	private static final Logger log = LoggerFactory.getLogger(DlfsStart.class);
@@ -205,7 +205,11 @@ public class DlfsStart extends ACommand {
 			}
 			// Closes the host (final checkpoint, sent to peers), then the node, then the store
 			try (store; node; host) {
-				dlfsServer.close();
+				try {
+					dlfsServer.close();
+				} catch (RuntimeException e) {
+					log.warn("Error stopping DLFS HTTP server",e);
+				}
 				node.stopIngress();
 				try {
 					driveManager.sync();
