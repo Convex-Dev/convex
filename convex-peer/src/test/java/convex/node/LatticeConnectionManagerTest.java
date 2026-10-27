@@ -351,6 +351,35 @@ public class LatticeConnectionManagerTest {
 		assertTrue(inbound.isClosed());
 	}
 
+	/**
+	 * Maintenance running while addPeer admits a supplied connection must not dial
+	 * the same peer: the dialled connection would replace the supplied one.
+	 */
+	@Test public void testSuppliedConnectionIsNotDialledWhileAdmitted() throws Exception {
+		AccountKey key=AKeyPair.createSeeded(806).getAccountKey();
+		StubPeer supplied=new StubPeer(key) {
+			boolean checked;
+			// addPeer checks the connection before installing it: run maintenance in that gap
+			@Override public boolean isConnected() {
+				if (!checked) {
+					checked=true;
+					manager.maintainConnections();
+				}
+				return super.isConnected();
+			}
+			@Override public InetSocketAddress getHostAddress() {
+				return new InetSocketAddress("localhost",1);
+			}
+		};
+
+		CompletableFuture<Convex> admitted=manager.addPeer(key,supplied);
+		assertTrue(manager.dials.isEmpty(),"no second connection is dialled");
+		assertSame(supplied,admitted.getNow(null));
+		assertSame(supplied,manager.getConnection(key));
+		manager.maintainConnections();
+		assertTrue(manager.dials.isEmpty(),"an admitted peer is not dialled");
+	}
+
 	/** A maintenance pass during the final write must not retire the route and discard it (#778). */
 	@Test public void testCloseKeepsRoutesOpenUntilWritten() throws Exception {
 		manager.setPeerTargets(1,0);

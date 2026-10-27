@@ -755,13 +755,25 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (convex instanceof ConvexRemote remote && remote.getEndpoint()!=null) {
 			desired=DesiredPeer.create(peerKey,remote.getEndpoint());
 		}
-		if (!registerDesiredPeerIntent(peerKey,desired,false)) {
+		boolean registered;
+		synchronized (connectionLock) {
+			registered=registerDesiredPeerIntent(peerKey,desired,false);
+			// Reserve the peer as a dial does, so maintenance cannot dial it before the
+			// supplied connection is installed; a dial already in flight is superseded
+			if (registered) dialling.put(peerKey,desired);
+		}
+		if (!registered) {
 			closeSilently(convex);
 			return CompletableFuture.failedFuture(new IllegalStateException(
 				accepting ? "Desired peer limit of "+maxDesiredPeers+" reached"
 					: "Connection manager is closed"));
 		}
-		CompletableFuture<Convex> admission=beginOutboundAdmission(peerKey, convex);
+		CompletableFuture<Convex> admission;
+		try {
+			admission=beginOutboundAdmission(peerKey, convex);
+		} finally {
+			synchronized (connectionLock) { dialling.remove(peerKey,desired); }
+		}
 		maintenanceSignal.release();
 		return admission;
 	}
