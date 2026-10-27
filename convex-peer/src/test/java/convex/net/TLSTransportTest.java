@@ -6,13 +6,11 @@ import java.io.IOException;
 import java.net.URI;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
-import java.security.cert.Certificate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManagerFactory;
@@ -24,6 +22,7 @@ import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.CertUtils;
+import convex.core.crypto.TLS;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
 import convex.core.data.Blobs;
@@ -53,14 +52,7 @@ public class TLSTransportTest {
 		generator.initialize(2048);
 		var keys=generator.generateKeyPair();
 		var certificate=CertUtils.selfSign(keys,"CN=localhost");
-		char[] password="test-only".toCharArray();
-		KeyStore identity=KeyStore.getInstance("PKCS12");
-		identity.load(null,null);
-		identity.setKeyEntry("server",keys.getPrivate(),password,new Certificate[] {certificate});
-		KeyManagerFactory kmf=KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-		kmf.init(identity,password);
-		serverContext=SSLContext.getInstance("TLS");
-		serverContext.init(kmf.getKeyManagers(),null,null);
+		serverContext=TLS.serverContext(keys.getPrivate(),certificate);
 
 		KeyStore trust=KeyStore.getInstance("PKCS12");
 		trust.load(null,null);

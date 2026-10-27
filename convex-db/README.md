@@ -150,6 +150,22 @@ PgServer server = PgServer.builder()
 server.start();
 ```
 
+### TLS
+
+Give the server an `SSLContext` holding its certificate and private key, and clients that request TLS are upgraded before they send their startup message or password:
+
+```java
+KeyStore identity = PFXTools.loadStore(new File("server.p12"), "storepass".toCharArray());
+PgServer server = PgServer.builder()
+    .port(5432)
+    .database("mydb")
+    .password("secret")
+    .sslContext(TLS.serverContext(identity, "keypass".toCharArray()))
+    .build();
+```
+
+Once TLS is offered, a client that does not request it is refused with SQLSTATE `28000`, as PostgreSQL's `hostssl` does. Set `.allowPlaintext(true)` to admit such clients as well. Clients connect as they would to PostgreSQL, from `sslmode=require` up to `sslmode=verify-full` when the certificate names the server's host. [CAD055](https://docs.convex.world/docs/cad/transport_security) specifies the behaviour.
+
 ### Command Line
 
 ```bash

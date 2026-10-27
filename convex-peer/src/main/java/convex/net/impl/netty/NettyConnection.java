@@ -19,6 +19,7 @@ import javax.net.ssl.SSLParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.crypto.TLS;
 import convex.core.data.Vectors;
 import convex.core.message.BoundedMessageQueue;
 import convex.core.message.Message;
@@ -162,8 +163,7 @@ public class NettyConnection extends AConnection {
 			ssl=null;
 		} else {
 			InetSocketAddress address=(InetSocketAddress)sa;
-			SSLEngine engine=sslContext.createSSLEngine(address.getHostString(),address.getPort());
-			engine.setUseClientMode(true);
+			SSLEngine engine=TLS.clientEngine(sslContext,address.getHostString(),address.getPort());
 			SSLParameters parameters=engine.getSSLParameters();
 			parameters.setEndpointIdentificationAlgorithm(verifyHostname ? "HTTPS" : null);
 			engine.setSSLParameters(parameters);

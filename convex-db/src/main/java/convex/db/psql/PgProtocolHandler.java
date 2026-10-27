@@ -1,10 +1,12 @@
 package convex.db.psql;
 
+import convex.core.crypto.TLS;
 import convex.db.calcite.StalePlanException;
 import convex.db.psql.msg.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.ssl.SslHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,6 +16,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+
+import javax.net.ssl.SSLContext;
 
 /**
  * Handles the PostgreSQL wire protocol and executes SQL queries.
@@ -30,8 +34,13 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	private static final Pattern CAST = Pattern.compile(
 		"(?i)::(?:integer|int4|int8|int|bigint|text|varchar|regclass|oid)\\b");
 
+	/** Time allowed for a client's TLS handshake after the server answers SSLRequest */
+	private static final long TLS_HANDSHAKE_TIMEOUT_MILLIS = 10_000;
+
 	private final Supplier<Connection> connectionSupplier;
 	private final String requiredPassword;
+	private final SSLContext sslContext;
+	private final boolean allowPlaintext;
 
 	private Connection connection;
 	private String user;
@@ -47,8 +56,24 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 * @param requiredPassword Password required for authentication, or null for trust auth
 	 */
 	public PgProtocolHandler(Supplier<Connection> connectionSupplier, String requiredPassword) {
+		this(connectionSupplier, requiredPassword, null, true);
+	}
+
+	/**
+	 * Creates a handler that may offer TLS. The channel's decoder must be created with
+	 * TLS offered when a context is given.
+	 *
+	 * @param connectionSupplier Supplies JDBC connections for query execution
+	 * @param requiredPassword Password required for authentication, or null for trust auth
+	 * @param sslContext Context presenting the server's TLS identity, or null not to offer TLS
+	 * @param allowPlaintext True to admit clients that do not request TLS when it is offered
+	 */
+	public PgProtocolHandler(Supplier<Connection> connectionSupplier, String requiredPassword,
+			SSLContext sslContext, boolean allowPlaintext) {
 		this.connectionSupplier = connectionSupplier;
 		this.requiredPassword = requiredPassword;
+		this.sslContext = sslContext;
+		this.allowPlaintext = allowPlaintext;
 		this.processId = processIdCounter.incrementAndGet();
 		this.secretKey = ThreadLocalRandom.current().nextInt();
 	}
@@ -67,6 +92,9 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		}
 		if (msg instanceof PgMessageDecoder.SSLRequest) {
 			handleSSLRequest(ctx);
+		} else if (msg instanceof PgMessageDecoder.GSSENCRequest) {
+			// GSSAPI encryption is not offered; the client continues with SSLRequest or startup
+			writeByte(ctx, 'N');
 		} else if (msg instanceof PgMessageDecoder.StartupMessage startup) {
 			handleStartup(ctx, startup);
 		} else if (msg instanceof PgMessageDecoder.PasswordMessage pwd) {
@@ -95,14 +123,42 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	private void handleSSLRequest(ChannelHandlerContext ctx) {
-		// Respond with 'N' - we don't support SSL
+		if (sslContext == null || isTLS(ctx)) {
+			// TLS not offered, or already started
+			writeByte(ctx, 'N');
+			return;
+		}
+		// 'S' leaves in plaintext; everything the client sends next passes through TLS first
+		writeByte(ctx, 'S');
+		SslHandler tls = new SslHandler(TLS.serverEngine(sslContext));
+		tls.setHandshakeTimeoutMillis(TLS_HANDSHAKE_TIMEOUT_MILLIS);
+		ctx.pipeline().addFirst(tls);
+	}
+
+	private static boolean isTLS(ChannelHandlerContext ctx) {
+		return ctx.pipeline().get(SslHandler.class) != null;
+	}
+
+	private static void writeByte(ChannelHandlerContext ctx, char response) {
 		ByteBuf buf = ctx.alloc().buffer(1);
-		buf.writeByte('N');
+		buf.writeByte(response);
 		ctx.writeAndFlush(buf);
 	}
 
 	private void handleStartup(ChannelHandlerContext ctx, PgMessageDecoder.StartupMessage startup) {
 		log.debug("Startup: version={}.{}, params={}", startup.majorVersion(), startup.minorVersion(), startup.params());
+
+		if (sslContext != null && !allowPlaintext && !isTLS(ctx)) {
+			// As PostgreSQL's hostssl: a client that did not request TLS is refused
+			write(ctx, ErrorResponse.builder()
+				.severity("FATAL")
+				.code("28000")
+				.message("connection requires TLS")
+				.build());
+			ctx.flush();
+			ctx.close();
+			return;
+		}
 
 		this.user = startup.params().get("user");
 		this.database = startup.params().get("database");

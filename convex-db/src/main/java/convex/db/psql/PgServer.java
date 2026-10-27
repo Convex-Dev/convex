@@ -15,6 +15,8 @@ import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
+import javax.net.ssl.SSLContext;
+
 /**
  * PostgreSQL wire protocol server backed by Convex SQL.
  *
@@ -46,6 +48,8 @@ public class PgServer {
 	private int port;
 	private final String database;
 	private final String password;
+	private final SSLContext sslContext;
+	private final boolean allowPlaintext;
 	private final Supplier<Connection> connectionSupplier;
 
 	private EventLoopGroup bossGroup;
@@ -57,6 +61,8 @@ public class PgServer {
 		this.port = builder.port;
 		this.database = builder.database;
 		this.password = builder.password;
+		this.sslContext = builder.sslContext;
+		this.allowPlaintext = builder.allowPlaintext;
 
 		if (builder.connectionSupplier != null) {
 			this.connectionSupplier = builder.connectionSupplier;
@@ -96,8 +102,8 @@ public class PgServer {
 					@Override
 					protected void initChannel(SocketChannel ch) {
 						ch.pipeline().addLast(
-							new PgMessageDecoder(),
-							new PgProtocolHandler(connectionSupplier, password)
+							new PgMessageDecoder(sslContext != null),
+							new PgProtocolHandler(connectionSupplier, password, sslContext, allowPlaintext)
 						);
 					}
 				})
@@ -128,7 +134,11 @@ public class PgServer {
 			java.net.InetSocketAddress addr = (java.net.InetSocketAddress) serverChannel.localAddress();
 			this.port = addr.getPort();
 
-			log.info("PostgreSQL server started on port {}", this.port);
+			log.info("PostgreSQL server started on port {}{}", this.port,
+				sslContext == null ? "" : (allowPlaintext ? " with TLS offered" : " with TLS required"));
+			if (password != null && !password.isEmpty() && (sslContext == null || allowPlaintext)) {
+				log.warn("Passwords can reach this PostgreSQL server unencrypted: require TLS to protect them");
+			}
 			log.info("Database: {}", database);
 			log.info("Connect with: psql -h localhost -p {} -d {}", port, database);
 
@@ -214,6 +224,8 @@ public class PgServer {
 		private int port = 5432;
 		private String database = "convex";
 		private String password = null;
+		private SSLContext sslContext = null;
+		private boolean allowPlaintext = false;
 		private Supplier<Connection> connectionSupplier = null;
 
 		/**
@@ -237,6 +249,26 @@ public class PgServer {
 		 */
 		public Builder password(String password) {
 			this.password = password;
+			return this;
+		}
+
+		/**
+		 * Offers TLS with the given context, which presents the server's identity
+		 * (see {@link convex.core.crypto.TLS}). Clients that send SSLRequest are
+		 * upgraded to TLS before their startup message. If null (the default), TLS
+		 * is not offered and SSLRequest is declined.
+		 */
+		public Builder sslContext(SSLContext context) {
+			this.sslContext = context;
+			return this;
+		}
+
+		/**
+		 * Sets whether clients that do not request TLS are admitted when TLS is
+		 * offered. Default is false: they are refused, as by PostgreSQL's hostssl.
+		 */
+		public Builder allowPlaintext(boolean allow) {
+			this.allowPlaintext = allow;
 			return this;
 		}
 

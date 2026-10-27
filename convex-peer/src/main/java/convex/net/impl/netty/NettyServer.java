@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
+import convex.core.crypto.TLS;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.message.Message;
@@ -158,8 +159,7 @@ public class NettyServer extends AServer {
             	 }
             	 clientChannels.add(ch);
 				 if (sslContext!=null) {
-					 SSLEngine engine=sslContext.createSSLEngine();
-					 engine.setUseClientMode(false);
+					 SSLEngine engine=TLS.serverEngine(sslContext);
 					 SslHandler ssl=new SslHandler(engine);
 					 ssl.setHandshakeTimeoutMillis(Config.DEFAULT_INTERNAL_TIMEOUT);
 					 ch.pipeline().addLast(ssl);
