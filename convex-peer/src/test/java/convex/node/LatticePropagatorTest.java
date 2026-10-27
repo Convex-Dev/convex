@@ -17,7 +17,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -201,7 +200,7 @@ public class LatticePropagatorTest {
 		}
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		server2.getCursor().assoc(dataKeyword, updatedDataIndex);
-		CompletableFuture<ACell> published=nextAnnounceMatching(propagator2,
+		CompletableFuture<ACell> published=Announcements.nextMatching(propagator2,
 			value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
 		// Synchronous commit persists the authoritative node root; propagation-view
 		// materialisation completes independently on the future above.
@@ -225,7 +224,7 @@ public class LatticePropagatorTest {
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
 		values = values.assoc(expectedHash, expected);
-		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
+		CompletableFuture<ACell> received=Announcements.nextMatching(propagator2,
 			value -> expected.equals(RT.getIn(value,dataKeyword,expectedHash)));
 		server1.getCursor().assoc(dataKeyword, values);
 		server1.getHost().sync();
@@ -251,7 +250,7 @@ public class LatticePropagatorTest {
 
 		propagator1.setMaxDeltaMessageSize(700);
 		Index<Hash,ACell> expectedValues=values;
-		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
+		CompletableFuture<ACell> received=Announcements.nextMatching(propagator2,
 			value -> expectedValues.equals(RT.getIn(value,dataKeyword)));
 		server1.getCursor().assoc(dataKeyword,values);
 		server1.getHost().sync();
@@ -348,39 +347,6 @@ public class LatticePropagatorTest {
 		assertEquals(MessageTag.LATTICE_VALUE,payload.get(0));
 		assertEquals(3L,payload.count(),"root sync should be an optimistic push");
 		return payload.getRef(2).getHash();
-	}
-
-	/** Waits on announce signals until the expected value arrives, without polling. */
-	private static CompletableFuture<ACell> nextAnnounceMatching(
-			LatticePropagator propagator,Predicate<ACell> predicate) {
-		CompletableFuture<ACell> result=new CompletableFuture<>();
-		awaitMatching(propagator,predicate,result,16);
-		return result;
-	}
-
-	private static void awaitMatching(LatticePropagator propagator,
-			Predicate<ACell> predicate,CompletableFuture<ACell> result,int remaining) {
-		propagator.nextAnnounce().whenComplete((value,error) -> {
-			if (error!=null) {
-				result.completeExceptionally(error);
-			} else {
-				boolean matches;
-				try {
-					matches=predicate.test(value);
-				} catch (Throwable predicateFailure) {
-					result.completeExceptionally(predicateFailure);
-					return;
-				}
-				if (matches) {
-					result.complete(value);
-				} else if (remaining<=1) {
-					result.completeExceptionally(
-						new AssertionError("Expected announcement did not arrive"));
-				} else {
-					awaitMatching(propagator,predicate,result,remaining-1);
-				}
-			}
-		});
 	}
 
 	/** Filtering belongs to the propagator and runs before its store boundary. */
@@ -619,7 +585,7 @@ public class LatticePropagatorTest {
 			}
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 			server1.getCursor().assoc(dataKeyword, updatedDataIndex);
-			CompletableFuture<ACell> published=nextAnnounceMatching(propagator1,
+			CompletableFuture<ACell> published=Announcements.nextMatching(propagator1,
 				value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
 			// Synchronous commit persists the authoritative node root; wait for the
 			// source group to expose that exact root before pulling it.
