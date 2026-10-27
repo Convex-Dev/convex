@@ -25,7 +25,7 @@ import convex.core.store.NullStore;
 
 /**
  * The per-row last-write-wins policy. Rows merge by key whichever schema wins, and a row
- * held on one side only survives if it was written at or after the other side's utime,
+ * held on one side only survives if it was written at or after the other side's ctime,
  * so rows from before a table was dropped and created again never return.
  */
 public class RowLWWTest {
@@ -40,9 +40,9 @@ public class RowLWWTest {
 	}
 
 	/** A table entry: live with a schema, dropped without one. */
-	private static AVector<ACell> entry(AVector<AVector<ACell>> schema, long utime, Index<ABlob, AVector<ACell>> rows) {
+	private static AVector<ACell> entry(AVector<AVector<ACell>> schema, long ctime, Index<ABlob, AVector<ACell>> rows) {
 		Index<ABlob, AVector<ACell>> held = (schema == null && rows.isEmpty()) ? null : rows;
-		return Vectors.of(schema, held, CVMLong.create(utime), CVMLong.create(SQLTable.computeLiveCount(held)));
+		return Vectors.of(schema, held, CVMLong.create(ctime), CVMLong.create(SQLTable.computeLiveCount(held)));
 	}
 
 	private static AVector<ACell> rowsOnly(Index<ABlob, AVector<ACell>> rows) {
@@ -84,7 +84,7 @@ public class RowLWWTest {
 		AVector<ACell> stale = entry(SCHEMA, 1, Index.of(R, row("old", 2)));
 		AVector<ACell> recreated = entry(SCHEMA, 4, Index.of(Q, row("new", 5)));
 		for (AVector<ACell> merged : List.of(RowLWW.mergeTable(stale, recreated), RowLWW.mergeTable(recreated, stale))) {
-			assertEquals(CVMLong.create(4), merged.get(SQLTable.POS_UTIME));
+			assertEquals(CVMLong.create(4), merged.get(SQLTable.POS_CTIME));
 			assertNull(rows(merged).get(R));
 			assertEquals(1, visible(merged));
 		}
@@ -186,7 +186,7 @@ public class RowLWWTest {
 
 	/**
 	 * Associative and idempotent over every combination of a small set of entries whose rows
-	 * were written at or after their utime, and commutative unless two entries tie on utime
+	 * were written at or after their ctime, and commutative unless two entries tie on ctime
 	 * with different schemas, where the own entry is kept.
 	 */
 	@Test
@@ -196,7 +196,7 @@ public class RowLWWTest {
 			assertEquals(a, RowLWW.mergeTable(a, a));
 			for (AVector<ACell> b : entries) {
 				AVector<ACell> ab = RowLWW.mergeTable(a, b);
-				boolean tie = a.get(SQLTable.POS_UTIME).equals(b.get(SQLTable.POS_UTIME))
+				boolean tie = a.get(SQLTable.POS_CTIME).equals(b.get(SQLTable.POS_CTIME))
 					&& !java.util.Objects.equals(a.get(SQLTable.POS_SCHEMA), b.get(SQLTable.POS_SCHEMA));
 				if (!tie) assertEquals(ab, RowLWW.mergeTable(b, a));
 				for (AVector<ACell> c : entries) {
@@ -217,20 +217,20 @@ public class RowLWWTest {
 			}
 		}
 		List<AVector<ACell>> entries = new ArrayList<>();
-		for (long utime : new long[] {1, 3, 4, 6}) {
+		for (long ctime : new long[] {1, 3, 4, 6}) {
 			for (Index<ABlob, AVector<ACell>> rows : rowSets) {
-				if (!writtenSince(rows, utime)) continue;
-				entries.add(entry(SCHEMA, utime, rows));
-				entries.add(entry(null, utime, rows));
-				if (utime == 4) entries.add(entry(OTHER_SCHEMA, utime, rows));
+				if (!writtenSince(rows, ctime)) continue;
+				entries.add(entry(SCHEMA, ctime, rows));
+				entries.add(entry(null, ctime, rows));
+				if (ctime == 4) entries.add(entry(OTHER_SCHEMA, ctime, rows));
 			}
 		}
 		return entries;
 	}
 
-	private static boolean writtenSince(Index<ABlob, AVector<ACell>> rows, long utime) {
+	private static boolean writtenSince(Index<ABlob, AVector<ACell>> rows, long ctime) {
 		boolean[] ok = {true};
-		rows.forEach((k, v) -> ok[0] &= SQLRow.getTimestamp(v).longValue() >= utime);
+		rows.forEach((k, v) -> ok[0] &= SQLRow.getTimestamp(v).longValue() >= ctime);
 		return ok[0];
 	}
 

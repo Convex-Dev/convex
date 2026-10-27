@@ -52,7 +52,7 @@ import convex.lattice.cursor.Cursors;
  * merge agree. The table store ({@code [:tables]}), a table entry
  * ({@code [:tables, name]}), a table's rows ({@code [:tables, name, 1]}) and one row
  * ({@code [:tables, name, 1, key]}) can be delivered; rows are lifted into a table
- * entry without a utime. Deliveries to other sections are ignored, and other paths
+ * entry without a ctime. Deliveries to other sections are ignored, and other paths
  * refused.
  *
  * <p>The table store and tables ({@link #tables()}) are live views for table
@@ -468,7 +468,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		return path.length == 3 || path[3] instanceof ABlobLike;
 	}
 
-	/** Delivered rows as an entry without a utime, or null when the value is not rows. */
+	/** Delivered rows as an entry without a ctime, or null when the value is not rows. */
 	@SuppressWarnings("unchecked")
 	private static AVector<ACell> rowsEntry(ACell value, ACell[] path) {
 		Index<ABlob, AVector<ACell>> rows;

@@ -17,11 +17,11 @@ import convex.lattice.cursor.AForkableCursor;
 /**
  * A single SQL table within the lattice table store.
  *
- * <p>Wraps a lattice cursor pointing at the table's state vector: [schema, rows, utime, liveCount, version]
+ * <p>Wraps a lattice cursor pointing at the table's state vector: [schema, rows, ctime, liveCount, version]
  * <ul>
  *   <li>schema (AVector) - Column definitions: [[name, type, precision, scale], ...]</li>
  *   <li>rows (Index) - Row data: primary-key (ABlob) → row entry</li>
- *   <li>utime (CVMLong) - Schema update timestamp for LWW</li>
+ *   <li>ctime (CVMLong) - When the table was created, or dropped for a tombstone</li>
  *   <li>liveCount (CVMLong) - Number of live (non-tombstone) rows</li>
  *   <li>version (CVMLong) - Format version (CAD039); absent in version 0 entries</li>
  * </ul>
@@ -38,7 +38,7 @@ import convex.lattice.cursor.AForkableCursor;
  * merges with the policy its wrapper supplies.
  *
  * <p>Row writes are stamped with the clock the containing schema supplies, read once
- * per write.
+ * per write, and never earlier than the table's ctime (CAD039).
  */
 public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 
@@ -46,8 +46,8 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	static final int POS_SCHEMA = 0;
 	/** Position of rows in table vector */
 	static final int POS_ROWS = 1;
-	/** Position of update timestamp */
-	static final int POS_UTIME = 2;
+	/** Position of the creation timestamp */
+	static final int POS_CTIME = 2;
 	/** Position of live row count */
 	static final int POS_LIVE_COUNT = 3;
 	/** Position of the format version, absent in version 0 entries */
@@ -157,12 +157,12 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	}
 
 	/**
-	 * Gets the update timestamp.
+	 * Gets the table's ctime: when it was created, or dropped for a tombstone.
 	 */
 	public CVMLong getTimestamp() {
 		AVector<ACell> state = cursor().get();
 		if (state == null) return null;
-		return (CVMLong) state.get(POS_UTIME);
+		return (CVMLong) state.get(POS_CTIME);
 	}
 
 	/**
@@ -297,7 +297,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 *
 	 * @param pk Primary key (blob-encoded)
 	 * @param values Full row values (including PK as first element)
-	 * @param timestamp Insert timestamp
+	 * @param timestamp Insert timestamp, raised to the table's ctime if earlier
 	 * @return true if inserted successfully
 	 */
 	@SuppressWarnings("unchecked")
@@ -311,11 +311,11 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			// Check if this insert adds a new live row
 			AVector<ACell> existing = rows.get(pk);
 			boolean addsLive = (existing == null || !SQLRow.isLive(existing));
-			rows = rows.assoc(pk, SQLRow.create(values, timestamp));
+			rows = rows.assoc(pk, SQLRow.create(values, rowTimestamp(timestamp, state)));
 			long liveCount = getLiveCount(state) + (addsLive ? 1 : 0);
 			result[0] = true;
-			// utime is the schema timestamp: row writes leave it unchanged (CAD039)
-			return entry(state.get(POS_SCHEMA), rows, state.get(POS_UTIME), liveCount, versionField(state));
+			// ctime is the creation time: row writes leave it unchanged (CAD039)
+			return entry(state.get(POS_SCHEMA), rows, state.get(POS_CTIME), liveCount, versionField(state));
 		});
 		return result[0];
 	}
@@ -324,7 +324,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Deletes a row by primary key with an explicit timestamp.
 	 *
 	 * @param key Primary key (blob-encoded)
-	 * @param timestamp Deletion timestamp
+	 * @param timestamp Deletion timestamp, raised to the table's ctime if earlier
 	 * @return true if a live row was deleted
 	 */
 	@SuppressWarnings("unchecked")
@@ -337,10 +337,10 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			if (rows == null) return state;
 			AVector<ACell> row = rows.get(key);
 			if (row == null || !SQLRow.isLive(row)) return state;
-			rows = rows.assoc(key, SQLRow.createTombstone(timestamp));
+			rows = rows.assoc(key, SQLRow.createTombstone(rowTimestamp(timestamp, state)));
 			long liveCount = getLiveCount(state) - 1;
 			result[0] = true;
-			return entry(state.get(POS_SCHEMA), rows, state.get(POS_UTIME), liveCount, versionField(state));
+			return entry(state.get(POS_SCHEMA), rows, state.get(POS_CTIME), liveCount, versionField(state));
 		});
 		return result[0];
 	}
@@ -348,13 +348,23 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	// ========== Helpers ==========
 
 	/**
+	 * The timestamp of a row write: the given one, or the table's ctime if that is later,
+	 * so a merge policy can tell the table's own rows from those of an earlier table of the
+	 * same name, whatever the writer's clock (CAD039).
+	 */
+	private static CVMLong rowTimestamp(CVMLong timestamp, AVector<ACell> state) {
+		CVMLong ctime = (CVMLong) state.get(POS_CTIME);
+		return (ctime == null || timestamp.longValue() >= ctime.longValue()) ? timestamp : ctime;
+	}
+
+	/**
 	 * Builds a live table state, with a version field only when there is one to carry,
 	 * so that version 0 entries keep exactly their four fields.
 	 */
-	static AVector<ACell> entry(ACell schema, ACell rows, ACell utime, long liveCount, ACell version) {
+	static AVector<ACell> entry(ACell schema, ACell rows, ACell ctime, long liveCount, ACell version) {
 		CVMLong count = CVMLong.create(liveCount);
-		if (version == null) return Vectors.of(schema, rows, utime, count);
-		return Vectors.of(schema, rows, utime, count, version);
+		if (version == null) return Vectors.of(schema, rows, ctime, count);
+		return Vectors.of(schema, rows, ctime, count, version);
 	}
 
 	/** The version field of a state, or null when it has none. */

@@ -14,7 +14,7 @@ LatticeHost                     ← persistence and publication policy
               │
               └── path(:tables) ← SQLSchema: table name → table entry
                     │
-                    └── path("users") ← SQLTable: schema, rows, utime, live count, version
+                    └── path("users") ← SQLTable: schema, rows, ctime, live count, version
 ```
 
 Each `path()` call creates a lightweight descended cursor that reads/writes through
@@ -58,8 +58,9 @@ Writes are stamped with a clock the application supplies, a `Supplier<CVMLong>`
 given to `ConvexDB` (or to a standalone `SQLDatabase` or `SQLSchema`), defaulting to
 the runtime clock. The factories pass it down to every database and table, and forks
 and transactions keep it. Each write reads it once: creating or dropping a table
-stamps the table entry, and inserting or deleting a row stamps the row. Merges never
-read it, and incoming values keep their timestamps.
+stamps the table entry with its `ctime`, and inserting or deleting a row stamps the
+row, never earlier than the table's `ctime`. Merges never read it, and incoming
+values keep their timestamps.
 
 The clock is how a writer orders its writes, so it is the application's policy. A
 single writer that needs every later write to win supplies strictly increasing
@@ -149,7 +150,7 @@ Every route by which state arrives reaches the policy:
   whole-value merge agree. The table store (`[database, :tables]`), a table entry
   (`[database, :tables, table]`), its rows (`[database, :tables, table, 1]`) or one row
   (`[database, :tables, table, 1, key]`) can be delivered; rows are lifted into a table
-  entry without a `utime`. Deliveries to other sections are ignored, and other paths
+  entry without a `ctime`. Deliveries to other sections are ignored, and other paths
   are refused.
 - **Fork publication**: `sync()` reconciles a fork with its destination through the
   policy. `SQLDatabase` publishes only its tables: the destination's other sections
@@ -165,20 +166,21 @@ Every route by which state arrives reaches the policy:
 |-------|----------|------|
 | database | `merge` | `:tables` by `mergeTables`; other sections are ignored on receipt and kept where held |
 | table store | `mergeTables` | union of table names; each entry by `mergeTable` |
-| table entry | `mergeTable` | LWW schema on `utime`, own on a tie; a dropped table's tombstone wins in the same way; rows by `mergeRows`, whichever schema wins |
-| rows | `mergeRows` | by key; a row held on one side only survives if written at or after the other side's `utime` |
+| table entry | `mergeTable` | LWW schema on `ctime`, own on a tie; a dropped table's tombstone wins in the same way; rows by `mergeRows`, whichever schema wins |
+| rows | `mergeRows` | by key; a row held on one side only survives if written at or after the other side's `ctime` |
 | row entry | `mergeRow` | LWW by timestamp; equal timestamps favour deletion, otherwise own |
 
-An entry's `utime` is the time the table was created or dropped: row writes leave it
-unchanged. A row written before a table was created belongs to an earlier table of
-that name, so when one side holds a row the other lacks, the row survives only if it
-was written at or after the other side's `utime`. Rows written before a `DROP TABLE`
+An entry's `ctime` is the time the table was created, or dropped for a tombstone: row
+writes leave it unchanged and are stamped no earlier than it. A row written before a
+table was created belongs to an earlier table of that name, so when one side holds a
+row the other lacks, the row survives only if it was written at or after the other
+side's `ctime`. Rows written before a `DROP TABLE`
 therefore never return, whether a copy missed the drop or the table was created again,
 and every copy of a single writer's tables converges to the writer's own. `DROP TABLE`
 writes only the tombstone: a dropped table holds just the rows written after it was
 dropped, which no reader sees.
 
-A table entry without a `utime` carries only rows, from a delivery below the entry: its
+A table entry without a `ctime` carries only rows, from a delivery below the entry: its
 rows merge into a table that exists, live or dropped, as those of a whole entry would,
 and an absent table takes nothing. Merges that accept nothing create nothing: a
 database or table store that is absent stays absent. Equal timestamps keep the

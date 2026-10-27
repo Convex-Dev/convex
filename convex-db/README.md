@@ -367,7 +367,7 @@ AHashMap<AString, Index>
 Where table-store is:
 ```
 Index<AString, AVector>
-  table-name → [schema, rows, utime, live-count, version]
+  table-name → [schema, rows, ctime, live-count, version]
 ```
 
 A version 0 entry has no `version` field

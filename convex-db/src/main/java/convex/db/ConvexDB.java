@@ -43,7 +43,7 @@ import convex.node.NodeServer;
  * ConvexDB      db name → database state
  *   └─ SQLDatabase   :tables → table store
  *        └─ SQLSchema     table name → table entry
- *             └─ SQLTable      [schema, rows, utime, live-count, version?]
+ *             └─ SQLTable      [schema, rows, ctime, live-count, version?]
  * </pre>
  *
  * <p>How databases merge is the application's policy, supplied when a ConvexDB is
