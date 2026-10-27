@@ -19,18 +19,20 @@ SQL "SELECT name FROM t WHERE id = 1"
          ↓
     ConvexToEnumerableConverter (boundary to Enumerable convention)
          ↓
-    ConvexRelExecutor.execute() converts ACell[] → Object[] at runtime
+    ConvexResultConverter.execute() runs the ConvexRel tree, converting ACell[] → Object[]
          ↓
     Calcite Avatica JDBC ResultSet
 ```
+
+`INSERT`, `UPDATE` and `DELETE` plan to `ConvexTableModify` in the Enumerable convention, whose generated code calls the table's insert, update and delete methods.
 
 ### Key Design Points
 
 - **TranslatableTable**: `ConvexTable.toRel()` returns `ConvexTableScan` directly — Calcite never creates `EnumerableTableScan`. This ensures all queries go through our pipeline.
 - **No EnumerableTableScan**: We don't implement `ScannableTable` or `FilterableTable`. The ConvexConvention pipeline handles everything.
 - **DataContext threading**: `ConvexRel.execute(DataContext)` passes context through the operator tree so `ConvexFilter` can resolve PreparedStatement `?` parameters at runtime.
-- **Plan reuse**: PreparedStatements reuse the plan across executions — no re-planning overhead. A plan is valid only for the binding of each table it reads or writes, its schema and format version (CAD039): `ConvexTableScan` and `ConvexTableModify` capture it when planned, and `ConvexTable.boundTable()` checks it before any row is read or written. Once a table is dropped or changed, execution fails with `StalePlanException` and the statement must be prepared again.
-- **Type-correct output**: `ConvexToEnumerableConverter` selects SCALAR format (single column) or ARRAY format (multi-column) matching Calcite's `JavaRowFormat` contract, calling `executeScalar()` or `execute()` respectively.
+- **Plan reuse**: PreparedStatements reuse the plan across executions — no re-planning overhead. The plan carries its `ConvexRel` tree, stashed with `implementor.stash()`, so there is no registry. A plan is valid only for the binding of each table it reads or writes, its schema and format version (CAD039): `ConvexTableScan` and `ConvexTableModify` capture it when planned, and `ConvexTable.boundTable()` checks it before any row is read or written. Once a table is dropped or changed, execution fails with `StalePlanException` and the statement must be prepared again.
+- **Type-correct output**: `ConvexToEnumerableConverter` selects SCALAR format (single column) or ARRAY format (multi-column) matching Calcite's `JavaRowFormat` contract, calling `ConvexResultConverter.executeScalar()` or `execute()` respectively.
 
 ## Components
 
@@ -46,44 +48,60 @@ SQL "SELECT name FROM t WHERE id = 1"
 
 | Operator | SQL | Notes |
 |----------|-----|-------|
-| `ConvexTableScan` | `FROM table` | Full scan via `selectAll()` |
+| `ConvexTableScan` | `FROM table` | Full scan in primary key order, in one `forEach` pass over the rows |
 | `ConvexFilter` | `WHERE ...` | PK pushdown for `WHERE pk = literal/param` → O(log n) `selectByKey()` |
 | `ConvexProject` | `SELECT expr, ...` | Expression evaluation via `ConvexExpressionEvaluator` |
 | `ConvexSort` | `ORDER BY ... LIMIT N OFFSET M` | Type-specific comparators from `SqlTypeName` at plan time |
 | `ConvexAggregate` | `GROUP BY ... COUNT/SUM/AVG/MIN/MAX` | CVM-native arithmetic via `RT.plus()`, `RT.min()`, etc. |
-| `ConvexJoin` | `JOIN ... ON` | Nested-loop join (INNER, LEFT, RIGHT, FULL OUTER) |
+| `ConvexMergeJoin` | `JOIN ... ON a = b` | Merge join for conditions with at least one equality (INNER, LEFT, RIGHT, FULL OUTER); sorts both inputs on the join keys, cheaply when already in key order, then merges in O(n+m); other conditions filter matched rows |
+| `ConvexJoin` | `JOIN ... ON` | Nested-loop join for any condition (INNER, LEFT, RIGHT, FULL OUTER) |
 
 ### Boundary
 
 | Class | Purpose |
 |-------|---------|
-| `ConvexToEnumerableConverter` | Generates code calling `ConvexRelExecutor` at runtime |
-| `ConvexRelExecutor` | Executes ConvexRel tree, converts `ACell[]` → `Object[]` |
+| `ConvexToEnumerableConverter` | Stashes the `ConvexRel` tree in the plan and generates a call to `ConvexResultConverter` |
+| `ConvexResultConverter` | Runs the `ConvexRel` tree, converting each value to the Java value for its result column's type |
+
+### Data Modification
+
+| Class | Purpose |
+|-------|---------|
+| `ConvexLogicalTableModify` | Logical `INSERT`/`UPDATE`/`DELETE` on a `ConvexTable`, from `ConvexTable.toModificationRel()` |
+| `ConvexTableModify` | Enumerable implementation; generated code resolves the table, checks its binding and writes through it |
 
 ### Rules
 
-`ConvexRules` provides converter rules registered via `Hook.PLANNER` in `ConvexDriver`:
+`ConvexDriver` registers the rules through `Hook.PLANNER`. `ConvexRules` provides the query rules:
 
 - `ConvexFilterRule` — LogicalFilter → ConvexFilter
 - `ConvexProjectRule` — LogicalProject → ConvexProject
 - `ConvexSortRule` — LogicalSort → ConvexSort
 - `ConvexAggregateRule` — LogicalAggregate → ConvexAggregate
 - `ConvexJoinRule` — LogicalJoin → ConvexJoin
+- `ConvexMergeJoinRule` — LogicalJoin with an equality → ConvexMergeJoin, which the planner prefers by cost
 - `ConvexToEnumerableConverterRule` — ConvexConvention → EnumerableConvention
 
 No `ConvexTableScanRule` needed — `TranslatableTable.toRel()` creates `ConvexTableScan` directly.
+
+For data modification, the hook replaces Calcite's `ENUMERABLE_TABLE_MODIFICATION_RULE` with:
+
+- `ConvexTableModifyRule` — ConvexLogicalTableModify → ConvexTableModify
+- `ConvexLogicalTableModifyRule` — a LogicalTableModify on a `ConvexTable`, as Calcite creates for `UPDATE` and `DELETE` → ConvexTableModify
+
+The query rules match only `ConvexTable` plans, but the removal of Calcite's rule applies to every Calcite connection in the JVM.
 
 ### Expression Evaluator
 
 `ConvexExpressionEvaluator` evaluates `RexNode` expressions against `ACell[]` rows:
 
 - **Arithmetic**: +, -, *, /, MOD, negation
-- **Comparison**: =, <>, <, <=, >, >=, BETWEEN, IN
+- **Comparison**: =, <>, <, <=, >, >=, BETWEEN, IN, IS [NOT] DISTINCT FROM
 - **Logical**: AND, OR, NOT, IS NULL, IS NOT NULL
 - **SEARCH**: Calcite's optimised range/equality operator (Sarg)
 - **CAST**, **CASE WHEN**, **COALESCE**
 - **Math**: ABS, FLOOR, CEIL, SQRT, POWER, EXP, SIGN
-- **String**: UPPER, LOWER, TRIM, SUBSTRING, LENGTH, CONCAT, POSITION, REPLACE, LIKE
+- **String**: UPPER, LOWER, TRIM, LTRIM, RTRIM, SUBSTRING, LENGTH, CONCAT, POSITION, REPLACE, LIKE
 
 ### PK Index Pushdown
 
@@ -92,33 +110,43 @@ No `ConvexTableScanRule` needed — `TranslatableTable.toRel()` creates `ConvexT
 ## File Structure
 
 ```
-convex-db/src/main/java/convex/db/calcite/
-├── ConvexTable.java              # TranslatableTable + ModifiableTable
-├── ConvexSchema.java             # Schema providing table map
-├── ConvexSchemaFactory.java      # Schema factory for model config
-├── ConvexType.java               # SQL ↔ CVM type mapping
-├── ConvexColumnType.java         # Column type with nullability
-├── ConvexDdlExecutor.java        # CREATE TABLE / DROP TABLE
-├── convention/
-│   ├── ConvexConvention.java     # Convention enum
-│   ├── ConvexRel.java            # execute(DataContext) interface
-│   └── ConvexEnumerable.java     # Iterable<ACell[]>
-├── rel/
-│   ├── ConvexTableScan.java      # Full table scan
-│   ├── ConvexFilter.java         # WHERE with PK pushdown
-│   ├── ConvexProject.java        # SELECT expressions
-│   ├── ConvexSort.java           # ORDER BY / LIMIT / OFFSET
-│   ├── ConvexAggregate.java      # GROUP BY / aggregates
-│   ├── ConvexJoin.java           # JOIN (nested loop)
-│   ├── ConvexToEnumerableConverter.java  # Convention boundary
-│   └── ConvexRelExecutor.java    # Runtime executor + ACell→Java conversion
-├── rules/
-│   ├── ConvexRules.java          # All converter rules
-│   └── ConvexToEnumerableConverterRule.java
-├── eval/
-│   └── ConvexExpressionEvaluator.java  # RexNode → ACell evaluation
+convex-db/src/main/java/convex/db/
+├── calcite/
+│   ├── ConvexTable.java                  # TranslatableTable + ModifiableTable, plan bindings
+│   ├── ConvexSchema.java                 # Schema providing table map
+│   ├── ConvexSchemaFactory.java          # Schema factory; resolves tables for DML code
+│   ├── ConvexTableFactory.java           # Table factory for model config
+│   ├── ConvexType.java                   # SQL ↔ CVM type mapping
+│   ├── ConvexColumnType.java             # Column type with precision and scale
+│   ├── ConvexTypeSystem.java             # Calcite type system for every connection
+│   ├── ConvexDdlExecutor.java            # CREATE TABLE / DROP TABLE
+│   ├── ConvexLogicalTableModify.java     # DML, logical
+│   ├── ConvexTableModify.java            # DML, generated code
+│   ├── ConvexLogicalTableModifyRule.java
+│   ├── ConvexTableModifyRule.java
+│   ├── StalePlanException.java           # Table changed since the plan was built
+│   ├── convention/
+│   │   ├── ConvexConvention.java         # Convention enum
+│   │   ├── ConvexRel.java                # execute(DataContext) interface
+│   │   └── ConvexEnumerable.java         # Iterable<ACell[]>
+│   ├── rel/
+│   │   ├── ConvexTableScan.java          # Full table scan
+│   │   ├── ConvexFilter.java             # WHERE with PK pushdown
+│   │   ├── ConvexProject.java            # SELECT expressions
+│   │   ├── ConvexSort.java               # ORDER BY / LIMIT / OFFSET
+│   │   ├── ConvexAggregate.java          # GROUP BY / aggregates
+│   │   ├── ConvexMergeJoin.java          # JOIN on equality (merge)
+│   │   ├── ConvexJoin.java               # JOIN on any condition (nested loop)
+│   │   ├── ConvexToEnumerableConverter.java  # Convention boundary
+│   │   └── ConvexResultConverter.java    # Runs the tree, ACell → Java conversion
+│   ├── rules/
+│   │   ├── ConvexRules.java              # Query converter rules
+│   │   └── ConvexToEnumerableConverterRule.java
+│   ├── eval/
+│   │   └── ConvexExpressionEvaluator.java  # RexNode → ACell evaluation
+│   └── pgcatalog/                        # pg_catalog tables for PostgreSQL clients
 └── jdbc/
-    └── ConvexDriver.java         # JDBC driver, planner hook registration
+    └── ConvexDriver.java                 # JDBC driver, planner hook registration
 ```
 
 ## Performance
@@ -131,11 +159,11 @@ At 10,000 rows:
 | Update | 1.4 us/op | 23 us/op |
 | Insert | 0.9 us/op | 8 us/op |
 
-JDBC PK lookups are constant time (O(log n)) regardless of table size.
+JDBC PK lookups are O(log n) index lookups, so their cost barely grows with table size.
 
 ## Open Questions
 
-1. **Hash join**: Current join is nested-loop O(n*m). Hash join would improve equi-join performance.
+1. **Hash join**: Equi-joins sort both inputs before merging, which costs O(n log n) when an input is not already in key order; a hash join would avoid that. Other joins are nested-loop O(n*m).
 2. **Query plan caching**: Plans are reused per PreparedStatement but not across statements with the same SQL text.
 3. **Secondary indexes**: Only PK (column 0) pushdown is supported. See issue #537.
 4. **Window functions**: Not yet implemented.

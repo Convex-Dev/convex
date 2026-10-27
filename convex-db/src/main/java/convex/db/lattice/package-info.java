@@ -19,6 +19,6 @@
  * tables are live views with no merge of their own. {@link convex.db.ConvexDB} merges
  * its databases by name, each with that policy.
  *
- * @see <a href="https://docs.convex.world/cad/039_convex_sql">CAD039: Convex SQL</a>
+ * @see <a href="https://docs.convex.world/docs/cad/convex_sql">CAD039: Convex SQL</a>
  */
 package convex.db.lattice;

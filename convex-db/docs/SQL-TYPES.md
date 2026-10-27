@@ -58,7 +58,7 @@ the schema together with the entry's version, and every path that touches a valu
 Public API:
 
 ```java
-ConvexColumnType.fromDeclared(RelDataType declared)   // DDL: the declared SQL type
+ConvexColumnType.fromRelDataType(RelDataType declared) // DDL: the declared SQL type
 ConvexColumnType.fromSchema(AVector<ACell> column, int version) // a stored column definition
 RelDataType toRelDataType(RelDataTypeFactory factory)  // Calcite type for the column
 ACell toCell(Object value)    // Java value to stored CVM value; SQLException if it does not conform

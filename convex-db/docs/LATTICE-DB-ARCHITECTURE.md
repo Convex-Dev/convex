@@ -14,7 +14,7 @@ LatticeHost                     ← persistence and publication policy
               │
               └── path(:tables) ← SQLSchema: table name → table entry
                     │
-                    └── path("users") ← SQLTable: schema, rows, utime
+                    └── path("users") ← SQLTable: schema, rows, utime, live count, version
 ```
 
 Each `path()` call creates a lightweight descended cursor that reads/writes through
@@ -79,7 +79,7 @@ navigation without adding another copy of the application state.
 transaction forks that `SQLDatabase`; this gives atomic commit and cheap rollback:
 
 ```
-RootCursor / ConvexDB              ← hosted database map
+ConvexDB                           ← hosted database map
   │
   └── SQLDatabase cursor           ← live database path
         │
@@ -121,9 +121,8 @@ SQLDatabase tx2 = db.fork();
 tx2.tables().insert("users", row2);
 tx2.sync();  // merge into db cursor (both rows now visible)
 
-// Publish the hosted application root, then request physical durability
-cdb.sync();
-server.getHost().flush();
+// Retain the host's current snapshot and make it durable
+server.getHost().checkpoint();
 ```
 
 ## Merge Policy
@@ -213,7 +212,7 @@ ConvexDB cdb = ConvexDB.create(MyApp::keepReference);
 
 `ConvexDBMergeTest` exercises such a policy across every route.
 
-## Target API
+## API Summary
 
 ```java
 // Setup — the host's registered ConvexDB merges incoming values
@@ -232,9 +231,8 @@ tx.tables().insert("users", row2);
 tx.tables().deleteByKey("users", oldPk);
 tx.sync();    // commit: atomic merge into db cursor
 
-// Publish and flush through host policy
-cdb.sync();
-server.getHost().flush();
+// Save durably through the host
+server.getHost().checkpoint();
 ```
 
 Each component owns its cursor, and each database merges with the policy its wrapper

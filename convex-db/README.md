@@ -13,17 +13,13 @@ Convex DB provides SQL query capabilities over lattice data structures, built on
 ## Quick Start
 
 ```java
-// 1. Create a ConvexDB, choosing how its databases merge, and a named database
+// 1. Create a ConvexDB, choosing how its databases merge
 ConvexDB cdb = ConvexDB.create(RowLWW::merge);
-SQLDatabase db = cdb.database("mydb");
 
-// 2. Register for JDBC/PostgreSQL access
-cdb.register("mydb");
+// 2. Connect via JDBC to a named database within it
+Connection conn = cdb.getConnection("mydb");
 
-// 3. Connect via JDBC
-Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
-
-// 4. Use standard SQL
+// 3. Use standard SQL
 Statement stmt = conn.createStatement();
 stmt.execute("CREATE TABLE users (id, name, email)");
 stmt.execute("INSERT INTO users VALUES (1, 'Alice', 'alice@example.com')");
@@ -47,8 +43,9 @@ try (var store = EtchStore.create(file); var host = ConvexDB.openHost(store, Row
 durability barrier. Closing the host does so once more, then the store closes.
 For batched saving, use `host.sync()` after accepted edits and scope
 `host.autoFlush(interval)` around the service lifetime; closing the host stops
-it. Stop request handling and close any `NodeServer` before closing the host.
-Closing an optional `NodeServer` does not save pending database edits. See the
+it. With a `NodeServer`, stop request handling and call `server.stopIngress()`
+before closing the host, then close the server, which sends the host's final
+checkpoint to peers. Closing a `NodeServer` saves nothing itself. See the
 executable local and JDBC reopen scenarios in
 [`ConvexDBPersistenceTest`](src/test/java/convex/db/ConvexDBPersistenceTest.java).
 
@@ -57,8 +54,13 @@ Convex DB provides a standard JDBC driver for SQL access.
 ### Connection URL
 
 ```
-jdbc:convex:database=<database-name>
+jdbc:convex:<name>              — named in-memory database (also jdbc:convex:mem:<name>)
+jdbc:convex:file:<path>         — persistent, Etch-backed database
+jdbc:convex:database=<name>     — a ConvexDB registered with register(<name>)
 ```
+
+[docs/JDBC.md](docs/JDBC.md) describes the URL parameters and when file-backed
+databases are saved.
 
 The `jdbc:convex:` driver is local and in-process: there is no network protocol
 between the JDBC client and the database, so the URL takes no host or port. To
@@ -72,7 +74,7 @@ a PostgreSQL client or driver.
 import java.sql.*;
 
 // Driver auto-registers via ServiceLoader
-Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
+Connection conn = DriverManager.getConnection("jdbc:convex:mydb");
 
 // DDL
 Statement stmt = conn.createStatement();
@@ -106,7 +108,7 @@ Convex DB supports standard SQL via Apache Calcite:
 - **DDL**: `CREATE TABLE`, `DROP TABLE`
 - **DML**: `INSERT`, `UPDATE`, `DELETE`
 - **Queries**: `SELECT`, `WHERE`, `ORDER BY`, `LIMIT`, `OFFSET`
-- **Joins**: `INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN`, `CROSS JOIN`
+- **Joins**: `INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN`, `FULL OUTER JOIN`, `CROSS JOIN`
 - **Aggregations**: `GROUP BY`, `HAVING`, `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`
 - **Expressions**: Arithmetic, string functions, `CASE`, `COALESCE`, `CAST`
 
@@ -188,7 +190,8 @@ Some PostgreSQL-specific features are not yet supported:
 - Regex operators (`~`, `!~`, `~*`)
 - Some system catalog tables (pg_proc, pg_index, pg_constraint)
 - PostgreSQL-specific functions
-- Transaction isolation across connections (read-committed level via lattice fork/sync)
+- Serialisable transactions: a transaction reads a snapshot taken when it begins, and
+  merges with concurrent changes at commit by the database's policy
 
 ## Lattice Tables API
 
@@ -291,7 +294,7 @@ db1.mergeReplicas(db2.exportReplica());
 ### Replica Ownership
 
 `mergeReplicas` accepts a replica when its signer is authorised for the owner it is
-published under and its signature verifies ([CAD038](https://docs.convex.world/docs/cad/038_lattice_auth)).
+published under and its signature verifies ([CAD038](https://docs.convex.world/docs/cad/lattice_auth)).
 By default, an owner that is an account key, or a self-certifying `did:key`, must be the
 signer, and any other owner, such as an account address or a `did:web`, is refused. To
 support other owners, supply an owner verifier. It replaces the default and decides for
@@ -347,8 +350,11 @@ AHashMap<AString, Index>
 Where table-store is:
 ```
 Index<AString, AVector>
-  table-name → [schema, rows, utime, live-count]
+  table-name → [schema, rows, utime, live-count, version]
 ```
+
+A version 0 entry has no `version` field
+([CAD039](https://docs.convex.world/docs/cad/convex_sql)).
 
 A replica exported by `SQLDatabase.exportReplica` is
 `owner-key → signed(db-name → database)`.

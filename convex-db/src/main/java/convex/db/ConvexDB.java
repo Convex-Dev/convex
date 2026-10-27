@@ -223,9 +223,10 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	/**
 	 * Creates optional networking around a store-backed ConvexDB host.
 	 * Call {@code server.getHost().checkpoint()} to save durably while running. At
-	 * shutdown, close the server, then {@code server.getHost()} to save, then the
-	 * store; network close does not save pending state. Local-only applications can
-	 * use {@link #openHost}.
+	 * shutdown, call {@code server.stopIngress()}, close {@code server.getHost()} to
+	 * save, then close the server, which sends that final checkpoint to peers, then
+	 * the store; network close does not save pending state. Local-only applications
+	 * can use {@link #openHost}.
 	 *
 	 * <p>Usage:
 	 * <pre>
@@ -446,7 +447,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * Bypasses DriverManager and the static registry entirely.
 	 *
 	 * <p>This is the preferred API when you already hold a ConvexDB instance
-	 * (e.g. from {@link #connect(AForkableCursor)}).
+	 * (e.g. from {@link #connect(ALatticeComponent)}).
 	 *
 	 * @param dbName Database name within this ConvexDB
 	 * @return JDBC Connection backed by this instance's cursor chain

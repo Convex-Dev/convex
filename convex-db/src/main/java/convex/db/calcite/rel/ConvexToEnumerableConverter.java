@@ -25,11 +25,11 @@ import convex.db.calcite.convention.ConvexRel;
 /**
  * Converter from ConvexConvention to EnumerableConvention.
  *
- * <p>Registers the ConvexRel tree once at compile time. At runtime,
- * generated code calls the appropriate ConvexResultConverter method:
+ * <p>Stashes the ConvexRel tree in the plan at compile time. At runtime,
+ * generated code passes it to the appropriate ConvexResultConverter method:
  * <ul>
- *   <li>SCALAR format (1 column): {@code executeScalar(id, ctx)} → {@code Enumerable<Object>}</li>
- *   <li>ARRAY format (N columns): {@code execute(id, N, ctx)} → {@code Enumerable<Object[]>}</li>
+ *   <li>SCALAR format (1 column): {@code executeScalar(rel, ctx)} → {@code Enumerable<Object>}</li>
+ *   <li>ARRAY format (N columns): {@code execute(rel, N, ctx)} → {@code Enumerable<Object[]>}</li>
  * </ul>
  */
 public class ConvexToEnumerableConverter extends ConverterImpl implements EnumerableRel {

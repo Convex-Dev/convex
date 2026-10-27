@@ -31,13 +31,10 @@ import convex.db.calcite.eval.ConvexExpressionEvaluator;
 /**
  * Merge join in CONVEX convention.
  *
- * <p>Performs an O(n+m) merge join on sorted inputs. Both sides must be
- * sorted on the equi-join key columns, which is naturally the case when
- * the join key is the primary key (column 0) — the Index radix tree
- * produces rows in sorted PK order.
- *
- * <p>For non-PK join keys, the planner inserts ConvexSort operators
- * below the merge join to sort both sides first (sort-merge join).
+ * <p>Collects both inputs and sorts each on the equi-join key columns, then
+ * merges them in O(n+m). Sorting costs little when an input is already in
+ * key order, as it is when the join key is the primary key (column 0) — the
+ * Index radix tree produces rows in sorted PK order.
  *
  * <p>Supports INNER, LEFT, RIGHT, and FULL OUTER joins. Any residual
  * non-equi conditions are evaluated as a post-filter on matched rows.

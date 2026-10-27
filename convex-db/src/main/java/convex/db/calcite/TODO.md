@@ -10,10 +10,11 @@
 - [x] ConvexSort — ORDER BY with type-specific comparators, LIMIT, OFFSET
 - [x] ConvexAggregate — GROUP BY, COUNT, SUM, AVG, MIN, MAX, HAVING
 - [x] ConvexJoin — INNER, LEFT, RIGHT, FULL OUTER (nested loop)
+- [x] ConvexMergeJoin — equi-joins, sorting inputs on the join keys
 - [x] DML — INSERT, UPDATE, DELETE (via EnumerableConvention)
 - [x] DDL — CREATE TABLE, DROP TABLE
 - [x] DataContext threading — PreparedStatement `?` param resolution
-- [x] Plan reuse — ConvexRelExecutor registry for PreparedStatement caching
+- [x] Plan reuse — ConvexRel tree stashed in the plan; table bindings checked before rows are read or written
 - [x] SCALAR/ARRAY format — correct JavaRowFormat for single vs multi-column results
 
 ### Expression Evaluator
@@ -25,7 +26,7 @@
 - [x] Conditionals: CASE WHEN, COALESCE
 - [x] CAST
 - [x] Math: ABS, FLOOR, CEIL, SQRT, POWER, EXP, SIGN
-- [x] String: UPPER, LOWER, TRIM, SUBSTRING, LENGTH, CONCAT, POSITION, REPLACE, LIKE
+- [x] String: UPPER, LOWER, TRIM, LTRIM, RTRIM, SUBSTRING, LENGTH, CONCAT, POSITION, REPLACE, LIKE
 
 ---
 
@@ -51,8 +52,7 @@
 ## Phase 5: Optimisation
 
 - [ ] Secondary index support (issue #537)
-- [ ] Hash join for equi-joins
-- [ ] Merge join for sorted inputs
+- [ ] Hash join for equi-joins whose inputs are not in key order
 - [ ] Cross-statement query plan caching
 - [ ] Table statistics for cost estimation
 - [ ] Parallel scan support
