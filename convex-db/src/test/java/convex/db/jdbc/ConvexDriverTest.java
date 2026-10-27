@@ -138,13 +138,20 @@ public class ConvexDriverTest {
 		}
 	}
 
-	/** SQL cannot name a class either: DDL other than for tables is refused. */
+	/**
+	 * SQL cannot name a class either: DDL other than for tables is refused, and type
+	 * and function names resolve only within the schema.
+	 */
 	@Test
-	public void testDdlCannotNameClasses() throws Exception {
+	public void testSqlCannotNameClasses() throws Exception {
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:ddl_test");
 				Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("CREATE TABLE t (id INTEGER)");
 			for (String sql : new String[] {"CREATE FUNCTION f AS '" + CANARY + "'",
-					"CREATE FOREIGN SCHEMA s LIBRARY '" + CANARY + "'"}) {
+					"CREATE FOREIGN SCHEMA s LIBRARY '" + CANARY + "'",
+					"CREATE TABLE u (id INTEGER, x \"" + CANARY + "\")",
+					"SELECT CAST(id AS \"" + CANARY + "\") FROM t",
+					"SELECT \"" + CANARY + "\"(id) FROM t"}) {
 				assertThrows(SQLException.class, () -> stmt.execute(sql), sql);
 			}
 		}
