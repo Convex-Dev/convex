@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
+import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
@@ -138,6 +139,16 @@ class MapComponentTest {
 		assertEquals(indexed,root.get() instanceof Index<?,?>);
 		map.remove(A);
 		assertFalse(map.containsKey(A));
+	}
+
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void equalPutLeavesStorageUnchanged(boolean indexed) {
+		var root=new Root<ACell>();
+		var map=component(root,indexed);
+		map.put(A,Blob.wrap(new byte[] {1,2,3}));
+		var before=root.get();
+		assertEquals(Blob.wrap(new byte[] {1,2,3}),map.put(A,Blob.wrap(new byte[] {1,2,3}))); // equal, distinct instance
+		assertSame(before,root.get());
 	}
 
 	@ParameterizedTest @ValueSource(booleans={false,true})

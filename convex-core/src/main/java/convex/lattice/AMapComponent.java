@@ -53,8 +53,8 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 	private AMap<K,V> associate(ACell stored,K key,V value) {
 		M map=requireMap(stored);
 		if (map==null) map=createContainer();
-		if (map.containsKey(key) && Utils.equals(map.get(key),value)) return map;
-		AMap<K,V> updated=map.assoc(key,value);
+		// Keeping an equal current value leaves the map unchanged
+		AMap<K,V> updated=map.update(key,(current,v) -> Utils.equals(current,v)?current:v,value);
 		if (updated==null) throw new IllegalArgumentException("Key is not supported by this map");
 		return updated;
 	}
