@@ -131,12 +131,14 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 
 	@Override
 	public boolean equals(Ref<T> a) {
-		if (a.hash!=null) {
-			// prefer hash comparison, this avoid potential store lookups
-			return hash.equals(a.hash);
-		}
-		// compare by value
-		return Cells.equals(getValue(),a.getValue());
+		if (a == this) return true;
+		Hash otherHash=a.cachedHash();
+		if (otherHash!=null) return hash.equals(otherHash);
+		// Preserve cheap value comparisons when resident, without fetching from the store.
+		T resident=softRef.get();
+		if (resident!=null) return Cells.equals(resident,a.getValue());
+		// Only the hash is available on this side.
+		return hash.equals(a.getHash());
 	}
 
 	@Override

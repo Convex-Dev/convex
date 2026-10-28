@@ -3,11 +3,13 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.lang.ref.Reference;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Set;
@@ -27,10 +29,58 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
+import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class RefTest {
+
+	@Test
+	public void testSoftEqualityResidentCountMismatch() {
+		AVector<CVMLong> resident=Vectors.repeat(CVMLong.ONE,256);
+		RefSoft<AVector<CVMLong>> soft=RefSoft.create(new MemoryStore(),resident,Ref.UNKNOWN);
+		AVector<CVMLong> other=Vectors.repeat(CVMLong.ONE,65536);
+		Ref<AVector<CVMLong>> direct=other.getRef();
+		assertNull(direct.cachedHash());
+		assertNull(other.cachedHash());
+
+		assertFalse(soft.equals(direct));
+		assertNull(direct.cachedHash());
+		assertNull(other.cachedHash());
+		for (int i=0; i<other.getRefCount(); i++) {
+			assertNull(other.getRef(i).cachedHash());
+		}
+		Reference.reachabilityFence(resident);
+	}
+
+	@Test
+	public void testSoftEqualityWithoutStoredValue() {
+		for (int size : new int[] {1, 256}) {
+			Blob value=Blob.wrap(new byte[size]);
+			Hash hash=value.getHash();
+			MemoryStore store=new MemoryStore();
+			Ref<Blob> soft=Ref.forHash(hash,store);
+			assertThrows(MissingDataException.class,soft::getValue);
+			assertTrue(soft.equals(soft));
+
+			for (boolean equal : new boolean[] {true, false}) {
+				for (boolean softFirst : new boolean[] {true, false}) {
+					byte[] bytes=new byte[size];
+					if (!equal) bytes[size-1]=1;
+					Blob other=Blob.wrap(bytes);
+					Ref<Blob> direct=RefDirect.create(other);
+					// Each direction must start cold: the first comparison caches the hash.
+					assertNull(direct.cachedHash());
+					assertNull(other.cachedHash());
+					assertEquals(equal,softFirst?soft.equals(direct):direct.equals(soft));
+					assertEquals(equal,value.getEncoding().equals(other.getEncoding()));
+					assertEquals(equal,soft.equals(direct));
+					assertEquals(equal,direct.equals(soft));
+				}
+			}
+			assertThrows(MissingDataException.class,soft::getValue);
+		}
+	}
 
 	@Test
 	public void testMissingData() {
