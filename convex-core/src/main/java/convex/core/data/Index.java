@@ -615,14 +615,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private Index<K, V> assocEntry(MapEntry<K, V> e, long match) {
 		if (count == 0L) return create(e);
-		if (count == 1L) {
-			assert (mask == (short) 0); // should be no children
-			if (entry.keyEquals(e)) {
-				if (entry == e) return this;
-				// recreate, preserving current depth
-				return create(e);
-			}
-		}
 		ACell maybeValidKey=e.getKey();
 		if (!(maybeValidKey instanceof ABlobLike)) return null; // invalid key type!
 		ABlobLike<?> k = (ABlobLike)maybeValidKey;
@@ -726,13 +718,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			if (node.count==0L) {
 				result=create(e);
 				break;
-			}
-			if (node.count==1L) {
-				assert node.mask==(short)0;
-				if (node.entry.keyEquals(e)) {
-					result=(node.entry==e) ? node : create(e);
-					break;
-				}
 			}
 
 			ABlobLike<?> prefix=node.getPrefix();

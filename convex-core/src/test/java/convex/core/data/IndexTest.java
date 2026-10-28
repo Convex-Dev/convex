@@ -610,6 +610,32 @@ public class IndexTest {
 		assertEquals(Index.of(shorter,CVMLong.ONE,longer,CVMLong.create(6)),names.update(longer,plus,delta));
 	}
 
+	/** Assoc compares key bytes without hashing either key, whether it replaces, forks or extends an entry. */
+	@Test
+	public void testAssocLeavesKeysUnhashed() {
+		Random r=new Random(5821);
+		List<Blob> keys=new ArrayList<>();
+		Index<ABlob,CVMLong> index=Index.none();
+		for (int i=0;i<20;i++) {
+			// Distinct keys of equal length: each sits alone in a single-entry node
+			Blob key=Blob.createRandom(r,30);
+			keys.add(key);
+			index=index.assoc(key,CVMLong.create(i));
+		}
+		List<Blob> added=new ArrayList<>();
+		for (Blob key:keys) added.add(Blob.wrap(key.getBytes())); // same bytes, new instance
+		byte[] forked=keys.get(0).getBytes();
+		forked[29]^=0x01;
+		added.add(Blob.wrap(forked));
+		added.add(Blob.wrap(Arrays.copyOf(keys.get(0).getBytes(),31)));
+		for (Blob key:added) index=index.assoc(key,CVMLong.create(-1));
+
+		for (Blob key:keys) assertNull(key.cachedHash());
+		for (Blob key:added) assertNull(key.cachedHash());
+		assertEquals(22,index.count());
+		for (Blob key:added) assertEquals(CVMLong.create(-1),index.get(key));
+	}
+
 	@Test
 	public void testDissocAll() throws InvalidDataException {
 		Index<Address, CVMLong> m=Index.none();
