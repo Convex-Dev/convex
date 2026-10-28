@@ -155,7 +155,7 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	public boolean equals(ACell o) {
 		// This is OK since these are guaranteed to be singleton instances!
 		if (o instanceof CoreFn) return o==this;
-		return Cells.equalsGeneric(this, o);
+		return Cells.equalsEncoding(this, o);
 	}
 	
 	@Override

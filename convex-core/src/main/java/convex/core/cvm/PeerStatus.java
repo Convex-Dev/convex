@@ -315,7 +315,7 @@ public class PeerStatus extends ARecordGeneric {
 	@Override 
 	public boolean equals(ACell a) {
 		if (a instanceof PeerStatus) return equals((PeerStatus)a);
-		return Cells.equalsGeneric(this, a);
+		return Cells.equalsEncoding(this, a);
 	}
 	
 	/**
@@ -325,7 +325,7 @@ public class PeerStatus extends ARecordGeneric {
 	 */
 	public boolean equals(PeerStatus a) {
 		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		return Cells.equalsGeneric(this, a);
+		return Cells.equalsEncoding(this, a);
 	}
 
 	public PeerStatus addReward(long peerFees) {

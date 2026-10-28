@@ -113,7 +113,7 @@ public abstract class ATransaction extends ARecordGeneric {
 	
 	@Override
 	public boolean equals(ACell o) {
-		return Cells.equalsGeneric(this, o);
+		return Cells.equalsEncoding(this, o);
 	}
 
 }

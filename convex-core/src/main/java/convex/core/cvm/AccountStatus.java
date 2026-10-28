@@ -212,7 +212,7 @@ public class AccountStatus extends ARecordGeneric {
 	@Override 
 	public boolean equals(ACell o) {
 		if (o instanceof AccountStatus as) return equals(as);
-		return Cells.equalsGeneric(this, o);
+		return Cells.equalsEncoding(this, o);
 	}
 	
 	/**

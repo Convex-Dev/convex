@@ -55,7 +55,7 @@ public abstract class AFn<T extends ACell> extends ACVMCode implements IFn<T> {
 	
 	@Override
 	public boolean equals(ACell o) {
-		return Cells.equalsGeneric(this, o);
+		return Cells.equalsEncoding(this, o);
 	}
 
 }

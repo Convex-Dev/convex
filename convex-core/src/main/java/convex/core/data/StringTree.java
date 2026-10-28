@@ -132,7 +132,7 @@ public class StringTree extends AString {
 		if (this==b) return true;
 		if (b==null) return false;
 		if (count()!=b.count()) return false;
-		return Cells.equalsGeneric(this, b);
+		return Cells.equalsEncoding(this, b);
 	}
 
 	@Override

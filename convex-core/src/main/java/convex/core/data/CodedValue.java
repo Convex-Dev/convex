@@ -61,7 +61,7 @@ public class CodedValue extends ACell {
 
 	@Override
 	public boolean equals(ACell a) {
-		return Cells.equalsGeneric(this, a);
+		return Cells.equalsEncoding(this, a);
 	}
 
 	@Override

@@ -89,7 +89,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 		if (a instanceof ARecordGeneric) {
 			return equals((ARecordGeneric)a);
 		} else {
-			return Cells.equalsGeneric(this, a);
+			return Cells.equalsEncoding(this, a);
 		}
 	}
 		

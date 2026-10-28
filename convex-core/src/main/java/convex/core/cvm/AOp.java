@@ -82,6 +82,6 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 	
 	@Override
 	public boolean equals(ACell o) {
-		return Cells.equalsGeneric(this, o);
+		return Cells.equalsEncoding(this, o);
 	}
 }

@@ -78,7 +78,7 @@ public class Local<T extends ACell> extends AOp<T> {
 	@Override
 	public boolean equals(ACell a) {
 		if (a instanceof Local<?> l) return position==l.position;
-		return Cells.equalsGeneric(this, a); // generic ExtensionValue with the local tag
+		return Cells.equalsEncoding(this, a); // generic ExtensionValue with the local tag
 	}
 	
 	@Override

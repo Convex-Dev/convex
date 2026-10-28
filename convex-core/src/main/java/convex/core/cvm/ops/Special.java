@@ -157,7 +157,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	@Override
 	public boolean equals(ACell a) {
 		if (a instanceof Special<?> s) return specialCode==s.specialCode;
-		return Cells.equalsGeneric(this, a); // generic ExtensionValue with the special tag
+		return Cells.equalsEncoding(this, a); // generic ExtensionValue with the special tag
 	}
 
 	@Override
