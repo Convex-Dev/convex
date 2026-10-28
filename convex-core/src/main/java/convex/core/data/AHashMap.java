@@ -1,7 +1,9 @@
 package convex.core.data;
 
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.MergeFunction;
@@ -23,6 +25,16 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	public abstract AHashMap<K, V> assocRef(Ref<K> keyRef, V value);
 
 	public abstract AHashMap<K, V> assocEntry(MapEntry<K, V> e);
+
+	@Override
+	public <A> AHashMap<K, V> update(ACell key, BiFunction<? super V, ? super A, ? extends V> function, A arg) {
+		return (AHashMap<K, V>) super.update(key,function,arg);
+	}
+
+	@Override
+	public AHashMap<K, V> update(ACell key, UnaryOperator<V> function) {
+		return (AHashMap<K, V>) super.update(key,function);
+	}
 
 	@Override
 	public abstract AHashMap<K, V> dissoc(ACell key);

@@ -11,6 +11,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
@@ -258,11 +259,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	/**
-	 * Updates the value for a key, equivalent in value to
-	 * {@code assoc(key, function.apply(get(key), arg))}. A present key takes one
-	 * descent; an absent key is inserted with {@link #assoc}. The function receives
-	 * null for an absent key. If it returns the current value instance, this Index
-	 * is returned unchanged. The function must be pure: it may be applied again.
+	 * Updates the value for a key, as {@link AMap#update(ACell, BiFunction, Object)}.
+	 * A present key takes one descent; an absent key is inserted with {@link #assoc}.
 	 *
 	 * @param <A> Type of the function argument
 	 * @param key Key to update
@@ -270,6 +268,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * @param arg Argument passed to the function
 	 * @return Updated Index, or null if the key is null
 	 */
+	@Override
 	public <A> Index<K, V> update(K key, BiFunction<? super V, ? super A, ? extends V> function, A arg) {
 		if (key==null) return null;
 		Index<K,V> updated;
@@ -281,6 +280,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 		if (updated!=null) return updated;
 		return assoc(key,function.apply(null,arg));
+	}
+
+	@Override
+	public Index<K, V> update(K key, UnaryOperator<V> function) {
+		return update(key,(v,f) -> f.apply(v),function);
 	}
 
 	/**

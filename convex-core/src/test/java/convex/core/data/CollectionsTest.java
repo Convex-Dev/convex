@@ -175,6 +175,16 @@ public class CollectionsTest {
 			assertEquals(n - 1, da.count());
 			assertNull(da.getEntry(key));
 			assertEquals(a, da.assocEntry(me));
+
+			// update is assoc of the function's result, unchanged if it returns the current value
+			assertSame(a, a.update(key, v -> v));
+			assertSame(a, a.update(key, (v, x) -> v, null));
+			assertEquals(a.assoc(key, null), a.update(key, v -> null));
+			assertEquals(a, da.update(key, (v, x) -> x, value));
+			assertEquals(a, da.update(key, v -> {
+				assertNull(v);
+				return value;
+			}));
 		}
 		
 		doMapEntrySetTests(a);

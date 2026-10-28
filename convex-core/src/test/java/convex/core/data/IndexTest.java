@@ -600,9 +600,17 @@ public class IndexTest {
 			Index<ABlob,CVMLong> updated=index.update(key,plus,delta);
 			assertEquals(index.assoc(key,plus.apply(index.get(key),delta)),updated);
 			updated.validate();
+			Index<ABlob,CVMLong> unary=index.update(key,v -> plus.apply(v,delta));
+			assertEquals(updated,unary);
+			ACell cellKey=key;
+			AIndex<ABlob,CVMLong> viaCell=index.update(cellKey,plus,delta);
+			assertEquals(updated,viaCell);
 			if (index.containsKey(key)) assertSame(index,index.update(key,(v,a) -> v,null));
 		}
 		assertNull(index.update(null,plus,delta));
+		assertNull(index.update(null,v -> v));
+		assertNull(index.update(CVMLong.ONE,plus,delta)); // not a valid Index key
+		assertNull(index.update(CVMLong.ONE,v -> v));
 
 		AString shorter=Strings.create("counter-7"), longer=Strings.create("counter-70");
 		Index<AString,CVMLong> names=Index.of(shorter,CVMLong.ONE,longer,CVMLong.ONE);

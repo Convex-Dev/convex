@@ -423,7 +423,10 @@ public class MapsTest {
 			K firstKey=firstEntry.getKey();
 			assertEquals(firstEntry,m.getEntryByHash(Hash.get(firstKey)));
 			assertEquals(m,m.assocEntry(firstEntry));
-			
+			AHashMap<K, V> updated=m.update(firstKey,v -> null);
+			assertEquals(m.assoc(firstKey,null),updated);
+
+
 			// Test a smaller version of this map
 			AHashMap<K, V> smaller = m.dissoc(firstKey);
 			assertEquals(n-1,smaller.count());
