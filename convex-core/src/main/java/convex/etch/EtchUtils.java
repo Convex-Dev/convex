@@ -145,11 +145,12 @@ public class EtchUtils {
 		// The single marker (rewritten by every completeGC) names it; no marker
 		// means the base file itself is current
 		File current = null;
+		boolean markerMalformed = false;
 		String markerDiscardReason = null;
 		if (marker.exists()) {
-			String name = readMarkerName(marker, file);
+			String name = readMarkerName(marker);
 			if (name == null) {
-				markerDiscardReason = "empty or malformed";
+				markerMalformed = true;
 			} else {
 				File named = new File(file.getParentFile(), name).getCanonicalFile();
 				if (named.equals(file)) {
@@ -192,7 +193,13 @@ public class EtchUtils {
 		// maintenance/rebuild path for the others.
 		Set<File> uncommitted=validateRecoveryFiles(file,current,targets,config);
 
-		if (markerDiscardReason!=null) {
+		// Logged only once recovery acts on the marker: a refusal above reports
+		// the problem through its exception instead
+		if (markerMalformed) {
+			warn("Etch GC recovery: marker {} is empty or malformed - removing it. Any completed GC"
+					+ " target alongside {} is treated as an abandoned cycle.", marker, file.getName());
+			deleteOrThrow(marker);
+		} else if (markerDiscardReason!=null) {
 			debug("Etch GC recovery: marker {} {} - removing the stale marker.",
 					marker.getName(),markerDiscardReason);
 			deleteOrThrow(marker);
@@ -226,11 +233,11 @@ public class EtchUtils {
 				// target's first sync. The live file passed validation and was not
 				// written during the cycle, so it holds the last committed root.
 				if (st.delete()) {
-					warn("Etch GC recovery: deleted abandoned GC target {}, which was never checkpointed"
+					debug("Etch GC recovery: deleted abandoned GC target {}, which was never checkpointed"
 							+ " and so holds no committed root. {} keeps its last checkpoint.",
 							st.getName(), live.getName());
 				} else {
-					warn("Etch GC recovery: abandoned GC target {} was never checkpointed but cannot be"
+					debug("Etch GC recovery: abandoned GC target {} was never checkpointed but cannot be"
 							+ " deleted yet (pinned by memory mappings?). It is ignored, and deletion is"
 							+ " retried on later starts.", st.getName());
 				}
@@ -372,16 +379,10 @@ public class EtchUtils {
 	 * This inspection is deliberately side-effect free: recovery authenticates
 	 * participating Etch files before deleting even malformed metadata.
 	 */
-	static String readMarkerName(File marker, File base) throws IOException {
+	static String readMarkerName(File marker) throws IOException {
 		List<String> lines = Files.readAllLines(marker.toPath());
 		String name = lines.isEmpty() ? "" : lines.get(0).trim();
-		if (name.isEmpty()) {
-			warn("Etch GC recovery: marker {} is empty/malformed. Any completed GC target alongside"
-					+ " {} will be treated as an abandoned cycle after store authentication.",
-					marker,base.getName());
-			return null;
-		}
-		return name;
+		return name.isEmpty() ? null : name;
 	}
 
 	private static void deleteOrThrow(File f) throws IOException {
