@@ -635,25 +635,28 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * limit. The value's embedded status is always judged against the embedded
 	 * limit (and cached in the flags); only its contribution is compared with the
 	 * caller's remaining budget, since an embedded value must be inlined however
-	 * little room its parent has left.
+	 * little room its parent has left. When the status is unknown, one measurement
+	 * against the embedded limit settles both the status and the length.
 	 *
 	 * @param limit Maximum length of interest
 	 * @return Exact length of Ref encoding, or 0 if it exceeds limit
 	 */
 	public final int getEncodingLength(int limit) {
-		int result;
-		if (isEmbedded()) {
-			T value=getValue();
-			if (value==null) {
-				result=1;
-			} else {
-				result=value.getEncodingLength(limit);
-				if (result==0) return 0;
-			}
-		} else {
-			result=Ref.INDIRECT_ENCODING_LENGTH;
+		int f=flags;
+		if ((f&NON_EMBEDDED_MASK)!=0) return (INDIRECT_ENCODING_LENGTH>limit)?0:INDIRECT_ENCODING_LENGTH;
+		T value=getValue();
+		if (value==null) {
+			flags=f|KNOWN_EMBEDDED_MASK;
+			return (limit<1)?0:1;
 		}
-		return (result>limit)?0:result;
+		if ((f&KNOWN_EMBEDDED_MASK)!=0) return value.getEncodingLength(limit);
+		int el=value.getEncodingLength(Format.MAX_EMBEDDED_LENGTH);
+		if (el==0) {
+			flags=f|NON_EMBEDDED_MASK;
+			return (INDIRECT_ENCODING_LENGTH>limit)?0:INDIRECT_ENCODING_LENGTH;
+		}
+		flags=f|KNOWN_EMBEDDED_MASK;
+		return (el>limit)?0:el;
 	}
 
 	/**
