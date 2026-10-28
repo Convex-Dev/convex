@@ -8,6 +8,7 @@ import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Symbol;
@@ -151,6 +152,12 @@ public class Special<T extends ACell> extends AOp<T> {
 	@Override
 	public byte getTag() {
 		return CVMTag.OP_SPECIAL;
+	}
+
+	@Override
+	public boolean equals(ACell a) {
+		if (a instanceof Special<?> s) return specialCode==s.specialCode;
+		return Cells.equalsGeneric(this, a); // generic ExtensionValue with the special tag
 	}
 
 	@Override

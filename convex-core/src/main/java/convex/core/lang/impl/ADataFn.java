@@ -58,4 +58,12 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 	public byte getTag() {
 		return getCanonical().getTag();
 	}
+
+	/** Compares as the wrapped data value; the other side may be a wrapper too. */
+	@Override
+	public boolean equals(ACell a) {
+		if (a==this) return true;
+		if (a==null) return false;
+		return getCanonical().equals(a.getCanonical());
+	}
 }
