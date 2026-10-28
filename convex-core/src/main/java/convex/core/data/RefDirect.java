@@ -94,15 +94,21 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 		if (a instanceof RefDirect) {
 			T va=((RefDirect<T>) a).value;
 			if (value==va) return true; // fast path
-			if (value==null) return va==null; // catch nulls
-			if (this.hash != null) {
+			if ((value==null)||(va==null)) return false; // only one is null
+			Hash h=this.hash;
+			if (h != null) {
 				Hash ha=a.hash;
-				// use hash if available for both Refs
-				if (ha != null) return this.hash.equals(ha);
+				if (ha != null) return h.equals(ha); // both already hashed
 			}
+			// Embedded values compare by value: the walk is bounded by the embedded
+			// limit, and no encoding ever needs their hash. Equal values have the same
+			// canonical encoding, so a value embedded on one side only is unequal.
+			boolean em=isEmbedded();
+			if (em!=a.isEmbedded()) return false;
+			if (em) return value.equals(va);
 		}
-		// Fall back to hash comparison. getHash() computes and caches lazily,
-		// so with structural sharing this avoids exponential recursive equals.
+		// Branch values compare by hash, computed and cached on the refs, so shared
+		// subtrees are hashed once and a deep comparison stays linear.
 		return getHash().equals(a.getHash());
 	}
 

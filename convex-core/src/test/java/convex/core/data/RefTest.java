@@ -57,6 +57,48 @@ public class RefTest {
 	}
 
 	@Test
+	public void testDirectEqualityEmbeddedByValue() {
+		// Embedded values compare by value: no encoding ever needs their hash, so
+		// comparing two separately built small vectors computes no hash at all.
+		ACell[] as=new ACell[16];
+		ACell[] bs=new ACell[16];
+		for (int i=0; i<16; i++) {
+			as[i]=CVMLong.create(1000000+i);
+			bs[i]=CVMLong.create(1000000+i);
+		}
+		AVector<CVMLong> a=Vectors.create(as);
+		AVector<CVMLong> b=Vectors.create(bs);
+		Ref<AVector<CVMLong>> ra=a.getRef();
+		Ref<AVector<CVMLong>> rb=b.getRef();
+		assertTrue(ra.isEmbedded());
+		assertTrue(ra.equals(rb));
+		assertTrue(rb.equals(ra));
+		assertNull(ra.cachedHash());
+		assertNull(rb.cachedHash());
+		for (int i=0; i<16; i++) {
+			assertNull(a.getRef(i).cachedHash());
+			assertNull(b.getRef(i).cachedHash());
+		}
+		bs[15]=CVMLong.create(-1);
+		assertFalse(ra.equals(Vectors.create(bs).getRef()));
+		assertNull(ra.cachedHash());
+	}
+
+	@Test
+	public void testDirectEqualityEmbeddedAgainstBranch() {
+		// Equal values have the same canonical encoding, so a value embedded on one
+		// side only is unequal, and neither side is hashed to find that out.
+		Ref<AVector<CVMLong>> small=Vectors.repeat(CVMLong.ONE,16).getRef();
+		Ref<AVector<CVMLong>> big=Vectors.repeat(CVMLong.ONE,256).getRef();
+		assertTrue(small.isEmbedded());
+		assertFalse(big.isEmbedded());
+		assertFalse(small.equals(big));
+		assertFalse(big.equals(small));
+		assertNull(small.cachedHash());
+		assertNull(big.cachedHash());
+	}
+
+	@Test
 	public void testSoftEqualityWithoutStoredValue() {
 		for (int size : new int[] {1, 256}) {
 			Blob value=Blob.wrap(new byte[size]);

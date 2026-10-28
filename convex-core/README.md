@@ -56,6 +56,7 @@ ACell result = ctx.getResult();  // Returns 6
 - Design documents under [`docs/`](docs/), each an implementation companion to a
   CAD:
   - [Encoder design](docs/ENCODER_DESIGN.md) — encoding lengths, embedding, encoder hierarchy, multi-cell messages
+  - [Equality](docs/EQUALITY.md) — where comparisons check identity, hashes, embedding and content
   - [Consensus](docs/CONSENSUS.md) — determinism boundary, time handling, attack surfaces
   - [Network upgrades](docs/UPGRADE.md) — protocol versions, migrations, test state policy
   - [CNS implementation notes](docs/CNS.md) — registry layout and the planned v1 registry migration
