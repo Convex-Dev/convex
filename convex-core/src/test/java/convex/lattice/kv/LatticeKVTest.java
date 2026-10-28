@@ -10,10 +10,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -324,6 +326,28 @@ public class LatticeKVTest {
 		assertEquals(1, kv.srem("s", Strings.create("a")));
 		assertFalse(kv.sismember("s", Strings.create("a")));
 		assertEquals(1, kv.scard("s"));
+	}
+
+	/** Re-adding a removed member keeps its remove time, so merges still see the removal. */
+	@Test
+	public void testReAddKeepsRemoveTime() {
+		AString a = Strings.create("a");
+		Hash key = Hash.get(a);
+		CVMLong removed = CVMLong.create(20);
+
+		Index<ABlob, AVector<ACell>> set = KVSet.addMember(null, a, CVMLong.create(10));
+		assertEquals(CVMLong.ZERO, set.get(key).get(KVSet.POS_REMOVE_TIME));
+		set = KVSet.removeMember(set, a, removed);
+		set = KVSet.addMember(set, a, CVMLong.create(30));
+		assertEquals(Vectors.of(a, CVMLong.create(30), removed), set.get(key));
+		assertTrue(KVSet.isMember(set, a));
+
+		Index<ABlob, AVector<ACell>> zset = KVSortedSet.addMember(null, a, CVMDouble.create(1.0), CVMLong.create(10));
+		assertEquals(CVMLong.ZERO, zset.get(key).get(KVSortedSet.POS_REMOVE_TIME));
+		zset = KVSortedSet.removeMember(zset, a, removed);
+		zset = KVSortedSet.addMember(zset, a, CVMDouble.create(2.0), CVMLong.create(30));
+		assertEquals(Vectors.of(a, CVMDouble.create(2.0), CVMLong.create(30), removed), zset.get(key));
+		assertEquals(CVMDouble.create(2.0), KVSortedSet.getScore(zset, a));
 	}
 
 	@Test

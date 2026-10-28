@@ -43,13 +43,9 @@ public class KVSortedSet {
 			? (Index<ABlob, AVector<ACell>>) zsetValue
 			: empty();
 		ABlob key = Hash.get(member);
-		AVector<ACell> existing = index.get(key);
-		CVMLong removeTime = CVMLong.ZERO;
-		if (existing != null) {
-			removeTime = (CVMLong) existing.get(POS_REMOVE_TIME);
-		}
-		AVector<ACell> entry = Vectors.of(member, score, timestamp, removeTime);
-		return index.assoc(key, entry);
+		// Keep any remove time so merges still see the removal
+		return index.update(key, existing -> Vectors.of(member, score, timestamp,
+			(existing == null) ? CVMLong.ZERO : existing.get(POS_REMOVE_TIME)));
 	}
 
 	/**
