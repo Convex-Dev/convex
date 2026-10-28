@@ -131,13 +131,9 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 
 	@Override
 	public boolean equals(Ref<T> a) {
-		if (a == this) return true;
-		Hash otherHash=a.cachedHash();
-		if (otherHash!=null) return hash.equals(otherHash);
-		// Preserve cheap value comparisons when resident, without fetching from the store.
-		T resident=softRef.get();
-		if (resident!=null) return Cells.equals(resident,a.getValue());
-		// Only the hash is available on this side.
+		// A soft ref always holds a hash, so compare hashes and never read the store.
+		// Hashing the other side caches the result on it, which keeps a comparison
+		// linear in distinct cells however much structure the values share.
 		return hash.equals(a.getHash());
 	}
 

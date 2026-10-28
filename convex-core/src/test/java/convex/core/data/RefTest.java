@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.lang.ref.Reference;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Set;
@@ -36,21 +35,25 @@ import convex.test.Samples;
 public class RefTest {
 
 	@Test
-	public void testSoftEqualityResidentCountMismatch() {
+	public void testSoftEqualityHashesBranch() {
+		// A soft ref compares by hash. Comparing it with an unhashed direct ref to a
+		// branch value hashes that value once and leaves the hash cached on the direct
+		// ref, so repeated and shared comparisons never walk the value again.
 		AVector<CVMLong> resident=Vectors.repeat(CVMLong.ONE,256);
 		RefSoft<AVector<CVMLong>> soft=RefSoft.create(new MemoryStore(),resident,Ref.UNKNOWN);
-		AVector<CVMLong> other=Vectors.repeat(CVMLong.ONE,65536);
+		AVector<CVMLong> other=Vectors.repeat(CVMLong.ONE,256);
 		Ref<AVector<CVMLong>> direct=other.getRef();
 		assertNull(direct.cachedHash());
-		assertNull(other.cachedHash());
 
-		assertFalse(soft.equals(direct));
-		assertNull(direct.cachedHash());
-		assertNull(other.cachedHash());
-		for (int i=0; i<other.getRefCount(); i++) {
-			assertNull(other.getRef(i).cachedHash());
-		}
-		Reference.reachabilityFence(resident);
+		assertTrue(soft.equals(direct));
+		assertEquals(soft.getHash(),direct.cachedHash());
+		assertTrue(direct.equals(soft));
+
+		Ref<AVector<CVMLong>> different=Vectors.repeat(CVMLong.ONE,65536).getRef();
+		assertNull(different.cachedHash());
+		assertFalse(soft.equals(different));
+		assertNotNull(different.cachedHash());
+		assertFalse(different.equals(soft));
 	}
 
 	@Test
