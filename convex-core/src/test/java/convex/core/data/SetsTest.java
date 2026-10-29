@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static convex.test.Assertions.assertEqualityCachesNothing;
+import static convex.test.Assertions.assertEqualityHashesRoots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -26,16 +27,29 @@ import convex.test.Samples;
 public class SetsTest {
 
 	@Test
-	public void testTreeEqualityCachesNothing() {
+	public void testTreeEquality() {
+		// An embedded tree compares its children: nothing is encoded or hashed
 		ASet<ACell> a = Sets.empty(), b = Sets.empty(), c = Sets.empty();
+		for (long i = 0; i < 17; i++) {
+			CVMLong v=CVMLong.create(i);
+			a = a.include(v);
+			b = b.include(v);
+			c = c.include((i==16)?CVMLong.create(-1):v);
+		}
+		assertTrue(a instanceof SetTree);
+		assertTrue(a.isEmbedded());
+		assertEqualityCachesNothing(a,b,c);
+
+		// A branch tree compares by hash, which is kept
+		a = Sets.empty(); b = Sets.empty(); c = Sets.empty();
 		for (long i = 0; i < 300; i++) {
 			CVMLong v=CVMLong.create(1000000+i);
 			a = a.include(v);
 			b = b.include(v);
 			c = c.include((i==299)?CVMLong.create(-1):v);
 		}
-		assertTrue(a instanceof SetTree);
-		assertEqualityCachesNothing(a,b,c);
+		assertFalse(a.isEmbedded());
+		assertEqualityHashesRoots(a,b,c);
 	}
 
 	@Test

@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static convex.test.Assertions.assertCVMEquals;
 import static convex.test.Assertions.assertEqualityCachesNothing;
+import static convex.test.Assertions.assertEqualityHashesRoots;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -52,17 +53,32 @@ import convex.test.Samples;
 public class IndexTest {
 
 	@Test
-	public void testTreeEqualityCachesNothing() {
+	public void testTreeEquality() {
+		// An embedded tree compares its entry and children: nothing is encoded or hashed
 		Index<Address, CVMLong> a = Index.none(), b = Index.none(), c = Index.none();
+		for (long i = 0; i < 3; i++) {
+			Address k=Address.create(i);
+			CVMLong v=CVMLong.create(i);
+			a = a.assoc(k, v);
+			b = b.assoc(k, v);
+			c = c.assoc(k, (i==2)?CVMLong.create(-1):v);
+		}
+		assertTrue(a.getDepth()>0);
+		assertTrue(a.isEmbedded());
+		assertEqualityCachesNothing(a,b,c);
+
+		// A branch tree compares by hash, which is kept. Keys spread over all sixteen
+		// digits below the common leading nibble, so the root has sixteen branch children
+		a = Index.none(); b = Index.none(); c = Index.none();
 		for (long i = 0; i < 300; i++) {
-			Address k=Address.create(1000000+i);
+			Address k=Address.create(((i%16)<<56)|i);
 			CVMLong v=CVMLong.create(i);
 			a = a.assoc(k, v);
 			b = b.assoc(k, v);
 			c = c.assoc(k, (i==299)?CVMLong.create(-1):v);
 		}
-		assertTrue(a.getDepth()>0);
-		assertEqualityCachesNothing(a,b,c);
+		assertFalse(a.isEmbedded());
+		assertEqualityHashesRoots(a,b,c);
 	}
 
 	@Test

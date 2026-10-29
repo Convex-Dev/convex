@@ -96,9 +96,11 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 			if (value==va) return true; // fast path
 			if ((value==null)||(va==null)) return false; // only one is null
 			Hash h=this.hash;
+			if (h==null) h=value.cachedHash();
 			if (h != null) {
 				Hash ha=a.hash;
-				if (ha != null) return h.equals(ha); // both already hashed
+				if (ha==null) ha=va.cachedHash();
+				if (ha != null) return h.equals(ha); // both already hashed, on the ref or the value
 			}
 			// Embedded values compare by value: the walk is bounded by the embedded
 			// limit, and no encoding ever needs their hash. Equal values have the same

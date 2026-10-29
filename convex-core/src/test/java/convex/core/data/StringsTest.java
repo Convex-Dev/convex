@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static convex.test.Assertions.assertEqualityCachesNothing;
+import static convex.test.Assertions.assertEqualityHashesRoots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -25,13 +26,25 @@ import convex.test.Samples;
 public class StringsTest {
 
 	@Test
-	public void testTreeEqualityCachesNothing() {
+	public void testTreeEquality() {
 		String s=Samples.MIN_TREE_STRING.toString();
 		AString a=Strings.create(s);
 		AString b=Strings.create(s);
 		AString c=Strings.create(s.substring(0, s.length()-1)+(s.endsWith("~")?"!":"~"));
 		assertTrue(a instanceof StringTree);
+		// A tree of two chunks is embedded: it compares its chunk tree, nothing hashed
+		assertTrue(a.isEmbedded());
 		assertEqualityCachesNothing(a,b,c);
+
+		// A tree of many chunks is a branch: it compares by hash, which is kept
+		StringBuilder sb=new StringBuilder();
+		for (int i=0; i<20*StringShort.MAX_LENGTH; i++) sb.append((char)('a'+(i%26)));
+		String big=sb.toString();
+		AString ba=Strings.create(big);
+		AString bb=Strings.create(big);
+		AString bc=Strings.create(big.substring(0, big.length()-1)+"~");
+		assertFalse(ba.isEmbedded());
+		assertEqualityHashesRoots(ba,bb,bc);
 
 		// A slice compares as its canonical string, in both directions
 		AString slice=StringSlice.create((StringTree)a, 1, 5);

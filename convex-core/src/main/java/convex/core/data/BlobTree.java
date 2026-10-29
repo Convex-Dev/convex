@@ -284,7 +284,12 @@ public class BlobTree extends ABlob {
 			Hash hb=b.cachedHash();
 			if (hb!=null) return h.equals(hb);
 		}
-		// Children compare through their refs: embedded by value, branch by hash
+		// A branch tree compares by hash, which any parent encoding or store needs
+		// anyway, so the work is kept. An embedded tree (a few chunks) compares its
+		// children through their refs.
+		boolean em=isEmbedded();
+		if (em!=b.isEmbedded()) return false;
+		if (!em) return getHash().equals(b.getHash());
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
 			if (!children[i].equals(b.children[i])) return false;

@@ -53,6 +53,20 @@ public class Assertions {
 		}
 	}
 
+	/**
+	 * Asserts that a and b are equal, that c differs from a, and that the comparisons
+	 * hashed all three: branch tree nodes compare by hash, which is kept.
+	 */
+	public static void assertEqualityHashesRoots(ACell a, ACell b, ACell c) {
+		assertTrue(a.equals(b));
+		assertTrue(b.equals(a));
+		assertFalse(a.equals(c));
+		assertFalse(c.equals(a));
+		for (ACell x : new ACell[] { a, b, c }) {
+			assertNotNull(Cells.cachedHash(x), () -> "Hash not kept comparing " + x);
+		}
+	}
+
 	public static void assertError(Object et, Context ctx) {
 		ACell cet = ctx.getErrorCode();
 		assertEquals(et, cet, "Expected error type " + et + " but got result: " + ctx.getValue());

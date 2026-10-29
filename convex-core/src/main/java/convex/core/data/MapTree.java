@@ -773,7 +773,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (hb!=null) return h.equals(hb);
 		}
 
-		// Children compare through their refs: embedded by value, branch by hash
+		// A branch node compares by hash, which any parent encoding or store needs
+		// anyway, so the work is kept. An embedded node compares its children through
+		// their refs, since no encoding ever needs its hash.
+		boolean em=isEmbedded();
+		if (em!=b.isEmbedded()) return false;
+		if (!em) return getHash().equals(b.getHash());
 		int n=children.length;
 		for (int i=0; i<n; i++) {
 			if (!children[i].equals(b.children[i])) return false;

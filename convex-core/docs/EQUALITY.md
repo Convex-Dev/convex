@@ -56,20 +56,25 @@ Each class checks, in order:
 5. One comparison strategy:
    - **Content**: compare fields or bytes directly. Leaf types only.
    - **Children**: compare child refs pairwise with `Ref.equals`, which takes the
-     embedded or branch path for each child. Every type with children compares its
-     own typed fields this way, with no generic helper and no virtual child access:
-     the tree types their child arrays, records their values vector, ops and coded
-     values their two refs, closures and multi-ops their data vector, string trees
-     their chunk tree.
+     embedded or branch path for each child. Each class compares its own typed fields,
+     with no generic helper and no virtual child access: records their values vector,
+     ops and coded values their two refs, closures and multi-ops their data vector,
+     map entries their two refs. A cell with a fixed handful of fields always compares
+     this way: a few ref comparisons cost less than any encoding.
+   - **Hash**: compare `getHash()` on both. Tree nodes (`MapTree`, `SetTree`, `Index`,
+     `VectorTree`, `BlobTree`, `StringTree`) use this when they are branch cells, and
+     the children strategy when they are embedded: the rule `Ref.equals` applies to a
+     child, applied to the node itself. A branch node's hash is needed anyway, by its
+     parent's encoding, by the store, and by the next level of a nested comparison such
+     as a lattice path update, so computing it here is work kept. Walking its children
+     instead saves nothing when its hash is computed a moment later, and costs the walk.
    - **Encoding**: `Cells.equalsEncoding` compares encodings. Building an encoding
      inlines embedded children and hashes branch children, so it never computes the
      cell's own hash or any embedded cell's hash. Used only where the classes differ
      but the tags agree (a generic `DenseRecord` or `CodedValue` against the typed
      class with that tag), and by `ACAD3Record`, which is only ever decoded.
 
-The cell level never asks whether a cell is embedded: the encoding and the child refs
-already reflect it. A comparison never computes the hash of either cell being
-compared, only of branch children that lack one.
+A comparison never computes the hash of an embedded cell.
 
 ### Refs: `equals(Ref)`, the embedded or branch decision
 
@@ -81,7 +86,8 @@ agree by construction.
 `RefDirect.equals`:
 
 1. Same ref, same value instance, or null.
-2. Either ref is soft, or both already hold a hash: compare hashes.
+2. Either ref is soft, or both sides already hold a hash (on the ref or cached on the
+   value): compare hashes.
 3. `Ref.isEmbedded()`, a cached flag or else a length check bounded by 140 bytes at
    each level. The first check on a fresh tree examines a few children per level, which
    is sublinear in the tree and far below hashing it, and the flag is then cached.
@@ -103,14 +109,14 @@ A new exception belongs in this table with its reason. No exception may change a
 
 ## Consequences
 
-- Comparing a new version of a tree with its predecessor hashes the branch nodes below
-  the changed path; shared children match by identity or cached hash, and the roots
-  themselves are never hashed or encoded. The work is kept if that version is stored
-  or published. Updates inside a lattice draft do not compare values (only `sync()`
-  does), so high-rate writers batch there.
-- Separately built equal values compare equal without either root being encoded or
-  hashed. `convex.test.Assertions.assertEqualityCachesNothing` checks this for each
-  type with children.
+- Comparing a new version of a tree with its predecessor hashes the branch nodes on the
+  changed path; shared children match by identity or cached hash. The work is kept if
+  that version is stored or published. Updates inside a lattice draft do not compare
+  values (only `sync()` does), so high-rate writers batch there.
+- Separately built equal values compare equal without either being encoded or hashed
+  when they are embedded or have a fixed handful of fields; branch tree nodes compare by
+  hash, which is kept. `convex.test.Assertions.assertEqualityCachesNothing` and
+  `assertEqualityHashesRoots` check this per type.
 - `ACell.hashCode()` uses the encoding, so it agrees with equality but builds the
   encoding. `Ref.hashCode()` computes the hash, embedded or not. Java maps keyed by
   cells or refs pay for this; key by `Hash` where the hash already exists.

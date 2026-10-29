@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import static convex.test.Assertions.assertEqualityCachesNothing;
+import static convex.test.Assertions.assertEqualityHashesRoots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -29,6 +31,29 @@ import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class BlobsTest {
+
+	@Test public void testTreeEquality() {
+		// A tree of two chunks is embedded: it compares its children, nothing hashed
+		long len=2*Blob.CHUNK_LENGTH+1;
+		ABlob a=Blobs.createRandom(new java.util.Random(1234), len);
+		ABlob b=Blobs.createRandom(new java.util.Random(1234), len);
+		byte[] bs=a.getBytes();
+		bs[(int)len-1]^=1;
+		ABlob c=(ABlob) Blob.create(bs).getCanonical();
+		assertTrue(a instanceof BlobTree);
+		assertTrue(a.isEmbedded());
+		assertEqualityCachesNothing(a,b,c);
+
+		// A tree of many chunks is a branch: it compares by hash, which is kept
+		len=20*Blob.CHUNK_LENGTH;
+		ABlob ba=Blobs.createRandom(new java.util.Random(99), len);
+		ABlob bb=Blobs.createRandom(new java.util.Random(99), len);
+		bs=ba.getBytes();
+		bs[(int)len-1]^=1;
+		ABlob bc=(ABlob) Blob.create(bs).getCanonical();
+		assertFalse(ba.isEmbedded());
+		assertEqualityHashesRoots(ba,bb,bc);
+	}
 
 	@Test public void testConstants() {
 		assertEquals(4096,Blob.CHUNK_LENGTH); // verify expected constant value of 4k

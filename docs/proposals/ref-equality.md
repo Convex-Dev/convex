@@ -1,7 +1,10 @@
 # Ref equality: hash branch children only when reached
 
-- Status: Implemented on `develop` (all four changes, plus the same children path for
-  `MapTree`, `SetTree`, `Index`, `DenseRecord` and `MapEntry`)
+- Status: Implemented on `develop`. Changes 1 to 3 as proposed, also for `DenseRecord`
+  and `MapEntry`. Tree nodes, `StringTree` included, take the children path only when
+  embedded and compare by hash when branch: measured against the pre-series code, the
+  children path on branch nodes made lattice path updates a quarter slower, because the
+  next level up needs the hash a moment later anyway.
 - Last updated: 2026-10-29
 - Specification: [CAD003](https://docs.convex.world/docs/cad/encoding) defines value
   identity: two cells are equal exactly when their canonical encodings are equal. Nothing

@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static convex.test.Assertions.assertCVMEquals;
 import static convex.test.Assertions.assertEqualityCachesNothing;
+import static convex.test.Assertions.assertEqualityHashesRoots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -33,16 +34,29 @@ import convex.test.Samples;
 public class MapsTest {
 
 	@Test
-	public void testTreeEqualityCachesNothing() {
+	public void testTreeEquality() {
+		// An embedded tree compares its children: nothing is encoded or hashed
 		AMap<CVMLong, CVMLong> a = Maps.empty(), b = Maps.empty(), c = Maps.empty();
+		for (long i = 0; i < 17; i++) {
+			CVMLong k=CVMLong.create(i);
+			a = a.assoc(k, k);
+			b = b.assoc(k, k);
+			c = c.assoc(k, (i==16)?CVMLong.create(-1):k);
+		}
+		assertTrue(a instanceof MapTree);
+		assertTrue(a.isEmbedded());
+		assertEqualityCachesNothing(a,b,c);
+
+		// A branch tree compares by hash, which is kept
+		a = Maps.empty(); b = Maps.empty(); c = Maps.empty();
 		for (long i = 0; i < 300; i++) {
 			CVMLong k=CVMLong.create(1000000+i);
 			a = a.assoc(k, k);
 			b = b.assoc(k, k);
 			c = c.assoc(k, (i==299)?CVMLong.create(-1):k);
 		}
-		assertTrue(a instanceof MapTree);
-		assertEqualityCachesNothing(a,b,c);
+		assertFalse(a.isEmbedded());
+		assertEqualityHashesRoots(a,b,c);
 	}
 
 	@Test
