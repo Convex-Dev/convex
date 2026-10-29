@@ -6,7 +6,6 @@ import convex.core.data.AHashMap;
 import convex.core.data.Maps;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Cells;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Vectors;
@@ -310,22 +309,6 @@ public class PeerStatus extends ARecordGeneric {
 	protected static long computeDelegatedStake(Index<Address, CVMLong> stks) {
 		long ds = stks.reduceValues((acc, e)->acc+e.longValue(), 0L);
 		return ds;
-	}
-
-	@Override 
-	public boolean equals(ACell a) {
-		if (a instanceof PeerStatus) return equals((PeerStatus)a);
-		return Cells.equalsEncoding(this, a);
-	}
-	
-	/**
-	 * Tests if this PeerStatus is equal to another
-	 * @param a PeerStatus to compare with
-	 * @return true if equal, false otherwise
-	 */
-	public boolean equals(PeerStatus a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		return Cells.equalsEncoding(this, a);
 	}
 
 	public PeerStatus addReward(long peerFees) {

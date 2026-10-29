@@ -88,6 +88,22 @@ public class TransactionTest extends ACVMTest {
 		doTransactionTests(t1);
 	}
 	
+	@Test public void testEqualityCachesNothing() {
+		Invoke t1=Invoke.create(VILLAIN, 1, "(+ 2 3)");
+		Invoke t2=Invoke.create(VILLAIN, 1, "(+ 2 3)");
+		Invoke t3=Invoke.create(VILLAIN, 2, "(+ 2 3)");
+
+		// Fields compare through their refs: no transaction is encoded or hashed
+		assertTrue(t1.equals(t2));
+		assertTrue(t2.equals(t1));
+		assertFalse(t1.equals(t3));
+		assertFalse(t3.equals(t1));
+		for (ATransaction t : new ATransaction[] { t1, t2, t3 }) {
+			assertNull(t.cachedEncoding());
+			assertNull(Cells.cachedHash(t));
+		}
+	}
+
 	@Test public void testJSON() {
 		Invoke tx=Invoke.create(VILLAIN, 1, "(+ 2 3)");
 		HashMap<String,Object> hm=Transactions.toJSON(tx);

@@ -7,7 +7,6 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.type.AType;
 import convex.core.data.type.Transaction;
@@ -109,11 +108,6 @@ public abstract class ATransaction extends ARecordGeneric {
 	@Override
 	public boolean isCanonical() {
 		return true;
-	}
-	
-	@Override
-	public boolean equals(ACell o) {
-		return Cells.equalsEncoding(this, o);
 	}
 
 }
