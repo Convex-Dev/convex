@@ -593,8 +593,9 @@ public class Format {
 		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
 
 		// Add the top level vector as a branch iff it is not embedded in the Result
-		if (!v.isEmbedded()) {
-			cells.add(v.getRef());
+		Ref<?> vr=v.getRef();
+		if (!vr.isEmbedded()) {
+			cells.add(vr);
 		}
 
 		v.visitAllChildren(vc->{

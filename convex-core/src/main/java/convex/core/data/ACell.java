@@ -460,25 +460,36 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Determines if this Cell Represents an embedded object. Embedded objects are encoded directly into
-	 * the encoding of the containing Cell (avoiding the need for a hashed reference). 
-	 * 
-	 * Subclasses should override this if they have a cheap O(1) 
-	 * way to determine if they are embedded or otherwise. 
-	 * 
+	 * Determines if this Cell represents an embedded object. Embedded objects are encoded directly into
+	 * the encoding of the containing Cell (avoiding the need for a hashed reference).
+	 *
+	 * Answers from what this Cell already holds: a zero memory size, a flag on its cached
+	 * Ref, or the length of its cached encoding. Otherwise measures the encoding, stopping
+	 * as soon as the embedded limit is passed. Creates no Ref on a canonical Cell, since
+	 * embedded status is a fact about the value while a Ref says where a value lives; a
+	 * non-canonical Cell measures through its canonical form, which {@link #getCanonical()}
+	 * keeps on a Ref. A measurement records the status on a Ref this Cell already holds,
+	 * and a zero memory size when the Cell is fully embedded, so a repeat in either case
+	 * reads a field. A Cell holding neither is measured again, a walk bounded by the
+	 * embedded limit.
+	 *
+	 * Subclasses should override this if they have a cheap O(1)
+	 * way to determine if they are embedded or otherwise.
+	 *
 	 * @return true if Cell is embedded, false otherwise
 	 */
 	public boolean isEmbedded() {
 		if (memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE) return true;
-		if (cachedRef!=null) {
-			int flags=cachedRef.flags;
+		Ref<ACell> ref=cachedRef;
+		if (ref!=null) {
+			int flags=ref.flags;
 			if ((flags&Ref.KNOWN_EMBEDDED_MASK)!=0) return true;
 			if ((flags&Ref.NON_EMBEDDED_MASK)!=0) return false;
-		} else {
-			cachedRef=createRef();
 		}
-		boolean embedded= getEncodingLength(Format.MAX_EMBEDDED_LENGTH)>0;
-		cachedRef.flags|=(embedded)?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
+		boolean embedded=getEncodingLength(Format.MAX_EMBEDDED_LENGTH)>0;
+		// A measurement records the status on the cached Ref itself; a cached encoding
+		// answers from its length without one, so record on the Ref here for both paths
+		if (ref!=null) ref.flags|=embedded?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
 		return embedded;
 	}
 

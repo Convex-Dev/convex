@@ -153,10 +153,12 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			ds.pos++;
 			return Ref.nil();
 		}
-		// Embedded cell — dispatch through this encoder's virtual read
+		// Embedded cell: dispatch through this encoder's virtual read. The Ref is wanted
+		// either way, so take it first and let the check record the status on it.
 		T cell = (T) this.read(ds);
+		Ref<T> ref = cell.getRef();
 		if (!cell.isEmbedded()) throw new BadFormatException("Non-embedded cell found instead of ref");
-		return cell.getRef();
+		return ref;
 	}
 
 	/**

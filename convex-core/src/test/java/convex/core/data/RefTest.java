@@ -549,4 +549,52 @@ public class RefTest {
 		ACell decoded = Samples.TEST_STORE.decode(b);
 		assertEquals(ref, decoded.getRef());
 	}
+
+	@Test
+	public void testEmbeddingCheckCreatesNoRef() {
+		// Fresh values never handed to getRef: embedded status is a fact about the value,
+		// so asking for it must not leave a Ref behind. Three shapes: fully embedded,
+		// a branch, and embedded with a branch child (which keeps no size cache).
+		Random rnd=new Random(811);
+		AHashMap<CVMLong,CVMLong> small=Maps.of(1L,2L,3L,4L);
+		AVector<CVMLong> branch=Vectors.empty();
+		for (int i=0; i<300; i++) branch=branch.conj(CVMLong.create(i));
+		AHashMap<CVMLong,ACell> mixed=Maps.of(1L,Blob.createRandom(rnd,200));
+		for (ACell c : new ACell[] {small,branch,mixed}) {
+			assertTrue(c.isCanonical()); // a non-canonical cell holds a Ref to its canonical form
+			assertNull(c.cachedRef);
+			boolean embedded=c.isEmbedded();
+			assertEquals(c.getEncodingLength()<=Format.MAX_EMBEDDED_LENGTH, embedded);
+			assertEquals(embedded, c.isEmbedded());
+			assertNull(c.cachedRef);
+		}
+		assertTrue(small.isEmbedded());
+		assertFalse(branch.isEmbedded());
+		assertTrue(mixed.isEmbedded());
+		// A fully embedded value records its zero memory size, so the next check reads a field
+		assertEquals(Format.FULL_EMBEDDED_MEMORY_SIZE, small.memorySize);
+		assertTrue(mixed.memorySize<0);
+	}
+
+	@Test
+	public void testEmbeddingCheckRecordsOnExistingRef() {
+		// With a Ref attached and the encoding cached, the check answers from the encoding
+		// length and must still record the status on that Ref. A fully embedded value
+		// would answer from its zero memory size instead, so use one with a branch child.
+		Random rnd=new Random(811);
+		AHashMap<CVMLong,ACell> mixed=Maps.of(1L,Blob.createRandom(rnd,200));
+		mixed.getEncoding();
+		Ref<?> mr=mixed.getRef();
+		assertEquals(0, mr.getFlags()&Ref.EMBEDDING_MASK);
+		assertTrue(mixed.isEmbedded());
+		assertEquals(Ref.KNOWN_EMBEDDED_MASK, mr.getFlags()&Ref.EMBEDDING_MASK);
+
+		AVector<CVMLong> branch=Vectors.empty();
+		for (int i=0; i<300; i++) branch=branch.conj(CVMLong.create(i));
+		branch.getEncoding();
+		Ref<?> br=branch.getRef();
+		assertEquals(0, br.getFlags()&Ref.EMBEDDING_MASK);
+		assertFalse(branch.isEmbedded());
+		assertEquals(Ref.NON_EMBEDDED_MASK, br.getFlags()&Ref.EMBEDDING_MASK);
+	}
 }
