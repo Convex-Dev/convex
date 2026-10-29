@@ -61,7 +61,13 @@ public class CodedValue extends ACell {
 
 	@Override
 	public boolean equals(ACell a) {
-		return Cells.equalsEncoding(this, a);
+		if (a==this) return true;
+		if (a instanceof CodedValue cv) {
+			if (tag!=cv.tag) return false;
+			// Children compare through their refs: embedded by value, branch by hash
+			return codeRef.equals(cv.codeRef)&&valueRef.equals(cv.valueRef);
+		}
+		return Cells.equalsEncoding(this, a); // e.g. an op with the same tag
 	}
 
 	@Override

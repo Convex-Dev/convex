@@ -52,6 +52,16 @@ public class DenseRecord extends ACAD3Record {
 	}
 
 	@Override
+	public boolean equals(ACell a) {
+		if (a==this) return true;
+		if (a instanceof DenseRecord dr) {
+			if (tag!=dr.tag) return false;
+			return data.equals(dr.data); // same tag: equal exactly when the data vectors are
+		}
+		return super.equals(a); // another cell with a dense record tag
+	}
+
+	@Override
 	public ACell updateRefs(IRefFunction func) {
 		AVector<ACell> newData=data.updateRefs(func);
 		if (newData==data) return this;

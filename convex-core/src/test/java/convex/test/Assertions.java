@@ -1,8 +1,11 @@
 package convex.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.function.Executable;
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.function.Executable;
 import convex.core.ErrorCodes;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
+import convex.core.data.Cells;
 import convex.core.data.Refs;
 import convex.core.data.prim.ANumeric;
 import convex.core.exceptions.ParseException;
@@ -31,6 +35,22 @@ public class Assertions {
 	
 	public static void assertCVMEquals(Object expected, Object result) {
 		assertEquals((Object)RT.cvm(expected),RT.cvm(result));
+	}
+
+	/**
+	 * Asserts that a and b are equal, that c differs from a, and that none of the
+	 * comparisons encoded or hashed any of the three: children compare through
+	 * their refs, embedded by value and branch by hash.
+	 */
+	public static void assertEqualityCachesNothing(ACell a, ACell b, ACell c) {
+		assertTrue(a.equals(b));
+		assertTrue(b.equals(a));
+		assertFalse(a.equals(c));
+		assertFalse(c.equals(a));
+		for (ACell x : new ACell[] { a, b, c }) {
+			assertNull(x.cachedEncoding(), () -> "Encoding built comparing " + x);
+			assertNull(Cells.cachedHash(x), () -> "Hash computed comparing " + x);
+		}
 	}
 
 	public static void assertError(Object et, Context ctx) {

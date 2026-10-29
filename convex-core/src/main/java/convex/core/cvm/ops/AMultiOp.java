@@ -62,6 +62,16 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 	public <R extends ACell> Ref<R> getRef(int i) {
 		return (Ref<R>) ops.getRef(i);
 	}
+
+	@Override
+	public boolean equals(ACell o) {
+		if (o==this) return true;
+		if (o instanceof AMultiOp<?> m) {
+			if (tag!=m.tag) return false;
+			return ops.equals(m.ops); // same tag: equal exactly when the ops vectors are
+		}
+		return Cells.equalsEncoding(this, o); // another cell with an op tag
+	}
 	
 	@Override
 	public void validateStructure() throws InvalidDataException {

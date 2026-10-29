@@ -4,6 +4,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.cvm.AOp;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
+import convex.core.data.Cells;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.exceptions.InvalidDataException;
@@ -61,6 +62,19 @@ public abstract class ACodedOp<T extends ACell, C extends ACell, V extends ACell
 		case 1: return value;
 		}
 		throw new IndexOutOfBoundsException(i);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public boolean equals(ACell o) {
+		if (o==this) return true;
+		if (o instanceof ACodedOp) {
+			ACodedOp<T,C,V> op=(ACodedOp<T,C,V>) o;
+			if (tag!=op.tag) return false;
+			// Children compare through their refs: embedded by value, branch by hash
+			return code.equals(op.code)&&value.equals(op.value);
+		}
+		return Cells.equalsEncoding(this, o); // another cell with an op tag
 	}
 
 	@SuppressWarnings("unchecked")

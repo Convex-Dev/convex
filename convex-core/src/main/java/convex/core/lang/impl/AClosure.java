@@ -4,6 +4,7 @@ import convex.core.cvm.AFn;
 import convex.core.cvm.CVMTag;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
@@ -61,7 +62,15 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	public Ref<ACell> getRef(int i) {
 		return data.getRef(i);
 	}
-	
+
+	@Override
+	public boolean equals(ACell o) {
+		if (o==this) return true;
+		// Every closure has the FN tag, so equal exactly when the data vectors are
+		if (o instanceof AClosure<?> c) return data.equals(c.data);
+		return Cells.equalsEncoding(this, o); // another cell with the FN tag
+	}
+
 	@Override
 	public AFn<T> updateRefs(IRefFunction func) {
 		AVector<ACell> newData=data.updateRefs(func);
