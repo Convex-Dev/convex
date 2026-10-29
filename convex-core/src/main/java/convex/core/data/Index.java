@@ -1303,7 +1303,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		else refs[offset]=right.getRef();
 		if (overlap) refs[offset]=joined.getRef();
 		// A prefix entry precedes its descendants, so it can only come from the left.
-		return new Index<>(depth,alignedLeft?entry:null,(Ref[])refs,(short)(lm|rm),count+right.count);
+		return new Index<K,V>(depth,alignedLeft?entry:null,(Ref[])refs,(short)(lm|rm),count+right.count);
 	}
 
 	/** Iterative fallback for already ordered ranges after recursive overflow. */
