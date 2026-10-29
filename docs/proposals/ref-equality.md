@@ -1,7 +1,8 @@
 # Ref equality: hash branch children only when reached
 
-- Status: Proposed
-- Last updated: 2026-10-28
+- Status: Implemented on `develop` (all four changes, plus the same children path for
+  `MapTree`, `SetTree`, `Index`, `DenseRecord` and `MapEntry`)
+- Last updated: 2026-10-29
 - Specification: [CAD003](https://docs.convex.world/docs/cad/encoding) defines value
   identity: two cells are equal exactly when their canonical encodings are equal. Nothing
   here changes a result, only which hashes are computed and when.
