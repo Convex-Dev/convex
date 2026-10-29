@@ -79,7 +79,7 @@ public abstract class ACodedOp<T extends ACell, C extends ACell, V extends ACell
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public final AOp<T> updateRefs(IRefFunction func) {
+	protected final AOp<T> rebuildRefs(IRefFunction func) {
 		Ref<C> nc=func.apply(code);
 		Ref<V> nv=func.apply(value);
 		return rebuild(nc,nv);

@@ -47,7 +47,7 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 	}
 	
 	@Override
-	public AMultiOp<T> updateRefs(IRefFunction func) {
+	protected AMultiOp<T> rebuildRefs(IRefFunction func) {
 		AVector<AOp<ACell>> newOps = ops.updateRefs(func);
 		return recreate(newOps);
 	}

@@ -10,7 +10,6 @@ import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -176,11 +175,6 @@ public class Special<T extends ACell> extends AOp<T> {
 	@Override
 	public int encodeAfterOpcode(byte[] bs, int pos) {
 		throw new Error(ErrorMessages.UNREACHABLE);
-	}
-
-	@Override
-	public Special<T> updateRefs(IRefFunction func) {
-		return this;
 	}
 
 	@Override

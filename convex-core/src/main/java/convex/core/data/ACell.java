@@ -649,28 +649,54 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Updates all child Refs in this object using the given function.
-	 * 
-	 * This clears the currently cached Ref if an update occurred. This is because, presumably, 
-	 * a new Ref for this cell needs to be created.
-	 * 
-	 * The function *must not* change the hash value of Refs, in order to ensure
-	 * structural integrity of modified data structures.
-	 * 
-	 * The implementation *should* re-attach any original encoding in order to
-	 * prevent re-encoding or surplus hashing
-	 * 
-	 * This is a building block for a very sneaky trick that enables use to do a lot
-	 * of efficient operations on large trees of smart references.
-	 * 
-	 * Must return the same object if no Refs are altered.
+	 * Returns this Cell with every child Ref mapped through the given function: the
+	 * same value, held through different Refs. This is the building block behind
+	 * persistence, announcement, GC copying and multi-cell decoding, which all change
+	 * what a Ref says about a child (direct or soft, store binding, status) and never
+	 * which child it refers to. The function must not change the value a Ref refers
+	 * to: hash-keyed structures would silently corrupt, and the caches carried here
+	 * would be wrong.
+	 *
+	 * Because the value is unchanged, whatever was cached about the value alone is
+	 * still true of the rebuilt Cell and travels with it: the encoding and the memory
+	 * size here, class-specific caches in {@link #rebuildRefs(IRefFunction)}. The
+	 * cached Ref does not travel. It refers to the old instance, and its status is a
+	 * claim the caller changing the Refs is about to re-decide: a store write boundary
+	 * may lower it, and {@link #attachRef(Ref)} only ever raises. The caller supplies
+	 * the new Cell's Ref, as the stores do once they know its status.
+	 *
+	 * @param <T> Type of this Cell
 	 * @param func Ref update function
-	 * @return Cell with updated Refs
+	 * @return This instance if no Ref changed, otherwise a Cell equal to this one
 	 */
-	public ACell updateRefs(IRefFunction func) {
+	@SuppressWarnings("unchecked")
+	public final <T extends ACell> T updateRefs(IRefFunction func) {
+		ACell result=rebuildRefs(func);
+		if (result!=this) {
+			// Facts about the value, not about this instance or its Refs: see above
+			if ((encoding!=null)&&(result.encoding==null)) result.encoding=encoding;
+			if ((memorySize>=0)&&(result.memorySize<0)) result.memorySize=memorySize;
+		}
+		return (T) result;
+	}
+
+	/**
+	 * Builds this Cell with its child Refs mapped through the given function, for
+	 * {@link #updateRefs(IRefFunction)}, which carries the encoding and memory size
+	 * over. An implementation applies the function to each child Ref in encoding
+	 * order, returns this instance if none changed, and otherwise constructs the same
+	 * value over the new Refs, carrying any class-specific cache of its own (an Index
+	 * carries its prefix). A non-canonical Cell rebuilds its canonical form, and a
+	 * Cell without child Refs needs no override: both are handled here.
+	 *
+	 * @param func Ref update function
+	 * @return This instance, or the rebuilt Cell
+	 */
+	protected ACell rebuildRefs(IRefFunction func) {
 		ACell canonical=getCanonical();
-		assert (canonical!=this) : "Canonical updateRefs not implemented: " + this.getClass();
-		return canonical.updateRefs(func);
+		if (canonical!=this) return canonical.updateRefs(func);
+		assert (getRefCount()==0) : "rebuildRefs not implemented: " + this.getClass();
+		return this;
 	}
 
 	/**
@@ -717,18 +743,22 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Sets the cached ref of this Cell if it is not already set. USe with caution.
-	 * 
+	 * Gives this Cell a cached Ref, when it has none or the given Ref claims a higher
+	 * status than the current one. Status only rises here: a store attaches the Ref
+	 * whose status it has just proven, and a lower claim never displaces it. What the
+	 * current Ref knows about the value itself (embedded status, signature
+	 * verification) is merged into the incoming Ref, since it stays true whichever Ref
+	 * the Cell ends up holding.
+	 *
 	 * @param ref Ref to assign
 	 */
 	@SuppressWarnings("unchecked")
 	public void attachRef(Ref<?> ref) {
 		Ref<?> current=this.cachedRef;
 		if (current!=null) {
-			// This solves problem of trashing internal cached refs
 			if (ref.getStatus()<=current.getStatus()) return;
-		//	return;
-		//	// throw new IllegalStateException("Cell of type "+Utils.getClassName(this)+" already has cached Ref");
+			int known=current.getFlags()&~Ref.STATUS_MASK;
+			if ((known&~ref.getFlags())!=0) ref.mergeFlags(known);
 		}
 		this.cachedRef=(Ref<ACell>) ref;
 	}

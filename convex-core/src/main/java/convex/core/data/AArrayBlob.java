@@ -430,12 +430,6 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public ACell updateRefs(IRefFunction func) {
-		if (count>Blob.CHUNK_LENGTH) return super.updateRefs(func);
-		return this;
-	}
-	
-	@Override
 	public int getRefCount() {
 		if (count>Blob.CHUNK_LENGTH) return super.getRefCount();
 		return 0;

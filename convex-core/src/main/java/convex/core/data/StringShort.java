@@ -190,12 +190,6 @@ public final class StringShort extends AString {
 	}
 
 	@Override
-	public ACell updateRefs(IRefFunction func) {
-		if (!isCanonical()) return super.updateRefs(func);
-		return this;
-	}
-	
-	@Override
 	public int getRefCount() {
 		if (!isCanonical()) return super.getRefCount();
 		return 0;

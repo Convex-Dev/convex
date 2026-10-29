@@ -120,6 +120,10 @@ public class MemoryStore extends AStore {
 		// otherwise cap at STORED (this cell is stored but descendants may be incomplete)
 		int achievedStatus = (minChildStatus[0]>=requiredStatus) ? requiredStatus : Math.max(Ref.STORED, minChildStatus[0]);
 		ref=ref.withMinimumStatus(achievedStatus);
+		// A rebuilt cell starts with no Ref: updateRefs carries only facts about the value,
+		// and leaves the Ref to the store that knows the status. Hand it over, as EtchStore
+		// does, so the cell's hash and status are known without another walk.
+		cell.attachRef(ref);
 		if (topLevel||!embedded) {
 			// Persist at top level
 			final Hash fHash = (hash!=null)?hash:ref.getHash();

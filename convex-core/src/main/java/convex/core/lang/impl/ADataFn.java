@@ -16,7 +16,8 @@ import convex.core.lang.RT;
 public abstract class ADataFn<T extends ACell> extends AFn<T> {
 
 	@Override
-	public AFn<T> updateRefs(IRefFunction func) {
+	protected AFn<T> rebuildRefs(IRefFunction func) {
+		// Rebuild the wrapped data structure, then wrap it as a function again
 		return RT.castFunction(getCanonical().updateRefs(func));
 	}
 

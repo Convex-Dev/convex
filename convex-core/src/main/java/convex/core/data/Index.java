@@ -164,13 +164,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public Index<K,V> updateRefs(IRefFunction func) {
+	protected Index<K,V> rebuildRefs(IRefFunction func) {
 		MapEntry<K, V> newEntry = Ref.update(entry,func);
 		Ref<Index<K, V>>[] newChildren = Ref.updateRefs(children, func);
 		if ((entry == newEntry) && (children == newChildren)) return this;
 		Index<K,V> result= new Index<K, V>(depth, newEntry, (Ref[])newChildren, mask, count);
-		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
-		result.cachedPrefix=cachedPrefix; // ref update preserves cell values, so prefix is unchanged
+		result.cachedPrefix=cachedPrefix; // a fact about the value, like the caches updateRefs carries
 		return result;
 	}
 

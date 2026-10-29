@@ -585,7 +585,7 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public BlobTree updateRefs(IRefFunction func) {
+	protected BlobTree rebuildRefs(IRefFunction func) {
 		Ref<ABlob>[] newChildren = Ref.updateRefs(children, func);
 		return withChildren(newChildren);
 	}

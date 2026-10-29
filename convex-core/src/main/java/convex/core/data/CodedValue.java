@@ -106,11 +106,11 @@ public class CodedValue extends ACell {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public CodedValue updateRefs(IRefFunction func) {
+	@Override
+	protected CodedValue rebuildRefs(IRefFunction func) {
 		Ref<ACell> nc=func.apply(codeRef);
 		Ref<ACell> nv=func.apply(valueRef);
 		if ((nc==codeRef)&&(nv==valueRef)) return this;
-		
 		return new CodedValue(tag,nc,nv);
 	}
 

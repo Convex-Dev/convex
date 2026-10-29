@@ -199,9 +199,6 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 		return this;
 	}
 
-	@Override
-	public abstract AVector<T> updateRefs(IRefFunction func);
-
 	/**
 	 * Computes the length of the longest common prefix of this vector and another
 	 * vector.

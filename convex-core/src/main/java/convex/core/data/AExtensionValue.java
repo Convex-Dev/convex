@@ -135,11 +135,6 @@ public abstract class AExtensionValue extends ABlobLike<CVMLong> {
 	}
 
 	@Override
-	public ACell updateRefs(IRefFunction func) {
-		return this;
-	}
-	
-	@Override
 	public final int getRefCount() {
 		// No Refs
 		return 0;

@@ -447,7 +447,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public SetTree<T> updateRefs(IRefFunction func) {
+	protected SetTree<T> rebuildRefs(IRefFunction func) {
 		int n = children.length;
 		if (n == 0) return this;
 		Ref<AHashSet<T>>[] newChildren = children;

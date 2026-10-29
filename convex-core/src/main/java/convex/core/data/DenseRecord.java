@@ -62,12 +62,10 @@ public class DenseRecord extends ACAD3Record {
 	}
 
 	@Override
-	public ACell updateRefs(IRefFunction func) {
+	protected ACell rebuildRefs(IRefFunction func) {
 		AVector<ACell> newData=data.updateRefs(func);
 		if (newData==data) return this;
-		DenseRecord dr= new DenseRecord(tag,newData);
-		dr.attachEncoding(getEncoding());
-		return dr;
+		return new DenseRecord(tag,newData);
 	}
 
 	@Override

@@ -563,7 +563,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public VectorLeaf<T> updateRefs(IRefFunction func) {
+	protected VectorLeaf<T> rebuildRefs(IRefFunction func) {
 		Ref<?> newPrefix = (prefix == null) ? null : func.apply(prefix); // do this first for in-order traversal
 		int ic = items.length;
 		Ref<?>[] newItems = items;
@@ -576,10 +576,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 			}
 		}
 		if ((items==newItems) && (prefix == newPrefix)) return this; // if no change, safe to return this
-		VectorLeaf<T> result= new VectorLeaf<T>((Ref<T>[]) newItems, (Ref<AVector<T>>) newPrefix, count);
-		
-		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
-		return result;
+		return new VectorLeaf<T>((Ref<T>[]) newItems, (Ref<AVector<T>>) newPrefix, count);
 	}
 
 	@SuppressWarnings("unchecked")

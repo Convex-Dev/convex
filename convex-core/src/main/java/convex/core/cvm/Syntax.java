@@ -250,7 +250,7 @@ public final class Syntax extends ACell {
 
 	
 	@Override
-	public Syntax updateRefs(IRefFunction func) {
+	protected Syntax rebuildRefs(IRefFunction func) {
 		@SuppressWarnings("unchecked")
 		Ref<ACell> newDatum = (Ref<ACell>)func.apply(datumRef);
 		AHashMap<ACell, ACell> newMeta = meta.updateRefs(func);

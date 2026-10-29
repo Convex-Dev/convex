@@ -162,16 +162,11 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public MapEntry<K, V> updateRefs(IRefFunction func) {
+	protected MapEntry<K, V> rebuildRefs(IRefFunction func) {
 		Ref<K> newKeyRef = (Ref<K>) func.apply(keyRef);
 		Ref<V> newValueRef = (Ref<V>) func.apply(valueRef);
-		
-		// Keep this instance if no change
 		if ((keyRef == newKeyRef) && (valueRef == newValueRef)) return this;
-		
-		MapEntry<K, V> result= new MapEntry<K, V>(newKeyRef, newValueRef);
-		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
-		return result;
+		return new MapEntry<K, V>(newKeyRef, newValueRef);
 	}
 	
 	@SuppressWarnings("unchecked")

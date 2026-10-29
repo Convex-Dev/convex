@@ -81,7 +81,7 @@ public class StringTree extends AString {
 	}
 
 	@Override
-	public StringTree updateRefs(IRefFunction func) {
+	protected StringTree rebuildRefs(IRefFunction func) {
 		BlobTree bt2=data.updateRefs(func);
 		if (bt2==data) return this;
 		return new StringTree(bt2);

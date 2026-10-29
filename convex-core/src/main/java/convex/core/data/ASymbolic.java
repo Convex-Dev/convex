@@ -157,11 +157,6 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 	}
 
 	@Override
-	public ACell updateRefs(IRefFunction func) {
-		return this;
-	}
-	
-	@Override
 	public int getRefCount() {
 		// Never any refs
 		return 0;

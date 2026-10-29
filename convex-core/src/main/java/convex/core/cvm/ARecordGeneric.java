@@ -111,7 +111,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	}
 
 	@Override
-	public final ARecordGeneric updateRefs(IRefFunction func) {
+	protected final ARecordGeneric rebuildRefs(IRefFunction func) {
 		AVector<ACell> newValues=values.updateRefs(func); // ensure values are canonical via toVector
 		if (newValues==values) return this;
 		return withValues(newValues);

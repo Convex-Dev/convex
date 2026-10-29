@@ -56,9 +56,6 @@ public abstract class ACAD3Record extends ARecord<CVMLong,ACell> {
 	
 	@Override
 	public abstract Ref<ACell> getRef(int i);
-	
-	@Override
-	public abstract ACell updateRefs(IRefFunction func);
 
 	@Override
 	public boolean isCanonical() {

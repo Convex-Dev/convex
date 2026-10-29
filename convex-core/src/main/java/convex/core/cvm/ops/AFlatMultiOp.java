@@ -53,8 +53,8 @@ public abstract class AFlatMultiOp<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	public final AFlatMultiOp<T> updateRefs(IRefFunction func) {
-		AVector<AOp<ACell>> newOps=(AVector<AOp<ACell>>) ops.updateRefs(func);
+	protected final AFlatMultiOp<T> rebuildRefs(IRefFunction func) {
+		AVector<AOp<ACell>> newOps=ops.updateRefs(func);
 		return recreate(newOps);
 	}
 

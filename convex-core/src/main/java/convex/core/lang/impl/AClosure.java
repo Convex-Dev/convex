@@ -72,7 +72,7 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	}
 
 	@Override
-	public AFn<T> updateRefs(IRefFunction func) {
+	protected AFn<T> rebuildRefs(IRefFunction func) {
 		AVector<ACell> newData=data.updateRefs(func);
 		if (data==newData) return this;
 		return recreate(newData);

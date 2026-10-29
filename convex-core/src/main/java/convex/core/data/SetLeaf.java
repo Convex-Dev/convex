@@ -274,7 +274,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public SetLeaf updateRefs(IRefFunction func) {
+	protected SetLeaf rebuildRefs(IRefFunction func) {
 		int n = elements.length;
 		if (n == 0) return this;
 		Ref<T>[] newEntries = elements;

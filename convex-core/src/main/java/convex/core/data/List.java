@@ -210,8 +210,8 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	public List<T> updateRefs(IRefFunction func) {
-		AVector<T> newData = (AVector<T>) data.updateRefs(func);
+	protected List<T> rebuildRefs(IRefFunction func) {
+		AVector<T> newData = data.updateRefs(func);
 		if (newData == data) return this;
 		return new List<T>(newData);
 	}

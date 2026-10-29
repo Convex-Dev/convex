@@ -531,7 +531,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public MapTree<K,V> updateRefs(IRefFunction func) {
+	protected MapTree<K,V> rebuildRefs(IRefFunction func) {
 		int n = children.length;
 		if (n == 0) return this;
 		Ref<AHashMap<K, V>>[] newChildren = children;
@@ -547,9 +547,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		if (newChildren == children) return this;
 		// Note: we assume no key hashes have changed, so structure is the same
-		MapTree<K,V> result= new MapTree<>(newChildren, shift, mask, count);
-		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
-		return result;
+		return new MapTree<>(newChildren, shift, mask, count);
 	}
 
 	@Override

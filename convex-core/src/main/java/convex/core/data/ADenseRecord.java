@@ -29,7 +29,7 @@ public abstract class ADenseRecord extends ARecord<ACell,ACell> {
 	}
 	
 	@Override
-	public ADenseRecord updateRefs(IRefFunction func) {
+	protected ADenseRecord rebuildRefs(IRefFunction func) {
 		AVector<ACell> newValues=values.toVector().updateRefs(func); // ensure values are canonical via toVector
 		return withValues(newValues);
 	}
