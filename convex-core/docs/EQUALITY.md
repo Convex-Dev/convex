@@ -21,8 +21,8 @@ Java classes reach that answer cheaply. Read it before changing any `equals` met
   anyway: every parent encoding holds it, Etch stores by it and peers exchange it, so
   computing it during a comparison is work done early and kept. An embedded cell's hash
   is needed only when the cell is a top-level value, a hash map or set key, or hashed
-  explicitly. Equality never computes it. Signing an embedded value signs its encoding,
-  not its hash.
+  explicitly. Equality computes it only in the one case the exceptions table gives.
+  Signing an embedded value signs its encoding, not its hash.
 - **Bounded work per call, the rest cached.** CVM `=` costs flat juice. One comparison
   may build a cell's encoding and hash branch children that lack a hash, and all of that
   stays cached. A recursive walk through branch children that caches nothing is not
@@ -77,7 +77,8 @@ Each class checks, in order:
      but the tags agree (a generic `DenseRecord` or `CodedValue` against the typed
      class with that tag), and by `ACAD3Record`, which is only ever decoded.
 
-A comparison never computes the hash of an embedded cell.
+A comparison computes the hash of an embedded cell only in the case the exceptions
+table gives.
 
 ### Refs: `equals(Ref)`, the embedded or branch decision
 
@@ -107,6 +108,7 @@ needed.
 | Leaf types: `CVMLong`, `CVMDouble`, `CVMBool`, `CVMChar`, `Keyword`, `Symbol`, `Address`, `AExtensionValue`, `StringShort`, `AArrayBlob` (with `Blob`, `Hash`, `AccountKey`) | Compare content and may skip step 4 | No children, and canonical blobs hold at most 4096 bytes: a direct comparison is cheap, bounded and allocates nothing. A longer `Blob` is non-canonical and compares encodings. |
 | `CVMLong`, `CVMBigInteger` | Compare numerically across classes, with no tag check | A non-canonical `CVMBigInteger` holding a long equals the `CVMLong` of that value, although its tag differs. |
 | `RefSoft`, and `RefDirect` against a soft ref | May compute the hash of an embedded value on the direct side | Reading the soft ref's value may need the store. Soft refs normally point at stored branch cells. |
+| Tree types, through `ACell.compareAsEmbedded` | May compute the hash of an embedded node when the other side, of the same shape, is a known branch | The side that knows its status decides the path, so a fresh value compared with a stored one is never measured. The two differ in status, so the hashes differ and the result is unequal; only the proof costs a hash. |
 
 A new exception belongs in this table with its reason. No exception may change a result.
 
