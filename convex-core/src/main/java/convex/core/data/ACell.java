@@ -481,6 +481,35 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		cachedRef.flags|=(embedded)?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
 		return embedded;
 	}
+
+	/**
+	 * Decides whether a comparison of this cell with another of the same shape (equal
+	 * header fields) takes the embedded path, comparing children, or the branch path,
+	 * comparing hashes. Answers from whichever side already knows its status, so a
+	 * fresh value compared with a stored one is not measured. Either path gives the
+	 * right result if the two sides differ in status, since neither their children nor
+	 * their hashes can then agree; the choice only decides which path finds the
+	 * difference.
+	 *
+	 * @param b Cell of the same shape to compare with
+	 * @return true to compare children, false to compare hashes
+	 */
+	protected final boolean compareAsEmbedded(ACell b) {
+		Ref<ACell> r=cachedRef;
+		if (r!=null) {
+			int flags=r.flags;
+			if ((flags&Ref.KNOWN_EMBEDDED_MASK)!=0) return true;
+			if ((flags&Ref.NON_EMBEDDED_MASK)!=0) return false;
+		}
+		Ref<ACell> rb=b.cachedRef;
+		if (rb!=null) {
+			int flags=rb.flags;
+			if ((flags&Ref.KNOWN_EMBEDDED_MASK)!=0) return true;
+			if ((flags&Ref.NON_EMBEDDED_MASK)!=0) return false;
+		}
+		// Neither side knows: a side holding its encoding answers from its length
+		return ((encoding!=null)||(b.encoding==null))?isEmbedded():b.isEmbedded();
+	}
 	
 	/**
 	 * Returns true if this Cell is in a canonical CAD3 representation.

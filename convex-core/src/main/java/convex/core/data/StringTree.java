@@ -141,9 +141,7 @@ public class StringTree extends AString {
 			// A branch tree compares by hash, which any parent encoding or store needs
 			// anyway, so the work is kept. An embedded tree (a few chunks) compares its
 			// chunk tree, whose children compare through their refs.
-			boolean em=isEmbedded();
-			if (em!=st.isEmbedded()) return false;
-			if (!em) return getHash().equals(st.getHash());
+			if (!compareAsEmbedded(st)) return getHash().equals(st.getHash());
 			return data.equals(st.data);
 		}
 		// Another string of this length is non-canonical: compare with its canonical form

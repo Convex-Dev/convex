@@ -57,6 +57,22 @@ public class MapsTest {
 		}
 		assertFalse(a.isEmbedded());
 		assertEqualityHashesRoots(a,b,c);
+
+		// Same shape, one embedded and one branch: unequal whichever side decides the path
+		AMap<CVMLong, ACell> small = Maps.empty(), big = Maps.empty(), big2 = Maps.empty();
+		for (long i = 0; i < 17; i++) {
+			CVMLong k=CVMLong.create(i);
+			small = small.assoc(k, k);
+			big = big.assoc(k, Strings.create("value number "+i+" padded to be long enough to make the tree a branch"));
+			big2 = big2.assoc(k, Strings.create("value number "+i+" padded to be long enough to make the tree a branch"));
+		}
+		assertTrue(small.isEmbedded()); // small knows, big does not
+		assertFalse(small.equals(big));
+		assertFalse(big.equals(small));
+		assertFalse(big2.isEmbedded()); // big2 knows
+		assertFalse(big2.equals(small));
+		assertFalse(small.equals(big2));
+		assertEquals(big,big2);
 	}
 
 	@Test

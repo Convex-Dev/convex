@@ -68,6 +68,9 @@ Each class checks, in order:
      parent's encoding, by the store, and by the next level of a nested comparison such
      as a lattice path update, so computing it here is work kept. Walking its children
      instead saves nothing when its hash is computed a moment later, and costs the walk.
+     Which path to take comes from whichever side already knows its status
+     (`ACell.compareAsEmbedded`), so a fresh value compared with a stored one is not
+     measured; either path finds the difference when the two sides differ in status.
    - **Encoding**: `Cells.equalsEncoding` compares encodings. Building an encoding
      inlines embedded children and hashes branch children, so it never computes the
      cell's own hash or any embedded cell's hash. Used only where the classes differ

@@ -1448,9 +1448,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		// A branch node compares by hash, which any parent encoding or store needs
 		// anyway, so the work is kept. An embedded node compares its entry and
 		// children through their refs, since no encoding ever needs its hash.
-		boolean em=isEmbedded();
-		if (em!=a.isEmbedded()) return false;
-		if (!em) return getHash().equals(a.getHash());
+		if (!compareAsEmbedded(a)) return getHash().equals(a.getHash());
 		MapEntry<K, V> e=entry;
 		MapEntry<K, V> ae=a.entry;
 		if (e!=ae) {
