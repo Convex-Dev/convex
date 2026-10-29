@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import static convex.test.Assertions.assertEqualityCachesNothing;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -23,6 +24,19 @@ import convex.test.Samples;
  * Tests for general set behaviour and logic
  */
 public class SetsTest {
+
+	@Test
+	public void testTreeEqualityCachesNothing() {
+		ASet<ACell> a = Sets.empty(), b = Sets.empty(), c = Sets.empty();
+		for (long i = 0; i < 300; i++) {
+			CVMLong v=CVMLong.create(1000000+i);
+			a = a.include(v);
+			b = b.include(v);
+			c = c.include((i==299)?CVMLong.create(-1):v);
+		}
+		assertTrue(a instanceof SetTree);
+		assertEqualityCachesNothing(a,b,c);
+	}
 
 	@Test
 	public void testEmptySet() {

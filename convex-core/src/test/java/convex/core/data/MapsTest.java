@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertEqualityCachesNothing;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -30,6 +31,19 @@ import convex.test.Samples;
  * Tests for CVM Map data structures.
  */
 public class MapsTest {
+
+	@Test
+	public void testTreeEqualityCachesNothing() {
+		AMap<CVMLong, CVMLong> a = Maps.empty(), b = Maps.empty(), c = Maps.empty();
+		for (long i = 0; i < 300; i++) {
+			CVMLong k=CVMLong.create(1000000+i);
+			a = a.assoc(k, k);
+			b = b.assoc(k, k);
+			c = c.assoc(k, (i==299)?CVMLong.create(-1):k);
+		}
+		assertTrue(a instanceof MapTree);
+		assertEqualityCachesNothing(a,b,c);
+	}
 
 	@Test
 	public void testMapBuilding() throws InvalidDataException, ValidationException {

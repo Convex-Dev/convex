@@ -761,16 +761,24 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	boolean equals(MapTree<K, V> b) {
-		if (b==null) return false;
 		if (this == b) return true;
-		long n = count;
-		if (n != b.count) return false;
+		if (b==null) return false;
+		if (count != b.count) return false;
 		if (mask != b.mask) return false;
 		if (shift != b.shift) return false;
 
-		// Fall back to comparing hashes. Probably most efficient in general.
-		if (getHash().equals(b.getHash())) return true;
-		return false;
+		Hash h=cachedHash();
+		if (h!=null) {
+			Hash hb=b.cachedHash();
+			if (hb!=null) return h.equals(hb);
+		}
+
+		// Children compare through their refs: embedded by value, branch by hash
+		int n=children.length;
+		for (int i=0; i<n; i++) {
+			if (!children[i].equals(b.children[i])) return false;
+		}
+		return true;
 	}
 
 	@Override

@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertEqualityCachesNothing;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,6 +50,20 @@ import convex.etch.EtchStore;
 import convex.test.Samples;
 
 public class IndexTest {
+
+	@Test
+	public void testTreeEqualityCachesNothing() {
+		Index<Address, CVMLong> a = Index.none(), b = Index.none(), c = Index.none();
+		for (long i = 0; i < 300; i++) {
+			Address k=Address.create(1000000+i);
+			CVMLong v=CVMLong.create(i);
+			a = a.assoc(k, v);
+			b = b.assoc(k, v);
+			c = c.assoc(k, (i==299)?CVMLong.create(-1):v);
+		}
+		assertTrue(a.getDepth()>0);
+		assertEqualityCachesNothing(a,b,c);
+	}
 
 	@Test
 	public void testEmpty() throws InvalidDataException {

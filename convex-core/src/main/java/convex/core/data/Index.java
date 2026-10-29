@@ -1432,14 +1432,31 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * @return true if maps are equal, false otherwise.
 	 */
 	public boolean equals(Index<K, V> a) {
+		if (this == a) return true;
 		if (a==null) return false;
-		long n=this.count();
-		if (n != a.count()) return false;
-		if (this.mask!=a.mask) return false;
-		
-		if (!Cells.equals(this.entry, a.entry)) return false;
-		
-		return getHash().equals(a.getHash());
+		long n=count;
+		if (n != a.count) return false;
+		if (mask!=a.mask) return false;
+		if ((n>1)&&(getDepth()!=a.getDepth())) return false; // encoded only with more than one entry
+
+		Hash h=cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return h.equals(ha);
+		}
+
+		// Entry and children compare through their refs: embedded by value, branch by hash
+		MapEntry<K, V> e=entry;
+		MapEntry<K, V> ae=a.entry;
+		if (e!=ae) {
+			if ((e==null)||(ae==null)) return false;
+			if (!e.equals(ae)) return false;
+		}
+		int cn=children.length;
+		for (int i=0; i<cn; i++) {
+			if (!children[i].equals(a.children[i])) return false;
+		}
+		return true;
 	}
 
 	@Override

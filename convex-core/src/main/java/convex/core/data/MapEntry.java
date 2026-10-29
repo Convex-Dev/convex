@@ -174,13 +174,18 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return result;
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(AVector<?> o) {
-		if (o==null) return false;
 		if (o==this) return true;
-		AVector<?> v=(AVector<?>) o;
-		if (v.count()!=2) return false;
-		return getEncoding().equals(o.getEncoding());
+		if (o==null) return false;
+		if (o instanceof MapEntry) return equals((MapEntry<K,V>)o);
+		if (o.count()!=2) return false;
+		// Any other vector of two elements has the same canonical encoding shape,
+		// so equal exactly when the element refs are
+		Ref<ACell> kr=(Ref<ACell>) keyRef;
+		Ref<ACell> vr=(Ref<ACell>) valueRef;
+		return kr.equals((Ref<ACell>)o.getElementRef(0))&&vr.equals((Ref<ACell>)o.getElementRef(1));
 	}
 
 	public boolean equals(MapEntry<K, V> b) {
