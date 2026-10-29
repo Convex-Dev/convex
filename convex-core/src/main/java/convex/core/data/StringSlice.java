@@ -110,7 +110,8 @@ public class StringSlice extends AString {
 	public boolean equals(AString b) {
 		if (this==b) return true;
 		if (b==null) return false;
-		return false;
+		if (length!=b.count()) return false;
+		return getCanonical().equals(b); // non-canonical: compare as the canonical string
 	}
 
 	@Override

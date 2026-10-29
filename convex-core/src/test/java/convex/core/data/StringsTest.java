@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import static convex.test.Assertions.assertEqualityCachesNothing;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -22,6 +23,24 @@ import convex.core.util.JSON;
 import convex.test.Samples;
 
 public class StringsTest {
+
+	@Test
+	public void testTreeEqualityCachesNothing() {
+		String s=Samples.MIN_TREE_STRING.toString();
+		AString a=Strings.create(s);
+		AString b=Strings.create(s);
+		AString c=Strings.create(s.substring(0, s.length()-1)+(s.endsWith("~")?"!":"~"));
+		assertTrue(a instanceof StringTree);
+		assertEqualityCachesNothing(a,b,c);
+
+		// A slice compares as its canonical string, in both directions
+		AString slice=StringSlice.create((StringTree)a, 1, 5);
+		AString sub=Strings.create(s.substring(1, 6));
+		assertEquals(sub,slice);
+		assertEquals(slice,sub);
+		assertFalse(slice.equals(Strings.create(s.substring(1, 7))));
+		assertEquals(a,StringSlice.create((StringTree)a, 0, a.count()));
+	}
 
 	@Test
 	public void testStringShort() {

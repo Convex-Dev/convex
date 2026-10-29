@@ -279,6 +279,12 @@ public class BlobTree extends ABlob {
 	public boolean equals(BlobTree b) {
 		if (b == this) return true;
 		if (b.count != count) return false;
+		Hash h=cachedHash();
+		if (h!=null) {
+			Hash hb=b.cachedHash();
+			if (hb!=null) return h.equals(hb);
+		}
+		// Children compare through their refs: embedded by value, branch by hash
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
 			if (!children[i].equals(b.children[i])) return false;

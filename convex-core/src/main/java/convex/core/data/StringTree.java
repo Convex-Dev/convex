@@ -132,7 +132,18 @@ public class StringTree extends AString {
 		if (this==b) return true;
 		if (b==null) return false;
 		if (count()!=b.count()) return false;
-		return Cells.equalsEncoding(this, b);
+		if (b instanceof StringTree st) {
+			Hash h=cachedHash();
+			if (h!=null) {
+				Hash hb=st.cachedHash();
+				if (hb!=null) return h.equals(hb);
+			}
+			return data.equals(st.data); // chunk trees compare their children through refs
+		}
+		// Another string of this length is non-canonical: compare with its canonical form
+		ACell c=b.getCanonical();
+		if (c==b) return false;
+		return equals(c);
 	}
 
 	@Override
