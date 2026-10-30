@@ -3718,9 +3718,8 @@ public abstract class CoreTest extends ACVMTest {
 		// create a new peer with zero stake
 		assertError(step(ctx,"(create-peer hero-peer 0)"));
 
-		// creating a peer on an account key that isn't the hero account key
-		// TODO: what should happen here?
-		//assertArgumentError(step(ctx,"(create-peer 0x1234567812345678123456781234567812345678123456781234567812345678 1234)"));
+		// any 32-byte key is accepted, even one the caller does not hold
+		assertNotError(step(ctx,"(create-peer 0x1234567812345678123456781234567812345678123456781234567812345678 1234)"));
 
 		// creating a peer with invalid account key
 		assertCastError(step(ctx,"(create-peer *address* 1234)"));
