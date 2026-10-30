@@ -824,4 +824,72 @@ public class PgServerTest {
 			}
 		}
 	}
+
+	// ========== Transaction control ==========
+
+	private String pgUrl() {
+		return "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+	}
+
+	private boolean userExists(int id) throws Exception {
+		try (Connection conn = DriverManager.getConnection(pgUrl());
+			 Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery("SELECT name FROM users WHERE id = " + id)) {
+			return rs.next();
+		}
+	}
+
+	/** setAutoCommit(false) sends BEGIN, commit() sends COMMIT: another connection sees the row. */
+	@Test
+	public void testTransactionCommitIsVisibleElsewhere() throws Exception {
+		try (Connection conn = DriverManager.getConnection(pgUrl())) {
+			conn.setAutoCommit(false);
+			try (Statement stmt = conn.createStatement()) {
+				stmt.execute("INSERT INTO users (id, name, email) VALUES (10, 'Dave', 'dave@example.com')");
+			}
+			assertFalse(userExists(10), "not visible before commit");
+			conn.commit();
+		}
+		assertTrue(userExists(10));
+	}
+
+	@Test
+	public void testTransactionRollbackDiscardsTheWrite() throws Exception {
+		try (Connection conn = DriverManager.getConnection(pgUrl())) {
+			conn.setAutoCommit(false);
+			try (Statement stmt = conn.createStatement()) {
+				stmt.execute("INSERT INTO users (id, name, email) VALUES (11, 'Erin', 'erin@example.com')");
+			}
+			conn.rollback();
+		}
+		assertFalse(userExists(11));
+	}
+
+	/**
+	 * The status each ReadyForQuery reports, as pgjdbc records it: open in a block, failed
+	 * after an error there, with every later statement refused with 25P02 until ROLLBACK.
+	 */
+	@Test
+	public void testTransactionStatus() throws Exception {
+		try (Connection conn = DriverManager.getConnection(pgUrl()); Statement stmt = conn.createStatement()) {
+			org.postgresql.core.BaseConnection pg = conn.unwrap(org.postgresql.core.BaseConnection.class);
+			assertEquals(org.postgresql.core.TransactionState.IDLE, pg.getTransactionState());
+
+			stmt.execute("BEGIN");
+			assertEquals(org.postgresql.core.TransactionState.OPEN, pg.getTransactionState());
+			stmt.execute("INSERT INTO users (id, name, email) VALUES (12, 'Fay', 'fay@example.com')");
+
+			assertThrows(java.sql.SQLException.class, () -> stmt.execute("SELECT * FROM no_such_table"));
+			assertEquals(org.postgresql.core.TransactionState.FAILED, pg.getTransactionState());
+			java.sql.SQLException refused = assertThrows(java.sql.SQLException.class, () -> stmt.execute("SELECT 1"));
+			assertEquals("25P02", refused.getSQLState());
+
+			stmt.execute("ROLLBACK");
+			assertEquals(org.postgresql.core.TransactionState.IDLE, pg.getTransactionState());
+			assertFalse(userExists(12));
+
+			java.sql.SQLException savepoint = assertThrows(java.sql.SQLException.class, () -> stmt.execute("SAVEPOINT a"));
+			assertEquals("0A000", savepoint.getSQLState());
+		}
+	}
 }

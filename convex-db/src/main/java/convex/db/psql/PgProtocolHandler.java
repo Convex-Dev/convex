@@ -84,6 +84,12 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 */
 	private boolean discardUntilSync = false;
 
+	/**
+	 * The transaction status every ReadyForQuery reports: idle, in a transaction block, or
+	 * in a block an error has failed, where statements are refused until the block ends.
+	 */
+	private byte transactionStatus = ReadyForQuery.IDLE;
+
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 		if (discardUntilSync && isDiscardable(msg)) {
@@ -232,7 +238,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 		if (fullSql.isEmpty()) {
 			write(ctx, new EmptyQueryResponse());
-			write(ctx, ReadyForQuery.IDLE_INSTANCE);
+			write(ctx, readyForQuery());
 			ctx.flush();
 			return;
 		}
@@ -247,34 +253,101 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				continue;
 			}
 
-			// Handle special commands
-			if (sql.toUpperCase().startsWith("SET ")) {
-				// Ignore SET commands for now
-				write(ctx, CommandComplete.set());
-				continue;
-			}
-
 			try {
+				if (transactionControl(ctx, sql)) continue;
+				requireTransactionNotFailed();
+
+				// Handle special commands
+				if (sql.toUpperCase().startsWith("SET ")) {
+					// Ignore SET commands for now
+					write(ctx, CommandComplete.set());
+					continue;
+				}
+
 				executeQuery(ctx, sql);
 			} catch (SQLException e) {
 				log.warn("Query error: {}", e.getMessage(), e);
-				write(ctx, ErrorResponse.fromException(e));
+				writeError(ctx, ErrorResponse.fromException(e));
 				// Stop processing on error
 				break;
 			} catch (RuntimeException e) {
 				// Runtime exceptions from Calcite (type coercion, etc.) are query errors
 				log.warn("Query execution error: {}", e.getMessage(), e);
-				write(ctx, ErrorResponse.fromException(e));
+				writeError(ctx, ErrorResponse.fromException(e));
 				break;
 			} catch (Exception e) {
 				log.error("Unexpected error", e);
-				write(ctx, ErrorResponse.fromException(e));
+				writeError(ctx, ErrorResponse.fromException(e));
 				break;
 			}
 		}
 
-		write(ctx, ReadyForQuery.IDLE_INSTANCE);
+		write(ctx, readyForQuery());
 		ctx.flush();
+	}
+
+	// ========== Transaction control ==========
+
+	/**
+	 * Runs a statement if it is transaction control, on the connection's own transaction:
+	 * BEGIN turns autocommit off, which forks the database, COMMIT syncs the fork and ROLLBACK
+	 * discards it. COMMIT of a failed block rolls it back, as PostgreSQL does. BEGIN inside a
+	 * block and COMMIT or ROLLBACK outside one change nothing.
+	 *
+	 * @return true if the statement was transaction control and has completed
+	 * @throws SQLException with SQLSTATE 0A000 for transaction control the server does not support
+	 */
+	private boolean transactionControl(ChannelHandlerContext ctx, String sql) throws SQLException {
+		PgTransactionControl.Kind kind = PgTransactionControl.classify(sql);
+		if (kind == null) return false;
+		switch (kind) {
+			case BEGIN -> {
+				if (transactionStatus == ReadyForQuery.IDLE) {
+					connection.setAutoCommit(false);
+					transactionStatus = ReadyForQuery.IN_TRANSACTION;
+				}
+				write(ctx, CommandComplete.begin());
+			}
+			case COMMIT -> {
+				boolean failed = (transactionStatus == ReadyForQuery.FAILED_TRANSACTION);
+				endTransaction(!failed);
+				write(ctx, failed ? CommandComplete.rollback() : CommandComplete.commit());
+			}
+			case ROLLBACK -> {
+				endTransaction(false);
+				write(ctx, CommandComplete.rollback());
+			}
+		}
+		return true;
+	}
+
+	/** Ends a transaction block, if one is open, and returns the connection to autocommit. */
+	private void endTransaction(boolean commit) throws SQLException {
+		if (transactionStatus == ReadyForQuery.IDLE) return;
+		transactionStatus = ReadyForQuery.IDLE;
+		try {
+			if (commit) connection.commit();
+			else connection.rollback();
+		} finally {
+			connection.setAutoCommit(true);
+		}
+	}
+
+	/** Refuses a statement in a failed transaction block, as PostgreSQL does, until the block ends. */
+	private void requireTransactionNotFailed() throws SQLException {
+		if (transactionStatus == ReadyForQuery.FAILED_TRANSACTION) {
+			throw new SQLException("current transaction is aborted, commands ignored until end of transaction block", "25P02");
+		}
+	}
+
+	/** Reports an error; inside a transaction block it fails the block. */
+	private void writeError(ChannelHandlerContext ctx, ErrorResponse error) {
+		write(ctx, error);
+		if (transactionStatus == ReadyForQuery.IN_TRANSACTION) transactionStatus = ReadyForQuery.FAILED_TRANSACTION;
+	}
+
+	private ReadyForQuery readyForQuery() {
+		return (transactionStatus == ReadyForQuery.IDLE) ? ReadyForQuery.IDLE_INSTANCE : new ReadyForQuery(transactionStatus);
 	}
 
 	private void executeQuery(ChannelHandlerContext ctx, String sql) throws SQLException {
@@ -662,6 +735,10 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 */
 	private void executeWithParameters(ChannelHandlerContext ctx, PreparedStmt stmt, byte[][] paramValues,
 			short[] paramFormats, short[] resultFormats) throws SQLException {
+		// pgjdbc sends COMMIT and ROLLBACK through the extended protocol
+		if (transactionControl(ctx, stmt.query().trim())) return;
+		requireTransactionNotFailed();
+
 		String sql = rewriteQuery(stmt.query());
 		int[] paramTypes = stmt.paramTypes();
 
@@ -985,13 +1062,13 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 	private void handleSync(ChannelHandlerContext ctx) {
 		discardUntilSync = false;
-		write(ctx, ReadyForQuery.IDLE_INSTANCE);
+		write(ctx, readyForQuery());
 		ctx.flush();
 	}
 
 	/** Reports an error from an extended query message, discarding messages until Sync. */
 	private void writeExtendedError(ChannelHandlerContext ctx, ErrorResponse error) {
-		write(ctx, error);
+		writeError(ctx, error);
 		discardUntilSync = true;
 	}
 

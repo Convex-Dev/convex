@@ -212,7 +212,10 @@ Some PostgreSQL-specific features are not yet supported:
 - Some system catalog tables (pg_proc, pg_index, pg_constraint)
 - PostgreSQL-specific functions
 - Serialisable transactions: a transaction reads a snapshot taken when it begins, and
-  merges with concurrent changes at commit by the database's policy
+  merges with concurrent changes at commit by the database's policy. `BEGIN`, `COMMIT`
+  and `ROLLBACK` (and their `START TRANSACTION`, `END` and `ABORT` forms) run such a
+  transaction; `ISOLATION LEVEL SERIALIZABLE`, `READ ONLY`, savepoints, chained and
+  two-phase transactions are refused with SQLSTATE `0A000`
 
 ## Lattice Tables API
 
