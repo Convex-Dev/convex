@@ -53,8 +53,8 @@ SQL "SELECT name FROM t WHERE id = 1"
 | `ConvexProject` | `SELECT expr, ...` | Expression evaluation via `ConvexExpressionEvaluator` |
 | `ConvexSort` | `ORDER BY ... LIMIT N OFFSET M` | Type-specific comparators from `SqlTypeName` at plan time |
 | `ConvexAggregate` | `GROUP BY ... COUNT/SUM/AVG/MIN/MAX` | CVM-native arithmetic via `RT.plus()`, `RT.min()`, etc. |
-| `ConvexMergeJoin` | `JOIN ... ON a = b` | Merge join for conditions with at least one equality (INNER, LEFT, RIGHT, FULL OUTER); sorts both inputs on the join keys, cheaply when already in key order, then merges in O(n+m); other conditions filter matched rows |
-| `ConvexJoin` | `JOIN ... ON` | Nested-loop join for any condition (INNER, LEFT, RIGHT, FULL OUTER) |
+| `ConvexMergeJoin` | `JOIN ... ON a = b` | Merge join for conditions with at least one equality (INNER, LEFT, RIGHT, FULL OUTER, SEMI, ANTI); sorts both inputs on the join keys, cheaply when already in key order, then merges in O(n+m); other conditions filter matched rows; a NULL in a key compared by `=` matches nothing |
+| `ConvexJoin` | `JOIN ... ON` | Nested-loop join for any condition (INNER, LEFT, RIGHT, FULL OUTER, SEMI, ANTI); SEMI and ANTI are what Calcite plans for `IN` and `EXISTS` subqueries and for a join whose right side only filters |
 
 ### Boundary
 

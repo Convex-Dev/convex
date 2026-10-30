@@ -327,4 +327,85 @@ class JoinSubqueryTest {
 			assertFalse(rs.next()); // Berlin (Dave) has no orders
 		}
 	}
+
+	// ========== SEMI join (a join whose right side only filters) ==========
+
+	/** The ids the query returns, in order. */
+	private String ids(String sql) throws Exception {
+		StringBuilder sb = new StringBuilder();
+		try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+			while (rs.next()) {
+				if (sb.length() > 0) sb.append(',');
+				sb.append(rs.getLong(1));
+			}
+		}
+		return sb.toString();
+	}
+
+	private String plan(String sql) throws Exception {
+		StringBuilder sb = new StringBuilder();
+		try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery("EXPLAIN PLAN FOR " + sql)) {
+			while (rs.next()) sb.append(rs.getString(1)).append('\n');
+		}
+		return sb.toString();
+	}
+
+	/**
+	 * A table joined with itself where only the left side's columns are selected,
+	 * the right side is unique on the join key (its primary key) and the left side
+	 * is filtered on three columns: Calcite plans a SEMI join and, from about 80
+	 * rows on, gives it to ConvexJoin.
+	 */
+	@Test
+	void testJoinUsedOnlyAsFilterBecomesSemiJoin() throws Exception {
+		db.tables().createTable("content", new String[]{"id", "parent_id", "tool", "tp", "hdr"}, new ConvexColumnType[] {
+			ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.of(ConvexType.INTEGER),
+			ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.of(ConvexType.INTEGER),
+			ConvexColumnType.varchar(20)
+		});
+		// parent_id: none for the first 5, else one of them or one that does not exist (id 99)
+		StringBuilder expected = new StringBuilder();
+		for (long i = 1; i <= 80; i++) {
+			Long parent = i <= 5 ? null : (i % 6 == 0 ? 99L : (i % 5) + 1);
+			db.tables().insert("content", i, parent, i % 7, i % 3, "h" + (i % 4));
+			if (parent != null && parent != 99L && i % 7 == 5 && i % 3 == 1 && i % 4 == 1) {
+				expected.append(expected.length() > 0 ? "," : "").append(i);
+			}
+		}
+		String sql = "SELECT t.id FROM content t JOIN content m ON m.id = t.parent_id " +
+			"WHERE t.tool = 5 AND t.tp = 1 AND t.hdr = 'h1'";
+		String plan = plan(sql);
+		assertTrue(plan.contains("ConvexJoin") && plan.contains("joinType=[semi]"), plan);
+		assertFalse(expected.toString().isEmpty());
+		assertEquals(expected.toString(), ids(sql + " ORDER BY t.id"));
+	}
+
+	/** A join on a column with NULLs: NULL = NULL is not true, so they match nothing. */
+	@Test
+	void testJoinOnNullKeys() throws Exception {
+		db.tables().createTable("node", new String[]{"id", "parent_id", "tp"}, new ConvexColumnType[] {
+			ConvexColumnType.of(ConvexType.INTEGER),
+			ConvexColumnType.of(ConvexType.INTEGER),
+			ConvexColumnType.of(ConvexType.INTEGER)
+		});
+		db.tables().insert("node", 1L, null, 5L);
+		db.tables().insert("node", 2L, null, 0L);
+		db.tables().insert("node", 3L, 1L, 1L);
+		db.tables().insert("node", 4L, 1L, 1L);
+		db.tables().insert("node", 5L, 2L, 1L);
+		db.tables().insert("node", 6L, 3L, 0L);
+		// NULL = NULL is not true: the two top nodes are not siblings
+		assertEquals("3,3,4,4,5,6", ids(
+			"SELECT a.id FROM node a JOIN node b ON a.parent_id = b.parent_id ORDER BY a.id"));
+		// ... and in an outer join they come back unmatched
+		assertEquals("1,2,3,3,4,4,5,6", ids(
+			"SELECT a.id FROM node a LEFT JOIN node b ON a.parent_id = b.parent_id ORDER BY a.id"));
+		assertEquals("1,2,3,3,4,4,5,6", ids(
+			"SELECT COALESCE(b.id, 0) FROM node a RIGHT JOIN node b ON a.parent_id = b.parent_id ORDER BY 1"));
+		assertEquals("0,0,1,2,3,3,4,4,5,6", ids(
+			"SELECT COALESCE(a.id, 0) FROM node a FULL JOIN node b ON a.parent_id = b.parent_id ORDER BY 1"));
+		// IS NOT DISTINCT FROM does match NULL with NULL
+		assertEquals("1,1,2,2,3,3,4,4,5,6", ids(
+			"SELECT a.id FROM node a JOIN node b ON a.parent_id IS NOT DISTINCT FROM b.parent_id ORDER BY a.id"));
+	}
 }

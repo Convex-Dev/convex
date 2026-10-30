@@ -1,6 +1,7 @@
 package convex.db.calcite.rel;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -17,6 +18,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.validate.SqlValidatorUtil;
 
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMBool;
@@ -29,7 +31,9 @@ import convex.db.calcite.eval.ConvexExpressionEvaluator;
  * Join in CONVEX convention.
  *
  * <p>Performs join operations on ACell[] rows using CVM-native comparisons.
- * Supports INNER, LEFT, RIGHT, and FULL OUTER joins.
+ * Supports INNER, LEFT, RIGHT and FULL OUTER joins, and the SEMI and ANTI
+ * joins Calcite plans for IN and EXISTS subqueries and for a join whose right
+ * side only filters: the left rows with a match on the right, or with none.
  */
 public class ConvexJoin extends Join implements ConvexRel {
 
@@ -77,7 +81,11 @@ public class ConvexJoin extends Join implements ConvexRel {
 
 		int leftWidth = getLeft().getRowType().getFieldCount();
 		int rightWidth = getRight().getRowType().getFieldCount();
-		RelDataType combinedRowType = getRowType();
+		// The condition is evaluated over a left row and a right row side by side. For SEMI
+		// and ANTI that is not this join's own row type, which is the left row alone.
+		RelDataType combinedRowType = joinType.projectsRight() ? getRowType()
+			: SqlValidatorUtil.createJoinType(getCluster().getTypeFactory(),
+				getLeft().getRowType(), getRight().getRowType(), null, List.of());
 
 		List<ACell[]> result = new ArrayList<>();
 
@@ -86,6 +94,8 @@ public class ConvexJoin extends Join implements ConvexRel {
 			case LEFT -> executeLeftJoin(leftRows, rightRows, leftWidth, rightWidth, combinedRowType, result);
 			case RIGHT -> executeRightJoin(leftRows, rightRows, leftWidth, rightWidth, combinedRowType, result);
 			case FULL -> executeFullJoin(leftRows, rightRows, leftWidth, rightWidth, combinedRowType, result);
+			case SEMI -> executeSemiJoin(leftRows, rightRows, leftWidth, rightWidth, combinedRowType, false, result);
+			case ANTI -> executeSemiJoin(leftRows, rightRows, leftWidth, rightWidth, combinedRowType, true, result);
 			default -> throw new UnsupportedOperationException("Join type not supported: " + joinType);
 		}
 
@@ -176,6 +186,26 @@ public class ConvexJoin extends Join implements ConvexRel {
 		for (int i = 0; i < rightRows.size(); i++) {
 			if (!rightMatched[i]) {
 				result.add(combineRows(nullRow(leftWidth), rightRows.get(i), leftWidth, rightWidth));
+			}
+		}
+	}
+
+	/**
+	 * SEMI JOIN: the left rows that match at least one right row, each once, as the
+	 * left row alone. ANTI JOIN ({@code anti}): the left rows that match none.
+	 */
+	private void executeSemiJoin(List<ACell[]> leftRows, List<ACell[]> rightRows,
+			int leftWidth, int rightWidth, RelDataType rowType, boolean anti, List<ACell[]> result) {
+		for (ACell[] leftRow : leftRows) {
+			boolean matched = false;
+			for (ACell[] rightRow : rightRows) {
+				if (matchesCondition(combineRows(leftRow, rightRow, leftWidth, rightWidth), rowType)) {
+					matched = true;
+					break;
+				}
+			}
+			if (matched != anti) {
+				result.add(Arrays.copyOf(leftRow, leftWidth));
 			}
 		}
 	}

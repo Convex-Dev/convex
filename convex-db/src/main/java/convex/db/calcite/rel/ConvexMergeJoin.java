@@ -1,6 +1,7 @@
 package convex.db.calcite.rel;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -20,6 +21,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.validate.SqlValidatorUtil;
 
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMBool;
@@ -36,8 +38,15 @@ import convex.db.calcite.eval.ConvexExpressionEvaluator;
  * key order, as it is when the join key is the primary key (column 0) — the
  * Index radix tree produces rows in sorted PK order.
  *
- * <p>Supports INNER, LEFT, RIGHT, and FULL OUTER joins. Any residual
+ * <p>Supports INNER, LEFT, RIGHT and FULL OUTER joins, and SEMI and ANTI
+ * joins (the left rows with a match on the right, or with none). Any residual
  * non-equi conditions are evaluated as a post-filter on matched rows.
+ *
+ * <p>A row with NULL in a key compared by {@code =} matches nothing, since
+ * {@code NULL = x} is not true; a key compared by {@code IS NOT DISTINCT FROM}
+ * does match NULL with NULL. The merge itself orders NULL keys together, so
+ * rows with a NULL in an excluding key are set apart before it and added back
+ * afterwards where the join type keeps unmatched rows.
  */
 public class ConvexMergeJoin extends Join implements ConvexRel {
 
@@ -81,8 +90,20 @@ public class ConvexMergeJoin extends Join implements ConvexRel {
 
 		int leftWidth = getLeft().getRowType().getFieldCount();
 		int rightWidth = getRight().getRowType().getFieldCount();
-		RelDataType combinedType = getRowType();
+		// The residual condition is evaluated over a left row and a right row side by side.
+		// For SEMI and ANTI that is not this join's own row type, which is the left row alone.
+		RelDataType combinedType = joinType.projectsRight() ? getRowType()
+			: SqlValidatorUtil.createJoinType(getCluster().getTypeFactory(),
+				getLeft().getRowType(), getRight().getRowType(), null, List.of());
 		List<RexNode> residual = info.nonEquiConditions;
+
+		// Rows with NULL in a key compared by "=" match nothing; see the class comment
+		boolean[] nullsExcluded = new boolean[leftKeys.length];
+		for (int i = 0; i < nullsExcluded.length; i++) {
+			nullsExcluded[i] = i >= info.nullExclusionFlags.size() || info.nullExclusionFlags.get(i);
+		}
+		List<ACell[]> leftNoMatch = setApartNullKeys(leftRows, leftKeys, nullsExcluded);
+		List<ACell[]> rightNoMatch = setApartNullKeys(rightRows, rightKeys, nullsExcluded);
 
 		// Sort both sides by join key (no-op if already sorted, e.g. PK scan)
 		Comparator<ACell[]> leftComp = rowComparator(leftKeys, keyComparator);
@@ -101,7 +122,22 @@ public class ConvexMergeJoin extends Join implements ConvexRel {
 				keyComparator, leftWidth, rightWidth, combinedType, residual, result);
 			case FULL -> mergeFull(leftRows, rightRows, leftKeys, rightKeys,
 				keyComparator, leftWidth, rightWidth, combinedType, residual, result);
+			case SEMI -> mergeSemi(leftRows, rightRows, leftKeys, rightKeys,
+				keyComparator, leftWidth, rightWidth, combinedType, residual, false, result);
+			case ANTI -> mergeSemi(leftRows, rightRows, leftKeys, rightKeys,
+				keyComparator, leftWidth, rightWidth, combinedType, residual, true, result);
 			default -> throw new UnsupportedOperationException("Join type not supported: " + joinType);
+		}
+
+		// The rows set apart could match nothing; the join types that keep unmatched rows get them back
+		if (joinType == JoinRelType.LEFT || joinType == JoinRelType.FULL) {
+			for (ACell[] row : leftNoMatch) result.add(combineRows(row, nullRow(rightWidth), leftWidth, rightWidth));
+		}
+		if (joinType == JoinRelType.RIGHT || joinType == JoinRelType.FULL) {
+			for (ACell[] row : rightNoMatch) result.add(combineRows(nullRow(leftWidth), row, leftWidth, rightWidth));
+		}
+		if (joinType == JoinRelType.ANTI) {
+			for (ACell[] row : leftNoMatch) result.add(Arrays.copyOf(row, leftWidth));
 		}
 
 		return ConvexEnumerable.of(result);
@@ -255,7 +291,57 @@ public class ConvexMergeJoin extends Join implements ConvexRel {
 		}
 	}
 
+	/**
+	 * SEMI: each left row that matches at least one right row, once, as the left row
+	 * alone. ANTI ({@code anti}): each left row that matches none.
+	 */
+	private void mergeSemi(List<ACell[]> left, List<ACell[]> right,
+			int[] leftKeys, int[] rightKeys, Comparator<ACell> keyCmp,
+			int lw, int rw, RelDataType rowType, List<RexNode> residual,
+			boolean anti, List<ACell[]> result) {
+		int li = 0, ri = 0;
+		while (li < left.size()) {
+			int cmp = ri >= right.size() ? -1
+				: compareKeys(left.get(li), leftKeys, right.get(ri), rightKeys, keyCmp);
+			if (cmp < 0) {
+				if (anti) result.add(Arrays.copyOf(left.get(li), lw));
+				li++;
+			} else if (cmp > 0) {
+				ri++;
+			} else {
+				int ls = li, rs = ri;
+				while (li < left.size() && compareKeys(left.get(li), leftKeys, left.get(ls), leftKeys, keyCmp) == 0) li++;
+				while (ri < right.size() && compareKeys(right.get(ri), rightKeys, right.get(rs), rightKeys, keyCmp) == 0) ri++;
+				for (int l = ls; l < li; l++) {
+					boolean matched = false;
+					for (int r = rs; r < ri && !matched; r++) {
+						matched = matchesResidual(combineRows(left.get(l), right.get(r), lw, rw), rowType, residual);
+					}
+					if (matched != anti) result.add(Arrays.copyOf(left.get(l), lw));
+				}
+			}
+		}
+	}
+
 	// ========== Helpers ==========
+
+	/**
+	 * Removes from {@code rows} those with NULL in a key whose {@code nullsExcluded}
+	 * flag is set, and returns them.
+	 */
+	private static List<ACell[]> setApartNullKeys(List<ACell[]> rows, int[] keys, boolean[] nullsExcluded) {
+		List<ACell[]> apart = new ArrayList<>();
+		rows.removeIf(row -> {
+			for (int i = 0; i < keys.length; i++) {
+				if (nullsExcluded[i] && (keys[i] >= row.length || row[keys[i]] == null)) {
+					apart.add(row);
+					return true;
+				}
+			}
+			return false;
+		});
+		return apart;
+	}
 
 	private static List<ACell[]> collect(ConvexEnumerable input) {
 		List<ACell[]> rows = new ArrayList<>();
