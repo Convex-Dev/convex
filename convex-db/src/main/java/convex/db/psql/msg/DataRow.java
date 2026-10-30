@@ -1,11 +1,14 @@
 package convex.db.psql.msg;
 
+import convex.db.psql.PgBinaryCodec;
 import convex.db.psql.PgMessage;
+import convex.db.psql.PgMessageDecoder.Bind;
 import io.netty.buffer.ByteBuf;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 
 /**
@@ -20,15 +23,31 @@ public class DataRow extends PgMessage {
 	}
 
 	/**
-	 * Creates a DataRow from a JDBC ResultSet (current row).
+	 * Creates a DataRow from a JDBC ResultSet (current row), with every value in text
+	 * format, as the simple query protocol sends them.
 	 */
 	public static DataRow fromResultSet(ResultSet rs, int columnCount) throws SQLException {
+		return fromResultSet(rs, rs.getMetaData(), null);
+	}
+
+	/**
+	 * Creates a DataRow from a JDBC ResultSet (current row), each value in the format the
+	 * client asked for in Bind: text, or binary encoded as the type announced for the column.
+	 *
+	 * @param rs Result set, positioned on the row
+	 * @param meta Its metadata, which names each column's type
+	 * @param resultFormats Bind's result format codes, or null for text
+	 */
+	public static DataRow fromResultSet(ResultSet rs, ResultSetMetaData meta, short[] resultFormats) throws SQLException {
+		int columnCount = meta.getColumnCount();
 		byte[][] values = new byte[columnCount][];
 		for (int i = 0; i < columnCount; i++) {
 			int col = i + 1;
 			Object obj = rs.getObject(col);
 			if (obj == null || rs.wasNull()) {
 				values[i] = null;
+			} else if (Bind.binary(resultFormats, i)) {
+				values[i] = PgBinaryCodec.encode(obj, RowDescription.typeOid(meta, col));
 			} else {
 				values[i] = formatValue(obj);
 			}

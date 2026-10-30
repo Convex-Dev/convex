@@ -287,6 +287,14 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 *        never sends one: there the client asks for it with Describe.
 	 */
 	private void executeQuery(ChannelHandlerContext ctx, String sql, boolean describeRows) throws SQLException {
+		executeQuery(ctx, sql, describeRows, null);
+	}
+
+	/**
+	 * As {@link #executeQuery(ChannelHandlerContext, String, boolean)}, sending the rows in
+	 * the formats the client asked for in Bind, or in text for null.
+	 */
+	private void executeQuery(ChannelHandlerContext ctx, String sql, boolean describeRows, short[] resultFormats) throws SQLException {
 		sql = rewriteQuery(sql);
 
 		// Null means return empty result (e.g., for system catalog queries)
@@ -300,7 +308,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 			if (hasResultSet) {
 				try (ResultSet rs = stmt.getResultSet()) {
-					sendResultSet(ctx, rs, describeRows);
+					sendResultSet(ctx, rs, describeRows, resultFormats);
 				}
 			} else {
 				int updateCount = stmt.getUpdateCount();
@@ -427,9 +435,15 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		return CAST.matcher(sql).replaceAll("");
 	}
 
-	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs, boolean describeRows) throws SQLException {
+	/**
+	 * Sends the rows of a result, each value in the format the client asked for in Bind:
+	 * text, or binary encoded as the type the RowDescription announces for the column.
+	 *
+	 * @param describeRows Whether to send the RowDescription first
+	 * @param resultFormats Bind's result format codes, or null for text
+	 */
+	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs, boolean describeRows, short[] resultFormats) throws SQLException {
 		ResultSetMetaData meta = rs.getMetaData();
-		int columnCount = meta.getColumnCount();
 
 		// Send row description
 		if (describeRows) {
@@ -439,7 +453,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		// Send data rows
 		long rowCount = 0;
 		while (rs.next()) {
-			write(ctx, DataRow.fromResultSet(rs, columnCount));
+			write(ctx, DataRow.fromResultSet(rs, meta, resultFormats));
 			rowCount++;
 		}
 
@@ -619,7 +633,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				return;
 			}
 
-			executeWithParameters(ctx, portal.stmt(), portal.paramValues(), portal.paramFormats());
+			executeWithParameters(ctx, portal.stmt(), portal.paramValues(), portal.paramFormats(), portal.resultFormats());
 		} catch (ResultTypeChanged e) {
 			log.debug("Execute error: {}", e.getMessage());
 			// PostgreSQL's routine for this error, by which clients such as pgjdbc know to
@@ -646,7 +660,8 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	/**
 	 * Execute a prepared statement with bound parameters.
 	 */
-	private void executeWithParameters(ChannelHandlerContext ctx, PreparedStmt stmt, byte[][] paramValues, short[] paramFormats) throws SQLException {
+	private void executeWithParameters(ChannelHandlerContext ctx, PreparedStmt stmt, byte[][] paramValues,
+			short[] paramFormats, short[] resultFormats) throws SQLException {
 		String sql = rewriteQuery(stmt.query());
 		int[] paramTypes = stmt.paramTypes();
 
@@ -657,7 +672,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 		// If no parameters, execute directly
 		if (paramValues == null || paramValues.length == 0) {
-			executeQuery(ctx, sql, false);
+			executeQuery(ctx, sql, false, resultFormats);
 			return;
 		}
 
@@ -669,7 +684,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			lowerSql.contains("pg_namespace") || lowerSql.contains("pg_attribute") ||
 			lowerSql.contains("pg_tables")) {
 			String substituted = substituteParameters(sql, paramValues, paramFormats);
-			executeQuery(ctx, substituted, false);
+			executeQuery(ctx, substituted, false, resultFormats);
 			return;
 		}
 
@@ -693,7 +708,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		}
 		if (hasResultSet) {
 			try (ResultSet rs = pstmt.getResultSet()) {
-				sendResultSet(ctx, rs, false);
+				sendResultSet(ctx, rs, false, resultFormats);
 			}
 		} else {
 			int updateCount = pstmt.getUpdateCount();
@@ -719,13 +734,9 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			if (value == null) {
 				pstmt.setNull(i + 1, java.sql.Types.NULL);
 			} else {
-				// Determine format: 0 = text, 1 = binary
-				short format = (paramFormats != null && paramFormats.length > 0)
-					? (paramFormats.length == 1 ? paramFormats[0] : paramFormats[i])
-					: 0;
 				int oid = (paramTypes != null && i < paramTypes.length) ? paramTypes[i] : 0;
 
-				if (format == 0) {
+				if (!PgMessageDecoder.Bind.binary(paramFormats, i)) {
 					// Text format - parse by the declared type, or the type the query implies
 					if (oid == 0 || oid == PgType.UNKNOWN) {
 						if (inferred == null) inferred = pstmt.getParameterMetaData();
@@ -788,66 +799,21 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 * <p>The PostgreSQL JDBC driver sends numbers in binary format: setLong arrives as
 	 * the 8 bytes of an int8, not as the digits of the number. Binding those bytes as
 	 * they are hands Calcite a byte string where it expects a number, and the statement
-	 * fails. Types without a decoding here, and parameters the client declared no type
-	 * for, are bound as bytes as before.
+	 * fails. Types without a binary form in {@link PgBinaryCodec}, and parameters the
+	 * client declared no type for, are bound as bytes as before.
 	 */
 	static void bindBinaryParameter(PreparedStatement pstmt, int index, byte[] value, int oid) throws SQLException {
-		java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(value);
-		switch (oid) {
-			case PgType.INT2 -> { requireLength(value, 2, "int2"); pstmt.setLong(index, buf.getShort()); }
-			case PgType.INT4 -> { requireLength(value, 4, "int4"); pstmt.setLong(index, buf.getInt()); }
-			case PgType.OID -> { requireLength(value, 4, "oid"); pstmt.setLong(index, Integer.toUnsignedLong(buf.getInt())); }
-			case PgType.INT8 -> { requireLength(value, 8, "int8"); pstmt.setLong(index, buf.getLong()); }
-			case PgType.FLOAT4 -> { requireLength(value, 4, "float4"); pstmt.setDouble(index, buf.getFloat()); }
-			case PgType.FLOAT8 -> { requireLength(value, 8, "float8"); pstmt.setDouble(index, buf.getDouble()); }
-			case PgType.BOOL -> { requireLength(value, 1, "bool"); pstmt.setBoolean(index, value[0] != 0); }
-			case PgType.NUMERIC -> pstmt.setBigDecimal(index, decodeNumeric(value));
-			case PgType.TEXT, PgType.VARCHAR, PgType.CHAR, PgType.NAME ->
-				pstmt.setString(index, new String(value, java.nio.charset.StandardCharsets.UTF_8));
-			default -> pstmt.setBytes(index, value);
-		}
+		Object decoded = PgBinaryCodec.decode(value, oid);
+		if (decoded instanceof Long l) pstmt.setLong(index, l);
+		else if (decoded instanceof Double d) pstmt.setDouble(index, d);
+		else if (decoded instanceof Boolean b) pstmt.setBoolean(index, b);
+		else if (decoded instanceof java.math.BigDecimal n) pstmt.setBigDecimal(index, n);
+		else if (decoded instanceof String s) pstmt.setString(index, s);
+		else if (decoded instanceof Timestamp t) pstmt.setTimestamp(index, t);
+		else if (decoded instanceof byte[] b) pstmt.setBytes(index, b);
+		else pstmt.setBytes(index, value);
 	}
 
-	/**
-	 * Decodes PostgreSQL's binary numeric: digit count, weight, sign and display scale as
-	 * 16-bit integers, then the base 10000 digits, most significant first. The first digit
-	 * is worth 10000^weight. NaN and infinities have no exact value, so are invalid.
-	 */
-	static java.math.BigDecimal decodeNumeric(byte[] value) throws SQLException {
-		if (value.length < 8) {
-			throw new SQLException("Binary numeric parameter has " + value.length + " bytes, expected at least 8", "08P01");
-		}
-		java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(value);
-		int ndigits = buf.getShort();
-		int weight = buf.getShort();
-		int sign = buf.getShort() & 0xffff;
-		int dscale = buf.getShort();
-		if (ndigits < 0) throw new SQLException("Binary numeric parameter has a negative digit count", "08P01");
-		requireLength(value, 8 + 2 * ndigits, "numeric");
-		if ((sign != 0x0000 && sign != 0x4000) || dscale < 0) {
-			throw new SQLException("Binary numeric parameter is not a finite number", "22P02");
-		}
-		StringBuilder digits = new StringBuilder(4 * ndigits + 1).append('0');
-		for (int i = 0; i < ndigits; i++) {
-			int digit = buf.getShort();
-			if (digit < 0 || digit > 9999) {
-				throw new SQLException("Binary numeric parameter has an invalid digit", "22P02");
-			}
-			String s = Integer.toString(digit);
-			digits.append("0000", s.length(), 4).append(s);
-		}
-		java.math.BigDecimal result = new java.math.BigDecimal(new java.math.BigInteger(digits.toString()))
-			.scaleByPowerOfTen(4 * (weight - ndigits + 1));
-		// The display scale only adds trailing zeros
-		if (result.scale() < dscale) result = result.setScale(dscale);
-		return (sign == 0x4000) ? result.negate() : result;
-	}
-
-	private static void requireLength(byte[] value, int expected, String type) throws SQLException {
-		if (value.length != expected) {
-			throw new SQLException("Binary " + type + " parameter has " + value.length + " bytes, expected " + expected, "08P01");
-		}
-	}
 
 	/**
 	 * Binds a parameter that arrived in text format, parsing it as the given type the way
@@ -965,11 +931,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			if (paramValues[i] == null) {
 				replacement = "NULL";
 			} else {
-				short format = (paramFormats != null && paramFormats.length > 0)
-					? (paramFormats.length == 1 ? paramFormats[0] : paramFormats[i])
-					: 0;
-
-				if (format == 0) {
+				if (!PgMessageDecoder.Bind.binary(paramFormats, i)) {
 					// Text format
 					String strValue = new String(paramValues[i], java.nio.charset.StandardCharsets.UTF_8);
 					// Check if it looks like a boolean or number

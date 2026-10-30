@@ -31,8 +31,7 @@ public class RowDescription extends PgMessage {
 			if (name == null || name.isEmpty()) {
 				name = meta.getColumnName(colIndex);
 			}
-			String typeName = meta.getColumnTypeName(colIndex);
-			int typeOid = PgType.fromSqlType(typeName);
+			int typeOid = typeOid(meta, colIndex);
 			int typeLen = PgType.typeLength(typeOid);
 			int precision = meta.getPrecision(colIndex);
 			int typeMod = (typeOid == PgType.NUMERIC)
@@ -42,6 +41,18 @@ public class RowDescription extends PgMessage {
 			columns[i] = new Column(name, 0, 0, typeOid, (short) typeLen, typeMod, 0);
 		}
 		return new RowDescription(columns);
+	}
+
+	/**
+	 * The PostgreSQL type OID announced for a result column, which is also the type its
+	 * values are encoded as.
+	 *
+	 * @param meta Metadata of the result
+	 * @param colIndex Column index, from 1
+	 * @return Type OID
+	 */
+	public static int typeOid(ResultSetMetaData meta, int colIndex) throws SQLException {
+		return PgType.fromSqlType(meta.getColumnTypeName(colIndex));
 	}
 
 	@Override

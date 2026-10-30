@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Run the semi- and anti-joins Calcite plans for `IN` and `EXISTS` subqueries on larger Convex DB tables, and match no row on a NULL join key compared by `=` (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Aggregate only the rows a `FILTER (WHERE ...)` or `CASE` admits, run scalar subqueries, and add `IS TRUE`, `IS FALSE` and `ROUND` to Convex DB SQL (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Write a Convex DB `UPDATE` that keeps its key as one row write, not a delete and an insert that a replica could resolve to the delete (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
+- Send Convex DB PostgreSQL wire results in the format each client asks for in Bind. pgjdbc asks for binary numbers, timestamps and byte strings once a statement is prepared server-side, and received text; `VARBINARY` columns are now announced as `bytea` (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Apply the connection's `caseSensitive` setting to Convex DB DDL as well as queries: `CREATE TABLE` qualified with a lower-case schema name and `DROP TABLE` of a lower-case table now resolve, and `CREATE TABLE` of a name that already resolves is refused instead of adding a second table (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 
 ## [0.8.18] - 2026-10-25

@@ -58,7 +58,7 @@ public final class PgType {
 			case "TEXT" -> TEXT;
 			case "VARCHAR", "CHARACTER VARYING" -> VARCHAR;
 			case "CHAR", "CHARACTER" -> CHAR;
-			case "BYTEA", "BLOB" -> BYTEA;
+			case "BYTEA", "BLOB", "BINARY", "VARBINARY" -> BYTEA;
 			case "DATE" -> DATE;
 			case "TIME" -> TIME;
 			case "TIMESTAMP" -> TIMESTAMP;

@@ -191,6 +191,10 @@ import psycopg2
 conn = psycopg2.connect(host="localhost", port=5432, dbname="mydb")
 ```
 
+Results go to each client in the format it asks for: text, or binary for the types it
+decodes itself, as pgjdbc requests for numbers, timestamps and byte strings once a
+statement is prepared server-side.
+
 ### Compatible Tools
 
 The PostgreSQL server works with:

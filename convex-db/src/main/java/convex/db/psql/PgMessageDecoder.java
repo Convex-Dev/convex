@@ -235,7 +235,18 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 	public record CancelRequest(int processId, int secretKey) {}
 	public record Query(String sql) {}
 	public record Parse(String name, String query, int[] paramTypes) {}
-	public record Bind(String portal, String statement, short[] paramFormats, byte[][] paramValues, short[] resultFormats) {}
+	public record Bind(String portal, String statement, short[] paramFormats, byte[][] paramValues, short[] resultFormats) {
+		/**
+		 * Whether value {@code index} is in binary format, as a Bind's format codes say: no
+		 * codes means every value is text, one code applies to every value, otherwise there
+		 * is one code per value.
+		 */
+		public static boolean binary(short[] formats, int index) {
+			if (formats == null || formats.length == 0) return false;
+			if (formats.length == 1) return formats[0] == 1;
+			return index < formats.length && formats[index] == 1;
+		}
+	}
 	public record Describe(byte type, String name) {}
 	public record Execute(String portal, int maxRows) {}
 	public enum Sync { INSTANCE }

@@ -17,6 +17,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.Blob;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBigInteger;
+import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 
@@ -751,6 +757,70 @@ public class PgServerTest {
 			} else {
 				byte[] content = new byte[length - 4];
 				in.readFully(content);
+			}
+		}
+	}
+
+	// ========== Binary result formats ==========
+
+	/**
+	 * A prepared SELECT executed more often than pgjdbc's prepare threshold: the driver then
+	 * names the statement and asks for binary results for the integer column, which must be
+	 * encoded as the RowDescription announced it.
+	 */
+	@Test
+	public void testPreparedSelectPastThresholdGetsBinaryResults() throws Exception {
+		db.tables().createTable("reused", new String[]{"id", "name"},
+			new ConvexColumnType[]{ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.varchar(50)});
+		int rowCount = 40;
+		for (long i = 0; i < rowCount; i++) db.tables().insert("reused", i, "row-" + i);
+
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url);
+			 java.sql.PreparedStatement sel = conn.prepareStatement("SELECT id, name FROM reused WHERE id = ?")) {
+			for (int i = 0; i < rowCount; i++) {
+				sel.setInt(1, i);
+				try (ResultSet rs = sel.executeQuery()) {
+					assertTrue(rs.next(), "row " + i);
+					assertEquals(i, rs.getInt("id"));
+					assertEquals("row-" + i, rs.getString("name"));
+					assertFalse(rs.next());
+				}
+			}
+		}
+	}
+
+	/**
+	 * Each type pgjdbc asks for in binary once a statement is named, read back through the
+	 * driver's own decoders. With prepareThreshold=1 the second execution is binary.
+	 */
+	@Test
+	public void testBinaryResultTypes() throws Exception {
+		db.tables().createTable("typed", new String[]{"id", "big", "dbl", "flag", "bin", "ts"},
+			new ConvexColumnType[]{ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.of(ConvexType.BIGINT),
+				ConvexColumnType.of(ConvexType.DOUBLE), ConvexColumnType.of(ConvexType.BOOLEAN),
+				ConvexColumnType.of(ConvexType.VARBINARY), ConvexColumnType.of(ConvexType.TIMESTAMP)});
+		java.math.BigInteger big = java.math.BigInteger.TWO.pow(70).negate();
+		byte[] bin = {1, 2, (byte) 0xff};
+		long millis = 1_700_000_000_123L;
+		db.tables().insert("typed", Vectors.of(CVMLong.create(1), CVMBigInteger.wrap(big), CVMDouble.create(-2.5),
+			CVMBool.TRUE, Blob.wrap(bin), CVMLong.create(millis)));
+
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser&prepareThreshold=1";
+		try (Connection conn = DriverManager.getConnection(url);
+			 java.sql.PreparedStatement sel = conn.prepareStatement("SELECT id, big, dbl, flag, bin, ts FROM typed WHERE id = ?")) {
+			for (int pass = 0; pass < 2; pass++) {
+				sel.setInt(1, 1);
+				try (ResultSet rs = sel.executeQuery()) {
+					assertTrue(rs.next(), "pass " + pass);
+					assertEquals(1, rs.getInt("id"));
+					assertEquals(0, new java.math.BigDecimal(big).compareTo(rs.getBigDecimal("big")));
+					assertEquals(-2.5, rs.getDouble("dbl"), 0.0);
+					assertTrue(rs.getBoolean("flag"));
+					assertArrayEquals(bin, rs.getBytes("bin"));
+					assertEquals(millis, rs.getTimestamp("ts").getTime());
+					assertFalse(rs.next());
+				}
 			}
 		}
 	}

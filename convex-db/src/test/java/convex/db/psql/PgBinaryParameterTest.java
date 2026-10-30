@@ -42,22 +42,22 @@ public class PgBinaryParameterTest {
 	@Test
 	public void testNumeric() throws SQLException {
 		// 12345.678: digits 1, 2345, 6780 with weight 1 and display scale 3
-		assertEquals(new BigDecimal("12345.6780"), PgProtocolHandler.decodeNumeric(numeric(3, 1, 0x0000, 3, 1, 2345, 6780)));
-		assertEquals(new BigDecimal("-0.0005"), PgProtocolHandler.decodeNumeric(numeric(1, -1, 0x4000, 4, 5)));
-		assertEquals(0, BigDecimal.ZERO.compareTo(PgProtocolHandler.decodeNumeric(numeric(0, 0, 0x0000, 0))));
+		assertEquals(new BigDecimal("12345.678"), PgBinaryCodec.decodeNumeric(numeric(3, 1, 0x0000, 3, 1, 2345, 6780)));
+		assertEquals(new BigDecimal("-0.0005"), PgBinaryCodec.decodeNumeric(numeric(1, -1, 0x4000, 4, 5)));
+		assertEquals(0, BigDecimal.ZERO.compareTo(PgBinaryCodec.decodeNumeric(numeric(0, 0, 0x0000, 0))));
 		// 2^64 = 1844 6744 0737 0955 1616
 		assertEquals(new BigDecimal("18446744073709551616"),
-			PgProtocolHandler.decodeNumeric(numeric(5, 4, 0x0000, 0, 1844, 6744, 737, 955, 1616)));
+			PgBinaryCodec.decodeNumeric(numeric(5, 4, 0x0000, 0, 1844, 6744, 737, 955, 1616)));
 	}
 
 	@Test
 	public void testInvalidNumeric() {
-		assertEquals("08P01", assertThrows(SQLException.class, () -> PgProtocolHandler.decodeNumeric(new byte[6])).getSQLState());
+		assertEquals("08P01", assertThrows(SQLException.class, () -> PgBinaryCodec.decodeNumeric(new byte[6])).getSQLState());
 		byte[] truncated = numeric(2, 0, 0x0000, 0, 1, 2);
 		assertEquals("08P01", assertThrows(SQLException.class,
-			() -> PgProtocolHandler.decodeNumeric(java.util.Arrays.copyOf(truncated, truncated.length - 2))).getSQLState());
-		assertEquals("22P02", assertThrows(SQLException.class, () -> PgProtocolHandler.decodeNumeric(numeric(0, 0, 0xC000, 0))).getSQLState());
-		assertEquals("22P02", assertThrows(SQLException.class, () -> PgProtocolHandler.decodeNumeric(numeric(1, 0, 0x0000, 0, 10000))).getSQLState());
+			() -> PgBinaryCodec.decodeNumeric(java.util.Arrays.copyOf(truncated, truncated.length - 2))).getSQLState());
+		assertEquals("22P02", assertThrows(SQLException.class, () -> PgBinaryCodec.decodeNumeric(numeric(0, 0, 0xC000, 0))).getSQLState());
+		assertEquals("22P02", assertThrows(SQLException.class, () -> PgBinaryCodec.decodeNumeric(numeric(1, 0, 0x0000, 0, 10000))).getSQLState());
 	}
 
 	private static byte[] numeric(int ndigits, int weight, int sign, int dscale, int... digits) {
