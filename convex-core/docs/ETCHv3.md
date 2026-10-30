@@ -485,13 +485,6 @@ and **root persistence** (complete only if the selected source root verifies
 transitively in the destination). Setting the destination root is permitted only on
 complete root persistence. Full-file repair remains the index-independent path.
 
-## Not yet implemented
-
-- Lenient (`--unsafe`) migration as a CLI command. The unsafe reader and the
-  coverage/root-persistence contract above are designed; the CLI currently offers
-  strict `etch migrate --into` and index-independent `etch repair --into`.
-- Failure-injection coverage around body force, header publication and dirty close.
-
 ## Where the code lives
 
 All classes are in `convex.etch` in `convex-core` unless stated.

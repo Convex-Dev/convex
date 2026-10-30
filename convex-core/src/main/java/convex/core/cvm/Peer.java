@@ -561,7 +561,7 @@ public class Peer {
 		long consensusMatch=blocks.commonPrefixLength(consensusBlocks);
 		if (consensusMatch<stateIndex) {
 			if (!CPoSConstants.ENABLE_FORK_RECOVERY) {
-				throw new IllegalStateException("Network Fork detected but fork recovery diabled!");
+				throw new IllegalStateException("Network Fork detected but fork recovery disabled!");
 			}
 			
 			// We need to rollback to recover from a fork!!
