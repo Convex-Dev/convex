@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.junit.jupiter.api.AfterEach;
@@ -271,5 +272,88 @@ class SortAggregateTest {
 			assertEquals(2, rs.getInt("category"));
 			assertFalse(rs.next()); // category 3 has only 1 item
 		}
+	}
+
+	// ========== FILTER and scalar subqueries ==========
+
+	/**
+	 * Conditional aggregates, the pivot pattern: Calcite lifts each CASE out of its
+	 * aggregate as {@code FILTER (WHERE condition IS TRUE)}, so each aggregate must see
+	 * only its own rows.
+	 */
+	@Test
+	void testConditionalAggregates() throws Exception {
+		try (Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery(
+				 "SELECT MAX(CASE WHEN category = 1 THEN price END) AS c1, " +
+				 "MAX(CASE WHEN category = 2 THEN price END) AS c2, " +
+				 "COUNT(CASE WHEN category = 3 THEN 1 END) AS c3 FROM items")) {
+			assertTrue(rs.next());
+			assertEquals(1.50, rs.getDouble("c1"), 0.0);
+			assertEquals(3.00, rs.getDouble("c2"), 0.0);
+			assertEquals(1, rs.getInt("c3"));
+			assertFalse(rs.next());
+		}
+	}
+
+	@Test
+	void testAggregateFilter() throws Exception {
+		try (Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery(
+				 "SELECT category, COUNT(*) FILTER (WHERE price > 1) AS dear, COUNT(*) AS total " +
+				 "FROM items GROUP BY category ORDER BY category")) {
+			assertTrue(rs.next());
+			assertEquals(1, rs.getInt("category"));
+			assertEquals(1, rs.getInt("dear")); // apple
+			assertEquals(2, rs.getInt("total"));
+			assertTrue(rs.next());
+			assertEquals(2, rs.getInt("category"));
+			assertEquals(1, rs.getInt("dear")); // eggs
+			assertEquals(2, rs.getInt("total"));
+			assertTrue(rs.next());
+			assertEquals(3, rs.getInt("category"));
+			assertEquals(1, rs.getInt("dear")); // donut
+			assertEquals(1, rs.getInt("total"));
+			assertFalse(rs.next());
+		}
+	}
+
+	/**
+	 * A scalar subquery gives its one value, NULL for no row, and SQLSTATE 21000 for more
+	 * than one. The subqueries filter on a column that is not unique, so the planner cannot
+	 * prove them single-row and keeps the SINGLE_VALUE aggregate.
+	 */
+	@Test
+	void testScalarSubquery() throws Exception {
+		try (Statement stmt = conn.createStatement()) {
+			try (ResultSet rs = stmt.executeQuery("SELECT (SELECT name FROM items WHERE category = 3) AS x")) {
+				assertTrue(rs.next());
+				assertEquals("donut", rs.getString("x"));
+			}
+			try (ResultSet rs = stmt.executeQuery(
+					"SELECT id FROM items WHERE category = (SELECT category FROM items WHERE name = 'donut')")) {
+				assertTrue(rs.next());
+				assertEquals(4, rs.getInt("id"));
+				assertFalse(rs.next());
+			}
+			try (ResultSet rs = stmt.executeQuery("SELECT (SELECT name FROM items WHERE category = 9) AS x")) {
+				assertTrue(rs.next());
+				assertNull(rs.getString("x"));
+			}
+			SQLException e = assertThrows(SQLException.class, () -> {
+				try (ResultSet rs = stmt.executeQuery("SELECT (SELECT name FROM items WHERE category = 1) AS x")) {
+					rs.next();
+				}
+			});
+			assertEquals("21000", sqlState(e));
+		}
+	}
+
+	/** The SQLSTATE of the first SQLException in the cause chain. */
+	private static String sqlState(Throwable t) {
+		for (Throwable c = t; c != null; c = c.getCause()) {
+			if (c instanceof SQLException e && e.getSQLState() != null) return e.getSQLState();
+		}
+		return null;
 	}
 }

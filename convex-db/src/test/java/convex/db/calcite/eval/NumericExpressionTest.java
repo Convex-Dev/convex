@@ -420,4 +420,49 @@ class NumericExpressionTest {
 			assertEquals(50, ((Number) rs.getObject(5)).intValue());
 		}
 	}
+
+	// ========== ROUND ==========
+
+	/** ROUND over doubles rounds halves away from zero and stays a double. */
+	@Test
+	void testRoundDouble() throws Exception {
+		try (Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery(
+				 "SELECT ROUND(double_val) AS r0, ROUND(int_val / 3.0, 2) AS r2, " +
+				 "ROUND(double_val * 100, -2) AS rm FROM numbers WHERE id = 2")) {
+			assertTrue(rs.next());
+			assertEquals(3.0, rs.getDouble("r0"), 0.0);      // 2.5
+			assertEquals(6.67, rs.getDouble("r2"), 0.0001);  // 20 / 3.0
+			assertEquals(300.0, rs.getDouble("rm"), 0.0);    // 250 to the nearest hundred
+		}
+	}
+
+	/** ROUND keeps integers exact, and an inexact integer average is rounded as NUMERIC. */
+	@Test
+	void testRoundInteger() throws Exception {
+		try (Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery(
+				 "SELECT ROUND(int_val) AS r0, ROUND(int_val, 2) AS r2, ROUND(int_val, -2) AS rm " +
+				 "FROM numbers WHERE id = 5")) {
+			assertTrue(rs.next());
+			assertEquals(50, rs.getInt("r0"));
+			assertEquals(50, rs.getInt("r2"));
+			assertEquals(100, rs.getInt("rm")); // 50 to the nearest hundred, away from zero
+		}
+		try (Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery(
+				 "SELECT ROUND(AVG(int_val), 2) AS r FROM numbers WHERE id IN (1, 2, 4)")) {
+			assertTrue(rs.next());
+			assertEquals(23.33, rs.getDouble("r"), 0.0); // (10 + 20 + 40) / 3
+		}
+		try (Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery(
+				 "SELECT ROUND(AVG(int_val), 2) AS exact, ROUND(SUM(int_val), -2) AS down, " +
+				 "ROUND(MAX(int_val), -2) AS up FROM numbers")) {
+			assertTrue(rs.next());
+			assertEquals(0, java.math.BigDecimal.valueOf(30).compareTo(rs.getBigDecimal("exact")));
+			assertEquals(0, java.math.BigDecimal.valueOf(200).compareTo(rs.getBigDecimal("down"))); // 150
+			assertEquals(100, rs.getInt("up")); // 50
+		}
+	}
 }

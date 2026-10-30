@@ -1,5 +1,6 @@
 package convex.db.calcite.rel;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +39,13 @@ import convex.db.calcite.convention.ConvexRel;
  *   <li>COUNT - simple counter</li>
  *   <li>MIN/MAX - uses RT.min()/RT.max()</li>
  *   <li>AVG - SUM/COUNT with CVMDouble</li>
+ *   <li>SINGLE_VALUE - the one value of a scalar subquery, NULL for none, an error for more</li>
  * </ul>
+ *
+ * <p>An aggregate with a {@code FILTER (WHERE ...)} clause sees only the rows the filter
+ * admits. Calcite also produces that clause itself when it lifts a CASE out of an
+ * aggregate's argument, so {@code MAX(CASE WHEN c THEN x END)} arrives as
+ * {@code MAX(x) FILTER (WHERE c IS TRUE)}.
  */
 public class ConvexAggregate extends Aggregate implements ConvexRel {
 
@@ -117,6 +124,16 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 		SqlKind kind = aggCall.getAggregation().getKind();
 		List<Integer> argList = aggCall.getArgList();
 
+		// FILTER (WHERE ...): only the rows whose filter column is true take part
+		if (aggCall.hasFilter()) {
+			int filterIndex = aggCall.filterArg;
+			List<ACell[]> admitted = new ArrayList<>();
+			for (ACell[] row : rows) {
+				if (filterIndex < row.length && RT.bool(row[filterIndex])) admitted.add(row);
+			}
+			rows = admitted;
+		}
+
 		// Get column index (-1 for COUNT(*))
 		int colIndex = argList.isEmpty() ? -1 : argList.get(0);
 
@@ -126,8 +143,24 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 			case MIN -> computeMin(rows, colIndex);
 			case MAX -> computeMax(rows, colIndex);
 			case AVG -> computeAvg(rows, colIndex, aggCall.getType());
+			case SINGLE_VALUE -> computeSingleValue(rows, colIndex);
 			default -> throw new UnsupportedOperationException("Aggregate not supported: " + kind);
 		};
+	}
+
+	/**
+	 * SINGLE_VALUE, which Calcite wraps around a scalar subquery such as
+	 * {@code WHERE x = (SELECT y FROM t WHERE ...)}: no row is NULL, one row is its
+	 * value, and more than one is a cardinality violation, SQLSTATE 21000.
+	 */
+	private ACell computeSingleValue(List<ACell[]> rows, int colIndex) {
+		if (rows.isEmpty()) return null;
+		if (rows.size() > 1) {
+			String message = "Scalar subquery returned " + rows.size() + " rows, where at most one is allowed";
+			throw new IllegalStateException(message, new SQLException(message, "21000"));
+		}
+		ACell[] row = rows.get(0);
+		return colIndex < row.length ? row[colIndex] : null;
 	}
 
 	/**

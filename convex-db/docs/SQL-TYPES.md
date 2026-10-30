@@ -125,8 +125,8 @@ the result converter hands them to Calcite through the result column's codec.
 
 ## Errors
 
-The codec raises `SQLException`s with PostgreSQL's SQLSTATE codes, which reach JDBC callers
-unchanged and pgwire clients through `ErrorResponse.fromException`. When Calcite wraps the
+The codec and the operators raise `SQLException`s with PostgreSQL's SQLSTATE codes, which reach
+JDBC callers unchanged and pgwire clients through `ErrorResponse.fromException`. When Calcite wraps the
 exception, `fromException` takes the SQLSTATE from the first `SQLException` in the cause
 chain.
 
@@ -137,6 +137,7 @@ chain.
 | Text that is not valid input for the type (pgwire parameters) | `22P02` |
 | Stored value that does not conform to its column (from a merge) | `22000` |
 | Table definition with an unsupported SQL type | `0A000` |
+| Scalar subquery returning more than one row | `21000` |
 
 ## PostgreSQL Wire Protocol
 

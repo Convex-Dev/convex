@@ -1,6 +1,7 @@
 package convex.db.calcite.eval;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Set;
 
@@ -206,6 +207,13 @@ public class ConvexExpressionEvaluator {
 			}
 			case NOT -> CVMBool.create(!RT.bool(args[0]));
 
+			// IS TRUE family, three-valued: NULL is neither true nor false. Calcite also
+			// produces IS TRUE itself when it lifts a CASE out of an aggregate's argument.
+			case IS_TRUE -> CVMBool.create(RT.bool(args[0]));
+			case IS_NOT_TRUE -> CVMBool.create(!RT.bool(args[0]));
+			case IS_FALSE -> CVMBool.create(CVMBool.FALSE.equals(args[0]));
+			case IS_NOT_FALSE -> CVMBool.create(!CVMBool.FALSE.equals(args[0]));
+
 			// Arithmetic operators - use RT functions
 			case PLUS -> cellAdd(args[0], args[1]);
 			case MINUS -> RT.minus(args);
@@ -330,6 +338,7 @@ public class ConvexExpressionEvaluator {
 			case "EXP" -> RT.exp(args[0]);
 			case "POWER", "POW" -> RT.pow(args);
 			case "SIGN", "SIGNUM" -> RT.signum(args[0]);
+			case "ROUND" -> cellRound(args);
 
 			// String functions (using Java String methods since no CVM equivalents)
 			case "UPPER" -> cellUpper(args[0]);
@@ -349,6 +358,31 @@ public class ConvexExpressionEvaluator {
 
 			default -> throw new UnsupportedOperationException("Function not supported: " + funcName);
 		};
+	}
+
+	/**
+	 * ROUND(x) rounds to the nearest integer and ROUND(x, n) to n decimal places, halves
+	 * away from zero; a negative n rounds to tens, hundreds and so on. An integer stays
+	 * exact: to zero or more places it is itself, to fewer it is rounded in integer
+	 * arithmetic. A double is rounded through BigDecimal and stays a double.
+	 */
+	private static ACell cellRound(ACell[] args) {
+		ANumeric value = RT.ensureNumber(args[0]);
+		if (value == null) return null;
+		int scale = 0;
+		if (args.length > 1) {
+			AInteger n = RT.ensureInteger(args[1]);
+			if (n == null) return null;
+			scale = (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, n.longValue()));
+		}
+		if (value instanceof AInteger i) {
+			if (scale >= 0) return i;
+			BigDecimal rounded = new BigDecimal(i.big()).setScale(scale, RoundingMode.HALF_UP);
+			return AInteger.create(rounded.toBigIntegerExact());
+		}
+		double d = value.doubleValue();
+		if (!Double.isFinite(d)) return value;
+		return CVMDouble.create(BigDecimal.valueOf(d).setScale(scale, RoundingMode.HALF_UP).doubleValue());
 	}
 
 	// ========== String Functions ==========
