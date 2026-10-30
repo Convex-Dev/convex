@@ -252,7 +252,7 @@ an uncertain index must never become the base for further in-place mutation.
 
 ### Unsafe maintenance open
 
-Migration and repair need to inspect a file normal open has rejected. "Unsafe"
+Repair and offline validation need to inspect a file normal open has rejected. "Unsafe"
 describes the consistency assumptions a caller may make about the source, not weaker
 bounds checking or permission to modify it. A maintenance open:
 
@@ -476,14 +476,10 @@ explicit cutover. Physical offsets and index shape are not data and need not be
 preserved. A crash during migration leaves the source valid and the destination
 disposable.
 
-Strict migration uses normal fail-fast open. The designed complement is a lenient
-migration for a source that normal open rejects: an unsafe maintenance open drives a
-lenient index walk that copies every independently readable indexed cell, records the
-slots and subtrees it could not traverse, and reports two independent results:
-**index coverage** (complete only if the whole walk finished with nothing skipped)
-and **root persistence** (complete only if the selected source root verifies
-transitively in the destination). Setting the destination root is permitted only on
-complete root persistence. Full-file repair remains the index-independent path.
+Migration uses normal fail-fast open. A source that normal open rejects is salvaged
+with repair instead (see [Maintenance: unsafe open and repair](#maintenance-unsafe-open-and-repair)),
+which copies every independently valid cell into a fresh destination and sets the root
+only when it verifies completely.
 
 ## Where the code lives
 
