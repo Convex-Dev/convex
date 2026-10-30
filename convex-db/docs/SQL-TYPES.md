@@ -3,8 +3,8 @@
 **Status: proposed design, partly implemented.** The table entry's format
 version (see [Format Version](#format-version)), the [Calcite type system](#calcite-type-system)
 and the presentation of version 0 integer columns are in place; tables are still written as
-version 0. The rest is tracked in [#793](https://github.com/Convex-Dev/convex/issues/793), and
-types not yet supported in [#796](https://github.com/Convex-Dev/convex/issues/796).
+version 0. The rest, including types not yet supported, is tracked in
+[#793](https://github.com/Convex-Dev/convex/issues/793).
 
 How Convex DB binds the SQL types users declare to the values stored in the lattice, and
 how it presents them through JDBC and the PostgreSQL wire protocol.
