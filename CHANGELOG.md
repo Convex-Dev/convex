@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Speed up `Index.assoc` up to threefold for newly created or decoded keys, which it now compares by bytes instead of hashing.
 - Keep Convex DB JDBC connections to the driver's own parameters, `database` and `caseSensitive`: a URL with any other is refused, and other connection properties are ignored. ([JDBC](convex-db/docs/JDBC.md#url-format))
 - Send a lattice node's final state to its peers when it shuts down: services stop ingress with `stopIngress()`, then close the host before the node. ([Shutdown](convex-peer/docs/SHUTDOWN.md), [#778](https://github.com/Convex-Dev/convex/issues/778))
+- Upgrade inbound lattice connections only through `LatticePropagator.authenticateInboundRoute`; `LatticeConnectionManager.upgradeInboundConnection` is no longer public.
 
 ### Fixed
 
@@ -49,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Describe Convex DB PostgreSQL wire statements from their prepared metadata, without running them: each prepared query ran twice, once only for its column description (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Run transactions from PostgreSQL clients: Convex DB's wire server accepts `BEGIN`, `COMMIT` and `ROLLBACK`, so `setAutoCommit(false)` works through pgjdbc, reports the transaction status, and refuses statements in a failed block with `25P02` until it ends (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Apply the connection's `caseSensitive` setting to Convex DB DDL as well as queries: `CREATE TABLE` qualified with a lower-case schema name and `DROP TABLE` of a lower-case table now resolve, and `CREATE TABLE` of a name that already resolves is refused instead of adding a second table (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
+- Treat nodes found by P2P discovery as connection candidates only: nodes you name with `connect`, and return routes for nodes that connect and prove their key, no longer depend on how many nodes discovery has seen. ([Live peer selection](convex-p2p/README.md#live-peer-selection))
 
 ## [0.8.18] - 2026-10-25
 

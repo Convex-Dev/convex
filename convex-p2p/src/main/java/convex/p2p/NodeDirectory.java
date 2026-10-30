@@ -33,7 +33,7 @@ import convex.core.util.Utils;
  * own signed record through the node-record component, validates and indexes the
  * records of other nodes, and recognises the one update shape that may claim an
  * identity for inbound route authentication. It reads and writes the lattice only.
- * A {@link P2PNode} turns the indexed records into connection intent and asks its
+ * A {@link P2PNode} turns the indexed records into connection candidates and asks its
  * propagation group to authenticate routes; nothing here opens a socket, marks a
  * connection trusted or merges a foreign value.</p>
  *
@@ -68,7 +68,7 @@ final class NodeDirectory {
 		return application.ownKey();
 	}
 
-	/** Bounds the number of remote records indexed; a node sets this to its peer bound. */
+	/** Bounds the number of remote records indexed; a node sets this to its candidate bound. */
 	void setMaxRecords(int maxRecords) {
 		if (maxRecords<0) throw new IllegalArgumentException("Record bound must not be negative");
 		this.maxRecords=maxRecords;
@@ -157,7 +157,7 @@ final class NodeDirectory {
 	/**
 	 * Rebuilds the bounded validated index from the current registry and returns
 	 * the remote records that are new or newer than before, for the node to turn
-	 * into connection intent.
+	 * into connection candidates.
 	 */
 	@SuppressWarnings("unchecked")
 	synchronized List<NodeRecord> refresh() {

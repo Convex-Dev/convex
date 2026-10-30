@@ -39,7 +39,7 @@
  * by operator policy to one propagator view. A manager-opened outbound socket is
  * held in verification limbo until the expected node key answers a challenge.
  * A physically inbound socket becomes an outbound route only after
- * {@code LatticeInboundVerifier} proves its key and
+ * {@code LatticeInboundVerifier} proves the key its application vouched for and
  * {@code LatticeConnectionManager.upgradeInboundConnection} records the
  * explicit upgrade.</p>
  *

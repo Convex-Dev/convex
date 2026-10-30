@@ -2491,9 +2491,12 @@ public class NodeServerTest {
 		cm.close();
 	}
 
-	/** An inbound socket becomes an outbound route only after both trust and admission. */
+	/**
+	 * An inbound socket becomes an outbound route only after authentication. The
+	 * key needs no desired-peer entry: the application vouched for it.
+	 */
 	@Test
-	public void testInboundRouteUpgradeRequiresAuthenticatedAdmittedIdentity() throws Exception {
+	public void testInboundRouteUpgradeRequiresAuthenticatedIdentity() throws Exception {
 		LatticeConnectionManager cm = new LatticeConnectionManager(store);
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
 		RecordingConnection inbound = new RecordingConnection();
@@ -2503,10 +2506,6 @@ public class NodeServerTest {
 		assertFalse(cm.hasUpgradedInboundConnection(peerKey));
 
 		inbound.setTrustedKey(peerKey);
-		assertThrows(SecurityException.class, () -> cm.upgradeInboundConnection(inbound),
-			"a proven but unadmitted key must not become a propagation route");
-
-		cm.addPeer(peerKey);
 		CompletableFuture<AConnection> upgraded = cm.whenInboundConnectionUpgraded(peerKey);
 		assertSame(inbound, cm.upgradeInboundConnection(inbound));
 		assertSame(inbound, upgraded.get(5, TimeUnit.SECONDS));
@@ -2558,7 +2557,7 @@ public class NodeServerTest {
 		cm.removePeer(key2);
 	}
 
-	/** Discovery and explicit additions share one hard desired-peer bound. */
+	/** Discovered candidates are bounded; explicit intent is never refused for capacity. */
 	@Test
 	public void testDesiredPeerLimit() throws Exception {
 		NodeConfig cfg=NodeConfig.create(Maps.of(
@@ -2569,23 +2568,35 @@ public class NodeServerTest {
 		LatticeConnectionManager cm=propagator(maxNodeServer).getConnectionManager();
 		assertEquals(2,cm.getMaxDesiredPeers());
 
-		for (int i=0; i<3; i++) {
-			cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),i+1);
-		}
+		AccountKey first=AKeyPair.generate().getAccountKey();
+		assertTrue(cm.updateDiscoveredPeer(first,Vectors.empty(),1));
+		assertTrue(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),2));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),3));
 		assertEquals(2,cm.getDesiredPeers().size());
 
-		CompletableFuture<Convex> rejected=cm.connectPeer(
-			AKeyPair.generate().getAccountKey(),new InetSocketAddress("localhost",1));
-		assertThrows(ExecutionException.class,
-			() -> rejected.get(5,TimeUnit.SECONDS));
-		assertEquals(2,cm.getDesiredPeers().size());
+		// A full candidate pool does not stop explicit intent
+		AccountKey named=AKeyPair.generate().getAccountKey();
+		cm.addPeer(named);
+		assertTrue(cm.getDesiredPeers().containsKey(named));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),4));
+
+		// Naming a candidate makes it explicit, which frees its candidate slot
+		cm.addPeer(first);
+		AccountKey later=AKeyPair.generate().getAccountKey();
+		assertTrue(cm.updateDiscoveredPeer(later,Vectors.empty(),5));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),6));
+
+		// Removing a candidate frees its slot; removing explicit intent does not add one
+		cm.removePeer(later);
+		cm.removePeer(named);
+		assertTrue(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),7));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),8));
 	}
 
 	@Test
 	public void testRejectedOwnedPeerConnectionIsClosed() {
 		LatticeConnectionManager cm=new LatticeConnectionManager(store);
-		cm.setMaxDesiredPeers(1);
-		cm.addPeer(AKeyPair.createSeeded(301).getAccountKey());
+		cm.close();
 		ControlledVerificationConvex rejected=new ControlledVerificationConvex();
 
 		CompletableFuture<Convex> admission=cm.addPeer(
@@ -2594,7 +2605,6 @@ public class NodeServerTest {
 		assertTrue(admission.isCompletedExceptionally());
 		assertFalse(rejected.isConnected());
 		assertEquals(1,rejected.closeCount);
-		cm.close();
 	}
 
 	@Test

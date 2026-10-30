@@ -89,7 +89,7 @@ import convex.social.Social;
  * class owns the transport and the moments replication knows about: after the
  * transport binds it asks the application to publish the node's record, when a peer
  * is admitted it pulls the application's bootstrap paths, and when an inbound value
- * is accepted it turns the application's refreshed directory into connection intent
+ * is accepted it turns the application's refreshed directory into connection candidates
  * and authenticates a route the application has validated. {@link PointOfPresence}
  * handles transient routed messages and is not a lattice concern. P2PNode uses its
  * node key as both transport identity and NodeInfo owner; social DIDs and their
@@ -428,7 +428,7 @@ public class P2PNode implements Closeable {
 	/**
 	 * Replication accepted an inbound value. The application reads what it means for
 	 * the node registry; this node acts on connections: refreshed discovery becomes
-	 * connection intent, and a validated one-record registry update may authenticate
+	 * connection candidates, and a validated one-record registry update may authenticate
 	 * the inbound route that carried it.
 	 */
 	private void onAcceptedInbound(AConnection connection,LatticePropagator source,
@@ -441,7 +441,7 @@ public class P2PNode implements Closeable {
 		}
 	}
 
-	/** Turns the application's refreshed directory into this node's connection intent. */
+	/** Offers the application's refreshed directory as this node's connection candidates. */
 	private void refreshDiscovery() {
 		LatticeConnectionManager manager=propagator.getConnectionManager();
 		for (NodeDirectory.NodeRecord record:application.directory().refresh()) {

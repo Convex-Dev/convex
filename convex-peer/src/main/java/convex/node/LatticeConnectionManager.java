@@ -44,7 +44,7 @@ import convex.net.Transports;
 import convex.peer.AConnectionManager;
 
 /**
- * Maintains bounded connection intent and outbound routes for one
+ * Maintains connection intent and outbound routes for one
  * {@link LatticePropagator}.
  *
  * <p>This is a transport component. It does not read a lattice cursor or know
@@ -55,8 +55,11 @@ import convex.peer.AConnectionManager;
  * interchangeable:</p>
  *
  * <ol>
- *   <li>{@link DesiredPeer} entries are bounded connection <em>intent</em>, not
- *       live sockets or trust assertions.</li>
+ *   <li>{@link DesiredPeer} entries are connection <em>intent</em>, not live
+ *       sockets or trust assertions. Explicit peers named through the
+ *       {@code addPeer} and {@code connectPeer} APIs are always kept. Discovered
+ *       peers are only candidates: they are bounded by {@link #setMaxDesiredPeers}
+ *       and never block explicit intent or an inbound route upgrade.</li>
  *   <li>Pending connections are manager-owned outbound sockets held in identity
  *       verification limbo.</li>
  *   <li>Active connections are admitted manager-owned outbound clients.</li>
@@ -103,7 +106,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Receive limit after challenge/response proves the expected remote AccountKey. */
 	private volatile int trustedMessageLimit = LatticePropagatorConfig.DEFAULT_MAX_TRUSTED_MESSAGE_SIZE;
 
-	/** Hard cap for operator- and discovery-supplied desired peer identities. */
+	/** Hard cap for discovered candidates; explicit intent is not counted. */
 	private volatile int maxDesiredPeers = LatticePropagatorConfig.DEFAULT_MAX_DESIRED_PEERS;
 	private int ambientPeers=LatticePropagatorConfig.DEFAULT_AMBIENT_PEERS;
 	private int activePeers=LatticePropagatorConfig.DEFAULT_ACTIVE_PEERS;
@@ -161,6 +164,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Local policy state, bounded by desiredPeers and independent of discovery revisions. */
 	private final Map<AccountKey,PeerActivity> activity=new HashMap<>();
+	/** Desired peers that are discovered candidates rather than explicit intent. Lock held. */
+	private int candidateCount;
 	/** Reservations include socket opening, before identity verification begins. */
 	private final Map<AccountKey,DesiredPeer> dialling=new HashMap<>();
 	private final Map<AccountKey,HealthCheck> health=new HashMap<>();
@@ -302,24 +307,25 @@ public class LatticeConnectionManager extends AConnectionManager {
 	}
 
 	/**
-	 * Configures the hard desired-peer cap. Existing entries are not truncated.
+	 * Configures the hard cap on discovered candidates. Explicit peers are not
+	 * counted. Existing entries are not truncated.
 	 *
-	 * @param maxDesiredPeers maximum retained peer identities
+	 * @param maxDesiredPeers maximum retained discovered candidates
 	 */
 	public void setMaxDesiredPeers(int maxDesiredPeers) {
 		if (maxDesiredPeers <= 0) throw new IllegalArgumentException(
 			"Maximum desired peers must be positive");
 		synchronized (connectionLock) {
-			if (desiredPeers.size() > maxDesiredPeers) throw new IllegalStateException(
-				"Desired peer count already exceeds requested limit");
+			if (candidateCount > maxDesiredPeers) throw new IllegalStateException(
+				"Discovered candidate count already exceeds requested limit");
 			this.maxDesiredPeers=maxDesiredPeers;
 		}
 	}
 
 	/**
-	 * Returns the configured hard desired-peer cap.
+	 * Returns the configured hard cap on discovered candidates.
 	 *
-	 * @return maximum retained peer identities
+	 * @return maximum retained discovered candidates
 	 */
 	public int getMaxDesiredPeers() {
 		return maxDesiredPeers;
@@ -529,7 +535,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return;
 		}
 		if (!registerDesiredPeerIntent(peerKey,DesiredPeer.create(peerKey),false)) {
-			log.warn("Ignoring desired peer {}: limit of {} reached",peerKey,maxDesiredPeers);
+			log.warn("Ignoring desired peer {}: connection manager is closed",peerKey);
 			return;
 		}
 		maintenanceSignal.release();
@@ -548,7 +554,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return;
 		}
 		if (!registerDesiredPeerIntent(peerKey,DesiredPeer.create(peerKey,address),true)) {
-			log.warn("Ignoring desired peer {}: limit of {} reached",peerKey,maxDesiredPeers);
+			log.warn("Ignoring desired peer {}: connection manager is closed",peerKey);
 			return;
 		}
 		maintenanceSignal.release();
@@ -572,20 +578,30 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		if (!registerDesiredPeerIntent(peerKey,DesiredPeer.create(peerKey,address),true)) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
-				"Desired peer limit of "+maxDesiredPeers+" reached"));
+				"Connection manager is closed"));
 		}
 		maintenanceSignal.release();
 		return whenConnected(peerKey);
 	}
 
-	/** Adds bounded connection intent, optionally replacing only its dial metadata. */
+	/**
+	 * Adds explicit connection intent, optionally replacing only its dial metadata.
+	 * Explicit intent is never refused for capacity: only operator calls create it,
+	 * and a discovered candidate it promotes stops counting against the candidate cap.
+	 *
+	 * @return {@code false} only if the manager is closed
+	 */
 	private boolean registerDesiredPeerIntent(
 			AccountKey peerKey,DesiredPeer desired,boolean replace) {
 		synchronized (connectionLock) {
 			if (!accepting) return false;
 			DesiredPeer existing=desiredPeers.get(peerKey);
 			if (existing!=null) {
-				activity.get(peerKey).explicit=true;
+				PeerActivity state=activity.get(peerKey);
+				if (!state.explicit) {
+					state.explicit=true;
+					candidateCount--;
+				}
 				if (replace) {
 					// An operator-supplied address replaces only the dial target. Keep
 					// discovery revision metadata so stale discovery cannot overwrite it.
@@ -594,7 +610,6 @@ public class LatticeConnectionManager extends AConnectionManager {
 				}
 				return true;
 			}
-			if (desiredPeers.size()>=maxDesiredPeers) return false;
 			desiredPeers.put(peerKey,desired);
 			PeerActivity state=new PeerActivity();
 			state.explicit=true;
@@ -634,18 +649,20 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * outbound propagation route.
 	 *
 	 * <p>An operator-assigned inbound connection is not sufficient. The connection
-	 * must already carry a trusted key established by live challenge/response, and
-	 * that key must identify a desired peer learned from discovery or explicit
-	 * operator configuration. This method never authenticates or assigns trust
-	 * itself.</p>
+	 * must already carry a trusted key established by live challenge/response for
+	 * the identity its application vouched for through
+	 * {@link LatticePropagator#authenticateInboundRoute}; the inbound verifier is
+	 * the only caller. Admission does not depend on desired-peer membership, so
+	 * discovered candidates can never block it. This method never authenticates or
+	 * assigns trust itself.</p>
 	 *
 	 * @param connection authenticated inbound physical connection
 	 * @return the upgraded connection
 	 * @throws IllegalArgumentException if {@code connection} is {@code null}
 	 * @throws IllegalStateException if the connection is closed
-	 * @throws SecurityException if authentication or desired-peer admission is absent
+	 * @throws SecurityException if the connection carries no authenticated key
 	 */
-	public AConnection upgradeInboundConnection(AConnection connection) {
+	AConnection upgradeInboundConnection(AConnection connection) {
 		if (connection == null) throw new IllegalArgumentException("Connection must not be null");
 		AccountKey peerKey = connection.getTrustedKey();
 		if (peerKey == null) {
@@ -656,9 +673,6 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		synchronized (connectionLock) {
 			if (!accepting) throw new IllegalStateException("Connection manager is closed");
-			if (!desiredPeers.containsKey(peerKey)) {
-				throw new SecurityException("Authenticated peer has no admitted node identity: " + peerKey);
-			}
 			upgradedInboundRoutes.put(peerKey, connection);
 			if (!connections.containsKey(peerKey)) health.put(peerKey,new HealthCheck(connection,clock.getAsLong()));
 		}
@@ -765,8 +779,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (!registered) {
 			closeSilently(convex);
 			return CompletableFuture.failedFuture(new IllegalStateException(
-				accepting ? "Desired peer limit of "+maxDesiredPeers+" reached"
-					: "Connection manager is closed"));
+				"Connection manager is closed"));
 		}
 		CompletableFuture<Convex> admission;
 		try {
@@ -952,7 +965,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 		CompletableFuture<AConnection> routeWaiter;
 		synchronized (connectionLock) {
 			desiredPeers.remove(peerKey);
-			activity.remove(peerKey);
+			PeerActivity state=activity.remove(peerKey);
+			if (state!=null && !state.explicit) candidateCount--;
 			dialling.remove(peerKey);
 			health.remove(peerKey);
 			removed = connections.remove(peerKey);
@@ -989,24 +1003,22 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return new HashMap<>(desiredPeers);
 	}
 
-	/** Returns whether discovery or explicit operator configuration admits this peer. */
-	boolean isDesiredPeer(AccountKey peerKey) {
-		return peerKey != null && desiredPeers.containsKey(peerKey);
-	}
-
 	/**
-	 * Adds or refreshes one peer translated by an external discovery adapter.
+	 * Adds or refreshes one candidate translated by an external discovery adapter.
 	 *
 	 * <p>The caller owns discovery validation and schema interpretation. This
 	 * transport layer accepts only the expected node key, ordered transport URIs
-	 * and a monotonically increasing revision. The operation is additive/update-only
+	 * and a monotonically increasing revision. A new key becomes a candidate that
+	 * maintenance may dial for an ambient slot, never explicit intent; candidates
+	 * are bounded by {@link #setMaxDesiredPeers}. For a key that is already present,
+	 * only its transport metadata is refreshed. The operation is additive/update-only
 	 * and merely wakes maintenance; it never opens a socket on the caller's thread.</p>
 	 *
 	 * @param peerKey expected remote node key
 	 * @param transports ordered transport URIs, possibly empty but not null
 	 * @param revision discovery-source revision used to reject stale replacement
 	 * @return {@code true} if the peer is present after the operation; {@code false}
-	 *         if the cap rejected a new peer or the arguments are invalid
+	 *         if the candidate cap rejected a new peer or the arguments are invalid
 	 */
 	public boolean updateDiscoveredPeer(
 			AccountKey peerKey,AVector<AString> transports,long revision) {
@@ -1019,9 +1031,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 			if (!accepting) return false;
 			DesiredPeer existing=desiredPeers.get(peerKey);
 			if (existing==null) {
-				if (desiredPeers.size()>=maxDesiredPeers) return false;
+				if (candidateCount>=maxDesiredPeers) return false;
 				desiredPeers.put(peerKey,DesiredPeer.discovered(peerKey,transports,revision));
 				activity.put(peerKey,new PeerActivity());
+				candidateCount++;
 				changed=true;
 			} else if (!existing.discovered || revision>existing.revision) {
 				DesiredPeer updated=DesiredPeer.discovered(peerKey,transports,revision);
@@ -1568,7 +1581,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	// ========== DesiredPeer ==========
 
 	/**
-	 * Bounded connection intent for one remote node identity.
+	 * Explicit connection intent or a discovered candidate for one remote node identity.
 	 *
 	 * <p>Public fields are immutable transport metadata. Private mutable retry state
 	 * belongs to the maintenance loop and is preserved across newer discovery

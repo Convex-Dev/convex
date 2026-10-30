@@ -166,7 +166,7 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 | `LatticeNode` | Optional TCP networking for a host: owns the server, listener and dynamic propagation groups |
 | `LatticeListener` | Application-owned inbound TCP transport and connection-to-group router |
 | `LatticePropagator` | Owns one filtered serving view, protocol endpoint and external route set |
-| `LatticeConnectionManager` | Maintains bounded connection intent and authenticated routes for one propagator; discovery schemas live in application modules |
+| `LatticeConnectionManager` | Maintains explicit peers, bounded discovered candidates and authenticated routes for one propagator; discovery schemas live in application modules |
 
 ## Lattice Node
 

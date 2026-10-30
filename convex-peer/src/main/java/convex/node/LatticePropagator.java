@@ -526,9 +526,10 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Starts non-blocking possession verification for an assigned inbound
-	 * connection. The expected key must already be in this group's bounded
-	 * desired-peer set. On success, the full-duplex socket becomes an authenticated
-	 * outbound route; callers may await
+	 * connection. The caller vouches for {@code expectedKey} on this connection; a
+	 * P2P node does so when the connection delivers that key's own valid signed
+	 * NodeInfo. Desired-peer membership is not required. On success, the full-duplex
+	 * socket becomes an authenticated outbound route; callers may await
 	 * {@link LatticeConnectionManager#whenInboundConnectionUpgraded(AccountKey)}.
 	 *
 	 * @param connection assigned physical inbound connection

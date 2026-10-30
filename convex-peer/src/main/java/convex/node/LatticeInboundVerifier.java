@@ -27,8 +27,8 @@ import convex.core.message.Message;
  *
  * <p>Operator assignment to a {@link LatticePropagator} permits inbound lattice
  * access but does not authenticate the remote endpoint. This verifier preserves
- * that distinction: only a successful live challenge, followed by confirmation
- * that the proven key is an admitted desired peer, can call
+ * that distinction: only a successful live challenge for the key the application
+ * vouched for on this connection can call
  * {@link LatticeConnectionManager#upgradeInboundConnection(AConnection)}.</p>
  */
 final class LatticeInboundVerifier {
@@ -54,8 +54,7 @@ final class LatticeInboundVerifier {
 	void maybeStart(AConnection connection, LatticePropagator owner, AccountKey claimedKey) {
 		if (connection == null || owner == null || connection.isClosed()
 				|| connection.isTrusted() || !connection.supportsMessage()
-				|| claimedKey == null
-				|| !owner.getConnectionManager().isDesiredPeer(claimedKey)) return;
+				|| claimedKey == null) return;
 
 		CompletableFuture<Message> resultFuture = new CompletableFuture<>();
 		PendingVerification pending = new PendingVerification(owner, claimedKey, resultFuture);
@@ -92,18 +91,13 @@ final class LatticeInboundVerifier {
 			AccountKey remoteKey = Message.verifyChallengeResponse(
 				result, token, ownKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT,
 				pending.claimedKey());
-			if (remoteKey == null) return;
-			LatticeConnectionManager manager = pending.owner().getConnectionManager();
-			if (!manager.isDesiredPeer(remoteKey)) {
-				log.debug("Authenticated inbound key {} has no admitted node identity", remoteKey);
-				return;
-			}
-			if (connection.isClosed()) return;
+			if (remoteKey == null || connection.isClosed()) return;
 
-			// Trust is established only here. upgradeInboundConnection independently
-			// asserts this binding before granting the outbound propagation capability.
+			// Trust is established only here, for the key the application vouched for:
+			// the response above must be signed by that key. upgradeInboundConnection
+			// independently refuses a connection without a trusted key.
 			connection.setTrustedKey(remoteKey);
-			manager.upgradeInboundConnection(connection);
+			pending.owner().getConnectionManager().upgradeInboundConnection(connection);
 		} catch (Exception e) {
 			log.debug("Inbound lattice authentication failed for {}: {}",
 				connection.getRemoteAddress(), e.getMessage());

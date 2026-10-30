@@ -57,7 +57,7 @@ Key features across the host and its groups:
 `NodeServer` is schema-independent. It does not recognise `:p2p`, publish NodeInfo,
 refresh discovery state or apply social/PoP policy. `P2PNode` composes those concerns;
 its `NodeDirectory` translates validated `[:p2p :nodes]` records into the generic
-connection intent accepted by `LatticeConnectionManager`.
+connection candidates accepted by `LatticeConnectionManager`.
 
 ### 2.3 Consensus (Server + BeliefPropagator)
 
@@ -238,7 +238,7 @@ post-merge acknowledgement. It then pulls and merges the bootstrap node's `:p2p`
 therefore receives its follow-filtered view without an unrestricted full-root pull or
 waiting for another publication. The receiving node independently challenges the connecting
 node over the same full-duplex socket. Only after the live connection proves the key
-of an admitted signed NodeInfo record is that physically inbound connection upgraded
+of the valid signed NodeInfo it delivered is that physically inbound connection upgraded
 into an outbound propagation route. A node with empty `:transports` therefore supports
 bidirectional gossip without a reverse TCP connection.
 
@@ -462,8 +462,11 @@ INBOUND / AUTHENTICATED / OUTBOUND-PROPAGATION ROUTE
 
 `NodeServer` owns the physical inbound connection throughout. The explicit upgrade
 adds it to `LatticeConnectionManager`'s outbound broadcast routes; it does not turn it
-into a `Convex` client or transfer connection ownership. The upgrade method rejects an
-untrusted connection and a proven key with no admitted node identity. Disconnect
+into a `Convex` client or transfer connection ownership. The application vouches for
+the key it expects on that connection (P2P: the connection delivered that key's own
+valid signed NodeInfo), and the upgrade happens only after the connection proves that
+key. Desired-peer membership plays no part, so discovered candidates cannot block an
+upgrade. The upgrade method rejects an untrusted connection. Disconnect
 revokes both the trust-bound route and all ordinary inbound per-connection state.
 
 Manager-owned outbound clients have the mirror behaviour. After authenticating their
@@ -499,12 +502,16 @@ CONNECTING → CONNECTED → DISCONNECTED
 
 For lattice nodes, `LatticeConnectionManager` separately maintains identity-keyed
 desired, pending and admitted connections. A configured node key keeps a socket in
-capability-free limbo until challenge/response succeeds. Desired peers are populated
-through generic connection APIs; in the P2P application, `NodeDirectory` validates
-correctly owner-signed `[:p2p :nodes]` records and translates their transport fields.
+capability-free limbo until challenge/response succeeds. Desired peers are of two
+kinds. Explicit peers come from the operator through `connectPeer` and `addPeer` and
+are always kept. Discovered peers are only candidates for ambient slots: in the P2P
+application, `NodeDirectory` validates correctly owner-signed `[:p2p :nodes]` records
+and translates their transport fields. Discovery never makes a node a wanted peer.
 The connection manager itself never reads that lattice path or parses NodeInfo. Callers
-can await admission without polling. Explicit and discovered desired peers share the
-configurable `maxDesiredPeers` cap (256 by default).
+can await admission without polling. Discovered candidates are bounded by the
+configurable `maxDesiredPeers` cap (256 by default); explicit peers are not counted,
+and a full candidate pool never refuses explicit intent or an inbound route upgrade.
+Choosing among candidates by local liveness evidence is #814.
 That cap bounds candidates, not live connections. The soft live targets are 16
 ambient peers plus up to 16 recently active communicators (`ambientPeers` and
 `activePeers` in `LatticePropagatorConfig`). Explicit connections may exceed them.
@@ -580,7 +587,7 @@ P2PNode / NodeDirectory (P2P schema, discovery and policy)
 ├── LatticeListener (application-owned inbound TCP and group routing)
 └── LatticePropagator (application-configured replication policy group)
     ├── LatticeProtocolEndpoint (CAD036 queues, acquisition and trust)
-    └── LatticeConnectionManager (external routes and desired-peer bounds)
+    └── LatticeConnectionManager (external routes, explicit peers and bounded candidates)
 ```
 
 ### 9.2 Message Routing

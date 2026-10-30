@@ -297,7 +297,9 @@ operations do not introduce runtime group creation or subscription negotiation.
 
 ## Live peer selection
 
-`maxDesiredPeers` bounds candidates (default 256). The independent soft targets
+`maxDesiredPeers` bounds discovered candidates (default 256). Explicit
+`connectPeer`/`addPeer` intent is not counted and is never refused for capacity,
+and inbound route upgrades do not depend on it. The independent soft targets
 `ambientPeers` and `activePeers` default to 16 each. Maintenance retains healthy
 ambient incumbents, samples replacements, and prioritises the most recently used
 active peers for two minutes. Explicit `connectPeer`/`addPeer` intent survives

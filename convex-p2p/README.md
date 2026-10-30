@@ -243,8 +243,8 @@ bob.whenInboundConnectionUpgraded(daveKey.getAccountKey()).join();
 
 This distinction is intentional. Assigning an inbound socket to a propagator permits
 the operator-selected inbound lattice view, but leaves the connection untrusted. It
-becomes an outbound gossip route only after challenge/response proves the node key and
-that key has an admitted signed NodeInfo record. A NAT leaf does not need
+becomes an outbound gossip route only after challenge/response proves the key of the
+valid signed NodeInfo that connection delivered. A NAT leaf does not need
 `serveAllInbound()` merely to receive reverse traffic from a peer it connected to and
 authenticated; arbitrary incoming sockets remain denied by default.
 
@@ -315,8 +315,9 @@ java -cp convex.jar convex.p2p.P2PNode [etch-file]
 
 ## Live peer selection
 
-The desired-peer list is a candidate pool (`maxDesiredPeers`, default 256), not
-a target number of concurrent connections. Each propagation group normally keeps
+Discovered nodes form a candidate pool (`maxDesiredPeers`, default 256), not
+a target number of concurrent connections. Nodes named with `connect` are not
+candidates and are always kept. Each propagation group normally keeps
 16 ambient peers plus up to 16 recently active communicators. Configure the soft
 targets with `LatticePropagatorConfig.AMBIENT_PEERS` (`ambientPeers`) and
 `ACTIVE_PEERS` (`activePeers`); either may be zero.
@@ -347,8 +348,8 @@ either via `serveAllInbound()` for a public single-view node, or a custom policy
 on the application-owned listener returned by `getTransport()`. See
 `convex-peer`'s `LatticeListener` and `NodeServer` for the full capability model.
 Operator assignment is not authentication and does not add the connection to
-outbound gossip. That separate upgrade requires live
-challenge/response plus an admitted node identity. The challenge and response both
+outbound gossip. That separate upgrade requires live challenge/response for the
+key of the NodeInfo the connection delivered. The challenge and response both
 have verified Ed25519 signatures and bind a random nonce, the opposite party's node
 key as audience, and the fixed `convex-lattice-peer-v1` context.
 
@@ -359,7 +360,8 @@ infrastructure regions whole and, from the social region, only the owners it wan
 locally registered social DIDs, explicit pins and their direct active follows. The
 same set bounds what the node publishes. Every social slot must have a valid signature
 from a key authorised for its DID. The node's `maxConnections` bounds inbound
-sockets and the group's `maxDesiredPeers` bounds explicit plus discovery-driven peers.
+sockets and the group's `maxDesiredPeers` bounds discovered candidates. Discovery
+never makes a node a wanted peer: nodes named with `connect` are kept regardless.
 
 ## License
 
