@@ -34,6 +34,8 @@ import static org.apache.calcite.util.Static.RESOURCE;
  *
  * <p>Supports CREATE TABLE and DROP TABLE via SQL. Tables are persisted
  * to the lattice cursor tree and participate in lattice replication.
+ * Schema and table names are resolved as the connection's case sensitivity
+ * says, the same as in queries.
  */
 public class ConvexDdlExecutor extends DdlExecutorImpl {
 
@@ -60,13 +62,15 @@ public class ConvexDdlExecutor extends DdlExecutorImpl {
 		CalciteSchema schema = requireNonNull(pair.left, "schema");
 		String tableName = pair.right;
 
-		// Check if table already exists
-		if (schema.plus().tables().get(tableName) != null) {
+		// Check if table already exists, under whatever case it is stored
+		CalciteSchema.TableEntry existing = schema.getTable(tableName, caseSensitive(context));
+		if (existing != null) {
 			if (create.ifNotExists) return;
 			if (!create.getReplace()) {
 				throw SqlUtil.newContextException(create.name.getParserPosition(),
-						RESOURCE.tableExists(tableName));
+						RESOURCE.tableExists(existing.name));
 			}
+			tableName = existing.name;
 		}
 
 		// Extract column names and types from the DDL
@@ -120,18 +124,20 @@ public class ConvexDdlExecutor extends DdlExecutorImpl {
 
 		switch (drop.getKind()) {
 		case DROP_TABLE:
+			// The table under its stored name, resolved as the connection does
+			CalciteSchema.TableEntry entry = schema.getTable(name, caseSensitive(context));
+			if (entry == null) {
+				if (drop.ifExists) return;
+				throw SqlUtil.newContextException(drop.name.getParserPosition(),
+						RESOURCE.objectNotFound(name));
+			}
 			// Drop from lattice
 			Schema unwrapped = schema.plus().unwrap(ConvexSchema.class);
 			if (unwrapped instanceof ConvexSchema convexSchema) {
-				if (!convexSchema.dropTable(name)) {
-					if (!drop.ifExists) {
-						throw SqlUtil.newContextException(drop.name.getParserPosition(),
-								RESOURCE.objectNotFound(name));
-					}
-				}
+				convexSchema.dropTable(entry.name);
 			}
 			// Remove from Calcite
-			schema.removeTable(name);
+			schema.removeTable(entry.name);
 			break;
 		default:
 			throw new UnsupportedOperationException("DROP " + drop.getKind() + " not supported");
@@ -151,10 +157,15 @@ public class ConvexDdlExecutor extends DdlExecutorImpl {
 		}
 		CalciteSchema schema = context.getMutableRootSchema();
 		for (String p : path) {
-			CalciteSchema sub = schema.getSubSchema(p, true);
+			CalciteSchema sub = schema.getSubSchema(p, caseSensitive(context));
 			if (sub == null) return Pair.of(null, name);
 			schema = sub;
 		}
 		return Pair.of(schema, name);
+	}
+
+	/** Whether this connection compares identifiers case-sensitively. */
+	private static boolean caseSensitive(CalcitePrepare.Context context) {
+		return context.config().caseSensitive();
 	}
 }

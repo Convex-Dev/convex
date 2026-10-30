@@ -52,7 +52,7 @@ jdbc:convex:file:/data/mydb.etch;caseSensitive=false
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `caseSensitive` | `false` | SQL identifier case sensitivity |
+| `caseSensitive` | `false` | SQL identifier case sensitivity, for queries and DDL alike |
 | `database` | file stem or instance name | Database within the instance (see [One ConvexDB, Many Databases](#one-convexdb-many-databases)) |
 
 These are the only parameters: a URL with any other is refused, and other
