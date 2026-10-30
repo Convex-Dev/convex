@@ -30,6 +30,19 @@ public class PgProtocolHandlerTest {
 	}
 
 	@Test
+	public void testReturnsRows() {
+		for (String sql : new String[] {"SELECT * FROM t WHERE id = ?", "select 1", "VALUES (1)",
+				"WITH a AS (SELECT 1) SELECT * FROM a", "SELECT 1 UNION SELECT 2", "SELECT * FROM t ORDER BY id",
+				"EXPLAIN PLAN FOR SELECT 1", "SELECT count(*) AS rowcount FROM t"}) {
+			assertTrue(PgProtocolHandler.returnsRows(sql), sql);
+		}
+		for (String sql : new String[] {"INSERT INTO t VALUES (?, ?)", "UPDATE t SET v = 1", "DELETE FROM t",
+				"CREATE TABLE u (id INTEGER)", "DROP TABLE u"}) {
+			assertFalse(PgProtocolHandler.returnsRows(sql), sql);
+		}
+	}
+
+	@Test
 	public void testHasRegexOperator() {
 		assertTrue(PgProtocolHandler.hasRegexOperator("SELECT * FROM t WHERE name ~ '^A'"));
 		assertTrue(PgProtocolHandler.hasRegexOperator("SELECT * FROM t WHERE name ~* '^a'"));

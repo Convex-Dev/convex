@@ -266,7 +266,7 @@ over TCP using the PostgreSQL client protocol. It reuses the same `ConvexSchema`
 and Calcite pipeline as the JDBC driver, but adds:
 
 - Network transport (Netty)
-- PG message framing (Parse/Bind/Execute/Describe)
+- PG message framing (Parse/Bind/Execute/Describe); Describe answers from the prepared statement's metadata without executing it
 - Prepared statements kept for each connection. One whose table changed is prepared again, or, if its rows would now be described differently, fails with SQLSTATE `0A000` until the client prepares it again, as in PostgreSQL
 - `pg_catalog` virtual schema for client tool compatibility
 - Optional password authentication

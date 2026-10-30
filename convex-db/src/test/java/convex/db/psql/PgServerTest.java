@@ -747,6 +747,49 @@ public class PgServerTest {
 		}
 	}
 
+	/** Sends one frontend message: its type, its length and its body. */
+	private void sendMessage(DataOutputStream out, char type, byte[] body) throws IOException {
+		out.writeByte(type);
+		out.writeInt(4 + body.length);
+		out.write(body);
+		out.flush();
+	}
+
+	/** Parse, Describe and Sync for an unnamed statement with no declared parameter types. */
+	private void parseDescribeSync(DataOutputStream out, String sql) throws IOException {
+		java.io.ByteArrayOutputStream parse = new java.io.ByteArrayOutputStream();
+		parse.write(0); // unnamed statement
+		parse.write(sql.getBytes(StandardCharsets.UTF_8));
+		parse.write(0);
+		parse.write(new byte[] {0, 0}); // no parameter types
+		sendMessage(out, 'P', parse.toByteArray());
+		sendMessage(out, 'D', new byte[] {'S', 0});
+		sendMessage(out, 'S', new byte[0]);
+	}
+
+	/**
+	 * Describe answers from the statement's prepared metadata, without executing it: a scalar
+	 * subquery over two rows fails only when it runs, and an INSERT described writes nothing.
+	 */
+	@Test
+	public void testDescribeDoesNotExecute() throws Exception {
+		try (Socket socket = new Socket("localhost", server.getPort())) {
+			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+			DataInputStream in = new DataInputStream(socket.getInputStream());
+			sendStartupMessage(out, dbName, "testuser");
+			skipToReadyForQuery(in);
+
+			// ParseComplete, ParameterDescription, RowDescription, ReadyForQuery
+			parseDescribeSync(out, "SELECT (SELECT name FROM users) AS x");
+			assertEquals("1tTZ", readMessageTypes(in));
+
+			// ... and NoData for a statement that returns no rows
+			parseDescribeSync(out, "INSERT INTO users (id, name, email) VALUES (20, 'Gus', 'gus@example.com')");
+			assertEquals("1tnZ", readMessageTypes(in));
+		}
+		assertFalse(userExists(20));
+	}
+
 	private void skipToReadyForQuery(DataInputStream in) throws IOException {
 		while (true) {
 			byte type = in.readByte();

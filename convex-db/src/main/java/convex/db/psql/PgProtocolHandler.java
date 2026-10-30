@@ -632,23 +632,9 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 					return;
 				}
 
-				// Send parameter description
+				RowDescription rows = describeRows(stmt);
 				write(ctx, new ParameterDescription(stmt.paramTypes()));
-
-				String query = rewriteQuery(stmt.query());
-				if (query != null && query.toUpperCase().trim().startsWith("SELECT")) {
-					// Execute to get metadata (substitute $N with NULL for metadata query)
-					String metaQuery = query.replaceAll("\\$\\d+", "NULL");
-					try (Statement s = connection.createStatement();
-						 ResultSet rs = s.executeQuery(metaQuery)) {
-						write(ctx, RowDescription.fromMetaData(rs.getMetaData()));
-					} catch (SQLException e) {
-						// If metadata query fails, return NoData
-						write(ctx, NoData.INSTANCE);
-					}
-				} else {
-					write(ctx, NoData.INSTANCE);
-				}
+				write(ctx, (rows == null) ? NoData.INSTANCE : rows);
 			} else {
 				// Describe portal
 				Portal portal = portals.get(describe.name());
@@ -661,18 +647,8 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 					return;
 				}
 
-				String query = rewriteQuery(portal.stmt().query());
-				if (query != null && query.toUpperCase().trim().startsWith("SELECT")) {
-					String metaQuery = query.replaceAll("\\$\\d+", "NULL");
-					try (Statement s = connection.createStatement();
-						 ResultSet rs = s.executeQuery(metaQuery)) {
-						write(ctx, RowDescription.fromMetaData(rs.getMetaData()));
-					} catch (SQLException e) {
-						write(ctx, NoData.INSTANCE);
-					}
-				} else {
-					write(ctx, NoData.INSTANCE);
-				}
+				RowDescription rows = describeRows(portal.stmt());
+				write(ctx, (rows == null) ? NoData.INSTANCE : rows);
 			}
 		} catch (Exception e) {
 			log.warn("Describe error: {}", e.getMessage(), e);
@@ -755,25 +731,15 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 		// For pg_catalog queries, substitute parameters directly
 		// (Calcite's virtual tables don't support prepared statements well)
-		String lowerSql = sql.toLowerCase();
-		if (lowerSql.contains("pg_catalog") || lowerSql.contains("pg_database") ||
-			lowerSql.contains("pg_type") || lowerSql.contains("pg_class") ||
-			lowerSql.contains("pg_namespace") || lowerSql.contains("pg_attribute") ||
-			lowerSql.contains("pg_tables")) {
+		if (isCatalogQuery(sql)) {
 			String substituted = substituteParameters(sql, paramValues, paramFormats);
 			executeQuery(ctx, substituted, false, resultFormats);
 			return;
 		}
 
-		// Convert $1, $2 to ? for JDBC
-		String jdbcSql = sql.replaceAll("\\$\\d+", "?");
-
-		PreparedStatement pstmt = jdbcStatements.get(stmt);
-		boolean kept = (pstmt != null);
-		if (!kept) {
-			pstmt = connection.prepareStatement(jdbcSql);
-			jdbcStatements.put(stmt, pstmt);
-		}
+		String jdbcSql = jdbcSql(sql);
+		boolean kept = jdbcStatements.containsKey(stmt);
+		PreparedStatement pstmt = keptStatement(stmt, jdbcSql);
 		boolean hasResultSet;
 		try {
 			hasResultSet = bindAndExecute(pstmt, paramValues, paramFormats, paramTypes);
@@ -851,6 +817,68 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	private static RowDescription describe(PreparedStatement pstmt) throws SQLException {
 		ResultSetMetaData meta = pstmt.getMetaData();
 		return (meta == null) ? null : RowDescription.fromMetaData(meta);
+	}
+
+	/**
+	 * Whether a statement returns rows: a query or EXPLAIN, by the kind Calcite's parser gives
+	 * it. A prepared statement's metadata cannot say, since for DML it is Calcite's update
+	 * count column. A statement that does not parse is taken to return rows, so preparing it
+	 * reports the error.
+	 */
+	static boolean returnsRows(String jdbcSql) {
+		try {
+			org.apache.calcite.sql.SqlNode node = org.apache.calcite.sql.parser.SqlParser.create(jdbcSql,
+				org.apache.calcite.sql.parser.SqlParser.config()
+					.withParserFactory(convex.db.calcite.ConvexDdlExecutor.PARSER_FACTORY)).parseStmt();
+			return node.isA(org.apache.calcite.sql.SqlKind.QUERY) || node.getKind() == org.apache.calcite.sql.SqlKind.EXPLAIN;
+		} catch (org.apache.calcite.sql.parser.SqlParseException e) {
+			return true;
+		}
+	}
+
+	/**
+	 * The RowDescription of a client's prepared statement, from the metadata of its kept JDBC
+	 * statement, which preparing yields without executing anything. Null if the statement
+	 * returns no rows. Catalogue queries, which are not prepared, are described from a run
+	 * with their parameters as NULL; they read only the catalogue.
+	 */
+	private RowDescription describeRows(PreparedStmt stmt) throws SQLException {
+		if (PgTransactionControl.classify(stmt.query()) != null) return null;
+		String sql = rewriteQuery(stmt.query());
+		if (sql == null) return null;
+		if (isCatalogQuery(sql)) {
+			try (Statement s = connection.createStatement();
+				 ResultSet rs = s.executeQuery(sql.replaceAll("\\$\\d+", "NULL"))) {
+				return RowDescription.fromMetaData(rs.getMetaData());
+			}
+		}
+		String jdbcSql = jdbcSql(sql);
+		if (!returnsRows(jdbcSql)) return null;
+		return describe(keptStatement(stmt, jdbcSql));
+	}
+
+	/** The JDBC statement kept for a client's prepared statement, prepared on first use. */
+	private PreparedStatement keptStatement(PreparedStmt stmt, String jdbcSql) throws SQLException {
+		PreparedStatement pstmt = jdbcStatements.get(stmt);
+		if (pstmt == null) {
+			pstmt = connection.prepareStatement(jdbcSql);
+			jdbcStatements.put(stmt, pstmt);
+		}
+		return pstmt;
+	}
+
+	/** A query with PostgreSQL's numbered parameters as JDBC's. */
+	private static String jdbcSql(String sql) {
+		return sql.replaceAll("\\$\\d+", "?");
+	}
+
+	/** Whether a query reads the virtual catalogue tables, which Calcite does not prepare with parameters. */
+	private static boolean isCatalogQuery(String sql) {
+		String lowerSql = sql.toLowerCase();
+		return lowerSql.contains("pg_catalog") || lowerSql.contains("pg_database") ||
+			lowerSql.contains("pg_type") || lowerSql.contains("pg_class") ||
+			lowerSql.contains("pg_namespace") || lowerSql.contains("pg_attribute") ||
+			lowerSql.contains("pg_tables");
 	}
 
 	private static boolean isStalePlan(Throwable e) {
