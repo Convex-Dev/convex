@@ -347,6 +347,27 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return table.insertRow(pk, row);
 	}
 
+	/**
+	 * Inserts rows into a table in one atomic write, as {@link SQLTable#insertRows}. The
+	 * first column of each row is its primary key. Every key is encoded before anything is
+	 * written, so a row whose key cannot be one leaves the table unchanged.
+	 *
+	 * @param tableName Table name
+	 * @param rows The rows
+	 * @return The number of rows written, 0 if the table is not live
+	 */
+	public long insertAll(String tableName, Iterable<AVector<ACell>> rows) {
+		return insertAll(Strings.create(tableName), rows);
+	}
+
+	public long insertAll(AString tableName, Iterable<AVector<ACell>> rows) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return 0;
+		java.util.List<SQLTable.Row> keyed = new java.util.ArrayList<>();
+		for (AVector<ACell> row : rows) keyed.add(new SQLTable.Row(toWriteKey(row.get(0)), row));
+		return table.insertRows(keyed);
+	}
+
 	/** Inserts a row with auto-conversion from Java types. First value is primary key. */
 	public boolean insert(String tableName, Object... values) {
 		return insert(Strings.create(tableName), Vectors.of(values));

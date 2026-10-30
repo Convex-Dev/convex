@@ -25,6 +25,7 @@ import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.util.ImmutableBitSet;
 
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Vectors;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.rel.ConvexTableScan;
@@ -201,16 +202,18 @@ public class ConvexTable extends AbstractQueryableTable
 
 	// ========== DML Operations (called from generated code) ==========
 
+	/**
+	 * Inserts the rows of an INSERT in one atomic write: every value is converted to its
+	 * column's type first, so a value that does not fit leaves the table unchanged.
+	 */
 	public long executeInsert(Enumerable<?> input) {
 		try {
-			long count = 0;
+			List<AVector<ACell>> rows = new java.util.ArrayList<>();
 			for (Object value : input) {
 				Object[] row=normaliseRow(value);
-				if (row != null && insertRow(row)) {
-					count++;
-				}
+				if (row != null && row.length > 0) rows.add(toCells(row));
 			}
-			return count;
+			return schema.getTables().insertAll(tableName, rows);
 		} catch (ExceptionInInitializerError e) {
 			throw wrapTypeError(e, "INSERT");
 		}
@@ -309,13 +312,18 @@ public class ConvexTable extends AbstractQueryableTable
 
 	private boolean insertRow(Object[] row) {
 		if (row == null || row.length < 1) return false;
+		return schema.getTables().insert(tableName, toCells(row));
+	}
+
+	/** A row's values as cells of their columns' types. */
+	private AVector<ACell> toCells(Object[] row) {
 		ConvexColumnType[] types = getColumnTypes();
 		ACell[] cells = new ACell[row.length];
 		for (int i = 0; i < row.length; i++) {
 			ConvexColumnType type = (types != null && i < types.length) ? types[i] : ConvexColumnType.of(ConvexType.ANY);
 			cells[i] = type.toCell(row[i]);
 		}
-		return schema.getTables().insert(tableName, Vectors.of(cells));
+		return Vectors.of(cells);
 	}
 
 	private ACell toCell(Object v, int columnIndex) {

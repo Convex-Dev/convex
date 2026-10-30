@@ -254,6 +254,9 @@ schema.insert("users", values);
 // Insert with auto-conversion from Java values (first value is the primary key)
 schema.insert("users", 2, "Bob", "bob@example.com");
 
+// Insert several rows in one atomic write
+schema.insertAll("users", List.of(row1, row2, row3));
+
 // Select by key
 AVector<ACell> row = schema.selectByKey("users", CVMLong.create(1));
 

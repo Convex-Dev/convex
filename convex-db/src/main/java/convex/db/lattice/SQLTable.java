@@ -1,5 +1,6 @@
 package convex.db.lattice;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -300,24 +301,54 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * @param timestamp Insert timestamp
 	 * @return true if inserted successfully
 	 */
-	@SuppressWarnings("unchecked")
 	public boolean insertRow(ABlob pk, AVector<ACell> values, CVMLong timestamp) {
-		boolean[] result = new boolean[1];
+		return insertRows(List.of(new Row(pk, values)), timestamp) == 1;
+	}
+
+	/** A row to write: its primary key, blob-encoded, and its values with the key column first. */
+	public record Row(ABlob key, AVector<ACell> values) {}
+
+	/**
+	 * Inserts rows into this table in one write, all stamped with one reading of this
+	 * table's clock. A row replaces any row of its key, a later row in the batch an earlier.
+	 *
+	 * @param rows The rows
+	 * @return The number of rows written, 0 if the table is not live
+	 */
+	public long insertRows(List<Row> rows) {
+		return insertRows(rows, clock.get());
+	}
+
+	/**
+	 * Inserts rows into this table in one write, with an explicit timestamp. The write is
+	 * atomic: a reader sees all of the rows or none. A caller with more rows than one write
+	 * should hold may write them as consecutive batches.
+	 *
+	 * @param rows The rows; a list, since the write may be retried and read it again
+	 * @param timestamp Insert timestamp
+	 * @return The number of rows written, 0 if the table is not live
+	 */
+	@SuppressWarnings("unchecked")
+	public long insertRows(List<Row> rows, CVMLong timestamp) {
+		long[] written = new long[1];
 		cursor().updateAndGet(state -> {
+			written[0] = 0;
 			if (state == null || state.get(POS_SCHEMA) == null) return state;
 			requireSupportedVersion(state);
-			Index<ABlob, AVector<ACell>> rows = (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
-			if (rows == null) rows = Index.none();
-			// Check if this insert adds a new live row
-			AVector<ACell> existing = rows.get(pk);
-			boolean addsLive = (existing == null || !SQLRow.isLive(existing));
-			rows = rows.assoc(pk, SQLRow.create(values, timestamp));
-			long liveCount = getLiveCount(state) + (addsLive ? 1 : 0);
-			result[0] = true;
+			Index<ABlob, AVector<ACell>> index = (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
+			if (index == null) index = Index.none();
+			long liveCount = getLiveCount(state);
+			for (Row row : rows) {
+				// Count the rows this write makes live
+				AVector<ACell> existing = index.get(row.key());
+				if (existing == null || !SQLRow.isLive(existing)) liveCount++;
+				index = index.assoc(row.key(), SQLRow.create(row.values(), timestamp));
+			}
+			written[0] = rows.size();
 			// ctime is the creation time: row writes leave it unchanged (CAD039)
-			return entry(state.get(POS_SCHEMA), rows, state.get(POS_CTIME), liveCount, versionField(state));
+			return entry(state.get(POS_SCHEMA), index, state.get(POS_CTIME), liveCount, versionField(state));
 		});
-		return result[0];
+		return written[0];
 	}
 
 	/**

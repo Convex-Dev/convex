@@ -270,6 +270,46 @@ public class ConvexTableTest {
 		}
 	}
 
+	/**
+	 * A multi-row INSERT is one write, and atomic: a value that does not fit its column
+	 * leaves none of the statement's rows written.
+	 */
+	@Test
+	void testMultiRowInsertIsOneAtomicWrite() throws Exception {
+		AtomicLong ticks = new AtomicLong();
+		ConvexDB counted = ConvexDB.create(RowLWW::merge, () -> CVMLong.create(ticks.incrementAndGet()));
+		String name = dbName + "_batch";
+		SQLDatabase cdb2 = counted.database(name);
+		cdb2.tables().createTable("t", new String[]{"id", "amount"}, new ConvexType[]{ConvexType.INTEGER, ConvexType.INTEGER});
+		counted.register(name);
+		try (Connection c = DriverManager.getConnection("jdbc:convex:database=" + name);
+			 Statement stmt = c.createStatement()) {
+			long before = ticks.get();
+			assertEquals(3, stmt.executeUpdate("INSERT INTO t VALUES (1, 10), (2, 20), (3, 30)"));
+			assertEquals(before + 1, ticks.get(), "three rows, one write");
+			assertEquals(3, cdb2.tables().getRowCount("t"));
+
+			assertThrows(SQLException.class,
+				() -> stmt.executeUpdate("INSERT INTO t VALUES (4, 40), (5, 99999999999999999999999)"));
+			assertEquals(3, cdb2.tables().getRowCount("t"), "no row of the failed statement is written");
+			assertNull(cdb2.tables().selectByKey("t", CVMLong.create(4)));
+		} finally {
+			counted.unregister(name);
+		}
+	}
+
+	@Test
+	void testInsertAll() {
+		java.util.List<convex.core.data.AVector<convex.core.data.ACell>> rows = java.util.List.of(
+			convex.core.data.Vectors.of(CVMLong.create(7), convex.core.data.Strings.create("a"), CVMLong.create(1)),
+			convex.core.data.Vectors.of(CVMLong.create(8), convex.core.data.Strings.create("b"), CVMLong.create(2)),
+			convex.core.data.Vectors.of(CVMLong.create(7), convex.core.data.Strings.create("c"), CVMLong.create(3)));
+		assertEquals(3, db.tables().insertAll("test_table", rows));
+		assertEquals(2, db.tables().getRowCount("test_table"), "a later row of the same key replaces the earlier");
+		assertEquals("c", db.tables().selectByKey("test_table", CVMLong.create(7)).get(1).toString());
+		assertEquals(0, db.tables().insertAll("no_such_table", rows));
+	}
+
 	@Test
 	void testUpdateNoMatch() throws SQLException {
 		try (Statement stmt = conn.createStatement()) {
