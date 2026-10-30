@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import convex.db.ConvexDB;
+import convex.db.jdbc.IdentifierPolicy;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
@@ -32,6 +33,7 @@ class JoinTwoFiltersTest {
 		cdb = ConvexDB.create(RowLWW::merge);
 		SQLDatabase db = cdb.database(dbName);
 		cdb.register(dbName);
+		IdentifierPolicy.LOWER.applyTo(db);
 		db.tables().createTable("rel", new String[] { "relid", "fromid", "toid", "sts" },
 			new ConvexType[] { ConvexType.INTEGER, ConvexType.INTEGER, ConvexType.INTEGER, ConvexType.INTEGER });
 		db.tables().createTable("pow", new String[] { "powid", "relid", "tp", "sts" },

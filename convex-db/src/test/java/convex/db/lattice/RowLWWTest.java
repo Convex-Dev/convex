@@ -12,9 +12,11 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
@@ -22,6 +24,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.NullStore;
+import convex.db.ConvexDB;
 
 /**
  * The per-row last-write-wins policy. Rows merge by key whichever schema wins, and a row
@@ -244,6 +247,26 @@ public class RowLWWTest {
 			out.add(subset);
 		}
 		return out;
+	}
+
+	/**
+	 * The database's {@code :config} section is local to the replica under this policy:
+	 * its own config is kept, and an incoming one is not taken, even when it has none.
+	 */
+	@Test
+	public void testConfigStaysLocal() {
+		Keyword config = Keyword.intern("config");
+		Index<Keyword, ACell> lower = Index.of(Keyword.intern("identifiers"), Keyword.intern("lower"));
+		Index<Keyword, ACell> upper = Index.of(Keyword.intern("identifiers"), Keyword.intern("upper"));
+		Index<AString, AVector<ACell>> tables = Index.of(Strings.create("t"), entry(SCHEMA, 1, Index.of(R, row("a", 1))));
+
+		Index<Keyword, ACell> own = Index.of(config, lower);
+		Index<Keyword, ACell> other = Index.of(config, upper, ConvexDB.KEY_TABLES, tables);
+		Index<Keyword, ACell> merged = RowLWW.merge(own, other);
+		assertEquals(lower, merged.get(config));
+		assertEquals(tables, merged.get(ConvexDB.KEY_TABLES));
+
+		assertNull(RowLWW.merge(Index.of(ConvexDB.KEY_TABLES, tables), other).get(config));
 	}
 
 	private static List<List<AVector<ACell>>> permutations(List<AVector<ACell>> xs) {

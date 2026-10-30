@@ -124,18 +124,19 @@ public class ConvexDriverTest {
 		assertFalse(CANARY_LOADED.get());
 	}
 
+	/**
+	 * Identifier case is the database's setting, not the connection's: a URL connection
+	 * follows the standard, and a URL cannot choose otherwise.
+	 */
 	@Test
-	public void testCaseSensitiveParameter() throws Exception {
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:case_test;caseSensitive=true");
+	public void testIdentifiersFollowTheDatabase() throws Exception {
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:case_test");
 				Statement stmt = conn.createStatement()) {
 			stmt.executeUpdate("CREATE TABLE t (id INTEGER)");
+			assertFalse(stmt.executeQuery("SELECT * FROM \"T\"").next());
 			assertThrows(SQLException.class, () -> stmt.executeQuery("SELECT * FROM \"t\""));
 		}
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:case_test");
-				Statement stmt = conn.createStatement();
-				ResultSet rs = stmt.executeQuery("SELECT * FROM \"t\"")) {
-			assertFalse(rs.next(), "identifiers match regardless of case by default");
-		}
+		assertThrows(SQLException.class, () -> DriverManager.getConnection("jdbc:convex:case_test;caseSensitive=false"));
 	}
 
 	/**
@@ -329,6 +330,7 @@ public class ConvexDriverTest {
 	@Test
 	public void testDirectGetConnection() throws Exception {
 		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
+		IdentifierPolicy.LOWER.applyTo(cdb.database("direct_test"));
 		cdb.database("direct_test").tables().createTable("t",
 				new String[]{"id", "name"},
 				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR});
@@ -381,6 +383,7 @@ public class ConvexDriverTest {
 	@Test
 	public void testLegacyFormatWithRegistry() throws Exception {
 		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
+		IdentifierPolicy.LOWER.applyTo(cdb.database("legacy_test"));
 		cdb.database("legacy_test").tables().createTable("t",
 				new String[]{"id", "name"},
 				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR});

@@ -39,7 +39,7 @@ jdbc:convex:database=<dbName>              — registered database
 Parameters are appended with semicolons:
 
 ```
-jdbc:convex:file:/data/mydb.etch;caseSensitive=false
+jdbc:convex:file:/data/store.etch;database=market
 ```
 
 | Mode | URL | Description |
@@ -52,12 +52,13 @@ jdbc:convex:file:/data/mydb.etch;caseSensitive=false
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `caseSensitive` | `false` | SQL identifier case sensitivity, for queries and DDL alike |
 | `database` | file stem or instance name | Database within the instance (see [One ConvexDB, Many Databases](#one-convexdb-many-databases)) |
 
-These are the only parameters: a URL with any other is refused, and other
-connection properties are ignored. Calcite's own connection properties are set by
-the driver alone.
+This is the only parameter: a URL with any other is refused, and other connection
+properties are ignored. Calcite's own connection properties are set by the driver
+alone. How SQL names resolve is the database's own setting, not the connection's:
+the driver applies the database's identifier policy when a connection opens (see
+[Identifier Case](../README.md#identifier-case)).
 
 ### Database Identification
 

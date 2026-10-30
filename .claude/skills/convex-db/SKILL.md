@@ -47,6 +47,11 @@ CREATE TABLE users (id, name, email)
 
 Column 0 (first column) is always the primary key. Types are inferred from inserted data.
 
+Names follow the SQL standard by default: unquoted names fold to upper case and
+compare exactly, so this creates `USERS`. A table created through the lattice API as
+`users` must be quoted in SQL (`"users"`), unless the database's identifier policy
+is `:lower` (`IdentifierPolicy.LOWER.applyTo(db)`), as a PostgreSQL user would expect.
+
 ## Inserting Data
 
 ```sql

@@ -32,7 +32,7 @@ import convex.db.lattice.SQLSchema;
 public class ConvexDBClockTest {
 
 	private static final String DB = "clock-test";
-	private static final String TABLE = "t";
+	private static final String TABLE = "T";
 
 	/** A clock counting its reads, each returning the next integer. */
 	static final class Clock implements Supplier<CVMLong> {

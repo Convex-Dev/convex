@@ -10,7 +10,7 @@ LatticeHost                     ← persistence and publication policy
   │
   └── ConvexDB                  ← registered application: database name → database
         │
-        └── path("mydb")        ← SQLDatabase: :tables → table store
+        └── path("mydb")        ← SQLDatabase: :tables → table store, optional :config → settings
               │
               └── path(:tables) ← SQLSchema: table name → table entry
                     │
@@ -165,7 +165,7 @@ Every route by which state arrives reaches the policy:
 
 | Level | Function | Rule |
 |-------|----------|------|
-| database | `merge` | `:tables` by `mergeTables`; other sections are ignored on receipt and kept where held |
+| database | `merge` | `:tables` by `mergeTables`; other sections, `:config` included, are ignored on receipt and kept where held |
 | table store | `mergeTables` | union of table names; each entry by `mergeTable` |
 | table entry | `mergeTable` | LWW schema on `ctime`, own on a tie; a dropped table's tombstone wins in the same way; rows by `mergeRows`, whichever schema wins |
 | rows | `mergeRows` | by key; a row held on one side only survives if written at or after the other side's `ctime` |

@@ -16,6 +16,7 @@ import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 
 import convex.db.calcite.ConvexType;
+import convex.db.jdbc.IdentifierPolicy;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
@@ -32,6 +33,7 @@ class SortAggregateTest {
 	void setUp() throws Exception {
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database("sort_agg_test");
+		IdentifierPolicy.LOWER.applyTo(db);
 		cdb.register("sort_agg_test");
 
 		// Create table with test data

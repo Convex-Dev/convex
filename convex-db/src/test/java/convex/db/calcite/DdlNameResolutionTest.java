@@ -13,14 +13,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import convex.db.ConvexDB;
+import convex.db.jdbc.IdentifierPolicy;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
  * Name resolution in DDL and in an open connection: identifiers the parser
- * upper-cases must still find a lower-case schema and lower-case tables on a
- * case-insensitive connection, and a table created outside the connection
- * must be visible to it.
+ * upper-cases must still find a lower-case schema and lower-case tables in a
+ * database with the case-insensitive identifier policy, and a table created
+ * outside the connection must be visible to it.
  */
 class DdlNameResolutionTest {
 
@@ -37,6 +38,7 @@ class DdlNameResolutionTest {
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
 		cdb.register(dbName);
+		IdentifierPolicy.INSENSITIVE.applyTo(db);
 		db.tables().createTable("first_table", new String[]{"id", "v"}, TYPES);
 		conn = DriverManager.getConnection("jdbc:convex:database=" + dbName);
 	}

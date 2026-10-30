@@ -51,8 +51,9 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  * <pre>
  * jdbc:convex:file:/data/store.etch;database=market
  * </pre>
- * A URL may carry only {@code database} and {@code caseSensitive}, and any other
- * parameter is refused. Of the connection properties, only those two are read.
+ * A URL may carry only {@code database}, and any other parameter is refused. Of the
+ * connection properties, only that one is read. How SQL identifiers resolve is the
+ * database's own setting, {@link IdentifierPolicy}.
  *
  * <p>A file-backed database is saved durably on each commit, when a connection
  * closes, by {@link #closeAll()} and at JVM shutdown. Auto-committed statements
@@ -87,9 +88,6 @@ public class ConvexDriver extends Driver {
 
 	/** Parameter naming the database within the instance. */
 	static final String PARAM_DATABASE = "database";
-
-	/** Parameter for SQL identifier case sensitivity, {@code true} or {@code false}. */
-	static final String PARAM_CASE_SENSITIVE = "caseSensitive";
 
 	/** Open database instances, keyed by canonical identifier. */
 	public static final ConcurrentHashMap<String, ManagedInstance> instances = new ConcurrentHashMap<>();
@@ -139,7 +137,7 @@ public class ConvexDriver extends Driver {
 			throw new SQLException("Cannot resolve database for URL: " + url);
 		}
 
-		return open(cdb.database(parsed.database), (file == null) ? null : file::checkpoint, parsed.caseSensitive);
+		return open(cdb.database(parsed.database), (file == null) ? null : file::checkpoint);
 	}
 
 	/**
@@ -152,7 +150,7 @@ public class ConvexDriver extends Driver {
 	 * @return JDBC Connection
 	 */
 	public static Connection connect(ConvexDB cdb, String database) throws SQLException {
-		Connection conn = new ConvexDriver().open(cdb.database(database), null, false);
+		Connection conn = new ConvexDriver().open(cdb.database(database), null);
 		if (conn == null) {
 			throw new SQLException("Failed to create connection");
 		}
@@ -161,19 +159,20 @@ public class ConvexDriver extends Driver {
 
 	/**
 	 * Opens a Calcite connection whose schema is the given database, under its own
-	 * name. Transactions on the connection fork that database.
+	 * name, resolving identifiers by the database's {@link IdentifierPolicy}.
+	 * Transactions on the connection fork that database.
 	 *
 	 * @param db Database the connection is bound to
 	 * @param save Saves published state durably after each commit and when the
 	 *        connection closes, or null for none
-	 * @param caseSensitive Whether SQL identifiers are case sensitive
 	 * @return JDBC Connection, or null if Calcite does not accept the URL
+	 * @throws SQLException with SQLSTATE 0A000 if the database's identifier policy is unknown
 	 */
-	private Connection open(SQLDatabase db, Runnable save, boolean caseSensitive) throws SQLException {
+	private Connection open(SQLDatabase db, Runnable save) throws SQLException {
 		// Calcite reads only the properties set here, from a URL with no parameters:
 		// its plugin properties name classes to load, so none comes from a caller
 		Properties props = new Properties();
-		props.setProperty("caseSensitive", Boolean.toString(caseSensitive));
+		IdentifierPolicy.of(db).setProperties(props);
 		props.setProperty("parserFactory", "convex.db.calcite.ConvexDdlExecutor#PARSER_FACTORY");
 		// Column types are presented in this type system, so it is not optional
 		props.setProperty("typeSystem", "convex.db.calcite.ConvexTypeSystem#INSTANCE");
@@ -207,18 +206,16 @@ public class ConvexDriver extends Driver {
 		final Mode mode;
 		final String identifier; // name for mem, path for file, name for legacy
 		final String database;   // database name within the ConvexDB
-		final boolean caseSensitive;
 
-		ParsedURL(Mode mode, String identifier, String database, boolean caseSensitive) {
+		ParsedURL(Mode mode, String identifier, String database) {
 			this.mode = mode;
 			this.identifier = identifier;
 			this.database = database;
-			this.caseSensitive = caseSensitive;
 		}
 	}
 
 	/**
-	 * Parses a JDBC URL into mode, identifier, database name and case sensitivity.
+	 * Parses a JDBC URL into mode, identifier and database name.
 	 * The URL may carry only the driver's own parameters, which override the same
 	 * connection properties; no other connection property is read.
 	 *
@@ -230,7 +227,6 @@ public class ConvexDriver extends Driver {
 		// Split off semicolon-separated parameters
 		String path = params;
 		String dbParam = info.getProperty(PARAM_DATABASE);
-		String caseParam = info.getProperty(PARAM_CASE_SENSITIVE);
 		if (params.contains(";")) {
 			String[] parts = params.split(";", 2);
 			path = parts[0];
@@ -242,51 +238,42 @@ public class ConvexDriver extends Driver {
 				String val = kv.substring(eq + 1).trim();
 				switch (key) {
 					case PARAM_DATABASE -> dbParam = val;
-					case PARAM_CASE_SENSITIVE -> caseParam = val;
 					default -> throw new SQLException("Unknown connection parameter: " + key);
 				}
 			}
 		}
-		boolean caseSensitive = parseCaseSensitive(caseParam);
 
 		// Determine mode
 		if (path.startsWith("file:")) {
 			String filePath = path.substring(5);
 			String database = (dbParam != null) ? dbParam : stemName(filePath);
-			return new ParsedURL(ParsedURL.Mode.FILE, filePath, database, caseSensitive);
+			return new ParsedURL(ParsedURL.Mode.FILE, filePath, database);
 		}
 
 		if (path.startsWith("mem:")) {
 			String name = path.substring(4);
 			String database = (dbParam != null) ? dbParam : name;
-			return new ParsedURL(ParsedURL.Mode.MEM, name, database, caseSensitive);
+			return new ParsedURL(ParsedURL.Mode.MEM, name, database);
 		}
 
 		// Legacy: database=name
 		if (path.startsWith("database=")) {
 			String name = path.substring(9);
-			return new ParsedURL(ParsedURL.Mode.LEGACY, name, name, caseSensitive);
+			return new ParsedURL(ParsedURL.Mode.LEGACY, name, name);
 		}
 
 		// Bare name — treat as mem:
 		if (!path.isEmpty() && !path.contains("=")) {
 			String database = (dbParam != null) ? dbParam : path;
-			return new ParsedURL(ParsedURL.Mode.MEM, path, database, caseSensitive);
+			return new ParsedURL(ParsedURL.Mode.MEM, path, database);
 		}
 
 		// Fallback: check properties
 		if (dbParam != null) {
-			return new ParsedURL(ParsedURL.Mode.LEGACY, dbParam, dbParam, caseSensitive);
+			return new ParsedURL(ParsedURL.Mode.LEGACY, dbParam, dbParam);
 		}
 
-		return new ParsedURL(ParsedURL.Mode.MEM, "default", "default", caseSensitive);
-	}
-
-	/** Reads the case sensitivity parameter, false when absent. */
-	private static boolean parseCaseSensitive(String value) throws SQLException {
-		if (value == null || value.equalsIgnoreCase("false")) return false;
-		if (value.equalsIgnoreCase("true")) return true;
-		throw new SQLException("caseSensitive must be true or false: " + value);
+		return new ParsedURL(ParsedURL.Mode.MEM, "default", "default");
 	}
 
 	/** Extracts a name from a file path (stem without extension). */

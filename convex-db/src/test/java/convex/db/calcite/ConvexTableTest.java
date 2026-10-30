@@ -18,6 +18,7 @@ import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
+import convex.db.jdbc.IdentifierPolicy;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
@@ -43,6 +44,7 @@ public class ConvexTableTest {
 		dbName = "testdb_" + (++testCounter) + "_" + System.currentTimeMillis();
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
+		IdentifierPolicy.LOWER.applyTo(db);
 		cdb.register(dbName);
 		// Create typed table: id (INTEGER), name (VARCHAR), amount (INTEGER)
 		db.tables().createTable("test_table",
@@ -248,6 +250,7 @@ public class ConvexTableTest {
 		Supplier<CVMLong> clock = () -> CVMLong.create(ticks.incrementAndGet());
 		ConvexDB counted = ConvexDB.create(RowLWW::merge, clock);
 		String name = dbName + "_clock";
+		IdentifierPolicy.LOWER.applyTo(counted.database(name));
 		counted.database(name).tables().createTable("t",
 			new String[]{"id", "amount"}, new ConvexType[]{ConvexType.INTEGER, ConvexType.INTEGER});
 		counted.register(name);
@@ -280,6 +283,7 @@ public class ConvexTableTest {
 		ConvexDB counted = ConvexDB.create(RowLWW::merge, () -> CVMLong.create(ticks.incrementAndGet()));
 		String name = dbName + "_batch";
 		SQLDatabase cdb2 = counted.database(name);
+		IdentifierPolicy.LOWER.applyTo(cdb2);
 		cdb2.tables().createTable("t", new String[]{"id", "amount"}, new ConvexType[]{ConvexType.INTEGER, ConvexType.INTEGER});
 		counted.register(name);
 		try (Connection c = DriverManager.getConnection("jdbc:convex:database=" + name);

@@ -137,6 +137,7 @@ chain.
 | Text that is not valid input for the type (pgwire parameters) | `22P02` |
 | Stored value that does not conform to its column (from a merge) | `22000` |
 | Table definition with an unsupported SQL type | `0A000` |
+| Connection to a database whose identifier policy is unknown | `0A000` |
 | Scalar subquery returning more than one row | `21000` |
 | `INSERT` or key-changing `UPDATE` of a primary key the table already holds | `23505` |
 

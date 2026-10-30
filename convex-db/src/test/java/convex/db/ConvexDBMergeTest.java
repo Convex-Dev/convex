@@ -205,8 +205,8 @@ public class ConvexDBMergeTest {
 
 		try (Connection conn = cdb.getConnection(DB); Statement stmt = conn.createStatement()) {
 			conn.setAutoCommit(false);
-			stmt.executeUpdate("INSERT INTO frozen VALUES (2, 'two')");
-			stmt.executeUpdate("INSERT INTO plain VALUES (2, 'two')");
+			stmt.executeUpdate("INSERT INTO \"frozen\" VALUES (2, 'two')");
+			stmt.executeUpdate("INSERT INTO \"plain\" VALUES (2, 'two')");
 			insert(db, 3);
 			conn.commit();
 		}

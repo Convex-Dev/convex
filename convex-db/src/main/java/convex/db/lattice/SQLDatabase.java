@@ -10,6 +10,7 @@ import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -54,6 +55,12 @@ import convex.lattice.cursor.Cursors;
  * ({@code [:tables, name, 1, key]}) can be delivered; rows are lifted into a table
  * entry without a ctime. Deliveries to other sections are ignored, and other paths
  * refused.
+ *
+ * <p>The optional {@code :config} section holds the database's settings, a map from
+ * keywords to values, read with {@link #getSetting} and written with
+ * {@link #configure}; absent settings take their defaults. Convex DB reads
+ * {@code :identifiers} (see {@link convex.db.jdbc.IdentifierPolicy}) and keeps any
+ * other setting as it is.
  *
  * <p>The table store and tables ({@link #tables()}) are live views for table
  * operations, with no merge of their own. Connecting to a database and reading it
@@ -284,6 +291,39 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	public SQLSchema tables() {
 		return new SQLSchema(tablesPath(), clock);
+	}
+
+	/**
+	 * Returns a setting from this database's {@code :config} section.
+	 *
+	 * @param key Setting key
+	 * @return Setting value, or null if the setting or the section is absent
+	 */
+	public ACell getSetting(Keyword key) {
+		Index<Keyword, ACell> state = cursor().get();
+		if (state == null || !(state.get(ConvexDB.KEY_CONFIG) instanceof AMap<?, ?> config)) return null;
+		return config.get(key);
+	}
+
+	/**
+	 * Sets or removes a setting in this database's {@code :config} section, keeping the
+	 * other settings, and creates the section if absent. The section is written
+	 * directly to this database: it is not a table operation, so a fork does not
+	 * publish it. How the section merges between replicas is the merge policy's.
+	 *
+	 * @param key Setting key
+	 * @param value Setting value, or null to remove the setting
+	 */
+	@SuppressWarnings("unchecked")
+	public void configure(Keyword key, ACell value) {
+		Objects.requireNonNull(key, "Setting key must not be null");
+		cursor().updateAndGet(state -> {
+			Index<Keyword, ACell> db = (state == null) ? Index.none() : state;
+			ACell section = db.get(ConvexDB.KEY_CONFIG);
+			AMap<ACell, ACell> config = (AMap<ACell, ACell>) ((section instanceof AMap) ? section : Index.none());
+			config = (value == null) ? config.dissoc(key) : config.assoc(key, value);
+			return db.assoc(ConvexDB.KEY_CONFIG, config);
+		});
 	}
 
 	/**

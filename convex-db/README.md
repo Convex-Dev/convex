@@ -113,6 +113,31 @@ Convex DB supports standard SQL via Apache Calcite:
 - **Aggregations**: `GROUP BY`, `HAVING`, `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`
 - **Expressions**: Arithmetic, string functions, `CASE`, `COALESCE`, `CAST`
 
+### Identifier Case
+
+SQL names resolve as the SQL standard says by default: unquoted names fold to upper
+case, quoted names keep their case, and names compare exactly. `CREATE TABLE users`
+creates `USERS`, which `SELECT * FROM users` finds. A table created through the
+lattice API keeps the name it was given, so a table created as `users` is
+`"users"` in SQL.
+
+Each database chooses its policy in its `:identifiers` setting, and every JDBC and
+PostgreSQL wire connection opened from then on applies it:
+
+| Setting | Unquoted names | Comparison |
+|---------|----------------|------------|
+| `:upper` (default) | fold to upper case | exact |
+| `:lower` | fold to lower case, as in PostgreSQL | exact |
+| `:insensitive` | fold to upper case | any case |
+
+```java
+IdentifierPolicy.LOWER.applyTo(db);   // SELECT * FROM users now finds "users"
+```
+
+A database holding a policy this implementation does not know cannot be opened for
+SQL (`0A000`). Changing the policy of a database that already has tables changes
+which names its existing SQL resolves to.
+
 ### Transactions
 
 JDBC transaction support uses Convex's lattice component fork/sync model:
@@ -375,8 +400,12 @@ Convex DB maps between SQL types and Convex lattice types (see [SQL-TYPES.md](do
 A database map, held wherever the application roots it:
 ```
 AHashMap<AString, Index>
-  db-name → {:tables table-store}
+  db-name → {:tables table-store, :config settings}
 ```
+
+The `:config` section is optional: a map of setting keywords to values, such as
+`{:identifiers :lower}` (see [Identifier Case](#identifier-case)). Absent settings
+take their defaults, and settings Convex DB does not use are kept.
 
 Where table-store is:
 ```

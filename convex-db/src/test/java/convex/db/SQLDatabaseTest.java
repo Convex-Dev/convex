@@ -30,6 +30,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.db.ConvexDB;
+import convex.db.jdbc.IdentifierPolicy;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
@@ -525,6 +526,8 @@ public class SQLDatabaseTest {
 		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 		SQLDatabase db1 = cdb.database("db_alpha");
 		SQLDatabase db2 = cdb.database("db_beta");
+		IdentifierPolicy.LOWER.applyTo(db1);
+		IdentifierPolicy.LOWER.applyTo(db2);
 		db1.tables().createTable("t1", new String[]{"id", "val"});
 		db2.tables().createTable("t2", new String[]{"id", "val"});
 		db1.tables().insert("t1", 1, "alpha");

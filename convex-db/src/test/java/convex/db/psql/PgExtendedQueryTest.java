@@ -22,6 +22,7 @@ import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
+import convex.db.jdbc.IdentifierPolicy;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import io.netty.buffer.ByteBuf;
@@ -49,6 +50,7 @@ public class PgExtendedQueryTest {
 		dbName = "pgext_" + DB_COUNTER.getAndIncrement();
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
+		IdentifierPolicy.LOWER.applyTo(db);
 		cdb.register(dbName);
 
 		db.tables().createTable("users", new String[]{"id", "name", "email"}, new ConvexColumnType[] {

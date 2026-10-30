@@ -27,6 +27,7 @@ import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexType;
 import convex.db.calcite.ConvexTypeSystem;
+import convex.db.jdbc.IdentifierPolicy;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.psql.PgServer;
@@ -60,6 +61,7 @@ public class IntegerColumnsTest {
 		dbName = "integers_" + DB_COUNTER.getAndIncrement();
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
+		IdentifierPolicy.LOWER.applyTo(db);
 		cdb.register(dbName);
 
 		// Rows are written through the lattice API, which stores any CVM integer

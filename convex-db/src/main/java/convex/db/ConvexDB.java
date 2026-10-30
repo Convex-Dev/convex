@@ -92,6 +92,9 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	/** Keyword for the tables section within a database. */
 	public static final Keyword KEY_TABLES = Keyword.intern("tables");
 
+	/** Keyword for the optional settings section within a database. */
+	public static final Keyword KEY_CONFIG = Keyword.intern("config");
+
 	// ========== Named instance registry ==========
 
 	/** Registry of ConvexDB instances available for JDBC/PG access. */

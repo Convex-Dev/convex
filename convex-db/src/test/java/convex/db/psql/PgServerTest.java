@@ -27,6 +27,7 @@ import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 
 import convex.db.calcite.ConvexType;
+import convex.db.jdbc.IdentifierPolicy;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
@@ -49,6 +50,7 @@ public class PgServerTest {
 		// Create and register a test database
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
+		IdentifierPolicy.LOWER.applyTo(db);
 		cdb.register(dbName);
 
 		// Create users table using SQLSchema API

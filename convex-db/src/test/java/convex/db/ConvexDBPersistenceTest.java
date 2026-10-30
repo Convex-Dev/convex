@@ -40,7 +40,7 @@ import convex.node.NodeServer;
 public class ConvexDBPersistenceTest {
 
 	private static final String DB_NAME = "persist_test";
-	private static final String TABLE_NAME = "t";
+	private static final String TABLE_NAME = "T";
 
 	private NodeServer<AHashMap<AString,Index<Keyword,ACell>>> server;
 	private EtchStore store;
