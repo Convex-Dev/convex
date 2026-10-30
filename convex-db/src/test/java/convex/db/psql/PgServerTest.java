@@ -790,6 +790,46 @@ public class PgServerTest {
 		assertFalse(userExists(20));
 	}
 
+	/**
+	 * A simple query, sent as one Query message, whose statements contain semicolons in
+	 * literals and comments; then DEALLOCATE of a named statement. (pgjdbc splits statements
+	 * itself, so the raw protocol is what reaches the server's splitting.)
+	 */
+	@Test
+	public void testSimpleQuerySplittingAndDeallocate() throws Exception {
+		try (Socket socket = new Socket("localhost", server.getPort())) {
+			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+			DataInputStream in = new DataInputStream(socket.getInputStream());
+			sendStartupMessage(out, dbName, "testuser");
+			skipToReadyForQuery(in);
+
+			sendQuery(out, "INSERT INTO users (id, name, email) VALUES (30, 'a; b', 'x;y@example.com'); "
+				+ "INSERT INTO users (id, name, email) VALUES (31, 'c', 'd') -- comment; not a statement\n;");
+			assertEquals("CCZ", readMessageTypes(in), "two statements, each completed");
+
+			java.io.ByteArrayOutputStream parse = new java.io.ByteArrayOutputStream();
+			parse.write("named_one".getBytes(StandardCharsets.UTF_8));
+			parse.write(0);
+			parse.write("SELECT 1".getBytes(StandardCharsets.UTF_8));
+			parse.write(0);
+			parse.write(new byte[] {0, 0});
+			sendMessage(out, 'P', parse.toByteArray());
+			sendMessage(out, 'S', new byte[0]);
+			assertEquals("1Z", readMessageTypes(in));
+			sendQuery(out, "DEALLOCATE named_one");
+			assertEquals("CZ", readMessageTypes(in));
+			sendQuery(out, "DEALLOCATE named_one");
+			assertEquals("EZ", readMessageTypes(in), "a second DEALLOCATE finds no statement");
+		}
+		try (Connection conn = DriverManager.getConnection(pgUrl());
+			 Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery("SELECT name FROM users WHERE id = 30")) {
+			assertTrue(rs.next());
+			assertEquals("a; b", rs.getString(1));
+		}
+		assertTrue(userExists(31));
+	}
+
 	private void skipToReadyForQuery(DataInputStream in) throws IOException {
 		while (true) {
 			byte type = in.readByte();

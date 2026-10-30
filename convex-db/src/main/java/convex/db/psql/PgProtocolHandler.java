@@ -28,7 +28,6 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	private static final AtomicInteger processIdCounter = new AtomicInteger(1000);
 
 	/** Single-quoted literals and double-quoted identifiers, with doubled-quote escapes */
-	private static final Pattern QUOTED = Pattern.compile("'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"");
 
 	/** The ::type casts removed by rewriteQuery, matched as whole type names */
 	private static final Pattern CAST = Pattern.compile(
@@ -243,19 +242,11 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			return;
 		}
 
-		// Split on semicolons and execute each statement
-		// Note: This is a simple split - doesn't handle semicolons in strings
-		String[] statements = fullSql.split(";");
-
-		for (String sql : statements) {
-			sql = sql.trim();
-			if (sql.isEmpty()) {
-				continue;
-			}
-
+		for (String sql : PgSqlScanner.split(fullSql)) {
 			try {
 				if (transactionControl(ctx, sql)) continue;
 				requireTransactionNotFailed();
+				if (deallocate(ctx, sql)) continue;
 
 				// Handle special commands
 				if (sql.toUpperCase().startsWith("SET ")) {
@@ -495,7 +486,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 * value does not count as an operator.
 	 */
 	static boolean hasRegexOperator(String sql) {
-		String code = QUOTED.matcher(sql).replaceAll("''");
+		String code = PgSqlScanner.code(sql);
 		return code.contains("!~") || code.contains("~*") ||
 			(code.contains("~") && !code.contains("~=") && !code.contains("~~"));
 	}
@@ -714,6 +705,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		// pgjdbc sends COMMIT and ROLLBACK through the extended protocol
 		if (transactionControl(ctx, stmt.query().trim())) return;
 		requireTransactionNotFailed();
+		if (deallocate(ctx, stmt.query())) return;
 
 		String sql = rewriteQuery(stmt.query());
 		int[] paramTypes = stmt.paramTypes();
@@ -1064,6 +1056,49 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			result = result.replaceFirst(placeholder, replacement);
 		}
 		return result;
+	}
+
+	/**
+	 * Runs {@code DEALLOCATE [PREPARE] name | ALL}, the SQL form of closing prepared
+	 * statements, which clients such as PHP's PDO send. An unquoted name folds to lower
+	 * case, as PostgreSQL folds identifiers; an unknown name is 26000.
+	 *
+	 * @return true if the statement was DEALLOCATE and has completed
+	 */
+	private boolean deallocate(ChannelHandlerContext ctx, String sql) throws SQLException {
+		String target = deallocateTarget(sql);
+		if (target == null) return false;
+		if (target.isEmpty()) {
+			for (PreparedStmt stmt : statements.values()) closeJdbcStatement(stmt);
+			statements.clear();
+			write(ctx, new CommandComplete("DEALLOCATE ALL"));
+		} else {
+			PreparedStmt stmt = statements.remove(target);
+			if (stmt == null) throw new SQLException("prepared statement \"" + target + "\" does not exist", "26000");
+			closeJdbcStatement(stmt);
+			write(ctx, new CommandComplete("DEALLOCATE"));
+		}
+		return true;
+	}
+
+	/**
+	 * The statement name a DEALLOCATE names: empty for ALL, null if the statement is not
+	 * DEALLOCATE.
+	 */
+	static String deallocateTarget(String sql) throws SQLException {
+		String s = sql.strip();
+		while (s.endsWith(";")) s = s.substring(0, s.length() - 1).strip();
+		String[] words = s.split("\\s+", 3);
+		if (!words[0].equalsIgnoreCase("DEALLOCATE")) return null;
+		String name = (words.length > 1 && words[1].equalsIgnoreCase("PREPARE"))
+			? (words.length > 2 ? words[2] : "")
+			: s.substring(words[0].length()).strip();
+		if (name.isEmpty()) throw new SQLException("syntax error at end of input", "42601");
+		if (name.length() > 1 && name.startsWith("\"") && name.endsWith("\"")) {
+			return name.substring(1, name.length() - 1).replace("\"\"", "\"");
+		}
+		if (name.equalsIgnoreCase("ALL")) return "";
+		return name.toLowerCase(java.util.Locale.ROOT);
 	}
 
 	private void handleClose(ChannelHandlerContext ctx, PgMessageDecoder.Close close) {

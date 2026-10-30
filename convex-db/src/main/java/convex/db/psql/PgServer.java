@@ -154,6 +154,18 @@ public class PgServer {
 	 */
 	public void startAndWait() throws InterruptedException {
 		start();
+		awaitClose();
+	}
+
+	/**
+	 * Blocks until the started server closes, so a caller can act between the server
+	 * accepting connections and waiting on it.
+	 *
+	 * @throws IllegalStateException if the server has not been started
+	 * @throws InterruptedException if interrupted while waiting
+	 */
+	public void awaitClose() throws InterruptedException {
+		if (serverChannel == null) throw new IllegalStateException("PgServer has not been started");
 		serverChannel.closeFuture().sync();
 	}
 

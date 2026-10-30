@@ -30,6 +30,18 @@ public class PgProtocolHandlerTest {
 	}
 
 	@Test
+	public void testDeallocateTarget() throws java.sql.SQLException {
+		assertEquals("pdo_stmt_00000001", PgProtocolHandler.deallocateTarget("DEALLOCATE pdo_stmt_00000001"));
+		assertEquals("s_1", PgProtocolHandler.deallocateTarget("deallocate prepare S_1;"));
+		assertEquals("S_1", PgProtocolHandler.deallocateTarget("DEALLOCATE \"S_1\""));
+		assertEquals("", PgProtocolHandler.deallocateTarget("DEALLOCATE ALL"));
+		assertEquals("", PgProtocolHandler.deallocateTarget("DEALLOCATE PREPARE ALL"));
+		assertNull(PgProtocolHandler.deallocateTarget("SELECT 1"));
+		assertNull(PgProtocolHandler.deallocateTarget("DEALLOCATED"));
+		assertEquals("42601", assertThrows(java.sql.SQLException.class, () -> PgProtocolHandler.deallocateTarget("DEALLOCATE")).getSQLState());
+	}
+
+	@Test
 	public void testReturnsRows() {
 		for (String sql : new String[] {"SELECT * FROM t WHERE id = ?", "select 1", "VALUES (1)",
 				"WITH a AS (SELECT 1) SELECT * FROM a", "SELECT 1 UNION SELECT 2", "SELECT * FROM t ORDER BY id",
