@@ -335,7 +335,11 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	// ========== Row Operations ==========
 
-	/** Inserts a row into a table. First column is used as primary key. */
+	/**
+	 * Inserts or replaces a row in a table: an upsert, replacing any row of its key. First
+	 * column is used as primary key. {@link #insertNew} inserts only new rows, as SQL's
+	 * INSERT does.
+	 */
 	public boolean insert(String tableName, AVector<ACell> row) {
 		return insert(Strings.create(tableName), row);
 	}
@@ -348,9 +352,9 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	/**
-	 * Inserts rows into a table in one atomic write, as {@link SQLTable#insertRows}. The
-	 * first column of each row is its primary key. Every key is encoded before anything is
-	 * written, so a row whose key cannot be one leaves the table unchanged.
+	 * Inserts or replaces rows in a table in one atomic write, as {@link SQLTable#insertRows}:
+	 * an upsert. The first column of each row is its primary key. Every key is encoded before
+	 * anything is written, so a row whose key cannot be one leaves the table unchanged.
 	 *
 	 * @param tableName Table name
 	 * @param rows The rows
@@ -363,9 +367,29 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	public long insertAll(AString tableName, Iterable<AVector<ACell>> rows) {
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return 0;
+		return table.insertRows(keyed(rows));
+	}
+
+	/**
+	 * Inserts only new rows into a table, in one atomic write, as SQL's INSERT and
+	 * {@link SQLTable#insertNewRows}: no row may have a key the table holds or another row has.
+	 *
+	 * @param tableName Table name
+	 * @param rows The rows, each with its primary key first
+	 * @return The number of rows written, 0 if the table is not live
+	 * @throws DuplicateKeyException if a key is taken, with nothing written
+	 */
+	public long insertNew(AString tableName, Iterable<AVector<ACell>> rows) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return 0;
+		return table.insertNewRows(keyed(rows));
+	}
+
+	/** Rows with their primary keys encoded. */
+	private static java.util.List<SQLTable.Row> keyed(Iterable<AVector<ACell>> rows) {
 		java.util.List<SQLTable.Row> keyed = new java.util.ArrayList<>();
 		for (AVector<ACell> row : rows) keyed.add(new SQLTable.Row(toWriteKey(row.get(0)), row));
-		return table.insertRows(keyed);
+		return keyed;
 	}
 
 	/** Inserts a row with auto-conversion from Java types. First value is primary key. */

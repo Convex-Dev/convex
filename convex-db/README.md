@@ -254,8 +254,12 @@ schema.insert("users", values);
 // Insert with auto-conversion from Java values (first value is the primary key)
 schema.insert("users", 2, "Bob", "bob@example.com");
 
+// insert and insertAll are upserts: a row replaces any row of its key
 // Insert several rows in one atomic write
 schema.insertAll("users", List.of(row1, row2, row3));
+
+// Insert only new rows, as SQL's INSERT does: a taken key throws DuplicateKeyException
+schema.insertNew(Strings.create("users"), List.of(row4));
 
 // Select by key
 AVector<ACell> row = schema.selectByKey("users", CVMLong.create(1));

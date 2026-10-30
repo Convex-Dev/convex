@@ -138,6 +138,7 @@ chain.
 | Stored value that does not conform to its column (from a merge) | `22000` |
 | Table definition with an unsupported SQL type | `0A000` |
 | Scalar subquery returning more than one row | `21000` |
+| `INSERT` or key-changing `UPDATE` of a primary key the table already holds | `23505` |
 
 ## PostgreSQL Wire Protocol
 

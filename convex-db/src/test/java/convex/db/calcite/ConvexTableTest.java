@@ -298,6 +298,53 @@ public class ConvexTableTest {
 		}
 	}
 
+	/**
+	 * INSERT adds only new rows, as the SQL standard has it: a key the table holds, or one
+	 * repeated in the statement, is a unique violation (23505) and writes nothing. A deleted
+	 * key may be inserted again.
+	 */
+	@Test
+	void testInsertOfAnExistingKeyIsAUniqueViolation() throws Exception {
+		try (Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'one', 10)");
+
+			SQLException taken = assertThrows(SQLException.class,
+				() -> stmt.executeUpdate("INSERT INTO test_table VALUES (2, 'two', 20), (1, 'uno', 11)"));
+			assertEquals("23505", sqlState(taken));
+			assertEquals(1, db.tables().getRowCount("test_table"), "nothing of the statement is written");
+			assertEquals("one", db.tables().selectByKey("test_table", CVMLong.create(1)).get(1).toString());
+
+			SQLException repeated = assertThrows(SQLException.class,
+				() -> stmt.executeUpdate("INSERT INTO test_table VALUES (3, 'a', 1), (3, 'b', 2)"));
+			assertEquals("23505", sqlState(repeated));
+			assertNull(db.tables().selectByKey("test_table", CVMLong.create(3)));
+
+			stmt.executeUpdate("DELETE FROM test_table WHERE id = 1");
+			assertEquals(1, stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'again', 12)"));
+		}
+	}
+
+	@Test
+	void testInsertNew() {
+		convex.core.data.AVector<convex.core.data.ACell> row =
+			convex.core.data.Vectors.of(CVMLong.create(5), convex.core.data.Strings.create("e"), CVMLong.create(5));
+		convex.core.data.AString t = convex.core.data.Strings.create("test_table");
+		assertEquals(1, db.tables().insertNew(t, java.util.List.of(row)));
+		convex.db.lattice.DuplicateKeyException e = assertThrows(convex.db.lattice.DuplicateKeyException.class,
+			() -> db.tables().insertNew(t, java.util.List.of(row)));
+		assertEquals(row, e.getRow());
+		// The lattice API's insert is an upsert
+		assertTrue(db.tables().insert("test_table", row));
+	}
+
+	/** The SQLSTATE of the first SQLException in the cause chain. */
+	private static String sqlState(Throwable t) {
+		for (Throwable c = t; c != null; c = c.getCause()) {
+			if (c instanceof SQLException e && e.getSQLState() != null) return e.getSQLState();
+		}
+		return null;
+	}
+
 	@Test
 	void testInsertAll() {
 		java.util.List<convex.core.data.AVector<convex.core.data.ACell>> rows = java.util.List.of(

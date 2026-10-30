@@ -309,8 +309,9 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	public record Row(ABlob key, AVector<ACell> values) {}
 
 	/**
-	 * Inserts rows into this table in one write, all stamped with one reading of this
-	 * table's clock. A row replaces any row of its key, a later row in the batch an earlier.
+	 * Inserts or replaces rows in this table in one write, all stamped with one reading of
+	 * this table's clock: an upsert. A row replaces any row of its key, a later row in the
+	 * batch an earlier. {@link #insertNewRows} inserts only new rows, as SQL's INSERT does.
 	 *
 	 * @param rows The rows
 	 * @return The number of rows written, 0 if the table is not live
@@ -328,15 +329,46 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * @param timestamp Insert timestamp
 	 * @return The number of rows written, 0 if the table is not live
 	 */
-	@SuppressWarnings("unchecked")
 	public long insertRows(List<Row> rows, CVMLong timestamp) {
+		return write(rows, timestamp, false);
+	}
+
+	/**
+	 * Inserts rows only if they are all new, in one write stamped with one reading of this
+	 * table's clock: as SQL's INSERT, no row may have a key the table holds as a live row, or
+	 * a key another of the rows has. The check and the write are one atomic update, against
+	 * this replica's state; rows other replicas insert meanwhile are reconciled by the
+	 * database's merge policy.
+	 *
+	 * @param rows The rows; a list, since the write may be retried and read it again
+	 * @return The number of rows written, 0 if the table is not live
+	 * @throws DuplicateKeyException if a key is taken, with nothing written
+	 */
+	public long insertNewRows(List<Row> rows) {
+		return write(rows, clock.get(), true);
+	}
+
+	@SuppressWarnings("unchecked")
+	private long write(List<Row> rows, CVMLong timestamp, boolean newOnly) {
 		long[] written = new long[1];
+		Row[] taken = new Row[1];
 		cursor().updateAndGet(state -> {
 			written[0] = 0;
+			taken[0] = null;
 			if (state == null || state.get(POS_SCHEMA) == null) return state;
 			requireSupportedVersion(state);
 			Index<ABlob, AVector<ACell>> index = (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
 			if (index == null) index = Index.none();
+			if (newOnly) {
+				java.util.Set<ABlob> keys = new java.util.HashSet<>();
+				for (Row row : rows) {
+					AVector<ACell> existing = index.get(row.key());
+					if ((existing != null && SQLRow.isLive(existing)) || !keys.add(row.key())) {
+						taken[0] = row;
+						return state;
+					}
+				}
+			}
 			long liveCount = getLiveCount(state);
 			for (Row row : rows) {
 				// Count the rows this write makes live
@@ -348,6 +380,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			// ctime is the creation time: row writes leave it unchanged (CAD039)
 			return entry(state.get(POS_SCHEMA), index, state.get(POS_CTIME), liveCount, versionField(state));
 		});
+		if (taken[0] != null) throw new DuplicateKeyException(taken[0].values());
 		return written[0];
 	}
 

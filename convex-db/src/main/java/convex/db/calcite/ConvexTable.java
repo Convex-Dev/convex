@@ -203,8 +203,10 @@ public class ConvexTable extends AbstractQueryableTable
 	// ========== DML Operations (called from generated code) ==========
 
 	/**
-	 * Inserts the rows of an INSERT in one atomic write: every value is converted to its
-	 * column's type first, so a value that does not fit leaves the table unchanged.
+	 * Inserts the rows of an INSERT in one atomic write, as the SQL standard has it: every
+	 * value is converted to its column's type first, and a key the table already holds, or
+	 * one repeated in the statement, is a unique violation (SQLSTATE 23505). Either way
+	 * nothing is written.
 	 */
 	public long executeInsert(Enumerable<?> input) {
 		try {
@@ -213,7 +215,9 @@ public class ConvexTable extends AbstractQueryableTable
 				Object[] row=normaliseRow(value);
 				if (row != null && row.length > 0) rows.add(toCells(row));
 			}
-			return schema.getTables().insertAll(tableName, rows);
+			return schema.getTables().insertNew(convex.core.data.Strings.create(tableName), rows);
+		} catch (convex.db.lattice.DuplicateKeyException e) {
+			throw uniqueViolation(e.getRow().get(0), e);
 		} catch (ExceptionInInitializerError e) {
 			throw wrapTypeError(e, "INSERT");
 		}
@@ -259,8 +263,7 @@ public class ConvexTable extends AbstractQueryableTable
 				// new row on a replica.
 				if (pkBeingUpdated && !oldPk.equals(newPk)) {
 					if (schema.getTables().selectByKey(tableName, newPk) != null) {
-						throw new RuntimeException("Unique constraint violation: primary key '" +
-							newPk + "' already exists in table '" + tableName + "'");
+						throw uniqueViolation(newPk, null);
 					}
 					schema.getTables().deleteByKey(tableName, oldPk);
 				}
@@ -313,6 +316,14 @@ public class ConvexTable extends AbstractQueryableTable
 	private boolean insertRow(Object[] row) {
 		if (row == null || row.length < 1) return false;
 		return schema.getTables().insert(tableName, toCells(row));
+	}
+
+	/** A unique violation of this table's primary key, SQLSTATE 23505 in the cause chain. */
+	private RuntimeException uniqueViolation(ACell key, Throwable cause) {
+		String message = "Unique constraint violation: duplicate key value violates the primary key of table \""
+			+ tableName + "\": key (" + key + ") already exists";
+		java.sql.SQLException sql = new java.sql.SQLException(message, "23505", cause);
+		return new IllegalStateException(message, sql);
 	}
 
 	/** A row's values as cells of their columns' types. */

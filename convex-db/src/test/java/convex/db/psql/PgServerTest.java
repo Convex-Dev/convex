@@ -922,6 +922,16 @@ public class PgServerTest {
 		}
 	}
 
+	/** A PostgreSQL client sees an INSERT of an existing key as a unique violation, 23505. */
+	@Test
+	public void testInsertOfAnExistingKeyIs23505() throws Exception {
+		try (Connection conn = DriverManager.getConnection(pgUrl()); Statement stmt = conn.createStatement()) {
+			java.sql.SQLException e = assertThrows(java.sql.SQLException.class,
+				() -> stmt.executeUpdate("INSERT INTO users (id, name, email) VALUES (1, 'Again', 'again@example.com')"));
+			assertEquals("23505", e.getSQLState());
+		}
+	}
+
 	/** setAutoCommit(false) sends BEGIN, commit() sends COMMIT: another connection sees the row. */
 	@Test
 	public void testTransactionCommitIsVisibleElsewhere() throws Exception {
