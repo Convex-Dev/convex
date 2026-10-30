@@ -551,29 +551,66 @@ public class RefTest {
 	}
 
 	@Test
-	public void testEmbeddingCheckCreatesNoRef() {
-		// Fresh values never handed to getRef: embedded status is a fact about the value,
-		// so asking for it must not leave a Ref behind. Three shapes: fully embedded,
-		// a branch, and embedded with a branch child (which keeps no size cache).
+	public void testEmbeddingCheckCreatesRefOnlyForWalk() {
+		// A check that walks the children keeps its answer on a Ref, created when the value
+		// holds none. Three shapes: fully embedded, a branch, and embedded with a branch child.
 		Random rnd=new Random(811);
 		AHashMap<CVMLong,CVMLong> small=Maps.of(1L,2L,3L,4L);
 		AVector<CVMLong> branch=Vectors.empty();
 		for (int i=0; i<300; i++) branch=branch.conj(CVMLong.create(i));
 		AHashMap<CVMLong,ACell> mixed=Maps.of(1L,Blob.createRandom(rnd,200));
 		for (ACell c : new ACell[] {small,branch,mixed}) {
-			assertTrue(c.isCanonical()); // a non-canonical cell holds a Ref to its canonical form
+			assertTrue(c.isCanonical()); // a non-canonical cell measures through its canonical form
 			assertNull(c.cachedRef);
 			boolean embedded=c.isEmbedded();
 			assertEquals(c.getEncodingLength()<=Format.MAX_EMBEDDED_LENGTH, embedded);
+			Ref<?> r=c.cachedRef;
+			assertNotNull(r);
+			assertEquals(embedded?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK, r.getFlags()&Ref.EMBEDDING_MASK);
 			assertEquals(embedded, c.isEmbedded());
-			assertNull(c.cachedRef);
+			assertSame(r, c.cachedRef);
 		}
 		assertTrue(small.isEmbedded());
 		assertFalse(branch.isEmbedded());
 		assertTrue(mixed.isEmbedded());
-		// A fully embedded value records its zero memory size, so the next check reads a field
 		assertEquals(Format.FULL_EMBEDDED_MEMORY_SIZE, small.memorySize);
 		assertTrue(mixed.memorySize<0);
+
+		// No children: the header length answers, and an embedded value keeps a zero memory size
+		Blob smallBlob=Blob.createRandom(rnd,100);
+		assertNull(smallBlob.cachedRef);
+		assertTrue(smallBlob.isEmbedded());
+		assertNull(smallBlob.cachedRef);
+		assertEquals(Format.FULL_EMBEDDED_MEMORY_SIZE, smallBlob.memorySize);
+		Blob bigBlob=Blob.createRandom(rnd,1000);
+		assertFalse(bigBlob.isEmbedded());
+		assertNull(bigBlob.cachedRef);
+
+		// A cached encoding answers from its length
+		AHashMap<CVMLong,ACell> encoded=Maps.of(2L,Blob.createRandom(rnd,200));
+		encoded.getEncoding();
+		assertNull(encoded.cachedRef);
+		assertTrue(encoded.isEmbedded());
+		assertNull(encoded.cachedRef);
+
+		// A non-canonical value measures through its canonical form and records on the Ref
+		// that getCanonical leaves behind, whether the walk completes or stops early
+		ACell[] blobs=new ACell[8];
+		for (int i=0; i<8; i++) blobs[i]=Blob.createRandom(rnd,200);
+		AVector<ACell> oneBlob=Vectors.of(blobs[0]);
+		AVector<ACell> eightBlobs=Vectors.of((Object[])blobs);
+		for (ACell c : new ACell[] {oneBlob,eightBlobs}) {
+			assertFalse(c.isCanonical());
+			assertNull(c.cachedRef);
+			boolean embedded=c.isEmbedded();
+			Ref<?> r=c.cachedRef;
+			assertNotNull(r);
+			assertEquals(embedded?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK, r.getFlags()&Ref.EMBEDDING_MASK);
+			assertEquals(embedded, c.isEmbedded());
+			assertSame(r, c.cachedRef);
+		}
+		assertTrue(oneBlob.isEmbedded());
+		assertFalse(eightBlobs.isEmbedded());
 	}
 
 	@Test

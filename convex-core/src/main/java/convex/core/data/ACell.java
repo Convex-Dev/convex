@@ -465,13 +465,13 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 *
 	 * Answers from what this Cell already holds: a zero memory size, a flag on its cached
 	 * Ref, or the length of its cached encoding. Otherwise measures the encoding, stopping
-	 * as soon as the embedded limit is passed. Creates no Ref on a canonical Cell, since
-	 * embedded status is a fact about the value while a Ref says where a value lives; a
-	 * non-canonical Cell measures through its canonical form, which {@link #getCanonical()}
-	 * keeps on a Ref. A measurement records the status on a Ref this Cell already holds,
-	 * and a zero memory size when the Cell is fully embedded, so a repeat in either case
-	 * reads a field. A Cell holding neither is measured again, a walk bounded by the
-	 * embedded limit.
+	 * as soon as the embedded limit is passed. A measurement that walks the children is
+	 * the one costly answer, so it is kept on a Ref, created for the purpose when the Cell
+	 * holds none: a Cell with children that needs measuring is about to be placed in a
+	 * parent or persisted and needs its Ref anyway. An answer read from a field or a
+	 * cached encoding costs the same again and creates nothing. A non-canonical Cell
+	 * measures through its canonical form, which {@link #getCanonical()} keeps on a Ref,
+	 * and records there.
 	 *
 	 * Subclasses should override this if they have a cheap O(1)
 	 * way to determine if they are embedded or otherwise.
@@ -485,10 +485,17 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 			int flags=ref.flags;
 			if ((flags&Ref.KNOWN_EMBEDDED_MASK)!=0) return true;
 			if ((flags&Ref.NON_EMBEDDED_MASK)!=0) return false;
+		} else if (encoding==null && isCanonical() && getRefCount()>0) {
+			// Measuring means a walk over the children: keep the result on a Ref, which a
+			// Cell with children will need anyway. An answer read from a field or a cached
+			// encoding costs the same again, so those create nothing
+			ref=getRef();
 		}
 		boolean embedded=getEncodingLength(Format.MAX_EMBEDDED_LENGTH)>0;
-		// A measurement records the status on the cached Ref itself; a cached encoding
-		// answers from its length without one, so record on the Ref here for both paths
+		// A non-canonical Cell now holds its canonical form's Ref: record there
+		if (ref==null) ref=cachedRef;
+		// A completed walk records on the cached Ref itself; a cached encoding or a walk
+		// that stops as non-embedded does not, so record here for every path
 		if (ref!=null) ref.flags|=embedded?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
 		return embedded;
 	}
