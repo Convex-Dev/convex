@@ -250,14 +250,17 @@ public class ConvexTable extends AbstractQueryableTable
 				ACell oldPk = toCell(row[0], 0);
 				ACell newPk = toCell(updatedRow[0], 0);
 
+				// A changed key moves the row: free the old key first, once the new one is known
+				// to be free. Otherwise the insert replaces the row under its key in one write;
+				// deleting first would publish a tombstone that can tie with, and outlive, the
+				// new row on a replica.
 				if (pkBeingUpdated && !oldPk.equals(newPk)) {
 					if (schema.getTables().selectByKey(tableName, newPk) != null) {
 						throw new RuntimeException("Unique constraint violation: primary key '" +
 							newPk + "' already exists in table '" + tableName + "'");
 					}
+					schema.getTables().deleteByKey(tableName, oldPk);
 				}
-
-				schema.getTables().deleteByKey(tableName, oldPk);
 				if (insertRow(updatedRow)) {
 					count++;
 				}

@@ -7,11 +7,14 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
@@ -235,6 +238,38 @@ public class ConvexTableTest {
 	/**
 	 * Tests that WHERE clause with no matches returns 0 updated rows.
 	 */
+	/**
+	 * An UPDATE that keeps its key writes the row once; only a key change deletes the old
+	 * row first. Each write reads the database clock once, so a counting clock sees them.
+	 */
+	@Test
+	void testUpdateWritesOnce() throws Exception {
+		AtomicLong ticks = new AtomicLong();
+		Supplier<CVMLong> clock = () -> CVMLong.create(ticks.incrementAndGet());
+		ConvexDB counted = ConvexDB.create(RowLWW::merge, clock);
+		String name = dbName + "_clock";
+		counted.database(name).tables().createTable("t",
+			new String[]{"id", "amount"}, new ConvexType[]{ConvexType.INTEGER, ConvexType.INTEGER});
+		counted.register(name);
+		try (Connection c = DriverManager.getConnection("jdbc:convex:database=" + name);
+			 Statement stmt = c.createStatement()) {
+			stmt.executeUpdate("INSERT INTO t VALUES (1, 10)");
+			long before = ticks.get();
+			assertEquals(1, stmt.executeUpdate("UPDATE t SET amount = 20 WHERE id = 1"));
+			assertEquals(before + 1, ticks.get(), "an update in place is one write");
+			assertEquals(1, stmt.executeUpdate("UPDATE t SET id = 2 WHERE id = 1"));
+			assertEquals(before + 3, ticks.get(), "a key change deletes the old row, then writes the new");
+			try (ResultSet rs = stmt.executeQuery("SELECT id, amount FROM t")) {
+				assertTrue(rs.next());
+				assertEquals(2, rs.getInt(1));
+				assertEquals(20, rs.getInt(2));
+				assertFalse(rs.next());
+			}
+		} finally {
+			counted.unregister(name);
+		}
+	}
+
 	@Test
 	void testUpdateNoMatch() throws SQLException {
 		try (Statement stmt = conn.createStatement()) {
