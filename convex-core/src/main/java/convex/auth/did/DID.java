@@ -20,12 +20,16 @@ import convex.core.util.Utils;
  * - did:convex:13
  * - did:convex:id.foo
  *
- * The method-specific id is held as written in the DID string, normalised per
- * RFC 3986 within the DID syntax: percent-encoded idchars are decoded, other
- * percent-encodings keep upper-case hex. An encoded reserved character differs
- * from the raw one, so did:web:example.com%3A8080 (a port) is not
- * did:web:example.com:8080 (a path). Methods that give an encoding meaning
- * decode it when resolving.
+ * The method-specific id is held as written in the DID string, in the
+ * normalised form CAD043 specifies: RFC 3986 syntax-based normalisation
+ * (section 6.2.2) within the DID Core syntax. An encoded reserved character
+ * differs from the raw one (RFC 3986 section 2.2), so did:web:example.com%3A8080
+ * (a port) is not did:web:example.com:8080 (a path). Methods that give an
+ * encoding meaning decode it when resolving.
+ *
+ * @see <a href="https://docs.convex.world/docs/cad/did#did-syntax">CAD043: DID Syntax</a>
+ * @see <a href="https://www.w3.org/TR/did-core/#did-syntax">W3C DID Core: DID Syntax</a>
+ * @see <a href="https://www.rfc-editor.org/rfc/rfc3986#section-6.2.2">RFC 3986: Syntax-Based Normalization</a>
  */
 public class DID {
 
@@ -159,10 +163,11 @@ public class DID {
     }
 
     /**
-     * Normalises a written method-specific id. A percent-encoded idchar
-     * (ALPHA / DIGIT / "." / "-" / "_") is decoded, as RFC 3986 decodes
-     * unreserved characters; "~" is unreserved but not an idchar, so it stays
-     * encoded. Other percent-encodings keep their meaning, with upper-case hex.
+     * Normalises a written method-specific id. A percent-encoded DID Core
+     * idchar (ALPHA / DIGIT / "." / "-" / "_") is decoded, as RFC 3986 section
+     * 6.2.2.2 decodes unreserved characters; "~" is unreserved but not an
+     * idchar, so it stays encoded. Other percent-encodings keep their meaning,
+     * with upper-case hex (RFC 3986 section 6.2.2.1).
      * Raw idchars and the ":" separator are kept; any other character is
      * percent-encoded as UTF-8. Note URLDecoder is unsuitable here: it decodes
      * reserved characters and form-decodes "+" as space.
