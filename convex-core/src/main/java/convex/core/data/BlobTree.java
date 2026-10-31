@@ -1,10 +1,7 @@
 package convex.core.data;
 
-import java.io.InputStream;
-import java.io.SequenceInputStream;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
-import java.util.Enumeration;
 
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
@@ -461,29 +458,6 @@ public class BlobTree extends ABlob {
 		long childSize = 1L << shift;
 		int child = Utils.checkedInt(chunkIndex >> shift);
 		return getChild(child).getChunk(chunkIndex - child * childSize);
-	}
-	
-	@Override
-	public InputStream getInputStream() {
-		return new SequenceInputStream(enumerateChildStreams());
-	}
-	
-	Enumeration<InputStream> enumerateChildStreams() {
-		return new ChildEnumeration();
-	}
-	
-	private class ChildEnumeration implements Enumeration<InputStream> {
-		private int i=0;
-
-		@Override
-		public boolean hasMoreElements() {
-			return i<childCount();
-		}
-
-		@Override
-		public InputStream nextElement() {
-			return getChild(i++).getInputStream();
-		}
 	}
 	
 	@Override

@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.security.MessageDigest;
 
 import convex.core.crypto.Hashing;
@@ -9,6 +10,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
+import convex.core.data.util.BlobChannel;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Bits;
 import convex.core.util.Utils;
@@ -366,6 +368,6 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 
 	@Override
 	public InputStream getInputStream() {
-		return toFlatBlob().getInputStream();
+		return Channels.newInputStream(BlobChannel.create(this));
 	}
 }
