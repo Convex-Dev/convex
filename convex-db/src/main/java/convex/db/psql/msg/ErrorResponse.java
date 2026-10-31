@@ -179,17 +179,6 @@ public class ErrorResponse extends PgMessage {
 	}
 
 	/**
-	 * Creates an undefined table error.
-	 */
-	public static ErrorResponse undefinedTable(String tableName) {
-		return builder()
-			.severity("ERROR")
-			.code("42P01") // undefined_table
-			.message("relation \"" + tableName + "\" does not exist")
-			.build();
-	}
-
-	/**
 	 * Creates an authentication failure error.
 	 */
 	public static ErrorResponse authenticationFailed(String user) {

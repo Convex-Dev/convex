@@ -21,6 +21,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
 import convex.db.ConvexDB;
+import convex.db.calcite.ConvexPrepare;
 import convex.db.calcite.ConvexSchema;
 import convex.db.calcite.ConvexLogicalTableModifyRule;
 import convex.db.calcite.ConvexTableModifyRule;
@@ -109,8 +110,9 @@ public class ConvexDriver extends Driver {
 		});
 	}
 
+	/** Prepares statements with {@link ConvexPrepare}, which gives validation errors their SQLSTATEs. */
 	public ConvexDriver() {
-		super();
+		super(ConvexPrepare::new);
 	}
 
 	@Override
