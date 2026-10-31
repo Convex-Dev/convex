@@ -30,9 +30,10 @@ public interface RootAuthorityPolicy {
 
 	/**
 	 * Self-sovereign policy: the owner of a DID-scoped resource is the DID that prefixes
-	 * it, and only the owner may root a grant over it. DIDs are compared canonically
-	 * (method + percent-decoded id), so encoding differences do not defeat or spoof the
-	 * match. Any resource without a derivable DID owner is refused.
+	 * it, and only the owner may root a grant over it. DIDs are compared by method and
+	 * normalised id ({@link DID#getID()}), so equivalent spellings match while an encoded
+	 * reserved character stays distinct from the raw one. Any resource without a derivable
+	 * DID owner is refused.
 	 */
 	RootAuthorityPolicy SELF_SOVEREIGN = (rootIssuer, with) -> {
 		if (rootIssuer == null) return false;
@@ -78,7 +79,7 @@ public interface RootAuthorityPolicy {
 		String s = with.toString();
 		if (!s.startsWith("did:")) return null;
 		try {
-			return DID.fromString(s); // strips path/query/fragment, decodes percent-encoding
+			return DID.fromString(s); // strips path/query/fragment, normalises the id
 		} catch (Exception e) {
 			return null;
 		}

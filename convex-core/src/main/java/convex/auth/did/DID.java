@@ -1,24 +1,31 @@
 package convex.auth.did;
 
 import java.net.URI;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 
 import convex.core.crypto.util.Multikey;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Strings;
+import convex.core.util.Utils;
 
 /**
  * Represents a W3C Decentralized Identifier (DID) with method and id
- * 
+ *
  * A DID follows the format: did:method:method_specific_id
- * 
+ *
  * Examples:
  * - did:web:example.com
  * - did:web:example.com%3A8080 (non-default port, percent-encoded per did:web)
  * - did:convex:13
  * - did:convex:id.foo
+ *
+ * The method-specific id is held as written in the DID string, normalised per
+ * RFC 3986 within the DID syntax: percent-encoded idchars are decoded, other
+ * percent-encodings keep upper-case hex. An encoded reserved character differs
+ * from the raw one, so did:web:example.com%3A8080 (a port) is not
+ * did:web:example.com:8080 (a path). Methods that give an encoding meaning
+ * decode it when resolving.
  */
 public class DID {
 
@@ -26,15 +33,18 @@ public class DID {
 	private static final String DID_START = URI_SCHEME+":";
 	private static final String DID_KEY_START = "did:key:";
 	private static final AString DID_KEY_PREFIX = Strings.intern(DID_KEY_START);
-    
+	private static final String HEX_DIGITS = "0123456789ABCDEF";
+
     private final String method;
     private final String id;
-    
+
     /**
      * Constructs a DID with the specified components.
-     * 
+     *
      * @param method The DID method (e.g., "web", "key", "peer")
-     * @param id The DID identifier
+     * @param id The method-specific id as written in a DID string, where "%"
+     *        starts a percent-encoding; other characters that may not appear
+     *        raw are percent-encoded as UTF-8
      */
     public DID(String method, String id) {
         if (method == null) {
@@ -43,9 +53,13 @@ public class DID {
         if (id == null) {
             throw new IllegalArgumentException("DID id cannot be null");
         }
-        
+        String normalised = normaliseID(id);
+        if (normalised == null) {
+            throw new IllegalArgumentException("DID id is not well-formed: " + id);
+        }
+
         this.method = method;
-        this.id = id;
+        this.id = normalised;
     }
     
     /**
@@ -86,9 +100,8 @@ public class DID {
         int slashPos=id.indexOf('/');
         if (slashPos>=0) {
         	id=id.substring(0, slashPos);
-        } 
-        
-        id=URLDecoder.decode(id,StandardCharsets.UTF_8);
+        }
+
         return new DID(method, id);
     }
     
@@ -113,9 +126,10 @@ public class DID {
     }
     
     /**
-     * Gets the DID identifier.
-     * 
-     * @return The DID identifier
+     * Gets the method-specific id in its normalised written form, with
+     * percent-encodings in place (e.g. "example.com%3A8080").
+     *
+     * @return The method-specific id
      */
     public String getID() {
         return id;
@@ -141,30 +155,61 @@ public class DID {
     
     @Override
     public String toString() {
-        return DID_START+method+":"+encodeID(id);
+        return DID_START+method+":"+id;
     }
 
     /**
-     * Encodes a method-specific id for string representation. Legal idchars
-     * (ALPHA / DIGIT / "." / "-" / "_") and the ":" segment separator are
-     * preserved per the W3C DID ABNF; all other characters are percent-encoded
-     * as UTF-8. Note URLEncoder is unsuitable here: it form-encodes (space as
-     * "+") and escapes the structural ":" separator.
+     * Normalises a written method-specific id. A percent-encoded idchar
+     * (ALPHA / DIGIT / "." / "-" / "_") is decoded, as RFC 3986 decodes
+     * unreserved characters; "~" is unreserved but not an idchar, so it stays
+     * encoded. Other percent-encodings keep their meaning, with upper-case hex.
+     * Raw idchars and the ":" separator are kept; any other character is
+     * percent-encoded as UTF-8. Note URLDecoder is unsuitable here: it decodes
+     * reserved characters and form-decodes "+" as space.
+     *
+     * @return The normalised id, or null if a percent-encoding is malformed or
+     *         the id is not valid UTF-16
      */
-    private static String encodeID(String s) {
-        StringBuilder sb = new StringBuilder(s.length());
-        for (byte b : s.getBytes(StandardCharsets.UTF_8)) {
-            char c = (char) (b & 0xFF);
-            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
-                    || c == '.' || c == '-' || c == '_' || c == ':') {
+    private static String normaliseID(String s) {
+        int n = s.length();
+        StringBuilder sb = new StringBuilder(n);
+        for (int i = 0; i < n; i++) {
+            char c = s.charAt(i);
+            if (c == '%') {
+                if (i + 2 >= n) return null;
+                int hi = Utils.hexVal(s.charAt(i + 1));
+                int lo = Utils.hexVal(s.charAt(i + 2));
+                if ((hi < 0) || (lo < 0)) return null;
+                int b = (hi << 4) | lo;
+                if (isIDChar((char) b)) {
+                    sb.append((char) b);
+                } else {
+                    appendEncoded(sb, b);
+                }
+                i += 2;
+            } else if (isIDChar(c) || (c == ':')) {
                 sb.append(c);
             } else {
-                sb.append('%');
-                sb.append(Character.toUpperCase(Character.forDigit((b >> 4) & 0xF, 16)));
-                sb.append(Character.toUpperCase(Character.forDigit(b & 0xF, 16)));
+                int cp = s.codePointAt(i);
+                if (Character.getType(cp) == Character.SURROGATE) return null;
+                for (byte b : Character.toString(cp).getBytes(StandardCharsets.UTF_8)) {
+                    appendEncoded(sb, b & 0xFF);
+                }
+                i += Character.charCount(cp) - 1;
             }
         }
         return sb.toString();
+    }
+
+    private static boolean isIDChar(char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                || c == '.' || c == '-' || c == '_';
+    }
+
+    private static void appendEncoded(StringBuilder sb, int b) {
+        sb.append('%');
+        sb.append(HEX_DIGITS.charAt(b >> 4));
+        sb.append(HEX_DIGITS.charAt(b & 0xF));
     }
 
 	public static DID create(String method, String id) {
@@ -198,7 +243,11 @@ public class DID {
 		}
 	}
 
-	/** Returns true iff this is the canonical string form of a base DID. */
+	/**
+	 * Returns true iff this is the canonical string form of a base DID: a
+	 * lower-case method, no path, query or fragment, a non-empty final id
+	 * segment, and an id already normalised as {@link #getID()} returns it.
+	 */
 	public static boolean isCanonicalBase(AString did) {
 		if (did==null) return false;
 		String text=did.toString();
@@ -209,24 +258,8 @@ public class DID {
 			char c=text.charAt(i);
 			if (!((c>='a'&&c<='z')||(c>='0'&&c<='9'))) return false;
 		}
-		int segmentLength=0;
-		for (int i=methodEnd+1; i<text.length(); i++) {
-			char c=text.charAt(i);
-			if (c==':') {
-				segmentLength=0;
-				continue;
-			}
-			if (c=='%') {
-				if (i+2>=text.length() || Character.digit(text.charAt(i+1),16)<0
-						|| Character.digit(text.charAt(i+2),16)<0) return false;
-				i+=2;
-				segmentLength++;
-				continue;
-			}
-			if (!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')
-					|| c=='.'||c=='-'||c=='_')) return false;
-			segmentLength++;
-		}
-		return segmentLength>0;
+		String id=text.substring(methodEnd+1);
+		if (id.isEmpty() || id.endsWith(":")) return false;
+		return id.equals(normaliseID(id));
 	}
 }
