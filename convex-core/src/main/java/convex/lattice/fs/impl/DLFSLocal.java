@@ -32,7 +32,9 @@ import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.ForkedCursor;
+import convex.lattice.fs.ConditionFailedException;
 import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFSCondition;
 import convex.lattice.fs.DLFSCorruptionException;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSLocation;
@@ -223,6 +225,46 @@ public class DLFSLocal extends DLFileSystem {
 			AVector<ACell> next=DLFSNode.updateNode(root,path,updated,operationTime);
 			if (rootCursor.compareAndSet(root,next)) return updated;
 		}
+	}
+
+	@Override
+	public AVector<ACell> install(DLPath path, ABlob content, DLFSCondition condition) throws IOException {
+		checkOpen();
+		if (path.getFileSystem()!=this) throw new IllegalArgumentException("Path belongs to another filesystem");
+		DLPath target=path.toAbsolutePath().normalize();
+		DLPath parent=target.getParent();
+		if (parent==null) throw new FileSystemException(target.toString(),null,"Cannot install over the DLFS root");
+
+		// Save before the update, so a retry under contention redoes only the install
+		ABlob data=checkpointBlob(content);
+		CVMLong operationTime=currentTimestamp();
+		try {
+			while (true) {
+				AVector<ACell> root=rootCursor.get();
+				requireDirectory(root,parent);
+				AVector<ACell> existing=resolveValidUnchecked(root,target);
+				if (!condition.test(existing)) throw new ConditionFailedException(target.toString());
+				AVector<ACell> base;
+				if (existing==null) {
+					base=DLFSNode.createEmptyFile(operationTime);
+				} else if (DLFSNode.isRegularFile(existing)) {
+					base=existing;
+				} else {
+					throw new FileSystemException(target.toString(),null,"Is a directory");
+				}
+				// Editing the existing entry keeps its metadata and unknown trailing fields
+				AVector<ACell> updated=DLFSNode.withContentTime(base.assoc(DLFSNode.POS_DATA,data),operationTime);
+				AVector<ACell> next=DLFSNode.updateNode(root,target,updated,operationTime);
+				if (rootCursor.compareAndSet(root,next)) return existing;
+			}
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
+	}
+
+	@Override
+	protected AStore getContentStore() {
+		return store;
 	}
 
 	@Override

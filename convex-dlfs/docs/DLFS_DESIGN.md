@@ -162,14 +162,14 @@ authenticated users can each have a drive called "home" without conflict.
 
 | Method | Drive-level | File-level |
 |--------|-------------|------------|
-| `GET` | List drive names | Read file content / directory listing |
+| `GET` | List drive names | Read file content or one byte range (206) / directory listing |
 | `PUT` | Rejected (403) | Write file (201 Created / 204 No Content) |
 | `DELETE` | Delete drive | Delete file (tombstone) |
 | `MKCOL` | Create drive | Create directory |
 | `PROPFIND` | Drive list (207 Multi-Status) | File/directory properties (207) |
 | `MOVE` | Rename drive | Move file (read + write + delete) |
 | `COPY` | — | Copy file |
-| `HEAD` | Exists check | File metadata (Content-Type, Content-Length) |
+| `HEAD` | Exists check | File metadata (Content-Type, Content-Length, ETag) |
 | `OPTIONS` | DAV capability discovery | DAV capability discovery |
 | `LOCK`/`UNLOCK` | 501 Not Implemented | 501 Not Implemented |
 | `PROPPATCH` | 501 Not Implemented | 501 Not Implemented |
@@ -232,11 +232,32 @@ HTTP request
           → DLFSLocal (cursor.updateAndGet for writes)
 ```
 
-File operations go through the NIO filesystem abstraction. Whole-file replacements
-use `DLFileSystem.writeAllBytes` so truncate and write form one filesystem-locked
-mutation. Each external transport mutation refreshes the caller-managed timestamp and
-calls `sync()`; PUT also supports ETag-based `If-Match` and `If-None-Match`
-preconditions. DLFS itself does not advance that timestamp.
+File operations go through the NIO filesystem abstraction, apart from whole-file
+reads and writes. GET and HEAD read the file entry once and serve its blob, so
+headers and body come from one version of the file; GET answers a single byte
+`Range`, and file responses are not compressed, so lengths and ranges refer to the
+stored bytes. Whole-file replacements use `DLFileSystem.writeAllBytes`, a single
+atomic install. Each external transport mutation refreshes the caller-managed
+timestamp and calls `sync()`; PUT also supports ETag-based `If-Match` and
+`If-None-Match` preconditions. DLFS itself does not advance that timestamp.
+
+### Publishing Files
+
+`DLFileSystem.install(path, blob, condition)` publishes complete content in one
+atomic update of the drive root: readers see the old file or the new one, never part
+of either. The condition tests the file's current entry inside that update
+(`DLFSCondition.ANY`, `ABSENT`, `matching(entryHash)`, or any other test of the
+entry); if it fails, `ConditionFailedException` is thrown and nothing changes.
+Install returns the entry it replaced, or null if it created the file. An existing
+entry keeps its metadata and unknown trailing fields, as CAD028 requires; the
+content is saved to the drive's store before the update, so a retry under contention
+redoes only the install.
+
+`newWriter(path, condition)` builds content in bounded memory, saving it to the
+drive's store as it arrives, and installs it on an explicit `commit()`. Closing
+without commit discards the content, so a source that fails partway publishes
+nothing; `write(path, in, condition)` commits only if the stream ends cleanly. Plain
+NIO channels keep POSIX behaviour: each write is visible as it lands.
 
 ### Content-Type Detection
 
@@ -547,8 +568,9 @@ to choose publication after successful mutations, for example
 The callback belongs to service wiring; domain components know only their cursors.
 The component hierarchy exposes its root `AStore` internally to each drive's
 `DLFSLocal` adapter, while `sync()` remains the explicit publication and replication
-boundary. Streamed blob writes install store-backed references every 16 MiB without
-moving the cursor or selecting retained GC roots. A region, drive collection or
+boundary. NIO channel writes install store-backed references every 16 MiB, and file
+writers save content every 1 MiB before their single install, without selecting
+retained GC roots. A region, drive collection or
 drive `fork()` is a temporary working component and only merges logical changes when
 explicitly synced.
 

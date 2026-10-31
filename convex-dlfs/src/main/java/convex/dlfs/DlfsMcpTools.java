@@ -487,10 +487,11 @@ public class DlfsMcpTools {
 				if (bytes.length > MAX_MCP_FILE_SIZE) {
 					return McpProtocol.toolError("Content is too large for MCP write");
 				}
-				boolean isNew = !Files.exists(path);
+				boolean isNew;
 				if (access.fs() instanceof convex.lattice.fs.DLFileSystem dlfs) {
-					dlfs.writeAllBytes((convex.lattice.fs.DLPath) path, bytes);
+					isNew = dlfs.writeAllBytes((convex.lattice.fs.DLPath) path, bytes);
 				} else {
+					isNew = !Files.exists(path);
 					Files.write(path, bytes, StandardOpenOption.CREATE,
 						StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
 				}

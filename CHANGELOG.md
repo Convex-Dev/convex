@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Encrypt Convex DB's PostgreSQL wire connections with TLS: clients connect with `sslmode=require` up to `verify-full` (proposed by @trsb-standards). ([TLS](convex-db/README.md#tls), [#756](https://github.com/Convex-Dev/convex/issues/756))
 - Sign a JWT under the header its profile requires, such as only `alg` and `kid` for a DID Configuration, or an explicit `typ`, with `JWT.signPublic(header, claims, keyPair)` and `JWT.signSymmetric(header, claims, secret)`. ([Signing](convex-core/docs/JWT.md#signing), [#815](https://github.com/Convex-Dev/convex/issues/815))
 - Read part of a DLFS file over WebDAV with an HTTP `Range` request, to resume a download or read from a large file. GET and HEAD answer from one version of the file, uncompressed, so lengths, ranges and ETags always match it. ([#790](https://github.com/Convex-Dev/convex/issues/790))
+- Work with large blobs in bounded memory: read from any position or range with `BlobChannel`, and build one from a stream with `BlobOutputStream` or `Blobs.fromStream(in, store)`, which save to a store as the content arrives. ([#790](https://github.com/Convex-Dev/convex/issues/790))
+- Publish a DLFS file atomically with `install(path, blob, condition)`, or write it through `newWriter(path, condition)` and an explicit `commit()`: readers see the old file or the new one, and a failed condition or source changes nothing. `writeAllBytes` is now a single atomic install. ([Publishing Files](convex-dlfs/docs/DLFS_DESIGN.md#publishing-files), [#790](https://github.com/Convex-Dev/convex/issues/790))
 
 ### Changed
 
