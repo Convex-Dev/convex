@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update any map entry from its current value in one step with `update(key, function)` or `update(key, function, arg)`; on an `Index` it is about a third faster than `get` then `assoc`.
 - Encrypt Convex DB's PostgreSQL wire connections with TLS: clients connect with `sslmode=require` up to `verify-full` (proposed by @trsb-standards). ([TLS](convex-db/README.md#tls), [#756](https://github.com/Convex-Dev/convex/issues/756))
 - Sign a JWT under the header its profile requires, such as only `alg` and `kid` for a DID Configuration, or an explicit `typ`, with `JWT.signPublic(header, claims, keyPair)` and `JWT.signSymmetric(header, claims, secret)`. ([Signing](convex-core/docs/JWT.md#signing), [#815](https://github.com/Convex-Dev/convex/issues/815))
+- Read part of a DLFS file over WebDAV with an HTTP `Range` request, to resume a download or read from a large file. GET and HEAD answer from one version of the file, uncompressed, so lengths, ranges and ETags always match it. ([#790](https://github.com/Convex-Dev/convex/issues/790))
 
 ### Changed
 

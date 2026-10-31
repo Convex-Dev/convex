@@ -1,6 +1,7 @@
 package convex.dlfs;
 
 import java.io.IOException;
+import java.nio.channels.Channels;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystem;
@@ -16,7 +17,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import convex.core.data.ABlob;
+import convex.core.data.ACell;
+import convex.core.data.AVector;
+import convex.core.data.Cells;
+import convex.core.data.util.BlobChannel;
+import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
+import convex.lattice.fs.DLPath;
+import convex.lattice.fs.impl.DLFSFileAttributes;
 import convex.restapi.auth.AuthMiddleware;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
@@ -222,7 +231,7 @@ public class DLFSWebDAV {
 	private boolean writeCompleteFile(Path path, byte[] data) throws IOException {
 		if (data.length > maxFileSize) return false;
 		if (path.getFileSystem() instanceof DLFileSystem dlfs) {
-			dlfs.writeAllBytes((convex.lattice.fs.DLPath) path, data);
+			dlfs.writeAllBytes((DLPath) path, data);
 		} else {
 			Files.write(path, data, StandardOpenOption.CREATE,
 				StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
@@ -257,6 +266,12 @@ public class DLFSWebDAV {
 		Path path = resolveFilePath(ctx, dp);
 		if (path == null) {
 			ctx.status(404).result("Not Found: drive '" + dp.driveName() + "' does not exist");
+			return;
+		}
+
+		AVector<ACell> fileNode = getFileNode(path);
+		if (fileNode != null) {
+			sendFile(ctx, path, fileNode, true);
 			return;
 		}
 
@@ -388,6 +403,12 @@ public class DLFSWebDAV {
 		Path path = resolveFilePath(ctx, dp);
 		if (path == null) {
 			ctx.status(404);
+			return;
+		}
+
+		AVector<ACell> fileNode = getFileNode(path);
+		if (fileNode != null) {
+			sendFile(ctx, path, fileNode, false);
 			return;
 		}
 
@@ -715,15 +736,82 @@ public class DLFSWebDAV {
 		}
 	}
 
+	/**
+	 * Gets the entry of a regular DLFS file, read once from the live drive.
+	 * @return File entry, or null if the path is not a regular DLFS file
+	 */
+	private static AVector<ACell> getFileNode(Path path) throws IOException {
+		if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof DLPath dlp) {
+			AVector<ACell> node = dlfs.getNode(dlp);
+			if (DLFSNode.isRegularFile(node)) return node;
+		}
+		return null;
+	}
+
+	/**
+	 * Answers GET or HEAD for one version of a DLFS file. All headers and the
+	 * body come from the same file entry, so a concurrent write cannot make them
+	 * disagree. Lengths and byte ranges refer to the stored bytes, so the
+	 * response is never compressed.
+	 */
+	private static void sendFile(Context ctx, Path path, AVector<ACell> node, boolean withBody) {
+		String etag = etagOf(node);
+		ctx.header("ETag", etag);
+		if (headerMatches(ctx.header("If-None-Match"), etag)) {
+			ctx.status(304);
+			return;
+		}
+
+		ABlob data = DLFSNode.getData(node);
+		long size = data.count();
+		ctx.contentType(guessContentType(path.toString()));
+		setLastModified(ctx, DLFSFileAttributes.create(node));
+		ctx.header("Accept-Ranges", "bytes");
+		ctx.disableCompression();
+
+		ByteRange range = withBody ? requestedRange(ctx, etag, size) : null;
+		if (range == ByteRange.UNSATISFIABLE) {
+			ctx.header("Content-Range", "bytes */" + size);
+			ctx.status(416);
+			return;
+		}
+		long start = 0;
+		long end = size;
+		if (range != null) {
+			start = range.first();
+			end = range.last() + 1;
+			ctx.header("Content-Range", range.contentRange(size));
+		}
+		ctx.header("Content-Length", String.valueOf(end - start));
+		ctx.status((range == null) ? 200 : 206);
+		if (withBody) ctx.result(Channels.newInputStream(BlobChannel.create(data, start, end)));
+	}
+
+	/**
+	 * Gets the byte range a GET asks for. Range is honoured without If-Range, or
+	 * when If-Range names the current version; a stale or date If-Range gets the
+	 * whole file.
+	 * @return Range to serve, ByteRange.UNSATISFIABLE, or null for the whole file
+	 */
+	private static ByteRange requestedRange(Context ctx, String etag, long size) {
+		String ifRange = ctx.header("If-Range");
+		if ((ifRange != null) && !ifRange.strip().equals(etag)) return null;
+		return ByteRange.parse(ctx.header("Range"), size);
+	}
+
+	private static String etagOf(AVector<ACell> node) {
+		return "\"" + Cells.getHash(node).toHexString() + "\"";
+	}
+
 	private static void setETag(Context ctx, Path path) {
 		ctx.header("ETag", calculateETag(path));
 	}
 
 	private static String calculateETag(Path path) {
 		try {
-			if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof convex.lattice.fs.DLPath dlp) {
-				convex.core.data.Hash hash = dlfs.getNodeHash(dlp);
-				if (hash != null) return "\"" + hash.toHexString() + "\"";
+			if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof DLPath dlp) {
+				AVector<ACell> node = dlfs.getNode(dlp);
+				if (node != null) return etagOf(node);
 			}
 			BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
 			return "W/\"" + attrs.size() + "-" + attrs.lastModifiedTime().toMillis() + "\"";

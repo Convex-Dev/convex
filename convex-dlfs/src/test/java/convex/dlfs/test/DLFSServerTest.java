@@ -8,6 +8,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Random;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -384,6 +386,75 @@ public class DLFSServerTest {
 			.header("If-None-Match", "*")
 			.PUT(HttpRequest.BodyPublishers.ofString("v3")).build(), HttpResponse.BodyHandlers.ofString());
 		assertEquals(412, createOnly.statusCode());
+	}
+
+	@Test
+	void testRangeRequests() throws Exception {
+		byte[] content = new byte[3 * 4096 + 100];
+		new Random(790).nextBytes(content);
+		int n = content.length;
+		String path = driveURL + "range.bin";
+		assertEquals(201, client.send(HttpRequest.newBuilder(URI.create(path))
+			.PUT(HttpRequest.BodyPublishers.ofByteArray(content)).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+
+		HttpResponse<byte[]> full = getRange(path, null, null);
+		assertEquals(200, full.statusCode());
+		assertArrayEquals(content, full.body());
+		assertEquals("bytes", full.headers().firstValue("Accept-Ranges").orElse(null));
+		String etag = full.headers().firstValue("ETag").orElseThrow();
+
+		HttpResponse<String> head = client.send(HttpRequest.newBuilder(URI.create(path))
+			.method("HEAD", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, head.statusCode());
+		assertEquals(String.valueOf(n), head.headers().firstValue("Content-Length").orElse(null));
+		assertEquals("bytes", head.headers().firstValue("Accept-Ranges").orElse(null));
+		assertEquals(etag, head.headers().firstValue("ETag").orElse(null));
+
+		assertPartial(getRange(path, "bytes=4000-4199", null), content, 4000, 4199);
+		assertPartial(getRange(path, "bytes=8192-", null), content, 8192, n - 1);
+		assertPartial(getRange(path, "bytes=-100", null), content, n - 100, n - 1);
+		assertPartial(getRange(path, "bytes=4000-4199", etag), content, 4000, 4199);
+
+		HttpResponse<byte[]> beyond = getRange(path, "bytes=" + n + "-", null);
+		assertEquals(416, beyond.statusCode());
+		assertEquals("bytes */" + n, beyond.headers().firstValue("Content-Range").orElse(null));
+
+		// Several ranges, or a stale If-Range, get the whole file
+		HttpResponse<byte[]> several = getRange(path, "bytes=0-9,20-29", null);
+		assertEquals(200, several.statusCode());
+		assertArrayEquals(content, several.body());
+		HttpResponse<byte[]> stale = getRange(path, "bytes=0-9", "\"stale\"");
+		assertEquals(200, stale.statusCode());
+		assertArrayEquals(content, stale.body());
+	}
+
+	@Test
+	void testFileResponsesAreNotCompressed() throws Exception {
+		String path = driveURL + "compressible.txt";
+		client.send(HttpRequest.newBuilder(URI.create(path))
+			.PUT(HttpRequest.BodyPublishers.ofString("compressible ".repeat(1000))).build(), HttpResponse.BodyHandlers.ofString());
+		for (String range : new String[] { null, "bytes=100-5099" }) {
+			HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(path)).header("Accept-Encoding", "gzip").GET();
+			if (range != null) req.header("Range", range);
+			HttpResponse<byte[]> resp = client.send(req.build(), HttpResponse.BodyHandlers.ofByteArray());
+			assertTrue(resp.headers().firstValue("Content-Encoding").isEmpty());
+			assertEquals(String.valueOf(resp.body().length), resp.headers().firstValue("Content-Length").orElse(null));
+		}
+	}
+
+	private static HttpResponse<byte[]> getRange(String url, String range, String ifRange) throws Exception {
+		HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(url)).GET();
+		if (range != null) req.header("Range", range);
+		if (ifRange != null) req.header("If-Range", ifRange);
+		return client.send(req.build(), HttpResponse.BodyHandlers.ofByteArray());
+	}
+
+	private static void assertPartial(HttpResponse<byte[]> resp, byte[] content, int first, int last) {
+		assertEquals(206, resp.statusCode());
+		assertEquals("bytes " + first + "-" + last + "/" + content.length,
+			resp.headers().firstValue("Content-Range").orElse(null));
+		assertEquals(String.valueOf(last - first + 1), resp.headers().firstValue("Content-Length").orElse(null));
+		assertArrayEquals(Arrays.copyOfRange(content, first, last + 1), resp.body());
 	}
 
 	@Test
