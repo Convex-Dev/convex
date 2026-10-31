@@ -222,13 +222,19 @@ Standard `OwnerLattice` merge with additional NodeInfo-specific rules:
 
 - **Signature verification** via `OwnerLattice` — signer must match owner key
 - **Timestamp monotonicity** — newer NodeInfo replaces older (LWW per owner)
-- **Conditional acceptance** via `LatticeContext` — nodes may reject entries from peers with zero on-chain stake, unregistered peers, etc.
+- **Admission** — any correctly self-signed record is accepted. Optional stronger
+  proofs, and local policies that use them, are proposed in
+  [#713](https://github.com/Convex-Dev/convex/issues/713).
 
-#### Relationship to On-Chain PeerStatus
+#### Node identity and Convex peers
 
-On-chain `PeerStatus` (in global consensus state) is the **single source of truth** for peer identity: AccountKey, stake, controller address, delegated stakes, balance, and metadata (including a `:url` hostname entry). This is the authoritative peer registry — if a peer isn't registered on-chain with stake, it isn't a peer.
+A P2P node is identified by its node key alone. Its signed NodeInfo needs no
+on-chain registration or stake, and no node rejects a record for lacking either.
 
-The P2P node registry at `[:p2p :nodes]` provides **supplementary off-chain metadata** for operational convenience: multiple transport URIs, supported lattice regions, protocol version, and capabilities. This data propagates faster than on-chain updates (gossip vs. consensus finality) but has weaker guarantees (no finality, latest-timestamp-wins). It is always subordinate to the on-chain record.
+A node key may also belong to a Convex peer registered in on-chain `PeerStatus`.
+That is orthogonal to discovery, connection and routing. Local policy may treat it
+as extra trust, as one of the optional proofs proposed in #713, and on-chain peer
+entries are one optional bootstrap source (§6.3).
 
 **Implemented bootstrap path**: An operator gives `P2PNode.connect` one node
 AccountKey and TCP address. After challenge/response verifies that endpoint, the
@@ -242,18 +248,17 @@ of the valid signed NodeInfo it delivered is that physically inbound connection 
 into an outbound propagation route. A node with empty `:transports` therefore supports
 bidirectional gossip without a reverse TCP connection.
 
-**Proposed on-chain bootstrap path**: A new node reads the on-chain peer list
-(PeerStatus records with hostnames), connects to a peer via the on-chain `:url`, then
-pulls the P2P node registry to discover richer transport metadata. The on-chain URL is
-the fallback when P2P metadata is unavailable.
-
-**Validation**: Nodes should validate P2P entries against on-chain state — reject NodeInfo from AccountKeys not registered on-chain, or from peers with zero stake. The on-chain PeerStatus is the trust anchor; the P2P lattice is a convenience cache.
+**Proposed on-chain bootstrap path** (optional): A node may take seeds from the
+on-chain peer list, the keys and `:url` hosts in `PeerStatus`, alongside configured
+and remembered peers. Each connection is authenticated by the same challenge/response
+for the listed key, and the node then pulls the P2P registry as from any bootstrap
+peer.
 
 ### 4.3 Kademlia Routing [FUTURE]
 
 Kademlia provides O(log N) lookup of any peer by AccountKey, using XOR distance. The `Kademlia` utility class already provides `proximity()` and `distance()` functions. `KadLattice` exists as a stub.
 
-This is planned for **future implementation** when the network scales beyond what the node registry and on-chain peer list can efficiently serve. For current network sizes (up to hundreds of peers), strategies 1-3 in §4.4 are sufficient.
+This is planned for **future implementation** when the network scales beyond what the node registry can efficiently serve. For current network sizes (up to hundreds of peers), strategies 1-3 in §4.4 are sufficient.
 
 When implemented, Kademlia routing state would be **node-local** (not propagated) since each node's k-bucket view is inherently specific to its own key position. It would live under `:local` or as a non-propagated local data structure.
 
@@ -267,9 +272,13 @@ A node uses multiple strategies to discover and maintain connections, in order:
    file integration remains future work. Connections are authenticated and maintained
    persistently.
 
-2. **On-chain peer registry** — `PeerStatus` entries in consensus state provide hostname/URL for staked peers. Used for bootstrapping and as fallback. `ConnectionManager` already uses stake-weighted random selection from this registry.
+2. **On-chain peer registry** [PROPOSED, optional] — `PeerStatus` entries in
+   consensus state name registered Convex peers' keys and `:url` hosts. A node may
+   use them as bootstrap seeds; they confer no P2P identity.
 
-3. **P2P node registry** (`[:p2p :nodes]`) — Richer transport metadata propagated via gossip. Provides multi-protocol endpoints and faster updates than on-chain.
+3. **P2P node registry** (`[:p2p :nodes]`) — Each node's own signed transport
+   metadata, propagated via gossip. This is where discovery happens once a node
+   has bootstrapped.
 
 4. **Kademlia lookup** [FUTURE] — For discovering specific peers by AccountKey when direct routing is needed. O(log N) hops. Not needed at current network scale; planned for future growth.
 
@@ -400,16 +409,20 @@ Clients select the best available transport from the peer's advertised set:
 - **Simple API callers** use HTTPS
 - **AI agents / MCP clients** use WSS or Streamable HTTP
 
-### 6.3 On-Chain as Source of Truth
+### 6.3 On-Chain Bootstrap [PROPOSED, optional]
 
-On-chain `PeerStatus` is the authoritative peer registry. Its metadata includes a `:url` entry (hostname) which is the primary and always-available connection point. The P2P node registry provides supplementary transport metadata.
+On-chain `PeerStatus` lists registered Convex peers with their keys and a `:url`
+host. A node may use these as bootstrap seeds alongside configured and remembered
+peers. They are not a source of P2P identity or transports: the node authenticates
+each one by challenge/response for the listed key, and learns transports from the P2P
+registry once connected.
 
 **Bootstrap flow**:
 
-1. New node reads on-chain peer list — `PeerStatus` records with hostnames and stakes
-2. Connects to staked peers via on-chain `:url` (TCP or HTTPS)
-3. Optionally pulls P2P node registry (`[:p2p :nodes]`) for richer transport metadata
-4. Establishes preferred connections using advertised URIs where available, falling back to on-chain hostname
+1. Read the on-chain peer list: keys and `:url` hosts
+2. Connect to listed hosts, expecting the listed key
+3. Pull the P2P node registry (`[:p2p :nodes]`) as from any bootstrap peer
+4. Continue with candidates discovered from the registry
 
 ## 7. Authentication [EXISTS + PROPOSED]
 
@@ -654,21 +667,21 @@ Nodes apply acceptance rules during lattice merges via `LatticeContext`:
 
 - **Always**: reject invalid signatures (enforced by `OwnerLattice`/`SignedLattice`)
 - **Always**: reject non-monotonic timestamps (enforced by LWW merge)
-- **Optional**: reject entries from peers with zero on-chain stake
-- **Optional**: reject entries from unregistered peers
+- **Optional**: local admission policies using stronger proofs, such as Convex peer
+  status ([#713](https://github.com/Convex-Dev/convex/issues/713))
 - **Optional**: rate limiting to prevent metadata spam
 
 These rules are enforced locally. Invalid entries are silently discarded and cannot propagate through the network because every honest node independently validates.
 
-## 11. Peer Lifecycle
+## 11. Node Lifecycle
 
-1. **Registration**: Peer registers on-chain with AccountKey and stake
-2. **Bootstrap**: Connects to configured peers or on-chain hostnames
+1. **Identity**: The node uses its own node key. A node that is also a Convex peer may use its registered peer key; registration is optional
+2. **Bootstrap**: Connects to configured peers, remembered peers ([#716](https://github.com/Convex-Dev/convex/issues/716)) or, optionally, on-chain peer hosts
 3. **Advertisement**: Publishes `SignedData<NodeInfo>` to `[:p2p :nodes]`
-4. **Discovery**: Discovered by other peers via P2P gossip (and optionally Kademlia)
-5. **Connection**: Peers establish connections using advertised transport URIs
-6. **Participation**: Peer joins lattice regions (consensus, data, etc.) via selective attention
-7. **Departure**: NodeInfo ages out; peer can withdraw stake on-chain
+4. **Discovery**: Discovered by other nodes via P2P gossip (and optionally Kademlia)
+5. **Connection**: Nodes establish connections using advertised transport URIs
+6. **Participation**: The node joins lattice regions (consensus, data, etc.) via selective attention
+7. **Departure**: Other nodes stop selecting it once it is unreachable ([#716](https://github.com/Convex-Dev/convex/issues/716), [#814](https://github.com/Convex-Dev/convex/issues/814)); a Convex peer withdraws its stake on-chain separately
 
 ## 12. Lattice Path Summary
 
@@ -693,15 +706,19 @@ Lattice.ROOT (KeyedLattice)
 
 ### 13.2 KadLattice — Future Work (DECIDED)
 
-Kademlia routing is deferred until network scale demands it. Current peer discovery via on-chain PeerStatus + P2P node registry + configured peers is sufficient for hundreds of peers. When implemented, Kademlia state will be node-local (not propagated) since each node's k-bucket view is specific to its own key position.
+Kademlia routing is deferred until network scale demands it. Discovery through configured peers and the P2P node registry is sufficient for hundreds of nodes. When implemented, Kademlia state will be node-local (not propagated) since each node's k-bucket view is specific to its own key position.
 
 ### 13.3 Server Architecture — Netty + Javalin (DECIDED)
 
 Netty handles binary protocol (TCP + WSS): high-performance peer-to-peer lattice traffic. Javalin handles HTTP-based APIs (REST + MCP + SSE): web-friendly with JSON, middleware, CORS. Both frameworks connect to the same `NodeServer` and `Server` instances.
 
-### 13.4 PeerStatus as Source of Truth (DECIDED)
+### 13.4 Node Identity Is the Node Key (DECIDED)
 
-On-chain `PeerStatus` is the single source of truth for peer identity, stake, and primary hostname. The P2P node registry (`[:p2p :nodes]`) provides supplementary off-chain metadata (transport URIs, supported regions, protocol version) validated against on-chain state. Nodes reject P2P entries from unregistered or zero-stake peers.
+A P2P node is identified by its self-signed node key; no on-chain registration or
+stake is required, and the node registry (`[:p2p :nodes]`) is not validated against
+on-chain state. Being a Convex peer registered in `PeerStatus` is orthogonal: local
+policy may treat it as extra trust (#713), and on-chain peer entries are one optional
+bootstrap source (§6.3).
 
 ### 13.5 BeliefLattice Merge Context (OPEN)
 
@@ -717,7 +734,7 @@ This needs to be resolved before Phase 2 of the consensus migration.
 ## 14. Implementation Phases
 
 ### Phase 1 — P2P Node Registry
-- Implement `NodeInfoLattice` (LWW per owner, validated against on-chain PeerStatus)
+- Implement the node registry (LWW per owner, signed by each node key)
 - Register `[:p2p :nodes]` in `Lattice.ROOT` with `OwnerLattice<NodeInfo>`
 - `NodeServer` propagates P2P metadata via existing LATTICE_VALUE gossip
 - Peers advertise transport URIs; `ConnectionManager` uses them for connection selection
@@ -745,11 +762,11 @@ This needs to be resolved before Phase 2 of the consensus migration.
 
 ## 15. Summary
 
-The Convex peer network is built on lattice technology — the same algebraic foundations, data structures, security model, and propagation mechanisms used by every other part of the ecosystem. On-chain `PeerStatus` is the single source of truth for peer identity and stake.
+The Convex peer network is built on lattice technology — the same algebraic foundations, data structures, security model, and propagation mechanisms used by every other part of the ecosystem. A P2P node's identity is its own signed node key; being a Convex peer as well is optional and orthogonal.
 
 The design extends this with:
 
-1. **P2P peer discovery** at `[:p2p :nodes]` — `OwnerLattice`-based signed peer metadata, validated against on-chain PeerStatus, propagated via `NodeServer` gossip
+1. **P2P node discovery** at `[:p2p :nodes]` — `OwnerLattice`-based metadata signed by each node key, propagated via `NodeServer` gossip
 2. **Consensus beliefs as a lattice region** at `[:convex <genesis-hash> :peers]` — gradual migration from dedicated BELIEF messages to standard LATTICE_VALUE protocol
 3. **NodeServer as the unified P2P core** — all lattice propagation (including consensus) through one mechanism, with `BeliefPropagator` as a timing-specific wrapper
 4. **Multi-transport support** — Netty for binary (TCP + WSS), Javalin for HTTP (REST + MCP), with transport advertisement and failover
@@ -758,5 +775,5 @@ This means:
 - One propagation mechanism (`NodeServer` + `LatticePropagator`) serves all regions
 - One security model (SignedData + AccountKey) authenticates everything
 - One encoding format (CAD3) on the wire and in storage
-- On-chain PeerStatus as the trust anchor; P2P lattice as the operational layer
+- Each node's own key as its identity, with Convex peer status as optional extra trust
 - Transport is a thin adapter layer beneath the unified lattice protocol
