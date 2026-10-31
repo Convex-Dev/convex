@@ -2,8 +2,10 @@ package convex.core.data.util;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,7 +19,9 @@ import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
+import convex.core.data.RefSoft;
 import convex.core.store.MemoryStore;
+import convex.etch.EtchStore;
 
 public class BlobOutputStreamTest {
 
@@ -82,6 +86,18 @@ public class BlobOutputStreamTest {
 		assertTrue(blob.isCanonical());
 		assertNotNull(store.refForHash(chunkHash(bs,4)));
 		assertNotNull(store.refForHash(blob.getHash()));
+	}
+
+	@Test public void testEtchBranchesAreSoft() throws IOException {
+		byte[] bs=randomBytes(5*CHUNK);
+		try (EtchStore store=EtchStore.createTemp("blob-output-stream")) {
+			BlobOutputStream out=BlobOutputStream.create(store,2*CHUNK);
+			out.write(bs);
+			ABlob blob=out.toBlob();
+			assertArrayEquals(bs,blob.getBytes());
+			RefSoft<?> ref=assertInstanceOf(RefSoft.class,blob.getRef(0));
+			assertSame(store,ref.getStore());
+		}
 	}
 
 	@Test public void testFromStream() throws IOException {

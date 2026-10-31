@@ -3,6 +3,7 @@ package convex.lattice.fs;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -28,10 +29,12 @@ import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.RefSoft;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobOutputStream;
 import convex.core.store.MemoryStore;
+import convex.etch.EtchStore;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.impl.DLFSLocal;
 
@@ -213,6 +216,20 @@ public class DLFSInstallTest {
 		ABlob data=DLFSNode.getData(fs.getNode(file));
 		assertArrayEquals(bytes,data.getBytes());
 		assertNotNull(store.refForHash(data.getHash()));
+	}
+
+	@Test public void testWriterLeavesSoftBranchesInEtch() throws IOException {
+		try (EtchStore store=EtchStore.createTemp("dlfs-writer")) {
+			DLFSLocal fs=DLFSLocal.create(DLFS.provider(),"etch",Cursors.root(DLFSLattice.INSTANCE.zero()),store);
+			DLPath file=fs.getPath("/file.bin");
+			byte[] bytes=content(5*Blob.CHUNK_LENGTH).getBytes();
+			fs.write(file,new ByteArrayInputStream(bytes),DLFSCondition.ANY);
+
+			ABlob data=DLFSNode.getData(fs.getNode(file));
+			assertArrayEquals(bytes,data.getBytes());
+			RefSoft<?> ref=assertInstanceOf(RefSoft.class,data.getRef(0));
+			assertSame(store,ref.getStore());
+		}
 	}
 
 	@Test public void testWriteAllBytes() throws IOException {

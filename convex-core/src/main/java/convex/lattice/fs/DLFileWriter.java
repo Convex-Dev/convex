@@ -13,8 +13,9 @@ import convex.core.data.util.BlobOutputStream;
  *
  * Nothing is visible in the drive until commit, which installs the content in
  * one atomic update. Closing without commit discards the content, so a failure
- * partway through, such as a source read error, publishes nothing. Content is
- * saved to the drive's store as it is written, so memory use stays bounded.
+ * partway through, such as a source read error, publishes nothing. On a drive
+ * with a store, content is saved there as it is written, so memory use stays
+ * bounded; otherwise it is held in memory until commit.
  */
 public final class DLFileWriter extends OutputStream {
 
