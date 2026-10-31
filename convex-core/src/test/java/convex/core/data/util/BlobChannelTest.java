@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NonWritableChannelException;
 import java.util.Random;
@@ -88,6 +89,43 @@ public class BlobChannelTest {
 				assertEquals(blob.slice(skip,n),Blob.wrap(in.readAllBytes()));
 			}
 		}
+	}
+
+	@Test public void testRangeChannel() throws IOException {
+		ABlob blob=randomBlob(18*CHUNK+77);
+		long n=blob.count();
+		long[][] ranges={{0,0},{0,1},{CHUNK-1,CHUNK+1},{5*CHUNK+3,9*CHUNK},{n-10,n},{n,n},{0,n}};
+		for (long[] range: ranges) {
+			long start=range[0];
+			long end=range[1];
+			try (BlobChannel channel=BlobChannel.create(blob,start,end)) {
+				assertEquals(end-start,channel.size());
+				assertEquals(0,channel.position());
+			}
+			try (InputStream in=Channels.newInputStream(BlobChannel.create(blob,start,end))) {
+				assertEquals(end-start,in.available());
+				assertEquals(blob.slice(start,end),Blob.wrap(in.readAllBytes()));
+			}
+		}
+
+		// Positions count from the range start, and reads stop at the range end
+		try (BlobChannel channel=BlobChannel.create(blob,CHUNK,2*CHUNK)) {
+			channel.position(10);
+			ByteBuffer buf=ByteBuffer.allocate(20);
+			assertEquals(20,channel.read(buf));
+			assertEquals(blob.slice(CHUNK+10,CHUNK+30),Blob.wrap(buf.array()));
+
+			channel.position(CHUNK-5);
+			ByteBuffer tail=ByteBuffer.allocate(100);
+			assertEquals(5,channel.read(tail));
+			assertEquals(blob.slice(2*CHUNK-5,2*CHUNK),Blob.wrap(tail.array(),0,5));
+			assertEquals(-1,channel.read(tail));
+		}
+
+		assertThrows(IllegalArgumentException.class,()->BlobChannel.create(blob,-1,5));
+		assertThrows(IllegalArgumentException.class,()->BlobChannel.create(blob,5,4));
+		assertThrows(IllegalArgumentException.class,()->BlobChannel.create(blob,0,n+1));
+		assertThrows(IllegalArgumentException.class,()->BlobChannel.create(null,0,0));
 	}
 
 	@Test public void testRangeReadSkipsEarlierChunks() throws IOException, BadFormatException {

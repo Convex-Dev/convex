@@ -9,12 +9,15 @@ import java.nio.channels.SeekableByteChannel;
 import convex.core.data.ABlob;
 
 /**
- * Read-only channel over one Blob.
+ * Read-only channel over one Blob, or a range of it.
  *
  * The Blob is immutable, so the channel reads a single version without locking.
  * Setting the position costs nothing, and each read walks the tree to the bytes
  * requested, loading branches from the store as needed. Reading a range never
  * touches the chunks before it.
+ *
+ * A channel over a range behaves as a channel over just those bytes: its size is
+ * the range length and positions count from the range start.
  *
  * Branches missing from the store throw MissingDataException, as on any other
  * Blob access.
@@ -22,11 +25,15 @@ import convex.core.data.ABlob;
 public final class BlobChannel implements SeekableByteChannel {
 
 	private final ABlob blob;
+	private final long start;
+	private final long size;
 	private long position=0;
 	private volatile boolean isOpen=true;
 
-	private BlobChannel(ABlob blob) {
+	private BlobChannel(ABlob blob, long start, long size) {
 		this.blob=blob;
+		this.start=start;
+		this.size=size;
 	}
 
 	/**
@@ -36,14 +43,30 @@ public final class BlobChannel implements SeekableByteChannel {
 	 */
 	public static BlobChannel create(ABlob blob) {
 		if (blob==null) throw new IllegalArgumentException("Null blob");
-		return new BlobChannel(blob);
+		return create(blob,0,blob.count());
+	}
+
+	/**
+	 * Creates a channel over a range of a Blob, positioned at the range start
+	 * @param blob Blob to read
+	 * @param start Start of range, inclusive
+	 * @param end End of range, exclusive
+	 * @return New channel
+	 */
+	public static BlobChannel create(ABlob blob, long start, long end) {
+		if (blob==null) throw new IllegalArgumentException("Null blob");
+		if ((start<0)||(end<start)||(end>blob.count())) {
+			throw new IllegalArgumentException("Invalid range "+start+"-"+end+" in blob of size "+blob.count());
+		}
+		return new BlobChannel(blob,start,end-start);
 	}
 
 	@Override
 	public synchronized int read(ByteBuffer dst) throws IOException {
 		checkOpen();
-		if (position>=blob.count()) return -1;
-		int read=blob.toByteBuffer(position,dst);
+		if (position>=size) return -1;
+		long n=Math.min(dst.remaining(),size-position);
+		int read=blob.toByteBuffer(start+position,n,dst);
 		position+=read;
 		return read;
 	}
@@ -70,7 +93,7 @@ public final class BlobChannel implements SeekableByteChannel {
 	@Override
 	public long size() throws IOException {
 		checkOpen();
-		return blob.count();
+		return size;
 	}
 
 	@Override
