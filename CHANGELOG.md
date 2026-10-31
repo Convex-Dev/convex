@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolve names in Convex DB DDL as queries resolve them: in a case-insensitive database, `CREATE TABLE` qualified with a lower-case schema name and `DROP TABLE` of a lower-case table now resolve, and `CREATE TABLE` of a name that already resolves is refused instead of adding a second table (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Treat nodes found by P2P discovery as connection candidates only: nodes you name with `connect`, and return routes for nodes that connect and prove their key, no longer depend on how many nodes discovery has seen. ([Live peer selection](convex-p2p/README.md#live-peer-selection))
 - Keep percent-encoded reserved characters in a DID: `did:web:example.com%3A8080` round-trips and no longer equals `did:web:example.com:8080`, and lattice owner DIDs accept only the normalised spelling. ([#816](https://github.com/Convex-Dev/convex/issues/816))
+- Complete the final flush when an interrupted thread closes a host's automatic flushing, and keep that thread's interrupt status.
 
 ## [0.8.18] - 2026-10-25
 

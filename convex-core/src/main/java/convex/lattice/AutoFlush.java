@@ -67,14 +67,15 @@ public final class AutoFlush implements Closeable {
 	private void closeResources() throws IOException {
 		if (closed) return;
 		executor.shutdown();
-		boolean interrupted=false;
+		// A surrounding resource scope may close the store as soon as we return.
+		// Drain and flush uninterrupted, then restore the owner's interruption.
+		// Clear it first: awaitTermination ignores it once the worker has stopped.
+		boolean interrupted=Thread.interrupted();
 		try {
 			for (;;) {
 				try {
 					if (executor.awaitTermination(Long.MAX_VALUE,TimeUnit.NANOSECONDS)) break;
 				} catch (InterruptedException e) {
-					// A surrounding resource scope may close the store as soon as we
-					// return. Drain first, then restore the owner's interruption.
 					interrupted=true;
 				}
 			}
