@@ -1,14 +1,17 @@
 package convex.core.data.util;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import convex.core.data.ABlob;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMChar;
+import convex.core.store.AStore;
 import convex.core.util.Utils;
 import convex.core.exceptions.Panic;
 
@@ -360,6 +363,17 @@ public class BlobBuilder {
 			count+=fill;
 			if (arrayPos()==Blob.CHUNK_LENGTH) completeChunk();
 		}
+	}
+
+	/**
+	 * Saves the completed chunks to a store. Saved branches are held by soft
+	 * references, so a store on disk lets the heap free them. A partial last
+	 * chunk stays in memory.
+	 * @param store Store to save to
+	 * @throws IOException In case of store error
+	 */
+	public void persist(AStore store) throws IOException {
+		acc=Cells.persist(acc,store);
 	}
 
 	/**
