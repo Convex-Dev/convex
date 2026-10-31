@@ -32,7 +32,7 @@ class JoinSubqueryTest {
 	void setUp() throws Exception {
 		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database("join_test");
-		IdentifierPolicy.LOWER.applyTo(db);
+		IdentifierPolicy.INSENSITIVE.applyTo(db);
 		cdb.register("join_test");
 
 		// Create customers table

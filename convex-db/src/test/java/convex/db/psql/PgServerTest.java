@@ -428,6 +428,32 @@ public class PgServerTest {
 	}
 
 	/**
+	 * Under the standard identifier policy, PostgreSQL clients see names folded to upper
+	 * case and compared exactly: the server applies the database's policy, whatever
+	 * PostgreSQL itself would do.
+	 */
+	@Test
+	public void testStandardIdentifiers() throws Exception {
+		IdentifierPolicy.UPPER.applyTo(db);
+		String url = "jdbc:postgresql://localhost:" + server.getPort() + "/" + dbName + "?user=testuser";
+		try (Connection conn = DriverManager.getConnection(url); Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("CREATE TABLE Orders (id INTEGER, total INTEGER)");
+			assertEquals(1, stmt.executeUpdate("INSERT INTO orders VALUES (1, 10)"));
+			try (ResultSet rs = stmt.executeQuery("SELECT total FROM \"ORDERS\" WHERE id = 1")) {
+				assertEquals("TOTAL", rs.getMetaData().getColumnLabel(1));
+				assertTrue(rs.next());
+				assertEquals(10, rs.getInt(1));
+			}
+			try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM \"users\"")) {
+				assertTrue(rs.next());
+				assertEquals(2, rs.getInt(1));
+			}
+			assertThrows(java.sql.SQLException.class, () -> stmt.executeQuery("SELECT COUNT(*) FROM users"));
+		}
+		assertTrue(db.tables().tableExists("ORDERS"));
+	}
+
+	/**
 	 * Tests connectivity using the PostgreSQL JDBC driver.
 	 */
 	@Test
