@@ -506,8 +506,9 @@ capability-free limbo until challenge/response succeeds. Desired peers are of tw
 kinds. Explicit peers come from the operator through `connectPeer` and `addPeer` and
 are always kept. Discovered peers are only candidates for ambient slots: in the P2P
 application, `NodeDirectory` validates correctly owner-signed `[:p2p :nodes]` records
-and translates their transport fields. Discovery never makes a node a wanted peer.
-The connection manager itself never reads that lattice path or parses NodeInfo. Callers
+and translates their transport fields. Discovery never makes a node a wanted peer,
+and a node with no supported transport to dial, such as a NAT leaf, is not a
+candidate. The connection manager itself never reads that lattice path or parses NodeInfo. Callers
 can await admission without polling. Discovered candidates are bounded by the
 configurable `maxDesiredPeers` cap (256 by default); explicit peers are not counted,
 and a full candidate pool never refuses explicit intent or an inbound route upgrade.
@@ -522,6 +523,8 @@ liveness and pending-attempt rules.
 It also keeps authenticated inbound connections in a separate upgraded-route map.
 Ordinary inbound sockets never appear in broadcasts; an upgraded route is selected
 only when no live manager-owned outbound client already serves the same peer key.
+A peer reached only through an upgraded route takes no ambient or active slot, so
+nodes that connect in cannot displace the peers this node chose.
 
 ### 8.3 Reconnection [EXISTS — lattice nodes]
 

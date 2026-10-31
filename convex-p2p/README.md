@@ -315,8 +315,9 @@ java -cp convex.jar convex.p2p.P2PNode [etch-file]
 
 ## Live peer selection
 
-Discovered nodes form a candidate pool (`maxDesiredPeers`, default 256), not
-a target number of concurrent connections. Nodes named with `connect` are not
+Discovered nodes with a supported transport to dial form a candidate pool
+(`maxDesiredPeers`, default 256), not a target number of concurrent connections.
+Outbound-only nodes, which advertise no transport, are not candidates. Nodes named with `connect` are not
 candidates and are always kept. Each propagation group normally keeps
 16 ambient peers plus up to 16 recently active communicators. Configure the soft
 targets with `LatticePropagatorConfig.AMBIENT_PEERS` (`ambientPeers`) and
@@ -326,8 +327,10 @@ Healthy ambient routes stay stable and vacant slots sample eligible candidates.
 Directed point messages and application-requested pulls earn two minutes of active
 retention; gossip, bootstrap and keepalives do not. Explicit `connect`/`addPeer`
 requests remain preferred until removed and may exceed the targets. Outstanding
-requests are protected from trimming. Authenticated inbound routes count as existing
-connectivity, without imposing a new physical-socket cap on NAT return paths.
+requests are protected from trimming. The targets count only connections this node
+opens: a node that connects in and proves its key is never dialled again and takes
+no slot, so nodes connecting in cannot displace the peers this node chose. Nor do the
+targets cap NAT return paths.
 
 Maintenance checks every second, but normal incoming propagation acts as the
 heartbeat: healthy ambient peers have no scheduled rotation. Only after two minutes

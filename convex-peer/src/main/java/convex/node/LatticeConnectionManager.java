@@ -58,14 +58,16 @@ import convex.peer.AConnectionManager;
  *   <li>{@link DesiredPeer} entries are connection <em>intent</em>, not live
  *       sockets or trust assertions. Explicit peers named through the
  *       {@code addPeer} and {@code connectPeer} APIs are always kept. Discovered
- *       peers are only candidates: they are bounded by {@link #setMaxDesiredPeers}
- *       and never block explicit intent or an inbound route upgrade.</li>
+ *       peers are only candidates: nodes with a supported transport to dial, bounded
+ *       by {@link #setMaxDesiredPeers}, never blocking explicit intent or an inbound
+ *       route upgrade.</li>
  *   <li>Pending connections are manager-owned outbound sockets held in identity
  *       verification limbo.</li>
  *   <li>Active connections are admitted manager-owned outbound clients.</li>
  *   <li>Upgraded inbound routes are authenticated sockets physically owned by
  *       an application transport and assigned endpoint; this manager owns only their
- *       outbound capability.</li>
+ *       outbound capability. They take none of the peer slots set by
+ *       {@link #setPeerTargets}.</li>
  * </ol>
  *
  * <p>The {@code addPeer} overloads all create or retain desired-peer intent.
@@ -224,7 +226,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 		this.clock=clock;
 	}
 
-	/** Sets soft live-peer targets; explicit connections and outstanding work may exceed them. */
+	/**
+	 * Sets soft targets for the routes this node opens. Explicit connections and
+	 * outstanding work may exceed them; peers reached only inbound do not count.
+	 */
 	public void setPeerTargets(int ambient,int active) {
 		if (ambient<0 || active<0) throw new IllegalArgumentException("Peer targets must be non-negative");
 		synchronized (connectionLock) {
@@ -1008,17 +1013,21 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 *
 	 * <p>The caller owns discovery validation and schema interpretation. This
 	 * transport layer accepts only the expected node key, ordered transport URIs
-	 * and a monotonically increasing revision. A new key becomes a candidate that
-	 * maintenance may dial for an ambient slot, never explicit intent; candidates
-	 * are bounded by {@link #setMaxDesiredPeers}. For a key that is already present,
-	 * only its transport metadata is refreshed. The operation is additive/update-only
-	 * and merely wakes maintenance; it never opens a socket on the caller's thread.</p>
+	 * and a monotonically increasing revision. A new key with a supported transport
+	 * becomes a candidate that maintenance may dial for an ambient slot, never
+	 * explicit intent; candidates are bounded by {@link #setMaxDesiredPeers}. A node
+	 * with nothing to dial, such as an outbound-only node behind NAT, is not a
+	 * candidate, and a candidate whose newer record has nothing to dial leaves the
+	 * pool. For explicit intent, only the transport metadata is refreshed. The
+	 * operation merely wakes maintenance; it never opens a socket on the caller's
+	 * thread.</p>
 	 *
 	 * @param peerKey expected remote node key
 	 * @param transports ordered transport URIs, possibly empty but not null
 	 * @param revision discovery-source revision used to reject stale replacement
 	 * @return {@code true} if the peer is present after the operation; {@code false}
-	 *         if the candidate cap rejected a new peer or the arguments are invalid
+	 *         if a candidate has no supported transport, the candidate cap rejected a
+	 *         new peer or the arguments are invalid
 	 */
 	public boolean updateDiscoveredPeer(
 			AccountKey peerKey,AVector<AString> transports,long revision) {
@@ -1026,25 +1035,36 @@ public class LatticeConnectionManager extends AConnectionManager {
 		for (long i=0; i<transports.count(); i++) {
 			if (transports.get(i)==null) return false;
 		}
+		boolean dialable=resolveTransport(transports)!=null;
+		boolean present=true;
 		boolean changed=false;
 		synchronized (connectionLock) {
 			if (!accepting) return false;
 			DesiredPeer existing=desiredPeers.get(peerKey);
 			if (existing==null) {
-				if (candidateCount>=maxDesiredPeers) return false;
+				if (!dialable || candidateCount>=maxDesiredPeers) return false;
 				desiredPeers.put(peerKey,DesiredPeer.discovered(peerKey,transports,revision));
 				activity.put(peerKey,new PeerActivity());
 				candidateCount++;
 				changed=true;
 			} else if (!existing.discovered || revision>existing.revision) {
-				DesiredPeer updated=DesiredPeer.discovered(peerKey,transports,revision);
-				updated.copyRetryState(existing);
-				desiredPeers.put(peerKey,updated);
+				if (dialable || activity.get(peerKey).explicit) {
+					DesiredPeer updated=DesiredPeer.discovered(peerKey,transports,revision);
+					updated.copyRetryState(existing);
+					desiredPeers.put(peerKey,updated);
+				} else {
+					// Nothing left to dial, so no longer a candidate. Maintenance retires
+					// any route this node opened to it; an inbound route stays.
+					desiredPeers.remove(peerKey);
+					activity.remove(peerKey);
+					candidateCount--;
+					present=false;
+				}
 				changed=true;
 			}
 		}
 		if (changed) maintenanceSignal.release();
-		return true;
+		return present;
 	}
 
 	// ========== Accessors ==========
@@ -1257,8 +1277,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 					retired.add(peer);
 				}
 			}
-			// Listener-owned inbound sockets may exceed these soft targets. They
-			// already provide connectivity and must not provoke duplicate outbound dials.
+			// Listener-owned inbound sockets take no slot and are never trimmed here.
+			// Their keys already have a route, so they are never dialled again.
 			ArrayList<AccountKey> ordered=new ArrayList<>(selected);
 			Utils.shuffle(ordered);
 			ordered.sort((a,b) -> Boolean.compare(activity.get(b).explicit,activity.get(a).explicit));
@@ -1275,7 +1295,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 		for (DesiredPeer desired:attempts) startDial(desired);
 	}
 
-	/** Stable healthy incumbents first; random sampling fills vacant ambient slots. Lock held. */
+	/**
+	 * Stable healthy incumbents first; random sampling fills vacant ambient slots.
+	 * Slots hold routes this node opens: a peer reached only inbound takes none, so
+	 * peers connecting in cannot displace the ones this node chose. Lock held.
+	 */
 	private Set<AccountKey> selectPeers(long now) {
 		HashSet<AccountKey> selected=new HashSet<>();
 		ArrayList<AccountKey> recent=new ArrayList<>();
@@ -1284,14 +1308,16 @@ public class LatticeConnectionManager extends AConnectionManager {
 			AccountKey key=entry.getKey();
 			PeerActivity state=activity.get(key);
 			if (state.explicit) selected.add(key);
-			else if (state.lastActive!=Long.MIN_VALUE && now-state.lastActive<ACTIVE_RETENTION_MS) recent.add(key);
+			else if (state.lastActive!=Long.MIN_VALUE && now-state.lastActive<ACTIVE_RETENTION_MS
+					&& !reachedOnlyInbound(key)) recent.add(key);
 		}
 		recent.sort((a,b) -> Long.compare(activity.get(b).lastActive,activity.get(a).lastActive));
 		for (int i=0;i<Math.min(activePeers,recent.size());i++) selected.add(recent.get(i));
 		for (var entry:desiredPeers.entrySet()) {
 			AccountKey key=entry.getKey();
-			if (!selected.contains(key) && (hasRouteOrAttempt(key)
-					|| (entry.getValue().isRetryDue(now) && hasDialTarget(entry.getValue())))) ambient.add(key);
+			if (selected.contains(key) || reachedOnlyInbound(key)) continue;
+			if (hasRouteOrAttempt(key)
+					|| (entry.getValue().isRetryDue(now) && hasDialTarget(entry.getValue()))) ambient.add(key);
 		}
 		Utils.shuffle(ambient);
 		ambient.sort((a,b) -> Integer.compare(routeRank(a),routeRank(b)));
@@ -1300,8 +1326,14 @@ public class LatticeConnectionManager extends AConnectionManager {
 	}
 
 	private int routeRank(AccountKey key) {
-		if (connections.containsKey(key) || upgradedInboundRoutes.containsKey(key)) return 0;
+		if (connections.containsKey(key)) return 0;
 		return hasRouteOrAttempt(key) ? 1 : 2;
+	}
+
+	/** An upgraded inbound route with no route or attempt of this node's own. Lock held. */
+	private boolean reachedOnlyInbound(AccountKey key) {
+		return upgradedInboundRoutes.containsKey(key) && !connections.containsKey(key)
+			&& !pendingConnections.containsKey(key) && !dialling.containsKey(key);
 	}
 
 	private boolean hasRouteOrAttempt(AccountKey key) {
@@ -1470,7 +1502,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Returns the first supported endpoint without resolving DNS or losing its scheme. */
 	static URI resolveTransport(DesiredPeer desired) {
-		AVector<AString> transports = desired.transports;
+		return resolveTransport(desired.transports);
+	}
+
+	private static URI resolveTransport(AVector<AString> transports) {
 		if (transports == null || transports.isEmpty()) return null;
 
 		for (long i = 0; i < transports.count(); i++) {

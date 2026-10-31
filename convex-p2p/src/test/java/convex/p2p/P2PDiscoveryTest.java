@@ -55,21 +55,23 @@ public class P2PDiscoveryTest {
 	public void testFullCandidatePoolBlocksNoConnection() throws Exception {
 		hubStore=EtchStore.createTemp("p2p-discovery-hub");
 		peerStore=EtchStore.createTemp("p2p-discovery-peer");
+		// No ambient slots: the hub keeps candidates but dials none of them
 		LatticePropagatorConfig bounded=LatticePropagatorConfig.create(Maps.of(
-			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(CANDIDATES)));
+			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(CANDIDATES),
+			LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.create(0)));
 		hub=P2PNode.create(hubStore,NodeConfig.localNetwork(),bounded,hubKey).serveAllInbound();
 		peer=P2PNode.create(peerStore,NodeConfig.localNetwork(),
 			LatticePropagatorConfig.create(),peerKey).serveAllInbound();
 		hub.launch();
 		peer.launch();
 
-		// More valid records than the hub has candidate slots, offered over an
-		// unverified public connection. Discovery runs before the reply.
+		// More valid dialable records than the hub has candidate slots, offered over
+		// an unverified public connection. Discovery runs before the reply.
 		AHashMap<ACell,SignedData<ACell>> records=Maps.empty();
 		for (int i=0; i<2*CANDIDATES; i++) {
 			records=records.merge(convex.lattice.p2p.P2PLattice.createSignedEntry(AKeyPair.generate(),
-				convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.empty(),Strings.create("test"),
-					Strings.create("test"),null,1L)));
+				convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.of(Strings.create("tcp://localhost:1")),
+					Strings.create("test"),Strings.create("test"),null,1L)));
 		}
 		Message update=Message.create(MessageType.LATTICE_VALUE,Vectors.create(
 			MessageTag.LATTICE_VALUE,null,NodeDirectory.REGISTRY_PATH,records));

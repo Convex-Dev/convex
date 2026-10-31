@@ -2561,36 +2561,39 @@ public class NodeServerTest {
 	@Test
 	public void testDesiredPeerLimit() throws Exception {
 		NodeConfig cfg=NodeConfig.create(Maps.of(
-			NodeConfig.MAX_DESIRED_PEERS,CVMLong.create(2)));
+			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(2),
+			LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.create(0)));
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,cfg);
 		propagator(maxNodeServer);
 		maxNodeServer.launch();
 		LatticeConnectionManager cm=propagator(maxNodeServer).getConnectionManager();
 		assertEquals(2,cm.getMaxDesiredPeers());
 
+		// Candidates must be dialable; with no ambient slots none is dialled
+		AVector<AString> tcp=Vectors.of(Strings.create("tcp://localhost:1"));
 		AccountKey first=AKeyPair.generate().getAccountKey();
-		assertTrue(cm.updateDiscoveredPeer(first,Vectors.empty(),1));
-		assertTrue(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),2));
-		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),3));
+		assertTrue(cm.updateDiscoveredPeer(first,tcp,1));
+		assertTrue(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,2));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,3));
 		assertEquals(2,cm.getDesiredPeers().size());
 
 		// A full candidate pool does not stop explicit intent
 		AccountKey named=AKeyPair.generate().getAccountKey();
 		cm.addPeer(named);
 		assertTrue(cm.getDesiredPeers().containsKey(named));
-		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),4));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,4));
 
 		// Naming a candidate makes it explicit, which frees its candidate slot
 		cm.addPeer(first);
 		AccountKey later=AKeyPair.generate().getAccountKey();
-		assertTrue(cm.updateDiscoveredPeer(later,Vectors.empty(),5));
-		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),6));
+		assertTrue(cm.updateDiscoveredPeer(later,tcp,5));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,6));
 
 		// Removing a candidate frees its slot; removing explicit intent does not add one
 		cm.removePeer(later);
 		cm.removePeer(named);
-		assertTrue(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),7));
-		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),8));
+		assertTrue(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,7));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,8));
 	}
 
 	@Test

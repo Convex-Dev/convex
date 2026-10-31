@@ -297,7 +297,8 @@ operations do not introduce runtime group creation or subscription negotiation.
 
 ## Live peer selection
 
-`maxDesiredPeers` bounds discovered candidates (default 256). Explicit
+A discovered node is a candidate only while it advertises a supported transport
+to dial; `maxDesiredPeers` bounds candidates (default 256). Explicit
 `connectPeer`/`addPeer` intent is not counted and is never refused for capacity,
 and inbound route upgrades do not depend on it. The independent soft targets
 `ambientPeers` and `activePeers` default to 16 each. Maintenance retains healthy
@@ -310,9 +311,13 @@ automatic attempts outstanding. Each attempt runs independently of maintenance.
 `markActive` records useful directed traffic. `withPeer` protects an asynchronous
 operation from trimming and can optionally record activity. Application pulls and
 authenticated point-message routes use these hooks; background bootstrap, broadcast
-gossip and PING traffic do not earn priority. Inbound and outbound routes to one key
-count once. Inbound physical sockets remain owned by their listener/endpoint, so
-soft targets are not an aggregate socket limit.
+gossip and PING traffic do not earn priority.
+
+The targets count only routes this node opens. A peer reached only through an
+authenticated inbound route takes no ambient or active slot and is not dialled, so
+peers that connect in cannot displace the ones this node chose. Inbound physical
+sockets remain owned by their listener/endpoint, so soft targets are not an
+aggregate socket limit.
 
 Maintenance runs every second, but normal propagation supplies the heartbeat and
 healthy ambient peers are not periodically rotated. Only two minutes without

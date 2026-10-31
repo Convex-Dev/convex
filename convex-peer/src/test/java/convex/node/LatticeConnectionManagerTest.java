@@ -6,7 +6,9 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -291,20 +293,66 @@ public class LatticeConnectionManagerTest {
 		assertTrue(replacement.isConnected());
 	}
 
-	@Test public void testInboundRouteCountsWithoutBeingClosedByTrimming() {
+	@Test public void testInboundRouteTakesNoSlotAndIsNotClosedByTrimming() {
 		manager.setPeerTargets(1,0);
 		AccountKey key=candidate(1);
-		candidate(2);
+		AccountKey other=candidate(2);
 		StubInbound inbound=new StubInbound();
 		inbound.setTrustedKey(key);
 		manager.upgradeInboundConnection(inbound);
 		manager.maintainConnections();
-		assertEquals(0,manager.openCount);
+		assertEquals(Set.of(other),manager.dials.keySet(),"the inbound peer is not dialled and takes no slot");
 		manager.setPeerTargets(0,0);
 		manager.maintainConnections();
 		assertSame(inbound,manager.getUpgradedInboundConnection(key));
 		manager.close();
 		assertFalse(inbound.isClosed(),"listener retains physical ownership");
+	}
+
+	/** Peers that connect in take no ambient or active slot, so cannot displace this node's choices. */
+	@Test public void testInboundRoutesCannotDisplaceChosenPeers() {
+		manager.setPeerTargets(2,1);
+		List<AccountKey> keys=new ArrayList<>();
+		for (int i=0;i<8;i++) keys.add(candidate(i));
+		fill(2);
+		manager.markActive(manager.getConnections().keySet().iterator().next());
+		fill(3);
+		Map<AccountKey,Convex> chosen=manager.getConnections();
+
+		now.incrementAndGet();
+		for (AccountKey key:keys) {
+			if (chosen.containsKey(key)) continue;
+			StubInbound inbound=new StubInbound();
+			inbound.setTrustedKey(key);
+			manager.upgradeInboundConnection(inbound);
+			manager.markActive(key);
+		}
+		for (int i=0;i<10;i++) manager.maintainConnections();
+		assertEquals(chosen,manager.getConnections());
+		assertEquals(3,manager.openCount);
+	}
+
+	/** A candidate is a node to dial: records with no supported transport take no slot. */
+	@Test public void testOnlyDialableRecordsAreCandidates() {
+		manager.setMaxDesiredPeers(1);
+		AccountKey leaf=AKeyPair.createSeeded(1).getAccountKey();
+		assertFalse(manager.updateDiscoveredPeer(leaf,Vectors.empty(),1));
+		assertFalse(manager.updateDiscoveredPeer(leaf,Vectors.of(Strings.create("wss://localhost:1")),2));
+		AccountKey node=candidate(2);
+		fill(1);
+
+		// A newer record with nothing to dial leaves the pool, and its route is retired
+		assertFalse(manager.updateDiscoveredPeer(node,Vectors.empty(),2));
+		assertFalse(manager.getDesiredPeers().containsKey(node));
+		manager.maintainConnections();
+		assertEquals(0,manager.getConnectionCount());
+		candidate(3);
+
+		// Explicit intent keeps its entry whatever discovery advertises
+		AccountKey named=AKeyPair.createSeeded(4).getAccountKey();
+		manager.addPeer(named);
+		assertTrue(manager.updateDiscoveredPeer(named,Vectors.empty(),1));
+		assertTrue(manager.getDesiredPeers().containsKey(named));
 	}
 
 	@Test public void testLateDialAfterCloseIsClosed() {
