@@ -1,12 +1,15 @@
 package convex.dlfs;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
@@ -22,8 +25,11 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.util.BlobChannel;
+import convex.lattice.fs.ConditionFailedException;
+import convex.lattice.fs.DLFSCondition;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
+import convex.lattice.fs.DLFileWriter;
 import convex.lattice.fs.DLPath;
 import convex.lattice.fs.impl.DLFSFileAttributes;
 import convex.restapi.auth.AuthMiddleware;
@@ -228,17 +234,6 @@ public class DLFSWebDAV {
 		if (fs!=null) driveManager.syncDrive(fs);
 	}
 
-	private boolean writeCompleteFile(Path path, byte[] data) throws IOException {
-		if (data.length > maxFileSize) return false;
-		if (path.getFileSystem() instanceof DLFileSystem dlfs) {
-			dlfs.writeAllBytes((DLPath) path, data);
-		} else {
-			Files.write(path, data, StandardOpenOption.CREATE,
-				StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-		}
-		return true;
-	}
-
 	// ==================== Handlers ====================
 
 	/**
@@ -332,25 +327,97 @@ public class DLFSWebDAV {
 			ctx.status(413).result("Content Too Large");
 			return;
 		}
-		byte[] body = ctx.bodyAsBytes();
-		if (body.length > maxFileSize) {
-			ctx.status(413).result("Content Too Large");
-			return;
-		}
 
-		// Ensure parent directory exists
+		// Refuse requests that cannot succeed before reading the body
 		Path parent = path.getParent();
 		if (parent != null && !Files.isDirectory(parent)) {
 			ctx.status(409).result("Conflict: parent directory does not exist");
 			return;
 		}
+		if (Files.isDirectory(path)) {
+			ctx.status(405).result("Method Not Allowed: cannot PUT to a directory");
+			return;
+		}
 
+		if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof DLPath dlp) {
+			putFile(ctx, dp, dlfs, dlp);
+			return;
+		}
+
+		byte[] body = ctx.bodyAsBytes();
+		if (body.length > maxFileSize) {
+			ctx.status(413).result("Content Too Large");
+			return;
+		}
 		boolean isNew = !Files.exists(path);
 		if (!checkWritePreconditions(ctx, path, !isNew)) return;
-		writeCompleteFile(path, body);
+		Files.write(path, body, StandardOpenOption.CREATE,
+			StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
 
 		syncDrive(ctx, dp);
 		ctx.status(isNew ? 201 : 204);
+	}
+
+	/**
+	 * Streams a PUT body into a DLFS writer and installs it in one atomic update,
+	 * with If-Match and If-None-Match checked inside that update. A body over the
+	 * size limit, a failed upload or a failed condition publishes nothing.
+	 */
+	private void putFile(Context ctx, DrivePath dp, DLFileSystem dlfs, DLPath path) throws IOException {
+		DLFSCondition condition = writeCondition(ctx);
+		// The install checks again; this refuses a doomed upload before its body arrives
+		if (!condition.test(dlfs.getNode(path))) {
+			ctx.status(412).result("Precondition Failed");
+			return;
+		}
+
+		AVector<ACell> replaced;
+		try (DLFileWriter writer = dlfs.newWriter(path, condition)) {
+			if (!copyBody(ctx.bodyInputStream(), writer, maxFileSize)) {
+				ctx.status(413).result("Content Too Large");
+				return;
+			}
+			replaced = writer.commit();
+		} catch (ConditionFailedException e) {
+			ctx.status(412).result("Precondition Failed");
+			return;
+		} catch (NoSuchFileException | NotDirectoryException e) {
+			ctx.status(409).result("Conflict: parent directory does not exist");
+			return;
+		}
+
+		syncDrive(ctx, dp);
+		ctx.status((replaced == null) ? 201 : 204);
+	}
+
+	/**
+	 * Builds the condition that If-Match and If-None-Match place on a write, to
+	 * be checked against the file's entry inside the install.
+	 */
+	private static DLFSCondition writeCondition(Context ctx) {
+		String ifMatch = ctx.header("If-Match");
+		String ifNoneMatch = ctx.header("If-None-Match");
+		return entry -> {
+			String etag = (entry == null) ? null : etagOf(entry);
+			if ((ifMatch != null) && ((etag == null) || !headerMatches(ifMatch, etag))) return false;
+			return (ifNoneMatch == null) || (etag == null) || !headerMatches(ifNoneMatch, etag);
+		};
+	}
+
+	/**
+	 * Copies a request body, refusing more than a limit
+	 * @return false if the body is longer than the limit
+	 */
+	private static boolean copyBody(InputStream body, OutputStream out, long limit) throws IOException {
+		byte[] buffer = new byte[16384];
+		long total = 0;
+		int n;
+		while ((n = body.read(buffer)) >= 0) {
+			total += n;
+			if (total > limit) return false;
+			out.write(buffer, 0, n);
+		}
+		return true;
 	}
 
 	void handleDelete(Context ctx) {

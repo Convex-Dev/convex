@@ -163,7 +163,7 @@ authenticated users can each have a drive called "home" without conflict.
 | Method | Drive-level | File-level |
 |--------|-------------|------------|
 | `GET` | List drive names | Read file content or one byte range (206) / directory listing |
-| `PUT` | Rejected (403) | Write file (201 Created / 204 No Content) |
+| `PUT` | Rejected (403) | Write file atomically (201 Created / 204 No Content) |
 | `DELETE` | Delete drive | Delete file (tombstone) |
 | `MKCOL` | Create drive | Create directory |
 | `PROPFIND` | Drive list (207 Multi-Status) | File/directory properties (207) |
@@ -236,10 +236,12 @@ File operations go through the NIO filesystem abstraction, apart from whole-file
 reads and writes. GET and HEAD read the file entry once and serve its blob, so
 headers and body come from one version of the file; GET answers a single byte
 `Range`, and file responses are not compressed, so lengths and ranges refer to the
-stored bytes. Whole-file replacements use `DLFileSystem.writeAllBytes`, a single
-atomic install. Each external transport mutation refreshes the caller-managed
-timestamp and calls `sync()`; PUT also supports ETag-based `If-Match` and
-`If-None-Match` preconditions. DLFS itself does not advance that timestamp.
+stored bytes. PUT streams the body into a `DLFileWriter` and installs it in one
+atomic update, checking `If-Match` and `If-None-Match` inside that update, so a body
+over the size limit, a failed upload or a failed condition publishes nothing. The MCP
+write tool uses `DLFileSystem.writeAllBytes`, also a single install. Each external
+transport mutation refreshes the caller-managed timestamp and calls `sync()`. DLFS
+itself does not advance that timestamp.
 
 ### Publishing Files
 

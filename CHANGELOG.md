@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Read part of a DLFS file over WebDAV with an HTTP `Range` request, to resume a download or read from a large file. GET and HEAD answer from one version of the file, uncompressed, so lengths, ranges and ETags always match it. ([#790](https://github.com/Convex-Dev/convex/issues/790))
 - Work with large blobs in bounded memory: read from any position or range with `BlobChannel`, and build one from a stream with `BlobOutputStream` or `Blobs.fromStream(in, store)`, which save to a store as the content arrives. ([#790](https://github.com/Convex-Dev/convex/issues/790))
 - Publish a DLFS file atomically with `install(path, blob, condition)`, or write it through `newWriter(path, condition)` and an explicit `commit()`: readers see the old file or the new one, and a failed condition or source changes nothing. `writeAllBytes` is now a single atomic install. ([Publishing Files](convex-dlfs/docs/DLFS_DESIGN.md#publishing-files), [#790](https://github.com/Convex-Dev/convex/issues/790))
+- Upload large files to DLFS over WebDAV: PUT streams the body in bounded memory and publishes it in one atomic update, with `If-Match` and `If-None-Match` checked in that update, so a failed, oversized or conflicting upload leaves the file as it was. ([#790](https://github.com/Convex-Dev/convex/issues/790))
 
 ### Changed
 

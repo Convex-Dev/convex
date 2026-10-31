@@ -389,6 +389,74 @@ public class DLFSServerTest {
 	}
 
 	@Test
+	void testPutStreamsLargeFile() throws Exception {
+		byte[] first = new byte[(3 << 20) / 2];
+		new Random(791).nextBytes(first);
+		String path = driveURL + "large-put.bin";
+		assertEquals(201, client.send(HttpRequest.newBuilder(URI.create(path))
+			.PUT(HttpRequest.BodyPublishers.ofByteArray(first)).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+		assertArrayEquals(first, getRange(path, null, null).body());
+
+		// A body of unknown length streams too
+		byte[] second = Arrays.copyOf(first, 5000);
+		assertEquals(204, client.send(HttpRequest.newBuilder(URI.create(path))
+			.PUT(HttpRequest.BodyPublishers.ofInputStream(() -> new java.io.ByteArrayInputStream(second))).build(),
+			HttpResponse.BodyHandlers.ofString()).statusCode());
+		assertArrayEquals(second, getRange(path, null, null).body());
+	}
+
+	@Test
+	void testPutConditions() throws Exception {
+		String path = driveURL + "put-conditions.txt";
+		HttpResponse<String> missing = client.send(HttpRequest.newBuilder(URI.create(path))
+			.header("If-Match", "*")
+			.PUT(HttpRequest.BodyPublishers.ofString("v0")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(412, missing.statusCode());
+		assertEquals(404, getRange(path, null, null).statusCode());
+
+		HttpResponse<String> created = client.send(HttpRequest.newBuilder(URI.create(path))
+			.header("If-None-Match", "*")
+			.PUT(HttpRequest.BodyPublishers.ofString("v1")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(201, created.statusCode());
+		String etag = getRange(path, null, null).headers().firstValue("ETag").orElseThrow();
+
+		HttpResponse<String> listed = client.send(HttpRequest.newBuilder(URI.create(path))
+			.header("If-Match", "\"other\", " + etag)
+			.PUT(HttpRequest.BodyPublishers.ofString("v2")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(204, listed.statusCode());
+
+		HttpResponse<String> notThis = client.send(HttpRequest.newBuilder(URI.create(path))
+			.header("If-None-Match", getRange(path, null, null).headers().firstValue("ETag").orElseThrow())
+			.PUT(HttpRequest.BodyPublishers.ofString("v3")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(412, notThis.statusCode());
+		assertEquals("v2", new String(getRange(path, null, null).body()));
+	}
+
+	@Test
+	void testPutLimitWhileStreaming() throws Exception {
+		try (DLFSServer limited = DLFSServer.createEphemeral().setMaxRequestSize(8)) {
+			limited.getDriveManager().createDrive(null, "limited");
+			limited.start(0);
+			String url = "http://localhost:" + limited.getPort() + "/dlfs/limited/streamed.txt";
+			HttpResponse<String> response = client.send(HttpRequest.newBuilder(URI.create(url))
+				.PUT(HttpRequest.BodyPublishers.ofInputStream(() -> new java.io.ByteArrayInputStream(new byte[9]))).build(),
+				HttpResponse.BodyHandlers.ofString());
+			assertEquals(413, response.statusCode());
+			assertEquals(404, getRange(url, null, null).statusCode());
+		}
+	}
+
+	@Test
+	void testPutOnDirectory() throws Exception {
+		String dir = driveURL + "put-target-dir/";
+		assertEquals(201, client.send(HttpRequest.newBuilder(URI.create(dir))
+			.method("MKCOL", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+		HttpResponse<String> put = client.send(HttpRequest.newBuilder(URI.create(driveURL + "put-target-dir"))
+			.PUT(HttpRequest.BodyPublishers.ofString("x")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(405, put.statusCode());
+	}
+
+	@Test
 	void testRangeRequests() throws Exception {
 		byte[] content = new byte[3 * 4096 + 100];
 		new Random(790).nextBytes(content);
