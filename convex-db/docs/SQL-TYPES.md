@@ -125,21 +125,23 @@ the result converter hands them to Calcite through the result column's codec.
 
 ## Errors
 
-The codec and the operators raise `SQLException`s with PostgreSQL's SQLSTATE codes, which reach
-JDBC callers unchanged and pgwire clients through `ErrorResponse.fromException`. When Calcite wraps the
-exception, `fromException` takes the SQLSTATE from the first `SQLException` in the cause
-chain.
+The codec and the operators raise `SQLException`s with the SQL standard's SQLSTATE codes, which
+reach JDBC callers in the cause chain and pgwire clients through `ErrorResponse.fromException`.
+When Calcite wraps the exception, `fromException` takes the SQLSTATE from the first
+`SQLException` in the cause chain. Where PostgreSQL has a more specific code, the wire server
+reports it instead, recognising the condition by the type of exception in the chain, never by
+its message.
 
-| Condition | SQLSTATE |
-|-----------|----------|
-| Value out of the column's range or precision | `22003` |
-| String or blob longer than the declared length | `22001` |
-| Text that is not valid input for the type (pgwire parameters) | `22P02` |
-| Stored value that does not conform to its column (from a merge) | `22000` |
-| Table definition with an unsupported SQL type | `0A000` |
-| Connection to a database whose identifier policy is unknown | `0A000` |
-| Scalar subquery returning more than one row | `21000` |
-| `INSERT` or key-changing `UPDATE` of a primary key the table already holds | `23505` |
+| Condition | JDBC | PostgreSQL wire |
+|-----------|------|-----------------|
+| Value out of the column's range or precision | `22003` | `22003` |
+| String or blob longer than the declared length | `22001` | `22001` |
+| Text that is not valid input for the type (pgwire parameters) | | `22P02` |
+| Stored value that does not conform to its column (from a merge) | `22000` | `22000` |
+| Table definition with an unsupported SQL type | `0A000` | `0A000` |
+| Connection to a database whose identifier policy is unknown | `0A000` | `0A000` |
+| Scalar subquery returning more than one row | `21000` | `21000` |
+| `INSERT` or key-changing `UPDATE` of a primary key the table already holds | `23000`, a `SQLIntegrityConstraintViolationException` caused by `DuplicateKeyException` | `23505` |
 
 ## PostgreSQL Wire Protocol
 

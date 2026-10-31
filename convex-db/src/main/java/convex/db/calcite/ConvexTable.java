@@ -205,8 +205,8 @@ public class ConvexTable extends AbstractQueryableTable
 	/**
 	 * Inserts the rows of an INSERT in one atomic write, as the SQL standard has it: every
 	 * value is converted to its column's type first, and a key the table already holds, or
-	 * one repeated in the statement, is a unique violation (SQLSTATE 23505). Either way
-	 * nothing is written.
+	 * one repeated in the statement, is an integrity constraint violation (SQLSTATE 23000).
+	 * Either way nothing is written.
 	 */
 	public long executeInsert(Enumerable<?> input) {
 		try {
@@ -217,7 +217,7 @@ public class ConvexTable extends AbstractQueryableTable
 			}
 			return schema.getTables().insertNew(convex.core.data.Strings.create(tableName), rows);
 		} catch (convex.db.lattice.DuplicateKeyException e) {
-			throw uniqueViolation(e.getRow().get(0), e);
+			throw uniqueViolation(e);
 		} catch (ExceptionInInitializerError e) {
 			throw wrapTypeError(e, "INSERT");
 		}
@@ -263,7 +263,7 @@ public class ConvexTable extends AbstractQueryableTable
 				// new row on a replica.
 				if (pkBeingUpdated && !oldPk.equals(newPk)) {
 					if (schema.getTables().selectByKey(tableName, newPk) != null) {
-						throw uniqueViolation(newPk, null);
+						throw uniqueViolation(new convex.db.lattice.DuplicateKeyException(toCells(updatedRow)));
 					}
 					schema.getTables().deleteByKey(tableName, oldPk);
 				}
@@ -318,11 +318,14 @@ public class ConvexTable extends AbstractQueryableTable
 		return schema.getTables().insert(tableName, toCells(row));
 	}
 
-	/** A unique violation of this table's primary key, SQLSTATE 23505 in the cause chain. */
-	private RuntimeException uniqueViolation(ACell key, Throwable cause) {
+	/**
+	 * A violation of this table's primary key: in the cause chain, the SQL standard's
+	 * integrity constraint violation (SQLSTATE 23000), caused by the duplicate key.
+	 */
+	private RuntimeException uniqueViolation(convex.db.lattice.DuplicateKeyException duplicate) {
 		String message = "Unique constraint violation: duplicate key value violates the primary key of table \""
-			+ tableName + "\": key (" + key + ") already exists";
-		java.sql.SQLException sql = new java.sql.SQLException(message, "23505", cause);
+			+ tableName + "\": key (" + duplicate.getRow().get(0) + ") already exists";
+		java.sql.SQLException sql = new java.sql.SQLIntegrityConstraintViolationException(message, "23000", duplicate);
 		return new IllegalStateException(message, sql);
 	}
 

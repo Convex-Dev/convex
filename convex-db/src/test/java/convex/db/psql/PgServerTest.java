@@ -950,12 +950,18 @@ public class PgServerTest {
 		}
 	}
 
-	/** A PostgreSQL client sees an INSERT of an existing key as a unique violation, 23505. */
+	/**
+	 * A PostgreSQL client sees an INSERT of an existing key, or an UPDATE to one, as
+	 * PostgreSQL's unique_violation, 23505.
+	 */
 	@Test
-	public void testInsertOfAnExistingKeyIs23505() throws Exception {
+	public void testDuplicateKeyIs23505() throws Exception {
 		try (Connection conn = DriverManager.getConnection(pgUrl()); Statement stmt = conn.createStatement()) {
 			java.sql.SQLException e = assertThrows(java.sql.SQLException.class,
 				() -> stmt.executeUpdate("INSERT INTO users (id, name, email) VALUES (1, 'Again', 'again@example.com')"));
+			assertEquals("23505", e.getSQLState());
+			e = assertThrows(java.sql.SQLException.class,
+				() -> stmt.executeUpdate("UPDATE users SET id = 2 WHERE id = 1"));
 			assertEquals("23505", e.getSQLState());
 		}
 	}

@@ -304,8 +304,8 @@ public class ConvexTableTest {
 
 	/**
 	 * INSERT adds only new rows, as the SQL standard has it: a key the table holds, or one
-	 * repeated in the statement, is a unique violation (23505) and writes nothing. A deleted
-	 * key may be inserted again.
+	 * repeated in the statement, is an integrity constraint violation (23000) and writes
+	 * nothing. A deleted key may be inserted again.
 	 */
 	@Test
 	void testInsertOfAnExistingKeyIsAUniqueViolation() throws Exception {
@@ -314,18 +314,43 @@ public class ConvexTableTest {
 
 			SQLException taken = assertThrows(SQLException.class,
 				() -> stmt.executeUpdate("INSERT INTO test_table VALUES (2, 'two', 20), (1, 'uno', 11)"));
-			assertEquals("23505", sqlState(taken));
+			assertDuplicateKey(taken);
 			assertEquals(1, db.tables().getRowCount("test_table"), "nothing of the statement is written");
 			assertEquals("one", db.tables().selectByKey("test_table", CVMLong.create(1)).get(1).toString());
 
 			SQLException repeated = assertThrows(SQLException.class,
 				() -> stmt.executeUpdate("INSERT INTO test_table VALUES (3, 'a', 1), (3, 'b', 2)"));
-			assertEquals("23505", sqlState(repeated));
+			assertDuplicateKey(repeated);
 			assertNull(db.tables().selectByKey("test_table", CVMLong.create(3)));
 
 			stmt.executeUpdate("DELETE FROM test_table WHERE id = 1");
 			assertEquals(1, stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'again', 12)"));
 		}
+	}
+
+	/** An UPDATE that moves a row to a key the table holds is the same violation. */
+	@Test
+	void testUpdateToAnExistingKeyIsAUniqueViolation() throws Exception {
+		try (Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'one', 10), (2, 'two', 20)");
+			assertDuplicateKey(assertThrows(SQLException.class,
+				() -> stmt.executeUpdate("UPDATE test_table SET id = 2 WHERE id = 1")));
+			assertEquals("one", db.tables().selectByKey("test_table", CVMLong.create(1)).get(1).toString());
+		}
+	}
+
+	/**
+	 * A duplicate key reaches JDBC callers as the standard integrity constraint violation,
+	 * with the lattice's DuplicateKeyException as its cause.
+	 */
+	private static void assertDuplicateKey(SQLException e) {
+		java.sql.SQLIntegrityConstraintViolationException violation = null;
+		for (Throwable c = e; c != null && violation == null; c = c.getCause()) {
+			if (c instanceof java.sql.SQLIntegrityConstraintViolationException v) violation = v;
+		}
+		assertNotNull(violation, "an integrity constraint violation in the cause chain");
+		assertEquals("23000", violation.getSQLState());
+		assertInstanceOf(convex.db.lattice.DuplicateKeyException.class, violation.getCause());
 	}
 
 	@Test
@@ -339,14 +364,6 @@ public class ConvexTableTest {
 		assertEquals(row, e.getRow());
 		// The lattice API's insert is an upsert
 		assertTrue(db.tables().insert("test_table", row));
-	}
-
-	/** The SQLSTATE of the first SQLException in the cause chain. */
-	private static String sqlState(Throwable t) {
-		for (Throwable c = t; c != null; c = c.getCause()) {
-			if (c instanceof SQLException e && e.getSQLState() != null) return e.getSQLState();
-		}
-		return null;
 	}
 
 	@Test

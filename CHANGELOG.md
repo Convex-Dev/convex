@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Make Convex DB's SQL `INSERT` standard: a primary key the table already holds, or one repeated in the statement, is a unique violation (`23505`) and the statement writes nothing, where it replaced the row before. The lattice API's `insert` and `insertAll` stay upserts; `insertNew` inserts only new rows. ([#799](https://github.com/Convex-Dev/convex/issues/799))
+- Make Convex DB's SQL `INSERT` standard: a primary key the table already holds, or one repeated in the statement, is an integrity constraint violation (`23000` through JDBC, PostgreSQL's `23505` over the wire protocol) and the statement writes nothing, where it replaced the row before. The lattice API's `insert` and `insertAll` stay upserts; `insertNew` inserts only new rows. ([#799](https://github.com/Convex-Dev/convex/issues/799))
 - Assemble Convex DB hosts with `ConvexDB.openHost`, which replaces the static Convex DB lattices; connecting to a database no longer creates it. ([#779](https://github.com/Convex-Dev/convex/issues/779))
 - Creating a Convex DB `ConvexDB` or `SQLDatabase` takes its merge policy, such as `RowLWW::merge`; transactions fork a whole database. ([#784](https://github.com/Convex-Dev/convex/issues/784))
 - Speed up prepared statements over the Convex DB PostgreSQL wire protocol: a statement with parameters is planned once per connection and reused for every execution. ([#767](https://github.com/Convex-Dev/convex/pull/767))

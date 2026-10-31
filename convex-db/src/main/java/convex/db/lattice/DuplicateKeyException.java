@@ -4,8 +4,8 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 
 /**
- * Thrown when an insert that must add new rows meets a primary key the table already
- * holds as a live row, or one repeated among the rows inserted. Nothing is written.
+ * Thrown when a write that must add new rows meets a primary key the table already
+ * holds as a live row, or one repeated among the rows written. Nothing is written.
  */
 public class DuplicateKeyException extends IllegalStateException {
 

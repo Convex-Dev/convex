@@ -1,5 +1,6 @@
 package convex.db.psql.msg;
 
+import convex.db.lattice.DuplicateKeyException;
 import convex.db.psql.PgMessage;
 import io.netty.buffer.ByteBuf;
 
@@ -150,8 +151,9 @@ public class ErrorResponse extends PgMessage {
 		}
 
 		// Set SQL state code: the first one in the cause chain, since Calcite wraps the
-		// exceptions raised while executing a statement
-		String sqlState = null;
+		// exceptions raised while executing a statement. A duplicate key, standard 23000,
+		// is PostgreSQL's more specific unique_violation.
+		String sqlState = hasCause(t, DuplicateKeyException.class) ? UNIQUE_VIOLATION : null;
 		for (Throwable c = t; c != null && sqlState == null; c = (c.getCause() == c) ? null : c.getCause()) {
 			if (c instanceof SQLException sqlEx) sqlState = sqlEx.getSQLState();
 		}
@@ -164,6 +166,17 @@ public class ErrorResponse extends PgMessage {
 		}
 
 		return builder.build();
+	}
+
+	/** PostgreSQL's unique_violation. */
+	static final String UNIQUE_VIOLATION = "23505";
+
+	/** Whether an exception or any of its causes is of a type. */
+	private static boolean hasCause(Throwable t, Class<? extends Throwable> type) {
+		for (Throwable c = t; c != null; c = (c.getCause() == c) ? null : c.getCause()) {
+			if (type.isInstance(c)) return true;
+		}
+		return false;
 	}
 
 	/**
