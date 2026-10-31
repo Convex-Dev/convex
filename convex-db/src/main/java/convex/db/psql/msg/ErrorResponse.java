@@ -180,29 +180,6 @@ public class ErrorResponse extends PgMessage {
 	}
 
 	/**
-	 * Creates a syntax error response.
-	 */
-	public static ErrorResponse syntaxError(String message, int position) {
-		return builder()
-			.severity("ERROR")
-			.code("42601") // syntax_error
-			.message(message)
-			.position(position)
-			.build();
-	}
-
-	/**
-	 * Creates an undefined table error.
-	 */
-	public static ErrorResponse undefinedTable(String tableName) {
-		return builder()
-			.severity("ERROR")
-			.code("42P01") // undefined_table
-			.message("relation \"" + tableName + "\" does not exist")
-			.build();
-	}
-
-	/**
 	 * Creates an authentication failure error.
 	 */
 	public static ErrorResponse authenticationFailed(String user) {
