@@ -255,7 +255,7 @@ public class PgExtendedQueryTest {
 		assertEquals("2D[Bob]CZ", run("s1", "2"));
 
 		assertTrue(db.tables().dropTable("users"));
-		assertEquals("2E(42P01)Z", run("s1", "2"), "preparing the statement again finds no table");
+		assertEquals("2E(42000)Z", run("s1", "2"), "preparing the statement again finds no table");
 
 		createUsers(new String[] {"id", "name", "email"}, ConvexColumnType.varchar(50), ConvexColumnType.varchar(100));
 		db.tables().insert("users", 2L, "Robert", "robert@example.com");

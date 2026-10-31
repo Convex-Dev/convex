@@ -139,7 +139,6 @@ chain.
 | Table definition with an unsupported SQL type | `0A000` |
 | Connection to a database whose identifier policy is unknown | `0A000` |
 | Scalar subquery returning more than one row | `21000` |
-| Statement naming a table that does not exist | `42P01` |
 | `INSERT` or key-changing `UPDATE` of a primary key the table already holds | `23505` |
 
 ## PostgreSQL Wire Protocol

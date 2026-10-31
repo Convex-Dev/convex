@@ -53,7 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Describe Convex DB PostgreSQL wire statements from their prepared metadata, without running them: each prepared query ran twice, once only for its column description (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Run transactions from PostgreSQL clients: Convex DB's wire server accepts `BEGIN`, `COMMIT` and `ROLLBACK`, so `setAutoCommit(false)` works through pgjdbc, reports the transaction status, and refuses statements in a failed block with `25P02` until it ends (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Resolve names in Convex DB DDL as queries resolve them: in a case-insensitive database, `CREATE TABLE` qualified with a lower-case schema name and `DROP TABLE` of a lower-case table now resolve, and `CREATE TABLE` of a name that already resolves is refused instead of adding a second table (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
-- Report a Convex DB statement that names a missing table as `42P01` (undefined table), through JDBC and the PostgreSQL wire protocol, where it was the generic `42000`.
 - Treat nodes found by P2P discovery as connection candidates only: nodes you name with `connect`, and return routes for nodes that connect and prove their key, no longer depend on how many nodes discovery has seen. ([Live peer selection](convex-p2p/README.md#live-peer-selection))
 
 ## [0.8.18] - 2026-10-25
