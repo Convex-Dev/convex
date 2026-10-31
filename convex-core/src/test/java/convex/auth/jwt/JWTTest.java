@@ -42,7 +42,6 @@ public class JWTTest {
 		
 		AString head=Strings.create("{\"alg\":\"HS256\",\"typ\":\"JWT\"}");
 		AString base64Head=JWT.encode(head);
-		assertEquals(JWT.HEADER_HS256,base64Head);
 		assertEquals("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",base64Head.toString());
 		
 		AString claims=Strings.create("{\"sub\":\"1234567890\",\"name\":\"John Doe\",\"admin\":true,\"iat\":1516239022}");
@@ -75,7 +74,7 @@ public class JWTTest {
 		assertEquals("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",sig.toString());
 		
 		AString jwt=message.append(".").append(sig);
-		assertTrue(JWT.verifyHS256(jwt, key));
+		assertNotNull(JWT.verifySymmetric(jwt, Blob.wrap(key)));
 	}
 
 	@Test public void testSignSymmetricRoundTrip() {
@@ -86,7 +85,8 @@ public class JWTTest {
 
 		AString jwt = JWT.signSymmetric(claims, secret);
 
-		assertTrue(JWT.verifyHS256(jwt, secret.getBytes()));
+		assertEquals(claims, JWT.verifySymmetric(jwt, secret));
+		assertEquals(Maps.of(JWT.ALG, "HS256", JWT.TYP, "JWT"), JWT.parse(jwt).getHeader());
 
 		String[] parts = jwt.toString().split("\\.");
 		assertEquals(3, parts.length);
@@ -110,8 +110,7 @@ public class JWTTest {
 
 		AString headerB64 = Strings.create(parts[0]);
 		String headerJson = new String(JWT.decodeRaw(headerB64));
-		assertTrue(headerJson.contains("\"alg\":\"EdDSA\""));
-		assertTrue(headerJson.contains("\"kid\":\"z"));
+		assertEquals("{\"kid\":\""+Multikey.encodePublicKey(kp.getAccountKey())+"\",\"typ\":\"JWT\",\"alg\":\"EdDSA\"}", headerJson);
 
 		AString payloadB64 = Strings.create(parts[1]);
 		AString message = Strings.create(parts[0]).append(".").append(payloadB64);
@@ -174,6 +173,70 @@ public class JWTTest {
 		assertNull(JWT.verifyPublic(JWT.signPublic(claims,kp,Strings.create("did:web:example.com#"))));
 		assertNull(JWT.verifyPublic(JWT.signPublic(claims,kp,Strings.create("did:web:example.com#not-a-multikey"))));
 		assertNull(JWT.verifyPublic(JWT.signPublic(claims,kp,Strings.create("did:web:example.com#one#two"))));
+	}
+
+	@Test public void testSignPublicWithHeaderOfOnlyKid() {
+		// The DIF Well-Known DID Configuration form: alg and kid, no typ
+		AKeyPair kp=AKeyPair.createSeeded(1122L);
+		AString multikey=Multikey.encodePublicKey(kp.getAccountKey());
+		AString kid=Strings.create("did:key:").append(multikey).append("#").append(multikey);
+		AMap<AString,ACell> claims=Maps.of("iss","did:key:"+multikey);
+
+		AString token=JWT.signPublic(Maps.of(JWT.KID,kid),claims,kp);
+		JWT parsed=JWT.parse(token);
+
+		assertEquals(Maps.of(JWT.ALG,"EdDSA",JWT.KID,kid),parsed.getHeader());
+		assertEquals(claims,JWT.verifyPublic(token));
+		assertEquals(claims,JWT.verifyPublic(token,kp.getAccountKey()));
+	}
+
+	@Test public void testSignPublicWithHeaderAddsOnlyAlg() {
+		AKeyPair kp=AKeyPair.createSeeded(3344L);
+		AMap<AString,ACell> claims=Maps.of("sub","alice");
+
+		AString token=JWT.signPublic(Maps.empty(),claims,kp);
+		assertEquals(Maps.of(JWT.ALG,"EdDSA"),JWT.parse(token).getHeader());
+		assertNull(JWT.verifyPublic(token),"No kid names a key");
+		assertEquals(claims,JWT.verifyPublic(token,kp.getAccountKey()));
+
+		AMap<AString,ACell> typed=Maps.of(JWT.ALG,"EdDSA",JWT.TYP,"at+jwt");
+		assertEquals(typed,JWT.parse(JWT.signPublic(typed,claims,kp)).getHeader());
+
+		assertThrows(IllegalArgumentException.class,()->JWT.signPublic(null,claims,kp));
+	}
+
+	@Test public void testSignSymmetricWithHeader() {
+		AString secret=Strings.create("a-secret-key-used-for-testing");
+		AMap<AString,ACell> claims=Maps.of("sub","bob");
+
+		AString token=JWT.signSymmetric(Maps.of(JWT.TYP,"at+jwt"),claims,secret);
+		assertEquals(Maps.of(JWT.ALG,"HS256",JWT.TYP,"at+jwt"),JWT.parse(token).getHeader());
+		assertEquals(claims,JWT.verifySymmetric(token,secret));
+		assertNull(JWT.verifySymmetric(token,Strings.create("another-secret-key-for-testing")));
+	}
+
+	@Test public void testSignRefusesHeaderNamingAnotherAlgorithm() {
+		AKeyPair kp=AKeyPair.createSeeded(5566L);
+		AString secret=Strings.create("a-secret-key-used-for-testing");
+		AMap<AString,ACell> claims=Maps.of("sub","alice");
+
+		assertThrows(IllegalArgumentException.class,()->JWT.signPublic(Maps.of(JWT.ALG,"HS256"),claims,kp));
+		assertThrows(IllegalArgumentException.class,()->JWT.signPublic(Maps.of(JWT.ALG,"none"),claims,kp));
+		assertThrows(IllegalArgumentException.class,()->JWT.signPublic(Maps.of(JWT.ALG,null),claims,kp));
+		assertThrows(IllegalArgumentException.class,()->JWT.signSymmetric(Maps.of(JWT.ALG,"EdDSA"),claims,secret));
+		assertNotNull(JWT.signSymmetric(Maps.of(JWT.ALG,"HS256"),claims,secret));
+	}
+
+	@Test public void testVerifySymmetricRequiresHS256() {
+		AString secret=Strings.create("a-secret-key-used-for-testing");
+		AString claims=JWT.encode(JWT.claims(Maps.of("sub","bob")));
+		for (String alg : new String[] {"HS256","EdDSA","none"}) {
+			// A valid HMAC under a header naming another algorithm must not verify
+			AString toSign=JWT.encode(JWT.claims(Maps.of(JWT.ALG,alg))).append(".").append(claims);
+			AString token=toSign.append(".").append(JWT.signHS256(toSign,secret));
+			assertEquals("HS256".equals(alg),JWT.verifySymmetric(token,secret)!=null,alg);
+		}
+		assertNull(JWT.verifySymmetric(Strings.create("not-a-jwt"),secret));
 	}
 
 	@Test public void testBuildAccessTokenClaims() {

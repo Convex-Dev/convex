@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Merge a small delta into a large `Index` without visiting the rest of it, with `Index.merge`; Convex DB row deliveries now cost the rows delivered, not the table. ([#786](https://github.com/Convex-Dev/convex/issues/786))
 - Update any map entry from its current value in one step with `update(key, function)` or `update(key, function, arg)`; on an `Index` it is about a third faster than `get` then `assoc`.
 - Encrypt Convex DB's PostgreSQL wire connections with TLS: clients connect with `sslmode=require` up to `verify-full` (proposed by @trsb-standards). ([TLS](convex-db/README.md#tls), [#756](https://github.com/Convex-Dev/convex/issues/756))
+- Sign a JWT under the header its profile requires, such as only `alg` and `kid` for a DID Configuration, or an explicit `typ`, with `JWT.signPublic(header, claims, keyPair)` and `JWT.signSymmetric(header, claims, secret)`. ([Signing](convex-core/docs/JWT.md#signing), [#815](https://github.com/Convex-Dev/convex/issues/815))
 
 ### Changed
 
@@ -28,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolve Convex DB SQL names as the SQL standard does: unquoted names fold to upper case and compare exactly, where any case matched before. A database's `:identifiers` setting can choose `:lower`, as in PostgreSQL, or `:insensitive` instead, for JDBC and PostgreSQL wire connections alike; the JDBC `caseSensitive` parameter is gone. ([Identifier Case](convex-db/README.md#identifier-case), [#812](https://github.com/Convex-Dev/convex/issues/812))
 - Send a lattice node's final state to its peers when it shuts down: services stop ingress with `stopIngress()`, then close the host before the node. ([Shutdown](convex-peer/docs/SHUTDOWN.md), [#778](https://github.com/Convex-Dev/convex/issues/778))
 - Upgrade inbound lattice connections only through `LatticePropagator.authenticateInboundRoute`; `LatticeConnectionManager.upgradeInboundConnection` is no longer public.
+- Verify an HS256 JWT with `JWT.verifySymmetric`, which returns its claims as `verifyPublic` does, checks `alg` and compares signatures in constant time; it replaces the static `JWT.verifyHS256(jwt, secret)`. ([Verifying](convex-core/docs/JWT.md#verifying))
 
 ### Fixed
 
