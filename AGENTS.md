@@ -30,7 +30,7 @@ skill sources live in **`.claude/skills/`**, one directory per skill with a
 - *Working on Convex* — `build-convex`, `local-network`, `peer`, `etch`
 - *Protocol internals* — `protocol-versions`, `cad3-encoding`, `juice`, `memory`
 - *Writing CVM code* — `convex-lisp`, `trust`, `deploy`, `query`, `transact`
-- *Using a network* — `account`, `transfer`, `token`, `cns`, `convex-db`
+- *Using a network* — `account`, `transfer`, `token`, `cns`, `convex-db`, `dlfs`
 
 `convex-lisp` holds the shared CVM conventions the others assume; read it
 before writing CVM source.
