@@ -3,6 +3,7 @@ package convex.node;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -660,8 +661,124 @@ public class LatticeConnectionManagerTest {
 		assertFalse(peer.isConnected());
 	}
 
+	private static final URI ENDPOINT=URI.create("tcp://localhost:1");
+
+	/** A node known only by its endpoint is admitted under the key it proves, then is explicit intent there. */
+	@Test public void testEndpointPeerIsAdmittedUnderTheKeyItProves() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey remote=AKeyPair.createSeeded(201).getAccountKey();
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		assertFalse(connecting.isDone());
+		manager.maintainConnections();
+		IdentifyingPeer peer=new IdentifyingPeer(remote);
+		manager.endpointDials.remove(ENDPOINT).complete(peer);
+
+		assertSame(peer,connecting.getNow(null));
+		assertTrue(peer.challenged);
+		assertNull(peer.challengedFor,"an endpoint is challenged for no particular key");
+		assertEquals(remote,peer.getVerifiedPeer());
+		assertSame(peer,manager.getConnection(remote));
+		assertTrue(manager.getAuthenticatedRouteKeys().contains(remote));
+		assertEquals(Vectors.of(Strings.create(ENDPOINT.toString())),manager.getDesiredPeers().get(remote).transports);
+		manager.maintainConnections();
+		assertTrue(manager.endpointDials.isEmpty(),"the endpoint is not dialled again");
+		assertTrue(manager.dials.isEmpty(),"the admitted peer is not dialled again");
+	}
+
+	/** An unreachable endpoint is retried after a backoff, and fails once its few attempts run out. */
+	@Test public void testEndpointAttemptsRunOutQuickly() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		for (int attempt=1;attempt<=LatticeConnectionManager.MAX_ENDPOINT_ATTEMPTS;attempt++) {
+			manager.maintainConnections();
+			assertFalse(connecting.isDone());
+			manager.endpointDials.remove(ENDPOINT).completeExceptionally(new java.net.ConnectException("Connection refused"));
+			manager.maintainConnections();
+			assertTrue(manager.endpointDials.isEmpty(),"a failed attempt waits for its backoff");
+			now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
+		}
+		assertTrue(connecting.isCompletedExceptionally());
+		manager.maintainConnections();
+		assertTrue(manager.endpointDials.isEmpty(),"the intent is dropped");
+		assertTrue(manager.getDesiredPeers().isEmpty());
+	}
+
+	/** A node that proves no key, as one refusing the challenge does, is never admitted. */
+	@Test public void testEndpointThatProvesNoKeyIsNotAdmitted() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		for (int attempt=1;attempt<=LatticeConnectionManager.MAX_ENDPOINT_ATTEMPTS;attempt++) {
+			manager.maintainConnections();
+			IdentifyingPeer refusing=new IdentifyingPeer(null);
+			manager.endpointDials.remove(ENDPOINT).complete(refusing);
+			assertFalse(refusing.isConnected(),"the client that proved nothing is closed");
+			now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
+		}
+		assertTrue(connecting.isCompletedExceptionally());
+		assertEquals(0,manager.getConnectionCount());
+		assertTrue(manager.getDesiredPeers().isEmpty());
+	}
+
+	/** A node that proves its key but drops before admission fails the caller and leaves nothing to dial. */
+	@Test public void testEndpointDroppedBeforeAdmissionLeavesNoIntent() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey remote=AKeyPair.createSeeded(201).getAccountKey();
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		manager.maintainConnections();
+		IdentifyingPeer dropping=new IdentifyingPeer(remote) {
+			@Override public CompletableFuture<AccountKey> verifyPeer(AccountKey expected,ACell context) {
+				CompletableFuture<AccountKey> proved=super.verifyPeer(expected,context);
+				close();
+				return proved;
+			}
+		};
+		manager.endpointDials.remove(ENDPOINT).complete(dropping);
+		assertTrue(connecting.isCompletedExceptionally());
+		assertFalse(manager.getDesiredPeers().containsKey(remote));
+		manager.maintainConnections();
+		assertTrue(manager.dials.isEmpty(),"nothing is left to dial");
+	}
+
+	/** An endpoint that turns out to be this node fails at once. */
+	@Test public void testEndpointThatIsThisNodeIsRefused() {
+		AKeyPair own=AKeyPair.createSeeded(200);
+		manager.setKeyPair(own);
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		manager.maintainConnections();
+		IdentifyingPeer self=new IdentifyingPeer(own.getAccountKey());
+		manager.endpointDials.remove(ENDPOINT).complete(self);
+		assertTrue(connecting.isCompletedExceptionally());
+		assertFalse(self.isConnected());
+		assertNull(manager.getConnection(own.getAccountKey()));
+		assertTrue(manager.getDesiredPeers().isEmpty());
+	}
+
+	/** Without a key of its own the manager cannot challenge, so it refuses at once, as for an unknown transport. */
+	@Test public void testEndpointNeedsAKeyPairAndATransport() {
+		assertTrue(manager.connectPeer(ENDPOINT).isCompletedExceptionally());
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		assertTrue(manager.connectPeer(URI.create("https://localhost:1")).isCompletedExceptionally());
+		manager.maintainConnections();
+		assertTrue(manager.endpointDials.isEmpty());
+	}
+
+	/** Closing fails a waiting endpoint, and a client opened after close is closed, not admitted. */
+	@Test public void testCloseFailsEndpointIntents() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
+		manager.maintainConnections();
+		CompletableFuture<Convex> inFlight=manager.endpointDials.remove(ENDPOINT);
+		manager.close();
+		assertTrue(connecting.isCompletedExceptionally());
+		IdentifyingPeer late=new IdentifyingPeer(AKeyPair.createSeeded(201).getAccountKey());
+		inFlight.complete(late);
+		assertFalse(late.isConnected());
+		assertEquals(0,manager.getConnectionCount());
+	}
+
 	private static class TestManager extends LatticeConnectionManager {
 		final Map<AccountKey,CompletableFuture<Convex>> dials=new LinkedHashMap<>();
+		final Map<URI,CompletableFuture<Convex>> endpointDials=new LinkedHashMap<>();
 		final Map<Object,CompletableFuture<Void>> probes=new HashMap<>();
 		int openCount;
 		boolean respond=true;
@@ -670,6 +787,11 @@ public class LatticeConnectionManagerTest {
 			openCount++;
 			CompletableFuture<Convex> future=new CompletableFuture<>();
 			dials.put(peer.peerKey,future);
+			return future;
+		}
+		@Override CompletableFuture<Convex> openEndpoint(URI endpoint) {
+			CompletableFuture<Convex> future=new CompletableFuture<>();
+			endpointDials.put(endpoint,future);
 			return future;
 		}
 		@Override CompletableFuture<?> probePeer(Object route) {
@@ -727,6 +849,21 @@ public class LatticeConnectionManagerTest {
 			super(null,null);
 			setConnection(physical);
 			setVerifiedPeer(key);
+		}
+	}
+
+	/** A newly opened client which, challenged for no particular key, proves the given one or none. */
+	private static class IdentifyingPeer extends StubPeer {
+		final AccountKey proves;
+		boolean challenged;
+		AccountKey challengedFor;
+		IdentifyingPeer(AccountKey proves) { super(proves); setVerifiedPeer(null); this.proves=proves; }
+		@Override public CompletableFuture<AccountKey> verifyPeer(AccountKey expected,ACell context) {
+			challenged=true;
+			challengedFor=expected;
+			if (expected!=null) return CompletableFuture.completedFuture(null);
+			if (proves!=null) setVerifiedPeer(proves);
+			return CompletableFuture.completedFuture(proves);
 		}
 	}
 

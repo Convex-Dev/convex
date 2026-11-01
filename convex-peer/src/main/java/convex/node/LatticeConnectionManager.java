@@ -5,6 +5,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,7 +76,9 @@ import convex.peer.AConnectionManager;
  * {@link #addPeer(AccountKey, InetSocketAddress)} supplies an operator transport,
  * and {@link #addPeer(AccountKey, Convex)} begins admission of an already opened
  * manager-owned client. {@link #connectPeer(AccountKey, InetSocketAddress)} is the
- * deterministic connect-and-wait convenience API.</p>
+ * deterministic connect-and-wait convenience API. {@link #connectPeer(URI)} reaches a
+ * node known only by its endpoint and admits it under the key it proves, after which
+ * it is explicit intent like any other.</p>
  *
  * <p>When a key pair is configured, newly opened connections remain in a limbo set
  * until challenge/response proves the expected remote identity. Limbo connections
@@ -125,6 +128,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** New, unverified sockets have a separate, short admission deadline. */
 	static final long ADMISSION_TIMEOUT_MS = 5_000L;
 	static final int MAX_CONCURRENT_DIALS = 4;
+	/** Attempts to reach a node known only by its endpoint and learn its key, before giving up. */
+	static final int MAX_ENDPOINT_ATTEMPTS = 3;
 
 	/** Initial reconnection delay (milliseconds). */
 	static final long INITIAL_BACKOFF_MS = 1_000L;
@@ -177,6 +182,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private int candidateCount;
 	/** Reservations include socket opening, before identity verification begins. */
 	private final Map<AccountKey,DesiredPeer> dialling=new HashMap<>();
+	/** Nodes known only by endpoint, until one proves a key or its attempts run out. Lock held. */
+	private final Map<URI,EndpointIntent> endpointIntents=new LinkedHashMap<>();
 	private final Map<AccountKey,HealthCheck> health=new HashMap<>();
 	private final LongSupplier clock;
 	private ExecutorService workers=Executors.newVirtualThreadPerTaskExecutor();
@@ -616,11 +623,15 @@ public class LatticeConnectionManager extends AConnectionManager {
 		List<CompletableFuture<Convex>> waiters;
 		List<CompletableFuture<AConnection>> routeWaiters;
 		List<CompletableFuture<Void>> stateWaiters;
+		List<EndpointIntent> unidentified;
 		synchronized (connectionLock) {
 			active = new ArrayList<>(connections.values());
 			connections.clear();
 			pending = new ArrayList<>(pendingConnections.values());
 			pendingConnections.clear();
+			// Attempts in flight find their intent gone and close what they opened
+			unidentified = new ArrayList<>(endpointIntents.values());
+			endpointIntents.clear();
 			waiters = new ArrayList<>(connectionWaiters.values());
 			connectionWaiters.clear();
 			routeWaiters = new ArrayList<>(upgradedRouteWaiters.values());
@@ -642,6 +653,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		for (CompletableFuture<Convex> waiter : waiters) {
 			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
+		}
+		for (EndpointIntent intent : unidentified) {
+			intent.admission.completeExceptionally(new IllegalStateException("Connection manager closed"));
 		}
 		for (CompletableFuture<AConnection> waiter : routeWaiters) {
 			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
@@ -715,6 +729,46 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		maintenanceSignal.release();
 		return whenConnected(peerKey);
+	}
+
+	/**
+	 * Connects to a node known only by its transport endpoint, admitting it under the
+	 * key it proves. The maintenance thread dials the endpoint and challenges the node
+	 * without an expected key; the key it proves becomes an explicit peer at that
+	 * endpoint, so reconnections challenge for that key. A node that cannot be reached
+	 * or proves no key is retried briefly: after {@value #MAX_ENDPOINT_ATTEMPTS} failed
+	 * attempts the future fails and the intent is dropped.
+	 *
+	 * <p>This proves only that the node at the endpoint holds the key it names, not that
+	 * it is the node the caller meant; name the key with
+	 * {@link #connectPeer(AccountKey, InetSocketAddress)} when it is known.</p>
+	 *
+	 * @param endpoint {@code tcp://} or {@code tls://} endpoint of the remote node
+	 * @return future completing with the admitted connection, whose verified peer is
+	 *         the key the node proved
+	 */
+	public CompletableFuture<Convex> connectPeer(URI endpoint) {
+		if (endpoint == null) {
+			return CompletableFuture.failedFuture(new IllegalArgumentException("Endpoint must not be null"));
+		}
+		try {
+			Transports.forEndpoint(endpoint);
+		} catch (IllegalArgumentException e) {
+			return CompletableFuture.failedFuture(e);
+		}
+		if (keyPair == null) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+				"Identifying a node by its endpoint needs this node's key pair"));
+		}
+		CompletableFuture<Convex> admission;
+		synchronized (connectionLock) {
+			if (!accepting) {
+				return CompletableFuture.failedFuture(new IllegalStateException("Connection manager is closed"));
+			}
+			admission=endpointIntents.computeIfAbsent(endpoint,EndpointIntent::new).admission;
+		}
+		maintenanceSignal.release();
+		return admission;
 	}
 
 	/**
@@ -1462,8 +1516,21 @@ public class LatticeConnectionManager extends AConnectionManager {
 		checkHealth(now);
 		List<Convex> retired=new ArrayList<>();
 		List<DesiredPeer> attempts=new ArrayList<>();
+		List<EndpointIntent> identifications=new ArrayList<>();
 		synchronized (connectionLock) {
 			if (!accepting) return;
+			// A caller waits on each endpoint, and its attempts are few, so it dials first
+			int identifying=0;
+			for (EndpointIntent intent:endpointIntents.values()) {
+				if (intent.dialling) identifying++;
+			}
+			for (EndpointIntent intent:endpointIntents.values()) {
+				if (dialling.size()+pendingConnections.size()+identifying>=MAX_CONCURRENT_DIALS) break;
+				if (intent.dialling || now<intent.nextRetryTime) continue;
+				intent.dialling=true;
+				identifying++;
+				identifications.add(intent);
+			}
 			Set<AccountKey> selected=selectPeers(now);
 			for (var entry:connections.entrySet()) {
 				AccountKey key=entry.getKey();
@@ -1482,7 +1549,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			Utils.shuffle(ordered);
 			ordered.sort((a,b) -> Boolean.compare(activity.get(b).explicit,activity.get(a).explicit));
 			for (AccountKey key:ordered) {
-				if (dialling.size()+pendingConnections.size()>=MAX_CONCURRENT_DIALS) break;
+				if (dialling.size()+pendingConnections.size()+identifying>=MAX_CONCURRENT_DIALS) break;
 				if (hasRouteOrAttempt(key)) continue;
 				DesiredPeer desired=desiredPeers.get(key);
 				if (desired==null || !desired.isRetryDue(now) || !hasDialTarget(desired)) continue;
@@ -1491,6 +1558,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			}
 		}
 		for (Convex peer:retired) closeSilently(peer);
+		for (EndpointIntent intent:identifications) startIdentification(intent);
 		for (DesiredPeer desired:attempts) startDial(desired);
 		List<CompletableFuture<Void>> isolated;
 		synchronized (connectionLock) {
@@ -1598,6 +1666,143 @@ public class LatticeConnectionManager extends AConnectionManager {
 				throw new java.util.concurrent.CompletionException(e);
 			}
 		},workers);
+	}
+
+	/** Overridable transport boundary for a node whose key is not yet known. */
+	CompletableFuture<Convex> openEndpoint(URI endpoint) {
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				return ConvexRemote.connect(endpoint,Transports.forEndpoint(endpoint),untrustedMessageLimit);
+			} catch (Exception e) {
+				throw new java.util.concurrent.CompletionException(e);
+			}
+		},workers);
+	}
+
+	/** Dials an endpoint and asks the node there to prove a key, then admits it under that key. */
+	private void startIdentification(EndpointIntent intent) {
+		CompletableFuture<Convex> opened;
+		try {
+			opened=openEndpoint(intent.endpoint);
+		} catch (RuntimeException e) {
+			opened=CompletableFuture.failedFuture(e);
+		}
+		opened.whenComplete((peer,error) -> {
+			if (error!=null) {
+				failIdentification(intent,error);
+				return;
+			}
+			CompletableFuture<AccountKey> identified;
+			try {
+				identified=identify(peer);
+			} catch (RuntimeException e) {
+				identified=CompletableFuture.failedFuture(e);
+			}
+			identified.whenComplete((key,failure) -> {
+				try {
+					if (failure==null && key!=null) {
+						admitIdentified(intent,key,peer);
+						return;
+					}
+					closeSilently(peer);
+					failIdentification(intent,(failure!=null) ? failure
+						: new SecurityException("The node at "+intent.endpoint+" proved no key"));
+				} catch (RuntimeException callbackFailure) {
+					closeSilently(peer);
+					failIdentification(intent,callbackFailure);
+				}
+			});
+		});
+	}
+
+	/**
+	 * Challenges a newly opened client for whatever key it holds. The client stays in
+	 * limbo, without store access or the trusted receive limit, until it is admitted.
+	 */
+	private CompletableFuture<AccountKey> identify(Convex peer) {
+		AKeyPair kp=keyPair;
+		if (kp==null) throw new IllegalStateException("Identifying a node by its endpoint needs this node's key pair");
+		if (!accepting) throw new IllegalStateException("Connection manager is closed");
+		restrictOutboundToLimbo(peer);
+		peer.setKeyPair(kp);
+		CompletableFuture<AccountKey> verification=peer.verifyPeer(null,Message.LATTICE_PEER_CHALLENGE_CONTEXT);
+		if (verification==null) throw new IllegalStateException("Peer verification returned no future");
+		return verification.orTimeout(ADMISSION_TIMEOUT_MS,TimeUnit.MILLISECONDS);
+	}
+
+	/**
+	 * Makes a node that proved a key explicit intent at its endpoint, and admits the
+	 * client that proved it. A node that proves this node's own key is refused at once.
+	 */
+	private void admitIdentified(EndpointIntent intent,AccountKey key,Convex peer) {
+		AKeyPair kp=keyPair;
+		boolean self=kp!=null && key.equals(kp.getAccountKey());
+		DesiredPeer desired=DesiredPeer.create(key,intent.endpoint);
+		boolean current;
+		boolean named;
+		synchronized (connectionLock) {
+			intent.dialling=false;
+			current=accepting && endpointIntents.remove(intent.endpoint,intent);
+			PeerActivity state=activity.get(key);
+			named=state!=null && state.explicit;
+			if (current && !self) {
+				registerDesiredPeerIntent(key,desired,true);
+				// Reserve the peer as a dial does, so maintenance cannot dial it before admission
+				dialling.put(key,desired);
+			}
+		}
+		if (!current || self) {
+			closeSilently(peer);
+			// A closed manager has already failed the intent
+			if (current) intent.admission.completeExceptionally(new IllegalArgumentException(
+				"The node at "+intent.endpoint+" is this node"));
+			maintenanceSignal.release();
+			return;
+		}
+		CompletableFuture<Convex> admission;
+		try {
+			admission=beginOutboundAdmission(key,peer);
+		} catch (RuntimeException e) {
+			closeSilently(peer);
+			admission=CompletableFuture.failedFuture(e);
+		} finally {
+			synchronized (connectionLock) { dialling.remove(key,desired); }
+			maintenanceSignal.release();
+		}
+		admission.whenComplete((admitted,error) -> {
+			if (error==null) {
+				intent.admission.complete(admitted);
+				return;
+			}
+			// The caller is told this failed, so the intent it caused goes too; a peer
+			// already named explicitly keeps its own
+			if (!named) releasePeer(key);
+			intent.admission.completeExceptionally(error);
+		});
+	}
+
+	/** Counts a failed attempt; once the attempts run out, the intent fails and is dropped. */
+	private void failIdentification(EndpointIntent intent,Throwable error) {
+		Throwable cause=(error instanceof java.util.concurrent.CompletionException && error.getCause()!=null)
+			? error.getCause() : error;
+		String reason=(cause.getMessage()!=null) ? cause.getMessage() : cause.getClass().getSimpleName();
+		boolean exhausted=false;
+		synchronized (connectionLock) {
+			intent.dialling=false;
+			if (endpointIntents.get(intent.endpoint)==intent) {
+				intent.failCount++;
+				exhausted=intent.failCount>=MAX_ENDPOINT_ATTEMPTS;
+				if (exhausted) endpointIntents.remove(intent.endpoint);
+				else intent.nextRetryTime=clock.getAsLong()+calculateBackoff(intent.failCount);
+			}
+		}
+		if (exhausted) {
+			intent.admission.completeExceptionally(new IllegalStateException("No node at "+intent.endpoint
+				+" proved a key in "+MAX_ENDPOINT_ATTEMPTS+" attempts: "+reason,cause));
+		} else {
+			log.debug("Attempt to identify the node at {} failed: {}",intent.endpoint,reason);
+		}
+		maintenanceSignal.release();
 	}
 
 	/** Probes are correlated requests, independently of activity used for peer selection. */
@@ -1840,6 +2045,22 @@ public class LatticeConnectionManager extends AConnectionManager {
 		PendingConnection(Convex connection,long started) {
 			this.connection = connection;
 			this.started=started;
+		}
+	}
+
+	/** Intent to reach a node known only by its endpoint, until it proves a key. Lock held. */
+	private static final class EndpointIntent {
+		final URI endpoint;
+		final CompletableFuture<Convex> admission = new CompletableFuture<>();
+		/** Failed attempts so far; the intent is dropped at {@link #MAX_ENDPOINT_ATTEMPTS}. */
+		int failCount;
+		/** Earliest monotonic maintenance time for the next attempt. */
+		long nextRetryTime;
+		/** Whether an attempt is in flight, holding one of the concurrent dial slots. */
+		boolean dialling;
+
+		EndpointIntent(URI endpoint) {
+			this.endpoint=endpoint;
 		}
 	}
 

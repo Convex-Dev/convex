@@ -105,6 +105,38 @@ public final class Transports {
 		return uri;
 	}
 
+	/**
+	 * Parses a peer an operator names by address: a {@code tcp://} or {@code tls://}
+	 * URI, or {@code host:port} for TCP, always with a port. A DID cannot be resolved
+	 * to a node yet, so one is refused rather than read as a host name.
+	 *
+	 * @param peer peer address as the operator wrote it
+	 * @return the peer's transport endpoint, without DNS resolution
+	 * @throws IllegalArgumentException if the peer is not named by such an endpoint
+	 */
+	public static URI peerEndpoint(String peer) {
+		if (peer==null) throw new IllegalArgumentException("Peer address required");
+		String text=peer.trim();
+		if (text.regionMatches(true,0,"did:",0,4)) {
+			throw new IllegalArgumentException("Connecting to a peer by DID is not supported yet: "+text);
+		}
+		URI endpoint;
+		try {
+			endpoint=endpoint(text);
+			forEndpoint(endpoint);
+		} catch (IllegalArgumentException e) {
+			throw new IllegalArgumentException("Invalid peer address "+text+": "+e.getMessage(),e);
+		}
+		if (endpoint.getRawQuery()!=null || (endpoint.getRawPath()!=null && !endpoint.getRawPath().isEmpty())) {
+			throw new IllegalArgumentException("Invalid peer address "+text+": a peer endpoint has no path or query");
+		}
+		int port=endpoint.getPort();
+		if (port<1 || port>65535) {
+			throw new IllegalArgumentException("Invalid peer address "+text+": a port from 1 to 65535 is required");
+		}
+		return endpoint;
+	}
+
 	/** Native stream transports have no path, query or user information. */
 	private static InetSocketAddress socketAddress(URI endpoint, String scheme) {
 		if (!scheme.equalsIgnoreCase(endpoint.getScheme()) || endpoint.getHost()==null

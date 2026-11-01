@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Let applications choose how each Convex DB database merges, with per-row last-write-wins provided as one policy. ([Merge Policy](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-policy), [#779](https://github.com/Convex-Dev/convex/issues/779), [#784](https://github.com/Convex-Dev/convex/issues/784))
 - Let applications supply the clock that stamps Convex DB writes. ([Clock](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#clock), [#781](https://github.com/Convex-Dev/convex/issues/781))
+- Connect to a lattice node known only by its address with `LatticeConnectionManager.connectPeer(URI)`: it is admitted under the key it proves, or fails after a few attempts. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#connection-capabilities))
 - Wait until a lattice propagation group serves the state you need with `whenAnnounced(condition)`. ([Waiting](convex-peer/docs/PERSISTENCE.md#waiting-in-tests-and-applications), [#805](https://github.com/Convex-Dev/convex/issues/805))
 - Give each `LatticeNode` propagation group its own limits with `createPropagator(groupConfig)`. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md), [#769](https://github.com/Convex-Dev/convex/issues/769))
 - Merge a small delta into a large `Index` without visiting the rest of it, with `Index.merge`; Convex DB row deliveries now cost the rows delivered, not the table. ([#786](https://github.com/Convex-Dev/convex/issues/786))
@@ -48,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Make `convex dlfs start --peer` connect: each peer, given as `host:port` or a `tcp://` or `tls://` URI, is admitted under the key it proves, and startup fails if one cannot be reached. Before, no peer was admitted. ([DLFS](convex-dlfs/README.md#run-a-webdav-server), [#629](https://github.com/Convex-Dev/convex/issues/629))
 - Preserve concurrent KV updates and return the result of the committed edit.
 - Keep KV deletes: tombstones persist, so a stale replica can no longer restore a deleted key, and `LatticeKV.gc()` is removed. ([#807](https://github.com/Convex-Dev/convex/issues/807))
 - Reject malformed queue states before installation, and report concurrent queue worker failures to producers, flush callers and shutdown.

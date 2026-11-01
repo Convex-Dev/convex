@@ -29,6 +29,21 @@ public class TransportsTest {
 		assertThrows(IllegalArgumentException.class,() -> Transports.endpoint("tcp://user@localhost:1"));
 	}
 
+	/** An operator names a peer by a TCP or TLS endpoint with a port; a DID is not read as a host. */
+	@Test
+	public void peerEndpointsNeedATransportAndAPort() {
+		assertEquals(URI.create("tcp://localhost:19888"),Transports.peerEndpoint(" localhost:19888 "));
+		assertEquals(URI.create("tcp://10.0.0.2:19888"),Transports.peerEndpoint("tcp://10.0.0.2:19888"));
+		assertEquals(URI.create("tls://peer.example.com:443"),Transports.peerEndpoint("tls://peer.example.com:443"));
+		assertEquals(URI.create("tcp://[::1]:19888"),Transports.peerEndpoint("[::1]:19888"));
+		for (String invalid:new String[] {"did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+				"DID:web:peer.example.com","localhost","tcp://localhost","localhost:0","localhost:70000",
+				"https://localhost:443","tcp://localhost:1/path","tcp://localhost:1?q=1","tcp://user@localhost:1",""}) {
+			assertThrows(IllegalArgumentException.class,() -> Transports.peerEndpoint(invalid),invalid);
+		}
+		assertThrows(IllegalArgumentException.class,() -> Transports.peerEndpoint(null));
+	}
+
 	@Test
 	public void plainTCPFactoriesAndReconnectNeedNoTLSConfiguration() throws Exception {
 		try (NettyServer server=new NettyServer(0)) {

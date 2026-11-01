@@ -2,10 +2,18 @@ package convex.cli.dlfs;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.Convex;
 import convex.auth.did.DID;
 import convex.cli.ACommand;
 import convex.cli.CLIError;
@@ -30,7 +38,9 @@ import convex.dlfs.DLFSServer;
 import convex.lattice.LatticeHost;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
+import convex.net.Transports;
 import convex.node.NodeConfig;
+import convex.node.LatticeConnectionManager;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -47,7 +57,7 @@ import picocli.CommandLine.Mixin;
  *
  * <p>Usage:
  * <pre>
- * convex dlfs start --port 8080 --node-port 19888 --drive home
+ * convex dlfs start --port 8080 --node-port 19888 --drive home --peer tcp://peer.example.com:19888
  * </pre>
  */
 @Command(name="start",
@@ -82,7 +92,8 @@ public class DlfsStart extends ACommand {
 	private String[] driveNames;
 
 	@Option(names={"--peer"},
-		description="Remote peer address(es) to connect to for replication (host:port).")
+		description="Peer to replicate with, as tcp://host:port, tls://host:port or host:port. "
+			+"Each is admitted under the key it proves; startup fails if one cannot be reached. Repeatable.")
 	private String[] peers;
 
 	@Option(names={"--public-key"},
@@ -121,6 +132,7 @@ public class DlfsStart extends ACommand {
 				throw new CLIError(ExitCodes.CONFIG, "Invalid drive name: " + driveName);
 			}
 		}
+		List<URI> peerEndpoints=peerEndpoints(peers);
 		// Resolve or generate key pair
 		AKeyPair keyPair = resolveKeyPair();
 		inform("Key: " + keyPair.getAccountKey().toChecksumHex());
@@ -163,7 +175,7 @@ public class DlfsStart extends ACommand {
 		DLFSDriveManager driveManager;
 		DLFSServer dlfsServer;
 		try {
-			connectPeers(propagator);
+			connectPeers(propagator.getConnectionManager(),peerEndpoints);
 			driveManager=createDriveManager(host,application,accountKey);
 			for (String driveName : driveNames) {
 				boolean created=driveManager.createDrive(null, driveName);
@@ -178,7 +190,7 @@ public class DlfsStart extends ACommand {
 			// Authentication-aware per-user drive provisioning is a separate product concern.
 			dlfsServer.setRequireAuthForWrites(false);
 			dlfsServer.start(port);
-		} catch (RuntimeException e) {
+		} catch (InterruptedException | RuntimeException e) {
 			closeFailedStart(e,store,node,host);
 			throw e;
 		}
@@ -293,28 +305,31 @@ public class DlfsStart extends ACommand {
 		return NodeConfig.create(configMap);
 	}
 
-	private void connectPeers(LatticePropagator propagator) {
-		if (peers == null) return;
-		for (int i = 0; i < peers.length; i++) {
-			String peer = peers[i];
+	/** The {@code --peer} options as transport endpoints, refused before anything opens. */
+	static List<URI> peerEndpoints(String[] peers) {
+		if (peers==null) return List.of();
+		List<URI> endpoints=new ArrayList<>(peers.length);
+		for (String peer:peers) {
 			try {
-				String[] parts = peer.split(":");
-				if (parts.length != 2) {
-					informWarning("Invalid --peer address (expected host:port): " + peer);
-					continue;
-				}
-				String host = parts[0];
-				int peerPort = Integer.parseInt(parts[1]);
-				java.net.InetSocketAddress addr = new java.net.InetSocketAddress(host, peerPort);
-				convex.api.Convex connection = convex.api.ConvexRemote.connect(addr);
-				// Placeholder key, unique per peer so connections don't collide. Since we
-				// choose to trust these peers the exact key may not matter, but ideally
-				// this would be the peer's real key from a handshake. See #629
-				AccountKey peerKey = AccountKey.dummy(Integer.toHexString(i + 1));
-				propagator.addPeer(peerKey, connection);
-				inform("Connected to peer: " + peer);
-			} catch (Exception e) {
-				informWarning("Failed to connect to peer " + peer + ": " + e.getMessage());
+				endpoints.add(Transports.peerEndpoint(peer));
+			} catch (IllegalArgumentException e) {
+				throw new CLIError(ExitCodes.USAGE,"--peer: "+e.getMessage(),e);
+			}
+		}
+		return endpoints;
+	}
+
+	/** Connects to every peer before serving, each admitted under the key it proves. */
+	private void connectPeers(LatticeConnectionManager manager,List<URI> endpoints) throws InterruptedException {
+		Map<URI,CompletableFuture<Convex>> connecting=new LinkedHashMap<>();
+		for (URI endpoint:endpoints) connecting.put(endpoint,manager.connectPeer(endpoint));
+		for (Map.Entry<URI,CompletableFuture<Convex>> entry:connecting.entrySet()) {
+			try {
+				AccountKey peerKey=entry.getValue().get().getVerifiedPeer();
+				inform("Connected to peer "+peerKey.toChecksumHex()+" at "+entry.getKey());
+			} catch (ExecutionException e) {
+				Throwable cause=(e.getCause()==null)?e:e.getCause();
+				throw new CLIError(ExitCodes.NOHOST,"Cannot connect to peer "+entry.getKey()+": "+cause.getMessage(),cause);
 			}
 		}
 	}

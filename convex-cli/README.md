@@ -450,6 +450,19 @@ source encryption policy and require the source key to open.
 See [Etch GC](../convex-core/docs/ETCH_GC.md#snapshot-and-collect) for API usage,
 Windows mapping behaviour and recovery, or run `convex etch gc --help` for options.
 
+## DLFS file server
+
+`dlfs start` serves DLFS drives over WebDAV and replicates them with other DLFS
+nodes named with `--peer`:
+
+```bash
+convex dlfs start --key 0x7e66429ca... --etch dlfs.etch --peer tcp://files.example.com:19888
+```
+
+Each peer is admitted under the key it proves, and startup fails if a peer cannot be
+reached. See the [DLFS README](../convex-dlfs/README.md#run-a-webdav-server) for peer
+addresses and what the peer must allow.
+
 ## Global Options
 
 These options work with most commands:

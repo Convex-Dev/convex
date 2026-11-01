@@ -28,6 +28,7 @@ import convex.core.store.MemoryStore;
 import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
+import convex.net.Transports;
 
 /** Optional networking preserves the existing host, application boundaries and store ownership. */
 class LatticeNodeTest {
@@ -166,6 +167,26 @@ class LatticeNodeTest {
 					target.sync();
 					assertEquals(Sets.of(1),targetStore.getRootData());
 				}
+			}
+		}
+	}
+
+	/** A node reached only by its address is admitted under the key it proves (#629). */
+	@Test void nodeReachedByAddressIsAdmittedUnderTheKeyItProves() throws Exception {
+		try (var serverStore=new MemoryStore(); var clientStore=new MemoryStore()) {
+			var serverKey=AKeyPair.createSeeded(705);
+			var clientKey=AKeyPair.createSeeded(706);
+			try (var server=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,serverStore),NodeConfig.port(0)).launch();
+					var client=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,clientStore),NodeConfig.port(-1)).launch()) {
+				server.setIdentity(DID.forKey(serverKey.getAccountKey()),serverKey);
+				server.serveAllInbound(server.createPropagator());
+				client.setIdentity(DID.forKey(clientKey.getAccountKey()),clientKey);
+				var manager=client.createPropagator().getConnectionManager();
+
+				var peer=manager.connectPeer(Transports.endpoint(server.getHostAddress())).get(10,TimeUnit.SECONDS);
+				assertEquals(serverKey.getAccountKey(),peer.getVerifiedPeer());
+				assertSame(peer,manager.getConnection(serverKey.getAccountKey()));
+				assertTrue(manager.getAuthenticatedRouteKeys().contains(serverKey.getAccountKey()));
 			}
 		}
 	}

@@ -110,11 +110,11 @@ same host may use different allowances or no clock-based admission. Move existin
 `node.maxFutureTimestampSkew` settings into the `dlfs` section.
 
 Bootstrap entries pair a TCP address with its expected `AccountKey`; the connection
-manager challenges that identity after connecting and keeps an unverified connection
-under the conservative message-size cap. Verification failure is not yet a fatal
-transport error, so this is identity-aware bootstrap rather than a private trust
-boundary. Bootstrap contacts are not a separate DLFS concept: the same `NodeServer`
-connection and lattice propagation path carries `:p2p` discovery data and DLFS state.
+manager challenges for that key after connecting, holding the connection under the
+conservative message-size cap until the node proves it. A node that does not prove it
+is disconnected and retried later, never admitted. Bootstrap contacts are not a
+separate DLFS concept: the same lattice connection and propagation path carries `:p2p`
+discovery data and DLFS state.
 Bootstrap configures the outbound side only; the remote node must separately grant an
 inbound lattice view.
 
@@ -184,6 +184,13 @@ The `convex dlfs start --etch <file>` command uses a cursor-backed registry and 
 a stable keystore key (`--key` or `--public-key`). This prevents a restart from silently
 selecting a different owner. Registry mutations and file writes are persisted
 synchronously at the service `sync()` boundary.
+
+`convex dlfs start --peer <address>` connects to another DLFS node before serving,
+given as `tcp://host:port`, `tls://host:port` or `host:port`, and repeatable. Each peer
+is admitted under the key it proves, which the command prints; startup fails if a peer
+cannot be reached or proves no key. The peer must serve its lattice view to inbound
+connections, as `convex.dlfs.Main` does with `latticeInbound: "public"` or
+`--serve-inbound`; `convex dlfs start` itself refuses inbound lattice connections.
 
 ### Host DLFS in a lattice application
 

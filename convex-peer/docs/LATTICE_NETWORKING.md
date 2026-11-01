@@ -163,6 +163,16 @@ bounded desired-peer intent
         -> admitted manager-owned route
 ```
 
+A node known only by its endpoint, named with `connectPeer(URI)`, is challenged for
+no particular key. The key it proves becomes explicit intent at that endpoint, so
+reconnections challenge for that key. This proves the node holds the key it names, not
+that it is the node the caller meant; over `tls://` the certificate vouches for the
+host name first. A node that cannot be reached or proves no key gets three attempts,
+with the usual retry backoff, then the caller's future fails, so a service that needs
+its peers in order to start fails promptly rather than waiting on one that is not
+there. `Transports.peerEndpoint` parses an operator's `tcp://` or `tls://` URI, or
+`host:port`, and refuses a DID, which cannot be resolved to a node yet.
+
 Zero-trust connectivity is still useful. Public complete values can be checked
 by the application lattice regardless of route authentication. Trust controls
 route capability and partial-data acquisition; it never replaces signed lattice
@@ -289,7 +299,8 @@ operations do not introduce runtime group creation or subscription negotiation.
 - **desired**: retained bounded candidate or explicit intent for a route to an identity.
 - **pending**: a manager-owned socket exists but admission is incomplete.
 - **assigned**: application policy selected one group for an inbound socket.
-- **trusted**: a live challenge proved possession of the expected transport key.
+- **trusted**: a live challenge proved possession of the expected transport key, or of
+  the key a node known only by its endpoint named.
 - **upgraded**: an assigned inbound socket is also installed as an authenticated
   outbound route.
 - **owner-authorised**: signed application data passed lattice validation; this
@@ -313,7 +324,8 @@ peers it used as seeds. `whenIsolated` completes once a maintenance pass finds n
 authenticated route in either direction, or at once when there is none, which is when
 it can seed again.
 Pending socket opens and identity challenges reserve slots, with at most four
-automatic attempts outstanding. Each attempt runs independently of maintenance.
+automatic attempts outstanding, attempts to reach a node known only by its endpoint
+among them. Each attempt runs independently of maintenance.
 
 `markActive` records useful directed traffic. `withPeer` protects an asynchronous
 operation from trimming and can optionally record activity. Application pulls and

@@ -7,6 +7,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -59,6 +60,24 @@ public class DlfsStartTest {
 
 		assertEquals(ExitCodes.CONFIG, result.getResult());
 		assertTrue(result.getError().contains("requires a stable key"));
+	}
+
+	/** A DID, or an address without a port, stops startup before anything opens. */
+	@Test
+	public void testInvalidPeerRejectedBeforeStartup() {
+		for (String peer:new String[] {"did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+				"localhost","tcp://localhost","https://localhost:443"}) {
+			CLTester result=CLTester.run("dlfs", "start", "--no-tray", "--peer", peer);
+			assertEquals(ExitCodes.USAGE, result.getResult(), peer);
+		}
+	}
+
+	/** host:port is a TCP peer, and a URI keeps its transport. */
+	@Test
+	public void testPeersAreTransportEndpoints() {
+		assertEquals(List.of(URI.create("tcp://localhost:19889"),URI.create("tls://peer.example.com:443")),
+			DlfsStart.peerEndpoints(new String[] {"localhost:19889","tls://peer.example.com:443"}));
+		assertEquals(List.of(),DlfsStart.peerEndpoints(null));
 	}
 
 	@Test
