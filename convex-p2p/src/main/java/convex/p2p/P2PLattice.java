@@ -220,6 +220,12 @@ public class P2PLattice {
 	public static final int MAX_POINTS_OF_PRESENCE = 16;
 
 	/**
+	 * Maximum memory size of another node's signed record that a node keeps. A
+	 * complete record with every Point of Presence is well under it.
+	 */
+	public static final long MAX_NODE_RECORD_SIZE = 4096;
+
+	/**
 	 * Creates a NodeInfo map with an explicit timestamp (#561).
 	 *
 	 * <p>The timestamp is supplied by the caller — the driving (merging or test) process —

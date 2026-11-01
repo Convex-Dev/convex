@@ -23,6 +23,7 @@ import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
@@ -192,6 +193,11 @@ final class LatticeProtocolEndpoint implements Closeable {
 			throw new IllegalStateException("Inbound connection belongs to another propagation group");
 		}
 		inboundVerifier.maybeStart(connection,propagator,expectedKey);
+	}
+
+	/** The keys inbound connections are being challenged for. */
+	Set<AccountKey> authenticatingInboundKeys() {
+		return inboundVerifier.claimedKeys();
 	}
 
 	/** Releases every resource scoped to one physical connection. */

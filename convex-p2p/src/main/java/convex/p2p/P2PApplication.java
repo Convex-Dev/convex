@@ -9,7 +9,6 @@ import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
@@ -34,17 +33,18 @@ import convex.social.Social;
  *
  * <p>This is the application a P2P host hands incoming values to. It owns their
  * merge: an incoming root, or a path value reduced to its path, is projected to what
- * this node wants and delegated to the lattice merge, which merges every region as
- * declared and verifies each owner's slot. The projection keeps the infrastructure
- * regions whole, reduces the social region to the owners this node wants and
- * leaves out {@code :local}, which this node neither accepts nor publishes. The
- * application also owns the P2P policy that reads the lattice:
- * the node registry as a validated directory, the social owners this node wants, and
- * the paths to pull from a newly admitted peer. A node with a key also keeps its
- * {@link ContactRecords} as local state, synced with the application. It imports
- * nothing from the node package. A {@link P2PNode} assembles it with replication and calls it at the
- * moments replication knows about; a local application may use the same component
- * over a standalone {@link LatticeHost}.</p>
+ * this node wants. The projection reduces the social region to the owners this node
+ * wants and leaves out {@code :local}, which this node neither accepts nor
+ * publishes. Its {@link P2PConnections} merges the {@code :p2p} region and keeps the
+ * node records this node wants; the lattice merge takes the other regions as
+ * declared, verifying each owner's slot. The two merge in separate updates, as
+ * keyed regions do, so a reader may see one before the other. The application also
+ * owns the P2P policy that reads the lattice: the social owners this node wants and
+ * the paths to pull from a newly admitted peer, with the node directory and contact
+ * records held by its connections. It imports nothing from the node package. A
+ * {@link P2PNode} assembles it with replication and calls it at the moments
+ * replication knows about; a local application may use the same component over a
+ * standalone {@link LatticeHost}.</p>
  *
  * <p>Every instance is bound to a host and has a directory and social policy.
  * Applications needing domain views or transaction drafts compose {@link Social}
@@ -58,13 +58,12 @@ import convex.social.Social;
 public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 
 	private final LatticeHost<Index<Keyword,ACell>> host;
-	private final NodeDirectory directory;
 	private final SocialReplicationPolicy socialPolicy;
 	private final AccountKey ownKey;
 	private final BiFunction<ACell,ACell,SignedData<ACell>> signer;
 	private final Supplier<CVMLong> clock;
 	private final ASet<Keyword> servedRegions;
-	private final ContactRecords contacts;
+	private final P2PConnections connections;
 
 	/** Connects a relay with standard DID verification and no authoring capability. */
 	public static P2PApplication connect(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host) {
@@ -86,7 +85,6 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		return new P2PApplication(lattice,host,ownKey,signer,clock,didAuthorizer);
 	}
 
-	@SuppressWarnings("unchecked")
 	private P2PApplication(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host,
 			AccountKey ownKey,BiFunction<ACell,ACell,SignedData<ACell>> signer,
 			Supplier<CVMLong> clock,DIDKeyAuthorizer didAuthorizer) {
@@ -96,23 +94,23 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		this.signer=signer;
 		this.clock=java.util.Objects.requireNonNull(clock);
 		this.servedRegions=Sets.fromCollection(lattice.getKeys()).exclude(LocalLattice.KEY_LOCAL);
-		this.directory=new NodeDirectory(this);
 		this.socialPolicy=new SocialReplicationPolicy(this,java.util.Objects.requireNonNull(didAuthorizer));
-		// Only a node that can sign its own :local slot keeps contact records
-		this.contacts=(ownKey==null || signer==null)?null:new ContactRecords(cursor(),ownKey,
-			value -> (SignedData<AHashMap<Keyword,ACell>>)(SignedData<?>)signer.apply(ownKey,value),clock);
+		this.connections=new P2PConnections(this,signer);
 	}
 
 	AccountKey ownKey() { return ownKey; }
 	Supplier<CVMLong> clock() { return clock; }
 
-	/** This node's contact records, or null for a node without a key. */
-	ContactRecords contacts() { return contacts; }
+	/** This node's connection management: the node registry it keeps and its contact records. */
+	P2PConnections connections() { return connections; }
 
-	/** Syncs this node's contact records into its {@code :local} slot, signing it once if they changed. */
+	/** This node's contact records, or null for a node without a key. */
+	ContactRecords contacts() { return connections.contacts(); }
+
+	/** Syncs this node's connections, signing its {@code :local} slot once if its contact records changed. */
 	@Override
 	protected void syncChildren() {
-		if (contacts!=null) contacts.sync();
+		connections.sync();
 	}
 
 	/** The top-level regions this application serves, as advertised in its node record. Never {@code :local}. */
@@ -120,13 +118,17 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 
 	/**
 	 * Merges an incoming root projected to what this node wants ({@link #project}).
-	 * The lattice merge does the rest, verifying each owner's slot. A path delivery
-	 * arrives here reduced to its path, so the same projection selects it.
+	 * The connections take the {@code :p2p} region and the lattice merge the rest,
+	 * verifying each owner's slot. A path delivery arrives here reduced to its path,
+	 * so the same projection selects it.
 	 */
 	@Override
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 		Index<Keyword,ACell> wanted=project(other);
-		return cursor().updateAndGet(own -> getLattice().merge(own,wanted));
+		if (wanted==null) return cursor().get();
+		connections.merge(wanted);
+		Index<Keyword,ACell> rest=wanted.dissoc(P2PLattice.KEY_P2P);
+		return cursor().updateAndGet(own -> getLattice().merge(own,rest));
 	}
 
 	/**
@@ -191,7 +193,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 
 	/** This application's validated view of the node registry. */
 	NodeDirectory directory() {
-		return directory;
+		return connections.directory();
 	}
 
 	/** This application's social retention and admission policy. */

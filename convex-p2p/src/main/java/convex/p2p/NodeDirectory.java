@@ -39,16 +39,14 @@ import convex.core.util.Utils;
  * propagation group to authenticate routes; nothing here opens a socket, marks a
  * connection trusted or merges a foreign value.</p>
  *
- * <p>The in-memory index is bounded by {@link #setMaxRecords} and is
- * additive/update-only. Lattice absence is not interpreted as revocation because
- * the current Owner/LWW registry has no deletion contract.</p>
+ * <p>The in-memory index follows the registry the application holds, which
+ * {@link P2PConnections} keeps bounded: a record it drops leaves the index. A
+ * dropped record is not revoked, since the Owner/LWW registry has no deletion
+ * contract.</p>
  */
 final class NodeDirectory {
 
 	private static final Logger log=LoggerFactory.getLogger(NodeDirectory.class);
-
-	/** Bound on indexed remote records until a node supplies its own. */
-	static final int DEFAULT_MAX_RECORDS=256;
 
 	/** The registry path within the application root, as a message path. */
 	static final AVector<ACell> REGISTRY_PATH=Vectors.of(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
@@ -56,7 +54,6 @@ final class NodeDirectory {
 	private final P2PApplication application;
 	private final ConcurrentHashMap<AccountKey,NodeRecord> records=
 		new ConcurrentHashMap<>();
-	private volatile int maxRecords=DEFAULT_MAX_RECORDS;
 
 	private AVector<AccountKey> pointsOfPresence=Vectors.empty();
 	private boolean relay;
@@ -68,12 +65,6 @@ final class NodeDirectory {
 	/** This node's key, supplied explicitly by the application, or null for a keyless node. */
 	private AccountKey ownKey() {
 		return application.ownKey();
-	}
-
-	/** Bounds the number of remote records indexed; a node sets this to its candidate bound. */
-	void setMaxRecords(int maxRecords) {
-		if (maxRecords<0) throw new IllegalArgumentException("Record bound must not be negative");
-		this.maxRecords=maxRecords;
 	}
 
 	/** Sets the bounded PoP declarations used by the next NodeInfo publication. */
@@ -92,6 +83,11 @@ final class NodeDirectory {
 			}
 		}
 		pointsOfPresence=value;
+	}
+
+	/** The Points of Presence this node declares. */
+	AVector<AccountKey> pointsOfPresence() {
+		return pointsOfPresence;
 	}
 
 	/** Sets whether the next NodeInfo advertises bounded point-message relay. */
@@ -158,18 +154,18 @@ final class NodeDirectory {
 	}
 
 	/**
-	 * Rebuilds the bounded validated index from the current registry and returns
-	 * the remote records that are new or newer than before, for the node to turn
-	 * into connection candidates.
+	 * Rebuilds the validated index from the current registry and returns the remote
+	 * records that are new or newer than before, for the node to turn into
+	 * connection candidates. Records no longer held leave the index.
 	 */
 	@SuppressWarnings("unchecked")
 	synchronized List<NodeRecord> refresh() {
 		List<NodeRecord> changed=new ArrayList<>();
 		ACell value=application.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		if (!(value instanceof AHashMap<?,?> rawNodes)) return changed;
-		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap<ACell,SignedData<ACell>>)rawNodes;
+		AHashMap<ACell,SignedData<ACell>> nodes=(value instanceof AHashMap<?,?> rawNodes)
+			? (AHashMap<ACell,SignedData<ACell>>)rawNodes : Maps.empty();
+		records.keySet().removeIf(key -> !nodes.containsKey(key));
 		AccountKey ownKey=ownKey();
-		int limit=maxRecords;
 		for (Map.Entry<ACell,SignedData<ACell>> entry:nodes.entrySet()) {
 			AccountKey peerKey=RT.ensureAccountKey(entry.getKey());
 			if (peerKey==null) continue;
@@ -178,10 +174,8 @@ final class NodeDirectory {
 
 			NodeRecord existing=records.get(peerKey);
 			if (existing!=null && updated.timestamp()<=existing.timestamp()) continue;
-			boolean own=peerKey.equals(ownKey);
-			if (existing==null && !own && remoteRecordCount(ownKey)>=limit) continue;
 			records.put(peerKey,updated);
-			if (!own) changed.add(updated);
+			if (!peerKey.equals(ownKey)) changed.add(updated);
 		}
 		return changed;
 	}
@@ -191,9 +185,9 @@ final class NodeDirectory {
 		return new HashMap<>(records);
 	}
 
-	private int remoteRecordCount(AccountKey ownKey) {
-		int size=records.size();
-		return ownKey!=null && records.containsKey(ownKey) ? size-1 : size;
+	/** Whether a signed record is a valid NodeInfo for its owner. */
+	static boolean isValid(AccountKey peerKey,SignedData<?> signed) {
+		return parseRecord(peerKey,signed)!=null;
 	}
 
 	private static boolean isRegistryPath(ACell[] path) {

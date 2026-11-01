@@ -2,6 +2,8 @@ package convex.node;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -105,6 +107,13 @@ final class LatticeInboundVerifier {
 			pending.future().cancel(false);
 			active.remove(connection, pending);
 		}
+	}
+
+	/** The keys claimed by the connections being challenged now. */
+	Set<AccountKey> claimedKeys() {
+		HashSet<AccountKey> keys = new HashSet<>();
+		for (PendingVerification pending : active.values()) keys.add(pending.claimedKey());
+		return keys;
 	}
 
 	/** Cancels verification state when the propagator observes physical disconnect. */

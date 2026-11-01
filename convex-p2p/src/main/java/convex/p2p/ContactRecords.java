@@ -67,6 +67,22 @@ public final class ContactRecords extends ALocalComponent {
 		return contacts.get(node);
 	}
 
+	/** Every contact record this node keeps, by node key. */
+	AHashMap<AccountKey,AHashMap<Keyword,ACell>> all() {
+		AHashMap<AccountKey,AHashMap<Keyword,ACell>> all=contacts.get();
+		return (all==null)?Maps.empty():all;
+	}
+
+	/** Whether a contact record shows a node that answered and has not failed since. */
+	static boolean answered(AHashMap<Keyword,ACell> record) {
+		return record!=null && record.get(LAST_CONTACT)!=null && failures(record)==0;
+	}
+
+	/** Whether a contact record shows failures since the last contact, if any. */
+	static boolean failing(AHashMap<Keyword,ACell> record) {
+		return record!=null && failures(record)>0;
+	}
+
 	private AForkableCursor<AHashMap<Keyword,ACell>> contact(AccountKey node) {
 		return contacts.<AHashMap<Keyword,ACell>>path(node).withDefault(Maps.empty());
 	}

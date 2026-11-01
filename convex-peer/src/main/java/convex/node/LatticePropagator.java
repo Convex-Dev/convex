@@ -540,6 +540,18 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
+	 * Returns the keys this group's inbound connections are being challenged for:
+	 * vouched for by {@link #authenticateInboundRoute}, not yet proven. A key leaves
+	 * this set once its challenge ends, after a successful one has upgraded the route.
+	 *
+	 * @return defensive set of claimed keys
+	 */
+	public Set<AccountKey> getAuthenticatingInboundKeys() {
+		LatticeProtocolEndpoint result=endpoint;
+		return (result==null)?new HashSet<>():result.authenticatingInboundKeys();
+	}
+
+	/**
 	 * Returns aggregate ingress counters for this attached policy group.
 	 *
 	 * @return immutable counter snapshot

@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,12 +86,14 @@ import convex.social.Social;
  * <p><b>Layering.</b> {@link NodeServer} is the schema-independent replication layer
  * over the assembled host and merges nothing. The {@link P2PApplication} is the host's
  * receiver: it merges incoming values through its lattice, projected to what this node
- * wants, keeps the validated node directory and lists the paths to pull from a new peer. This
- * class owns the transport and the moments replication knows about: after the
- * transport binds it asks the application to publish the node's record, when a peer
- * is admitted it pulls the application's bootstrap paths, and when an inbound value
- * is accepted it turns the application's refreshed directory into connection candidates
- * and authenticates a route the application has validated. {@link PointOfPresence}
+ * wants, keeps the node records it wants with the validated node directory and lists
+ * the paths to pull from a new peer. This class owns the transport and the moments
+ * replication knows about: after the transport binds it asks the application to
+ * publish the node's record, when a peer is admitted it pulls the application's
+ * bootstrap paths, and when an inbound value is accepted it turns the application's
+ * refreshed directory into connection candidates and authenticates a route the
+ * application has validated. It tells the application's connections which nodes it
+ * routes to and which the operator named, so their records are kept. {@link PointOfPresence}
  * handles transient routed messages and is not a lattice concern. P2PNode uses its
  * node key as both transport identity and NodeInfo owner; social DIDs and their
  * signing keys remain independent.</p>
@@ -120,9 +123,16 @@ public class P2PNode implements Closeable {
 		this.propagator=propagator;
 		this.config=config;
 		this.keyPair=keyPair;
-		NodeDirectory directory=application.directory();
-		directory.setMaxRecords(propagator.getConnectionManager().getMaxDesiredPeers());
-		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,directory);
+		P2PConnections connections=application.connections();
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		connections.setMaxRecords(manager.getMaxDesiredPeers());
+		// Nodes with an authenticated route, or one being authenticated, keep their records
+		connections.setRoutes(() -> {
+			Set<AccountKey> routes=manager.getAuthenticatedRouteKeys();
+			routes.addAll(propagator.getAuthenticatingInboundKeys());
+			return routes;
+		});
+		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,connections.directory());
 		// The application merges incoming roots through its projection; the
 		// propagation group publishes through the same projection.
 		propagator.setPublicationFilter(application::project);
@@ -438,10 +448,16 @@ public class P2PNode implements Closeable {
 			ACell[] path,ACell value,boolean changed) {
 		if (!NodeDirectory.mayAffectRegistry(path)) return;
 		AccountKey claimed=application.directory().claimedOwner(path,value);
-		refreshDiscovery();
 		if (connection!=null && claimed!=null) {
 			source.authenticateInboundRoute(connection,claimed);
+			// The claimant keeps its record while its route is authenticated, so a
+			// record a full registry turned away is merged again
+			var host=server.getHost();
+			Index<Keyword,ACell> before=host.cursor().get();
+			host.mergeAt(value,path);
+			if (!before.equals(host.cursor().get())) host.sync();
 		}
+		refreshDiscovery();
 	}
 
 	/** Offers the application's refreshed directory as this node's connection candidates. */
@@ -476,6 +492,8 @@ public class P2PNode implements Closeable {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("P2P node must be launched before connecting"));
 		}
+		// A node the operator named keeps its record however full the registry is
+		application.connections().name(peerKey);
 		return propagator.getConnectionManager().connectPeer(peerKey,address)
 			.thenCompose(peer -> initialisePeer(peer).thenApply(ignored -> peer));
 	}

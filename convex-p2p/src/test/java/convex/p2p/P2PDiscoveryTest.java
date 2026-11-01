@@ -2,6 +2,7 @@ package convex.p2p;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.concurrent.TimeUnit;
 
@@ -79,6 +80,8 @@ public class P2PDiscoveryTest {
 			assertFalse(sender.request(update).get(5,TimeUnit.SECONDS).isError());
 		}
 		assertEquals(CANDIDATES,hub.propagationGroup().getConnectionManager().getDesiredPeers().size());
+		// The hub keeps as many as its bound, besides its own
+		assertEquals(CANDIDATES+1,registry(hub).count());
 
 		// The operator's own connection is not a candidate and still succeeds
 		Convex toPeer=hub.connect(peerKey.getAccountKey(),peer.getHostAddress())
@@ -93,5 +96,33 @@ public class P2PDiscoveryTest {
 		AConnection route=hub.whenInboundConnectionUpgraded(leafKey.getAccountKey())
 			.get(5,TimeUnit.SECONDS);
 		assertEquals(leafKey.getAccountKey(),route.getTrustedKey());
+	}
+
+	/**
+	 * A hub with no room for records it has not pinned still keeps an outbound-only
+	 * node's record: the claimant is pinned while its route is authenticated, and
+	 * the record it pushed is merged again.
+	 */
+	@Test
+	public void testOutboundOnlyNodeKeepsItsRecordAtAFullHub() throws Exception {
+		hubStore=EtchStore.createTemp("p2p-discovery-hub");
+		hub=P2PNode.create(hubStore,NodeConfig.localNetwork(),LatticePropagatorConfig.create(),hubKey)
+			.serveAllInbound();
+		hub.getApplication().connections().setMaxRecords(0);
+		hub.launch();
+
+		leafStore=EtchStore.createTemp("p2p-discovery-leaf");
+		leaf=P2PNode.create(leafStore,NodeConfig.port(-1),LatticePropagatorConfig.create(),leafKey);
+		leaf.launch();
+		leaf.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(5,TimeUnit.SECONDS);
+		assertNotNull(registry(hub).get(leafKey.getAccountKey()),"kept before the leaf's own publication can arrive");
+		hub.whenInboundConnectionUpgraded(leafKey.getAccountKey()).get(5,TimeUnit.SECONDS);
+		assertNotNull(registry(hub).get(leafKey.getAccountKey()));
+	}
+
+	@SuppressWarnings("unchecked")
+	private static AHashMap<ACell,SignedData<ACell>> registry(P2PNode node) {
+		ACell nodes=node.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		return (AHashMap<ACell,SignedData<ACell>>)nodes;
 	}
 }

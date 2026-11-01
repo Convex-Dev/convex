@@ -237,29 +237,42 @@ The owner's `:timestamp` orders only that owner's own records. A node whose cloc
 falls behind its last published record cannot replace that record until its clock
 passes it. The timestamp is never evidence that the node is alive (§4.6).
 
-#### Retention [PROPOSED]
+#### Retention
 
-Each node holds only the node records it wants, as it already does for social
-owners. The P2P application's merge reduces an incoming `[:p2p :nodes]` value to the
-records it wants before the lattice merge, and the node publishes only what it holds.
-There is no global directory: each node passes on the records it keeps, so discovery
-spreads as gossip of samples, and the registry's cost to a node stays bounded however
-many keys exist.
+Each node holds only the node records it wants, as it does for social owners. The
+P2P application's connection-management component, `P2PConnections`, merges the
+`:p2p` region: an incoming registry merges by the owner rule, then is reduced to the
+records the node keeps, and the node publishes only what it holds. There is no
+global directory: each node passes on the records it keeps, so discovery spreads as
+gossip of samples, and the registry's cost to a node stays bounded however many keys
+exist.
 
-A node always keeps:
+A node always keeps, without counting them:
 
 - its own record;
-- records of nodes the operator named;
+- records of nodes the operator named with `connect`;
 - records of nodes it has an authenticated route to, including NAT leaves that
-  connected in;
+  connected in, and of a node whose inbound route it is authenticating;
 - records of its own Points of Presence.
 
-Beyond those it keeps a bounded number of other records (`maxDesiredPeers`, 256 by
-default), each within a size limit. When that set is full, a new record may replace
-only one whose node has never been reached or has failed, chosen at random, never one
-whose node has answered. That evidence comes from `:local` (§4.6), never from the
-record itself. A dropped record leaves local state; if it arrives again, the merge
-reduces it away again until it qualifies.
+It also always keeps the records it holds of nodes that answered and have not failed
+since. With those it keeps up to `maxDesiredPeers` records (256 by default), choosing
+the rest in order: nodes that answered, then nodes never reached, then nodes that
+failed. Within each group the order is a hash of the node key salted with a secret
+the node draws when it starts. Other nodes cannot predict the order, so none can
+choose which records a node keeps. It is stable while the node runs, so a record
+turned away is turned away again when it next arrives, and exchanges between nodes
+settle. The evidence comes from `:local` (§4.6), never from the record itself.
+
+Apart from its own, a node keeps only valid NodeInfo records within 4 KB
+(`P2PLattice.MAX_NODE_RECORD_SIZE`); a newer record that fails either check leaves
+the one held. A dropped record leaves the node directory but stays a connection
+candidate.
+
+A NAT leaf pushes its record before the receiving node authenticates its route, so a
+full registry may turn the record away. The receiving node keeps the leaf's record
+while it authenticates the route, and merges the pushed record again. If the
+authentication fails, the record competes like any other at the next merge.
 
 A node can route a point message only through records it keeps. Finding an
 arbitrary node by key is Kademlia's job (§4.3).
@@ -377,7 +390,8 @@ Proposed for the same record:
 - operator and policy blocklists of keys and addresses
   ([#814](https://github.com/Convex-Dev/convex/issues/814)).
 
-Retention (§4.2), candidate selection and retry are to rank by this evidence.
+Retention (§4.2) ranks node records by this evidence; candidate selection and retry
+are to do the same.
 
 ## 5. Transport Layer [PROPOSED]
 
