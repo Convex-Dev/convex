@@ -222,6 +222,10 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-surefire-plugin</artifactId>
+					<!-- CI runs no filtered (-Dtest=...) build. Before upgrading, check one
+					     locally, e.g. -pl convex-db -am -Dtest=TypesTest,RowLWWTest
+					     -Dsurefire.failIfNoSpecifiedTests=false: see the argLine note in
+					     convex-core/pom.xml. -->
 					<version>3.6.1</version>
 					<configuration>
 						<forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>

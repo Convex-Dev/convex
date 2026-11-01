@@ -21,7 +21,9 @@ replace `./mvnw` with `.\mvnw.cmd` and keep the remaining arguments unchanged.
 ./mvnw -B -T1C test
 ```
 
-Reserve `./mvnw -B clean install` for final verification and releases. Ordinary
+Use `./mvnw -B clean verify` for final verification. `install` also copies the
+artifacts into `~/.m2`, where other local projects resolve them, so keep it for
+releases and for a sibling project that needs the fresh snapshot. Ordinary
 builds do not generate source/Javadoc jars or load Maven Central publishing;
 `-Prelease` enables those release-only artifacts and services.
 
@@ -138,10 +140,10 @@ git add pom.xml '**/pom.xml' && git commit -m "Prepare for Release 0.8.4"
 
 As part of the same version-bump commit, also update:
 
-- **`project.build.outputTimestamp`** in the parent `pom.xml` — set to the current UTC
-  time (e.g. `2026-04-18T16:08:52Z`). This is frozen for reproducible builds and must
-  be refreshed each release, otherwise the new artifacts carry the previous release's
-  timestamp.
+- **`project.build.outputTimestamp`** in the parent `pom.xml` — `versions:set`
+  refreshes it to the current UTC time (e.g. `2026-04-18T16:08:52Z`); check that the
+  diff shows the new value. It is frozen for reproducible builds, so a stale value
+  would give the new artifacts the previous release's timestamp.
 - **Module README install snippets** — the Maven/Gradle `<version>` examples in the
   module `README.md` files should reference the new release version:
 
@@ -182,6 +184,12 @@ git push origin 0.8.4
 
 This triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
 
+A ruleset restricts release tags to accounts that can bypass it. When the push
+bypasses the rule, git still prints a rule message (`Bypassed rule violations`, or
+`Cannot create ref due to creations being restricted`) followed by `* [new tag]`:
+the tag landed. `GH013` with `! [remote rejected]` means it did not. Confirm with
+`git ls-remote --tags origin 0.8.4`.
+
 ### 7. Confirm GitHub Release is live
 
 **Wait for the release workflow to complete successfully** before proceeding. Check at:
@@ -191,7 +199,7 @@ https://github.com/Convex-Dev/convex/releases
 Verify:
 - Release status is not draft/pre-release
 - `convex.jar` is attached as an asset, along with its SHA-256 checksum (`convex.jar.sha256`) and the SBOM (`convex-<version>-sbom.json`)
-- Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex`
+- Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex` (it may print nothing on success: exit code 0 means verified, or add `--format json`)
 - Changelog content is correct (not the fallback "See CHANGELOG.md for details" — if that shows, the changelog section header didn't match the tag and the workflow should have failed; investigate).
 - Docker images pushed: `convexlive/convex:<version>` and a freshly-updated `latest` at https://hub.docker.com/r/convexlive/convex/tags
 
