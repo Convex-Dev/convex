@@ -30,8 +30,8 @@ Lattice.ROOT (KeyedLattice)
 ├── :kv    → OwnerLattice(MapLattice(KVStoreLattice))       Key-value databases
 ├── :queue → OwnerLattice(MapLattice(TopicLattice))         Message queues
 ├── :p2p   → P2PLattice (KeyedLattice)                      Peer discovery metadata
-│   └── :nodes → OwnerLattice(LWWLattice)                     Signed NodeInfo per peer
-└── :local → LocalLattice                                   Signed per-peer configuration
+│   └── :nodes → OwnerLattice(LWWLattice)                     Signed NodeInfo per node
+└── :local → LocalLattice                                   Node-local data, not replicated
 ```
 
 Source of truth: `convex.lattice.Lattice.ROOT`.
@@ -44,8 +44,8 @@ Source of truth: `convex.lattice.Lattice.ROOT`.
 | `:fs` | `OwnerLattice(MapLattice(DLFSLattice))` | `[:fs <ownerKey> :value <driveName>]` | Per-owner signed namespaces of named drives with DLFS merge ([CAD028](https://docs.convex.world/docs/cad/dlfs)). |
 | `:kv` | `OwnerLattice(MapLattice(KVStoreLattice))` | `[:kv <ownerKey> :value <storeName>]` | Per-owner key-value stores with entry-level merge ([CAD037](https://docs.convex.world/docs/cad/kv_database)). |
 | `:queue` | `OwnerLattice(MapLattice(TopicLattice))` | `[:queue <ownerKey> :value <topicName>]` | Per-owner message topics with partitions and metadata ([CAD040](https://docs.convex.world/docs/cad/lattice_queue)). |
-| `:p2p :nodes` | `OwnerLattice(LWWLattice)` | `[:p2p :nodes <accountKey>]` | Each node publishes `SignedData<NodeInfo>`: transport URIs, relay willingness, served regions, protocol version, timestamp. Latest timestamp wins. |
-| `:local` | `LocalLattice` | `[:local <peerKey>]` | Signed per-peer configuration. A serving projection must exclude any state intended to remain private. |
+| `:p2p :nodes` | `OwnerLattice(LWWLattice)` | `[:p2p :nodes <accountKey>]` | Each node publishes `SignedData<NodeInfo>`: transport URIs, Points of Presence, relay willingness, served regions, software version, timestamp. Latest timestamp wins. Each node keeps only the records it wants; the record format belongs to `convex-p2p`. |
+| `:local` | `LocalLattice` | `[:local <peerKey>]` | A node's local data, such as configuration and what it has seen of other nodes, signed under its own key. Not normally replicated: a node's serving projection and its incoming merges must leave it out. |
 
 The `:value` paths in the table describe local unsigned views only. Deliver the
 complete owner's envelope when replicating these regions.

@@ -29,18 +29,19 @@ P2PLattice.ROOT (KeyedLattice)
 ```
 
 **`:p2p`** — the shared node registry. Each node publishes a signed, LWW `NodeInfo`
-(transports, PoPs, relay willingness, regions, version, timestamp) under its node
-`AccountKey` at `[:p2p :nodes <nodeKey>]`. Reuses core's region instance directly, so registry merge
-semantics cannot drift between this root and `Lattice.ROOT`, and
-`NodeDirectory` publishes and validates this application-owned path while the
-generic propagation layer transports it without interpreting its schema.
+(transports, PoPs, relay willingness, served regions, software version, timestamp)
+under its node `AccountKey` at `[:p2p :nodes <nodeKey>]`. The record format belongs to
+this module: `NodeDirectory` publishes and validates this application-owned path while
+the generic propagation layer transports it without interpreting its schema. Each
+node is meant to keep only the records it wants, merged through the P2P application
+([retention](../convex-peer/docs/P2P_DESIGN.md#retention-proposed) is not built yet).
 
 **`:id`** — P2P user identity, separate from transport details, so one identity can
 advertise several nodes and change its claims without republishing node records.
 
-**`:kad`** — reserved for Kademlia routing. The path is claimed and stable, but the
-merge semantics are still open (`P2P_DESIGN.md` §4.3 and decision 13.2 lean towards
-k-buckets being node-local rather than propagated), so it is backed by core's
+**`:kad`** — reserved for Kademlia routing. Each node will keep its own signed routing
+view under its node key, shareable with others (`P2P_DESIGN.md` §4.3). The view's
+format and merge are still open, so the region is backed by core's
 `convex.lattice.generic.ReservedLattice`, which discards anything sent there. Discarding
 rather than throwing matters: an unimplemented lattice that throws would abort the whole
 enclosing merge, costing a peer its valid sibling regions and counting against

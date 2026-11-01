@@ -69,8 +69,8 @@ public class P2PDiscoveryTest {
 		// an unverified public connection. Discovery runs before the reply.
 		AHashMap<ACell,SignedData<ACell>> records=Maps.empty();
 		for (int i=0; i<2*CANDIDATES; i++) {
-			records=records.merge(convex.lattice.p2p.P2PLattice.createSignedEntry(AKeyPair.generate(),
-				convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.of(Strings.create("tcp://localhost:1")),
+			records=records.merge(P2PLattice.createSignedEntry(AKeyPair.generate(),
+				P2PLattice.createNodeInfo(Vectors.of(Strings.create("tcp://localhost:1")),
 					Strings.create("test"),Strings.create("test"),null,1L)));
 		}
 		Message update=Message.create(MessageType.LATTICE_VALUE,Vectors.create(

@@ -69,10 +69,10 @@ public class P2PNodeTest {
 		AKeyPair keyPair=AKeyPair.generate();
 		AKeyPair remote=AKeyPair.generate();
 		node=P2PNode.create(store,NodeConfig.create(),keyPair);
-		AHashMap<Keyword,ACell> info=convex.lattice.p2p.P2PLattice.createNodeInfo(
+		AHashMap<Keyword,ACell> info=P2PLattice.createNodeInfo(
 			Vectors.empty(),Strings.create("test"),Strings.create("0"),Vectors.empty(),false,
 			System.currentTimeMillis());
-		node.getNodeServer().mergeAt(convex.lattice.p2p.P2PLattice.createSignedEntry(remote,info),
+		node.getNodeServer().mergeAt(P2PLattice.createSignedEntry(remote,info),
 			P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		assertEquals(info,node.getApplication().node(remote.getAccountKey()).getNodeInfo());
 		assertEquals(info,nodeInfo(remote.getAccountKey()));
@@ -223,6 +223,6 @@ public class P2PNodeTest {
 	private AHashMap<Keyword,ACell> nodeInfo(AccountKey key) {
 		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap<ACell,SignedData<ACell>>)
 			(ACell)node.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		return convex.lattice.p2p.P2PLattice.getNodeInfo(nodes,key);
+		return P2PLattice.getNodeInfo(nodes,key);
 	}
 }

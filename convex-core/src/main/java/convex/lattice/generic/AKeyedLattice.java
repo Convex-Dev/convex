@@ -1,6 +1,8 @@
 package convex.lattice.generic;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -123,6 +125,15 @@ public abstract class AKeyedLattice<K extends ACell, M extends AMap<K, ACell>> e
 	@Override
 	public M zero() {
 		return emptyMap();
+	}
+
+	/**
+	 * Returns the registered keys, in registration order.
+	 *
+	 * @return Unmodifiable list of keys
+	 */
+	public List<K> getKeys() {
+		return Collections.unmodifiableList(keys);
 	}
 
 	@Override

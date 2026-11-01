@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publish a DLFS file atomically with `install(path, blob, condition)`, or write it through `newWriter(path, condition)` and an explicit `commit()`: readers see the old file or the new one, and a failed condition or source changes nothing. `writeAllBytes` is now a single atomic install. ([Publishing Files](convex-dlfs/docs/DLFS_DESIGN.md#publishing-files), [#790](https://github.com/Convex-Dev/convex/issues/790))
 - Serve stored content from any Javalin endpoint with `ContentResponse.send`: it streams from a file or blob channel with an ETag, `If-None-Match` and single byte ranges, as DLFS WebDAV does. ([#790](https://github.com/Convex-Dev/convex/issues/790))
 - Upload large files to DLFS over WebDAV: PUT streams the body in bounded memory and publishes it in one atomic update, with `If-Match` and `If-None-Match` checked in that update, so a failed, oversized or conflicting upload leaves the file as it was. ([#790](https://github.com/Convex-Dev/convex/issues/790))
+- P2P node records name the lattice regions each node serves, in `:regions`. ([P2P design](convex-peer/docs/P2P_DESIGN.md))
 
 ### Changed
 
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Send a lattice node's final state to its peers when it shuts down: services stop ingress with `stopIngress()`, then close the host before the node. ([Shutdown](convex-peer/docs/SHUTDOWN.md), [#778](https://github.com/Convex-Dev/convex/issues/778))
 - Upgrade inbound lattice connections only through `LatticePropagator.authenticateInboundRoute`; `LatticeConnectionManager.upgradeInboundConnection` is no longer public.
 - Verify an HS256 JWT with `JWT.verifySymmetric`, which returns its claims as `verifyPublic` does, checks `alg` and compares signatures in constant time; it replaces the static `JWT.verifyHS256(jwt, secret)`. ([Verifying](convex-core/docs/JWT.md#verifying))
+- Build and read P2P node records with `convex.p2p.P2PLattice`, alongside the P2P application that validates them; `convex.lattice.p2p.P2PLattice` keeps only the `:p2p` region's merge rule.
 
 ### Fixed
 

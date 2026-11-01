@@ -13,11 +13,13 @@ import org.slf4j.LoggerFactory;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -77,7 +79,7 @@ final class NodeDirectory {
 	/** Sets the bounded PoP declarations used by the next NodeInfo publication. */
 	void setPointsOfPresence(AVector<AccountKey> pops) {
 		AVector<AccountKey> value=(pops==null) ? Vectors.empty() : pops;
-		if (value.count()>convex.lattice.p2p.P2PLattice.MAX_POINTS_OF_PRESENCE) {
+		if (value.count()>P2PLattice.MAX_POINTS_OF_PRESENCE) {
 			throw new IllegalArgumentException("Too many Points of Presence: "+value.count());
 		}
 		AccountKey ownKey=ownKey();
@@ -118,13 +120,14 @@ final class NodeDirectory {
 		String currentVersion=Utils.getVersion();
 		AString version=Strings.create(currentVersion==null ? "unknown" : currentVersion);
 		long timestamp=application.clock().get().longValue();
-		AHashMap<Keyword,ACell> info=convex.lattice.p2p.P2PLattice.createNodeInfo(
-			transports,type,version,null,pointsOfPresence,relay,timestamp);
+		ASet<Keyword> regions=application.servedRegions();
+		AHashMap<Keyword,ACell> info=P2PLattice.createNodeInfo(
+			transports,type,version,regions,pointsOfPresence,relay,timestamp);
 
 		application.node(ownKey).setNodeInfo(info);
 		application.syncHost();
-		log.debug("Published NodeInfo: transports={}, pops={}, relay={}, type={}, version={}",
-			transports,pointsOfPresence,relay,type,version);
+		log.debug("Published NodeInfo: transports={}, regions={}, pops={}, relay={}, type={}, version={}",
+			transports,regions,pointsOfPresence,relay,type,version);
 	}
 
 	/** The signed registry entry this node has published, as a one-entry owner map, or null. */
@@ -231,9 +234,19 @@ final class NodeDirectory {
 		AString version=RT.ensureString(rawVersion);
 		if ((rawType!=null && type==null) || (rawVersion!=null && version==null)) return null;
 
+		ACell rawRegions=info.get(Keywords.REGIONS);
+		ASet<Keyword> regions=Sets.empty();
+		if (rawRegions!=null) {
+			if (!(rawRegions instanceof ASet<?> regionSet)) return null;
+			for (ACell region:regionSet) {
+				if (!(region instanceof Keyword)) return null;
+			}
+			regions=(ASet<Keyword>)regionSet;
+		}
+
 		AVector<?> rawPops=RT.ensureVector(info.get(Keywords.POPS));
 		if (rawPops==null) rawPops=Vectors.empty();
-		if (rawPops.count()>convex.lattice.p2p.P2PLattice.MAX_POINTS_OF_PRESENCE) return null;
+		if (rawPops.count()>P2PLattice.MAX_POINTS_OF_PRESENCE) return null;
 		HashSet<AccountKey> unique=new HashSet<>();
 		AVector<AccountKey> pops=Vectors.empty();
 		for (long i=0; i<rawPops.count(); i++) {
@@ -247,7 +260,7 @@ final class NodeDirectory {
 		boolean relay=(rawRelay instanceof CVMBool flag) && flag.booleanValue();
 		CVMLong timestamp=RT.ensureLong(info.get(Keywords.TIMESTAMP));
 		if (timestamp==null) return null;
-		return new NodeRecord(peerKey,transports,type,version,pops,relay,timestamp.longValue());
+		return new NodeRecord(peerKey,transports,type,version,regions,pops,relay,timestamp.longValue());
 	}
 
 	/**
@@ -255,5 +268,6 @@ final class NodeDirectory {
 	 * routing. Possession of a record does not authenticate a live connection.
 	 */
 	record NodeRecord(AccountKey peerKey,AVector<AString> transports,AString type,
-		AString version,AVector<AccountKey> pointsOfPresence,boolean relay,long timestamp) {}
+		AString version,ASet<Keyword> regions,AVector<AccountKey> pointsOfPresence,
+		boolean relay,long timestamp) {}
 }

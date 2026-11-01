@@ -173,14 +173,17 @@ The `:convex` keyword at the root level is a namespace for Convex-native protoco
 
 ### 4.1 Lattice Paths
 
-P2P state lives under the `:p2p` region with two sub-regions:
+P2P discovery and routing use three paths, each keyed by node key:
 
 ```
-[:p2p :nodes]  → OwnerLattice<NodeInfo>   Known peers and their metadata
-[:p2p :kad]    → KadLattice               Kademlia routing table
+[:p2p :nodes <node key>]  → SignedData<NodeInfo>        Node records this node keeps
+[:kad <node key>]         → SignedData<routing view>    Each node's own Kademlia view   [FUTURE]
+[:local <node key> :p2p]  → local evidence              What this node has seen of others  [PROPOSED]
 ```
 
-Both follow standard lattice merge semantics with SignedData verification.
+Node records and routing views are shared. Each entry is signed by its node key and
+merges by the standard owner rule, and each node holds only the entries it wants
+(§4.2). `:local` holds a node's local data and is not normally replicated (§4.6).
 
 ### 4.2 Node Registry: `[:p2p :nodes]`
 
@@ -198,15 +201,14 @@ This uses `OwnerLattice` — the same pattern as `:kv` and `:fs`. The AccountKey
 
 ```clojure
 ;; NodeInfo (wrapped in SignedData)
-{:transports  ["tcp://peer.convex.world:18888"
-                "wss://peer.convex.world/ws"
-                "https://peer.convex.world"]
- :timestamp   1708000000000       ;; monotonic, milliseconds
- :pops        [0xdef456...]        ;; node keys providing a return path
- :relay       true                ;; willing to relay bounded signed messages
- :regions     #{:convex :p2p :data :fs :kv}  ;; lattice regions this peer serves
- :version     "0.8.3"             ;; protocol version
- :metadata    {...}}              ;; optional additional metadata
+{:timestamp   1708000000000            ;; owner's clock, milliseconds
+ :transports  ["tcp://peer.convex.world:18888"
+               "wss://peer.convex.world/ws"]
+ :pops        [0xdef456...]             ;; node keys providing a return path
+ :relay       true                     ;; willing to relay bounded signed messages
+ :regions     #{:p2p :id :kad :social}  ;; top-level lattice regions this node serves
+ :type        "Convex Lattice Node"
+ :version     "0.8.18"}                ;; software version
 ```
 
 `:transports` may be an empty vector. That is an explicit, signed statement that
@@ -214,7 +216,11 @@ the node is identifiable but not directly dialable, as for an outbound-only node
 behind NAT. Private or guessed addresses must not be advertised as public transports.
 `:pops` contains at most 16 unique remote node keys and `:relay` defaults to false
 when absent. These fields advertise routing intent; they do not authenticate or open
-a connection.
+a connection. `:regions` names the top-level regions the node serves, so other nodes
+can choose peers that serve what they need (§4.5). It never includes `:local`.
+
+The record format and its validation belong to the P2P application in
+`convex-p2p`, which merges the registry through its own component.
 
 #### Merge Function
 
@@ -225,6 +231,38 @@ Standard `OwnerLattice` merge with additional NodeInfo-specific rules:
 - **Admission** — any correctly self-signed record is accepted. Optional stronger
   proofs, and local policies that use them, are proposed in
   [#713](https://github.com/Convex-Dev/convex/issues/713).
+- **Retention** — each node keeps only the records it wants (below).
+
+The owner's `:timestamp` orders only that owner's own records. A node whose clock
+falls behind its last published record cannot replace that record until its clock
+passes it. The timestamp is never evidence that the node is alive (§4.6).
+
+#### Retention [PROPOSED]
+
+Each node holds only the node records it wants, as it already does for social
+owners. The P2P application's merge reduces an incoming `[:p2p :nodes]` value to the
+records it wants before the lattice merge, and the node publishes only what it holds.
+There is no global directory: each node passes on the records it keeps, so discovery
+spreads as gossip of samples, and the registry's cost to a node stays bounded however
+many keys exist.
+
+A node always keeps:
+
+- its own record;
+- records of nodes the operator named;
+- records of nodes it has an authenticated route to, including NAT leaves that
+  connected in;
+- records of its own Points of Presence.
+
+Beyond those it keeps a bounded number of other records (`maxDesiredPeers`, 256 by
+default), each within a size limit. When that set is full, a new record may replace
+only one whose node has never been reached or has failed, chosen at random, never one
+whose node has answered. That evidence comes from `:local` (§4.6), never from the
+record itself. A dropped record leaves local state; if it arrives again, the merge
+reduces it away again until it qualifies.
+
+A node can route a point message only through records it keeps. Finding an
+arbitrary node by key is Kademlia's job (§4.3).
 
 #### Node identity and Convex peers
 
@@ -256,11 +294,18 @@ peer.
 
 ### 4.3 Kademlia Routing [FUTURE]
 
-Kademlia provides O(log N) lookup of any peer by AccountKey, using XOR distance. The `Kademlia` utility class already provides `proximity()` and `distance()` functions. `KadLattice` exists as a stub.
+Kademlia provides O(log N) lookup of any node by key, using XOR distance. The `Kademlia` utility class already provides `proximity()` and `distance()` functions. `KadLattice` exists as a stub.
 
-This is planned for **future implementation** when the network scales beyond what the node registry can efficiently serve. For current network sizes (up to hundreds of peers), strategies 1-3 in §4.4 are sufficient.
+Routing state is owner-keyed. `[:kad <node key>]` holds one node's signed routing
+view, its k-buckets. Each node maintains only its own view, because the view depends
+on its own key position, but views are shareable: another node can read a view to
+find nodes closer to the key it is looking for. A node keeps the views it wants, as
+it does node records. The region stays reserved (`ReservedLattice`) until the view's
+format and merge are designed.
 
-When implemented, Kademlia routing state would be **node-local** (not propagated) since each node's k-bucket view is inherently specific to its own key position. It would live under `:local` or as a non-propagated local data structure.
+This is planned for when the network outgrows what retained node records can serve.
+For current network sizes (up to hundreds of nodes), strategies 1-3 in §4.4 are
+sufficient.
 
 ### 4.4 Peer Discovery Strategies
 
@@ -277,18 +322,41 @@ A node uses multiple strategies to discover and maintain connections, in order:
    use them as bootstrap seeds; they confer no P2P identity.
 
 3. **P2P node registry** (`[:p2p :nodes]`) — Each node's own signed transport
-   metadata, propagated via gossip. This is where discovery happens once a node
-   has bootstrapped.
+   metadata, passed on by every node that keeps it (§4.2). This is where discovery
+   happens once a node has bootstrapped.
 
 4. **Kademlia lookup** [FUTURE] — For discovering specific peers by AccountKey when direct routing is needed. O(log N) hops. Not needed at current network scale; planned for future growth.
 
 ### 4.5 Selective Attention
 
-Nodes only propagate lattice regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. The P2P node registry advertises which regions each peer serves, enabling efficient gossip targeting.
+Nodes only propagate lattice regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. Each node record's `:regions` names the top-level regions that node serves, so a node can prefer peers that serve what it needs. Region-aware peer selection is [PROPOSED].
 
 This is natural in the `NodeServer` model: the application attaches propagators
 with the appropriate filtered views, while a node only merges values governed by
 its configured lattice.
+
+### 4.6 Local Evidence [PROPOSED]
+
+What a node has seen of other nodes is its own business. It lives at
+`[:local <own node key> :p2p]`: `:local` holds a node's local data, which is not
+normally replicated, so publication and incoming merges both leave it out. It holds:
+
+- a contact record per node key: last authenticated contact, consecutive failures
+  and the last failure;
+- failures per address, since many keys can name one address;
+- remembered peers, for bootstrap after a restart
+  ([#716](https://github.com/Convex-Dev/convex/issues/716));
+- operator and policy blocklists of keys and addresses
+  ([#814](https://github.com/Convex-Dev/convex/issues/814)).
+
+Only an authenticated connection counts as contact: a verified outbound admission, an
+inbound route upgrade, or traffic on an authenticated route. Nothing the owner writes
+in its record, such as `:timestamp`, ever does.
+
+`LatticeConnectionManager` sees every dial, challenge and silence, so it keeps the live
+records and reports changes. It knows no lattice paths. The P2P application stores the
+records in `:local` and gives them back to the manager at start. Retention (§4.2),
+candidate selection and retry all rank by this evidence.
 
 ## 5. Transport Layer [PROPOSED]
 
@@ -678,7 +746,7 @@ These rules are enforced locally. Invalid entries are silently discarded and can
 1. **Identity**: The node uses its own node key. A node that is also a Convex peer may use its registered peer key; registration is optional
 2. **Bootstrap**: Connects to configured peers, remembered peers ([#716](https://github.com/Convex-Dev/convex/issues/716)) or, optionally, on-chain peer hosts
 3. **Advertisement**: Publishes `SignedData<NodeInfo>` to `[:p2p :nodes]`
-4. **Discovery**: Discovered by other nodes via P2P gossip (and optionally Kademlia)
+4. **Discovery**: Discovered by other nodes via P2P gossip (and optionally Kademlia); each keeps the record if it wants it
 5. **Connection**: Nodes establish connections using advertised transport URIs
 6. **Participation**: The node joins lattice regions (consensus, data, etc.) via selective attention
 7. **Departure**: Other nodes stop selecting it once it is unreachable ([#716](https://github.com/Convex-Dev/convex/issues/716), [#814](https://github.com/Convex-Dev/convex/issues/814)); a Convex peer withdraws its stake on-chain separately
@@ -706,7 +774,7 @@ Lattice.ROOT (KeyedLattice)
 
 ### 13.2 KadLattice — Future Work (DECIDED)
 
-Kademlia routing is deferred until network scale demands it. Discovery through configured peers and the P2P node registry is sufficient for hundreds of nodes. When implemented, Kademlia state will be node-local (not propagated) since each node's k-bucket view is specific to its own key position.
+Kademlia routing is deferred until network scale demands it. Discovery through configured peers and the P2P node registry is sufficient for hundreds of nodes. When implemented, Kademlia state will be owner-keyed at `[:kad <node key>]`: each node maintains its own view, since it depends on its key position, and views are shareable (§4.3).
 
 ### 13.3 Server Architecture — Netty + Javalin (DECIDED)
 
@@ -740,6 +808,12 @@ This needs to be resolved before Phase 2 of the consensus migration.
 - Peers advertise transport URIs; `ConnectionManager` uses them for connection selection
 - Existing BELIEF messages and `BeliefPropagator` unchanged
 
+### Phase 1b — Retention and Local Evidence
+- Node records advertise served regions (`:regions`, §4.2)
+- Contact records kept by the connection manager and stored in `:local` (§4.6)
+- Each node keeps only the records it wants, ranked by that evidence (§4.2)
+- Remembered peers and blocklists from the same records (#716, #814)
+
 ### Phase 2 — Consensus as Lattice Region
 - Implement `BeliefLattice` wrapping `BeliefMerge` with CPoS semantics
 - Register `[:convex <genesis-hash> :peers]` in `Lattice.ROOT`
@@ -758,7 +832,7 @@ This needs to be resolved before Phase 2 of the consensus migration.
 
 ### Future — Kademlia
 - Implement `KadLattice` for O(log N) routing when network scale demands it
-- Node-local only (not propagated)
+- Owner-keyed: each node publishes its own routing view at `[:kad <node key>]`
 
 ## 15. Summary
 
@@ -766,7 +840,7 @@ The Convex peer network is built on lattice technology — the same algebraic fo
 
 The design extends this with:
 
-1. **P2P node discovery** at `[:p2p :nodes]` — `OwnerLattice`-based metadata signed by each node key, propagated via `NodeServer` gossip
+1. **P2P node discovery** at `[:p2p :nodes]` — `OwnerLattice`-based metadata signed by each node key, propagated via `NodeServer` gossip, with each node keeping the records it wants
 2. **Consensus beliefs as a lattice region** at `[:convex <genesis-hash> :peers]` — gradual migration from dedicated BELIEF messages to standard LATTICE_VALUE protocol
 3. **NodeServer as the unified P2P core** — all lattice propagation (including consensus) through one mechanism, with `BeliefPropagator` as a timing-specific wrapper
 4. **Multi-transport support** — Netty for binary (TCP + WSS), Javalin for HTTP (REST + MCP), with transport advertisement and failover

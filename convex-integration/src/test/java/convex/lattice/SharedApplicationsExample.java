@@ -51,8 +51,8 @@ public final class SharedApplicationsExample {
 
 	/** A node record for the P2P region. */
 	static AHashMap<Keyword,ACell> nodeInfo(String name,long time) {
-		return convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.empty(),
-			Strings.create(name),Strings.create("example"),Vectors.empty(),time);
+		return P2PLattice.createNodeInfo(Vectors.empty(),
+			Strings.create(name),Strings.create("example"),null,time);
 	}
 
 	/** Social feeds, staged at {@code :social}. The P2P regions are shared live. */

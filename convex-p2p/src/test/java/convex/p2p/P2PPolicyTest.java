@@ -10,13 +10,21 @@ import org.junit.jupiter.api.Test;
 
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.ASet;
 import convex.core.data.AString;
+import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
+import convex.lattice.LocalLattice;
+import convex.lattice.generic.KeyedLattice;
 import convex.social.Social;
 
 /** Policy tests need neither sockets nor temporary stores. */
@@ -50,6 +58,42 @@ public class P2PPolicyTest {
 		var before=app.cursor().get();
 		app.mergeAt(Maps.of(ALICE.getAccountKey(),incoming.get(BOB.getAccountKey())),P2PLattice.KEY_ID);
 		assertSame(before,app.cursor().get());
+	}
+
+	/** A node record names the top-level regions its application serves. */
+	@Test void publishedRecordAdvertisesServedRegions() {
+		for (var root:new KeyedLattice[] {P2PLattice.ROOT,P2PLattice.NODE_ROOT,
+				P2PLattice.ROOT.addLattice(LocalLattice.KEY_LOCAL,LocalLattice.LATTICE)}) {
+			var host=LatticeHost.create();
+			var app=host.addApplication(P2PApplication.connect(root,host,ALICE.getAccountKey(),
+				(owner,value) -> ALICE.signData(value),() -> CVMLong.create(123),DIDKeyAuthorizer.CONVEX));
+			app.directory().publishOwnRecord(null);
+			ASet<Keyword> expected=Sets.of(P2PLattice.KEY_P2P,P2PLattice.KEY_ID,P2PLattice.KEY_KAD);
+			if (root==P2PLattice.NODE_ROOT) expected=expected.conj(Social.KEY_SOCIAL);
+			assertEquals(expected,app.node(ALICE.getAccountKey()).getNodeInfo().get(Keywords.REGIONS));
+		}
+	}
+
+	/** {@code :regions} must be a set of keywords; any other shape invalidates the record. */
+	@Test void directoryAcceptsOnlyKeywordRegionSets() {
+		var host=LatticeHost.create();
+		var app=host.addApplication(P2PApplication.connect(P2PLattice.ROOT,host));
+		AHashMap<Keyword,ACell> base=P2PLattice.createNodeInfo(Vectors.empty(),
+			Strings.create("t"),Strings.create("v"),null,100);
+		ACell[] invalid= {Vectors.of(Keywords.P2P),Sets.of(Strings.create("p2p")),Strings.create("p2p")};
+		for (ACell regions:invalid) {
+			app.mergeAt(P2PLattice.createSignedEntry(AKeyPair.generate(),base.assoc(Keywords.REGIONS,regions)),
+				P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		}
+		assertTrue(app.directory().refresh().isEmpty());
+
+		ASet<Keyword> regions=Sets.of(Keywords.P2P,Social.KEY_SOCIAL);
+		app.mergeAt(P2PLattice.createSignedEntry(BOB,base.assoc(Keywords.REGIONS,regions)),
+			P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		var records=app.directory().refresh();
+		assertEquals(1,records.size());
+		assertEquals(BOB.getAccountKey(),records.get(0).peerKey());
+		assertEquals(regions,records.get(0).regions());
 	}
 
 	@Test void registeredDIDsShareAnOwnerAwareSocialViewAndOneVerifier() {

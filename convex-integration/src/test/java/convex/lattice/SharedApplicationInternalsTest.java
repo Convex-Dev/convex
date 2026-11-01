@@ -185,8 +185,8 @@ public class SharedApplicationInternalsTest {
 		var drive=filesApp.files.createDrive("home");
 		Files.writeString(drive.fileSystem().getPath("/hello.txt"),"working file");
 		Files.writeString(drive.fileSystem().getPath("/another.txt"),"batched file");
-		var info=convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.empty(),
-			Strings.create("peer"),Strings.create("test"),Vectors.empty(),100);
+		var info=P2PLattice.createNodeInfo(Vectors.empty(),
+			Strings.create("peer"),Strings.create("test"),null,100);
 		socialApp.node.setNodeInfo(info);
 		filesApp.node.setNodeInfo(info);
 		assertEquals(HOST_ROOT.zero(),host.cursor().get());
@@ -328,8 +328,8 @@ public class SharedApplicationInternalsTest {
 			.setIdentity(Strings.create("social user"),Vectors.empty(),100);
 		f.files.p2p(FILES_KEY.getAccountKey()).identity()
 			.setIdentity(Strings.create("files user"),Vectors.empty(),100);
-		f.social.p2p(COMMON_KEY.getAccountKey()).node().setNodeInfo(convex.lattice.p2p.P2PLattice.createNodeInfo(
-			Vectors.empty(),Strings.create("shared node"),Strings.create("test"),Vectors.empty(),100));
+		f.social.p2p(COMMON_KEY.getAccountKey()).node().setNodeInfo(P2PLattice.createNodeInfo(
+			Vectors.empty(),Strings.create("shared node"),Strings.create("test"),null,100));
 		return new Data(post,drive);
 	}
 
@@ -351,8 +351,8 @@ public class SharedApplicationInternalsTest {
 				var user=app.social.user(SOCIAL_KEY.getAccountKey());
 				user.feed().post("Atomic post and follow");
 				user.follows().follow(FILES_KEY.getAccountKey());
-				app.p2p(COMMON_KEY.getAccountKey()).node().setNodeInfo(convex.lattice.p2p.P2PLattice.createNodeInfo(
-					Vectors.empty(),Strings.create("transactional node"),Strings.create("test"),Vectors.empty(),100));
+				app.p2p(COMMON_KEY.getAccountKey()).node().setNodeInfo(P2PLattice.createNodeInfo(
+					Vectors.empty(),Strings.create("transactional node"),Strings.create("test"),null,100));
 				assertSame(before,root.get());
 			});
 			var user=f.social.social.user(SOCIAL_KEY.getAccountKey());
@@ -415,8 +415,8 @@ public class SharedApplicationInternalsTest {
 					// Register a new peer in lattice state; opening a connection is a separate effect.
 					var peer=f.files.p2p(COMMON_KEY.getAccountKey()).node();
 					assertNull(observer.p2p(COMMON_KEY.getAccountKey()).node().getNodeInfo());
-					var info=convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.empty(),
-						Strings.create("new peer"),Strings.create("test"),Vectors.empty(),100);
+					var info=P2PLattice.createNodeInfo(Vectors.empty(),
+						Strings.create("new peer"),Strings.create("test"),null,100);
 					peer.setNodeInfo(info);
 					assertEquals(info,observer.p2p(COMMON_KEY.getAccountKey()).node().getNodeInfo());
 					assertSigned(f,COMMON_KEY.getAccountKey(),info,
