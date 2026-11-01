@@ -2507,7 +2507,7 @@ public class NodeServerTest {
 
 		inbound.setTrustedKey(peerKey);
 		CompletableFuture<AConnection> upgraded = cm.whenInboundConnectionUpgraded(peerKey);
-		assertSame(inbound, cm.upgradeInboundConnection(inbound));
+		assertSame(inbound, cm.upgradeInboundConnection(inbound).get(5, TimeUnit.SECONDS));
 		assertSame(inbound, upgraded.get(5, TimeUnit.SECONDS));
 		assertTrue(cm.hasUpgradedInboundConnection(peerKey));
 		assertFalse(cm.isConnected(peerKey),

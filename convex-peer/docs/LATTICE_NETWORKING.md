@@ -154,6 +154,12 @@ physical inbound socket
           authenticated outbound route
 ```
 
+A group holds one upgraded route per key. When another connection proves a key whose
+route is live, the group pings that route: if it answers within the five-second
+admission deadline it is kept and the new connection is closed; otherwise the new
+connection replaces it. A route that still works is not taken over, and a node that
+reconnects over a socket that has silently died regains its route within that deadline.
+
 Manager-owned outbound connections follow their own admission path:
 
 ```text

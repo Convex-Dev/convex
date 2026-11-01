@@ -498,6 +498,41 @@ public class LatticeConnectionManagerTest {
 		assertTrue(inbound.isClosed());
 	}
 
+	/** Another connection proving the same key leaves a route that answers, and replaces one that does not. */
+	@Test public void testLiveInboundRouteIsKeptAgainstAnotherProof() {
+		AccountKey key=AKeyPair.createSeeded(120).getAccountKey();
+		List<AConnection> retired=new ArrayList<>();
+		manager.setInboundProbe(connection -> new CompletableFuture<>(),retired::add);
+		manager.respond=false;
+		StubInbound first=new StubInbound();
+		first.setTrustedKey(key);
+		assertSame(first,manager.upgradeInboundConnection(first).join(),"nothing held, so no probe");
+		assertTrue(manager.probes.isEmpty());
+
+		StubInbound second=new StubInbound();
+		second.setTrustedKey(key);
+		CompletableFuture<AConnection> kept=manager.upgradeInboundConnection(second);
+		assertFalse(kept.isDone(),"the live route is probed first");
+		assertSame(first,manager.getUpgradedInboundConnection(key));
+		manager.probes.get(first).complete(null);
+		assertSame(first,kept.join());
+		assertSame(first,manager.getUpgradedInboundConnection(key));
+		assertEquals(List.of(second),retired);
+
+		StubInbound third=new StubInbound();
+		third.setTrustedKey(key);
+		CompletableFuture<AConnection> replaced=manager.upgradeInboundConnection(third);
+		manager.probes.get(first).completeExceptionally(new IllegalStateException("no answer"));
+		assertSame(third,replaced.join());
+		assertSame(third,manager.getUpgradedInboundConnection(key));
+		assertEquals(List.of(second,first),retired);
+
+		third.close();
+		StubInbound fourth=new StubInbound();
+		fourth.setTrustedKey(key);
+		assertSame(fourth,manager.upgradeInboundConnection(fourth).join(),"a closed route is not probed");
+	}
+
 	/** Contact means an authenticated route: verified admissions and upgraded inbound routes only. */
 	@Test public void testContactHandlerReportsOnlyAuthenticatedRoutes() {
 		List<AccountKey> contacted=new ArrayList<>();

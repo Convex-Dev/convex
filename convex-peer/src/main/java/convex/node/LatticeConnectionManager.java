@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -845,13 +846,21 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * discovered candidates can never block it. This method never authenticates or
 	 * assigns trust itself.</p>
 	 *
+	 * <p>A live route already held for the same key is probed first. If it answers
+	 * within {@link #ADMISSION_TIMEOUT_MS} it is kept and this connection is retired;
+	 * otherwise it is retired and this connection replaces it. A second proof of a
+	 * key cannot take over a route that still works, and a node reconnecting over a
+	 * dead socket regains its route within one probe.</p>
+	 *
 	 * @param connection authenticated inbound physical connection
-	 * @return the upgraded connection
+	 * @return future completing with the route held for the key once decided: this
+	 *   connection, or the live route kept in its place; it fails if the manager
+	 *   closes first
 	 * @throws IllegalArgumentException if {@code connection} is {@code null}
-	 * @throws IllegalStateException if the connection is closed
+	 * @throws IllegalStateException if the connection or the manager is closed
 	 * @throws SecurityException if the connection carries no authenticated key
 	 */
-	AConnection upgradeInboundConnection(AConnection connection) {
+	CompletableFuture<AConnection> upgradeInboundConnection(AConnection connection) {
 		if (connection == null) throw new IllegalArgumentException("Connection must not be null");
 		AccountKey peerKey = connection.getTrustedKey();
 		if (peerKey == null) {
@@ -862,15 +871,100 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		synchronized (connectionLock) {
 			if (!accepting) throw new IllegalStateException("Connection manager is closed");
-			upgradedInboundRoutes.put(peerKey, connection);
-			if (!connections.containsKey(peerKey)) health.put(peerKey,new HealthCheck(connection,clock.getAsLong()));
 		}
+		CompletableFuture<AConnection> decided=new CompletableFuture<>();
+		decideInboundRoute(peerKey,connection,decided);
+		return decided;
+	}
+
+	/** Installs {@code connection} as the key's route unless a live route answers a probe first. */
+	private void decideInboundRoute(AccountKey peerKey,AConnection connection,
+			CompletableFuture<AConnection> decided) {
+		boolean closed;
+		AConnection held;
+		synchronized (connectionLock) {
+			closed=!accepting;
+			held=closed ? null : getUpgradedInboundConnection(peerKey);
+			if (!closed && (held==null || held==connection)) installInboundRoute(peerKey,connection);
+		}
+		if (closed) {
+			decided.completeExceptionally(new IllegalStateException("Connection manager is closed"));
+		} else if (held==null || held==connection) {
+			inboundRouteInstalled(peerKey,connection,null,decided);
+		} else {
+			probeHeldRoute(peerKey,connection,held,decided);
+		}
+	}
+
+	/** Keeps {@code held} if it answers a probe in time, otherwise replaces it with {@code connection}. */
+	private void probeHeldRoute(AccountKey peerKey,AConnection connection,AConnection held,
+			CompletableFuture<AConnection> decided) {
+		CompletableFuture<?> probe;
+		try {
+			probe=probePeer(held);
+		} catch (RuntimeException e) {
+			probe=CompletableFuture.failedFuture(e);
+		}
+		probe.orTimeout(ADMISSION_TIMEOUT_MS,TimeUnit.MILLISECONDS).whenComplete((value,error) -> {
+			// Decided off the thread that completed the probe, which may be the inbound dispatcher
+			try {
+				workers.execute(() -> heldRouteProbed(peerKey,connection,held,error,decided));
+			} catch (RejectedExecutionException e) {
+				decided.completeExceptionally(new IllegalStateException("Connection manager is closed"));
+			}
+		});
+	}
+
+	private void heldRouteProbed(AccountKey peerKey,AConnection connection,AConnection held,
+			Throwable error,CompletableFuture<AConnection> decided) {
+		boolean closed;
+		boolean replace;
+		AConnection current;
+		synchronized (connectionLock) {
+			closed=!accepting;
+			current=closed ? null : getUpgradedInboundConnection(peerKey);
+			replace=!closed && current==held && error!=null && !connection.isClosed();
+			if (replace) installInboundRoute(peerKey,connection);
+		}
+		if (closed) {
+			decided.completeExceptionally(new IllegalStateException("Connection manager is closed"));
+		} else if (replace) {
+			inboundRouteInstalled(peerKey,connection,held,decided);
+		} else if (current!=held) {
+			// The route changed while it was probed: decide again against the new one
+			decideInboundRoute(peerKey,connection,decided);
+		} else if (error==null) {
+			log.debug("Kept the live inbound route for {} against another authenticated connection",peerKey);
+			retireInbound(connection);
+			decided.complete(held);
+		} else {
+			// This connection closed while the silent route was probed; health checks retire that
+			decided.complete(held);
+		}
+	}
+
+	/** Records {@code connection} as the key's upgraded route. Requires {@code connectionLock}. */
+	private void installInboundRoute(AccountKey peerKey,AConnection connection) {
+		upgradedInboundRoutes.put(peerKey, connection);
+		if (!connections.containsKey(peerKey)) health.put(peerKey,new HealthCheck(connection,clock.getAsLong()));
+	}
+
+	/** Completes an upgrade once {@code connection} is installed, retiring the route it replaced. */
+	private void inboundRouteInstalled(AccountKey peerKey,AConnection connection,AConnection replaced,
+			CompletableFuture<AConnection> decided) {
+		if (replaced!=null) retireInbound(replaced);
 		notifyContact(peerKey);
 		CompletableFuture<AConnection> waiter = upgradedRouteWaiters.remove(peerKey);
 		if (waiter != null) waiter.complete(connection);
 		maintenanceSignal.release();
 		log.debug("Upgraded authenticated inbound connection to outbound propagation route for {}", peerKey);
-		return connection;
+		decided.complete(connection);
+	}
+
+	/** Hands a listener-owned connection back to its owner to disconnect. */
+	private void retireInbound(AConnection connection) {
+		Consumer<AConnection> failure=inboundFailure;
+		if (failure!=null) failure.accept(connection);
 	}
 
 	/**
