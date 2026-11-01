@@ -86,7 +86,9 @@ import convex.social.Social;
  * then pulls and merges the bootstrap node's {@code :p2p} and {@code :id} regions and
  * each currently desired complete social-owner slot. This lets existing and
  * late-joining nodes discover each other without accepting unrelated social owners.
- * On-chain bootstrap and public PoP selection remain to be built on top.</p>
+ * {@link #seed(Map)} joins through configured seed nodes the same way and lets them go
+ * once other peers can replace them. On-chain bootstrap and public PoP selection
+ * remain to be built on top.</p>
  *
  * <p><b>Inbound policy.</b> The application-owned listener denies all network
  * lattice traffic until an operator assigns inbound connections to a propagator.

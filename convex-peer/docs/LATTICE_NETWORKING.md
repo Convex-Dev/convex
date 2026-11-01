@@ -304,7 +304,11 @@ and inbound route upgrades do not depend on it. The independent soft targets
 `ambientPeers` and `activePeers` default to 16 each. Maintenance retains healthy
 ambient incumbents, samples replacements, and prioritises the most recently used
 active peers for two minutes. Explicit `connectPeer`/`addPeer` intent survives
-discovery metadata updates and may exceed these targets until `removePeer`.
+discovery metadata updates and may exceed these targets until `removePeer`, or until
+`releasePeer` withdraws it: that closes the route this node opened, keeps any route
+the peer opened, and leaves the peer a candidate only if discovery lists it.
+`whenAmbientTargetMet` completes once routes to peers that are not explicit fill the
+ambient target, which is when an application can release peers it used as seeds.
 Pending socket opens and identity challenges reserve slots, with at most four
 automatic attempts outstanding. Each attempt runs independently of maintenance.
 

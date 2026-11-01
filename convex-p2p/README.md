@@ -9,8 +9,8 @@ Rollup package for Convex P2P nodes. Builds on the lattice data structures in
 and converge on shared state — and bundles the application regions those nodes
 serve, so one dependency gives you a complete node.
 
-> **Status: early implementation.** Authenticated one-peer bootstrap, signed
-> NodeInfo discovery, bounded desired-peer state, follow-filtered social replication,
+> **Status: early implementation.** Authenticated bootstrap from configured seed
+> nodes, signed NodeInfo discovery, bounded desired-peer state, follow-filtered social replication,
 > outbound-only NAT leaf nodes and opt-in public Point of Presence message relay work
 > over TCP. On-chain bootstrap, direct hole punching, region-aware connection selection
 > and additional transports remain to be built.
@@ -309,10 +309,41 @@ published components. Writes require an authorised signer for that owner
 (see [Owner binding](#owner-binding) above). A facade fork isolates identity edits;
 use `me.node().fork()` to stage the independent node-record component.
 
-Or run a node standalone:
+## Running a node
+
+A node joins a network through seed nodes. It connects to each seed as `connect`
+does, then releases them once its own ambient slots hold routes to other peers, so a
+seed carries a node only while it joins
+([seed nodes](../convex-peer/docs/P2P_DESIGN.md#node-identity-and-convex-peers)). A restarted
+node needs no seed: the records it retained become connection candidates at launch.
+
+Seeds are node configuration, listed under `seeds` (at most 16), and an embedding
+application joins with `node.seed(P2PNode.seeds(config))` after launch. The same JSON5
+file runs a public node from the command line; `store` and `keypair` (an Ed25519 seed
+in hex) are for the launcher and stay out of the node's configuration. A store needs a
+stable key, since the node keeps its own record and its contact records under it.
+
+```json5
+{
+  port: 18888,
+  url: "tcp://node.example.com:18888",
+  seeds: [
+    {key: "0x1234…", url: "tcp://seed.example.com:18888"},
+  ],
+  store: "~/.convex/p2p.etch",
+  keypair: "0xabcd…",
+}
+```
 
 ```bash
-java -cp convex.jar convex.p2p.P2PNode [etch-file]
+java -cp convex.jar convex.p2p.P2PNode p2p.json5
+```
+
+The Convex CLI runs the same service with its key from the keystore, and options
+that override the file:
+
+```bash
+convex p2p start --key 0xabcd --etch ~/.convex/p2p.etch --seed 0x1234…@tcp://seed.example.com:18888
 ```
 
 ## Live peer selection
@@ -320,7 +351,7 @@ java -cp convex.jar convex.p2p.P2PNode [etch-file]
 Discovered nodes with a supported transport to dial form a candidate pool
 (`maxDesiredPeers`, default 256), not a target number of concurrent connections.
 Outbound-only nodes, which advertise no transport, are not candidates. Nodes named with `connect` are not
-candidates and are always kept. Each propagation group normally keeps
+candidates and are always kept; seeds are kept the same way until they are released. Each propagation group normally keeps
 16 ambient peers plus up to 16 recently active communicators. Configure the soft
 targets with `LatticePropagatorConfig.AMBIENT_PEERS` (`ambientPeers`) and
 `ACTIVE_PEERS` (`activePeers`); either may be zero.

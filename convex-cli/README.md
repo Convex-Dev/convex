@@ -518,6 +518,10 @@ convex
   dlfs        Operate a DLFS (Data Lattice File System) server
     start     Start a DLFS WebDAV server with lattice replication
 
+  p2p         Operate a P2P lattice node
+    start     Start a node, joining the network through any seed nodes
+              (see convex-p2p/README.md, "Running a node")
+
   desktop     Launch GUI application
 
   help        Show help for commands

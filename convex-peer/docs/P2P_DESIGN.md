@@ -314,9 +314,18 @@ of the valid signed NodeInfo it delivered is that physically inbound connection 
 into an outbound propagation route. A node with empty `:transports` therefore supports
 bidirectional gossip without a reverse TCP connection.
 
+**Seed nodes**: A node joins a network through the seed nodes its configuration
+lists under `seeds`, at most 16 pairs of node key and TCP URL, with `P2PNode.seed`.
+Each seed is connected and initialised as with `connect`. Once the node's own ambient
+slots hold routes to other peers, which can replace the seeds, it releases every seed:
+the route it opened closes, and a seed whose record it holds stays an ordinary
+candidate. Seeds so carry a node only while it joins, not for good. A node that
+already holds enough routes releases them at once; in a network too small to fill
+the slots, they stay connected. A restarted node needs no seed (§4.6).
+
 **Proposed on-chain bootstrap path** (optional): A node may take seeds from the
 on-chain peer list, the keys and `:url` hosts in `PeerStatus`, alongside configured
-and remembered peers. Each connection is authenticated by the same challenge/response
+seeds and retained records. Each connection is authenticated by the same challenge/response
 for the listed key, and the node then pulls the P2P registry as from any bootstrap
 peer.
 
@@ -339,11 +348,10 @@ sufficient.
 
 A node uses multiple strategies to discover and maintain connections, in order:
 
-1. **Configured peers** — Explicitly supplied connection endpoints (bootstrap
-   nodes, operator preferences). `P2PNode.connect` and
-   `LatticeConnectionManager.connectPeer` implement the one-peer case; configuration
-   file integration remains future work. Connections are authenticated and maintained
-   persistently.
+1. **Configured peers** — Seed nodes from the node configuration, held only until
+   other peers can replace them (§4.2), and nodes the operator names with
+   `P2PNode.connect`, which are kept. Every connection is authenticated by
+   challenge/response.
 
 2. **On-chain peer registry** [PROPOSED, optional] — `PeerStatus` entries in
    consensus state name registered Convex peers' keys and `:url` hosts. A node may
@@ -407,13 +415,13 @@ its `:local` slot, signing the slot once, whenever it syncs the host to publish 
 own record, and when the service shuts down as [SHUTDOWN.md](SHUTDOWN.md) prescribes;
 a service that skips that sync loses what changed since. The host persists the slot
 with the rest of its root, so after a restart the records start from what the host
-retained. A node without a key keeps none.
+retained. A node without a key keeps none. The registry is retained the same way, and
+the records it holds become connection candidates at launch, so a restarted node
+rejoins without a seed.
 
 Proposed for the same record:
 
 - failures per address, since many keys can name one address;
-- remembered peers, for bootstrap after a restart
-  ([#716](https://github.com/Convex-Dev/convex/issues/716));
 - operator and policy blocklists of keys and addresses
   ([#814](https://github.com/Convex-Dev/convex/issues/814)).
 
@@ -542,8 +550,8 @@ Clients select the best available transport from the peer's advertised set:
 ### 6.3 On-Chain Bootstrap [PROPOSED, optional]
 
 On-chain `PeerStatus` lists registered Convex peers with their keys and a `:url`
-host. A node may use these as bootstrap seeds alongside configured and remembered
-peers. They are not a source of P2P identity or transports: the node authenticates
+host. A node may use these as bootstrap seeds alongside configured seeds and retained
+records. They are not a source of P2P identity or transports: the node authenticates
 each one by challenge/response for the listed key, and learns transports from the P2P
 registry once connected.
 
@@ -647,8 +655,8 @@ For lattice nodes, `LatticeConnectionManager` separately maintains identity-keye
 desired, pending and admitted connections. A configured node key keeps a socket in
 capability-free limbo until challenge/response succeeds. Desired peers are of two
 kinds. Explicit peers come from the operator through `connectPeer` and `addPeer` and
-are always kept. Discovered peers are only candidates for ambient slots: in the P2P
-application, `NodeDirectory` validates correctly owner-signed `[:p2p :nodes]` records
+are kept until removed or, as for seeds, released. Discovered peers are only
+candidates for ambient slots: in the P2P application, `NodeDirectory` validates correctly owner-signed `[:p2p :nodes]` records
 and translates their transport fields. Discovery never makes a node a wanted peer,
 and a node with no supported transport to dial, such as a NAT leaf, is not a
 candidate. The connection manager itself never reads that lattice path or parses NodeInfo. Callers
@@ -807,12 +815,12 @@ These rules are enforced locally. Invalid entries are silently discarded and can
 ## 11. Node Lifecycle
 
 1. **Identity**: The node uses its own node key. A node that is also a Convex peer may use its registered peer key; registration is optional
-2. **Bootstrap**: Connects to configured peers, remembered peers ([#716](https://github.com/Convex-Dev/convex/issues/716)) or, optionally, on-chain peer hosts
+2. **Bootstrap**: Connects to configured seeds or named peers, to the records it retained before a restart or, optionally, to on-chain peer hosts
 3. **Advertisement**: Publishes `SignedData<NodeInfo>` to `[:p2p :nodes]`
 4. **Discovery**: Discovered by other nodes via P2P gossip (and optionally Kademlia); each keeps the record if it wants it
 5. **Connection**: Nodes establish connections using advertised transport URIs
 6. **Participation**: The node joins lattice regions (consensus, data, etc.) via selective attention
-7. **Departure**: Other nodes stop selecting it once it is unreachable ([#716](https://github.com/Convex-Dev/convex/issues/716), [#814](https://github.com/Convex-Dev/convex/issues/814)); a Convex peer withdraws its stake on-chain separately
+7. **Departure**: A newer record with no transports takes it out of other nodes' candidates; an unreachable node keeps its record while attempts on it back off ([#814](https://github.com/Convex-Dev/convex/issues/814)); a Convex peer withdraws its stake on-chain separately
 
 ## 12. Lattice Path Summary
 
@@ -875,7 +883,8 @@ This needs to be resolved before Phase 2 of the consensus migration.
 - Node records advertise served regions (`:regions`, §4.2)
 - Contact records reported by the connection manager and kept in `:local` (§4.6)
 - Each node keeps only the records it wants, ranked by that evidence (§4.2)
-- Remembered peers and blocklists from the same records (#716, #814)
+- Seed nodes released once other peers replace them, and rejoining from retained records (§4.2)
+- Blocklists from the same records (#814)
 
 ### Phase 2 — Consensus as Lattice Region
 - Implement `BeliefLattice` wrapping `BeliefMerge` with CPoS semantics
