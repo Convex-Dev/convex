@@ -33,11 +33,10 @@ import convex.lattice.ALatticeApplication;
  * <ul>
  *   <li>always, and not counted: its own record and those of nodes the operator
  *       named, nodes it has an authenticated route to or is authenticating one from,
- *       and its Points of Presence;</li>
- *   <li>always: records it held of nodes that answered and have not failed since;</li>
- *   <li>with those, up to the bound: the best of the rest, nodes that answered first,
- *       then nodes never reached, then nodes that failed, each in an order salted
- *       with a secret drawn when this component is created.</li>
+ *       and its Points of Presence, all bounded by configuration and connections;</li>
+ *   <li>up to the bound: the best of the rest, nodes that answered and have not
+ *       failed since first, then nodes never reached, then nodes that failed, each in
+ *       an order salted with a secret drawn when this component is created.</li>
  * </ul>
  *
  * <p>Except its own, a record is kept only if it is a valid NodeInfo within
@@ -132,25 +131,19 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 			AHashMap<AccountKey,AHashMap<Keyword,ACell>> evidence) {
 		AHashMap<ACell,SignedData<ACell>> kept=Maps.empty();
 		List<Candidate> candidates=new ArrayList<>();
-		int room=maxRecords;
 		for (Map.Entry<ACell,SignedData<ACell>> entry:offered.entrySet()) {
 			AccountKey node=RT.ensureAccountKey(entry.getKey());
 			if (node==null) continue;
-			SignedData<ACell> current=held.get(node);
-			SignedData<ACell> record=wanted(node,entry.getValue())?entry.getValue():current;
+			SignedData<ACell> record=wanted(node,entry.getValue())?entry.getValue():held.get(node);
 			if (!wanted(node,record)) continue;
-			AHashMap<Keyword,ACell> contact=evidence.get(node);
 			if (pinned.contains(node)) {
 				kept=kept.assoc(node,record);
-			} else if (current!=null && ContactRecords.answered(contact)) {
-				kept=kept.assoc(node,record);
-				room--;
 			} else {
-				candidates.add(new Candidate(node,record,standing(contact),salt.append(node).getContentHash()));
+				candidates.add(new Candidate(node,record,standing(evidence.get(node)),salt.append(node).getContentHash()));
 			}
 		}
 		candidates.sort(null);
-		for (int i=0; i<Math.min(room,candidates.size()); i++) {
+		for (int i=0; i<Math.min(maxRecords,candidates.size()); i++) {
 			kept=kept.assoc(candidates.get(i).node(),candidates.get(i).record());
 		}
 		return kept;

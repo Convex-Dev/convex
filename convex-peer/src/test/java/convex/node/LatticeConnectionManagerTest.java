@@ -414,6 +414,30 @@ public class LatticeConnectionManagerTest {
 		assertEquals(List.of(verified,inbound),contacted);
 	}
 
+	/** A healthy route is reported again once per quiet interval, whether heard from or probed. */
+	@Test public void testContactHandlerReportsAHealthyRouteAgain() {
+		List<AccountKey> contacted=new ArrayList<>();
+		manager.setContactHandlers(contacted::add,null);
+		AccountKey key=candidate(1);
+		fill(1);
+		Object route=manager.getConnections().get(key);
+		assertEquals(List.of(key),contacted);
+
+		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS-1);
+		manager.received(key,route);
+		now.incrementAndGet();
+		manager.maintainConnections();
+		manager.maintainConnections();
+		assertEquals(List.of(key,key),contacted,"heard from: reported once, without a probe");
+		assertTrue(manager.probes.isEmpty());
+
+		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		manager.maintainConnections();
+		assertNotNull(manager.probes.get(route));
+		manager.maintainConnections();
+		assertEquals(List.of(key,key,key),contacted,"answered a probe");
+	}
+
 	/** A failed dial and a failed identity challenge are each reported for their peer. */
 	@Test public void testFailureHandlerReportsFailedDialsAndChallenges() {
 		List<AccountKey> failed=new ArrayList<>();

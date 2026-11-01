@@ -255,11 +255,11 @@ A node always keeps, without counting them:
   connected in, and of a node whose inbound route it is authenticating;
 - records of its own Points of Presence.
 
-It also always keeps the records it holds of nodes that answered and have not failed
-since. With those it keeps up to `maxDesiredPeers` records (256 by default), choosing
-the rest in order: nodes that answered, then nodes never reached, then nodes that
-failed. Within each group the order is a hash of the node key salted with a secret
-the node draws when it starts. Other nodes cannot predict the order, so none can
+These are bounded by configuration and by the node's connection limit. Beyond them
+it keeps up to `maxDesiredPeers` records (256 by default), in order: nodes that
+answered and have not failed since, then nodes never reached, then nodes that failed.
+Nothing an incoming value or connection can create escapes a bound. Within each group
+the order is a hash of the node key salted with a secret the node draws when it starts. Other nodes cannot predict the order, so none can
 choose which records a node keeps. It is stable while the node runs, so a record
 turned away is turned away again when it next arrives, and exchanges between nodes
 settle. The evidence comes from `:local` (§4.6), never from the record itself.
@@ -368,9 +368,15 @@ the failures since it and the last failure.
 ```
 
 Only an authenticated connection counts as contact: a verified outbound admission or
-an inbound route upgrade. A failure is a dial or identity challenge that failed for a
-desired peer, or an authenticated route that stopped answering. Nothing the owner
-writes in its node record, such as `:timestamp`, ever counts.
+an inbound route upgrade, and then each quiet interval (two minutes) in which the
+route is heard from or answers a probe. A failure is a dial or identity challenge that
+failed for a desired peer, or an authenticated route that stopped answering. Nothing
+the owner writes in its node record, such as `:timestamp`, ever counts.
+
+Nodes connecting in can create records, so at most 1024 nodes have one
+(`ContactRecords.MAX_NODES`). A new node beyond that replaces the one whose latest
+contact or failure is oldest. A healthy route keeps reporting contact, so a node
+still in touch does not age out.
 
 `LatticeConnectionManager` sees every dial, challenge and silence and reports contact
 and failures through `setContactHandlers`. It knows no lattice paths. The P2P node

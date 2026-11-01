@@ -2,6 +2,7 @@ package convex.p2p;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -12,6 +13,7 @@ import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
@@ -57,6 +59,28 @@ public class ContactRecordsTest {
 
 		contacts.contacted(CAROL);
 		assertEquals(CVMLong.ZERO,contacts.get(CAROL).get(ContactRecords.FAILURES),"contact clears failures");
+	}
+
+	@Test void atMostMaxNodesHaveARecordAndTheOldestGoesFirst() {
+		var contacts=alice(LatticeHost.create()).contacts();
+		Random random=new Random(9104);
+		AccountKey[] nodes=new AccountKey[ContactRecords.MAX_NODES+1];
+		for (int i=0; i<nodes.length; i++) nodes[i]=AccountKey.create(Blob.createRandom(random,AccountKey.LENGTH));
+		for (int i=0; i<ContactRecords.MAX_NODES; i++) {
+			time.incrementAndGet();
+			contacts.failed(nodes[i]);
+		}
+		// A route still in touch is reported again, so the first node is no longer the oldest
+		time.incrementAndGet();
+		contacts.contacted(nodes[0]);
+		assertEquals(ContactRecords.MAX_NODES,contacts.all().count());
+
+		time.incrementAndGet();
+		contacts.contacted(nodes[ContactRecords.MAX_NODES]);
+		assertEquals(ContactRecords.MAX_NODES,contacts.all().count());
+		assertNull(contacts.get(nodes[1]));
+		assertNotNull(contacts.get(nodes[0]));
+		assertNotNull(contacts.get(nodes[ContactRecords.MAX_NODES]));
 	}
 
 	@Test void applicationSyncSignsOnceAndTheRecordsSurviveARestart() throws Exception {

@@ -1,7 +1,9 @@
 package convex.p2p;
 
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -26,6 +28,11 @@ import convex.lattice.cursor.AForkableCursor;
  *  :contacts {&lt;node key&gt; {:last-contact t, :failures n, :last-failure t}}}
  * </pre>
  *
+ * <p>At most {@link #MAX_NODES} nodes have a record, since nodes connecting in can
+ * create them. A new node beyond that replaces the one whose latest event is oldest.
+ * A route is reported as contact again while it stays healthy, so a node this node
+ * is still in touch with does not age out.</p>
+ *
  * <p>Each event edits a private copy, which signs nothing and leaves the host alone.
  * The application syncs the copy into the node's {@code :local} slot when its policy
  * says, signing the slot once, and the host persists it with the rest of its root.
@@ -33,6 +40,9 @@ import convex.lattice.cursor.AForkableCursor;
  * small and synced whole, so it is not persisted separately.</p>
  */
 public final class ContactRecords extends ALocalComponent {
+
+	/** Most nodes with a record. Each is about 100 bytes, so the slot stays near 100 KB. */
+	static final int MAX_NODES=1024;
 
 	static final Keyword CONTACTS=Keyword.intern("contacts");
 	static final Keyword LAST_CONTACT=Keyword.intern("last-contact");
@@ -53,13 +63,41 @@ public final class ContactRecords extends ALocalComponent {
 	/** Records authenticated contact with a node, clearing its failures. */
 	public void contacted(AccountKey node) {
 		CVMLong now=clock.get();
-		contact(node).update(record -> record.assoc(LAST_CONTACT,now).assoc(FAILURES,CVMLong.ZERO));
+		record(node,record -> record.assoc(LAST_CONTACT,now).assoc(FAILURES,CVMLong.ZERO));
 	}
 
 	/** Records a failed attempt to reach a node. */
 	public void failed(AccountKey node) {
 		CVMLong now=clock.get();
-		contact(node).update(record -> record.assoc(FAILURES,CVMLong.create(failures(record)+1)).assoc(LAST_FAILURE,now));
+		record(node,record -> record.assoc(FAILURES,CVMLong.create(failures(record)+1)).assoc(LAST_FAILURE,now));
+	}
+
+	/** Applies an event to a node's record, making room for a new node by dropping the record with the oldest event. */
+	private void record(AccountKey node,UnaryOperator<AHashMap<Keyword,ACell>> event) {
+		contacts.cursor().update(all -> {
+			AHashMap<AccountKey,AHashMap<Keyword,ACell>> records=(all==null)?Maps.empty():all;
+			AHashMap<Keyword,ACell> record=records.get(node);
+			if (record==null && records.count()>=MAX_NODES) records=records.dissoc(oldest(records));
+			return records.assoc(node,event.apply((record==null)?Maps.empty():record));
+		});
+	}
+
+	/** The node whose latest contact or failure is oldest. */
+	private static AccountKey oldest(AHashMap<AccountKey,AHashMap<Keyword,ACell>> records) {
+		AccountKey oldest=null;
+		long oldestTime=Long.MAX_VALUE;
+		for (Map.Entry<AccountKey,AHashMap<Keyword,ACell>> entry:records.entrySet()) {
+			long time=Math.max(time(entry.getValue(),LAST_CONTACT),time(entry.getValue(),LAST_FAILURE));
+			if (oldest==null || time<oldestTime) {
+				oldest=entry.getKey();
+				oldestTime=time;
+			}
+		}
+		return oldest;
+	}
+
+	private static long time(AHashMap<Keyword,ACell> record,Keyword field) {
+		return (record.get(field) instanceof CVMLong time)?time.longValue():Long.MIN_VALUE;
 	}
 
 	/** Returns the contact record for a node, or null if this node has none. */
@@ -81,10 +119,6 @@ public final class ContactRecords extends ALocalComponent {
 	/** Whether a contact record shows failures since the last contact, if any. */
 	static boolean failing(AHashMap<Keyword,ACell> record) {
 		return record!=null && failures(record)>0;
-	}
-
-	private AForkableCursor<AHashMap<Keyword,ACell>> contact(AccountKey node) {
-		return contacts.<AHashMap<Keyword,ACell>>path(node).withDefault(Maps.empty());
 	}
 
 	private static long failures(AHashMap<Keyword,ACell> record) {

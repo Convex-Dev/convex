@@ -66,7 +66,14 @@ public class P2PConnectionsTest {
 		assertEquals(BOUND+4,held.count());
 	}
 
-	@Test void anAnsweredNodeIsNeverDisplacedAndAFailedOneGoesFirst() {
+	@Test void answeredNodesAreBoundedToo() {
+		alice.connections().setMaxRecords(2);
+		for (int i=0; i<3; i++) alice.contacts().contacted(key(i).getAccountKey());
+		alice.merge(registry(records(0,3,1)));
+		assertEquals(2,held().count());
+	}
+
+	@Test void anAnsweredNodeOutranksOthersAndAFailedOneGoesFirst() {
 		AKeyPair answered=key(100),failed=key(101),fresh=key(102);
 		alice.connections().setMaxRecords(2);
 		alice.merge(registry(record(answered,1).merge(record(failed,1))));

@@ -364,9 +364,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/**
 	 * Sets hooks reporting what this manager learns about other nodes. Contact is an
 	 * authenticated connection: a verified outbound admission or an upgraded inbound
-	 * route. Failure is a dial or identity challenge that failed for a desired peer, or
-	 * an authenticated route that stopped answering. Hooks run outside the manager's
-	 * locks and must not block; their failures are logged.
+	 * route, reported again for each quiet interval in which the route is heard from or
+	 * answers a probe. Failure is a dial or identity challenge that failed for a desired
+	 * peer, or an authenticated route that stopped answering. Hooks run outside the
+	 * manager's locks and must not block; their failures are logged.
 	 *
 	 * @param contacted contact hook, or {@code null} for none
 	 * @param failed failure hook, or {@code null} for none
@@ -1450,6 +1451,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private void checkHealth(long now) {
 		List<Map.Entry<AccountKey,HealthCheck>> probes=new ArrayList<>();
 		List<Map.Entry<AccountKey,HealthCheck>> failures=new ArrayList<>();
+		List<AccountKey> heard=new ArrayList<>();
 		synchronized (connectionLock) {
 			Map<AccountKey,Object> routes=new HashMap<>(upgradedInboundRoutes);
 			routes.putAll(connections);
@@ -1466,14 +1468,20 @@ public class LatticeConnectionManager extends AConnectionManager {
 					if (now-check.probeStarted>=PROBE_TIMEOUT_MS) {
 						failures.add(Map.entry(key,check));
 					}
-				} else if (now-check.lastReceived>=QUIET_PROBE_MS
-						&& (route instanceof Convex || inboundProbe!=null)) {
-					check.probing=true;
-					check.probeStarted=now;
-					probes.add(Map.entry(key,check));
+				} else if (now-check.lastReceived>=QUIET_PROBE_MS) {
+					if (route instanceof Convex || inboundProbe!=null) {
+						check.probing=true;
+						check.probeStarted=now;
+						probes.add(Map.entry(key,check));
+					}
+				} else if (now-check.lastReported>=QUIET_PROBE_MS) {
+					// Heard from within the quiet interval: still in contact
+					check.lastReported=now;
+					heard.add(key);
 				}
 			}
 		}
+		for (AccountKey key:heard) notifyContact(key);
 		for (var entry:failures) failRoute(entry.getKey(),entry.getValue());
 		for (var entry:probes) {
 			AccountKey key=entry.getKey();
@@ -1533,9 +1541,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private static final class HealthCheck {
 		final Object route;
 		long lastReceived;
+		/** When contact was last reported for this route; admission reports it first. */
+		long lastReported;
 		boolean probing;
 		long probeStarted;
-		HealthCheck(Object route,long now) { this.route=route; lastReceived=now; }
+		HealthCheck(Object route,long now) { this.route=route; lastReceived=now; lastReported=now; }
 	}
 
 	/** Revokes upgraded capabilities whose listener-owned socket is no longer valid. */
