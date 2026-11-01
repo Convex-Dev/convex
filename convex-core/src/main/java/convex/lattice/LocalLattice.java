@@ -37,6 +37,9 @@ import convex.lattice.generic.OwnerLattice;
  *   <li>OwnerLattice merge preserves each peer's slot independently</li>
  *   <li>A replica or restored backup merges cleanly</li>
  * </ul>
+ *
+ * Services keep their records through {@link ALocalComponent}, which edits a
+ * private copy and signs the slot once each time the application syncs it.
  */
 public class LocalLattice {
 

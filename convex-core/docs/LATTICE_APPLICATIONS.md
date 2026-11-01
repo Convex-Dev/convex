@@ -298,6 +298,14 @@ of recovery. A checkpoint retains one host snapshot and completes the store's
 barrier. It excludes private application drafts and writes arriving after that
 snapshot. A failed barrier does not roll back publication already performed.
 
+State that is not shared, such as configuration or what a node has seen of
+others, lives in the owner's slot in `:local`, one record per service. An
+`ALocalComponent` edits a private copy of its record and writes it into the slot
+with one signature when the application syncs it, so the application decides how
+many edits share a signature. To retain interim state, build the component over a
+private host with its own store and checkpoint that host. Whether the main host
+takes the record from it is for the main host's applications to decide.
+
 The service chooses when to promise durability. It can checkpoint before
 acknowledging a durable request or batch flushes when delayed durability is
 acceptable. Background flushing processes already-retained state and must expose

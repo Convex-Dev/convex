@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Serve stored content from any Javalin endpoint with `ContentResponse.send`: it streams from a file or blob channel with an ETag, `If-None-Match` and single byte ranges, as DLFS WebDAV does. ([#790](https://github.com/Convex-Dev/convex/issues/790))
 - Upload large files to DLFS over WebDAV: PUT streams the body in bounded memory and publishes it in one atomic update, with `If-Match` and `If-None-Match` checked in that update, so a failed, oversized or conflicting upload leaves the file as it was. ([#790](https://github.com/Convex-Dev/convex/issues/790))
 - P2P node records name the lattice regions each node serves, in `:regions`. ([P2P design](convex-peer/docs/P2P_DESIGN.md))
+- Keep a service's private state, such as what a node has seen of others, in `:local` with `ALocalComponent`: edits stay in a private copy, signed once when the application syncs them. ([Retention](convex-core/docs/LATTICE_APPLICATIONS.md#retention-durability-and-networking))
 
 ### Changed
 
@@ -66,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep the peers a lattice node chooses: nodes that connect in no longer take its peer slots, and discovered nodes with nothing to dial no longer fill its candidate pool. ([Live peer selection](convex-peer/docs/LATTICE_NETWORKING.md#live-peer-selection), [#814](https://github.com/Convex-Dev/convex/issues/814))
 - Keep percent-encoded reserved characters in a DID: `did:web:example.com%3A8080` round-trips and no longer equals `did:web:example.com:8080`, and lattice owner DIDs accept only the normalised spelling. ([#816](https://github.com/Convex-Dev/convex/issues/816))
 - Complete the final flush when an interrupted thread closes a host's automatic flushing, and keep that thread's interrupt status.
+- Never publish a P2P node's `:local` state or accept another's, even when its lattice declares `:local`.
 
 ## [0.8.18] - 2026-10-25
 

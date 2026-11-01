@@ -203,7 +203,8 @@ so local authoring uses the same authorisation as incoming verification.
 cannot distinguish local edits from incoming state: the component retains the
 underlying cursor when incoming merges must preserve their original timestamps.
 Neither wrapper merges values or controls publication timing. Use `SignedComponent`
-for unsigned working state that is signed only when published.
+for unsigned working state that is signed only when published, and
+`ALocalComponent` for a service's stamped record in `:local`.
 
 ## Code and specifications
 
