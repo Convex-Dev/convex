@@ -1110,10 +1110,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/**
 	 * Withdraws the explicit intent {@link #addPeer} or {@link #connectPeer} declared
 	 * for a peer and closes the route this node opened to it, as for a seed that other
-	 * peers have replaced. The peer stays a candidate like any discovered node while
-	 * it has a dial target and the candidate cap allows; otherwise it is forgotten. A
-	 * route the peer opened to this node is kept. A peer that is not explicit is left
-	 * as it is.
+	 * peers have replaced. A peer that discovery has listed with a dial target stays a
+	 * candidate like any other while the candidate cap allows; otherwise it is
+	 * forgotten, so an operator-supplied address alone never makes a candidate. A route
+	 * the peer opened to this node is kept. A peer that is not explicit is left as it is.
 	 *
 	 * @param peerKey key of the peer to release
 	 */
@@ -1125,7 +1125,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 		synchronized (connectionLock) {
 			PeerActivity state=activity.get(peerKey);
 			if (state==null || !state.explicit) return;
-			if (hasDialTarget(desiredPeers.get(peerKey)) && candidateCount<maxDesiredPeers) {
+			DesiredPeer desired=desiredPeers.get(peerKey);
+			if (desired.discovered && hasDialTarget(desired) && candidateCount<maxDesiredPeers) {
 				state.explicit=false;
 				candidateCount++;
 			} else {
@@ -1711,6 +1712,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Completes the limbo-to-active transition after the expected key was proved. */
 	private void completeVerifiedAdmission(AccountKey peerKey, PendingConnection pending) {
 		Convex replaced=null;
+		List<CompletableFuture<Void>> met=List.of();
 		boolean eligible;
 		synchronized (connectionLock) {
 			eligible=accepting && pendingConnections.get(peerKey) == pending
@@ -1721,6 +1723,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 				replaced = connections.put(peerKey, pending.connection);
 				health.put(peerKey,new HealthCheck(pending.connection,clock.getAsLong()));
 				pendingConnections.remove(peerKey, pending);
+				met=takeMetAmbientWaiters();
 			}
 		}
 		if (!eligible) {
@@ -1728,6 +1731,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 				new IllegalStateException("Verified connection is no longer eligible for admission"));
 			return;
 		}
+		for (CompletableFuture<Void> waiter:met) waiter.complete(null);
 		if (replaced != null && replaced != pending.connection) closeSilently(replaced);
 		resetRetryBackoff(peerKey);
 		notifyContact(peerKey);

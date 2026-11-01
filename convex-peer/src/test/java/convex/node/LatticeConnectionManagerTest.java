@@ -139,6 +139,8 @@ public class LatticeConnectionManagerTest {
 		manager.setPeerTargets(2,0);
 		AccountKey seed=AKeyPair.createSeeded(100).getAccountKey();
 		manager.connectPeer(seed,new InetSocketAddress("localhost",1));
+		// The seed's own record arrives, as it does once this node pulls its registry
+		assertTrue(manager.updateDiscoveredPeer(seed,Vectors.of(Strings.create("tcp://localhost:1")),1));
 		CompletableFuture<Void> met=manager.whenAmbientTargetMet();
 		fill(1);
 		assertFalse(met.isDone(),"an explicit route does not count towards the target");
@@ -188,6 +190,11 @@ public class LatticeConnectionManagerTest {
 		manager.addPeer(named);
 		manager.releasePeer(named);
 		assertFalse(manager.getDesiredPeers().containsKey(named),"nothing to dial, so not a candidate");
+
+		AccountKey unlisted=AKeyPair.createSeeded(102).getAccountKey();
+		manager.addPeer(unlisted,new InetSocketAddress("localhost",1));
+		manager.releasePeer(unlisted);
+		assertFalse(manager.getDesiredPeers().containsKey(unlisted),"an operator's address alone makes no candidate");
 
 		AccountKey discovered=candidate(1);
 		manager.releasePeer(discovered);
