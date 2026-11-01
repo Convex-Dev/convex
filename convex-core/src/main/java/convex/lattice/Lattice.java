@@ -30,8 +30,8 @@ public class Lattice {
 	 *   Each database has per-node signed replicas merged via KVStoreLattice
 	 * - :queue - Kafka-style message queues (owner -> topic -> :partitions -> partition id -> queue)
 	 *   Each topic has metadata + partitions; each partition is an append-only log
-	 * - :local - Peer-local storage (owner -> keyword-keyed map of peer-local data)
-	 *   Each peer owns a signed slot; safe to replicate via OwnerLattice merge
+	 * - :local - Application state that is not shared (owner -> keyword-keyed map)
+	 *   Each peer owns a signed slot, written by one application instance; may be replicated for backup
 	 */
 	public static KeyedLattice ROOT = KeyedLattice.create(
 		Keywords.DATA, DataLattice.INSTANCE,

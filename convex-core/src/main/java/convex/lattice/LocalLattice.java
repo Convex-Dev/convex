@@ -25,14 +25,15 @@ import convex.lattice.generic.OwnerLattice;
  *     peer-key-B → Signed(Index&lt;Keyword, ACell&gt;)
  * </pre>
  *
- * This data is local to a node (encrypted secrets, signing keys, configuration,
- * what it has seen of other nodes) and is not normally replicated: a node's
- * serving projection and its incoming merges must leave it out. It still uses
- * standard lattice semantics so that:
+ * This region holds any application state that is not meant to be shared
+ * (encrypted secrets, signing keys, configuration, what a node has seen of
+ * other nodes). One application instance writes and manages each slot. It may
+ * be replicated, for example for backup, but is not published for others to
+ * use. It still uses standard lattice semantics so that:
  * <ul>
  *   <li>Multiple peers can share a store without conflicts</li>
  *   <li>OwnerLattice merge preserves each peer's slot independently</li>
- *   <li>A node's own backup or restore merges cleanly</li>
+ *   <li>A replica or restored backup merges cleanly</li>
  * </ul>
  */
 public class LocalLattice {
