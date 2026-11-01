@@ -368,7 +368,7 @@ the failures since it and the last failure.
 ```
 
 Only an authenticated connection counts as contact: a verified outbound admission or
-an inbound route upgrade, and then each `keepAlive` interval (30 seconds by default)
+an inbound route upgrade, and then each `keepAlive` interval (60 seconds by default)
 in which the route is heard from or answers a probe. A failure is a dial or identity
 challenge that failed for a desired peer, or an authenticated route that stopped
 answering. Nothing the owner writes in its node record, such as `:timestamp`, ever

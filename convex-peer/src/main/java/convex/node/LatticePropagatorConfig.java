@@ -69,11 +69,12 @@ public final class LatticePropagatorConfig {
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT=Strings.intern("inboundShutdownTimeout");
 
 	/**
-	 * Milliseconds a live route may stay silent before this group probes it. Any
-	 * traffic counts, so only quiet routes are probed. Set it below the shortest idle
-	 * timeout of the NATs, load balancers and firewalls on the path, which can drop a
-	 * quiet connection without telling either end. Nodes without a connection are
-	 * never probed.
+	 * Milliseconds a live route may hear nothing before this group probes it. Any
+	 * traffic counts, including the root sync each end sends every
+	 * {@link LatticePropagator#ROOT_SYNC_INTERVAL}, so a healthy route is never
+	 * probed. Keep it above that interval with a margin, or probes race the root
+	 * sync. The root sync, not the probe, keeps NATs and load balancers from dropping
+	 * a quiet route. Nodes without a connection are never probed.
 	 */
 	public static final AString KEEP_ALIVE=Strings.intern("keepAlive");
 
@@ -103,8 +104,8 @@ public final class LatticePropagatorConfig {
 	/** Default time allowed for accepted endpoint work to drain. */
 	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT=10_000L;
 
-	/** Default quiet time before a live route is probed: half the common 60-second load-balancer idle timeout. */
-	public static final long DEFAULT_KEEP_ALIVE=30_000L;
+	/** Default quiet time before a live route is probed: two root-sync intervals, so a probe follows a missed sync. */
+	public static final long DEFAULT_KEEP_ALIVE=2*LatticePropagator.ROOT_SYNC_INTERVAL;
 
 	private final AMap<AString,ACell> config;
 

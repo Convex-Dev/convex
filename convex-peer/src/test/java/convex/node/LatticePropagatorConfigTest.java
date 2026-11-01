@@ -31,7 +31,7 @@ public class LatticePropagatorConfigTest {
 
 	@Test
 	public void testKeepAlive() {
-		assertEquals(30_000,LatticePropagatorConfig.create().getKeepAlive());
+		assertEquals(60_000,LatticePropagatorConfig.create().getKeepAlive());
 		assertEquals(5_000,LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.KEEP_ALIVE,CVMLong.create(5_000))).getKeepAlive());
 		var invalid=LatticePropagatorConfig.create(Maps.of(LatticePropagatorConfig.KEEP_ALIVE,CVMLong.ZERO));

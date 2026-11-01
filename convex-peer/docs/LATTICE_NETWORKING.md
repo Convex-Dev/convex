@@ -320,12 +320,13 @@ sockets remain owned by their listener/endpoint, so soft targets are not an
 aggregate socket limit.
 
 Maintenance runs every second, but normal propagation supplies the heartbeat and
-healthy ambient peers are not periodically rotated. A live route is probed only
-after `keepAlive` (30 seconds by default) without decoded incoming traffic, with a
-further 30-second grace period. Set `keepAlive` below the shortest idle timeout of
-the NATs, load balancers and firewalls on the path, which drop quiet connections
-silently; the default is half the common 60-second load-balancer timeout. Nodes
-without a route are never probed.
+healthy ambient peers are not periodically rotated. Each end also sends its root to
+every route every 30 seconds, changed or not, which keeps NATs and load balancers
+from dropping a quiet route. A live route is probed only after `keepAlive` (60
+seconds by default, two root syncs) without decoded incoming traffic, with a further
+30-second grace period, so a healthy route is never probed and a silent one is
+retired within 90 seconds. Keep `keepAlive` above the root-sync interval, or probes
+race the root sync. Nodes without a route are never probed.
 Any incoming traffic cancels the liveness check; a late or failed probe request
 cannot evict a peer that has resumed propagation or shorten that grace period.
 New identity challenges use a separate five-second admission deadline.

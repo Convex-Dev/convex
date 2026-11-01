@@ -439,6 +439,19 @@ public class LatticeConnectionManagerTest {
 		assertEquals(List.of(key,key,key),contacted,"answered a probe");
 	}
 
+	/** Root syncs that arrive late, as they do under load, keep a route from being probed. */
+	@Test public void testLateRootSyncsNeedNoProbe() {
+		AccountKey key=candidate(1);
+		fill(1);
+		Object route=manager.getConnections().get(key);
+		for (int i=0; i<10; i++) {
+			now.addAndGet(LatticePropagator.ROOT_SYNC_INTERVAL+5_000);
+			manager.maintainConnections();
+			manager.received(key,route);
+		}
+		assertTrue(manager.probes.isEmpty());
+	}
+
 	/** A configured keep-alive decides when a quiet route is probed. */
 	@Test public void testConfiguredKeepAliveProbesAQuietRoute() {
 		manager.setKeepAlive(5_000);
