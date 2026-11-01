@@ -49,9 +49,11 @@ public class LocalLattice {
 	 * Value lattice for per-peer data. Uses a MapLattice that merges each
 	 * keyword's value independently via LWW (timestamp-based last-write-wins).
 	 *
-	 * Each service (e.g. :signing) stores its own timestamped map. Concurrent
-	 * updates to different services merge cleanly; updates to the same service
-	 * resolve by picking the higher timestamp.
+	 * Each service (e.g. :signing) stores its own timestamped map. One application
+	 * instance writes it, so the timestamp matters when a copy comes back, as in
+	 * restoring a backup: the newer of the two wins, so a stale backup never
+	 * overwrites newer state and a newer one replaces stale state. Services merge
+	 * independently of each other.
 	 */
 	private static final MapLattice<Keyword, ACell> VALUE_LATTICE =
 			MapLattice.create(LWWLattice.INSTANCE);
