@@ -169,7 +169,7 @@ public class P2PConnectionsTest {
 	}
 
 	@Test void theBoundIsConfiguredOnTheNode() {
-		assertEquals(NodeRegistryLattice.DEFAULT_MAX_RECORDS,P2PNode.maxNodeRecords(NodeConfig.create()));
+		assertEquals(P2PConnections.DEFAULT_MAX_RECORDS,P2PNode.maxNodeRecords(NodeConfig.create()));
 		assertEquals(5,P2PNode.maxNodeRecords(config(5)));
 		assertEquals(0,P2PNode.maxNodeRecords(config(0)));
 		assertThrows(IllegalArgumentException.class,() -> P2PNode.maxNodeRecords(config(-1)));
@@ -182,7 +182,7 @@ public class P2PConnectionsTest {
 	@SuppressWarnings("unchecked")
 	private AHashMap<ACell,SignedData<ACell>> held() {
 		ACell nodes=host.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		return (AHashMap<ACell,SignedData<ACell>>)nodes;
+		return (nodes==null)?Maps.empty():(AHashMap<ACell,SignedData<ACell>>)nodes;
 	}
 
 	private static Index<Keyword,ACell> registry(AHashMap<ACell,SignedData<ACell>> nodes) {

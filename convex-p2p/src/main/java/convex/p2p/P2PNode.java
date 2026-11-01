@@ -153,7 +153,7 @@ public class P2PNode implements Closeable {
 	/** The configured bound on node records kept besides pinned ones. */
 	static int maxNodeRecords(NodeConfig config) {
 		ACell value=config.getMap().get(MAX_NODE_RECORDS);
-		if (value==null) return NodeRegistryLattice.DEFAULT_MAX_RECORDS;
+		if (value==null) return P2PConnections.DEFAULT_MAX_RECORDS;
 		CVMLong bound=RT.ensureLong(value);
 		if (bound==null || bound.longValue()<0 || bound.longValue()>Integer.MAX_VALUE) {
 			throw new IllegalArgumentException(MAX_NODE_RECORDS+" must be between 0 and "+Integer.MAX_VALUE+": "+value);

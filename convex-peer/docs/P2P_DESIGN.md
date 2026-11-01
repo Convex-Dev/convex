@@ -240,15 +240,14 @@ passes it. The timestamp is never evidence that the node is alive (§4.6).
 #### Retention
 
 Each node holds only the node records it wants, as it does for social owners. The
-registry merges by a lattice of the node's own, `NodeRegistryLattice`: the owner
-rule, applied only to the records the node wants. Nodes that accept every record
-converge under the owner rule; a node that turns records away holds a subset of
-theirs. An incoming record that differs from the one held is checked before it is
-merged, and the node publishes only what it holds. The policy the lattice applies is
-held by the P2P application's connection-management component, `P2PConnections`.
-There is no global directory: each node passes on the records it keeps, so discovery
-spreads as gossip of samples, and the registry's cost to a node stays bounded however
-many keys exist.
+P2P application's connection-management component, `P2PConnections`, defines the
+registry's merge: the owner rule, applied only to the records the node wants. Nodes
+that accept every record converge under the owner rule; a node that turns records
+away holds a subset of theirs. An incoming record that differs from the one held is
+checked before it is merged, and the node publishes only what it holds. There is no
+global directory: each node passes on the records it keeps, so discovery spreads as
+gossip of samples, and the registry's cost to a node stays bounded however many keys
+exist.
 
 A node always keeps, without counting them:
 

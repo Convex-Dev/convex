@@ -58,9 +58,6 @@ import convex.core.lang.RT;
  * {@code merge}. A consequence of proper owner-keying is that a peer can only ever wedge its
  * <em>own</em> slot (self-denial); cross-owner effects require a deliberately shared register
  * or an explicit trust choice, which is the operator's to make, not the merge's to police.
- * A node may also merge with a lattice of its own that omits entries it does not want, such
- * as a bounded registry: nodes that accept every entry converge under the shared rule, and a
- * node that omits entries holds a subset of what they hold.
  * The {@link LatticeContext} timestamp is the writer's <em>stamp-on-write</em> clock — the
  * "when" companion to the signing "who" — used when a node stamps its <em>own</em> new values;
  * it is not a filter applied to the timestamps inside others' incoming values.</p>
