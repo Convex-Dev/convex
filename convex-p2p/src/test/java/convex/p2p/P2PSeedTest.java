@@ -1,0 +1,198 @@
+package convex.p2p;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+
+import convex.core.Constants;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
+import convex.core.data.AccountKey;
+import convex.core.data.Maps;
+import convex.core.data.Strings;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
+import convex.core.util.JSON;
+import convex.etch.EtchStore;
+import convex.node.LatticeConnectionManager;
+import convex.node.LatticePropagatorConfig;
+import convex.node.NodeConfig;
+
+/**
+ * Joining a network through seed nodes, which are let go once other peers can
+ * replace them, and rejoining after a restart from retained records alone.
+ */
+public class P2PSeedTest {
+
+	private static final long TIMEOUT=10;
+
+	private final AKeyPair hubKey=AKeyPair.generate();
+	private final AKeyPair otherKey=AKeyPair.generate();
+	private final AKeyPair joinerKey=AKeyPair.generate();
+	private final List<AutoCloseable> resources=new ArrayList<>();
+
+	@AfterEach
+	public void tearDown() throws Exception {
+		Collections.reverse(resources);
+		for (AutoCloseable resource:resources) resource.close();
+	}
+
+	/** One ambient slot for the joiner; none for the others, so only the joiner dials. */
+	private static LatticePropagatorConfig ambient(int slots) {
+		return LatticePropagatorConfig.create(Maps.of(LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.create(slots)));
+	}
+
+	private EtchStore store(String name) throws Exception {
+		EtchStore store=EtchStore.createTemp(name);
+		resources.add(store);
+		return store;
+	}
+
+	private P2PNode launch(EtchStore store,NodeConfig config,int slots,AKeyPair key) throws Exception {
+		P2PNode node=P2PNode.create(store,config,ambient(slots),key).serveAllInbound();
+		resources.add(node);
+		node.launch();
+		return node;
+	}
+
+	private static AVector<ACell> seedList(AccountKey key,P2PNode node) {
+		return Vectors.of(Maps.of(Strings.create("key"),Strings.create(key.toHexString()),
+			Strings.create("url"),Strings.create("tcp://localhost:"+node.getPort())));
+	}
+
+	private static NodeConfig withSeeds(AVector<ACell> seeds) {
+		return NodeConfig.create(NodeConfig.localNetwork().getMap().assoc(P2PNode.SEEDS,seeds));
+	}
+
+	/** A hub that holds a record of one other node, which it learned when that node connected. */
+	private P2PNode hubKnowingOther() throws Exception {
+		P2PNode hub=launch(store("seed-hub"),NodeConfig.localNetwork(),0,hubKey);
+		P2PNode other=launch(store("seed-other"),NodeConfig.localNetwork(),0,otherKey);
+		other.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS);
+		return hub;
+	}
+
+	@Test
+	public void testColdNodeJoinsThroughOneSeedAndReleasesIt() throws Exception {
+		P2PNode hub=hubKnowingOther();
+		NodeConfig config=withSeeds(seedList(hubKey.getAccountKey(),hub));
+		P2PNode joiner=launch(store("seed-joiner"),config,1,joinerKey);
+
+		joiner.seed(P2PNode.seeds(config)).get(TIMEOUT,TimeUnit.SECONDS);
+		LatticeConnectionManager manager=joiner.propagationGroup().getConnectionManager();
+		assertNotNull(manager.getConnection(otherKey.getAccountKey()),"a node learned from the seed fills the slot");
+		assertNull(manager.getConnection(hubKey.getAccountKey()),"the route to the seed is closed");
+		assertTrue(manager.getDesiredPeers().containsKey(hubKey.getAccountKey()),"the seed stays a candidate");
+		assertNotNull(registry(hub).get(joinerKey.getAccountKey()),"the seed took the joiner's record");
+	}
+
+	@Test
+	public void testSeedWithTheWrongKeyHoldsUpNoOther() throws Exception {
+		P2PNode hub=hubKnowingOther();
+		AccountKey wrongKey=AKeyPair.generate().getAccountKey();
+		NodeConfig config=withSeeds(seedList(wrongKey,hub).concat(seedList(hubKey.getAccountKey(),hub)));
+		P2PNode joiner=launch(store("seed-joiner"),config,1,joinerKey);
+
+		joiner.seed(P2PNode.seeds(config)).get(TIMEOUT,TimeUnit.SECONDS);
+		LatticeConnectionManager manager=joiner.propagationGroup().getConnectionManager();
+		assertNotNull(manager.getConnection(otherKey.getAccountKey()));
+		assertNull(manager.getConnection(wrongKey),"the endpoint never proved the configured key");
+		assertFalse(manager.getDesiredPeers().containsKey(wrongKey),"a seed no record lists is forgotten");
+	}
+
+	@Test
+	public void testNodeDoesNotSeedFromItself() throws Exception {
+		P2PNode joiner=launch(store("seed-joiner"),NodeConfig.localNetwork(),1,joinerKey);
+		CompletableFuture<Void> seeding=joiner.seed(Map.of(joinerKey.getAccountKey(),joiner.getHostAddress()));
+		assertTrue(joiner.propagationGroup().getConnectionManager().getDesiredPeers().isEmpty());
+		assertFalse(seeding.isDone(),"no other peer fills the slot");
+	}
+
+	@Test
+	public void testRestartedNodeRejoinsFromRetainedRecordsWithoutSeeds() throws Exception {
+		P2PNode hub=launch(store("seed-hub"),NodeConfig.localNetwork(),0,hubKey);
+		EtchStore joinerStore=store("seed-joiner");
+		P2PNode first=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		first.launch();
+		first.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS);
+		// Shut down as a service does, keeping the store for the restart
+		try (first; var host=first.getNodeServer().getHost()) {
+			first.stopIngress();
+			first.getApplication().sync();
+		}
+
+		P2PNode restarted=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		resources.add(restarted);
+		assertTrue(ContactRecords.answered(restarted.getApplication().contacts().get(hubKey.getAccountKey())),
+			"the contact record survived the restart");
+		restarted.launch();
+		restarted.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
+	}
+
+	@Test
+	public void testSeedsAreReadFromConfiguration() {
+		assertTrue(P2PNode.seeds(NodeConfig.create()).isEmpty());
+
+		AccountKey first=AKeyPair.createSeeded(1).getAccountKey();
+		AccountKey second=AKeyPair.createSeeded(2).getAccountKey();
+		NodeConfig config=NodeConfig.create(JSON.parseJSON5("{seeds: [{key: '0x"+first.toHexString()
+			+"', url: 'tcp://peer.example.com:19000'}, {key: '"+second.toHexString()+"', url: 'peer.example.com'}]}"));
+		Map<AccountKey,InetSocketAddress> seeds=P2PNode.seeds(config);
+		assertEquals(List.of(first,second),List.copyOf(seeds.keySet()),"in configured order");
+		InetSocketAddress address=seeds.get(first);
+		assertTrue(address.isUnresolved(),"resolved when dialled");
+		assertEquals("peer.example.com",address.getHostString());
+		assertEquals(19000,address.getPort());
+		assertEquals(Constants.DEFAULT_PEER_PORT,seeds.get(second).getPort());
+
+		AVector<ACell> tooMany=Vectors.empty();
+		for (int i=0; i<=P2PNode.MAX_SEEDS; i++) {
+			tooMany=tooMany.conj(Maps.of(Strings.create("key"),Strings.create(AKeyPair.createSeeded(i).getAccountKey().toHexString()),
+				Strings.create("url"),Strings.create("tcp://localhost:1")));
+		}
+		assertInvalid(tooMany);
+		assertInvalid(Strings.create("tcp://localhost:1"));
+		assertInvalid(Vectors.of(Maps.of(Strings.create("key"),Strings.create(first.toHexString()))));
+		assertInvalid(Vectors.of(Maps.of(Strings.create("key"),Strings.create("0x1234"),Strings.create("url"),Strings.create("tcp://localhost:1"))));
+		assertInvalid(Vectors.of(Maps.of(Strings.create("key"),Strings.create(first.toHexString()),Strings.create("url"),Strings.create("tls://localhost:1"))));
+		assertInvalid(Vectors.of(Maps.of(Strings.create("key"),Strings.create(first.toHexString()),Strings.create("url"),Strings.create("tcp://localhost:1/path"))));
+	}
+
+	@Test
+	public void testLauncherKeyIsAnEd25519Seed() {
+		assertNull(P2PNode.keyPair(null));
+		AKeyPair key=AKeyPair.createSeeded(7);
+		assertEquals(key.getAccountKey(),P2PNode.keyPair(Strings.create(key.getSeed().toHexString())).getAccountKey());
+		AString shortSeed=Strings.create("0x1234");
+		assertThrows(IllegalArgumentException.class,() -> P2PNode.keyPair(shortSeed));
+		assertThrows(IllegalArgumentException.class,() -> P2PNode.keyPair(CVMLong.ONE));
+	}
+
+	private static void assertInvalid(ACell seeds) {
+		NodeConfig config=NodeConfig.create(Maps.of(P2PNode.SEEDS,seeds));
+		assertThrows(IllegalArgumentException.class,() -> P2PNode.seeds(config));
+	}
+
+	@SuppressWarnings("unchecked")
+	private static AHashMap<ACell,ACell> registry(P2PNode node) {
+		ACell nodes=node.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		return (AHashMap<ACell,ACell>)nodes;
+	}
+}

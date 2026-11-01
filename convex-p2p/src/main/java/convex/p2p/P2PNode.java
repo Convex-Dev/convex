@@ -1,11 +1,15 @@
 package convex.p2p;
 
 import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -18,16 +22,20 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
+import convex.core.Constants;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -38,12 +46,15 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
+import convex.core.util.ConfigUtils;
+import convex.core.util.FileUtils;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
+import convex.net.Transports;
 import convex.node.LatticeConnectionManager;
 import convex.node.LatticeListener;
 import convex.node.LatticeNode;
@@ -112,6 +123,28 @@ public class P2PNode implements Closeable {
 	 */
 	public static final AString MAX_NODE_RECORDS=Strings.intern("maxNodeRecords");
 
+	/**
+	 * Node configuration key: the seed nodes to join a network through, a list of at
+	 * most {@link #MAX_SEEDS} entries, each the node's {@code key} and TCP {@code url}.
+	 * Read with {@link #seeds(NodeConfig)} and joined with {@link #seed(Map)}.
+	 */
+	public static final AString SEEDS=Strings.intern("seeds");
+
+	/** Most seed nodes a configuration may list. */
+	public static final int MAX_SEEDS=16;
+
+	private static final AString SEED_KEY=Strings.intern("key");
+	private static final AString SEED_URL=Strings.intern("url");
+
+	/** Launcher configuration key: the Etch store file. Not a node setting. */
+	public static final AString STORE=Strings.intern("store");
+
+	/**
+	 * Launcher configuration key: the node key's Ed25519 seed in hex, read with
+	 * {@link #keyPair(ACell)}. Not a node setting, and kept out of the node's configuration.
+	 */
+	public static final AString KEYPAIR=Strings.intern("keypair");
+
 	private final LatticeNode<Index<Keyword, ACell>> network;
 	/** The network's server, which replicates the host. */
 	private final NodeServer<Index<Keyword, ACell>> server;
@@ -159,6 +192,47 @@ public class P2PNode implements Closeable {
 			throw new IllegalArgumentException(MAX_NODE_RECORDS+" must be between 0 and "+Integer.MAX_VALUE+": "+value);
 		}
 		return (int)bound.longValue();
+	}
+
+	/**
+	 * Reads the seed nodes a configuration lists under {@link #SEEDS}, for
+	 * {@link #seed(Map)}. A URL without a port uses the default peer port.
+	 *
+	 * @param config node configuration
+	 * @return seed node keys and TCP addresses in configured order, empty if none
+	 * @throws IllegalArgumentException if the list or an entry is invalid
+	 */
+	public static Map<AccountKey,InetSocketAddress> seeds(NodeConfig config) {
+		Map<AccountKey,InetSocketAddress> seeds=new LinkedHashMap<>();
+		ACell value=config.getMap().get(SEEDS);
+		if (value==null) return seeds;
+		if (!(value instanceof AVector<?> list)) {
+			throw new IllegalArgumentException(SEEDS+" must be a list of {key, url} entries");
+		}
+		if (list.count()>MAX_SEEDS) {
+			throw new IllegalArgumentException(SEEDS+" lists more than "+MAX_SEEDS+" nodes");
+		}
+		for (ACell entry:list) {
+			AMap<ACell,ACell> seed=RT.ensureMap(entry);
+			AccountKey key=(seed==null)?null:AccountKey.parse(seed.get(SEED_KEY));
+			AString url=(seed==null)?null:RT.ensureString(seed.get(SEED_URL));
+			if (key==null || url==null) {
+				throw new IllegalArgumentException("Seed needs a node key and a URL: "+entry);
+			}
+			seeds.put(key,seedAddress(url.toString()));
+		}
+		return seeds;
+	}
+
+	/** A seed's TCP address, resolved when it is dialled. */
+	private static InetSocketAddress seedAddress(String url) {
+		URI endpoint=Transports.endpoint(url);
+		if (!"tcp".equalsIgnoreCase(endpoint.getScheme()) || endpoint.getRawQuery()!=null
+				|| (endpoint.getRawPath()!=null && !endpoint.getRawPath().isEmpty())) {
+			throw new IllegalArgumentException("Seed URL must be tcp://host:port: "+url);
+		}
+		int port=endpoint.getPort();
+		return InetSocketAddress.createUnresolved(endpoint.getHost(),(port<0)?Constants.DEFAULT_PEER_PORT:port);
 	}
 
 	/**
@@ -519,6 +593,44 @@ public class P2PNode implements Closeable {
 			.thenCompose(peer -> initialisePeer(peer).thenApply(ignored -> peer));
 	}
 
+	/**
+	 * Joins the network through seed nodes. Each seed is connected as with
+	 * {@link #connect}: once it proves its key, this node pushes its own record and
+	 * pulls the seed's registry, which names other nodes to connect to. A seed that
+	 * cannot be reached or fails its challenge backs off without holding up the others.
+	 *
+	 * <p>Once this node's own ambient slots hold routes to other peers, they can replace
+	 * the seeds, so every seed is released: the route this node opened to it closes, and
+	 * it stays a candidate like any other node. A seed so carries a node only while it
+	 * joins. A node that already holds enough routes, such as one restarted with retained
+	 * records, releases its seeds at once; in a network too small to fill the slots they
+	 * stay connected. A seed also named with {@link #connect} stays connected.</p>
+	 *
+	 * @param seeds seed node keys and TCP addresses, as {@link #seeds(NodeConfig)} reads them
+	 * @return future completing when the seeds are released
+	 */
+	public CompletableFuture<Void> seed(Map<AccountKey,InetSocketAddress> seeds) {
+		if (!server.isRunning()) {
+			return CompletableFuture.failedFuture(
+				new IllegalStateException("P2P node must be launched before seeding"));
+		}
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		List<AccountKey> held=new ArrayList<>();
+		for (Map.Entry<AccountKey,InetSocketAddress> seed:seeds.entrySet()) {
+			AccountKey key=seed.getKey();
+			// Seed nodes may share one configuration that lists them all
+			if (keyPair!=null && key.equals(keyPair.getAccountKey())) continue;
+			manager.addPeer(key,seed.getValue());
+			held.add(key);
+		}
+		P2PConnections connections=application.connections();
+		return manager.whenAmbientTargetMet().thenRun(() -> {
+			for (AccountKey key:held) {
+				if (!connections.isNamed(key)) manager.releasePeer(key);
+			}
+		});
+	}
+
 	private CompletableFuture<Void> initialisePeer(Convex peer) {
 		initialisations.keySet().removeIf(p -> !p.isConnected());
 		return initialisations.computeIfAbsent(peer,p -> {
@@ -684,24 +796,61 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * Stub command line entry point. Launches a public P2P node and runs until the
-	 * JVM is terminated.
+	 * Command line entry point. Launches a public P2P node, joins the network through
+	 * any configured seeds and runs until the JVM is terminated.
 	 *
-	 * @param args Optional Etch store file path; a temporary store is used if absent
-	 * @throws IOException If the store or node cannot be opened
+	 * <p>The optional argument is a JSON5 file holding the node configuration, such as
+	 * {@code port}, {@code url}, {@code maxNodeRecords} and {@code seeds}, plus
+	 * {@code store}, the Etch store file, and {@code keypair}, the node key's Ed25519
+	 * seed in hex. A store needs a stable key, since the node keeps its own record and
+	 * its contact records under it. Without a store the node uses a temporary one, and
+	 * without a key it generates one.</p>
+	 *
+	 * @param args Optional JSON5 configuration file
+	 * @throws IOException If the configuration, store or node cannot be opened
 	 * @throws InterruptedException If interrupted while running
 	 */
 	public static void main(String[] args) throws IOException, InterruptedException {
-		AStore store = (args.length > 0)
-			? EtchStore.create(new File(args[0]))
-			: EtchStore.createTemp("convex-p2p");
-
-		AKeyPair keyPair = AKeyPair.generate();
+		AMap<AString,ACell> settings=(args.length>0)?ConfigUtils.readConfigFile(args[0]):Maps.empty();
+		AString storeFile=RT.ensureString(settings.get(STORE));
+		AKeyPair configuredKey=keyPair(settings.get(KEYPAIR));
+		if (storeFile!=null && configuredKey==null) {
+			throw new IllegalArgumentException("A store needs a stable node key: set "+KEYPAIR);
+		}
+		// The key stays out of the configuration given to the node
+		NodeConfig config=NodeConfig.create(settings.dissoc(STORE).dissoc(KEYPAIR));
+		// Invalid seeds fail before the store opens
+		seeds(config);
+		AKeyPair keyPair=(configuredKey!=null)?configuredKey:AKeyPair.generate();
 		log.info("Node key: {}", keyPair.getAccountKey().toChecksumHex());
 
+		AStore store = (storeFile!=null)
+			? EtchStore.create(FileUtils.getFile(storeFile.toString()))
+			: EtchStore.createTemp("convex-p2p");
+		serve(store,config,keyPair,node -> {});
+	}
+
+	/**
+	 * Runs a public node as a service until the JVM shuts down. Launches the node,
+	 * joins the network through the seeds the configuration lists, as
+	 * {@link #seed(Map)} does, then on shutdown stops it in the order
+	 * convex-peer/docs/SHUTDOWN.md prescribes and closes the store.
+	 *
+	 * @param store store the node opens its host from; closed when the service ends
+	 * @param config node configuration, including any {@link #SEEDS}
+	 * @param keyPair node key
+	 * @param started called once the node is launched, before the service waits
+	 * @throws IOException If the node cannot be launched
+	 * @throws InterruptedException If interrupted while running
+	 * @throws IllegalArgumentException If the configuration is invalid
+	 */
+	public static void serve(AStore store,NodeConfig config,AKeyPair keyPair,Consumer<P2PNode> started)
+			throws IOException, InterruptedException {
+		Map<AccountKey,InetSocketAddress> seeds;
 		P2PNode node;
 		try {
-			node = P2PNode.create(store, NodeConfig.create(), keyPair).serveAllInbound();
+			seeds=seeds(config);
+			node = P2PNode.create(store, config, keyPair).serveAllInbound();
 		} catch (RuntimeException e) {
 			store.close();
 			throw e;
@@ -724,13 +873,33 @@ public class P2PNode implements Closeable {
 				.thenAcceptAsync(error -> log.warn("P2P store flush failed",error));
 			node.launch();
 			host.checkpoint();
+			if (!seeds.isEmpty()) {
+				node.seed(seeds).thenRun(() -> log.info("Released seed nodes: other peers now fill this node's slots"));
+			}
+			started.accept(node);
 			// Runs in Convex's shutdown order, before transports and Etch files close
 			Shutdown.addHook(Shutdown.SERVICE,shutdown);
-			// A real service can run its control loop here.
 			shutdown.await();
 		} finally {
 			Shutdown.removeHook(Shutdown.SERVICE,shutdown);
 			shutdown.run();
 		}
+	}
+
+	/**
+	 * Reads a launcher's node key, as {@link #KEYPAIR} holds it.
+	 *
+	 * @param seed Ed25519 seed in hex, or null
+	 * @return the key pair, or null if no seed is set
+	 * @throws IllegalArgumentException if the seed is not a valid Ed25519 seed
+	 */
+	public static AKeyPair keyPair(ACell seed) {
+		if (seed==null) return null;
+		AString hex=RT.ensureString(seed);
+		Blob bytes=(hex==null)?null:Blob.parse(hex.toString());
+		if (bytes==null || bytes.count()!=AKeyPair.SEED_LENGTH) {
+			throw new IllegalArgumentException(KEYPAIR+" must be a "+AKeyPair.SEED_LENGTH+"-byte Ed25519 seed in hex");
+		}
+		return AKeyPair.create(bytes);
 	}
 }

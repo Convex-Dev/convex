@@ -100,6 +100,11 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 		named.add(node);
 	}
 
+	/** Whether the operator named a node. */
+	boolean isNamed(AccountKey node) {
+		return named.contains(node);
+	}
+
 	/** Drops a node's record and refuses it from now on. */
 	@SuppressWarnings("unchecked")
 	void block(AccountKey node) {
