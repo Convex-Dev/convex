@@ -28,10 +28,12 @@ import convex.lattice.cursor.AForkableCursor;
  *  :contacts {&lt;node key&gt; {:last-contact t, :failures n, :last-failure t}}}
  * </pre>
  *
- * <p>At most {@link #MAX_NODES} nodes have a record, since nodes connecting in can
- * create them. A new node beyond that replaces the one whose latest event is oldest.
- * A route is reported as contact again while it stays healthy, so a node this node
- * is still in touch with does not age out.</p>
+ * <p>A node that answered and has not failed since keeps that standing whether or not
+ * this node is connected to it: time alone is no evidence against it. At most
+ * {@link #MAX_NODES} nodes have a record, since nodes connecting in can create them. A
+ * new node beyond that replaces one with failures if there is one, otherwise the one
+ * this node has been out of touch with longest. A live route is reported as contact
+ * again while it stays healthy, so it is never the oldest.</p>
  *
  * <p>Each event edits a private copy, which signs nothing and leaves the host alone.
  * The application syncs the copy into the node's {@code :local} slot when its policy
@@ -72,28 +74,35 @@ public final class ContactRecords extends ALocalComponent {
 		record(node,record -> record.assoc(FAILURES,CVMLong.create(failures(record)+1)).assoc(LAST_FAILURE,now));
 	}
 
-	/** Applies an event to a node's record, making room for a new node by dropping the record with the oldest event. */
+	/** Applies an event to a node's record, making room for a new node by dropping the least useful record. */
 	private void record(AccountKey node,UnaryOperator<AHashMap<Keyword,ACell>> event) {
 		contacts.cursor().update(all -> {
 			AHashMap<AccountKey,AHashMap<Keyword,ACell>> records=(all==null)?Maps.empty():all;
 			AHashMap<Keyword,ACell> record=records.get(node);
-			if (record==null && records.count()>=MAX_NODES) records=records.dissoc(oldest(records));
+			if (record==null && records.count()>=MAX_NODES) records=records.dissoc(leastUseful(records));
 			return records.assoc(node,event.apply((record==null)?Maps.empty():record));
 		});
 	}
 
-	/** The node whose latest contact or failure is oldest. */
-	private static AccountKey oldest(AHashMap<AccountKey,AHashMap<Keyword,ACell>> records) {
-		AccountKey oldest=null;
-		long oldestTime=Long.MAX_VALUE;
+	/**
+	 * The node to forget first: one with failures, which there is reason to doubt,
+	 * before one without; then the one whose latest contact or failure is oldest.
+	 */
+	private static AccountKey leastUseful(AHashMap<AccountKey,AHashMap<Keyword,ACell>> records) {
+		AccountKey chosen=null;
+		boolean chosenFailing=false;
+		long chosenTime=Long.MAX_VALUE;
 		for (Map.Entry<AccountKey,AHashMap<Keyword,ACell>> entry:records.entrySet()) {
-			long time=Math.max(time(entry.getValue(),LAST_CONTACT),time(entry.getValue(),LAST_FAILURE));
-			if (oldest==null || time<oldestTime) {
-				oldest=entry.getKey();
-				oldestTime=time;
+			AHashMap<Keyword,ACell> record=entry.getValue();
+			boolean failing=failing(record);
+			long time=Math.max(time(record,LAST_CONTACT),time(record,LAST_FAILURE));
+			if (chosen==null || (failing && !chosenFailing) || (failing==chosenFailing && time<chosenTime)) {
+				chosen=entry.getKey();
+				chosenFailing=failing;
+				chosenTime=time;
 			}
 		}
-		return oldest;
+		return chosen;
 	}
 
 	private static long time(AHashMap<Keyword,ACell> record,Keyword field) {

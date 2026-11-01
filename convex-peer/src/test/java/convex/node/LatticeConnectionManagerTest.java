@@ -37,6 +37,7 @@ import convex.core.store.MemoryStore;
 
 /** Exercises real maintenance and admission using controlled time and transport completion. */
 public class LatticeConnectionManagerTest {
+	private static final long KEEP_ALIVE=LatticePropagatorConfig.DEFAULT_KEEP_ALIVE;
 	private final AtomicLong now=new AtomicLong();
 	private TestManager manager;
 
@@ -155,7 +156,7 @@ public class LatticeConnectionManagerTest {
 		AccountKey failed=manager.getConnections().keySet().iterator().next();
 		StubPeer old=(StubPeer)manager.getConnection(failed);
 		manager.respond=false;
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		now.addAndGet(KEEP_ALIVE);
 		manager.maintainConnections();
 		CompletableFuture<Void> probe=manager.probes.get(old);
 		assertNotNull(probe);
@@ -170,14 +171,14 @@ public class LatticeConnectionManagerTest {
 		assertNull(manager.getConnection(failed));
 	}
 
-	@Test public void testQuietPeerGetsTwoMinutesBeforeProbingAndFullGraceAfterError() {
+	@Test public void testQuietPeerGetsKeepAliveBeforeProbingAndFullGraceAfterError() {
 		candidate(1); fill(1);
 		AccountKey key=manager.getConnections().keySet().iterator().next();
 		Convex peer=manager.getConnection(key);
 		manager.respond=false;
-		now.set(119_999);
+		now.set(KEEP_ALIVE-1);
 		manager.maintainConnections();
-		assertTrue(manager.probes.isEmpty(),"quiet peers are not probed during the first two minutes");
+		assertTrue(manager.probes.isEmpty(),"quiet peers are not probed within the keep-alive");
 		now.incrementAndGet();
 		manager.maintainConnections();
 		CompletableFuture<Void> probe=manager.probes.get(peer);
@@ -187,7 +188,7 @@ public class LatticeConnectionManagerTest {
 		probe.completeExceptionally(new java.util.concurrent.TimeoutException());
 		manager.maintainConnections();
 		assertSame(peer,manager.getConnection(key));
-		now.set(149_999);
+		now.set(KEEP_ALIVE+LatticeConnectionManager.PROBE_TIMEOUT_MS-1);
 		manager.maintainConnections();
 		assertSame(peer,manager.getConnection(key),"an early probe error cannot shorten the grace period");
 		now.incrementAndGet();
@@ -215,7 +216,7 @@ public class LatticeConnectionManagerTest {
 		AccountKey key=candidate(1); fill(1);
 		Convex peer=manager.getConnection(key);
 		manager.respond=false;
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		now.addAndGet(KEEP_ALIVE);
 		manager.maintainConnections();
 		CompletableFuture<Void> oldProbe=manager.probes.get(peer);
 		assertNotNull(oldProbe);
@@ -223,7 +224,7 @@ public class LatticeConnectionManagerTest {
 		now.addAndGet(LatticeConnectionManager.PROBE_TIMEOUT_MS);
 		manager.maintainConnections();
 		assertSame(peer,manager.getConnection(key),"propagation satisfies liveness without a PING reply");
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS-LatticeConnectionManager.PROBE_TIMEOUT_MS);
+		now.addAndGet(KEEP_ALIVE-LatticeConnectionManager.PROBE_TIMEOUT_MS);
 		manager.maintainConnections();
 		CompletableFuture<Void> newProbe=manager.probes.get(peer);
 		assertNotSame(oldProbe,newProbe);
@@ -242,12 +243,12 @@ public class LatticeConnectionManagerTest {
 		StubInbound physical=new StubInbound();
 		ConnectedStubPeer peer=new ConnectedStubPeer(key,physical);
 		manager.addPeer(key,peer).join();
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		now.addAndGet(KEEP_ALIVE);
 		manager.received(key,physical);
 		manager.maintainConnections();
 		assertTrue(manager.probes.isEmpty(),"endpoint-decoded traffic refreshes the outbound client's health");
 		manager.respond=false;
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		now.addAndGet(KEEP_ALIVE);
 		StubInbound stale=new StubInbound();
 		stale.setTrustedKey(key);
 		manager.received(key,stale);
@@ -271,7 +272,7 @@ public class LatticeConnectionManagerTest {
 	@Test public void testReceiveTrafficDefersProbeWithoutBecomingActivity() {
 		candidate(1); fill(1);
 		AccountKey key=manager.getConnections().keySet().iterator().next();
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		now.addAndGet(KEEP_ALIVE);
 		manager.received(key,manager.getConnection(key));
 		manager.maintainConnections();
 		assertTrue(manager.probes.isEmpty());
@@ -284,7 +285,7 @@ public class LatticeConnectionManagerTest {
 		AccountKey key=candidate(1); fill(1);
 		StubPeer old=(StubPeer)manager.getConnection(key);
 		manager.respond=false;
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		now.addAndGet(KEEP_ALIVE);
 		manager.maintainConnections();
 		StubPeer replacement=new StubPeer(key);
 		manager.addPeer(key,replacement).join();
@@ -390,7 +391,7 @@ public class LatticeConnectionManagerTest {
 		manager.setInboundProbe(connection -> new CompletableFuture<>(),AConnection::close);
 		manager.upgradeInboundConnection(inbound);
 		manager.respond=false;
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		now.addAndGet(KEEP_ALIVE);
 		manager.maintainConnections();
 		assertNotNull(manager.probes.get(inbound));
 		now.addAndGet(LatticeConnectionManager.PROBE_TIMEOUT_MS);
@@ -423,7 +424,7 @@ public class LatticeConnectionManagerTest {
 		Object route=manager.getConnections().get(key);
 		assertEquals(List.of(key),contacted);
 
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS-1);
+		now.addAndGet(KEEP_ALIVE-1);
 		manager.received(key,route);
 		now.incrementAndGet();
 		manager.maintainConnections();
@@ -431,11 +432,25 @@ public class LatticeConnectionManagerTest {
 		assertEquals(List.of(key,key),contacted,"heard from: reported once, without a probe");
 		assertTrue(manager.probes.isEmpty());
 
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		now.addAndGet(KEEP_ALIVE);
 		manager.maintainConnections();
 		assertNotNull(manager.probes.get(route));
 		manager.maintainConnections();
 		assertEquals(List.of(key,key,key),contacted,"answered a probe");
+	}
+
+	/** A configured keep-alive decides when a quiet route is probed. */
+	@Test public void testConfiguredKeepAliveProbesAQuietRoute() {
+		manager.setKeepAlive(5_000);
+		AccountKey key=candidate(1);
+		fill(1);
+		Object route=manager.getConnections().get(key);
+		now.addAndGet(4_999);
+		manager.maintainConnections();
+		assertTrue(manager.probes.isEmpty());
+		now.incrementAndGet();
+		manager.maintainConnections();
+		assertNotNull(manager.probes.get(route));
 	}
 
 	/** A failed dial and a failed identity challenge are each reported for their peer. */
@@ -463,7 +478,7 @@ public class LatticeConnectionManagerTest {
 		AccountKey key=candidate(1);
 		fill(1);
 		manager.respond=false;
-		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		now.addAndGet(KEEP_ALIVE);
 		manager.maintainConnections();
 		now.addAndGet(LatticeConnectionManager.PROBE_TIMEOUT_MS);
 		manager.maintainConnections();

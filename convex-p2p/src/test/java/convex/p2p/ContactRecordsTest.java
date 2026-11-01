@@ -61,26 +61,30 @@ public class ContactRecordsTest {
 		assertEquals(CVMLong.ZERO,contacts.get(CAROL).get(ContactRecords.FAILURES),"contact clears failures");
 	}
 
-	@Test void atMostMaxNodesHaveARecordAndTheOldestGoesFirst() {
+	@Test void atMostMaxNodesHaveARecordAndFailingOnesGoFirst() {
 		var contacts=alice(LatticeHost.create()).contacts();
+		int max=ContactRecords.MAX_NODES;
 		Random random=new Random(9104);
-		AccountKey[] nodes=new AccountKey[ContactRecords.MAX_NODES+1];
+		AccountKey[] nodes=new AccountKey[max+2];
 		for (int i=0; i<nodes.length; i++) nodes[i]=AccountKey.create(Blob.createRandom(random,AccountKey.LENGTH));
-		for (int i=0; i<ContactRecords.MAX_NODES; i++) {
+		// The first node is friendly and out of touch longest; the second has failed
+		for (int i=0; i<max; i++) {
 			time.incrementAndGet();
-			contacts.failed(nodes[i]);
+			if (i==1) contacts.failed(nodes[i]); else contacts.contacted(nodes[i]);
 		}
-		// A route still in touch is reported again, so the first node is no longer the oldest
-		time.incrementAndGet();
-		contacts.contacted(nodes[0]);
-		assertEquals(ContactRecords.MAX_NODES,contacts.all().count());
+		assertEquals(max,contacts.all().count());
 
 		time.incrementAndGet();
-		contacts.contacted(nodes[ContactRecords.MAX_NODES]);
-		assertEquals(ContactRecords.MAX_NODES,contacts.all().count());
-		assertNull(contacts.get(nodes[1]));
-		assertNotNull(contacts.get(nodes[0]));
-		assertNotNull(contacts.get(nodes[ContactRecords.MAX_NODES]));
+		contacts.contacted(nodes[max]);
+		assertEquals(max,contacts.all().count());
+		assertNull(contacts.get(nodes[1]),"a node with failures goes first");
+		assertNotNull(contacts.get(nodes[0]),"time alone is no evidence against a friendly node");
+
+		time.incrementAndGet();
+		contacts.contacted(nodes[max+1]);
+		assertEquals(max,contacts.all().count());
+		assertNull(contacts.get(nodes[0]),"then the node out of touch longest");
+		assertNotNull(contacts.get(nodes[max+1]));
 	}
 
 	@Test void applicationSyncSignsOnceAndTheRecordsSurviveARestart() throws Exception {

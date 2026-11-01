@@ -111,6 +111,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Hard cap for discovered candidates; explicit intent is not counted. */
 	private volatile int maxDesiredPeers = LatticePropagatorConfig.DEFAULT_MAX_DESIRED_PEERS;
 	private int ambientPeers=LatticePropagatorConfig.DEFAULT_AMBIENT_PEERS;
+	/** Normal root propagation is the heartbeat; a live route is probed only after this much silence. */
+	private volatile long keepAlive=LatticePropagatorConfig.DEFAULT_KEEP_ALIVE;
 	private int activePeers=LatticePropagatorConfig.DEFAULT_ACTIVE_PEERS;
 
 	// ========== Constants ==========
@@ -118,8 +120,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Interval between maintenance loop iterations (milliseconds). */
 	static final long MAINTENANCE_INTERVAL = 1_000L;
 	static final long ACTIVE_RETENTION_MS = 120_000L;
-	/** Normal root propagation is the heartbeat; only probe after sustained silence. */
-	static final long QUIET_PROBE_MS = 120_000L;
+	/** Time a probe may take: a round trip plus queueing behind outbound lattice data. */
 	static final long PROBE_TIMEOUT_MS = 30_000L;
 	/** New, unverified sockets have a separate, short admission deadline. */
 	static final long ADMISSION_TIMEOUT_MS = 5_000L;
@@ -240,6 +241,19 @@ public class LatticeConnectionManager extends AConnectionManager {
 			ambientPeers=ambient;
 			activePeers=active;
 		}
+		maintenanceSignal.release();
+	}
+
+	/**
+	 * Sets how long a live route may stay silent before it is probed, and so how
+	 * often a healthy route is reported as contact. Nodes without a route are never
+	 * probed.
+	 *
+	 * @param keepAlive quiet time in milliseconds
+	 */
+	public void setKeepAlive(long keepAlive) {
+		if (keepAlive<=0) throw new IllegalArgumentException("Keep-alive must be positive");
+		this.keepAlive=keepAlive;
 		maintenanceSignal.release();
 	}
 
@@ -1452,6 +1466,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		List<Map.Entry<AccountKey,HealthCheck>> probes=new ArrayList<>();
 		List<Map.Entry<AccountKey,HealthCheck>> failures=new ArrayList<>();
 		List<AccountKey> heard=new ArrayList<>();
+		long quiet=keepAlive;
 		synchronized (connectionLock) {
 			Map<AccountKey,Object> routes=new HashMap<>(upgradedInboundRoutes);
 			routes.putAll(connections);
@@ -1468,13 +1483,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 					if (now-check.probeStarted>=PROBE_TIMEOUT_MS) {
 						failures.add(Map.entry(key,check));
 					}
-				} else if (now-check.lastReceived>=QUIET_PROBE_MS) {
+				} else if (now-check.lastReceived>=quiet) {
 					if (route instanceof Convex || inboundProbe!=null) {
 						check.probing=true;
 						check.probeStarted=now;
 						probes.add(Map.entry(key,check));
 					}
-				} else if (now-check.lastReported>=QUIET_PROBE_MS) {
+				} else if (now-check.lastReported>=quiet) {
 					// Heard from within the quiet interval: still in contact
 					check.lastReported=now;
 					heard.add(key);

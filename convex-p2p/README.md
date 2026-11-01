@@ -335,9 +335,11 @@ no slot, so nodes connecting in cannot displace the peers this node chose. Nor d
 targets cap NAT return paths.
 
 Maintenance checks every second, but normal incoming propagation acts as the
-heartbeat: healthy ambient peers have no scheduled rotation. Only after two minutes
-without decoded incoming traffic does it send a correlated PING, allowing a further
-30 seconds of silence before retiring the route. Any incoming traffic cancels the
+heartbeat: healthy ambient peers have no scheduled rotation. Only after
+`LatticePropagatorConfig.KEEP_ALIVE` (`keepAlive`, 30 seconds by default) without
+decoded incoming traffic does it send a correlated PING, allowing a further 30
+seconds of silence before retiring the route. Keep it below the shortest idle timeout
+of the NATs and load balancers between nodes. Any incoming traffic cancels the
 liveness check, even if the PING reply is late or the request itself times out early.
 Known-closed routes release their slots immediately; their own retries back off while
 other candidates fill the vacancies. Automatic socket opening and identity admission

@@ -204,6 +204,7 @@ public class LatticePropagator implements Closeable {
 		this.maxDeltaBroadcastSize=config.getMaxDeltaBroadcastSize();
 		connectionManager.setMaxDesiredPeers(config.getMaxDesiredPeers());
 		connectionManager.setPeerTargets(config.getAmbientPeers(),config.getActivePeers());
+		connectionManager.setKeepAlive(config.getKeepAlive());
 		connectionManager.setInboundMessageLimits(
 			config.getMaxMessageSize(),config.getMaxTrustedMessageSize());
 	}

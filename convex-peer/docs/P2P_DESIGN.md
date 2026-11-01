@@ -368,15 +368,21 @@ the failures since it and the last failure.
 ```
 
 Only an authenticated connection counts as contact: a verified outbound admission or
-an inbound route upgrade, and then each quiet interval (two minutes) in which the
-route is heard from or answers a probe. A failure is a dial or identity challenge that
-failed for a desired peer, or an authenticated route that stopped answering. Nothing
-the owner writes in its node record, such as `:timestamp`, ever counts.
+an inbound route upgrade, and then each `keepAlive` interval (30 seconds by default)
+in which the route is heard from or answers a probe. A failure is a dial or identity
+challenge that failed for a desired peer, or an authenticated route that stopped
+answering. Nothing the owner writes in its node record, such as `:timestamp`, ever
+counts.
+
+Only live connections, which hold a socket and a slot, are probed. A node that
+answered and has not failed since keeps that standing whether or not this node is
+connected to it: time alone is no evidence against it, and nothing dials it just to
+check.
 
 Nodes connecting in can create records, so at most 1024 nodes have one
-(`ContactRecords.MAX_NODES`). A new node beyond that replaces the one whose latest
-contact or failure is oldest. A healthy route keeps reporting contact, so a node
-still in touch does not age out.
+(`ContactRecords.MAX_NODES`). A new node beyond that replaces one with failures if
+there is one, otherwise the one this node has been out of touch with longest. A live
+route keeps reporting contact, so it is never the oldest.
 
 `LatticeConnectionManager` sees every dial, challenge and silence and reports contact
 and failures through `setContactHandlers`. It knows no lattice paths. The P2P node

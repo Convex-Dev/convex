@@ -68,6 +68,15 @@ public final class LatticePropagatorConfig {
 	 */
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT=Strings.intern("inboundShutdownTimeout");
 
+	/**
+	 * Milliseconds a live route may stay silent before this group probes it. Any
+	 * traffic counts, so only quiet routes are probed. Set it below the shortest idle
+	 * timeout of the NATs, load balancers and firewalls on the path, which can drop a
+	 * quiet connection without telling either end. Nodes without a connection are
+	 * never probed.
+	 */
+	public static final AString KEEP_ALIVE=Strings.intern("keepAlive");
+
 	/** Conservative public-route message limit. */
 	public static final int DEFAULT_MAX_MESSAGE_SIZE=4*1024*1024;
 
@@ -93,6 +102,9 @@ public final class LatticePropagatorConfig {
 
 	/** Default time allowed for accepted endpoint work to drain. */
 	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT=10_000L;
+
+	/** Default quiet time before a live route is probed: half the common 60-second load-balancer idle timeout. */
+	public static final long DEFAULT_KEEP_ALIVE=30_000L;
 
 	private final AMap<AString,ACell> config;
 
@@ -231,6 +243,14 @@ public final class LatticePropagatorConfig {
 		if (value<=0) {
 			throw new IllegalArgumentException(INBOUND_SHUTDOWN_TIMEOUT+" must be positive: "+value);
 		}
+		return value;
+	}
+
+	/** Returns the quiet time in milliseconds before a live route is probed. */
+	public long getKeepAlive() {
+		CVMLong configured=RT.ensureLong(config.get(KEEP_ALIVE));
+		long value=(configured==null) ? DEFAULT_KEEP_ALIVE : configured.longValue();
+		if (value<=0) throw new IllegalArgumentException(KEEP_ALIVE+" must be positive: "+value);
 		return value;
 	}
 

@@ -30,6 +30,15 @@ public class LatticePropagatorConfigTest {
 	}
 
 	@Test
+	public void testKeepAlive() {
+		assertEquals(30_000,LatticePropagatorConfig.create().getKeepAlive());
+		assertEquals(5_000,LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.KEEP_ALIVE,CVMLong.create(5_000))).getKeepAlive());
+		var invalid=LatticePropagatorConfig.create(Maps.of(LatticePropagatorConfig.KEEP_ALIVE,CVMLong.ZERO));
+		assertThrows(IllegalArgumentException.class,invalid::getKeepAlive);
+	}
+
+	@Test
 	public void testHostAndGroupConfigurationAreIndependent() throws Exception {
 		NodeConfig host=NodeConfig.create(Maps.of(
 			NodeConfig.PORT,CVMLong.create(-1),
