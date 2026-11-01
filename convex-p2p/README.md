@@ -376,11 +376,14 @@ key as audience, and the fixed `convex-lattice-peer-v1` context.
 An unverified assigned connection may submit complete `LATTICE_VALUE` messages, because
 the P2P data is public, but it cannot stage unsolicited `DATA` or trigger missing-cell
 acquisition. Complete values are handed to the P2P application, which takes the
-infrastructure regions whole and, from the social region, only the owners it wants:
+identity region whole, the node registry by its own rule
+([retention](../convex-peer/docs/P2P_DESIGN.md#retention)) and, from the social
+region, only the owners it wants:
 locally registered social DIDs, explicit pins and their direct active follows. The
 same set bounds what the node publishes. Every social slot must have a valid signature
 from a key authorised for its DID. The node's `maxConnections` bounds inbound
-sockets and the group's `maxDesiredPeers` bounds discovered candidates. Discovery
+sockets, its `maxNodeRecords` the node records it keeps (default 1024), and the
+group's `maxDesiredPeers` discovered candidates. Discovery
 never makes a node a wanted peer: nodes named with `connect` are kept regardless.
 
 ## License

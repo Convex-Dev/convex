@@ -22,7 +22,7 @@ import convex.lattice.generic.KeyedLattice;
  *
  * <p>It holds the policy of this node's {@link NodeRegistryLattice}, the rule the
  * application merges the registry with: the bound, the blocklist, the contact
- * records records rank by, and the nodes whose records are pinned, which are this
+ * records by which records rank, and the nodes whose records are pinned, which are this
  * node's own and those of nodes the operator named, nodes it has an authenticated
  * route to or is authenticating one from, and its Points of Presence, all bounded by
  * configuration and connections. Evidence comes from this node's contact records,

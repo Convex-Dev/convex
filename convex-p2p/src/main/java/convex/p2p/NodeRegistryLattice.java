@@ -95,12 +95,16 @@ final class NodeRegistryLattice extends ALattice<AHashMap<ACell,SignedData<ACell
 		if (other==null || other==own) return own;
 		if (!checkForeign(other)) throw new IllegalArgumentException("Invalid node registry");
 		if (own==null) own=zero();
+		List<Offer> offers=differences(own,other);
+		if (offers.isEmpty()) return own;
+		// Read inside the caller's update, which may run more than once: both are
+		// lock-free snapshots
 		Set<AccountKey> pins=pins();
 		AHashMap<AccountKey,AHashMap<Keyword,ACell>> contacts=evidence.get();
 
 		List<Candidate> arrivals=new ArrayList<>();
 		AHashMap<ACell,SignedData<ACell>> result=own;
-		for (Offer offer:differences(own,other)) {
+		for (Offer offer:offers) {
 			AccountKey node=offer.node();
 			boolean isOwn=node.equals(ownKey);
 			if (blocked.contains(node)) continue;
