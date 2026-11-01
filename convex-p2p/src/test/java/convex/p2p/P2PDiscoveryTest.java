@@ -80,8 +80,8 @@ public class P2PDiscoveryTest {
 			assertFalse(sender.request(update).get(5,TimeUnit.SECONDS).isError());
 		}
 		assertEquals(CANDIDATES,hub.propagationGroup().getConnectionManager().getDesiredPeers().size());
-		// The hub keeps as many as its bound, besides its own
-		assertEquals(CANDIDATES+1,registry(hub).count());
+		// The directory is not a connection list: the hub keeps every record, besides its own
+		assertEquals(2*CANDIDATES+1,registry(hub).count());
 
 		// The operator's own connection is not a candidate and still succeeds
 		Convex toPeer=hub.connect(peerKey.getAccountKey(),peer.getHostAddress())

@@ -17,6 +17,7 @@ import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
@@ -26,6 +27,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -39,8 +41,8 @@ import convex.core.util.Utils;
  * propagation group to authenticate routes; nothing here opens a socket, marks a
  * connection trusted or merges a foreign value.</p>
  *
- * <p>The in-memory index follows the registry the application holds, which
- * {@link P2PConnections} keeps bounded: a record it drops leaves the index. A
+ * <p>The in-memory index follows the registry the application holds, which its
+ * {@link NodeRegistryLattice} keeps bounded: a record it drops leaves the index. A
  * dropped record is not revoked, since the Owner/LWW registry has no deletion
  * contract.</p>
  */
@@ -54,6 +56,8 @@ final class NodeDirectory {
 	private final P2PApplication application;
 	private final ConcurrentHashMap<AccountKey,NodeRecord> records=
 		new ConcurrentHashMap<>();
+	/** The registry the index was last brought up to. */
+	private AHashMap<ACell,SignedData<ACell>> indexed=Maps.empty();
 
 	private AVector<AccountKey> pointsOfPresence=Vectors.empty();
 	private boolean relay;
@@ -154,29 +158,39 @@ final class NodeDirectory {
 	}
 
 	/**
-	 * Rebuilds the validated index from the current registry and returns the remote
+	 * Brings the validated index up to the current registry and returns the remote
 	 * records that are new or newer than before, for the node to turn into
-	 * connection candidates. Records no longer held leave the index.
+	 * connection candidates. Only records that differ from the registry last indexed
+	 * are read, so a refresh with nothing changed costs one comparison. Records no
+	 * longer held leave the index.
 	 */
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({"unchecked","rawtypes"})
 	synchronized List<NodeRecord> refresh() {
-		List<NodeRecord> changed=new ArrayList<>();
 		ACell value=application.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		AHashMap<ACell,SignedData<ACell>> nodes=(value instanceof AHashMap<?,?> rawNodes)
 			? (AHashMap<ACell,SignedData<ACell>>)rawNodes : Maps.empty();
-		records.keySet().removeIf(key -> !nodes.containsKey(key));
+		if (nodes.equals(indexed)) return List.of();
+		List<NodeRecord> changed=new ArrayList<>();
 		AccountKey ownKey=ownKey();
-		for (Map.Entry<ACell,SignedData<ACell>> entry:nodes.entrySet()) {
-			AccountKey peerKey=RT.ensureAccountKey(entry.getKey());
-			if (peerKey==null) continue;
-			NodeRecord updated=parseRecord(peerKey,entry.getValue());
-			if (updated==null) continue;
-
-			NodeRecord existing=records.get(peerKey);
-			if (existing!=null && updated.timestamp()<=existing.timestamp()) continue;
-			records.put(peerKey,updated);
-			if (!peerKey.equals(ownKey)) changed.add(updated);
-		}
+		((AHashMap)indexed).mergeDifferences(nodes,new MergeFunction<ACell>() {
+			@Override public ACell merge(ACell a,ACell b) {
+				throw new IllegalStateException("Directory refresh requires the entry key");
+			}
+			@Override public ACell merge(Object key,ACell a,ACell b) {
+				AccountKey peerKey=(key instanceof ACell cell)?RT.ensureAccountKey(cell):null;
+				if (peerKey==null || Cells.equals(a,b)) return a;
+				NodeRecord updated=(b instanceof SignedData<?> signed)?parseRecord(peerKey,signed):null;
+				if (updated==null) {
+					records.remove(peerKey);
+					return a;
+				}
+				NodeRecord existing=records.put(peerKey,updated);
+				boolean newer=(existing==null || updated.timestamp()>existing.timestamp());
+				if (newer && !peerKey.equals(ownKey)) changed.add(updated);
+				return a;
+			}
+		});
+		indexed=nodes;
 		return changed;
 	}
 

@@ -21,6 +21,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeHost;
+import convex.node.NodeConfig;
 
 /** A node keeps the records it wants: pinned ones, answered ones, and the best of the rest up to its bound. */
 public class P2PConnectionsTest {
@@ -128,6 +129,54 @@ public class P2PConnectionsTest {
 		alice.directory().refresh();
 		assertEquals(0,held().count());
 		assertFalse(alice.directory().records().containsKey(routed.getAccountKey()));
+	}
+
+	@Test void aDeliveryAtTheRegistryPathIsBoundedToo() {
+		alice.mergeAt(records(0,10,1),P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		assertEquals(BOUND,held().count());
+	}
+
+	@Test void raisingTheBoundAdmitsRecordsTurnedAway() {
+		var offered=records(0,10,1);
+		alice.merge(registry(offered));
+		alice.connections().setMaxRecords(10);
+		alice.merge(registry(offered));
+		assertEquals(10,held().count());
+	}
+
+	@Test void aBlockedNodeIsDroppedAndRefused() {
+		AKeyPair bob=key(100);
+		alice.merge(registry(record(bob,1)));
+		alice.directory().refresh();
+		alice.connections().block(bob.getAccountKey());
+		assertNull(held().get(bob.getAccountKey()));
+		assertFalse(alice.directory().records().containsKey(bob.getAccountKey()));
+
+		alice.merge(registry(record(bob,2)));
+		assertNull(held().get(bob.getAccountKey()),"a blocked node's newer record is refused");
+	}
+
+	@Test void aRefreshReportsOnlyWhatChanged() {
+		alice.merge(registry(records(0,3,1)));
+		assertEquals(3,alice.directory().refresh().size());
+		assertTrue(alice.directory().refresh().isEmpty(),"nothing changed");
+
+		AKeyPair newer=key(0);
+		alice.merge(registry(record(newer,2)));
+		var changed=alice.directory().refresh();
+		assertEquals(1,changed.size());
+		assertEquals(newer.getAccountKey(),changed.get(0).peerKey());
+	}
+
+	@Test void theBoundIsConfiguredOnTheNode() {
+		assertEquals(NodeRegistryLattice.DEFAULT_MAX_RECORDS,P2PNode.maxNodeRecords(NodeConfig.create()));
+		assertEquals(5,P2PNode.maxNodeRecords(config(5)));
+		assertEquals(0,P2PNode.maxNodeRecords(config(0)));
+		assertThrows(IllegalArgumentException.class,() -> P2PNode.maxNodeRecords(config(-1)));
+	}
+
+	private static NodeConfig config(long maxNodeRecords) {
+		return NodeConfig.create(Maps.of(P2PNode.MAX_NODE_RECORDS,CVMLong.create(maxNodeRecords)));
 	}
 
 	@SuppressWarnings("unchecked")

@@ -18,6 +18,7 @@ import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
+import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeApplication;
@@ -35,10 +36,10 @@ import convex.social.Social;
  * merge: an incoming root, or a path value reduced to its path, is projected to what
  * this node wants. The projection reduces the social region to the owners this node
  * wants and leaves out {@code :local}, which this node neither accepts nor
- * publishes. Its {@link P2PConnections} merges the {@code :p2p} region and keeps the
- * node records this node wants; the lattice merge takes the other regions as
- * declared, verifying each owner's slot. The two merge in separate updates, as
- * keyed regions do, so a reader may see one before the other. The application also
+ * publishes. The lattice merge takes the regions in one update, verifying each
+ * owner's slot; the node registry merges by this node's {@link NodeRegistryLattice},
+ * which keeps only the node records this node wants, under the policy its
+ * {@link P2PConnections} holds. The application also
  * owns the P2P policy that reads the lattice: the social owners this node wants and
  * the paths to pull from a newly admitted peer, with the node directory and contact
  * records held by its connections. It imports nothing from the node package. A
@@ -82,12 +83,17 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		if (lattice.path(Social.KEY_SOCIAL)!=null) {
 			lattice=lattice.addLattice(Social.KEY_SOCIAL,Social.ownerLattice(didAuthorizer));
 		}
-		return new P2PApplication(lattice,host,ownKey,signer,clock,didAuthorizer);
+		NodeRegistryLattice registry=new NodeRegistryLattice(ownKey);
+		ALattice<?> region=lattice.path(P2PLattice.KEY_P2P);
+		if (region instanceof KeyedLattice p2p && p2p.path(P2PLattice.KEY_NODES)!=null) {
+			lattice=lattice.addLattice(P2PLattice.KEY_P2P,p2p.addLattice(P2PLattice.KEY_NODES,registry));
+		}
+		return new P2PApplication(lattice,host,ownKey,signer,clock,didAuthorizer,registry);
 	}
 
 	private P2PApplication(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host,
 			AccountKey ownKey,BiFunction<ACell,ACell,SignedData<ACell>> signer,
-			Supplier<CVMLong> clock,DIDKeyAuthorizer didAuthorizer) {
+			Supplier<CVMLong> clock,DIDKeyAuthorizer didAuthorizer,NodeRegistryLattice registry) {
 		super(lattice,host.cursor());
 		this.host=host;
 		this.ownKey=ownKey;
@@ -95,7 +101,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		this.clock=java.util.Objects.requireNonNull(clock);
 		this.servedRegions=Sets.fromCollection(lattice.getKeys()).exclude(LocalLattice.KEY_LOCAL);
 		this.socialPolicy=new SocialReplicationPolicy(this,java.util.Objects.requireNonNull(didAuthorizer));
-		this.connections=new P2PConnections(this,signer);
+		this.connections=new P2PConnections(this,registry,signer);
 	}
 
 	AccountKey ownKey() { return ownKey; }
@@ -117,18 +123,15 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	ASet<Keyword> servedRegions() { return servedRegions; }
 
 	/**
-	 * Merges an incoming root projected to what this node wants ({@link #project}).
-	 * The connections take the {@code :p2p} region and the lattice merge the rest,
-	 * verifying each owner's slot. A path delivery arrives here reduced to its path,
-	 * so the same projection selects it.
+	 * Merges an incoming root projected to what this node wants ({@link #project})
+	 * in one update, verifying each owner's slot. A path delivery arrives here
+	 * reduced to its path, so the same projection selects it.
 	 */
 	@Override
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 		Index<Keyword,ACell> wanted=project(other);
 		if (wanted==null) return cursor().get();
-		connections.merge(wanted);
-		Index<Keyword,ACell> rest=wanted.dissoc(P2PLattice.KEY_P2P);
-		return cursor().updateAndGet(own -> getLattice().merge(own,rest));
+		return cursor().updateAndGet(own -> getLattice().merge(own,wanted));
 	}
 
 	/**

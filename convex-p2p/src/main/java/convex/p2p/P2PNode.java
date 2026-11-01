@@ -29,7 +29,10 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
@@ -102,6 +105,13 @@ public class P2PNode implements Closeable {
 
 	private static final Logger log = LoggerFactory.getLogger(P2PNode.class.getName());
 
+	/**
+	 * Node configuration key: the node records a node keeps besides pinned ones
+	 * (Long, default 1024). The directory is not a connection list, so this is
+	 * independent of the peers a node connects to.
+	 */
+	public static final AString MAX_NODE_RECORDS=Strings.intern("maxNodeRecords");
+
 	private final LatticeNode<Index<Keyword, ACell>> network;
 	/** The network's server, which replicates the host. */
 	private final NodeServer<Index<Keyword, ACell>> server;
@@ -125,7 +135,7 @@ public class P2PNode implements Closeable {
 		this.keyPair=keyPair;
 		P2PConnections connections=application.connections();
 		LatticeConnectionManager manager=propagator.getConnectionManager();
-		connections.setMaxRecords(manager.getMaxDesiredPeers());
+		connections.setMaxRecords(maxNodeRecords(config));
 		// Nodes with an authenticated route, or one being authenticated, keep their records
 		connections.setRoutes(() -> {
 			Set<AccountKey> routes=manager.getAuthenticatedRouteKeys();
@@ -138,6 +148,17 @@ public class P2PNode implements Closeable {
 		propagator.setPublicationFilter(application::project);
 		propagator.setApplicationMessageHandler(pointOfPresence::handle);
 		propagator.setInboundLatticeListener(this::onAcceptedInbound);
+	}
+
+	/** The configured bound on node records kept besides pinned ones. */
+	static int maxNodeRecords(NodeConfig config) {
+		ACell value=config.getMap().get(MAX_NODE_RECORDS);
+		if (value==null) return NodeRegistryLattice.DEFAULT_MAX_RECORDS;
+		CVMLong bound=RT.ensureLong(value);
+		if (bound==null || bound.longValue()<0 || bound.longValue()>Integer.MAX_VALUE) {
+			throw new IllegalArgumentException(MAX_NODE_RECORDS+" must be between 0 and "+Integer.MAX_VALUE+": "+value);
+		}
+		return (int)bound.longValue();
 	}
 
 	/**

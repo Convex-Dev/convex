@@ -33,9 +33,9 @@ P2PLattice.ROOT (KeyedLattice)
 under its node `AccountKey` at `[:p2p :nodes <nodeKey>]`. The record format belongs to
 this module: `NodeDirectory` publishes and validates this application-owned path while
 the generic propagation layer transports it without interpreting its schema. Each
-node keeps only the records it wants: `P2PConnections` merges the region and keeps
-the records of nodes it routes to or was told to connect to, plus a bounded sample of
-others ([retention](../convex-peer/docs/P2P_DESIGN.md#retention)).
+node keeps only the records it wants: it merges the registry by a lattice of its own
+that keeps the records of nodes it routes to or was told to connect to, plus a bounded
+sample of others ([retention](../convex-peer/docs/P2P_DESIGN.md#retention)).
 
 **`:id`** — P2P user identity, separate from transport details, so one identity can
 advertise several nodes and change its claims without republishing node records.

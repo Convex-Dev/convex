@@ -240,12 +240,15 @@ passes it. The timestamp is never evidence that the node is alive (§4.6).
 #### Retention
 
 Each node holds only the node records it wants, as it does for social owners. The
-P2P application's connection-management component, `P2PConnections`, merges the
-`:p2p` region: an incoming registry merges by the owner rule, then is reduced to the
-records the node keeps, and the node publishes only what it holds. There is no
-global directory: each node passes on the records it keeps, so discovery spreads as
-gossip of samples, and the registry's cost to a node stays bounded however many keys
-exist.
+registry merges by a lattice of the node's own, `NodeRegistryLattice`: the owner
+rule, applied only to the records the node wants. Nodes that accept every record
+converge under the owner rule; a node that turns records away holds a subset of
+theirs. An incoming record that differs from the one held is checked before it is
+merged, and the node publishes only what it holds. The policy the lattice applies is
+held by the P2P application's connection-management component, `P2PConnections`.
+There is no global directory: each node passes on the records it keeps, so discovery
+spreads as gossip of samples, and the registry's cost to a node stays bounded however
+many keys exist.
 
 A node always keeps, without counting them:
 
@@ -256,17 +259,30 @@ A node always keeps, without counting them:
 - records of its own Points of Presence.
 
 These are bounded by configuration and by the node's connection limit. Beyond them
-it keeps up to `maxDesiredPeers` records (256 by default), in order: nodes that
-answered and have not failed since, then nodes never reached, then nodes that failed.
-Nothing an incoming value or connection can create escapes a bound. Within each group
-the order is a hash of the node key salted with a secret the node draws when it starts. Other nodes cannot predict the order, so none can
-choose which records a node keeps. It is stable while the node runs, so a record
-turned away is turned away again when it next arrives, and exchanges between nodes
-settle. The evidence comes from `:local` (§4.6), never from the record itself.
+it keeps up to `maxNodeRecords` records (1024 by default, in the node configuration),
+in order: nodes that answered and have not failed since, then nodes never reached,
+then nodes that failed. The registry is a directory, not a connection list, so this
+bound is independent of how many peers the node connects to. Nothing an incoming
+value or connection can create escapes a bound. Within each group the order is a
+hash of the node key salted with a secret the node draws when it starts. Other nodes
+cannot predict the order, so none can choose which records a node keeps. It is
+stable while the node runs, so a record turned away is turned away again when it
+next arrives, and exchanges between nodes settle. The evidence comes from `:local`
+(§4.6), never from the record itself.
 
-Apart from its own, a node keeps only valid NodeInfo records within 4 KB
-(`P2PLattice.MAX_NODE_RECORD_SIZE`); a newer record that fails either check leaves
-the one held. A dropped record leaves the node directory but stays a connection
+The checks on an incoming record run cheapest first:
+
+1. a record of a node this node has blocked is refused;
+2. a record over 4 KB (`P2PLattice.MAX_NODE_RECORD_SIZE`) is refused;
+3. a new node competing for a place in a full registry is refused if it ranks below
+   the lowest record held;
+4. a record that is not newer under the owner rule is ignored;
+5. a record that is not a valid NodeInfo is refused, leaving any held one.
+
+The node's own record skips the size and validity checks. Held records are not
+checked again; they leave only when outranked or blocked. Each node keeps a different
+subset, so every exchange offers records turned away before, and each costs a
+comparison. A dropped record leaves the node directory but stays a connection
 candidate.
 
 A NAT leaf pushes its record before the receiving node authenticates its route, so a
