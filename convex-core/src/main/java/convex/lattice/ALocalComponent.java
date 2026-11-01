@@ -32,10 +32,8 @@ import convex.lattice.cursor.AForkableCursor;
  * into the private copy, for the next sync to publish. Where records come from is the
  * application's decision: {@code :local} is not exchanged with other nodes.</p>
  *
- * <p>The root may belong to a private host with a store of its own
- * ({@link LatticeHost#fork(convex.core.store.AStore)}). Syncing into it and
- * checkpointing that host retains interim state in that store. Whether another host
- * takes the record from it is for that host's applications to decide.</p>
+ * <p>Given a persistence function, such as the host's, {@link #persist()} writes the
+ * private copy to the application's store without signing or touching the slot.</p>
  */
 public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword,ACell>> {
 
@@ -51,10 +49,12 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 	 * @param owner Key that owns, and signs, the slot
 	 * @param signer Signs the owner's slot when the record is synced
 	 * @param clock Supplies the record's {@code :timestamp} for each edit
+	 * @param persister Persists the private copy, such as {@code host::persist}, or null if it is never persisted
 	 */
 	protected ALocalComponent(AForkableCursor<Index<Keyword,ACell>> root,Keyword service,AccountKey owner,
-			Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer,Supplier<CVMLong> clock) {
-		super(recordPath(root,service,owner,signer).fork());
+			Function<AHashMap<Keyword,ACell>,SignedData<AHashMap<Keyword,ACell>>> signer,Supplier<CVMLong> clock,
+			Persister<AHashMap<Keyword,ACell>> persister) {
+		super(recordPath(root,service,owner,signer).fork(),persister);
 		record=Timestamped.create(storage.withDefault(Maps.empty()),clock);
 	}
 

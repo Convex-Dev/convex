@@ -298,13 +298,20 @@ of recovery. A checkpoint retains one host snapshot and completes the store's
 barrier. It excludes private application drafts and writes arriving after that
 snapshot. A failed barrier does not roll back publication already performed.
 
+A component with working state of its own, such as a host-bound application or any
+component given a persistence function when built, persists it with `persist()`. Its cells go to the store and need
+not stay in memory, but nothing is published, signed or retained as the root, so
+it survives a restart only once synced and checkpointed. The component never
+holds a store: it persists through a function supplied when it was built, which a
+host-bound application takes from its host. A component without one refuses,
+since its state is its parent's. Which components persist, and when, is the
+application's policy.
+
 State that is not shared, such as configuration or what a node has seen of
 others, lives in the owner's slot in `:local`, one record per service. An
 `ALocalComponent` edits a private copy of its record and writes it into the slot
 with one signature when the application syncs it, so the application decides how
-many edits share a signature. To retain interim state, build the component over a
-private host with its own store and checkpoint that host. Whether the main host
-takes the record from it is for the main host's applications to decide.
+many edits share a signature.
 
 The service chooses when to promise durability. It can checkpoint before
 acknowledging a durable request or batch flushes when delayed durability is

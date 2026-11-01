@@ -3,14 +3,17 @@ package convex.lattice;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.Blobs;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -31,14 +34,23 @@ class LocalComponentTest {
 	/** A minimal service whose signer counts signatures and whose clock the test sets. */
 	private static final class Notes extends ALocalComponent {
 		Notes(AForkableCursor<Index<Keyword,ACell>> root,Keyword service,AtomicInteger signatures,AtomicLong time) {
+			this(root,service,signatures,time,null);
+		}
+
+		Notes(AForkableCursor<Index<Keyword,ACell>> root,Keyword service,AtomicInteger signatures,AtomicLong time,
+				Persister<AHashMap<Keyword,ACell>> persister) {
 			super(root,service,KEY.getAccountKey(),value -> {
 				signatures.incrementAndGet();
 				return KEY.signData(value);
-			},() -> CVMLong.create(time.get()));
+			},() -> CVMLong.create(time.get()),persister);
 		}
 
 		void put(Keyword key,long value) {
-			cursor().path(key).set(CVMLong.create(value));
+			put(key,CVMLong.create(value));
+		}
+
+		void put(Keyword key,ACell value) {
+			cursor().path(key).set(value);
 		}
 	}
 
@@ -147,16 +159,28 @@ class LocalComponentTest {
 		}
 	}
 
-	@Test void interimStateCanBeRetainedInAPrivateHost() throws IOException {
-		var host=LatticeHost.create();
+	@Test void persistWritesThePrivateCopyToTheHostsStoreWithoutSigning() throws IOException {
 		var store=new MemoryStore();
-		var interim=host.fork(store);
-		var notes=new Notes(interim.cursor(),ALPHA,new AtomicInteger(),new AtomicLong(10));
-		notes.put(A,1);
+		var host=LatticeHost.create(store);
+		var root=host.cursor().get();
+		var signatures=new AtomicInteger();
+		var notes=new Notes(host.cursor(),ALPHA,signatures,new AtomicLong(10),host::persist);
+		ABlob blob=Blobs.createRandom(new Random(7531),1000);
+		notes.put(A,blob);
+
+		var persisted=notes.persist();
+		assertNotNull(store.refForHash(blob.getHash()));
+		assertEquals(0,signatures.get());
+		assertSame(root,host.cursor().get());
+		assertNull(store.getRootData());
+
 		notes.sync();
-		interim.checkpoint();
-		Index<Keyword,ACell> retained=store.getRootData();
-		assertEquals(notes.cursor().get(),slot(retained).getValue().get(ALPHA));
-		assertNull(host.cursor().get().get(LocalLattice.KEY_LOCAL));
+		assertEquals(1,signatures.get());
+		assertEquals(persisted,slot(host.cursor().get()).getValue().get(ALPHA));
+	}
+
+	@Test void persistNeedsAFunction() {
+		var notes=new Notes(LatticeHost.create().cursor(),ALPHA,new AtomicInteger(),new AtomicLong(10));
+		assertThrows(UnsupportedOperationException.class,notes::persist);
 	}
 }

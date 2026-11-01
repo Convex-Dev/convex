@@ -10,9 +10,10 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p>Applications define incoming merge and routing through their domain components.
  * No abstract lattice or parallel structure declaration is required. A host-bound
- * application owns a staged copy of the host value; a cursor-bound application
- * shares the supplied working state. Children may share that state or own separate
- * publication boundaries.</p>
+ * application owns a staged copy of the host value and persists it through the
+ * host's store; a cursor-bound application shares the supplied working state.
+ * Children may share that state or own separate publication boundaries. Which
+ * children persist, and when, is the application's policy.</p>
  *
  * <p>Sync prepares the application, syncs its managed children, then publishes its
  * own working boundary. Publication stops at the destination cursor. The host owns
@@ -23,9 +24,9 @@ import convex.lattice.cursor.AForkableCursor;
  */
 public abstract class ALatticeApplication<V extends ACell> extends ALatticeComponent<V> {
 
-	/** Creates private working state over a host. */
+	/** Creates private working state over a host, persisted through the host's store. */
 	protected ALatticeApplication(LatticeHost<V> host) {
-		super(Objects.requireNonNull(host,"Application host must not be null").cursor().fork());
+		super(Objects.requireNonNull(host,"Application host must not be null").cursor().fork(),host::persist);
 	}
 
 	/** Shares working storage, for live applications, nested containers and transaction views. */

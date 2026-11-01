@@ -58,6 +58,8 @@ Applications must publish their own staged changes first. A checkpoint never
 accepts private application drafts and never exchanges a forked host with its
 origin. Checkpointing a private host with a separate store therefore saves a
 private draft; explicit fork sync or delivery accepts it into another host.
+`persist()` writes a draft's cells to its host's store without publishing it; the
+draft is still not retained until it is synced and checkpointed.
 
 A service can scope `host.autoFlush(Duration)` around its lifetime for periodic
 barriers. The resource exposes the first background failure through `failure()`,

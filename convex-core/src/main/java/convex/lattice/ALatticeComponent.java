@@ -1,5 +1,6 @@
 package convex.lattice;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -25,19 +26,37 @@ import convex.lattice.cursor.ForkedCursor;
  * rules as implementation details. {@link LatticeComponent} adapts a supplied lattice
  * when its generic merge and navigation are the intended component behaviour.</p>
  *
- * <p>Persistence belongs to the host ({@link LatticeHost}) and to components which
- * explicitly own a store for their own data, such as DLFS drives.</p>
+ * <p>A component never holds a store. One with working state of its own persists
+ * it through a function supplied at construction ({@link #persist()}); others are
+ * persisted with their parent, and the root by the host ({@link LatticeHost}).
+ * Components which own a store for their own data, such as DLFS drives, manage it
+ * themselves.</p>
  *
  * @param <V> Value type of the wrapped cursor
  */
 public abstract class ALatticeComponent<V extends ACell> {
 
+	/** Writes a value's cells to a store, returning an equal value whose cells are retained there. */
+	@FunctionalInterface
+	public interface Persister<V extends ACell> {
+		V persist(V value) throws IOException;
+	}
+
 	/** Working storage bound at construction; editing views do not move this boundary. */
 	protected final AForkableCursor<V> storage;
 
+	/** Persists this component's own working state, or null when its parent persists it. */
+	private final Persister<V> persister;
+
 	/** Binds the supplied storage directly, without creating another fork. */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
+		this(cursor,null);
+	}
+
+	/** Binds the supplied storage with the function that persists it, for working state of its own. */
+	protected ALatticeComponent(AForkableCursor<V> cursor,Persister<V> persister) {
 		this.storage=Objects.requireNonNull(cursor,"Component cursor must not be null");
+		this.persister=persister;
 	}
 
 	/**
@@ -147,6 +166,25 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 */
 	public V sync() {
 		return storage.sync(this::mergePublication);
+	}
+
+	/**
+	 * Persists this component's working state through the function supplied at
+	 * construction, without publishing it. The persisted value, equal to the working
+	 * value, replaces it so its cells need not stay in memory; an edit made meanwhile
+	 * is kept for the next persist. Nothing is signed and no destination changes.
+	 * Persisted state survives a restart only once synced into the host and retained.
+	 * A component without a function refuses: its state, if any, is its parent's.
+	 *
+	 * @return Persisted working value
+	 * @throws IOException If the store fails
+	 */
+	public V persist() throws IOException {
+		if (persister==null) throw new UnsupportedOperationException(getClass().getSimpleName()+" does not know how to persist");
+		V working=storage.get();
+		V persisted=persister.persist(working);
+		storage.compareAndSet(working,persisted);
+		return persisted;
 	}
 
 }

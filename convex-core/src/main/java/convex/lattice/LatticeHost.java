@@ -283,10 +283,13 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 
 	/**
 	 * Persists the current root value without changing the cursor or publishing.
+	 * Unlike a component's working state, the root keeps its references until
+	 * {@link #sync()} installs the retained snapshot.
 	 *
 	 * @return Persisted current root value
 	 * @throws IOException If persistence fails
 	 */
+	@Override
 	public V persist() throws IOException {
 		return persist(cursor().get());
 	}
