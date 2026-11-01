@@ -344,6 +344,19 @@ together are limited to four concurrent attempts; new identity challenges retain
 separate five-second deadline. Physical inbound sockets that remain silent are
 retired by their owning endpoint so an outbound-only node can reconnect.
 
+## Local state
+
+What a node learns about other nodes is local state at `[:local <node key> :p2p]`,
+never shared: the P2P application leaves `:local` out of everything it publishes and
+accepts. `ContactRecords` holds, per node key, the last authenticated contact, the
+failures since it and the last failure. It is this module's example of an
+`ALocalComponent`. The connection manager's reports edit a private copy and sign
+nothing; the application syncs the copy into the node's signed slot, once, when it
+publishes its own record and when the service shuts down as
+[SHUTDOWN.md](../convex-peer/docs/SHUTDOWN.md) prescribes; the host persists it with its
+root, so the records survive a restart. A node without a key keeps none. See
+[Local Evidence](../convex-peer/docs/P2P_DESIGN.md#46-local-evidence-partial).
+
 ## Security
 
 Inbound network lattice traffic is **denied by default**. A node serves queries and

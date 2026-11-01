@@ -384,6 +384,9 @@ public class P2PNode implements Closeable {
 				log.debug("Unable to initialise admitted peer {}: {}",peerKey,error.getMessage());
 				return null;
 			}));
+		// The application's contact records hear what the manager learns about other nodes
+		ContactRecords contacts=application.contacts();
+		if (contacts!=null) manager.setContactHandlers(contacts::contacted,contacts::failed);
 		// A failed launch closes the network itself
 		network.launch();
 		try {
@@ -667,10 +670,12 @@ public class P2PNode implements Closeable {
 		var host=node.getNodeServer().getHost();
 		// Runs once; a second caller waits until it has finished
 		Shutdown.Once shutdown=Shutdown.once(() -> {
-			// Stop ingress, then close the host (stops flushing, final checkpoint published
-			// through the node), then the node (sends it to peers), then the store.
+			// Stop ingress and sync the application's local state, then close the host
+			// (stops flushing, final checkpoint published through the node), then the
+			// node (sends it to peers), then the store.
 			try (store; node; host) {
 				node.stopIngress();
+				node.getApplication().sync();
 			} catch (IOException | RuntimeException e) {
 				log.warn("Unable to finish P2P service shutdown",e);
 			}

@@ -178,7 +178,7 @@ P2P discovery and routing use three paths, each keyed by node key:
 ```
 [:p2p :nodes <node key>]  → SignedData<NodeInfo>        Node records this node keeps
 [:kad <node key>]         → SignedData<routing view>    Each node's own Kademlia view   [FUTURE]
-[:local <node key> :p2p]  → local evidence              What this node has seen of others  [PROPOSED]
+[:local <node key> :p2p]  → local evidence              What this node has seen of others  [PARTIAL]
 ```
 
 Node records and routing views are shared. Each entry is signed by its node key and
@@ -335,30 +335,49 @@ This is natural in the `NodeServer` model: the application attaches propagators
 with the appropriate filtered views, while a node only merges values governed by
 its configured lattice.
 
-### 4.6 Local Evidence [PROPOSED]
+### 4.6 Local Evidence [PARTIAL]
 
 What a node has seen of other nodes is its own business. It lives at
 `[:local <own node key> :p2p]`: `:local` holds application state that is not meant
 to be shared, written and managed by one application instance. The node may
-replicate it for backup, but never publishes it to other nodes or merges theirs. It
-holds:
+replicate it for backup, but never publishes it to other nodes or merges theirs: the
+P2P application's projection leaves `:local` out in both directions.
 
-- a contact record per node key: last authenticated contact, consecutive failures
-  and the last failure;
+`ContactRecords` holds a contact record per node key: the last authenticated contact,
+the failures since it and the last failure.
+
+```clojure
+;; Value at [:local <own node key> :p2p]
+{:timestamp 1708000000000
+ :contacts  {0xabc123... {:last-contact 1708000000000, :failures 0}
+             0xdef456... {:last-contact 1707990000000, :failures 2,
+                          :last-failure 1707999000000}}}
+```
+
+Only an authenticated connection counts as contact: a verified outbound admission or
+an inbound route upgrade. A failure is a dial or identity challenge that failed for a
+desired peer, or an authenticated route that stopped answering. Nothing the owner
+writes in its node record, such as `:timestamp`, ever counts.
+
+`LatticeConnectionManager` sees every dial, challenge and silence and reports contact
+and failures through `setContactHandlers`. It knows no lattice paths. The P2P node
+routes the reports to the application's `ContactRecords`, an `ALocalComponent`: each
+report edits its private copy and signs nothing. The application syncs the copy into
+its `:local` slot, signing the slot once, whenever it syncs the host to publish its
+own record, and when the service shuts down as [SHUTDOWN.md](SHUTDOWN.md) prescribes;
+a service that skips that sync loses what changed since. The host persists the slot
+with the rest of its root, so after a restart the records start from what the host
+retained. A node without a key keeps none.
+
+Proposed for the same record:
+
 - failures per address, since many keys can name one address;
 - remembered peers, for bootstrap after a restart
   ([#716](https://github.com/Convex-Dev/convex/issues/716));
 - operator and policy blocklists of keys and addresses
   ([#814](https://github.com/Convex-Dev/convex/issues/814)).
 
-Only an authenticated connection counts as contact: a verified outbound admission, an
-inbound route upgrade, or traffic on an authenticated route. Nothing the owner writes
-in its record, such as `:timestamp`, ever does.
-
-`LatticeConnectionManager` sees every dial, challenge and silence, so it keeps the live
-records and reports changes. It knows no lattice paths. The P2P application stores the
-records in `:local` and gives them back to the manager at start. Retention (§4.2),
-candidate selection and retry all rank by this evidence.
+Retention (§4.2), candidate selection and retry are to rank by this evidence.
 
 ## 5. Transport Layer [PROPOSED]
 
@@ -812,7 +831,7 @@ This needs to be resolved before Phase 2 of the consensus migration.
 
 ### Phase 1b — Retention and Local Evidence
 - Node records advertise served regions (`:regions`, §4.2)
-- Contact records kept by the connection manager and stored in `:local` (§4.6)
+- Contact records reported by the connection manager and kept in `:local` (§4.6)
 - Each node keeps only the records it wants, ranked by that evidence (§4.2)
 - Remembered peers and blocklists from the same records (#716, #814)
 

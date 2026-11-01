@@ -9,6 +9,7 @@ import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
@@ -39,8 +40,9 @@ import convex.social.Social;
  * leaves out {@code :local}, which this node neither accepts nor publishes. The
  * application also owns the P2P policy that reads the lattice:
  * the node registry as a validated directory, the social owners this node wants, and
- * the paths to pull from a newly admitted peer. It imports nothing from the node
- * package. A {@link P2PNode} assembles it with replication and calls it at the
+ * the paths to pull from a newly admitted peer. A node with a key also keeps its
+ * {@link ContactRecords} as local state, synced with the application. It imports
+ * nothing from the node package. A {@link P2PNode} assembles it with replication and calls it at the
  * moments replication knows about; a local application may use the same component
  * over a standalone {@link LatticeHost}.</p>
  *
@@ -62,6 +64,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	private final BiFunction<ACell,ACell,SignedData<ACell>> signer;
 	private final Supplier<CVMLong> clock;
 	private final ASet<Keyword> servedRegions;
+	private final ContactRecords contacts;
 
 	/** Connects a relay with standard DID verification and no authoring capability. */
 	public static P2PApplication connect(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host) {
@@ -83,6 +86,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		return new P2PApplication(lattice,host,ownKey,signer,clock,didAuthorizer);
 	}
 
+	@SuppressWarnings("unchecked")
 	private P2PApplication(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host,
 			AccountKey ownKey,BiFunction<ACell,ACell,SignedData<ACell>> signer,
 			Supplier<CVMLong> clock,DIDKeyAuthorizer didAuthorizer) {
@@ -94,10 +98,22 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		this.servedRegions=Sets.fromCollection(lattice.getKeys()).exclude(LocalLattice.KEY_LOCAL);
 		this.directory=new NodeDirectory(this);
 		this.socialPolicy=new SocialReplicationPolicy(this,java.util.Objects.requireNonNull(didAuthorizer));
+		// Only a node that can sign its own :local slot keeps contact records
+		this.contacts=(ownKey==null || signer==null)?null:new ContactRecords(cursor(),ownKey,
+			value -> (SignedData<AHashMap<Keyword,ACell>>)(SignedData<?>)signer.apply(ownKey,value),clock);
 	}
 
 	AccountKey ownKey() { return ownKey; }
 	Supplier<CVMLong> clock() { return clock; }
+
+	/** This node's contact records, or null for a node without a key. */
+	ContactRecords contacts() { return contacts; }
+
+	/** Syncs this node's contact records into its {@code :local} slot, signing it once if they changed. */
+	@Override
+	protected void syncChildren() {
+		if (contacts!=null) contacts.sync();
+	}
 
 	/** The top-level regions this application serves, as advertised in its node record. Never {@code :local}. */
 	ASet<Keyword> servedRegions() { return servedRegions; }
@@ -183,8 +199,12 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		return socialPolicy;
 	}
 
-	/** Publishes the host root, so an edit made by this application's policy is persisted and announced. */
+	/**
+	 * Syncs this application, then publishes the host root, so an edit made by this
+	 * application's policy, and its contact records, are persisted and announced.
+	 */
 	void syncHost() {
+		sync();
 		host.sync();
 	}
 
