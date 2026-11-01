@@ -936,6 +936,11 @@ This needs to be resolved before Phase 2 of the consensus migration.
 - Implement `KadLattice` for O(log N) routing when network scale demands it
 - Owner-keyed: each node publishes its own routing view at `[:kad <node key>]`
 
+### Future — Shared Blocklists
+- Publish blocklists for other nodes to subscribe to, as an owner-signed `AccessList`
+  in its own region, unlike a node's private list in `:local` (§4.6)
+- A node chooses whose lists it follows, and reads them together with its own
+
 ## 15. Summary
 
 The Convex peer network is built on lattice technology — the same algebraic foundations, data structures, security model, and propagation mechanisms used by every other part of the ecosystem. A P2P node's identity is its own signed node key; being a Convex peer as well is optional and orthogonal.
