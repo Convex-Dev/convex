@@ -28,11 +28,13 @@ import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.BoundedMessageQueue;
 import convex.core.message.Message;
@@ -94,6 +96,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private volatile AKeyPair transportKeyPair;
 	private volatile Predicate<Message> applicationMessageHandler;
 	private volatile InboundLatticeListener inboundLatticeListener;
+	private volatile Predicate<AccountKey> challengerAdmission;
 
 	LatticeProtocolEndpoint(LatticePropagator propagator,NodeServer<?> node,
 			LatticePropagatorConfig config) {
@@ -120,6 +123,11 @@ final class LatticeProtocolEndpoint implements Closeable {
 	/** Configures the post-merge observer for values received through this group. */
 	void setInboundLatticeListener(InboundLatticeListener listener) {
 		this.inboundLatticeListener=listener;
+	}
+
+	/** Configures which nodes that challenge this group over inbound connections are challenged back. */
+	void setChallengerAdmission(Predicate<AccountKey> admission) {
+		this.challengerAdmission=admission;
 	}
 
 	/** Starts this group's ordered ingress and maintenance workers. */
@@ -425,7 +433,37 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	private void processChallenge(Message message) {
+		// Decided before answering, so a challenger that has the answer has also been
+		// challenged back, if it ever will be
+		admitChallenger(message);
 		message.respondToChallenge(transportKeyPair,Message.LATTICE_PEER_CHALLENGE_CONTEXT::equals);
+	}
+
+	/**
+	 * Challenges back a node that challenged this group by name over an inbound
+	 * connection, when the application admits its key; proving it makes the
+	 * connection an outbound route. A challenge naming no key, or another node's, is
+	 * one any node could replay, so it admits nothing.
+	 */
+	private void admitChallenger(Message message) {
+		Predicate<AccountKey> admission=challengerAdmission;
+		AKeyPair kp=transportKeyPair;
+		AConnection connection=message.getConnection();
+		if (admission==null || kp==null || connection==null || connection.isTrusted()
+				|| !ownsInbound(connection)) return;
+		try {
+			AVector<ACell> payload=message.getPayload();
+			if (payload==null || payload.count()!=3 || !(payload.get(2) instanceof SignedData<?> signed)) return;
+			if (!(signed.getValue() instanceof AVector<?> challenge) || challenge.count()!=3) return;
+			if (!kp.getAccountKey().equals(RT.ensureAccountKey(challenge.get(1)))) return;
+			if (!Message.LATTICE_PEER_CHALLENGE_CONTEXT.equals(challenge.get(2))) return;
+			if (!signed.checkSignature()) return;
+			AccountKey challenger=signed.getAccountKey();
+			if (challenger==null || challenger.equals(kp.getAccountKey()) || !admission.test(challenger)) return;
+			inboundVerifier.maybeStart(connection,propagator,challenger);
+		} catch (RuntimeException e) {
+			log.debug("Unable to admit challenger on {}: {}",connection.getRemoteAddress(),e.getMessage());
+		}
 	}
 
 	private void processApplicationMessage(Message message,ConnectionContext context) {

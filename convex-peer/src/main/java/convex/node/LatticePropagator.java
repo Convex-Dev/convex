@@ -99,6 +99,7 @@ public class LatticePropagator implements Closeable {
 	private AKeyPair transportKeyPair;
 	private Predicate<Message> applicationMessageHandler;
 	private InboundLatticeListener inboundLatticeListener;
+	private Predicate<AccountKey> challengerAdmission;
 
 	/** Background publication worker. */
 	private Thread propagationThread;
@@ -350,6 +351,7 @@ public class LatticePropagator implements Closeable {
 			endpoint.setTransportKeyPair(transportKeyPair);
 			endpoint.setApplicationMessageHandler(applicationMessageHandler);
 			endpoint.setInboundLatticeListener(inboundLatticeListener);
+			endpoint.setChallengerAdmission(challengerAdmission);
 		}
 	}
 
@@ -415,6 +417,24 @@ public class LatticePropagator implements Closeable {
 		synchronized (writeLock) {
 			this.inboundLatticeListener=listener;
 			if (endpoint!=null) endpoint.setInboundLatticeListener(listener);
+		}
+	}
+
+	/**
+	 * Sets which nodes this group gossips with when they connect to it. A node that
+	 * challenges this group over an inbound connection, naming this group's transport
+	 * key, is challenged back if the predicate admits its key; once it proves the key,
+	 * the connection becomes an authenticated outbound route, as with
+	 * {@link #authenticateInboundRoute}. A challenge naming no key, which a node
+	 * dialling an endpoint sends first, is answered but admits nothing. Admission
+	 * spends this group's bandwidth on the node; it grants no trust in what it sends.
+	 *
+	 * @param admission keys to admit, or {@code null} to admit none, the default
+	 */
+	public void setChallengerAdmission(Predicate<AccountKey> admission) {
+		synchronized (writeLock) {
+			this.challengerAdmission=admission;
+			if (endpoint!=null) endpoint.setChallengerAdmission(admission);
 		}
 	}
 

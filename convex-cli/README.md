@@ -453,15 +453,18 @@ Windows mapping behaviour and recovery, or run `convex etch gc --help` for optio
 ## DLFS file server
 
 `dlfs start` serves DLFS drives over WebDAV and replicates them with other DLFS
-nodes named with `--peer`:
+nodes. To replicate two nodes both ways, start one serving inbound peers, then name it
+from the other with `--peer`:
 
 ```bash
-convex dlfs start --key 0x7e66429ca... --etch dlfs.etch --peer tcp://files.example.com:19888
+convex dlfs start --key 0x7e66429ca... --etch a.etch --serve-inbound
+convex dlfs start --key 0x2b5f61d0e... --etch b.etch --port 8081 --node-port 19889 --peer tcp://localhost:19888
 ```
 
 Each peer is admitted under the key it proves, and startup fails if a peer cannot be
-reached. See the [DLFS README](../convex-dlfs/README.md#run-a-webdav-server) for peer
-addresses and what the peer must allow.
+reached. `--serve-inbound` lets anyone who can reach the node port read every
+replicated drive. See the [DLFS README](../convex-dlfs/README.md#run-a-webdav-server)
+for peer addresses and what serving inbound exposes.
 
 ## Global Options
 

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -674,8 +675,8 @@ public class LatticeConnectionManagerTest {
 		manager.endpointDials.remove(ENDPOINT).complete(peer);
 
 		assertSame(peer,connecting.getNow(null));
-		assertTrue(peer.challenged);
-		assertNull(peer.challengedFor,"an endpoint is challenged for no particular key");
+		assertEquals(Arrays.asList(null,remote),peer.challengedFor,
+			"challenged for no key, then naming the key it proved");
 		assertEquals(remote,peer.getVerifiedPeer());
 		assertSame(peer,manager.getConnection(remote));
 		assertTrue(manager.getAuthenticatedRouteKeys().contains(remote));
@@ -852,18 +853,16 @@ public class LatticeConnectionManagerTest {
 		}
 	}
 
-	/** A newly opened client which, challenged for no particular key, proves the given one or none. */
+	/** A newly opened client proving the given key, or none, to a challenge naming no key or that key. */
 	private static class IdentifyingPeer extends StubPeer {
 		final AccountKey proves;
-		boolean challenged;
-		AccountKey challengedFor;
+		final List<AccountKey> challengedFor=new ArrayList<>();
 		IdentifyingPeer(AccountKey proves) { super(proves); setVerifiedPeer(null); this.proves=proves; }
 		@Override public CompletableFuture<AccountKey> verifyPeer(AccountKey expected,ACell context) {
-			challenged=true;
-			challengedFor=expected;
-			if (expected!=null) return CompletableFuture.completedFuture(null);
-			if (proves!=null) setVerifiedPeer(proves);
-			return CompletableFuture.completedFuture(proves);
+			challengedFor.add(expected);
+			AccountKey proved=(expected==null || expected.equals(proves)) ? proves : null;
+			if (proved!=null) setVerifiedPeer(proved);
+			return CompletableFuture.completedFuture(proved);
 		}
 	}
 

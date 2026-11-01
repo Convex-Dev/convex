@@ -106,8 +106,14 @@ public class DlfsStart extends ACommand {
 	private String etchFile;
 
 	@Option(names={"--url"},
-		description="Public URL for this node (enables P2P discovery). Must be reachable from the internet.")
+		description="Public URL of this node's lattice port. Unused: dlfs start does not advertise itself.")
 	private String publicUrl;
+
+	@Option(names={"--serve-inbound"},
+		description="Serve this node's lattice view to every node that connects, and send its updates to any "
+			+"that proves its key, so a peer naming this node with --peer replicates both ways. "
+			+"Anyone who can reach the node port can read every replicated drive.")
+	private boolean serveInbound;
 
 	@Option(names={"--no-tray"},
 		description="Disable the system tray icon.")
@@ -157,6 +163,11 @@ public class DlfsStart extends ACommand {
 			.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
 		// The command's node config also carries the group limits
 		LatticePropagator propagator=node.createPropagator(LatticePropagatorConfig.from(config));
+		if (serveInbound) {
+			node.serveAllInbound(propagator);
+			// Gossip with any node that connects and proves its key: it can read this view anyway
+			propagator.setChallengerAdmission(key -> true);
+		}
 
 		try {
 			node.launch();
@@ -167,7 +178,8 @@ public class DlfsStart extends ACommand {
 			closeFailedStart(e,store,node,host);
 			throw new CLIError(ExitCodes.CONFIG, "Failed to launch lattice node: " + e.getMessage(), e);
 		}
-		inform("Lattice transport started on port " + node.getListener().getPort());
+		inform("Lattice transport started on port " + node.getListener().getPort()
+			+ (serveInbound ? ", serving inbound peers" : ", refusing inbound peers"));
 
 		// Serve the local owner's drives through the application's registered region.
 		// Starting the HTTP server is the last step, so a failure leaves nothing of it open.

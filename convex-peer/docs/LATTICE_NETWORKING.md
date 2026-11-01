@@ -164,14 +164,23 @@ bounded desired-peer intent
 ```
 
 A node known only by its endpoint, named with `connectPeer(URI)`, is challenged for
-no particular key. The key it proves becomes explicit intent at that endpoint, so
-reconnections challenge for that key. This proves the node holds the key it names, not
+no particular key, then again naming the key it proved. The key becomes explicit
+intent at that endpoint, so reconnections challenge for that key. This proves the node holds the key it names, not
 that it is the node the caller meant; over `tls://` the certificate vouches for the
 host name first. A node that cannot be reached or proves no key gets three attempts,
 with the usual retry backoff, then the caller's future fails, so a service that needs
 its peers in order to start fails promptly rather than waiting on one that is not
 there. `Transports.peerEndpoint` parses an operator's `tcp://` or `tls://` URI, or
 `host:port`, and refuses a DID, which cannot be resolved to a node yet.
+
+A group can also gossip with nodes that connect to it. With
+`setChallengerAdmission(predicate)`, a node that challenges the group over an inbound
+connection, naming the group's transport key, is challenged back if the predicate
+admits its key, and proving it upgrades the connection. The predicate is how the
+application admits keys, as CAD036 requires. A challenge naming no key, or another
+node's, is answered but admits nothing: it could be a replay of one the challenger
+sent elsewhere. Admission spends the group's bandwidth on the node, bounded by the
+listener's connection limit, and grants no trust in the values it sends.
 
 Zero-trust connectivity is still useful. Public complete values can be checked
 by the application lattice regardless of route authentication. Trust controls

@@ -734,8 +734,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/**
 	 * Connects to a node known only by its transport endpoint, admitting it under the
 	 * key it proves. The maintenance thread dials the endpoint and challenges the node
-	 * without an expected key; the key it proves becomes an explicit peer at that
-	 * endpoint, so reconnections challenge for that key. A node that cannot be reached
+	 * without an expected key, then again naming the key it proved, so a node that
+	 * admits challengers can gossip back over this connection (see
+	 * {@link LatticePropagator#setChallengerAdmission}). The key becomes an explicit peer
+	 * at that endpoint, so reconnections challenge for that key. A node that cannot be reached
 	 * or proves no key is retried briefly: after {@value #MAX_ENDPOINT_ATTEMPTS} failed
 	 * attempts the future fails and the intent is dropped.
 	 *
@@ -1716,8 +1718,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 	}
 
 	/**
-	 * Challenges a newly opened client for whatever key it holds. The client stays in
-	 * limbo, without store access or the trusted receive limit, until it is admitted.
+	 * Challenges a newly opened client for whatever key it holds, then again naming
+	 * that key: a node admitting challengers acts only on a challenge that names it,
+	 * since one naming no key could be replayed to any node. The client stays in limbo,
+	 * without store access or the trusted receive limit, until it is admitted.
 	 */
 	private CompletableFuture<AccountKey> identify(Convex peer) {
 		AKeyPair kp=keyPair;
@@ -1725,9 +1729,15 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (!accepting) throw new IllegalStateException("Connection manager is closed");
 		restrictOutboundToLimbo(peer);
 		peer.setKeyPair(kp);
-		CompletableFuture<AccountKey> verification=peer.verifyPeer(null,Message.LATTICE_PEER_CHALLENGE_CONTEXT);
-		if (verification==null) throw new IllegalStateException("Peer verification returned no future");
-		return verification.orTimeout(ADMISSION_TIMEOUT_MS,TimeUnit.MILLISECONDS);
+		CompletableFuture<AccountKey> learned=peer.verifyPeer(null,Message.LATTICE_PEER_CHALLENGE_CONTEXT);
+		if (learned==null) throw new IllegalStateException("Peer verification returned no future");
+		return learned.thenCompose(key -> {
+			// This node itself needs no second challenge: admission refuses it
+			if (key==null || key.equals(kp.getAccountKey())) return CompletableFuture.completedFuture(key);
+			CompletableFuture<AccountKey> named=peer.verifyPeer(key,Message.LATTICE_PEER_CHALLENGE_CONTEXT);
+			return (named!=null) ? named : CompletableFuture.<AccountKey>failedFuture(
+				new IllegalStateException("Peer verification returned no future"));
+		}).orTimeout(ADMISSION_TIMEOUT_MS,TimeUnit.MILLISECONDS);
 	}
 
 	/**

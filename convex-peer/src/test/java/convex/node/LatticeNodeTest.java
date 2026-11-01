@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
@@ -187,6 +188,93 @@ class LatticeNodeTest {
 				assertEquals(serverKey.getAccountKey(),peer.getVerifiedPeer());
 				assertSame(peer,manager.getConnection(serverKey.getAccountKey()));
 				assertTrue(manager.getAuthenticatedRouteKeys().contains(serverKey.getAccountKey()));
+			}
+		}
+	}
+
+	/** A node admitting challengers gets a route back to a node that dialled it, so its updates reach that node. */
+	@Test void admittedChallengerReceivesTheDialledNodesUpdates() throws Exception {
+		try (var servedStore=new MemoryStore(); var diallerStore=new MemoryStore()) {
+			var servedHost=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),servedStore);
+			var diallerHost=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),diallerStore);
+			var app=diallerHost.addApplication(new LatticeApplication<>(SetLattice.<CVMLong>create(),diallerHost));
+			var servedKey=AKeyPair.createSeeded(707);
+			var diallerKey=AKeyPair.createSeeded(708);
+			try (var served=new LatticeNode<>(servedHost,NodeConfig.port(0)).launch();
+					var dialler=new LatticeNode<>(diallerHost,NodeConfig.port(-1)).launch()) {
+				served.setIdentity(DID.forKey(servedKey.getAccountKey()),servedKey);
+				var servedGroup=served.createPropagator();
+				served.serveAllInbound(servedGroup);
+				servedGroup.setChallengerAdmission(key -> true);
+				dialler.setIdentity(DID.forKey(diallerKey.getAccountKey()),diallerKey);
+				var diallerGroup=dialler.createPropagator();
+				var received=new CompletableFuture<Void>();
+				diallerGroup.setInboundLatticeListener((connection,group,path,value,changed) -> {
+					if (app.cursor().get().contains(CVMLong.ONE)) received.complete(null);
+				});
+
+				diallerGroup.getConnectionManager().connectPeer(Transports.endpoint(served.getHostAddress()))
+					.get(10,TimeUnit.SECONDS);
+				servedGroup.getConnectionManager().whenInboundConnectionUpgraded(diallerKey.getAccountKey())
+					.get(10,TimeUnit.SECONDS);
+				servedHost.cursor().set(Sets.of(1));
+				servedHost.sync();
+				received.get(10,TimeUnit.SECONDS);
+				assertEquals(Sets.of(1),app.cursor().get());
+			}
+		}
+	}
+
+	/** Without admission, serving inbound gives a node that dialled in no route back. */
+	@Test void servingInboundAloneGivesNoRouteBack() throws Exception {
+		try (var servedStore=new MemoryStore(); var diallerStore=new MemoryStore()) {
+			var servedKey=AKeyPair.createSeeded(709);
+			var diallerKey=AKeyPair.createSeeded(710);
+			try (var served=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,servedStore),NodeConfig.port(0)).launch();
+					var dialler=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,diallerStore),NodeConfig.port(-1)).launch()) {
+				served.setIdentity(DID.forKey(servedKey.getAccountKey()),servedKey);
+				var servedGroup=served.createPropagator();
+				served.serveAllInbound(servedGroup);
+				dialler.setIdentity(DID.forKey(diallerKey.getAccountKey()),diallerKey);
+				dialler.createPropagator().getConnectionManager()
+					.connectPeer(Transports.endpoint(served.getHostAddress())).get(10,TimeUnit.SECONDS);
+				// Admission is decided before the challenge is answered, so it would have begun by now
+				assertTrue(servedGroup.getAuthenticatingInboundKeys().isEmpty());
+				assertFalse(servedGroup.getConnectionManager().hasUpgradedInboundConnection(diallerKey.getAccountKey()));
+			}
+		}
+	}
+
+	/** Only a challenge naming this node, from a key the application admits, earns a challenge back. */
+	@Test void onlyANamedChallengeFromAnAdmittedKeyIsChallengedBack() throws Exception {
+		try (var store=new MemoryStore()) {
+			var servedKey=AKeyPair.createSeeded(711);
+			var admittedKey=AKeyPair.createSeeded(712);
+			var otherKey=AKeyPair.createSeeded(713);
+			try (var served=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch()) {
+				served.setIdentity(DID.forKey(servedKey.getAccountKey()),servedKey);
+				var group=served.createPropagator();
+				served.serveAllInbound(group);
+				group.setChallengerAdmission(admittedKey.getAccountKey()::equals);
+				var manager=group.getConnectionManager();
+				var context=Message.LATTICE_PEER_CHALLENGE_CONTEXT;
+				try (var admitted=ConvexRemote.connect(served.getHostAddress());
+						var other=ConvexRemote.connect(served.getHostAddress())) {
+					admitted.setKeyPair(admittedKey);
+					other.setKeyPair(otherKey);
+
+					assertEquals(servedKey.getAccountKey(),admitted.verifyPeer(null,context).get(10,TimeUnit.SECONDS));
+					assertTrue(group.getAuthenticatingInboundKeys().isEmpty(),"a challenge naming no key admits nothing");
+					assertFalse(manager.hasUpgradedInboundConnection(admittedKey.getAccountKey()));
+
+					assertEquals(servedKey.getAccountKey(),other.verifyPeer(servedKey.getAccountKey(),context).get(10,TimeUnit.SECONDS));
+					assertTrue(group.getAuthenticatingInboundKeys().isEmpty(),"a key the application refuses is not challenged back");
+					assertFalse(manager.hasUpgradedInboundConnection(otherKey.getAccountKey()));
+
+					assertEquals(servedKey.getAccountKey(),admitted.verifyPeer(servedKey.getAccountKey(),context).get(10,TimeUnit.SECONDS));
+					manager.whenInboundConnectionUpgraded(admittedKey.getAccountKey()).get(10,TimeUnit.SECONDS);
+					assertTrue(manager.getAuthenticatedRouteKeys().contains(admittedKey.getAccountKey()));
+				}
 			}
 		}
 	}

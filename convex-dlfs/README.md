@@ -189,8 +189,17 @@ synchronously at the service `sync()` boundary.
 given as `tcp://host:port`, `tls://host:port` or `host:port`, and repeatable. Each peer
 is admitted under the key it proves, which the command prints; startup fails if a peer
 cannot be reached or proves no key. The peer must serve its lattice view to inbound
-connections, as `convex.dlfs.Main` does with `latticeInbound: "public"` or
-`--serve-inbound`; `convex dlfs start` itself refuses inbound lattice connections.
+connections: `convex dlfs start --serve-inbound` does, as does `convex.dlfs.Main` with
+`latticeInbound: "public"` or `--serve-inbound`. Without it, `convex dlfs start` refuses
+inbound lattice connections.
+
+A `convex dlfs start --serve-inbound` node also sends its updates back to any node that
+connects and proves its key, so two such nodes replicate both ways when one names the
+other: start the serving node, then the other with `--peer`. Anyone who can reach its
+node port can read every replicated drive and receive its updates. Each node serves
+only its own drives over HTTP; the other node's drives are replicated but not shown. A
+node that joins receives the other's existing state with its next update or root sync,
+within about 30 seconds.
 
 ### Host DLFS in a lattice application
 
