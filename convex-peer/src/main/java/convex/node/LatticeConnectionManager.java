@@ -159,6 +159,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private final ConcurrentHashMap<AccountKey, CompletableFuture<AConnection>> upgradedRouteWaiters =
 		new ConcurrentHashMap<>();
 
+	/** Futures awaiting the ambient target, met by routes to peers not named explicitly. Lock held. */
+	private final List<CompletableFuture<Void>> ambientWaiters=new ArrayList<>();
+
 	/** Wakes the single maintenance thread when desired-peer state changes. */
 	private final Semaphore maintenanceSignal = new Semaphore(0);
 
@@ -237,11 +240,54 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public void setPeerTargets(int ambient,int active) {
 		if (ambient<0 || active<0) throw new IllegalArgumentException("Peer targets must be non-negative");
+		List<CompletableFuture<Void>> met;
 		synchronized (connectionLock) {
 			ambientPeers=ambient;
 			activePeers=active;
+			met=takeMetAmbientWaiters();
 		}
+		for (CompletableFuture<Void> waiter:met) waiter.complete(null);
 		maintenanceSignal.release();
+	}
+
+	/**
+	 * Returns a future that completes once this node holds routes it opened to at least
+	 * the ambient target of peers, not counting peers named with {@link #addPeer} or
+	 * {@link #connectPeer}. A node seeding its connections from explicitly named peers
+	 * can then release them, as other peers can replace them. Completes at once if the
+	 * target is already met, including a target of zero, and fails when the manager
+	 * closes. Routes lost later do not undo it.
+	 *
+	 * @return future completing when the ambient target is met
+	 */
+	public CompletableFuture<Void> whenAmbientTargetMet() {
+		synchronized (connectionLock) {
+			if (!accepting) {
+				return CompletableFuture.failedFuture(new IllegalStateException("Connection manager is closed"));
+			}
+			if (isAmbientTargetMet()) return CompletableFuture.completedFuture(null);
+			CompletableFuture<Void> waiter=new CompletableFuture<>();
+			ambientWaiters.add(waiter);
+			return waiter;
+		}
+	}
+
+	/** Whether routes this node opened to peers not named explicitly meet the ambient target. Lock held. */
+	private boolean isAmbientTargetMet() {
+		int routes=0;
+		for (AccountKey key:connections.keySet()) {
+			PeerActivity state=activity.get(key);
+			if (state!=null && !state.explicit) routes++;
+		}
+		return routes>=ambientPeers;
+	}
+
+	/** Removes the ambient waiters to complete, once the target is met. Lock held. */
+	private List<CompletableFuture<Void>> takeMetAmbientWaiters() {
+		if (ambientWaiters.isEmpty() || !isAmbientTargetMet()) return List.of();
+		List<CompletableFuture<Void>> met=new ArrayList<>(ambientWaiters);
+		ambientWaiters.clear();
+		return met;
 	}
 
 	/**
@@ -529,6 +575,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		List<PendingConnection> pending;
 		List<CompletableFuture<Convex>> waiters;
 		List<CompletableFuture<AConnection>> routeWaiters;
+		List<CompletableFuture<Void>> targetWaiters;
 		synchronized (connectionLock) {
 			active = new ArrayList<>(connections.values());
 			connections.clear();
@@ -538,6 +585,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 			connectionWaiters.clear();
 			routeWaiters = new ArrayList<>(upgradedRouteWaiters.values());
 			upgradedRouteWaiters.clear();
+			targetWaiters = new ArrayList<>(ambientWaiters);
+			ambientWaiters.clear();
 			// The listener/endpoint owns these physical inbound connections. Closing
 			// this manager revokes only their logical outbound capability.
 			upgradedInboundRoutes.clear();
@@ -553,6 +602,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
 		}
 		for (CompletableFuture<AConnection> waiter : routeWaiters) {
+			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
+		}
+		for (CompletableFuture<Void> waiter : targetWaiters) {
 			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
 		}
 	}
@@ -901,6 +953,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			AccountKey peerKey,Convex convex,boolean trusted) {
 		Convex replaced=null;
 		PendingConnection pending=null;
+		List<CompletableFuture<Void>> met=List.of();
 		boolean eligible;
 		synchronized (connectionLock) {
 			eligible=accepting && desiredPeers.containsKey(peerKey);
@@ -910,8 +963,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 				replaced = connections.put(peerKey, convex);
 				health.put(peerKey,new HealthCheck(convex,clock.getAsLong()));
 				pending = pendingConnections.remove(peerKey);
+				met=takeMetAmbientWaiters();
 			}
 		}
+		for (CompletableFuture<Void> waiter:met) waiter.complete(null);
 		if (!eligible) {
 			closeSilently(convex);
 			return CompletableFuture.failedFuture(new IllegalStateException("Peer was removed before admission"));
@@ -1050,6 +1105,52 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (routeWaiter != null) {
 			routeWaiter.completeExceptionally(new IllegalStateException("Peer removed before route upgrade"));
 		}
+	}
+
+	/**
+	 * Withdraws the explicit intent {@link #addPeer} or {@link #connectPeer} declared
+	 * for a peer and closes the route this node opened to it, as for a seed that other
+	 * peers have replaced. The peer stays a candidate like any discovered node while
+	 * it has a dial target and the candidate cap allows; otherwise it is forgotten. A
+	 * route the peer opened to this node is kept. A peer that is not explicit is left
+	 * as it is.
+	 *
+	 * @param peerKey key of the peer to release
+	 */
+	public void releasePeer(AccountKey peerKey) {
+		if (peerKey == null) return;
+		Convex removed;
+		PendingConnection pending=null;
+		CompletableFuture<Convex> waiter;
+		synchronized (connectionLock) {
+			PeerActivity state=activity.get(peerKey);
+			if (state==null || !state.explicit) return;
+			if (hasDialTarget(desiredPeers.get(peerKey)) && candidateCount<maxDesiredPeers) {
+				state.explicit=false;
+				candidateCount++;
+			} else {
+				desiredPeers.remove(peerKey);
+				activity.remove(peerKey);
+				dialling.remove(peerKey);
+				pending=pendingConnections.remove(peerKey);
+			}
+			removed=connections.remove(peerKey);
+			// Maintenance checks an inbound route the peer opened from its next pass
+			if (removed!=null) health.remove(peerKey);
+			waiter=connectionWaiters.remove(peerKey);
+		}
+		if (removed != null) {
+			closeSilently(removed);
+			log.debug("Released peer: {}", peerKey);
+		}
+		if (pending != null) {
+			pending.admission.completeExceptionally(new IllegalStateException("Peer released while awaiting verification"));
+			closeSilently(pending.connection);
+		}
+		if (waiter != null) {
+			waiter.completeExceptionally(new IllegalStateException("Peer released before connection"));
+		}
+		maintenanceSignal.release();
 	}
 
 	// ========== Desired Peer Management ==========

@@ -134,6 +134,66 @@ public class LatticeConnectionManagerTest {
 		assertEquals(5,manager.getConnectionCount());
 	}
 
+	/** A seed named explicitly is released once other peers fill the ambient slots. */
+	@Test public void testExplicitPeerIsReleasedOnceOthersMeetTheAmbientTarget() {
+		manager.setPeerTargets(2,0);
+		AccountKey seed=AKeyPair.createSeeded(100).getAccountKey();
+		manager.connectPeer(seed,new InetSocketAddress("localhost",1));
+		CompletableFuture<Void> met=manager.whenAmbientTargetMet();
+		fill(1);
+		assertFalse(met.isDone(),"an explicit route does not count towards the target");
+		candidate(1);
+		candidate(2);
+		fill(3);
+		assertTrue(met.isDone());
+
+		manager.releasePeer(seed);
+		assertNull(manager.getConnection(seed),"the route this node opened is closed");
+		assertTrue(manager.getDesiredPeers().containsKey(seed),"it stays a candidate");
+		for (int i=0;i<10;i++) {
+			manager.maintainConnections();
+			manager.completeDials();
+		}
+		assertEquals(2,manager.getConnectionCount(),"the peers that replaced it keep their slots");
+		assertNull(manager.getConnection(seed));
+	}
+
+	@Test public void testAmbientTargetFutureCompletesWhenMetAndFailsOnClose() {
+		manager.setPeerTargets(0,0);
+		assertTrue(manager.whenAmbientTargetMet().isDone(),"a target of zero is met at once");
+		manager.setPeerTargets(1,0);
+		CompletableFuture<Void> lowered=manager.whenAmbientTargetMet();
+		assertFalse(lowered.isDone());
+		manager.setPeerTargets(0,0);
+		assertTrue(lowered.isDone() && !lowered.isCompletedExceptionally(),"lowering the target can meet it");
+		manager.setPeerTargets(1,0);
+		CompletableFuture<Void> waiting=manager.whenAmbientTargetMet();
+		manager.close();
+		assertTrue(waiting.isCompletedExceptionally());
+		assertTrue(manager.whenAmbientTargetMet().isCompletedExceptionally());
+	}
+
+	@Test public void testReleaseKeepsInboundRoutesAndForgetsPeersWithNothingToDial() {
+		AccountKey seed=AKeyPair.createSeeded(100).getAccountKey();
+		CompletableFuture<Convex> connecting=manager.connectPeer(seed,new InetSocketAddress("localhost",1));
+		StubInbound inbound=new StubInbound();
+		inbound.setTrustedKey(seed);
+		manager.upgradeInboundConnection(inbound);
+		manager.releasePeer(seed);
+		assertSame(inbound,manager.getUpgradedInboundConnection(seed),"the route the peer opened stays");
+		assertFalse(inbound.isClosed());
+		assertTrue(connecting.isCompletedExceptionally(),"the intent is withdrawn");
+
+		AccountKey named=AKeyPair.createSeeded(101).getAccountKey();
+		manager.addPeer(named);
+		manager.releasePeer(named);
+		assertFalse(manager.getDesiredPeers().containsKey(named),"nothing to dial, so not a candidate");
+
+		AccountKey discovered=candidate(1);
+		manager.releasePeer(discovered);
+		assertTrue(manager.getDesiredPeers().containsKey(discovered),"a candidate is left as it is");
+	}
+
 	@Test public void testOutstandingWorkIsNotTrimmedAndBootstrapIsNotActivity() {
 		manager.setPeerTargets(1,1);
 		candidate(1);
