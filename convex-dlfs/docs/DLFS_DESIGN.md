@@ -233,8 +233,9 @@ HTTP request
 ```
 
 File operations go through the NIO filesystem abstraction, apart from whole-file
-reads and writes. GET and HEAD read the file entry once and serve its blob, so
-headers and body come from one version of the file; GET answers a single byte
+reads and writes. GET and HEAD read the file entry once and serve its blob through
+convex-restapi's `ContentResponse`, so headers and body come from one version of the
+file; GET answers a single byte
 `Range`, and file responses are not compressed, so lengths and ranges refer to the
 stored bytes. PUT streams the body into a `DLFileWriter` and installs it in one
 atomic update, checking `If-Match` and `If-None-Match` inside that update, so a body
