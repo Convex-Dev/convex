@@ -417,8 +417,8 @@ Proposed for the same record:
 - operator and policy blocklists of keys and addresses
   ([#814](https://github.com/Convex-Dev/convex/issues/814)).
 
-Retention (§4.2) ranks node records by this evidence; candidate selection and retry
-are to do the same.
+Retention (§4.2) ranks node records by this evidence. Candidate selection
+deliberately does not (§8.2).
 
 ## 5. Transport Layer [PROPOSED]
 
@@ -655,7 +655,8 @@ candidate. The connection manager itself never reads that lattice path or parses
 can await admission without polling. Discovered candidates are bounded by the
 configurable `maxDesiredPeers` cap (256 by default); explicit peers are not counted,
 and a full candidate pool never refuses explicit intent or an inbound route upgrade.
-Choosing among candidates by local liveness evidence is #814.
+Vacant ambient slots are filled from the candidates at random, so connections stay
+spread across the network rather than settling into fixed clusters.
 That cap bounds candidates, not live connections. The soft live targets are 16
 ambient peers plus up to 16 recently active communicators (`ambientPeers` and
 `activePeers` in `LatticePropagatorConfig`). Explicit connections may exceed them.
