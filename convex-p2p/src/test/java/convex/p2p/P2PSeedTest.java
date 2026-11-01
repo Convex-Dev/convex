@@ -121,8 +121,33 @@ public class P2PSeedTest {
 	public void testNodeDoesNotSeedFromItself() throws Exception {
 		P2PNode joiner=launch(store("seed-joiner"),NodeConfig.localNetwork(),1,joinerKey);
 		CompletableFuture<Void> seeding=joiner.seed(Map.of(joinerKey.getAccountKey(),joiner.getHostAddress()));
+		assertTrue(seeding.isDone(),"nothing left to seed from");
 		assertTrue(joiner.propagationGroup().getConnectionManager().getDesiredPeers().isEmpty());
-		assertFalse(seeding.isDone(),"no other peer fills the slot");
+	}
+
+	/** Losing every route is seeding from scratch, as when the node started. */
+	@Test
+	public void testNodeLeftWithoutRoutesSeedsAgain() throws Exception {
+		P2PNode hub=launch(store("seed-hub"),NodeConfig.localNetwork(),0,hubKey);
+		P2PNode other=launch(store("seed-other"),NodeConfig.localNetwork(),0,otherKey);
+		other.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS);
+		NodeConfig config=withSeeds(seedList(hubKey.getAccountKey(),hub));
+		// Room for one candidate, which the other node takes, so the released seed is forgotten
+		LatticePropagatorConfig group=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.ONE,
+			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.ONE));
+		P2PNode joiner=P2PNode.create(store("seed-joiner"),config,group,joinerKey).serveAllInbound();
+		resources.add(joiner);
+		joiner.launch();
+
+		joiner.seed(P2PNode.seeds(config)).get(TIMEOUT,TimeUnit.SECONDS);
+		LatticeConnectionManager manager=joiner.propagationGroup().getConnectionManager();
+		assertFalse(manager.getDesiredPeers().containsKey(hubKey.getAccountKey()),"only seeding dials the hub again");
+
+		// The joiner's only route goes, so it seeds again
+		resources.remove(other);
+		other.close();
+		joiner.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
 	}
 
 	@Test

@@ -311,9 +311,10 @@ use `me.node().fork()` to stage the independent node-record component.
 
 ## Running a node
 
-A node joins a network through seed nodes. It connects to each seed as `connect`
-does, then releases them once its own ambient slots hold routes to other peers, so a
-seed carries a node only while it joins
+A node joins a network through seed nodes. Whenever it has no route, as when it
+starts, it connects to each seed as `connect` does, then releases them once its own
+ambient slots hold routes to other peers, so a seed carries a node only while it joins
+or rejoins
 ([seed nodes](../convex-peer/docs/P2P_DESIGN.md#node-identity-and-convex-peers)). A restarted
 node needs no seed: the records it retained become connection candidates at launch.
 

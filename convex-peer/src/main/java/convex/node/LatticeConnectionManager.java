@@ -162,6 +162,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Futures awaiting the ambient target, met by routes to peers not named explicitly. Lock held. */
 	private final List<CompletableFuture<Void>> ambientWaiters=new ArrayList<>();
 
+	/** Futures awaiting a maintenance pass that finds no authenticated route. Lock held. */
+	private final List<CompletableFuture<Void>> isolationWaiters=new ArrayList<>();
+
 	/** Wakes the single maintenance thread when desired-peer state changes. */
 	private final Semaphore maintenanceSignal = new Semaphore(0);
 
@@ -252,10 +255,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/**
 	 * Returns a future that completes once this node holds routes it opened to at least
-	 * the ambient target of peers, not counting peers named with {@link #addPeer} or
-	 * {@link #connectPeer}. A node seeding its connections from explicitly named peers
-	 * can then release them, as other peers can replace them. Completes at once if the
-	 * target is already met, including a target of zero, and fails when the manager
+	 * the ambient target of peers, and to at least one, not counting peers named with
+	 * {@link #addPeer} or {@link #connectPeer}. A node seeding its connections from
+	 * explicitly named peers can then release them, as other peers can replace them.
+	 * Completes at once if the target is already met, and fails when the manager
 	 * closes. Routes lost later do not undo it.
 	 *
 	 * @return future completing when the ambient target is met
@@ -272,14 +275,51 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 	}
 
-	/** Whether routes this node opened to peers not named explicitly meet the ambient target. Lock held. */
+	/**
+	 * Whether routes this node opened to peers not named explicitly meet the ambient
+	 * target. A node without ambient slots still needs one, else nothing could replace
+	 * the peers it was told to use. Lock held.
+	 */
 	private boolean isAmbientTargetMet() {
 		int routes=0;
 		for (AccountKey key:connections.keySet()) {
 			PeerActivity state=activity.get(key);
 			if (state!=null && !state.explicit) routes++;
 		}
-		return routes>=ambientPeers;
+		return routes>=Math.max(1,ambientPeers);
+	}
+
+	/**
+	 * Returns a future that completes once this node holds no authenticated route,
+	 * opened by either side: at once if it holds none now, as when it starts, otherwise
+	 * when a maintenance pass finds the last one gone. A node can then seed its
+	 * connections again. Fails when the manager closes.
+	 *
+	 * @return future completing when this node has no route
+	 */
+	public CompletableFuture<Void> whenIsolated() {
+		synchronized (connectionLock) {
+			if (!accepting) {
+				return CompletableFuture.failedFuture(new IllegalStateException("Connection manager is closed"));
+			}
+			if (isIsolated()) return CompletableFuture.completedFuture(null);
+			CompletableFuture<Void> waiter=new CompletableFuture<>();
+			isolationWaiters.add(waiter);
+			return waiter;
+		}
+	}
+
+	/** Whether this node holds no route, outbound or upgraded inbound. Lock held. */
+	private boolean isIsolated() {
+		return connections.isEmpty() && upgradedInboundRoutes.isEmpty();
+	}
+
+	/** Removes the isolation waiters to complete, once no route is left. Lock held. */
+	private List<CompletableFuture<Void>> takeIsolationWaiters() {
+		if (isolationWaiters.isEmpty() || !isIsolated()) return List.of();
+		List<CompletableFuture<Void>> isolated=new ArrayList<>(isolationWaiters);
+		isolationWaiters.clear();
+		return isolated;
 	}
 
 	/** Removes the ambient waiters to complete, once the target is met. Lock held. */
@@ -575,7 +615,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		List<PendingConnection> pending;
 		List<CompletableFuture<Convex>> waiters;
 		List<CompletableFuture<AConnection>> routeWaiters;
-		List<CompletableFuture<Void>> targetWaiters;
+		List<CompletableFuture<Void>> stateWaiters;
 		synchronized (connectionLock) {
 			active = new ArrayList<>(connections.values());
 			connections.clear();
@@ -585,8 +625,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 			connectionWaiters.clear();
 			routeWaiters = new ArrayList<>(upgradedRouteWaiters.values());
 			upgradedRouteWaiters.clear();
-			targetWaiters = new ArrayList<>(ambientWaiters);
+			stateWaiters = new ArrayList<>(ambientWaiters);
 			ambientWaiters.clear();
+			stateWaiters.addAll(isolationWaiters);
+			isolationWaiters.clear();
 			// The listener/endpoint owns these physical inbound connections. Closing
 			// this manager revokes only their logical outbound capability.
 			upgradedInboundRoutes.clear();
@@ -604,7 +646,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		for (CompletableFuture<AConnection> waiter : routeWaiters) {
 			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
 		}
-		for (CompletableFuture<Void> waiter : targetWaiters) {
+		for (CompletableFuture<Void> waiter : stateWaiters) {
 			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
 		}
 	}
@@ -1450,6 +1492,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		for (Convex peer:retired) closeSilently(peer);
 		for (DesiredPeer desired:attempts) startDial(desired);
+		List<CompletableFuture<Void>> isolated;
+		synchronized (connectionLock) {
+			isolated=takeIsolationWaiters();
+		}
+		for (CompletableFuture<Void> waiter:isolated) waiter.complete(null);
 	}
 
 	/**

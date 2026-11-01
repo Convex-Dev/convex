@@ -162,17 +162,46 @@ public class LatticeConnectionManagerTest {
 
 	@Test public void testAmbientTargetFutureCompletesWhenMetAndFailsOnClose() {
 		manager.setPeerTargets(0,0);
-		assertTrue(manager.whenAmbientTargetMet().isDone(),"a target of zero is met at once");
-		manager.setPeerTargets(1,0);
+		assertFalse(manager.whenAmbientTargetMet().isDone(),"even a target of zero needs one route");
+		manager.setPeerTargets(2,0);
+		candidate(1);
+		fill(1);
 		CompletableFuture<Void> lowered=manager.whenAmbientTargetMet();
 		assertFalse(lowered.isDone());
-		manager.setPeerTargets(0,0);
-		assertTrue(lowered.isDone() && !lowered.isCompletedExceptionally(),"lowering the target can meet it");
 		manager.setPeerTargets(1,0);
+		assertTrue(lowered.isDone() && !lowered.isCompletedExceptionally(),"lowering the target can meet it");
+		assertTrue(manager.whenAmbientTargetMet().isDone(),"already met, so at once");
+		manager.setPeerTargets(2,0);
 		CompletableFuture<Void> waiting=manager.whenAmbientTargetMet();
 		manager.close();
 		assertTrue(waiting.isCompletedExceptionally());
 		assertTrue(manager.whenAmbientTargetMet().isCompletedExceptionally());
+	}
+
+	@Test public void testIsolationFutureCompletesOnceNoRouteIsLeft() {
+		assertTrue(manager.whenIsolated().isDone(),"a node with no route is isolated at once");
+		AccountKey key=candidate(1);
+		fill(1);
+		CompletableFuture<Void> isolated=manager.whenIsolated();
+		StubInbound inbound=new StubInbound();
+		inbound.setTrustedKey(candidate(2));
+		manager.upgradeInboundConnection(inbound);
+
+		manager.getConnection(key).close();
+		manager.maintainConnections();
+		assertFalse(isolated.isDone(),"a route the peer opened still connects this node");
+		manager.removeUpgradedInboundConnection(inbound);
+		manager.maintainConnections();
+		assertTrue(isolated.isDone() && !isolated.isCompletedExceptionally());
+
+		// The lost routes count as failures, so a route returns after their backoff
+		manager.setPeerTargets(1,0);
+		now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
+		fill(1);
+		CompletableFuture<Void> closing=manager.whenIsolated();
+		assertFalse(closing.isDone());
+		manager.close();
+		assertTrue(closing.isCompletedExceptionally());
 	}
 
 	@Test public void testReleaseKeepsInboundRoutesAndForgetsPeersWithNothingToDial() {

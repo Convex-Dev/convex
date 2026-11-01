@@ -6,9 +6,7 @@ import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -596,40 +594,57 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * Joins the network through seed nodes. Each seed is connected as with
-	 * {@link #connect}: once it proves its key, this node pushes its own record and
+	 * Joins the network through seed nodes, and again whenever this node is left with no
+	 * route. Each time it has none, as when it starts, it connects to each seed as with
+	 * {@link #connect}: once a seed proves its key, this node pushes its own record and
 	 * pulls the seed's registry, which names other nodes to connect to. A seed that
 	 * cannot be reached or fails its challenge backs off without holding up the others.
 	 *
 	 * <p>Once this node's own ambient slots hold routes to other peers, they can replace
 	 * the seeds, so every seed is released: the route this node opened to it closes, and
 	 * it stays a candidate like any other node. A seed so carries a node only while it
-	 * joins. A node that already holds enough routes, such as one restarted with retained
-	 * records, releases its seeds at once; in a network too small to fill the slots they
-	 * stay connected. A seed also named with {@link #connect} stays connected.</p>
+	 * joins. In a network too small to fill the slots, seeds stay connected. A seed also
+	 * named with {@link #connect} stays connected. Seeding stops when the node closes.</p>
 	 *
 	 * @param seeds seed node keys and TCP addresses, as {@link #seeds(NodeConfig)} reads them
-	 * @return future completing when the seeds are released
+	 * @return future completing when the seeds are first released, at once if there are none
 	 */
 	public CompletableFuture<Void> seed(Map<AccountKey,InetSocketAddress> seeds) {
 		if (!server.isRunning()) {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("P2P node must be launched before seeding"));
 		}
+		Map<AccountKey,InetSocketAddress> held=new LinkedHashMap<>(seeds);
+		// Seed nodes may share one configuration that lists them all
+		if (keyPair!=null) held.remove(keyPair.getAccountKey());
+		if (held.isEmpty()) return CompletableFuture.completedFuture(null);
+		CompletableFuture<Void> released=new CompletableFuture<>();
+		seedWhenIsolated(held,released);
+		return released;
+	}
+
+	/** Once this node has no route, holds its seeds until other peers fill its ambient slots, then again. */
+	private void seedWhenIsolated(Map<AccountKey,InetSocketAddress> seeds,CompletableFuture<Void> released) {
 		LatticeConnectionManager manager=propagator.getConnectionManager();
-		List<AccountKey> held=new ArrayList<>();
-		for (Map.Entry<AccountKey,InetSocketAddress> seed:seeds.entrySet()) {
-			AccountKey key=seed.getKey();
-			// Seed nodes may share one configuration that lists them all
-			if (keyPair!=null && key.equals(keyPair.getAccountKey())) continue;
-			manager.addPeer(key,seed.getValue());
-			held.add(key);
-		}
-		P2PConnections connections=application.connections();
-		return manager.whenAmbientTargetMet().thenRun(() -> {
-			for (AccountKey key:held) {
+		manager.whenIsolated().thenCompose(isolated -> {
+			log.info("Joining the network through {} seed nodes",seeds.size());
+			for (Map.Entry<AccountKey,InetSocketAddress> seed:seeds.entrySet()) {
+				manager.addPeer(seed.getKey(),seed.getValue());
+			}
+			return manager.whenAmbientTargetMet();
+		}).whenComplete((met,error) -> {
+			// Fails only when the node closes
+			if (error!=null) {
+				released.completeExceptionally(error);
+				return;
+			}
+			P2PConnections connections=application.connections();
+			for (AccountKey key:seeds.keySet()) {
 				if (!connections.isNamed(key)) manager.releasePeer(key);
 			}
+			log.info("Released seed nodes: other peers now fill this node's slots");
+			released.complete(null);
+			seedWhenIsolated(seeds,released);
 		});
 	}
 
@@ -875,9 +890,7 @@ public class P2PNode implements Closeable {
 				.thenAcceptAsync(error -> log.warn("P2P store flush failed",error));
 			node.launch();
 			host.checkpoint();
-			if (!seeds.isEmpty()) {
-				node.seed(seeds).thenRun(() -> log.info("Released seed nodes: other peers now fill this node's slots"));
-			}
+			node.seed(seeds);
 			started.accept(node);
 			// Runs in Convex's shutdown order, before transports and Etch files close
 			Shutdown.addHook(Shutdown.SERVICE,shutdown);

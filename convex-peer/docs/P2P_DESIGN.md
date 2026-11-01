@@ -316,12 +316,12 @@ bidirectional gossip without a reverse TCP connection.
 
 **Seed nodes**: A node joins a network through the seed nodes its configuration
 lists under `seeds`, at most 16 pairs of node key and TCP URL, with `P2PNode.seed`.
-Each seed is connected and initialised as with `connect`. Once the node's own ambient
-slots hold routes to other peers, which can replace the seeds, it releases every seed:
-the route it opened closes, and a seed whose record it holds stays an ordinary
-candidate. Seeds so carry a node only while it joins, not for good. A node that
-already holds enough routes releases them at once; in a network too small to fill
-the slots, they stay connected. A restarted node needs no seed (§4.6).
+Whenever the node has no route, as when it starts, each seed is connected and
+initialised as with `connect`. Once the node's own ambient slots hold routes to other
+peers, at least one, which can replace the seeds, it releases every seed: the route it
+opened closes, and a seed whose record it holds stays an ordinary candidate. Seeds so
+carry a node only while it joins or rejoins, not for good; in a network too small to
+fill the slots, they stay connected. A restarted node needs no seed (§4.6).
 
 **Proposed on-chain bootstrap path** (optional): A node may take seeds from the
 on-chain peer list, the keys and `:url` hosts in `PeerStatus`, alongside configured
