@@ -399,6 +399,53 @@ public class LatticeConnectionManagerTest {
 		assertTrue(inbound.isClosed());
 	}
 
+	/** Contact means an authenticated route: verified admissions and upgraded inbound routes only. */
+	@Test public void testContactHandlerReportsOnlyAuthenticatedRoutes() {
+		List<AccountKey> contacted=new ArrayList<>();
+		manager.setContactHandlers(contacted::add,null);
+		AccountKey verified=candidate(1);
+		manager.addPeer(verified,new StubPeer(verified)).join();
+		AccountKey unverified=candidate(2);
+		manager.addPeer(unverified,new UnverifiedPeer(unverified)).join();
+		AccountKey inbound=candidate(3);
+		StubInbound connection=new StubInbound();
+		connection.setTrustedKey(inbound);
+		manager.upgradeInboundConnection(connection);
+		assertEquals(List.of(verified,inbound),contacted);
+	}
+
+	/** A failed dial and a failed identity challenge are each reported for their peer. */
+	@Test public void testFailureHandlerReportsFailedDialsAndChallenges() {
+		List<AccountKey> failed=new ArrayList<>();
+		manager.setContactHandlers(null,failed::add);
+		manager.setKeyPair(AKeyPair.generate());
+		AccountKey refused=candidate(1);
+		manager.maintainConnections();
+		manager.dials.remove(refused).completeExceptionally(new IllegalStateException("refused"));
+		assertEquals(List.of(refused),failed);
+
+		AccountKey challenged=candidate(2);
+		manager.maintainConnections();
+		manager.dials.remove(challenged).complete(new UnverifiedPeer(challenged));
+		now.addAndGet(LatticeConnectionManager.ADMISSION_TIMEOUT_MS);
+		manager.maintainConnections();
+		assertEquals(List.of(refused,challenged),failed);
+	}
+
+	/** An authenticated route that stops answering is reported as a failure. */
+	@Test public void testFailureHandlerReportsARouteThatStopsAnswering() {
+		List<AccountKey> failed=new ArrayList<>();
+		manager.setContactHandlers(null,failed::add);
+		AccountKey key=candidate(1);
+		fill(1);
+		manager.respond=false;
+		now.addAndGet(LatticeConnectionManager.QUIET_PROBE_MS);
+		manager.maintainConnections();
+		now.addAndGet(LatticeConnectionManager.PROBE_TIMEOUT_MS);
+		manager.maintainConnections();
+		assertEquals(List.of(key),failed);
+	}
+
 	/**
 	 * Maintenance running while addPeer admits a supplied connection must not dial
 	 * the same peer: the dialled connection would replace the supplied one.

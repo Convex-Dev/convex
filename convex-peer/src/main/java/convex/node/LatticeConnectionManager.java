@@ -194,6 +194,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Lifecycle hook for application protocols to initialise every admitted peer. */
 	private volatile BiConsumer<AccountKey,Convex> peerAdmissionHandler;
 
+	/** Hooks reporting authenticated contact and failures, for an application's own records. */
+	private volatile Consumer<AccountKey> contactHandler;
+	private volatile Consumer<AccountKey> failureHandler;
+
 	/** Maintenance thread for reconnection. */
 	private Thread maintenanceThread;
 
@@ -355,6 +359,21 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public void setPeerAdmissionHandler(BiConsumer<AccountKey,Convex> handler) {
 		this.peerAdmissionHandler=handler;
+	}
+
+	/**
+	 * Sets hooks reporting what this manager learns about other nodes. Contact is an
+	 * authenticated connection: a verified outbound admission or an upgraded inbound
+	 * route. Failure is a dial or identity challenge that failed for a desired peer, or
+	 * an authenticated route that stopped answering. Hooks run outside the manager's
+	 * locks and must not block; their failures are logged.
+	 *
+	 * @param contacted contact hook, or {@code null} for none
+	 * @param failed failure hook, or {@code null} for none
+	 */
+	public void setContactHandlers(Consumer<AccountKey> contacted,Consumer<AccountKey> failed) {
+		this.contactHandler=contacted;
+		this.failureHandler=failed;
 	}
 
 	/**
@@ -681,6 +700,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			upgradedInboundRoutes.put(peerKey, connection);
 			if (!connections.containsKey(peerKey)) health.put(peerKey,new HealthCheck(connection,clock.getAsLong()));
 		}
+		notifyContact(peerKey);
 		CompletableFuture<AConnection> waiter = upgradedRouteWaiters.remove(peerKey);
 		if (waiter != null) waiter.complete(connection);
 		maintenanceSignal.release();
@@ -887,6 +907,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			closeSilently(pending.connection);
 		}
 		resetRetryBackoff(peerKey);
+		if (trusted) notifyContact(peerKey);
 		completePeerWaiter(peerKey,convex);
 		notifyPeerAdmitted(peerKey,convex);
 		log.debug("Admitted {} connection to peer {} at {}", trusted ? "verified" : "unverified",
@@ -898,6 +919,25 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private void completePeerWaiter(AccountKey peerKey, Convex convex) {
 		CompletableFuture<Convex> waiter=connectionWaiters.remove(peerKey);
 		if (waiter!=null) waiter.complete(convex);
+	}
+
+	/** Reports authenticated contact, outside the manager's locks. */
+	private void notifyContact(AccountKey peerKey) {
+		report(contactHandler,peerKey);
+	}
+
+	/** Reports a failed dial, challenge or route, outside the manager's locks. */
+	private void notifyFailure(AccountKey peerKey) {
+		report(failureHandler,peerKey);
+	}
+
+	private static void report(Consumer<AccountKey> handler,AccountKey peerKey) {
+		if (handler==null) return;
+		try {
+			handler.accept(peerKey);
+		} catch (RuntimeException e) {
+			log.warn("Contact handler failed for {}",peerKey,e);
+		}
 	}
 
 	/** Runs the optional post-admission hook without allowing it to undo admission. */
@@ -1351,11 +1391,14 @@ public class LatticeConnectionManager extends AConnectionManager {
 		try {
 			openPeer(desired).whenComplete((peer,error) -> {
 				boolean eligible;
+				boolean failed;
 				synchronized (connectionLock) {
 					eligible=accepting && dialling.get(key)==desired && desiredPeers.containsKey(key);
 					if (error!=null || !eligible) dialling.remove(key,desired);
-					if (eligible && error!=null) recordRetryFailure(desiredPeers.get(key),clock.getAsLong());
+					failed=eligible && error!=null;
+					if (failed) recordRetryFailure(desiredPeers.get(key),clock.getAsLong());
 				}
+				if (failed) notifyFailure(key);
 				if (error!=null || !eligible) {
 					if (peer!=null) closeSilently(peer);
 					maintenanceSignal.release();
@@ -1370,9 +1413,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 				}
 			});
 		} catch (RuntimeException e) {
+			boolean failed;
 			synchronized (connectionLock) {
-				if (dialling.remove(key,desired)) recordRetryFailure(desired,clock.getAsLong());
+				failed=dialling.remove(key,desired);
+				if (failed) recordRetryFailure(desired,clock.getAsLong());
 			}
+			if (failed) notifyFailure(key);
 			maintenanceSignal.release();
 		}
 	}
@@ -1454,6 +1500,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private void failRoute(AccountKey key,HealthCheck check) {
 		boolean close=false;
 		boolean retireInbound=false;
+		boolean failed=false;
 		synchronized (connectionLock) {
 			if (health.get(key)!=check) return;
 			Object current=connections.get(key);
@@ -1466,8 +1513,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 			if (check.route instanceof Convex peer) close=connections.remove(key,peer);
 			else retireInbound=upgradedInboundRoutes.remove(key,check.route);
 			DesiredPeer desired=desiredPeers.get(key);
-			if (desired!=null) recordRetryFailure(desired,clock.getAsLong());
+			failed=desired!=null;
+			if (failed) recordRetryFailure(desired,clock.getAsLong());
 		}
+		if (failed) notifyFailure(key);
 		if (close) closeSilently((Convex)check.route);
 		// The endpoint owns socket failure handling. In particular, a silent NAT
 		// return route must disconnect so its remote owner can reconnect it.
@@ -1555,6 +1604,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		if (replaced != null && replaced != pending.connection) closeSilently(replaced);
 		resetRetryBackoff(peerKey);
+		notifyContact(peerKey);
 		completePeerWaiter(peerKey,pending.connection);
 		notifyPeerAdmitted(peerKey,pending.connection);
 		pending.admission.complete(pending.connection);
@@ -1573,7 +1623,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (!removed) return;
 		pending.admission.completeExceptionally(failure);
 		closeSilently(pending.connection);
-		if (desired != null) recordRetryFailure(desired, clock.getAsLong());
+		if (desired != null) {
+			recordRetryFailure(desired, clock.getAsLong());
+			notifyFailure(peerKey);
+		}
 		maintenanceSignal.release();
 		log.debug("Rejected peer {} after failed identity challenge: {}", peerKey, failure.getMessage());
 	}
