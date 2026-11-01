@@ -1,5 +1,6 @@
 package convex.lattice.cursor;
 
+import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
@@ -93,6 +94,29 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 			previous=other;
 			return candidate;
 		}
+	}
+
+	/**
+	 * Persists the working value as any cursor does, then the reconciled baseline,
+	 * so the fork keeps no copy the persister has made redundant. The baseline is
+	 * persisted outside the lock and replaced only if no sync has moved it meanwhile;
+	 * a moved baseline waits for the next persist.
+	 */
+	@Override
+	public V persist(Persister<V> persister) throws IOException {
+		V persisted=working.persist(persister);
+		Lock lock=working.exclusiveLock();
+		V previous;
+		lock.lock();
+		try { previous=baseline; } finally { lock.unlock(); }
+		V retained=(previous==null)?null:persister.persist(previous);
+		lock.lock();
+		try {
+			if (baseline==previous) baseline=retained;
+		} finally {
+			lock.unlock();
+		}
+		return persisted;
 	}
 
 	// ===== Working storage =====

@@ -21,6 +21,7 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Persister;
 
 class LocalComponentTest {
 

@@ -11,7 +11,7 @@ component-owned working state and batched signing.
 ## Class hierarchy
 
 ```text
-ACursor<V>                                get / atomic update / path
+ACursor<V>                                get / atomic update / persist / path
 └── AForkableCursor<V>                    typed paths; fork(); sync(merge)
     ├── Root<V>                           atomic value holder
     │   └── TransactionalRootCursor<V>    opt-in coordinated writes
@@ -53,6 +53,18 @@ changed an unrelated field. Atomic update operations retry as needed.
 
 Multi-key paths use one `PathCursor`. External key conversion remains a lattice or
 component concern; cursors accept canonical CVM keys.
+
+## Persistence
+
+`persist(persister)` replaces the value a cursor holds with the equal value a
+`Persister` returns, such as `LatticeHost::persist`, in one atomic update. On an
+Etch store the stored cells are then soft references and need not stay in memory.
+The cursor holds no store. An edit landing meanwhile repeats the update on the
+edited value; persisting again only finds the cells already stored. A fork persists
+its working value, then its reconciled baseline outside its lock, replacing the
+baseline only if no sync has moved it meanwhile. Views hold no value of their own:
+they treat the equal value as unchanged, so the cells are stored and their source
+is left to its owner.
 
 ## Component-supplied construction
 

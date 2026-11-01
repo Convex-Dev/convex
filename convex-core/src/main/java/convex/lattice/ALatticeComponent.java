@@ -5,9 +5,9 @@ import java.util.Arrays;
 import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.exceptions.StoreException;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
+import convex.lattice.cursor.Persister;
 
 /**
  * Domain operations over a cursor at one path.
@@ -36,12 +36,6 @@ import convex.lattice.cursor.ForkedCursor;
  * @param <V> Value type of the wrapped cursor
  */
 public abstract class ALatticeComponent<V extends ACell> {
-
-	/** Writes a value's cells to a store, returning an equal value whose cells are retained there. */
-	@FunctionalInterface
-	public interface Persister<V extends ACell> {
-		V persist(V value) throws IOException;
-	}
 
 	/** Working storage bound at construction; editing views do not move this boundary. */
 	protected final AForkableCursor<V> storage;
@@ -171,9 +165,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 
 	/**
 	 * Persists this component's working state through the function supplied at
-	 * construction, without publishing it. One atomic update replaces the working
-	 * value with its persisted equal, so its cells need not stay in memory; an edit
-	 * landing meanwhile makes the update persist the edited value instead. Nothing is
+	 * construction, without publishing it. Its storage replaces the working value
+	 * with the persisted equal in one atomic update
+	 * ({@link convex.lattice.cursor.ACursor#persist}), and a fork persists its
+	 * baseline too, so the cells need not stay in memory. Nothing is
 	 * signed and no destination changes. Persisted state survives a restart only once
 	 * synced into the host and retained. A component without a function refuses: its
 	 * state, if any, is its parent's.
@@ -183,21 +178,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 */
 	public V persist() throws IOException {
 		if (persister==null) throw new UnsupportedOperationException(getClass().getSimpleName()+" does not know how to persist");
-		try {
-			return storage.updateAndGet(this::persistWorking);
-		} catch (StoreException e) {
-			if (e.getCause() instanceof IOException cause) throw cause;
-			throw e;
-		}
-	}
-
-	/** Safe to repeat within an atomic update: cells already in the store are not written again. */
-	private V persistWorking(V working) {
-		try {
-			return persister.persist(working);
-		} catch (IOException e) {
-			throw new StoreException("Unable to persist component state",e);
-		}
+		return storage.persist(persister);
 	}
 
 }
