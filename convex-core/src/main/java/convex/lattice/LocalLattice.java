@@ -16,13 +16,15 @@ import convex.lattice.generic.OwnerLattice;
  *
  * The `:local` key in a lattice root maps to an OwnerLattice where each peer
  * has its own signed slot keyed by AccountKey. Each slot contains an
- * {@code Index<Keyword, ACell>} — a keyword-keyed map of peer-local data.
+ * {@code AHashMap<Keyword, ACell>} — one entry per application or service, each
+ * a whole value merged by LWW on its own {@code :timestamp}.
  *
  * Structure:
  * <pre>
  *   :local → OwnerLattice
- *     peer-key-A → Signed(Index&lt;Keyword, ACell&gt;)
- *     peer-key-B → Signed(Index&lt;Keyword, ACell&gt;)
+ *     peer-key-A → Signed(AHashMap&lt;Keyword, ACell&gt;)
+ *       :signing → {:timestamp t, ...}
+ *     peer-key-B → Signed(AHashMap&lt;Keyword, ACell&gt;)
  * </pre>
  *
  * This region holds any application state that is not meant to be shared
@@ -80,7 +82,7 @@ public class LocalLattice {
 	 *
 	 * @param localValue The OwnerLattice value
 	 * @param peerKey The peer's public key
-	 * @return The peer's Index&lt;Keyword, ACell&gt; data, or null if not present
+	 * @return The peer's keyword-keyed data, or null if not present
 	 */
 	public static AHashMap<Keyword, ACell> getSlot(
 			AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> localValue,
