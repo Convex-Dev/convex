@@ -35,7 +35,8 @@ import convex.social.Social;
  * merge: an incoming root, or a path value reduced to its path, is projected to what
  * this node wants and delegated to the lattice merge, which merges every region as
  * declared and verifies each owner's slot. The projection keeps the infrastructure
- * regions whole and reduces the social region to the owners this node wants. The
+ * regions whole, reduces the social region to the owners this node wants and
+ * leaves out {@code :local}, which this node neither accepts nor publishes. The
  * application also owns the P2P policy that reads the lattice:
  * the node registry as a validated directory, the social owners this node wants, and
  * the paths to pull from a newly admitted peer. It imports nothing from the node
@@ -102,15 +103,25 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	ASet<Keyword> servedRegions() { return servedRegions; }
 
 	/**
-	 * Merges an incoming root projected to what this node wants: every region as
-	 * declared, the social region reduced to the owners this node wants. The lattice
-	 * merge does the rest, verifying each owner's slot. A path delivery arrives
-	 * here reduced to its path, so the same projection selects it.
+	 * Merges an incoming root projected to what this node wants ({@link #project}).
+	 * The lattice merge does the rest, verifying each owner's slot. A path delivery
+	 * arrives here reduced to its path, so the same projection selects it.
 	 */
 	@Override
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-		Index<Keyword,ACell> wanted=socialPolicy.projectRoot(other);
+		Index<Keyword,ACell> wanted=project(other);
 		return cursor().updateAndGet(own -> getLattice().merge(own,wanted));
+	}
+
+	/**
+	 * Projects a root to what this node exchanges with others: every region as
+	 * declared except {@code :local}, which holds state that is not shared, and the
+	 * social region reduced to the owners this node wants. Incoming roots merge
+	 * through it and a node publishes through it.
+	 */
+	Index<Keyword,ACell> project(Index<Keyword,ACell> root) {
+		Index<Keyword,ACell> wanted=socialPolicy.projectRoot(root);
+		return (wanted==null)?null:wanted.dissoc(LocalLattice.KEY_LOCAL);
 	}
 
 	/** Registers and opens a local {@code did:key} social user. */

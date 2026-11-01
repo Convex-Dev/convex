@@ -123,9 +123,9 @@ public class P2PNode implements Closeable {
 		NodeDirectory directory=application.directory();
 		directory.setMaxRecords(propagator.getConnectionManager().getMaxDesiredPeers());
 		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,directory);
-		// The application merges incoming roots through its policy's projection; the
+		// The application merges incoming roots through its projection; the
 		// propagation group publishes through the same projection.
-		propagator.setPublicationFilter(application.policy()::projectRoot);
+		propagator.setPublicationFilter(application::project);
 		propagator.setApplicationMessageHandler(pointOfPresence::handle);
 		propagator.setInboundLatticeListener(this::onAcceptedInbound);
 	}

@@ -15,6 +15,7 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
@@ -71,6 +72,31 @@ public class P2PPolicyTest {
 			ASet<Keyword> expected=Sets.of(P2PLattice.KEY_P2P,P2PLattice.KEY_ID,P2PLattice.KEY_KAD);
 			if (root==P2PLattice.NODE_ROOT) expected=expected.conj(Social.KEY_SOCIAL);
 			assertEquals(expected,app.node(ALICE.getAccountKey()).getNodeInfo().get(Keywords.REGIONS));
+		}
+	}
+
+	/** {@code :local} is never published, and never accepted, even signed by the node's own key. */
+	@Test void localStateIsNeitherPublishedNorAccepted() {
+		Keyword service=Keyword.intern("p2p");
+		var own=LocalLattice.createSlot(ALICE,Maps.of(service,Maps.of(Keywords.TIMESTAMP,CVMLong.create(1))));
+		var foreign=LocalLattice.setSlot(
+			LocalLattice.createSlot(ALICE,Maps.of(service,Maps.of(Keywords.TIMESTAMP,CVMLong.create(2)))),
+			BOB,Maps.of(service,Maps.of(Keywords.TIMESTAMP,CVMLong.create(3))));
+		for (var root:new KeyedLattice[] {P2PLattice.ROOT,P2PLattice.ROOT.addLattice(LocalLattice.KEY_LOCAL,LocalLattice.LATTICE)}) {
+			var host=LatticeHost.create();
+			var app=host.addApplication(P2PApplication.connect(root,host,ALICE.getAccountKey(),
+				(owner,value) -> ALICE.signData(value),() -> CVMLong.create(123),DIDKeyAuthorizer.CONVEX));
+			app.directory().publishOwnRecord(null);
+			host.cursor().update(r -> r.assoc(LocalLattice.KEY_LOCAL,own));
+
+			var projected=app.project(host.cursor().get());
+			assertNull(projected.get(LocalLattice.KEY_LOCAL));
+			assertNotNull(projected.get(P2PLattice.KEY_P2P));
+
+			app.merge(Index.of(LocalLattice.KEY_LOCAL,foreign));
+			app.mergeAt(foreign,LocalLattice.KEY_LOCAL);
+			app.mergeAt(foreign.get(BOB.getAccountKey()),LocalLattice.KEY_LOCAL,BOB.getAccountKey());
+			assertSame(own,host.cursor().get(LocalLattice.KEY_LOCAL));
 		}
 	}
 
