@@ -904,6 +904,10 @@ public class Etch {
 		try {
 			Hash hash = Hash.wrap(key);
 			T cell = reader.decode(encoding);
+			// The key becomes the content hash of the encoding attached to the decoded cell,
+			// which may be a JVM-wide cached instance (small integers, booleans, empty
+			// collections). Stored keys are content hashes; a record written under any other
+			// key, as only a test can, would give that shared cell a wrong hash JVM-wide.
 			encoding.attachContentHash(hash);
 
 			if (memorySize > 0) {

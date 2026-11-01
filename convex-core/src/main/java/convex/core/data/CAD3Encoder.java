@@ -266,7 +266,10 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			if (result.byteLength()!=bc) throw new BadFormatException("Excess leading bytes in BigInteger representation");
 			return result;
 		}
-		// CVMDouble: tag 0x1D, 8 raw bytes (IEEE 754)
+		// CVMDouble: tag 0x1D, 8 raw bytes (IEEE 754). Every bit pattern decodes, including
+		// non-canonical NaNs: each is a distinct cell with its own unique encoding. NaN must
+		// be canonical only within the CVM (CAD003), which CVMDouble.create and (double x)
+		// enforce by coercion, so rejecting them here would be wrong.
 		if (tag == Tag.DOUBLE) {
 			long bits=Utils.readLong(ds.data, ds.pos, 8);
 			ds.pos+=8;

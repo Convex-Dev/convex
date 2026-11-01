@@ -1144,6 +1144,12 @@ public class Core {
 	 *
 	 * <p>NOT part of the genesis environment: installed into the core environment by
 	 * the v1 upgrade migration (see UPGRADE.md).</p>
+	 *
+	 * <p>Macro hygiene is explicit by design. Clojure-style automatic {@code x#}
+	 * renaming was rejected (#602): as a reader rewrite it would change the genesis
+	 * hash, since core.cvx uses {@code #}-suffixed template symbols; in the compiler it
+	 * would do nothing, as locals are positional; and as an expander pass it needs
+	 * heuristics in consensus-critical code for a cosmetic gain.</p>
 	 */
 	public static final CoreFn<Symbol> GENSYM = regNonGenesis(new CoreFn<>(Symbols.GENSYM,503) {
 

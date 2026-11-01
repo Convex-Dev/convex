@@ -22,6 +22,12 @@ import convex.core.lang.RT;
  * {@link convex.peer.PeerConfig}, providing typed accessors with sensible
  * defaults. The underlying config map is immutable.</p>
  *
+ * <p>The map is the configuration, as parsed from a service's JSON5; this class
+ * holds nothing else and adds no meaning beyond typed accessors and defaults.
+ * Every component given the map reads the keys it knows by name, so a setting
+ * that must differ between components belongs in a separate map, as
+ * {@link LatticePropagatorConfig} is for a propagation group.</p>
+ *
  * <p>Key names reuse {@link convex.peer.PeerConfig} constants where they
  * overlap (port) so configurations are consistent
  * across peer and lattice node servers.</p>

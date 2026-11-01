@@ -246,7 +246,9 @@ final class MBBFileMapper extends AFileMapper {
 
 	@Override
 	public synchronized void close() {
-		// Java 21 has no supported deterministic unmap operation.
+		// Java 21 has no supported deterministic unmap operation. The file stays mapped
+		// until GC, and Windows refuses to delete a mapped file, so a delete or rename of
+		// it soon after close may be deferred or fail.
 		regionMap.clear();
 	}
 }

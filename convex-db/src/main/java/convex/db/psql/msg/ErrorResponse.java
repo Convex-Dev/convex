@@ -152,7 +152,10 @@ public class ErrorResponse extends PgMessage {
 
 		// Set SQL state code: the first one in the cause chain, since Calcite wraps the
 		// exceptions raised while executing a statement. A duplicate key, standard 23000,
-		// is PostgreSQL's more specific unique_violation.
+		// is PostgreSQL's more specific unique_violation. Codes come only from structured
+		// signals such as exception types and SQLStates, never from message text, which
+		// is fragile even against a library's own templates: without one, the generic
+		// code stands.
 		String sqlState = hasCause(t, DuplicateKeyException.class) ? UNIQUE_VIOLATION : null;
 		for (Throwable c = t; c != null && sqlState == null; c = (c.getCause() == c) ? null : c.getCause()) {
 			if (c instanceof SQLException sqlEx) sqlState = sqlEx.getSQLState();

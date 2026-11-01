@@ -15,7 +15,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Utilities for threading and concurrency
+ * Utilities for threading and concurrency.
+ *
+ * <p>Thread pools are a shared resource. Before adding one, check whether an existing
+ * executor can serve. A new shared pool lives here behind call methods, as
+ * {@link #callUninterruptibly} does, with no {@link ExecutorService} exposed, so no
+ * caller can shut it down or cancel its tasks. Note that the virtual executor's
+ * shutdown hook calls {@code shutdownNow()}, which interrupts running tasks.</p>
  */
 public class ThreadUtils {
 

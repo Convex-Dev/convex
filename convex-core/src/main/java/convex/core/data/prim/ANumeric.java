@@ -4,7 +4,15 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 /**
- * BAse class for CVM numeric types
+ * Base class for CVM numeric types.
+ *
+ * <p>The CVM numeric tower is deliberately two types: exact, arbitrary-precision
+ * integers ({@link AInteger}, a {@link CVMLong} when the value fits 64 bits and a
+ * {@link CVMBigInteger} otherwise) and IEEE 754 doubles ({@link CVMDouble}). Exact
+ * decimals are integers in a smallest unit with an explicit scale, as Convex Coins
+ * are counted in copper. Further numeric types, such as a decimal type or a separate
+ * big integer type, would add consensus-critical encoding tags, core functions and
+ * promotion rules without serving a case these two do not.</p>
  */
 public abstract class ANumeric extends APrimitive implements Comparable<ANumeric> {
 

@@ -31,6 +31,16 @@ There are no `Merge`, `Ownership`, `Signing`, `Stamping` or `Shape` interfaces.
 Lattice classes retain their domain methods directly. Specialised cursors accept
 ordinary Java functions supplied by their owning components.
 
+The base contract stays minimal: get, atomic update and path at one location.
+Subclasses and compositions add behaviour; the base gains no capability hooks that
+every subclass and view would have to forward. A service owned by the root gets at
+most one hook, resolved through existing source links: `exclusiveLock()`, for
+transactions and fork publication, is the only one. Storage, durability and
+publication attach at the host, and a module that needs a store mid-write, such as
+DLFS writing blob checkpoints, takes it as an explicit parameter. `persist` is not a
+hook: it is one concrete method over `updateAndGet` with a store-agnostic
+`Persister`, which views inherit and only `ForkedCursor` overrides.
+
 ## Atomic operations and paths
 
 `get`, `set`, `getAndSet`, `compareAndSet`, `getAndUpdate`, `updateAndGet`,

@@ -73,6 +73,10 @@ public class Samples {
 	 * run GC on it: unrelated tests may be using it concurrently. Private stores
 	 * are for tests of creation/reopening, GC, configuration, retained roots or
 	 * exact store contents.
+	 *
+	 * A {@code @ParameterizedTest} given this store as an argument must set
+	 * {@code autoCloseArguments = false}: JUnit closes AutoCloseable arguments after
+	 * each invocation, which would close it for every later test in the JVM.
 	 */
 	public static final EtchStore TEST_STORE = createTestStore("test-store");
 

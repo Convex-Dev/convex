@@ -196,7 +196,9 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 
 		// A synthesised value must be signed as this owner. If we cannot author it,
 		// retain the own value: never store, or propagate, a slot signed by a
-		// non-owner, and never abort an otherwise valid merge over it.
+		// non-owner, and never abort an otherwise valid merge over it. Throwing would
+		// reject the whole incoming value and count against the sending connection's
+		// circuit breaker, disconnecting an honest peer.
 		SignedData<V> signed=author.apply(m);
 		return (signed!=null)?signed:ownValue;
 	}
