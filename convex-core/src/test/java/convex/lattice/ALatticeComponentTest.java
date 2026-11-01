@@ -2,6 +2,7 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -9,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
@@ -20,8 +22,11 @@ import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.RefDirect;
+import convex.core.data.RefSoft;
 import convex.core.data.Sets;
 import convex.core.store.MemoryStore;
+import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.SetLattice;
@@ -123,20 +128,35 @@ public class ALatticeComponentTest {
 		assertNull(store.getRootData());
 	}
 
-	/** An edit made while persisting is kept, and persisted next time. */
+	/** An edit landing while persisting is persisted too: the atomic update repeats on the edited value. */
 	@Test
-	public void persistKeepsAnEditMadeMeanwhile() throws Exception {
+	public void persistIsAtomicWithAnEditMadeMeanwhile() throws Exception {
 		var host=LatticeHost.<ASet<ACell>>create(Sets.empty(),new MemoryStore());
 		var a=Blob.fromHex("aa");
 		var b=Blob.fromHex("bb");
 		var component=new AtomicReference<TestComponent>();
+		var edited=new AtomicBoolean();
 		component.set(new TestComponent(host.cursor().fork(),value -> {
-			component.get().add(b);
+			if (edited.compareAndSet(false,true)) component.get().add(b);
 			return host.persist(value);
 		}));
 		component.get().add(a);
-		assertEquals(Sets.of(a),component.get().persist());
-		assertEquals(Sets.of(a,b),component.get().cursor().get());
+		var persisted=component.get().persist();
+		assertEquals(Sets.of(a,b),persisted);
+		assertSame(persisted,component.get().storage().get());
+	}
+
+	/** With an Etch store, persisted working state refers to its stored cells softly, so memory can release them. */
+	@Test
+	public void persistedWorkingStateRefersToStoredCellsSoftly() throws Exception {
+		try (EtchStore store=EtchStore.createTemp()) {
+			var host=LatticeHost.<ASet<ACell>>create(Sets.empty(),store);
+			var component=new TestComponent(host.cursor().fork(),host::persist);
+			component.add(Blobs.createRandom(new Random(4321),1000));
+			assertInstanceOf(RefDirect.class,component.storage().get().getRef(0));
+			component.persist();
+			assertInstanceOf(RefSoft.class,component.storage().get().getRef(0));
+		}
 	}
 
 	/** Only a component given a function persists itself; others are persisted with their parent. */

@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Objects;
 
 import convex.core.data.ACell;
+import convex.core.exceptions.StoreException;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
 
@@ -170,21 +171,33 @@ public abstract class ALatticeComponent<V extends ACell> {
 
 	/**
 	 * Persists this component's working state through the function supplied at
-	 * construction, without publishing it. The persisted value, equal to the working
-	 * value, replaces it so its cells need not stay in memory; an edit made meanwhile
-	 * is kept for the next persist. Nothing is signed and no destination changes.
-	 * Persisted state survives a restart only once synced into the host and retained.
-	 * A component without a function refuses: its state, if any, is its parent's.
+	 * construction, without publishing it. One atomic update replaces the working
+	 * value with its persisted equal, so its cells need not stay in memory; an edit
+	 * landing meanwhile makes the update persist the edited value instead. Nothing is
+	 * signed and no destination changes. Persisted state survives a restart only once
+	 * synced into the host and retained. A component without a function refuses: its
+	 * state, if any, is its parent's.
 	 *
 	 * @return Persisted working value
 	 * @throws IOException If the store fails
 	 */
 	public V persist() throws IOException {
 		if (persister==null) throw new UnsupportedOperationException(getClass().getSimpleName()+" does not know how to persist");
-		V working=storage.get();
-		V persisted=persister.persist(working);
-		storage.compareAndSet(working,persisted);
-		return persisted;
+		try {
+			return storage.updateAndGet(this::persistWorking);
+		} catch (StoreException e) {
+			if (e.getCause() instanceof IOException cause) throw cause;
+			throw e;
+		}
+	}
+
+	/** Safe to repeat within an atomic update: cells already in the store are not written again. */
+	private V persistWorking(V working) {
+		try {
+			return persister.persist(working);
+		} catch (IOException e) {
+			throw new StoreException("Unable to persist component state",e);
+		}
 	}
 
 }
