@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
@@ -23,11 +24,15 @@ import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALatticeApplication;
+import convex.lattice.MapComponent;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Root;
 
 /**
  * Connection management for the P2P application: the node registry this node holds
- * at {@code [:p2p :nodes]}, its validated view as a {@link NodeDirectory}, and what
- * this node has learned about other nodes as {@link ContactRecords}.
+ * at {@code [:p2p :nodes]}, its validated view as a {@link NodeDirectory}, what
+ * this node has learned about other nodes as {@link ContactRecords}, and the nodes
+ * and addresses it refuses as its {@link Blocklist}.
  *
  * <p>Its merge is the registry's acceptance boundary: the owner rule, applied only to
  * the records this node wants. Nodes that accept every record converge under the
@@ -56,8 +61,8 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 	private final AccountKey ownKey;
 	private final NodeDirectory directory;
 	private final ContactRecords contacts;
+	private final Blocklist blocklist;
 	private final Set<AccountKey> named=ConcurrentHashMap.newKeySet();
-	private final Set<AccountKey> blocked=ConcurrentHashMap.newKeySet();
 	private final Blob salt=Blob.createRandom(new SecureRandom(),32);
 	private volatile Supplier<Set<AccountKey>> routes=() -> Set.of();
 	private volatile int maxRecords=DEFAULT_MAX_RECORDS;
@@ -71,6 +76,14 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 		// Only a node that can sign its own :local slot keeps contact records
 		this.contacts=(ownKey==null || signer==null)?null:new ContactRecords(cursor(),ownKey,
 			value -> (SignedData<AHashMap<Keyword,ACell>>)(SignedData<?>)signer.apply(ownKey,value),application.clock());
+		// The blocklist shares the contact records' :local record, or stays in memory without one
+		AForkableCursor<Index<ABlobLike<?>,ACell>> blocked;
+		if (contacts==null) {
+			blocked=new Root<Index<ABlobLike<?>,ACell>>();
+		} else {
+			blocked=new MapComponent<Keyword,ACell>(contacts.cursor()).<Index<ABlobLike<?>,ACell>>path(Blocklist.KEY);
+		}
+		this.blocklist=new Blocklist(blocked,application.clock());
 	}
 
 	/** This node's validated view of the registry it holds. */
@@ -105,10 +118,19 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 		return named.contains(node);
 	}
 
-	/** Drops a node's record and refuses it from now on. */
+	/** The nodes and addresses this node refuses. */
+	Blocklist blocklist() {
+		return blocklist;
+	}
+
+	/**
+	 * Blocks a node: drops its record, refuses it from now on and stops keeping it
+	 * as named. Returns whether it was not blocked before.
+	 */
 	@SuppressWarnings("unchecked")
-	void block(AccountKey node) {
-		blocked.add(node);
+	boolean block(AccountKey node) {
+		boolean added=blocklist.block(node);
+		named.remove(node);
 		cursor().updateAndGet(own -> {
 			if (!(own.get(P2PLattice.KEY_P2P) instanceof Index<?,?> region)) return own;
 			Index<Keyword,ACell> p2p=(Index<Keyword,ACell>)region;
@@ -116,9 +138,15 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 			return own.assoc(P2PLattice.KEY_P2P,p2p.assoc(P2PLattice.KEY_NODES,((AHashMap<ACell,ACell>)nodes).dissoc(node)));
 		});
 		directory.refresh();
+		return added;
 	}
 
-	/** Syncs this node's contact records into its {@code :local} slot. */
+	/** Unblocks a node, whose record is taken again when it next arrives. Returns whether it was blocked. */
+	boolean unblock(AccountKey node) {
+		return blocklist.unblock(node);
+	}
+
+	/** Syncs this node's contact records and blocklist into its {@code :local} slot. */
 	@Override
 	protected void syncChildren() {
 		if (contacts!=null) contacts.sync();
@@ -161,7 +189,7 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 		for (Offer offer:offers) {
 			AccountKey node=offer.node();
 			boolean isOwn=node.equals(ownKey);
-			if (blocked.contains(node)) continue;
+			if (blocklist.isBlocked(node)) continue;
 			if (!isOwn && ACell.getMemorySize(offer.incoming())>P2PLattice.MAX_NODE_RECORD_SIZE) continue;
 			Candidate arrival=null;
 			if (offer.held()==null && !pins.contains(node)) {

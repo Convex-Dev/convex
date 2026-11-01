@@ -392,6 +392,13 @@ publishes its own record and when the service shuts down as
 root, so the records survive a restart. A node without a key keeps none. See
 [Local Evidence](../convex-peer/docs/P2P_DESIGN.md#46-local-evidence-partial).
 
+The same record holds the node's blocklist. `node.block(nodeKey)` refuses a node: its
+record, its connections and its point messages. `node.block(address)` takes a
+transport address such as `tcp://203.0.113.5:18888`, which the node then never dials,
+or a host, which it never dials and, for an IP address, takes no connection from.
+`unblock` and `isBlocked` take the same arguments. Each change syncs the host, so the
+list survives a restart; a node without a key keeps it in memory.
+
 ## Security
 
 Inbound network lattice traffic is **denied by default**. A node serves queries and

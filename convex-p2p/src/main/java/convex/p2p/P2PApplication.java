@@ -40,8 +40,8 @@ import convex.social.Social;
  * declared, verifying each owner's slot. The two merge in separate updates, as
  * keyed regions do, so a reader may see one before the other. The application also
  * owns the P2P policy that reads the lattice: the social owners this node wants and
- * the paths to pull from a newly admitted peer, with the node directory and contact
- * records held by its connections. It imports nothing from the node package. A
+ * the paths to pull from a newly admitted peer, with the node directory, contact
+ * records and blocklist held by its connections. It imports nothing from the node package. A
  * {@link P2PNode} assembles it with replication and calls it at the moments
  * replication knows about; a local application may use the same component over a
  * standalone {@link LatticeHost}.</p>

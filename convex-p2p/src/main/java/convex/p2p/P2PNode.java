@@ -6,7 +6,10 @@ import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -18,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.Constants;
@@ -175,7 +179,8 @@ public class P2PNode implements Closeable {
 			routes.addAll(propagator.getAuthenticatingInboundKeys());
 			return routes;
 		});
-		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,connections.directory());
+		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,connections.directory(),
+			connections.blocklist());
 		// The application merges incoming roots through its projection; the
 		// propagation group publishes through the same projection.
 		propagator.setPublicationFilter(application::project);
@@ -388,8 +393,9 @@ public class P2PNode implements Closeable {
 
 	/**
 	 * Grants every inbound network connection this application's public propagation
-	 * group. This is appropriate only for an intentionally public node serving a
-	 * single lattice view.
+	 * group, except one from an IP address this node has blocked, which is closed.
+	 * This is appropriate only for an intentionally public node serving a single
+	 * lattice view.
 	 * The connection remains untrusted unless the independent node-key challenge
 	 * succeeds, and the application still takes only the social owners it wants.
 	 * May be called while running: connections accepted afterwards use the group,
@@ -399,7 +405,9 @@ public class P2PNode implements Closeable {
 	 * @return this node, for chaining
 	 */
 	public P2PNode serveAllInbound() {
-		network.serveAllInbound(propagator);
+		Blocklist blocklist=application.connections().blocklist();
+		network.getListener().setSelector(connection ->
+			blocklist.refuses(connection.getRemoteAddress())?null:propagator);
 		return this;
 	}
 
@@ -489,9 +497,10 @@ public class P2PNode implements Closeable {
 				log.debug("Unable to initialise admitted peer {}: {}",peerKey,error.getMessage());
 				return null;
 			}));
-		// The application's contact records hear what the manager learns about other nodes
+		// The application's contact records hear what the manager learns about other nodes,
+		// and a blocked node that authenticates is dropped then
 		ContactRecords contacts=application.contacts();
-		if (contacts!=null) manager.setContactHandlers(contacts::contacted,contacts::failed);
+		manager.setContactHandlers(this::contacted,(contacts==null)?null:contacts::failed);
 		// A failed launch closes the network itself
 		network.launch();
 		try {
@@ -537,12 +546,16 @@ public class P2PNode implements Closeable {
 	 * Replication accepted an inbound value. The application reads what it means for
 	 * the node registry; this node acts on connections: refreshed discovery becomes
 	 * connection candidates, and a validated one-record registry update may authenticate
-	 * the inbound route that carried it.
+	 * the inbound route that carried it. A connection claiming a blocked node is closed.
 	 */
 	private void onAcceptedInbound(AConnection connection,LatticePropagator source,
 			ACell[] path,ACell value,boolean changed) {
 		if (!NodeDirectory.mayAffectRegistry(path)) return;
 		AccountKey claimed=application.directory().claimedOwner(path,value);
+		if (connection!=null && claimed!=null && application.connections().blocklist().isBlocked(claimed)) {
+			connection.close();
+			return;
+		}
 		if (connection!=null && claimed!=null) {
 			source.authenticateInboundRoute(connection,claimed);
 			// The claimant keeps its record while its route is authenticated, so a
@@ -557,10 +570,51 @@ public class P2PNode implements Closeable {
 
 	/** Offers the application's refreshed directory as this node's connection candidates. */
 	private void refreshDiscovery() {
-		LatticeConnectionManager manager=propagator.getConnectionManager();
-		for (NodeDirectory.NodeRecord record:application.directory().refresh()) {
-			manager.updateDiscoveredPeer(record.peerKey(),record.transports(),record.timestamp());
+		for (NodeDirectory.NodeRecord record:application.directory().refresh()) offer(record);
+	}
+
+	/** Offers a node as a connection candidate at the transports this node does not refuse; never a blocked node. */
+	private void offer(NodeDirectory.NodeRecord record) {
+		Blocklist blocklist=application.connections().blocklist();
+		if (blocklist.isBlocked(record.peerKey())) return;
+		propagator.getConnectionManager().updateDiscoveredPeer(record.peerKey(),
+			blocklist.dialable(record.transports()),record.timestamp());
+	}
+
+	/** Reports authenticated contact to the contact records, or drops a blocked node at once. */
+	private void contacted(AccountKey peerKey) {
+		if (application.connections().blocklist().isBlocked(peerKey)) {
+			drop(peerKey);
+			return;
 		}
+		ContactRecords contacts=application.contacts();
+		if (contacts!=null) contacts.contacted(peerKey);
+	}
+
+	/** Closes every connection to a node, including one it opened, and forgets it as a candidate. */
+	private void drop(AccountKey peerKey) {
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		AConnection inbound=manager.getUpgradedInboundConnection(peerKey);
+		manager.removePeer(peerKey);
+		if (inbound!=null) inbound.close();
+	}
+
+	/** Whether this node refuses to dial a node at an address: the node, the address or its host is blocked. */
+	private boolean refuses(AccountKey peerKey,InetSocketAddress address) {
+		Blocklist blocklist=application.connections().blocklist();
+		return blocklist.isBlocked(peerKey)
+			|| (address!=null && blocklist.refuses(Strings.create(Transports.endpoint(address).toString())));
+	}
+
+	/** Whether a node's live route is at an address this node refuses. */
+	private boolean refusesRoute(LatticeConnectionManager manager,AccountKey peerKey) {
+		Blocklist blocklist=application.connections().blocklist();
+		Convex outbound=manager.getConnection(peerKey);
+		if (outbound!=null && blocklist.refuses(outbound.getHostAddress())) return true;
+		if (outbound instanceof ConvexRemote remote && remote.getEndpoint()!=null
+				&& blocklist.refuses(Strings.create(remote.getEndpoint().toString()))) return true;
+		AConnection inbound=manager.getUpgradedInboundConnection(peerKey);
+		return inbound!=null && blocklist.refuses(inbound.getRemoteAddress());
 	}
 
 	/**
@@ -577,15 +631,22 @@ public class P2PNode implements Closeable {
 	 * gossip even when this node publishes an empty {@code :transports} vector because
 	 * it is behind NAT. A late joiner obtains only its follow-filtered social view.</p>
 	 *
+	 * <p>A blocked node, or one at a blocked address, is refused at once.</p>
+	 *
 	 * @param peerKey expected AccountKey of the bootstrap node
 	 * @param address bootstrap node's TCP address
 	 * @return future completing after connection admission, own-identity merge and
-	 *         local merge of the bootstrap node's selective bootstrap paths
+	 *         local merge of the bootstrap node's selective bootstrap paths, or failing
+	 *         with a {@link SecurityException} if the node or address is blocked
 	 */
 	public CompletableFuture<Convex> connect(AccountKey peerKey, InetSocketAddress address) {
 		if (!server.isRunning()) {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("P2P node must be launched before connecting"));
+		}
+		if (refuses(peerKey,address)) {
+			return CompletableFuture.failedFuture(
+				new SecurityException("Node "+peerKey+" at "+address+" is blocked"));
 		}
 		// A node the operator named keeps its record however full the registry is
 		application.connections().name(peerKey);
@@ -604,7 +665,8 @@ public class P2PNode implements Closeable {
 	 * the seeds, so every seed is released: the route this node opened to it closes, and
 	 * it stays a candidate like any other node. A seed so carries a node only while it
 	 * joins. In a network too small to fill the slots, seeds stay connected. A seed also
-	 * named with {@link #connect} stays connected. Seeding stops when the node closes.</p>
+	 * named with {@link #connect} stays connected. A blocked seed, or one at a blocked
+	 * address, is skipped. Seeding stops when the node closes.</p>
 	 *
 	 * @param seeds seed node keys and TCP addresses, as {@link #seeds(NodeConfig)} reads them
 	 * @return future completing when the seeds are first released, at once if there are none
@@ -629,7 +691,7 @@ public class P2PNode implements Closeable {
 		manager.whenIsolated().thenCompose(isolated -> {
 			log.info("Joining the network through {} seed nodes",seeds.size());
 			for (Map.Entry<AccountKey,InetSocketAddress> seed:seeds.entrySet()) {
-				manager.addPeer(seed.getKey(),seed.getValue());
+				if (!refuses(seed.getKey(),seed.getValue())) manager.addPeer(seed.getKey(),seed.getValue());
 			}
 			return manager.whenAmbientTargetMet();
 		}).whenComplete((met,error) -> {
@@ -646,6 +708,115 @@ public class P2PNode implements Closeable {
 			released.complete(null);
 			seedWhenIsolated(seeds,released);
 		});
+	}
+
+	/**
+	 * Blocks a node. Its record is dropped and refused, every connection to it is
+	 * closed, including one it opened, and no message is taken from it, sent to it or
+	 * relayed through it. It stops being a node the operator named. The blocklist is
+	 * synced into this node's {@code :local} record, which the host keeps.
+	 *
+	 * @param node key of the node to block
+	 * @return whether it was not blocked before
+	 */
+	public boolean block(AccountKey node) {
+		if (node==null) throw new IllegalArgumentException("Node key must not be null");
+		boolean added=application.connections().block(node);
+		application.syncHost();
+		drop(node);
+		return added;
+	}
+
+	/**
+	 * Blocks a transport address, such as {@code tcp://host:port}, or a host. This node
+	 * dials no blocked address and no address at a blocked host, and takes no inbound
+	 * connection from a blocked IP address. A node with a route at such an address, or
+	 * advertising one, is dropped and offered again at its other addresses. A host name
+	 * is matched as written, without DNS. The blocklist is synced as for
+	 * {@link #block(AccountKey)}.
+	 *
+	 * @param address transport address or host
+	 * @return whether it was not blocked before
+	 * @throws IllegalArgumentException if the address is neither
+	 */
+	public boolean block(AString address) {
+		Blocklist blocklist=application.connections().blocklist();
+		boolean added=blocklist.block(address);
+		application.syncHost();
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		Map<AccountKey,NodeDirectory.NodeRecord> records=application.directory().records();
+		Set<AccountKey> affected=new HashSet<>();
+		for (NodeDirectory.NodeRecord record:records.values()) {
+			if (blocklist.dialable(record.transports())!=record.transports()) affected.add(record.peerKey());
+		}
+		for (AccountKey key:manager.getAuthenticatedRouteKeys()) {
+			if (refusesRoute(manager,key)) affected.add(key);
+		}
+		for (AccountKey key:affected) {
+			drop(key);
+			NodeDirectory.NodeRecord record=records.get(key);
+			if (record!=null) offer(record);
+		}
+		return added;
+	}
+
+	/**
+	 * Unblocks a node. Its record is taken again when it next arrives, making it a
+	 * candidate again. The blocklist is synced as for {@link #block(AccountKey)}.
+	 *
+	 * @param node key of the node to unblock
+	 * @return whether it was blocked
+	 */
+	public boolean unblock(AccountKey node) {
+		boolean removed=application.connections().unblock(node);
+		application.syncHost();
+		return removed;
+	}
+
+	/**
+	 * Unblocks a transport address or a host. A node that advertises addresses this
+	 * node refused, and that it has no route to, is offered again with every address it
+	 * no longer refuses; a node with a route, or one the operator named, keeps the
+	 * addresses it has until its record changes. The blocklist is synced as for
+	 * {@link #block(AccountKey)}.
+	 *
+	 * @param address transport address or host
+	 * @return whether it was blocked
+	 * @throws IllegalArgumentException if the address is neither
+	 */
+	public boolean unblock(AString address) {
+		Blocklist blocklist=application.connections().blocklist();
+		List<NodeDirectory.NodeRecord> refused=new ArrayList<>();
+		for (NodeDirectory.NodeRecord record:application.directory().records().values()) {
+			if (blocklist.dialable(record.transports())!=record.transports()) refused.add(record);
+		}
+		boolean removed=blocklist.unblock(address);
+		application.syncHost();
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		Set<AccountKey> routes=manager.getAuthenticatedRouteKeys();
+		for (NodeDirectory.NodeRecord record:refused) {
+			AccountKey key=record.peerKey();
+			if (routes.contains(key) || application.connections().isNamed(key)) continue;
+			// The same record again is no newer, so the candidate is replaced
+			manager.removePeer(key);
+			offer(record);
+		}
+		return removed;
+	}
+
+	/** Whether a node is blocked. */
+	public boolean isBlocked(AccountKey node) {
+		return application.connections().blocklist().isBlocked(node);
+	}
+
+	/**
+	 * Whether a transport address or a host is itself blocked: an address at a blocked
+	 * host is refused but not itself blocked.
+	 *
+	 * @throws IllegalArgumentException if the address is neither
+	 */
+	public boolean isBlocked(AString address) {
+		return application.connections().blocklist().isBlocked(address);
 	}
 
 	private CompletableFuture<Void> initialisePeer(Convex peer) {

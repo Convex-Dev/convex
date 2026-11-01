@@ -84,6 +84,15 @@ a set or map component gives atomic local edits without forcing every field
 containing that collection to merge by union. Navigation below a register is an
 editing convenience; it does not make those fields independently mergeable.
 
+Reusable components are therefore placement-free: one built over a cursor takes
+its replication from where that cursor sits and adds no merge of its own, so the
+same component can be private in a `:local` record or published in an owner's
+signed value. `AccessList`, the standard component for blocklists and allowlists,
+is one: an `Index` from each key to a small optional record, read against an
+injected clock. Inside a register such as a `:local` record, removing a key
+carries over with the record, with no tombstone. An allowlist and a blocklist are
+separate lists, and what each refuses or admits is the application's decision.
+
 The boundary determines what concurrent edits can preserve. A set inside a
 last-write-wins record is part of that record: competing versions select one
 whole record, even if the local editing API offers set operations. A union set

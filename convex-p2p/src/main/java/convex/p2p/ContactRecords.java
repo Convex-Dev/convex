@@ -25,8 +25,12 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <pre>
  * {:timestamp t
- *  :contacts {&lt;node key&gt; {:last-contact t, :failures n, :last-failure t}}}
+ *  :contacts {&lt;node key&gt; {:last-contact t, :failures n, :last-failure t}}
+ *  :blocked  {&lt;node key or address&gt; {}}}
  * </pre>
+ *
+ * <p>The same record holds this node's {@link Blocklist} at {@code :blocked}, edited
+ * through {@link #cursor()}, so both are synced and signed together.</p>
  *
  * <p>A node that answered and has not failed since keeps that standing whether or not
  * this node is connected to it: time alone is no evidence against it. At most

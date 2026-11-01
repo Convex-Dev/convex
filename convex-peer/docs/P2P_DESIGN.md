@@ -271,7 +271,7 @@ next arrives, and exchanges between nodes settle. The evidence comes from `:loca
 
 The checks on an incoming record run cheapest first:
 
-1. a record of a node this node has blocked is refused;
+1. a record of a node this node has blocked (§4.6) is refused;
 2. a record over 4 KB (`P2PLattice.MAX_NODE_RECORD_SIZE`) is refused;
 3. a new node competing for a place in a full registry is refused if it ranks below
    the lowest record held;
@@ -387,7 +387,10 @@ the failures since it and the last failure.
 {:timestamp 1708000000000
  :contacts  {0xabc123... {:last-contact 1708000000000, :failures 0}
              0xdef456... {:last-contact 1707990000000, :failures 2,
-                          :last-failure 1707999000000}}}
+                          :last-failure 1707999000000}}
+ :blocked   {0x789abc...                {}
+             "tcp://203.0.113.5:18888"  {}
+             "198.51.100.7"             {}}}
 ```
 
 Only an authenticated connection counts as contact: a verified outbound admission or
@@ -419,11 +422,35 @@ retained. A node without a key keeps none. The registry is retained the same way
 the records it holds become connection candidates at launch, so a restarted node
 rejoins without a seed.
 
+The same record holds, at `:blocked`, the node keys, transport addresses and hosts
+the operator blocked with `P2PNode.block`, as an `AccessList`
+([LATTICE_APPLICATIONS.md](../../convex-core/docs/LATTICE_APPLICATIONS.md#data-and-merge-boundaries)).
+The record is replaced whole, so an unblock survives a restart and an older copy of
+the record cannot bring back a removed block. `block` and `unblock` sync the host at
+once; durability is the service's, as for contacts. A node without a key keeps its
+list in memory. What an entry refuses:
+
+- a node key: its record (§4.2), its connections, including one it opened, being a
+  connection candidate, and point messages from it, to it or through it;
+- a transport address, such as `tcp://host:port`: dialling it;
+- a host: dialling any address at it and, for an IP address, inbound connections
+  from it, which `serveAllInbound` turns away. A host name is matched as written,
+  without DNS, so it refuses only dialling.
+
+An address is stored in one form whatever its spelling: scheme and host in lower
+case, the port explicit, an IP address in standard text. The P2P node checks the
+list wherever it hands the connection manager a peer, which holds no list itself
+(§8.2). Blocking a node closes its connections at once, and a blocked node that
+connects in is closed when it claims its key, or dropped if it authenticates.
+Blocking an address drops the nodes with a route at it or advertising it, and
+offers them again at their other addresses. An unauthenticated inbound connection
+already open when its address is blocked stays open until it closes, with no route.
+
 Proposed for the same record:
 
 - failures per address, since many keys can name one address;
-- operator and policy blocklists of keys and addresses
-  ([#814](https://github.com/Convex-Dev/convex/issues/814)).
+- blocks the node adds itself, with an expiry, for misbehaviour such as repeated
+  failed challenges.
 
 Retention (§4.2) ranks node records by this evidence. Candidate selection
 deliberately does not (§8.2).
@@ -659,7 +686,10 @@ are kept until removed or, as for seeds, released. Discovered peers are only
 candidates for ambient slots: in the P2P application, `NodeDirectory` validates correctly owner-signed `[:p2p :nodes]` records
 and translates their transport fields. Discovery never makes a node a wanted peer,
 and a node with no supported transport to dial, such as a NAT leaf, is not a
-candidate. The connection manager itself never reads that lattice path or parses NodeInfo. Callers
+candidate. The connection manager itself never reads that lattice path or parses NodeInfo,
+and holds no blocklist: the P2P node offers a candidate only at the addresses it does
+not refuse, never offers or connects to a blocked node, and drops one that
+authenticates (§4.6). Callers
 can await admission without polling. Discovered candidates are bounded by the
 configurable `maxDesiredPeers` cap (256 by default); explicit peers are not counted,
 and a full candidate pool never refuses explicit intent or an inbound route upgrade.
@@ -884,7 +914,7 @@ This needs to be resolved before Phase 2 of the consensus migration.
 - Contact records reported by the connection manager and kept in `:local` (§4.6)
 - Each node keeps only the records it wants, ranked by that evidence (§4.2)
 - Seed nodes released once other peers replace them, and rejoining from retained records (§4.2)
-- Blocklists from the same records (#814)
+- Operator blocklists of node keys and addresses in the same record (§4.6)
 
 ### Phase 2 — Consensus as Lattice Region
 - Implement `BeliefLattice` wrapping `BeliefMerge` with CPoS semantics
