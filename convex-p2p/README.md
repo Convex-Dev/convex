@@ -384,8 +384,8 @@ liveness check, even if the PING reply is late or the request itself times out e
 Known-closed routes release their slots immediately; their own retries back off while
 other candidates fill the vacancies. Automatic socket opening and identity admission
 together are limited to four concurrent attempts; new identity challenges retain a
-separate five-second deadline. Physical inbound sockets that remain silent are
-retired by their owning endpoint so an outbound-only node can reconnect.
+separate five-second deadline. An authenticated inbound route that stays silent is
+probed and then retired by its group, so an outbound-only node can reconnect.
 
 ## Local state
 
