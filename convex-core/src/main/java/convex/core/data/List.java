@@ -384,7 +384,7 @@ public class List<T extends ACell> extends AList<T> {
 	protected <R> void copyToArray(R[] arr, int offset) {
 		int n=Utils.checkedInt(count);
 		for (int i=0; i<n; i++) {
-			arr[offset+i]=(R)get(offset+i);
+			arr[offset+i]=(R)get(i);
 		}
 	}
 
