@@ -23,6 +23,8 @@ import convex.core.store.AStore;
 import convex.core.util.ConfigUtils;
 import convex.core.util.FileUtils;
 import convex.etch.EtchStore;
+import convex.net.PeerName;
+import convex.net.PeerResolver;
 import convex.node.NodeConfig;
 import convex.p2p.P2PNode;
 import picocli.CommandLine.Command;
@@ -66,8 +68,9 @@ public class P2PStart extends ACommand {
 	private String publicUrl;
 
 	@Option(names={"--seed"},
-		description="Seed node to join through, as <key>@<url>, e.g. 0x1234...@tcp://peer.example.com:18888. "
-			+"Repeatable, and added to the configured seeds.")
+		description="Seed node to join through: tcp://host:port, tls://host:port, host:port, a did:web or a did:key, "
+			+"optionally as <key>@<peer> to require that key, e.g. 0x1234...@tcp://peer.example.com:18888. "
+			+"A missing port is 18888. Repeatable, and added to the configured seeds.")
 	private String[] seeds;
 
 	@Option(names={"--etch"},
@@ -136,14 +139,16 @@ public class P2PStart extends ACommand {
 		return settings;
 	}
 
-	/** A {@code --seed} option, {@code <key>@<url>}, as a configured seed entry. */
+	/** A {@code --seed} option, a peer name as {@code [<key>@]<peer>}, as a configured seed entry. */
 	static AMap<AString,ACell> seedEntry(String seed) {
-		int at=seed.indexOf('@');
-		if (at<=0 || at==seed.length()-1) {
-			throw new CLIError(ExitCodes.USAGE,"--seed must be <key>@<url>: "+seed);
+		PeerName name;
+		try {
+			name=PeerResolver.parse(seed);
+		} catch (IllegalArgumentException e) {
+			throw new CLIError(ExitCodes.USAGE,"Invalid --seed: "+e.getMessage(),e);
 		}
-		return Maps.of(Strings.create("key"),Strings.create(seed.substring(0,at).trim()),
-			Strings.create("url"),Strings.create(seed.substring(at+1).trim()));
+		AMap<AString,ACell> entry=Maps.of(Strings.create("url"),Strings.create(name.uri().toString()));
+		return (name.key()==null)?entry:entry.assoc(Strings.create("key"),Strings.create(name.key().toHexString()));
 	}
 
 	/** The key from --key, else the configured keypair, else null. */

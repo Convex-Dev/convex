@@ -2210,8 +2210,14 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	// ========== Backoff Calculation ==========
 
-	/** Calculates bounded exponential retry delay with full lower-half jitter. */
-	static long calculateBackoff(int failCount) {
+	/**
+	 * Calculates bounded exponential retry delay with full lower-half jitter, the
+	 * backoff this manager uses and callers that own their retries share.
+	 *
+	 * @param failCount failures so far, at least one
+	 * @return delay before the next attempt in milliseconds
+	 */
+	public static long calculateBackoff(int failCount) {
 		long base = Math.min(MAX_BACKOFF_MS, INITIAL_BACKOFF_MS << Math.min(failCount - 1, 10));
 		long jitter = ThreadLocalRandom.current().nextLong(base / 2 + 1);
 		return base / 2 + jitter;

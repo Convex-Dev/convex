@@ -302,7 +302,9 @@ That is orthogonal to discovery, connection and routing. Local policy may treat 
 as extra trust, as one of the optional proofs proposed in #713, and on-chain peer
 entries are one optional bootstrap source (§6.3).
 
-**Implemented bootstrap path**: An operator gives `P2PNode.connect` one node
+**Implemented bootstrap path**: An operator gives `P2PNode.connect` one node by a peer
+name, which the node resolves with its records and blocklist and keeps
+([LATTICE_NETWORKING.md](LATTICE_NETWORKING.md#connection-capabilities)), or by node
 AccountKey and TCP address. After challenge/response verifies that endpoint, the
 connecting node pushes only its own signed `[:p2p :nodes]` entry and waits for a
 post-merge acknowledgement. It then pulls and merges the bootstrap node's `:p2p` and
@@ -315,11 +317,14 @@ into an outbound propagation route. A node with empty `:transports` therefore su
 bidirectional gossip without a reverse TCP connection.
 
 **Seed nodes**: A node joins a network through the seed nodes its configuration
-lists under `seeds`, at most 16 pairs of node key and TCP URL, with `P2PNode.seed`.
-Whenever the node has no route, as when it starts, each seed is connected and
-initialised as with `connect`. Once the node's own ambient slots hold routes to other
-peers, at least one, which can replace the seeds, it releases every seed: the route it
-opened closes, and a seed whose record it holds stays an ordinary candidate. Seeds so
+lists under `seeds`, at most 16 peer names, each a `url` with an optional `key`, with
+`P2PNode.seed`. Whenever the node has no route, as when it starts, each seed's name is
+resolved and the seed connected and initialised as with `connect`; a seed that cannot
+be reached, or loses its route, is resolved again and retried after a backoff. A
+`did:key` seed is found where the node's records or contact addresses place its key.
+Once the node's own ambient slots hold routes to other peers, at least one, which can
+replace the seeds, it releases every seed: the route it opened closes, and a seed whose
+record or contact address it holds stays an ordinary candidate. Seeds so
 carry a node only while it joins or rejoins, not for good; in a network too small to
 fill the slots, they stay connected. A restarted node needs no seed (§4.6).
 
