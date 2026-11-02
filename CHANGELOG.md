@@ -53,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build and read P2P node records with `convex.p2p.P2PLattice`, alongside the P2P application that validates them; `convex.lattice.p2p.P2PLattice` keeps only the `:p2p` region's merge rule.
 - Remove the `--url` option from `convex dlfs start`, which has not advertised the node since 0.8.16; `convex p2p start --url` advertises a P2P node.
 
+### Deprecated
+
+- Deprecate `DIDKeyAuthorizer.fromAlsoKnownAs`: an alias proves nothing by itself, so authorise the keys a DID document lists. ([CAD043](https://docs.convex.world/docs/cad/did))
+
 ### Fixed
 
 - Make `convex dlfs start --peer` connect: each peer, given as `host:port` or a `tcp://` or `tls://` URI, is admitted under the key it proves, and startup fails if one cannot be reached. Before, no peer was admitted. ([DLFS](convex-dlfs/README.md#run-a-webdav-server), [#629](https://github.com/Convex-Dev/convex/issues/629))

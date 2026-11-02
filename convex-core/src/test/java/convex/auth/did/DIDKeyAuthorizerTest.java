@@ -37,6 +37,7 @@ public class DIDKeyAuthorizerTest {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	void testAuthenticatedAlsoKnownAsKey() {
 		AKeyPair current=AKeyPair.generate();
 		AString web=Strings.create("did:web:identity.example");

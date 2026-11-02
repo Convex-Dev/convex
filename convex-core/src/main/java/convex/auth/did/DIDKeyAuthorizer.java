@@ -49,7 +49,14 @@ public interface DIDKeyAuthorizer {
 	 * Builds an authoriser from authenticated {@code alsoKnownAs} aliases.
 	 * A {@code did:key} alias authorises exactly the key encoded by that alias;
 	 * aliases never rewrite or equate the subject DID itself.
+	 *
+	 * @deprecated An alias proves nothing by itself, and Convex's DID documents no
+	 * longer list a key's {@code did:key} as one
+	 * (<a href="https://docs.convex.world/docs/cad/did">CAD043</a>). Authorise the keys
+	 * a DID document lists, read with {@link DIDDocuments#authenticationKeys} from a
+	 * {@link DIDResolver} result.
 	 */
+	@Deprecated
 	static DIDKeyAuthorizer fromAlsoKnownAs(
 			Function<AString,? extends Iterable<AString>> aliases) {
 		if (aliases==null) return (did,key) -> false;

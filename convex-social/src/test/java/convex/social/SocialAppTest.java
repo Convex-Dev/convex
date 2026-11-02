@@ -613,11 +613,10 @@ public class SocialAppTest {
 			Social.SOCIAL_LATTICE.merge(LatticeContext.EMPTY,Maps.empty(),update);
 		assertNull(denied.get(webDid));
 
-		DIDKeyAuthorizer aliases=DIDKeyAuthorizer.fromAlsoKnownAs(did ->
-			did.equals(webDid)?java.util.List.of(DID.forKey(signer.getAccountKey()))
-				:java.util.List.of());
+		// As a resolver would, from the keys the DID's document lists
+		DIDKeyAuthorizer resolved=(did,key) -> did.equals(webDid) && key.equals(signer.getAccountKey());
 		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> accepted=
-			Social.ownerLattice(aliases).merge(Maps.empty(),update);
+			Social.ownerLattice(resolved).merge(Maps.empty(),update);
 		assertNotNull(accepted.get(webDid));
 	}
 
