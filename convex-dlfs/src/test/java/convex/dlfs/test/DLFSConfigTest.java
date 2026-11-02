@@ -110,7 +110,7 @@ public class DLFSConfigTest {
 			"{node:{bootstrap:[{key:'"+AKeyPair.createSeeded(1).getAccountKey().toHexString()
 			+"',url:'https://localhost:18888'}]}}").validate());
 		assertThrows(IllegalArgumentException.class,()->DLFSConfig.parse(
-			"{node:{bootstrap:[{url:'tcp://localhost'}]}}").validate());
+			"{node:{bootstrap:[{url:'tcp://localhost:0'}]}}").validate());
 		assertThrows(IllegalArgumentException.class,()->DLFSConfig.parse(
 			"{node:{bootstrap:[{url:'did:convex:13'}]}}").validate());
 		assertThrows(IllegalArgumentException.class,()->DLFSConfig.parse(

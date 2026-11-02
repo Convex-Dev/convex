@@ -68,20 +68,21 @@ public class DlfsStartTest {
 	@Test
 	public void testInvalidPeerRejectedBeforeStartup() {
 		for (String peer:new String[] {"did:convex:13","did:web:example.com/path",
-				"localhost","tcp://localhost","https://localhost:443","nothex@localhost:19889"}) {
+				"localhost:0","https://localhost:443","nothex@localhost:19889"}) {
 			CLTester result=CLTester.run("dlfs", "start", "--no-tray", "--peer", peer);
 			assertEquals(ExitCodes.USAGE, result.getResult(), peer);
 		}
 	}
 
-	/** host:port is a TCP peer, a URI keeps its transport, and a DID or expected key is kept. */
+	/** host:port is a TCP peer, a URI keeps its transport, a missing port is the default, and a DID or expected key is kept. */
 	@Test
 	public void testPeersAreNames() {
 		AccountKey key=AKeyPair.createSeeded(9242).getAccountKey();
 		assertEquals(List.of(new PeerName(URI.create("tcp://localhost:19889"),null),
 				new PeerName(URI.create("tls://peer.example.com:443"),null),
+				new PeerName(URI.create("tcp://localhost:"+convex.core.Constants.DEFAULT_PEER_PORT),null),
 				new PeerName(URI.create("did:web:files.example.com"),key)),
-			DlfsStart.peerNames(new String[] {"localhost:19889","tls://peer.example.com:443",
+			DlfsStart.peerNames(new String[] {"localhost:19889","tls://peer.example.com:443","localhost",
 				key.toHexString()+"@did:web:files.example.com"}));
 		assertEquals(List.of(),DlfsStart.peerNames(null));
 	}

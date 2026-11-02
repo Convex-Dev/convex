@@ -91,7 +91,7 @@ public class DlfsStart extends ACommand {
 
 	@Option(names={"--peer"},
 		description="Peer to replicate with: tcp://host:port, tls://host:port, host:port or a did:web, "
-			+"optionally as <key>@<peer> to require that key. A transport peer is admitted under the key it "
+			+"optionally as <key>@<peer> to require that key. A missing port is 18888. A transport peer is admitted under the key it "
 			+"proves, a did:web under a key its document lists. Startup fails if one cannot be reached; "
 			+"afterwards a lost peer is resolved again and reconnected. Repeatable.")
 	private String[] peers;

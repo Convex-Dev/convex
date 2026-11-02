@@ -188,7 +188,8 @@ selecting a different owner. Registry mutations and file writes are persisted
 synchronously at the service `sync()` boundary.
 
 `convex dlfs start --peer <peer>` connects to another DLFS node before serving, and is
-repeatable. A peer is named as `tcp://host:port`, `tls://host:port`, `host:port` or a
+repeatable. A peer is named as `tcp://host:port`, `tls://host:port`, `host:port` (a
+missing port is the default peer port, 18888) or a
 `did:web` whose document lists the node's key under `authentication` and its endpoints
 as `ConvexLatticeNode` services
 ([CAD043](https://docs.convex.world/docs/cad/did)); `<key>@<peer>` requires that key.

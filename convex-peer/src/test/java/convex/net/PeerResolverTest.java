@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import convex.auth.did.DID;
 import convex.auth.did.DIDResolution;
 import convex.auth.did.DIDResolver;
+import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.util.Multikey;
 import convex.core.data.ACell;
@@ -39,6 +40,7 @@ public class PeerResolverTest {
 	void parsesTransportNamesAsTheyWereReadBefore() {
 		assertEquals(new PeerName(URI.create("tcp://peer.example:18888"),null),PeerResolver.parse("peer.example:18888"));
 		assertEquals(new PeerName(URI.create("tls://peer.example:19888"),null),PeerResolver.parse(" tls://peer.example:19888 "));
+		assertEquals(new PeerName(URI.create("tcp://peer.example:"+Constants.DEFAULT_PEER_PORT),null),PeerResolver.parse("peer.example"));
 		assertEquals(new PeerName(URI.create("tcp://peer.example:18888"),KEY),
 			PeerResolver.parse(KEY.toHexString()+"@tcp://peer.example:18888"));
 		assertEquals(new PeerName(URI.create("tcp://peer.example:18888"),KEY),
@@ -56,7 +58,7 @@ public class PeerResolverTest {
 
 	@Test
 	void refusesMalformedAndUnsupportedNames() {
-		for (String name:new String[] {"","peer.example","tcp://peer.example","wss://peer.example:443",
+		for (String name:new String[] {"","peer.example:0","wss://peer.example:443",
 				"udp://peer.example:1","did:convex:13","did:example:abc","did:key:zabc","did:web:example.com/path",
 				"did:web:example.com#frag","@tcp://peer.example:1","nothex@tcp://peer.example:1",
 				"tcp://peer.example:1@"}) {

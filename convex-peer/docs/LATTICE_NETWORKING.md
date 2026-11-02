@@ -179,7 +179,8 @@ its peers in order to start fails promptly rather than waiting on one that is no
 there.
 
 Operators name peers the same way wherever a peer is named: `tcp://host:port`,
-`tls://host:port`, `host:port`, `did:web` or `did:key`, optionally beside an expected
+`tls://host:port`, `host:port` (a missing port is the default peer port), `did:web` or
+`did:key`, optionally beside an expected
 key (`<key>@<peer>`, or `{key, url}` in configuration). `PeerResolver.parse` checks a
 name without network access, and `PeerResolver.resolve` turns it into a target. A
 transport name is dialled as written. A DID is resolved through the shared

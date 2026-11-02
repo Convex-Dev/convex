@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
+import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.net.impl.netty.NettyServer;
 
@@ -29,15 +30,19 @@ public class TransportsTest {
 		assertThrows(IllegalArgumentException.class,() -> Transports.endpoint("tcp://user@localhost:1"));
 	}
 
-	/** An operator names a peer by a TCP or TLS endpoint with a port; a DID is not read as a host. */
+	/** An operator names a peer by a TCP or TLS endpoint, with the default port if none; a DID is not read as a host. */
 	@Test
-	public void peerEndpointsNeedATransportAndAPort() {
+	public void peerEndpointsNeedATransportAndTakeTheDefaultPort() {
 		assertEquals(URI.create("tcp://localhost:19888"),Transports.peerEndpoint(" localhost:19888 "));
 		assertEquals(URI.create("tcp://10.0.0.2:19888"),Transports.peerEndpoint("tcp://10.0.0.2:19888"));
 		assertEquals(URI.create("tls://peer.example.com:443"),Transports.peerEndpoint("tls://peer.example.com:443"));
 		assertEquals(URI.create("tcp://[::1]:19888"),Transports.peerEndpoint("[::1]:19888"));
+		int port=Constants.DEFAULT_PEER_PORT;
+		assertEquals(URI.create("tcp://localhost:"+port),Transports.peerEndpoint("localhost"));
+		assertEquals(URI.create("tls://peer.example.com:"+port),Transports.peerEndpoint("tls://peer.example.com"));
+		assertEquals(URI.create("tcp://[::1]:"+port),Transports.peerEndpoint("tcp://[::1]"));
 		for (String invalid:new String[] {"did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-				"DID:web:peer.example.com","localhost","tcp://localhost","localhost:0","localhost:70000",
+				"DID:web:peer.example.com","localhost:0","localhost:70000",
 				"https://localhost:443","tcp://localhost:1/path","tcp://localhost:1?q=1","tcp://user@localhost:1",""}) {
 			assertThrows(IllegalArgumentException.class,() -> Transports.peerEndpoint(invalid),invalid);
 		}

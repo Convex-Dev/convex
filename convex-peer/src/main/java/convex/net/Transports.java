@@ -107,11 +107,12 @@ public final class Transports {
 
 	/**
 	 * Parses a peer an operator names by address: a {@code tcp://} or {@code tls://}
-	 * URI, or {@code host:port} for TCP, always with a port. A DID is a name
-	 * {@link PeerResolver} resolves, so one is refused here rather than read as a host name.
+	 * URI, or {@code host[:port]} for TCP. A missing port is the default peer port,
+	 * written into the endpoint. A DID is a name {@link PeerResolver} resolves, so one is
+	 * refused here rather than read as a host name.
 	 *
 	 * @param peer peer address as the operator wrote it
-	 * @return the peer's transport endpoint, without DNS resolution
+	 * @return the peer's transport endpoint with its port, without DNS resolution
 	 * @throws IllegalArgumentException if the peer is not named by such an endpoint
 	 */
 	public static URI peerEndpoint(String peer) {
@@ -131,8 +132,15 @@ public final class Transports {
 			throw new IllegalArgumentException("Invalid peer address "+text+": a peer endpoint has no path or query");
 		}
 		int port=endpoint.getPort();
+		if (port<0) {
+			try {
+				return new URI(endpoint.getScheme(),null,endpoint.getHost(),Constants.DEFAULT_PEER_PORT,null,null,null);
+			} catch (URISyntaxException e) {
+				throw new IllegalArgumentException("Invalid peer address "+text,e);
+			}
+		}
 		if (port<1 || port>65535) {
-			throw new IllegalArgumentException("Invalid peer address "+text+": a port from 1 to 65535 is required");
+			throw new IllegalArgumentException("Invalid peer address "+text+": a port is from 1 to 65535");
 		}
 		return endpoint;
 	}
