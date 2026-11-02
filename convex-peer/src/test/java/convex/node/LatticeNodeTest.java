@@ -11,8 +11,10 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.ConvexRemote;
 import convex.auth.did.DID;
+import convex.auth.did.DIDResolution;
 import convex.core.ErrorCodes;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.util.Multikey;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Maps;
@@ -22,13 +24,16 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.StoreException;
+import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.util.JSON;
 import convex.core.store.MemoryStore;
 import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
+import convex.net.PeerResolver;
 import convex.net.Transports;
 
 /** Optional networking preserves the existing host, application boundaries and store ownership. */
@@ -188,6 +193,38 @@ class LatticeNodeTest {
 				assertEquals(serverKey.getAccountKey(),peer.getVerifiedPeer());
 				assertSame(peer,manager.getConnection(serverKey.getAccountKey()));
 				assertTrue(manager.getAuthenticatedRouteKeys().contains(serverKey.getAccountKey()));
+			}
+		}
+	}
+
+	/** A node named by a did:web is dialled at its document's lattice endpoint and must prove a key it lists. */
+	@Test void nodeNamedByDIDIsAdmittedUnderAKeyItsDocumentLists() throws Exception {
+		try (var serverStore=new MemoryStore(); var clientStore=new MemoryStore()) {
+			var serverKey=AKeyPair.createSeeded(707);
+			var clientKey=AKeyPair.createSeeded(708);
+			try (var server=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,serverStore),NodeConfig.port(0)).launch();
+					var client=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,clientStore),NodeConfig.port(-1)).launch()) {
+				server.setIdentity(DID.forKey(serverKey.getAccountKey()),serverKey);
+				server.serveAllInbound(server.createPropagator());
+				client.setIdentity(DID.forKey(clientKey.getAccountKey()),clientKey);
+				String did="did:web:files.example.com";
+				String document="""
+					{"id": "%1$s",
+					 "verificationMethod": [{"id": "#node", "type": "Multikey", "controller": "%1$s",
+					   "publicKeyMultibase": "%2$s"}],
+					 "authentication": ["#node"],
+					 "service": [{"id": "#lattice", "type": "ConvexLatticeNode", "serviceEndpoint": "%3$s"}]}
+					""".formatted(did,Multikey.encodePublicKey(serverKey.getAccountKey()),
+						Transports.endpoint(server.getHostAddress()));
+				client.setPeerResolver(new PeerResolver(name -> CompletableFuture.completedFuture(
+					DIDResolution.of(RT.ensureMap(JSON.parse(document)),null)),null));
+				var group=client.createPropagator();
+
+				var peer=client.connectPeer(group,PeerResolver.parse(did)).get(10,TimeUnit.SECONDS);
+				assertEquals(serverKey.getAccountKey(),peer.getVerifiedPeer());
+				var manager=group.getConnectionManager();
+				assertSame(peer,manager.getConnection(serverKey.getAccountKey()));
+				assertNull(manager.getDesiredPeers().get(serverKey.getAccountKey()).transports,"held, not redialled");
 			}
 		}
 	}

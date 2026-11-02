@@ -1,9 +1,6 @@
 package convex.dlfs;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -27,6 +24,8 @@ import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.etch.EtchConfig;
 import convex.lattice.fs.DLFSLattice;
+import convex.net.PeerName;
+import convex.net.PeerResolver;
 import convex.node.NodeConfig;
 import convex.peer.Config;
 
@@ -43,7 +42,7 @@ import convex.peer.Config;
  *     port: 19888,
  *     store: "dlfs.etch",
  *     keypair: "<32-byte seed hex>",
- *     bootstrap: [{key: "<AccountKey>", url: "tcp://127.0.0.1:19889"}],
+ *     bootstrap: [{key: "<AccountKey>", url: "tcp://127.0.0.1:19889"}, {url: "did:web:files.example.com"}],
  *   },
  *   dlfs: {path: ["fs"], drive: "home"},
  *   http: {bind: "127.0.0.1", port: 8080},
@@ -194,13 +193,17 @@ public final class DLFSConfig {
 		return AKeyPair.create(seed);
 	}
 
-	/** Gets configured TCP bootstrap peers and their expected identities. */
-	public List<BootstrapPeer> getBootstrapPeers() {
+	/**
+	 * Gets the configured bootstrap peers: each a peer URI under {@code url}, as
+	 * {@link PeerResolver#parse(String, String)} reads it, with an optional expected
+	 * {@code key}.
+	 */
+	public List<PeerName> getBootstrapPeers() {
 		ACell value=getSection(NODE).get(BOOTSTRAP);
 		if (value==null) return List.of();
 		AVector<ACell> entries=RT.ensureVector(value);
 		if (entries==null) throw new IllegalArgumentException("node.bootstrap must be an array");
-		ArrayList<BootstrapPeer> result=new ArrayList<>((int)entries.count());
+		ArrayList<PeerName> result=new ArrayList<>((int)entries.count());
 		for (long i=0;i<entries.count();i++) {
 			AMap<AString,ACell> entry=RT.castMap(entries.get(i));
 			if (entry==null) throw new IllegalArgumentException("node.bootstrap["+i+"] must be an object");
@@ -209,27 +212,17 @@ public final class DLFSConfig {
 		return List.copyOf(result);
 	}
 
-	private static BootstrapPeer parseBootstrapPeer(AMap<AString,ACell> entry,long index) {
-		AString keyValue=RT.ensureString(entry.get(KEY));
+	private static PeerName parseBootstrapPeer(AMap<AString,ACell> entry,long index) {
+		ACell keyValue=entry.get(KEY);
 		AString urlValue=RT.ensureString(entry.get(NodeConfig.URL));
-		if (keyValue==null) throw new IllegalArgumentException("node.bootstrap["+index+"].key is required");
 		if (urlValue==null) throw new IllegalArgumentException("node.bootstrap["+index+"].url is required");
-		AccountKey key=AccountKey.parse(keyValue.toString());
-		if (key==null) throw new IllegalArgumentException("Invalid AccountKey at node.bootstrap["+index+"].key");
+		if (keyValue!=null && RT.ensureString(keyValue)==null) {
+			throw new IllegalArgumentException("node.bootstrap["+index+"].key must be a string");
+		}
 		try {
-			URI uri=new URI(urlValue.toString());
-			if (!"tcp".equalsIgnoreCase(uri.getScheme())) {
-				throw new IllegalArgumentException("node.bootstrap["+index+"].url must use tcp://");
-			}
-			if ((uri.getHost()==null)||(uri.getPort()<1)||(uri.getPort()>65535)
-					||(uri.getUserInfo()!=null)||(uri.getQuery()!=null)||(uri.getFragment()!=null)
-					||((uri.getPath()!=null)&&!uri.getPath().isEmpty())) {
-				throw new IllegalArgumentException("Invalid TCP URL at node.bootstrap["+index+"].url");
-			}
-			return new BootstrapPeer(key,
-				InetSocketAddress.createUnresolved(uri.getHost(),uri.getPort()));
-		} catch (URISyntaxException e) {
-			throw new IllegalArgumentException("Invalid URL at node.bootstrap["+index+"].url",e);
+			return PeerResolver.parse(urlValue.toString(),(keyValue==null)?null:keyValue.toString());
+		} catch (IllegalArgumentException e) {
+			throw new IllegalArgumentException("node.bootstrap["+index+"]: "+e.getMessage(),e);
 		}
 	}
 
@@ -496,14 +489,6 @@ public final class DLFSConfig {
 	private static void validatePort(int port,String location) {
 		if ((port<0)||(port>65535)) {
 			throw new IllegalArgumentException(location+" must be between 0 and 65535");
-		}
-	}
-
-	/** Bootstrap transport paired with its expected remote identity. */
-	public record BootstrapPeer(AccountKey key,InetSocketAddress address) {
-		public BootstrapPeer {
-			if (key==null) throw new IllegalArgumentException("Bootstrap key is required");
-			if (address==null) throw new IllegalArgumentException("Bootstrap address is required");
 		}
 	}
 

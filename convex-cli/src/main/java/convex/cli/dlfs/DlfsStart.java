@@ -2,7 +2,6 @@ package convex.cli.dlfs;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,9 +37,9 @@ import convex.dlfs.DLFSServer;
 import convex.lattice.LatticeHost;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
-import convex.net.Transports;
+import convex.net.PeerName;
+import convex.net.PeerResolver;
 import convex.node.NodeConfig;
-import convex.node.LatticeConnectionManager;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -92,8 +91,10 @@ public class DlfsStart extends ACommand {
 	private String[] driveNames;
 
 	@Option(names={"--peer"},
-		description="Peer to replicate with, as tcp://host:port, tls://host:port or host:port. "
-			+"Each is admitted under the key it proves; startup fails if one cannot be reached. Repeatable.")
+		description="Peer to replicate with: tcp://host:port, tls://host:port, host:port or a did:web, "
+			+"optionally as <key>@<peer> to require that key. A transport peer is admitted under the key it "
+			+"proves, a did:web under a key its document lists. Startup fails if one cannot be reached; "
+			+"afterwards a lost peer is resolved again and reconnected. Repeatable.")
 	private String[] peers;
 
 	@Option(names={"--public-key"},
@@ -138,7 +139,7 @@ public class DlfsStart extends ACommand {
 				throw new CLIError(ExitCodes.CONFIG, "Invalid drive name: " + driveName);
 			}
 		}
-		List<URI> peerEndpoints=peerEndpoints(peers);
+		List<PeerName> peerNames=peerNames(peers);
 		// Resolve or generate key pair
 		AKeyPair keyPair = resolveKeyPair();
 		inform("Key: " + keyPair.getAccountKey().toChecksumHex());
@@ -187,7 +188,7 @@ public class DlfsStart extends ACommand {
 		DLFSDriveManager driveManager;
 		DLFSServer dlfsServer;
 		try {
-			connectPeers(propagator.getConnectionManager(),peerEndpoints);
+			connectPeers(node,propagator,peerNames);
 			driveManager=createDriveManager(host,application,accountKey);
 			for (String driveName : driveNames) {
 				boolean created=driveManager.createDrive(null, driveName);
@@ -317,32 +318,38 @@ public class DlfsStart extends ACommand {
 		return NodeConfig.create(configMap);
 	}
 
-	/** The {@code --peer} options as transport endpoints, refused before anything opens. */
-	static List<URI> peerEndpoints(String[] peers) {
+	/** The {@code --peer} options as peer names, refused before anything opens. */
+	static List<PeerName> peerNames(String[] peers) {
 		if (peers==null) return List.of();
-		List<URI> endpoints=new ArrayList<>(peers.length);
+		List<PeerName> names=new ArrayList<>(peers.length);
 		for (String peer:peers) {
 			try {
-				endpoints.add(Transports.peerEndpoint(peer));
+				names.add(PeerResolver.parse(peer));
 			} catch (IllegalArgumentException e) {
 				throw new CLIError(ExitCodes.USAGE,"--peer: "+e.getMessage(),e);
 			}
 		}
-		return endpoints;
+		return names;
 	}
 
-	/** Connects to every peer before serving, each admitted under the key it proves. */
-	private void connectPeers(LatticeConnectionManager manager,List<URI> endpoints) throws InterruptedException {
-		Map<URI,CompletableFuture<Convex>> connecting=new LinkedHashMap<>();
-		for (URI endpoint:endpoints) connecting.put(endpoint,manager.connectPeer(endpoint));
-		for (Map.Entry<URI,CompletableFuture<Convex>> entry:connecting.entrySet()) {
+	/**
+	 * Connects to every peer before serving, then keeps each: a lost peer is resolved
+	 * again and reconnected.
+	 */
+	private void connectPeers(LatticeNode<?> node,LatticePropagator propagator,List<PeerName> names)
+			throws InterruptedException {
+		Map<PeerName,CompletableFuture<Convex>> connecting=new LinkedHashMap<>();
+		for (PeerName name:names) connecting.put(name,node.connectPeer(propagator,name));
+		for (Map.Entry<PeerName,CompletableFuture<Convex>> entry:connecting.entrySet()) {
+			Convex admitted;
 			try {
-				AccountKey peerKey=entry.getValue().get().getVerifiedPeer();
-				inform("Connected to peer "+peerKey.toChecksumHex()+" at "+entry.getKey());
+				admitted=entry.getValue().get();
 			} catch (ExecutionException e) {
 				Throwable cause=(e.getCause()==null)?e:e.getCause();
 				throw new CLIError(ExitCodes.NOHOST,"Cannot connect to peer "+entry.getKey()+": "+cause.getMessage(),cause);
 			}
+			inform("Connected to peer "+admitted.getVerifiedPeer().toChecksumHex()+" at "+entry.getKey());
+			node.keepPeer(propagator,entry.getKey(),admitted);
 		}
 	}
 }

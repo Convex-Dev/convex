@@ -107,8 +107,8 @@ public final class Transports {
 
 	/**
 	 * Parses a peer an operator names by address: a {@code tcp://} or {@code tls://}
-	 * URI, or {@code host:port} for TCP, always with a port. A DID cannot be resolved
-	 * to a node yet, so one is refused rather than read as a host name.
+	 * URI, or {@code host:port} for TCP, always with a port. A DID is a name
+	 * {@link PeerResolver} resolves, so one is refused here rather than read as a host name.
 	 *
 	 * @param peer peer address as the operator wrote it
 	 * @return the peer's transport endpoint, without DNS resolution
@@ -118,7 +118,7 @@ public final class Transports {
 		if (peer==null) throw new IllegalArgumentException("Peer address required");
 		String text=peer.trim();
 		if (text.regionMatches(true,0,"did:",0,4)) {
-			throw new IllegalArgumentException("Connecting to a peer by DID is not supported yet: "+text);
+			throw new IllegalArgumentException("A DID is not a peer address: "+text);
 		}
 		URI endpoint;
 		try {

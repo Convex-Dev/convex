@@ -109,12 +109,14 @@ synchronisation. This belongs to the DLFS application; other components on the
 same host may use different allowances or no clock-based admission. Move existing
 `node.maxFutureTimestampSkew` settings into the `dlfs` section.
 
-Bootstrap entries pair a TCP address with its expected `AccountKey`; the connection
-manager challenges for that key after connecting, holding the connection under the
-conservative message-size cap until the node proves it. A node that does not prove it
-is disconnected and retried later, never admitted. Bootstrap contacts are not a
-separate DLFS concept: the same lattice connection and propagation path carries `:p2p`
-discovery data and DLFS state.
+Each bootstrap entry names a peer under `url`, as `--peer` does, with an optional
+expected `key`: the node must prove that key, or with none the key it proves first. The
+connection manager holds the connection under the conservative message-size cap until
+the node proves it; a node that does not is disconnected, never admitted. Bootstrap
+peers are connected in the background, resolved again and reconnected when they cannot
+be reached or their route is lost, and given up after ten minutes without success.
+Bootstrap contacts are not a separate DLFS concept: they use the same lattice
+connection and propagation path as DLFS state.
 Bootstrap configures the outbound side only; the remote node must separately grant an
 inbound lattice view.
 
@@ -185,12 +187,18 @@ a stable keystore key (`--key` or `--public-key`). This prevents a restart from 
 selecting a different owner. Registry mutations and file writes are persisted
 synchronously at the service `sync()` boundary.
 
-`convex dlfs start --peer <address>` connects to another DLFS node before serving,
-given as `tcp://host:port`, `tls://host:port` or `host:port`, and repeatable. DLFS nodes
-listen on TCP only ([#797](https://github.com/Convex-Dev/convex/issues/797)), so
-`tls://` reaches one only through a proxy that terminates TLS. Each peer
-is admitted under the key it proves, which the command prints; startup fails if a peer
-cannot be reached or proves no key. The peer must serve its lattice view to inbound
+`convex dlfs start --peer <peer>` connects to another DLFS node before serving, and is
+repeatable. A peer is named as `tcp://host:port`, `tls://host:port`, `host:port` or a
+`did:web` whose document lists the node's key under `authentication` and its endpoints
+as `ConvexLatticeNode` services
+([CAD043](https://docs.convex.world/docs/cad/did)); `<key>@<peer>` requires that key.
+DLFS nodes listen on TCP only ([#797](https://github.com/Convex-Dev/convex/issues/797)),
+so `tls://` reaches one only through a proxy that terminates TLS. A peer named by
+address is admitted under the key it proves, which the command prints, and a `did:web`
+under a key its document lists; startup fails if a peer cannot be reached or proves no
+such key. A peer whose route is lost later is resolved again and reconnected, and given
+up after ten minutes without success. A `did:key`, or a `did:web` with no endpoints,
+cannot be used: a DLFS node keeps no node records to find it by. The peer must serve its lattice view to inbound
 connections: `convex dlfs start --serve-inbound` does, as does `convex.dlfs.Main` with
 `latticeInbound: "public"` or `--serve-inbound`. Without it, `convex dlfs start` refuses
 inbound lattice connections.

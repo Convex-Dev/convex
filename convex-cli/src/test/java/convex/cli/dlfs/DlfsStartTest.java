@@ -14,10 +14,12 @@ import org.junit.jupiter.api.Test;
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
 import convex.core.store.MemoryStore;
 import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSServer;
 import convex.lattice.LatticeHost;
+import convex.net.PeerName;
 
 public class DlfsStartTest {
 
@@ -62,22 +64,26 @@ public class DlfsStartTest {
 		assertTrue(result.getError().contains("requires a stable key"));
 	}
 
-	/** A DID, or an address without a port, stops startup before anything opens. */
+	/** A malformed or unsupported peer name stops startup before anything opens. */
 	@Test
 	public void testInvalidPeerRejectedBeforeStartup() {
-		for (String peer:new String[] {"did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-				"localhost","tcp://localhost","https://localhost:443"}) {
+		for (String peer:new String[] {"did:convex:13","did:web:example.com/path",
+				"localhost","tcp://localhost","https://localhost:443","nothex@localhost:19889"}) {
 			CLTester result=CLTester.run("dlfs", "start", "--no-tray", "--peer", peer);
 			assertEquals(ExitCodes.USAGE, result.getResult(), peer);
 		}
 	}
 
-	/** host:port is a TCP peer, and a URI keeps its transport. */
+	/** host:port is a TCP peer, a URI keeps its transport, and a DID or expected key is kept. */
 	@Test
-	public void testPeersAreTransportEndpoints() {
-		assertEquals(List.of(URI.create("tcp://localhost:19889"),URI.create("tls://peer.example.com:443")),
-			DlfsStart.peerEndpoints(new String[] {"localhost:19889","tls://peer.example.com:443"}));
-		assertEquals(List.of(),DlfsStart.peerEndpoints(null));
+	public void testPeersAreNames() {
+		AccountKey key=AKeyPair.createSeeded(9242).getAccountKey();
+		assertEquals(List.of(new PeerName(URI.create("tcp://localhost:19889"),null),
+				new PeerName(URI.create("tls://peer.example.com:443"),null),
+				new PeerName(URI.create("did:web:files.example.com"),key)),
+			DlfsStart.peerNames(new String[] {"localhost:19889","tls://peer.example.com:443",
+				key.toHexString()+"@did:web:files.example.com"}));
+		assertEquals(List.of(),DlfsStart.peerNames(null));
 	}
 
 	@Test

@@ -461,10 +461,11 @@ convex dlfs start --key 0x7e66429ca... --etch a.etch --serve-inbound
 convex dlfs start --key 0x2b5f61d0e... --etch b.etch --port 8081 --node-port 19889 --peer tcp://localhost:19888
 ```
 
-Each peer is admitted under the key it proves, and startup fails if a peer cannot be
-reached. `--serve-inbound` lets anyone who can reach the node port read every
-replicated drive. See the [DLFS README](../convex-dlfs/README.md#run-a-webdav-server)
-for peer addresses and what serving inbound exposes.
+A peer is named by address or `did:web`, optionally as `<key>@<peer>`. Startup fails if
+a peer cannot be reached; a peer lost later is resolved again and reconnected.
+`--serve-inbound` lets anyone who can reach the node port read every replicated drive.
+See the [DLFS README](../convex-dlfs/README.md#run-a-webdav-server) for peer names and
+what serving inbound exposes.
 
 ## Global Options
 

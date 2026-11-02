@@ -176,8 +176,19 @@ that it is the node the caller meant; over `tls://` the certificate vouches for 
 host name first. A node that cannot be reached or proves no key gets three attempts,
 with the usual retry backoff, then the caller's future fails, so a service that needs
 its peers in order to start fails promptly rather than waiting on one that is not
-there. `Transports.peerEndpoint` parses an operator's `tcp://` or `tls://` URI, or
-`host:port`, and refuses a DID, which cannot be resolved to a node yet.
+there.
+
+Operators name peers the same way wherever a peer is named: `tcp://host:port`,
+`tls://host:port`, `host:port`, `did:web` or `did:key`, optionally beside an expected
+key (`<key>@<peer>`, or `{key, url}` in configuration). `PeerResolver.parse` checks a
+name without network access, and `PeerResolver.resolve` turns it into a target. A
+transport name is dialled as written. A DID is resolved through the shared
+`DIDResolver`, which fetches a `did:web` document over HTTPS: the peer must prove a key
+the document lists under `authentication`, and is dialled at the endpoints of its
+`ConvexLatticeNode` services ([CAD043](https://docs.convex.world/docs/cad/did)). A
+`did:key`, or a document without those services, is located by key in the node's
+records, which a node that keeps them supplies to its resolver; without a record the
+name fails as having no known address. An expected key narrows the target to that key.
 
 A peer resolved from its name is a `PeerTarget`: the keys it may prove, none meaning
 any, and the endpoints to dial it at. `connectPeer(PeerTarget)` makes one bounded

@@ -17,6 +17,7 @@ import convex.etch.EtchStore;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.lattice.LatticeHost;
+import convex.net.PeerName;
 import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
@@ -85,10 +86,9 @@ public final class Main {
 		DLFSServer server;
 		try {
 			node.launch();
-			for (DLFSConfig.BootstrapPeer peer:config.getBootstrapPeers()) {
-				if (!keyPair.getAccountKey().equals(peer.key())) {
-					propagator.getConnectionManager().addPeer(peer.key(),peer.address());
-				}
+			// Each is resolved and connected in the background, and resolved again when lost
+			for (PeerName peer:config.getBootstrapPeers()) {
+				if (!keyPair.getAccountKey().equals(peer.key())) node.keepPeer(propagator,peer,null);
 			}
 			if (application.drives(keyPair.getAccountKey()).getOrCreateDrive(driveName)==null) {
 				throw new IllegalStateException("Could not open or create drive: "+driveName);
