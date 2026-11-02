@@ -113,10 +113,13 @@ public class P2PSeedTest {
 	public void testSeedWithTheWrongKeyHoldsUpNoOther() throws Exception {
 		P2PNode hub=hubKnowingOther();
 		AccountKey wrongKey=AKeyPair.generate().getAccountKey();
-		NodeConfig config=withSeeds(seedList(wrongKey,hub).concat(seedList(hubKey.getAccountKey(),hub)));
+		// The same endpoint under another URI, since names at one URI are one seed
+		NodeConfig config=withSeeds(Vectors.<ACell>of(Maps.of(Strings.create("key"),Strings.create(wrongKey.toHexString()),
+			Strings.create("url"),address(hub))).concat(seedList(hubKey.getAccountKey(),hub)));
 		P2PNode joiner=launch(store("seed-joiner"),config,1,joinerKey);
 
 		joiner.seed(P2PNode.seeds(config)).get(TIMEOUT,TimeUnit.SECONDS);
+		assertEquals(2,joiner.getSeeds().size(),"both seeds are listed");
 		LatticeConnectionManager manager=joiner.propagationGroup().getConnectionManager();
 		assertNotNull(manager.getConnection(otherKey.getAccountKey()));
 		assertNull(manager.getConnection(wrongKey),"the endpoint never proved the configured key");
