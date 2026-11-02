@@ -20,6 +20,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.MemoryStore;
 import convex.lattice.LatticeHost;
 import convex.node.NodeConfig;
 
@@ -63,6 +64,19 @@ public class NodeRegistryTest {
 		var held=held();
 		for (AKeyPair key:new AKeyPair[] {ALICE,named,routed}) assertNotNull(held.get(key.getAccountKey()));
 		assertEquals(BOUND+3,held.count());
+	}
+
+	@Test void aNodeKeepsTheRecordsOfItsPointsOfPresence() throws Exception {
+		AKeyPair pop=key(100),other=key(101);
+		try (P2PNode node=P2PNode.create(new MemoryStore(),config(0),ALICE)) {
+			node.pointsOfPresence(pop.getAccountKey());
+			P2PApplication application=node.getApplication();
+			application.merge(registry(record(pop,1).merge(record(other,1))));
+			ACell nodes=application.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+			AHashMap<?,?> held=(AHashMap<?,?>)nodes;
+			assertNotNull(held.get(pop.getAccountKey()));
+			assertNull(held.get(other.getAccountKey()),"a full registry turns other nodes away");
+		}
 	}
 
 	@Test void aNodeWithoutAKeyBoundsItsRegistryToo() {
