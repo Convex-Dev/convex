@@ -12,7 +12,7 @@ The primary use case is agent-driven key management and transaction signing via 
 
 Implementation spans three modules:
 - **`convex-core`** — lattice primitives (`:local`, `OwnerLattice`), crypto (`JWT`, `Multikey`, HKDF), Etch storage
-- **`convex-peer`** — signing service backend (key lifecycle, encryption, lattice persistence, auth token issuance)
+- **`convex-peer`** — signing service backend (key lifecycle, encryption, local lattice state, auth token issuance)
 - **`convex-restapi`** — API layer (MCP tools, auth endpoints, Convex convenience layer)
 
 ## Design Principles
@@ -336,7 +336,7 @@ Unauthenticated access remains available for public endpoints (queries, network 
 │  convex-peer                           (service layer)   │
 │                                                          │
 │  SigningService:                                         │
-│    Key lifecycle (create, import, export, delete)         │
+│    Key lifecycle (create, import, export, delete)        │
 │    Sign bytes, build self-issued JWTs                    │
 │    Passphrase-based encryption/decryption                │
 │    Identity index management                             │
@@ -346,12 +346,12 @@ Unauthenticated access remains available for public endpoints (queries, network 
 │  Peer Authentication:                                    │
 │    Social login → peer-signed JWT issuance               │
 │    Self-issued JWT verification                          │
-│    encryptionSecret management (generate, wrap, unwrap)        │
+│    encryptionSecret management (generate, wrap, unwrap)  │
 │                                                          │
-│  Cursor-based state (ACursor<ACell>):                    │
-│    Server layer provides cursor to :signing subtree      │
-│    SigningService reads/writes through cursor             │
-│    Persistence/replication is server layer's choice       │
+│  Local state (ALocalComponent):                          │
+│    Record at [:local <peer key> :signing]                │
+│    Edits a private copy; the application syncs it        │
+│    Sync and persistence are the application's choice     │
 ├──────────────────────────────────────────────────────────┤
 │  convex-core                         (primitives layer)  │
 │                                                          │
@@ -369,37 +369,37 @@ Unauthenticated access remains available for public endpoints (queries, network 
 | Layer | Module | Owns | Does NOT own |
 |---|---|---|---|
 | **Primitives** | `convex-core` | OwnerLattice, LocalLattice, `:local` in `Lattice.ROOT`, ACursor abstraction, JWT, Multikey, HKDF, AESGCM, Etch storage | Key management logic, auth flows, API |
-| **Service** | `convex-peer` | SigningService (cursor-based), key encryption/decryption, `:signing` data structure, encryptionSecret management, auth token issuance | Persistence decisions, cursor construction, MCP tools, HTTP routing |
-| **API** | `convex-restapi` | MCP tool handlers, auth endpoints, confirm UI, Convex convenience tools, cursor construction and persistence | Encryption, key storage internals |
+| **Service** | `convex-peer` | SigningService (an `ALocalComponent`), key encryption/decryption, the `:signing` record, encryptionSecret management, auth token issuance | Sync and persistence policy, the root it is bound under, MCP tools, HTTP routing |
+| **API** | `convex-restapi` | MCP tool handlers, auth endpoints, confirm UI, Convex convenience tools, the root the service is bound under and when it is synced | Encryption, key storage internals |
 
-The API layer constructs the cursor (choosing persistence strategy) and passes it to the service layer. The service layer uses core primitives. No layer reaches down more than one level.
+The API layer binds the service under a lattice root and decides when its record is synced and persisted. The service layer uses core primitives. No layer reaches down more than one level.
 
 ## Threat Model and Security
 
 ### Encryption Secret
 
-The `encryptionSecret` used for all key store encryption is a random 256-bit key, generated once when the signing service is first initialised. It is stored encrypted (AES-256-GCM, keyed by the peer's Ed25519 key via [HKDF](https://datatracker.ietf.org/doc/html/rfc5869)) in the peer's OwnerLattice slot:
+The `encryptionSecret` used for all key store encryption is a random 256-bit key, generated with the first stored key. It is stored encrypted (AES-256-GCM, keyed by the peer's Ed25519 key via [HKDF](https://datatracker.ietf.org/doc/html/rfc5869)) in the peer's OwnerLattice slot:
 
 ```
 :local → <peerKey> → :signing → :secret → ABlob (encrypted encryptionSecret)
 ```
 
 **Lifecycle:**
-1. First start: generate random 256-bit `encryptionSecret`, encrypt with `HKDF(peerSeed, info: "convex-signing-secret-v1")`, store in `:secret`
-2. Normal start: load `:secret` from lattice, decrypt with current peer key
-3. Peer key rotation: decrypt `:secret` with old key, re-encrypt with new key, store in new OwnerLattice slot. All signing keys remain valid — only the wrapper around `encryptionSecret` changes, not the secret itself.
+1. First stored key: generate random 256-bit `encryptionSecret`, encrypt with `HKDF(peerSeed, info: "convex-signing-secret-v1")`, store in `:secret` in the same atomic edit as the key
+2. Each use: decrypt `:secret` from the current record with the peer key, then discard it, so a newer record taken in by merge (a restored backup) is used as it is
+3. Peer key rotation: decrypt `:secret` with old key, re-encrypt with new key, and merge the record into the new key's service, which syncs it into the new key's OwnerLattice slot. All signing keys remain valid — only the wrapper around `encryptionSecret` changes, not the secret itself.
 
 This decouples encryption from peer identity. Peer key rotation requires re-wrapping one value, not re-encrypting every stored key.
 
 ### Content-Based Key Encryption
 
 ```
-wrappingKey = HKDF-SHA256(ikm: encryptionSecret, salt: identity || publicKey || passphrase,
-                          info: "convex-signing-service-v1")
-lookupHash  = SHA-256(identity || publicKey || passphrase)
+credentials = value ID of the vector [identity publicKey passphrase]
+wrappingKey = HKDF-SHA256(ikm: encryptionSecret, salt: credentials, info: "convex-signing-service-v1")
+lookupHash  = HKDF-SHA256(ikm: encryptionSecret, salt: credentials, info: "convex-signing-lookup-v1")
 ```
 
-Where `identity` is the canonical DID (e.g., `"did:web:peer.example.com:oauth:google:118234..."` or `"did:key:z6Mk..."`).
+Where `identity` is the canonical DID (e.g., `"did:web:peer.example.com:oauth:google:118234..."` or `"did:key:z6Mk..."`). Encoding the three as a vector keeps field boundaries explicit, and keying the lookup hash with `encryptionSecret` means a copy of the record alone gives no way to test a passphrase.
 
 The key store contains only opaque `lookupHash → encryptedSeed` mappings. No metadata.
 
@@ -762,15 +762,17 @@ The `:local` subtree may live in the peer's main Etch store or in a separate sto
 ### Lattice Structure
 
 ```
-:local → OwnerLattice<AccountKey, Index<Keyword, ACell>>
+:local → OwnerLattice<AccountKey, AHashMap<Keyword, ACell>>
 │
-├── <peer-key-A> → Signed<Index<Keyword, ACell>>
+├── <peer-key-A> → Signed<AHashMap<Keyword, ACell>>
 │   │
-│   ├── :signing → Index<Keyword, ACell>
+│   ├── :signing → AHashMap<Keyword, ACell>
+│   │   ├── :timestamp → CVMLong (stamped on every edit)
+│   │   │
 │   │   ├── :secret → ABlob (encryptionSecret, encrypted with peer key)
 │   │   │
 │   │   ├── :keys → Index<Hash, ABlob>
-│   │   │     key:   lookupHash — SHA-256(identity ‖ publicKey ‖ passphrase)
+│   │   │     key:   lookupHash — HKDF keyed by encryptionSecret (see above)
 │   │   │     value: encryptedSeed — AES-256-GCM ciphertext (includes nonce)
 │   │   │
 │   │   ├── :identities → Index<Hash, AVector<AccountKey>>
@@ -785,13 +787,13 @@ The `:local` subtree may live in the peer's main Etch store or in a separate sto
 │   │
 │   └── (future peer-local services can add sibling keys here)
 │
-├── <peer-key-B> → Signed<Index<Keyword, ACell>>
+├── <peer-key-B> → Signed<AHashMap<Keyword, ACell>>
 │   └── :signing → ...  (independent, non-conflicting)
 │
 └── ...
 ```
 
-**`:local`** uses `OwnerLattice` — each peer writes only to its own slot, signed with its peer key. Within each peer's slot, a `MapLattice` merges per-keyword using `LWWLattice` (timestamp-based last-write-wins; on equal timestamps the value already held is kept). Each service (`:signing`, etc.) bumps a `:timestamp` key on every mutation; during merge, the higher-timestamp version wins. Different services merge independently — updating `:signing` does not clobber a sibling service. This enables:
+**`:local`** uses `OwnerLattice` — each peer writes only to its own slot, signed with its peer key. Within each peer's slot, a `MapLattice` merges per-keyword using `LWWLattice` (timestamp-based last-write-wins; on equal timestamps the value already held is kept). Each service (`:signing`, etc.) is an `ALocalComponent`, which stamps its record's `:timestamp` on every edit; during merge, the higher-timestamp version wins. Different services merge independently — updating `:signing` does not clobber a sibling service. This enables:
 
 - **Shared store** — multiple peers coexist in the same Etch store without conflict
 - **Safe replication** — `:local` can be replicated between peers for fault tolerance; each peer's data is signed and can't be tampered with by others
@@ -807,9 +809,9 @@ All `Index` keys are `ABlobLike` types (`Hash`, `ABlob`, `Keyword`) — compatib
 
 `Index<Hash, ABlob>` mapping lookup hashes to encrypted seeds.
 
-- Key: `Hash.of(identity ‖ publicKey ‖ passphrase)` — 32-byte SHA-256
+- Key: `lookupHash` — 32-byte HKDF output keyed by `encryptionSecret` ([Content-Based Key Encryption](#content-based-key-encryption))
 - Value: `Blob.wrap(ciphertext)` — AES-256-GCM encrypted Ed25519 seed (nonce prepended)
-- Wrapping key: `HKDF(encryptionSecret, salt: identity ‖ publicKey ‖ passphrase, info: "convex-signing-service-v1")`
+- Wrapping key: `wrappingKey` from the same section
 
 No metadata stored alongside the ciphertext. The lookup hash is the only way to find a key — you must know identity, public key, and passphrase to compute it.
 
@@ -822,7 +824,7 @@ No metadata stored alongside the ciphertext. The lookup hash is the only way to 
 
 Enables `listKeys` — the peer reads the identity's key vector directly. No passphrase or decryption needed.
 
-**Deletion:** Key deletion uses `dissoc` on the `:keys` Index (removes the encrypted seed) and rebuilds the identity's `AVector` without the deleted public key. No tombstones are needed because the entire `:signing` map is merged as a unit via LWW — a stale replica with the old key cannot resurrect deleted entries, since the newer map (with the deletion and higher `:timestamp`) always wins.
+**Deletion:** Key deletion uses `dissoc` on the `:keys` Index (removes the encrypted seed) and rebuilds the identity's `AVector` without the deleted public key, dropping the identity once it lists none. No tombstones are needed because the entire `:signing` map is merged as a unit via LWW — a stale replica with the old key cannot resurrect deleted entries, since the newer map (with the deletion and higher `:timestamp`) always wins.
 
 **`:audit` — Audit Log (Optional)**
 
@@ -837,42 +839,44 @@ Enables `listKeys` — the peer reads the identity's key vector directly. No pas
 
 `CVMLong` for future schema migrations. Currently `1`.
 
-### Cursor-Based Access Pattern
+### Local Component
 
-The `SigningService` operates on an `ACursor<ACell>` pointing at the `:signing` subtree. This decouples key management from persistence — the server layer controls how the cursor is backed (EtchStore, in-memory `Root`, OwnerLattice path, etc.). Follows the same pattern as `convex.lattice.kv.LatticeKV` / `KVDatabase`.
+`SigningService` is an `ALocalComponent` (see [Lattice Applications](../../convex-core/docs/LATTICE_APPLICATIONS.md#retention-durability-and-networking)): it binds `[:local <peer key> :signing]` under the root it is given and edits a private copy of that record. It knows nothing of stores. The application hosting it decides when to sync the record into the peer's slot, signing the slot once, and whether and when its host persists and checkpoints.
 
 ```java
-// Server layer constructs the cursor (choice of persistence belongs here)
-// Option A: in-memory (testing, ephemeral)
-ACursor<ACell> cursor = new Root<>((ACell) null);
+// A persistent application keeps the service as one of its children
+class PeerApplication extends LatticeApplication<Index<Keyword, ACell>> {
+    final SigningService signing;
 
-// Option B: path into EtchStore-backed lattice root
-// Root<ACell> latticeRoot = ...;  // backed by EtchStore
-// ACursor<ACell> cursor = latticeRoot.path(LOCAL, peerKey, SIGNING);
+    PeerApplication(LatticeHost<Index<Keyword, ACell>> host, AKeyPair peerKeyPair) {
+        super(KeyedLattice.create(LocalLattice.KEY_LOCAL, LocalLattice.LATTICE), host);
+        signing = new SigningService(cursor(), peerKeyPair, Utils::getCurrentTimestampCell, host::persist);
+    }
 
-// SigningService operates through the cursor — doesn't know or care about backing
-SigningService svc = new SigningService(peerKeyPair, cursor);
-svc.init();  // generates or loads encryptionSecret via cursor
+    @Override
+    protected void syncChildren() {
+        signing.sync();  // writes the record into the peer's slot, signing it once
+    }
+}
 
-// Key operations read/write through the cursor atomically
-AccountKey pk = svc.createKey(Strings.create("did:key:alice"), Strings.create("passphrase"));
-List<AccountKey> keys = svc.listKeys(Strings.create("did:key:alice"));
-byte[] seed = svc.loadKey(Strings.create("did:key:alice"), pk, Strings.create("passphrase"));
+// Key operations edit the private copy; app.sync() then host.checkpoint() makes them durable
+AccountKey pk = app.signing.createKey(Strings.create("did:key:alice"), Strings.create("passphrase"));
+List<AccountKey> keys = app.signing.listKeys(Strings.create("did:key:alice"));
 ```
 
-The cursor provides `get()`, `set()`, and `updateAndGet()` with `AtomicReference` semantics. The `SigningService` uses `updateAndGet()` for mutations, ensuring thread-safe read-modify-write.
+`RESTServer` binds the service under an in-memory root and never syncs it, so its keys last as long as the server.
 
-### Write-Through Persistence
+### Durability
 
-Persistence is the server layer's responsibility. The server can flush the cursor's backing store after each operation, batch writes, or rely on the cursor's own persistence semantics. The `SigningService` itself is persistence-agnostic — it writes through the cursor and trusts the cursor to be durable.
+Until synced into a host that retains its root, the record exists only in the service's private copy. `persist()` writes that copy's cells to the host's store through the function supplied at construction, without signing or publishing it; the record survives a restart only once synced and checkpointed. Each key operation is a separate edit, so an application wanting every key durable before answering syncs and checkpoints after each one.
 
 ### Concurrency
 
-The cursor abstraction provides atomic updates via `updateAndGet()`. All mutations go through this, so concurrent access is safe without external locking. Read operations (`get()`) return immutable snapshots — Convex data structures are persistent/immutable, so readers never see partial writes.
+Each operation is one atomic edit of the private copy, so concurrent operations need no external locking: a key's encrypted seed and its entry in the identity index change together, and the first stored key creates the encryption secret in the same edit. Reads take an immutable snapshot, so they never see a partial edit.
 
 ### Backup, Recovery, and Replication
 
-Persistence and replication are the server layer's responsibility. When backed by an Etch store, the store is self-consistent at all times — the root hash in the file header points to a complete, content-addressed tree. The `:local` subtree travels with the store.
+Persistence and replication are the hosting application's responsibility. When its host is backed by an Etch store, the store is self-consistent at all times — the root hash in the file header points to a complete, content-addressed tree. The `:local` subtree travels with the store.
 
 | Operation | Method |
 |---|---|
@@ -948,16 +952,14 @@ Crypto and lattice primitives used by the service layer. These exist (or will be
 
 ### Service Layer (convex-peer)
 
-The signing service backend. Owns key lifecycle and encryption. Operates on an `ACursor<ACell>` — decoupled from persistence/replication, which is the server layer's responsibility. Follows the `LatticeKV` / `KVDatabase` cursor pattern.
+The signing service backend. Owns key lifecycle and encryption. An `ALocalComponent` over the peer's `:signing` record — decoupled from sync, persistence and replication, which are the hosting application's responsibility ([Local Component](#local-component)).
 
 **SigningService** — `convex.peer.signing.SigningService`:
-- Constructor: `SigningService(AKeyPair peerKeyPair, ACursor<ACell> cursor)`
-- `init()` — generates or loads `encryptionSecret` via cursor
-- Key lifecycle: `createKey`, `listKeys`, `loadKey`, `importKey`, `exportKey`, `deleteKey`, `changePassphrase`
+- Constructor: `SigningService(root, peerKeyPair, clock)`, or with a persistence function such as `host::persist` as a fourth argument
+- Key lifecycle: `createKey`, `listKeys`, `importKey`, `exportKey`, `deleteKey`, `changePassphrase`
 - Sign bytes, build self-issued JWTs
-- `encryptionSecret` management: generate random 256-bit key on first start, store encrypted with peer key in cursor
-- Wrapping key derivation: `HKDF-SHA256(ikm: encryptionSecret, salt: identity ‖ publicKey ‖ passphrase, info: "convex-signing-service-v1")`
-- Lookup hash: `SHA-256(identity ‖ publicKey ‖ passphrase)`
+- `encryptionSecret` management: generate random 256-bit key with the first stored key, store encrypted with peer key in the record
+- Wrapping key and lookup hash: HKDF keyed by `encryptionSecret` ([Content-Based Key Encryption](#content-based-key-encryption))
 - Identity index: plaintext `Index<Hash, AVector<AccountKey>>` (`:identities` key)
 - All parameters use `AString` (CVM string type) for identity and passphrase
 - Memory safety: zero seed material and wrapping keys after each operation

@@ -1,8 +1,11 @@
 package convex.peer.signing;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 import convex.auth.did.DID;
 import convex.auth.jwt.JWT;
@@ -26,108 +29,87 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ACursor;
+import convex.lattice.ALocalComponent;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Persister;
 
 /**
- * Encrypted key management service for Convex peers.
+ * Encrypted key store for a peer's signing service, kept as the peer's local state at
+ * {@code [:local <peer key> :signing]}.
  *
- * Operates on an arbitrary {@link ACursor} pointing to the {@code :signing}
- * subtree of a peer's local lattice data. The cursor abstraction decouples
- * key management from the choice of persistence/replication mechanism — the
- * server layer controls how the cursor is backed (EtchStore, in-memory, etc.).
- *
- * <h2>Data Layout</h2>
- * The cursor should point at an {@code AHashMap<Keyword, ACell>} with:
  * <pre>
- *   :secret     → ABlob (encryptionSecret, encrypted with peer key)
- *   :keys       → Index&lt;Hash, ABlob&gt; (lookup-hash → encrypted seed)
- *   :identities → Index&lt;Hash, AVector&gt; (identity-hash → vector of public keys)
- *   :version    → CVMLong (schema version)
- *   :timestamp  → CVMLong (epoch millis, bumped on every mutation for LWW merge)
+ * {:timestamp  t
+ *  :version    1
+ *  :secret     &lt;encryption secret, wrapped with the peer key&gt;
+ *  :keys       {&lt;lookup hash&gt; &lt;encrypted seed&gt;}
+ *  :identities {&lt;identity hash&gt; [&lt;public key&gt; ...]}}
  * </pre>
  *
- * The {@code :identities} index is a plaintext mapping from identity hash to
- * a vector of {@link AccountKey}s. It enables {@link #listKeys(AString)} to
- * enumerate keys for a given identity. This is separate from the peer-level
- * {@code :users} registry which tracks user lifecycle and ownership.
- *
- * <h2>Security Model</h2>
  * <ul>
- *   <li>A random 256-bit {@code encryptionSecret} is generated once and stored
- *       encrypted with the peer key. All key material derives from this secret.</li>
- *   <li>Individual keys are encrypted with HKDF-derived wrapping keys bound to
- *       (identity, publicKey, passphrase). You must know all three to decrypt.</li>
- *   <li>The identity index is unencrypted — it maps identity hashes to public
- *       keys, both of which are public information.</li>
+ *   <li>A random 256-bit encryption secret is created with the first stored key and
+ *       kept wrapped with the peer key. All key material derives from it.</li>
+ *   <li>Each key's seed is encrypted with a wrapping key derived from the secret and
+ *       (identity, public key, passphrase), and found by a lookup hash keyed with the
+ *       secret, so the record alone gives no way to test a passphrase.</li>
+ *   <li>The identity index maps the SHA-256 of each identity to its public keys, so
+ *       {@link #listKeys(AString)} needs no passphrase.</li>
  * </ul>
+ *
+ * <p>Each operation is one atomic edit of a private copy of the record, as for any
+ * {@link ALocalComponent}. The service neither syncs, signs nor persists by itself:
+ * the application hosting it decides when to sync the record into the peer's slot
+ * and whether to persist it. Keys outlive this instance only once synced into a host
+ * that retains its root.</p>
  *
  * @see convex.core.crypto.HKDF
  * @see convex.core.crypto.AESGCM
  */
-public class SigningService {
+public class SigningService extends ALocalComponent {
 
-	// Keyword constants for the :signing subtree
+	/** Keyword naming this service's record in the peer's {@code :local} slot. */
+	public static final Keyword KEY_SIGNING = Keyword.intern("signing");
+
 	static final Keyword KEY_SECRET     = Keyword.intern("secret");
 	static final Keyword KEY_KEYS       = Keyword.intern("keys");
 	static final Keyword KEY_IDENTITIES = Keyword.intern("identities");
 	static final Keyword KEY_VERSION    = Keyword.intern("version");
-	static final Keyword KEY_TIMESTAMP  = Keyword.intern("timestamp");
+
+	private static final CVMLong VERSION = CVMLong.ONE;
 
 	// HKDF info strings
 	private static final byte[] INFO_SECRET = "convex-signing-secret-v1".getBytes();
 	private static final byte[] INFO_KEY    = "convex-signing-service-v1".getBytes();
 	private static final byte[] INFO_LOOKUP = "convex-signing-lookup-v1".getBytes();
 
+	private static final SecureRandom RANDOM = new SecureRandom();
+
 	private final AKeyPair peerKeyPair;
-	private final ACursor<ACell> cursor;
-	private byte[] encryptionSecret;
 
 	/**
-	 * Creates a SigningService operating on the given cursor.
+	 * Binds the signing record of a peer under the supplied root, never persisted by
+	 * itself.
 	 *
-	 * The cursor should point to the {@code :signing} subtree (or an empty/null
-	 * value if this is a first start). Call {@link #init()} to initialise or
-	 * recover the encryption secret.
-	 *
-	 * @param peerKeyPair The peer's Ed25519 key pair (for encrypting the secret)
-	 * @param cursor Cursor to the :signing data subtree
+	 * @param root Root cursor of the containing application
+	 * @param peerKeyPair The peer's key pair, which owns and signs the slot and wraps the secret
+	 * @param clock Supplies the record's {@code :timestamp} for each edit
 	 */
-	public SigningService(AKeyPair peerKeyPair, ACursor<ACell> cursor) {
-		if (peerKeyPair == null) throw new IllegalArgumentException("Peer key pair required");
-		if (cursor == null) throw new IllegalArgumentException("Cursor required");
-		this.peerKeyPair = peerKeyPair;
-		this.cursor = cursor;
+	public SigningService(AForkableCursor<Index<Keyword,ACell>> root, AKeyPair peerKeyPair, Supplier<CVMLong> clock) {
+		this(root, peerKeyPair, clock, null);
 	}
 
 	/**
-	 * Initialises the signing service. On first start, generates a random
-	 * encryptionSecret and writes the initial structure. On subsequent starts,
-	 * loads and decrypts the existing secret.
+	 * Binds the signing record of a peer under the supplied root.
+	 *
+	 * @param root Root cursor of the containing application
+	 * @param peerKeyPair The peer's key pair, which owns and signs the slot and wraps the secret
+	 * @param clock Supplies the record's {@code :timestamp} for each edit
+	 * @param persister Persists the private copy, such as {@code host::persist}, or null if it is never persisted
 	 */
-	public void init() {
-		ACell current = cursor.get();
-		if (current == null || !(current instanceof AHashMap)) {
-			// First start — generate secret and initialise structure
-			encryptionSecret = new byte[32];
-			new java.security.SecureRandom().nextBytes(encryptionSecret);
-
-			ABlob encryptedSecret = encryptSecret(encryptionSecret);
-			AHashMap<Keyword, ACell> initial = Maps.of(
-				KEY_SECRET,     encryptedSecret,
-				KEY_KEYS,       Index.none(),
-				KEY_IDENTITIES, Index.none(),
-				KEY_VERSION,    CVMLong.ONE
-			);
-			initial = initial.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
-			cursor.set(initial);
-		} else {
-			// Load existing secret
-			@SuppressWarnings("unchecked")
-			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) current;
-			ABlob encryptedSecret = (ABlob) data.get(KEY_SECRET);
-			if (encryptedSecret == null) throw new IllegalStateException("Missing encryption secret");
-			encryptionSecret = decryptSecret(encryptedSecret);
-		}
+	public SigningService(AForkableCursor<Index<Keyword,ACell>> root, AKeyPair peerKeyPair, Supplier<CVMLong> clock,
+			Persister<AHashMap<Keyword,ACell>> persister) {
+		super(root, KEY_SIGNING, Objects.requireNonNull(peerKeyPair, "Peer key pair required").getAccountKey(),
+			peerKeyPair::signData, clock, persister);
+		this.peerKeyPair = peerKeyPair;
 	}
 
 	/**
@@ -139,18 +121,13 @@ public class SigningService {
 	 * @return Public key of the created key pair
 	 */
 	public AccountKey createKey(AString identity, AString passphrase) {
-		checkInitialised();
 		AKeyPair newKP = AKeyPair.generate();
-		AccountKey publicKey = newKP.getAccountKey();
 		byte[] seed = newKP.getSeed().getBytes();
-
-		storeKey(identity, publicKey, passphrase, seed);
-		addToKeyIndex(identity, publicKey);
-
-		// Zero the seed bytes
-		Arrays.fill(seed, (byte) 0);
-
-		return publicKey;
+		try {
+			return storeKey(identity, passphrase, seed);
+		} finally {
+			Arrays.fill(seed, (byte) 0);
+		}
 	}
 
 	/**
@@ -160,35 +137,12 @@ public class SigningService {
 	 * @return List of public keys, may be empty
 	 */
 	public List<AccountKey> listKeys(AString identity) {
-		checkInitialised();
+		AVector<AccountKey> keys = identities(cursor().get()).get(computeIdentityHash(identity));
 		List<AccountKey> result = new ArrayList<>();
-		Hash idHash = computeIdentityHash(identity);
-
-		@SuppressWarnings("unchecked")
-		AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) cursor.get();
-		if (data == null) return result;
-
-		@SuppressWarnings("unchecked")
-		Index<Hash, ACell> identities = (Index<Hash, ACell>) data.get(KEY_IDENTITIES);
-		if (identities == null) return result;
-
-		@SuppressWarnings("unchecked")
-		AVector<ACell> keys = (AVector<ACell>) identities.get(idHash);
-		if (keys == null) return result;
-
-		for (long i = 0; i < keys.count(); i++) {
-			AccountKey ak = (AccountKey) keys.get(i);
-			if (ak != null) result.add(ak);
+		if (keys != null) {
+			for (AccountKey key : keys) result.add(key);
 		}
-
 		return result;
-	}
-
-	/**
-	 * Gets the peer key pair used by this signing service.
-	 */
-	public AKeyPair getPeerKeyPair() {
-		return peerKeyPair;
 	}
 
 	/**
@@ -201,7 +155,6 @@ public class SigningService {
 	 * @return Ed25519 signature, or null if key not found
 	 */
 	public ASignature sign(AString identity, AccountKey publicKey, AString passphrase, ABlob message) {
-		checkInitialised();
 		byte[] seed = loadKey(identity, publicKey, passphrase);
 		if (seed == null) return null;
 
@@ -230,7 +183,6 @@ public class SigningService {
 	 */
 	public AString getSelfSignedJWT(AString identity, AccountKey publicKey, AString passphrase,
 			String audience, AMap<AString, ACell> extraClaims, long lifetimeSeconds) {
-		checkInitialised();
 		byte[] seed = loadKey(identity, publicKey, passphrase);
 		if (seed == null) return null;
 
@@ -279,18 +231,12 @@ public class SigningService {
 	 * @return Public key derived from the seed
 	 */
 	public AccountKey importKey(AString identity, ABlob seed, AString passphrase) {
-		checkInitialised();
-		AKeyPair kp = AKeyPair.create(seed.getBytes());
-		AccountKey publicKey = kp.getAccountKey();
-
-		storeKey(identity, publicKey, passphrase, seed.getBytes());
-
-		// Only add to key index if not already present
-		if (!listKeys(identity).contains(publicKey)) {
-			addToKeyIndex(identity, publicKey);
+		byte[] bytes = seed.getBytes();
+		try {
+			return storeKey(identity, passphrase, bytes);
+		} finally {
+			Arrays.fill(bytes, (byte) 0);
 		}
-
-		return publicKey;
 	}
 
 	/**
@@ -302,7 +248,6 @@ public class SigningService {
 	 * @return Decrypted seed as a Blob, or null if key not found
 	 */
 	public ABlob exportKey(AString identity, AccountKey publicKey, AString passphrase) {
-		checkInitialised();
 		byte[] seed = loadKey(identity, publicKey, passphrase);
 		if (seed == null) return null;
 		return Blob.wrap(seed);
@@ -318,15 +263,23 @@ public class SigningService {
 	 * @param passphrase Passphrase (required to compute the lookup hash)
 	 */
 	public void deleteKey(AString identity, AccountKey publicKey, AString passphrase) {
-		checkInitialised();
-		removeFromKeys(identity, publicKey, passphrase);
-		removeFromKeyIndex(identity, publicKey);
+		Hash idHash = computeIdentityHash(identity);
+		cursor().update(record -> {
+			byte[] secret = secret(record);
+			if (secret == null) return record;
+			try {
+				Hash lookupHash = lookupHash(secret, identity, publicKey, passphrase);
+				return unlisted(record.assoc(KEY_KEYS, keys(record).dissoc(lookupHash)), idHash, publicKey);
+			} finally {
+				Arrays.fill(secret, (byte) 0);
+			}
+		});
 	}
 
 	/**
 	 * Changes the passphrase for a stored key. Decrypts the seed with the old
-	 * passphrase, removes the old encrypted entry, and re-encrypts with the
-	 * new passphrase. The key index is unchanged (public key identity is the same).
+	 * passphrase and replaces its entry with one encrypted under the new
+	 * passphrase. The key index is unchanged (public key identity is the same).
 	 *
 	 * @param identity Caller identity (DID string)
 	 * @param publicKey Public key identifying which key to re-wrap
@@ -335,71 +288,159 @@ public class SigningService {
 	 * @throws IllegalArgumentException if the old passphrase is wrong
 	 */
 	public void changePassphrase(AString identity, AccountKey publicKey, AString oldPass, AString newPass) {
-		checkInitialised();
-		byte[] seed = loadKey(identity, publicKey, oldPass);
-		if (seed == null) throw new IllegalArgumentException("Cannot decrypt key with provided credentials");
-
-		try {
-			removeFromKeys(identity, publicKey, oldPass);
-			storeKey(identity, publicKey, newPass, seed);
-		} finally {
-			Arrays.fill(seed, (byte) 0);
-		}
-	}
-
-	// ==================== Internal Methods ====================
-
-	private void checkInitialised() {
-		if (encryptionSecret == null) throw new IllegalStateException("SigningService not initialised");
-	}
-
-	/**
-	 * Stores an encrypted seed in the :keys index.
-	 */
-	void storeKey(AString identity, AccountKey publicKey, AString passphrase, byte[] seed) {
-		Hash lookupHash = computeLookupHash(identity, publicKey, passphrase);
-		byte[] wrappingKey = deriveKeyWrappingKey(identity, publicKey, passphrase);
-		byte[] encrypted = AESGCM.encrypt(wrappingKey, seed);
-		Arrays.fill(wrappingKey, (byte) 0);
-
-		ABlob encryptedBlob = Blob.wrap(encrypted);
-
-		cursor.updateAndGet(v -> {
-			@SuppressWarnings("unchecked")
-			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
-			@SuppressWarnings("unchecked")
-			Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(KEY_KEYS);
-			if (keys == null) keys = Index.none();
-			keys = keys.assoc(lookupHash, encryptedBlob);
-			data = data.assoc(KEY_KEYS, keys);
-			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
-			return data;
+		cursor().update(record -> {
+			byte[] secret = secret(record);
+			byte[] seed = (secret == null) ? null : unwrap(secret, record, identity, publicKey, oldPass);
+			try {
+				if (seed == null) throw new IllegalArgumentException("Cannot decrypt key with provided credentials");
+				Index<Hash, ABlob> keys = keys(record).dissoc(lookupHash(secret, identity, publicKey, oldPass))
+					.assoc(lookupHash(secret, identity, publicKey, newPass), wrap(secret, identity, publicKey, newPass, seed));
+				return record.assoc(KEY_KEYS, keys);
+			} finally {
+				if (secret != null) Arrays.fill(secret, (byte) 0);
+				if (seed != null) Arrays.fill(seed, (byte) 0);
+			}
 		});
 	}
 
+	// ==================== Record Edits ====================
+
 	/**
-	 * Loads and decrypts a seed from the :keys index.
+	 * Stores an encrypted seed and lists its public key under the identity, in one
+	 * edit. The first stored key creates the encryption secret in the same edit, so
+	 * concurrent first writes cannot encrypt under different secrets.
+	 */
+	private AccountKey storeKey(AString identity, AString passphrase, byte[] seed) {
+		AccountKey publicKey = AKeyPair.create(seed).getAccountKey();
+		Hash idHash = computeIdentityHash(identity);
+		cursor().update(current -> {
+			AHashMap<Keyword, ACell> record = withSecret(current);
+			byte[] secret = secret(record);
+			try {
+				Index<Hash, ABlob> keys = keys(record).assoc(lookupHash(secret, identity, publicKey, passphrase),
+					wrap(secret, identity, publicKey, passphrase, seed));
+				return listed(record.assoc(KEY_KEYS, keys), idHash, publicKey);
+			} finally {
+				Arrays.fill(secret, (byte) 0);
+			}
+		});
+		return publicKey;
+	}
+
+	/**
+	 * Loads and decrypts a seed from the current record.
 	 *
 	 * @return Decrypted seed bytes, or null if not found
 	 */
 	byte[] loadKey(AString identity, AccountKey publicKey, AString passphrase) {
-		Hash lookupHash = computeLookupHash(identity, publicKey, passphrase);
-
-		@SuppressWarnings("unchecked")
-		AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) cursor.get();
-		if (data == null) return null;
-
-		@SuppressWarnings("unchecked")
-		Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(KEY_KEYS);
-		if (keys == null) return null;
-
-		ABlob encrypted = keys.get(lookupHash);
-		if (encrypted == null) {
-			// May predate the keyed lookup hash: migrate now, while we hold the passphrase
-			return migrateLegacyKey(identity, publicKey, passphrase, keys);
+		AHashMap<Keyword, ACell> record = cursor().get();
+		byte[] secret = secret(record);
+		if (secret == null) return null;
+		try {
+			return unwrap(secret, record, identity, publicKey, passphrase);
+		} finally {
+			Arrays.fill(secret, (byte) 0);
 		}
+	}
 
-		byte[] wrappingKey = deriveKeyWrappingKey(identity, publicKey, passphrase);
+	/** The record with an encryption secret, creating one if it has none. */
+	private AHashMap<Keyword, ACell> withSecret(AHashMap<Keyword, ACell> record) {
+		if (record.get(KEY_SECRET) instanceof ABlob) return record;
+		byte[] secret = new byte[32];
+		RANDOM.nextBytes(secret);
+		try {
+			return record.assoc(KEY_SECRET, encryptSecret(secret)).assoc(KEY_VERSION, VERSION);
+		} finally {
+			Arrays.fill(secret, (byte) 0);
+		}
+	}
+
+	/**
+	 * Decrypts the record's encryption secret, or returns null if it has none yet. Read
+	 * from the record on each use, so a newer record taken in by merge is used as it is.
+	 * The caller zeroes the result.
+	 */
+	private byte[] secret(AHashMap<Keyword, ACell> record) {
+		ACell wrapped = record.get(KEY_SECRET);
+		return (wrapped instanceof ABlob blob) ? decryptSecret(blob) : null;
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Index<Hash, ABlob> keys(AHashMap<Keyword, ACell> record) {
+		ACell keys = record.get(KEY_KEYS);
+		return (keys instanceof Index) ? (Index<Hash, ABlob>) keys : Index.none();
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Index<Hash, AVector<AccountKey>> identities(AHashMap<Keyword, ACell> record) {
+		ACell identities = record.get(KEY_IDENTITIES);
+		return (identities instanceof Index) ? (Index<Hash, AVector<AccountKey>>) identities : Index.none();
+	}
+
+	/** Adds a public key to an identity's list unless it is already there. */
+	private static AHashMap<Keyword, ACell> listed(AHashMap<Keyword, ACell> record, Hash idHash, AccountKey publicKey) {
+		Index<Hash, AVector<AccountKey>> identities = identities(record);
+		AVector<AccountKey> keys = identities.get(idHash);
+		if (keys == null) keys = Vectors.empty();
+		if (keys.contains(publicKey)) return record;
+		return record.assoc(KEY_IDENTITIES, identities.assoc(idHash, keys.conj(publicKey)));
+	}
+
+	/** Removes a public key from an identity's list, dropping the identity once it lists none. */
+	private static AHashMap<Keyword, ACell> unlisted(AHashMap<Keyword, ACell> record, Hash idHash, AccountKey publicKey) {
+		Index<Hash, AVector<AccountKey>> identities = identities(record);
+		AVector<AccountKey> keys = identities.get(idHash);
+		if (keys == null || !keys.contains(publicKey)) return record;
+		AVector<AccountKey> remaining = Vectors.empty();
+		for (AccountKey k : keys) {
+			if (!publicKey.equals(k)) remaining = remaining.conj(k);
+		}
+		identities = remaining.isEmpty() ? identities.dissoc(idHash) : identities.assoc(idHash, remaining);
+		return record.assoc(KEY_IDENTITIES, identities);
+	}
+
+	// ==================== Crypto Helpers ====================
+
+	/**
+	 * Encrypts the encryption secret with the peer's key.
+	 * Uses HKDF(peerSeed, info: "convex-signing-secret-v1") as the wrapping key.
+	 */
+	ABlob encryptSecret(byte[] secret) {
+		byte[] wrappingKey = peerWrappingKey();
+		try {
+			return Blob.wrap(AESGCM.encrypt(wrappingKey, secret));
+		} finally {
+			Arrays.fill(wrappingKey, (byte) 0);
+		}
+	}
+
+	/**
+	 * Decrypts the encryption secret with the peer's key.
+	 */
+	byte[] decryptSecret(ABlob encryptedSecret) {
+		byte[] wrappingKey = peerWrappingKey();
+		try {
+			return AESGCM.decrypt(wrappingKey, encryptedSecret.getBytes());
+		} finally {
+			Arrays.fill(wrappingKey, (byte) 0);
+		}
+	}
+
+	private byte[] peerWrappingKey() {
+		byte[] peerSeed = peerKeyPair.getSeed().getBytes();
+		try {
+			return HKDF.derive256(peerSeed, null, INFO_SECRET);
+		} finally {
+			Arrays.fill(peerSeed, (byte) 0);
+		}
+	}
+
+	/** Decrypts a stored seed, or returns null if the record holds none for these credentials. */
+	private static byte[] unwrap(byte[] secret, AHashMap<Keyword, ACell> record,
+			AString identity, AccountKey publicKey, AString passphrase) {
+		ABlob encrypted = keys(record).get(lookupHash(secret, identity, publicKey, passphrase));
+		if (encrypted == null) return null;
+		byte[] wrappingKey = keyWrappingKey(secret, identity, publicKey, passphrase);
 		try {
 			return AESGCM.decrypt(wrappingKey, encrypted.getBytes());
 		} finally {
@@ -407,150 +448,10 @@ public class SigningService {
 		}
 	}
 
-	/**
-	 * Reads an entry stored under the legacy unkeyed lookup hash, rewrites it under the
-	 * current scheme and drops the old entry. Returns null if there is no legacy entry.
-	 */
-	private byte[] migrateLegacyKey(AString identity, AccountKey publicKey, AString passphrase,
-			Index<Hash, ABlob> keys) {
-		Hash legacyHash = legacyLookupHash(identity, publicKey, passphrase);
-		ABlob encrypted = keys.get(legacyHash);
-		if (encrypted == null) return null;
-
-		byte[] seed;
-		byte[] legacyKey = legacyKeyWrappingKey(identity, publicKey, passphrase);
+	private static ABlob wrap(byte[] secret, AString identity, AccountKey publicKey, AString passphrase, byte[] seed) {
+		byte[] wrappingKey = keyWrappingKey(secret, identity, publicKey, passphrase);
 		try {
-			seed = AESGCM.decrypt(legacyKey, encrypted.getBytes());
-		} finally {
-			Arrays.fill(legacyKey, (byte) 0);
-		}
-
-		ABlob rewrapped;
-		byte[] wrappingKey = deriveKeyWrappingKey(identity, publicKey, passphrase);
-		try {
-			rewrapped = Blob.wrap(AESGCM.encrypt(wrappingKey, seed));
-		} finally {
-			Arrays.fill(wrappingKey, (byte) 0);
-		}
-
-		rewriteKey(legacyHash, computeLookupHash(identity, publicKey, passphrase), rewrapped);
-		return seed;
-	}
-
-	/**
-	 * Moves one encrypted entry to a new lookup hash in a single update.
-	 */
-	private void rewriteKey(Hash from, Hash to, ABlob encrypted) {
-		cursor.updateAndGet(v -> {
-			@SuppressWarnings("unchecked")
-			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
-			@SuppressWarnings("unchecked")
-			Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(KEY_KEYS);
-			if (keys == null) keys = Index.none();
-			keys = keys.dissoc(from).assoc(to, encrypted);
-			data = data.assoc(KEY_KEYS, keys);
-			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
-			return data;
-		});
-	}
-
-	/**
-	 * Removes an encrypted seed from the :keys index.
-	 */
-	void removeFromKeys(AString identity, AccountKey publicKey, AString passphrase) {
-		Hash lookupHash = computeLookupHash(identity, publicKey, passphrase);
-		Hash legacyHash = legacyLookupHash(identity, publicKey, passphrase);
-		cursor.updateAndGet(v -> {
-			@SuppressWarnings("unchecked")
-			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
-			@SuppressWarnings("unchecked")
-			Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(KEY_KEYS);
-			if (keys == null) return v;
-			keys = keys.dissoc(lookupHash).dissoc(legacyHash);
-			data = data.assoc(KEY_KEYS, keys);
-			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
-			return data;
-		});
-	}
-
-	/**
-	 * Adds a public key to the identity's key index.
-	 */
-	void addToKeyIndex(AString identity, AccountKey publicKey) {
-		Hash idHash = computeIdentityHash(identity);
-		cursor.updateAndGet(v -> {
-			@SuppressWarnings("unchecked")
-			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
-			@SuppressWarnings("unchecked")
-			Index<Hash, ACell> identities = (Index<Hash, ACell>) data.get(KEY_IDENTITIES);
-			if (identities == null) identities = Index.none();
-
-			@SuppressWarnings("unchecked")
-			AVector<ACell> keys = (AVector<ACell>) identities.get(idHash);
-			if (keys == null) keys = Vectors.empty();
-			keys = keys.conj(publicKey);
-
-			identities = identities.assoc(idHash, keys);
-			data = data.assoc(KEY_IDENTITIES, identities);
-			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
-			return data;
-		});
-	}
-
-	/**
-	 * Removes a public key from the identity's key index.
-	 */
-	void removeFromKeyIndex(AString identity, AccountKey publicKey) {
-		Hash idHash = computeIdentityHash(identity);
-		cursor.updateAndGet(v -> {
-			@SuppressWarnings("unchecked")
-			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
-			@SuppressWarnings("unchecked")
-			Index<Hash, ACell> identities = (Index<Hash, ACell>) data.get(KEY_IDENTITIES);
-			if (identities == null) return v;
-
-			@SuppressWarnings("unchecked")
-			AVector<ACell> keys = (AVector<ACell>) identities.get(idHash);
-			if (keys == null) return v;
-
-			// Rebuild vector without the deleted key
-			AVector<ACell> newKeys = Vectors.empty();
-			for (long i = 0; i < keys.count(); i++) {
-				ACell k = keys.get(i);
-				if (!publicKey.equals(k)) {
-					newKeys = newKeys.conj(k);
-				}
-			}
-
-			identities = identities.assoc(idHash, newKeys);
-			data = data.assoc(KEY_IDENTITIES, identities);
-			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
-			return data;
-		});
-	}
-
-	// ==================== Crypto Helpers ====================
-
-	/**
-	 * Encrypts the encryptionSecret with the peer's key.
-	 * Uses HKDF(peerSeed, info: "convex-signing-secret-v1") as the wrapping key.
-	 */
-	ABlob encryptSecret(byte[] secret) {
-		byte[] peerSeed = peerKeyPair.getSeed().getBytes();
-		byte[] wrappingKey = HKDF.derive256(peerSeed, null, INFO_SECRET);
-		byte[] encrypted = AESGCM.encrypt(wrappingKey, secret);
-		Arrays.fill(wrappingKey, (byte) 0);
-		return Blob.wrap(encrypted);
-	}
-
-	/**
-	 * Decrypts the encryptionSecret with the peer's key.
-	 */
-	byte[] decryptSecret(ABlob encryptedSecret) {
-		byte[] peerSeed = peerKeyPair.getSeed().getBytes();
-		byte[] wrappingKey = HKDF.derive256(peerSeed, null, INFO_SECRET);
-		try {
-			return AESGCM.decrypt(wrappingKey, encryptedSecret.getBytes());
+			return Blob.wrap(AESGCM.encrypt(wrappingKey, seed));
 		} finally {
 			Arrays.fill(wrappingKey, (byte) 0);
 		}
@@ -570,23 +471,20 @@ public class SigningService {
 	/**
 	 * Computes the lookup hash used as the :keys index key.
 	 *
-	 * Keyed with the peer-held encryptionSecret. An unkeyed hash would let anyone
-	 * holding a replica of this store brute-force the passphrase offline, since the
-	 * identity and public key are public information.
+	 * Keyed with the encryption secret. An unkeyed hash would let anyone holding a
+	 * copy of the record brute-force the passphrase offline, since the identity and
+	 * public key are public information.
 	 */
-	Hash computeLookupHash(AString identity, AccountKey publicKey, AString passphrase) {
-		checkInitialised();
-		return Hash.wrap(HKDF.derive256(encryptionSecret,
-				credentialBytes(identity, publicKey, passphrase), INFO_LOOKUP));
+	private static Hash lookupHash(byte[] secret, AString identity, AccountKey publicKey, AString passphrase) {
+		return Hash.wrap(HKDF.derive256(secret, credentialBytes(identity, publicKey, passphrase), INFO_LOOKUP));
 	}
 
 	/**
-	 * Lookup hash used before the keyed scheme: SHA-256(identity || publicKey || passphrase).
-	 * Retained so that existing entries can still be found and migrated.
+	 * Derives the wrapping key for an individual signing key.
+	 * HKDF(encryptionSecret, salt: canonical credential bytes, info: "convex-signing-service-v1")
 	 */
-	static Hash legacyLookupHash(AString identity, AccountKey publicKey, AString passphrase) {
-		ABlob combined = identity.toBlob().append(publicKey).append(passphrase.toBlob());
-		return Hashing.sha256(combined);
+	private static byte[] keyWrappingKey(byte[] secret, AString identity, AccountKey publicKey, AString passphrase) {
+		return HKDF.derive256(secret, credentialBytes(identity, publicKey, passphrase), INFO_KEY);
 	}
 
 	/**
@@ -594,22 +492,5 @@ public class SigningService {
 	 */
 	static Hash computeIdentityHash(AString identity) {
 		return Hashing.sha256(identity);
-	}
-
-	/**
-	 * Derives the wrapping key for an individual signing key.
-	 * HKDF(encryptionSecret, salt: canonical credential bytes, info: "convex-signing-service-v1")
-	 */
-	byte[] deriveKeyWrappingKey(AString identity, AccountKey publicKey, AString passphrase) {
-		return HKDF.derive256(encryptionSecret,
-				credentialBytes(identity, publicKey, passphrase), INFO_KEY);
-	}
-
-	/**
-	 * Wrapping key for entries written before the credential bytes were canonicalised.
-	 */
-	byte[] legacyKeyWrappingKey(AString identity, AccountKey publicKey, AString passphrase) {
-		ABlob salt = identity.toBlob().append(publicKey).append(passphrase.toBlob());
-		return HKDF.derive256(encryptionSecret, salt.getBytes(), INFO_KEY);
 	}
 }

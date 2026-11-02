@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verify an HS256 JWT with `JWT.verifySymmetric`, which returns its claims as `verifyPublic` does, checks `alg` and compares signatures in constant time; it replaces the static `JWT.verifyHS256(jwt, secret)`. ([Verifying](convex-core/docs/JWT.md#verifying))
 - Build and read P2P node records with `convex.p2p.P2PLattice`, alongside the P2P application that validates them; `convex.lattice.p2p.P2PLattice` keeps only the `:p2p` region's merge rule.
 - Remove the `--url` option from `convex dlfs start`, which has not advertised the node since 0.8.16; `convex p2p start --url` advertises a P2P node.
+- Keep the peer signing service's keys as local state at `[:local <peer key> :signing]`, so a lattice application hosting `SigningService` can sync and persist them; it is bound under a root and needs no `init()`. ([Local Component](convex-restapi/docs/MCP_AUTH.md#local-component))
 
 ### Deprecated
 

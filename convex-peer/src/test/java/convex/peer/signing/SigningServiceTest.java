@@ -2,14 +2,15 @@ package convex.peer.signing;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
 
 import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
-import convex.core.crypto.AESGCM;
 import convex.core.crypto.util.Multikey;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -22,13 +23,20 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
-import convex.lattice.cursor.ACursor;
-import convex.lattice.cursor.Root;
+import convex.core.store.MemoryStore;
+import convex.core.util.Utils;
+import convex.lattice.LatticeApplication;
+import convex.lattice.LatticeHost;
+import convex.lattice.LocalLattice;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.generic.KeyedLattice;
 
 /**
- * Tests for SigningService — encrypted key store operating on a cursor.
+ * Tests for SigningService — encrypted key store kept as a peer's local record.
  */
 public class SigningServiceTest {
 
@@ -36,65 +44,115 @@ public class SigningServiceTest {
 	private static AString s(String v) { return Strings.create(v); }
 
 	/**
-	 * Creates a fresh SigningService backed by an in-memory Root cursor.
+	 * Creates a fresh SigningService over an in-memory root.
 	 */
 	private static SigningService createService() {
-		AKeyPair peerKP = AKeyPair.generate();
-		ACursor<ACell> cursor = new Root<>((ACell) null);
-		SigningService svc = new SigningService(peerKP, cursor);
-		svc.init();
-		return svc;
+		return createService(AKeyPair.generate(), LatticeHost.create().cursor());
 	}
 
 	/**
-	 * Creates a SigningService with a specific peer key pair and cursor.
+	 * Creates a SigningService with a specific peer key pair and root.
 	 */
-	private static SigningService createService(AKeyPair peerKP, ACursor<ACell> cursor) {
-		SigningService svc = new SigningService(peerKP, cursor);
-		svc.init();
-		return svc;
+	private static SigningService createService(AKeyPair peerKP, AForkableCursor<Index<Keyword, ACell>> root) {
+		return new SigningService(root, peerKP, Utils::getCurrentTimestampCell);
 	}
 
-	// ===== Initialisation =====
+	/** The peer's signed {@code :local} slot in a root, or null if it has none. */
+	@SuppressWarnings("unchecked")
+	private static SignedData<AHashMap<Keyword, ACell>> slot(Index<Keyword, ACell> root, AKeyPair peerKP) {
+		var local = (AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>>) root.get(LocalLattice.KEY_LOCAL);
+		return LocalLattice.getSignedSlot(local, peerKP.getAccountKey());
+	}
+
+	/** An application keeping the signing service as its local state, as a persistent service would. */
+	private static final class SigningApplication extends LatticeApplication<Index<Keyword, ACell>> {
+		final SigningService signing;
+
+		SigningApplication(LatticeHost<Index<Keyword, ACell>> host, AKeyPair peerKP) {
+			super(KeyedLattice.create(LocalLattice.KEY_LOCAL, LocalLattice.LATTICE), host);
+			signing = new SigningService(cursor(), peerKP, Utils::getCurrentTimestampCell, host::persist);
+		}
+
+		@Override
+		protected void syncChildren() {
+			signing.sync();
+		}
+	}
+
+	// ===== Local record =====
 
 	@Test
-	public void testInitCreatesStructure() {
-		AKeyPair peerKP = AKeyPair.generate();
-		Root<ACell> cursor = new Root<>((ACell) null);
+	public void testConstructionCreatesNoState() {
+		LatticeHost<Index<Keyword, ACell>> host = LatticeHost.create();
+		Index<Keyword, ACell> before = host.cursor().get();
 
-		SigningService svc = new SigningService(peerKP, cursor);
-		assertNull(cursor.get(), "Cursor should be null before init");
-
-		svc.init();
-		assertNotNull(cursor.get(), "Cursor should have data after init");
+		SigningService svc = createService(AKeyPair.generate(), host.cursor());
+		assertTrue(svc.cursor().get().isEmpty());
+		assertTrue(svc.listKeys(s("did:key:alice")).isEmpty());
+		svc.sync();
+		assertSame(before, host.cursor().get(), "An unused service writes and signs nothing");
 	}
 
 	@Test
-	public void testInitIdempotent() {
+	public void testKeysStayPrivateUntilSync() {
 		AKeyPair peerKP = AKeyPair.generate();
-		Root<ACell> cursor = new Root<>((ACell) null);
+		LatticeHost<Index<Keyword, ACell>> host = LatticeHost.create();
+		Index<Keyword, ACell> before = host.cursor().get();
 
-		SigningService svc = new SigningService(peerKP, cursor);
-		svc.init();
-		ACell first = cursor.get();
+		SigningService svc = createService(peerKP, host.cursor());
+		svc.createKey(s("did:key:alice"), s("pass"));
+		assertSame(before, host.cursor().get(), "Key operations do not publish the record");
 
-		// Second init should load existing, not overwrite
-		SigningService svc2 = new SigningService(peerKP, cursor);
-		svc2.init();
-		ACell second = cursor.get();
-
-		assertEquals(first, second, "Re-init should preserve existing data");
+		svc.sync();
+		SignedData<AHashMap<Keyword, ACell>> signed = slot(host.cursor().get(), peerKP);
+		assertTrue(signed.checkSignature());
+		assertEquals(peerKP.getAccountKey(), signed.getAccountKey());
+		assertEquals(svc.cursor().get(), signed.getValue().get(SigningService.KEY_SIGNING));
 	}
 
 	@Test
-	public void testUninitialised() {
+	public void testKeysSurviveRestartInPersistentApplication() throws IOException {
 		AKeyPair peerKP = AKeyPair.generate();
-		Root<ACell> cursor = new Root<>((ACell) null);
-		SigningService svc = new SigningService(peerKP, cursor);
+		AString alice = s("did:key:alice");
+		Blob message = Blob.wrap("hello".getBytes());
+		try (MemoryStore store = new MemoryStore()) {
+			AccountKey pk;
+			try (LatticeHost<Index<Keyword, ACell>> host = LatticeHost.create(store)) {
+				SigningApplication app = new SigningApplication(host, peerKP);
+				pk = app.signing.createKey(alice, s("pass"));
+				app.signing.persist();
+				assertNull(store.getRootData(), "Persisting the working copy retains no root");
+				app.sync();
+			}
 
-		// Operations before init should fail
-		assertThrows(IllegalStateException.class, () -> svc.createKey(s("did:key:test"), s("pass")));
-		assertThrows(IllegalStateException.class, () -> svc.listKeys(s("did:key:test")));
+			try (LatticeHost<Index<Keyword, ACell>> host = LatticeHost.open(store)) {
+				SigningApplication app = new SigningApplication(host, peerKP);
+				assertEquals(List.of(pk), app.signing.listKeys(alice));
+				assertTrue(app.signing.sign(alice, pk, s("pass"), message).verify(message, pk));
+			}
+		}
+	}
+
+	@Test
+	public void testNewerRestoredRecordIsUsed() {
+		AKeyPair peerKP = AKeyPair.generate();
+		AtomicLong time = new AtomicLong(20);
+		AString alice = s("did:key:alice");
+
+		SigningService backup = new SigningService(LatticeHost.create().cursor(), peerKP,
+				() -> CVMLong.create(time.get()));
+		AccountKey backedUp = backup.createKey(alice, s("pass"));
+		AHashMap<Keyword, ACell> record = backup.cursor().get();
+
+		// This copy's own record, under a secret of its own, is older than the backup
+		time.set(10);
+		SigningService svc = new SigningService(LatticeHost.create().cursor(), peerKP,
+				() -> CVMLong.create(time.get()));
+		svc.createKey(alice, s("pass"));
+
+		svc.merge(record);
+		assertEquals(List.of(backedUp), svc.listKeys(alice));
+		assertNotNull(svc.loadKey(alice, backedUp, s("pass")), "The restored record's secret is used");
 	}
 
 	// ===== createKey =====
@@ -197,24 +255,21 @@ public class SigningServiceTest {
 				"Recovered key pair should have same public key");
 	}
 
-	// ===== Persistence via Cursor =====
+	// ===== Sync and Reload =====
 
 	@Test
-	public void testPersistAndReloadViaCursor() {
+	public void testSyncedKeysReloadFromSlot() {
 		AKeyPair peerKP = AKeyPair.generate();
-		Root<ACell> cursor = new Root<>((ACell) null);
+		LatticeHost<Index<Keyword, ACell>> host = LatticeHost.create();
 
 		// Create service, add keys
-		SigningService svc1 = createService(peerKP, cursor);
+		SigningService svc1 = createService(peerKP, host.cursor());
 		AccountKey pk1 = svc1.createKey(s("did:key:alice"), s("pass1"));
 		AccountKey pk2 = svc1.createKey(s("did:key:alice"), s("pass2"));
+		svc1.sync();
 
-		// Simulate restart: new service instance, same cursor state
-		// In production, cursor state would be persisted/loaded by the server layer
-		ACell savedState = cursor.get();
-		Root<ACell> cursor2 = Root.create(savedState);
-
-		SigningService svc2 = createService(peerKP, cursor2);
+		// A new instance over the same root starts from the synced record
+		SigningService svc2 = createService(peerKP, host.cursor());
 
 		// Keys should survive
 		List<AccountKey> keys = svc2.listKeys(s("did:key:alice"));
@@ -230,21 +285,17 @@ public class SigningServiceTest {
 
 	@Test
 	public void testDifferentPeerKeyCannotDecryptSecret() {
-		AKeyPair peerKP1 = AKeyPair.generate();
-		Root<ACell> cursor = new Root<>((ACell) null);
-
 		// Peer 1 creates service and keys
-		SigningService svc1 = createService(peerKP1, cursor);
-		svc1.createKey(s("did:key:alice"), s("pass"));
+		SigningService svc1 = createService();
+		AccountKey pk = svc1.createKey(s("did:key:alice"), s("pass"));
 
-		// Peer 2 tries to load with same cursor data but different peer key
-		AKeyPair peerKP2 = AKeyPair.generate();
-		ACell savedState = cursor.get();
-		Root<ACell> cursor2 = Root.create(savedState);
-
-		SigningService svc2 = new SigningService(peerKP2, cursor2);
-		assertThrows(RuntimeException.class, svc2::init,
-				"Different peer key should fail to decrypt encryptionSecret");
+		// Peer 2 is given peer 1's record
+		SigningService svc2 = createService();
+		svc2.merge(svc1.cursor().get());
+		assertThrows(RuntimeException.class, () -> svc2.loadKey(s("did:key:alice"), pk, s("pass")),
+				"Different peer key should fail to decrypt the encryption secret");
+		assertThrows(RuntimeException.class, () -> svc2.createKey(s("did:key:bob"), s("pass")),
+				"A secret that cannot be decrypted is never replaced");
 	}
 
 	// ===== encryptionSecret Round-Trip =====
@@ -486,16 +537,16 @@ public class SigningServiceTest {
 	@Test
 	public void testDeleteKeyPersistsAcrossRestart() {
 		AKeyPair peerKP = AKeyPair.generate();
-		Root<ACell> cursor = new Root<>((ACell) null);
+		LatticeHost<Index<Keyword, ACell>> host = LatticeHost.create();
 
-		SigningService svc1 = createService(peerKP, cursor);
+		SigningService svc1 = createService(peerKP, host.cursor());
 		AccountKey pk = svc1.createKey(s("did:key:alice"), s("pass"));
+		svc1.sync();
 		svc1.deleteKey(s("did:key:alice"), pk, s("pass"));
+		svc1.sync();
 
-		// Restart with same cursor state
-		ACell savedState = cursor.get();
-		Root<ACell> cursor2 = Root.create(savedState);
-		SigningService svc2 = createService(peerKP, cursor2);
+		// Restart over the same root
+		SigningService svc2 = createService(peerKP, host.cursor());
 
 		assertTrue(svc2.listKeys(s("did:key:alice")).isEmpty(),
 				"Deletion should persist across restart");
@@ -534,10 +585,12 @@ public class SigningServiceTest {
 	public void testChangePassphraseWrongOldThrows() {
 		SigningService svc = createService();
 		AccountKey pk = svc.createKey(s("did:key:alice"), s("correct"));
+		AHashMap<Keyword, ACell> before = svc.cursor().get();
 
 		assertThrows(IllegalArgumentException.class,
 				() -> svc.changePassphrase(s("did:key:alice"), pk, s("wrong"), s("new")),
 				"Wrong old passphrase should throw");
+		assertSame(before, svc.cursor().get(), "A failed change leaves the record as it was");
 	}
 
 	@Test
@@ -577,33 +630,25 @@ public class SigningServiceTest {
 
 	// ===== Key Rotation (re-wrap encryptionSecret) =====
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testPeerKeyRotation() {
 		AKeyPair oldKP = AKeyPair.generate();
 		AKeyPair newKP = AKeyPair.generate();
-		Root<ACell> cursor = new Root<>((ACell) null);
 
 		// Create service with old peer key, add signing keys
-		SigningService oldSvc = createService(oldKP, cursor);
+		SigningService oldSvc = createService(oldKP, LatticeHost.create().cursor());
 		AccountKey pk1 = oldSvc.createKey(s("did:key:alice"), s("pass1"));
 		AccountKey pk2 = oldSvc.createKey(s("did:key:alice"), s("pass2"));
 
-		// Re-wrap: decrypt encryptionSecret with old key, re-encrypt with new key
-		AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) cursor.get();
-		ABlob oldEncryptedSecret = (ABlob) data.get(SigningService.KEY_SECRET);
-		byte[] rawSecret = oldSvc.decryptSecret(oldEncryptedSecret);
-
-		SigningService tempSvc = new SigningService(newKP, new Root<>((ACell) null));
-		ABlob newEncryptedSecret = tempSvc.encryptSecret(rawSecret);
+		// Re-wrap: decrypt the encryption secret with the old key, re-encrypt with the new key
+		AHashMap<Keyword, ACell> data = oldSvc.cursor().get();
+		byte[] rawSecret = oldSvc.decryptSecret((ABlob) data.get(SigningService.KEY_SECRET));
+		SigningService newSvc = createService(newKP, LatticeHost.create().cursor());
+		ABlob newEncryptedSecret = newSvc.encryptSecret(rawSecret);
 		java.util.Arrays.fill(rawSecret, (byte) 0);
 
-		// Update cursor with re-wrapped secret
-		data = data.assoc(SigningService.KEY_SECRET, newEncryptedSecret);
-		Root<ACell> newCursor = Root.create(data);
-
-		// New service with new peer key should load successfully
-		SigningService newSvc = createService(newKP, newCursor);
+		// The new peer key's service takes the record with the re-wrapped secret
+		newSvc.merge(data.assoc(SigningService.KEY_SECRET, newEncryptedSecret));
 
 		// All signing keys still accessible
 		List<AccountKey> keys = newSvc.listKeys(s("did:key:alice"));
@@ -624,73 +669,34 @@ public class SigningServiceTest {
 	@Test
 	public void testNullConstructorArgs() {
 		AKeyPair kp = AKeyPair.generate();
-		Root<ACell> cursor = new Root<>((ACell) null);
+		AForkableCursor<Index<Keyword, ACell>> root = LatticeHost.create().cursor();
 
-		assertThrows(IllegalArgumentException.class, () -> new SigningService(null, cursor));
-		assertThrows(IllegalArgumentException.class, () -> new SigningService(kp, null));
+		assertThrows(NullPointerException.class, () -> createService(null, root));
+		assertThrows(NullPointerException.class, () -> createService(kp, null));
 	}
 
-	// ===== Lookup hash keying and legacy migration =====
+	// ===== Lookup hash keying =====
 
 	@SuppressWarnings("unchecked")
-	private static Index<Hash, ABlob> keysIndex(ACursor<ACell> cursor) {
-		AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) cursor.get();
-		return (Index<Hash, ABlob>) data.get(SigningService.KEY_KEYS);
-	}
-
-	/** Writes an entry directly into the :keys index, as the pre-migration code did. */
-	private static void putLegacyKey(ACursor<ACell> cursor, Hash hash, ABlob value) {
-		cursor.updateAndGet(v -> {
-			@SuppressWarnings("unchecked")
-			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
-			@SuppressWarnings("unchecked")
-			Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(SigningService.KEY_KEYS);
-			return data.assoc(SigningService.KEY_KEYS, keys.assoc(hash, value));
-		});
+	private static Index<Hash, ABlob> keysIndex(SigningService svc) {
+		return (Index<Hash, ABlob>) svc.cursor().get().get(SigningService.KEY_KEYS);
 	}
 
 	@Test
 	public void testLookupHashIsKeyedToService() {
 		AString identity = s("did:key:alice");
 		AString pass = s("mypass");
-		AccountKey pk = AKeyPair.generate().getAccountKey();
+		Blob seed = AKeyPair.generate().getSeed();
 
 		SigningService a = createService();
 		SigningService b = createService();
+		a.importKey(identity, seed, pass);
+		b.importKey(identity, seed, pass);
 
-		// Without the peer-held secret the hash cannot be recomputed, so a replica of the
-		// store gives no offline oracle for guessing the passphrase
-		assertNotEquals(a.computeLookupHash(identity, pk, pass), b.computeLookupHash(identity, pk, pass));
-		assertNotEquals(SigningService.legacyLookupHash(identity, pk, pass),
-				a.computeLookupHash(identity, pk, pass));
-	}
-
-	@Test
-	public void testLegacyEntryMigratesOnLoad() {
-		ACursor<ACell> cursor = new Root<>((ACell) null);
-		SigningService svc = createService(AKeyPair.generate(), cursor);
-
-		AString identity = s("did:key:alice");
-		AString pass = s("mypass");
-		AKeyPair kp = AKeyPair.generate();
-		AccountKey pk = kp.getAccountKey();
-		byte[] seed = kp.getSeed().getBytes();
-
-		// Store an entry exactly as the unkeyed scheme did
-		Hash legacyHash = SigningService.legacyLookupHash(identity, pk, pass);
-		byte[] legacyWrap = svc.legacyKeyWrappingKey(identity, pk, pass);
-		putLegacyKey(cursor, legacyHash, Blob.wrap(AESGCM.encrypt(legacyWrap, seed)));
-
-		Hash newHash = svc.computeLookupHash(identity, pk, pass);
-		assertNull(keysIndex(cursor).get(newHash));
-
-		// Loading finds the legacy entry and rewrites it under the keyed hash
-		assertArrayEquals(seed, svc.loadKey(identity, pk, pass));
-		assertNotNull(keysIndex(cursor).get(newHash), "Entry should be rewritten under the keyed hash");
-		assertNull(keysIndex(cursor).get(legacyHash), "Legacy entry should be removed");
-
-		// Still loads afterwards, now through the migrated entry
-		assertArrayEquals(seed, svc.loadKey(identity, pk, pass));
+		// Without the peer-held secret the hash cannot be recomputed, so a copy of the
+		// record gives no offline oracle for guessing the passphrase
+		assertEquals(1, keysIndex(a).count());
+		assertNotEquals(keysIndex(a).entryAt(0).getKey(), keysIndex(b).entryAt(0).getKey());
 	}
 
 }
