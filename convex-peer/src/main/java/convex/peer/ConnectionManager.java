@@ -126,12 +126,17 @@ public class ConnectionManager extends AConnectionManager {
 	}
 
 	@Override
-	public synchronized void close() {
-		if (closed) return;
-		closed = true;
+	public void close() {
+		// Stop and close outside the lock: the maintenance thread and identification
+		// callbacks on event loops take it, and closing a connection waits for its loop
+		Thread managerThread;
+		synchronized (this) {
+			if (closed) return;
+			closed = true;
+			managerThread=thread;
+			thread=null;
+		}
 
-		Thread managerThread=thread;
-		thread=null;
 		if (managerThread != null) {
 			managerThread.interrupt();
 			if (managerThread != Thread.currentThread()) {
@@ -443,11 +448,12 @@ public class ConnectionManager extends AConnectionManager {
 					return;
 				}
 
-				Convex existing;
+				Convex existing=null;
 				synchronized (ConnectionManager.this) {
-					existing=getConnection(peerKey);
-					if (existing == null && !closed && addConnection(peerKey, convex)) {
-						existing=convex;
+					// Once closed, an existing route is about to be closed too
+					if (!closed) {
+						existing=getConnection(peerKey);
+						if (existing == null && addConnection(peerKey, convex)) existing=convex;
 					}
 				}
 				if (existing == null) {

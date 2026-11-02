@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
@@ -505,6 +506,36 @@ public class ConnectionManagerTest {
 		assertFalse(manager.addConnection(AKeyPair.createSeeded(217).getAccountKey(),late));
 		assertEquals(1,late.closeCount);
 		server.close();
+	}
+
+	@Test
+	@Timeout(60)
+	public void testCloseReleasesLockBeforeClosingConnections() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(221));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			// Closing a network connection waits for its event loop, which may be running
+			// a callback that needs the manager's lock: model that with another thread
+			SequencedConvex connection=new SequencedConvex(-1) {
+				@Override public void close() {
+					Thread callback=Thread.ofVirtual().start(() -> { synchronized (manager) {} });
+					try {
+						callback.join();
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+						throw new IllegalStateException(e);
+					}
+					super.close();
+				}
+			};
+			assertTrue(manager.addConnection(AKeyPair.createSeeded(222).getAccountKey(),connection));
+
+			manager.close();
+
+			assertEquals(1,connection.closeCount);
+		} finally {
+			server.close();
+		}
 	}
 
 	@Test
