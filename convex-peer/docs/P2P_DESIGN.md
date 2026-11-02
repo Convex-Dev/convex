@@ -389,7 +389,9 @@ What a node has seen of other nodes is its own business. It lives at
 `[:local <own node key> :p2p]`: `:local` holds application state that is not meant
 to be shared, written and managed by one application instance. The node may
 replicate it for backup, but never publishes it to other nodes or merges theirs: the
-P2P application's projection leaves `:local` out in both directions.
+P2P application's projection leaves `:local` out in both directions. Leaving it out is
+not secrecy: its cells sit in the node's store like any others, and `DATA_REQUEST`
+serves any stored cell to a node that names its hash.
 
 `ContactRecords` holds a contact record per node key: the last authenticated contact,
 the address this node last dialled and found the node's key at, the failures since
