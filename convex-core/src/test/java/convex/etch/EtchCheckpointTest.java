@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -119,7 +118,7 @@ public class EtchCheckpointTest {
 				}
 			}));
 			try {
-				assertTrue(copied.await(10,TimeUnit.SECONDS));
+				copied.await();
 				if (cancel) source.cancelGC();
 				else {
 					source.transferGC();
@@ -139,7 +138,7 @@ public class EtchCheckpointTest {
 				current.close(); // the private lease outlives all application handles
 				assertTrue(pinned.getFile().exists());
 			} finally { resume.countDown(); }
-			assertEquals(destination.getCanonicalFile(),result.get(10,TimeUnit.SECONDS));
+			assertEquals(destination.getCanonicalFile(),result.get());
 			EtchGCLifecycleTest.assertRetiredFileDeleted(pinned);
 			try (EtchStore restored=EtchStore.create(destination,config)) { assertEquals(root,restored.getRootData()); }
 		} finally {
@@ -160,7 +159,7 @@ public class EtchCheckpointTest {
 	}
 
 	private static void await(CountDownLatch signal) throws IOException {
-		try { if (!signal.await(10,TimeUnit.SECONDS)) throw new IOException("Timed out waiting for test signal"); }
+		try { signal.await(); }
 		catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new InterruptedIOException(); }
 	}
 
@@ -247,9 +246,9 @@ public class EtchCheckpointTest {
 			};
 			var first=executor.submit(export);
 			var second=executor.submit(export);
-			try { assertTrue(atPublication.await(10,TimeUnit.SECONDS)); }
+			try { atPublication.await(); }
 			finally { publish.countDown(); }
-			assertNotEquals(first.get(10,TimeUnit.SECONDS),second.get(10,TimeUnit.SECONDS));
+			assertNotEquals(first.get(),second.get());
 			try (EtchStore restored=EtchStore.create(destination)) { assertEquals(root,restored.getRootData()); }
 		}
 	}

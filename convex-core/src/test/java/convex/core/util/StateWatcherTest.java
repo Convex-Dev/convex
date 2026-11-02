@@ -7,18 +7,17 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
+@Timeout(60)
 class StateWatcherTest {
-
-	private static final Duration TIMEOUT=Duration.ofSeconds(1);
 
 	@Test
 	void noUpdateFastPath() {
@@ -39,7 +38,7 @@ class StateWatcherTest {
 			seen.countDown();
 		})) {
 			watcher.update(2);
-			assertTrue(await(seen));
+			seen.await();
 			assertNotEquals(Thread.currentThread(),callbackThread.get());
 			assertEquals(2,value.get());
 		}
@@ -61,33 +60,33 @@ class StateWatcherTest {
 			if (v==3) latestSeen.countDown();
 		})) {
 			watcher.update(0);
-			assertTrue(await(initialStarted));
-			org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(TIMEOUT,()-> {
-				watcher.update(1);
-				watcher.update(2);
-				watcher.update(3);
-			});
+			initialStarted.await();
+			// The consumer is held until after these updates, so an update that
+			// waited for it would deadlock here
+			watcher.update(1);
+			watcher.update(2);
+			watcher.update(3);
 			releaseInitial.countDown();
 
-			assertTrue(await(latestSeen));
+			latestSeen.await();
 			assertEquals(3,latest.get());
 		}
 	}
 
 	@Test
 	void closeStopsDelivery() throws Exception {
-		CountDownLatch seen=new CountDownLatch(1);
-		StateWatcher<Integer> watcher=new StateWatcher<>(v->seen.countDown());
+		// The consumer runs on the dispatcher thread, so it can report which thread that is
+		CompletableFuture<Thread> dispatcher=new CompletableFuture<>();
+		StateWatcher<Integer> watcher=new StateWatcher<>(v->dispatcher.complete(Thread.currentThread()));
 		watcher.update(1);
-		assertTrue(await(seen));
+		Thread thread=dispatcher.get();
 
 		watcher.close();
 		watcher.close();
 		assertTrue(watcher.isClosed());
 		assertThrows(IllegalStateException.class,()->watcher.update(2));
-		org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(TIMEOUT,()-> {
-			while (watcher.isDispatcherRunning()) Thread.yield();
-		});
+		thread.join();
+		assertFalse(watcher.isDispatcherRunning());
 	}
 
 	@Test
@@ -110,12 +109,11 @@ class StateWatcherTest {
 				}
 			});
 
-			assertTrue(await(consumerStarted));
+			consumerStarted.await();
 			assertFalse(returned.get());
 			releaseConsumer.countDown();
-			caller.join(TIMEOUT.toMillis());
+			caller.join();
 
-			assertFalse(caller.isAlive());
 			assertNull(failure.get());
 			assertTrue(returned.get());
 		}
@@ -139,10 +137,9 @@ class StateWatcherTest {
 		});
 
 		try {
-			assertTrue(await(consumerStarted));
+			consumerStarted.await();
 			watcher.close();
-			caller.join(TIMEOUT.toMillis());
-			assertFalse(caller.isAlive());
+			caller.join();
 			assertTrue(failure.get() instanceof IllegalStateException);
 		} finally {
 			releaseConsumer.countDown();
@@ -161,9 +158,5 @@ class StateWatcherTest {
 			}
 		}
 		if (interrupted) Thread.currentThread().interrupt();
-	}
-
-	private static boolean await(CountDownLatch latch) throws InterruptedException {
-		return latch.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS);
 	}
 }

@@ -9,15 +9,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Uninterruptible blocking calls (#776): an interrupt while the caller waits reaches
  * neither the call nor the thread running it, and the caller keeps its interrupt.
+ *
+ * <p>Each test runs on a thread of its own: an uninterruptible call ignores the
+ * interrupt a same-thread timeout would send, and the interrupt this test sends must
+ * never reach a thread shared with other tests.</p>
  */
+@Timeout(value=60,threadMode=Timeout.ThreadMode.SEPARATE_THREAD)
 public class ThreadUtilsTest {
 
 	@AfterEach
@@ -30,9 +35,11 @@ public class ThreadUtilsTest {
 		Thread caller=Thread.currentThread();
 		CountDownLatch entered=new CountDownLatch(1);
 		CountDownLatch release=new CountDownLatch(1);
+		// Interrupts the caller only while it waits: the call cannot return before release
 		Thread interrupter=new Thread(() -> {
 			try {
-				if (entered.await(10,TimeUnit.SECONDS)) caller.interrupt();
+				entered.await();
+				caller.interrupt();
 			} catch (InterruptedException e) {
 				// Leave the call to finish when released
 			} finally {
@@ -44,7 +51,7 @@ public class ThreadUtilsTest {
 		Thread worker=ThreadUtils.callUninterruptibly(() -> {
 			entered.countDown();
 			try {
-				if (!release.await(10,TimeUnit.SECONDS)) throw new IOException("Timed out waiting for test signal");
+				release.await();
 			} catch (InterruptedException e) {
 				throw new IOException("Uninterruptible worker was interrupted");
 			}

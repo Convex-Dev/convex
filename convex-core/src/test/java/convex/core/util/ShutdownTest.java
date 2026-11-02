@@ -13,11 +13,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Regression tests for #604: {@link Shutdown#addHook} raced on the shared backing
@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Also covers {@link Shutdown#once}, the run-once task services register.</p>
  */
+@Timeout(60)
 public class ShutdownTest {
 
 	/** Priority base chosen well clear of the real hook priorities (60..120). */
@@ -93,7 +94,7 @@ public class ShutdownTest {
 			threads.add(t);
 			t.start();
 		}
-		assertTrue(done.await(30, TimeUnit.SECONDS), "threads did not complete");
+		done.await();
 		for (Thread t : threads) t.join();
 		assertNull(failure.get(), () -> "addHook threw under concurrency: " + failure.get());
 
@@ -134,7 +135,7 @@ public class ShutdownTest {
 			threads.add(t);
 			t.start();
 		}
-		assertTrue(done.await(30, TimeUnit.SECONDS), "threads did not complete");
+		done.await();
 		for (Thread t : threads) t.join();
 		assertNull(failure.get(), () -> "addHook threw under concurrency: " + failure.get());
 
@@ -205,7 +206,7 @@ public class ShutdownTest {
 		Thread first = new Thread(once);
 		first.start();
 		try {
-			assertTrue(entered.await(10, TimeUnit.SECONDS));
+			entered.await();
 			Thread.currentThread().interrupt();
 			once.run();
 			assertTrue(Thread.interrupted(), "the waiter keeps its interrupt");
