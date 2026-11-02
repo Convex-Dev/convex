@@ -25,12 +25,14 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.JSON;
 import convex.etch.EtchStore;
+import convex.net.Transports;
 import convex.node.LatticeConnectionManager;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeConfig;
@@ -157,18 +159,44 @@ public class P2PSeedTest {
 		P2PNode first=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
 		first.launch();
 		first.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS);
-		// Shut down as a service does, keeping the store for the restart
-		try (first; var host=first.getNodeServer().getHost()) {
-			first.stopIngress();
-			first.getApplication().sync();
-		}
+		shutDown(first);
 
 		P2PNode restarted=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
 		resources.add(restarted);
-		assertTrue(ContactRecords.answered(restarted.getApplication().contacts().get(hubKey.getAccountKey())),
-			"the contact record survived the restart");
+		AHashMap<Keyword,ACell> contact=restarted.getApplication().contacts().get(hubKey.getAccountKey());
+		assertTrue(ContactRecords.answered(contact),"the contact record survived the restart");
+		assertEquals(address(hub),ContactRecords.address(contact),"with the address the hub proved its key at");
 		restarted.launch();
 		restarted.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
+	}
+
+	/** The address a contact record holds is enough to rejoin: this node has no node record for the hub. */
+	@Test
+	public void testRestartedNodeDialsTheAddressItRecordedForAContact() throws Exception {
+		P2PNode hub=launch(store("seed-hub"),NodeConfig.localNetwork(),0,hubKey);
+		EtchStore joinerStore=store("seed-joiner");
+		P2PNode first=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		first.launch();
+		first.getApplication().contacts().contacted(hubKey.getAccountKey(),address(hub));
+		shutDown(first);
+
+		P2PNode restarted=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		resources.add(restarted);
+		assertNull(registry(restarted).get(hubKey.getAccountKey()));
+		restarted.launch();
+		restarted.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
+	}
+
+	/** Shuts a node down as a service does, keeping its store for a restart. */
+	private static void shutDown(P2PNode node) throws Exception {
+		try (node; var host=node.getNodeServer().getHost()) {
+			node.stopIngress();
+			node.getApplication().sync();
+		}
+	}
+
+	private static AString address(P2PNode node) {
+		return Strings.create(Transports.endpoint(node.getHostAddress()).toString());
 	}
 
 	@Test

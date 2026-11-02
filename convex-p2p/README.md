@@ -384,7 +384,8 @@ retired by their owning endpoint so an outbound-only node can reconnect.
 What a node learns about other nodes is local state at `[:local <node key> :p2p]`,
 never shared: the P2P application leaves `:local` out of everything it publishes and
 accepts. `ContactRecords` holds, per node key, the last authenticated contact, the
-failures since it and the last failure. It is this module's example of an
+address this node last dialled and found the node's key at, the failures since that
+contact and the last failure; a restarted node dials the recorded addresses. It is this module's example of an
 `ALocalComponent`. The connection manager's reports edit a private copy and sign
 nothing; the application syncs the copy into the node's signed slot, once, when it
 publishes its own record and when the service shuts down as

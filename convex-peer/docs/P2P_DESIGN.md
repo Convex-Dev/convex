@@ -380,12 +380,14 @@ replicate it for backup, but never publishes it to other nodes or merges theirs:
 P2P application's projection leaves `:local` out in both directions.
 
 `ContactRecords` holds a contact record per node key: the last authenticated contact,
-the failures since it and the last failure.
+the address this node last dialled and found the node's key at, the failures since
+that contact and the last failure.
 
 ```clojure
 ;; Value at [:local <own node key> :p2p]
 {:timestamp 1708000000000
- :contacts  {0xabc123... {:last-contact 1708000000000, :failures 0}
+ :contacts  {0xabc123... {:last-contact 1708000000000, :failures 0,
+                          :address "tcp://198.51.100.20:18888"}
              0xdef456... {:last-contact 1707990000000, :failures 2,
                           :last-failure 1707999000000}}
  :blocked   {0x789abc...                {}
@@ -398,7 +400,8 @@ an inbound route upgrade, and then each `keepAlive` interval (60 seconds by defa
 in which the route is heard from or answers a probe. A failure is a dial or identity
 challenge that failed for a desired peer, or an authenticated route that stopped
 answering. Nothing the owner writes in its node record, such as `:timestamp`, ever
-counts.
+counts. Only a verified route this node dialled records an address: a route the other
+node opened says nothing about where it can be reached.
 
 Only live connections, which hold a socket and a slot, are probed. A node that
 answered and has not failed since keeps that standing whether or not this node is
@@ -418,9 +421,11 @@ its `:local` slot, signing the slot once, whenever it syncs the host to publish 
 own record, and when the service shuts down as [SHUTDOWN.md](SHUTDOWN.md) prescribes;
 a service that skips that sync loses what changed since. The host persists the slot
 with the rest of its root, so after a restart the records start from what the host
-retained. A node without a key keeps none. The registry is retained the same way, and
-the records it holds become connection candidates at launch, so a restarted node
-rejoins without a seed.
+retained. A node without a key keeps none. At launch each node with a recorded address
+becomes a connection candidate there, so a restarted node rejoins any node it dialled
+without a seed, using only its own records. The registry is retained the same way, and
+its records become candidates too; a node record names newer transports than a contact
+address.
 
 The same record holds, at `:blocked`, the node keys, transport addresses and hosts
 the operator blocked with `P2PNode.block`, as an `AccessList`

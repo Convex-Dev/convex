@@ -508,6 +508,7 @@ public class P2PNode implements Closeable {
 			Integer port = getPort();
 			application.directory().publishOwnRecord(config.getAdvertisedURL(port));
 			refreshDiscovery();
+			offerContacts();
 			for (Convex peer:manager.getPeers()) initialisePeer(peer);
 			if (port != null && port >= 0) {
 				log.info("Convex P2P node listening on port {}", port);
@@ -588,7 +589,32 @@ public class P2PNode implements Closeable {
 			return;
 		}
 		ContactRecords contacts=application.contacts();
-		if (contacts!=null) contacts.contacted(peerKey);
+		if (contacts!=null) contacts.contacted(peerKey,dialledAddress(peerKey));
+	}
+
+	/** The address of a live route this node dialled and proved the node's key over, or null. */
+	private AString dialledAddress(AccountKey peerKey) {
+		Convex outbound=propagator.getConnectionManager().getConnection(peerKey);
+		if (!(outbound instanceof ConvexRemote remote) || remote.getEndpoint()==null
+				|| !peerKey.equals(remote.getVerifiedPeer())) return null;
+		return Strings.create(remote.getEndpoint().toString());
+	}
+
+	/**
+	 * Offers each node this node has dialled before as a connection candidate at the
+	 * address it found the node's key at. A node record names newer transports and
+	 * replaces it.
+	 */
+	private void offerContacts() {
+		ContactRecords contacts=application.contacts();
+		if (contacts==null) return;
+		Blocklist blocklist=application.connections().blocklist();
+		for (Map.Entry<AccountKey,AHashMap<Keyword,ACell>> entry:contacts.all().entrySet()) {
+			AString address=ContactRecords.address(entry.getValue());
+			if (address==null || blocklist.isBlocked(entry.getKey())) continue;
+			propagator.getConnectionManager().updateDiscoveredPeer(entry.getKey(),
+				blocklist.dialable(Vectors.<AString>of(address)),Long.MIN_VALUE);
+		}
 	}
 
 	/** Closes every connection to a node, including one it opened, and forgets it as a candidate. */

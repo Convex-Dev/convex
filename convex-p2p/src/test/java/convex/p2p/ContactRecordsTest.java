@@ -12,15 +12,18 @@ import org.junit.jupiter.api.Test;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
+import convex.net.Transports;
 import convex.node.NodeConfig;
 
 /** A node's contact records are local state: edited privately, synced by the application, kept by the host. */
@@ -61,6 +64,21 @@ public class ContactRecordsTest {
 		assertEquals(CVMLong.ZERO,contacts.get(CAROL).get(ContactRecords.FAILURES),"contact clears failures");
 	}
 
+	@Test void aContactKeepsTheAddressItWasLastDialledAt() {
+		var contacts=alice(LatticeHost.create()).contacts();
+		AString dialled=Strings.create("tcp://bob.example:18888");
+		contacts.contacted(BOB,dialled);
+		assertEquals(dialled,ContactRecords.address(contacts.get(BOB)));
+		contacts.contacted(BOB);
+		assertEquals(dialled,ContactRecords.address(contacts.get(BOB)),"a route Bob opened says nothing of where he is");
+		contacts.failed(BOB);
+		assertEquals(dialled,ContactRecords.address(contacts.get(BOB)));
+		AString moved=Strings.create("tcp://bob.example:18889");
+		contacts.contacted(BOB,moved);
+		assertEquals(moved,ContactRecords.address(contacts.get(BOB)));
+		assertNull(ContactRecords.address(contacts.get(CAROL)));
+	}
+
 	@Test void atMostMaxNodesHaveARecordAndFailingOnesGoFirst() {
 		var contacts=alice(LatticeHost.create()).contacts();
 		int max=ContactRecords.MAX_NODES;
@@ -91,7 +109,7 @@ public class ContactRecordsTest {
 		var store=new MemoryStore();
 		var host=LatticeHost.create(store);
 		var application=alice(host);
-		application.contacts().contacted(BOB);
+		application.contacts().contacted(BOB,Strings.create("tcp://bob.example:18888"));
 		application.contacts().failed(CAROL);
 		application.syncHost();
 		assertEquals(1,signatures.get(),"the :local slot is signed once per sync");
@@ -121,8 +139,12 @@ public class ContactRecordsTest {
 				leaf.launch();
 				leaf.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(5,TimeUnit.SECONDS);
 				hub.whenInboundConnectionUpgraded(leafKey.getAccountKey()).get(5,TimeUnit.SECONDS);
-				assertNotNull(leaf.getApplication().contacts().get(hubKey.getAccountKey()));
-				assertNotNull(hub.getApplication().contacts().get(leafKey.getAccountKey()));
+				var hubContact=leaf.getApplication().contacts().get(hubKey.getAccountKey());
+				var leafContact=hub.getApplication().contacts().get(leafKey.getAccountKey());
+				assertNotNull(leafContact);
+				assertEquals(Strings.create(Transports.endpoint(hub.getHostAddress()).toString()),
+					ContactRecords.address(hubContact),"the leaf dialled the hub and found its key there");
+				assertNull(ContactRecords.address(leafContact),"the hub was dialled, so knows no address for the leaf");
 			} finally {
 				leaf.close();
 				hub.close();

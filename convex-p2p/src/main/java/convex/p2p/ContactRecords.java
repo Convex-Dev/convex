@@ -7,6 +7,7 @@ import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -20,12 +21,13 @@ import convex.lattice.cursor.AForkableCursor;
 /**
  * What this node has learned about other nodes, kept as local state at
  * {@code [:local <node key> :p2p]}: for each node key, the last authenticated
- * contact, the failures since it and the last failure. It is never shared with other
+ * contact, the address this node last dialled and found the node's key at, the
+ * failures since that contact and the last failure. It is never shared with other
  * nodes, and only an authenticated connection counts as contact.
  *
  * <pre>
  * {:timestamp t
- *  :contacts {&lt;node key&gt; {:last-contact t, :failures n, :last-failure t}}
+ *  :contacts {&lt;node key&gt; {:last-contact t, :address "tcp://host:port", :failures n, :last-failure t}}
  *  :blocked  {&lt;node key or address&gt; {}}}
  * </pre>
  *
@@ -47,11 +49,12 @@ import convex.lattice.cursor.AForkableCursor;
  */
 public final class ContactRecords extends ALocalComponent {
 
-	/** Most nodes with a record. Each is about 100 bytes, so the slot stays near 100 KB. */
+	/** Most nodes with a record. Each is about 90 bytes, or 140 with an address, so the slot stays under 150 KB. */
 	static final int MAX_NODES=1024;
 
 	static final Keyword CONTACTS=Keyword.intern("contacts");
 	static final Keyword LAST_CONTACT=Keyword.intern("last-contact");
+	static final Keyword ADDRESS=Keyword.intern("address");
 	static final Keyword FAILURES=Keyword.intern("failures");
 	static final Keyword LAST_FAILURE=Keyword.intern("last-failure");
 
@@ -68,8 +71,22 @@ public final class ContactRecords extends ALocalComponent {
 
 	/** Records authenticated contact with a node, clearing its failures. */
 	public void contacted(AccountKey node) {
+		contacted(node,null);
+	}
+
+	/**
+	 * Records authenticated contact with a node, clearing its failures.
+	 *
+	 * @param node node key
+	 * @param address transport address this node dialled and found the node's key at,
+	 *        or null to keep the one recorded, as for a route the node opened
+	 */
+	public void contacted(AccountKey node,AString address) {
 		CVMLong now=clock.get();
-		record(node,record -> record.assoc(LAST_CONTACT,now).assoc(FAILURES,CVMLong.ZERO));
+		record(node,record -> {
+			AHashMap<Keyword,ACell> updated=record.assoc(LAST_CONTACT,now).assoc(FAILURES,CVMLong.ZERO);
+			return (address==null)?updated:updated.assoc(ADDRESS,address);
+		});
 	}
 
 	/** Records a failed attempt to reach a node. */
@@ -122,6 +139,11 @@ public final class ContactRecords extends ALocalComponent {
 	AHashMap<AccountKey,AHashMap<Keyword,ACell>> all() {
 		AHashMap<AccountKey,AHashMap<Keyword,ACell>> all=contacts.get();
 		return (all==null)?Maps.empty():all;
+	}
+
+	/** The address a contact record says this node found the node's key at, or null. */
+	static AString address(AHashMap<Keyword,ACell> record) {
+		return (record!=null && record.get(ADDRESS) instanceof AString address)?address:null;
 	}
 
 	/** Whether a contact record shows a node that answered and has not failed since. */
