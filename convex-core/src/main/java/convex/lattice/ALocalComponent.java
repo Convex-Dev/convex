@@ -16,7 +16,7 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Persister;
 
 /**
- * Base for one service's state that is not shared, held as a record at
+ * Base for one service's state that is not shared externally, held as a record at
  * {@code [:local <owner> <service>]} ({@link LocalLattice}). Subclasses add the
  * service's domain operations over {@link #cursor()}.
  *

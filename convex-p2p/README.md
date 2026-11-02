@@ -390,7 +390,8 @@ retired by their owning endpoint so an outbound-only node can reconnect.
 ## Local state
 
 What a node learns about other nodes is local state at `[:local <node key> :p2p]`,
-the node's own: the P2P application leaves `:local` out of everything it publishes and
+not shared externally, though it may be replicated for backup: the P2P application
+leaves `:local` out of everything it publishes and
 accepts. `ContactRecords` holds, per node key, the last authenticated contact, the
 address this node last dialled and found the node's key at, the failures since that
 contact and the last failure; a restarted node dials the recorded addresses. It is this module's example of an

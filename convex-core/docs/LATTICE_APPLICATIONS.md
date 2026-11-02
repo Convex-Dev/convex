@@ -316,8 +316,9 @@ host-bound application takes from its host. A component without one refuses,
 since its state is its parent's. Which components persist, and when, is the
 application's policy.
 
-State that is not shared, such as configuration or what a node has seen of
-others, lives in the owner's slot in `:local`, one record per service. An
+State that is not meant to be shared externally, such as configuration or what
+a node has seen of others, lives in the owner's slot in `:local`, one record per
+service; it may still be replicated for backup. An
 `ALocalComponent` edits a private copy of its record and writes it into the slot
 with one signature when the application syncs it, so the application decides how
 many edits share a signature.

@@ -183,7 +183,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 
 	/**
 	 * Projects a root to what this node exchanges with others: every region as
-	 * declared except {@code :local}, which holds state that is not shared, and the
+	 * declared except {@code :local}, which holds state that is not shared externally, and the
 	 * social region reduced to the owners this node wants. Incoming roots merge
 	 * through it and a node publishes through it.
 	 */

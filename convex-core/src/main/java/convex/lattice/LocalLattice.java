@@ -28,7 +28,7 @@ import convex.lattice.generic.OwnerLattice;
  * </pre>
  *
  * This region holds any application state that is not meant to be shared
- * (encrypted secrets, signing keys, configuration, what a node has seen of
+ * externally (encrypted secrets, signing keys, configuration, what a node has seen of
  * other nodes). One application instance writes and manages each slot. It may
  * be replicated, for example for backup, but is not published for others to
  * use. It still uses standard lattice semantics so that:
