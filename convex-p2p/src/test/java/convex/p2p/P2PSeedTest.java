@@ -173,7 +173,7 @@ public class P2PSeedTest {
 		P2PNode leaf=launch(store("seed-joiner"),NodeConfig.localNetwork(),0,joinerKey);
 		Convex peer=leaf.connect(PeerResolver.parse(address(hub).toString())).get(TIMEOUT,TimeUnit.SECONDS);
 		assertEquals(hubKey.getAccountKey(),peer.getVerifiedPeer());
-		assertTrue(leaf.getApplication().connections().isNamed(hubKey.getAccountKey()));
+		assertTrue(leaf.isNamed(hubKey.getAccountKey()));
 
 		P2PNode blocking=launch(store("seed-other"),NodeConfig.localNetwork(),0,otherKey);
 		blocking.block(hubKey.getAccountKey());

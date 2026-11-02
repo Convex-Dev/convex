@@ -3,6 +3,7 @@ package convex.p2p;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -139,6 +140,21 @@ public final class ContactRecords extends ALocalComponent {
 	AHashMap<AccountKey,AHashMap<Keyword,ACell>> all() {
 		AHashMap<AccountKey,AHashMap<Keyword,ACell>> all=contacts.get();
 		return (all==null)?Maps.empty():all;
+	}
+
+	/** A snapshot of every node's standing, as {@link #standing} gives it. */
+	ToIntFunction<AccountKey> standings() {
+		AHashMap<AccountKey,AHashMap<Keyword,ACell>> all=all();
+		return node -> standing(all.get(node));
+	}
+
+	/**
+	 * A contact record's standing, for ranking: 0 for a node that answered and has not
+	 * failed since, 1 for one never reached or without a record, 2 for one failing.
+	 */
+	static int standing(AHashMap<Keyword,ACell> record) {
+		if (answered(record)) return 0;
+		return failing(record)?2:1;
 	}
 
 	/** The address a contact record says this node found the node's key at, or null. */

@@ -24,7 +24,7 @@ import convex.lattice.LatticeHost;
 import convex.node.NodeConfig;
 
 /** A node keeps the records it wants: pinned ones, answered ones, and the best of the rest up to its bound. */
-public class P2PConnectionsTest {
+public class NodeRegistryTest {
 
 	private static final int BOUND=4;
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(9201);
@@ -34,7 +34,7 @@ public class P2PConnectionsTest {
 		ALICE.getAccountKey(),(owner,value) -> ALICE.signData(value),() -> CVMLong.create(100),DIDKeyAuthorizer.CONVEX));
 
 	{
-		alice.connections().setMaxRecords(BOUND);
+		alice.registry().setMaxRecords(BOUND);
 	}
 
 	@Test void aFullRegistryKeepsItsBound() {
@@ -53,22 +53,29 @@ public class P2PConnectionsTest {
 		assertSame(root,host.cursor().get(),"merging what it has seen again changes nothing");
 	}
 
-	@Test void pinnedRecordsAreKeptAndNotCounted() {
+	@Test void theOwnRecordAndPinnedRecordsAreKeptAndNotCounted() {
 		alice.directory().publishOwnRecord(null);
-		AKeyPair named=key(100),routed=key(101),pop=key(102);
-		alice.connections().name(named.getAccountKey());
-		alice.connections().setRoutes(() -> Set.of(routed.getAccountKey()));
-		alice.directory().setPointsOfPresence(Vectors.of(pop.getAccountKey()));
+		AKeyPair named=key(100),routed=key(101);
+		alice.registry().setPinned(() -> Set.of(named.getAccountKey(),routed.getAccountKey()));
 
 		alice.merge(registry(records(0,10,1)));
-		alice.merge(registry(record(named,1).merge(record(routed,1)).merge(record(pop,1))));
+		alice.merge(registry(record(named,1).merge(record(routed,1))));
 		var held=held();
-		for (AKeyPair key:new AKeyPair[] {ALICE,named,routed,pop}) assertNotNull(held.get(key.getAccountKey()));
-		assertEquals(BOUND+4,held.count());
+		for (AKeyPair key:new AKeyPair[] {ALICE,named,routed}) assertNotNull(held.get(key.getAccountKey()));
+		assertEquals(BOUND+3,held.count());
+	}
+
+	@Test void aNodeWithoutAKeyBoundsItsRegistryToo() {
+		var relayHost=LatticeHost.<Index<Keyword,ACell>>create();
+		var relay=relayHost.addApplication(P2PApplication.connect(P2PLattice.ROOT,relayHost));
+		relay.registry().setMaxRecords(2);
+		relay.merge(registry(records(0,3,1)));
+		ACell nodes=relayHost.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		assertEquals(2,((AHashMap<?,?>)nodes).count());
 	}
 
 	@Test void answeredNodesAreBoundedToo() {
-		alice.connections().setMaxRecords(2);
+		alice.registry().setMaxRecords(2);
 		for (int i=0; i<3; i++) alice.contacts().contacted(key(i).getAccountKey());
 		alice.merge(registry(records(0,3,1)));
 		assertEquals(2,held().count());
@@ -76,7 +83,7 @@ public class P2PConnectionsTest {
 
 	@Test void anAnsweredNodeOutranksOthersAndAFailedOneGoesFirst() {
 		AKeyPair answered=key(100),failed=key(101),fresh=key(102);
-		alice.connections().setMaxRecords(2);
+		alice.registry().setMaxRecords(2);
 		alice.merge(registry(record(answered,1).merge(record(failed,1))));
 		alice.contacts().contacted(answered.getAccountKey());
 		alice.contacts().failed(failed.getAccountKey());
@@ -118,13 +125,13 @@ public class P2PConnectionsTest {
 
 	@Test void theDirectoryDropsRecordsNoLongerHeld() {
 		AKeyPair routed=key(100);
-		alice.connections().setRoutes(() -> Set.of(routed.getAccountKey()));
-		alice.connections().setMaxRecords(0);
+		alice.registry().setPinned(() -> Set.of(routed.getAccountKey()));
+		alice.registry().setMaxRecords(0);
 		alice.merge(registry(record(routed,1)));
 		alice.directory().refresh();
 		assertTrue(alice.directory().records().containsKey(routed.getAccountKey()));
 
-		alice.connections().setRoutes(() -> Set.of());
+		alice.registry().setPinned(() -> Set.of());
 		alice.merge(registry(record(key(101),1)));
 		alice.directory().refresh();
 		assertEquals(0,held().count());
@@ -139,7 +146,7 @@ public class P2PConnectionsTest {
 	@Test void raisingTheBoundAdmitsRecordsTurnedAway() {
 		var offered=records(0,10,1);
 		alice.merge(registry(offered));
-		alice.connections().setMaxRecords(10);
+		alice.registry().setMaxRecords(10);
 		alice.merge(registry(offered));
 		assertEquals(10,held().count());
 	}
@@ -148,7 +155,7 @@ public class P2PConnectionsTest {
 		AKeyPair bob=key(100);
 		alice.merge(registry(record(bob,1)));
 		alice.directory().refresh();
-		alice.connections().block(bob.getAccountKey());
+		alice.block(bob.getAccountKey());
 		assertNull(held().get(bob.getAccountKey()));
 		assertFalse(alice.directory().records().containsKey(bob.getAccountKey()));
 
@@ -169,7 +176,7 @@ public class P2PConnectionsTest {
 	}
 
 	@Test void theBoundIsConfiguredOnTheNode() {
-		assertEquals(P2PConnections.DEFAULT_MAX_RECORDS,P2PNode.maxNodeRecords(NodeConfig.create()));
+		assertEquals(NodeRegistry.DEFAULT_MAX_RECORDS,P2PNode.maxNodeRecords(NodeConfig.create()));
 		assertEquals(5,P2PNode.maxNodeRecords(config(5)));
 		assertEquals(0,P2PNode.maxNodeRecords(config(0)));
 		assertThrows(IllegalArgumentException.class,() -> P2PNode.maxNodeRecords(config(-1)));

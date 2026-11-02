@@ -111,8 +111,9 @@ import convex.social.Social;
  * publish the node's record, when a peer is admitted it pulls the application's
  * bootstrap paths, and when an inbound value is accepted it turns the application's
  * refreshed directory into connection candidates and authenticates a route the
- * application has validated. It tells the application's connections which nodes it
- * routes to and which the operator named, so their records are kept. {@link PointOfPresence}
+ * application has validated. It tells the application's node registry which nodes it
+ * routes to, which the operator named and which are its Points of Presence, so their
+ * records are kept. {@link PointOfPresence}
  * handles transient routed messages and is not a lattice concern. P2PNode uses its
  * node key as both transport identity and NodeInfo owner; social DIDs and their
  * signing keys remain independent.</p>
@@ -161,6 +162,8 @@ public class P2PNode implements Closeable {
 	private final PointOfPresence pointOfPresence;
 	private final ConcurrentHashMap<Convex,CompletableFuture<Void>> initialisations=
 		new ConcurrentHashMap<>();
+	/** Nodes the operator named, whose records are kept however full the registry is. */
+	private final Set<AccountKey> named=ConcurrentHashMap.newKeySet();
 	/** Freezes P2P application configuration at the same boundary as NodeServer. */
 	private boolean launchStarted;
 
@@ -172,17 +175,20 @@ public class P2PNode implements Closeable {
 		this.propagator=propagator;
 		this.config=config;
 		this.keyPair=keyPair;
-		P2PConnections connections=application.connections();
+		NodeRegistry registry=application.registry();
+		NodeDirectory directory=application.directory();
 		LatticeConnectionManager manager=propagator.getConnectionManager();
-		connections.setMaxRecords(maxNodeRecords(config));
-		// Nodes with an authenticated route, or one being authenticated, keep their records
-		connections.setRoutes(() -> {
-			Set<AccountKey> routes=manager.getAuthenticatedRouteKeys();
-			routes.addAll(propagator.getAuthenticatingInboundKeys());
-			return routes;
+		registry.setMaxRecords(maxNodeRecords(config));
+		// Named nodes, nodes with an authenticated route or one being authenticated, and
+		// Points of Presence keep their records
+		registry.setPinned(() -> {
+			Set<AccountKey> pinned=new HashSet<>(named);
+			pinned.addAll(manager.getAuthenticatedRouteKeys());
+			pinned.addAll(propagator.getAuthenticatingInboundKeys());
+			for (AccountKey pop:directory.pointsOfPresence()) pinned.add(pop);
+			return pinned;
 		});
-		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,connections.directory(),
-			connections.blocklist());
+		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,directory,application.blocklist());
 		// The application merges incoming roots through its projection; the
 		// propagation group publishes through the same projection.
 		propagator.setPublicationFilter(application::project);
@@ -200,7 +206,7 @@ public class P2PNode implements Closeable {
 	/** The configured bound on node records kept besides pinned ones. */
 	static int maxNodeRecords(NodeConfig config) {
 		ACell value=config.getMap().get(MAX_NODE_RECORDS);
-		if (value==null) return P2PConnections.DEFAULT_MAX_RECORDS;
+		if (value==null) return NodeRegistry.DEFAULT_MAX_RECORDS;
 		CVMLong bound=RT.ensureLong(value);
 		if (bound==null || bound.longValue()<0 || bound.longValue()>Integer.MAX_VALUE) {
 			throw new IllegalArgumentException(MAX_NODE_RECORDS+" must be between 0 and "+Integer.MAX_VALUE+": "+value);
@@ -402,7 +408,7 @@ public class P2PNode implements Closeable {
 	 * @return this node, for chaining
 	 */
 	public P2PNode serveAllInbound() {
-		Blocklist blocklist=application.connections().blocklist();
+		Blocklist blocklist=application.blocklist();
 		network.getListener().setSelector(connection ->
 			blocklist.refuses(connection.getRemoteAddress())?null:propagator);
 		return this;
@@ -550,7 +556,7 @@ public class P2PNode implements Closeable {
 			ACell[] path,ACell value,boolean changed) {
 		if (!NodeDirectory.mayAffectRegistry(path)) return;
 		AccountKey claimed=application.directory().claimedOwner(path,value);
-		if (connection!=null && claimed!=null && application.connections().blocklist().isBlocked(claimed)) {
+		if (connection!=null && claimed!=null && application.blocklist().isBlocked(claimed)) {
 			connection.close();
 			return;
 		}
@@ -573,7 +579,7 @@ public class P2PNode implements Closeable {
 
 	/** Offers a node as a connection candidate at the transports this node does not refuse; never a blocked node. */
 	private void offer(NodeDirectory.NodeRecord record) {
-		Blocklist blocklist=application.connections().blocklist();
+		Blocklist blocklist=application.blocklist();
 		if (blocklist.isBlocked(record.peerKey())) return;
 		propagator.getConnectionManager().updateDiscoveredPeer(record.peerKey(),
 			blocklist.dialable(record.transports()),record.timestamp());
@@ -581,7 +587,7 @@ public class P2PNode implements Closeable {
 
 	/** Reports authenticated contact to the contact records, or drops a blocked node at once. */
 	private void contacted(AccountKey peerKey) {
-		if (application.connections().blocklist().isBlocked(peerKey)) {
+		if (application.blocklist().isBlocked(peerKey)) {
 			drop(peerKey);
 			return;
 		}
@@ -612,7 +618,7 @@ public class P2PNode implements Closeable {
 	private void offerContact(AccountKey key) {
 		ContactRecords contacts=application.contacts();
 		AString address=(contacts==null)?null:ContactRecords.address(contacts.get(key));
-		Blocklist blocklist=application.connections().blocklist();
+		Blocklist blocklist=application.blocklist();
 		if (address==null || blocklist.isBlocked(key)) return;
 		propagator.getConnectionManager().updateDiscoveredPeer(key,
 			blocklist.dialable(Vectors.<AString>of(address)),Long.MIN_VALUE);
@@ -628,14 +634,14 @@ public class P2PNode implements Closeable {
 
 	/** Whether this node refuses to dial a node at an address: the node, the address or its host is blocked. */
 	private boolean refuses(AccountKey peerKey,InetSocketAddress address) {
-		Blocklist blocklist=application.connections().blocklist();
+		Blocklist blocklist=application.blocklist();
 		return blocklist.isBlocked(peerKey)
 			|| (address!=null && blocklist.refuses(Strings.create(Transports.endpoint(address).toString())));
 	}
 
 	/** Whether a node's live route is at an address this node refuses. */
 	private boolean refusesRoute(LatticeConnectionManager manager,AccountKey peerKey) {
-		Blocklist blocklist=application.connections().blocklist();
+		Blocklist blocklist=application.blocklist();
 		Convex outbound=manager.getConnection(peerKey);
 		if (outbound!=null && blocklist.refuses(outbound.getHostAddress())) return true;
 		if (outbound instanceof ConvexRemote remote && remote.getEndpoint()!=null
@@ -676,7 +682,7 @@ public class P2PNode implements Closeable {
 				new SecurityException("Node "+peerKey+" at "+address+" is blocked"));
 		}
 		// A node the operator named keeps its record however full the registry is
-		application.connections().name(peerKey);
+		named.add(peerKey);
 		return propagator.getConnectionManager().connectPeer(peerKey,address)
 			.thenCompose(peer -> initialisePeer(peer).thenApply(ignored -> peer));
 	}
@@ -702,7 +708,7 @@ public class P2PNode implements Closeable {
 				return CompletableFuture.<Convex>failedFuture(new SecurityException("Node "+key+" is blocked"));
 			}
 			// A node the operator named keeps its record however full the registry is
-			application.connections().name(key);
+			named.add(key);
 			network.keepPeer(propagator,name,peer);
 			return initialisePeer(peer).thenApply(ignored -> peer);
 		});
@@ -814,7 +820,7 @@ public class P2PNode implements Closeable {
 
 	/** Releases a seed this node reached, unless the operator named it; it stays a candidate where this node knows it. */
 	private void releaseSeed(AccountKey key) {
-		if (application.connections().isNamed(key)) return;
+		if (named.contains(key)) return;
 		propagator.getConnectionManager().releasePeer(key);
 		NodeDirectory.NodeRecord record=application.directory().records().get(key);
 		if (record!=null) offer(record);
@@ -837,7 +843,7 @@ public class P2PNode implements Closeable {
 	 *         refuses every address
 	 */
 	private PeerTarget permitted(PeerTarget target) {
-		Blocklist blocklist=application.connections().blocklist();
+		Blocklist blocklist=application.blocklist();
 		AVector<AccountKey> keys=target.keys();
 		if (!keys.isEmpty()) {
 			AVector<AccountKey> allowed=Vectors.empty();
@@ -863,7 +869,8 @@ public class P2PNode implements Closeable {
 	 */
 	public boolean block(AccountKey node) {
 		if (node==null) throw new IllegalArgumentException("Node key must not be null");
-		boolean added=application.connections().block(node);
+		boolean added=application.block(node);
+		named.remove(node);
 		application.syncHost();
 		drop(node);
 		return added;
@@ -882,7 +889,7 @@ public class P2PNode implements Closeable {
 	 * @throws IllegalArgumentException if the address is neither
 	 */
 	public boolean block(AString address) {
-		Blocklist blocklist=application.connections().blocklist();
+		Blocklist blocklist=application.blocklist();
 		boolean added=blocklist.block(address);
 		application.syncHost();
 		LatticeConnectionManager manager=propagator.getConnectionManager();
@@ -910,7 +917,7 @@ public class P2PNode implements Closeable {
 	 * @return whether it was blocked
 	 */
 	public boolean unblock(AccountKey node) {
-		boolean removed=application.connections().unblock(node);
+		boolean removed=application.blocklist().unblock(node);
 		application.syncHost();
 		return removed;
 	}
@@ -927,7 +934,7 @@ public class P2PNode implements Closeable {
 	 * @throws IllegalArgumentException if the address is neither
 	 */
 	public boolean unblock(AString address) {
-		Blocklist blocklist=application.connections().blocklist();
+		Blocklist blocklist=application.blocklist();
 		List<NodeDirectory.NodeRecord> refused=new ArrayList<>();
 		for (NodeDirectory.NodeRecord record:application.directory().records().values()) {
 			if (blocklist.dialable(record.transports())!=record.transports()) refused.add(record);
@@ -938,7 +945,7 @@ public class P2PNode implements Closeable {
 		Set<AccountKey> routes=manager.getAuthenticatedRouteKeys();
 		for (NodeDirectory.NodeRecord record:refused) {
 			AccountKey key=record.peerKey();
-			if (routes.contains(key) || application.connections().isNamed(key)) continue;
+			if (routes.contains(key) || named.contains(key)) continue;
 			// The same record again is no newer, so the candidate is replaced
 			manager.removePeer(key);
 			offer(record);
@@ -946,9 +953,14 @@ public class P2PNode implements Closeable {
 		return removed;
 	}
 
+	/** Whether the operator named a node, so its record is kept however full the registry is. */
+	boolean isNamed(AccountKey node) {
+		return named.contains(node);
+	}
+
 	/** Whether a node is blocked. */
 	public boolean isBlocked(AccountKey node) {
-		return application.connections().blocklist().isBlocked(node);
+		return application.blocklist().isBlocked(node);
 	}
 
 	/**
@@ -958,7 +970,7 @@ public class P2PNode implements Closeable {
 	 * @throws IllegalArgumentException if the address is neither
 	 */
 	public boolean isBlocked(AString address) {
-		return application.connections().blocklist().isBlocked(address);
+		return application.blocklist().isBlocked(address);
 	}
 
 	private CompletableFuture<Void> initialisePeer(Convex peer) {

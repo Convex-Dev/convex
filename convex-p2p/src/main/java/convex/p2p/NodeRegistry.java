@@ -6,11 +6,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiFunction;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
-import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
@@ -23,77 +22,64 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.MergeFunction;
-import convex.lattice.ALatticeApplication;
-import convex.lattice.MapComponent;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.Root;
 
 /**
- * Connection management for the P2P application: the node registry this node holds
- * at {@code [:p2p :nodes]}, its validated view as a {@link NodeDirectory}, what
- * this node has learned about other nodes as {@link ContactRecords}, and the nodes
- * and addresses it refuses as its {@link Blocklist}.
+ * The node registry this node holds at {@code [:p2p :nodes]}, as the component at
+ * {@code [:p2p]}: it defines how that region merges.
  *
  * <p>Its merge is the registry's acceptance boundary: the owner rule, applied only to
  * the records this node wants. Nodes that accept every record converge under the
  * owner rule, which takes each owner's newest signed record; this node holds a subset
  * of that. An incoming record that differs from the one held is checked first,
  * cheapest check first, and merged only if it passes. The checks, the pins and the
- * ranking are those of retention in {@code P2P_DESIGN.md} §4.2. Pins are this node's
- * own record and those of nodes the operator named, nodes it has an authenticated
+ * ranking are those of retention in {@code P2P_DESIGN.md} §4.2. The region's other
+ * entries merge as the lattice declares.</p>
+ *
+ * <p>The registry holds no local state. What it reads is supplied: whether this node
+ * refuses a node, each node's standing in this node's own contact records, never in
+ * a record itself, and the nodes to pin. Pins are this node's own record and the
+ * nodes its node supplies: those the operator named, those it has an authenticated
  * route to or is authenticating one from, and its Points of Presence, all bounded by
- * configuration and connections. Evidence comes from this node's contact records,
- * never from a record itself. The salt is drawn when this component is created, so
+ * configuration and connections. The salt is drawn when this component is created, so
  * the order is stable while the node runs.</p>
  *
  * <p>Held records are not checked again: they passed when they were merged. The
  * lowest held rank used to turn new nodes away is worked out once for each registry
- * value, so evidence and pins that change in between take effect at the next
+ * value, so standings and pins that change in between take effect at the next
  * change. Every node keeps a different subset, so each exchange offers records
  * turned away before, and each costs only a comparison. A dropped record leaves the
  * directory but not the connection manager's candidates.</p>
  */
-final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
+final class NodeRegistry extends ALatticeComponent<Index<Keyword,ACell>> {
 
 	/** Bound on counted records, the contact-record cap, so each can carry contact history. */
 	static final int DEFAULT_MAX_RECORDS=ContactRecords.MAX_NODES;
 
 	private final AccountKey ownKey;
-	private final NodeDirectory directory;
-	private final ContactRecords contacts;
-	private final Blocklist blocklist;
-	private final Set<AccountKey> named=ConcurrentHashMap.newKeySet();
+	private final Predicate<AccountKey> refused;
+	private final Supplier<ToIntFunction<AccountKey>> standings;
 	private final Blob salt=Blob.createRandom(new SecureRandom(),32);
-	private volatile Supplier<Set<AccountKey>> routes=() -> Set.of();
+	private volatile Supplier<Set<AccountKey>> pinned=Set::of;
 	private volatile int maxRecords=DEFAULT_MAX_RECORDS;
 	private volatile Cutoff cutoff;
 
-	@SuppressWarnings("unchecked")
-	P2PConnections(P2PApplication application,BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		super(application.cursor());
-		this.ownKey=application.ownKey();
-		this.directory=new NodeDirectory(application);
-		// Only a node that can sign its own :local slot keeps contact records
-		this.contacts=(ownKey==null || signer==null)?null:new ContactRecords(cursor(),ownKey,
-			value -> (SignedData<AHashMap<Keyword,ACell>>)(SignedData<?>)signer.apply(ownKey,value),application.clock());
-		// The blocklist shares the contact records' :local record, or stays in memory without one
-		AForkableCursor<Index<ABlobLike<?>,ACell>> blocked;
-		if (contacts==null) {
-			blocked=new Root<Index<ABlobLike<?>,ACell>>();
-		} else {
-			blocked=new MapComponent<Keyword,ACell>(contacts.cursor()).<Index<ABlobLike<?>,ACell>>path(Blocklist.KEY);
-		}
-		this.blocklist=new Blocklist(blocked,application.clock());
-	}
-
-	/** This node's validated view of the registry it holds. */
-	NodeDirectory directory() {
-		return directory;
-	}
-
-	/** This node's contact records, or null for a node without a key. */
-	ContactRecords contacts() {
-		return contacts;
+	/**
+	 * Binds the registry at {@code [:p2p]}.
+	 *
+	 * @param cursor cursor at the {@code :p2p} region
+	 * @param ownKey this node's key, whose record is always kept, or null for a keyless node
+	 * @param refused whether this node refuses a node
+	 * @param standings supplies a snapshot of each node's standing, lower ranking first,
+	 *        as {@link ContactRecords#standing} orders them
+	 */
+	NodeRegistry(AForkableCursor<Index<Keyword,ACell>> cursor,AccountKey ownKey,
+			Predicate<AccountKey> refused,Supplier<ToIntFunction<AccountKey>> standings) {
+		super(cursor);
+		this.ownKey=ownKey;
+		this.refused=refused;
+		this.standings=standings;
 	}
 
 	/** Bounds the counted records this node keeps. */
@@ -103,74 +89,31 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 		cutoff=null;
 	}
 
-	/** Supplies the nodes this node has, or is authenticating, a route to. */
-	void setRoutes(Supplier<Set<AccountKey>> routes) {
-		this.routes=routes;
+	/** Supplies the nodes whose records are kept and not counted, besides this node's own. */
+	void setPinned(Supplier<Set<AccountKey>> pinned) {
+		this.pinned=pinned;
 	}
 
-	/** Keeps a node's record, as the operator named it. */
-	void name(AccountKey node) {
-		named.add(node);
-	}
-
-	/** Whether the operator named a node. */
-	boolean isNamed(AccountKey node) {
-		return named.contains(node);
-	}
-
-	/** The nodes and addresses this node refuses. */
-	Blocklist blocklist() {
-		return blocklist;
-	}
-
-	/**
-	 * Blocks a node: drops its record, refuses it from now on and stops keeping it
-	 * as named. Returns whether it was not blocked before.
-	 */
-	@SuppressWarnings("unchecked")
-	boolean block(AccountKey node) {
-		boolean added=blocklist.block(node);
-		named.remove(node);
-		cursor().updateAndGet(own -> {
-			if (!(own.get(P2PLattice.KEY_P2P) instanceof Index<?,?> region)) return own;
-			Index<Keyword,ACell> p2p=(Index<Keyword,ACell>)region;
-			if (!(p2p.get(P2PLattice.KEY_NODES) instanceof AHashMap<?,?> nodes) || !nodes.containsKey(node)) return own;
-			return own.assoc(P2PLattice.KEY_P2P,p2p.assoc(P2PLattice.KEY_NODES,((AHashMap<ACell,ACell>)nodes).dissoc(node)));
+	/** Drops a node's record, if this node holds one. */
+	void drop(AccountKey node) {
+		cursor().updateAndGet(held -> {
+			AHashMap<ACell,SignedData<ACell>> nodes=nodes(held);
+			return nodes.containsKey(node)?held.assoc(P2PLattice.KEY_NODES,nodes.dissoc(node)):held;
 		});
-		directory.refresh();
-		return added;
 	}
 
-	/** Unblocks a node, whose record is taken again when it next arrives. Returns whether it was blocked. */
-	boolean unblock(AccountKey node) {
-		return blocklist.unblock(node);
-	}
-
-	/** Syncs this node's contact records and blocklist into its {@code :local} slot. */
+	/** Merges an incoming {@code :p2p} region: the registry by this node's rule, any other entries as the lattice declares. */
 	@Override
-	protected void syncChildren() {
-		if (contacts!=null) contacts.sync();
-	}
-
-	/**
-	 * Merges the {@code :p2p} region of an incoming root: the registry by this node's
-	 * rule, any other entries as the lattice declares. Other regions are left to the
-	 * application.
-	 */
-	@Override
-	@SuppressWarnings("unchecked")
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
-		if (incoming==null || !(incoming.get(P2PLattice.KEY_P2P) instanceof Index<?,?> region)) return cursor().get();
-		Index<Keyword,ACell> other=(Index<Keyword,ACell>)region;
-		return cursor().updateAndGet(own -> {
-			Index<Keyword,ACell> held=(Index<Keyword,ACell>)own.get(P2PLattice.KEY_P2P);
-			if (held==null) held=P2PLattice.P2P_LATTICE.zero();
-			Index<Keyword,ACell> updated=P2PLattice.P2P_LATTICE.merge(held,other.dissoc(P2PLattice.KEY_NODES));
-			AHashMap<ACell,SignedData<ACell>> heldNodes=nodes(held);
-			AHashMap<ACell,SignedData<ACell>> kept=mergeRegistry(heldNodes,nodes(other));
+		if (incoming==null) return cursor().get();
+		return cursor().updateAndGet(held -> {
+			Index<Keyword,ACell> base=(held==null)?P2PLattice.P2P_LATTICE.zero():held;
+			Index<Keyword,ACell> updated=P2PLattice.P2P_LATTICE.merge(base,incoming.dissoc(P2PLattice.KEY_NODES));
+			AHashMap<ACell,SignedData<ACell>> heldNodes=nodes(base);
+			AHashMap<ACell,SignedData<ACell>> kept=mergeRegistry(heldNodes,nodes(incoming));
 			if (kept!=heldNodes) updated=updated.assoc(P2PLattice.KEY_NODES,kept);
 			// A region that takes nothing new is left as it was
-			return Cells.equals(updated,held)?own:own.assoc(P2PLattice.KEY_P2P,updated);
+			return Cells.equals(updated,base)?held:updated;
 		});
 	}
 
@@ -182,19 +125,19 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 		// Read inside the caller's update, which may run more than once: both are
 		// lock-free snapshots
 		Set<AccountKey> pins=pinned();
-		AHashMap<AccountKey,AHashMap<Keyword,ACell>> evidence=(contacts==null)?Maps.empty():contacts.all();
+		ToIntFunction<AccountKey> standing=standings.get();
 
 		List<Candidate> arrivals=new ArrayList<>();
 		AHashMap<ACell,SignedData<ACell>> result=own;
 		for (Offer offer:offers) {
 			AccountKey node=offer.node();
 			boolean isOwn=node.equals(ownKey);
-			if (blocklist.isBlocked(node)) continue;
+			if (refused.test(node)) continue;
 			if (!isOwn && ACell.getMemorySize(offer.incoming())>P2PLattice.MAX_NODE_RECORD_SIZE) continue;
 			Candidate arrival=null;
 			if (offer.held()==null && !pins.contains(node)) {
-				arrival=candidate(node,offer.incoming(),evidence);
-				if (outranked(arrival,own,pins,evidence)) continue;
+				arrival=candidate(node,offer.incoming(),standing);
+				if (outranked(arrival,own,pins,standing)) continue;
 			}
 			var rule=P2PLattice.NODES_LATTICE.signingFor(node);
 			SignedData<ACell> winner=(rule==null)?null:rule.merge(offer.held(),offer.incoming());
@@ -206,12 +149,12 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 				arrivals.add(arrival);
 			}
 		}
-		return bound(result,arrivals,pins,evidence);
+		return bound(result,arrivals,pins,standing);
 	}
 
 	/** Keeps arrivals while there is room, otherwise the best of them and the counted records held. */
 	private AHashMap<ACell,SignedData<ACell>> bound(AHashMap<ACell,SignedData<ACell>> result,
-			List<Candidate> arrivals,Set<AccountKey> pins,AHashMap<AccountKey,AHashMap<Keyword,ACell>> evidence) {
+			List<Candidate> arrivals,Set<AccountKey> pins,ToIntFunction<AccountKey> standing) {
 		long counted=result.count();
 		for (AccountKey pin:pins) if (result.containsKey(pin)) counted--;
 		int max=maxRecords;
@@ -219,7 +162,7 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 			for (Candidate arrival:arrivals) result=result.assoc(arrival.node(),arrival.record());
 			return result;
 		}
-		List<Candidate> ranked=counted(result,pins,evidence);
+		List<Candidate> ranked=counted(result,pins,standing);
 		ranked.addAll(arrivals);
 		ranked.sort(null);
 		for (int i=0; i<ranked.size(); i++) {
@@ -236,10 +179,10 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	/** Whether a new node ranks below the lowest counted record of a full registry. */
 	private boolean outranked(Candidate arrival,AHashMap<ACell,SignedData<ACell>> held,Set<AccountKey> pins,
-			AHashMap<AccountKey,AHashMap<Keyword,ACell>> evidence) {
+			ToIntFunction<AccountKey> standing) {
 		Cutoff current=cutoff;
 		if (current==null || current.registry()!=held) {
-			List<Candidate> ranked=counted(held,pins,evidence);
+			List<Candidate> ranked=counted(held,pins,standing);
 			Candidate lowest=null;
 			for (Candidate candidate:ranked) {
 				if (lowest==null || candidate.compareTo(lowest)>0) lowest=candidate;
@@ -253,28 +196,25 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	/** The counted records of a registry as ranked candidates. */
 	private List<Candidate> counted(AHashMap<ACell,SignedData<ACell>> registry,Set<AccountKey> pins,
-			AHashMap<AccountKey,AHashMap<Keyword,ACell>> evidence) {
+			ToIntFunction<AccountKey> standing) {
 		List<Candidate> ranked=new ArrayList<>();
 		for (Map.Entry<ACell,SignedData<ACell>> entry:registry.entrySet()) {
 			AccountKey node=RT.ensureAccountKey(entry.getKey());
 			if (node==null || pins.contains(node)) continue;
-			ranked.add(candidate(node,entry.getValue(),evidence));
+			ranked.add(candidate(node,entry.getValue(),standing));
 		}
 		return ranked;
 	}
 
-	private Candidate candidate(AccountKey node,SignedData<ACell> record,
-			AHashMap<AccountKey,AHashMap<Keyword,ACell>> evidence) {
-		return new Candidate(node,record,standing(evidence.get(node)),salt.append(node).getContentHash());
+	private Candidate candidate(AccountKey node,SignedData<ACell> record,ToIntFunction<AccountKey> standing) {
+		return new Candidate(node,record,standing.applyAsInt(node),salt.append(node).getContentHash());
 	}
 
 	/** Nodes whose records are kept and not counted. */
 	private Set<AccountKey> pinned() {
-		Set<AccountKey> pinned=new HashSet<>(named);
-		pinned.addAll(routes.get());
-		for (AccountKey pop:directory.pointsOfPresence()) pinned.add(pop);
-		if (ownKey!=null) pinned.add(ownKey);
-		return pinned;
+		Set<AccountKey> pins=new HashSet<>(pinned.get());
+		if (ownKey!=null) pins.add(ownKey);
+		return pins;
 	}
 
 	/**
@@ -297,12 +237,6 @@ final class P2PConnections extends ALatticeApplication<Index<Keyword,ACell>> {
 			}
 		});
 		return offers;
-	}
-
-	/** Orders records: answered, then never reached, then failed. */
-	private static int standing(AHashMap<Keyword,ACell> contact) {
-		if (ContactRecords.answered(contact)) return 0;
-		return ContactRecords.failing(contact)?2:1;
 	}
 
 	@SuppressWarnings("unchecked")

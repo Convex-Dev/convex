@@ -108,7 +108,7 @@ public class P2PDiscoveryTest {
 		hubStore=EtchStore.createTemp("p2p-discovery-hub");
 		hub=P2PNode.create(hubStore,NodeConfig.localNetwork(),LatticePropagatorConfig.create(),hubKey)
 			.serveAllInbound();
-		hub.getApplication().connections().setMaxRecords(0);
+		hub.getApplication().registry().setMaxRecords(0);
 		hub.launch();
 
 		leafStore=EtchStore.createTemp("p2p-discovery-leaf");

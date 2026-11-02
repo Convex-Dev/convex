@@ -4,11 +4,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
@@ -23,8 +26,10 @@ import convex.lattice.IndexComponent;
 import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
+import convex.lattice.MapComponent;
 import convex.lattice.OwnedMap;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
 import convex.social.Social;
 
@@ -35,13 +40,18 @@ import convex.social.Social;
  * merge: an incoming root, or a path value reduced to its path, is projected to what
  * this node wants. The projection reduces the social region to the owners this node
  * wants and leaves out {@code :local}, which this node neither accepts nor
- * publishes. Its {@link P2PConnections} merges the {@code :p2p} region and keeps the
+ * publishes. Its {@link NodeRegistry} merges the {@code :p2p} region and keeps the
  * node records this node wants; the lattice merge takes the other regions as
  * declared, verifying each owner's slot. The two merge in separate updates, as
  * keyed regions do, so a reader may see one before the other. The application also
  * owns the P2P policy that reads the lattice: the social owners this node wants and
- * the paths to pull from a newly admitted peer, with the node directory, contact
- * records and blocklist held by its connections. It imports nothing from the node package. A
+ * the paths to pull from a newly admitted peer.</p>
+ *
+ * <p>It assembles each region's components side by side: the registry at
+ * {@code [:p2p]} with its validated view, the {@link NodeDirectory}, and this node's
+ * record at {@code [:local <node key> :p2p]}, the {@link ContactRecords} holding the
+ * {@link Blocklist}. The registry reads the local record only through what the
+ * application supplies to it. It imports nothing from the node package. A
  * {@link P2PNode} assembles it with replication and calls it at the moments
  * replication knows about; a local application may use the same component over a
  * standalone {@link LatticeHost}.</p>
@@ -63,7 +73,10 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	private final BiFunction<ACell,ACell,SignedData<ACell>> signer;
 	private final Supplier<CVMLong> clock;
 	private final ASet<Keyword> servedRegions;
-	private final P2PConnections connections;
+	private final NodeDirectory directory;
+	private final ContactRecords contacts;
+	private final Blocklist blocklist;
+	private final NodeRegistry registry;
 
 	/** Connects a relay with standard DID verification and no authoring capability. */
 	public static P2PApplication connect(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host) {
@@ -85,6 +98,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		return new P2PApplication(lattice,host,ownKey,signer,clock,didAuthorizer);
 	}
 
+	@SuppressWarnings("unchecked")
 	private P2PApplication(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host,
 			AccountKey ownKey,BiFunction<ACell,ACell,SignedData<ACell>> signer,
 			Supplier<CVMLong> clock,DIDKeyAuthorizer didAuthorizer) {
@@ -95,22 +109,52 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		this.clock=java.util.Objects.requireNonNull(clock);
 		this.servedRegions=Sets.fromCollection(lattice.getKeys()).exclude(LocalLattice.KEY_LOCAL);
 		this.socialPolicy=new SocialReplicationPolicy(this,java.util.Objects.requireNonNull(didAuthorizer));
-		this.connections=new P2PConnections(this,signer);
+		this.directory=new NodeDirectory(this);
+		// Only a node that can sign its own :local slot keeps contact records
+		this.contacts=(ownKey==null || signer==null)?null:new ContactRecords(cursor(),ownKey,
+			value -> (SignedData<AHashMap<Keyword,ACell>>)(SignedData<?>)signer.apply(ownKey,value),clock);
+		// The blocklist shares the contact records' :local record, or stays in memory without one
+		AForkableCursor<Index<ABlobLike<?>,ACell>> blocked;
+		if (contacts==null) {
+			blocked=new Root<Index<ABlobLike<?>,ACell>>();
+		} else {
+			blocked=new MapComponent<Keyword,ACell>(contacts.cursor()).<Index<ABlobLike<?>,ACell>>path(Blocklist.KEY);
+		}
+		this.blocklist=new Blocklist(blocked,clock);
+		// A node without contact records has reached no other node
+		Supplier<ToIntFunction<AccountKey>> standings=(contacts==null)
+			?() -> node -> ContactRecords.standing(null):contacts::standings;
+		this.registry=new NodeRegistry(new IndexComponent<Keyword,ACell>(cursor()).<Index<Keyword,ACell>>path(P2PLattice.KEY_P2P),
+			ownKey,blocklist::isBlocked,standings);
 	}
 
 	AccountKey ownKey() { return ownKey; }
 	Supplier<CVMLong> clock() { return clock; }
 
-	/** This node's connection management: the node registry it keeps and its contact records. */
-	P2PConnections connections() { return connections; }
+	/** This node's node registry, the component at {@code [:p2p]}. */
+	NodeRegistry registry() { return registry; }
 
 	/** This node's contact records, or null for a node without a key. */
-	ContactRecords contacts() { return connections.contacts(); }
+	ContactRecords contacts() { return contacts; }
 
-	/** Syncs this node's connections, signing its {@code :local} slot once if its contact records changed. */
+	/** The nodes and addresses this node refuses. */
+	Blocklist blocklist() { return blocklist; }
+
+	/**
+	 * Blocks a node: refuses it from now on and drops its record. Nothing is synced.
+	 * Returns whether it was not blocked before.
+	 */
+	boolean block(AccountKey node) {
+		boolean added=blocklist.block(node);
+		registry.drop(node);
+		directory.refresh();
+		return added;
+	}
+
+	/** Syncs this node's contact records and blocklist into its {@code :local} slot, signing it once if they changed. */
 	@Override
 	protected void syncChildren() {
-		connections.sync();
+		if (contacts!=null) contacts.sync();
 	}
 
 	/** The top-level regions this application serves, as advertised in its node record. Never {@code :local}. */
@@ -118,15 +162,16 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 
 	/**
 	 * Merges an incoming root projected to what this node wants ({@link #project}).
-	 * The connections take the {@code :p2p} region and the lattice merge the rest,
+	 * The registry takes the {@code :p2p} region and the lattice merge the rest,
 	 * verifying each owner's slot. A path delivery arrives here reduced to its path,
 	 * so the same projection selects it.
 	 */
 	@Override
+	@SuppressWarnings("unchecked")
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 		Index<Keyword,ACell> wanted=project(other);
 		if (wanted==null) return cursor().get();
-		connections.merge(wanted);
+		if (wanted.get(P2PLattice.KEY_P2P) instanceof Index<?,?> region) registry.merge((Index<Keyword,ACell>)region);
 		Index<Keyword,ACell> rest=wanted.dissoc(P2PLattice.KEY_P2P);
 		return cursor().updateAndGet(own -> getLattice().merge(own,rest));
 	}
@@ -193,7 +238,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 
 	/** This application's validated view of the node registry. */
 	NodeDirectory directory() {
-		return connections.directory();
+		return directory;
 	}
 
 	/** This application's social retention and admission policy. */

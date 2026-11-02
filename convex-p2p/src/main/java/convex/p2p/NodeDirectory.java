@@ -42,7 +42,7 @@ import convex.core.util.Utils;
  * connection trusted or merges a foreign value.</p>
  *
  * <p>The in-memory index follows the registry the application holds, which
- * {@link P2PConnections} keeps bounded: a record it drops leaves the index. A
+ * {@link NodeRegistry} keeps bounded: a record it drops leaves the index. A
  * dropped record is not revoked, since the Owner/LWW registry has no deletion
  * contract.</p>
  */

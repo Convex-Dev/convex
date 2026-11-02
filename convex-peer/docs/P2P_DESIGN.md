@@ -240,8 +240,10 @@ passes it. The timestamp is never evidence that the node is alive (§4.6).
 #### Retention
 
 Each node holds only the node records it wants, as it does for social owners. The
-P2P application's connection-management component, `P2PConnections`, defines the
-registry's merge: the owner rule, applied only to the records the node wants. Nodes
+P2P application's component for the region, `NodeRegistry`, defines the registry's
+merge: the owner rule, applied only to the records the node wants. It holds no local
+state: the application supplies the blocklist check and the contact standings from
+`:local` (§4.6), and the node supplies the nodes to keep. Nodes
 that accept every record converge under the owner rule; a node that turns records
 away holds a subset of theirs. An incoming record that differs from the one held is
 checked before it is merged, and the node publishes only what it holds. There is no
