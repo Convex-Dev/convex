@@ -137,6 +137,24 @@ public class P2PSeedTest {
 		assertTrue(manager.getDesiredPeers().containsKey(hubKey.getAccountKey()),"the seed stays a candidate");
 	}
 
+	/** A blocked seed, and this node named by its address alone, are skipped without holding up the others. */
+	@Test
+	public void testBlockedSeedAndOwnAddressAreSkipped() throws Exception {
+		P2PNode hub=hubKnowingOther();
+		P2PNode joiner=launch(store("seed-joiner"),NodeConfig.localNetwork(),1,joinerKey);
+		AccountKey blocked=AKeyPair.generate().getAccountKey();
+		joiner.block(blocked);
+
+		joiner.seed(List.of(new PeerName(URI.create(address(hub).toString()),blocked),
+				PeerResolver.parse(address(joiner).toString()),
+				PeerResolver.parse(address(hub).toString())))
+			.get(TIMEOUT,TimeUnit.SECONDS);
+		LatticeConnectionManager manager=joiner.propagationGroup().getConnectionManager();
+		assertNotNull(manager.getConnection(otherKey.getAccountKey()));
+		assertFalse(manager.getDesiredPeers().containsKey(blocked));
+		assertFalse(manager.getDesiredPeers().containsKey(joinerKey.getAccountKey()));
+	}
+
 	/** A did:key seed is located where this node knows its key, here at a contact address. */
 	@Test
 	public void testDIDKeySeedIsLocatedByWhatThisNodeKnows() throws Exception {

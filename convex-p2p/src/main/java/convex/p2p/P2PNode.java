@@ -722,7 +722,8 @@ public class P2PNode implements Closeable {
 	 * it stays a candidate where this node's records place it. A seed so carries a node
 	 * only while it joins. In a network too small to fill the slots, seeds stay
 	 * connected. A seed also named with {@link #connect} stays connected. A blocked seed,
-	 * or one at a blocked address, is skipped. Seeding stops when the node closes.</p>
+	 * one at a blocked address or one that turns out to be this node is skipped until the
+	 * next round. Seeding stops when the node closes.</p>
 	 *
 	 * @param seeds seed names, as {@link #seeds(NodeConfig)} reads them
 	 * @return future completing when the seeds are first released, at once if there are none
@@ -764,23 +765,29 @@ public class P2PNode implements Closeable {
 	/** One round of seeding: keeps each seed connected until the round ends, then releases the seeds reached. */
 	private final class SeedRound {
 		private final Set<AccountKey> reached=ConcurrentHashMap.newKeySet();
-		private final Set<CompletableFuture<Convex>> attempts=ConcurrentHashMap.newKeySet();
 		private volatile boolean over;
 
-		/** Resolves a seed and connects to it, again after a backoff if that fails or its route goes. */
+		/**
+		 * Resolves a seed and connects to it, again after a backoff if that fails or its
+		 * route goes. A seed that is blocked, or is this node, is skipped until the next round.
+		 */
 		void attempt(PeerName seed,int failures) {
 			if (over || !server.isRunning()) return;
-			CompletableFuture<Convex> attempt=network.connectPeer(propagator,seed);
-			attempts.add(attempt);
-			attempt.whenComplete((peer,error) -> {
-				attempts.remove(attempt);
+			network.connectPeer(propagator,seed).whenComplete((peer,error) -> {
+				Throwable cause=(error instanceof CompletionException && error.getCause()!=null)?error.getCause():error;
 				AccountKey key=(error==null)?peer.getVerifiedPeer():null;
-				if (key==null || isBlocked(key)) {
-					if (error!=null) log.debug("Seed {} not reached: {}",seed,error.getMessage());
+				if (cause instanceof SecurityException || cause instanceof IllegalArgumentException
+						|| (key!=null && isBlocked(key))) {
+					log.info("Skipping seed {}: {}",seed,(cause==null)?"blocked":cause.getMessage());
+					return;
+				}
+				if (key==null) {
+					log.debug("Seed {} not reached: {}",seed,(cause==null)?"no key proved":cause.getMessage());
 					retry(seed,failures+1);
 					return;
 				}
 				reached.add(key);
+				// Admitted after the round ended, so released at once
 				if (over) {
 					releaseSeed(key);
 					return;
@@ -798,10 +805,9 @@ public class P2PNode implements Closeable {
 				.execute(() -> attempt(seed,failures));
 		}
 
-		/** Ends the round: abandons attempts in progress and releases the seeds reached. */
+		/** Ends the round and releases the seeds reached; an attempt still dialling releases its seed when admitted. */
 		void end() {
 			over=true;
-			for (CompletableFuture<Convex> attempt:attempts) attempt.cancel(false);
 			for (AccountKey key:reached) releaseSeed(key);
 		}
 	}
