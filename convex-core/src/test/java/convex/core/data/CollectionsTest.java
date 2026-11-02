@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Map;
@@ -79,7 +80,23 @@ public class CollectionsTest {
 		assertThrows(IndexOutOfBoundsException.class, () -> a.getElementRef(-1));
 		assertThrows(IndexOutOfBoundsException.class, () -> a.getElementRef(n));
 
+		doForEachTests(a);
+
 		doCollectionTests(a);
+	}
+
+	/**
+	 * Tests that forEach visits every element of a sequence in get order
+	 * @param a Any Sequence Value
+	 */
+	public static <T extends ACell> void doForEachTests(ASequence<T> a) {
+		long n = a.count();
+		ArrayList<T> visited = new ArrayList<>();
+		a.forEach(visited::add);
+		assertEquals(n, visited.size());
+		for (int i=0; i<n; i++) {
+			assertEquals(a.get(i), visited.get(i));
+		}
 	}
 
 	static final Keyword UNLIKELY_KEYWORD=Keyword.create("this-is-not-likely-to-happen-at-random");

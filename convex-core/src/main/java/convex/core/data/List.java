@@ -359,7 +359,10 @@ public class List<T extends ACell> extends AList<T> {
 
 	@Override
 	public void forEach(Consumer<? super T> action) {
-		data.forEach(action);
+		ListIterator<T> it = data.listIterator(count);
+		while (it.hasPrevious()) {
+			action.accept(it.previous());
+		}
 	}
 
 	@Override

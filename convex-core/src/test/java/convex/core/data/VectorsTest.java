@@ -71,7 +71,16 @@ public class VectorsTest {
 		assertSame(Vectors.empty(), VectorLeaf.create(new ACell[10], 3, 0));
 	}
 	
-	@Test 
+	@Test
+	public void testForEach() {
+		// Empty, leaves (1, 16), leaf with a leaf prefix (17), trees (32, 256), leaves over trees (33, 300)
+		for (int n : new int[] {0, 1, 16, 17, 32, 33, 256, 300}) {
+			AVector<CVMLong> v = Samples.createTestIntVector(n);
+			CollectionsTest.doForEachTests(v);
+		}
+	}
+
+	@Test
 	public void testUnsafeCreate() {
 		doVectorTests(VectorTree.unsafeCreate(32, Samples.INT_VECTOR_16,Samples.INT_VECTOR_16));
 	}

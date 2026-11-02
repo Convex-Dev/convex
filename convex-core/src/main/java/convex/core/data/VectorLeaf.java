@@ -474,10 +474,9 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public void forEach(Consumer<? super T> action) {
 		if (prefix != null) {
 			prefix.getValue().forEach(action);
-
-			for (Ref<T> r : items) {
-				action.accept(r.getValue());
-			}
+		}
+		for (Ref<T> r : items) {
+			action.accept(r.getValue());
 		}
 	}
 

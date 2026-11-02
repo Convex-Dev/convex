@@ -100,7 +100,17 @@ public class ListsTest {
 		doListTests(Samples.INT_LIST_10);
 		doListTests(Samples.INT_LIST_300);
 	}
-	
+
+	@Test
+	public void testForEach() {
+		// Sizes cover each shape of the underlying vector
+		for (int n : new int[] {0, 1, 16, 17, 32, 33, 256, 300}) {
+			AVector<CVMLong> v = Samples.createTestIntVector(n);
+			AList<CVMLong> l = Lists.create(v);
+			CollectionsTest.doForEachTests(l);
+		}
+	}
+
 	@Test 
 	public void testToArray() {
 		CVMLong[] arr=new CVMLong[] {CVMLong.ZERO, CVMLong.ONE};
