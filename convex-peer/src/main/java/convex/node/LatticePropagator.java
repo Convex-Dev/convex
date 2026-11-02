@@ -429,6 +429,9 @@ public class LatticePropagator implements Closeable {
 	 * dialling an endpoint sends first, is answered but admits nothing. Admission
 	 * spends this group's bandwidth on the node; it grants no trust in what it sends.
 	 *
+	 * <p><b>API note:</b> This method is provisional until a group has one policy for
+	 * who may read its view, receive its updates and send it values (#823).</p>
+	 *
 	 * @param admission keys to admit, or {@code null} to admit none, the default
 	 */
 	public void setChallengerAdmission(Predicate<AccountKey> admission) {

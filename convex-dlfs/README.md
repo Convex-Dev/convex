@@ -186,7 +186,9 @@ selecting a different owner. Registry mutations and file writes are persisted
 synchronously at the service `sync()` boundary.
 
 `convex dlfs start --peer <address>` connects to another DLFS node before serving,
-given as `tcp://host:port`, `tls://host:port` or `host:port`, and repeatable. Each peer
+given as `tcp://host:port`, `tls://host:port` or `host:port`, and repeatable. DLFS nodes
+listen on TCP only ([#797](https://github.com/Convex-Dev/convex/issues/797)), so
+`tls://` reaches one only through a proxy that terminates TLS. Each peer
 is admitted under the key it proves, which the command prints; startup fails if a peer
 cannot be reached or proves no key. The peer must serve its lattice view to inbound
 connections: `convex dlfs start --serve-inbound` does, as does `convex.dlfs.Main` with
@@ -199,7 +201,10 @@ other: start the serving node, then the other with `--peer`. Anyone who can reac
 node port can read every replicated drive and receive its updates. Each node serves
 only its own drives over HTTP; the other node's drives are replicated but not shown. A
 node that joins receives the other's existing state with its next update or root sync,
-within about 30 seconds.
+within about 30 seconds. Use `--serve-inbound` only for drives you are willing to
+publish: serving drives to chosen nodes only is not supported
+([#823](https://github.com/Convex-Dev/convex/issues/823)), and the option is
+provisional until it is.
 
 ### Host DLFS in a lattice application
 

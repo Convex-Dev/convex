@@ -667,6 +667,9 @@ application context confers signing authority on DLFS components.
 
 ### Filtering for Public/Private Drives
 
-Using `LatticeFilter` on propagators, private drives can be excluded from public
-broadcast while still being persisted locally. This depends on the filtering
-infrastructure in `LatticePropagator` (Phase 5 in PERSISTENCE.md).
+A publication filter on a propagation group (`LatticePropagator.setPublicationFilter`)
+can leave private drives out of the view the group announces and sends, while they are
+still persisted locally. A filter shapes the view; it is not access control: every node
+the group serves can read the filtered view. Serving drives only to chosen nodes needs
+a group policy for who may read, which does not exist yet
+([#823](https://github.com/Convex-Dev/convex/issues/823)).
