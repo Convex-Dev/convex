@@ -25,7 +25,6 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.Shutdown;
@@ -105,10 +104,6 @@ public class DlfsStart extends ACommand {
 	@Option(names={"--etch"},
 		description="Etch store file for persistence. If omitted, uses in-memory store.")
 	private String etchFile;
-
-	@Option(names={"--url"},
-		description="Public URL of this node's lattice port. Unused: dlfs start does not advertise itself.")
-	private String publicUrl;
 
 	@Option(names={"--serve-inbound"},
 		description="Serve this node's lattice view to every node that connects, and send its updates to any "
@@ -312,9 +307,6 @@ public class DlfsStart extends ACommand {
 			convex.core.data.Maps.of(
 				NodeConfig.PORT, convex.core.data.prim.CVMLong.create(nodePort)
 			);
-		if (publicUrl != null && !publicUrl.isBlank()) {
-			configMap = configMap.assoc(NodeConfig.URL, Strings.create(publicUrl));
-		}
 		return NodeConfig.create(configMap);
 	}
 
