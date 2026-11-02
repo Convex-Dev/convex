@@ -89,8 +89,8 @@ import convex.social.Social;
  * then pulls and merges the bootstrap node's {@code :p2p} and {@code :id} regions and
  * each currently desired complete social-owner slot. This lets existing and
  * late-joining nodes discover each other without accepting unrelated social owners.
- * {@link #seed(Map)} joins through configured seed nodes the same way and lets them go
- * once other peers can replace them. On-chain bootstrap and public PoP selection
+ * {@link #seed(List)} joins through seed nodes the same way and lets them go once
+ * other peers can replace them. On-chain bootstrap and public PoP selection
  * remain to be built on top.</p>
  *
  * <p><b>Inbound policy.</b> The application-owned listener denies all network
@@ -132,13 +132,13 @@ public class P2PNode implements Closeable {
 	/**
 	 * Node configuration key: the seed nodes to join a network through, a list of at
 	 * most {@link #MAX_SEEDS} entries, each a peer name as {@code url} with an optional
-	 * expected {@code key}. Read with {@link #seeds(NodeConfig)} and joined with
-	 * {@link #seed(List)}.
+	 * expected {@code key}. Read with {@link #seeds(NodeConfig)} and added to the node's
+	 * live list by {@link #seed(List)}.
 	 */
 	public static final AString SEEDS=Strings.intern("seeds");
 
-	/** Most seed nodes a configuration may list. */
-	public static final int MAX_SEEDS=16;
+	/** Most seed nodes a configuration may list, and a node's live list may hold. */
+	public static final int MAX_SEEDS=Seeds.MAX_SEEDS;
 
 	private static final AString SEED_KEY=Strings.intern("key");
 	private static final AString SEED_URL=Strings.intern("url");
@@ -164,6 +164,10 @@ public class P2PNode implements Closeable {
 		new ConcurrentHashMap<>();
 	/** Nodes the operator named, whose records are kept however full the registry is. */
 	private final Set<AccountKey> named=ConcurrentHashMap.newKeySet();
+	/** Completes when seeds are first released; null until seeding starts. Guarded by this node. */
+	private CompletableFuture<Void> seeding;
+	/** The seeding round in progress, or null between rounds. */
+	private volatile SeedRound seedRound;
 	/** Freezes P2P application configuration at the same boundary as NodeServer. */
 	private boolean launchStarted;
 
@@ -715,13 +719,15 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * Joins the network through seed nodes, and again whenever this node is left with no
-	 * route. Each time it has none, as when it starts, it resolves each seed's name with
-	 * this node's records and blocklist and connects to it: once a seed proves its key,
-	 * this node pushes its own record and pulls the seed's registry, which names other
-	 * nodes to connect to. A seed that cannot be resolved or reached, fails its challenge
-	 * or loses its route is resolved again and retried after a backoff, without holding
-	 * up the others.
+	 * Adds seed names to this node's live list, as {@link #addSeed} does, and joins the
+	 * network through the seeds listed, and again whenever this node is left with no
+	 * route. Each time it has none, as when it starts, it reads the live list, resolves
+	 * each seed's name with this node's records and blocklist and connects to it: once a
+	 * seed proves its key, this node pushes its own record and pulls the seed's registry,
+	 * which names other nodes to connect to. A seed that cannot be resolved or reached,
+	 * fails its challenge or loses its route is resolved again and retried after a
+	 * backoff, without holding up the others. A seed added while this node is seeding is
+	 * connected to at once, and one removed is not retried.
 	 *
 	 * <p>Once this node's own ambient slots hold routes to other peers, they can replace
 	 * the seeds, so every seed is released: the route this node opened to it closes, and
@@ -731,30 +737,93 @@ public class P2PNode implements Closeable {
 	 * one at a blocked address or one that turns out to be this node is skipped until the
 	 * next round. Seeding stops when the node closes.</p>
 	 *
-	 * @param seeds seed names, as {@link #seeds(NodeConfig)} reads them
-	 * @return future completing when the seeds are first released, at once if there are none
+	 * <p>A name with this node's own key is left out, so seed nodes may share one
+	 * configuration that lists them all, and a name beyond {@link #MAX_SEEDS} is left out
+	 * with a warning, so the list a node kept never stops it starting. Seeding starts
+	 * once: a later call adds its names to the live list.</p>
+	 *
+	 * @param seeds seed names to add, as {@link #seeds(NodeConfig)} reads them
+	 * @return future completing when the seeds are first released, at once if none is listed
 	 */
-	public CompletableFuture<Void> seed(List<PeerName> seeds) {
+	public synchronized CompletableFuture<Void> seed(List<PeerName> seeds) {
 		if (!server.isRunning()) {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("P2P node must be launched before seeding"));
 		}
-		List<PeerName> held=new ArrayList<>(seeds);
-		// Seed nodes may share one configuration that lists them all
-		if (keyPair!=null) held.removeIf(seed -> keyPair.getAccountKey().equals(seed.key()));
-		if (held.isEmpty()) return CompletableFuture.completedFuture(null);
-		CompletableFuture<Void> released=new CompletableFuture<>();
-		seedWhenIsolated(List.copyOf(held),released);
-		return released;
+		Seeds list=application.seeds();
+		for (PeerName seed:seeds) {
+			if (isOwn(seed)) continue;
+			try {
+				list.add(seed);
+			} catch (IllegalStateException e) {
+				log.warn("Seed {} left out: {}",seed,e.getMessage());
+			}
+		}
+		if (!seeds.isEmpty()) application.syncHost();
+		SeedRound round=seedRound;
+		if (round!=null) for (PeerName seed:seeds) round.add(seed);
+		if (seeding==null) {
+			seeding=new CompletableFuture<>();
+			seedWhenIsolated(seeding);
+		}
+		return list.all().isEmpty()?CompletableFuture.completedFuture(null):seeding;
+	}
+
+	/**
+	 * Adds a seed to this node's live list, kept in its {@code :local} record so the
+	 * seed survives a restart, replacing any seed at the same URI. A node that is seeding
+	 * connects to it at once; otherwise it is used the next time this node seeds.
+	 *
+	 * @param seed seed name, as {@link PeerResolver#parse(String)} reads it
+	 * @return whether no seed was listed at its URI before
+	 * @throws IllegalArgumentException if it names this node's own key
+	 * @throws IllegalStateException if {@link #MAX_SEEDS} seeds at other URIs are listed
+	 */
+	public boolean addSeed(PeerName seed) {
+		if (seed==null) throw new IllegalArgumentException("Seed name must not be null");
+		if (isOwn(seed)) throw new IllegalArgumentException("A node cannot seed from itself");
+		boolean added=application.seeds().add(seed);
+		application.syncHost();
+		SeedRound round=seedRound;
+		if (round!=null) round.add(seed);
+		return added;
+	}
+
+	/**
+	 * Removes the seed at a name's URI from this node's live list, whatever key it
+	 * names. A seed not yet reached is not retried; one reached is released with the
+	 * others when the round ends.
+	 *
+	 * @param seed seed name
+	 * @return whether a seed was listed at its URI
+	 */
+	public boolean removeSeed(PeerName seed) {
+		if (seed==null) throw new IllegalArgumentException("Seed name must not be null");
+		boolean removed=application.seeds().remove(seed);
+		application.syncHost();
+		return removed;
+	}
+
+	/** The seeds in this node's live list. */
+	public List<PeerName> getSeeds() {
+		return application.seeds().all();
+	}
+
+	/** Whether a seed name says it is this node. */
+	private boolean isOwn(PeerName seed) {
+		return keyPair!=null && keyPair.getAccountKey().equals(seed.key());
 	}
 
 	/** Once this node has no route, connects to its seeds until other peers fill its ambient slots, then again. */
-	private void seedWhenIsolated(List<PeerName> seeds,CompletableFuture<Void> released) {
+	private void seedWhenIsolated(CompletableFuture<Void> released) {
 		LatticeConnectionManager manager=propagator.getConnectionManager();
 		manager.whenIsolated().thenCompose(isolated -> {
-			log.info("Joining the network through {} seed nodes",seeds.size());
 			SeedRound round=new SeedRound();
-			for (PeerName seed:seeds) round.attempt(seed,0);
+			// Published before the list is read, so a seed added meanwhile reaches the round
+			seedRound=round;
+			List<PeerName> seeds=application.seeds().all();
+			if (!seeds.isEmpty()) log.info("Joining the network through {} seed nodes",seeds.size());
+			for (PeerName seed:seeds) round.add(seed);
 			return manager.whenAmbientTargetMet().whenComplete((met,error) -> round.end());
 		}).whenComplete((met,error) -> {
 			// Fails only when the node closes
@@ -762,23 +831,34 @@ public class P2PNode implements Closeable {
 				released.completeExceptionally(error);
 				return;
 			}
-			log.info("Released seed nodes: other peers now fill this node's slots");
 			released.complete(null);
-			seedWhenIsolated(seeds,released);
+			seedWhenIsolated(released);
 		});
 	}
 
 	/** One round of seeding: keeps each seed connected until the round ends, then releases the seeds reached. */
 	private final class SeedRound {
 		private final Set<AccountKey> reached=ConcurrentHashMap.newKeySet();
+		/** Seeds this round has started on, so none is dialled twice at once. */
+		private final Set<PeerName> started=ConcurrentHashMap.newKeySet();
 		private volatile boolean over;
+
+		/** Starts connecting to a seed, unless this round already has or it names this node. */
+		void add(PeerName seed) {
+			if (!isOwn(seed) && started.add(seed)) attempt(seed,0);
+		}
 
 		/**
 		 * Resolves a seed and connects to it, again after a backoff if that fails or its
-		 * route goes. A seed that is blocked, or is this node, is skipped until the next round.
+		 * route goes. A seed that is blocked, or is this node, is skipped until the next
+		 * round; one no longer listed as it was is dropped.
 		 */
 		void attempt(PeerName seed,int failures) {
 			if (over || !server.isRunning()) return;
+			if (!application.seeds().contains(seed)) {
+				started.remove(seed);
+				return;
+			}
 			network.connectPeer(propagator,seed).whenComplete((peer,error) -> {
 				Throwable cause=(error instanceof CompletionException && error.getCause()!=null)?error.getCause():error;
 				AccountKey key=(error==null)?peer.getVerifiedPeer():null;
@@ -814,6 +894,8 @@ public class P2PNode implements Closeable {
 		/** Ends the round and releases the seeds reached; an attempt still dialling releases its seed when admitted. */
 		void end() {
 			over=true;
+			if (seedRound==this) seedRound=null;
+			if (!reached.isEmpty()) log.info("Released seed nodes: other peers now fill this node's slots");
 			for (AccountKey key:reached) releaseSeed(key);
 		}
 	}
@@ -1174,8 +1256,8 @@ public class P2PNode implements Closeable {
 
 	/**
 	 * Runs a public node as a service until the JVM shuts down. Launches the node,
-	 * joins the network through the seeds the configuration lists, as
-	 * {@link #seed(Map)} does, then on shutdown stops it in the order
+	 * adds the seeds the configuration lists to its live list and joins the network
+	 * through that list, as {@link #seed(List)} does, then on shutdown stops it in the order
 	 * convex-peer/docs/SHUTDOWN.md prescribes and closes the store.
 	 *
 	 * @param store store the node opens its host from; closed when the service ends

@@ -318,12 +318,16 @@ of the valid signed NodeInfo it delivered is that physically inbound connection 
 into an outbound propagation route. A node with empty `:transports` therefore supports
 bidirectional gossip without a reverse TCP connection.
 
-**Seed nodes**: A node joins a network through the seed nodes its configuration
-lists under `seeds`, at most 16 peer names, each a `url` with an optional `key`, with
-`P2PNode.seed`. Whenever the node has no route, as when it starts, each seed's name is
-resolved and the seed connected and initialised as with `connect`; a seed that cannot
-be reached, or loses its route, is resolved again and retried after a backoff. A
-`did:key` seed is found where the node's records or contact addresses place its key.
+**Seed nodes**: A node joins a network through its seed list, kept in its local
+record (§4.6), with `P2PNode.seed`. The list holds at most 16 peer names. The seeds
+its configuration lists under `seeds`, each a `url` with an optional `key`, are added
+to it at launch, and `addSeed` and `removeSeed` change it while the node runs.
+Whenever the node has no route, as when it starts, it reads the list, and each seed's
+name is resolved and the seed connected and initialised as with `connect`; a seed
+that cannot be reached, or loses its route, is resolved again and retried after a
+backoff while it stays listed. A seed added while the node is seeding is connected to
+at once. A `did:key` seed is found where the node's records or contact addresses
+place its key.
 Once the node's own ambient slots hold routes to other peers, at least one, which can
 replace the seeds, it releases every seed: the route it opened closes, and a seed whose
 record or contact address it holds stays an ordinary candidate. Seeds so
@@ -355,8 +359,9 @@ sufficient.
 
 A node uses multiple strategies to discover and maintain connections, in order:
 
-1. **Configured peers** — Seed nodes from the node configuration, held only until
-   other peers can replace them (§4.2), and nodes the operator names with
+1. **Configured peers** — Seed nodes from the node's seed list, which its
+   configuration adds to, held only until other peers can replace them (§4.2), and
+   nodes the operator names with
    `P2PNode.connect`, which are kept. Every connection is authenticated by
    challenge/response.
 
@@ -399,7 +404,9 @@ that contact and the last failure.
                           :last-failure 1707999000000}}
  :blocked   {0x789abc...                {}
              "tcp://203.0.113.5:18888"  {}
-             "198.51.100.7"             {}}}
+             "198.51.100.7"             {}}
+ :seeds     {"did:web:seed.example.com"       {}
+             "tcp://seed2.example.com:18888"  {:key 0xabc123...}}}
 ```
 
 Only an authenticated connection counts as contact: a verified outbound admission or
@@ -457,6 +464,12 @@ connects in is closed when it claims its key, or dropped if it authenticates.
 Blocking an address drops the nodes with a route at it or advertising it, and
 offers them again at their other addresses. An unauthenticated inbound connection
 already open when its address is blocked stays open until it closes, with no route.
+
+The same record holds, at `:seeds`, the node's seed list (§4.2): an `AccessList` from
+each peer URI to an entry that may name the key the peer must prove. Each distinct URI
+is one seed, though several may reach the same node. It is the live list, read each
+time the node seeds; configuration only adds to it, and `addSeed` and `removeSeed`
+change it and sync the host at once. A node without a key keeps its list in memory.
 
 Proposed for the same record:
 

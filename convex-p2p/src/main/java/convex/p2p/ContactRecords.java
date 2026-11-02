@@ -29,11 +29,13 @@ import convex.lattice.cursor.AForkableCursor;
  * <pre>
  * {:timestamp t
  *  :contacts {&lt;node key&gt; {:last-contact t, :address "tcp://host:port", :failures n, :last-failure t}}
- *  :blocked  {&lt;node key or address&gt; {}}}
+ *  :blocked  {&lt;node key or address&gt; {}}
+ *  :seeds    {&lt;peer URI&gt; {:key &lt;expected key&gt;}}}
  * </pre>
  *
- * <p>The same record holds this node's {@link Blocklist} at {@code :blocked}, edited
- * through {@link #cursor()}, so both are synced and signed together.</p>
+ * <p>The same record holds this node's {@link Blocklist} at {@code :blocked} and its
+ * {@link Seeds} at {@code :seeds}, edited through {@link #cursor()}, so all are synced
+ * and signed together.</p>
  *
  * <p>A node that answered and has not failed since keeps that standing whether or not
  * this node is connected to it: time alone is no evidence against it. At most

@@ -145,7 +145,8 @@ public class P2PSeedTest {
 		AccountKey blocked=AKeyPair.generate().getAccountKey();
 		joiner.block(blocked);
 
-		joiner.seed(List.of(new PeerName(URI.create(address(hub).toString()),blocked),
+		// The blocked seed has an address of its own: names at one URI are one seed
+		joiner.seed(List.of(new PeerName(URI.create("tcp://localhost:1"),blocked),
 				PeerResolver.parse(address(joiner).toString()),
 				PeerResolver.parse(address(hub).toString())))
 			.get(TIMEOUT,TimeUnit.SECONDS);
@@ -164,6 +165,38 @@ public class P2PSeedTest {
 
 		joiner.seed(List.of(new PeerName(URI.create(DID.forKey(hubKey.getAccountKey()).toString()),null)));
 		joiner.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
+	}
+
+	/** Seeding reads the live list: a seed added while the node seeds is connected to. */
+	@Test
+	public void testASeedAddedWhileSeedingIsConnected() throws Exception {
+		P2PNode hub=launch(store("seed-hub"),NodeConfig.localNetwork(),0,hubKey);
+		P2PNode joiner=launch(store("seed-joiner"),NodeConfig.localNetwork(),1,joinerKey);
+		assertTrue(joiner.seed(List.of()).isDone(),"no seed is listed");
+		assertTrue(joiner.addSeed(new PeerName(URI.create(address(hub).toString()),hubKey.getAccountKey())));
+		joiner.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
+	}
+
+	/** Seeds added at runtime are kept: a restarted node with none configured joins through them. */
+	@Test
+	public void testRestartedNodeSeedsFromTheListItKept() throws Exception {
+		P2PNode hub=launch(store("seed-hub"),NodeConfig.localNetwork(),0,hubKey);
+		EtchStore joinerStore=store("seed-joiner");
+		P2PNode first=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		first.launch();
+		PeerName seed=new PeerName(URI.create(address(hub).toString()),hubKey.getAccountKey());
+		assertTrue(first.addSeed(seed));
+		assertThrows(IllegalArgumentException.class,
+			() -> first.addSeed(new PeerName(URI.create(address(first).toString()),joinerKey.getAccountKey())),
+			"a node does not seed from itself");
+		shutDown(first);
+
+		P2PNode restarted=P2PNode.create(joinerStore,NodeConfig.localNetwork(),ambient(1),joinerKey).serveAllInbound();
+		resources.add(restarted);
+		assertEquals(List.of(seed),restarted.getSeeds());
+		restarted.launch();
+		restarted.seed(List.of());
+		restarted.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
 	}
 
 	/** A peer named to connect is kept by name and its record kept; a blocked one is refused before dialling. */

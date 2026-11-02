@@ -50,7 +50,7 @@ import convex.social.Social;
  * <p>It assembles each region's components side by side: the registry at
  * {@code [:p2p]} with its validated view, the {@link NodeDirectory}, and this node's
  * record at {@code [:local <node key> :p2p]}, the {@link ContactRecords} holding the
- * {@link Blocklist}. The registry reads the local record only through what the
+ * {@link Blocklist} and the {@link Seeds}. The registry reads the local record only through what the
  * application supplies to it. It imports nothing from the node package. A
  * {@link P2PNode} assembles it with replication and calls it at the moments
  * replication knows about; a local application may use the same component over a
@@ -76,6 +76,7 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	private final NodeDirectory directory;
 	private final ContactRecords contacts;
 	private final Blocklist blocklist;
+	private final Seeds seeds;
 	private final NodeRegistry registry;
 
 	/** Connects a relay with standard DID verification and no authoring capability. */
@@ -113,19 +114,20 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		// Only a node that can sign its own :local slot keeps contact records
 		this.contacts=(ownKey==null || signer==null)?null:new ContactRecords(cursor(),ownKey,
 			value -> (SignedData<AHashMap<Keyword,ACell>>)(SignedData<?>)signer.apply(ownKey,value),clock);
-		// The blocklist shares the contact records' :local record, or stays in memory without one
-		AForkableCursor<Index<ABlobLike<?>,ACell>> blocked;
-		if (contacts==null) {
-			blocked=new Root<Index<ABlobLike<?>,ACell>>();
-		} else {
-			blocked=new MapComponent<Keyword,ACell>(contacts.cursor()).<Index<ABlobLike<?>,ACell>>path(Blocklist.KEY);
-		}
-		this.blocklist=new Blocklist(blocked,clock);
+		// The blocklist and seed list share the contact records' :local record
+		this.blocklist=new Blocklist(this.<Index<ABlobLike<?>,ACell>>localField(Blocklist.KEY),clock);
+		this.seeds=new Seeds(this.<Index<AString,ACell>>localField(Seeds.KEY),clock);
 		// A node without contact records has reached no other node
 		Supplier<ToIntFunction<AccountKey>> standings=(contacts==null)
 			?() -> node -> ContactRecords.standing(null):contacts::standings;
 		this.registry=new NodeRegistry(new IndexComponent<Keyword,ACell>(cursor()).<Index<Keyword,ACell>>path(P2PLattice.KEY_P2P),
 			ownKey,blocklist::isBlocked,standings);
+	}
+
+	/** A field of this node's {@code :local} P2P record, or memory of its own for a node without that record. */
+	private <T extends ACell> AForkableCursor<T> localField(Keyword field) {
+		if (contacts==null) return new Root<T>();
+		return new MapComponent<Keyword,ACell>(contacts.cursor()).<T>path(field);
 	}
 
 	AccountKey ownKey() { return ownKey; }
@@ -139,6 +141,9 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 
 	/** The nodes and addresses this node refuses. */
 	Blocklist blocklist() { return blocklist; }
+
+	/** The seed nodes this node joins the network through. */
+	Seeds seeds() { return seeds; }
 
 	/**
 	 * Blocks a node: refuses it from now on and drops its record. Nothing is synced.

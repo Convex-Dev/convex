@@ -318,11 +318,14 @@ or rejoins
 ([seed nodes](../convex-peer/docs/P2P_DESIGN.md#node-identity-and-convex-peers)). A restarted
 node needs no seed: the records it retained become connection candidates at launch.
 
-Seeds are node configuration, listed under `seeds` (at most 16), each a peer name as
-`url` (`tcp://host:port`, `tls://host:port`, `host:port`, a `did:web` or a `did:key`;
-a missing port is 18888) with an optional expected `key`
+A node keeps its seeds in its own local record, so they survive a restart, and reads
+that list whenever it seeds (at most 16). The node configuration adds to it: seeds
+listed under `seeds`, each a peer name as `url` (`tcp://host:port`,
+`tls://host:port`, `host:port`, a `did:web` or a `did:key`; a missing port is 18888)
+with an optional expected `key`
 ([peer names](../convex-peer/docs/LATTICE_NETWORKING.md#connection-capabilities)). An
-embedding application joins with `node.seed(P2PNode.seeds(config))` after launch, and
+embedding application joins with `node.seed(P2PNode.seeds(config))` after launch,
+changes the list with `node.addSeed(name)` and `node.removeSeed(name)`, and
 `node.connect(name)` connects to and keeps one more peer by name. The same JSON5
 file runs a public node from the command line; `store` and `keypair` (an Ed25519 seed
 in hex) are for the launcher and stay out of the node's configuration. A store needs a
