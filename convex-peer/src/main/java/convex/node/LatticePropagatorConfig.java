@@ -21,7 +21,8 @@ import convex.core.lang.RT;
  */
 public final class LatticePropagatorConfig {
 
-	/** Maximum memory size of a complete value admitted by this group. */
+	/** @deprecated Ignored. Configure encoded frame limits with {@link #MAX_MESSAGE_SIZE} and {@link #MAX_TRUSTED_MESSAGE_SIZE}. */
+	@Deprecated
 	public static final AString MAX_INBOUND_VALUE_SIZE=Strings.intern("maxInboundValueSize");
 
 	/** Consecutive rejected messages before this group's circuit breaker closes a route. */
@@ -149,10 +150,10 @@ public final class LatticePropagatorConfig {
 		return config;
 	}
 
-	/** Returns the maximum complete inbound value size. */
+	/** @deprecated CAD036 limits encoded messages. This legacy accessor returns {@link Long#MAX_VALUE}. */
+	@Deprecated
 	public long getMaxInboundValueSize() {
-		CVMLong value=RT.ensureLong(config.get(MAX_INBOUND_VALUE_SIZE));
-		return (value==null) ? getMaxMessageSize() : value.longValue();
+		return Long.MAX_VALUE;
 	}
 
 	/** Returns the per-connection consecutive-reject limit, or zero when disabled. */

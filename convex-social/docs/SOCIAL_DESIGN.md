@@ -129,7 +129,7 @@ logical retention is defined by the projected root.
 
 Every admitted owner slot must:
 
-1. be a complete value within the configured inbound size bound;
+1. be a complete value;
 2. contain a signed social index, without requiring known schemas for every field;
 3. have a valid Ed25519 signature;
 4. use a signer authorised for the path DID.

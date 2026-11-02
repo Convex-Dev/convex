@@ -9,9 +9,9 @@ implementation choices documented here.
 
 The propagation path maintains five distinct invariants:
 
-1. A complete inbound value limit and an encoded message limit are separate.
-   Large store-backed values can arrive through many bounded DATA messages or
-   later hash-based acquisition; no single frame needs to contain the value.
+1. The receiver limits the encoded size of each message. A root can reference
+   any amount of data in the local store. Missing cells can arrive in bounded
+   DATA messages or be acquired by hash.
 2. A delta is encoded once per propagation attempt. Its immutable `Message`
    objects are shared across destination peers rather than reconstructed for
    each peer.
@@ -152,9 +152,7 @@ protocol limits:
 | Materialised messages per consensus update | 256 MB | `BeliefPropagator.MAX_UPDATE_BYTES` |
 | Lattice novelty retained per attempt | at most 65,536 cells, also byte-budgeted | `convex.node.NoveltyCollector` |
 
-The complete inbound lattice-value limit is separately configured with
-`LatticePropagatorConfig.maxInboundValueSize`; it does not need to equal the
-delta-message limit. Public and trusted encoded frame limits are configured per
+The legacy `maxInboundValueSize` setting is ignored. Public and trusted encoded frame limits are configured per
 group with `maxMessageSize` and `maxTrustedMessageSize` and must remain within
 the protocol maximum. `NodeConfig.maxMessageSize` independently protects each
 standard `LatticeListener` before a connection has been assigned to a group.

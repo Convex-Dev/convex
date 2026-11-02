@@ -606,11 +606,6 @@ public class LatticePropagator implements Closeable {
 		requireEndpoint().handle(message);
 	}
 
-	/** Package-visible size-policy probe for endpoint tests. */
-	boolean withinInboundSizeLimit(ACell value) {
-		return ACell.getMemorySize(value)<=config.getMaxInboundValueSize();
-	}
-
 	private LatticeProtocolEndpoint requireEndpoint() {
 		LatticeProtocolEndpoint result=endpoint;
 		if (result==null) throw new IllegalStateException("Propagator is not attached to a NodeServer");

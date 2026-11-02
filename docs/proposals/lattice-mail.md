@@ -304,8 +304,7 @@ The mail application takes `[:mail <did> ...]` values only for desired DIDs,
 selecting the desired mailboxes from a root or region value, and applies the
 checks the lattice cannot before calling its merge:
 
-- complete value within the inbound size bound; each envelope within the
-  envelope bound;
+- complete value with each envelope within the envelope bound;
 - `issued-at` within `[now - window, now + clock-lead]`;
 - per-connection and per-node deposit rate limits, with rejections counted by the
   existing per-connection circuit-breaker;

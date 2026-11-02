@@ -507,7 +507,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 		HashSet<Hash> missing=new HashSet<>();
 		Ref.get(value).findMissing(missing,1);
 		if (!missing.isEmpty()) throw new MissingDataException(store,missing.iterator().next());
-		if (!withinInboundSizeLimit(value)) throw new BadFormatException("Acquired lattice value exceeds inbound size limit");
 		// What the host's applications take from the value is theirs to decide
 		ACell complete=Cells.persist(value,store);
 		AVector<?> completePayload=Vectors.create(
@@ -519,12 +518,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private void processLatticeValue(Message message,ConnectionStats stats) throws BadFormatException {
 		LatticeValuePayload payload=parseLatticeValuePayload(message);
 		ACell value=payload.value();
-		if (!withinInboundSizeLimit(value)) {
-			recordMergeReject(message.getConnection(),stats);
-			returnLatticeResult(message,Result.error(ErrorCodes.MEMORY,
-				"LATTICE_VALUE exceeds the inbound size limit"));
-			return;
-		}
 
 		ACell[] path=payload.path().toCellArray();
 		NodeServer.MergeOutcome outcome=node.mergeInbound(path,value);
@@ -581,10 +574,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 		if (path==null) throw new BadFormatException("LATTICE_VALUE path must be a vector");
 		if (value==null) throw new BadFormatException("LATTICE_VALUE message missing value");
 		return new LatticeValuePayload(id,path,value);
-	}
-
-	private boolean withinInboundSizeLimit(ACell value) {
-		return ACell.getMemorySize(value)<=config.getMaxInboundValueSize();
 	}
 
 	private void beginLatticeAcquisition(Message message,ConnectionStats stats) {

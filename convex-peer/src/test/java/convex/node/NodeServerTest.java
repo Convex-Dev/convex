@@ -422,34 +422,6 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * #564: inbound values over the configured size limit are rejected before merge.
-	 */
-	@Test
-	public void testInboundValueSizeLimit() {
-		ALattice<AInteger> lattice = MaxLattice.create();
-
-		// A node configured with a tight inbound size limit (100 bytes)
-		NodeConfig tight = NodeConfig.create(Maps.of(NodeConfig.MAX_INBOUND_VALUE_SIZE, CVMLong.create(100)));
-		maxNodeServer = new TestNode<>(lattice, store, tight);
-
-		// A small (embedded) value is within the limit
-		assertTrue(propagator(maxNodeServer).withinInboundSizeLimit(CVMLong.ONE));
-
-		// A large value exceeds the limit and is rejected
-		convex.core.data.ABlob big = convex.core.data.Blob.wrap(new byte[500]);
-		assertTrue(big.getMemorySize() > 100); // sanity: this value really is over the limit
-		assertFalse(propagator(maxNodeServer).withinInboundSizeLimit(big));
-
-		// Under the default (permissive) config, the same large value is accepted
-		NodeServer<AInteger> permissive = new TestNode<>(lattice, store);
-		try {
-			assertTrue(propagator(permissive).withinInboundSizeLimit(big));
-		} finally {
-			try { permissive.close(); } catch (Exception e) { /* ignore */ }
-		}
-	}
-
-	/**
 	 * #562: an inbound value of the wrong type for the target lattice is rejected cleanly
 	 * and leaves the cursor unchanged (the merge aborts atomically).
 	 */
@@ -500,7 +472,6 @@ public class NodeServerTest {
 		assertEquals(16*1024*1024,groupDefaults.getMaxDeltaBroadcastSize());
 		assertEquals(convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH,
 			groupDefaults.getMaxTrustedMessageSize());
-		assertEquals(groupDefaults.getMaxMessageSize(),groupDefaults.getMaxInboundValueSize());
 		assertEquals(256,groupDefaults.getMaxConnections());
 		assertEquals(1024,groupDefaults.getInboundQueueSize());
 		assertEquals(16*1024*1024,groupDefaults.getMaxInboundQueueBytes());

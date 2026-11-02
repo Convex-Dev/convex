@@ -14,6 +14,7 @@ import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
+import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -40,6 +41,8 @@ class LatticeReplyAcquisitionTest {
 	private void acquiresMissingBranch(boolean receiverDials) throws Exception {
 		File file;
 		var branch=Blob.wrap(new byte[400]);
+		var shared=Blob.wrap(new byte[2048]);
+		int frameLimit=1024;
 		var senderKey=AKeyPair.generate();
 		var receiverKey=AKeyPair.generate();
 		var incoming=new CompletableFuture<AConnection>();
@@ -49,7 +52,10 @@ class LatticeReplyAcquisitionTest {
 				var listener=new LatticeListener(NodeConfig.localNetwork())) {
 			file=receiverStore.getFile();
 			var senderGroup=new LatticePropagator(senderStore,LatticePropagatorConfig.create());
-			var receiverGroup=new LatticePropagator(receiverStore,LatticePropagatorConfig.create());
+			var receiverGroup=new LatticePropagator(receiverStore,LatticePropagatorConfig.create(Maps.of(
+				LatticePropagatorConfig.MAX_MESSAGE_SIZE,frameLimit,
+				LatticePropagatorConfig.MAX_TRUSTED_MESSAGE_SIZE,frameLimit)));
+			receiver.getCursor().set(Cells.persist(Sets.of(shared),receiverStore));
 			senderGroup.setTransportKeyPair(senderKey);
 			receiverGroup.setTransportKeyPair(receiverKey);
 			sender.addPropagator(senderGroup);
@@ -70,12 +76,14 @@ class LatticeReplyAcquisitionTest {
 			listening.authenticateInboundRoute(inbound,diallerKey);
 			listening.getConnectionManager().whenInboundConnectionUpgraded(diallerKey).get(5,TimeUnit.SECONDS);
 
-			// Send only the top cell. Its one non-embedded branch exists solely on the sender.
-			var value=Cells.persist(Sets.of(branch),senderStore);
+			// The root exceeds the frame limit. Only one small branch needs to cross the wire.
+			var value=Cells.persist(Sets.of(shared,branch),senderStore);
+			assertTrue(value.getMemorySize()>frameLimit);
 			assertNull(receiverStore.refForHash(branch.getHash()));
 			var id=CVMLong.create(-1); // outside the connection's generated request IDs
 			var payload=Vectors.create(MessageTag.LATTICE_VALUE,id,Vectors.empty(),value);
 			var partial=Message.create(MessageType.LATTICE_VALUE,payload,payload.getEncoding());
+			assertTrue(partial.getMessageData().count()<frameLimit);
 			Result result=receiverDials
 				? inbound.sendRequest(partial,5000).get(5,TimeUnit.SECONDS).getPayload(senderStore)
 				: client.message(partial).get(5,TimeUnit.SECONDS);
@@ -87,7 +95,7 @@ class LatticeReplyAcquisitionTest {
 		try (var reopened=EtchStore.create(file);
 				var acquisition=Acquiror.create(branch.getHash(),reopened,hashes ->
 					CompletableFuture.failedFuture(new AssertionError("Unexpected request for a persisted branch")))) {
-			assertEquals(Sets.of(branch),reopened.getRootData());
+			assertEquals(Sets.of(shared,branch),reopened.getRootData());
 			assertEquals(branch,acquisition.getFuture().get(5,TimeUnit.SECONDS));
 		}
 	}

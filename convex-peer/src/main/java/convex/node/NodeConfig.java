@@ -60,7 +60,7 @@ public class NodeConfig {
 	 *  {@link NodeServer} itself ignores this field. */
 	public static final AString URL = Strings.intern("url");
 
-	/** @deprecated Use {@link LatticePropagatorConfig#MAX_INBOUND_VALUE_SIZE}. */
+	/** @deprecated Ignored. Configure encoded frame limits on the listener and propagation group. */
 	@Deprecated
 	public static final AString MAX_INBOUND_VALUE_SIZE =
 		LatticePropagatorConfig.MAX_INBOUND_VALUE_SIZE;
@@ -272,16 +272,12 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Returns the maximum memory size of a complete inbound lattice value admitted
-	 * by a propagation endpoint. Larger values are rejected before the authoritative
-	 * merge, bounding work from untrusted peers. The default is the configured message cap.
-	 *
-	 * @deprecated Use {@link LatticePropagatorConfig#getMaxInboundValueSize()}.
-	 * @return maximum inbound value size in bytes
+	 * @deprecated CAD036 limits encoded messages.
+	 * @return {@link Long#MAX_VALUE}
 	 */
 	@Deprecated
 	public long getMaxInboundValueSize() {
-		return LatticePropagatorConfig.from(this).getMaxInboundValueSize();
+		return Long.MAX_VALUE;
 	}
 
 	/**
@@ -322,8 +318,7 @@ public class NodeConfig {
 
 	/**
 	 * Returns the maximum encoded body size used for outbound lattice delta chunks.
-	 * This is independent of the complete inbound value-size policy. It defaults
-	 * to the conservative public frame limit advertised by this node.
+	 * It defaults to the conservative public frame limit advertised by this node.
 	 *
 	 * @deprecated Use {@link LatticePropagatorConfig#getMaxDeltaMessageSize()}.
 	 * @return maximum outbound delta chunk size in bytes
