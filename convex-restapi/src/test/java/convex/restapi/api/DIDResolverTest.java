@@ -12,9 +12,11 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.util.Multikey;
 import convex.core.cvm.Context;
 import convex.core.cvm.State;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
@@ -58,9 +60,15 @@ class DIDResolverTest {
 		assertEquals("did:convex:" + Init.ADMIN_ADDRESS.longValue(),
 				resolution.document().get("controller"));
 
-		List<String> aliases = stringList(resolution.document().get("alsoKnownAs"));
-		assertTrue(aliases.contains("did:convex:" + Init.GENESIS_ADDRESS.longValue()));
-		assertTrue(aliases.stream().anyMatch(alias -> alias.startsWith("did:key:")));
+		// The account DID pins the account behind the name; the key is in the verification method only
+		assertEquals(List.of("did:convex:" + Init.GENESIS_ADDRESS.longValue()),
+				stringList(resolution.document().get("alsoKnownAs")));
+		Map<?, ?> method = assertInstanceOf(Map.class,
+				assertInstanceOf(List.class, resolution.document().get("verificationMethod")).get(0));
+		assertEquals("Multikey", method.get("type"));
+		AccountKey key = context.getState().getAccount(Init.GENESIS_ADDRESS).getAccountKey();
+		assertEquals(Multikey.encodePublicKey(key).toString(), method.get("publicKeyMultibase"));
+		assertEquals(did + "#" + method.get("publicKeyMultibase"), method.get("id"));
 	}
 
 	@Test

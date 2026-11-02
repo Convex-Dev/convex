@@ -1,8 +1,5 @@
 package convex.restapi.api;
 
-import convex.core.crypto.util.Base58;
-import convex.core.crypto.util.Multikey;
-import convex.core.cvm.Address;
 import convex.core.data.AccountKey;
 import convex.core.util.JSON;
 import convex.restapi.RESTServer;
@@ -11,9 +8,7 @@ import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import io.javalin.http.NotFoundResponse;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -45,16 +40,14 @@ public class DIDAPI extends ABaseAPI {
 		String did = getVenueDID(ctx);
 
 		AccountKey peerKey = server.getPeer().getPeerKey();
-		Address peerController = server.getPeerController();
 
-		// alsoKnownAs: did:convex address and did:key
-		List<String> aliases = new ArrayList<>();
-		if (peerController != null) {
-			aliases.add("did:convex:" + peerController.longValue());
-		}
-		aliases.add("did:key:" + multibaseEncodeEd25519DIDKey(peerKey));
-
-		Map<String, Object> doc = buildDIDDocument(did, peerKey, aliases);
+		// No alsoKnownAs: the peer's key is in its verification method, and the peer's
+		// controller account owns the peer rather than being it
+		Map<String, Object> doc = new HashMap<>();
+		doc.put("@context", DIDResolver.DID_CONTEXT);
+		doc.put("id", did);
+		doc.put("controller", did);
+		DIDResolver.addVerificationMethod(doc, did, peerKey);
 
 		ctx.contentType("application/json");
 		ctx.result(JSON.toString(doc));
@@ -89,36 +82,6 @@ public class DIDAPI extends ABaseAPI {
 	}
 
 	/**
-	 * Build a W3C DID document. Key may be null for actor accounts.
-	 */
-	private Map<String, Object> buildDIDDocument(String did, AccountKey key, List<String> alsoKnownAs) {
-		Map<String, Object> doc = new HashMap<>();
-		doc.put("@context", "https://www.w3.org/ns/did/v1");
-		doc.put("id", did);
-		doc.put("controller", did);
-
-		if (key != null) {
-			String keyId = did + "#key-1";
-			String multibaseKey = multibaseEncode(key);
-
-			Map<String, Object> verificationMethod = new HashMap<>();
-			verificationMethod.put("id", keyId);
-			verificationMethod.put("type", "Ed25519VerificationMethod2020");
-			verificationMethod.put("controller", did);
-			verificationMethod.put("publicKeyMultibase", multibaseKey);
-
-			doc.put("verificationMethod", List.of(verificationMethod));
-			doc.put("authentication", List.of(keyId));
-		}
-
-		if (alsoKnownAs != null && !alsoKnownAs.isEmpty()) {
-			doc.put("alsoKnownAs", alsoKnownAs);
-		}
-
-		return doc;
-	}
-
-	/**
 	 * Gets the host for did:web identifiers. Per the did:web method
 	 * specification, a non-default port is percent-encoded (host%3Aport)
 	 * since ":" is the path separator in did:web identifiers.
@@ -145,21 +108,5 @@ public class DIDAPI extends ABaseAPI {
 	private String getVenueDID(Context ctx) {
 		if (restServer.getVenueDID()!=null) return restServer.getVenueDID().toString();
 		return "did:web:"+getWebHost(ctx);
-	}
-
-	/**
-	 * Encode an Ed25519 public key as multibase base58btc (z prefix).
-	 */
-	public static String multibaseEncode(AccountKey key) {
-		return "z" + Base58.encode(key.getBytes());
-	}
-
-	/**
-	 * Encode an Ed25519 public key as a did:key multibase identifier.
-	 * Format: z + base58btc(0xed01 + raw_key_bytes)
-	 * The 0xed01 prefix is the multicodec for Ed25519 public keys.
-	 */
-	public static String multibaseEncodeEd25519DIDKey(AccountKey key) {
-		return Multikey.encodePublicKey(key).toString();
 	}
 }

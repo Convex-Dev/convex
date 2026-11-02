@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Serve the REST server's DID documents with standard `Multikey` keys, readable by standard DID resolvers; `alsoKnownAs` now lists only an account's `did:convex`. ([CAD043](https://docs.convex.world/docs/cad/did))
 - `convex.p2p.P2PNode` takes a JSON5 configuration file, holding its store and a stable key, instead of an Etch file. ([Running a node](convex-p2p/README.md#running-a-node))
 - Make Convex DB's SQL `INSERT` standard: a primary key the table already holds, or one repeated in the statement, is an integrity constraint violation (`23000` through JDBC, PostgreSQL's `23505` over the wire protocol) and the statement writes nothing, where it replaced the row before. The lattice API's `insert` and `insertAll` stay upserts; `insertNew` inserts only new rows. ([#799](https://github.com/Convex-Dev/convex/issues/799))
 - Assemble Convex DB hosts with `ConvexDB.openHost`, which replaces the static Convex DB lattices; connecting to a database no longer creates it. ([#779](https://github.com/Convex-Dev/convex/issues/779))
