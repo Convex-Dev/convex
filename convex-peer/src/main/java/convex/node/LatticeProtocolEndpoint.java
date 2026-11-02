@@ -646,7 +646,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	private CompletableFuture<ACell> acquireHash(AConnection connection,Hash hash) {
-		Acquiror acquiror=Acquiror.create(hash,store,hashes -> requestMissing(connection,hashes));
+		Acquiror acquiror=Acquiror.fromMessages(hash,store,hashes ->
+			connection.request(Message.createDataRequest(null,hashes),Config.DEFAULT_INTERNAL_TIMEOUT));
 		Set<Acquiror> acquisitions;
 		synchronized (acquisitionLifecycleLock) {
 			if (!acceptingAcquisitions) {
@@ -665,10 +666,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 		return acquiror.getFuture();
 	}
 
-	private CompletableFuture<Result> requestMissing(AConnection connection,Hash[] hashes) {
-		return requestResult(connection,Message.createDataRequest(null,hashes));
-	}
-
 	/** Correlated liveness probe on an authenticated, listener-owned return route. */
 	CompletableFuture<?> probe(AConnection connection) {
 		if (connection==null) return CompletableFuture.failedFuture(new IOException("Lattice source connection is closed"));
@@ -679,11 +676,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 			}
 			return result;
 		});
-	}
-
-	private CompletableFuture<Result> requestResult(AConnection connection,Message request) {
-		if (connection==null) return CompletableFuture.failedFuture(new IOException("Lattice source connection is closed"));
-		return FutureUtils.map(connection.request(request,Config.DEFAULT_INTERNAL_TIMEOUT),Message::toResult);
 	}
 
 	private static Throwable unwrapCompletion(Throwable error) {

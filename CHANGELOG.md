@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Replicate lattice updates with missing cells over connections opened by the receiving node. ([#820](https://github.com/Convex-Dev/convex/issues/820))
 - Make `convex dlfs start --peer` connect: each peer, given as `host:port` or a `tcp://` or `tls://` URI, is admitted under the key it proves, and startup fails if one cannot be reached. Before, no peer was admitted. ([DLFS](convex-dlfs/README.md#run-a-webdav-server), [#629](https://github.com/Convex-Dev/convex/issues/629))
 - Preserve concurrent KV updates and return the result of the committed edit.
 - Keep KV deletes: tombstones persist, so a stale replica can no longer restore a deleted key, and `LatticeKV.gc()` is removed. ([#807](https://github.com/Convex-Dev/convex/issues/807))
