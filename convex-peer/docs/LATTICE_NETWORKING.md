@@ -179,6 +179,26 @@ its peers in order to start fails promptly rather than waiting on one that is no
 there. `Transports.peerEndpoint` parses an operator's `tcp://` or `tls://` URI, or
 `host:port`, and refuses a DID, which cannot be resolved to a node yet.
 
+A peer resolved from its name is a `PeerTarget`: the keys it may prove, none meaning
+any, and the endpoints to dial it at. `connectPeer(PeerTarget)` makes one bounded
+attempt, dialling the endpoints in turn, each at least once and three times in all at
+least, with the usual backoff. It challenges for the target's key when it names one;
+otherwise it learns the node's key as above and admits it only if the target names no
+keys or lists it. The admitted route is held: kept, safe from trimming, but never
+redialled nor given an address from discovery. When it closes the peer is forgotten
+and `whenDisconnected(key)` completes, and what happens next is the caller's; a caller
+wanting the manager to reconnect by itself declares desired intent instead, and a peer
+that already has it keeps it. Cancelling the attempt abandons it.
+
+`LatticeNode.connectPeer(group, name)` resolves a peer name with the node's
+`PeerResolver` and makes that one attempt. `LatticeNode.keepPeer` keeps a peer an
+operator named: when it cannot be reached or its route goes, the name is resolved
+again before the next attempt, after the usual backoff, so a moved endpoint or a
+changed DID document is picked up and a key the document no longer lists is not
+admitted again. A peer named by a transport URI without a key is held to the key it
+first proved. A peer unreachable for a whole period, ten minutes by default, is given
+up and reported; each lost route starts a new period.
+
 A group can also gossip with nodes that connect to it. With
 `setChallengerAdmission(predicate)`, a node that challenges the group over an inbound
 connection, naming the group's transport key, is challenged back if the predicate
@@ -312,6 +332,8 @@ operations do not introduce runtime group creation or subscription negotiation.
 ## Naming
 
 - **desired**: retained bounded candidate or explicit intent for a route to an identity.
+- **held**: an explicit route admitted from a resolved peer target, kept while it
+  lasts and never redialled.
 - **pending**: a manager-owned socket exists but admission is incomplete.
 - **assigned**: application policy selected one group for an inbound socket.
 - **trusted**: a live challenge proved possession of the expected transport key, or of

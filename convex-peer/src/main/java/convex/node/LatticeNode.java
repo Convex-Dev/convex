@@ -3,12 +3,23 @@ package convex.node;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
+import convex.api.Convex;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.lattice.LatticeHost;
+import convex.net.PeerName;
+import convex.net.PeerResolver;
+import convex.net.PeerTarget;
 
 /**
  * Optional TCP networking for an existing host, with dynamically created
@@ -24,10 +35,16 @@ import convex.lattice.LatticeHost;
  */
 public final class LatticeNode<V extends ACell> implements Closeable {
 
+	/** How long a kept peer is retried without success before it is given up, by default. */
+	public static final Duration DEFAULT_KEEP_PERIOD=Duration.ofMinutes(10);
+
 	private final NodeServer<V> server;
 	private final LatticeListener listener;
 	private AString did;
 	private AKeyPair keyPair;
+	private PeerResolver peerResolver;
+	/** Peers kept by {@link #keepPeer}, stopped with their group or the node. */
+	private final Map<CompletableFuture<Void>,LatticePropagator> keptPeers=new HashMap<>();
 
 	/** Assembles networking without starting workers or opening a socket. */
 	public LatticeNode(LatticeHost<V> host,NodeConfig config) {
@@ -92,8 +109,91 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 
 	/** Revokes inbound assignments and closes this group; other groups continue running. */
 	public synchronized boolean removePropagator(LatticePropagator propagator) {
+		stopKeeping(propagator);
 		listener.unregisterPropagator(propagator);
 		return server.removePropagator(propagator);
+	}
+
+	/**
+	 * Sets how this node resolves peer names. The default resolves {@code did:key} and
+	 * {@code did:web} and keeps no node records; a node that keeps them supplies a
+	 * resolver that locates peers by key.
+	 */
+	public synchronized LatticeNode<V> setPeerResolver(PeerResolver resolver) {
+		if (resolver==null) throw new IllegalArgumentException("Peer resolver must not be null");
+		this.peerResolver=resolver;
+		return this;
+	}
+
+	/** The resolver for peer names, created on first use if none was set. */
+	public synchronized PeerResolver getPeerResolver() {
+		if (peerResolver==null) peerResolver=PeerResolver.create();
+		return peerResolver;
+	}
+
+	/**
+	 * Makes one attempt to connect a group to a peer by its name: resolves the name,
+	 * then admits the peer through the group's connection manager, as
+	 * {@link LatticeConnectionManager#connectPeer(PeerTarget)} does. The route is not
+	 * redialled; see {@link #keepPeer} for a peer to keep.
+	 *
+	 * @param propagator group to connect
+	 * @param name peer name, as {@link PeerResolver#parse(String)} reads it
+	 * @return future completing with the admitted connection, or failing with why the
+	 *         name could not be resolved or the peer admitted
+	 */
+	public CompletableFuture<Convex> connectPeer(LatticePropagator propagator,PeerName name) {
+		PeerResolver resolver=getPeerResolver();
+		return resolver.resolve(name).thenCompose(target -> propagator.getConnectionManager().connectPeer(target));
+	}
+
+	/**
+	 * Keeps a group connected to a peer it names, with the default period, as
+	 * {@link #keepPeer(LatticePropagator, PeerName, Convex, Duration)} does.
+	 */
+	public CompletableFuture<Void> keepPeer(LatticePropagator propagator,PeerName name,Convex admitted) {
+		return keepPeer(propagator,name,admitted,DEFAULT_KEEP_PERIOD);
+	}
+
+	/**
+	 * Keeps a group connected to a peer the operator named. The name is resolved again
+	 * before every reconnection, after the peer could not be reached or its route went,
+	 * with a backoff between attempts. A peer unreachable for a whole period is given up
+	 * and reported; each lost route starts a new period.
+	 *
+	 * @param propagator group to connect
+	 * @param name peer name, as {@link PeerResolver#parse(String)} reads it
+	 * @param admitted a connection to the peer already admitted, or null to connect first
+	 * @param giveUpAfter period without success after which the peer is given up
+	 * @return future failing once the peer is given up; cancel it to stop keeping the
+	 *         peer and release its route
+	 */
+	public CompletableFuture<Void> keepPeer(LatticePropagator propagator,PeerName name,Convex admitted,
+			Duration giveUpAfter) {
+		PeerKeeper keeper=new PeerKeeper(propagator.getConnectionManager(),getPeerResolver(),name,
+			giveUpAfter.toMillis(),() -> System.nanoTime()/1_000_000L,
+			(delay,task) -> CompletableFuture.delayedExecutor(delay,TimeUnit.MILLISECONDS).execute(task));
+		synchronized (this) {
+			keptPeers.put(keeper.kept,propagator);
+		}
+		keeper.kept.whenComplete((value,error) -> {
+			synchronized (this) {
+				keptPeers.remove(keeper.kept);
+			}
+		});
+		keeper.start(admitted);
+		return keeper.kept;
+	}
+
+	/** Stops keeping the peers of one group, or of every group when null. */
+	private void stopKeeping(LatticePropagator propagator) {
+		List<CompletableFuture<Void>> stopping=new ArrayList<>();
+		synchronized (this) {
+			for (var entry:keptPeers.entrySet()) {
+				if (propagator==null || entry.getValue()==propagator) stopping.add(entry.getKey());
+			}
+		}
+		for (CompletableFuture<Void> kept:stopping) kept.cancel(false);
 	}
 
 	/**
@@ -156,6 +256,7 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	 */
 	@Override
 	public synchronized void close() throws IOException {
+		stopKeeping(null);
 		Throwable failure=null;
 		try {
 			listener.close();

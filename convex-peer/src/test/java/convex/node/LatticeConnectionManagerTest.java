@@ -26,6 +26,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
@@ -36,6 +38,7 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.net.PeerTarget;
 
 /** Exercises real maintenance and admission using controlled time and transport completion. */
 public class LatticeConnectionManagerTest {
@@ -810,6 +813,164 @@ public class LatticeConnectionManagerTest {
 		inFlight.complete(late);
 		assertFalse(late.isConnected());
 		assertEquals(0,manager.getConnectionCount());
+	}
+
+	private static PeerTarget target(List<AccountKey> keys,String... endpoints) {
+		AVector<AString> uris=Vectors.empty();
+		for (String endpoint:endpoints) uris=uris.conj(Strings.create(endpoint));
+		AVector<AccountKey> keyVector=Vectors.create(keys);
+		return new PeerTarget(Strings.create("test peer"),keyVector,uris);
+	}
+
+	/** A target naming one key is challenged for it alone, then held: kept, but never given an address or redialled. */
+	@Test public void testTargetPeerIsHeldUntilItsRouteGoes() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey remote=AKeyPair.createSeeded(201).getAccountKey();
+		CompletableFuture<Convex> connecting=manager.connectPeer(target(List.of(remote),"tcp://localhost:1"));
+		manager.maintainConnections();
+		IdentifyingPeer peer=new IdentifyingPeer(remote);
+		manager.endpointDials.remove(ENDPOINT).complete(peer);
+
+		assertSame(peer,connecting.getNow(null));
+		assertEquals(List.of(remote),peer.challengedFor,"challenged once, naming the key");
+		assertSame(peer,manager.getConnection(remote));
+		assertNull(manager.getDesiredPeers().get(remote).transports,"nothing to redial");
+		CompletableFuture<Void> gone=manager.whenDisconnected(remote);
+		assertFalse(gone.isDone());
+
+		assertTrue(manager.updateDiscoveredPeer(remote,Vectors.of(Strings.create("tcp://localhost:2")),5));
+		assertNull(manager.getDesiredPeers().get(remote).transports,"discovery gives a held peer no address");
+		manager.maintainConnections();
+		assertSame(peer,manager.getConnection(remote),"held, not trimmed");
+
+		peer.close();
+		manager.maintainConnections();
+		assertTrue(gone.isDone());
+		assertFalse(manager.getDesiredPeers().containsKey(remote),"forgotten once its route has gone");
+		now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
+		manager.maintainConnections();
+		assertTrue(manager.dials.isEmpty() && manager.endpointDials.isEmpty(),"not redialled");
+	}
+
+	/** A target listing several keys learns the key first and admits only one it lists. */
+	@Test public void testTargetAdmitsOnlyAKeyItLists() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey listed=AKeyPair.createSeeded(201).getAccountKey();
+		AccountKey rotated=AKeyPair.createSeeded(202).getAccountKey();
+		AccountKey stranger=AKeyPair.createSeeded(203).getAccountKey();
+
+		CompletableFuture<Convex> refused=manager.connectPeer(target(List.of(listed,rotated),"tcp://localhost:1"));
+		for (int attempt=1;attempt<=LatticeConnectionManager.MAX_ENDPOINT_ATTEMPTS;attempt++) {
+			manager.maintainConnections();
+			IdentifyingPeer other=new IdentifyingPeer(stranger);
+			manager.endpointDials.remove(ENDPOINT).complete(other);
+			assertFalse(other.isConnected(),"a node proving an unlisted key is closed");
+			now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
+		}
+		assertTrue(refused.isCompletedExceptionally());
+		assertNull(manager.getConnection(stranger));
+
+		CompletableFuture<Convex> admitted=manager.connectPeer(target(List.of(listed,rotated),"tcp://localhost:1"));
+		manager.maintainConnections();
+		IdentifyingPeer peer=new IdentifyingPeer(rotated);
+		manager.endpointDials.remove(ENDPOINT).complete(peer);
+		assertSame(peer,admitted.getNow(null));
+		assertEquals(Arrays.asList(null,rotated),peer.challengedFor);
+	}
+
+	/** A target's endpoints are tried in turn, each at least once, before it fails. */
+	@Test public void testTargetTriesEachEndpointInTurn() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey remote=AKeyPair.createSeeded(201).getAccountKey();
+		URI second=URI.create("tls://localhost:2");
+		CompletableFuture<Convex> connecting=manager.connectPeer(target(List.of(remote),
+			"tcp://localhost:1","wss://localhost/x","tls://localhost:2"));
+		List<URI> dialled=new ArrayList<>();
+		for (int attempt=1;attempt<=LatticeConnectionManager.MAX_ENDPOINT_ATTEMPTS;attempt++) {
+			manager.maintainConnections();
+			URI endpoint=manager.endpointDials.keySet().iterator().next();
+			dialled.add(endpoint);
+			manager.endpointDials.remove(endpoint).completeExceptionally(new java.net.ConnectException("Connection refused"));
+			now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
+		}
+		assertEquals(List.of(ENDPOINT,second,ENDPOINT),dialled,"an unsupported transport is skipped");
+		assertTrue(connecting.isCompletedExceptionally());
+		assertTrue(manager.getDesiredPeers().isEmpty());
+	}
+
+	/** A peer already desired intent keeps it when admitted from a target, and is redialled after its route goes. */
+	@Test public void testDesiredPeerAdmittedFromATargetIsStillRedialled() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey remote=AKeyPair.createSeeded(201).getAccountKey();
+		manager.addPeer(remote,new InetSocketAddress("localhost",3));
+		manager.maintainConnections();
+		manager.dials.remove(remote).completeExceptionally(new java.net.ConnectException("Connection refused"));
+
+		CompletableFuture<Convex> connecting=manager.connectPeer(target(List.of(remote),"tcp://localhost:1"));
+		manager.maintainConnections();
+		IdentifyingPeer peer=new IdentifyingPeer(remote);
+		manager.endpointDials.remove(ENDPOINT).complete(peer);
+		assertSame(peer,connecting.getNow(null));
+		assertEquals(Vectors.of(Strings.create("tcp://localhost:3")),manager.getDesiredPeers().get(remote).transports);
+
+		peer.close();
+		manager.maintainConnections();
+		now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
+		manager.maintainConnections();
+		assertTrue(manager.dials.containsKey(remote),"desired intent is redialled");
+	}
+
+	/** Cancelling abandons a target, and a node opened for it meanwhile is closed, not admitted. */
+	@Test public void testCancellingATargetAbandonsIt() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		AccountKey remote=AKeyPair.createSeeded(201).getAccountKey();
+		CompletableFuture<Convex> early=manager.connectPeer(target(List.of(remote),"tcp://localhost:1"));
+		early.cancel(false);
+		manager.maintainConnections();
+		assertTrue(manager.endpointDials.isEmpty());
+
+		CompletableFuture<Convex> late=manager.connectPeer(target(List.of(remote),"tcp://localhost:1"));
+		manager.maintainConnections();
+		CompletableFuture<Convex> inFlight=manager.endpointDials.remove(ENDPOINT);
+		late.cancel(false);
+		IdentifyingPeer peer=new IdentifyingPeer(remote);
+		inFlight.complete(peer);
+		assertFalse(peer.isConnected());
+		assertNull(manager.getConnection(remote));
+		assertTrue(manager.getDesiredPeers().isEmpty());
+	}
+
+	/** A target with nowhere this node can dial, or naming only this node, fails at once. */
+	@Test public void testTargetThatCannotBeDialledOrIsThisNodeFails() {
+		AKeyPair own=AKeyPair.createSeeded(200);
+		manager.setKeyPair(own);
+		assertTrue(manager.connectPeer(target(List.of(),"wss://localhost/x")).isCompletedExceptionally());
+		assertTrue(manager.connectPeer(target(List.of(own.getAccountKey()),"tcp://localhost:1")).isCompletedExceptionally());
+		manager.maintainConnections();
+		assertTrue(manager.endpointDials.isEmpty());
+	}
+
+	/** Waiting for a route to go completes at once without one, on release, and on close. */
+	@Test public void testWhenDisconnectedCompletesOnReleaseAndClose() {
+		manager.setKeyPair(AKeyPair.createSeeded(200));
+		assertTrue(manager.whenDisconnected(AKeyPair.createSeeded(209).getAccountKey()).isDone());
+
+		AccountKey released=AKeyPair.createSeeded(201).getAccountKey();
+		AccountKey kept=AKeyPair.createSeeded(202).getAccountKey();
+		for (AccountKey key:List.of(released,kept)) {
+			manager.connectPeer(target(List.of(key),"tcp://localhost:1"));
+			manager.maintainConnections();
+			manager.endpointDials.remove(ENDPOINT).complete(new IdentifyingPeer(key));
+		}
+		CompletableFuture<Void> releasedGone=manager.whenDisconnected(released);
+		CompletableFuture<Void> keptGone=manager.whenDisconnected(kept);
+		manager.releasePeer(released);
+		manager.maintainConnections();
+		assertTrue(releasedGone.isDone());
+		assertFalse(manager.getDesiredPeers().containsKey(released));
+		assertFalse(keptGone.isDone());
+		manager.close();
+		assertTrue(keptGone.isDone());
 	}
 
 	private static class TestManager extends LatticeConnectionManager {
