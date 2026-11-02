@@ -190,6 +190,16 @@ the document lists under `authentication`, and is dialled at the endpoints of it
 records, which a node that keeps them supplies to its resolver; without a record the
 name fails as having no known address. An expected key narrows the target to that key.
 
+What an operator relies on depends on how the peer is named. A `tcp://` address proves
+nothing about who answers: the peer is admitted under whatever key it proves. Over
+`tls://` the JVM trust store vouches for the host name first. An expected key is the
+operator's own copy, and the address only locates it. A `did:web` rests on whoever
+controls the domain's web server and certificate, who can name any key; an expected key
+beside it guards against a compromised domain. A `did:key` names the key itself, and
+its address comes from a node record the key holder signed. The resolver resolves
+whichever DIDs it is asked for, bounding each fetch in size and time, so a caller that
+resolves DIDs arriving from the network sets its own limits on how many and how often.
+
 A peer resolved from its name is a `PeerTarget`: the keys it may prove, none meaning
 any, and the endpoints to dial it at. `connectPeer(PeerTarget)` makes one bounded
 attempt, dialling the endpoints in turn, each at least once and three times in all at

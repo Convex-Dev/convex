@@ -559,11 +559,9 @@ wss://peer.convex.world/ws               WebSocket binary (clients)
 https://peer.convex.world                HTTPS REST + MCP
 ```
 
-Public key addressing for peer-to-peer:
-
-```
-tcp://0xabc123...@peer.convex.world:18888
-```
+A transport URI names where to reach a node, never its key. A node record pairs its
+transports with the key that signs it; where an operator expects a key, it is given
+beside the URI ([LATTICE_NETWORKING.md](LATTICE_NETWORKING.md#connection-capabilities)).
 
 ### 6.2 Transport Selection
 
