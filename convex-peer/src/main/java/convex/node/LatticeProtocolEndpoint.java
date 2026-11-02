@@ -198,6 +198,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 			throw new IllegalArgumentException("Connection and expected key must not be null");
 		}
 		if (!ownsInbound(connection)) {
+			// A connection leaves this group once it has closed, and then has nothing to authenticate
+			if (connection.isClosed()) return;
 			throw new IllegalStateException("Inbound connection belongs to another propagation group");
 		}
 		inboundVerifier.maybeStart(connection,propagator,expectedKey);

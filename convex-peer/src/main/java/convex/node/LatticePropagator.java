@@ -554,10 +554,13 @@ public class LatticePropagator implements Closeable {
 	 * P2P node does so when the connection delivers that key's own valid signed
 	 * NodeInfo. Desired-peer membership is not required. On success, the full-duplex
 	 * socket becomes an authenticated outbound route; callers may await
-	 * {@link LatticeConnectionManager#whenInboundConnectionUpgraded(AccountKey)}.
+	 * {@link LatticeConnectionManager#whenInboundConnectionUpgraded(AccountKey)}. A
+	 * connection that has closed, as one can just after delivering its last value, is
+	 * left alone.
 	 *
 	 * @param connection assigned physical inbound connection
 	 * @param expectedKey expected remote transport key
+	 * @throws IllegalStateException if an open connection belongs to another group
 	 */
 	public void authenticateInboundRoute(AConnection connection,AccountKey expectedKey) {
 		requireEndpoint().authenticateInbound(connection,expectedKey);
