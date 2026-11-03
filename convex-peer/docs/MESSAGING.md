@@ -312,11 +312,13 @@ Neither cancellation nor expiry implies that a submitted transaction did not run
 
 A reply completes the client's future on the thread that delivers it: a network
 event loop for a remote client, or for `ConvexLocal` the local peer's thread that
-handled the request, usually its query or transaction handler thread. A timeout or
-close completes it on the timeout scheduler or the closing thread. Stages attached
-with `thenApply`, `thenCompose`, `whenComplete` and the other non-async methods run
-on that thread without a hand-off, so they must not block: an event loop serves
-many connections, and a peer handler thread serves every client. A stage may send a
+produced the reply. That is the query handler for a query, the thread that executes
+blocks for a transaction's result, and the calling thread itself for a status or
+ping request. A timeout or close completes it on the timeout scheduler or the
+closing thread. Stages attached with `thenApply`, `thenCompose`, `whenComplete` and
+the other non-async methods run on that thread without a hand-off, so they must not
+block: an event loop serves many connections, and a local peer's threads serve every
+client and advance its state. A stage may send a
 further request: where its thread would wait for queue space that only it frees,
 the send fails at once with `FULL_CLIENT_BUFFER` instead
 ([CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md)). A stage that needs another
