@@ -29,8 +29,10 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
-import convex.lattice.LatticeApplication;
+import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
+import convex.lattice.LatticeOps;
 import convex.lattice.LocalLattice;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
@@ -65,12 +67,23 @@ public class SigningServiceTest {
 	}
 
 	/** An application keeping the signing service as its local state, as a persistent service would. */
-	private static final class SigningApplication extends LatticeApplication<Index<Keyword, ACell>> {
+	private static final class SigningApplication extends ALatticeApplication<Index<Keyword, ACell>> {
+		private static final KeyedLattice LATTICE = KeyedLattice.create(LocalLattice.KEY_LOCAL, LocalLattice.LATTICE);
 		final SigningService signing;
 
 		SigningApplication(LatticeHost<Index<Keyword, ACell>> host, AKeyPair peerKP) {
-			super(KeyedLattice.create(LocalLattice.KEY_LOCAL, LocalLattice.LATTICE), host);
+			super(host);
 			signing = new SigningService(cursor(), peerKP, Utils::getCurrentTimestampCell, host::persist);
+		}
+
+		@Override
+		public Index<Keyword, ACell> merge(Index<Keyword, ACell> other) {
+			return cursor().updateAndGet(own -> LATTICE.merge(own, other));
+		}
+
+		@Override
+		protected Index<Keyword, ACell> mergePublication(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
+			return LatticeOps.mergePublication(LATTICE, LatticeContext.EMPTY, own, other);
 		}
 
 		@Override

@@ -22,7 +22,6 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 import convex.lattice.LocalLattice;
 import convex.lattice.generic.KeyedLattice;
@@ -34,7 +33,7 @@ public class P2PPolicyTest {
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(8481);
 	private static final AKeyPair BOB=AKeyPair.createSeeded(8482);
 
-	@Test void multiKeySignerAndExplicitNodeIdentityAreIndependentOfContext() {
+	@Test void multiKeySignerAndExplicitNodeIdentityKeepTheBoundOwnerRule() {
 		var keys=Map.of(ALICE.getAccountKey(),ALICE,BOB.getAccountKey(),BOB);
 		var signatures=new AtomicInteger();
 		var host=LatticeHost.create();
@@ -44,7 +43,6 @@ public class P2PPolicyTest {
 				var key=keys.get(owner);
 				return key==null?null:key.signData(value);
 			},() -> CVMLong.create(123),DIDKeyAuthorizer.CONVEX));
-		app.setContext(LatticeContext.create(CVMLong.ZERO,BOB,(owner,key) -> true));
 		for (var key:keys.keySet()) app.identity(key).setIdentity(Strings.create("identity"),null,100);
 		app.directory().publishOwnRecord(null);
 		assertEquals(CVMLong.create(123),app.node(ALICE.getAccountKey()).getNodeInfo().get(P2PLattice.ID_TIMESTAMP));
@@ -55,7 +53,7 @@ public class P2PPolicyTest {
 		app.mergeAt(incoming,P2PLattice.KEY_ID);
 		assertEquals(3,signatures.get());
 		assertEquals(Strings.create("updated"),app.identity(BOB.getAccountKey()).getIdentity().get(P2PLattice.ID_NAME));
-		// An ambient permissive context cannot replace the registry's bound owner rule.
+		// A record placed under another owner's key is refused by the bound owner rule.
 		var before=app.cursor().get();
 		app.mergeAt(Maps.of(ALICE.getAccountKey(),incoming.get(BOB.getAccountKey())),P2PLattice.KEY_ID);
 		assertSame(before,app.cursor().get());

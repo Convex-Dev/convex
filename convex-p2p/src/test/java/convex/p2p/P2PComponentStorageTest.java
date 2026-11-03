@@ -21,7 +21,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeApplication;
+import convex.lattice.Regions;
 import convex.lattice.cursor.Root;
 
 /** Domain storage properties need neither a node nor a disk store. */
@@ -35,7 +35,7 @@ class P2PComponentStorageTest {
 		P2PLattice.createIdentity(Strings.intern("updated"),null,null,2);
 
 	private static P2PUser user(Root<ACell> root,BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		var application=new LatticeApplication<Index<Keyword,ACell>>(P2PLattice.ROOT,root.path()) {};
+		var application=new Regions(root.<Index<Keyword,ACell>>path());
 		return P2PUser.create(application,KEY,signer);
 	}
 

@@ -9,7 +9,7 @@ import convex.core.data.ASet;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
-import convex.lattice.LatticeApplication;
+import convex.lattice.ALatticeApplication;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
 
@@ -21,11 +21,15 @@ class NodeApplicationBoundaryTest {
 		assertEquals("NodeServer requires a host cell store",error.getMessage());
 	}
 
-	private static class App extends LatticeApplication<ASet<CVMLong>> {
+	private static class App extends ALatticeApplication<ASet<CVMLong>> {
+		private static final SetLattice<CVMLong> LATTICE=SetLattice.create();
 		int preparations;
-		App(LatticeHost<ASet<CVMLong>> host) { super(SetLattice.create(),host); }
+		App(LatticeHost<ASet<CVMLong>> host) { super(host); }
 		@Override public ASet<CVMLong> merge(ASet<CVMLong> other) {
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> LATTICE.merge(own,other));
+		}
+		@Override protected ASet<CVMLong> mergePublication(ASet<CVMLong> own,ASet<CVMLong> other) {
+			return LATTICE.merge(own,other);
 		}
 		@Override protected void beforeSync() { preparations++; }
 	}

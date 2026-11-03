@@ -22,8 +22,10 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.etch.EtchStore;
-import convex.lattice.LatticeApplication;
+import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
+import convex.lattice.LatticeOps;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.mail.Mail;
 import convex.lattice.mail.MailEnvelope;
@@ -55,11 +57,19 @@ class MailDeliveryTest {
 	 * lattice; a mail replication policy would first project it to the mailboxes a node
 	 * desires.
 	 */
-	static final class MailApp extends LatticeApplication<Index<Keyword,ACell>> {
-		MailApp(LatticeHost<Index<Keyword,ACell>> host) { super(ROOT,host); }
+	static final class MailApp extends ALatticeApplication<Index<Keyword,ACell>> {
+		MailApp(LatticeHost<Index<Keyword,ACell>> host) { super(host); }
 		Mail mail(AKeyPair user) { return Mail.connect(this,Mail.LATTICE,(owner,value) -> user.signData(value)); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> ROOT.merge(own,other));
+		}
+		/** A pulled mailbox arrives at its path and is reduced to a root by the lattice. */
+		@Override protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {
+			Index<Keyword,ACell> reduced=LatticeOps.reduce(ROOT,value,path);
+			return reduced==null?cursor().get():merge(reduced);
+		}
+		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeOps.mergePublication(ROOT,LatticeContext.EMPTY,own,other);
 		}
 	}
 

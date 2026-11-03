@@ -15,13 +15,14 @@ import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.lattice.generic.SetLattice;
 
-class LatticeApplicationTest {
+/** A component whose merge, path delivery and publication are a supplied lattice, registered at a host root. */
+class LatticeComponentTest {
 	private static final Keyword ITEMS=Keyword.intern("items");
 	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
 
-	@Test void privateApplicationAcceptsPathsButWaitsForPublication() {
+	@Test void stagedRootAcceptsPathsButWaitsForPublication() {
 		var host=LatticeHost.create();
-		var app=new LatticeApplication<>(LATTICE,host);
+		var app=new LatticeComponent<>(LATTICE,host.cursor().fork());
 		host.addApplication(app);
 		host.mergeAt(Sets.of(1),ITEMS);
 		assertEquals(Sets.of(1),app.cursor().get().get(ITEMS));
@@ -30,12 +31,12 @@ class LatticeApplicationTest {
 		assertEquals(app.cursor().get(),host.cursor().get());
 	}
 
-	@Test void legacyOwnerPathsRetainAuthorisation() {
+	@Test void ownerPathsRetainAuthorisation() {
 		var owner=AKeyPair.createSeeded(9183);
 		var stranger=AKeyPair.createSeeded(9184);
 		var lattice=KeyedLattice.create(ITEMS,OwnerLattice.create(SetLattice.create()));
 		var root=LatticeHost.create();
-		root.addApplication(LatticeApplication.live(lattice,root));
+		root.addApplication(new LatticeComponent<>(lattice,root.cursor()));
 		var values=Sets.of(CVMLong.ONE);
 		root.mergeAt(stranger.signData(values),ITEMS,owner.getAccountKey());
 		assertNull(RT.getIn(root.cursor().get(),ITEMS,owner.getAccountKey()));

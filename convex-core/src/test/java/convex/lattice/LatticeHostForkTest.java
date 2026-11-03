@@ -23,12 +23,12 @@ class LatticeHostForkTest {
 	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
 
 	/** A live application over the host, registered to receive deliveries. */
-	private static LatticeApplication<Index<Keyword,ACell>> live(LatticeHost<Index<Keyword,ACell>> host) {
-		return host.addApplication(LatticeApplication.live(LATTICE,host));
+	private static LatticeComponent<Index<Keyword,ACell>> live(LatticeHost<Index<Keyword,ACell>> host) {
+		return host.addApplication(new LatticeComponent<>(LATTICE,host.cursor()));
 	}
 
-	private static void add(LatticeApplication<Index<Keyword,ACell>> app,long item) {
-		app.<ASet<ACell>>resolve(ITEMS).updateAndGet(items ->
+	private static void add(LatticeComponent<Index<Keyword,ACell>> app,long item) {
+		LatticeComponent.<ASet<ACell>>resolve(app.cursor(),LATTICE,ITEMS).updateAndGet(items ->
 			(items==null?Sets.<ACell>empty():items).include(CVMLong.create(item)));
 	}
 
@@ -117,8 +117,8 @@ class LatticeHostForkTest {
 			var forkApp=live(fork);
 			Blob forkBlob=Blobs.createRandom(400);
 			Blob originBlob=Blobs.createRandom(400);
-			forkApp.<ASet<ACell>>resolve(ITEMS).updateAndGet(items -> Sets.of(forkBlob));
-			originApp.<ASet<ACell>>resolve(ITEMS).updateAndGet(items -> Sets.of(originBlob));
+			LatticeComponent.<ASet<ACell>>resolve(forkApp.cursor(),LATTICE,ITEMS).updateAndGet(items -> Sets.of(forkBlob));
+			LatticeComponent.<ASet<ACell>>resolve(originApp.cursor(),LATTICE,ITEMS).updateAndGet(items -> Sets.of(originBlob));
 			assertNull(store.refForHash(forkBlob.getHash()));
 			assertNull(scratch.refForHash(originBlob.getHash()));
 

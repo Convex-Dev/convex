@@ -103,7 +103,7 @@ public final class SharedApplicationsExample {
 		private Node(EtchStore store,AKeyPair nodeKey,long time) throws Exception {
 			host=LatticeHost.open(store);
 			// Infrastructure is registered once; both domain applications use its live state.
-			host.addApplication(LatticeApplication.live(P2PLattice.ROOT,host));
+			host.addApplication(new LatticeComponent<>(P2PLattice.ROOT,host.cursor()));
 			social=host.addApplication(new SocialApp(host,ALICE,time));
 			var region=DLFSRegion.connect(host.cursor().path(Keywords.FS),store,
 				BOB::signData,() -> CVMLong.create(time));

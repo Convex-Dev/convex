@@ -23,8 +23,8 @@ import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.IndexComponent;
-import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeHost;
+import convex.lattice.LatticeOps;
 import convex.lattice.LocalLattice;
 import convex.lattice.MapComponent;
 import convex.lattice.OwnedMap;
@@ -65,8 +65,9 @@ import convex.social.Social;
  * such as this node's own record, it
  * syncs its host so the edit is persisted and announced.</p>
  */
-public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
+public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
+	private final KeyedLattice lattice;
 	private final LatticeHost<Index<Keyword,ACell>> host;
 	private final SocialReplicationPolicy socialPolicy;
 	private final AccountKey ownKey;
@@ -103,7 +104,8 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 	private P2PApplication(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host,
 			AccountKey ownKey,BiFunction<ACell,ACell,SignedData<ACell>> signer,
 			Supplier<CVMLong> clock,DIDKeyAuthorizer didAuthorizer) {
-		super(lattice,host.cursor());
+		super(host.cursor());
+		this.lattice=lattice;
 		this.host=host;
 		this.ownKey=ownKey;
 		this.signer=signer;
@@ -178,8 +180,18 @@ public class P2PApplication extends LatticeApplication<Index<Keyword,ACell>> {
 		if (wanted==null) return cursor().get();
 		if (wanted.get(P2PLattice.KEY_P2P) instanceof Index<?,?> region) registry.merge((Index<Keyword,ACell>)region);
 		Index<Keyword,ACell> rest=wanted.dissoc(P2PLattice.KEY_P2P);
-		return cursor().updateAndGet(own -> getLattice().merge(own,rest));
+		return cursor().updateAndGet(own -> lattice.merge(own,rest));
 	}
+
+	/** Reduces a path delivery to a root with this application's lattice, then merges that root. */
+	@Override
+	protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {
+		Index<Keyword,ACell> reduced=LatticeOps.reduce(lattice,value,path);
+		return reduced==null?cursor().get():merge(reduced);
+	}
+
+	/** The root lattice this application was connected with, which selects its served regions. */
+	public KeyedLattice getLattice() { return lattice; }
 
 	/**
 	 * Projects a root to what this node exchanges with others: every region as

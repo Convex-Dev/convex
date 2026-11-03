@@ -66,6 +66,23 @@ public class ALatticeComponentTest {
 		}
 	}
 
+	/** An application merging a set by union, staged over a host or live in a cursor. */
+	private static class SetApplication extends ALatticeApplication<ASet<ACell>> {
+
+		SetApplication(LatticeHost<ASet<ACell>> host) {
+			super(host);
+		}
+
+		SetApplication(AForkableCursor<ASet<ACell>> cursor) {
+			super(cursor);
+		}
+
+		@Override
+		public ASet<ACell> merge(ASet<ACell> incoming) {
+			return cursor().updateAndGet(own -> own.includeAll(incoming));
+		}
+	}
+
 	@Test
 	public void testStandaloneComponentOverCursor() {
 		TestComponent component=new TestComponent(Cursors.root(Sets.<ACell>empty()));
@@ -165,9 +182,9 @@ public class ALatticeComponentTest {
 	public void persistNeedsAFunctionOrAHost() throws Exception {
 		var host=LatticeHost.<ASet<ACell>>create(Sets.empty(),new MemoryStore());
 		assertThrows(UnsupportedOperationException.class,() -> new TestComponent(host.cursor()).persist());
-		assertThrows(UnsupportedOperationException.class,() -> LatticeApplication.live(SetLattice.create(),host).persist());
+		assertThrows(UnsupportedOperationException.class,() -> new SetApplication(host.cursor()).persist());
 
-		var application=new LatticeApplication<ASet<ACell>>(SetLattice.create(),host);
+		var application=new SetApplication(host);
 		ABlob blob=Blobs.createRandom(new Random(5678),1000);
 		application.cursor().update(set -> set.include(blob));
 		assertEquals(Sets.of(blob),application.persist());

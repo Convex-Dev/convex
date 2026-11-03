@@ -41,8 +41,8 @@ import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.dlfs.DLFSServer;
-import convex.lattice.LatticeApplication;
 import convex.core.util.Utils;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFS;
@@ -64,9 +64,10 @@ public class DLFSComponentTest {
 		var lattice=KeyedLattice.create(projects,convex.lattice.generic.MapLattice.create(workspace));
 		var store=new MemoryStore();
 		var root=LatticeHost.create(lattice.zero(),store);
-		var app=new convex.lattice.LatticeApplication<>(lattice,root);
+		var app=new LatticeComponent<>(lattice,root.cursor().fork());
 		var key=AKeyPair.generate();
-		var attached=DLFSRegion.connect(app.resolve(projects,project,KEY_DOCUMENTS),null,key::signData,() -> CVMLong.create(123));
+		var attached=DLFSRegion.connect(LatticeComponent.resolve(app.cursor(),lattice,projects,project,KEY_DOCUMENTS),
+			null,key::signData,() -> CVMLong.create(123));
 		var destination=attached.cursor();
 		var files=attached.fork();
 		var liveDrive=files.drives(key.getAccountKey()).getOrCreateDrive("home");
@@ -87,7 +88,7 @@ public class DLFSComponentTest {
 		root.sync();
 		assertEquals(root.cursor().get(),store.getRootData());
 		var restored=DLFSRegion.connect(
-			LatticeApplication.live(lattice,root).resolve(projects,project,KEY_DOCUMENTS),store);
+			LatticeComponent.resolve(root.cursor(),lattice,projects,project,KEY_DOCUMENTS),store);
 		assertEquals("embedded subsystem",Files.readString(restored.drives(key.getAccountKey())
 			.drive("home").fileSystem().getPath("/draft.txt")));
 	}

@@ -27,8 +27,8 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.Lattice;
-import convex.lattice.LatticeApplication;
 import convex.lattice.LatticeContext;
+import convex.lattice.Regions;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.OwnerMapLattice;
@@ -70,14 +70,9 @@ public class SocialAppTest {
 		};
 	}
 
-	/** An application at the root level over an in-memory root. */
-	private static class TestRoot extends LatticeApplication<Index<Keyword, ACell>> {
-		TestRoot(KeyedLattice lattice) {
-			super(lattice,Cursors.root(lattice.zero()));
-		}
-		@Override public Index<Keyword, ACell> merge(Index<Keyword, ACell> other) {
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
-		}
+	/** An application at the root level over an in-memory root holding the lattice's zero. */
+	private static Regions testRoot(KeyedLattice lattice) {
+		return new Regions(Cursors.root(lattice.zero()));
 	}
 
 	@Test
@@ -398,7 +393,7 @@ public class SocialAppTest {
 
 		// An application at the root declares :social and hands the region its cursor
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		TestRoot application = new TestRoot(root);
+		var application = testRoot(root);
 
 		Social social = Social.connect(application, kp);
 
@@ -415,7 +410,7 @@ public class SocialAppTest {
 		AKeyPair kp = AKeyPair.generate();
 
 		KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-		TestRoot application = new TestRoot(root);
+		var application = testRoot(root);
 
 		Social social = Social.connect(application, kp);
 		social.user(kp.getAccountKey()).feed().post("Propagated");
@@ -429,8 +424,7 @@ public class SocialAppTest {
 	public void testComponentConnectionDoesNotInheritSigningAuthority() {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
-		TestRoot root=new TestRoot(lattice);
-		root.setContext(LatticeContext.create(null,kp));
+		var root=testRoot(lattice);
 		Social social=Social.connect(root);
 
 		assertThrows(IllegalStateException.class,() -> social.user(kp.getAccountKey()).feed().post("No authority"));
@@ -441,7 +435,7 @@ public class SocialAppTest {
 	public void testForkBeneathComponentStaysIsolatedUntilSync() {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
-		TestRoot root=new TestRoot(lattice);
+		var root=testRoot(lattice);
 		Social social=Social.connect(root,kp);
 		Social fork=social.fork();
 		Feed forkFeed=fork.user(kp.getAccountKey()).feed();

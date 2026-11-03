@@ -24,12 +24,12 @@ public class LatticeHostTest {
 	@Test
 	public void testAddedApplicationsKeepTheirStateAndPublicationBoundaries() {
 		var host=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),null);
-		var first=new LatticeApplication<>(SetLattice.<CVMLong>create(),host);
+		var first=new LatticeComponent<>(SetLattice.<CVMLong>create(),host.cursor().fork());
 		var context=new LatticeContext() {};
 		first.setContext(context);
 		first.cursor().set(Sets.of(1));
 		assertSame(first,host.addApplication(first));
-		var second=host.addApplication(new LatticeApplication<>(SetLattice.<CVMLong>create(),host));
+		var second=host.addApplication(new LatticeComponent<>(SetLattice.<CVMLong>create(),host.cursor().fork()));
 		assertSame(context,first.getContext());
 		assertEquals(Sets.of(1),first.cursor().get());
 		assertTrue(host.cursor().get().isEmpty());
@@ -119,7 +119,7 @@ public class LatticeHostTest {
 			if (path) host.mergeAt(Sets.of(1));
 			else host.merge(Sets.of(1));
 			assertTrue(host.cursor().get().isEmpty());
-			var app=host.addApplication(new LatticeApplication<>(SetLattice.<CVMLong>create(),host));
+			var app=host.addApplication(new LatticeComponent<>(SetLattice.<CVMLong>create(),host.cursor().fork()));
 			assertTrue(app.cursor().get().isEmpty());
 			host.merge(Sets.of(2));
 			assertEquals(Sets.of(2),app.cursor().get());

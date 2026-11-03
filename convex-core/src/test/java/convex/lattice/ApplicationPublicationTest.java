@@ -197,7 +197,7 @@ public class ApplicationPublicationTest {
 	public void testHostPersistenceCannotRemergeOverAnApplicationPublication() {
 		var maximum=CompareLattice.<CVMLong>create((a,b) -> a.compareTo(b));
 		var host=LatticeHost.create(CVMLong.create(5),null);
-		var app=new LatticeApplication<>(maximum,host);
+		var app=new LatticeComponent<>(maximum,host.cursor().fork());
 		host.addApplication(app);
 		app.cursor().set(CVMLong.ONE);
 		host.attachPublisher(snapshot -> {
@@ -229,14 +229,14 @@ public class ApplicationPublicationTest {
 	public void testApplicationMaySupplyItsOwnLattice() {
 		var host=LatticeHost.create(initial(),null);
 		var selected=KeyedLattice.create(REGISTER,LWW);
-		var app=new LatticeApplication<>(selected,host);
+		var app=new LatticeComponent<>(selected,host.cursor().fork());
 		host.addApplication(app);
 		host.merge(LATTICE.zero().assoc(REGISTER,CVMLong.ONE).assoc(IGNORED,CVMLong.TWO));
 		app.sync();
 		assertSame(selected,app.getLattice());
 		assertEquals(CVMLong.ZERO,host.cursor().get().get(REGISTER),"Incoming equal-time value loses to existing own");
 		assertNull(host.cursor().get().get(IGNORED));
-		app.<CVMLong>resolve(REGISTER).set(CVMLong.ONE);
+		LatticeComponent.<CVMLong>resolve(app.cursor(),selected,REGISTER).set(CVMLong.ONE);
 		app.sync();
 		assertEquals(CVMLong.ONE,host.cursor().get().get(REGISTER),"A local equal-time edit replaces its predecessor");
 	}

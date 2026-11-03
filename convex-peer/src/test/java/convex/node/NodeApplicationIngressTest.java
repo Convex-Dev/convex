@@ -23,23 +23,34 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
-import convex.lattice.LatticeApplication;
+import convex.lattice.ALatticeApplication;
+import convex.lattice.LatticeComponent;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
+import convex.lattice.LatticeOps;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.SetLattice;
 
 class NodeApplicationIngressTest {
 	private static final Keyword ITEMS=Keyword.intern("items");
 	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
-	private static class App extends LatticeApplication<Index<Keyword,ACell>> {
+	private static class App extends ALatticeApplication<Index<Keyword,ACell>> {
 		int preparations;
 		int merges;
 		boolean ignore;
-		App(LatticeHost<Index<Keyword,ACell>> host) { super(LATTICE,host); }
+		App(LatticeHost<Index<Keyword,ACell>> host) { super(host); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
 			if (ignore) return cursor().get();
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,incoming));
+			return cursor().updateAndGet(own -> LATTICE.merge(own,incoming));
+		}
+		/** A path delivery is reduced to a root by the lattice, then merged here. */
+		@Override protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {
+			Index<Keyword,ACell> reduced=LatticeOps.reduce(LATTICE,value,path);
+			return reduced==null?cursor().get():merge(reduced);
+		}
+		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeOps.mergePublication(LATTICE,LatticeContext.EMPTY,own,other);
 		}
 		@Override protected void beforeSync() { preparations++; }
 	}
@@ -135,7 +146,7 @@ class NodeApplicationIngressTest {
 		try (var store=EtchStore.createTemp("root-prelaunch")) {
 			store.setRootData(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE)));
 			var host=LatticeHost.open(LATTICE.zero(),store,convex.lattice.cursor.Cursors::transactionalRoot);
-			host.addApplication(convex.lattice.LatticeApplication.live(LATTICE,host));
+			host.addApplication(new LatticeComponent<>(LATTICE,host.cursor()));
 			try (var node=new NodeServer<>(host)) {
 				node.mergeValue(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));
 				assertTrue(node.getCursor().supportsExclusiveTransactions());

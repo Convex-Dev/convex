@@ -30,17 +30,21 @@ class ApplicationIngressTest {
 	private static final Keyword UNKNOWN=Keyword.intern("unknown");
 	private static final KeyedLattice LATTICE=KeyedLattice.create(ITEMS,SetLattice.create());
 
-	/** Counts root and path deliveries and takes the default for each, unless told to ignore them. */
-	private static class App extends LatticeApplication<Index<Keyword,ACell>> {
+	/** Counts root and path deliveries and merges each by its lattice, unless told to ignore them. */
+	private static class App extends ALatticeApplication<Index<Keyword,ACell>> {
+		final KeyedLattice rule;
 		int merges;
 		int pathMerges;
 		int preparations;
 		boolean ignore;
-		App(KeyedLattice lattice,LatticeHost<Index<Keyword,ACell>> host) { super(lattice,host); }
+		App(KeyedLattice rule,LatticeHost<Index<Keyword,ACell>> host) {
+			super(host);
+			this.rule=rule;
+		}
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
 			if (ignore) return cursor().get();
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,incoming));
+			return cursor().updateAndGet(own -> rule.merge(own,incoming));
 		}
 		@Override public Index<Keyword,ACell> mergeAt(ACell value,ACell... path) {
 			if (path.length>0) {
@@ -48,6 +52,17 @@ class ApplicationIngressTest {
 				if (ignore) return cursor().get();
 			}
 			return super.mergeAt(value,path);
+		}
+		/** A path no child resolves is reduced to a root by the lattice, then merged here. */
+		@Override protected Index<Keyword,ACell> mergeAtPath(ACell value,ACell... path) {
+			Index<Keyword,ACell> reduced=LatticeOps.reduce(rule,value,path);
+			return reduced==null?cursor().get():merge(reduced);
+		}
+		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeOps.mergePublication(rule,LatticeContext.EMPTY,own,other);
+		}
+		<T extends ACell> AForkableCursor<T> resolve(ACell... path) {
+			return LatticeComponent.resolve(cursor(),rule,path);
 		}
 		@Override protected void beforeSync() { preparations++; }
 	}

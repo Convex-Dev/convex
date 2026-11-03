@@ -65,15 +65,6 @@ public class HostStoresTest {
 	}
 
 
-	private static final class SetApplication extends LatticeApplication<ASet<ACell>> {
-		SetApplication(LatticeHost<ASet<ACell>> host) {
-			super(SetLattice.create(),host);
-		}
-		@Override public ASet<ACell> merge(ASet<ACell> other) {
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
-		}
-	}
-
 	private static final class FlushStore extends MemoryStore {
 		private boolean flushed;
 
@@ -161,7 +152,7 @@ public class HostStoresTest {
 	public void testApplicationPublishesWorkingStateBeforeHostPersistence() throws Exception {
 		try (MemoryStore store=new MemoryStore()) {
 			LatticeHost<ASet<ACell>> root=LatticeHost.create(SetLattice.create().zero(),store);
-			SetApplication application=new SetApplication(root);
+			var application=new LatticeComponent<>(SetLattice.<ACell>create(),root.cursor().fork());
 			ABlob blob=Blobs.createRandom(new Random(9012),5000);
 
 			assertTrue(application.getLattice() instanceof SetLattice);

@@ -31,7 +31,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.util.JSON;
 import convex.core.store.MemoryStore;
-import convex.lattice.LatticeApplication;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
 import convex.net.PeerResolver;
@@ -211,7 +211,7 @@ class LatticeNodeTest {
 		try (var sourceStore=new MemoryStore(); var targetStore=new MemoryStore()) {
 			var source=LatticeHost.create(Sets.<CVMLong>of(1),sourceStore);
 			var target=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),targetStore);
-			var app=target.addApplication(new LatticeApplication<>(SetLattice.<CVMLong>create(),target));
+			var app=target.addApplication(new LatticeComponent<>(SetLattice.<CVMLong>create(),target.cursor().fork()));
 			var sourceKey=AKeyPair.createSeeded(701);
 			try (var sender=new LatticeNode<>(source,NodeConfig.port(0)).launch();
 					var receiver=new LatticeNode<>(target,NodeConfig.port(-1)).launch()) {
@@ -291,7 +291,7 @@ class LatticeNodeTest {
 		try (var servedStore=new MemoryStore(); var diallerStore=new MemoryStore()) {
 			var servedHost=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),servedStore);
 			var diallerHost=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),diallerStore);
-			var app=diallerHost.addApplication(new LatticeApplication<>(SetLattice.<CVMLong>create(),diallerHost));
+			var app=diallerHost.addApplication(new LatticeComponent<>(SetLattice.<CVMLong>create(),diallerHost.cursor().fork()));
 			var servedKey=AKeyPair.createSeeded(707);
 			var diallerKey=AKeyPair.createSeeded(708);
 			try (var served=new LatticeNode<>(servedHost,NodeConfig.port(0)).launch();

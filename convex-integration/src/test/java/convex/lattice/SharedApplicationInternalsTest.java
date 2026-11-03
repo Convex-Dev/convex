@@ -87,13 +87,13 @@ public class SharedApplicationInternalsTest {
 	private static final LatticeContext VERIFY=LatticeContext.EMPTY.withOwnerVerifier(
 		(owner,signer) -> owner.equals(signer) || owner.equals(DID.forKey(signer)));
 
-	/** A live view of the whole host root, as a root application holds it. */
-	private static LatticeApplication<Index<Keyword,ACell>> view(LatticeHost<Index<Keyword,ACell>> host) {
-		return LatticeApplication.live(HOST_ROOT,host);
+	/** A live application over the whole host root, for opening domain views. */
+	private static ALatticeApplication<Index<Keyword,ACell>> view(LatticeHost<Index<Keyword,ACell>> host) {
+		return new Regions(host.cursor());
 	}
 
 	/** Applications choose working-state policy; ordinary domain views need no fork. */
-	private static final class WorkingApplication extends LatticeApplication<Index<Keyword,ACell>> {
+	private static final class WorkingApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		CVMLong timestamp=CVMLong.create(100);
 		final SignedComponent<Index<Keyword,ACell>> socialState;
 		final SignedComponent<AHashMap<AString,AVector<ACell>>> fileState;
@@ -103,8 +103,7 @@ public class SharedApplicationInternalsTest {
 		final P2PNodeRecord node;
 
 		WorkingApplication(LatticeHost<Index<Keyword,ACell>> host,boolean socialApp,Runnable signing) {
-			super(HOST_ROOT,host);
-			setContext(VERIFY);
+			super(host);
 			if (socialApp) {
 				var policy=context(SOCIAL_KEY,signing);
 				socialState=owned(host,policy,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
@@ -124,7 +123,11 @@ public class SharedApplicationInternalsTest {
 		}
 
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> HOST_ROOT.merge(VERIFY,own,other));
+		}
+
+		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeOps.mergePublication(HOST_ROOT,VERIFY,own,other);
 		}
 
 		/**
@@ -135,13 +138,13 @@ public class SharedApplicationInternalsTest {
 		@SuppressWarnings("unchecked")
 		private <T extends ACell> SignedComponent<T> owned(LatticeHost<Index<Keyword,ACell>> host,
 				LatticeContext context,ACell... path) {
-			ALattice<?> lattice=getLattice();
+			ALattice<?> lattice=HOST_ROOT;
 			for (ACell key:path) lattice=lattice.path(key);
 			var rule=(SignedLattice<T>)lattice;
 			// This legacy application's resolver supplies both the public owner rule
 			// and an explicit signer; the draft itself does not look up a context.
 			return new SignedComponent<>(rule.withOwner(rule.getOwner(),context::verifyOwner),
-				LatticeComponent.<SignedData<T>>resolve(host.cursor(),getLattice(),path),
+				LatticeComponent.<SignedData<T>>resolve(host.cursor(),HOST_ROOT,path),
 				value -> context.signAs(rule.getOwner(),value));
 		}
 
@@ -199,7 +202,7 @@ public class SharedApplicationInternalsTest {
 		assertNull(host.cursor().get().get(Keywords.FS));
 		filesApp.sync();
 		assertNotNull(Social.connect(view(host)).user(SOCIAL_KEY.getAccountKey()).feed().getPost(post));
-		assertEquals("working file",Files.readString(DLFSRegion.connect(view(host).resolve(Keywords.FS),host.store())
+		assertEquals("working file",Files.readString(DLFSRegion.connect(LatticeComponent.resolve(host.cursor(),HOST_ROOT,Keywords.FS),host.store())
 			.drives(FILES_KEY.getAccountKey()).drive("home").fileSystem().getPath("/hello.txt")));
 		assertEquals(info,P2PUser.create(view(host),COMMON_KEY.getAccountKey()).node().getNodeInfo());
 		assertEquals(info,P2PUser.create(view(host),FILES_KEY.getAccountKey()).node().getNodeInfo());
@@ -207,7 +210,6 @@ public class SharedApplicationInternalsTest {
 		socialApp.sync();
 		filesApp.sync();
 		assertEquals(4,signatures.get(),"Unchanged checkpoints do not sign");
-		assertNull(socialApp.getContext().getSigningKey());
 		assertNull(store.getRootData());
 		host.sync();
 		assertEquals(host.cursor().get(),store.getRootData());
@@ -232,7 +234,7 @@ public class SharedApplicationInternalsTest {
 	}
 
 	/** Domain composition over a root cursor, also usable as an isolated transaction view. */
-	private static final class SocialWithP2P extends LatticeApplication<Index<Keyword,ACell>>
+	private static final class SocialWithP2P extends Regions
 			implements TransactionalComponent<Index<Keyword,ACell>,SocialWithP2P> {
 		private final LatticeContext policy;
 		final Social social;
@@ -240,8 +242,11 @@ public class SharedApplicationInternalsTest {
 			this(host.cursor(),context(SOCIAL_KEY));
 		}
 		SocialWithP2P(AForkableCursor<Index<Keyword,ACell>> cursor,LatticeContext policy) {
-			super(SOCIAL_ROOT,cursor);
+			super(cursor);
 			this.policy=policy;
+			for (Keyword key:new Keyword[]{Social.KEY_SOCIAL,Keywords.P2P,Keywords.ID,P2PLattice.KEY_KAD}) {
+				region(key,LatticeComponent.live(SOCIAL_ROOT.path(key),cursor.path(key),LatticeContext.EMPTY));
+			}
 			social=Social.connect(cursor.path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 				(owner,value) -> policy.signAs(owner,value),policy::currentTimestamp);
 		}
@@ -672,7 +677,6 @@ public class SharedApplicationInternalsTest {
 			// Independent receiver sees the partial roots in reverse order, with the same result.
 			// It takes only the social owners it wants, so it pins the social user first.
 			var reverse=P2PApplication.connect(HOST_ROOT,LatticeHost.create(HOST_ROOT.zero(),reverseStore));
-			reverse.setContext(VERIFY);
 			reverse.pinSocial(DID.forKey(SOCIAL_KEY.getAccountKey()));
 			reverse.merge(filesView);
 			reverse.merge(socialView);

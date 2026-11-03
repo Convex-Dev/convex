@@ -23,7 +23,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.MemoryStore;
 import convex.core.util.ThreadUtils;
-import convex.lattice.LatticeApplication;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
 
@@ -103,7 +103,7 @@ class NodeShutdownTest {
 		try (var senderStore=new MemoryStore();
 				var receiverStore=new MemoryStore()) {
 			LatticeHost<ASet<ACell>> senderHost=LatticeHost.open(lattice.zero(),senderStore);
-			var app=senderHost.addApplication(new LatticeApplication<>(lattice,senderHost));
+			var app=senderHost.addApplication(new LatticeComponent<>(lattice,senderHost.cursor().fork()));
 			LatticeHost<ASet<ACell>> receiverHost=RelayHost.open(lattice,receiverStore);
 			try (var receiver=new LatticeNode<>(receiverHost,NodeConfig.port(0));
 					var sender=new LatticeNode<>(senderHost,NodeConfig.port(0))) {

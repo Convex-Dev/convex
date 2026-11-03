@@ -21,9 +21,8 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeApplication;
+import convex.lattice.Regions;
 import convex.lattice.cursor.Root;
-import convex.lattice.generic.KeyedLattice;
 
 /** Reads distinguish absence, empty values and incompatible data without modifying storage. */
 class SocialReadTest {
@@ -34,8 +33,7 @@ class SocialReadTest {
 
 	@Test void applicationViewsRejectIncompatibleRootsAndPreserveOtherRegions() {
 		var root=new Root<ACell>();
-		var app=new LatticeApplication<Index<Keyword,ACell>>(
-			KeyedLattice.create(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE),root.path()) {};
+		var app=new Regions(root.<Index<Keyword,ACell>>path());
 		var relay=Social.connect(app).user(DID_ALICE);
 		var author=Social.connect(app,ALICE).user(DID_ALICE);
 		assertEquals(0,relay.feed().count());
