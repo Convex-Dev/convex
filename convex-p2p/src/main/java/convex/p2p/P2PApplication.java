@@ -22,6 +22,7 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALatticeApplication;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.IndexComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.LatticeOps;
@@ -277,7 +278,7 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	 * ancestors only on a changed write and reject incompatible storage on access.
 	 * The owned map binds local signing to the same rule as incoming delivery.
 	 */
-	static AForkableCursor<ACell> identitySlot(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey,
+	static AForkableCursor<ACell> identitySlot(ALatticeComponent<Index<Keyword,ACell>> application, AccountKey userKey,
 			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		var root=new IndexComponent<>(application.cursor());
 		var ids=new OwnedMap<>(P2PLattice.ID_LATTICE,root.path(P2PLattice.KEY_ID));
@@ -285,7 +286,7 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 	}
 
 	/** Cursor at {@code [:p2p :nodes owner :value]}, navigated and signed the same way. */
-	static AForkableCursor<ACell> nodeSlot(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey,
+	static AForkableCursor<ACell> nodeSlot(ALatticeComponent<Index<Keyword,ACell>> application, AccountKey userKey,
 			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		var root=new IndexComponent<>(application.cursor());
 		var p2p=new IndexComponent<Keyword,ACell>(root.path(P2PLattice.KEY_P2P));

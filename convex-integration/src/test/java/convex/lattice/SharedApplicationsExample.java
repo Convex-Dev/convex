@@ -60,7 +60,7 @@ public final class SharedApplicationsExample {
 		private final Social social;
 
 		SocialApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long time) {
-			super(host);
+			super(host.cursor());
 			social=region(Social.KEY_SOCIAL,Social.connect(cursor().path(Social.KEY_SOCIAL),
 				DIDKeyAuthorizer.CONVEX,(owner,value) -> user.signData(value),() -> CVMLong.create(time)).fork());
 		}

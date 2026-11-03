@@ -94,7 +94,7 @@ class OwnedScoresApplicationTest {
 		var authority=new Authority();
 		authority.authorise(TEAM,ALICE.getAccountKey(),BOB.getAccountKey());
 		var host=LatticeHost.create();
-		var app=new SingleRegion<>(host,SCORES,new Scores(host.cursor().path(SCORES),authority).fork());
+		var app=new SingleRegion<>(host.cursor(),SCORES,new Scores(host.cursor().path(SCORES),authority).fork());
 		var alice=app.component().score(TEAM,ALICE);
 		var bob=app.component().score(TEAM,BOB);
 		alice.record(10);
@@ -104,7 +104,7 @@ class OwnedScoresApplicationTest {
 		app.sync();
 
 		var replicaHost=LatticeHost.create();
-		var replica=new SingleRegion<>(replicaHost,SCORES,new Scores(replicaHost.cursor().path(SCORES),authority).fork());
+		var replica=new SingleRegion<>(replicaHost.cursor(),SCORES,new Scores(replicaHost.cursor().path(SCORES),authority).fork());
 		replicaHost.addApplication(replica);
 		replicaHost.merge(host.cursor().get());
 		var accepted=replica.component().get(TEAM);

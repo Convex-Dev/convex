@@ -217,10 +217,10 @@ provisional until it is.
 
 ### Host DLFS in a lattice application
 
-`DLFSApplication` extends the general `ALatticeApplication` component over the
-complete hosted lattice root. It composes a physical, multi-owner `DLFSRegion`
-at a path of region keys, with no separate root lattice definition. It extends
-`Regions`, so applications can register other components alongside DLFS. The stack accepts a generic `LatticeHost` and has no
+`DLFSApplication` is a `Regions` component over the complete hosted lattice root,
+registered with the host as its application. It composes a physical, multi-owner
+`DLFSRegion` at a path of region keys, with no separate root lattice definition,
+and other components can be registered alongside DLFS. The stack accepts a generic `LatticeHost` and has no
 dependency on `NodeServer`.
 
 ```java

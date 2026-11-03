@@ -39,7 +39,7 @@ class KeyedRegionsTest {
 	private static final Keyword NESTED=Keyword.intern("nested");
 
 	private static class TestRegions extends Regions {
-		TestRegions(LatticeHost<Index<Keyword,ACell>> host) { super(host); }
+		TestRegions(LatticeHost<Index<Keyword,ACell>> host) { super(host.cursor()); }
 		TestRegions(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
 		Counter counter(Keyword key) { return create(key,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork()); }
 		Members members(Keyword key) { return create(key,(AForkableCursor<ASet<CVMLong>> cursor) -> new Members(cursor).fork()); }
@@ -64,12 +64,12 @@ class KeyedRegionsTest {
 
 	@Test void singleAndMultipleRegionsShareTheSameWorkspaceAndPolicy() {
 		var host=LatticeHost.create();
-		var single=SingleRegion.create(host,A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
+		var single=SingleRegion.create(host.cursor(),A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
 		var shared=single.component();
 		shared.setContext(LatticeContext.EMPTY.withSigningKey(AKeyPair.createSeeded(42)));
 		var context=shared.getContext();
-		var multiple=new Regions(host,Map.of(A,shared));
-		var another=new SingleRegion<>(host,A,shared);
+		var multiple=new Regions(host.cursor(),Map.of(A,shared));
+		var another=new SingleRegion<>(host.cursor(),A,shared);
 		assertSame(shared,another.component());
 		assertSame(context,shared.getContext());
 		host.addApplication(single);
@@ -85,7 +85,7 @@ class KeyedRegionsTest {
 
 	@Test void concreteRegionsComposeAtNestedPathsWithoutCreatingUnusedState() {
 		var host=LatticeHost.create();
-		var root=new Regions(host);
+		var root=new Regions(host.cursor());
 		var nested=root.<Index<Keyword,ACell>,Regions>create(NESTED,Regions::new);
 		var child=nested.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
 		var alias=new Regions(nested.cursor());
@@ -102,7 +102,7 @@ class KeyedRegionsTest {
 		var store=new MemoryStore();
 		var initial=Index.<Keyword,ACell>of(A,CVMLong.ONE,NESTED,Index.of(B,Strings.create("keep")));
 		var host=LatticeHost.create(initial,store);
-		var app=new Regions(host);
+		var app=new Regions(host.cursor());
 		host.addApplication(app);
 		for (int i=0;i<12;i++) {
 			var incoming=Index.<Keyword,ACell>of(A,CVMLong.create(i),UNKNOWN,Sets.of(i));

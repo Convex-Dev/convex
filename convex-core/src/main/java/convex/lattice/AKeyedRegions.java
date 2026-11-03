@@ -36,17 +36,15 @@ import convex.lattice.cursor.AForkableCursor;
  * with other applications: registration neither rebinds them nor changes their
  * policy or lifecycle. Shared children may receive repeated or concurrent
  * deliveries and syncs, so their operations must support that use.</p>
+ *
+ * <p>An application made of regions can extend this component or hold one; see
+ * {@code convex-core/docs/LATTICE_APPLICATIONS.md} for the choice.</p>
  */
-public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,ACell>> {
+public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACell>> {
 
 	private final Map<Keyword,ALatticeComponent<?>> registrations=new LinkedHashMap<>();
 	private volatile Map<Keyword,ALatticeComponent<?>> regions;
 	private final IndexComponent<Keyword,ACell> entries;
-
-	/** Constructs a root application using the host's cursor. */
-	protected AKeyedRegions(LatticeHost<Index<Keyword,ACell>> host) {
-		this(host.cursor());
-	}
 
 	/** Constructs a container view without changing or publishing its destination. */
 	protected AKeyedRegions(AForkableCursor<Index<Keyword,ACell>> cursor) {
@@ -159,8 +157,15 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 		return storage.get();
 	}
 
+	/**
+	 * Prepares state after registrations freeze and before any child publishes.
+	 * Failure prevents child publication. This hook can be called concurrently and
+	 * must use thread-safe component APIs.
+	 */
+	protected void beforeSync() {
+	}
+
 	/** Publishes children in registration order. The container has no staged snapshot. */
-	@Override
 	protected void syncChildren() {
 		for (var component:regions().values()) component.sync();
 	}

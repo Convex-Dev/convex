@@ -131,7 +131,7 @@ public final class FavouritesExample {
 		/** Shares the supplied region's pending state and destination; the clock is authoring policy. */
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,
 				KeyOwnedIndex<AHashMap<Keyword,ACell>> shared,Supplier<CVMLong> getTimestamp) {
-			super(host,FAVOURITES,shared);
+			super(host.cursor(),FAVOURITES,shared);
 			this.getTimestamp=getTimestamp;
 		}
 

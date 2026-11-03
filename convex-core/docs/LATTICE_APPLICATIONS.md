@@ -156,11 +156,18 @@ the same component instance also shares its pending changes; either application
 can publish them. Separate staged components at the same path reconcile their
 independent copies when publishing.
 
-A regions application routes incoming values and publishes its children. It has
+A region container (`Regions` or `SingleRegion`) is a component, at the root or
+nested, that routes incoming values to its children and publishes them. It has
 no separate aggregate copy to overwrite the container afterwards. Publishing
 children is sequential, not atomic across regions: earlier successful work
 remains if a later child fails. An operation needing an atomic aggregate belongs
 at a common ancestor that owns that aggregate.
+
+An application made only of regions extends a region container and is registered
+with the host as it is. One with root-level behaviour of its own, such as a merge
+across its regions or a private copy of the whole root, extends
+`ALatticeApplication`, holding a region container where that helps. The host
+registers either, since it takes any root component.
 
 Components must tolerate their destination changing through another view,
 publication or incoming merge. Live views observe shared changes directly;

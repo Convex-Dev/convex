@@ -87,8 +87,8 @@ public class SharedApplicationInternalsTest {
 	private static final LatticeContext VERIFY=LatticeContext.EMPTY.withOwnerVerifier(
 		(owner,signer) -> owner.equals(signer) || owner.equals(DID.forKey(signer)));
 
-	/** A live application over the whole host root, for opening domain views. */
-	private static ALatticeApplication<Index<Keyword,ACell>> view(LatticeHost<Index<Keyword,ACell>> host) {
+	/** A live component over the whole host root, for opening domain views. */
+	private static ALatticeComponent<Index<Keyword,ACell>> view(LatticeHost<Index<Keyword,ACell>> host) {
 		return new Regions(host.cursor());
 	}
 

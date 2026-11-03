@@ -112,7 +112,7 @@ public class DLFSApplication extends Regions {
 	 * publication boundary. The caller binds the region to its intended destination.
 	 */
 	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword key,DLFSRegion files) {
-		super(host);
+		super(host.cursor());
 		store=host.store();
 		dlfs=add(key,files);
 	}

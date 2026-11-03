@@ -44,7 +44,7 @@ class ApplicationLifecycleTest {
 		var host=LatticeHost.create(Index.<Keyword,ACell>of(OTHER,CVMLong.ONE),null);
 		List<String> events=new ArrayList<>();
 		boolean[] fail={true};
-		var root=new Regions(host) {
+		var root=new Regions(host.cursor()) {
 			@Override protected void beforeSync() {
 				events.add("root");
 				assertThrows(IllegalStateException.class,() -> add(OTHER,this));

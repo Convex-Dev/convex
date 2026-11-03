@@ -472,8 +472,8 @@ for transactions across its sets. These applications need no custom root merge o
 sync implementation.
 
 The host accepts any root component, so a normal application can inherit
-`AKeyedRegions` without also inheriting `ALatticeApplication`. The latter remains a
-convenience for root lattice navigation and custom application merges. This is a
+`AKeyedRegions` without also inheriting `ALatticeApplication`. The latter is for
+applications with root-level behaviour of their own, such as a custom merge. This is a
 component composition choice, not a change to lattice merge algorithms or encoding.
 
 CAD text affected: CAD045 *Application Architecture*, *Wrapper Pattern* and
@@ -617,9 +617,10 @@ Implemented 20 October 2026. `ALatticeApplication` extends `ALatticeComponent`
 without accepting an `ALattice`. It retains application preparation and adds the
 managed-child publication stage: `beforeSync()`, `syncChildren()`, then its own
 boundary. Failure prevents later stages but does not undo successful children.
-`AKeyedRegions` extends this application base, freezes registrations before
-preparation and publishes children in registration order. Nested applications
-participate through the same lifecycle. The empty collection remains inert.
+`AKeyedRegions` is a component with the same two stages and no publication of its
+own boundary: it freezes registrations before preparation and publishes children in
+registration order. Nested region containers prepare through the same stages. The
+empty collection remains inert.
 
 There is no root-lattice application class. An application that keeps a lattice
 for its own merge, as `P2PApplication` does, calls `LatticeOps` for path reduction

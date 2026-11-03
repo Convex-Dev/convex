@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep the peer signing service's keys as local state at `[:local <peer key> :signing]`, so a lattice application hosting `SigningService` can sync and persist them; it is bound under a root and needs no `init()`. ([Local Component](convex-restapi/docs/MCP_AUTH.md#local-component))
 - Limit how many data requests a lattice node serves at once. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#inbound-pipeline))
 - Remove `LatticeApplication`: register a `LatticeComponent` where a lattice is all a root does, or extend `ALatticeApplication`; `P2PApplication` no longer offers `setContext` or `resolve`. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#composition-and-sharing))
+- Make `Regions` and `SingleRegion` components rather than applications: build them over `host.cursor()`; `Social.connect`, `P2PUser.create` and `Mail.connect` take any root component. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#composition-and-sharing))
 
 ### Deprecated
 

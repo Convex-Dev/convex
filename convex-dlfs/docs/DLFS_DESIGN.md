@@ -89,8 +89,8 @@ the working state of a forked component (isolated working copy).
 | `DLFileSystem` | `convex-core/.../lattice/fs/DLFileSystem.java` | Abstract base with timestamp |
 | `DLFS` | `convex-core/.../lattice/fs/DLFS.java` | Factory methods |
 | `LatticeHost` | `convex-core/.../lattice/LatticeHost.java` | Generic store-backed application root and persistence policy |
-| `ALatticeApplication` | `convex-core/.../lattice/ALatticeApplication.java` | Root-level application composition and durability boundary |
-| `DLFSApplication` | `convex-dlfs/.../dlfs/DLFSApplication.java` | Application component composing DLFS at a configured path |
+| `Regions` | `convex-core/.../lattice/Regions.java` | Component composing children at named region keys |
+| `DLFSApplication` | `convex-dlfs/.../dlfs/DLFSApplication.java` | `Regions` component composing DLFS at a configured path, registered with the host |
 | `DLFSRegion` | `convex-dlfs/.../dlfs/DLFSRegion.java` | Physical multi-owner DLFS region at an arbitrary lattice path |
 | `DLFSDrives` | `convex-dlfs/.../dlfs/DLFSDrives.java` | One owner's map of named drives |
 | `DLFSDrive` | `convex-dlfs/.../dlfs/DLFSDrive.java` | Per-drive component and hosted NIO adapter |
@@ -131,11 +131,10 @@ particular host implementation:
 
 ```
 LatticeHost<V>                  store persistence, root publication, flush
-└── ALatticeApplication<V>        complete-root application composition
-    └── DLFSApplication           registered DLFS region component
-        └── DLFSRegion            physical multi-owner lattice region
-            └── DLFSDrives        long-lived component for one owner
-                └── DLFSDrive     named drive plus local NIO view
+└── DLFSApplication             Regions component registered with the host
+    └── DLFSRegion              physical multi-owner lattice region
+        └── DLFSDrives          long-lived component for one owner
+            └── DLFSDrive       named drive plus local NIO view
 ```
 
 A local bootstrap explicitly obtains the root with `LatticeHost.open(...)`.

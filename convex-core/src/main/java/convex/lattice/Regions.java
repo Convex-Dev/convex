@@ -14,23 +14,12 @@ import convex.lattice.cursor.AForkableCursor;
  */
 public class Regions extends AKeyedRegions {
 
-	/** Creates an empty collection at the host root. */
-	public Regions(LatticeHost<Index<Keyword,ACell>> host) {
-		super(host);
-	}
-
 	/** Creates an empty collection at a root or nested container. */
 	public Regions(AForkableCursor<Index<Keyword,ACell>> cursor) {
 		super(cursor);
 	}
 
-	/** Registers existing components in the supplied map's iteration order. */
-	public Regions(LatticeHost<Index<Keyword,ACell>> host,
-			Map<Keyword,? extends ALatticeComponent<?>> components) {
-		this(host.cursor(),components);
-	}
-
-	/** Registers existing components without rebinding them or changing their policy. */
+	/** Registers existing components in the supplied map's iteration order, without rebinding them or changing their policy. */
 	public Regions(AForkableCursor<Index<Keyword,ACell>> cursor,
 			Map<Keyword,? extends ALatticeComponent<?>> components) {
 		super(cursor);

@@ -411,7 +411,7 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell, Index<ABlob, S
     static Keyword KEY_MAIL                                  // :mail
     static MailLattice LATTICE                               // did:key-only default
     static Mail create(BiFunction<ACell,ACell,SignedData<ACell>> signer) // standalone root
-    static Mail connect(ALatticeApplication<Index<Keyword,ACell>> app, MailLattice lattice,
+    static Mail connect(ALatticeComponent<Index<Keyword,ACell>> app, MailLattice lattice,
         BiFunction<ACell,ACell,SignedData<ACell>> signer)
     Mailbox mailbox(AString did)                             // view of any mailbox
     Hash send(MailEnvelope envelope)                         // one atomic deposit in the recipient mailbox
