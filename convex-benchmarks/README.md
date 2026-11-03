@@ -28,6 +28,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `SignatureBenchmark` | Ed25519 signature generation and verification |
 | `LatencyBenchmark` | Round-trip transaction latency on a small local peer network |
 | `LocalPeerBenchmark` | Transactions and queries through a local in-process peer |
+| `ClientCallbackBenchmark` | Query round trips for local and remote clients: waiting callers, and callbacks that send a second query |
 | `ThreadCoordinationBenchmark` | Inter-thread queue handoff overhead |
 
 ## Running Benchmarks
