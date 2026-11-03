@@ -340,7 +340,7 @@ an already completed local publication.
 Networking does not decide that saving policy. Attaching or closing replication
 neither publishes application drafts nor supplies a durability guarantee; closing
 sends only what the host has already published. A host and its applications
-remain usable after networking closes. Propagation groups
+remain usable after networking closes. Propagator groups
 choose what to serve and whom to exchange with; delivery still passes through
 the application's acceptance rules.
 
@@ -365,11 +365,10 @@ owns it and stops it.
 | Main class | Reads configuration, opens the store and keys, assembles the other parts, launches them and shuts them down in order | One per service, such as `convex.dlfs.Main` |
 | Store | Holds cells and the retained root; the other parts borrow it | `EtchStore` |
 | Host and applications | The data: the host holds the published root and its durability, and each application merges the regions it understands | `LatticeHost`, and an application per domain such as `DLFSApplication` |
-| Node | Replicates the host, with the node's identity, peer name lookup, groups and listeners | `LatticeNode` |
-| Group | Publishes one view of the host, chosen by its filter, to its own peers within its own limits | `LatticePropagator` |
-| Listener | Accepts connections on one port and assigns each to a group | `LatticeListener` |
-| Network policy | Decides which peers each group connects to, what it pulls from them, whom it refuses and which messages it handles | The main class, or a class an application's package supplies, such as `P2PNode` |
-| Front end | Serves the service's own requests, such as WebDAV | `DLFSServer` |
+| Node | Replicates the host, with the node's identity, peer name lookup, propagator groups and listeners | `LatticeNode` |
+| Propagator group | Publishes one view of the host, chosen by its filter, to its own peers within its own limits | `LatticePropagator` |
+| Listener | Accepts connections on one port and assigns each to a propagator group | `LatticeListener` |
+| Network policy | Decides which peers each propagator group connects to, what it pulls from them, whom it refuses and which messages it handles | The main class, or a class an application's package supplies, such as `P2PNode` |
 
 The main class is the only part written for one deployment. A new service starts
 from a copy of an existing one and changes what it assembles; the other parts are
@@ -377,28 +376,32 @@ reused as they are. The main class makes the service's choices:
 
 - **Applications.** Several applications share one host root, with or without
   shared regions, as [composition and sharing](#composition-and-sharing) describes.
-- **Groups.** A group publishes what its filter keeps, so a group for some regions
-  is one whose filter keeps only those. Filters apply to publication only: what a
-  group receives is delivered to every application, which accepts what it
-  understands.
-- **Listeners.** Each listener assigns its connections to the groups it serves, so
-  a group reached separately, such as a replication port for trusted peers, gets a
-  listener of its own.
+- **Propagator groups.** Each publishes what its filter keeps, so a propagator
+  group for some regions is one whose filter keeps only those. Filters apply to
+  publication only: what a propagator group receives is delivered to every
+  application, which accepts what it understands.
+- **Listeners.** Each listener assigns its connections to the propagator groups it
+  serves, so a propagator group reached separately, such as a replication port for
+  trusted peers, gets a listener of its own.
 - **Network policy.** It can be a few lines of the main class, such as keeping the
   peers the configuration names, or a class that a package supplies for any
-  service to run on the groups it chooses, such as P2P's discovery.
+  service to run on the propagator groups it chooses, such as P2P's discovery.
+
+A service's own front ends and APIs, such as DLFS's WebDAV server, are outside
+this anatomy; how they are built and owned is the implementer's choice, often the
+main class.
 
 The store opens first and closes last. The host and its applications open before
-networking and stay usable after it closes. The node, its groups and listeners,
-network policy and front ends run from launch to shutdown, in the order
+networking and stay usable after it closes. The node, its propagator groups and
+listeners, and network policy run from launch to shutdown, in the order
 [shutdown](../../convex-peer/docs/SHUTDOWN.md) gives.
 
 The smallest networked service runs one application on a host, and a `LatticeNode`
-with one group that publishes the whole host and keeps the peers the configuration
-names; when configured to, it serves every inbound connection on the node's own
-listener. `convex.dlfs.Main` has this shape, with a WebDAV front end. Everything else
-is added by the main class: groups with their own filters and limits, listeners with
-their own selectors, and network policy.
+with one propagator group that publishes the whole host and keeps the peers the
+configuration names; when configured to, it serves every inbound connection on the
+node's own listener. `convex.dlfs.Main` has this shape, with a WebDAV front end.
+Everything else is added by the main class: propagator groups with their own filters
+and limits, listeners with their own selectors, and network policy.
 
 ### P2P as an example
 
@@ -413,19 +416,19 @@ The P2P package's service, which `convex p2p start` runs, has these parts:
   registers one application, `P2PApplication`. It owns the regions `:p2p` (node
   records), `:id`, `:social` and `:local`, and the bundled application regions of
   `P2PLattice.NODE_ROOT`.
-- **Node, group and listener:** `create` builds a `LatticeNode` whose identity is
-  the node key, with one group that publishes everything except `:local`, with
-  `:social` cut down to the owners the node wants. `serveAllInbound()` assigns every
-  connection on the node's own listener to that group, except one from a blocked
-  address.
-- **Network policy:** the `P2PNode` instance runs P2P's on that group. It publishes
-  the node's own record once the listener has its port, and offers the nodes in
-  validated records as connection candidates. It joins through seeds whenever it
-  has no route, pushes its record to each admitted peer and pulls `:p2p`, `:id` and
-  the social owners it wants from it. It turns an inbound connection that delivers
-  a node's own valid record into an authenticated route to that node, keeps contact
-  records, applies the blocklist and carries point messages.
-- **Front end:** none.
+- **Node, propagator group and listener:** `create` builds a `LatticeNode` whose
+  identity is the node key, with one propagator group that publishes everything
+  except `:local`, with `:social` cut down to the owners the node wants.
+  `serveAllInbound()` assigns every connection on the node's own listener to that
+  propagator group, except one from a blocked address.
+- **Network policy:** the `P2PNode` instance runs P2P's on that propagator group.
+  It publishes the node's own record once the listener has its port, and offers the
+  nodes in validated records as connection candidates. It joins through seeds
+  whenever it has no route, pushes its record to each admitted peer and pulls
+  `:p2p`, `:id` and the social owners it wants from it. It turns an inbound
+  connection that delivers a node's own valid record into an authenticated route to
+  that node, keeps contact records, applies the blocklist and carries point
+  messages.
 
 `P2PNode` therefore does the main class's work (`main`, `serve` and the assembly in
 `create`) as well as P2P's network policy. A service with other applications cannot
