@@ -598,8 +598,9 @@ immutable values without constructing a lattice definition.
 
 `LatticeComponent` is the explicit adapter for lattice-based implementations. It
 owns lattice path reduction, optional shape-based cursor construction and keyed
-publication reconciliation for simple values and caller-supplied lattices.
-`LatticeApplication` opts into these operations (see entry 25). Domain components extend
+publication reconciliation for simple values and caller-supplied lattices. A host
+registers one directly when a lattice is the whole of a root's behaviour, as
+`RelayHost` does. Domain components extend
 `ALatticeComponent` directly and call lattice rules in explicit publication or
 domain operations; using a lattice internally does not grant generic incoming
 merge or path routing. Owned maps explicitly accept complete owner envelopes and
@@ -620,10 +621,10 @@ boundary. Failure prevents later stages but does not undo successful children.
 preparation and publishes children in registration order. Nested applications
 participate through the same lifecycle. The empty collection remains inert.
 
-`LatticeApplication` is the explicit, extensible adapter for a supplied root lattice.
-The P2P and DLFS APIs that accept such lattices opt into it. Generic lattice path
-reduction and publication reconciliation are shared with `LatticeComponent` through
-`LatticeOps`; neither operation is required by ordinary applications. Standard
+There is no root-lattice application class. An application that keeps a lattice
+for its own merge, as `P2PApplication` does, calls `LatticeOps` for path reduction
+and publication reconciliation, the operations `LatticeComponent` uses; neither is
+required by ordinary applications. Standard
 region entry points navigate their known index/map types without a root lattice.
 This preserves CAD045's component boundaries and CAD035's fork semantics.
 

@@ -14,8 +14,8 @@ import convex.core.util.Utils;
 /**
  * Optional policy for lattice implementations and legacy write operations.
  *
- * <p>The optional {@link LatticeComponent} and {@link LatticeApplication} adapters
- * can supply a context to their lattice. Component bases, hosts and cursors carry
+ * <p>The optional {@link LatticeComponent} adapter can supply a context to its
+ * lattice. Component bases, hosts and cursors carry
  * no context; domain components bind their own clocks, signers and admission rules.
  * Implementations may return fixed values (useful for
  * deterministic tests) or resolve policies dynamically, for example from an

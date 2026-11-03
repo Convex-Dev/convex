@@ -30,7 +30,6 @@ import convex.etch.EtchStore;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Persister;
-import convex.lattice.generic.SetLattice;
 
 public class ALatticeComponentTest {
 

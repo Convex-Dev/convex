@@ -845,12 +845,17 @@ Enables `listKeys` — the peer reads the identity's key vector directly. No pas
 
 ```java
 // A persistent application keeps the service as one of its children
-class PeerApplication extends LatticeApplication<Index<Keyword, ACell>> {
+class PeerApplication extends ALatticeApplication<Index<Keyword, ACell>> {
     final SigningService signing;
 
     PeerApplication(LatticeHost<Index<Keyword, ACell>> host, AKeyPair peerKeyPair) {
-        super(KeyedLattice.create(LocalLattice.KEY_LOCAL, LocalLattice.LATTICE), host);
+        super(host.cursor());
         signing = new SigningService(cursor(), peerKeyPair, Utils::getCurrentTimestampCell, host::persist);
+    }
+
+    @Override
+    public Index<Keyword, ACell> merge(Index<Keyword, ACell> incoming) {
+        return cursor().get();  // a peer's :local slot is never taken from other nodes
     }
 
     @Override
