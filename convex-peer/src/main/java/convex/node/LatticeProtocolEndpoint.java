@@ -20,7 +20,6 @@ import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.CPoSConstants;
-import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -37,6 +36,7 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.BoundedMessageQueue;
+import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -93,7 +93,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private Thread inboundThread;
 	private Thread maintenanceThread;
 
-	private volatile AKeyPair transportKeyPair;
+	private volatile ChallengeSigner transportSigner;
 	private volatile Predicate<Message> applicationMessageHandler;
 	private volatile InboundLatticeListener inboundLatticeListener;
 	private volatile Predicate<AccountKey> challengerAdmission;
@@ -107,12 +107,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 		this.inboundQueue=new BoundedMessageQueue(
 			config.getInboundQueueSize(),config.getMaxInboundQueueBytes());
 		this.acquisitionPermits=new Semaphore(config.getInboundQueueSize());
-		this.inboundVerifier=new LatticeInboundVerifier(() -> transportKeyPair);
+		this.inboundVerifier=new LatticeInboundVerifier(() -> transportSigner);
 	}
 
 	/** Configures the identity used only for live transport possession proofs. */
-	void setTransportKeyPair(AKeyPair keyPair) {
-		this.transportKeyPair=keyPair;
+	void setTransportSigner(ChallengeSigner signer) {
+		this.transportSigner=signer;
 	}
 
 	/** Configures the handler for complete application extension messages. */
@@ -438,7 +438,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 		// Decided before answering, so a challenger that has the answer has also been
 		// challenged back, if it ever will be
 		admitChallenger(message);
-		message.respondToChallenge(transportKeyPair,Message.LATTICE_PEER_CHALLENGE_CONTEXT::equals);
+		message.respondToChallenge(transportSigner);
 	}
 
 	/**
@@ -449,19 +449,19 @@ final class LatticeProtocolEndpoint implements Closeable {
 	 */
 	private void admitChallenger(Message message) {
 		Predicate<AccountKey> admission=challengerAdmission;
-		AKeyPair kp=transportKeyPair;
+		ChallengeSigner signer=transportSigner;
 		AConnection connection=message.getConnection();
-		if (admission==null || kp==null || connection==null || connection.isTrusted()
+		if (admission==null || signer==null || connection==null || connection.isTrusted()
 				|| !ownsInbound(connection)) return;
 		try {
 			AVector<ACell> payload=message.getPayload();
 			if (payload==null || payload.count()!=3 || !(payload.get(2) instanceof SignedData<?> signed)) return;
 			if (!(signed.getValue() instanceof AVector<?> challenge) || challenge.count()!=3) return;
-			if (!kp.getAccountKey().equals(RT.ensureAccountKey(challenge.get(1)))) return;
+			if (!signer.getAccountKey().equals(RT.ensureAccountKey(challenge.get(1)))) return;
 			if (!Message.LATTICE_PEER_CHALLENGE_CONTEXT.equals(challenge.get(2))) return;
 			if (!signed.checkSignature()) return;
 			AccountKey challenger=signed.getAccountKey();
-			if (challenger==null || challenger.equals(kp.getAccountKey()) || !admission.test(challenger)) return;
+			if (challenger==null || challenger.equals(signer.getAccountKey()) || !admission.test(challenger)) return;
 			inboundVerifier.maybeStart(connection,propagator,challenger);
 		} catch (RuntimeException e) {
 			log.debug("Unable to admit challenger on {}: {}",connection.getRemoteAddress(),e.getMessage());

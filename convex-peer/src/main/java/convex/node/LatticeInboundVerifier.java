@@ -13,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Result;
-import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -21,6 +20,7 @@ import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
+import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 
 /**
@@ -43,13 +43,13 @@ final class LatticeInboundVerifier {
 			CompletableFuture<Message> future) {}
 
 	/** Supplies the propagator group's transport identity at challenge time. */
-	private final Supplier<AKeyPair> keyPairSupplier;
+	private final Supplier<ChallengeSigner> signerSupplier;
 	private final SecureRandom random = new SecureRandom();
 	private final ConcurrentHashMap<AConnection, PendingVerification> active =
 		new ConcurrentHashMap<>();
 
-	LatticeInboundVerifier(Supplier<AKeyPair> keyPairSupplier) {
-		this.keyPairSupplier = keyPairSupplier;
+	LatticeInboundVerifier(Supplier<ChallengeSigner> signerSupplier) {
+		this.signerSupplier = signerSupplier;
 	}
 
 	/** Starts at most one non-blocking authentication attempt per inbound connection. */
@@ -72,13 +72,12 @@ final class LatticeInboundVerifier {
 
 	private void verify(AConnection connection, PendingVerification pending) {
 		try {
-			AKeyPair keyPair = keyPairSupplier.get();
-			if (keyPair == null) return;
+			ChallengeSigner signer = signerSupplier.get();
+			if (signer == null) return;
 
 			Hash token = Blob.createRandom(random, 16).getHash();
-			AccountKey ownKey = keyPair.getAccountKey();
-			SignedData<ACell> signed = Message.signChallenge(keyPair, token,
-				pending.claimedKey(), Message.LATTICE_PEER_CHALLENGE_CONTEXT);
+			AccountKey ownKey = signer.getAccountKey();
+			SignedData<ACell> signed = signer.challenge(token, pending.claimedKey());
 			Message resultMessage = connection.request(Message.createChallenge(null,signed),0,pending.future())
 				.get(TIMEOUT_MS,TimeUnit.MILLISECONDS);
 			try {

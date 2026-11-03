@@ -47,11 +47,20 @@ instance or the GUI DLFS browser, uses `NodeServer` directly.
 The node may configure a primary DID and an authorised key pair with `setIdentity`.
 The two-argument overload validates `did:key`; other methods require an explicit
 `DIDKeyAuthorizer` backed by authenticated resolver data. The binding is checked
-when configured. New groups use that key by default; without a configured identity
-their key is null. No transient keys are generated. Group-specific key overrides
-remain possible, and existing groups keep their keys when the node default changes.
+when configured. New groups prove that key by default; without a configured identity
+they have none. No transient keys are generated. Group-specific overrides remain
+possible, and existing groups keep their identities when the node default changes.
 The primary DID is local configuration: remote peers still verify possession of
 the expected public key, resolving any DID binding through their own trust policy.
+
+A group holds a `ChallengeSigner` for its key, never the key pair: the group, its
+connection manager and the clients it dials can sign challenges and answers in the
+lattice challenge context and nothing else, and a dialled client refuses a challenge
+in any other context. `setTransportKeyPair(keyPair)` wraps a key pair in one;
+`setTransportSigner(signer)` takes one directly, and
+`setIdentity(did, signer, authorizer)` configures the node with a signer alone, so
+the node never holds the key pair either. Lattice data is signed by the
+applications' own signers.
 
 `serveAllInbound(group)` is an explicit public serving choice on the node's own
 listener. Otherwise a listener denies inbound access unless the caller installs a

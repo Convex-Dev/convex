@@ -49,6 +49,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
@@ -86,6 +87,11 @@ public abstract class Convex implements AutoCloseable {
 	 * Key pair for this Client
 	 */
 	protected AKeyPair keyPair;
+
+	/**
+	 * Proves this client's key in challenge/response in place of the key pair, or null
+	 */
+	protected volatile ChallengeSigner challengeSigner;
 
 	/**
 	 * Current Address for this Client
@@ -253,6 +259,17 @@ public abstract class Convex implements AutoCloseable {
 
 	public synchronized void setKeyPair(AKeyPair kp) {
 		this.keyPair = kp;
+	}
+
+	/**
+	 * Sets the signer this client proves its key with in challenge/response, in place
+	 * of its key pair. The client then challenges peers and answers their challenges
+	 * only in the signer's context, and the signer signs nothing else.
+	 *
+	 * @param signer challenge signer, or null to use the key pair
+	 */
+	public void setChallengeSigner(ChallengeSigner signer) {
+		this.challengeSigner = signer;
 	}
 
 	public void setNextSequence(long nextSequence) {
@@ -1158,13 +1175,20 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	@SuppressWarnings("unchecked")
 	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey, ACell contextID) {
-		AKeyPair kp = keyPair;
-		if (kp == null) return CompletableFuture.completedFuture(null);
+		ChallengeSigner signer = challengeSigner;
+		if (signer == null) {
+			AKeyPair kp = keyPair;
+			if (kp == null) return CompletableFuture.completedFuture(null);
+			signer = ChallengeSigner.create(kp, contextID);
+		} else if (!Utils.equals(signer.getContext(), contextID)) {
+			// A challenge signer proves its key in its own context only
+			return CompletableFuture.completedFuture(null);
+		}
 
 		Hash token = Blob.createRandom(new SecureRandom(), CHALLENGE_TOKEN_BYTES).getHash();
-		AccountKey ownKey = kp.getAccountKey();
+		AccountKey ownKey = signer.getAccountKey();
 
-		SignedData<ACell> signed = Message.signChallenge(kp, token, expectedKey, contextID);
+		SignedData<ACell> signed = signer.challenge(token, expectedKey);
 
 		return FutureUtils.map(sendChallenge(signed),result -> {
 			try {

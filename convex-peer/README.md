@@ -194,9 +194,11 @@ try (var network = new LatticeNode<>(host, NodeConfig.localNetwork()).launch()) 
 }
 ```
 
-New groups inherit the configured node key; without an identity they have no
-transport key. For an indirect DID, supply the authoriser as the third argument
-to `setIdentity`. A group can override its own key. Changing the node default
+New groups prove the configured node key with a challenge signer, which signs
+only lattice challenges, so they never hold the key pair; without an identity
+they have no transport key. For an indirect DID, supply the authoriser as the
+third argument to `setIdentity`, which also takes a `ChallengeSigner` in place of
+the key pair. A group can override its own identity. Changing the node default
 affects future groups only.
 
 The node closes its listeners, groups and server, leaving the host and its

@@ -19,6 +19,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
+import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.FutureUtils;
@@ -129,8 +130,11 @@ public abstract class AConvexConnected extends Convex {
 			MessageType type = m.getType();
 			observeReceive();
 			if (type == MessageType.CHALLENGE) {
+				ChallengeSigner signer = challengeSigner;
 				AKeyPair kp = keyPair;
-				if (kp != null) {
+				if (signer != null) {
+					m.respondToChallenge(signer);
+				} else if (kp != null) {
 					m.respondToChallenge(kp, null);
 				}
 				return;

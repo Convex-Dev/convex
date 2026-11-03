@@ -32,6 +32,7 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.message.AConnection;
+import convex.core.message.ChallengeSigner;
 import convex.core.store.AStore;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.ThreadUtils;
@@ -96,7 +97,7 @@ public class LatticePropagator implements Closeable {
 	private LatticeProtocolEndpoint endpoint;
 
 	/** Endpoint configuration retained until attachment. */
-	private AKeyPair transportKeyPair;
+	private ChallengeSigner transportSigner;
 	private Predicate<Message> applicationMessageHandler;
 	private InboundLatticeListener inboundLatticeListener;
 	private Predicate<AccountKey> challengerAdmission;
@@ -349,7 +350,7 @@ public class LatticePropagator implements Closeable {
 			this.node=node;
 			if (endpoint==null) endpoint=new LatticeProtocolEndpoint(this,node,config);
 			connectionManager.setInboundProbe(endpoint::probe,endpoint::retireConnection);
-			endpoint.setTransportKeyPair(transportKeyPair);
+			endpoint.setTransportSigner(transportSigner);
 			endpoint.setApplicationMessageHandler(applicationMessageHandler);
 			endpoint.setInboundLatticeListener(inboundLatticeListener);
 			endpoint.setChallengerAdmission(challengerAdmission);
@@ -361,21 +362,37 @@ public class LatticePropagator implements Closeable {
 	/** Public transport identity used for possession proofs, or null when unconfigured. */
 	public AccountKey getTransportKey() {
 		synchronized (writeLock) {
-			return transportKeyPair==null?null:transportKeyPair.getAccountKey();
+			return transportSigner==null?null:transportSigner.getAccountKey();
 		}
 	}
 
 	/**
-	 * Sets the key used by this group's challenge/response endpoint.
-	 * Changes apply to subsequent handshakes; existing routes are not reauthenticated.
+	 * Sets the key used by this group's challenge/response endpoint, as
+	 * {@link #setTransportSigner} does with a signer for it in the lattice challenge
+	 * context.
 	 *
 	 * @param keyPair transport identity, or {@code null} for unverified outbound routes
 	 */
 	public void setTransportKeyPair(AKeyPair keyPair) {
+		setTransportSigner((keyPair==null)?null
+			:ChallengeSigner.create(keyPair,Message.LATTICE_PEER_CHALLENGE_CONTEXT));
+	}
+
+	/**
+	 * Sets the signer this group proves its transport identity with, for its
+	 * challenge/response endpoint and the peers its connection manager dials. The
+	 * group holds no key pair, so it can sign challenges and answers and nothing else.
+	 * Changes apply to subsequent handshakes; existing routes are not reauthenticated.
+	 *
+	 * @param signer signer in the lattice challenge context, or {@code null} for
+	 *        unverified outbound routes
+	 * @throws IllegalArgumentException if the signer is for another challenge context
+	 */
+	public void setTransportSigner(ChallengeSigner signer) {
 		synchronized (writeLock) {
-			this.transportKeyPair=keyPair;
-			if (endpoint!=null) endpoint.setTransportKeyPair(keyPair);
-			connectionManager.setKeyPair(keyPair);
+			connectionManager.setChallengeSigner(signer);
+			this.transportSigner=signer;
+			if (endpoint!=null) endpoint.setTransportSigner(signer);
 		}
 	}
 

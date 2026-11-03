@@ -16,6 +16,8 @@ import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.message.ChallengeSigner;
+import convex.core.message.Message;
 import convex.lattice.LatticeHost;
 import convex.net.PeerName;
 import convex.net.PeerResolver;
@@ -46,7 +48,9 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	/** Whether launch completed and ingress has not stopped, so a new listener opens at once. */
 	private boolean accepting;
 	private AString did;
+	/** The key pair configured as this node's identity, or null; groups get only {@link #signer}. */
 	private AKeyPair keyPair;
+	private ChallengeSigner signer;
 	private PeerResolver peerResolver;
 	/** Peers kept by {@link #keepPeer}, stopped with their group or the node. */
 	private final Map<CompletableFuture<Void>,LatticePropagator> keptPeers=new HashMap<>();
@@ -64,28 +68,49 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Configures the primary DID and a key authorised for it. The authoriser must
-	 * use authenticated resolution data for indirect DIDs. The binding is checked
-	 * before changing configuration; no network resolution is performed here.
-	 * New groups copy this key. Existing groups retain their independently
-	 * configured transport keys. Pass null for both DID and key to clear the default.
+	 * Configures the primary DID and a key authorised for it, as
+	 * {@link #setIdentity(AString, ChallengeSigner, DIDKeyAuthorizer)} does with a
+	 * signer for the key in the lattice challenge context. Pass null for both DID and
+	 * key to clear the default.
 	 */
 	public synchronized LatticeNode<V> setIdentity(AString did,AKeyPair keyPair,DIDKeyAuthorizer authorizer) {
-		if (did!=null || keyPair!=null) {
-			if (did==null || keyPair==null || authorizer==null
-					|| !authorizer.safeAuthorises(did,keyPair.getAccountKey())) {
+		setIdentity(did,(keyPair==null)?null
+			:ChallengeSigner.create(keyPair,Message.LATTICE_PEER_CHALLENGE_CONTEXT),authorizer);
+		this.keyPair=keyPair;
+		return this;
+	}
+
+	/**
+	 * Configures the primary DID and a signer proving a key authorised for it, so the
+	 * node never holds the key pair. The authoriser must use authenticated resolution
+	 * data for indirect DIDs. The binding is checked before changing configuration; no
+	 * network resolution is performed here. New groups get this signer; existing
+	 * groups retain their independently configured transport identities. Pass null for
+	 * both DID and signer to clear the default.
+	 *
+	 * @throws IllegalArgumentException if the key is not authorised for the DID, or the
+	 *         signer is for another challenge context
+	 */
+	public synchronized LatticeNode<V> setIdentity(AString did,ChallengeSigner signer,DIDKeyAuthorizer authorizer) {
+		if (did!=null || signer!=null) {
+			if (did==null || signer==null || authorizer==null
+					|| !authorizer.safeAuthorises(did,signer.getAccountKey())) {
 				throw new IllegalArgumentException("Node key is not authorised for its primary DID");
+			}
+			if (!Message.LATTICE_PEER_CHALLENGE_CONTEXT.equals(signer.getContext())) {
+				throw new IllegalArgumentException("Lattice peers need a signer in the lattice challenge context");
 			}
 		}
 		this.did=did;
-		this.keyPair=keyPair;
+		this.keyPair=null;
+		this.signer=signer;
 		return this;
 	}
 
 	/** Primary DID, or null when no identity is configured. */
 	public synchronized AString getDID() { return did; }
 
-	/** Configured primary key, or null. No identity or key is generated implicitly. */
+	/** The key pair configured as the primary identity, or null, including when a signer was. */
 	public synchronized AKeyPair getKeyPair() { return keyPair; }
 
 	/**
@@ -110,9 +135,10 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	/**
 	 * Creates and registers a group over the host store with the given limits and
 	 * publication filter, starting it if already running. Every listener of this node
-	 * may assign connections to it. Its transport key defaults to the node's
-	 * configured key, or null without an identity. The group can override this
-	 * default through {@link LatticePropagator#setTransportKeyPair(AKeyPair)}.
+	 * may assign connections to it. It proves the node's configured identity through
+	 * the node's challenge signer, never holding the key pair, or has none without an
+	 * identity. The group can override this through
+	 * {@link LatticePropagator#setTransportSigner(ChallengeSigner)}.
 	 *
 	 * @param config the group's route, queue and publication limits
 	 * @param filter what the group publishes of the host's value, as
@@ -122,7 +148,7 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	public synchronized LatticePropagator createPropagator(LatticePropagatorConfig config,LatticeFilter<V> filter) {
 		if (filter==null) throw new IllegalArgumentException("Publication filter must not be null");
 		var propagator=new LatticePropagator(server.getStore(),config);
-		propagator.setTransportKeyPair(keyPair);
+		propagator.setTransportSigner(signer);
 		propagator.setPublicationFilter(filter);
 		server.addPropagator(propagator);
 		for (LatticeListener each:listeners) each.registerPropagator(propagator);

@@ -3,6 +3,7 @@ package convex.core.message;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import convex.core.ErrorCodes;
@@ -264,8 +265,25 @@ public class Message {
 	 * @param keyPair Key pair to sign the response with (must match the target key in the challenge)
 	 * @param contextValidator Optional predicate to validate contextID (element 2). Null to skip.
 	 */
-	@SuppressWarnings("unchecked")
 	public void respondToChallenge(AKeyPair keyPair, Predicate<ACell> contextValidator) {
+		respondToChallenge(challenge -> answerChallenge(keyPair,challenge,contextValidator));
+	}
+
+	/**
+	 * Responds to a CHALLENGE message with a challenge signer, which answers only a
+	 * challenge in its own context, as {@link ChallengeSigner#answer} does.
+	 *
+	 * @param signer signer to answer with, or null to refuse
+	 */
+	public void respondToChallenge(ChallengeSigner signer) {
+		respondToChallenge(challenge -> (signer==null)
+			?Result.error(ErrorCodes.TRUST,Strings.create("No signing key"))
+			:signer.answer(challenge));
+	}
+
+	/** Extracts the signed challenge from this message and returns the answer to it. */
+	@SuppressWarnings("unchecked")
+	private void respondToChallenge(Function<SignedData<ACell>,Result> answer) {
 		try {
 			// Message payload is [tag, id, signedData]
 			AVector<ACell> msgPayload = getPayload();
@@ -278,7 +296,7 @@ public class Message {
 				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Missing signed data")));
 				return;
 			}
-			returnResult(answerChallenge(keyPair,(SignedData<ACell>)rawSigned,contextValidator));
+			returnResult(answer.apply((SignedData<ACell>)rawSigned));
 		} catch (Exception e) {
 			try {
 				returnResult(Result.error(ErrorCodes.UNEXPECTED, Strings.create(e.getMessage())));

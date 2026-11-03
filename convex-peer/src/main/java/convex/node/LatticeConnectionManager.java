@@ -44,6 +44,7 @@ import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
 import convex.core.message.AConnection;
+import convex.core.message.ChallengeSigner;
 import convex.core.util.Utils;
 import convex.net.PeerTarget;
 import convex.net.Transports;
@@ -213,10 +214,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private final AStore store;
 
 	/**
-	 * Optional key pair for challenge/response peer verification. If null,
-	 * peer verification is skipped and connections are unverified.
+	 * Optional signer for challenge/response peer verification, in the lattice
+	 * challenge context. If null, peer verification is skipped and connections are
+	 * unverified. Clients this manager dials get the signer, never a key pair.
 	 */
-	private volatile AKeyPair keyPair;
+	private volatile ChallengeSigner challengeSigner;
 
 	/** Delivery hook for reverse messages arriving on admitted outbound clients. */
 	private volatile BiConsumer<Convex, Message> peerMessageHandler;
@@ -427,15 +429,31 @@ public class LatticeConnectionManager extends AConnectionManager {
 	}
 
 	/**
-	 * Sets the key pair used for challenge/response peer verification.
-	 * If set, subsequently admitted connections must verify the expected remote
-	 * node key. Changing this value is not retroactive: it neither upgrades nor
-	 * revokes clients which have already completed admission.
+	 * Sets the key used for challenge/response peer verification, as
+	 * {@link #setChallengeSigner} does with a signer for it in the lattice challenge
+	 * context.
 	 *
 	 * @param keyPair Key pair for signing challenges, or null to disable verification
 	 */
 	public void setKeyPair(AKeyPair keyPair) {
-		this.keyPair = keyPair;
+		setChallengeSigner((keyPair==null)?null
+			:ChallengeSigner.create(keyPair,Message.LATTICE_PEER_CHALLENGE_CONTEXT));
+	}
+
+	/**
+	 * Sets the signer used for challenge/response peer verification. If set,
+	 * subsequently admitted connections must verify the expected remote node key.
+	 * Changing this value is not retroactive: it neither upgrades nor revokes clients
+	 * which have already completed admission.
+	 *
+	 * @param signer signer in the lattice challenge context, or null to disable verification
+	 * @throws IllegalArgumentException if the signer is for another challenge context
+	 */
+	public void setChallengeSigner(ChallengeSigner signer) {
+		if (signer!=null && !Message.LATTICE_PEER_CHALLENGE_CONTEXT.equals(signer.getContext())) {
+			throw new IllegalArgumentException("Lattice peers need a signer in the lattice challenge context");
+		}
+		this.challengeSigner = signer;
 	}
 
 	/**
@@ -791,9 +809,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 		} catch (IllegalArgumentException e) {
 			return CompletableFuture.failedFuture(e);
 		}
-		if (keyPair == null) {
+		if (challengeSigner == null) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
-				"Identifying a node by its endpoint needs this node's key pair"));
+				"Identifying a node by its endpoint needs this node's key"));
 		}
 		CompletableFuture<Convex> admission;
 		synchronized (connectionLock) {
@@ -843,13 +861,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return CompletableFuture.failedFuture(new IllegalArgumentException(
 				"No endpoint this node can dial for peer "+target));
 		}
-		AKeyPair kp=keyPair;
-		if (kp == null) {
+		ChallengeSigner signer=challengeSigner;
+		if (signer == null) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
-				"Identifying a peer needs this node's key pair"));
+				"Identifying a peer needs this node's key"));
 		}
 		AVector<AccountKey> keys=target.keys();
-		if (keys.count()==1 && keys.get(0).equals(kp.getAccountKey())) {
+		if (keys.count()==1 && keys.get(0).equals(signer.getAccountKey())) {
 			return CompletableFuture.failedFuture(new IllegalArgumentException("Peer "+target+" is this node"));
 		}
 		EndpointIntent intent=new EndpointIntent(target,endpoints);
@@ -1206,13 +1224,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return CompletableFuture.failedFuture(failure);
 		}
 
-		AKeyPair kp = this.keyPair;
-		if (verifiedKey != null || kp == null) {
+		ChallengeSigner signer = this.challengeSigner;
+		if (verifiedKey != null || signer == null) {
 			return installAdmittedOutbound(peerKey, convex, verifiedKey != null);
 		}
 
 		restrictOutboundToLimbo(convex);
-		convex.setKeyPair(kp);
+		convex.setChallengeSigner(signer);
 		PendingConnection pending = new PendingConnection(convex,clock.getAsLong());
 		PendingConnection replaced=null;
 		boolean eligible;
@@ -2003,11 +2021,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * or the trusted receive limit, until it is admitted.
 	 */
 	private CompletableFuture<AccountKey> identify(Convex peer,AccountKey expected) {
-		AKeyPair kp=keyPair;
-		if (kp==null) throw new IllegalStateException("Identifying a node by its endpoint needs this node's key pair");
+		ChallengeSigner signer=challengeSigner;
+		if (signer==null) throw new IllegalStateException("Identifying a node by its endpoint needs this node's key");
 		if (!accepting) throw new IllegalStateException("Connection manager is closed");
 		restrictOutboundToLimbo(peer);
-		peer.setKeyPair(kp);
+		peer.setChallengeSigner(signer);
 		if (expected!=null) {
 			CompletableFuture<AccountKey> proved=peer.verifyPeer(expected,Message.LATTICE_PEER_CHALLENGE_CONTEXT);
 			if (proved==null) throw new IllegalStateException("Peer verification returned no future");
@@ -2017,7 +2035,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (learned==null) throw new IllegalStateException("Peer verification returned no future");
 		return learned.thenCompose(key -> {
 			// This node itself needs no second challenge: admission refuses it
-			if (key==null || key.equals(kp.getAccountKey())) return CompletableFuture.completedFuture(key);
+			if (key==null || key.equals(signer.getAccountKey())) return CompletableFuture.completedFuture(key);
 			CompletableFuture<AccountKey> named=peer.verifyPeer(key,Message.LATTICE_PEER_CHALLENGE_CONTEXT);
 			return (named!=null) ? named : CompletableFuture.<AccountKey>failedFuture(
 				new IllegalStateException("Peer verification returned no future"));
@@ -2031,8 +2049,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * own key is refused at once.
 	 */
 	private void admitIdentified(EndpointIntent intent,AccountKey key,Convex peer) {
-		AKeyPair kp=keyPair;
-		boolean self=kp!=null && key.equals(kp.getAccountKey());
+		ChallengeSigner signer=challengeSigner;
+		boolean self=signer!=null && key.equals(signer.getAccountKey());
 		boolean held=intent.target!=null;
 		// A held peer is never redialled, so it has no transport to dial
 		DesiredPeer desired=held ? DesiredPeer.create(key) : DesiredPeer.create(key,intent.current);
