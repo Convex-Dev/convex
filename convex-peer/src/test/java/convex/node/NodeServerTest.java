@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +64,8 @@ import convex.core.message.MessageType;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.etch.Etch;
+import convex.etch.EtchStore;
 import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.Lattice;
@@ -1937,12 +1940,13 @@ public class NodeServerTest {
 	}
 
 	/** Launches a MaxLattice node with one group, closing a route after two rejects. */
-	private LatticePropagator launchTwoRejectGroup(int acquisitions) throws IOException, InterruptedException {
+	private LatticePropagator launchTwoRejectGroup(AStore nodeStore,int acquisitions)
+			throws IOException, InterruptedException {
 		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS,CVMLong.create(2),
 			LatticePropagatorConfig.INBOUND_QUEUE_SIZE,CVMLong.create(acquisitions)));
-		maxNodeServer = new TestNode<>(MaxLattice.create(), store, NodeConfig.port(-1));
-		maxNodeServer.addPropagator(new LatticePropagator(store,groupConfig));
+		maxNodeServer = new TestNode<>(MaxLattice.create(), nodeStore, NodeConfig.port(-1));
+		maxNodeServer.addPropagator(new LatticePropagator(nodeStore,groupConfig));
 		maxNodeServer.launch();
 		return propagator(maxNodeServer);
 	}
@@ -1954,7 +1958,7 @@ public class NodeServerTest {
 	 */
 	@Test
 	public void testSenderLoadDoesNotCountAsReject() throws Exception {
-		LatticePropagator endpoint=launchTwoRejectGroup(LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
 		ScriptedPeer peer=new ScriptedPeer();
 		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
 
@@ -1978,7 +1982,7 @@ public class NodeServerTest {
 	/** This node's own full acquisition pool neither counts against the sender nor resets the count. */
 	@Test
 	public void testOwnAcquisitionLoadDoesNotCountAsReject() throws Exception {
-		LatticePropagator endpoint=launchTwoRejectGroup(1);
+		LatticePropagator endpoint=launchTwoRejectGroup(store,1);
 		ScriptedPeer peer=new ScriptedPeer();
 		Blob badValue=Blob.wrap(new byte[8]);
 		endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 1
@@ -1991,6 +1995,48 @@ public class NodeServerTest {
 
 		endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 2
 		assertTrue(peer.isClosed(),"the refusal must not have reset the count");
+	}
+
+	/** An Etch store that fails to persist one chosen value, as a full disk would. */
+	static final class PersistFailingStore extends EtchStore {
+		volatile Hash failing;
+
+		PersistFailingStore() throws IOException {
+			super(Etch.createTempEtch("persist-failing"));
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler)
+				throws IOException {
+			Hash target = failing;
+			if (target != null && target.equals(ref.getHash())) throw new IOException("Simulated store failure");
+			return super.storeTopRef(ref, status, noveltyHandler);
+		}
+	}
+
+	/** A failure in this node's own store neither counts against the sender nor resets the count. */
+	@Test
+	public void testOwnStoreFailureDoesNotCountAsReject() throws Exception {
+		PersistFailingStore failingStore=new PersistFailingStore();
+		try {
+			LatticePropagator endpoint=launchTwoRejectGroup(failingStore,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+			ScriptedPeer peer=new ScriptedPeer();
+			Blob badValue=Blob.wrap(new byte[8]);
+			endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 1
+
+			Blob unstorable=Blobs.createRandom(400);
+			failingStore.failing=unstorable.getHash();
+			AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(1),Vectors.empty(),unstorable);
+			endpoint.handleIncomingMessage(Message.create(MessageType.LATTICE_VALUE,payload).withConnection(peer));
+			assertEquals(ErrorCodes.IO,peer.awaitResult(1).getErrorCode());
+			assertFalse(peer.isClosed(),"this node's store failure is not the sender's fault");
+
+			endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 2
+			assertTrue(peer.isClosed(),"the failure must not have reset the count");
+		} finally {
+			if (maxNodeServer != null) maxNodeServer.close();
+			failingStore.close();
+		}
 	}
 
 	/**

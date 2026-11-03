@@ -497,7 +497,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 			recordMergeReject(message.getConnection(),stats);
 			returnLatticeResult(message,Result.error(ErrorCodes.FORMAT,e.getMessage()));
 		} catch (IOException e) {
-			recordMergeReject(message.getConnection(),stats);
+			// Our own store failed, which says nothing about the sender
 			returnLatticeResult(message,Result.fromException(e));
 		}
 	}
@@ -672,7 +672,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	 * Whether a failed acquisition shows the sender at fault: its value was
 	 * malformed, or it answered a data request with an error other than :LOAD.
 	 * Load on either side, an unanswered request and local failures count
-	 * neither way, as {@code ConnectionManager} treats a peer's :LOAD.
+	 * neither way, as {@code convex.peer.ConnectionManager} treats a peer's :LOAD.
 	 */
 	private static boolean isSenderFault(Throwable failure) {
 		if (failure instanceof BadFormatException) return true;
