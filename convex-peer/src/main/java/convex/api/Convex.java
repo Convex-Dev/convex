@@ -68,6 +68,13 @@ import convex.peer.Server;
  * 
  * This can be used by both peers and JVM-based clients.
  *
+ * Futures returned by a client may complete on the thread that delivers the
+ * reply, such as a network event loop or a local peer's handler thread. Stages
+ * attached with non-async methods such as {@code thenApply} then run on that
+ * thread, so they must not block: chain further requests with
+ * {@code thenCompose}, and attach only work that must wait with an
+ * {@code *Async} method and an executor.
+ *
  * "I'm doing a (free) operating system (just a hobby, won't be big and
  * professional like gnu)" - Linus Torvalds
  */

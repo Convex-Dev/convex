@@ -310,6 +310,19 @@ An added `orTimeout` on the returned owned future also releases its request.
 In contrast, `get(timeout)` only stops that wait: cancel explicitly to abandon it.
 Neither cancellation nor expiry implies that a submitted transaction did not run.
 
+A reply completes the client's future on the thread that delivers it: a network
+event loop for a remote client, or for `ConvexLocal` the local peer's thread that
+handled the request, usually its query or transaction handler thread. A timeout or
+close completes it on the timeout scheduler or the closing thread. Stages attached
+with `thenApply`, `thenCompose`, `whenComplete` and the other non-async methods run
+on that thread without a hand-off, so they must not block: an event loop serves
+many connections, and a peer handler thread serves every client. A stage may send a
+further request: where its thread would wait for queue space that only it frees,
+the send fails at once with `FULL_CLIENT_BUFFER` instead
+([CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md)). A stage that needs another
+reply chains it with `thenCompose` rather than waiting; only work that must wait,
+such as a `*Sync` call, belongs in an `*Async` stage with an executor.
+
 `sendRequest(message, timeout)` preserves caller-supplied numeric IDs for the raw
 Java APIs. Outstanding duplicates are rejected; completed IDs remain reusable
 for compatibility. Callers must avoid reuse while a late reply is possible,

@@ -278,6 +278,12 @@ public class NettyServer extends AServer {
 	}
 
 
+	/**
+	 * Sets the action for each received message. It runs on a network event loop that
+	 * serves many connections, so it must not block: hand off any work that may wait.
+	 *
+	 * @param handler action for each received message
+	 */
 	public void setReceiveAction(Consumer<Message> handler) {
 		receiveAction=handler;
 	}

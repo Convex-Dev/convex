@@ -58,7 +58,11 @@ public abstract class AConvexConnected extends Convex {
 	private volatile Consumer<Message> unsolicitedMessageHandler;
 	private volatile Runnable receiveObserver;
 
-	/** Observes decoded incoming traffic for a connection owner's liveness policy. */
+	/**
+	 * Observes decoded incoming traffic for a connection owner's liveness policy. Runs
+	 * on the thread delivering a message, which may be a network event loop, so it
+	 * must not block.
+	 */
 	public void setReceiveObserver(Runnable observer) {
 		receiveObserver=observer;
 	}
@@ -158,8 +162,8 @@ public abstract class AConvexConnected extends Convex {
 	 * This is deliberately separate from {@link #setStore(convex.core.store.AStore)}:
 	 * a local acquisition store must not implicitly become remotely readable.
 	 *
-	 * <p>The handler runs on the connection's receive thread and should hand off any
-	 * blocking work.
+	 * <p>The handler runs on the connection's receive thread, which may be a network
+	 * event loop, so it must not block: hand off any work that may wait.
 	 *
 	 * @param handler Data request handler, or null to deny reverse data requests
 	 */
@@ -172,6 +176,8 @@ public abstract class AConvexConnected extends Convex {
 	 * client result, challenge or DATA_REQUEST paths. Lattice nodes use this only
 	 * after the remote endpoint has been authenticated, allowing an outbound client
 	 * socket to carry reverse lattice propagation without becoming a general server.
+	 * The handler runs on the connection's receive thread, which may be a network event
+	 * loop, so it must not block: hand off any work that may wait.
 	 *
 	 * @param handler unsolicited message handler, or null to ignore such messages
 	 */
