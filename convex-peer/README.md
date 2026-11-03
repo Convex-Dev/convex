@@ -199,7 +199,7 @@ transport key. For an indirect DID, supply the authoriser as the third argument
 to `setIdentity`. A group can override its own key. Changing the node default
 affects future groups only.
 
-The node closes its listener, groups and server, leaving the host and its
+The node closes its listeners, groups and server, leaving the host and its
 caller-owned store usable. A service shuts down with
 `try (store; network; host) { network.stopIngress(); app.sync(); }`, so peers
 receive its final checkpoint; see [shutdown](docs/SHUTDOWN.md).

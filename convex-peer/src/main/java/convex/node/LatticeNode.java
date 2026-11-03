@@ -23,10 +23,11 @@ import convex.net.PeerTarget;
 
 /**
  * Optional TCP networking for an existing host, with dynamically created
- * propagation groups. Owns the server, groups and listener, but not their stores.
+ * propagation groups. Owns the server, groups and listeners, but not their stores.
  * Inbound connections are denied unless
  * the caller selects a policy through {@link #getListener()} or explicitly calls
- * {@link #serveAllInbound(LatticePropagator)}.
+ * {@link #serveAllInbound(LatticePropagator)}. Further listeners, from
+ * {@link #addListener(NodeConfig)}, deny until given a selector of their own.
  *
  * <p>For custom transports, assemble {@link NodeServer} and
  * {@link LatticeListener} directly. This convenience owns no domain policy.</p>
@@ -40,6 +41,10 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 
 	private final NodeServer<V> server;
 	private final LatticeListener listener;
+	/** Every listener this node starts and closes, its own first. */
+	private final List<LatticeListener> listeners=new ArrayList<>();
+	/** Whether launch completed and ingress has not stopped, so a new listener opens at once. */
+	private boolean accepting;
 	private AString did;
 	private AKeyPair keyPair;
 	private PeerResolver peerResolver;
@@ -50,6 +55,7 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	public LatticeNode(LatticeHost<V> host,NodeConfig config) {
 		server=new NodeServer<>(host,config);
 		listener=new LatticeListener(config);
+		listeners.add(listener);
 	}
 
 	/** Configures a primary did:key identity, or clears it when both arguments are null. */
@@ -92,26 +98,63 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Creates and registers a group over the host store with the given limits,
-	 * starting it if already running. Its transport key defaults to the node's
+	 * Creates and registers a group that publishes the host's value unfiltered, as
+	 * {@link #createPropagator(LatticePropagatorConfig, LatticeFilter)} does.
+	 *
+	 * @param config the group's route, queue and publication limits
+	 */
+	public LatticePropagator createPropagator(LatticePropagatorConfig config) {
+		return createPropagator(config,value -> value);
+	}
+
+	/**
+	 * Creates and registers a group over the host store with the given limits and
+	 * publication filter, starting it if already running. Every listener of this node
+	 * may assign connections to it. Its transport key defaults to the node's
 	 * configured key, or null without an identity. The group can override this
 	 * default through {@link LatticePropagator#setTransportKeyPair(AKeyPair)}.
 	 *
 	 * @param config the group's route, queue and publication limits
+	 * @param filter what the group publishes of the host's value, as
+	 *        {@link LatticePropagator#setPublicationFilter} takes it
+	 * @throws IllegalArgumentException if the filter is null
 	 */
-	public synchronized LatticePropagator createPropagator(LatticePropagatorConfig config) {
+	public synchronized LatticePropagator createPropagator(LatticePropagatorConfig config,LatticeFilter<V> filter) {
+		if (filter==null) throw new IllegalArgumentException("Publication filter must not be null");
 		var propagator=new LatticePropagator(server.getStore(),config);
 		propagator.setTransportKeyPair(keyPair);
+		propagator.setPublicationFilter(filter);
 		server.addPropagator(propagator);
-		listener.registerPropagator(propagator);
+		for (LatticeListener each:listeners) each.registerPropagator(propagator);
 		return propagator;
 	}
 
-	/** Revokes inbound assignments and closes this group; other groups continue running. */
+	/** Revokes inbound assignments on every listener and closes this group; other groups continue running. */
 	public synchronized boolean removePropagator(LatticePropagator propagator) {
 		stopKeeping(propagator);
-		listener.unregisterPropagator(propagator);
+		for (LatticeListener each:listeners) each.unregisterPropagator(propagator);
 		return server.removePropagator(propagator);
+	}
+
+	/**
+	 * Adds a listener on another port, with its own physical limits, for groups that
+	 * should be reached separately, such as a trusted or replication port. Every group
+	 * of this node may be assigned through it, but it denies every connection until
+	 * given a selector. The node opens it with its own listener, or at once if already
+	 * running, and closes it whenever it closes its own.
+	 *
+	 * @param config the listener's port and physical limits
+	 * @return the listener, for its selector
+	 * @throws IOException if the node is running and the listener cannot bind or start;
+	 *         it is then not added
+	 * @throws InterruptedException if opening it is interrupted
+	 */
+	public synchronized LatticeListener addListener(NodeConfig config) throws IOException,InterruptedException {
+		var added=new LatticeListener(config);
+		for (LatticePropagator propagator:server.getPropagators()) added.registerPropagator(propagator);
+		if (accepting) added.launch();
+		listeners.add(added);
+		return added;
 	}
 
 	/**
@@ -197,11 +240,11 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Explicitly serves this group's view to all inbound connections. Assignment
-	 * grants access to the view, not authentication or an outbound gossip route.
-	 * May be called while running. New assignments use this group; established
-	 * sockets keep their existing assignment. Private deployments can configure
-	 * the listener's selector instead.
+	 * Explicitly serves this group's view to all inbound connections on this node's
+	 * own listener. Assignment grants access to the view, not authentication or an
+	 * outbound gossip route. May be called while running. New assignments use this
+	 * group; established sockets keep their existing assignment. Private deployments
+	 * can configure the listener's selector instead.
 	 */
 	public synchronized LatticeNode<V> serveAllInbound(LatticePropagator propagator) {
 		if (!server.getPropagators().contains(propagator)) {
@@ -211,11 +254,12 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 		return this;
 	}
 
-	/** Starts publication before accepting connections. Failed launch closes owned resources. */
+	/** Starts publication before accepting connections on any listener. Failed launch closes owned resources. */
 	public synchronized LatticeNode<V> launch() throws IOException,InterruptedException {
 		try {
 			server.launch();
-			listener.launch();
+			for (LatticeListener each:listeners) each.launch();
+			accepting=true;
 			return this;
 		} catch (IOException | InterruptedException | RuntimeException | Error e) {
 			try {
@@ -230,23 +274,40 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	/** The server attached to the original host. */
 	public NodeServer<V> getServer() { return server; }
 
-	/** Listener for an explicit inbound selection policy. */
+	/** This node's own listener, on the port its configuration names, for an explicit inbound selection policy. */
 	public LatticeListener getListener() { return listener; }
 
-	/** Actual bound address, or null when listening is disabled. */
+	/** Actual bound address of this node's own listener, or null when listening is disabled. */
 	public InetSocketAddress getHostAddress() { return listener.getHostAddress(); }
 
 	/**
-	 * Stops networking changing the host: closes the listener, then drains the
+	 * Stops networking changing the host: closes every listener, then drains the
 	 * server's accepted inbound work, as {@link NodeServer#stopIngress()} does.
 	 * Publication continues; see convex-peer/docs/SHUTDOWN.md for the service order.
 	 */
 	public synchronized void stopIngress() {
 		try {
-			listener.close();
+			Throwable failure=closeListeners();
+			if (failure instanceof RuntimeException e) throw e;
+			if (failure instanceof Error e) throw e;
 		} finally {
 			server.stopIngress();
 		}
+	}
+
+	/** Closes every listener, each even if another fails, and returns the first failure, with any later one suppressed. */
+	private Throwable closeListeners() {
+		accepting=false;
+		Throwable failure=null;
+		for (LatticeListener each:listeners) {
+			try {
+				each.close();
+			} catch (RuntimeException | Error e) {
+				if (failure==null) failure=e;
+				else failure.addSuppressed(e);
+			}
+		}
+		return failure;
 	}
 
 	/**
@@ -257,12 +318,7 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	@Override
 	public synchronized void close() throws IOException {
 		stopKeeping(null);
-		Throwable failure=null;
-		try {
-			listener.close();
-		} catch (RuntimeException | Error e) {
-			failure=e;
-		}
+		Throwable failure=closeListeners();
 		try {
 			server.close();
 		} catch (IOException | RuntimeException | Error e) {

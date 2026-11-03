@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -131,6 +132,62 @@ class LatticeNodeTest {
 		var result=client.message(message).get(5,TimeUnit.SECONDS);
 		assertFalse(result.isError(),result.toString());
 		return result.getValue();
+	}
+
+	private static ACell pingError(ConvexRemote client) throws Exception {
+		return client.message(Message.createPing(1)).get(5,TimeUnit.SECONDS).getErrorCode();
+	}
+
+	/** A second port serves a group of its own; a group is registered on, and removed from, every listener. */
+	@Test void aSecondListenerServesAGroupOfItsOwn() throws Exception {
+		try (var store=new MemoryStore()) {
+			var host=LatticeHost.create(CVMLong.create(99),store);
+			try (var network=new LatticeNode<>(host,NodeConfig.port(0))) {
+				var open=network.createPropagator(LatticePropagatorConfig.create(),value -> CVMLong.ONE);
+				var trusted=network.createPropagator(LatticePropagatorConfig.create(),value -> CVMLong.TWO);
+				assertThrows(IllegalArgumentException.class,() -> network.createPropagator(LatticePropagatorConfig.create(),null));
+				assertEquals(List.of(open,trusted),network.getServer().getPropagators(),"a refused filter attaches no group");
+				network.serveAllInbound(open);
+				var second=network.addListener(NodeConfig.port(0));
+				network.launch();
+				assertTrue(second.isRunning(),"the node opens every listener");
+				try (var client=ConvexRemote.connect(second.getHostAddress())) {
+					assertEquals(ErrorCodes.TRUST,pingError(client),"a new listener denies until given a selector");
+				}
+				second.setSelector(connection -> trusted);
+				try (var openClient=ConvexRemote.connect(network.getHostAddress());
+						var trustedClient=ConvexRemote.connect(second.getHostAddress())) {
+					assertEquals(CVMLong.ONE,queryRoot(openClient));
+					assertEquals(CVMLong.TWO,queryRoot(trustedClient));
+				}
+				assertTrue(network.removePropagator(trusted));
+				try (var client=ConvexRemote.connect(second.getHostAddress())) {
+					assertEquals(ErrorCodes.TRUST,pingError(client),"a removed group is unregistered from every listener");
+				}
+				network.stopIngress();
+				assertFalse(network.getListener().isRunning());
+				assertFalse(second.isRunning(),"stopping ingress closes every listener");
+			}
+		}
+	}
+
+	/** A listener added while running opens at once and can assign existing groups; one that cannot bind fails alone. */
+	@Test void aListenerAddedWhileRunningOpensAtOnce() throws Exception {
+		try (var store=new MemoryStore(); var occupied=new ServerSocket(0)) {
+			var host=LatticeHost.create(CVMLong.ONE,store);
+			LatticeListener added;
+			try (var network=new LatticeNode<>(host,NodeConfig.port(-1)).launch()) {
+				var group=network.createPropagator(LatticePropagatorConfig.create(),value -> CVMLong.TWO);
+				assertThrows(IOException.class,() -> network.addListener(NodeConfig.port(occupied.getLocalPort())));
+				added=network.addListener(NodeConfig.port(0));
+				assertTrue(added.isRunning());
+				added.setSelector(connection -> group);
+				try (var client=ConvexRemote.connect(added.getHostAddress())) {
+					assertEquals(CVMLong.TWO,queryRoot(client));
+				}
+			}
+			assertFalse(added.isRunning(),"closing the node closes every listener");
+		}
 	}
 
 	@Test void inboundAccessRequiresAnExplicitPolicy() throws Exception {

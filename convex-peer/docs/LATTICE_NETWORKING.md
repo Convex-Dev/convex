@@ -33,8 +33,11 @@ try (var network = new LatticeNode<>(host, config).launch()) {
 it when the network is running. No separate add or activation call is needed.
 New groups have no peers or assigned inbound sockets. A group reads its limits from
 its own configuration, never the node's: `createPropagator(groupConfig)` supplies
-one, and the no-argument form uses defaults. `removePropagator(group)` revokes
-inbound assignments and closes that group without stopping other groups.
+one, and the no-argument form uses defaults. Both publish the host's value
+unfiltered; `createPropagator(groupConfig, filter)` gives the group its publication
+filter from the start and refuses a null one. `removePropagator(group)` revokes the
+group's inbound assignments on every listener and closes it without stopping other
+groups.
 
 `LatticeNode` is the standard TCP assembly: the DLFS server, `convex dlfs start` and
 `P2PNode` use it. A host replicated without a listener, such as a Convex DB managed
@@ -49,11 +52,16 @@ remain possible, and existing groups keep their keys when the node default chang
 The primary DID is local configuration: remote peers still verify possession of
 the expected public key, resolving any DID binding through their own trust policy.
 
-`serveAllInbound(group)` is an explicit public serving choice. Otherwise the listener
-denies inbound access unless the caller installs a selector. The selector can change
-while running; existing sockets keep their assigned group until closed or revoked. The
-wrapper starts the server before the listener, closes the listener before draining
-the server, and cleans up a failed launch. The host store remains caller-owned.
+`serveAllInbound(group)` is an explicit public serving choice on the node's own
+listener. Otherwise a listener denies inbound access unless the caller installs a
+selector. The selector can change while running; existing sockets keep their assigned
+group until closed or revoked. `addListener(listenerConfig)` adds a listener on another
+port, with its own connection and message limits, for groups reached separately, such
+as a trusted or replication port. Any group can be assigned through any listener, and
+a new listener denies every connection until given a selector. It opens with the
+node, or at once if the node is running. The wrapper starts the server before its
+listeners, closes every listener before draining the server, and cleans up a failed
+launch. The host store remains caller-owned.
 `NodeServer` detaches its publisher on close or failed launch, restoring local host
 publication and permitting a replacement server. Only one publisher may attach at
 a time. The wrapper creates no implicit propagation group and changes no group policy.

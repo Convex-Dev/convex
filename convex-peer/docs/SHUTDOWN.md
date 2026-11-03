@@ -36,9 +36,9 @@ resources. A front-end close or drafts sync that can fail catches its own failur
 so it neither skips stopping ingress nor loses the drafts. A service without drafts
 leaves out the sync.
 
-`LatticeNode.stopIngress()` and `P2PNode.stopIngress()` close their listener
-first. A node assembled from `NodeServer` and `LatticeListener` closes the
-listener, then calls `NodeServer.stopIngress()`.
+`LatticeNode.stopIngress()` and `P2PNode.stopIngress()` close every listener of
+the node first. A node assembled from `NodeServer` and `LatticeListener` closes its
+listeners, then calls `NodeServer.stopIngress()`.
 
 ## What each close leaves alone
 
