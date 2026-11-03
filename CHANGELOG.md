@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Let a lattice propagation group send its updates to nodes that connect to it and prove a key it admits, with `setChallengerAdmission`. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#connection-capabilities))
 - Wait until a lattice propagation group serves the state you need with `whenAnnounced(condition)`. ([Waiting](convex-peer/docs/PERSISTENCE.md#waiting-in-tests-and-applications), [#805](https://github.com/Convex-Dev/convex/issues/805))
 - Give each `LatticeNode` propagation group its own limits with `createPropagator(groupConfig)`. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md), [#769](https://github.com/Convex-Dev/convex/issues/769))
+- Run several listeners on a `LatticeNode` with `addListener`, each on its own port with its own limits, and give a group its publication filter from the start with `createPropagator(groupConfig, filter)`. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md))
 - Merge a small delta into a large `Index` without visiting the rest of it, with `Index.merge`; Convex DB row deliveries now cost the rows delivered, not the table. ([#786](https://github.com/Convex-Dev/convex/issues/786))
 - Update any map entry from its current value in one step with `update(key, function)` or `update(key, function, arg)`; on an `Index` it is about a third faster than `get` then `assoc`.
 - Encrypt Convex DB's PostgreSQL wire connections with TLS: clients connect with `sslmode=require` up to `verify-full` (proposed by @trsb-standards). ([TLS](convex-db/README.md#tls), [#756](https://github.com/Convex-Dev/convex/issues/756))
@@ -62,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Accept lattice roots of any size when their updates fit the network message limits. ([Propagation](convex-peer/docs/PROPAGATION.md), [#822](https://github.com/Convex-Dev/convex/issues/822))
 - Stop a peer's shutdown hanging when it is connecting to another peer at the same time.
+- Keep a key when the `signingDeleteKey` MCP tool is given the wrong passphrase: it now reports an error, where it reported the key deleted and hid it from `signingListKeys`. ([MCP Auth](convex-restapi/docs/MCP_AUTH.md#deletekey))
 - Close peer connections without waiting for the socket: a network thread no longer waits for another, and a TLS peer that stops reading no longer holds up a close for 3 seconds.
 - Replicate lattice updates with missing cells over connections opened by the receiving node. ([#820](https://github.com/Convex-Dev/convex/issues/820))
 - Make `convex dlfs start --peer` connect: each peer, given as `host:port` or a `tcp://` or `tls://` URI, is admitted under the key it proves, and startup fails if one cannot be reached. Before, no peer was admitted. ([DLFS](convex-dlfs/README.md#run-a-webdav-server), [#629](https://github.com/Convex-Dev/convex/issues/629))
