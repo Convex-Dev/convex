@@ -208,6 +208,7 @@ public class LatticePropagator implements Closeable {
 		connectionManager.setKeepAlive(config.getKeepAlive());
 		connectionManager.setInboundMessageLimits(
 			config.getMaxMessageSize(),config.getMaxTrustedMessageSize());
+		connectionManager.setDataRequestLimit(config.getInboundQueueSize());
 	}
 
 	/**

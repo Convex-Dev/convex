@@ -31,7 +31,10 @@ import org.slf4j.LoggerFactory;
 import convex.api.AConvexConnected;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
+import convex.core.ErrorCodes;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -119,6 +122,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Normal root propagation is the heartbeat; a live route is probed only after this much silence. */
 	private volatile long keepAlive=LatticePropagatorConfig.DEFAULT_KEEP_ALIVE;
 	private int activePeers=LatticePropagatorConfig.DEFAULT_ACTIVE_PEERS;
+	/** Reverse DATA_REQUESTs being served; the setter replaces it, so callers release the one they acquired. */
+	private volatile Semaphore dataRequestPermits=new Semaphore(LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
 
 	// ========== Constants ==========
 
@@ -138,6 +143,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Maximum reconnection delay (milliseconds). */
 	static final long MAX_BACKOFF_MS = 30_000L;
+
+	private static final Result DATA_REQUEST_LOAD=Result.error(ErrorCodes.LOAD,
+		"Lattice data request capacity exhausted");
 
 	// ========== State ==========
 
@@ -520,6 +528,18 @@ public class LatticeConnectionManager extends AConnectionManager {
 			});
 			pendingConnections.forEach((peerKey, pending) -> configureReceiveLimit(pending.connection, false));
 		}
+	}
+
+	/**
+	 * Configures how many reverse DATA_REQUESTs from admitted peers are served at
+	 * once. A request beyond the limit is answered with a :LOAD result. Requests
+	 * already being served keep their permits.
+	 *
+	 * @param limit maximum data requests served concurrently
+	 */
+	void setDataRequestLimit(int limit) {
+		if (limit<=0) throw new IllegalArgumentException("Data request limit must be positive");
+		this.dataRequestPermits=new Semaphore(limit);
 	}
 
 	private static void validateMessageLimit(int limit) {
@@ -1339,20 +1359,52 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * Hands store access off the network receive thread. Announce completes before a
 	 * propagator broadcasts, so every cell referenced by that update is already
 	 * serviceable from this exact store.
+	 *
+	 * <p>At most the configured number are served at once; beyond that the peer is
+	 * told the node is loaded, without waiting on the receive thread.</p>
 	 */
 	private void handleDataRequest(Message message) {
-		Thread.ofVirtual().name("Lattice data request").start(() -> {
+		Semaphore permits=dataRequestPermits;
+		if (!permits.tryAcquire()) {
+			refuseDataRequest(message);
+			return;
+		}
+		try {
+			Thread.ofVirtual().name("Lattice data request").start(() -> serveDataRequest(message,permits));
+		} catch (Throwable t) {
+			permits.release();
+			throw t;
+		}
+	}
+
+	private void serveDataRequest(Message message,Semaphore permits) {
+		try {
+			Message response;
 			try {
-				Message response = message.makeDataResponse(store);
-				if (!message.returnMessage(response)) {
-					log.debug("Unable to return lattice data: peer send buffer is full");
-				}
-			} catch (BadFormatException e) {
-				log.warn("Ignoring malformed lattice DATA_REQUEST: {}", e.getMessage());
-			} catch (Exception e) {
-				log.warn("Unable to serve lattice DATA_REQUEST", e);
+				response = message.makeDataResponse(store);
+			} finally {
+				// Before the non-blocking send, so a peer holding its reply finds the permit free
+				permits.release();
 			}
-		});
+			if (!message.returnMessage(response)) {
+				log.debug("Unable to return lattice data: peer send buffer is full");
+			}
+		} catch (BadFormatException e) {
+			log.warn("Ignoring malformed lattice DATA_REQUEST: {}", e.getMessage());
+		} catch (Exception e) {
+			log.warn("Unable to serve lattice DATA_REQUEST", e);
+		}
+	}
+
+	private static void refuseDataRequest(Message message) {
+		ACell id=message.getRequestID();
+		if (id==null || message.getConnection()==null) {
+			log.debug("Dropped lattice DATA_REQUEST: data request capacity exhausted");
+			return;
+		}
+		if (!message.returnMessage(Message.createResult(DATA_REQUEST_LOAD.withID(id)))) {
+			log.debug("Unable to refuse lattice DATA_REQUEST: peer send buffer is full");
+		}
 	}
 
 	/**

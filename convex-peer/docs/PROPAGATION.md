@@ -143,6 +143,7 @@ protocol limits:
 | Lattice delta message or DATA body | 4 MiB | `LatticePropagatorConfig.maxDeltaMessageSize` |
 | One eager lattice propagation | 16 MiB | `LatticePropagatorConfig.maxDeltaBroadcastSize` |
 | Node inbound processing queue | 1,024 messages and 16 MiB | `inboundQueueSize`, `maxInboundQueueBytes` |
+| Concurrent lattice acquisitions; DATA_REQUESTs served over routes the node opened | 1,024 each | `inboundQueueSize` |
 | Belief or own-Order delta message | 4 MiB | `:max-belief-delta-message-size` |
 | Trusted CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
 | Untrusted CPoS DATA/BELIEF queue | 10 messages and 4 MiB | `Config` constants |

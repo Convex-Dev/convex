@@ -1125,6 +1125,81 @@ public class NodeServerTest {
 	}
 
 	/**
+	 * Reverse DATA_REQUESTs beyond the serving limit are refused with :LOAD, and
+	 * served again once earlier requests finish. Requests on one connection take
+	 * permits in order on its receive thread, and a permit is free before its reply
+	 * is sent, so no step depends on timing.
+	 */
+	@Test
+	public void testReverseDataRequestsAreBounded() throws Exception {
+		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore();
+				AStore decodeStore = new MemoryStore();
+				NettyServer requester = new NettyServer(0)) {
+			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
+			servingStore.blockedHash = value.getHash();
+			CompletableFuture<AConnection> reverseConnection = new CompletableFuture<>();
+			ConcurrentHashMap<ACell, CompletableFuture<Message>> responses = new ConcurrentHashMap<>();
+
+			requester.setReceiveAction(message -> {
+				try {
+					ACell id = message.getResultID();
+					if (id != null) {
+						responses.computeIfAbsent(id, k -> new CompletableFuture<>()).complete(message);
+					} else {
+						reverseConnection.complete(message.getConnection());
+					}
+				} catch (Exception e) {
+					reverseConnection.completeExceptionally(e);
+				}
+			});
+			requester.launch();
+
+			LatticeConnectionManager manager = new LatticeConnectionManager(servingStore);
+			manager.setDataRequestLimit(2);
+			ConvexRemote peer = ConvexRemote.connect(requester.getHostAddress());
+			try {
+				manager.addPeer(AKeyPair.generate().getAccountKey(), peer);
+				assertTrue(peer.trySend(Message.createPing(1)));
+				AConnection connection = reverseConnection.get(5, TimeUnit.SECONDS);
+
+				// The first two hold both permits behind the store gate
+				for (long id = 81; id <= 83; id++) {
+					assertTrue(connection.sendMessage(
+						Message.createDataRequest(CVMLong.create(id), value.getHash())));
+				}
+				Result refused = dataResult(responses, 83, decodeStore);
+				assertEquals(ErrorCodes.LOAD, refused.getErrorCode());
+				assertEquals(CVMLong.create(83), refused.getID());
+
+				servingStore.release.countDown();
+				for (long id = 81; id <= 82; id++) {
+					Result served = dataResult(responses, id, decodeStore);
+					assertFalse(served.isError());
+					assertEquals(value, ((AVector<?>) served.getValue()).get(0));
+				}
+
+				assertTrue(connection.sendMessage(
+					Message.createDataRequest(CVMLong.create(84), value.getHash())));
+				Result later = dataResult(responses, 84, decodeStore);
+				assertFalse(later.isError(), "a request after the earlier ones finish is served");
+				assertEquals(value, ((AVector<?>) later.getValue()).get(0));
+			} finally {
+				servingStore.release.countDown();
+				manager.close();
+				peer.close();
+			}
+		}
+	}
+
+	private static Result dataResult(ConcurrentHashMap<ACell, CompletableFuture<Message>> responses,
+			long id, AStore decodeStore) throws Exception {
+		Message response = responses.computeIfAbsent(CVMLong.create(id), k -> new CompletableFuture<>())
+			.get(5, TimeUnit.SECONDS);
+		response.getPayload(decodeStore);
+		return response.toResult();
+	}
+
+	/**
 	 * An unverified connection may submit a complete lattice value, but cannot
 	 * trigger missing-cell acquisition into any node store.
 	 */

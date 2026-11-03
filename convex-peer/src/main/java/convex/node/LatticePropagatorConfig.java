@@ -56,7 +56,11 @@ public final class LatticePropagatorConfig {
 	/** Additional recently used peers to retain, excluding explicit connections. */
 	public static final AString ACTIVE_PEERS=Strings.intern("activePeers");
 
-	/** Maximum number of decoded messages awaiting ordered processing. */
+	/**
+	 * Maximum number of decoded messages awaiting ordered processing. Also bounds
+	 * concurrent missing-data acquisitions, and DATA_REQUESTs served at once over
+	 * routes the group opened.
+	 */
 	public static final AString INBOUND_QUEUE_SIZE=Strings.intern("inboundQueueSize");
 
 	/** Maximum encoded bytes retained by this group's inbound queue. */

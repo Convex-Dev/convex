@@ -264,6 +264,9 @@ Once the listener assigns a socket, all work belongs to that group:
 `DATA` only materialises independently addressable cells in the selected serving
 store. It never merges a lattice root. `DATA_REQUEST` is scoped to the same
 store, so one group cannot expose another group's private or filtered cache.
+A peer may also send `DATA_REQUEST` over a route this node opened to it. The
+connection manager serves at most `inboundQueueSize` of those at once, off the
+network thread, and answers any beyond that with a `:LOAD` result.
 
 The correlated response to `LATTICE_VALUE` confirms delivery to the host and
 logical root publication. It does not wait for every propagator group to
