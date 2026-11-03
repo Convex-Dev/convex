@@ -88,7 +88,7 @@ See [lattice networking](../../convex-peer/docs/LATTICE_NETWORKING.md).
 - Domain packages —
   `DataLattice`, `DLFSLattice`, `KVStoreLattice`, `TopicLattice`, `P2PLattice`,
   `LocalLattice` — the region lattices.
-- `convex.node.NodeServer` (`convex-peer`) — hosting and propagation.
+- `convex.lattice.LatticeHost` — hosting; `convex.node.LatticeNode` (`convex-peer`) — replication.
 
 ## Related
 

@@ -26,8 +26,8 @@ public class Lattice {
 	 * - :data - General purpose data storage
 	 * - :fs - DLFS replicated filesystem (owner -> drive name -> DLFS node)
 	 *   where drive names are AString (not Keywords)
-	 * - :kv - Key-value databases (db name -> owner/node -> signed KV store)
-	 *   Each database has per-node signed replicas merged via KVStoreLattice
+	 * - :kv - Key-value databases (owner -> store name -> KV store)
+	 *   Each owner signs its named stores; entries merge via KVStoreLattice
 	 * - :queue - Kafka-style message queues (owner -> topic -> :partitions -> partition id -> queue)
 	 *   Each topic has metadata + partitions; each partition is an append-only log
 	 * - :local - Application state that is not shared externally (owner -> keyword-keyed map)
