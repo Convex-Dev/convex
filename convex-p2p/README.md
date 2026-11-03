@@ -29,7 +29,7 @@ P2PLattice.ROOT (KeyedLattice)
 ```
 
 **`:p2p`** — the shared node registry. Each node publishes a signed, LWW `NodeInfo`
-(transports, PoPs, relay willingness, served regions, software version, timestamp)
+(transports, PoPs, relay willingness, regions of interest, software version, timestamp)
 under its node `AccountKey` at `[:p2p :nodes <nodeKey>]`. The record format belongs to
 this module: `NodeDirectory` publishes and validates this application-owned path while
 the generic propagation layer transports it without interpreting its schema. Each

@@ -206,7 +206,7 @@ This uses `OwnerLattice` — the same pattern as `:kv` and `:fs`. The AccountKey
                "wss://peer.convex.world/ws"]
  :pops        [0xdef456...]             ;; node keys providing a return path
  :relay       true                     ;; willing to relay bounded signed messages
- :regions     #{:p2p :id :kad :social}  ;; top-level lattice regions this node serves
+ :regions     #{:p2p :id :kad :social}  ;; top-level regions this node is interested in
  :type        "Convex Lattice Node"
  :version     "0.8.18"}                ;; software version
 ```
@@ -216,8 +216,10 @@ the node is identifiable but not directly dialable, as for an outbound-only node
 behind NAT. Private or guessed addresses must not be advertised as public transports.
 `:pops` contains at most 16 unique remote node keys and `:relay` defaults to false
 when absent. These fields advertise routing intent; they do not authenticate or open
-a connection. `:regions` names the top-level regions the node serves, so other nodes
-can choose peers that serve what they need (§4.5). It never includes `:local`.
+a connection. `:regions` names the top-level regions the node is interested in, so
+other nodes can locate nodes interested in the same regions (§4.5). It describes the
+node to the network; it is not a rule for how the node's applications or code are
+structured. It never includes `:local`.
 
 The record format and its validation belong to the P2P application in
 `convex-p2p`, which merges the registry through its own component.
@@ -377,7 +379,7 @@ A node uses multiple strategies to discover and maintain connections, in order:
 
 ### 4.5 Selective Attention
 
-Nodes only propagate lattice regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. Each node record's `:regions` names the top-level regions that node serves, so a node can prefer peers that serve what it needs. Region-aware peer selection is [PROPOSED].
+Nodes only propagate lattice regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. A node finds peers interested in the same regions through their records' `:regions` (§4.2); choosing peers by region is [PROPOSED].
 
 This is natural in the `NodeServer` model: the application attaches propagators
 with the appropriate filtered views, while a node only merges values governed by
@@ -936,7 +938,7 @@ This needs to be resolved before Phase 2 of the consensus migration.
 - Existing BELIEF messages and `BeliefPropagator` unchanged
 
 ### Phase 1b — Retention and Local Evidence
-- Node records advertise served regions (`:regions`, §4.2)
+- Node records name the regions each node is interested in (`:regions`, §4.2)
 - Contact records reported by the connection manager and kept in `:local` (§4.6)
 - Each node keeps only the records it wants, ranked by that evidence (§4.2)
 - Seed nodes released once other peers replace them, and rejoining from retained records (§4.2)

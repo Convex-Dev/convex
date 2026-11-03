@@ -103,8 +103,8 @@ import convex.social.Social;
  *       through which this node expects to be reachable</li>
  *   <li>{@code :relay} — whether this node is willing to relay bounded signed
  *       point-to-point messages</li>
- *   <li>{@code :regions} — {@code ASet<Keyword>} of the top-level lattice regions this
- *       node serves (optional, never {@code :local})</li>
+ *   <li>{@code :regions} — {@code ASet<Keyword>} of the top-level regions this node is
+ *       interested in (optional, never {@code :local}); see {@code P2P_DESIGN.md} §4.2</li>
  *   <li>{@code :type} — {@code AString} node software type (e.g. {@code "Convex Lattice Node"})</li>
  *   <li>{@code :version} — {@code AString} software version</li>
  * </ul>
@@ -235,7 +235,7 @@ public class P2PLattice {
 	 * @param transports Public transport URIs, or empty for an outbound-only node
 	 * @param type Node software type (e.g. "Convex Lattice Node")
 	 * @param version Software version string
-	 * @param regions Top-level lattice regions served (may be null or empty)
+	 * @param regions Top-level regions the node is interested in (may be null or empty)
 	 * @param timestamp Timestamp in millis
 	 * @return NodeInfo map
 	 */
@@ -263,12 +263,12 @@ public class P2PLattice {
 	}
 
 	/**
-	 * Creates a complete NodeInfo map including served regions and PoP metadata.
+	 * Creates a complete NodeInfo map including regions of interest and PoP metadata.
 	 *
 	 * @param transports Public transport URIs, or empty for an outbound-only node
 	 * @param type Node software type
 	 * @param version Software version string
-	 * @param regions Top-level lattice regions served (may be null or empty)
+	 * @param regions Top-level regions the node is interested in (may be null or empty)
 	 * @param pops Node keys for configured Points of Presence (may be null or empty)
 	 * @param relay Whether this node is willing to relay signed point messages
 	 * @param timestamp Timestamp in millis

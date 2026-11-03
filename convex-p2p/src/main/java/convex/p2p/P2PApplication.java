@@ -87,7 +87,7 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 
 	/**
 	 * Supplies node identity, multi-owner signing, time and DID admission explicitly.
-	 * The supplied root selects served regions. Its social owner boundary is
+	 * The supplied root selects the regions it merges. Its social owner boundary is
 	 * bound to this same DID authoriser. Root delivery is a relay:
 	 * domain components own any synthesis requiring a fresh signature.
 	 */
@@ -164,7 +164,7 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		if (contacts!=null) contacts.sync();
 	}
 
-	/** The top-level regions this application serves, as advertised in its node record. Never {@code :local}. */
+	/** The regions this node's record names as its interests: the keys of the root lattice it was connected with, never {@code :local}. */
 	ASet<Keyword> servedRegions() { return servedRegions; }
 
 	/**
@@ -190,7 +190,7 @@ public class P2PApplication extends ALatticeApplication<Index<Keyword,ACell>> {
 		return reduced==null?cursor().get():merge(reduced);
 	}
 
-	/** The root lattice this application was connected with, which selects its served regions. */
+	/** The root lattice this application was connected with, which selects the regions it merges. */
 	public KeyedLattice getLattice() { return lattice; }
 
 	/**
