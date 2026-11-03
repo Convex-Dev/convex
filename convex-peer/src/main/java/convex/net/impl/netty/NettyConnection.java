@@ -216,7 +216,7 @@ public class NettyConnection extends AConnection {
 			connected=true;
 			return client;
 		} finally {
-			if (!connected) chan.close().syncUninterruptibly();
+			if (!connected) chan.close();
 		}
 	}
 
@@ -414,9 +414,9 @@ public class NettyConnection extends AConnection {
 		clearOutbound();
 		closeRequests();
 		if (ch==null) return;
-		ChannelFuture closeFuture=ch.close();
-		if (!ch.eventLoop().inEventLoop()) closeFuture.syncUninterruptibly();
- 	}
+		// The event loop releases the socket; waiting for it here could block one event loop on another
+		ch.close();
+	}
 
 	@Override
 	public long getReceivedCount() {

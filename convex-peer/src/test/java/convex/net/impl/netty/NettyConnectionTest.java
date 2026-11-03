@@ -10,14 +10,18 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import convex.core.data.Blobs;
 import convex.core.data.Format;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.ThreadUtils;
@@ -63,6 +67,44 @@ public class NettyConnectionTest {
 				() -> client.flushOutbound().get(10,TimeUnit.SECONDS));
 			assertInstanceOf(IOException.class,failure.getCause());
 			assertEquals(0L,received.get(10,TimeUnit.SECONDS));
+		}
+	}
+
+	/** Close returns at once while the connection's event loop is busy delivering a message. */
+	@Test
+	@Timeout(60)
+	public void testCloseDoesNotWaitForBusyEventLoop() throws Exception {
+		try (NettyServer server=new NettyServer(0)) {
+			server.setReceiveAction(m -> {
+				try {
+					m.getPayload(null);
+				} catch (BadFormatException e) {
+					throw new AssertionError(e);
+				}
+				m.returnMessage(Message.createResult(m.getRequestID(),CVMLong.ONE,null));
+			});
+			server.launch();
+			CountDownLatch delivering=new CountDownLatch(1);
+			CountDownLatch release=new CountDownLatch(1);
+			NettyConnection client=NettyConnection.connect(server.getHostAddress(),m -> {
+				delivering.countDown();
+				try {
+					release.await();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+			});
+			try {
+				assertTrue(client.trySendMessage(Message.createPing(1)));
+				delivering.await();
+
+				// Close on another thread, so a timeout interrupts this one and the loop is released
+				Thread closer=Thread.ofVirtual().start(client::close);
+				closer.join();
+				assertTrue(client.isClosed());
+			} finally {
+				release.countDown();
+			}
 		}
 	}
 

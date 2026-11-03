@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Accept lattice roots of any size when their updates fit the network message limits. ([Propagation](convex-peer/docs/PROPAGATION.md), [#822](https://github.com/Convex-Dev/convex/issues/822))
 - Stop a peer's shutdown hanging when it is connecting to another peer at the same time.
+- Close peer connections without waiting for the socket: a network thread no longer waits for another, and a TLS peer that stops reading no longer holds up a close for 3 seconds.
 - Replicate lattice updates with missing cells over connections opened by the receiving node. ([#820](https://github.com/Convex-Dev/convex/issues/820))
 - Make `convex dlfs start --peer` connect: each peer, given as `host:port` or a `tcp://` or `tls://` URI, is admitted under the key it proves, and startup fails if one cannot be reached. Before, no peer was admitted. ([DLFS](convex-dlfs/README.md#run-a-webdav-server), [#629](https://github.com/Convex-Dev/convex/issues/629))
 - Preserve concurrent KV updates and return the result of the committed edit.

@@ -363,7 +363,11 @@ public abstract class AConnection {
 	public abstract boolean isClosed();
 
 	/**
-	 * Closes this connection. Idempotent — safe to call multiple times.
+	 * Closes this connection without waiting for the transport, so it is safe on any
+	 * thread. On return, outstanding requests have failed and {@link #isClosed()} is
+	 * true; the transport releases its resources on its own thread, and a message
+	 * already arriving may still be delivered until then. Idempotent — safe to call
+	 * multiple times.
 	 */
 	public abstract void close();
 
