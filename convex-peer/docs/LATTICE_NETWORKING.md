@@ -91,7 +91,7 @@ apply to subsequent handshakes; established routes are not reauthenticated.
 | `LatticeListener` | Application-owned TCP acceptance, physical limits and one immutable connection-to-group assignment | Propagator lifecycle, per-connection protocol state, serving stores, trust or lattice merge |
 | `LatticePropagator` | One propagator group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
 | `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, challenge state, statistics and extension handler | Node persistence, peer discovery, application schemas or which values are wanted |
-| `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification and admitted outbound routes | Discovery records, listener assignment, lattice merge or application-owner validation |
+| `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification, admitted outbound routes and serving `DATA_REQUEST` on them from the group's store | Discovery records, listener assignment, lattice merge or application-owner validation |
 | `ALattice` / `LatticeContext` | Value validation, merge semantics and application signing authority | Transport identity and routing |
 | Service | Construction, lifecycle order, transport composition and connection assignment; today also connecting its applications' network decisions, such as discovery and message handling, to the node ([anatomy](../../convex-core/docs/LATTICE_APPLICATIONS.md#network-decisions-and-mechanics)) | Generic protocol internals |
 
@@ -274,8 +274,10 @@ Once the listener assigns a socket, all work belongs to that group:
 store. It never merges a lattice root. `DATA_REQUEST` is scoped to the same
 store, so one group cannot expose another group's private or filtered cache.
 A peer may also send `DATA_REQUEST` over a route this node opened to it. The
-connection manager serves at most `inboundQueueSize` of those at once, off the
-network thread, and answers any beyond that with a `:LOAD` result.
+connection manager serves at most `maxDataRequests` of those at once, 16 by
+default, off the network thread. One route may hold a quarter of them, and at
+least one, so a single peer cannot crowd out the rest. Requests beyond either
+limit are answered with a `:LOAD` result.
 
 The correlated response to `LATTICE_VALUE` confirms delivery to the host and
 logical root publication. It does not wait for every propagator group to

@@ -123,8 +123,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Normal root propagation is the heartbeat; a live route is probed only after this much silence. */
 	private volatile long keepAlive=LatticePropagatorConfig.DEFAULT_KEEP_ALIVE;
 	private int activePeers=LatticePropagatorConfig.DEFAULT_ACTIVE_PEERS;
-	/** Reverse DATA_REQUESTs being served; the setter replaces it, so callers release the one they acquired. */
-	private volatile Semaphore dataRequestPermits=new Semaphore(LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+	/** Reverse DATA_REQUESTs served at once over all routes. */
+	private volatile int dataRequestLimit=LatticePropagatorConfig.DEFAULT_MAX_DATA_REQUESTS;
+	/** The pool for that limit; the setter replaces it, so callers release the one they acquired. */
+	private volatile Semaphore dataRequestPermits=new Semaphore(dataRequestLimit);
 
 	// ========== Constants ==========
 
@@ -144,6 +146,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Maximum reconnection delay (milliseconds). */
 	static final long MAX_BACKOFF_MS = 30_000L;
+
+	/** A route's share of the data request pool is the pool divided by this, so several routes are always served. */
+	static final int DATA_REQUEST_ROUTE_SHARES = 4;
 
 	private static final Result DATA_REQUEST_LOAD=Result.error(ErrorCodes.LOAD,
 		"Lattice data request capacity exhausted");
@@ -550,13 +555,15 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/**
 	 * Configures how many reverse DATA_REQUESTs from admitted peers are served at
-	 * once. A request beyond the limit is answered with a :LOAD result. Requests
-	 * already being served keep their permits.
+	 * once, and so each route's share of them, a quarter of that and at least one.
+	 * A request beyond either is answered with a :LOAD result. Requests already
+	 * being served keep their permits, and routes admitted earlier keep their share.
 	 *
 	 * @param limit maximum data requests served concurrently
 	 */
 	void setDataRequestLimit(int limit) {
 		if (limit<=0) throw new IllegalArgumentException("Data request limit must be positive");
+		this.dataRequestLimit=limit;
 		this.dataRequestPermits=new Semaphore(limit);
 	}
 
@@ -1356,7 +1363,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		convex.setStore(store);
 		if (convex instanceof AConvexConnected connected) {
 			connected.setReceiveObserver(() -> received(convex.getVerifiedPeer(),convex));
-			connected.setDataRequestHandler(this::handleDataRequest);
+			connected.setDataRequestHandler(dataRequestHandler());
 			connected.setUnsolicitedMessageHandler(message -> {
 				BiConsumer<Convex, Message> handler = peerMessageHandler;
 				if (handler != null) handler.accept(convex, message);
@@ -1373,36 +1380,50 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 	}
 
+	/** Creates the data request handler for one route, holding that route's share of the pool. */
+	private Consumer<Message> dataRequestHandler() {
+		Semaphore route=new Semaphore(Math.max(1,dataRequestLimit/DATA_REQUEST_ROUTE_SHARES));
+		return message -> handleDataRequest(message,route);
+	}
+
 	/**
 	 * Hands store access off the network receive thread. Announce completes before a
 	 * propagator broadcasts, so every cell referenced by that update is already
 	 * serviceable from this exact store.
 	 *
-	 * <p>At most the configured number are served at once; beyond that the peer is
-	 * told the node is loaded, without waiting on the receive thread.</p>
+	 * <p>Each request takes a permit from its route's share and one from the pool.
+	 * When either has none free the peer is told the node is loaded, without waiting
+	 * on the receive thread.</p>
 	 */
-	private void handleDataRequest(Message message) {
-		Semaphore permits=dataRequestPermits;
-		if (!permits.tryAcquire()) {
+	private void handleDataRequest(Message message,Semaphore route) {
+		if (!route.tryAcquire()) {
+			refuseDataRequest(message);
+			return;
+		}
+		Semaphore pool=dataRequestPermits;
+		if (!pool.tryAcquire()) {
+			route.release();
 			refuseDataRequest(message);
 			return;
 		}
 		try {
-			Thread.ofVirtual().name("Lattice data request").start(() -> serveDataRequest(message,permits));
+			Thread.ofVirtual().name("Lattice data request").start(() -> serveDataRequest(message,route,pool));
 		} catch (Throwable t) {
-			permits.release();
+			pool.release();
+			route.release();
 			throw t;
 		}
 	}
 
-	private void serveDataRequest(Message message,Semaphore permits) {
+	private void serveDataRequest(Message message,Semaphore route,Semaphore pool) {
 		try {
 			Message response;
 			try {
 				response = message.makeDataResponse(store);
 			} finally {
-				// Before the non-blocking send, so a peer holding its reply finds the permit free
-				permits.release();
+				// Before the non-blocking send, so a peer holding its reply finds its permits free
+				pool.release();
+				route.release();
 			}
 			if (!message.returnMessage(response)) {
 				log.debug("Unable to return lattice data: peer send buffer is full");

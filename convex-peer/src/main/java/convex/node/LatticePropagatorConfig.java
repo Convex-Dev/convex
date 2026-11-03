@@ -58,10 +58,16 @@ public final class LatticePropagatorConfig {
 
 	/**
 	 * Maximum number of decoded messages awaiting ordered processing. Also bounds
-	 * concurrent missing-data acquisitions, and DATA_REQUESTs served at once over
-	 * routes the group opened.
+	 * concurrent missing-data acquisitions.
 	 */
 	public static final AString INBOUND_QUEUE_SIZE=Strings.intern("inboundQueueSize");
+
+	/**
+	 * DATA_REQUESTs served at once over the routes this group opened. One route may
+	 * hold a quarter of them, and at least one; requests beyond either limit are
+	 * answered with a :LOAD result.
+	 */
+	public static final AString MAX_DATA_REQUESTS=Strings.intern("maxDataRequests");
 
 	/** Maximum encoded bytes retained by this group's inbound queue. */
 	public static final AString MAX_INBOUND_QUEUE_BYTES=Strings.intern("maxInboundQueueBytes");
@@ -105,6 +111,9 @@ public final class LatticePropagatorConfig {
 
 	/** Default encoded bytes awaiting ordered processing. */
 	public static final int DEFAULT_MAX_INBOUND_QUEUE_BYTES=16*1024*1024;
+
+	/** Default DATA_REQUESTs served at once over the group's own routes. */
+	public static final int DEFAULT_MAX_DATA_REQUESTS=16;
 
 	/** Default time allowed for accepted endpoint work to drain. */
 	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT=10_000L;
@@ -227,6 +236,11 @@ public final class LatticePropagatorConfig {
 	/** Returns the decoded-message capacity of this group's inbound queue. */
 	public int getInboundQueueSize() {
 		return getPositiveInt(INBOUND_QUEUE_SIZE,DEFAULT_INBOUND_QUEUE_SIZE);
+	}
+
+	/** Returns how many DATA_REQUESTs the group serves at once over the routes it opened. */
+	public int getMaxDataRequests() {
+		return getPositiveInt(MAX_DATA_REQUESTS,DEFAULT_MAX_DATA_REQUESTS);
 	}
 
 	/** Returns the encoded-byte capacity of this group's inbound queue. */

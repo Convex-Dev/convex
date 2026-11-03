@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -474,6 +475,7 @@ public class NodeServerTest {
 			groupDefaults.getMaxTrustedMessageSize());
 		assertEquals(256,groupDefaults.getMaxConnections());
 		assertEquals(1024,groupDefaults.getInboundQueueSize());
+		assertEquals(16,groupDefaults.getMaxDataRequests());
 		assertEquals(16*1024*1024,groupDefaults.getMaxInboundQueueBytes());
 		assertEquals(10_000L,groupDefaults.getInboundShutdownTimeout());
 
@@ -490,6 +492,7 @@ public class NodeServerTest {
 			LatticePropagatorConfig.MAX_TRUSTED_MESSAGE_SIZE,CVMLong.create(65536),
 			LatticePropagatorConfig.MAX_CONNECTIONS,CVMLong.create(12),
 			LatticePropagatorConfig.INBOUND_QUEUE_SIZE,CVMLong.create(34),
+			LatticePropagatorConfig.MAX_DATA_REQUESTS,CVMLong.create(5),
 			LatticePropagatorConfig.MAX_INBOUND_QUEUE_BYTES,CVMLong.create(65536),
 			LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.create(56)));
 		assertEquals(8192,group.getMaxMessageSize());
@@ -498,12 +501,16 @@ public class NodeServerTest {
 		assertEquals(65536,group.getMaxTrustedMessageSize());
 		assertEquals(12,group.getMaxConnections());
 		assertEquals(34,group.getInboundQueueSize());
+		assertEquals(5,group.getMaxDataRequests());
 		assertEquals(65536,group.getMaxInboundQueueBytes());
 		assertEquals(56,group.getInboundShutdownTimeout());
 
 		LatticePropagatorConfig invalid=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.INBOUND_QUEUE_SIZE,CVMLong.ZERO));
 		assertThrows(IllegalArgumentException.class,invalid::getInboundQueueSize);
+		LatticePropagatorConfig invalidDataRequests=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_DATA_REQUESTS,CVMLong.ZERO));
+		assertThrows(IllegalArgumentException.class,invalidDataRequests::getMaxDataRequests);
 		LatticePropagatorConfig invalidTimeout=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.ZERO));
 		assertThrows(IllegalArgumentException.class, invalidTimeout::getInboundShutdownTimeout);
@@ -1125,78 +1132,137 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Reverse DATA_REQUESTs beyond the serving limit are refused with :LOAD, and
-	 * served again once earlier requests finish. Requests on one connection take
-	 * permits in order on its receive thread, and a permit is free before its reply
-	 * is sent, so no step depends on timing.
+	 * Reverse DATA_REQUESTs over every route draw on one pool: with it held by one
+	 * route, another route's request is refused with :LOAD, and served once the
+	 * pool is free again. A permit is free before its reply is sent, so no step
+	 * depends on timing.
 	 */
 	@Test
-	public void testReverseDataRequestsAreBounded() throws Exception {
+	public void testReverseDataRequestsShareOnePool() throws Exception {
 		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore();
-				AStore decodeStore = new MemoryStore();
-				NettyServer requester = new NettyServer(0)) {
+				DataRequestRoutes routes = new DataRequestRoutes(servingStore, 1)) {
 			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
 			servingStore.blockedHash = value.getHash();
-			CompletableFuture<AConnection> reverseConnection = new CompletableFuture<>();
-			ConcurrentHashMap<ACell, CompletableFuture<Message>> responses = new ConcurrentHashMap<>();
-
-			requester.setReceiveAction(message -> {
-				try {
-					ACell id = message.getResultID();
-					if (id != null) {
-						responses.computeIfAbsent(id, k -> new CompletableFuture<>()).complete(message);
-					} else {
-						reverseConnection.complete(message.getConnection());
-					}
-				} catch (Exception e) {
-					reverseConnection.completeExceptionally(e);
-				}
-			});
-			requester.launch();
-
-			LatticeConnectionManager manager = new LatticeConnectionManager(servingStore);
-			manager.setDataRequestLimit(2);
-			ConvexRemote peer = ConvexRemote.connect(requester.getHostAddress());
+			routes.addRoute();
+			routes.addRoute();
 			try {
-				manager.addPeer(AKeyPair.generate().getAccountKey(), peer);
-				assertTrue(peer.trySend(Message.createPing(1)));
-				AConnection connection = reverseConnection.get(5, TimeUnit.SECONDS);
-
-				// The first two hold both permits behind the store gate
-				for (long id = 81; id <= 83; id++) {
-					assertTrue(connection.sendMessage(
-						Message.createDataRequest(CVMLong.create(id), value.getHash())));
-				}
-				Result refused = dataResult(responses, 83, decodeStore);
+				routes.send(0, 81, value.getHash());
+				// Route 0's request reaches the store gate holding the pool's only permit
+				assertTrue(servingStore.requested.await(5, TimeUnit.SECONDS));
+				routes.send(1, 82, value.getHash());
+				Result refused = routes.result(82);
 				assertEquals(ErrorCodes.LOAD, refused.getErrorCode());
-				assertEquals(CVMLong.create(83), refused.getID());
+				assertEquals(CVMLong.create(82), refused.getID());
 
 				servingStore.release.countDown();
-				for (long id = 81; id <= 82; id++) {
-					Result served = dataResult(responses, id, decodeStore);
-					assertFalse(served.isError());
-					assertEquals(value, ((AVector<?>) served.getValue()).get(0));
-				}
-
-				assertTrue(connection.sendMessage(
-					Message.createDataRequest(CVMLong.create(84), value.getHash())));
-				Result later = dataResult(responses, 84, decodeStore);
-				assertFalse(later.isError(), "a request after the earlier ones finish is served");
-				assertEquals(value, ((AVector<?>) later.getValue()).get(0));
+				assertServed(value, routes.result(81));
+				routes.send(1, 83, value.getHash());
+				assertServed(value, routes.result(83));
 			} finally {
 				servingStore.release.countDown();
-				manager.close();
-				peer.close();
 			}
 		}
 	}
 
-	private static Result dataResult(ConcurrentHashMap<ACell, CompletableFuture<Message>> responses,
-			long id, AStore decodeStore) throws Exception {
-		Message response = responses.computeIfAbsent(CVMLong.create(id), k -> new CompletableFuture<>())
-			.get(5, TimeUnit.SECONDS);
-		response.getPayload(decodeStore);
-		return response.toResult();
+	/**
+	 * One route holds at most a quarter of the pool, so another route is served
+	 * while the first is refused. Requests on one route take permits in order on its
+	 * receive thread, so no step depends on timing.
+	 */
+	@Test
+	public void testReverseDataRequestRouteShare() throws Exception {
+		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore();
+				DataRequestRoutes routes = new DataRequestRoutes(servingStore, 8)) {
+			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
+			servingStore.blockedHash = value.getHash();
+			routes.addRoute();
+			routes.addRoute();
+			try {
+				// The first two hold route 0's share of two behind the store gate
+				for (long id = 81; id <= 83; id++) routes.send(0, id, value.getHash());
+				Result refused = routes.result(83);
+				assertEquals(ErrorCodes.LOAD, refused.getErrorCode());
+				assertEquals(CVMLong.create(83), refused.getID());
+				routes.send(1, 84, value.getHash());
+
+				servingStore.release.countDown();
+				for (long id : new long[] {81, 82, 84}) assertServed(value, routes.result(id));
+				routes.send(0, 85, value.getHash());
+				assertServed(value, routes.result(85));
+			} finally {
+				servingStore.release.countDown();
+			}
+		}
+	}
+
+	private static void assertServed(Blob value, Result result) {
+		assertFalse(result.isError(), "expected data, got " + result);
+		assertEquals(value, ((AVector<?>) result.getValue()).get(0));
+	}
+
+	/**
+	 * Routes from one manager to peers connected to a requester, which sends
+	 * DATA_REQUESTs back over each route and collects the results by ID.
+	 */
+	private static final class DataRequestRoutes implements AutoCloseable {
+		final LatticeConnectionManager manager;
+		final NettyServer requester = new NettyServer(0);
+		final AStore decodeStore = new MemoryStore();
+		final List<ConvexRemote> peers = new ArrayList<>();
+		final ConcurrentHashMap<ACell, CompletableFuture<AConnection>> connections = new ConcurrentHashMap<>();
+		final ConcurrentHashMap<ACell, CompletableFuture<Message>> results = new ConcurrentHashMap<>();
+
+		DataRequestRoutes(AStore servingStore, int limit) throws IOException, InterruptedException {
+			manager = new LatticeConnectionManager(servingStore);
+			manager.setDataRequestLimit(limit);
+			requester.setReceiveAction(message -> {
+				try {
+					ACell resultID = message.getResultID();
+					if (resultID != null) {
+						future(results, resultID).complete(message);
+					} else {
+						// A route's PING carries its index, naming the connection back over it
+						message.getPayload(null);
+						future(connections, message.getRequestID()).complete(message.getConnection());
+					}
+				} catch (Exception e) {
+					// Leaves the awaited future incomplete, so the test fails on its timeout
+				}
+			});
+			requester.launch();
+		}
+
+		void addRoute() throws Exception {
+			int index = peers.size();
+			ConvexRemote peer = ConvexRemote.connect(requester.getHostAddress());
+			peers.add(peer);
+			manager.addPeer(AKeyPair.generate().getAccountKey(), peer);
+			assertTrue(peer.trySend(Message.createPing(index)));
+		}
+
+		void send(int route, long id, Hash hash) throws Exception {
+			AConnection connection = future(connections, CVMLong.create(route)).get(5, TimeUnit.SECONDS);
+			assertTrue(connection.sendMessage(Message.createDataRequest(CVMLong.create(id), hash)));
+		}
+
+		Result result(long id) throws Exception {
+			Message response = future(results, CVMLong.create(id)).get(5, TimeUnit.SECONDS);
+			response.getPayload(decodeStore);
+			return response.toResult();
+		}
+
+		private static <T> CompletableFuture<T> future(
+				ConcurrentHashMap<ACell, CompletableFuture<T>> futures, ACell id) {
+			return futures.computeIfAbsent(id, k -> new CompletableFuture<T>());
+		}
+
+		@Override
+		public void close() throws Exception {
+			manager.close();
+			for (ConvexRemote peer : peers) peer.close();
+			requester.close();
+			decodeStore.close();
+		}
 	}
 
 	/**
