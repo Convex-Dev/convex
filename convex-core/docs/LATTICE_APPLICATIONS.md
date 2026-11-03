@@ -410,12 +410,12 @@ each propagator group's network.
 The line between an application and the node is between deciding and doing. An
 application makes the decisions its domain calls for: which nodes to connect to,
 which to join through, what to pull from a new peer, which keys and addresses to
-refuse, when a delivered value proves who sent it, and how its messages are
-checked. The node does the work: sockets, dialling, retries and backoff,
-challenges, pulls, route upgrades and timers. Because replication's network work
-stays in the node, an application's data and merging work with no network and
-after networking closes. An application can still hold other things its domain
-needs, such as workers, caches or a front end.
+refuse, which key a delivered value vouches for as its sender's, and how its
+messages are checked. The node does the work: sockets, dialling, retries and
+backoff, challenges, pulls, route upgrades and timers. Because replication's
+network work stays in the node, an application's data and merging work with no
+network and after networking closes. An application can still hold other things
+its domain needs, such as workers, caches or a front end.
 
 The node connects the two by asking questions of the applications that decide a
 propagator group's network, and reporting events to them:
@@ -426,7 +426,7 @@ propagator group's network, and reporting events to them:
 | Asks which peers to join through when it has no route | Answers with its seeds |
 | Asks what to pull from a newly admitted peer | Answers with paths: its [interests](#intended-lifecycle-interests-and-observation) |
 | Asks whether a key or address is refused | Answers from its blocklist |
-| Asks whether an inbound value proves its sender's key | Answers with the key, or none |
+| Asks which key, if any, an inbound value vouches for as its sender's | Answers with the key, which the node then challenges the sender to prove |
 | Asks how a peer name resolves | Answers with the addresses it knows |
 | Reports that it is listening at an address | Publishes what it advertises there |
 | Reports that a key was proved, or a dial failed, at an address | Updates what it remembers of contacts |
@@ -436,13 +436,15 @@ propagator group's network, and reporting events to them:
 When an answer changes, as when an application blocks a node, the node asks again
 and acts on the new answer.
 
-These questions and reports are intended and not implemented. They need
-[CAD045](https://docs.convex.world/docs/cad/lattice_apps) and
-[CAD036](https://docs.convex.world/docs/cad/lattice_node) text before they become
-normative. Today a class in the application's package connects its decisions to
-the node by installing the node's lower-level handlers: the connection manager's
-admission and contact handlers and discovered peers, the propagator group's
-inbound value listener and message handler, and the node's peer resolver.
+These questions and reports are intended and not implemented. They are
+implementation design within the rules of
+[CAD036](https://docs.convex.world/docs/cad/lattice_node): applications may turn
+discovery into desired peers for a propagator group, and only a live proof of
+possession of a key an application admits upgrades an inbound connection to an
+authenticated route. Today a class in the application's package connects its
+decisions to the node by installing the node's lower-level handlers: the connection
+manager's admission and contact handlers and discovered peers, the propagator
+group's inbound value listener and message handler, and the node's peer resolver.
 
 ### P2P as an example
 
@@ -469,10 +471,10 @@ The P2P package's service, which `convex p2p start` runs, has these parts:
   publishes the node's own record once the listener has its port, and offers the
   nodes in validated records as connection candidates. It joins through seeds
   whenever it has no route, pushes its record to each admitted peer and pulls
-  `:p2p`, `:id` and the social owners it wants from it. It turns an inbound
-  connection that delivers a node's own valid record into an authenticated route to
-  that node, keeps contact records, applies the blocklist and carries point
-  messages. Joining through seeds, refusing, remembering contacts and pulling from
+  `:p2p`, `:id` and the social owners it wants from it. It challenges an inbound
+  connection that delivers a node's own valid record and, once the sender proves
+  that node's key, makes it an authenticated route to that node. It keeps contact
+  records, applies the blocklist and carries point messages. Joining through seeds, refusing, remembering contacts and pulling from
   new peers are generic network work that `P2PNode` does itself.
 
 `P2PNode` therefore does the main class's work (`main`, `serve` and the assembly in
