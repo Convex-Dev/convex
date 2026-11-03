@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,24 @@ class LatticeNodeTest {
 			assertEquals(LatticePropagatorConfig.DEFAULT_MAX_DESIRED_PEERS,
 				network.createPropagator().getConnectionManager().getMaxDesiredPeers());
 			assertEquals(5,network.createPropagator(groupConfig).getConnectionManager().getMaxDesiredPeers());
+		}
+	}
+
+	/**
+	 * Keeping a peer, and forgetting it, run on network threads, so neither may wait for
+	 * the node's monitor: close holds it while it waits for those threads to close
+	 * connections. The test holds the monitor as close does.
+	 */
+	@Test void keepingAPeerNeverWaitsForTheNodesLifecycle() throws Exception {
+		try (var store=new MemoryStore();
+				var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(-1));
+				var others=Executors.newVirtualThreadPerTaskExecutor()) {
+			var group=node.createPropagator();
+			synchronized (node) {
+				var kept=others.submit(() -> node.keepPeer(group,PeerResolver.parse("127.0.0.1:1"),null))
+					.get(5,TimeUnit.SECONDS);
+				assertTrue(others.submit(() -> kept.cancel(false)).get(5,TimeUnit.SECONDS));
+			}
 		}
 	}
 

@@ -5,11 +5,12 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import convex.api.Convex;
 import convex.auth.did.DIDKeyAuthorizer;
@@ -51,9 +52,15 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	/** The key pair configured as this node's identity, or null; groups get only {@link #signer}. */
 	private AKeyPair keyPair;
 	private ChallengeSigner signer;
-	private PeerResolver peerResolver;
+	/*
+	 * Callbacks on network threads keep peers and resolve their names, so the resolver
+	 * and kept peers never use this node's monitor: launch and close hold it while they
+	 * wait for those threads to open or close connections.
+	 */
+	/** The resolver for peer names, or null until set or first used. */
+	private final AtomicReference<PeerResolver> peerResolver=new AtomicReference<>();
 	/** Peers kept by {@link #keepPeer}, stopped with their group or the node. */
-	private final Map<CompletableFuture<Void>,LatticePropagator> keptPeers=new HashMap<>();
+	private final Map<CompletableFuture<Void>,LatticePropagator> keptPeers=new ConcurrentHashMap<>();
 
 	/** Assembles networking without starting workers or opening a socket. */
 	public LatticeNode(LatticeHost<V> host,NodeConfig config) {
@@ -188,16 +195,20 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	 * {@code did:web} and keeps no node records; a node that keeps them supplies a
 	 * resolver that locates peers by key.
 	 */
-	public synchronized LatticeNode<V> setPeerResolver(PeerResolver resolver) {
+	public LatticeNode<V> setPeerResolver(PeerResolver resolver) {
 		if (resolver==null) throw new IllegalArgumentException("Peer resolver must not be null");
-		this.peerResolver=resolver;
+		peerResolver.set(resolver);
 		return this;
 	}
 
 	/** The resolver for peer names, created on first use if none was set. */
-	public synchronized PeerResolver getPeerResolver() {
-		if (peerResolver==null) peerResolver=PeerResolver.create();
-		return peerResolver;
+	public PeerResolver getPeerResolver() {
+		PeerResolver resolver=peerResolver.get();
+		if (resolver!=null) return resolver;
+		// Racing first uses may each create one; all but the first installed are discarded
+		PeerResolver created=PeerResolver.create();
+		PeerResolver installed=peerResolver.compareAndExchange(null,created);
+		return (installed==null) ? created : installed;
 	}
 
 	/**
@@ -242,27 +253,17 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 		PeerKeeper keeper=new PeerKeeper(propagator.getConnectionManager(),getPeerResolver(),name,
 			giveUpAfter.toMillis(),() -> System.nanoTime()/1_000_000L,
 			(delay,task) -> CompletableFuture.delayedExecutor(delay,TimeUnit.MILLISECONDS).execute(task));
-		synchronized (this) {
-			keptPeers.put(keeper.kept,propagator);
-		}
-		keeper.kept.whenComplete((value,error) -> {
-			synchronized (this) {
-				keptPeers.remove(keeper.kept);
-			}
-		});
+		keptPeers.put(keeper.kept,propagator);
+		keeper.kept.whenComplete((value,error) -> keptPeers.remove(keeper.kept));
 		keeper.start(admitted);
 		return keeper.kept;
 	}
 
 	/** Stops keeping the peers of one group, or of every group when null. */
 	private void stopKeeping(LatticePropagator propagator) {
-		List<CompletableFuture<Void>> stopping=new ArrayList<>();
-		synchronized (this) {
-			for (var entry:keptPeers.entrySet()) {
-				if (propagator==null || entry.getValue()==propagator) stopping.add(entry.getKey());
-			}
+		for (var entry:keptPeers.entrySet()) {
+			if (propagator==null || entry.getValue()==propagator) entry.getKey().cancel(false);
 		}
-		for (CompletableFuture<Void> kept:stopping) kept.cancel(false);
 	}
 
 	/**
