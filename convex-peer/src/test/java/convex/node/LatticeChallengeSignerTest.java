@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import convex.api.Convex;
 import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -22,6 +23,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.message.AConnection;
 import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
+import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.MaxLattice;
@@ -71,15 +73,25 @@ public class LatticeChallengeSignerTest {
 			bobGroup.authenticateInboundRoute(fromAlice,aliceKey.getAccountKey());
 			bobManager.whenInboundConnectionUpgraded(aliceKey.getAccountKey()).get(5,TimeUnit.SECONDS);
 
-			// Her client refuses a challenge in any other context
+			// Her client answers a lattice challenge, and refuses the same one in any other context
 			Hash token=Blob.createRandom(new Random(5),16).getHash();
-			SignedData<ACell> foreign=Message.signChallenge(bobKey,token,aliceKey.getAccountKey(),CVMLong.create(42));
-			Message reply=fromAlice.request(Message.createChallenge(null,foreign),0,new CompletableFuture<>())
-				.get(5,TimeUnit.SECONDS);
-			reply.getPayload(bobStore);
-			Result answer=reply.toResult();
-			assertTrue(answer.isError(),"a challenge in another context must not be answered: "+answer);
+			Result answered=challenge(fromAlice,bobStore,Message.signChallenge(bobKey,token,
+				aliceKey.getAccountKey(),Message.LATTICE_PEER_CHALLENGE_CONTEXT));
+			assertEquals(aliceKey.getAccountKey(),Message.verifyChallengeResponse(answered,token,
+				bobKey.getAccountKey(),Message.LATTICE_PEER_CHALLENGE_CONTEXT,aliceKey.getAccountKey()));
+			Result foreign=challenge(fromAlice,bobStore,Message.signChallenge(bobKey,token,
+				aliceKey.getAccountKey(),CVMLong.create(42)));
+			assertEquals(ErrorCodes.TRUST,foreign.getErrorCode(),
+				"a challenge in another context must be refused: "+foreign);
 		}
+	}
+
+	/** Sends a challenge over a connection and returns the answer. */
+	private static Result challenge(AConnection connection,AStore store,SignedData<ACell> challenge) throws Exception {
+		Message reply=connection.request(Message.createChallenge(null,challenge),0,new CompletableFuture<>())
+			.get(5,TimeUnit.SECONDS);
+		reply.getPayload(store);
+		return reply.toResult();
 	}
 
 	@Test

@@ -1182,6 +1182,7 @@ public abstract class Convex implements AutoCloseable {
 			signer = ChallengeSigner.create(kp, contextID);
 		} else if (!Utils.equals(signer.getContext(), contextID)) {
 			// A challenge signer proves its key in its own context only
+			log.debug("verifyPeer: challenge signer is for context {}, not {}", signer.getContext(), contextID);
 			return CompletableFuture.completedFuture(null);
 		}
 
