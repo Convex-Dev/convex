@@ -13,7 +13,7 @@ import convex.core.message.AConnection;
  * for example by updating a discovery index, but must not reinterpret the merge
  * result or mutate {@code path}.</p>
  *
- * <p>The callback runs on the propagation group's ordered inbound dispatcher. It
+ * <p>The callback runs on the propagator group's ordered inbound dispatcher. It
  * must return promptly and hand slow work to another executor. Listener failures
  * are contained and do not turn an accepted merge into a rejection.</p>
  */
@@ -24,7 +24,7 @@ public interface InboundLatticeListener {
 	 * Handles one accepted inbound value.
 	 *
 	 * @param connection physical source connection, or null for local delivery
-	 * @param propagator propagation group assigned to the connection
+	 * @param propagator propagator group assigned to the connection
 	 * @param path canonical path at which the value was merged; do not mutate
 	 * @param value complete value presented to the host
 	 * @param changed true when the merge changed the host root

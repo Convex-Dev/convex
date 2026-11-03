@@ -112,7 +112,7 @@ For a small lattice network test:
 > inbound upgrade verifies both challenge signatures, a random nonce, responder and
 > challenger audiences, the fixed lattice-peer context and an admitted signed
 > NodeInfo. Shared-listener connections are bounded by `NodeConfig`; each
-> propagation group's desired peers, protocol state and queues are bounded by
+> propagator group's desired peers, protocol state and queues are bounded by
 > `LatticePropagatorConfig`.
 
 For a direct `NodeServer` network test, the minimum composition is explicit:
@@ -188,7 +188,7 @@ the node merely to treat the first group as a privileged "primary" group.
    therefore still signs each user edit inside the unpublished fork.
 6. Automatic gossip is fire-and-forget. To verify it without sleeping, wait on
    `group.whenAnnounced(condition)` for the expected application state. It
-   completes once this propagation group serves a value satisfying the condition
+   completes once this propagator group serves a value satisfying the condition
    and has queued its broadcast, after the host has merged the value and the
    node has published the root. A host sync itself guarantees only node
    publication; do not assume it completed group fan-out. Use an explicit

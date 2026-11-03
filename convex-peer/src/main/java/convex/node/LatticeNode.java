@@ -23,7 +23,7 @@ import convex.net.PeerTarget;
 
 /**
  * Optional TCP networking for an existing host, with dynamically created
- * propagation groups. Owns the server, groups and listeners, but not their stores.
+ * propagator groups. Owns the server, groups and listeners, but not their stores.
  * Inbound connections are denied unless
  * the caller selects a policy through {@link #getListener()} or explicitly calls
  * {@link #serveAllInbound(LatticePropagator)}. Further listeners, from

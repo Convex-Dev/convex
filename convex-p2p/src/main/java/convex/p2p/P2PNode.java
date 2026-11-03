@@ -73,7 +73,7 @@ import convex.social.Social;
  * <p>This is the main entry point for convex-p2p — a rollup package, so this is the
  * <em>only</em> node server, with no separate social or per-application node. It
  * assembles the node up to the lattice root: a host opened from the store as
- * configured, and a {@link LatticeNode} with one propagation group. From the root
+ * configured, and a {@link LatticeNode} with one propagator group. From the root
  * down, the {@link P2PApplication} configured on the host owns the lattice and the
  * P2P policy.</p>
  *
@@ -194,7 +194,7 @@ public class P2PNode implements Closeable {
 		});
 		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,directory,application.blocklist());
 		// The application merges incoming roots through its projection; the
-		// propagation group publishes through the same projection.
+		// propagator group publishes through the same projection.
 		propagator.setPublicationFilter(application::project);
 		propagator.setApplicationMessageHandler(pointOfPresence::handle);
 		propagator.setInboundLatticeListener(this::onAcceptedInbound);
@@ -1173,7 +1173,7 @@ public class P2PNode implements Closeable {
 		return network.getListener();
 	}
 
-	/** Package test hook for this wrapper's application-owned propagation group. */
+	/** Package test hook for this wrapper's application-owned propagator group. */
 	LatticePropagator propagationGroup() {
 		return propagator;
 	}

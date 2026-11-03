@@ -64,7 +64,7 @@ import convex.social.SocialUser;
 
 /**
  * Two compound applications, Social + P2P and DLFS + P2P, share one host.
- * Uses explicit region assembly and propagation groups: application subscription
+ * Uses explicit region assembly and propagator groups: application subscription
  * registration and automatic interest lifecycle are not implemented yet.
  */
 public class SharedApplicationInternalsTest {
@@ -271,7 +271,7 @@ public class SharedApplicationInternalsTest {
 	}
 
 	/** Explicit allow-list projection; a selective lattice merge is not projection. */
-	/** A propagation group announcing one projection of the host root. */
+	/** A propagator group announcing one projection of the host root. */
 	private static LatticePropagator group(AStore store,LatticeFilter<Index<Keyword,ACell>> projection) {
 		LatticePropagator group=new LatticePropagator(store,LatticePropagatorConfig.create());
 		group.setPublicationFilter(projection);

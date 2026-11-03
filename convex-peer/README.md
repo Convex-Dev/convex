@@ -162,8 +162,8 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 | `Convex` | Client API (`convex.api`) for queries and transactions against a peer |
 | `ConnectionManager` | Manages peer-to-peer network connections |
 | `BeliefPropagator` | Handles CPoS belief propagation protocol |
-| `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost` and notifies propagation groups |
-| `LatticeNode` | Optional TCP networking for a host: owns the server, listener and dynamic propagation groups |
+| `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost` and notifies propagator groups |
+| `LatticeNode` | Optional TCP networking for a host: owns the server, listener and dynamic propagator groups |
 | `LatticeListener` | Application-owned inbound TCP transport and connection-to-group router |
 | `LatticePropagator` | Owns one filtered serving view, protocol endpoint and external route set |
 | `LatticeConnectionManager` | Maintains explicit peers, bounded discovered candidates and authenticated routes for one propagator; discovery schemas live in application modules |

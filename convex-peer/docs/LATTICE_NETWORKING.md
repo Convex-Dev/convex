@@ -9,7 +9,7 @@ The central boundary is simple:
 - `NodeServer` replicates one assembled `LatticeHost`; the host's applications
   own the root's merge semantics.
 - The service ([anatomy](../../convex-core/docs/LATTICE_APPLICATIONS.md#service-anatomy))
-  constructs propagation policy groups.
+  constructs propagator groups.
 - The service composes inbound transports independently.
 - Each `LatticePropagator` owns its routes, serving view and protocol work, and
   merges nothing.
@@ -65,7 +65,7 @@ listeners, closes every listener before draining the server, and cleans up a fai
 launch. The host store remains caller-owned.
 `NodeServer` detaches its publisher on close or failed launch, restoring local host
 publication and permitting a replacement server. Only one publisher may attach at
-a time. The wrapper creates no implicit propagation group and changes no group policy.
+a time. The wrapper creates no implicit propagator group and changes no group policy.
 
 Group identity, message handlers, observers and publication filters can change
 while running. A filter change reprojects the latest processed source before
@@ -80,7 +80,7 @@ apply to subsequent handshakes; established routes are not reauthenticated.
 | `LatticeHost` and its applications | The published root, which applications receive incoming values, and the lattices that merge them | Replication, transport, persistence scheduling |
 | `NodeServer` | Node store root, persistence barriers, attached-group lifecycle and update fan-out for one assembled host | Lattice, merge policy, sockets, peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
 | `LatticeListener` | Application-owned TCP acceptance, physical limits and one immutable connection-to-group assignment | Propagator lifecycle, per-connection protocol state, serving stores, trust or lattice merge |
-| `LatticePropagator` | One propagation policy group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
+| `LatticePropagator` | One propagator group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
 | `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, challenge state, statistics and extension handler | Node persistence, peer discovery, application schemas or which values are wanted |
 | `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification and admitted outbound routes | Discovery records, listener assignment, lattice merge or application-owner validation |
 | `ALattice` / `LatticeContext` | Value validation, merge semantics and application signing authority | Transport identity and routing |
@@ -155,7 +155,7 @@ An assigned connection can later be upgraded:
 ```text
 physical inbound socket
         |
-        +-- application selector --> one propagation group
+        +-- application selector --> one propagator group
         |
         +-- expected key proves possession for this challenge audience
                     |
@@ -258,7 +258,7 @@ Once the listener assigns a socket, all work belongs to that group:
 6. `NodeServer` hands the value to its host, whose applications take what they
    want from it under their own lattices, then publishes the host root to the
    node store. Which values are wanted is the applications' decision alone; the
-   propagation group filters only what it serves.
+   propagator group filters only what it serves.
 7. The node schedules a non-blocking update for every attached group.
 
 `DATA` only materialises independently addressable cells in the selected serving
@@ -266,7 +266,7 @@ store. It never merges a lattice root. `DATA_REQUEST` is scoped to the same
 store, so one group cannot expose another group's private or filtered cache.
 
 The correlated response to `LATTICE_VALUE` confirms delivery to the host and
-logical root publication. It does not wait for every propagation group to
+logical root publication. It does not wait for every propagator group to
 materialise or broadcast its view.
 
 ## Publication pipeline

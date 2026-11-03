@@ -253,7 +253,7 @@ public class LatticeDemo {
 			// CLEANUP: Always close resources properly
 			System.out.println("\nShutting down nodes...");
 
-			// Each network closes its listener, server and propagation groups.
+			// Each network closes its listener, server and propagator groups.
 			for (int i = 0; i < networks.size(); i++) {
 				networks.get(i).close();
 				System.out.println("Node " + (i + 1) + " shutdown complete");

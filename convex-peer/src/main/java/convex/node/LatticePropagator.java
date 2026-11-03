@@ -172,7 +172,7 @@ public class LatticePropagator implements Closeable {
 	private final Object writeLock = new Object();
 
 	/**
-	 * Creates a propagation group with default limits.
+	 * Creates a propagator group with default limits.
 	 *
 	 * @param store serving store for delta tracking and data resolution
 	 * @param connectionManager connection manager for outbound routes
@@ -182,7 +182,7 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Creates a propagation group with application-supplied limits. Identity,
+	 * Creates a propagator group with application-supplied limits. Identity,
 	 * admission, projection and application hooks are optional policy configured
 	 * through the setters, including while running.
 	 *
@@ -211,7 +211,7 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Creates a propagation group with a new connection manager and default limits.
+	 * Creates a propagator group with a new connection manager and default limits.
 	 *
 	 * @param store serving store for delta tracking and peer data resolution
 	 */
@@ -220,7 +220,7 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Creates a propagation group with a new connection manager and
+	 * Creates a propagator group with a new connection manager and
 	 * application-supplied limits.
 	 *
 	 * @param store serving store for delta tracking and peer data resolution
@@ -230,7 +230,7 @@ public class LatticePropagator implements Closeable {
 		this(store,new LatticeConnectionManager(store),config);
 	}
 
-	/** Observable lifecycle of one propagation policy group. */
+	/** Observable lifecycle of one propagator group. */
 	public enum State {
 		/** Constructed and not started. */
 		NEW,
@@ -255,7 +255,7 @@ public class LatticePropagator implements Closeable {
 	public record Failure(long sequence,String operation,Throwable cause,long timestamp) {}
 
 	/**
-	 * Immutable operational snapshot for one propagation policy group.
+	 * Immutable operational snapshot for one propagator group.
 	 *
 	 * @param state current lifecycle state
 	 * @param failureCount contained failures since construction
@@ -507,7 +507,7 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Assigns a physically inbound connection to this propagation policy group.
+	 * Assigns a physically inbound connection to this propagator group.
 	 * Assignment permits this endpoint to process the connection; it does not
 	 * authenticate the remote node or add an outbound route.
 	 */
@@ -743,7 +743,7 @@ public class LatticePropagator implements Closeable {
 		}
 
 		void fail() {
-			future.completeExceptionally(new IllegalStateException("Propagation group stopped"));
+			future.completeExceptionally(new IllegalStateException("Propagator group stopped"));
 		}
 	}
 
@@ -1052,7 +1052,7 @@ public class LatticePropagator implements Closeable {
 		} catch (VirtualMachineError e) {
 			if (!(e instanceof StackOverflowError)) throw e;
 			recordFailure("publication",e);
-			log.warn("Contained stack overflow in propagation policy group",e);
+			log.warn("Contained stack overflow in propagator group",e);
 		} catch (Throwable e) {
 			// A broken filter, store cache or connection implementation belongs to
 			// this policy group. It must never terminate NodeServer publication or

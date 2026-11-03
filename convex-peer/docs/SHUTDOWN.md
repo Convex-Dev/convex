@@ -8,7 +8,7 @@ the store closes.
 ## Order
 
 1. Stop the service's requests and close its listener, so no new work is admitted.
-2. `node.stopIngress()`. Each propagation group drains the inbound work it has
+2. `node.stopIngress()`. Each propagator group drains the inbound work it has
    accepted, then the node stops accepting deliveries: an ingress worker that
    overran its drain, or a pull that completes later, is rejected rather than
    merged. From here networking no longer changes the host. Publication continues.

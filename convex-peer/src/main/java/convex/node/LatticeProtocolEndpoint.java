@@ -49,7 +49,7 @@ import convex.peer.Config;
 /**
  * Connection-facing CAD036 endpoint owned by one {@link LatticePropagator}.
  *
- * <p>The endpoint is the isolation boundary for a propagation policy group. It
+ * <p>The endpoint is the isolation boundary for a propagator group. It
  * owns that group's bounded inbound queue, connection statistics, missing-cell
  * acquisition, challenge correlation and application extension messages. It
  * decodes and projects complete values in the propagator's serving store, then
@@ -74,7 +74,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private final Predicate<Message> inboundRetry=this::offerInboundBlocking;
 	private final Predicate<Message> inboundRejected=message -> false;
 
-	/** Physically inbound connections assigned to this propagation policy group. */
+	/** Physically inbound connections assigned to this propagator group. */
 	private final Set<AConnection> inboundConnections=ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<AConnection,ConnectionStats> connectionStats=
 		new ConcurrentHashMap<>();
@@ -149,7 +149,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	void attachInbound(AConnection connection) {
 		if (connection==null) throw new IllegalArgumentException("Connection must not be null");
 		synchronized (inboundConnections) {
-			if (!acceptingInbound) throw new IllegalStateException("Propagation group is not accepting connections");
+			if (!acceptingInbound) throw new IllegalStateException("Propagator group is not accepting connections");
 			if (connection.isClosed()) throw new IllegalStateException("Inbound connection is closed");
 			inboundConnections.add(connection);
 		}
@@ -200,7 +200,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 		if (!ownsInbound(connection)) {
 			// A connection leaves this group once it has closed, and then has nothing to authenticate
 			if (connection.isClosed()) return;
-			throw new IllegalStateException("Inbound connection belongs to another propagation group");
+			throw new IllegalStateException("Inbound connection belongs to another propagator group");
 		}
 		inboundVerifier.maybeStart(connection,propagator,expectedKey);
 	}
@@ -641,7 +641,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 		synchronized (acquisitionLifecycleLock) {
 			if (!acceptingAcquisitions) {
 				acquiror.close();
-				return CompletableFuture.failedFuture(new IOException("Propagation group is stopping"));
+				return CompletableFuture.failedFuture(new IOException("Propagator group is stopping"));
 			}
 			acquisitions=activeAcquirors.computeIfAbsent(connection,c -> ConcurrentHashMap.newKeySet());
 			acquisitions.add(acquiror);

@@ -38,7 +38,7 @@ import convex.core.util.Utils;
  * records of other nodes, and recognises the one update shape that may claim an
  * identity for inbound route authentication. It reads and writes the lattice only.
  * A {@link P2PNode} turns the indexed records into connection candidates and asks its
- * propagation group to authenticate routes; nothing here opens a socket, marks a
+ * propagator group to authenticate routes; nothing here opens a socket, marks a
  * connection trusted or merges a foreign value.</p>
  *
  * <p>The in-memory index follows the registry the application holds, which

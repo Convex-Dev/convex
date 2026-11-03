@@ -51,7 +51,7 @@ Key features across the host and its groups:
   missing cells through correlated requests; unverified sources must send complete values
 - **Copy-on-write cursor** — atomic updates via `cursor.updateAndGet()`
 - **LatticeContext** — carries signing keys through the lattice hierarchy for `OwnerLattice`/`SignedLattice` verification
-- **LatticePropagator** — an application-configured propagation policy group
+- **LatticePropagator** — an application-configured propagator group
   owning its routes, serving store, filters and protocol endpoint
 
 `NodeServer` is schema-independent. It does not recognise `:p2p`, publish NodeInfo,
@@ -788,7 +788,7 @@ On reconnect, if the current transport repeatedly fails, the next is tried.
 ### 9.1 Architecture
 
 `NodeServer` remains schema-independent: it replicates an assembled host and
-merges nothing itself. The service constructs its propagation groups and transport
+merges nothing itself. The service constructs its propagator groups and transport
 hosts, while P2P policy stays above all three layers (see
 [service anatomy](../../convex-core/docs/LATTICE_APPLICATIONS.md#service-anatomy)):
 

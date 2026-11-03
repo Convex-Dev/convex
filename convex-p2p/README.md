@@ -46,7 +46,7 @@ format and merge are still open, so the region is backed by core's
 `convex.lattice.generic.ReservedLattice`, which discards anything sent there. Discarding
 rather than throwing matters: an unimplemented lattice that throws would abort the whole
 enclosing merge, costing a peer its valid sibling regions and counting against
-the propagation group's per-connection circuit-breaker.
+the propagator group's per-connection circuit-breaker.
 
 ### Independent top-level regions
 
@@ -271,7 +271,7 @@ ECIES wrapper; relays see only routing metadata and ciphertext. See
 bounds and trust model.
 
 `P2PNode` assembles the node up to the lattice root: the host opened from the store
-and a `LatticeNode` with one propagation group. `P2PApplication`
+and a `LatticeNode` with one propagator group. `P2PApplication`
 is the application the host hands incoming values to. It owns the P2P policy that
 reads the lattice and imports nothing from the node package, so it can also be
 connected directly to a standalone `LatticeHost` for local use.
@@ -360,7 +360,7 @@ convex p2p start --key 0xabcd --etch ~/.convex/p2p.etch --seed 0x1234…@tcp://s
 Discovered nodes with a supported transport to dial form a candidate pool
 (`maxDesiredPeers`, default 256), not a target number of concurrent connections.
 Outbound-only nodes, which advertise no transport, are not candidates. Nodes named with `connect` are not
-candidates and are always kept; seeds are kept the same way until they are released. Each propagation group normally keeps
+candidates and are always kept; seeds are kept the same way until they are released. Each propagator group normally keeps
 16 ambient peers plus up to 16 recently active communicators. Configure the soft
 targets with `LatticePropagatorConfig.AMBIENT_PEERS` (`ambientPeers`) and
 `ACTIVE_PEERS` (`activePeers`); either may be zero.

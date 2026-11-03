@@ -113,7 +113,7 @@ boundary for filtered public views.
 
 ## Inbound persistence boundary
 
-Inbound protocol work happens in the selected propagation group:
+Inbound protocol work happens in the selected propagator group:
 
 1. bounded queue admission;
 2. complete-value decode or trusted acquisition into the serving store;

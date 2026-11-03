@@ -212,7 +212,7 @@ public class NodeServerTest {
 		assertFalse(setNodeServer.isRunning());
 	}
 
-	/** A local host needs no implicit/default propagation policy group. */
+	/** A local host needs no implicit/default propagator group. */
 	@Test
 	public void testLaunchWithoutPropagatorsPersistsLocally() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
@@ -226,7 +226,7 @@ public class NodeServerTest {
 		assertTrue(maxNodeServer.isRunning());
 	}
 
-	/** Runtime policy remains on the propagation group, not the authoritative node. */
+	/** Runtime policy remains on the propagator group, not the authoritative node. */
 	@Test
 	public void testPropagatorPolicyCanChangeWhileRunning() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
@@ -272,7 +272,7 @@ public class NodeServerTest {
 		CompletableFuture<LatticePropagator.Failure> failureSignal=broken.nextFailure();
 
 		maxNodeServer.launch();
-		assertTrue(maxNodeServer.isRunning(),"a failed propagation group must not fail launch");
+		assertTrue(maxNodeServer.isRunning(),"a failed propagator group must not fail launch");
 		assertEquals("initial view materialisation",
 			failureSignal.get(5,TimeUnit.SECONDS).operation());
 		assertTrue(broken.getStatus().hasFailures());

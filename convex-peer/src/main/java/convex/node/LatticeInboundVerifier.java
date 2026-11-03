@@ -42,7 +42,7 @@ final class LatticeInboundVerifier {
 			AccountKey claimedKey,
 			CompletableFuture<Message> future) {}
 
-	/** Supplies the propagation group's transport identity at challenge time. */
+	/** Supplies the propagator group's transport identity at challenge time. */
 	private final Supplier<AKeyPair> keyPairSupplier;
 	private final SecureRandom random = new SecureRandom();
 	private final ConcurrentHashMap<AConnection, PendingVerification> active =

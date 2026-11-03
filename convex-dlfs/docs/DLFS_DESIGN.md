@@ -667,7 +667,7 @@ application context confers signing authority on DLFS components.
 
 ### Filtering for Public/Private Drives
 
-A publication filter on a propagation group (`LatticePropagator.setPublicationFilter`)
+A publication filter on a propagator group (`LatticePropagator.setPublicationFilter`)
 can leave private drives out of the view the group announces and sends, while they are
 still persisted locally. A filter shapes the view; it is not access control: every node
 the group serves can read the filtered view. Serving drives only to chosen nodes needs

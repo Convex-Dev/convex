@@ -77,7 +77,7 @@ Regions that are designed but not registered in `Lattice.ROOT`:
 
 A host delivers incoming state to its registered application components. They can
 ignore unknown regions while retaining unknown data already held locally. This is
-an acceptance policy, not a disclosure policy. Configure each propagation group's
+an acceptance policy, not a disclosure policy. Configure each propagator group's
 serving projection to select what peers may receive; omitted data is not a deletion.
 See [lattice networking](../../convex-peer/docs/LATTICE_NETWORKING.md).
 

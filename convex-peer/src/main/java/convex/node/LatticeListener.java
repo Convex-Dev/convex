@@ -56,7 +56,7 @@ public final class LatticeListener implements Closeable {
 	private boolean running;
 
 	/**
-	 * Creates a TCP lattice listener. No propagation group is admitted until it
+	 * Creates a TCP lattice listener. No propagator group is admitted until it
 	 * is explicitly registered and selected.
 	 *
 	 * @param config host limits and port, or {@code null} for defaults
@@ -67,7 +67,7 @@ public final class LatticeListener implements Closeable {
 	}
 
 	/**
-	 * Registers a propagation group as an eligible target of this transport.
+	 * Registers a propagator group as an eligible target of this transport.
 	 * The listener does not take lifecycle ownership of the group.
 	 *
 	 * @param propagator group which may receive accepted connections
@@ -199,7 +199,7 @@ public final class LatticeListener implements Closeable {
 	private Predicate<Message> containFailure(AConnection connection,
 			LatticePropagator propagator,Throwable failure) {
 		propagator.recordFailure("inbound delivery",failure);
-		log.warn("Propagation group failed while receiving; closing its connection",failure);
+		log.warn("Propagator group failed while receiving; closing its connection",failure);
 		assignments.remove(connection,propagator);
 		try {
 			propagator.removeInboundConnection(connection);
@@ -279,9 +279,9 @@ public final class LatticeListener implements Closeable {
 			propagator.removeInboundConnection(connection);
 		} catch (VirtualMachineError e) {
 			if (!(e instanceof StackOverflowError)) throw e;
-			log.warn("Propagation group overflowed during connection cleanup",e);
+			log.warn("Propagator group overflowed during connection cleanup",e);
 		} catch (Throwable e) {
-			log.warn("Propagation group failed during connection cleanup",e);
+			log.warn("Propagator group failed during connection cleanup",e);
 		}
 	}
 

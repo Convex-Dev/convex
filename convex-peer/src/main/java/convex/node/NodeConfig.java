@@ -26,7 +26,7 @@ import convex.core.lang.RT;
  * holds nothing else and adds no meaning beyond typed accessors and defaults.
  * Every component given the map reads the keys it knows by name, so a setting
  * that must differ between components belongs in a separate map, as
- * {@link LatticePropagatorConfig} is for a propagation group.</p>
+ * {@link LatticePropagatorConfig} is for a propagator group.</p>
  *
  * <p>Key names reuse {@link convex.peer.PeerConfig} constants where they
  * overlap (port) so configurations are consistent
@@ -60,7 +60,7 @@ public class NodeConfig {
 	 *  {@link NodeServer} itself ignores this field. */
 	public static final AString URL = Strings.intern("url");
 
-	/** @deprecated Ignored. Configure encoded frame limits on the listener and propagation group. */
+	/** @deprecated Ignored. Configure encoded frame limits on the listener and propagator group. */
 	@Deprecated
 	public static final AString MAX_INBOUND_VALUE_SIZE =
 		LatticePropagatorConfig.MAX_INBOUND_VALUE_SIZE;

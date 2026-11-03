@@ -29,7 +29,7 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p>{@code NodeServer} is replication only. It hands incoming values to its
  * {@link LatticeHost}, which delegates them to the applications configured to
- * receive them, and it publishes the host's root to its propagation groups. It
+ * receive them, and it publishes the host's root to its propagator groups. It
  * holds no lattice, no merge policy and no applications of its own: assemble the
  * host and its applications first, for example with {@link RelayHost}, then
  * construct the node from the host. The host owns retention and durability;
@@ -54,7 +54,7 @@ import convex.lattice.cursor.AForkableCursor;
  *
  * <p><b>Failure isolation.</b> Host-root publication is the mandatory part of a
  * host sync. Propagator initialisation, notification, worker and shutdown
- * failures are contained and logged independently; one propagation policy group
+ * failures are contained and logged independently; one propagator group
  * cannot fail a host sync or another group. Only
  * failures of the node store are surfaced by this class; transport failures
  * remain visible to their application owner.</p>
@@ -129,7 +129,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			seedPropagationViews();
 			startPropagationServices();
 			lifecycleState=LifecycleState.RUNNING;
-			log.debug("NodeServer started with {} propagation group(s)",
+			log.debug("NodeServer started with {} propagator group(s)",
 				propagators.size());
 		} catch (IOException | RuntimeException | Error e) {
 			abortFailedLaunch(e);
@@ -183,7 +183,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Pulls a complete root through an explicitly chosen propagation group and
+	 * Pulls a complete root through an explicitly chosen propagator group and
 	 * delivers it to the host. Configured applications may keep their
 	 * results private; only already-published host state is persisted and propagated.
 	 *
@@ -203,7 +203,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Pulls one path through an explicitly chosen propagation group.
+	 * Pulls one path through an explicitly chosen propagator group.
 	 * Path selection and handling belong to configured applications. A successful
 	 * pull does not force application publication.
 	 *
@@ -264,7 +264,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Pulls roots from every current manager-owned peer client in an explicit
-	 * propagation group and publishes the resulting host root.
+	 * propagator group and publishes the resulting host root.
 	 *
 	 * @param source application-selected attached group
 	 * @return {@code true} if every pull completed successfully
@@ -282,7 +282,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 				return true;
 			},NodeServer::stopped);
 		} catch (Exception e) {
-			log.warn("Pull through propagation group failed",e);
+			log.warn("Pull through propagator group failed",e);
 			return false;
 		}
 	}
@@ -420,7 +420,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Returns an immutable snapshot of attached propagation policy groups.
+	 * Returns an immutable snapshot of attached propagator groups.
 	 *
 	 * @return attached groups in attachment order
 	 */
@@ -429,7 +429,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Attaches a propagation policy group, starting it if the server is running.
+	 * Attaches a propagator group, starting it if the server is running.
 	 *
 	 * <p>This operation deliberately performs no policy configuration. In
 	 * particular it does not supply an identity, filters, handlers or peer routes.
@@ -469,7 +469,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Removes and shuts down one propagation group without stopping the node.
+	 * Removes and shuts down one propagator group without stopping the node.
 	 *
 	 * <p>Stops future node notifications and explicit pulls through this group,
 	 * drains its accepted work and closes its routes, including assigned inbound
@@ -504,7 +504,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private void requireAttached(LatticePropagator propagator) {
 		if (propagator==null || !attachedPropagators.contains(propagator)) {
-			throw new IllegalArgumentException("Propagation group is not attached to this node");
+			throw new IllegalArgumentException("Propagator group is not attached to this node");
 		}
 	}
 
@@ -548,7 +548,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			log.debug("Contained propagation-group stack overflow",e);
 		} catch (Throwable e) {
 			propagator.recordFailure(operation,e);
-			log.warn("Propagation group failed during {}; isolated {}: {}: {}",
+			log.warn("Propagator group failed during {}; isolated {}: {}: {}",
 				operation,propagator,e.getClass().getSimpleName(),e.getMessage());
 			log.debug("Isolated propagation-group failure",e);
 		}
