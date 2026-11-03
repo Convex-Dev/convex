@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build and read P2P node records with `convex.p2p.P2PLattice`, alongside the P2P application that validates them; `convex.lattice.p2p.P2PLattice` keeps only the `:p2p` region's merge rule.
 - Remove the `--url` option from `convex dlfs start`, which has not advertised the node since 0.8.16; `convex p2p start --url` advertises a P2P node.
 - Keep the peer signing service's keys as local state at `[:local <peer key> :signing]`, so a lattice application hosting `SigningService` can sync and persist them; it is bound under a root and needs no `init()`. ([Local Component](convex-restapi/docs/MCP_AUTH.md#local-component))
-- Bound how many data requests a lattice node serves at once over the routes it opened, 16 by default (`maxDataRequests`) and a quarter of that per route, answering further ones with `:LOAD`. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#inbound-pipeline))
+- Limit how many data requests a lattice node serves at once. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#inbound-pipeline))
 - Remove `LatticeApplication`: register a `LatticeComponent` where a lattice is all a root does, or extend `ALatticeApplication`; `P2PApplication` no longer offers `setContext` or `resolve`. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#composition-and-sharing))
 
 ### Deprecated
@@ -100,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep percent-encoded reserved characters in a DID: `did:web:example.com%3A8080` round-trips and no longer equals `did:web:example.com:8080`, and lattice owner DIDs accept only the normalised spelling. ([#816](https://github.com/Convex-Dev/convex/issues/816))
 - Complete the final flush when an interrupted thread closes a host's automatic flushing, and keep that thread's interrupt status.
 - Never publish a P2P node's `:local` state or accept another's, even when its lattice declares `:local`.
-- Stop holding load or local failures against a lattice peer: a `:LOAD` refusal from either side, a data request that goes unanswered or cannot be sent, or a failure in the node's own store no longer counts towards closing its route under `maxConsecutiveRejects`.
+- Stop closing a lattice peer's connection because either node is busy or the local store fails.
 
 ## [0.8.18] - 2026-10-25
 
