@@ -84,7 +84,7 @@ apply to subsequent handshakes; established routes are not reauthenticated.
 | `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, challenge state, statistics and extension handler | Node persistence, peer discovery, application schemas or which values are wanted |
 | `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification and admitted outbound routes | Discovery records, listener assignment, lattice merge or application-owner validation |
 | `ALattice` / `LatticeContext` | Value validation, merge semantics and application signing authority | Transport identity and routing |
-| Service | Construction, lifecycle order, transport composition, connection assignment and network policy, such as discovery and application message handlers | Generic protocol internals |
+| Service | Construction, lifecycle order, transport composition and connection assignment; today also connecting its applications' network decisions, such as discovery and message handling, to the node ([anatomy](../../convex-core/docs/LATTICE_APPLICATIONS.md#network-decisions-and-mechanics)) | Generic protocol internals |
 
 `LatticeListener` is the public standard TCP transport.
 `LatticeProtocolEndpoint` remains package-private behind the transport-facing
