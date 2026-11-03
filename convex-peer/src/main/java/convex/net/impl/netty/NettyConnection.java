@@ -42,6 +42,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.util.concurrent.EventExecutor;
 
 public class NettyConnection extends AConnection {
 
@@ -236,13 +237,16 @@ public class NettyConnection extends AConnection {
 	 *
 	 * <p>This is an outbound client connection, so blocking with a bounded
 	 * timeout is acceptable — the caller's virtual thread parks while the
-	 * outbound queue drains.</p>
+	 * outbound queue drains. On an event loop it does not wait: those threads
+	 * drain this queue and every other, so a full queue fails the send at once.</p>
 	 */
 	@Override
 	public boolean sendMessage(Message m) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
 		if (encodedLength(m)<0) return false;
+		if (outbound.offer(m)) return afterQueue(ch, m);
+		if (inEventLoop(ch.eventLoop().parent())) return false;
 		boolean queued;
 		try {
 			queued = outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
@@ -251,6 +255,20 @@ public class NettyConnection extends AConnection {
 			return false;
 		}
 		return queued && afterQueue(ch, m);
+	}
+
+	/**
+	 * Whether the calling thread is one of this group's event loops. Client and server
+	 * channels share the group, so a wait on any of its loops stalls every connection
+	 * that loop serves, and on a channel's own loop could never end early. A loop
+	 * outside any group, such as an embedded channel's, has no group to stall.
+	 */
+	static boolean inEventLoop(EventLoopGroup group) {
+		if (group==null) return false;
+		for (EventExecutor loop : group) {
+			if (loop.inEventLoop()) return true;
+		}
+		return false;
 	}
 
 	/**

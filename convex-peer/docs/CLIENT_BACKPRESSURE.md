@@ -14,7 +14,9 @@ application thread — no unbounded buffering, no polling threads.
 Two send methods — blocking and non-blocking — with no transport-specific concepts:
 
 - **`sendMessage(m)`** — blocks the calling (virtual) thread until space is available
-  or timeout. Used by `ConvexRemote.message()` for normal operation.
+  or timeout. Used by `ConvexRemote.message()` for normal operation. On a Netty event
+  loop it does not wait: the loops empty every connection's queue, so a full queue
+  fails the send at once.
 - **`trySendMessage(m)`** — immediate return, false if queue full. Used when the
   caller wants to detect overload and handle it (e.g. drop, retry later).
 
@@ -50,8 +52,7 @@ Application thread              Netty event loop
 | Application (virtual) thread | `outbound.offer()` | Queue only — never touches channel |
 | Netty event loop | `outbound.poll()`, `writeAndFlush()` | Queue and channel |
 
-The `ArrayBlockingQueue` is the only shared state. Thread-safe by design — no locks,
-no volatile flags, no custom synchronisation.
+The `BoundedMessageQueue` is the only state the two threads share.
 
 ### Drain Triggers
 
@@ -100,7 +101,7 @@ No polling, no extra threads, no unbounded buffering.
 | `PEER_OUTBOUND_QUEUE_SIZE` / `PEER_OUTBOUND_QUEUE_BYTE_LIMIT` | 65,536 / 256 MB, connections to peers only | `Config` |
 | `WriteBufferWaterMark` low | 32 KB | Client bootstrap |
 | `WriteBufferWaterMark` high | 64 KB | Client bootstrap |
-| Send timeout | `DEFAULT_CLIENT_TIMEOUT` (8s) | `Config` |
+| Send timeout | `DEFAULT_INTERNAL_TIMEOUT` (8 s) | `Config` |
 
 The outbound queue absorbs brief bursts — at ~1 KB per message average, 128 entries
 is ~128 KB per connection. The watermark bounds how much data sits in Netty's buffer

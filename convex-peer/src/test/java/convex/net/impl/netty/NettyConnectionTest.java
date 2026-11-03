@@ -25,6 +25,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.ThreadUtils;
+import convex.peer.Config;
+import io.netty.channel.EventLoopGroup;
+import io.netty.util.concurrent.EventExecutor;
 
 /** Outbound flushing of the Netty client connection. */
 public class NettyConnectionTest {
@@ -75,14 +78,7 @@ public class NettyConnectionTest {
 	@Timeout(60)
 	public void testCloseDoesNotWaitForBusyEventLoop() throws Exception {
 		try (NettyServer server=new NettyServer(0)) {
-			server.setReceiveAction(m -> {
-				try {
-					m.getPayload(null);
-				} catch (BadFormatException e) {
-					throw new AssertionError(e);
-				}
-				m.returnMessage(Message.createResult(m.getRequestID(),CVMLong.ONE,null));
-			});
+			server.setReceiveAction(NettyConnectionTest::replyOne);
 			server.launch();
 			CountDownLatch delivering=new CountDownLatch(1);
 			CountDownLatch release=new CountDownLatch(1);
@@ -106,6 +102,62 @@ public class NettyConnectionTest {
 				release.countDown();
 			}
 		}
+	}
+
+	/**
+	 * On its event loop a send to a full queue fails at once: that loop is what empties
+	 * the queue, so a wait for space could only time out.
+	 */
+	@Test
+	@Timeout(60)
+	public void testSendOnEventLoopDoesNotWait() throws Exception {
+		record Outcome(boolean full, boolean sent, long nanos) {}
+		try (NettyServer server=new NettyServer(0)) {
+			server.setReceiveAction(NettyConnectionTest::replyOne);
+			server.launch();
+			CompletableFuture<NettyConnection> self=new CompletableFuture<>();
+			CompletableFuture<Outcome> outcome=new CompletableFuture<>();
+			NettyConnection client=NettyConnection.connect(server.getHostAddress(),m -> {
+				if (outcome.isDone()) return;
+				NettyConnection c=self.join();
+				c.setOutboundLimits(1,Long.MAX_VALUE);
+				boolean full=c.trySendMessage(Message.createPing(2)) && !c.trySendMessage(Message.createPing(3));
+				long start=System.nanoTime();
+				boolean sent=c.sendMessage(Message.createPing(4));
+				outcome.complete(new Outcome(full,sent,System.nanoTime()-start));
+			});
+			try {
+				self.complete(client);
+				assertTrue(client.trySendMessage(Message.createPing(1)));
+				Outcome result=outcome.get();
+				assertTrue(result.full(),"Nothing leaves the queue while its event loop is busy");
+				assertFalse(result.sent());
+				// A wait would have lasted the whole timeout
+				assertTrue(result.nanos()<TimeUnit.MILLISECONDS.toNanos(Config.DEFAULT_INTERNAL_TIMEOUT));
+			} finally {
+				client.close();
+			}
+		}
+	}
+
+	/** Any loop of the shared group counts, not only the one serving a given channel. */
+	@Test
+	public void testInEventLoopCoversWholeGroup() throws Exception {
+		EventLoopGroup group=NettyConnection.getEventLoopGroup();
+		assertFalse(NettyConnection.inEventLoop(group));
+		for (EventExecutor loop : group) {
+			assertTrue(loop.submit(() -> NettyConnection.inEventLoop(group)).get());
+		}
+	}
+
+	/** Replies to a request with a result, as a peer would. */
+	private static void replyOne(Message m) {
+		try {
+			m.getPayload(null);
+		} catch (BadFormatException e) {
+			throw new AssertionError(e);
+		}
+		m.returnMessage(Message.createResult(m.getRequestID(),CVMLong.ONE,null));
 	}
 
 	/** Accepts one connection and counts its bytes until the client closes it. */

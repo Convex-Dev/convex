@@ -90,8 +90,10 @@ I/O thread: decode()
 ### ConvexLocal
 
 For in-JVM clients (no network), there is no Netty handler. If the queue is full,
-`ConvexLocal` calls the retry predicate directly on the caller's thread — blocking
-is safe because the caller is an application thread, not an I/O thread.
+`ConvexLocal` calls the retry predicate directly on the caller's thread, which waits
+for space. A caller on the handler's own thread, such as a local client's callback for
+a result that handler returned, is refused at once instead: only that thread empties
+the queue, so the wait could only time out.
 
 ## Queue Processing
 
@@ -161,8 +163,9 @@ handler orchestrates all channel-level backpressure. The server never sees a cha
 ### Deadlock Safety
 
 The Netty PR #6662 deadlock (both sides block on writes simultaneously) does not
-apply: server write volume is tiny (Result messages), the client's event loop is
-never blocked, and virtual threads hold no locks.
+apply: server write volume is tiny (Result messages), no event loop waits to send
+(a send on an event loop fails at once if its queue is full), and virtual threads
+hold no locks.
 
 ## Backward Compatibility
 

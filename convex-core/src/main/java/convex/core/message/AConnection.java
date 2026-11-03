@@ -261,8 +261,8 @@ public abstract class AConnection {
 	/**
 	 * Returns a message to the remote end, waiting a bounded time if the
 	 * connection's shared outbound capacity is exhausted. For handler threads that
-	 * report client results and may apply backpressure; never call from an I/O
-	 * thread. A connection that cannot accept the message for its own reasons
+	 * report client results and may apply backpressure; on an I/O thread it does not
+	 * wait. A connection that cannot accept the message for its own reasons
 	 * (closed, or its reader is not draining) still refuses at once.
 	 *
 	 * @param msg Message to return
@@ -324,7 +324,9 @@ public abstract class AConnection {
 	 * Sends a message over this connection. May block with a bounded timeout
 	 * if the outbound queue is full (e.g. outbound client connections under
 	 * backpressure). Callers that must not block should use
-	 * {@link #trySendMessage(Message)} instead.
+	 * {@link #trySendMessage(Message)} instead. Does not wait on a thread that
+	 * empties the queue, such as the transport's I/O thread, where a full queue
+	 * fails the send at once.
 	 *
 	 * @param msg Message to send
 	 * @return true if message queued/sent successfully, false otherwise

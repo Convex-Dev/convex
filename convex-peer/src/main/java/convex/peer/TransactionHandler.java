@@ -129,17 +129,13 @@ public class TransactionHandler extends AThreadedComponent {
 
 	/**
 	 * Offer a transaction for handling, blocking until space is available or timeout.
-	 * Used as the retry predicate for backpressure.
+	 * Used as the retry predicate for backpressure. Does not wait on this handler's
+	 * own thread, for example in a local client's callback for a transaction result.
 	 * @param m Message offered
 	 * @return True if queued for handling, false on timeout or interruption
 	 */
 	public boolean offerTransactionBlocking(Message m) {
-		try {
-			return txMessageQueue.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
+		return offerBlocking(txMessageQueue, m);
 	}
 	
 	/**

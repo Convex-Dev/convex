@@ -17,7 +17,8 @@ import io.netty.channel.Channel;
  * never wait and are safe on an I/O thread. {@link #sendMessage} and
  * {@link #returnMessageBlocking} wait a bounded time for space in the shared
  * queue, applying backpressure to handler threads that report client results
- * rather than dropping them under load. Neither form waits for this channel
+ * rather than dropping them under load; on an I/O thread they do not wait, since
+ * that thread writes for every channel it serves. Neither form waits for this channel
  * itself: a channel that is closed, or already holds more than its cap of bytes
  * handed to Netty and unwritten, has its reply refused at once, so a reader that
  * stalls loses only its own replies. One instance per accepted client channel.</p>
@@ -60,7 +61,8 @@ class NettyServerConnection extends AConnection {
 		long length = NettyConnection.encodedLength(msg);
 		if (length < 0) return false; // too large for a frame: logged, not sent
 		int bytes = Utils.checkedInt(length);
-		if (!mayBlock) return outbound.offer(this, ch, msg, bytes);
+		if (outbound.offer(this, ch, msg, bytes)) return true;
+		if (!mayBlock || NettyConnection.inEventLoop(ch.eventLoop().parent())) return false;
 		try {
 			return outbound.offerBlocking(this, ch, msg, bytes, Config.DEFAULT_INTERNAL_TIMEOUT);
 		} catch (InterruptedException e) {
