@@ -95,6 +95,10 @@ them. Before changing CVM behaviour, read the `protocol-versions` skill and
 - Generic components make no application policy (merge semantics, path resolution,
   sync scheduling); they offer defaults and extension points. A downstream request
   belongs upstream only for a real defect or a missing extension point.
+- Hand work to another thread only at the edge, where it lets independent work run
+  concurrently. Atomic updates and deterministic processes never hand off, and local
+  paths avoid it where they can: a hand-off costs a thread wake, about as long as a
+  whole local round trip.
 
 ## Modules
 
