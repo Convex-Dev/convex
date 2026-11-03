@@ -3,12 +3,15 @@ package convex.p2p;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -180,6 +183,30 @@ public class P2PNodeTest {
 		node=P2PNode.create(store,allowed,AKeyPair.generate());
 		node.launch();
 		assertNotNull(nodeInfo(node.p2p().getUserKey()));
+	}
+
+	/**
+	 * A peer's initialisation that fails at once, as a keyless node's always does, is
+	 * forgotten, so the next connection to that peer runs it again rather than reporting
+	 * the old failure.
+	 */
+	@Test
+	public void testFailedPeerInitialisationRunsAgain() throws Exception {
+		AKeyPair hubKey=AKeyPair.generate();
+		try (EtchStore hubStore=EtchStore.createTemp("p2p-node-test-hub");
+				P2PNode hub=P2PNode.create(hubStore,NodeConfig.localNetwork(),hubKey).serveAllInbound()) {
+			hub.launch();
+			node=P2PNode.create(store,NodeConfig.port(-1),null);
+			node.launch();
+			Throwable first=connectFailure(hubKey.getAccountKey(),hub);
+			Throwable second=connectFailure(hubKey.getAccountKey(),hub);
+			assertNotSame(first,second);
+		}
+	}
+
+	private Throwable connectFailure(AccountKey key,P2PNode hub) {
+		return assertThrows(ExecutionException.class,
+			() -> node.connect(key,hub.getHostAddress()).get(10,TimeUnit.SECONDS)).getCause();
 	}
 
 	/** The default node serves the application regions as well as the P2P ones. */

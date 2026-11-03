@@ -1057,15 +1057,26 @@ public class P2PNode implements Closeable {
 
 	private CompletableFuture<Void> initialisePeer(Convex peer) {
 		initialisations.keySet().removeIf(p -> !p.isConnected());
-		return initialisations.computeIfAbsent(peer,p -> {
-			CompletableFuture<Void> initialised=propagator.getConnectionManager().withPeer(
-				p.getVerifiedPeer(),false,() -> pushOwnNodeInfo(p)
-					.thenCompose(ignored -> pullBootstrap(p)));
-			initialised.whenComplete((ignored,error) -> {
-				if (error!=null) initialisations.remove(p,initialised);
-			});
-			return initialised;
+		CompletableFuture<Void> initialised=new CompletableFuture<>();
+		CompletableFuture<Void> existing=initialisations.putIfAbsent(peer,initialised);
+		if (existing!=null) return existing;
+		// Started only once the entry is in place: the work can fail at once, and
+		// forgetting a failure removes the entry, which no map update may do
+		initialised.whenComplete((ignored,error) -> {
+			if (error!=null) initialisations.remove(peer,initialised);
 		});
+		try {
+			propagator.getConnectionManager().withPeer(peer.getVerifiedPeer(),false,
+				() -> pushOwnNodeInfo(peer).thenCompose(ignored -> pullBootstrap(peer)))
+				.whenComplete((ignored,error) -> {
+					if (error==null) initialised.complete(null);
+					else initialised.completeExceptionally(error);
+				});
+		} catch (RuntimeException | Error e) {
+			initialised.completeExceptionally(e);
+			throw e;
+		}
+		return initialised;
 	}
 
 	/** Pulls the application's bootstrap paths from a new peer, in order, refreshing discovery after each. */

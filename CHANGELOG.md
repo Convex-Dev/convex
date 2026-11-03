@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Close peer connections without waiting for the socket: a network thread no longer waits for another, and a TLS peer that stops reading no longer holds up a close for 3 seconds.
 - Fail a send to a full queue at once when it is made on a network thread or on the peer thread that empties that queue, such as from a reply callback; it waited 8 seconds and held up every connection or request on that thread. ([Client backpressure](convex-peer/docs/CLIENT_BACKPRESSURE.md#aconnection-interface))
 - Stop a lattice node's close hanging when a peer it keeps is admitted or given up at the same time.
+- Let a later connection to a P2P peer initialise it after an attempt that failed at once, such as on a full send queue; that failure was kept and reported again until the peer disconnected.
 - Replicate lattice updates with missing cells over connections opened by the receiving node. ([#820](https://github.com/Convex-Dev/convex/issues/820))
 - Make `convex dlfs start --peer` connect: each peer, given as `host:port` or a `tcp://` or `tls://` URI, is admitted under the key it proves, and startup fails if one cannot be reached. Before, no peer was admitted. ([DLFS](convex-dlfs/README.md#run-a-webdav-server), [#629](https://github.com/Convex-Dev/convex/issues/629))
 - Preserve concurrent KV updates and return the result of the committed edit.
