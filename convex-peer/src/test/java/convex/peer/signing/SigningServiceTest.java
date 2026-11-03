@@ -501,10 +501,22 @@ public class SigningServiceTest {
 		AccountKey pk = svc.createKey(s("did:key:alice"), s("pass"));
 		assertEquals(1, svc.listKeys(s("did:key:alice")).size());
 
-		svc.deleteKey(s("did:key:alice"), pk, s("pass"));
+		assertTrue(svc.deleteKey(s("did:key:alice"), pk, s("pass")));
 
 		List<AccountKey> keys = svc.listKeys(s("did:key:alice"));
 		assertTrue(keys.isEmpty(), "Deleted key should not appear in listKeys");
+		assertFalse(svc.deleteKey(s("did:key:alice"), pk, s("pass")), "A deleted key cannot be deleted again");
+	}
+
+	@Test
+	public void testDeleteKeyWrongPassphraseKeepsKey() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey(s("did:key:alice"), s("pass"));
+
+		assertFalse(svc.deleteKey(s("did:key:alice"), pk, s("wrong")));
+
+		assertEquals(List.of(pk), svc.listKeys(s("did:key:alice")), "Key should stay listed");
+		assertNotNull(svc.loadKey(s("did:key:alice"), pk, s("pass")), "Key should stay usable");
 	}
 
 	@Test

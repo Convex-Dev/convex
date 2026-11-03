@@ -261,19 +261,27 @@ public class SigningService extends ALocalComponent {
 	 * @param identity Caller identity (DID string)
 	 * @param publicKey Public key identifying which key to delete
 	 * @param passphrase Passphrase (required to compute the lookup hash)
+	 * @return true if the key was deleted, false if no key matches these credentials
+	 *         (a wrong passphrase, or a key already deleted), leaving the store unchanged
 	 */
-	public void deleteKey(AString identity, AccountKey publicKey, AString passphrase) {
+	public boolean deleteKey(AString identity, AccountKey publicKey, AString passphrase) {
 		Hash idHash = computeIdentityHash(identity);
+		boolean[] deleted = new boolean[1];
 		cursor().update(record -> {
+			deleted[0] = false;
 			byte[] secret = secret(record);
 			if (secret == null) return record;
 			try {
 				Hash lookupHash = lookupHash(secret, identity, publicKey, passphrase);
-				return unlisted(record.assoc(KEY_KEYS, keys(record).dissoc(lookupHash)), idHash, publicKey);
+				Index<Hash, ABlob> keys = keys(record);
+				if (keys.get(lookupHash) == null) return record;
+				deleted[0] = true;
+				return unlisted(record.assoc(KEY_KEYS, keys.dissoc(lookupHash)), idHash, publicKey);
 			} finally {
 				Arrays.fill(secret, (byte) 0);
 			}
 		});
+		return deleted[0];
 	}
 
 	/**

@@ -701,7 +701,7 @@ class SigningMcpTools {
 			if (confirmResult != null) return confirmResult;
 
 			try {
-				svc.deleteKey(identity, publicKey, passphrase);
+				if (!svc.deleteKey(identity, publicKey, passphrase)) return api.toolError("Key not found or wrong passphrase");
 				return api.toolSuccess(Maps.of("deleted", CVMBool.TRUE));
 			} catch (Exception e) {
 				return api.toolError("Delete failed: " + e.getMessage());

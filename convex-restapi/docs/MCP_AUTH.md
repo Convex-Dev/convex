@@ -488,7 +488,7 @@ Generates a new Ed25519 keypair and stores the encrypted seed.
 
 | Name | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `passphrase` | string | no | `""` | Passphrase for at-rest encryption |
+| `passphrase` | string | yes | — | Passphrase for at-rest encryption |
 
 **Returns:**
 
@@ -534,7 +534,7 @@ Signs arbitrary bytes with an Ed25519 key. Passphrase is required to decrypt the
 |---|---|---|---|---|
 | `publicKey` | string | yes | — | Ed25519 public key to sign with |
 | `bytesToSign` | string | yes | — | Data to sign (hex-encoded) |
-| `passphrase` | string | no | `""` | Passphrase for key decryption |
+| `passphrase` | string | yes | — | Passphrase for key decryption |
 
 **Returns:**
 
@@ -563,7 +563,7 @@ Creates a self-issued EdDSA JWT signed by a managed key. Useful for authenticati
 | Name | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `publicKey` | string | yes | — | Ed25519 public key to sign with |
-| `passphrase` | string | no | `""` | Passphrase for key decryption |
+| `passphrase` | string | yes | — | Passphrase for key decryption |
 | `audience` | string | no | — | `aud` claim — the intended recipient (e.g., `"did:web:venue.example.com"`) |
 | `claims` | object | no | `{}` | Additional claims to include in payload |
 | `lifetime` | integer | no | `86400` | Token lifetime in seconds (default 24 hours, user's choice — no server-enforced maximum) |
@@ -610,7 +610,7 @@ Imports an existing Ed25519 seed. Elevated because seed material is in transit.
 | Name | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `seed` | string | yes | — | Ed25519 seed (hex-encoded) |
-| `passphrase` | string | no | `""` | Passphrase for encryption |
+| `passphrase` | string | yes | — | Passphrase for encryption |
 | `confirmToken` | string | no | — | Confirmation token from web UI |
 
 **Returns (without confirmToken):**
@@ -640,7 +640,7 @@ Returns the decrypted seed. Elevated because it exposes secret key material. Onl
 | Name | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `publicKey` | string | yes | — | Ed25519 public key |
-| `passphrase` | string | no | `""` | Passphrase for key decryption |
+| `passphrase` | string | yes | — | Passphrase for key decryption |
 | `confirmToken` | string | no | — | Confirmation token from web UI |
 
 **Returns (with valid confirmToken):**
@@ -661,10 +661,10 @@ Permanently destroys a stored encrypted seed. Elevated because it is irreversibl
 | Name | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `publicKey` | string | yes | — | Ed25519 public key |
-| `passphrase` | string | no | `""` | Passphrase for key decryption (to verify ownership) |
+| `passphrase` | string | yes | — | Passphrase for key decryption (to verify ownership) |
 | `confirmToken` | string | no | — | Confirmation token from web UI |
 
-**Returns (with valid confirmToken):** `{"deleted": true}`
+**Returns (with valid confirmToken):** `{"deleted": true}`, or an error if no stored key matches the public key and passphrase, in which case nothing is deleted.
 
 #### `changePassphrase`
 
@@ -675,7 +675,7 @@ Re-encrypts a key with a new passphrase. Elevated because it changes security pa
 | Name | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `publicKey` | string | yes | — | Ed25519 public key |
-| `passphrase` | string | no | `""` | Current passphrase |
+| `passphrase` | string | yes | — | Current passphrase |
 | `newPassphrase` | string | yes | — | New passphrase for re-encryption |
 | `confirmToken` | string | no | — | Confirmation token from web UI |
 
@@ -695,7 +695,7 @@ Full convenience — resolves signing key, prepares, signs, and submits.
 |---|---|---|---|---|
 | `address` | string | yes | — | Convex address (e.g., `"#42"`) |
 | `source` | string | yes | — | CVX source code |
-| `passphrase` | string | no | `""` | Passphrase for key decryption |
+| `passphrase` | string | yes | — | Passphrase for key decryption |
 
 **Returns:**
 
@@ -723,7 +723,7 @@ Creates a keypair and a Convex account in one step.
 | Name | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `faucet` | integer | no | `0` | Initial balance from faucet (copper) |
-| `passphrase` | string | no | `""` | Passphrase for key encryption |
+| `passphrase` | string | yes | — | Passphrase for key encryption |
 
 **Returns:**
 

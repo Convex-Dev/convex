@@ -180,6 +180,33 @@ public class ElevatedMcpTest extends ARESTTest {
 		}
 	}
 
+	@Test
+	public void testDeleteKeyWrongPassphraseKeepsKey() throws IOException, InterruptedException {
+		AMap<AString, ACell> createResult = expectResult(
+			makeAuthToolCall("signingCreateKey", Maps.of("passphrase", TEST_PASSPHRASE), ALICE_JWT));
+		AString publicKey = RT.getIn(createResult, "publicKey");
+
+		AMap<AString, ACell> deleteArgs = Maps.of("publicKey", publicKey, "passphrase", Strings.create("wrong-pass"));
+		AMap<AString, ACell> deleteResult = expectResult(
+			makeAuthToolCall("signingDeleteKey", deleteArgs, ALICE_JWT));
+		AString confirmToken = RT.ensureString(deleteResult.get(Strings.create("confirmToken")));
+		AString confirmUrl = RT.ensureString(deleteResult.get(Strings.create("confirmUrl")));
+		postForm(confirmUrl.toString());
+
+		AMap<AString, ACell> retryArgs = deleteArgs.assoc(Strings.create("confirmToken"), confirmToken);
+		assertNotNull(expectError(makeAuthToolCall("signingDeleteKey", retryArgs, ALICE_JWT)),
+			"Delete with a wrong passphrase should fail");
+
+		AMap<AString, ACell> listResult = expectResult(
+			makeAuthToolCall("signingListKeys", Maps.empty(), ALICE_JWT));
+		AVector<ACell> keys = RT.ensureVector(listResult.get(Strings.create("keys")));
+		boolean found = false;
+		for (long i = 0; i < keys.count(); i++) {
+			if (publicKey.equals(keys.get(i))) found = true;
+		}
+		assertTrue(found, "Key should stay listed after a failed delete");
+	}
+
 	// ===== Change passphrase with confirmation =====
 
 	@Test
