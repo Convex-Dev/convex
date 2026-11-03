@@ -183,7 +183,7 @@ P2P discovery and routing use three paths, each keyed by node key:
 
 Node records and routing views are shared. Each entry is signed by its node key and
 merges by the standard owner rule, and each node holds only the entries it wants
-(§4.2). `:local` holds application state that is not shared externally (§4.6).
+(§4.2). `:local` holds application state that is not meant to be shared externally (§4.6).
 
 ### 4.2 Node Registry: `[:p2p :nodes]`
 
@@ -387,9 +387,11 @@ its configured lattice.
 
 What a node has seen of other nodes is its own business. It lives at
 `[:local <own node key> :p2p]`: `:local` holds application state that is not meant
-to be shared externally, written and managed by one application instance. The node
-may replicate it for backup, but never publishes it to other nodes or merges theirs:
-the P2P application's projection leaves `:local` out in both directions.
+to be shared externally, written and managed by one application instance. The P2P
+application's projection, which the node's group publishes through, leaves `:local`
+out in both directions. A group with a filter that keeps `:local` can still publish
+it, for backup, diagnostics or failover replication; the receiving node keeps it only
+if one of its applications accepts it, which the P2P application does not.
 
 `ContactRecords` holds a contact record per node key: the last authenticated contact,
 the address this node last dialled and found the node's key at, the failures since
