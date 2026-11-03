@@ -25,7 +25,15 @@ public final class LatticePropagatorConfig {
 	@Deprecated
 	public static final AString MAX_INBOUND_VALUE_SIZE=Strings.intern("maxInboundValueSize");
 
-	/** Consecutive rejected messages before this group's circuit breaker closes a route. */
+	/**
+	 * Consecutive rejected messages before this group's circuit breaker closes a
+	 * route. Only messages that show the sender at fault count: malformed,
+	 * unmergeable, refused by the application handler, DATA over an unverified
+	 * route, or a value whose missing data the sender answers for wrongly. A :LOAD
+	 * refusal from either side, an unanswered data request and a local failure
+	 * count neither way. An accepted merge, DATA or application message resets the
+	 * count.
+	 */
 	public static final AString MAX_CONSECUTIVE_REJECTS=Strings.intern("maxConsecutiveRejects");
 
 	/** Maximum encoded message size on an unverified manager-owned route. */

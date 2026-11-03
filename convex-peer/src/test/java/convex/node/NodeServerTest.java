@@ -20,6 +20,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -1619,6 +1620,55 @@ public class NodeServerTest {
 		@Override public long getReceivedCount() { return 0; }
 	}
 
+	/**
+	 * A trusted peer whose data requests the test answers, or refuses to send, and
+	 * which collects the results returned to it by ID.
+	 */
+	static final class ScriptedPeer extends AConnection {
+		final LinkedBlockingQueue<Message> requests = new LinkedBlockingQueue<>();
+		final ConcurrentHashMap<ACell,CompletableFuture<Result>> results = new ConcurrentHashMap<>();
+		volatile boolean refuseSends = false;
+		volatile boolean closed = false;
+
+		ScriptedPeer() {
+			setTrustedKey(AKeyPair.generate().getAccountKey());
+		}
+
+		@Override public boolean sendMessage(Message msg) {
+			if (refuseSends) return false;
+			requests.add(msg);
+			return true;
+		}
+
+		@Override public boolean trySendMessage(Message msg) {
+			if (msg.getType() == MessageType.RESULT) {
+				Result result = msg.toResult();
+				result(result.getID()).complete(result);
+			}
+			return true;
+		}
+
+		CompletableFuture<Result> result(ACell id) {
+			return results.computeIfAbsent(id, key -> new CompletableFuture<>());
+		}
+
+		Result awaitResult(long id) throws Exception {
+			return result(CVMLong.create(id)).get(5, TimeUnit.SECONDS);
+		}
+
+		void answerNextRequest(Result reply) throws Exception {
+			Message request = requests.poll(5, TimeUnit.SECONDS);
+			assertNotNull(request, "the endpoint should request the missing data");
+			Message response = Message.createResult(reply.withID(request.getRequestID())).withConnection(this);
+			assertTrue(completeRequest(response));
+		}
+
+		@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.2", 30000); }
+		@Override public boolean isClosed() { return closed; }
+		@Override public void close() { closed = true; }
+		@Override public long getReceivedCount() { return 0; }
+	}
+
 	/** Store gate used to make the DATA_REQUEST/acquire/merge transition deterministic. */
 	static final class BlockingReadMemoryStore extends MemoryStore {
 		final CountDownLatch requested = new CountDownLatch(1);
@@ -1785,6 +1835,13 @@ public class NodeServerTest {
 		return Message.create(MessageType.LATTICE_VALUE, payload).withConnection(conn);
 	}
 
+	/** A LATTICE_VALUE with an ID whose one branch, a random blob, the receiver must acquire. */
+	private static Message partialLatticeValue(long id, AConnection conn) {
+		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, CVMLong.create(id), Vectors.empty(),
+			Sets.of(Blobs.createRandom(400)));
+		return Message.create(MessageType.LATTICE_VALUE, null, payload.getEncoding()).withConnection(conn);
+	}
+
 	/** A recoverable Error in one message must not terminate the single inbound consumer. */
 	@Test
 	public void testInboundDispatcherSurvivesStackOverflow() throws Exception {
@@ -1877,6 +1934,63 @@ public class NodeServerTest {
 		LatticePropagator.InboundStats aggregate=endpoint.getInboundStats();
 		assertTrue(aggregate.mergesAccepted()>=1);
 		assertTrue(aggregate.mergesRejected()>=2);
+	}
+
+	/** Launches a MaxLattice node with one group, closing a route after two rejects. */
+	private LatticePropagator launchTwoRejectGroup(int acquisitions) throws IOException, InterruptedException {
+		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS,CVMLong.create(2),
+			LatticePropagatorConfig.INBOUND_QUEUE_SIZE,CVMLong.create(acquisitions)));
+		maxNodeServer = new TestNode<>(MaxLattice.create(), store, NodeConfig.port(-1));
+		maxNodeServer.addPropagator(new LatticePropagator(store,groupConfig));
+		maxNodeServer.launch();
+		return propagator(maxNodeServer);
+	}
+
+	/**
+	 * A sender that is busy, or that this node cannot reach because its own send
+	 * buffer is full, is not at fault: neither counts towards closing its route nor
+	 * resets the count. One that answers for its missing data wrongly is.
+	 */
+	@Test
+	public void testSenderLoadDoesNotCountAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		endpoint.handleIncomingMessage(partialLatticeValue(1,peer));
+		peer.answerNextRequest(Result.error(ErrorCodes.LOAD,"Busy"));
+		assertEquals(ErrorCodes.LOAD,peer.awaitResult(1).getErrorCode());
+		assertFalse(peer.isClosed(),"a busy sender is not at fault");
+
+		peer.refuseSends=true;
+		endpoint.handleIncomingMessage(partialLatticeValue(2,peer));
+		assertTrue(peer.awaitResult(2).isError());
+		assertFalse(peer.isClosed(),"our full send buffer is not the sender's fault");
+		peer.refuseSends=false;
+
+		endpoint.handleIncomingMessage(partialLatticeValue(3,peer));
+		peer.answerNextRequest(Result.error(ErrorCodes.MISSING,"Not held"));
+		assertEquals(ErrorCodes.MISSING,peer.awaitResult(3).getErrorCode());
+		assertTrue(peer.isClosed(),"a sender lacking the data it announced is at fault, for the second reject");
+	}
+
+	/** This node's own full acquisition pool neither counts against the sender nor resets the count. */
+	@Test
+	public void testOwnAcquisitionLoadDoesNotCountAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(1);
+		ScriptedPeer peer=new ScriptedPeer();
+		Blob badValue=Blob.wrap(new byte[8]);
+		endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 1
+
+		// Holds the only acquisition permit: its data request is never answered
+		endpoint.handleIncomingMessage(partialLatticeValue(1,peer));
+		endpoint.handleIncomingMessage(partialLatticeValue(2,peer));
+		assertEquals(ErrorCodes.LOAD,peer.awaitResult(2).getErrorCode());
+		assertFalse(peer.isClosed(),"this node's load is not the sender's fault");
+
+		endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 2
+		assertTrue(peer.isClosed(),"the refusal must not have reset the count");
 	}
 
 	/**

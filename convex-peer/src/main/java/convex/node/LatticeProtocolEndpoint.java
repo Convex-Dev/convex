@@ -33,6 +33,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.BoundedMessageQueue;
@@ -249,7 +250,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 		boolean acquired=acquiredMessages.remove(message)!=null;
 		if (!acquired && acquisitionFailure==null) recordReceived(stats);
 		if (acquisitionFailure!=null) {
-			recordMergeReject(connection,stats);
+			if (isSenderFault(acquisitionFailure)) recordMergeReject(connection,stats);
 			returnLatticeResult(message,Result.fromException(acquisitionFailure));
 			return null;
 		}
@@ -583,7 +584,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 			return;
 		}
 		if (!acquisitionPermits.tryAcquire()) {
-			recordMergeReject(connection,stats);
+			// Our own load, which says nothing about the sender
 			returnLatticeResult(message,Result.error(ErrorCodes.LOAD,
 				"Lattice acquisition capacity exhausted"));
 			return;
@@ -665,6 +666,18 @@ final class LatticeProtocolEndpoint implements Closeable {
 			}
 			return result;
 		});
+	}
+
+	/**
+	 * Whether a failed acquisition shows the sender at fault: its value was
+	 * malformed, or it answered a data request with an error other than :LOAD.
+	 * Load on either side, an unanswered request and local failures count
+	 * neither way, as {@code ConnectionManager} treats a peer's :LOAD.
+	 */
+	private static boolean isSenderFault(Throwable failure) {
+		if (failure instanceof BadFormatException) return true;
+		if (failure instanceof ResultException e) return !ErrorCodes.LOAD.equals(e.getResult().getErrorCode());
+		return false;
 	}
 
 	private static Throwable unwrapCompletion(Throwable error) {

@@ -294,9 +294,9 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Returns the number of consecutive rejected or undecodable inbound messages
-	 * allowed per connection before its circuit breaker closes it. An accepted
-	 * merge resets the streak; zero disables the breaker.
+	 * Returns the number of consecutive rejected inbound messages allowed per
+	 * connection before its circuit breaker closes it; zero disables the breaker.
+	 * {@link LatticePropagatorConfig#MAX_CONSECUTIVE_REJECTS} says what counts.
 	 *
 	 * @deprecated Use {@link LatticePropagatorConfig#getMaxConsecutiveRejects()}.
 	 * @return consecutive-reject limit, or zero when disabled

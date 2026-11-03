@@ -97,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep percent-encoded reserved characters in a DID: `did:web:example.com%3A8080` round-trips and no longer equals `did:web:example.com:8080`, and lattice owner DIDs accept only the normalised spelling. ([#816](https://github.com/Convex-Dev/convex/issues/816))
 - Complete the final flush when an interrupted thread closes a host's automatic flushing, and keep that thread's interrupt status.
 - Never publish a P2P node's `:local` state or accept another's, even when its lattice declares `:local`.
+- Stop holding load against a lattice peer: a `:LOAD` refusal from either side, or a data request that goes unanswered or cannot be sent, no longer counts towards closing its route under `maxConsecutiveRejects`.
 
 ## [0.8.18] - 2026-10-25
 
