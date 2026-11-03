@@ -8,8 +8,9 @@ The central boundary is simple:
 
 - `NodeServer` replicates one assembled `LatticeHost`; the host's applications
   own the root's merge semantics.
-- The calling application constructs propagation policy groups.
-- The calling application composes inbound transports independently.
+- The service ([anatomy](../../convex-core/docs/LATTICE_APPLICATIONS.md#service-anatomy))
+  constructs propagation policy groups.
+- The service composes inbound transports independently.
 - Each `LatticePropagator` owns its routes, serving view and protocol work, and
   merges nothing.
 - Attaching a propagator connects it to the node for publication and inbound
@@ -83,7 +84,7 @@ apply to subsequent handshakes; established routes are not reauthenticated.
 | `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, challenge state, statistics and extension handler | Node persistence, peer discovery, application schemas or which values are wanted |
 | `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification and admitted outbound routes | Discovery records, listener assignment, lattice merge or application-owner validation |
 | `ALattice` / `LatticeContext` | Value validation, merge semantics and application signing authority | Transport identity and routing |
-| Application wrapper | Construction, lifecycle order, transport composition, connection assignment, discovery translation and application handlers | Generic protocol internals |
+| Service | Construction, lifecycle order, transport composition, connection assignment and network policy, such as discovery and application message handlers | Generic protocol internals |
 
 `LatticeListener` is the public standard TCP transport.
 `LatticeProtocolEndpoint` remains package-private behind the transport-facing

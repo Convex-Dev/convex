@@ -788,8 +788,9 @@ On reconnect, if the current transport repeatedly fails, the next is tried.
 ### 9.1 Architecture
 
 `NodeServer` remains schema-independent: it replicates an assembled host and
-merges nothing itself. The calling application constructs its propagation groups
-and transport hosts, while P2P policy stays above all three layers:
+merges nothing itself. The service constructs its propagation groups and transport
+hosts, while P2P policy stays above all three layers (see
+[service anatomy](../../convex-core/docs/LATTICE_APPLICATIONS.md#service-anatomy)):
 
 ```
 P2PNode / NodeDirectory (P2P schema, discovery and policy)
