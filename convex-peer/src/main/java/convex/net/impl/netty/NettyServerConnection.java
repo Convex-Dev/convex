@@ -1,6 +1,7 @@
 package convex.net.impl.netty;
 
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import convex.core.message.Message;
@@ -39,8 +40,8 @@ class NettyServerConnection extends AConnection {
 	}
 
 	@Override
-	public boolean sendMessage(Message msg) {
-		return send(msg, Config.DEFAULT_INTERNAL_TIMEOUT);
+	public boolean sendMessage(Message msg) throws ClosedChannelException, InterruptedException {
+		return offer(msg, Config.DEFAULT_INTERNAL_TIMEOUT);
 	}
 
 	@Override
@@ -58,22 +59,34 @@ class NettyServerConnection extends AConnection {
 		return send(msg, timeoutMillis);
 	}
 
+	/** As {@link #offer}, for paths that report only whether the message was accepted. */
 	private boolean send(Message msg, long timeoutMillis) {
-		Channel ch = channel;
-		if (ch == null || !ch.isActive()) return false;
-		// Message encoding can traverse a large cell tree. Do it on the caller's
-		// thread, never lazily in NettyOutboundHandler.
-		long length = NettyConnection.encodedLength(msg);
-		if (length < 0) return false; // too large for a frame: logged, not sent
-		int bytes = Utils.checkedInt(length);
-		if (outbound.offer(this, ch, msg, bytes)) return true;
-		if (timeoutMillis <= 0 || NettyConnection.inEventLoop(ch.eventLoop().parent())) return false;
+		if (NettyConnection.encodedLength(msg) < 0) return false; // too large for a frame: logged, not sent
 		try {
-			return outbound.offerBlocking(this, ch, msg, bytes, timeoutMillis);
+			return offer(msg, timeoutMillis);
+		} catch (ClosedChannelException e) {
+			return false;
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			return false;
 		}
+	}
+
+	/**
+	 * Offers a message to the shared queue, waiting up to the given time for space.
+	 * Returns false if there was no room, and throws as {@link #sendMessage} does.
+	 */
+	private boolean offer(Message msg, long timeoutMillis) throws ClosedChannelException, InterruptedException {
+		Channel ch = channel;
+		if (ch == null || !ch.isActive()) throw new ClosedChannelException();
+		// Message encoding can traverse a large cell tree. Do it on the caller's
+		// thread, never lazily in NettyOutboundHandler. Too large for a frame throws.
+		int bytes = Utils.checkedInt(msg.getMessageData().count());
+		if (outbound.offer(this, ch, msg, bytes)) return true;
+		if (timeoutMillis <= 0 || NettyConnection.inEventLoop(ch.eventLoop().parent())) return false;
+		if (outbound.offerBlocking(this, ch, msg, bytes, timeoutMillis)) return true;
+		if (!ch.isActive()) throw new ClosedChannelException();
+		return false;
 	}
 
 	void addPendingBytes(int delta) {

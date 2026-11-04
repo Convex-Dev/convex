@@ -313,10 +313,17 @@ public class Connection extends AConnection {
 		return (sent) ? id : -1;
 	}
 
+	/** Never waits: this transport's one selector thread serves every connection. */
 	@Override
-	public boolean sendMessage(Message msg) {
+	public boolean sendMessage(Message msg) throws IOException {
+		if (isClosed()) throw new ClosedChannelException();
+		return sendBuffer(msg.getMessageData());
+	}
+
+	@Override
+	public boolean trySendMessage(Message msg) {
 		try {
-			return sendBuffer(msg.getMessageData());
+			return sendMessage(msg);
 		} catch (IOException e) {
 			return false;
 		} catch (IllegalArgumentException e) {
@@ -324,11 +331,6 @@ public class Connection extends AConnection {
 			log.warn("Not sending {} message: {}",msg.getType(),e.getMessage());
 			return false;
 		}
-	}
-
-	@Override
-	public boolean trySendMessage(Message msg) {
-		return sendMessage(msg);
 	}
 
 	/**

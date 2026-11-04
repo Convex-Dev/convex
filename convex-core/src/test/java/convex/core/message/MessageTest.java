@@ -320,7 +320,7 @@ public class MessageTest {
 
 	// ---- Connection integration tests ----
 
-	@Test public void testLocalConnection() {
+	@Test public void testLocalConnection() throws IOException {
 		// LocalConnection paired channel delivers messages to the paired end's handler
 		java.util.concurrent.atomic.AtomicReference<Message> received = new java.util.concurrent.atomic.AtomicReference<>();
 		LocalConnection clientEnd = LocalConnection.create(m -> {
@@ -348,7 +348,7 @@ public class MessageTest {
 		assertNull(clientEnd.getPaired());
 	}
 
-	@Test public void testLocalConnectionBidirectional() {
+	@Test public void testLocalConnectionBidirectional() throws IOException {
 		// Both ends of a pair can send and receive
 		java.util.concurrent.atomic.AtomicReference<Message> receivedAtA = new java.util.concurrent.atomic.AtomicReference<>();
 		java.util.concurrent.atomic.AtomicReference<Message> receivedAtB = new java.util.concurrent.atomic.AtomicReference<>();
@@ -371,16 +371,19 @@ public class MessageTest {
 		assertSame(endA, receivedAtA.get().getConnection());
 	}
 
-	@Test public void testLocalConnectionReturnOnly() {
+	@Test public void testLocalConnectionReturnOnly() throws IOException {
 		// Return-only pair: client end can send, but paired end (no handler on client) cannot
 		LocalConnection clientEnd = LocalConnection.create(m -> true);
 		LocalConnection serverEnd = clientEnd.getPaired();
+		Message result = Message.createResult(Result.create(CVMLong.ONE, CVMLong.ONE, null));
 
 		// Client can send (to server's handler)
-		assertTrue(clientEnd.sendMessage(Message.createResult(Result.create(CVMLong.ONE, CVMLong.ONE, null))));
+		assertTrue(clientEnd.sendMessage(result));
 
 		// Server cannot send back via sendMessage (client has null handler)
-		assertFalse(serverEnd.sendMessage(Message.createResult(Result.create(CVMLong.ONE, CVMLong.ONE, null))));
+		assertFalse(serverEnd.supportsMessage());
+		assertThrows(UnsupportedOperationException.class, () -> serverEnd.sendMessage(result));
+		assertFalse(serverEnd.trySendMessage(result));
 	}
 
 	@Test public void testMessageWithConnection() throws BadFormatException {

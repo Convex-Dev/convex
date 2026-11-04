@@ -3,6 +3,7 @@ package convex.net.impl.netty;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -250,20 +251,17 @@ public class NettyConnection extends AConnection {
 	 * drain this queue and every other, so a full queue fails the send at once.</p>
 	 */
 	@Override
-	public boolean sendMessage(Message m) {
+	public boolean sendMessage(Message m) throws IOException, InterruptedException {
 		Channel ch = channel;
-		if (ch == null || !ch.isActive()) return false;
-		if (encodedLength(m)<0) return false;
-		if (outbound.offer(m)) return afterQueue(ch, m);
-		if (inEventLoop(ch.eventLoop().parent())) return false;
-		boolean queued;
-		try {
-			queued = outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
-		return queued && afterQueue(ch, m);
+		if (ch == null || !ch.isActive()) throw new ClosedChannelException();
+		m.getMessageData(); // encodes on this thread, or throws if too large for a frame
+		boolean queued = outbound.offer(m)
+			|| (!inEventLoop(ch.eventLoop().parent())
+				&& outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS));
+		if (queued && afterQueue(ch, m)) return true;
+		// Closing clears the queue, which also wakes a waiting send
+		if (!ch.isActive()) throw new ClosedChannelException();
+		return false;
 	}
 
 	/**

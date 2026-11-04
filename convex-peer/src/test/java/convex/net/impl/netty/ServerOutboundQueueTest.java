@@ -2,10 +2,13 @@ package convex.net.impl.netty;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
@@ -105,7 +108,13 @@ public class ServerOutboundQueueTest {
 			// A blocking send waits until the writer frees the shared bound. Hand over
 			// exactly one entry: the freed space lets the blocked send enqueue at any
 			// moment after that, so a whole-batch drain could pick it up too.
-			CompletableFuture<Boolean> blocked = CompletableFuture.supplyAsync(() -> conn.sendMessage(m));
+			CompletableFuture<Boolean> blocked = CompletableFuture.supplyAsync(() -> {
+				try {
+					return conn.sendMessage(m);
+				} catch (Exception e) {
+					throw new CompletionException(e);
+				}
+			});
 			assertEquals(1, queue.drainBatch(1));
 			assertTrue(blocked.get(5, TimeUnit.SECONDS), "blocked send proceeds once space is freed");
 			assertEquals(size, queue.getQueuedBytes());
@@ -120,7 +129,7 @@ public class ServerOutboundQueueTest {
 	}
 
 	@Test
-	public void testStuckChannelPinsOnlyItsOwnAllowance() {
+	public void testStuckChannelPinsOnlyItsOwnAllowance() throws Exception {
 		Message m = message(600);
 		int size = size(m);
 		ServerOutboundQueue queue = new ServerOutboundQueue(size * 10, size + size / 2, false);
@@ -184,7 +193,7 @@ public class ServerOutboundQueueTest {
 	}
 
 	@Test
-	public void testTrustedPeerServedFirstAndNeverWaits() {
+	public void testTrustedPeerServedFirstAndNeverWaits() throws Exception {
 		Message m = message(600);
 		int size = size(m);
 		ServerOutboundQueue queue = new ServerOutboundQueue(size + size / 2, size * 10, false);
@@ -222,7 +231,7 @@ public class ServerOutboundQueueTest {
 			NettyServerConnection conn = connection(ch, queue);
 			ch.close().syncUninterruptibly();
 			assertFalse(conn.trySendMessage(m));
-			assertFalse(conn.sendMessage(m));
+			assertThrows(ClosedChannelException.class, () -> conn.sendMessage(m));
 			assertEquals(0, queue.getQueuedBytes());
 		} finally {
 			queue.close();

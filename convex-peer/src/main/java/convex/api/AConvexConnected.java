@@ -1,6 +1,7 @@
 package convex.api;
 
 import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.RejectedExecutionException;
@@ -16,7 +17,6 @@ import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
-import convex.core.cvm.Keywords;
 import convex.core.data.AccountKey;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
@@ -90,12 +90,22 @@ public abstract class AConvexConnected extends Convex {
 		super(address, keyPair);
 	}
 
+	/**
+	 * The result for a message this client could not send, or a request that ended
+	 * without a reply. The connection reports these as exceptions; a client reports
+	 * every outcome as a Result.
+	 */
+	private static Result failureResult(Throwable error) {
+		if (error instanceof RejectedExecutionException) return Result.FULL_CLIENT_BUFFER;
+		if (error instanceof ClosedChannelException) return Result.CLOSED_CONNECTION;
+		return Result.fromException(error).withSource(SourceCodes.COMM);
+	}
+
 	/** Interprets a correlated reply using this client's store and transaction policy. */
 	private Result decodeResult(Message message,Throwable error,boolean transaction) {
 		while (error instanceof CompletionException && error.getCause()!=null) error=error.getCause();
 		if (error instanceof IllegalArgumentException) throw new CompletionException(error);
-		if (error instanceof RejectedExecutionException) return Result.FULL_CLIENT_BUFFER;
-		if (error!=null) return Result.fromException(error).withSource(SourceCodes.COMM);
+		if (error!=null) return failureResult(error);
 		try {
 			message.getPayload(getStore());
 		} catch (BadFormatException badFormat) {
@@ -287,8 +297,14 @@ public abstract class AConvexConnected extends Convex {
 			}
 			boolean transaction=m.getType()==MessageType.TRANSACT;
 			return FutureUtils.handle(conn.sendRequest(m,timeout),(reply,error) -> decodeResult(reply,error,transaction));
+		} catch (IllegalArgumentException e) {
+			// An invalid message fails, as an invalid request does
+			return CompletableFuture.failedFuture(e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return CompletableFuture.completedFuture(failureResult(e));
 		} catch (Exception e) {
-			return CompletableFuture.completedFuture(Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM));
+			return CompletableFuture.completedFuture(failureResult(e));
 		}
 	}
 

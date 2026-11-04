@@ -2,8 +2,10 @@ package convex.core.message;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
@@ -11,7 +13,7 @@ import org.junit.jupiter.api.Test;
 public class LocalConnectionTest {
 
 	@Test
-	public void testCloseClosesAndUnlinksBothEnds() {
+	public void testCloseClosesAndUnlinksBothEnds() throws Exception {
 		AtomicBoolean delivered=new AtomicBoolean();
 		LocalConnection first=LocalConnection.createPair(message -> true, message -> {
 			delivered.set(true);
@@ -29,7 +31,8 @@ public class LocalConnectionTest {
 		assertTrue(second.isClosed());
 		assertNull(first.getPaired());
 		assertNull(second.getPaired());
-		assertFalse(first.sendMessage(Message.createPing(2)));
+		assertThrows(ClosedChannelException.class,() -> first.sendMessage(Message.createPing(2)));
+		assertFalse(first.trySendMessage(Message.createPing(2)));
 		assertFalse(second.returnMessage(Message.createPing(3)));
 	}
 }

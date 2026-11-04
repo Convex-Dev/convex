@@ -37,7 +37,7 @@ with another participant. It provides three communication methods:
 | Method | Semantics | Blocking | Used for |
 |---|---|---|---|
 | `returnMessage(Message)` | Deliver a result to the other end | Non-blocking | Result delivery from processing threads |
-| `sendMessage(Message)` | Push an arbitrary message to the other end | May block (bounded) | General messaging, protocol exchange |
+| `sendMessage(Message)` | Push an arbitrary message to the other end; throws if it cannot be sent ([CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md#aconnection-interface)) | May block (bounded) | General messaging, protocol exchange |
 | `supportsMessage()` | Check if `sendMessage` is available | — | Guard before protocol exchange |
 
 `returnMessage` and `sendMessage` are independent capabilities. A connection
@@ -178,7 +178,8 @@ handler (null) and no general messaging.
 ### 3.4 Return-Only Pairs
 
 When an end has `acceptsMessages = false`, the paired end's `sendMessage`
-returns false for that direction. `returnMessage` is unaffected — results
+throws `UnsupportedOperationException` for that direction, and its
+`trySendMessage` returns false. `returnMessage` is unaffected — results
 always flow through. This structurally prevents server-initiated protocol
 exchange (e.g. challenge/response verification) on return-only connections
 while preserving result delivery.

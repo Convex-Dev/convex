@@ -8,6 +8,7 @@ import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.channels.ClosedChannelException;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -17,6 +18,10 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import convex.core.Result;
+import convex.core.cpos.CPoSConstants;
+import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
 import convex.core.data.Vectors;
@@ -123,8 +128,12 @@ public class NettyConnectionTest {
 				c.setOutboundLimits(1,Long.MAX_VALUE);
 				boolean full=c.trySendMessage(Message.createPing(2)) && !c.trySendMessage(Message.createPing(3));
 				long start=System.nanoTime();
-				boolean sent=c.sendMessage(Message.createPing(4));
-				outcome.complete(new Outcome(full,sent,System.nanoTime()-start));
+				try {
+					boolean sent=c.sendMessage(Message.createPing(4));
+					outcome.complete(new Outcome(full,sent,System.nanoTime()-start));
+				} catch (Exception e) {
+					outcome.completeExceptionally(e);
+				}
 			});
 			try {
 				self.complete(client);
@@ -138,6 +147,61 @@ public class NettyConnectionTest {
 				client.close();
 			}
 		}
+	}
+
+	/**
+	 * A send that fails for any reason but a full queue says why: a message too large
+	 * for one frame, an interrupt while waiting for space, and a closed connection.
+	 * The non-blocking send only answers false.
+	 */
+	@Test
+	@Timeout(60)
+	public void testSendReportsWhyItFailed() throws Exception {
+		try (NettyServer server=new NettyServer(0)) {
+			server.setReceiveAction(NettyConnectionTest::replyOne);
+			server.launch();
+			CountDownLatch delivering=new CountDownLatch(1);
+			CountDownLatch release=new CountDownLatch(1);
+			NettyConnection client=NettyConnection.connect(server.getHostAddress(),m -> {
+				delivering.countDown();
+				try {
+					release.await();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+			});
+			try {
+				Message oversized=oversizedMessage();
+				assertThrows(IllegalArgumentException.class,() -> client.sendMessage(oversized));
+				assertFalse(client.trySendMessage(oversized));
+
+				// The reply holds the event loop, so nothing leaves the queue
+				assertTrue(client.sendMessage(Message.createPing(1)));
+				delivering.await();
+				client.setOutboundLimits(1,Long.MAX_VALUE);
+				assertTrue(client.trySendMessage(Message.createPing(2)));
+				assertFalse(client.trySendMessage(Message.createPing(3)),"the queue is full");
+
+				Thread.currentThread().interrupt();
+				assertThrows(InterruptedException.class,() -> client.sendMessage(Message.createPing(4)));
+			} finally {
+				Thread.interrupted();
+				release.countDown();
+				client.close();
+			}
+			assertThrows(ClosedChannelException.class,() -> client.sendMessage(Message.createPing(5)));
+			assertFalse(client.trySendMessage(Message.createPing(5)));
+		}
+	}
+
+	/** A message whose payload cannot be encoded in one frame. */
+	private static Message oversizedMessage() {
+		// Distinct blobs, since identical cells are encoded once
+		Random r=new Random(41);
+		int n=(int)(CPoSConstants.MAX_MESSAGE_LENGTH/Blob.CHUNK_LENGTH)+64;
+		ACell[] blobs=new ACell[n];
+		for (int i=0; i<n; i++) blobs[i]=Blob.createRandom(r,Blob.CHUNK_LENGTH);
+		return Message.create(MessageType.RESULT,Result.create(CVMLong.ONE,Vectors.create(blobs)));
 	}
 
 	/** Any loop of the shared group counts, not only the one serving a given channel. */
