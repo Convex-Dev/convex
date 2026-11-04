@@ -407,7 +407,10 @@ main class or the application.
 The store opens first and closes last. The host and its applications open before
 networking and stay usable after it closes. The node, its propagator groups and
 listeners run from launch to shutdown, in the order
-[shutdown](../../convex-peer/docs/SHUTDOWN.md) gives.
+[shutdown](../../convex-peer/docs/SHUTDOWN.md) gives. A service that runs within
+one block opens the store, host and node in one `try`-with-resources header, which
+closes them in reverse, and saves as the block's last step; that document shows the
+block.
 
 The smallest networked service runs one application on a host, and a `LatticeNode`
 with one propagator group that publishes the whole host and keeps the peers the
@@ -464,8 +467,8 @@ The P2P package's service, which `convex p2p start` runs, has these parts:
 
 - **Main class:** `P2PNode.main` reads a JSON5 configuration of node settings,
   `seeds`, `store` and `keypair`. `P2PNode.serve` launches the node and joins the
-  network through the seeds; at shutdown it syncs the application and closes the
-  host, node and store.
+  network through the seeds; at shutdown it syncs the application and checkpoints
+  the host, then closes the node, host and store.
 - **Store:** the Etch file the configuration names, or a temporary store.
 - **Host and application:** `P2PNode.create` opens the host from the store and
   registers one application, `P2PApplication`. It owns the regions `:p2p` (node
