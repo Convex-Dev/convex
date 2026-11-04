@@ -432,6 +432,8 @@ public final class Result extends ARecordGeneric {
 	public static final Result CLOSED_CONNECTION = Result.error(ErrorCodes.CONNECT,Strings.create("Connection Closed")).withSource(SourceCodes.COMM);
 	public static final Result SENT_MESSAGE = Result.value(Strings.intern("Sent"));
 	public static final Result FULL_CLIENT_BUFFER = Result.error(ErrorCodes.LOAD, Strings.FULL_BUFFER).withSource(SourceCodes.COMM);
+	/** A peer shedding a request it had no capacity for, after waiting or by policy. */
+	public static final Result SERVER_LOADED = Result.error(ErrorCodes.LOAD, Strings.SERVER_LOADED).withSource(SourceCodes.PEER);
 	public static final Result BAD_FORMAT = Result.error(ErrorCodes.FORMAT, "Bad format");
 
 

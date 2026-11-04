@@ -206,7 +206,17 @@ it.
 ```java
 AConnection connect(URI endpoint, Consumer<Message> receiveAction, int maxMessageLength)
     throws IOException, InterruptedException, TimeoutException;
+
+AConnection connectWithDelivery(URI endpoint, Function<Message, Predicate<Message>> delivery,
+    int maxMessageLength) throws IOException, InterruptedException, TimeoutException;
 ```
+
+`connectWithDelivery` takes a delivery that may ask to wait by returning a retry,
+as a server's delivery does when a queue is full. The built-in Netty transports
+then stop reading that connection until the retry accepts the message or gives
+up ([BACKPRESSURE.md](BACKPRESSURE.md)). The default, used by a factory that
+implements only `connect` and by the NIO client, cannot pause: it answers a request
+it is asked to wait for with `:LOAD` at once and drops anything else.
 
 The factory installs the receive limit before delivery starts and returns a
 ready connection, including any transport handshake. `AConnection` continues
@@ -273,12 +283,16 @@ that communicate via an `AConnection`:
 
 - **Connection field** — `protected AConnection connection`, managed by
   `setConnection()` / `close()`
-- **Result correlation** — `returnMessageHandler` delegates matching to the
+- **Result correlation** — `returnMessageDelivery` delegates matching to the
   physical connection, then decodes the result with the client's store and
   applies transaction bookkeeping.
 - **Protocol handling** — incoming protocol messages (e.g. server-initiated
   CHALLENGE) are handled automatically (auto-response with the client's
-  keypair).
+  keypair). Reverse DATA_REQUESTs and other unsolicited messages go to the
+  deliveries set with `setDataRequestDelivery` and `setUnsolicitedMessageDelivery`,
+  which may ask to wait; `ConvexRemote` passes that request on to its transport.
+  `returnMessageHandler`, for paths that cannot pause such as `ConvexLocal`,
+  answers it with `:LOAD` instead.
 - **`message(Message)`** — delegates requests to the connection with their IDs
   unchanged. Fire-and-forget messages (no request ID) are sent directly and return
   `Result.SENT_MESSAGE`.

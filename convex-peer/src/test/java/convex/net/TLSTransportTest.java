@@ -139,6 +139,16 @@ public class TLSTransportTest {
 		}
 	}
 
+	/** A TLS connection stops reading while its delivery waits, as a TCP one does. */
+	@Test
+	public void tlsPausesWhileDeliveryWaits() throws Exception {
+		try (NettyServer server=new NettyServer(0)) {
+			server.setSSLContext(serverContext);
+			server.launch();
+			TransportsTest.assertPausesWhileDeliveryWaits(Transports.tls(clientContext),server,endpoint(server.getPort()));
+		}
+	}
+
 	@Test
 	public void certificateAndHostnameAreVerified() throws Exception {
 		try (NettyServer server=new NettyServer(0)) {

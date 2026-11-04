@@ -50,7 +50,7 @@ public class ConvexRemote extends AConvexConnected {
 	}
 
 	private void connectToPeer() throws IOException, TimeoutException, InterruptedException {
-		setConnection(transport.connect(endpoint,returnMessageHandler,maxInboundMessageLength));
+		setConnection(transport.connectWithDelivery(endpoint,returnMessageDelivery,maxInboundMessageLength));
 		remoteAddress=connection.getRemoteAddress();
 	}
 

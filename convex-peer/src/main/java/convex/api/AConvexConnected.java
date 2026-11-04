@@ -5,6 +5,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +25,7 @@ import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.FutureUtils;
+import convex.net.Transport;
 
 /**
  * Abstract base class for connection-oriented Convex client implementations.
@@ -45,17 +48,17 @@ public abstract class AConvexConnected extends Convex {
 	protected volatile AConnection connection;
 
 	/**
-	 * Handler for reverse DATA_REQUEST messages received from the remote endpoint.
+	 * Delivery for reverse DATA_REQUEST messages received from the remote endpoint.
 	 * Null means that this client connection grants no remote data access.
 	 */
-	private volatile Consumer<Message> dataRequestHandler;
+	private volatile Function<Message, Predicate<Message>> dataRequestDelivery;
 
 	/**
-	 * Handler for unsolicited protocol messages received from the remote endpoint.
+	 * Delivery for unsolicited protocol messages received from the remote endpoint.
 	 * Null preserves ordinary client behaviour, where messages other than correlated
 	 * results, challenges and explicitly enabled DATA_REQUESTs are ignored.
 	 */
-	private volatile Consumer<Message> unsolicitedMessageHandler;
+	private volatile Function<Message, Predicate<Message>> unsolicitedMessageDelivery;
 	private volatile Runnable receiveObserver;
 
 	/**
@@ -106,17 +109,19 @@ public abstract class AConvexConnected extends Convex {
 	}
 
 	/**
-	 * Result handler for Messages received back from a connection.
-	 * Delegates result correlation to the originating connection.
+	 * Delivery for Messages received back from a connection. Delegates result
+	 * correlation to the originating connection, auto-responds to server-initiated
+	 * CHALLENGE messages and passes explicitly enabled reverse DATA_REQUEST and
+	 * unsolicited messages to their deliveries.
 	 *
-	 * Also auto-responds to server-initiated CHALLENGE messages and delegates
-	 * explicitly enabled reverse DATA_REQUEST messages.
+	 * <p>Returns the retry such a delivery asks to wait with, for a transport that can
+	 * pause reading, and null for every message that needs no wait.</p>
 	 */
-	protected final Consumer<Message> returnMessageHandler = m-> {
+	protected final Function<Message, Predicate<Message>> returnMessageDelivery = m-> {
 		try {
 			AConnection source=m.getConnection();
-			if (source==null || source!=connection) return;
-			if (source.completeRequest(m)) return;
+			if (source==null || source!=connection) return null;
+			if (source.completeRequest(m)) return null;
 
 			// Built-in reverse messages are embedded and safe to inspect storelessly.
 			// A lattice delta may legitimately reference the node's serving store, so
@@ -124,11 +129,8 @@ public abstract class AConvexConnected extends Convex {
 			try {
 				m.getPayload(null);
 			} catch (Exception e) {
-				Consumer<Message> handler = unsolicitedMessageHandler;
-				if (handler != null) {
-					handler.accept(m);
-					return;
-				}
+				Function<Message, Predicate<Message>> delivery = unsolicitedMessageDelivery;
+				if (delivery != null) return delivery.apply(m);
 				throw e;
 			}
 			MessageType type = m.getType();
@@ -141,21 +143,23 @@ public abstract class AConvexConnected extends Convex {
 				} else if (kp != null) {
 					m.respondToChallenge(kp, null);
 				}
-				return;
-			} else if (type == MessageType.DATA_REQUEST) {
-				Consumer<Message> handler = dataRequestHandler;
-				if (handler != null) {
-					handler.accept(m);
-				}
-				return;
+				return null;
 			}
-
-			Consumer<Message> handler = unsolicitedMessageHandler;
-			if (handler != null) handler.accept(m);
+			Function<Message, Predicate<Message>> delivery =
+				(type == MessageType.DATA_REQUEST) ? dataRequestDelivery : unsolicitedMessageDelivery;
+			return (delivery != null) ? delivery.apply(m) : null;
 		} catch (Exception e) {
 			log.warn("Error in return message handler: {}",e.getMessage());
+			return null;
 		}
 	};
+
+	/**
+	 * Receive action for paths that cannot pause reading, such as a local connection:
+	 * a message a delivery asks to wait for is refused, as
+	 * {@link Transport#withoutPausing(Function)} describes.
+	 */
+	protected final Consumer<Message> returnMessageHandler = Transport.withoutPausing(returnMessageDelivery);
 
 	/**
 	 * Sets the handler for DATA_REQUEST messages initiated by the remote endpoint.
@@ -168,7 +172,29 @@ public abstract class AConvexConnected extends Convex {
 	 * @param handler Data request handler, or null to deny reverse data requests
 	 */
 	public void setDataRequestHandler(Consumer<Message> handler) {
-		this.dataRequestHandler = handler;
+		setDataRequestDelivery(neverWaits(handler));
+	}
+
+	/**
+	 * Sets the delivery for DATA_REQUEST messages initiated by the remote endpoint,
+	 * as {@link #setDataRequestHandler(Consumer)} does, except that it may ask to wait
+	 * by returning a retry. A transport that can pause reading then stops reading this
+	 * connection until the retry, run off the receive thread, takes the request or
+	 * gives up; elsewhere the request is answered with :LOAD. The delivery itself runs
+	 * on the receive thread and must not block.
+	 *
+	 * @param delivery Data request delivery, or null to deny reverse data requests
+	 */
+	public void setDataRequestDelivery(Function<Message, Predicate<Message>> delivery) {
+		this.dataRequestDelivery = delivery;
+	}
+
+	private static Function<Message, Predicate<Message>> neverWaits(Consumer<Message> handler) {
+		if (handler == null) return null;
+		return m -> {
+			handler.accept(m);
+			return null;
+		};
 	}
 
 	/**
@@ -182,7 +208,18 @@ public abstract class AConvexConnected extends Convex {
 	 * @param handler unsolicited message handler, or null to ignore such messages
 	 */
 	public void setUnsolicitedMessageHandler(Consumer<Message> handler) {
-		this.unsolicitedMessageHandler = handler;
+		setUnsolicitedMessageDelivery(neverWaits(handler));
+	}
+
+	/**
+	 * Sets the delivery for unsolicited messages, as
+	 * {@link #setUnsolicitedMessageHandler(Consumer)} does, except that it may ask to
+	 * wait by returning a retry, as {@link #setDataRequestDelivery(Function)} describes.
+	 *
+	 * @param delivery unsolicited message delivery, or null to ignore such messages
+	 */
+	public void setUnsolicitedMessageDelivery(Function<Message, Predicate<Message>> delivery) {
+		this.unsolicitedMessageDelivery = delivery;
 	}
 
 	/**
@@ -291,8 +328,8 @@ public abstract class AConvexConnected extends Convex {
 		}
 		connection = null;
 		verifiedPeer = null;
-		dataRequestHandler = null;
-		unsolicitedMessageHandler = null;
+		dataRequestDelivery = null;
+		unsolicitedMessageDelivery = null;
 		receiveObserver = null;
 	}
 }

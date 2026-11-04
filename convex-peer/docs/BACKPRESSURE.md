@@ -13,6 +13,9 @@ thread, while all other channels continue normally.
 The result: under load, clients experience brief blocking instead of errors. Throughput
 matches processing capacity rather than queue capacity.
 
+A full queue is a reason to wait, never on its own a reason to refuse. `:LOAD` means
+the peer is deliberately shedding work: a policy limit, or a wait that ran out.
+
 ## Architecture
 
 ```
@@ -86,6 +89,15 @@ I/O thread: decode()
                     resume reads
                     flush stranded data
 ```
+
+### Connections a Node Opens
+
+A client connection pauses in the same way when its delivery asks to wait
+(`Transport.connectWithDelivery`, used by `ConvexRemote`). Lattice nodes rely on this
+for requests and messages a peer sends back over a route the node opened; see
+[LATTICE_NETWORKING.md](LATTICE_NETWORKING.md#inbound-pipeline). A transport that
+cannot pause, such as the NIO client whose one selector thread serves every
+connection, answers such a request with `:LOAD` at once and drops anything else.
 
 ### ConvexLocal
 

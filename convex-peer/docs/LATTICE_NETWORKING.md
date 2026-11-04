@@ -257,7 +257,10 @@ authorisation.
 
 Once the listener assigns a socket, all work belongs to that group:
 
-1. The Netty event loop offers the message to the group's bounded queue.
+1. The Netty event loop offers the message to the group's bounded queue. When the
+   queue is full the connection stops reading until there is room. A reply to
+   one of this node's own requests completes as it arrives and never enters the
+   queue.
 2. The endpoint decodes the message against the group's serving store only when
    the connection is trusted; unverified values must already be complete.
 3. Protocol handlers deal with queries, values, DATA, challenges and application
@@ -276,8 +279,11 @@ store, so one group cannot expose another group's private or filtered cache.
 A peer may also send `DATA_REQUEST` over a route this node opened to it. The
 connection manager serves at most `maxDataRequests` of those at once, 16 by
 default, off the network thread. One route may hold a quarter of them, and at
-least one, so a single peer cannot crowd out the rest. Requests beyond either
-limit are answered with a `:LOAD` result.
+least one, so a single peer cannot crowd out the rest. A request beyond either
+limit makes its route stop reading until a permit frees, and is answered with
+`:LOAD` only if none frees within 8 seconds. Values and other messages a peer
+sends over such a route enter the group's queue as they do on an inbound
+connection, and wait for room in the same way.
 
 The correlated response to `LATTICE_VALUE` confirms delivery to the host and
 logical root publication. It does not wait for every propagator group to

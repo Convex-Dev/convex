@@ -152,11 +152,20 @@ public class NettyConnection extends AConnection {
 	/** Disable hostname checks only when the context authenticates an expected peer key. */
 	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction,
 			int maxMessageLength, SSLContext sslContext, boolean verifyHostname) throws InterruptedException, IOException {
-		Function<Message, Predicate<Message>> deliverFn = m -> {
+		return connectWithDelivery(sa, m -> {
 			receiveAction.accept(m);
 			return null;
-		};
-		NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
+		}, maxMessageLength, sslContext, verifyHostname);
+	}
+
+	/**
+	 * Connects with a delivery that may ask to wait by returning a retry, as a
+	 * server connection's does: this connection then stops reading until the retry,
+	 * run on a virtual thread, accepts the message or gives up.
+	 */
+	public static NettyConnection connectWithDelivery(SocketAddress sa, Function<Message, Predicate<Message>> delivery,
+			int maxMessageLength, SSLContext sslContext, boolean verifyHostname) throws InterruptedException, IOException {
+		NettyInboundHandler inbound=new NettyInboundHandler(delivery,null,maxMessageLength);
 		NettyConnection client=new NettyConnection(null,inbound);
 		inbound.setConnection(client);
 		SslHandler ssl;

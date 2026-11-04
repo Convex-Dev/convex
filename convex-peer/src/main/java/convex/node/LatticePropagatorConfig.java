@@ -72,8 +72,9 @@ public final class LatticePropagatorConfig {
 
 	/**
 	 * DATA_REQUESTs served at once over the routes this group opened. One route may
-	 * hold a quarter of them, and at least one; requests beyond either limit are
-	 * answered with a :LOAD result.
+	 * hold a quarter of them, and at least one; a request beyond either limit pauses
+	 * its route until a permit frees, and is answered with :LOAD only if none frees
+	 * within the internal timeout.
 	 */
 	public static final AString MAX_DATA_REQUESTS=Strings.intern("maxDataRequests");
 

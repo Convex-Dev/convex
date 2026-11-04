@@ -166,6 +166,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	 * to pause reads and retry through the returned predicate.
 	 */
 	Predicate<Message> deliver(Message message) {
+		if (completeReply(message)) return null;
 		if (!acceptingInbound) return inboundRejected;
 		if (inboundQueue.offer(message)) {
 			// Shutdown may have drained the queue between the admission check and
@@ -177,19 +178,38 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	/**
+	 * Completes a reply to a request this node sent on the message's connection, as a
+	 * client connection does, so it neither waits in the queue nor takes its space.
+	 * Matching reads only the reply's ID; the requester decodes it on its own thread.
+	 * The reply still counts as traffic for the route's liveness.
+	 */
+	private boolean completeReply(Message message) {
+		AConnection connection=message.getConnection();
+		if (connection==null) return false;
+		try {
+			if (!connection.completeRequest(message)) return false;
+		} catch (BadFormatException e) {
+			return false;
+		}
+		if (connection.isTrusted()) {
+			propagator.getConnectionManager().received(connection.getTrustedKey(),connection);
+		}
+		return true;
+	}
+
+	/**
 	 * Accepts reverse traffic from a manager-owned authenticated outbound route.
 	 * This bypasses physical inbound assignment but not the endpoint's queue or
-	 * protocol validation.
+	 * protocol validation. A full queue asks the route to pause reading and retry,
+	 * as {@link #deliver(Message)} does for an inbound connection.
 	 */
-	void receiveFromManagedOutbound(Convex peer,Message message) {
+	Predicate<Message> receiveFromManagedOutbound(Convex peer,Message message) {
 		AccountKeyBinding binding=AccountKeyBinding.from(peer,message);
 		if (binding==null || propagator.getConnectionManager().getConnection(binding.key())!=peer) {
 			log.debug("Dropped reverse message without current outbound admission");
-			return;
+			return null;
 		}
-		if (deliver(message)!=null) {
-			log.debug("Dropped reverse lattice message because this policy queue is full or stopping");
-		}
+		return deliver(message);
 	}
 
 	/** Starts possession verification for an inbound route owned by this group. */
@@ -660,6 +680,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 	CompletableFuture<?> probe(AConnection connection) {
 		if (connection==null) return CompletableFuture.failedFuture(new IOException("Lattice source connection is closed"));
 		return FutureUtils.map(connection.request(Message.createPing(null),Config.DEFAULT_INTERNAL_TIMEOUT),message -> {
+			// A reply completes undecoded, so the requester decodes it
+			try {
+				message.getPayload(null);
+			} catch (BadFormatException e) {
+				throw new IllegalStateException("Invalid PING response",e);
+			}
 			Result result=message.toResult();
 			if (result.isError() || !(result.getValue() instanceof CVMLong)) {
 				throw new IllegalStateException("Invalid PING response");

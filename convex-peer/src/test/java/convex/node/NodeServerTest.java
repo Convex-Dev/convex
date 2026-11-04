@@ -12,7 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -24,6 +23,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +58,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.Ref;
 import convex.core.message.AConnection;
+import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -1137,136 +1138,126 @@ public class NodeServerTest {
 
 	/**
 	 * Reverse DATA_REQUESTs over every route draw on one pool: with it held by one
-	 * route, another route's request is refused with :LOAD, and served once the
-	 * pool is free again. A permit is free before its reply is sent, so no step
-	 * depends on timing.
+	 * route, another route's request waits rather than being refused, and is served
+	 * once the pool is free again. Each request reports what it needs as it is
+	 * delivered, so no step depends on timing.
 	 */
 	@Test
 	public void testReverseDataRequestsShareOnePool() throws Exception {
 		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore();
-				DataRequestRoutes routes = new DataRequestRoutes(servingStore, 1)) {
+				LatticeConnectionManager manager = new LatticeConnectionManager(servingStore)) {
+			manager.setDataRequestLimit(1);
 			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
 			servingStore.blockedHash = value.getHash();
-			routes.addRoute();
-			routes.addRoute();
+			var route0 = manager.dataRequestDelivery();
+			var route1 = manager.dataRequestDelivery();
+			ScriptedPeer peer = new ScriptedPeer();
 			try {
-				routes.send(0, 81, value.getHash());
-				// Route 0's request reaches the store gate holding the pool's only permit
+				assertNull(route0.apply(dataRequest(81, value, peer)));
+				// Route 0's request holds the pool's only permit at the store gate
 				assertTrue(servingStore.requested.await(5, TimeUnit.SECONDS));
-				routes.send(1, 82, value.getHash());
-				Result refused = routes.result(82);
-				assertEquals(ErrorCodes.LOAD, refused.getErrorCode());
-				assertEquals(CVMLong.create(82), refused.getID());
+				Message waiting = dataRequest(82, value, peer);
+				Predicate<Message> retry = route1.apply(waiting);
+				assertNotNull(retry, "a request finding the pool taken waits rather than being refused");
+				CompletableFuture<Boolean> taken = testAsync(retry, waiting);
 
 				servingStore.release.countDown();
-				assertServed(value, routes.result(81));
-				routes.send(1, 83, value.getHash());
-				assertServed(value, routes.result(83));
+				assertTrue(taken.get(5, TimeUnit.SECONDS));
+				assertServed(value, peer.awaitResult(81));
+				assertServed(value, peer.awaitResult(82));
 			} finally {
 				servingStore.release.countDown();
 			}
 		}
 	}
 
-	/**
-	 * One route holds at most a quarter of the pool, so another route is served
-	 * while the first is refused. Requests on one route take permits in order on its
-	 * receive thread, so no step depends on timing.
-	 */
+	/** One route holds at most a quarter of the pool, so another route is served while the first waits. */
 	@Test
 	public void testReverseDataRequestRouteShare() throws Exception {
 		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore();
-				DataRequestRoutes routes = new DataRequestRoutes(servingStore, 8)) {
+				LatticeConnectionManager manager = new LatticeConnectionManager(servingStore)) {
+			manager.setDataRequestLimit(8);
 			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
 			servingStore.blockedHash = value.getHash();
-			routes.addRoute();
-			routes.addRoute();
+			var route0 = manager.dataRequestDelivery();
+			var route1 = manager.dataRequestDelivery();
+			ScriptedPeer peer = new ScriptedPeer();
 			try {
 				// The first two hold route 0's share of two behind the store gate
-				for (long id = 81; id <= 83; id++) routes.send(0, id, value.getHash());
-				Result refused = routes.result(83);
-				assertEquals(ErrorCodes.LOAD, refused.getErrorCode());
-				assertEquals(CVMLong.create(83), refused.getID());
-				routes.send(1, 84, value.getHash());
+				assertNull(route0.apply(dataRequest(81, value, peer)));
+				assertNull(route0.apply(dataRequest(82, value, peer)));
+				Message third = dataRequest(83, value, peer);
+				Predicate<Message> retry = route0.apply(third);
+				assertNotNull(retry, "a route beyond its share waits though the pool has permits to spare");
+				assertNull(route1.apply(dataRequest(84, value, peer)), "another route is served at once");
+				CompletableFuture<Boolean> taken = testAsync(retry, third);
 
 				servingStore.release.countDown();
-				for (long id : new long[] {81, 82, 84}) assertServed(value, routes.result(id));
-				routes.send(0, 85, value.getHash());
-				assertServed(value, routes.result(85));
+				assertTrue(taken.get(5, TimeUnit.SECONDS));
+				for (long id = 81; id <= 84; id++) assertServed(value, peer.awaitResult(id));
 			} finally {
 				servingStore.release.countDown();
 			}
 		}
+	}
+
+	/** A request that gives up waiting returns what it took, so later requests on its route are served. */
+	@Test
+	public void testAbandonedDataRequestWaitReturnsPermits() throws Exception {
+		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore();
+				LatticeConnectionManager manager = new LatticeConnectionManager(servingStore)) {
+			manager.setDataRequestLimit(1);
+			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
+			servingStore.blockedHash = value.getHash();
+			var route0 = manager.dataRequestDelivery();
+			var route1 = manager.dataRequestDelivery();
+			ScriptedPeer peer = new ScriptedPeer();
+			try {
+				assertNull(route0.apply(dataRequest(81, value, peer)));
+				assertTrue(servingStore.requested.await(5, TimeUnit.SECONDS));
+				Message abandoned = dataRequest(82, value, peer);
+				Predicate<Message> retry = route1.apply(abandoned);
+				assertNotNull(retry);
+				CompletableFuture<Boolean> gaveUp = new CompletableFuture<>();
+				Thread waiter = Thread.ofVirtual().start(() -> gaveUp.complete(retry.test(abandoned)));
+				// Parked only for the pool, so it already holds its route's permit
+				awaitTimedWait(waiter);
+				waiter.interrupt();
+				assertFalse(gaveUp.get(5, TimeUnit.SECONDS), "an interrupted wait gives up");
+
+				servingStore.release.countDown();
+				assertServed(value, peer.awaitResult(81));
+				Message later = dataRequest(83, value, peer);
+				Predicate<Message> laterRetry = route1.apply(later);
+				if (laterRetry != null) assertTrue(laterRetry.test(later));
+				assertServed(value, peer.awaitResult(83));
+			} finally {
+				servingStore.release.countDown();
+			}
+		}
+	}
+
+	private static Message dataRequest(long id, Blob value, AConnection connection) {
+		return Message.createDataRequest(CVMLong.create(id), value.getHash()).withConnection(connection);
+	}
+
+	/** Spins until a thread parks with a timeout, the only wait it can reach here. */
+	private static void awaitTimedWait(Thread thread) {
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+		while (thread.getState() != Thread.State.TIMED_WAITING) {
+			assertTrue(System.nanoTime() < deadline, "the thread should wait for a permit");
+			Thread.onSpinWait();
+		}
+	}
+
+	/** Runs a delivery's retry on its own thread, as a paused connection does. */
+	private static CompletableFuture<Boolean> testAsync(Predicate<Message> retry, Message message) {
+		return CompletableFuture.supplyAsync(() -> retry.test(message), task -> Thread.ofVirtual().start(task));
 	}
 
 	private static void assertServed(Blob value, Result result) {
 		assertFalse(result.isError(), "expected data, got " + result);
 		assertEquals(value, ((AVector<?>) result.getValue()).get(0));
-	}
-
-	/**
-	 * Routes from one manager to peers connected to a requester, which sends
-	 * DATA_REQUESTs back over each route and collects the results by ID.
-	 */
-	private static final class DataRequestRoutes implements AutoCloseable {
-		final LatticeConnectionManager manager;
-		final NettyServer requester = new NettyServer(0);
-		final AStore decodeStore = new MemoryStore();
-		final List<ConvexRemote> peers = new ArrayList<>();
-		final ConcurrentHashMap<ACell, CompletableFuture<AConnection>> connections = new ConcurrentHashMap<>();
-		final ConcurrentHashMap<ACell, CompletableFuture<Message>> results = new ConcurrentHashMap<>();
-
-		DataRequestRoutes(AStore servingStore, int limit) throws IOException, InterruptedException {
-			manager = new LatticeConnectionManager(servingStore);
-			manager.setDataRequestLimit(limit);
-			requester.setReceiveAction(message -> {
-				try {
-					ACell resultID = message.getResultID();
-					if (resultID != null) {
-						future(results, resultID).complete(message);
-					} else {
-						// A route's PING carries its index, naming the connection back over it
-						message.getPayload(null);
-						future(connections, message.getRequestID()).complete(message.getConnection());
-					}
-				} catch (Exception e) {
-					// Leaves the awaited future incomplete, so the test fails on its timeout
-				}
-			});
-			requester.launch();
-		}
-
-		void addRoute() throws Exception {
-			int index = peers.size();
-			ConvexRemote peer = ConvexRemote.connect(requester.getHostAddress());
-			peers.add(peer);
-			manager.addPeer(AKeyPair.generate().getAccountKey(), peer);
-			assertTrue(peer.trySend(Message.createPing(index)));
-		}
-
-		void send(int route, long id, Hash hash) throws Exception {
-			AConnection connection = future(connections, CVMLong.create(route)).get(5, TimeUnit.SECONDS);
-			assertTrue(connection.sendMessage(Message.createDataRequest(CVMLong.create(id), hash)));
-		}
-
-		Result result(long id) throws Exception {
-			Message response = future(results, CVMLong.create(id)).get(5, TimeUnit.SECONDS);
-			response.getPayload(decodeStore);
-			return response.toResult();
-		}
-
-		private static <T> CompletableFuture<T> future(
-				ConcurrentHashMap<ACell, CompletableFuture<T>> futures, ACell id) {
-			return futures.computeIfAbsent(id, k -> new CompletableFuture<T>());
-		}
-
-		@Override
-		public void close() throws Exception {
-			manager.close();
-			for (ConvexRemote peer : peers) peer.close();
-			requester.close();
-			decodeStore.close();
-		}
 	}
 
 	/**
@@ -1634,7 +1625,11 @@ public class NodeServerTest {
 		volatile boolean closed = false;
 
 		ScriptedPeer() {
-			setTrustedKey(AKeyPair.generate().getAccountKey());
+			this(AKeyPair.generate().getAccountKey());
+		}
+
+		ScriptedPeer(AccountKey key) {
+			setTrustedKey(key);
 		}
 
 		@Override public boolean sendMessage(Message msg) {
@@ -1860,6 +1855,84 @@ public class NodeServerTest {
 			assertEquals(CVMLong.create(42), nextAnnounce.get(10, TimeUnit.SECONDS));
 			assertTrue(faulting.closed, "the connection responsible for the Error must be closed");
 			assertTrue(node.isRunning(), "a recoverable message Error must not stop the node");
+		}
+	}
+
+	/**
+	 * A reply to this node's own request on a connection opened to it completes as it
+	 * arrives, without waiting behind messages the group has yet to process.
+	 */
+	@Test
+	public void testReplyCompletesWhileGroupIsBusy() throws Exception {
+		BlockingMessage blocking = new BlockingMessage();
+		ScriptedPeer peer = new ScriptedPeer();
+		try (NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), store)) {
+			LatticePropagator propagator=propagator(node);
+			node.launch();
+			try {
+				assertNull(propagator.deliverIncomingMessage(blocking));
+				assertTrue(blocking.entered.await(5, TimeUnit.SECONDS), "the group's processing thread is held");
+
+				CompletableFuture<Message> reply = peer.request(Message.createPing(null), 5000);
+				Message request = peer.requests.poll(5, TimeUnit.SECONDS);
+				assertNotNull(request);
+				Message response = Message.createResult(Result.create(request.getRequestID(), CVMLong.ONE)).withConnection(peer);
+				assertNull(propagator.deliverIncomingMessage(response));
+				assertTrue(reply.isDone(), "the reply must not wait for the group's processing thread");
+			} finally {
+				// Before the node closes, which would otherwise wait for the held thread
+				blocking.release.countDown();
+			}
+		}
+	}
+
+	/**
+	 * A value pushed over a route this node opened waits for room in the group's
+	 * queue, as one over a connection opened to the node does, rather than being dropped.
+	 */
+	@Test
+	public void testPushedValueWaitsForQueueSpace() throws Exception {
+		AKeyPair aliceKey = AKeyPair.generate();
+		AKeyPair bobKey = AKeyPair.generate();
+		MaxLattice lattice = MaxLattice.create();
+		BlockingMessage blocking = new BlockingMessage();
+		try (MemoryStore aliceStore = new MemoryStore(); MemoryStore bobStore = new MemoryStore()) {
+			LatticePropagator aliceGroup = new LatticePropagator(aliceStore, LatticePropagatorConfig.create(Maps.of(
+				LatticePropagatorConfig.INBOUND_QUEUE_SIZE, CVMLong.ONE)));
+			LatticePropagator bobGroup = new LatticePropagator(bobStore, LatticePropagatorConfig.create());
+			aliceGroup.setTransportSigner(ChallengeSigner.create(aliceKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT));
+			bobGroup.setTransportSigner(ChallengeSigner.create(bobKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT));
+			try (var alice = new NodeServer<>(RelayHost.open(lattice, aliceStore), NodeConfig.port(-1));
+					var bob = new NodeServer<>(RelayHost.open(lattice, bobStore), NodeConfig.localNetwork());
+					var listener = new LatticeListener(NodeConfig.localNetwork())) {
+				alice.addPropagator(aliceGroup);
+				bob.addPropagator(bobGroup);
+				listener.registerPropagator(bobGroup);
+				listener.setSelector(connection -> bobGroup);
+				alice.launch();
+				bob.launch();
+				listener.launch();
+				Convex route = aliceGroup.getConnectionManager().connectPeer(bobKey.getAccountKey(),
+					new InetSocketAddress("localhost", listener.getPort())).get(5, TimeUnit.SECONDS);
+
+				Predicate<Message> retry;
+				ScriptedPeer fromBob = new ScriptedPeer(bobKey.getAccountKey());
+				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, CVMLong.create(7), Vectors.empty(), CVMLong.create(7));
+				Message pushed = Message.create(MessageType.LATTICE_VALUE, payload).withConnection(fromBob);
+				try {
+					// Hold Alice's processing thread, then fill her one-message queue
+					assertNull(aliceGroup.deliverIncomingMessage(blocking));
+					assertTrue(blocking.entered.await(5, TimeUnit.SECONDS));
+					assertNull(aliceGroup.deliverIncomingMessage(latticeValue(CVMLong.ONE, null)));
+					retry = aliceGroup.receiveFromManagedOutbound(route, pushed);
+					assertNotNull(retry, "a full queue asks the route to wait rather than dropping the value");
+				} finally {
+					// Before the nodes close, which would otherwise wait for the held thread
+					blocking.release.countDown();
+				}
+				assertTrue(retry.test(pushed));
+				assertFalse(fromBob.awaitResult(7).isError(), "the pushed value is merged and answered");
+			}
 		}
 	}
 

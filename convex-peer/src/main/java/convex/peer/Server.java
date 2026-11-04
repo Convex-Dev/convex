@@ -127,9 +127,8 @@ public class Server implements Closeable {
 		Predicate<Message> retry = deliverMessage(m);
 		if (retry != null) {
 			if (!retry.test(m)) {
-				Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD).withSource(SourceCodes.PEER);
 				try {
-					m.returnResult(r);
+					m.returnResult(Result.SERVER_LOADED);
 				} catch (Exception e) {
 					// best effort
 				}

@@ -8,12 +8,9 @@ import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.ErrorCodes;
 import convex.core.Result;
-import convex.core.SourceCodes;
 import convex.core.cpos.CPoSConstants;
 import convex.core.data.Blob;
-import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
@@ -236,11 +233,8 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 						boolean delivered = retry.test(m);
 						if (!delivered) {
 							// Timeout — return :LOAD error
-							Result r = Result.create(m.getID(),
-								Strings.SERVER_LOADED, ErrorCodes.LOAD)
-								.withSource(SourceCodes.PEER);
 							try {
-								m.returnResult(r);
+								m.returnResult(Result.SERVER_LOADED);
 							} catch (Exception e) {
 								// best effort
 							}
@@ -255,12 +249,14 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 						// buffer. When decode() returned early (backpressured gate),
 						// any bytes already read from the socket stay in cumulation.
 						// Re-enabling autoRead only helps if NEW data arrives on
-						// the socket. To process already-buffered data, we fire a
-						// synthetic channelRead with an empty buffer — this triggers
-						// ByteToMessageDecoder.callDecode() on the existing cumulation.
+						// the socket. To process already-buffered data, we give this
+						// decoder a synthetic channelRead with an empty buffer, which
+						// triggers ByteToMessageDecoder.callDecode() on the existing
+						// cumulation. It goes to this handler directly: fired from the
+						// pipeline head, a TLS handler would consume it as ciphertext.
 						ctx.channel().eventLoop().execute(() -> {
 							try {
-								ctx.pipeline().fireChannelRead(Unpooled.EMPTY_BUFFER);
+								channelRead(ctx, Unpooled.EMPTY_BUFFER);
 							} catch (Exception e) {
 								ctx.fireExceptionCaught(e);
 							}

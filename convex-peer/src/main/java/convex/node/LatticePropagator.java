@@ -624,6 +624,11 @@ public class LatticePropagator implements Closeable {
 		requireEndpoint().handle(message);
 	}
 
+	/** Delivers reverse traffic from an admitted outbound route as the connection manager does, for package tests. */
+	Predicate<Message> receiveFromManagedOutbound(Convex peer,Message message) {
+		return requireEndpoint().receiveFromManagedOutbound(peer,message);
+	}
+
 	private LatticeProtocolEndpoint requireEndpoint() {
 		LatticeProtocolEndpoint result=endpoint;
 		if (result==null) throw new IllegalStateException("Propagator is not attached to a NodeServer");
@@ -849,7 +854,7 @@ public class LatticePropagator implements Closeable {
 		LatticeProtocolEndpoint protocol=endpoint;
 		try {
 			if (protocol!=null) {
-				connectionManager.setPeerMessageHandler((peer,message) ->
+				connectionManager.setPeerMessageDelivery((peer,message) ->
 					protocol.receiveFromManagedOutbound(peer,message));
 			}
 			connectionManager.start();

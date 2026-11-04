@@ -20,9 +20,11 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -31,10 +33,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.AConvexConnected;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
-import convex.core.ErrorCodes;
-import convex.core.Result;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -49,6 +48,7 @@ import convex.core.util.Utils;
 import convex.net.PeerTarget;
 import convex.net.Transports;
 import convex.peer.AConnectionManager;
+import convex.peer.Config;
 
 /**
  * Maintains connection intent and outbound routes for one
@@ -150,9 +150,6 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** A route's share of the data request pool is the pool divided by this, so several routes are always served. */
 	static final int DATA_REQUEST_ROUTE_SHARES = 4;
 
-	private static final Result DATA_REQUEST_LOAD=Result.error(ErrorCodes.LOAD,
-		"Lattice data request capacity exhausted");
-
 	// ========== State ==========
 
 	/**
@@ -226,7 +223,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private volatile ChallengeSigner challengeSigner;
 
 	/** Delivery hook for reverse messages arriving on admitted outbound clients. */
-	private volatile BiConsumer<Convex, Message> peerMessageHandler;
+	private volatile BiFunction<Convex, Message, Predicate<Message>> peerMessageDelivery;
 
 	/** Lifecycle hook for application protocols to initialise every admitted peer. */
 	private volatile BiConsumer<AccountKey,Convex> peerAdmissionHandler;
@@ -494,7 +491,22 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * @param handler handler receiving the owning client and message, or null
 	 */
 	public void setPeerMessageHandler(BiConsumer<Convex, Message> handler) {
-		this.peerMessageHandler = handler;
+		setPeerMessageDelivery((handler==null) ? null : (peer,message) -> {
+			handler.accept(peer,message);
+			return null;
+		});
+	}
+
+	/**
+	 * Sets the delivery hook for unsolicited messages arriving on an admitted
+	 * manager-owned outbound client, as {@link #setPeerMessageHandler(BiConsumer)}
+	 * does, except that it may ask to wait by returning a retry, which pauses that
+	 * route's reading until the retry accepts the message or gives up.
+	 *
+	 * @param delivery delivery receiving the owning client and message, or null
+	 */
+	public void setPeerMessageDelivery(BiFunction<Convex, Message, Predicate<Message>> delivery) {
+		this.peerMessageDelivery = delivery;
 	}
 
 	/**
@@ -556,8 +568,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/**
 	 * Configures how many reverse DATA_REQUESTs from admitted peers are served at
 	 * once, and so each route's share of them, a quarter of that and at least one.
-	 * A request beyond either is answered with a :LOAD result. Requests already
-	 * being served keep their permits, and routes admitted earlier keep their share.
+	 * A request beyond either waits, pausing its route, and is answered with :LOAD
+	 * only if no permit frees within the internal timeout. Requests already being
+	 * served keep their permits, and routes admitted earlier keep their share.
 	 *
 	 * @param limit maximum data requests served concurrently
 	 */
@@ -1363,10 +1376,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 		convex.setStore(store);
 		if (convex instanceof AConvexConnected connected) {
 			connected.setReceiveObserver(() -> received(convex.getVerifiedPeer(),convex));
-			connected.setDataRequestHandler(dataRequestHandler());
-			connected.setUnsolicitedMessageHandler(message -> {
-				BiConsumer<Convex, Message> handler = peerMessageHandler;
-				if (handler != null) handler.accept(convex, message);
+			connected.setDataRequestDelivery(dataRequestDelivery());
+			connected.setUnsolicitedMessageDelivery(message -> {
+				BiFunction<Convex, Message, Predicate<Message>> delivery = peerMessageDelivery;
+				return (delivery != null) ? delivery.apply(convex, message) : null;
 			});
 		}
 	}
@@ -1375,37 +1388,71 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private void restrictOutboundToLimbo(Convex convex) {
 		configureReceiveLimit(convex, false);
 		if (convex instanceof AConvexConnected connected) {
-			connected.setDataRequestHandler(null);
-			connected.setUnsolicitedMessageHandler(null);
+			connected.setDataRequestDelivery(null);
+			connected.setUnsolicitedMessageDelivery(null);
 		}
-	}
-
-	/** Creates the data request handler for one route, holding that route's share of the pool. */
-	private Consumer<Message> dataRequestHandler() {
-		Semaphore route=new Semaphore(Math.max(1,dataRequestLimit/DATA_REQUEST_ROUTE_SHARES));
-		return message -> handleDataRequest(message,route);
 	}
 
 	/**
-	 * Hands store access off the network receive thread. Announce completes before a
+	 * Creates the data request delivery for one route, holding that route's share of
+	 * the pool. A request that finds a permit taken asks to wait, pausing the route.
+	 */
+	Function<Message, Predicate<Message>> dataRequestDelivery() {
+		Semaphore route=new Semaphore(Math.max(1,dataRequestLimit/DATA_REQUEST_ROUTE_SHARES));
+		Predicate<Message> retry=message -> awaitDataRequest(message,route);
+		return message -> tryDataRequest(message,route) ? null : retry;
+	}
+
+	/**
+	 * Hands store access off the network receive thread if a permit from the route's
+	 * share and one from the pool are free at once. Announce completes before a
 	 * propagator broadcasts, so every cell referenced by that update is already
 	 * serviceable from this exact store.
-	 *
-	 * <p>Each request takes a permit from its route's share and one from the pool.
-	 * When either has none free the peer is told the node is loaded, without waiting
-	 * on the receive thread.</p>
 	 */
-	private void handleDataRequest(Message message,Semaphore route) {
-		if (!route.tryAcquire()) {
-			refuseDataRequest(message);
-			return;
-		}
+	private boolean tryDataRequest(Message message,Semaphore route) {
+		if (!route.tryAcquire()) return false;
 		Semaphore pool=dataRequestPermits;
 		if (!pool.tryAcquire()) {
 			route.release();
-			refuseDataRequest(message);
-			return;
+			return false;
 		}
+		startDataRequest(message,route,pool);
+		return true;
+	}
+
+	/**
+	 * Waits for the permits a request found taken, off the receive thread while its
+	 * route is paused, as the group queue waits for space. Gives up after the internal
+	 * timeout or on interrupt, when the peer is told the node is loaded. A request
+	 * whose route closed meanwhile is dropped: an admitted route never returns to
+	 * verification limbo, so closing is the only way it can go stale.
+	 */
+	private boolean awaitDataRequest(Message message,Semaphore route) {
+		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(Config.DEFAULT_INTERNAL_TIMEOUT);
+		boolean routeHeld=false;
+		try {
+			routeHeld=route.tryAcquire(Config.DEFAULT_INTERNAL_TIMEOUT,TimeUnit.MILLISECONDS);
+			if (!routeHeld) return false;
+			Semaphore pool=dataRequestPermits;
+			if (!pool.tryAcquire(Math.max(0,deadline-System.nanoTime()),TimeUnit.NANOSECONDS)) return false;
+			routeHeld=false;
+			AConnection connection=message.getConnection();
+			if (connection==null || connection.isClosed()) {
+				pool.release();
+				route.release();
+				return true;
+			}
+			startDataRequest(message,route,pool);
+			return true;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		} finally {
+			if (routeHeld) route.release();
+		}
+	}
+
+	private void startDataRequest(Message message,Semaphore route,Semaphore pool) {
 		try {
 			Thread.ofVirtual().name("Lattice data request").start(() -> serveDataRequest(message,route,pool));
 		} catch (Throwable t) {
@@ -1432,17 +1479,6 @@ public class LatticeConnectionManager extends AConnectionManager {
 			log.warn("Ignoring malformed lattice DATA_REQUEST: {}", e.getMessage());
 		} catch (Exception e) {
 			log.warn("Unable to serve lattice DATA_REQUEST", e);
-		}
-	}
-
-	private static void refuseDataRequest(Message message) {
-		ACell id=message.getRequestID();
-		if (id==null || message.getConnection()==null) {
-			log.debug("Dropped lattice DATA_REQUEST: data request capacity exhausted");
-			return;
-		}
-		if (!message.returnMessage(Message.createResult(DATA_REQUEST_LOAD.withID(id)))) {
-			log.debug("Unable to refuse lattice DATA_REQUEST: peer send buffer is full");
 		}
 	}
 
