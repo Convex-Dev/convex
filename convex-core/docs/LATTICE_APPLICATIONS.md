@@ -169,6 +169,11 @@ across its regions or a private copy of the whole root, extends
 `ALatticeApplication`, holding a region container where that helps. The host
 registers either, since it takes any root component.
 
+Building an application does not register it. The main class does both in one
+expression, `host.addApplication(new App(host, …))`. A component built over the
+host's cursor but never registered is a view: it reads and writes the root, but
+the host delivers nothing to it.
+
 Components must tolerate their destination changing through another view,
 publication or incoming merge. Live views observe shared changes directly;
 staged views reconcile when they publish. Keeping a component open does not
