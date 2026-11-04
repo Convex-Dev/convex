@@ -589,8 +589,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * its publication, sending what the host has published to connected peers within
 	 * its shutdown timeout, and closes its routes. Does not publish pending host edits
 	 * or flush its store; saving belongs to the owning host/service lifecycle, which
-	 * closes the host first so peers receive its final checkpoint. See
-	 * convex-peer/docs/SHUTDOWN.md.
+	 * checkpoints the host before closing the node so peers receive that checkpoint.
+	 * See convex-peer/docs/SHUTDOWN.md.
 	 */
 	@Override
 	public void close() throws IOException {

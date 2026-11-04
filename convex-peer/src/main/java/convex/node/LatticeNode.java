@@ -353,8 +353,8 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	/**
 	 * Closes every listener for good, then the server, which sends what the host has
 	 * published and detaches from the host. Both steps always run; the first failure
-	 * is thrown, with any later one suppressed. A service closes its host first, so
-	 * peers receive the host's final checkpoint; see convex-peer/docs/SHUTDOWN.md.
+	 * is thrown, with any later one suppressed. A service checkpoints its host before
+	 * closing the node, so peers receive that checkpoint; see convex-peer/docs/SHUTDOWN.md.
 	 */
 	@Override
 	public void close() throws IOException {

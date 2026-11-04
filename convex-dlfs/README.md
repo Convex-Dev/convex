@@ -256,12 +256,14 @@ Networked bootstrap supplies the host; the DLFS component API is unchanged:
 
 ```java
 NodeConfig nodeConfig = NodeConfig.port(0);
-var host = LatticeHost.open(store);
-var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
-    Utils::getCurrentTimestampCell, 30_000,
-    Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
 var did = DID.forKey(myKeyPair.getAccountKey());
-try (store; var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPair).launch(); host) {
+try (store;
+     var host = LatticeHost.open(store);
+     var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPair)) {
+    var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
+        Utils::getCurrentTimestampCell, 30_000,
+        Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
+    network.launch();
     var group = network.createPropagator();
     network.serveAllInbound(group); // explicitly allow inbound access to this view
 
@@ -284,7 +286,8 @@ try (store; var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, m
         // Run the application's service loop here, until shutdown is requested.
     }
     routes.sync();
-} // closes the host (final checkpoint, sent to peers), the network, then the store
+    host.checkpoint(); // saved, and sent to peers as the network closes
+} // closes the network, the host, then the store
 ```
 
 The propagator inherits the node's identity key and can be configured with peers

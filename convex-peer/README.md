@@ -203,8 +203,8 @@ affects future groups only.
 
 The node closes its listeners, groups and server, leaving the host and its
 caller-owned store usable. A service shuts down with
-`try (store; network; host) { app.sync(); }`, which closes the host before the
-network, so peers receive its final checkpoint; see [shutdown](docs/SHUTDOWN.md).
+`try (store; host; network) { app.sync(); host.checkpoint(); }`, so the network
+sends the final checkpoint to peers as it closes; see [shutdown](docs/SHUTDOWN.md).
 A host sync persists and schedules propagation;
 group announcement completes asynchronously. See the
 [reading-list example](src/test/java/convex/node/app/ReadingListApplicationTest.java)

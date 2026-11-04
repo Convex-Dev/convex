@@ -171,9 +171,9 @@ explicitly. Networking does not install a durability worker or shutdown hook.
 The application opens any `LatticeListener` only after node launch has prepared
 the attached propagation endpoints.
 
-Shutdown syncs drafts, then closes the host, the node and the store, as
-`try (store; node; host) { application.sync(); }` does; see
-[shutdown](SHUTDOWN.md).
+Shutdown syncs drafts and checkpoints the host, then closes the node, the host and
+the store, as `try (store; host; node) { application.sync(); host.checkpoint(); }`
+does; see [shutdown](SHUTDOWN.md).
 
 ## Waiting in tests and applications
 

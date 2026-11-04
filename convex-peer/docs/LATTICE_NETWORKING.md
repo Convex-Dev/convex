@@ -128,9 +128,10 @@ transport.setSelector(connection -> publicGroup);
 node.launch();
 transport.launch();
 
-// Shutdown (see SHUTDOWN.md): closes the host, then the node, then the store
-try (nodeStore; node; var host = node.getHost()) {
+// Shutdown (see SHUTDOWN.md): saves, then closes the node, the host and the store
+try (nodeStore; var host = node.getHost(); node) {
     transport.close();
+    host.checkpoint();
 }
 ```
 

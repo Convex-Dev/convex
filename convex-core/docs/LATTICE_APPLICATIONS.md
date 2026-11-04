@@ -339,8 +339,8 @@ many edits share a signature.
 The service chooses when to promise durability. It can checkpoint before
 acknowledging a durable request or batch flushes when delayed durability is
 acceptable. Background flushing processes already-retained state and must expose
-failures. Service shutdown keeps every accepted change in a final checkpoint and
-sends it to peers before the store closes; see
+failures. At shutdown the service saves what it keeps in a final checkpoint, which
+its node sends to peers as it closes; see
 [shutdown](../../convex-peer/docs/SHUTDOWN.md).
 
 Separating these boundaries avoids forcing every edit to pay for a disk barrier

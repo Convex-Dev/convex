@@ -205,9 +205,10 @@ server.launch();
 Connection conn = cdb.getConnection("market");
 // ... use conn ...
 
-// Shutdown (see convex-peer/docs/SHUTDOWN.md): closes the host, the server, the store
-try (store; server; host) {
+// Shutdown (see convex-peer/docs/SHUTDOWN.md): saves, then closes the server, the host, the store
+try (store; host; server) {
     conn.close();
+    host.checkpoint();
 }
 ```
 

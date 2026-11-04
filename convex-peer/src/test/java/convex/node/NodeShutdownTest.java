@@ -14,17 +14,21 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Blobs;
+import convex.core.data.Sets;
 import convex.core.store.MemoryStore;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
 
-/** Service shutdown: sync drafts, close the host, then close the node (#778). */
+/**
+ * Service shutdown: sync drafts and checkpoint the host, then close in reverse of
+ * opening, the node before the host before the store (#778).
+ */
 class NodeShutdownTest {
 
 	/**
-	 * A draft synced at shutdown is saved by the host's final checkpoint, which the
-	 * still-attached node sends to a connected peer as it closes.
+	 * A draft synced and checkpointed at shutdown is saved, and the still-running node
+	 * sends that checkpoint to a connected peer as it closes.
 	 */
 	@Test void finalCheckpointReachesConnectedPeer() throws Exception {
 		AKeyPair senderKey=AKeyPair.createSeeded(7781);
@@ -34,11 +38,11 @@ class NodeShutdownTest {
 		SetLattice<ACell> lattice=SetLattice.create();
 		try (var senderStore=new MemoryStore();
 				var receiverStore=new MemoryStore()) {
-			LatticeHost<ASet<ACell>> senderHost=LatticeHost.open(lattice.zero(),senderStore);
-			var app=senderHost.addApplication(new LatticeComponent<>(lattice,senderHost.cursor().fork()));
 			LatticeHost<ASet<ACell>> receiverHost=RelayHost.open(lattice,receiverStore);
 			try (var receiver=new LatticeNode<>(receiverHost,NodeConfig.port(0));
+					var senderHost=LatticeHost.open(lattice.zero(),senderStore);
 					var sender=new LatticeNode<>(senderHost,NodeConfig.port(0))) {
+				var app=senderHost.addApplication(new LatticeComponent<>(lattice,senderHost.cursor().fork()));
 				receiver.setIdentity(DID.forKey(receiverKey.getAccountKey()),receiverKey).launch();
 				LatticePropagator receiverGroup=receiver.createPropagator();
 				receiver.serveAllInbound(receiverGroup);
@@ -56,13 +60,37 @@ class NodeShutdownTest {
 				app.sync();
 				assertFalse(senderStore.<ASet<ACell>>getRootData().contains(draft),
 					"application sync alone neither saves nor publishes");
-				senderHost.close();
+				senderHost.checkpoint();
 				assertTrue(senderStore.<ASet<ACell>>getRootData().contains(draft));
 				sender.close();
 
 				received.get(10,TimeUnit.SECONDS);
 				assertTrue(receiverHost.cursor().get().contains(draft));
 			}
+		}
+	}
+
+	/**
+	 * Live state merged after the final checkpoint, as a peer's merge arriving while
+	 * the node closes would be, is saved when the host closes after the node.
+	 */
+	@Test void liveMergeAfterCheckpointIsSavedByHostClose() throws Exception {
+		SetLattice<ACell> lattice=SetLattice.create();
+		ACell early=Blobs.createRandom(new Random(7783),100);
+		ACell late=Blobs.createRandom(new Random(7784),100);
+		try (var store=new MemoryStore()) {
+			try (var host=LatticeHost.open(lattice.zero(),store);
+					var node=new LatticeNode<>(host,NodeConfig.port(0))) {
+				host.addApplication(new LatticeComponent<>(lattice,host.cursor()));
+				node.launch();
+				host.merge(Sets.of(early));
+				host.checkpoint();
+				host.merge(Sets.of(late));
+				assertFalse(store.<ASet<ACell>>getRootData().contains(late));
+			} // closes the node, then the host
+			ASet<ACell> saved=store.getRootData();
+			assertTrue(saved.contains(early));
+			assertTrue(saved.contains(late),"the host's close saves what arrived after the checkpoint");
 		}
 	}
 }

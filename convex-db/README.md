@@ -45,8 +45,8 @@ try (var store = EtchStore.create(file);
 durability barrier. Closing the host does so once more, then the store closes.
 For batched saving, use `host.sync()` after accepted edits and scope
 `host.autoFlush(interval)` around the service lifetime; closing the host stops
-it. With a `NodeServer`, stop request handling, close the host, then close the
-server, which sends the host's final checkpoint to peers. Closing a `NodeServer`
+it. With a `NodeServer`, stop request handling and checkpoint, then close the
+server, which sends that checkpoint to peers, then the host. Closing a `NodeServer`
 saves nothing itself. See the
 executable local and JDBC reopen scenarios in
 [`ConvexDBPersistenceTest`](src/test/java/convex/db/ConvexDBPersistenceTest.java).
