@@ -34,6 +34,13 @@ not lose the drafts. A service without drafts leaves out the sync. A node assemb
 from `NodeServer` and `LatticeListener` closes its listeners before the
 `NodeServer`.
 
+## What each close stops
+
+Each close must stop everything its component started: it interrupts the threads
+it runs, polling loops included, shuts down its executors, cancels its timers and
+releases the resources it owns. Once a close returns, nothing the component started
+may keep the JVM from exiting or do work that is no longer needed.
+
 ## What each close leaves alone
 
 - Closing the host neither syncs applications nor closes the store. A closed host
