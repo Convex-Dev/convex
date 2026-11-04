@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -38,6 +39,8 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.net.PeerConnectionException;
+import convex.net.PeerRefusedException;
 import convex.net.PeerTarget;
 
 /** Exercises real maintenance and admission using controlled time and transport completion. */
@@ -218,7 +221,7 @@ public class LatticeConnectionManagerTest {
 		manager.releasePeer(seed);
 		assertSame(inbound,manager.getUpgradedInboundConnection(seed),"the route the peer opened stays");
 		assertFalse(inbound.isClosed());
-		assertTrue(connecting.isCompletedExceptionally(),"the intent is withdrawn");
+		assertTrue(connecting.isCancelled(),"the intent is withdrawn, so the wait is abandoned");
 
 		AccountKey named=AKeyPair.createSeeded(101).getAccountKey();
 		manager.addPeer(named);
@@ -255,8 +258,8 @@ public class LatticeConnectionManagerTest {
 		fill(1);
 		assertFalse(fresh.isDone(),"the slot is filled");
 		manager.close();
-		assertTrue(fresh.isCompletedExceptionally());
-		assertTrue(manager.whenStarved().isCompletedExceptionally());
+		assertTrue(fresh.isCancelled(),"closing abandons the wait");
+		assertTrue(manager.whenStarved().isCancelled());
 	}
 
 	/** A named peer released with its route kept becomes an ordinary peer that fills a slot. */
@@ -795,10 +798,18 @@ public class LatticeConnectionManagerTest {
 			assertTrue(manager.endpointDials.isEmpty(),"a failed attempt waits for its backoff");
 			now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
 		}
-		assertTrue(connecting.isCompletedExceptionally());
+		Throwable failure=failure(connecting);
+		assertInstanceOf(PeerConnectionException.class,failure);
+		assertFalse(failure instanceof PeerRefusedException,"unreachable, not refused");
+		assertInstanceOf(java.net.ConnectException.class,failure.getCause(),"the network error is kept");
 		manager.maintainConnections();
 		assertTrue(manager.endpointDials.isEmpty(),"the intent is dropped");
 		assertTrue(manager.getDesiredPeers().isEmpty());
+	}
+
+	/** The error a failed future reports to a caller. */
+	private static Throwable failure(CompletableFuture<?> future) {
+		return assertThrows(CompletionException.class,future::join).getCause();
 	}
 
 	/** A node that proves no key, as one refusing the challenge does, is never admitted. */
@@ -812,7 +823,7 @@ public class LatticeConnectionManagerTest {
 			assertFalse(refusing.isConnected(),"the client that proved nothing is closed");
 			now.addAndGet(LatticeConnectionManager.MAX_BACKOFF_MS);
 		}
-		assertTrue(connecting.isCompletedExceptionally());
+		assertInstanceOf(PeerRefusedException.class,failure(connecting));
 		assertEquals(0,manager.getConnectionCount());
 		assertTrue(manager.getDesiredPeers().isEmpty());
 	}
@@ -831,7 +842,9 @@ public class LatticeConnectionManagerTest {
 			}
 		};
 		manager.endpointDials.remove(ENDPOINT).complete(dropping);
-		assertTrue(connecting.isCompletedExceptionally());
+		Throwable failure=failure(connecting);
+		assertInstanceOf(PeerConnectionException.class,failure);
+		assertFalse(failure instanceof PeerRefusedException,"dropped, not refused");
 		assertFalse(manager.getDesiredPeers().containsKey(remote));
 		manager.maintainConnections();
 		assertTrue(manager.dials.isEmpty(),"nothing is left to dial");
@@ -845,29 +858,33 @@ public class LatticeConnectionManagerTest {
 		manager.maintainConnections();
 		IdentifyingPeer self=new IdentifyingPeer(own.getAccountKey());
 		manager.endpointDials.remove(ENDPOINT).complete(self);
-		assertTrue(connecting.isCompletedExceptionally());
+		assertInstanceOf(PeerRefusedException.class,failure(connecting));
 		assertFalse(self.isConnected());
 		assertNull(manager.getConnection(own.getAccountKey()));
 		assertTrue(manager.getDesiredPeers().isEmpty());
 	}
 
-	/** Without a key of its own the manager cannot challenge, so it refuses at once, as for an unknown transport. */
+	/**
+	 * Without a key of its own the manager cannot challenge, so it refuses at once, as for
+	 * an unknown transport: misuse, reported unchecked, not as a connection failure.
+	 */
 	@Test public void testEndpointNeedsAKeyPairAndATransport() {
-		assertTrue(manager.connectPeer(ENDPOINT).isCompletedExceptionally());
+		assertInstanceOf(IllegalStateException.class,failure(manager.connectPeer(ENDPOINT)));
 		manager.setKeyPair(AKeyPair.createSeeded(200));
-		assertTrue(manager.connectPeer(URI.create("https://localhost:1")).isCompletedExceptionally());
+		assertInstanceOf(IllegalArgumentException.class,failure(manager.connectPeer(URI.create("https://localhost:1"))));
 		manager.maintainConnections();
 		assertTrue(manager.endpointDials.isEmpty());
 	}
 
-	/** Closing fails a waiting endpoint, and a client opened after close is closed, not admitted. */
+	/** Closing abandons a waiting endpoint, and a client opened after close is closed, not admitted. */
 	@Test public void testCloseFailsEndpointIntents() {
 		manager.setKeyPair(AKeyPair.createSeeded(200));
 		CompletableFuture<Convex> connecting=manager.connectPeer(ENDPOINT);
 		manager.maintainConnections();
 		CompletableFuture<Convex> inFlight=manager.endpointDials.remove(ENDPOINT);
 		manager.close();
-		assertTrue(connecting.isCompletedExceptionally());
+		assertTrue(connecting.isCancelled());
+		assertTrue(manager.connectPeer(ENDPOINT).isCancelled(),"a closed manager abandons a new attempt");
 		IdentifyingPeer late=new IdentifyingPeer(AKeyPair.createSeeded(201).getAccountKey());
 		inFlight.complete(late);
 		assertFalse(late.isConnected());

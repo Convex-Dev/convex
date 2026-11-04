@@ -158,8 +158,8 @@ public class PeerResolver {
 	 * and where it is are checked again each time.
 	 *
 	 * @param name parsed peer name
-	 * @return future completing with the target, or failing with the reason it could
-	 *         not be resolved
+	 * @return future completing with the target, or failing with a
+	 *         {@link PeerConnectionException} saying why it could not be resolved
 	 */
 	public CompletableFuture<PeerTarget> resolve(PeerName name) {
 		AString label=Strings.create(name.toString());
@@ -174,26 +174,34 @@ public class PeerResolver {
 		try {
 			resolution=dids.resolve(did);
 		} catch (RuntimeException e) {
-			resolution=CompletableFuture.completedFuture(DIDResolution.error(DIDResolution.INTERNAL_ERROR,e.getMessage()));
+			// A DID resolver reports what it cannot resolve in its result: this is a fault
+			resolution=CompletableFuture.failedFuture(e);
 		}
-		return resolution.thenApply(r -> target(label,did,name.key(),r));
+		return resolution.thenCompose(r -> {
+			try {
+				return CompletableFuture.completedFuture(target(label,did,name.key(),r));
+			} catch (PeerConnectionException e) {
+				return CompletableFuture.failedFuture(e);
+			}
+		});
 	}
 
 	/** Reads a resolved DID document as a peer target. */
-	private PeerTarget target(AString label,AString did,AccountKey expected,DIDResolution resolution) {
+	private PeerTarget target(AString label,AString did,AccountKey expected,DIDResolution resolution)
+			throws PeerConnectionException {
 		if (resolution.getErrorType()!=null) {
-			throw new IllegalStateException("Cannot resolve peer "+did+": "+resolution);
+			throw new PeerConnectionException("Cannot resolve peer "+did+": "+resolution);
 		}
 		AMap<AString,ACell> document=resolution.getDocument();
 		if (resolution.isDeactivated() || document==null) {
-			throw new IllegalStateException("Peer "+did+" is deactivated");
+			throw new PeerConnectionException("Peer "+did+" is deactivated");
 		}
 		String problem=DIDDocuments.problem(document);
-		if (problem!=null) throw new IllegalStateException("Invalid document for peer "+did+": "+problem);
+		if (problem!=null) throw new PeerConnectionException("Invalid document for peer "+did+": "+problem);
 		AVector<AccountKey> keys=DIDDocuments.authenticationKeys(document);
-		if (keys.isEmpty()) throw new IllegalStateException("Peer "+did+" lists no Ed25519 key for authentication");
+		if (keys.isEmpty()) throw new PeerConnectionException("Peer "+did+" lists no Ed25519 key for authentication");
 		if (expected!=null) {
-			if (!keys.contains(expected)) throw new IllegalStateException("Peer "+did+" does not list key "+expected);
+			if (!keys.contains(expected)) throw new PeerConnectionException("Peer "+did+" does not list key "+expected);
 			keys=Vectors.of(expected);
 		}
 		AVector<AString> endpoints=Vectors.empty();
@@ -203,7 +211,7 @@ public class PeerResolver {
 			if (isDialable(endpoint)) endpoints=endpoints.conj(endpoint);
 		}
 		if (endpoints.isEmpty()) endpoints=located(keys);
-		if (endpoints.isEmpty()) throw new IllegalStateException("No address known for peer "+did);
+		if (endpoints.isEmpty()) throw new PeerConnectionException("No address known for peer "+did);
 		return new PeerTarget(label,keys,endpoints);
 	}
 

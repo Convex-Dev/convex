@@ -38,6 +38,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.util.JSON;
 import convex.etch.EtchStore;
 import convex.net.PeerName;
+import convex.net.PeerRefusedException;
 import convex.net.PeerResolver;
 import convex.net.Transports;
 import convex.node.LatticeConnectionManager;
@@ -219,7 +220,7 @@ public class P2PSeedTest {
 		PeerName named=new PeerName(URI.create(address(hub).toString()),hubKey.getAccountKey());
 		ExecutionException refused=assertThrows(ExecutionException.class,
 			() -> blocking.connect(named).get(TIMEOUT,TimeUnit.SECONDS));
-		assertTrue(refused.getCause() instanceof SecurityException,refused.toString());
+		assertTrue(refused.getCause() instanceof PeerRefusedException,refused.toString());
 	}
 
 	@Test

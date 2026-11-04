@@ -31,6 +31,7 @@ import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.etch.EtchStore;
 import convex.lattice.LocalLattice;
+import convex.net.PeerRefusedException;
 import convex.net.Transports;
 import convex.node.LatticeConnectionManager.DesiredPeer;
 import convex.node.LatticePropagatorConfig;
@@ -215,7 +216,7 @@ public class P2PBlocklistTest {
 	private void assertBlocked(P2PNode node,P2PNode target) {
 		var failure=assertThrows(ExecutionException.class,
 			() -> node.connect(hubKey.getAccountKey(),target.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS));
-		assertInstanceOf(SecurityException.class,failure.getCause());
+		assertInstanceOf(PeerRefusedException.class,failure.getCause());
 	}
 
 	@Test

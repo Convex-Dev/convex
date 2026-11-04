@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -59,7 +60,9 @@ import convex.etch.EtchStore;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
+import convex.net.PeerConnectionException;
 import convex.net.PeerName;
+import convex.net.PeerRefusedException;
 import convex.net.PeerResolver;
 import convex.net.PeerTarget;
 import convex.net.Transports;
@@ -223,7 +226,7 @@ public class P2PNode implements Closeable {
 		network.setPeerResolver(new PeerResolver(PeerResolver.defaultDIDResolver(),this::knownTransports) {
 			@Override
 			public CompletableFuture<PeerTarget> resolve(PeerName name) {
-				return super.resolve(name).thenApply(P2PNode.this::permitted);
+				return super.resolve(name).thenCompose(P2PNode.this::permitted);
 			}
 		});
 	}
@@ -695,7 +698,9 @@ public class P2PNode implements Closeable {
 	 * @param address bootstrap node's TCP address
 	 * @return future completing after connection admission, own-identity merge and
 	 *         local merge of the bootstrap node's selective bootstrap paths, or failing
-	 *         with a {@link SecurityException} if the node or address is blocked
+	 *         with a {@link PeerRefusedException} if the node or address is blocked;
+	 *         otherwise it fails or is cancelled as
+	 *         {@link LatticeConnectionManager#connectPeer(AccountKey, InetSocketAddress)} does
 	 */
 	public CompletableFuture<Convex> connect(AccountKey peerKey, InetSocketAddress address) {
 		if (!server.isRunning()) {
@@ -704,7 +709,7 @@ public class P2PNode implements Closeable {
 		}
 		if (refuses(peerKey,address)) {
 			return CompletableFuture.failedFuture(
-				new SecurityException("Node "+peerKey+" at "+address+" is blocked"));
+				new PeerRefusedException("Node "+peerKey+" at "+address+" is blocked"));
 		}
 		// A node the operator named keeps its record however full the registry is
 		named.add(peerKey);
@@ -719,8 +724,9 @@ public class P2PNode implements Closeable {
 	 *
 	 * @param name peer name, as {@link PeerResolver#parse(String)} reads it
 	 * @return future completing after admission, own-identity merge and local merge of
-	 *         the peer's bootstrap paths, or failing if the name cannot be resolved, the
-	 *         peer cannot be reached or it is blocked
+	 *         the peer's bootstrap paths; failing with a {@link PeerRefusedException} if
+	 *         the peer is blocked or refused, or a {@link PeerConnectionException} if the
+	 *         name cannot be resolved or the peer reached
 	 */
 	public CompletableFuture<Convex> connect(PeerName name) {
 		if (!server.isRunning()) {
@@ -730,7 +736,7 @@ public class P2PNode implements Closeable {
 		return network.connectPeer(propagator,name).thenCompose(peer -> {
 			AccountKey key=peer.getVerifiedPeer();
 			if (isBlocked(key)) {
-				return CompletableFuture.<Convex>failedFuture(new SecurityException("Node "+key+" is blocked"));
+				return CompletableFuture.<Convex>failedFuture(new PeerRefusedException("Node "+key+" is blocked"));
 			}
 			// A node the operator named keeps its record however full the registry is
 			named.add(key);
@@ -773,7 +779,8 @@ public class P2PNode implements Closeable {
 	 * once: a later call adds its names to the live list.</p>
 	 *
 	 * @param seeds seed names to add, as {@link #seeds(NodeConfig)} reads them
-	 * @return future completing when the seeds are first released, at once if none is listed
+	 * @return future completing when the seeds are first released, at once if none is
+	 *         listed; cancelled if the node closes first
 	 */
 	public CompletableFuture<Void> seed(List<PeerName> seeds) {
 		if (!server.isRunning()) {
@@ -873,8 +880,14 @@ public class P2PNode implements Closeable {
 			// Dials off the JDK's timer thread, which every delay in the JVM shares
 			.thenComposeAsync(ignored -> seedAsLastResort())
 			.whenComplete((dialled,error) -> {
-				// Fails only when the node closes
-				if (error==null) seedWhenStarved(round);
+				if (error==null) {
+					seedWhenStarved(round);
+					return;
+				}
+				Throwable cause=PeerConnectionException.unwrap(error);
+				// Closing the node cancels the wait and the backoff: seeding ends with it
+				if (cause instanceof CancellationException) return;
+				log.warn("Stopped seeding as a last resort after an unexpected failure",cause);
 			});
 	}
 
@@ -1021,24 +1034,40 @@ public class P2PNode implements Closeable {
 					}
 					initialisePeer(peer).whenComplete((initialised,failure) -> finished());
 				} catch (RuntimeException e) {
+					log.warn("Seeding from {} failed unexpectedly",name,e);
 					finished();
 				}
 			});
 		}
 
-		/** Logs how a dial went and keeps or releases what it reached; returns whether a peer was admitted. */
+		/**
+		 * Logs how a dial went and keeps or releases what it reached; returns whether a
+		 * peer was admitted. A refused or unreachable peer is normal operation, an
+		 * abandoned dial means this node is closing, and anything else is a fault.
+		 */
 		private boolean admitted(PeerName name,boolean seed,AccountKey key,Throwable error) {
-			Throwable cause=(error instanceof CompletionException && error.getCause()!=null)?error.getCause():error;
 			String kind=seed?"seed":"node";
-			if (cause instanceof SecurityException || cause instanceof IllegalArgumentException
-					|| (key!=null && isBlocked(key))) {
-				log.info("Skipping {} {}: {}",kind,name,(cause==null)?"blocked":cause.getMessage());
+			if (error!=null) {
+				Throwable cause=PeerConnectionException.unwrap(error);
+				if (cause instanceof CancellationException) return false;
+				if (cause instanceof PeerRefusedException) {
+					log.info("Skipping {} {}: {}",kind,name,cause.getMessage());
+				} else if (cause instanceof PeerConnectionException) {
+					if (seed) log.info("Could not connect to seed {}: {}",name,cause.getMessage());
+					else log.debug("Could not reconnect to node {}: {}",name,cause.getMessage());
+				} else {
+					log.warn("Could not connect to {} {} after an unexpected failure",kind,name,cause);
+				}
+				return false;
+			}
+			if (key!=null && isBlocked(key)) {
+				log.info("Skipping {} {}: blocked",kind,name);
 				return false;
 			}
 			if (key==null) {
-				String reason=(cause==null)?"no key proved":cause.getMessage();
-				if (seed) log.info("Could not connect to seed {}: {}",name,reason);
-				else log.debug("Could not reconnect to node {}: {}",name,reason);
+				// Admitted without proving a key, as by a node without a key pair
+				if (seed) log.info("Could not connect to seed {}: no key proved",name);
+				else log.debug("Could not reconnect to node {}: no key proved",name);
 				return false;
 			}
 			if (!seed) {
@@ -1097,12 +1126,11 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * A resolved peer without the addresses this node refuses.
-	 *
-	 * @throws SecurityException if this node blocks every key the peer may prove, or
-	 *         refuses every address
+	 * A resolved peer without the addresses this node refuses, or a
+	 * {@link PeerRefusedException} if this node blocks every key the peer may prove, or
+	 * refuses every address.
 	 */
-	private PeerTarget permitted(PeerTarget target) {
+	private CompletableFuture<PeerTarget> permitted(PeerTarget target) {
 		Blocklist blocklist=application.blocklist();
 		AVector<AccountKey> keys=target.keys();
 		if (!keys.isEmpty()) {
@@ -1110,12 +1138,17 @@ public class P2PNode implements Closeable {
 			for (AccountKey key:keys) {
 				if (!blocklist.isBlocked(key)) allowed=allowed.conj(key);
 			}
-			if (allowed.isEmpty()) throw new SecurityException("Peer "+target.name()+" is blocked");
+			if (allowed.isEmpty()) {
+				return CompletableFuture.failedFuture(new PeerRefusedException("Peer "+target.name()+" is blocked"));
+			}
 			keys=allowed;
 		}
 		AVector<AString> endpoints=blocklist.dialable(target.endpoints());
-		if (endpoints.isEmpty()) throw new SecurityException("Every address of peer "+target.name()+" is blocked");
-		return new PeerTarget(target.name(),keys,endpoints);
+		if (endpoints.isEmpty()) {
+			return CompletableFuture.failedFuture(
+				new PeerRefusedException("Every address of peer "+target.name()+" is blocked"));
+		}
+		return CompletableFuture.completedFuture(new PeerTarget(target.name(),keys,endpoints));
 	}
 
 	/**

@@ -80,6 +80,9 @@ class LatticeNodeTest {
 		try (var store=new MemoryStore();
 				var others=Executors.newVirtualThreadPerTaskExecutor()) {
 			var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch();
+			// A node with a key keeps an unreachable peer, retrying, until it closes
+			var key=AKeyPair.createSeeded(714);
+			node.setIdentity(DID.forKey(key.getAccountKey()),key);
 			var group=node.createPropagator();
 			var selecting=new CountDownLatch(1);
 			var closing=new CountDownLatch(1);
@@ -91,10 +94,12 @@ class LatticeNodeTest {
 				return group;
 			});
 			// Close stops the peers it keeps before it closes any listener
-			node.keepPeer(group,PeerResolver.parse("127.0.0.1:1"),null).whenComplete((value,error) -> closing.countDown());
+			var kept=node.keepPeer(group,PeerResolver.parse("127.0.0.1:1"),null);
+			kept.whenComplete((value,error) -> closing.countDown());
 			try (var client=ConvexRemote.connect(node.getHostAddress())) {
 				client.message(Message.createPing(1));
 				assertTrue(selecting.await(5,TimeUnit.SECONDS));
+				assertFalse(kept.isDone(),"the peer is kept until the node closes");
 				others.submit(() -> {
 					node.close();
 					return null;

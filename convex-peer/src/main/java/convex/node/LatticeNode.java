@@ -241,8 +241,9 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	 *
 	 * @param propagator group to connect
 	 * @param name peer name, as {@link PeerResolver#parse(String)} reads it
-	 * @return future completing with the admitted connection, or failing with why the
-	 *         name could not be resolved or the peer admitted
+	 * @return future completing with the admitted connection, or failing with a
+	 *         {@link convex.net.PeerConnectionException} saying why the name could not be
+	 *         resolved or the peer admitted, as the connection manager's failures are
 	 */
 	public CompletableFuture<Convex> connectPeer(LatticePropagator propagator,PeerName name) {
 		PeerResolver resolver=getPeerResolver();
@@ -267,7 +268,9 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	 * @param name peer name, as {@link PeerResolver#parse(String)} reads it
 	 * @param admitted a connection to the peer already admitted, or null to connect first
 	 * @param giveUpAfter period without success after which the peer is given up
-	 * @return future failing once the peer is given up; cancel it to stop keeping the
+	 * @return future failing with a {@link convex.net.PeerConnectionException} once the
+	 *         peer is given up, or with the fault that stopped keeping it; cancelled if an
+	 *         attempt is abandoned, as when the node closes; cancel it to stop keeping the
 	 *         peer and release its route
 	 */
 	public CompletableFuture<Void> keepPeer(LatticePropagator propagator,PeerName name,Convex admitted,

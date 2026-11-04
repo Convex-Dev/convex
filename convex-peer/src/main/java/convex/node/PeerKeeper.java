@@ -1,7 +1,7 @@
 package convex.node;
 
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Future;
 import java.util.function.LongSupplier;
 
@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.core.data.AccountKey;
 import convex.core.data.Vectors;
+import convex.net.PeerConnectionException;
 import convex.net.PeerName;
 import convex.net.PeerResolver;
 import convex.net.PeerTarget;
@@ -20,7 +21,8 @@ import convex.net.PeerTarget;
  * be reached, or its route goes, resolves the name again and reconnects after a backoff,
  * so a moved endpoint or a changed DID document is picked up. A peer that stays
  * unreachable for a whole period is given up and reported; each lost route starts a
- * new period.
+ * new period. Only a {@link PeerConnectionException} is retried: an abandoned attempt
+ * stops keeping the peer, and so does a fault, which is logged as a warning.
  *
  * <p>A peer named by a transport URI without an expected key is held to the key it
  * first proves, as the manager holds desired intent to its key.</p>
@@ -42,7 +44,11 @@ final class PeerKeeper {
 	private final LongSupplier clock;
 	private final Scheduler scheduler;
 
-	/** Fails when the peer is given up; cancelling it stops keeping the peer. */
+	/**
+	 * Fails with a {@link PeerConnectionException} when the peer is given up, or with
+	 * the fault that stopped it; cancelled when an attempt is abandoned. Cancelling it
+	 * stops keeping the peer.
+	 */
 	final CompletableFuture<Void> kept=new CompletableFuture<>();
 
 	/** Key first proved under a transport name with no expected key. */
@@ -144,7 +150,18 @@ final class PeerKeeper {
 
 	private void failed(Throwable error) {
 		if (kept.isDone()) return;
-		Throwable cause=(error instanceof CompletionException && error.getCause()!=null) ? error.getCause() : error;
+		Throwable cause=PeerConnectionException.unwrap(error);
+		if (cause instanceof CancellationException) {
+			// Abandoned, as when the manager closes: keeping the peer ends with it
+			kept.completeExceptionally(cause);
+			return;
+		}
+		if (!(cause instanceof PeerConnectionException)) {
+			// A fault, which trying again would not mend
+			log.warn("Stopped keeping peer {} after an unexpected failure",name,cause);
+			kept.completeExceptionally(cause);
+			return;
+		}
 		long elapsed;
 		int failed;
 		synchronized (this) {
@@ -154,7 +171,7 @@ final class PeerKeeper {
 		// Failing to connect is normal operation: report the first failure of a period, not each retry
 		if (elapsed>=giveUpMillis) {
 			log.info("Gave up peer {} after {} s without reaching it: {}",name,elapsed/1000,cause.getMessage());
-			kept.completeExceptionally(new IllegalStateException("Gave up peer "+name+": "+cause.getMessage(),cause));
+			kept.completeExceptionally(new PeerConnectionException("Gave up peer "+name+": "+cause.getMessage(),cause));
 			return;
 		}
 		if (failed==1) log.info("Could not reach peer {}: {}; trying again",name,cause.getMessage());

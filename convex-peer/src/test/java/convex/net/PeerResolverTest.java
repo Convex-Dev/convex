@@ -187,6 +187,7 @@ public class PeerResolverTest {
 
 	private static void assertFailsWith(String message,CompletableFuture<PeerTarget> future) {
 		CompletionException e=assertThrows(CompletionException.class,future::join);
+		assertTrue(e.getCause() instanceof PeerConnectionException,"an expected failure is checked: "+e.getCause());
 		assertTrue(e.getCause().getMessage().contains(message),e.getCause().getMessage());
 	}
 }

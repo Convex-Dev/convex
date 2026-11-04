@@ -244,6 +244,18 @@ admitted again. A peer named by a transport URI without a key is held to the key
 first proved. A peer unreachable for a whole period, ten minutes by default, is given
 up and reported; each lost route starts a new period.
 
+A connection future reports an expected failure as a checked exception: a
+`PeerConnectionException` when the name cannot be resolved or the peer reached, with
+the network error as its cause, or its subtype `PeerRefusedException` when the peer is
+reached but not admitted, because it fails the challenge, proves a key other than
+the one expected, turns out to be this node, or the application refuses it. A wait or
+attempt that is abandoned, because the manager closes or the peer is released,
+removed or replaced, is cancelled. Misuse, such as an invalid argument or identifying
+a peer without a key of one's own, fails with an unchecked exception, as a fault does,
+so a caller can retry or report the checked failures and warn of anything else. A
+kept peer is retried only on a `PeerConnectionException`, and stops with a warning on
+a fault.
+
 A group can also gossip with nodes that connect to it. With
 `setChallengerAdmission(predicate)`, a node that challenges the group over an inbound
 connection, naming the group's transport key, is challenged back if the predicate

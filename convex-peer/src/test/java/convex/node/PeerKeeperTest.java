@@ -6,7 +6,9 @@ import java.net.InetSocketAddress;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +38,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.JSON;
+import convex.net.PeerConnectionException;
 import convex.net.PeerName;
 import convex.net.PeerResolver;
 import convex.net.PeerTarget;
@@ -159,6 +162,36 @@ public class PeerKeeperTest {
 		assertEquals(2,manager.targets.size(),"no attempt once stopped");
 	}
 
+	/** Giving up reports the connection failure that ended the period. */
+	@Test public void givingUpReportsAConnectionFailure() {
+		PeerKeeper keeper=keeper(TRANSPORT,"tcp://localhost:1");
+		keeper.start(null);
+		now.addAndGet(PERIOD);
+		manager.fail();
+		Throwable failure=assertThrows(CompletionException.class,keeper.kept::join).getCause();
+		assertInstanceOf(PeerConnectionException.class,failure);
+		assertEquals("unreachable",failure.getCause().getMessage());
+	}
+
+	/** A fault is not retried: keeping the peer stops with it. */
+	@Test public void aFaultStopsKeepingThePeer() {
+		PeerKeeper keeper=keeper(TRANSPORT,"tcp://localhost:1");
+		keeper.start(null);
+		IllegalStateException fault=new IllegalStateException("bug");
+		manager.fail(fault);
+		assertSame(fault,assertThrows(CompletionException.class,keeper.kept::join).getCause());
+		assertTrue(scheduled.isEmpty(),"nothing more is tried");
+	}
+
+	/** An abandoned attempt, as when the manager closes, stops keeping the peer quietly. */
+	@Test public void anAbandonedAttemptStopsKeepingThePeer() {
+		PeerKeeper keeper=keeper(TRANSPORT,"tcp://localhost:1");
+		keeper.start(null);
+		manager.fail(new CancellationException("Connection manager closed"));
+		assertTrue(keeper.kept.isCancelled());
+		assertTrue(scheduled.isEmpty(),"nothing more is tried");
+	}
+
 	/** Stopping while a retry is being scheduled, before the keeper holds it, still cancels it. */
 	@Test public void stoppingWhileARetryIsScheduledCancelsIt() {
 		CompletableFuture<Void> retry=new CompletableFuture<>();
@@ -206,7 +239,8 @@ public class PeerKeeperTest {
 
 		@Override public void releasePeer(AccountKey key) { released.add(key); }
 
-		void fail() { attempts.get(attempts.size()-1).completeExceptionally(new IllegalStateException("unreachable")); }
+		void fail() { fail(new PeerConnectionException("unreachable")); }
+		void fail(Throwable error) { attempts.get(attempts.size()-1).completeExceptionally(error); }
 		void admit(AccountKey key) { attempts.get(attempts.size()-1).complete(new StubPeer(key)); }
 		void loseRoute(AccountKey key) { routes.remove(key).complete(null); }
 	}
