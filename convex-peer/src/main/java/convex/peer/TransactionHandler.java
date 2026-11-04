@@ -324,10 +324,9 @@ public class TransactionHandler extends AThreadedComponent {
 	/**
 	 * Reports the results of one of this peer's blocks to the clients waiting for them.
 	 * The calling thread, normally the CVM executor, only collects the results and
-	 * clears their interests; a virtual thread of their own delivers them. So neither a
-	 * wait for outbound capacity, the encoding of a large result, nor an in-process
-	 * client's continuations hold up the peer's state, and each block's delivery is
-	 * independent of the others'.
+	 * clears their interests; a virtual thread of their own delivers them. So neither
+	 * the encoding of a large result nor an in-process client's continuations hold up
+	 * the peer's state, and each block's delivery is independent of the others'.
 	 */
 	void reportTransactions(Block block, BlockResult br, long blockNum) {
 		// TODO: consider culling old interests after some time period
@@ -358,20 +357,16 @@ public class TransactionHandler extends AThreadedComponent {
 	}
 
 	/**
-	 * Delivers one block's results in order. Waits for shared outbound capacity, but at
-	 * most {@link Config#DEFAULT_INTERNAL_TIMEOUT} for the whole block; after that each
-	 * remaining result is offered without waiting. A result is refused at once if its
+	 * Delivers one block's results in order, never waiting. A result is refused if its
 	 * client's connection is closed or its reader is not draining, which is normal
-	 * operation.
+	 * operation, or if the server is shedding load.
 	 */
 	private static void deliverResults(ArrayList<Message> recipients, ArrayList<Result> results) {
-		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(Config.DEFAULT_INTERNAL_TIMEOUT);
 		for (int i=0; i<recipients.size(); i++) {
 			Message m=recipients.get(i);
-			long remaining=TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime());
 			boolean reported;
 			try {
-				reported=m.returnResultBlocking(results.get(i),remaining);
+				reported=m.returnResult(results.get(i));
 			} catch (Exception e) {
 				log.warn("Failed to deliver transaction result for connection {}",m.getConnection(),e);
 				continue;

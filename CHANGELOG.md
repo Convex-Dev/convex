@@ -64,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Run an in-process client's queries on the calling thread, or on a virtual thread of their own when asynchronous, rather than on the peer's query handler, which they held up for network queries and data requests. ([Messaging](convex-peer/docs/MESSAGING.md#44-convexlocal--in-memory-client))
 - Deliver each block's transaction results on a thread of their own, so a peer keeps applying blocks while clients are slow to take results or an in-process client's continuations run; a client may receive a later block's result before an earlier one's. ([Result reporting](convex-peer/docs/TRANSACTION_PATH.md#result-reporting))
 - Report a closed connection to a client as `:CONNECT`, and fail a message too large to send, instead of reporting either as load: `AConnection.sendMessage` now throws when a message cannot be sent. ([Client backpressure](convex-peer/docs/CLIENT_BACKPRESSURE.md#aconnection-interface))
+- Slow a client that reads its results more slowly than it sends requests by not reading its requests until they drain, instead of making peer threads wait to send results; `AConnection.returnMessageBlocking` and `Message.returnResultBlocking` are removed, since no send on a peer waits. ([Reply backlog](convex-peer/docs/BACKPRESSURE.md#reply-backlog))
 
 ### Deprecated
 

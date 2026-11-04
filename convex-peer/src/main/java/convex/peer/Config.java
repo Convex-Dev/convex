@@ -197,10 +197,12 @@ public class Config {
 	public static final int SERVER_OUTBOUND_QUEUE_BYTE_LIMIT = 64 * 1024 * 1024;
 
 	/**
-	 * Bytes handed to Netty for one inbound connection but not yet written, beyond
-	 * which that connection's further replies are refused. Bounds the memory a
-	 * reader that stops draining its socket can pin to roughly this much plus one
-	 * message, without affecting any other connection.
+	 * Bytes of replies queued for one inbound client connection or handed to Netty,
+	 * and not yet written, beyond which that connection's further replies are
+	 * refused. Bounds the memory a reader that stops draining its socket can pin to
+	 * roughly this much plus one message, without affecting any other connection.
+	 * From half this much, the server stops reading the client's requests until its
+	 * replies are written down to a quarter.
 	 */
 	public static final int SERVER_CONNECTION_PENDING_BYTE_LIMIT = 1024 * 1024;
 

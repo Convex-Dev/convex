@@ -53,7 +53,7 @@ Client                          Peer Server
          │ one virtual thread per block
          ▼
 ┌──────────────────┐
-│ Result delivery   │  m.returnResultBlocking(res, remaining)
+│ Result delivery   │  m.returnResult(res), never waits
 └────────┬─────────┘
          │
          ▼
@@ -238,13 +238,13 @@ if (newConsensusPoint > reportedConsensusPoint) {
 For each new finalised block, the executor:
 1. Removes `interests.remove(txHash)` → original Message, and builds its result
 2. Starts a virtual thread for the block, which returns each result in order with
-   `m.returnResultBlocking(res, remaining)`
+   `m.returnResult(res)`
 
-The executor never waits for delivery: not for outbound capacity, nor to encode a
-result, nor for an in-process client's continuations, which run on the delivery
-thread. Each block's results are delivered independently, so one client can receive
-a later block's result before an earlier block's. A message sent without a request
-ID gets no result.
+The executor never waits for delivery: not to encode a result, nor for an
+in-process client's continuations, which run on the delivery thread. The delivery
+thread itself never waits for outbound capacity. Each block's results are
+delivered independently, so one client can receive a later block's result before
+an earlier block's. A message sent without a request ID gets no result.
 
 ## Timing Analysis
 
@@ -484,7 +484,7 @@ flushing happens, enabling batching at the connection level.
 
 ### Server Result Return
 
-Each block's delivery thread calls `m.returnResultBlocking(res, remaining)` per result. On a Netty
+Each block's delivery thread calls `m.returnResult(res)` per result. On a Netty
 server connection this offers the encoded result to the server's single
 `ServerOutboundQueue`, shared by every inbound connection and bounded by the bytes it
 holds (`Config.SERVER_OUTBOUND_QUEUE_BYTE_LIMIT`). One writer thread hands queued
@@ -492,17 +492,21 @@ messages to Netty and flushes each touched channel once per batch, so bursts of
 results coalesce into few TCP segments without `TransactionHandler` ever seeing a
 channel.
 
-The queue applies three policies:
+Nothing waits to add a result: it is queued or refused at once. The queue applies
+these policies:
 
-- **Backpressure, not loss.** If the shared bound is full, a block's delivery
-  thread waits for space, up to `Config.DEFAULT_INTERNAL_TIMEOUT` for the whole
-  block; after that, each remaining result is offered without waiting and dropped
-  if refused. The executor keeps applying blocks meanwhile.
-- **A stalled reader loses only its own replies.** Bytes handed to Netty but not
-  yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`,
-  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified peer).
-  Over that cap the connection's results are refused at once, never waited for, and
-  logged at debug. The client sees a `:TIMEOUT`.
+- **Slow the client, don't lose its results.** Each connection's backlog, the
+  bytes of its replies queued or handed to Netty and not yet written, is counted.
+  From half the client allowance (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`),
+  the server stops reading that client's requests until the backlog is written
+  down to a quarter ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)).
+- **A stalled reader loses only its own replies.** Over its allowance
+  (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`, or
+  `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified peer) a connection's
+  results are refused and logged at debug. The client sees a `:TIMEOUT`.
+- **Shedding load.** A client result that finds the shared bound full is refused.
+  The writer only hands messages to Netty, so this takes a server too short of CPU
+  for the writer to keep up.
 - **Trusted peers first.** Replies to verified peer connections go into a lane the
   writer drains first and that is exempt from the shared bound, so consensus and
   lattice replies never queue behind client results.

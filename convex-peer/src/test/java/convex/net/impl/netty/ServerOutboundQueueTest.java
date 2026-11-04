@@ -7,9 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
@@ -27,9 +24,9 @@ import io.netty.channel.embedded.EmbeddedChannel;
 
 /**
  * Replies to inbound connections pass through one shared queue bounded by the
- * bytes it holds. A channel that stops draining pins only its own small
- * in-flight allowance; client results wait for shared space rather than being
- * dropped; trusted peers are served first and never wait behind client results.
+ * bytes it holds. No send waits. A channel that stops draining pins only its own
+ * small backlog allowance; trusted peers are served first and never wait behind
+ * client results.
  */
 public class ServerOutboundQueueTest {
 
@@ -96,7 +93,7 @@ public class ServerOutboundQueueTest {
 	}
 
 	@Test
-	public void testBlockingSendWaitsForSharedSpace() throws Exception {
+	public void testSendRefusedWhileSharedBoundFull() throws Exception {
 		Message m = message(600);
 		int size = size(m);
 		ServerOutboundQueue queue = new ServerOutboundQueue(size + size / 2, size * 10, false);
@@ -105,23 +102,44 @@ public class ServerOutboundQueueTest {
 			NettyServerConnection conn = connection(ch, queue);
 			assertTrue(conn.trySendMessage(m));
 
-			// A blocking send waits until the writer frees the shared bound. Hand over
-			// exactly one entry: the freed space lets the blocked send enqueue at any
-			// moment after that, so a whole-batch drain could pick it up too.
-			CompletableFuture<Boolean> blocked = CompletableFuture.supplyAsync(() -> {
-				try {
-					return conn.sendMessage(m);
-				} catch (Exception e) {
-					throw new CompletionException(e);
-				}
-			});
-			assertEquals(1, queue.drainBatch(1));
-			assertTrue(blocked.get(5, TimeUnit.SECONDS), "blocked send proceeds once space is freed");
-			assertEquals(size, queue.getQueuedBytes());
-			assertEquals(1, queue.drainBatch(1));
+			// With the shared bound full, every form of send is refused at once
+			assertFalse(conn.sendMessage(m));
+			assertFalse(conn.returnMessage(m));
+			assertEquals(size, conn.getPendingBytes(), "a refused reply adds nothing to the backlog");
 
-			// A message that can never fit is refused without waiting
+			assertEquals(1, queue.drainBatch());
+			assertTrue(conn.sendMessage(m), "accepted once the writer frees the shared bound");
+			assertEquals(1, queue.drainBatch());
+
+			// A message that can never fit is refused
 			assertFalse(conn.sendMessage(message(size * 2)));
+		} finally {
+			queue.close();
+			ch.finishAndReleaseAll();
+		}
+	}
+
+	@Test
+	public void testBacklogCountsQueuedReplies() {
+		Message m = message(600);
+		int size = size(m);
+		// A client may have 4.5 replies in its backlog: reads pause from half that
+		ServerOutboundQueue queue = new ServerOutboundQueue(size * 10, 4 * size + size / 2, false);
+		EmbeddedChannel ch = new EmbeddedChannel(new NettyOutboundHandler());
+		try {
+			NettyServerConnection conn = connection(ch, queue);
+			assertTrue(conn.trySendMessage(m));
+			assertTrue(conn.trySendMessage(m));
+			assertEquals(2 * size, conn.getPendingBytes(), "queued replies count before the writer hands them over");
+			assertFalse(conn.isBacklogged());
+			assertTrue(conn.trySendMessage(m));
+			assertTrue(conn.isBacklogged());
+
+			// Replies for a channel that closes before hand-over leave the backlog too
+			ch.close().syncUninterruptibly();
+			assertEquals(3, queue.drainBatch());
+			assertEquals(0, conn.getPendingBytes());
+			assertFalse(conn.isBacklogged());
 		} finally {
 			queue.close();
 			ch.finishAndReleaseAll();
@@ -148,9 +166,7 @@ public class ServerOutboundQueueTest {
 			assertEquals(2 * size, slowConn.getPendingBytes());
 
 			assertFalse(slowConn.trySendMessage(m), "over its cap, the stuck reader's further replies are refused");
-			long start = System.nanoTime();
-			assertFalse(slowConn.sendMessage(m), "a blocking send never waits for a stalled reader");
-			assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(1));
+			assertFalse(slowConn.sendMessage(m));
 			assertTrue(otherConn.trySendMessage(m), "other connections are unaffected");
 			assertEquals(1, queue.drainBatch());
 			assertEquals(0, otherConn.getPendingBytes());
@@ -181,6 +197,7 @@ public class ServerOutboundQueueTest {
 				assertEquals(1, queue.drainBatch());
 			}
 			assertEquals(4 * size, conn.getPendingBytes());
+			assertFalse(conn.isBacklogged(), "a verified peer's reads never pause for its replies");
 			assertFalse(conn.trySendMessage(m), "over the peer allowance, further replies are refused");
 
 			stuck.complete();

@@ -263,32 +263,6 @@ public abstract class AConnection {
 	}
 
 	/**
-	 * Returns a message to the remote end, waiting a bounded time if the
-	 * connection's shared outbound capacity is exhausted. For handler threads that
-	 * report client results and may apply backpressure; on an I/O thread it does not
-	 * wait. A connection that cannot accept the message for its own reasons
-	 * (closed, or its reader is not draining) still refuses at once.
-	 *
-	 * @param msg Message to return
-	 * @return true if the message was accepted for delivery
-	 */
-	public boolean returnMessageBlocking(Message msg) {
-		return returnMessage(msg);
-	}
-
-	/**
-	 * As {@link #returnMessageBlocking(Message)}, waiting at most the given time,
-	 * so that a caller returning several messages can bound its total wait.
-	 *
-	 * @param msg Message to return
-	 * @param timeoutMillis Longest wait in milliseconds; zero or less does not wait
-	 * @return true if the message was accepted for delivery
-	 */
-	public boolean returnMessageBlocking(Message msg, long timeoutMillis) {
-		return returnMessage(msg);
-	}
-
-	/**
 	 * Checks if this connection supports general message sending (as opposed
 	 * to result-only delivery via {@link #returnMessage(Message)}).
 	 *
@@ -337,10 +311,12 @@ public abstract class AConnection {
 	}
 
 	/**
-	 * Sends a message over this connection, waiting a bounded time for space if the
-	 * outbound queue is full, so that backpressure reaches the sending thread. Does
-	 * not wait on a thread that empties the queue, such as the transport's I/O
-	 * thread. Callers that must not wait use {@link #trySendMessage(Message)}.
+	 * Sends a message over this connection. If the outbound queue is full, the
+	 * transport may wait a bounded time for space, so that backpressure reaches the
+	 * sending thread, but never on a thread that empties the queue, such as the
+	 * transport's I/O thread. A server's connection to its client never waits: it
+	 * slows the client by not reading its requests instead. Callers that must not
+	 * wait use {@link #trySendMessage(Message)}.
 	 *
 	 * @param msg Message to send
 	 * @return true if the message was accepted for sending; false if the queue had

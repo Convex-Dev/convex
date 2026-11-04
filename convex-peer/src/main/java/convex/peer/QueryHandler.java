@@ -130,7 +130,7 @@ public class QueryHandler extends AThreadedComponent {
 			Result result=Result.fromContext(id, resultContext).withSource(SourceCodes.PEER);
 			
 			// Report result back to message sender
-			boolean resultReturned= m.returnResultBlocking(result);
+			boolean resultReturned= m.returnResult(result);
 
 			if (!resultReturned) {
 				log.debug("Dropped query result {} for connection {}", id, m.getConnection());

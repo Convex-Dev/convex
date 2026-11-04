@@ -718,35 +718,6 @@ public class Message {
 		return returnMessage(msg);
 	}
 
-	/**
-	 * Returns a Result for this message, waiting a bounded time if the connection's
-	 * shared outbound capacity is exhausted. For handler threads only; see
-	 * {@link AConnection#returnMessageBlocking(Message)}. A message without a request
-	 * ID gets no result.
-	 *
-	 * @param res Result to return
-	 * @return true if the result was accepted for delivery
-	 */
-	public boolean returnResultBlocking(Result res) {
-		Message msg=createReturnResult(res);
-		if (msg==null) return false;
-		return returnConnection().returnMessageBlocking(msg);
-	}
-
-	/**
-	 * As {@link #returnResultBlocking(Result)}, waiting at most the given time for
-	 * outbound capacity; see {@link AConnection#returnMessageBlocking(Message, long)}.
-	 *
-	 * @param res Result to return
-	 * @param timeoutMillis Longest wait in milliseconds; zero or less does not wait
-	 * @return true if the result was accepted for delivery
-	 */
-	public boolean returnResultBlocking(Result res, long timeoutMillis) {
-		Message msg=createReturnResult(res);
-		if (msg==null) return false;
-		return returnConnection().returnMessageBlocking(msg,timeoutMillis);
-	}
-
 	/** The result message for this message's request ID, or null if it has none. */
 	private Message createReturnResult(Result res) {
 		ACell id=getRequestID();
@@ -754,12 +725,6 @@ public class Message {
 		return Message.createResult(res.withID(id));
 	}
 
-	private AConnection returnConnection() {
-		AConnection conn=connection;
-		if (conn==null) throw new IllegalStateException("No connection for return message");
-		return conn;
-	}
-	
 	/**
 	 * Returns a message back to the originator of the message.
 	 *

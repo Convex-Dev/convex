@@ -10,8 +10,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Format;
 import convex.core.message.Message;
+import convex.core.message.MessageType;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -75,5 +77,79 @@ public class NettyInboundHandlerTest {
 		assertEquals(Blob.wrap(body), delivered.get(0).getMessageData());
 		assertTrue(ch.isOpen());
 		ch.close();
+	}
+
+	/** A reply of a few hundred bytes for the server to send. */
+	private static Message reply() {
+		Blob b = Blobs.createRandom(600);
+		return Message.create(MessageType.DATA, b, b.getEncoding());
+	}
+
+	/**
+	 * While a client's replies are backed up, its requests are not read: the next one
+	 * is held back with reading off, and the write completions that drain the backlog
+	 * deliver it and resume reading, in order.
+	 */
+	@Test
+	public void testReadingPausesWhileRepliesBackedUp() {
+		Message reply = reply();
+		int size = (int) reply.getMessageData().count();
+		List<Message> delivered = new ArrayList<>();
+		NettyInboundHandler handler = new NettyInboundHandler(m -> {
+			delivered.add(m);
+			return null;
+		}, null, LIMIT);
+		EmbeddedChannel ch = new EmbeddedChannel(handler);
+		// Reads pause from a backlog of two replies, and resume once it is written down
+		ServerOutboundQueue queue = new ServerOutboundQueue(size * 10, 4 * size, false);
+		try {
+			NettyServerConnection conn = new NettyServerConnection(ch, handler, queue);
+			handler.setConnection(conn);
+			assertTrue(conn.trySendMessage(reply));
+			assertTrue(conn.trySendMessage(reply));
+
+			byte[] first = new byte[] {0x31};
+			byte[] second = new byte[] {0x32};
+			ch.writeInbound(frame(first));
+			ch.writeInbound(frame(second));
+			assertTrue(delivered.isEmpty(), "no request is delivered while replies are backed up");
+			assertFalse(ch.config().isAutoRead(), "reading is off");
+
+			// The writer hands the replies to the channel, which writes them
+			assertEquals(2, queue.drainBatch());
+			ch.runPendingTasks();
+			assertEquals(2, delivered.size(), "both requests are delivered once the replies drain");
+			assertEquals(Blob.wrap(first), delivered.get(0).getMessageData());
+			assertEquals(Blob.wrap(second), delivered.get(1).getMessageData());
+			assertTrue(ch.config().isAutoRead(), "reading is on again");
+		} finally {
+			queue.close();
+			ch.finishAndReleaseAll();
+		}
+	}
+
+	/** Requests are read as normal while a client's replies stay below the pause mark. */
+	@Test
+	public void testReadingContinuesWithSmallBacklog() {
+		Message reply = reply();
+		int size = (int) reply.getMessageData().count();
+		List<Message> delivered = new ArrayList<>();
+		NettyInboundHandler handler = new NettyInboundHandler(m -> {
+			delivered.add(m);
+			return null;
+		}, null, LIMIT);
+		EmbeddedChannel ch = new EmbeddedChannel(handler);
+		ServerOutboundQueue queue = new ServerOutboundQueue(size * 10, 4 * size, false);
+		try {
+			NettyServerConnection conn = new NettyServerConnection(ch, handler, queue);
+			handler.setConnection(conn);
+			assertTrue(conn.trySendMessage(reply));
+			ch.writeInbound(frame(new byte[] {0x31}));
+			assertEquals(1, delivered.size());
+			assertTrue(ch.config().isAutoRead());
+		} finally {
+			queue.close();
+			ch.finishAndReleaseAll();
+		}
 	}
 }

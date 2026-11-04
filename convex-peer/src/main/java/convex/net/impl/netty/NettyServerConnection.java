@@ -2,27 +2,24 @@ package convex.net.impl.netty;
 
 import java.net.InetSocketAddress;
 import java.nio.channels.ClosedChannelException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import convex.core.message.Message;
 import convex.core.message.AConnection;
 import convex.core.util.Utils;
-import convex.peer.Config;
 import io.netty.channel.Channel;
 
 /**
  * AConnection for server-side inbound Netty channels.
  *
  * <p>Encodes on the caller thread, then offers the message to the server's shared
- * {@link ServerOutboundQueue}. {@link #trySendMessage} and {@link #returnMessage}
- * never wait and are safe on an I/O thread. {@link #sendMessage} and
- * {@link #returnMessageBlocking} wait a bounded time for space in the shared
- * queue, so the threads that report client results wait rather than drop them
- * under load; on an I/O thread they do not wait, since
- * that thread writes for every channel it serves. Neither form waits for this channel
- * itself: a channel that is closed, or already holds more than its cap of bytes
- * handed to Netty and unwritten, has its reply refused at once, so a reader that
- * stalls loses only its own replies. One instance per accepted client channel.</p>
+ * {@link ServerOutboundQueue}. No send waits, so every form is safe on any thread:
+ * a message is queued, or refused at once if the shared queue is full or this
+ * connection's backlog of unwritten replies is over its allowance, so a reader that
+ * stalls loses only its own replies. Before that, a client whose backlog grows
+ * stops having its requests read until the backlog drains. One instance per
+ * accepted client channel.</p>
  */
 class NettyServerConnection extends AConnection {
 
@@ -30,7 +27,7 @@ class NettyServerConnection extends AConnection {
 	private final NettyInboundHandler inboundHandler;
 	private final ServerOutboundQueue outbound;
 
-	/** Encoded bytes handed to Netty for this channel and not yet reported written. */
+	/** Encoded bytes queued for this channel or handed to Netty, and not yet written. */
 	private final AtomicLong pendingBytes = new AtomicLong();
 
 	NettyServerConnection(Channel channel, NettyInboundHandler inboundHandler, ServerOutboundQueue outbound) {
@@ -39,62 +36,59 @@ class NettyServerConnection extends AConnection {
 		this.outbound = outbound;
 	}
 
-	@Override
-	public boolean sendMessage(Message msg) throws ClosedChannelException, InterruptedException {
-		return offer(msg, Config.DEFAULT_INTERNAL_TIMEOUT);
-	}
-
-	@Override
-	public boolean trySendMessage(Message msg) {
-		return send(msg, 0);
-	}
-
-	@Override
-	public boolean returnMessageBlocking(Message msg) {
-		return send(msg, Config.DEFAULT_INTERNAL_TIMEOUT);
-	}
-
-	@Override
-	public boolean returnMessageBlocking(Message msg, long timeoutMillis) {
-		return send(msg, timeoutMillis);
-	}
-
-	/** As {@link #offer}, for paths that report only whether the message was accepted. */
-	private boolean send(Message msg, long timeoutMillis) {
-		if (NettyConnection.encodedLength(msg) < 0) return false; // too large for a frame: logged, not sent
-		try {
-			return offer(msg, timeoutMillis);
-		} catch (ClosedChannelException e) {
-			return false;
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
-	}
-
 	/**
-	 * Offers a message to the shared queue, waiting up to the given time for space.
-	 * Returns false if there was no room, and throws as {@link #sendMessage} does.
+	 * Queues a message for this channel without waiting.
+	 *
+	 * @return false at once if the shared queue is full or this connection's backlog
+	 *         is over its allowance
 	 */
-	private boolean offer(Message msg, long timeoutMillis) throws ClosedChannelException, InterruptedException {
+	@Override
+	public boolean sendMessage(Message msg) throws ClosedChannelException {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) throw new ClosedChannelException();
 		// Message encoding can traverse a large cell tree. Do it on the caller's
 		// thread, never lazily in NettyOutboundHandler. Too large for a frame throws.
 		int bytes = Utils.checkedInt(msg.getMessageData().count());
-		if (outbound.offer(this, ch, msg, bytes)) return true;
-		if (timeoutMillis <= 0 || NettyConnection.inEventLoop(ch.eventLoop().parent())) return false;
-		if (outbound.offerBlocking(this, ch, msg, bytes, timeoutMillis)) return true;
-		if (!ch.isActive()) throw new ClosedChannelException();
-		return false;
+		return outbound.offer(this, ch, msg, bytes);
 	}
 
-	void addPendingBytes(int delta) {
-		pendingBytes.addAndGet(delta);
+	@Override
+	public boolean trySendMessage(Message msg) {
+		if (NettyConnection.encodedLength(msg) < 0) return false; // too large for a frame: logged, not sent
+		try {
+			return sendMessage(msg);
+		} catch (ClosedChannelException e) {
+			return false;
+		}
+	}
+
+	/** Adds to this connection's backlog, returning the new backlog. */
+	long addPendingBytes(int delta) {
+		return pendingBytes.addAndGet(delta);
 	}
 
 	long getPendingBytes() {
 		return pendingBytes.get();
+	}
+
+	/** Whether this connection's requests should not be read until its replies drain. */
+	boolean isBacklogged() {
+		return outbound.isBacklogged(this);
+	}
+
+	/**
+	 * Called on any thread when this connection's backlog drains far enough to read
+	 * requests again. Resumes reading on the channel's event loop if it was paused.
+	 */
+	void backlogDrained() {
+		if (!inboundHandler.isHolding()) return;
+		Channel ch = channel;
+		if (ch == null) return;
+		try {
+			ch.eventLoop().execute(inboundHandler::resumeHeld);
+		} catch (RejectedExecutionException e) {
+			// event loop shut down: the channel is closed, nothing to resume
+		}
 	}
 
 	@Override

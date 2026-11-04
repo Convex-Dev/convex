@@ -16,6 +16,10 @@ matches processing capacity rather than queue capacity.
 A full queue is a reason to wait, never on its own a reason to refuse. `:LOAD` means
 the peer is deliberately shedding work: a policy limit, or a wait that ran out.
 
+Results going the other way never wait. A client whose results back up has its
+requests read no further until they drain ([Reply Backlog](#reply-backlog)), so the
+waiting is done by its socket, not by a thread of the peer.
+
 ## Architecture
 
 ```
@@ -108,6 +112,27 @@ a result that handler returned, is refused at once instead: only that thread emp
 the queue, so the wait could only time out. `ConvexLocal` queries take no queue: they
 run on the client's own thread ([MESSAGING.md](MESSAGING.md) §4.4).
 
+### Reply Backlog
+
+Replies to a client go through the server's shared outbound queue, and no thread
+waits to add one: a reply is queued, or refused at once. Each connection counts its
+backlog, the bytes of its replies queued or handed to Netty and not yet written:
+
+| Backlog | Effect |
+|---------|--------|
+| Half `Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT` | The handler holds back the next request it decodes and stops reading the socket |
+| Written down to a quarter | The write completion that crosses it delivers the held request and resumes reading |
+| The whole limit | Further replies to that client are refused: it is not reading |
+
+So a client that sends faster than it reads is slowed by TCP, like one whose requests
+fill a queue, rather than losing results. Pausing always holds a decoded request, so
+that Netty's decoder does not ask the socket for more input while reads are off.
+
+A verified peer's reads are never paused for its replies: it has a far larger
+allowance (`Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT`) and a lane of its own. A client
+reply that finds the shared queue full is refused: the writer only hands messages to
+Netty, so that takes a server too short of CPU for the writer to keep up.
+
 ## Queue Processing
 
 Both `TransactionHandler` and `QueryHandler` use batch-drain processing: block
@@ -176,9 +201,9 @@ handler orchestrates all channel-level backpressure. The server never sees a cha
 ### Deadlock Safety
 
 The Netty PR #6662 deadlock (both sides block on writes simultaneously) does not
-apply: server write volume is tiny (Result messages), no event loop waits to send
-(a send on an event loop fails at once if its queue is full), and virtual threads
-hold no locks.
+apply: no server thread waits to send (a reply is queued or refused at once), and
+virtual threads hold no locks. A client's reads pause for its own reply backlog,
+which drains as soon as that client reads, whatever the server is doing.
 
 ## Backward Compatibility
 
