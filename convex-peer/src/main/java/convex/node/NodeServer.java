@@ -52,6 +52,12 @@ import convex.lattice.cursor.AForkableCursor;
  * Transports must be closed before this server so no new ingress reaches groups
  * while they drain.</p>
  *
+ * <p><b>Threading.</b> Lifecycle calls take no lock. The application launches,
+ * stops ingress, closes, and adds or removes groups from management code, one call
+ * after another, never from a group's message handler or a publication callback; a
+ * lifecycle call made while launch runs fails. Host syncs, inbound deliveries and
+ * pulls may run on any thread.</p>
+ *
  * <p><b>Failure isolation.</b> Host-root publication is the mandatory part of a
  * host sync. Propagator initialisation, notification, worker and shutdown
  * failures are contained and logged independently; one propagator group
@@ -120,7 +126,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @throws IOException if node store initialisation fails
 	 */
-	public synchronized void launch() throws IOException,InterruptedException {
+	public void launch() throws IOException,InterruptedException {
 		validateLaunchRequest();
 		lifecycleState=LifecycleState.STARTING;
 		setAcceptingDeliveries(true);
@@ -439,7 +445,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @param propagator configured policy group to attach
 	 */
-	public synchronized void addPropagator(LatticePropagator propagator) {
+	public void addPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
 		if (lifecycleState!=LifecycleState.NEW && lifecycleState!=LifecycleState.RUNNING) {
 			throw new IllegalStateException("Cannot add a propagator while the node is starting or stopped");
@@ -483,13 +489,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * group is excluded from subsequent node launches. Shutdown failures are
 	 * isolated and available through {@link LatticePropagator#getStatus()}.</p>
 	 *
-	 * <p>This blocking lifecycle operation must be called from application
-	 * management code, outside group message handlers and publication callbacks.</p>
-	 *
 	 * @param propagator group to remove
 	 * @return {@code true} if removed, or {@code false} if it was not attached
 	 */
-	public synchronized boolean removePropagator(LatticePropagator propagator) {
+	public boolean removePropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
 		if (lifecycleState==LifecycleState.STARTING || lifecycleState==LifecycleState.STOPPING) {
 			throw new IllegalStateException("Cannot remove a group during node launch or shutdown");
@@ -636,10 +639,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * calls it first. Group failures are isolated, and groups can no longer be added
 	 * or removed, as in close.</p>
 	 */
-	public synchronized void stopIngress() {
+	public void stopIngress() {
 		if (lifecycleState==LifecycleState.STARTING) {
 			throw new IllegalStateException(
-				"Cannot stop NodeServer re-entrantly while launch is in progress");
+				"Cannot stop NodeServer while launch is in progress");
 		}
 		if (lifecycleState!=LifecycleState.RUNNING) return;
 		lifecycleState=LifecycleState.STOPPING;
@@ -661,7 +664,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * next launch.
 	 */
 	@Override
-	public synchronized void close() throws IOException {
+	public void close() throws IOException {
 		try {
 			closeResources();
 		} finally {
@@ -684,7 +687,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 		if (lifecycleState==LifecycleState.STARTING) {
 			throw new IllegalStateException(
-				"Cannot close NodeServer re-entrantly while launch is in progress");
+				"Cannot close NodeServer while launch is in progress");
 		}
 		stopIngress();
 

@@ -15,7 +15,6 @@ import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -573,36 +572,6 @@ public class NodeServerTest {
 				throw new StoreException("simulated primary-store failure");
 			}
 			return super.setRootData(data);
-		}
-	}
-
-	/** Store gate used to hold launch at its first root checkpoint deterministically. */
-	static final class BlockingRootStore extends MemoryStore {
-		final CountDownLatch rootWriteEntered = new CountDownLatch(1);
-		final CountDownLatch releaseRootWrite = new CountDownLatch(1);
-		volatile boolean blockRootWrite = true;
-
-		@Override
-		public <T extends ACell> Ref<T> setRootData(T data) {
-			if (blockRootWrite) {
-				rootWriteEntered.countDown();
-				boolean interrupted = false;
-				while (true) {
-					try {
-						releaseRootWrite.await();
-						break;
-					} catch (InterruptedException e) {
-						interrupted = true;
-					}
-				}
-				if (interrupted) Thread.currentThread().interrupt();
-			}
-			return super.setRootData(data);
-		}
-
-		void release() {
-			blockRootWrite = false;
-			releaseRootWrite.countDown();
 		}
 	}
 
@@ -1529,74 +1498,35 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Lifecycle state is explicit, and configuration freezes atomically when the
-	 * first launch begins. Latches hold launch inside its initial root checkpoint;
-	 * the competing mutation future must remain blocked on the lifecycle monitor
-	 * until launch publishes RUNNING, then reject against that completed state.
+	 * Lifecycle state is explicit. Groups are added before launch or while running,
+	 * each once, and a stopped node relaunches with the groups it kept.
 	 */
 	@Test
-	public void testDynamicAdditionSerialisesWithLaunch() throws Exception {
-		BlockingRootStore testStore = new BlockingRootStore();
-		NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), testStore, NodeConfig.port(-1));
-		LatticePropagator primary = new LatticePropagator(testStore,LatticePropagatorConfig.create());
-		node.addPropagator(primary);
+	public void testGroupsAreAddedBeforeLaunchOrWhileRunning() throws Exception {
+		try (MemoryStore testStore=new MemoryStore();
+				NodeServer<AInteger> node=new TestNode<>(MaxLattice.create(),testStore,NodeConfig.port(-1))) {
+			LatticePropagator primary=new LatticePropagator(testStore,LatticePropagatorConfig.create());
+			node.addPropagator(primary);
+			assertEquals(NodeServer.LifecycleState.NEW,node.getLifecycleState());
+			assertThrows(UnsupportedOperationException.class,node.getPropagators()::clear,
+				"callers must not be able to reorder or remove attached propagators");
 
-		assertEquals(NodeServer.LifecycleState.NEW, node.getLifecycleState());
-		assertThrows(UnsupportedOperationException.class, node.getPropagators()::clear,
-			"callers must not be able to reorder or remove attached propagators");
-
-		CompletableFuture<Void> launchFuture = CompletableFuture.runAsync(() -> {
-			try {
-				node.launch();
-			} catch (IOException | InterruptedException e) {
-				throw new CompletionException(e);
-			}
-		});
-
-		CountDownLatch mutationStarted = new CountDownLatch(1);
-		try {
-			assertTrue(testStore.rootWriteEntered.await(5, TimeUnit.SECONDS));
-			assertEquals(NodeServer.LifecycleState.STARTING, node.getLifecycleState());
-
-			CompletableFuture<Throwable> mutationFuture = CompletableFuture.supplyAsync(() -> {
-				mutationStarted.countDown();
-				try {
-					node.addPropagator(new LatticePropagator(testStore));
-					return null;
-				} catch (Throwable t) {
-					return t;
-				}
-			});
-			assertTrue(mutationStarted.await(5, TimeUnit.SECONDS));
-			assertFalse(mutationFuture.isDone(),
-				"configuration mutation must serialize behind the in-progress launch");
-
-			testStore.release();
-			launchFuture.get(5, TimeUnit.SECONDS);
-			assertEquals(NodeServer.LifecycleState.RUNNING, node.getLifecycleState());
-			assertNull(mutationFuture.get(5, TimeUnit.SECONDS));
+			node.launch();
+			assertEquals(NodeServer.LifecycleState.RUNNING,node.getLifecycleState());
+			node.addPropagator(new LatticePropagator(testStore));
 			assertEquals(2,node.getPropagators().size());
-			assertTrue(node.getPropagators().get(1).isRunning());
-			assertThrows(IllegalArgumentException.class, () -> node.addPropagator(primary));
+			assertTrue(node.getPropagators().get(1).isRunning(),"a group added while running starts at once");
+			assertThrows(IllegalArgumentException.class,() -> node.addPropagator(primary));
 
 			node.close();
-			assertEquals(NodeServer.LifecycleState.STOPPED, node.getLifecycleState());
+			assertEquals(NodeServer.LifecycleState.STOPPED,node.getLifecycleState());
 			assertThrows(IllegalStateException.class,
 				() -> node.addPropagator(new LatticePropagator(testStore)),
 				"adding groups requires a new or running node");
 
 			node.launch();
-			assertEquals(NodeServer.LifecycleState.RUNNING, node.getLifecycleState(),
+			assertEquals(NodeServer.LifecycleState.RUNNING,node.getLifecycleState(),
 				"a stopped node may relaunch with its retained groups");
-		} finally {
-			testStore.release();
-			try {
-				launchFuture.get(5, TimeUnit.SECONDS);
-			} catch (Exception e) {
-				// The assertions above report the original launch failure if there was one.
-			}
-			node.close();
-			testStore.close();
 		}
 	}
 
