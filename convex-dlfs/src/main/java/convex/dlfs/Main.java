@@ -66,20 +66,32 @@ public final class Main {
 		AStore store=openStore(config,keyPair);
 
 		LatticeHost<Index<Keyword,ACell>> host;
-		DLFSApplication application;
 		try {
 			host=LatticeHost.open(store);
-			application=host.addApplication(new DLFSApplication(host,keyPair::signData,Utils::getCurrentTimestampCell,
-				config.getMaxFutureTimestampSkew(),regionPath));
 		} catch (IOException | RuntimeException e) {
 			store.close();
 			throw e;
 		}
-		LatticeNode<Index<Keyword,ACell>> node=new LatticeNode<>(host,nodeConfig)
-			.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
-		// The config file's node section also carries the group limits
-		LatticePropagator propagator=node.createPropagator(LatticePropagatorConfig.from(nodeConfig));
-		if (config.isPublicLatticeInbound()) node.serveAllInbound(propagator);
+		DLFSApplication application;
+		LatticeNode<Index<Keyword,ACell>> node;
+		LatticePropagator propagator;
+		try {
+			application=host.addApplication(new DLFSApplication(host,keyPair::signData,Utils::getCurrentTimestampCell,
+				config.getMaxFutureTimestampSkew(),regionPath));
+			node=new LatticeNode<>(host,nodeConfig)
+				.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
+			// The config file's node section also carries the group limits
+			propagator=node.createPropagator(LatticePropagatorConfig.from(nodeConfig));
+			if (config.isPublicLatticeInbound()) node.serveAllInbound(propagator);
+		} catch (RuntimeException e) {
+			// Nothing is launched yet, so closing the host and the store is enough
+			try (store; host) {
+				// Closing the host saves what it retains
+			} catch (Exception closeFailure) {
+				e.addSuppressed(closeFailure);
+			}
+			throw e;
+		}
 
 		// Starting the HTTP server is the last step, so a failure leaves nothing of it open
 		DLFSDriveManager drives;
@@ -124,8 +136,8 @@ public final class Main {
 			server.setMaxRequestSize(config.getMaxRequestBytes());
 			server.start(config.getHTTPPort());
 		} catch (IOException | InterruptedException | RuntimeException e) {
-			// A failed start closes what it opened, in shutdown order
-			try (store; node; host) {
+			// A failed start closes what it opened, in reverse: the node, the host, the store
+			try (store; host; node) {
 				// Closing the host saves what it retains
 			} catch (Exception closeFailure) {
 				e.addSuppressed(closeFailure);
@@ -145,20 +157,21 @@ public final class Main {
 
 		// Runs once; a second caller waits until it has finished
 		Shutdown.Once shutdown=Shutdown.once(()->{
-			// Closes the host (final checkpoint, sent to peers), then the node, then the store
-			try (store; node; host) {
+			// Saves, then closes the node (sending that save to peers), the host and the store
+			try (store; host; node) {
 				try {
 					server.close();
 				} catch (RuntimeException e) {
 					System.err.println("Failed to stop DLFS HTTP server: "+e.getMessage());
 				}
 				try {
+					// Syncs the drives and the application, then checkpoints the host
 					drives.sync();
 				} catch (RuntimeException e) {
-					System.err.println("Failed to publish DLFS state: "+e.getMessage());
+					System.err.println("Failed to save DLFS state: "+e.getMessage());
 				}
 			} catch (Exception e) {
-				// The first close to fail is the host's final save, if that failed
+				// The first failure, with any later close failures suppressed
 				System.err.println("DLFS shutdown failed: "+e.getMessage());
 				for (Throwable also:e.getSuppressed()) System.err.println("  also: "+also.getMessage());
 			}

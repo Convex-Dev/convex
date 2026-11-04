@@ -1394,7 +1394,7 @@ public class P2PNode implements Closeable {
 	/**
 	 * Stops networking, sending what the host has published to connected peers first.
 	 * Neither publishes pending host edits nor flushes the borrowed store; a service
-	 * closes the host first, as convex-peer/docs/SHUTDOWN.md describes.
+	 * checkpoints the host first, as convex-peer/docs/SHUTDOWN.md describes.
 	 */
 	@Override
 	public void close() throws IOException {
@@ -1470,11 +1470,12 @@ public class P2PNode implements Closeable {
 		var host=node.getNodeServer().getHost();
 		// Runs once; a second caller waits until it has finished
 		Shutdown.Once shutdown=Shutdown.once(() -> {
-			// Sync the application's local state, then close the host (stops flushing,
-			// final checkpoint published through the node), then the node (sends it to
-			// peers), then the store.
-			try (store; node; host) {
+			// Sync the application's local state and checkpoint, then close the node
+			// (sends the checkpoint to peers), the host (stops flushing, saves anything
+			// merged since) and the store.
+			try (store; host; node) {
 				node.getApplication().sync();
+				host.checkpoint();
 			} catch (IOException | RuntimeException e) {
 				log.warn("Unable to finish P2P service shutdown",e);
 			}

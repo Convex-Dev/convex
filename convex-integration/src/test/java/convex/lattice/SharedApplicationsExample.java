@@ -149,8 +149,15 @@ public final class SharedApplicationsExample {
 			propagation.whenAnnounced(host.cursor().get()::equals).get(10,TimeUnit.SECONDS);
 		}
 
+		/**
+		 * Saves what the host holds, then closes the network, which sends that save to
+		 * peers, and the host. Pending edits stay private: each application publishes
+		 * only when its owner chooses.
+		 */
 		@Override public void close() throws Exception {
-			network.close();
+			try (host; network) {
+				host.checkpoint();
+			}
 		}
 	}
 

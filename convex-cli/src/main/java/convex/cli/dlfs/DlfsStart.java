@@ -144,10 +144,8 @@ public class DlfsStart extends ACommand {
 
 		// Register DLFS before starting any incoming delivery.
 		LatticeHost<Index<Keyword,ACell>> host;
-		DLFSApplication application;
 		try {
 			host=LatticeHost.open(store);
-			application=host.addApplication(new DLFSApplication(host,keyPair::signData));
 		} catch (IOException e) {
 			store.close();
 			throw new CLIError(ExitCodes.CONFIG, "Failed to open node store: " + e.getMessage(), e);
@@ -155,14 +153,24 @@ public class DlfsStart extends ACommand {
 			store.close();
 			throw e;
 		}
-		LatticeNode<Index<Keyword,ACell>> node=new LatticeNode<>(host,config)
-			.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
-		// The command's node config also carries the group limits
-		LatticePropagator propagator=node.createPropagator(LatticePropagatorConfig.from(config));
-		if (serveInbound) {
-			node.serveAllInbound(propagator);
-			// Gossip with any node that connects and proves its key: it can read this view anyway
-			propagator.setChallengerAdmission(key -> true);
+		DLFSApplication application;
+		LatticeNode<Index<Keyword,ACell>> node;
+		LatticePropagator propagator;
+		try {
+			application=host.addApplication(new DLFSApplication(host,keyPair::signData));
+			node=new LatticeNode<>(host,config)
+				.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
+			// The command's node config also carries the group limits
+			propagator=node.createPropagator(LatticePropagatorConfig.from(config));
+			if (serveInbound) {
+				node.serveAllInbound(propagator);
+				// Gossip with any node that connects and proves its key: it can read this view anyway
+				propagator.setChallengerAdmission(key -> true);
+			}
+		} catch (RuntimeException e) {
+			// Nothing is launched yet, so closing the host and the store is enough
+			closeFailedStart(e,store,null,host);
+			throw e;
 		}
 
 		try {
@@ -212,20 +220,21 @@ public class DlfsStart extends ACommand {
 		// Runs once; a second caller, such as the JVM hook after the tray, waits until
 		// it has finished, so neither process exit nor Etch closing overtakes the save
 		Shutdown.Once shutdown=Shutdown.once(()->{
-			// Closes the host (final checkpoint, sent to peers), then the node, then the store
-			try (store; node; host) {
+			// Saves, then closes the node (sending that save to peers), the host and the store
+			try (store; host; node) {
 				try {
 					dlfsServer.close();
 				} catch (RuntimeException e) {
 					log.warn("Error stopping DLFS HTTP server",e);
 				}
 				try {
+					// Syncs the drives and the application, then checkpoints the host
 					driveManager.sync();
 				} catch (RuntimeException e) {
-					log.warn("Error publishing DLFS state",e);
+					log.warn("Error saving DLFS state",e);
 				}
 			} catch (Exception e) {
-				// The first close to fail is the host's final save, if that failed
+				// The first failure, with any later close failures suppressed
 				log.warn("Error shutting down DLFS",e);
 			}
 		});
@@ -246,10 +255,13 @@ public class DlfsStart extends ACommand {
 		}
 	}
 
-	/** Closes what a failed start opened, in shutdown order, behind the start failure. */
+	/**
+	 * Closes what a failed start opened, in reverse: the node, if any, the host and the
+	 * store, behind the start failure.
+	 */
 	private static void closeFailedStart(Exception failure,AStore store,
 			LatticeNode<?> node,LatticeHost<?> host) {
-		try (store; node; host) {
+		try (store; host; node) {
 			// Closing the host saves what it retains
 		} catch (Exception closeFailure) {
 			failure.addSuppressed(closeFailure);
