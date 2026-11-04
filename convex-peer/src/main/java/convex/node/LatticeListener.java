@@ -36,24 +36,29 @@ import convex.net.impl.netty.NettyServer;
  * only eligibility for the application selector; it does not attach, start or
  * close a propagator. The application must start the authoritative node and its
  * attached groups before opening this listener, then close the listener before
- * closing those groups.</p>
+ * closing those groups. Closing is final: a closed listener cannot be launched
+ * again.</p>
  */
 public final class LatticeListener implements Closeable {
 
 	private static final Logger log=LoggerFactory.getLogger(LatticeListener.class);
 
 	private final NodeConfig config;
-	private final Set<LatticePropagator> allowedPropagators=
-		ConcurrentHashMap.newKeySet();
+	private final Set<LatticePropagator> allowedPropagators;
+	/** Whether the eligible groups are a {@link LatticeNode}'s, which only the node changes. */
+	private final boolean nodeGroups;
 	private final ConcurrentHashMap<AConnection,LatticePropagator> assignments=
 		new ConcurrentHashMap<>();
 	/** Serialises initial assignment with revocation; established traffic does not lock. */
 	private final Object assignmentLock=new Object();
 	private volatile Function<AConnection,LatticePropagator> selector;
-	private AServer server;
-	private Integer port;
+	private volatile AServer server;
+	private volatile Integer port;
+	/** Guarded by this listener, as launch and close are. */
 	private boolean launchStarted;
-	private boolean running;
+	/** Guarded by this listener, as launch and close are. */
+	private boolean closed;
+	private volatile boolean running;
 
 	/**
 	 * Creates a TCP lattice listener. No propagator group is admitted until it
@@ -62,8 +67,23 @@ public final class LatticeListener implements Closeable {
 	 * @param config host limits and port, or {@code null} for defaults
 	 */
 	public LatticeListener(NodeConfig config) {
+		this(config,ConcurrentHashMap.newKeySet(),false);
+	}
+
+	/**
+	 * Creates a listener of a node, which may assign connections to the node's groups.
+	 * The node adds and removes them in {@code groups}, which all its listeners share,
+	 * and calls {@link #revoke(LatticePropagator)} on each listener after removing one.
+	 */
+	LatticeListener(NodeConfig config,Set<LatticePropagator> groups) {
+		this(config,groups,true);
+	}
+
+	private LatticeListener(NodeConfig config,Set<LatticePropagator> groups,boolean nodeGroups) {
 		this.config=(config==null) ? NodeConfig.create() : config;
 		this.port=this.config.getPort();
+		this.allowedPropagators=groups;
+		this.nodeGroups=nodeGroups;
 	}
 
 	/**
@@ -71,9 +91,12 @@ public final class LatticeListener implements Closeable {
 	 * The listener does not take lifecycle ownership of the group.
 	 *
 	 * @param propagator group which may receive accepted connections
+	 * @throws IllegalStateException on a {@link LatticeNode}'s listener, whose groups
+	 *         are the node's
 	 */
-	public synchronized void registerPropagator(LatticePropagator propagator) {
+	public void registerPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
+		requireOwnGroups();
 		allowedPropagators.add(propagator);
 	}
 
@@ -84,16 +107,53 @@ public final class LatticeListener implements Closeable {
 	 *
 	 * @param propagator group to unregister
 	 * @return {@code true} if registered, or {@code false} if already absent
+	 * @throws IllegalStateException on a {@link LatticeNode}'s listener, whose groups
+	 *         are the node's
 	 */
 	public boolean unregisterPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
-		ArrayList<AConnection> connections=new ArrayList<>();
+		requireOwnGroups();
+		ArrayList<AConnection> connections;
 		synchronized (assignmentLock) {
 			if (!allowedPropagators.remove(propagator)) return false;
-			assignments.forEach((connection,owner) -> {
-				if (owner==propagator) connections.add(connection);
-			});
+			connections=assignedTo(propagator);
 		}
+		closeAssigned(propagator,connections);
+		return true;
+	}
+
+	/**
+	 * Closes a group's sockets on this listener once its node has removed the group
+	 * from the groups this listener shares with the node's other listeners.
+	 */
+	void revoke(LatticePropagator propagator) {
+		ArrayList<AConnection> connections;
+		synchronized (assignmentLock) {
+			// The node removed the group before calling this. A delivery assigns under this
+			// lock, so either it ran first and its socket is collected here, or it runs
+			// after and finds the group gone.
+			connections=assignedTo(propagator);
+		}
+		closeAssigned(propagator,connections);
+	}
+
+	private void requireOwnGroups() {
+		if (nodeGroups) {
+			throw new IllegalStateException(
+				"A lattice node's listener serves the node's groups: add or remove them through the node");
+		}
+	}
+
+	/** The group's assigned sockets on this listener. Call holding the assignment lock. */
+	private ArrayList<AConnection> assignedTo(LatticePropagator propagator) {
+		ArrayList<AConnection> connections=new ArrayList<>();
+		assignments.forEach((connection,owner) -> {
+			if (owner==propagator) connections.add(connection);
+		});
+		return connections;
+	}
+
+	private void closeAssigned(LatticePropagator propagator,ArrayList<AConnection> connections) {
 		// Closing a socket may call back into this listener. Never hold the assignment
 		// lock while waiting for transport cleanup or invoking group observers.
 		for (AConnection connection:connections) {
@@ -106,7 +166,6 @@ public final class LatticeListener implements Closeable {
 				removeConnection(connection);
 			}
 		}
-		return true;
 	}
 
 	/**
@@ -117,18 +176,22 @@ public final class LatticeListener implements Closeable {
 	 *
 	 * @param selector assignment policy, or {@code null} to deny every connection
 	 */
-	public synchronized void setSelector(Function<AConnection,LatticePropagator> selector) {
+	public void setSelector(Function<AConnection,LatticePropagator> selector) {
 		this.selector=selector;
 	}
 
 	/**
-	 * Opens the listener. A negative port represents an intentionally absent
-	 * inbound transport and completes launch without binding a socket.
+	 * Opens the listener, or does nothing if it is already open. A negative port
+	 * represents an intentionally absent inbound transport and completes launch
+	 * without binding a socket.
 	 *
 	 * @throws IOException if the transport cannot bind or start
 	 * @throws InterruptedException if launch is interrupted
+	 * @throws IllegalStateException if the listener is closed, or an earlier launch failed
 	 */
 	public synchronized void launch() throws IOException,InterruptedException {
+		if (closed) throw new IllegalStateException("Listener is closed");
+		if (running) return;
 		requireNotLaunched("launch");
 		launchStarted=true;
 		if (port!=null && port<0) {
@@ -142,11 +205,11 @@ public final class LatticeListener implements Closeable {
 		netty.setMaxMessageLength(config.getMaxMessageSize());
 		server=netty;
 		try {
-			server.launch();
-			port=server.getPort();
+			netty.launch();
+			port=netty.getPort();
 			running=true;
 		} catch (IOException | InterruptedException | RuntimeException | Error e) {
-			server.close();
+			netty.close();
 			server=null;
 			throw e;
 		}
@@ -292,7 +355,8 @@ public final class LatticeListener implements Closeable {
 
 	/** Returns the bound TCP address, or {@code null} when no socket is open. */
 	public InetSocketAddress getHostAddress() {
-		return server==null ? null : server.getHostAddress();
+		AServer current=server;
+		return current==null ? null : current.getHostAddress();
 	}
 
 	/** Returns whether launch completed and the listener has not been closed. */
@@ -300,8 +364,10 @@ public final class LatticeListener implements Closeable {
 		return running;
 	}
 
+	/** Closes the listener for good; closing again does nothing. */
 	@Override
 	public synchronized void close() {
+		closed=true;
 		AServer current=server;
 		if (current!=null) current.close();
 		for (AConnection connection:Set.copyOf(assignments.keySet())) removeConnection(connection);

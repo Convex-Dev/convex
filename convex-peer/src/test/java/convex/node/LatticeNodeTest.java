@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -56,19 +57,109 @@ class LatticeNodeTest {
 	}
 
 	/**
-	 * Keeping a peer, and forgetting it, run on network threads, so neither may wait for
-	 * the node's monitor: close holds it while it waits for those threads to close
-	 * connections. The test holds the monitor as close does.
+	 * Network threads read and set the node's identity and serving policy and keep its
+	 * peers, so none of these waits for a launch in progress. A listener added meanwhile
+	 * is opened by that launch. The test holds launch while it prepares a group's view.
 	 */
-	@Test void keepingAPeerNeverWaitsForTheNodesLifecycle() throws Exception {
+	@Test void aLaunchInProgressHoldsUpNoOtherCall() throws Exception {
+		var preparing=new CountDownLatch(1);
+		var release=new CountDownLatch(1);
 		try (var store=new MemoryStore();
 				var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(-1));
 				var others=Executors.newVirtualThreadPerTaskExecutor()) {
+			var group=node.createPropagator(LatticePropagatorConfig.create(),value -> {
+				preparing.countDown();
+				awaitUninterruptibly(release);
+				return value;
+			});
+			try {
+				var launched=others.submit(node::launch);
+				assertTrue(preparing.await(5,TimeUnit.SECONDS));
+				var key=AKeyPair.createSeeded(714);
+				var did=DID.forKey(key.getAccountKey());
+				var added=others.submit(() -> {
+					node.setIdentity(did,key);
+					assertEquals(did,node.getDID());
+					assertSame(key,node.getKeyPair());
+					node.serveAllInbound(group);
+					assertTrue(node.keepPeer(group,PeerResolver.parse("127.0.0.1:1"),null).cancel(false));
+					return node.addListener(NodeConfig.port(0));
+				}).get(5,TimeUnit.SECONDS);
+				assertFalse(added.isRunning(),"launch has not reached its listeners");
+				release.countDown();
+				launched.get(5,TimeUnit.SECONDS);
+				assertTrue(added.isRunning(),"launch opens a listener added while it ran");
+			} finally {
+				release.countDown();
+			}
+		}
+	}
+
+	/** Close is final: a closed node cannot be launched and opens no listener. */
+	@Test void aClosedNodeStaysClosed() throws Exception {
+		try (var store=new MemoryStore()) {
+			var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0));
 			var group=node.createPropagator();
-			synchronized (node) {
-				var kept=others.submit(() -> node.keepPeer(group,PeerResolver.parse("127.0.0.1:1"),null))
-					.get(5,TimeUnit.SECONDS);
-				assertTrue(others.submit(() -> kept.cancel(false)).get(5,TimeUnit.SECONDS));
+			node.close();
+			assertThrows(IllegalStateException.class,node::launch);
+			assertFalse(node.getServer().isRunning(),"a launch after close undoes itself");
+			assertFalse(group.isRunning());
+			assertFalse(node.getListener().isRunning());
+			assertFalse(node.addListener(NodeConfig.port(0)).isRunning());
+			node.close();
+		}
+	}
+
+	/** Once ingress stops, a listener added to the node is never opened. */
+	@Test void noListenerOpensAfterIngressStops() throws Exception {
+		try (var store=new MemoryStore();
+				var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch()) {
+			node.stopIngress();
+			assertFalse(node.getListener().isRunning());
+			assertFalse(node.addListener(NodeConfig.port(0)).isRunning());
+		}
+	}
+
+	/**
+	 * A selector runs on the network thread that close waits for to close the listener's
+	 * connections, so it may read the node's identity and set its serving policy while
+	 * the node closes.
+	 */
+	@Test void closeNeverWaitsForASelectorThatReadsTheNode() throws Exception {
+		try (var store=new MemoryStore();
+				var others=Executors.newVirtualThreadPerTaskExecutor()) {
+			var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch();
+			var group=node.createPropagator();
+			var selecting=new CountDownLatch(1);
+			var closing=new CountDownLatch(1);
+			node.getListener().setSelector(connection -> {
+				selecting.countDown();
+				awaitUninterruptibly(closing);
+				node.getDID();
+				node.serveAllInbound(group);
+				return group;
+			});
+			// Close stops the peers it keeps before it closes any listener
+			node.keepPeer(group,PeerResolver.parse("127.0.0.1:1"),null).whenComplete((value,error) -> closing.countDown());
+			try (var client=ConvexRemote.connect(node.getHostAddress())) {
+				client.message(Message.createPing(1));
+				assertTrue(selecting.await(5,TimeUnit.SECONDS));
+				others.submit(() -> {
+					node.close();
+					return null;
+				}).get(5,TimeUnit.SECONDS);
+			}
+			assertFalse(node.getListener().isRunning());
+		}
+	}
+
+	private static void awaitUninterruptibly(CountDownLatch latch) {
+		while (true) {
+			try {
+				latch.await();
+				return;
+			} catch (InterruptedException e) {
+				// Keep waiting: the test releases the latch
 			}
 		}
 	}
@@ -168,6 +259,13 @@ class LatticeNodeTest {
 				assertEquals(List.of(open,trusted),network.getServer().getPropagators(),"a refused filter attaches no group");
 				network.serveAllInbound(open);
 				var second=network.addListener(NodeConfig.port(0));
+				assertThrows(IllegalStateException.class,() -> second.registerPropagator(open),
+					"a node's listeners serve the node's groups");
+				assertThrows(IllegalStateException.class,() -> network.getListener().unregisterPropagator(open));
+				var attachedDirectly=new LatticePropagator(store);
+				network.getServer().addPropagator(attachedDirectly);
+				assertThrows(IllegalArgumentException.class,() -> network.serveAllInbound(attachedDirectly),
+					"only a group the node created can be served");
 				network.launch();
 				assertTrue(second.isRunning(),"the node opens every listener");
 				try (var client=ConvexRemote.connect(second.getHostAddress())) {
