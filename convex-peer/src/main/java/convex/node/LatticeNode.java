@@ -36,10 +36,9 @@ import convex.net.PeerTarget;
  * <p>The node takes no lock of its own. Its identity, serving policy and peer
  * methods never wait, so network callbacks such as a listener's selector may call
  * them. Launch, stopping ingress, close, adding a listener and creating or removing
- * a group wait for sockets, groups or the host: call them from management code, not
- * from a callback those waits depend on. Stopping ingress or closing while launch
- * runs closes every listener for good, so launch fails if it has not yet opened them
- * all.</p>
+ * a group wait for sockets, groups or the host: the application calls them from
+ * management code, one after another, and never from a callback those waits depend
+ * on.</p>
  *
  * <p>For custom transports, assemble {@link NodeServer} and
  * {@link LatticeListener} directly. This convenience owns no domain policy.</p>
@@ -61,11 +60,7 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	private final LatticeListener listener;
 	/** Every listener this node opens and closes, its own first. */
 	private final List<LatticeListener> listeners=new CopyOnWriteArrayList<>();
-	/**
-	 * Raised by stopping ingress and by close before they close the listeners. Adding a
-	 * listener reads it after adding to {@link #listeners}, so either the closing call
-	 * closes the new listener or the new listener is never opened.
-	 */
+	/** Raised by stopping ingress and by close: a listener added afterwards is never opened. */
 	private volatile boolean stopped;
 	/** The configured identity; groups get only its signer. */
 	private volatile Identity identity=Identity.NONE;
@@ -204,13 +199,11 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	 * @throws IOException if the node is running and the listener cannot bind or start;
 	 *         it is then not added
 	 * @throws InterruptedException if opening it is interrupted
-	 * @throws IllegalStateException if the node stops ingress or closes while opening it
 	 */
 	public LatticeListener addListener(NodeConfig config) throws IOException,InterruptedException {
 		var added=new LatticeListener(config,groups);
 		listeners.add(added);
-		// Before the server runs, launch opens it, since launch reads the listeners after
-		// starting the server. Launch may open it too; opening it again does nothing.
+		// Before the server runs, launch opens it with the others
 		if (!stopped && server.isRunning()) {
 			try {
 				added.launch();

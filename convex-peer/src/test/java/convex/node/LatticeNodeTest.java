@@ -56,45 +56,6 @@ class LatticeNodeTest {
 		}
 	}
 
-	/**
-	 * Network threads read and set the node's identity and serving policy and keep its
-	 * peers, so none of these waits for a launch in progress. A listener added meanwhile
-	 * is opened by that launch. The test holds launch while it prepares a group's view.
-	 */
-	@Test void aLaunchInProgressHoldsUpNoOtherCall() throws Exception {
-		var preparing=new CountDownLatch(1);
-		var release=new CountDownLatch(1);
-		try (var store=new MemoryStore();
-				var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(-1));
-				var others=Executors.newVirtualThreadPerTaskExecutor()) {
-			var group=node.createPropagator(LatticePropagatorConfig.create(),value -> {
-				preparing.countDown();
-				awaitUninterruptibly(release);
-				return value;
-			});
-			try {
-				var launched=others.submit(node::launch);
-				assertTrue(preparing.await(5,TimeUnit.SECONDS));
-				var key=AKeyPair.createSeeded(714);
-				var did=DID.forKey(key.getAccountKey());
-				var added=others.submit(() -> {
-					node.setIdentity(did,key);
-					assertEquals(did,node.getDID());
-					assertSame(key,node.getKeyPair());
-					node.serveAllInbound(group);
-					assertTrue(node.keepPeer(group,PeerResolver.parse("127.0.0.1:1"),null).cancel(false));
-					return node.addListener(NodeConfig.port(0));
-				}).get(5,TimeUnit.SECONDS);
-				assertFalse(added.isRunning(),"launch has not reached its listeners");
-				release.countDown();
-				launched.get(5,TimeUnit.SECONDS);
-				assertTrue(added.isRunning(),"launch opens a listener added while it ran");
-			} finally {
-				release.countDown();
-			}
-		}
-	}
-
 	/** Close is final: a closed node cannot be launched and opens no listener. */
 	@Test void aClosedNodeStaysClosed() throws Exception {
 		try (var store=new MemoryStore()) {

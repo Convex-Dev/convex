@@ -38,6 +38,10 @@ import convex.net.impl.netty.NettyServer;
  * attached groups before opening this listener, then close the listener before
  * closing those groups. Closing is final: a closed listener cannot be launched
  * again.</p>
+ *
+ * <p>The listener takes no lock. Its owner launches and closes it, one after the
+ * other. Network threads assign connections while the owner registers and revokes
+ * groups; a connection that arrives as its group is revoked is turned away.</p>
  */
 public final class LatticeListener implements Closeable {
 
@@ -49,14 +53,10 @@ public final class LatticeListener implements Closeable {
 	private final boolean nodeGroups;
 	private final ConcurrentHashMap<AConnection,LatticePropagator> assignments=
 		new ConcurrentHashMap<>();
-	/** Serialises initial assignment with revocation; established traffic does not lock. */
-	private final Object assignmentLock=new Object();
 	private volatile Function<AConnection,LatticePropagator> selector;
 	private volatile AServer server;
 	private volatile Integer port;
-	/** Guarded by this listener, as launch and close are. */
 	private boolean launchStarted;
-	/** Guarded by this listener, as launch and close are. */
 	private boolean closed;
 	private volatile boolean running;
 
@@ -113,49 +113,20 @@ public final class LatticeListener implements Closeable {
 	public boolean unregisterPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
 		requireOwnGroups();
-		ArrayList<AConnection> connections;
-		synchronized (assignmentLock) {
-			if (!allowedPropagators.remove(propagator)) return false;
-			connections=assignedTo(propagator);
-		}
-		closeAssigned(propagator,connections);
+		if (!allowedPropagators.remove(propagator)) return false;
+		revoke(propagator);
 		return true;
 	}
 
 	/**
-	 * Closes a group's sockets on this listener once its node has removed the group
-	 * from the groups this listener shares with the node's other listeners.
+	 * Closes a group's sockets on this listener once the group has been removed from
+	 * the groups this listener serves.
 	 */
 	void revoke(LatticePropagator propagator) {
-		ArrayList<AConnection> connections;
-		synchronized (assignmentLock) {
-			// The node removed the group before calling this. A delivery assigns under this
-			// lock, so either it ran first and its socket is collected here, or it runs
-			// after and finds the group gone.
-			connections=assignedTo(propagator);
-		}
-		closeAssigned(propagator,connections);
-	}
-
-	private void requireOwnGroups() {
-		if (nodeGroups) {
-			throw new IllegalStateException(
-				"A lattice node's listener serves the node's groups: add or remove them through the node");
-		}
-	}
-
-	/** The group's assigned sockets on this listener. Call holding the assignment lock. */
-	private ArrayList<AConnection> assignedTo(LatticePropagator propagator) {
 		ArrayList<AConnection> connections=new ArrayList<>();
 		assignments.forEach((connection,owner) -> {
 			if (owner==propagator) connections.add(connection);
 		});
-		return connections;
-	}
-
-	private void closeAssigned(LatticePropagator propagator,ArrayList<AConnection> connections) {
-		// Closing a socket may call back into this listener. Never hold the assignment
-		// lock while waiting for transport cleanup or invoking group observers.
 		for (AConnection connection:connections) {
 			try {
 				connection.close();
@@ -165,6 +136,13 @@ public final class LatticeListener implements Closeable {
 			} finally {
 				removeConnection(connection);
 			}
+		}
+	}
+
+	private void requireOwnGroups() {
+		if (nodeGroups) {
+			throw new IllegalStateException(
+				"A lattice node's listener serves the node's groups: add or remove them through the node");
 		}
 	}
 
@@ -189,7 +167,7 @@ public final class LatticeListener implements Closeable {
 	 * @throws InterruptedException if launch is interrupted
 	 * @throws IllegalStateException if the listener is closed, or an earlier launch failed
 	 */
-	public synchronized void launch() throws IOException,InterruptedException {
+	public void launch() throws IOException,InterruptedException {
 		if (closed) throw new IllegalStateException("Listener is closed");
 		if (running) return;
 		requireNotLaunched("launch");
@@ -229,25 +207,22 @@ public final class LatticeListener implements Closeable {
 			Selection selection=select(connection);
 			propagator=selection.propagator();
 			if (propagator==null) return reject(message,selection.rejection());
-			boolean revoked;
 			try {
-				synchronized (assignmentLock) {
-					// Selection is application code and runs outside the lock. Recheck
-					// registration in case it raced with unregistration.
-					revoked=!allowedPropagators.contains(propagator);
-					if (!revoked) {
-						LatticePropagator previous=assignments.putIfAbsent(connection,propagator);
-						if (previous!=null) propagator=previous;
-						else propagator.attachInboundConnection(connection);
-					}
-				}
+				propagator.attachInboundConnection(connection);
 			} catch (VirtualMachineError e) {
 				if (!(e instanceof StackOverflowError)) throw e;
 				return containFailure(connection,propagator,e);
 			} catch (Throwable e) {
 				return containFailure(connection,propagator,e);
 			}
-			if (revoked) return reject(message,"Inbound propagation policy selected an unavailable group");
+			// A connection's messages arrive one at a time, so nothing else assigns it.
+			// Revoking the group removes it before collecting its sockets, so checking after
+			// assigning turns the connection away here, or revocation releases it.
+			assignments.put(connection,propagator);
+			if (!allowedPropagators.contains(propagator)) {
+				removeConnection(connection);
+				return reject(message,"Inbound propagation policy selected an unavailable group");
+			}
 		}
 		try {
 			return propagator.deliverIncomingMessage(message);
@@ -366,7 +341,7 @@ public final class LatticeListener implements Closeable {
 
 	/** Closes the listener for good; closing again does nothing. */
 	@Override
-	public synchronized void close() {
+	public void close() {
 		closed=true;
 		AServer current=server;
 		if (current!=null) current.close();
