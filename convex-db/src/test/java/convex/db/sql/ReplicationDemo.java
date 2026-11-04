@@ -7,13 +7,19 @@ import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.Hash;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.db.ConvexDB;
 import convex.etch.EtchStore;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
+import convex.lattice.LatticeHost;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import convex.node.LatticeListener;
@@ -53,10 +59,12 @@ public class ReplicationDemo {
 		// Create NodeServers over hosts whose ConvexDB merges incoming values
 		NodeConfig configLondon=NodeConfig.port(0);
 		NodeConfig configTokyo=NodeConfig.port(0);
-		NodeServer<?> serverLondon = new NodeServer<>(
-				ConvexDB.openHost(storeLondon, RowLWW::merge),configLondon);
-		NodeServer<?> serverTokyo  = new NodeServer<>(
-				ConvexDB.openHost(storeTokyo, RowLWW::merge),configTokyo);
+		LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> hostLondon = LatticeHost.open(Maps.empty(), storeLondon);
+		LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> hostTokyo  = LatticeHost.open(Maps.empty(), storeTokyo);
+		ConvexDB cdbLondon = hostLondon.addApplication(new ConvexDB(hostLondon.cursor(), RowLWW::merge));
+		ConvexDB cdbTokyo  = hostTokyo.addApplication(new ConvexDB(hostTokyo.cursor(), RowLWW::merge));
+		NodeServer<?> serverLondon = new NodeServer<>(hostLondon,configLondon);
+		NodeServer<?> serverTokyo  = new NodeServer<>(hostTokyo,configTokyo);
 		LatticePropagator propagatorLondon=new LatticePropagator(storeLondon,LatticePropagatorConfig.create());
 		LatticePropagator propagatorTokyo=new LatticePropagator(storeTokyo,LatticePropagatorConfig.create());
 		serverLondon.addPropagator(propagatorLondon);
@@ -97,12 +105,9 @@ public class ReplicationDemo {
 
 			section("2. Peer connections established (bidirectional)");
 
-			// ── 3. Connect ConvexDB to each node's cursor ───────────────
-			// Each ConvexDB wraps the NodeServer's live cursor, so SQL
+			// ── 3. Open a database on each node ─────────────────────────
+			// Each node's ConvexDB is live over its host's root, so SQL
 			// operations flow through the lattice and into the propagator.
-
-			ConvexDB cdbLondon = ConvexDB.connect(serverLondon.getCursor(), RowLWW::merge);
-			ConvexDB cdbTokyo  = ConvexDB.connect(serverTokyo.getCursor(), RowLWW::merge);
 
 			SQLDatabase dbLondon = cdbLondon.database("inventory");
 			SQLDatabase dbTokyo  = cdbTokyo.database("inventory");

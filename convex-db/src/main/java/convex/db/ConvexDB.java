@@ -1,12 +1,8 @@
 package convex.db;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Objects;
-import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BinaryOperator;
 import java.util.function.Supplier;
@@ -19,16 +15,13 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.core.store.AStore;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Cursors;
-import convex.node.NodeServer;
 
 /**
  * Root lattice component for the Convex DB SQL database system.
@@ -56,8 +49,7 @@ import convex.node.NodeServer;
  *
  * <p>A ConvexDB takes the cursor for the database map and assumes nothing about where
  * that lies: an application can root it anywhere in its own state, and registers it
- * with its host to receive incoming values. {@link #openHost} is a convenience that
- * assembles a host whose root is the database map.
+ * with its host to receive incoming values.
  *
  * <p>The application also supplies the clock that stamps writes, defaulting to the
  * runtime clock. Factories pass it down to every database and table, forks keep it,
@@ -71,11 +63,12 @@ import convex.node.NodeServer;
  * SQLDatabase db = cdb.database("mydb");
  * db.tables().createTable("users", new String[]{"id", "name"});
  *
- * // With persistence
- * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
- *     ConvexDB.createNodeServer(store, RowLWW::merge);
+ * // Persistent and networked: the main class keeps the ConvexDB it registers
+ * LatticeHost&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; host =
+ *     LatticeHost.open(Maps.empty(), store);
+ * ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+ * NodeServer&lt;?&gt; server = new NodeServer&lt;&gt;(host);
  * server.launch();
- * ConvexDB cdb = ConvexDB.connect(server.getHost());
  * cdb.register("mydb");
  *
  * // JDBC access (after register)
@@ -99,9 +92,6 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	/** Registry of ConvexDB instances available for JDBC/PG access. */
 	private static final ConcurrentHashMap<String, ConvexDB> registry = new ConcurrentHashMap<>();
-
-	/** The application each host assembled by {@link #openHost} has registered. */
-	private static final Map<LatticeHost<?>, ConvexDB> hosted = Collections.synchronizedMap(new WeakHashMap<>());
 
 	/**
 	 * Looks up a registered ConvexDB by database name.
@@ -192,23 +182,6 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	}
 
 	/**
-	 * Returns the ConvexDB registered with a host assembled by {@link #openHost} or
-	 * {@link #createNodeServer}, with its policy and clock. For any other containing
-	 * component, use {@link #connect(ALatticeComponent, BinaryOperator)} and supply the
-	 * policy.
-	 *
-	 * @param parent Host assembled by {@link #openHost}
-	 * @return The registered ConvexDB
-	 * @throws IllegalArgumentException if no ConvexDB is registered with the component
-	 */
-	public static ConvexDB connect(ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent) {
-		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		ConvexDB registered = (parent instanceof LatticeHost<?> host) ? hosted.get(host) : null;
-		if (registered == null) throw new IllegalArgumentException("No ConvexDB is registered with this component; supply a merge policy");
-		return registered;
-	}
-
-	/**
 	 * Connects to a containing component at the database-map level, as a live view of
 	 * the component's cursor that receives no incoming values and stamps writes with the
 	 * runtime clock.
@@ -221,83 +194,6 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 			BinaryOperator<Index<Keyword, ACell>> policy) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
 		return new ConvexDB(parent.cursor(), policy);
-	}
-
-	/**
-	 * Creates optional networking around a store-backed ConvexDB host.
-	 * Call {@code server.getHost().checkpoint()} to save durably while running. At
-	 * shutdown, call {@code server.stopIngress()}, close {@code server.getHost()} to
-	 * save, then close the server, which sends that final checkpoint to peers, then
-	 * the store; network close does not save pending state. Local-only applications
-	 * can use {@link #openHost}.
-	 *
-	 * <p>Usage:
-	 * <pre>
-	 * EtchStore store = EtchStore.createTemp();
-	 * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
-	 *     ConvexDB.createNodeServer(store, RowLWW::merge);
-	 * server.launch();
-	 * ConvexDB cdb = ConvexDB.connect(server.getHost());
-	 * </pre>
-	 *
-	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
-	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
-	 * @return NodeServer over a host assembled by {@link #openHost}
-	 * @throws IOException if the store's retained root cannot be read
-	 */
-	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store,
-			BinaryOperator<Index<Keyword, ACell>> policy) throws IOException {
-		return createNodeServer(store, policy, Utils::getCurrentTimestampCell);
-	}
-
-	/**
-	 * Creates optional networking around a store-backed ConvexDB host whose writes are
-	 * stamped with the given clock, as {@link #createNodeServer(AStore, BinaryOperator)}.
-	 *
-	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
-	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
-	 * @param clock Clock that stamps writes
-	 * @return NodeServer over a host assembled by {@link #openHost(AStore, BinaryOperator, Supplier)}
-	 * @throws IOException if the store's retained root cannot be read
-	 */
-	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store,
-			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) throws IOException {
-		return new NodeServer<>(openHost(store, policy, clock));
-	}
-
-	/**
-	 * Opens a host whose root is a database map, as
-	 * {@link #openHost(AStore, BinaryOperator, Supplier)}, stamping writes with the
-	 * runtime clock.
-	 *
-	 * @param store Store for persistence, or null for an in-memory host
-	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
-	 * @return Host with a registered ConvexDB
-	 * @throws IOException if the store's retained root cannot be read
-	 */
-	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store,
-			BinaryOperator<Index<Keyword, ACell>> policy) throws IOException {
-		return openHost(store, policy, Utils::getCurrentTimestampCell);
-	}
-
-	/**
-	 * Opens a host whose root is a database map, restoring the root the store retains,
-	 * and registers a live ConvexDB with it as its application, so incoming values are
-	 * merged with the given policy. {@link #connect(ALatticeComponent)} returns that
-	 * instance. This is a convenience: an application that roots its databases
-	 * elsewhere assembles its own host.
-	 *
-	 * @param store Store for persistence, or null for an in-memory host
-	 * @param policy Merge policy for each database, for example {@code RowLWW::merge}
-	 * @param clock Clock that stamps writes
-	 * @return Host with a registered ConvexDB
-	 * @throws IOException if the store's retained root cannot be read
-	 */
-	public static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> openHost(AStore store,
-			BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) throws IOException {
-		LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> host = LatticeHost.open(Maps.empty(), store);
-		hosted.put(host, host.addApplication(new ConvexDB(host.cursor(), policy, clock)));
-		return host;
 	}
 
 	/** Subclasses override this to return their own type, so forks keep their databases, policy and clock. */
@@ -450,8 +346,8 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * The database is reached through the connection only: neither the registry
 	 * nor the driver's URL instances see it, and the name may be any string.
 	 *
-	 * <p>This is the preferred API when you already hold a ConvexDB instance
-	 * (e.g. from {@link #connect(ALatticeComponent)}).
+	 * <p>This is the preferred API when you already hold a ConvexDB instance, such
+	 * as the one registered with a host.
 	 *
 	 * @param dbName Database name within this ConvexDB
 	 * @return JDBC Connection backed by this instance's cursor chain

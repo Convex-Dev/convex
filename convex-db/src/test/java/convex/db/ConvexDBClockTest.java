@@ -13,8 +13,13 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -23,6 +28,7 @@ import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLRow;
 import convex.db.lattice.SQLSchema;
+import convex.lattice.LatticeHost;
 
 /**
  * The clock is an explicit dependency the application supplies. Factories pass it
@@ -43,6 +49,15 @@ public class ConvexDBClockTest {
 	private static final Supplier<CVMLong> NO_CLOCK = () -> {
 		throw new AssertionError("Merges and reads must not read the clock");
 	};
+
+	/** An in-memory host with a ConvexDB registered, stamping writes with the given clock. */
+	private static ConvexDB hosted(LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host, Supplier<CVMLong> clock) {
+		return host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge, clock));
+	}
+
+	private static LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host() {
+		return LatticeHost.create(Maps.empty(), null);
+	}
 
 	private static AVector<ACell> row(SQLSchema tables, long id) {
 		return tables.getTable(TABLE).getRows().get(Blob.fromHex(String.format("%016x", id)));
@@ -85,9 +100,9 @@ public class ConvexDBClockTest {
 	@Test
 	public void testHostAndStandaloneDatabasesUseTheSuppliedClock() throws Exception {
 		Clock clock = new Clock();
-		var host = ConvexDB.openHost(null, RowLWW::merge, clock);
-		assertSame(clock, ConvexDB.connect(host).getClock());
-		assertTrue(ConvexDB.connect(host).database(DB).tables().createTable(TABLE, new String[] {"id"}));
+		ConvexDB cdb = hosted(host(), clock);
+		assertSame(clock, cdb.getClock());
+		assertTrue(cdb.database(DB).tables().createTable(TABLE, new String[] {"id"}));
 		assertEquals(1, clock.reads.get());
 
 		Clock replicaClock = new Clock();
@@ -106,8 +121,8 @@ public class ConvexDBClockTest {
 		sourceTables.insert(TABLE, 1, "one");
 		var remote = source.cursor().get();
 
-		var host = ConvexDB.openHost(null, RowLWW::merge, NO_CLOCK);
-		ConvexDB cdb = ConvexDB.connect(host);
+		var host = host();
+		ConvexDB cdb = hosted(host, NO_CLOCK);
 		host.merge(remote);
 		host.mergeAt(row(sourceTables, 1), Strings.create(DB), ConvexDB.KEY_TABLES, Strings.create(TABLE),
 			CVMLong.ONE, Blob.fromHex(String.format("%016x", 1)));

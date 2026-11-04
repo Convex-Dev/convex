@@ -18,6 +18,12 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.schema.SchemaPlus;
 
+import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
 import convex.db.ConvexDB;
@@ -28,6 +34,7 @@ import convex.db.calcite.rules.ConvexRules;
 import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.etch.EtchStore;
+import convex.lattice.LatticeHost;
 import convex.node.NodeServer;
 
 import org.apache.calcite.adapter.enumerable.EnumerableRules;
@@ -72,8 +79,7 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  * // Persistent
  * Connection conn = DriverManager.getConnection("jdbc:convex:file:/data/mydb.etch");
  *
- * // Direct from ConvexDB instance (no DriverManager)
- * ConvexDB cdb = ConvexDB.connect(server.getHost());
+ * // Direct from a ConvexDB the application holds (no DriverManager)
  * Connection conn = cdb.getConnection("mydb");
  * </pre>
  *
@@ -333,9 +339,10 @@ public class ConvexDriver extends Driver {
 			try {
 				File file = new File(path);
 				EtchStore store = EtchStore.create(file);
-				var server = ConvexDB.createNodeServer(store, RowLWW::merge);
+				LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.open(Maps.empty(), store);
+				ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+				var server = new NodeServer<>(host);
 				server.launch();
-				ConvexDB cdb = ConvexDB.connect(server.getHost());
 				ManagedInstance created = new ManagedInstance(cdb, server, store);
 				Shutdown.addHook(Shutdown.SERVICE, created.shutdownHook);
 				return created;

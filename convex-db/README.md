@@ -32,8 +32,10 @@ For a durable local installation, open a host over an Etch store. Networking is
 optional and does not control saving:
 
 ```java
-try (var store = EtchStore.create(file); var host = ConvexDB.openHost(store, RowLWW::merge)) {
-    SQLDatabase db = ConvexDB.connect(host).database("mydb");
+try (var store = EtchStore.create(file);
+     LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.open(Maps.empty(), store)) {
+    ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+    SQLDatabase db = cdb.database("mydb");
     // Perform database operations through this live view.
     host.checkpoint();
 }

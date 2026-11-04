@@ -2,7 +2,6 @@ package convex.db;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -233,28 +232,22 @@ public class ConvexDBMergeTest {
 	// ========== Per-row last-write-wins ==========
 
 	@Test
-	public void testOpenHostRegistersConvexDB() throws Exception {
-		var host = ConvexDB.openHost(null, RowLWW::merge);
-		ConvexDB cdb = ConvexDB.connect(host);
-		assertSame(cdb, ConvexDB.connect(host));
+	public void testRegisteredConvexDBMergesRowsByKey() throws Exception {
+		var host = host();
+		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 		populate(cdb.database(DB));
 
 		host.merge(remoteWithRow2(host.cursor().get()));
 		assertTrue(has(cdb.database(DB), FROZEN, 2), "RowLWW merges rows by key");
 		assertTrue(has(cdb.database(DB), PLAIN, 2));
-
-		// A host assembled elsewhere has no registered ConvexDB: a view needs its policy
-		var plain = host();
-		assertThrows(IllegalArgumentException.class, () -> ConvexDB.connect(plain));
-		assertNotSame(ConvexDB.connect(plain, RowLWW::merge), ConvexDB.connect(plain, RowLWW::merge));
 	}
 
 	/** Delivered rows merge as those of a whole entry would: only rows written since the table was created or dropped. */
 	@Test
 	public void testRowDeliveryIntoLiveDroppedAndAbsentTables() throws Exception {
 		// Tables created at 1 and 3, with rows at 2 and 4; delivered rows are stamped 5 and later
-		var host = ConvexDB.openHost(null, RowLWW::merge, counter());
-		SQLDatabase db = ConvexDB.connect(host).database(DB);
+		var host = host();
+		SQLDatabase db = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge, counter())).database(DB);
 		populate(db);
 		AVector<ACell> row = SQLRow.create(Vectors.of(CVMLong.create(2), Strings.create("two")), CVMLong.create(5));
 		AVector<ACell> created = db.tables().getTable(PLAIN).getState();
@@ -298,8 +291,8 @@ public class ConvexDBMergeTest {
 
 	@Test
 	public void testMissingDatabaseIsNotCreated() throws Exception {
-		var host = ConvexDB.openHost(null, RowLWW::merge);
-		ConvexDB cdb = ConvexDB.connect(host);
+		var host = host();
+		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 		var empty = host.cursor().get();
 
 		SQLDatabase db = cdb.database("missing");

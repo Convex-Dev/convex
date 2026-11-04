@@ -27,9 +27,8 @@ lies. Where the databases live is the application's choice: it can root the map 
 the host root, under a region of its own or inside another application, and it
 registers the `ConvexDB` with its host to receive incoming values. By convention,
 an application's own databases live under `:app`; `:sql` is intended for publicly
-shared data such as reference tables. `ConvexDB.openHost(store, policy)` is a convenience that
-assembles a host whose root is the database map, with a `ConvexDB` registered;
-`ConvexDB.connect(host)` returns that instance.
+shared data such as reference tables. The main class keeps the `ConvexDB` it
+registers, as the [API summary](#api-summary) shows.
 
 ## Component ↔ Cursor Mapping
 
@@ -110,8 +109,7 @@ snapshotting the database value at fork time, whose destination is the live curs
 and publishes the tables; the destination's other sections stay as they are.
 
 ```java
-ConvexDB cdb = ConvexDB.connect(server.getHost());
-SQLDatabase db = cdb.database("mydb");
+SQLDatabase db = cdb.database("mydb");   // cdb: the ConvexDB registered with the host
 
 // Transaction 1
 SQLDatabase tx1 = db.fork();
@@ -219,9 +217,10 @@ ConvexDB cdb = ConvexDB.create(MyApp::keepReference);
 
 ```java
 // Setup — the host's registered ConvexDB merges incoming values
-var server = ConvexDB.createNodeServer(store, RowLWW::merge);
+LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.open(Maps.empty(), store);
+ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+var server = new NodeServer<>(host);
 server.launch();
-ConvexDB cdb = ConvexDB.connect(server.getHost());
 SQLDatabase db = cdb.database("mydb");
 
 // DDL (directly on db, outside transaction)

@@ -102,12 +102,11 @@ DriverManager.getConnection("jdbc:convex:file:/data/market.etch")
     │     ├── Found → return new Connection on existing cursor/store
     │     └── Not found:
     │           ├── EtchStore.create(file)          — opens or creates Etch file
-    │           ├── ConvexDB.createNodeServer(store, RowLWW::merge)
-    │           │                                   — ConvexDB.openHost restores the
-    │           │                                     retained root and registers a
-    │           │                                     ConvexDB with the host
-    │           ├── server.launch()
-    │           ├── ConvexDB.connect(server.getHost()) — the registered ConvexDB
+    │           ├── LatticeHost.open(Maps.empty(), store)
+    │           │                                   — restores the retained root
+    │           ├── host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge))
+    │           │                                   — the ConvexDB the driver keeps
+    │           ├── new NodeServer<>(host), server.launch()
     │           └── Store in map, add a shutdown hook to save, return Connection
     │
     └── Connection wraps Calcite + ConvexSchema backed by the cursor chain
@@ -146,7 +145,6 @@ Code that already holds a `ConvexDB` instance can get a Connection directly,
 without a URL or registration:
 
 ```java
-ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 ```
 
@@ -199,15 +197,16 @@ For advanced use cases (replication, custom NodeServer config):
 
 ```java
 EtchStore store = EtchStore.create(new File("/data/market.etch"));
-var server = new NodeServer<>(ConvexDB.openHost(store, RowLWW::merge), config);
+LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.open(Maps.empty(), store);
+ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+var server = new NodeServer<>(host, config);
 server.launch();
 
-ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 // ... use conn ...
 
 // Shutdown (see convex-peer/docs/SHUTDOWN.md): closes the host, the server, the store
-try (store; server; var host = server.getHost()) {
+try (store; server; host) {
     server.stopIngress(); // replication no longer changes the host
 }
 ```
