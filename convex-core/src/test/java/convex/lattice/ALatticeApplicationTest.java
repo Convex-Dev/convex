@@ -98,7 +98,7 @@ public class ALatticeApplicationTest {
 	public void testPreparationFailureLeavesCheckpointsLocalForRetry() {
 		var host=LatticeHost.create(LATTICE.zero(),null);
 		AtomicInteger calls=new AtomicInteger();
-		var app=new ALatticeApplication<Index<Keyword,ACell>>(host) {
+		var app=new ALatticeApplication<Index<Keyword,ACell>>(host.cursor().fork(),host::persist) {
 			@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 				return cursor().updateAndGet(own -> LATTICE.merge(own,other));
 			}

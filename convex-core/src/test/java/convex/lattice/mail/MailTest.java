@@ -451,7 +451,7 @@ public class MailTest {
 	private static final class HostedRoot extends ALatticeApplication<Index<Keyword,ACell>> {
 		private final KeyedLattice lattice;
 		HostedRoot(KeyedLattice lattice, LatticeHost<Index<Keyword,ACell>> host) {
-			super(host);
+			super(host.cursor().fork(),host::persist);
 			this.lattice=lattice;
 		}
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {

@@ -83,7 +83,7 @@ class ApplicationLifecycleTest {
 	/** Children publish into a staged application before its own boundary becomes visible. */
 	@Test void childFailureDefersApplicationPublicationAndCanRetry() {
 		var host=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),null);
-		var app=new ALatticeApplication<ASet<CVMLong>>(host) {
+		var app=new ALatticeApplication<ASet<CVMLong>>(host.cursor().fork(),host::persist) {
 			final Values child=new Values(cursor().fork());
 			boolean fail=true;
 			@Override protected void beforeSync() { child.merge(Sets.of(1)); }
@@ -111,7 +111,7 @@ class ApplicationLifecycleTest {
 		var ready=new CountDownLatch(2);
 		var publish=new CountDownLatch(1);
 		class App extends ALatticeApplication<ASet<CVMLong>> {
-			App() { super(host); }
+			App() { super(host.cursor().fork(),host::persist); }
 			@Override public ASet<CVMLong> merge(ASet<CVMLong> incoming) {
 				return cursor().updateAndGet(own -> union(own,incoming));
 			}

@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Limit how many data requests a lattice node serves at once. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#inbound-pipeline))
 - Remove `LatticeApplication`: register a `LatticeComponent` where a lattice is all a root does, or extend `ALatticeApplication`; `P2PApplication` no longer offers `setContext` or `resolve`. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#composition-and-sharing))
 - Make `Regions` and `SingleRegion` components rather than applications: build them over `host.cursor()`; `Social.connect`, `P2PUser.create` and `Mail.connect` take any root component. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#composition-and-sharing))
+- Remove the `ALatticeApplication` constructor taking a host: an application with a private copy of the root calls `super(host.cursor().fork(), host::persist)`. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#retention-durability-and-networking))
 - Run an in-process client's queries on the calling thread, or on a virtual thread of their own when asynchronous, rather than on the peer's query handler, which they held up for network queries and data requests. ([Messaging](convex-peer/docs/MESSAGING.md#44-convexlocal--in-memory-client))
 
 ### Deprecated

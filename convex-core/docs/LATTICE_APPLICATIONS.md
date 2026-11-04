@@ -315,12 +315,12 @@ of recovery. A checkpoint retains one host snapshot and completes the store's
 barrier. It excludes private application drafts and writes arriving after that
 snapshot. A failed barrier does not roll back publication already performed.
 
-A component with working state of its own, such as a host-bound application or any
-component given a persistence function when built, persists it with `persist()`. Its cells go to the store and need
-not stay in memory, but nothing is published, signed or retained as the root, so
-it survives a restart only once synced and checkpointed. The component never
-holds a store: it persists through a function supplied when it was built, which a
-host-bound application takes from its host. A component without one refuses,
+A component with working state of its own, given a persistence function when
+built, persists it with `persist()`. An application holding a private copy of the
+root is built as `super(host.cursor().fork(), host::persist)`. Its cells go to the
+store and need not stay in memory, but nothing is published, signed or retained as
+the root, so it survives a restart only once synced and checkpointed. The component
+never holds a store: it persists through the function it was built with. A component without one refuses,
 since its state is its parent's. Which components persist, and when, is the
 application's policy.
 

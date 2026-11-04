@@ -634,7 +634,10 @@ This preserves CAD045's component boundaries and CAD035's fork semantics.
 Implemented. A component binds the storage it is given, `super(cursor)`. A staged
 component is one constructed over a fork of its destination, `destination.fork()`,
 and a component fork is `rebind(storage.fork())`, the same class over a forked
-cursor. There is no second constructor form and no ownership flag.
+cursor. There is no second constructor form and no ownership flag. Applications
+follow the same rule: one holding a private copy of the root is built over
+`host.cursor().fork()` with `host::persist`, and no application constructor takes
+a host.
 
 `sync()` publishes the bound storage with the component's own reconciliation,
 `storage.sync(this::mergePublication)`. On a fork that reconciles and publishes into

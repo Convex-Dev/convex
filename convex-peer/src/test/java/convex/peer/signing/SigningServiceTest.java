@@ -72,7 +72,7 @@ public class SigningServiceTest {
 		final SigningService signing;
 
 		SigningApplication(LatticeHost<Index<Keyword, ACell>> host, AKeyPair peerKP) {
-			super(host);
+			super(host.cursor().fork(),host::persist);
 			signing = new SigningService(cursor(), peerKP, Utils::getCurrentTimestampCell, host::persist);
 		}
 

@@ -69,7 +69,7 @@ public class ALatticeComponentTest {
 	private static class SetApplication extends ALatticeApplication<ASet<ACell>> {
 
 		SetApplication(LatticeHost<ASet<ACell>> host) {
-			super(host);
+			super(host.cursor().fork(),host::persist);
 		}
 
 		SetApplication(AForkableCursor<ASet<ACell>> cursor) {

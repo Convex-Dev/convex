@@ -1,17 +1,17 @@
 package convex.lattice;
 
-import java.util.Objects;
-
 import convex.core.data.ACell;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.Persister;
 
 /**
  * Application lifecycle over a component's working state and managed children.
  *
  * <p>Applications define incoming merge and routing through their domain components.
- * No abstract lattice or parallel structure declaration is required. A host-bound
- * application owns a staged copy of the host value and persists it through the
- * host's store; a cursor-bound application shares the supplied working state.
+ * No abstract lattice or parallel structure declaration is required. An application
+ * binds the storage it is given: a live application shares {@code host.cursor()},
+ * and one holding a private copy of the root is given a fork with the function that
+ * persists it, {@code super(host.cursor().fork(), host::persist)}.
  * Children may share that state or own separate publication boundaries. Which
  * children persist, and when, is the application's policy.</p>
  *
@@ -24,14 +24,17 @@ import convex.lattice.cursor.AForkableCursor;
  */
 public abstract class ALatticeApplication<V extends ACell> extends ALatticeComponent<V> {
 
-	/** Creates private working state over a host, persisted through the host's store. */
-	protected ALatticeApplication(LatticeHost<V> host) {
-		super(Objects.requireNonNull(host,"Application host must not be null").cursor().fork(),host::persist);
-	}
-
 	/** Shares working storage, for live applications, nested containers and transaction views. */
 	protected ALatticeApplication(AForkableCursor<V> cursor) {
 		super(cursor);
+	}
+
+	/**
+	 * Binds working state of its own with the function that persists it, normally a
+	 * private copy of the root, {@code host.cursor().fork()}, with {@code host::persist}.
+	 */
+	protected ALatticeApplication(AForkableCursor<V> cursor,Persister<V> persister) {
+		super(cursor,persister);
 	}
 
 	/**

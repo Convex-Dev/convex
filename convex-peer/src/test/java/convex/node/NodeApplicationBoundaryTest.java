@@ -24,7 +24,7 @@ class NodeApplicationBoundaryTest {
 	private static class App extends ALatticeApplication<ASet<CVMLong>> {
 		private static final SetLattice<CVMLong> LATTICE=SetLattice.create();
 		int preparations;
-		App(LatticeHost<ASet<CVMLong>> host) { super(host); }
+		App(LatticeHost<ASet<CVMLong>> host) { super(host.cursor().fork(),host::persist); }
 		@Override public ASet<CVMLong> merge(ASet<CVMLong> other) {
 			return cursor().updateAndGet(own -> LATTICE.merge(own,other));
 		}

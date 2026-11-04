@@ -61,7 +61,7 @@ public class ApplicationPublicationTest {
 		volatile AKeyPair signingKey=KEY;
 
 		Application(LatticeHost<Index<Keyword,ACell>> host) {
-			super(host);
+			super(host.cursor().fork(),host::persist);
 			// The owned subtree publishes through its own fork of the host, beside this
 			// application's staged root, so each fork reconciles only what it owns.
 			owner=new SignedComponent<>(SIGNED,

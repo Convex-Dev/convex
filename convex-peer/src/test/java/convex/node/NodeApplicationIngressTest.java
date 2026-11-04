@@ -38,7 +38,7 @@ class NodeApplicationIngressTest {
 		int preparations;
 		int merges;
 		boolean ignore;
-		App(LatticeHost<Index<Keyword,ACell>> host) { super(host); }
+		App(LatticeHost<Index<Keyword,ACell>> host) { super(host.cursor().fork(),host::persist); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
 			merges++;
 			if (ignore) return cursor().get();

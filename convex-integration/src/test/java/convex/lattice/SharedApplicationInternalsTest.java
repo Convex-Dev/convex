@@ -103,7 +103,7 @@ public class SharedApplicationInternalsTest {
 		final P2PNodeRecord node;
 
 		WorkingApplication(LatticeHost<Index<Keyword,ACell>> host,boolean socialApp,Runnable signing) {
-			super(host);
+			super(host.cursor().fork(),host::persist);
 			if (socialApp) {
 				var policy=context(SOCIAL_KEY,signing);
 				socialState=owned(host,policy,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));

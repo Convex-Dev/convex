@@ -58,7 +58,7 @@ class MailDeliveryTest {
 	 * desires.
 	 */
 	static final class MailApp extends ALatticeApplication<Index<Keyword,ACell>> {
-		MailApp(LatticeHost<Index<Keyword,ACell>> host) { super(host); }
+		MailApp(LatticeHost<Index<Keyword,ACell>> host) { super(host.cursor().fork(),host::persist); }
 		Mail mail(AKeyPair user) { return Mail.connect(this,Mail.LATTICE,(owner,value) -> user.signData(value)); }
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
 			return cursor().updateAndGet(own -> ROOT.merge(own,other));

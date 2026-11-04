@@ -38,7 +38,7 @@ class ApplicationIngressTest {
 		int preparations;
 		boolean ignore;
 		App(KeyedLattice rule,LatticeHost<Index<Keyword,ACell>> host) {
-			super(host);
+			super(host.cursor().fork(),host::persist);
 			this.rule=rule;
 		}
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
