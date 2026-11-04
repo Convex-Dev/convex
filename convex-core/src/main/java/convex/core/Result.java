@@ -415,7 +415,7 @@ public final class Result extends ARecordGeneric {
 			// Either a caller that caught this on its own thread did not restore the
 			// status, or a worker on another thread was interrupted. Neither is expected.
 			if (!Thread.currentThread().isInterrupted()) {
-				log.log(System.Logger.Level.WARNING,"InterruptedException reached Result.fromException on a thread that is not interrupted: "
+				log.log(System.Logger.Level.ERROR,"InterruptedException reached Result.fromException on a thread that is not interrupted: "
 						+"restore the status where it was caught (Result.fromInterrupt), or it came from another thread",e);
 			}
 			return INTERRUPTED_RESULT;
