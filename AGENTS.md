@@ -15,8 +15,6 @@ releases.
 - Cross-module, build-system, protocol or release changes: the full
   `./mvnw -B clean verify`.
 - Docs and comments: check the diff.
-- Code must also compile under Eclipse's compiler (ecj): give explicit type
-  arguments where inference crosses a raw array or a wildcard.
 
 ## Branches and commits
 
