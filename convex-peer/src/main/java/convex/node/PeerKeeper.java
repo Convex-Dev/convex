@@ -2,6 +2,7 @@ package convex.node;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Future;
 import java.util.function.LongSupplier;
 
 import org.slf4j.Logger;
@@ -28,10 +29,10 @@ final class PeerKeeper {
 
 	private static final Logger log=LoggerFactory.getLogger(PeerKeeper.class);
 
-	/** Runs a task after a delay. */
+	/** Runs a task after a delay, returning the pending task; cancelling it stops the task and its timer. */
 	@FunctionalInterface
 	interface Scheduler {
-		void schedule(long delayMillis,Runnable task);
+		Future<?> schedule(long delayMillis,Runnable task);
 	}
 
 	private final LatticeConnectionManager manager;
@@ -52,6 +53,8 @@ final class PeerKeeper {
 	private long since;
 	/** Failed attempts in the current period, for backoff. */
 	private int failures;
+	/** The last retry scheduled; stopping cancels it, so no timer outlives the keeper. */
+	private volatile Future<?> retry;
 
 	PeerKeeper(LatticeConnectionManager manager,PeerResolver resolver,PeerName name,long giveUpMillis,
 			LongSupplier clock,Scheduler scheduler) {
@@ -62,6 +65,8 @@ final class PeerKeeper {
 		this.clock=clock;
 		this.scheduler=scheduler;
 		kept.whenComplete((value,error) -> {
+			Future<?> pending=retry;
+			if (pending!=null) pending.cancel(false);
 			if (!kept.isCancelled()) return;
 			AccountKey key;
 			synchronized (this) {
@@ -154,6 +159,9 @@ final class PeerKeeper {
 		}
 		if (failed==1) log.info("Could not reach peer {}: {}; trying again",name,cause.getMessage());
 		else log.debug("Could not reach peer {}: {}; trying again",name,cause.getMessage());
-		scheduler.schedule(LatticeConnectionManager.calculateBackoff(failed),this::attempt);
+		Future<?> pending=scheduler.schedule(LatticeConnectionManager.calculateBackoff(failed),this::attempt);
+		retry=pending;
+		// Stopped meanwhile, perhaps before this retry was published for stopping to cancel
+		if (kept.isDone()) pending.cancel(false);
 	}
 }

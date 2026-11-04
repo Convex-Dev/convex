@@ -185,6 +185,8 @@ public class P2PNode implements Closeable {
 	private CompletableFuture<Void> seeding;
 	/** The seeding round still dialling, or null between rounds. */
 	private volatile SeedRound seedRound;
+	/** The last backoff before seeding as a last resort; closing cancels it, so no timer outlives the node. */
+	private volatile CompletableFuture<Void> seedBackoff;
 	/** The node each seed name proved it was, from its last connection. */
 	private final Map<PeerName,AccountKey> seedKeys=new ConcurrentHashMap<>();
 	/** Freezes P2P application configuration at the same boundary as NodeServer. */
@@ -867,15 +869,27 @@ public class P2PNode implements Closeable {
 		CompletableFuture<Void> starved=propagator.getConnectionManager().whenStarved();
 		// Each round that leaves this node still starved backs off further; a wait starts afresh
 		int round=starved.isDone()?rounds+1:1;
-		starved.thenCompose(ignored -> {
-			CompletableFuture<Void> due=new CompletableFuture<>();
-			CompletableFuture.delayedExecutor(LatticeConnectionManager.calculateBackoff(round),TimeUnit.MILLISECONDS)
-				.execute(() -> due.complete(null));
-			return due;
-		}).thenCompose(ignored -> seedAsLastResort()).whenComplete((dialled,error) -> {
-			// Fails only when the node closes
-			if (error==null) seedWhenStarved(round);
-		});
+		starved.thenCompose(ignored -> startSeedBackoff(LatticeConnectionManager.calculateBackoff(round)))
+			// Dials off the JDK's timer thread, which every delay in the JVM shares
+			.thenComposeAsync(ignored -> seedAsLastResort())
+			.whenComplete((dialled,error) -> {
+				// Fails only when the node closes
+				if (error==null) seedWhenStarved(round);
+			});
+	}
+
+	/** A backoff before seeding as a last resort, which closing the node cancels with its timer. */
+	private CompletableFuture<Void> startSeedBackoff(long millis) {
+		CompletableFuture<Void> due=new CompletableFuture<Void>().completeOnTimeout(null,millis,TimeUnit.MILLISECONDS);
+		seedBackoff=due;
+		// Closed meanwhile, perhaps before this backoff was published for closing to cancel
+		if (!server.isRunning()) due.cancel(false);
+		return due;
+	}
+
+	/** The last backoff before seeding as a last resort, or null if none has started. */
+	CompletableFuture<Void> seedBackoff() {
+		return seedBackoff;
 	}
 
 	/** One round of last resort: dials a few seeds this node is not connected to, chosen at random. */
@@ -1384,7 +1398,13 @@ public class P2PNode implements Closeable {
 	 */
 	@Override
 	public void close() throws IOException {
-		network.close();
+		try {
+			network.close();
+		} finally {
+			// Once the server stops, a backoff started later cancels itself
+			CompletableFuture<Void> backoff=seedBackoff;
+			if (backoff!=null) backoff.cancel(false);
+		}
 	}
 
 	/**

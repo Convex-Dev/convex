@@ -225,6 +225,22 @@ public class P2PNodeTest {
 		}
 	}
 
+	/**
+	 * A node that knows no peer waits out a backoff before turning to its seeds; closing
+	 * the node cancels that backoff, and with it the timer, so nothing it started outlives it.
+	 */
+	@Test
+	public void testCloseCancelsTheSeedingBackoff() throws Exception {
+		node=P2PNode.create(store,NodeConfig.port(-1),AKeyPair.generate());
+		node.launch();
+		node.seed(List.of());
+		CompletableFuture<Void> backoff=node.seedBackoff();
+		assertNotNull(backoff,"a node that knows no peer waits to seed as a last resort");
+		assertFalse(backoff.isDone());
+		node.close();
+		assertTrue(backoff.isCancelled());
+	}
+
 	private Throwable connectFailure(AccountKey key,P2PNode hub) {
 		return assertThrows(ExecutionException.class,
 			() -> node.connect(key,hub.getHostAddress()).get(10,TimeUnit.SECONDS)).getCause();

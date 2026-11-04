@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,11 +53,14 @@ public class PeerKeeperTest {
 	// One instance serves the class's tests, which run in turn, so each starts afresh
 	private AtomicLong now;
 	private ArrayDeque<Runnable> scheduled;
+	/** Every retry scheduled, as the keeper sees it pending. */
+	private List<CompletableFuture<Void>> retries;
 	private RecordingManager manager;
 
 	@BeforeEach public void setUp() {
 		now=new AtomicLong();
 		scheduled=new ArrayDeque<>();
+		retries=new ArrayList<>();
 		manager=new RecordingManager();
 	}
 
@@ -64,7 +68,12 @@ public class PeerKeeperTest {
 
 	private PeerKeeper keeper(PeerResolver resolver,String name) {
 		return new PeerKeeper(manager,resolver,PeerResolver.parse(name),PERIOD,now::get,
-			(delay,task) -> scheduled.add(task));
+			(delay,task) -> {
+				scheduled.add(task);
+				CompletableFuture<Void> retry=new CompletableFuture<>();
+				retries.add(retry);
+				return retry;
+			});
 	}
 
 	private void runScheduled() {
@@ -144,8 +153,25 @@ public class PeerKeeperTest {
 		failing.start(null);
 		manager.fail();
 		failing.kept.cancel(false);
+		assertTrue(retries.get(0).isCancelled(),"stopping cancels the pending retry and its timer");
+		// A retry already running when stopped makes no attempt
 		runScheduled();
 		assertEquals(2,manager.targets.size(),"no attempt once stopped");
+	}
+
+	/** Stopping while a retry is being scheduled, before the keeper holds it, still cancels it. */
+	@Test public void stoppingWhileARetryIsScheduledCancelsIt() {
+		CompletableFuture<Void> retry=new CompletableFuture<>();
+		AtomicReference<PeerKeeper> stopping=new AtomicReference<>();
+		PeerKeeper keeper=new PeerKeeper(manager,TRANSPORT,PeerResolver.parse("tcp://localhost:1"),PERIOD,now::get,
+			(delay,task) -> {
+				stopping.get().kept.cancel(false);
+				return retry;
+			});
+		stopping.set(keeper);
+		keeper.start(null);
+		manager.fail();
+		assertTrue(retry.isCancelled(),"no retry is left pending");
 	}
 
 	private static AMap<AString,ACell> document(AccountKey key) {

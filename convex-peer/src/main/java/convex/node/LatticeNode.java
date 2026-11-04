@@ -274,7 +274,12 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 			Duration giveUpAfter) {
 		PeerKeeper keeper=new PeerKeeper(propagator.getConnectionManager(),getPeerResolver(),name,
 			giveUpAfter.toMillis(),() -> System.nanoTime()/1_000_000L,
-			(delay,task) -> CompletableFuture.delayedExecutor(delay,TimeUnit.MILLISECONDS).execute(task));
+			(delay,task) -> {
+				// Cancelling the pending retry removes its timer too, so none outlives the node
+				CompletableFuture<Void> due=new CompletableFuture<Void>().completeOnTimeout(null,delay,TimeUnit.MILLISECONDS);
+				due.thenRunAsync(task);
+				return due;
+			});
 		keptPeers.put(keeper.kept,propagator);
 		keeper.kept.whenComplete((value,error) -> keptPeers.remove(keeper.kept));
 		keeper.start(admitted);
