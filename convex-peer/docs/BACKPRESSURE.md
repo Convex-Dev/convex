@@ -93,7 +93,8 @@ For in-JVM clients (no network), there is no Netty handler. If the queue is full
 `ConvexLocal` calls the retry predicate directly on the caller's thread, which waits
 for space. A caller on the handler's own thread, such as a local client's callback for
 a result that handler returned, is refused at once instead: only that thread empties
-the queue, so the wait could only time out.
+the queue, so the wait could only time out. `ConvexLocal` queries take no queue: they
+run on the client's own thread ([MESSAGING.md](MESSAGING.md) §4.4).
 
 ## Queue Processing
 

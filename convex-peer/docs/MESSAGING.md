@@ -312,10 +312,10 @@ Neither cancellation nor expiry implies that a submitted transaction did not run
 
 A reply completes the client's future on the thread that delivers it: a network
 event loop for a remote client, or for `ConvexLocal` the local peer's thread that
-produced the reply. That is the query handler for a query, the thread that executes
-blocks for a transaction's result, and the calling thread itself for a status or
-ping request. A timeout or close completes it on the timeout scheduler or the
-closing thread. Stages attached with `thenApply`, `thenCompose`, `whenComplete` and
+produced the reply. That is the thread that executes blocks for a transaction's
+result, the query handler for a raw QUERY message, and the calling thread itself
+for a status or ping request; a `ConvexLocal` query takes no peer thread (§4.4).
+A timeout or close completes it on the timeout scheduler or the closing thread. Stages attached with `thenApply`, `thenCompose`, `whenComplete` and
 the other non-async methods run on that thread without a hand-off, so they must not
 block: an event loop serves many connections, and a local peer's threads serve every
 client and advance its state. A stage may send a
@@ -359,6 +359,14 @@ The pair is created at construction time. The mode depends on keypair presence:
 - Server end cannot `sendMessage` to client (`supportsMessage()` = false)
 - `returnMessage` works — results flow back through the awaiting map
 - No trust accumulation; `InboundVerifier` skips these connections
+
+**Queries** do not use the pair. `querySync` runs the query against the peer's
+current state on the calling thread, and `query` on a virtual thread of its own,
+which completes the returned future. A local query therefore never waits in, or
+holds up, the peer's query handler, which stays free for network queries and data
+requests, and its continuations never run on a peer thread. A raw QUERY message
+sent with `message` or `request` still takes the peer's query queue, as from the
+network (§4.6).
 
 ### 4.5 `ConvexDirect` — Fast Path
 

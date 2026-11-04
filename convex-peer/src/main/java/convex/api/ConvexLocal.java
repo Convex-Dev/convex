@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 import convex.core.Result;
+import convex.core.ResultContext;
 import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
@@ -20,6 +21,7 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
+import convex.core.message.AConnection;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.store.AStore;
@@ -31,7 +33,8 @@ import convex.peer.Server;
  *
  * <p>Uses a persistent paired {@link LocalConnection} for bidirectional messaging
  * with the local server. Result correlation and CHALLENGE auto-response are handled
- * by the shared dispatch logic in {@link AConvexConnected}.</p>
+ * by the shared dispatch logic in {@link AConvexConnected}. Queries skip the
+ * connection and run against the peer's current state on the client's own thread.</p>
  */
 public class ConvexLocal extends AConvexConnected {
 
@@ -124,10 +127,35 @@ public class ConvexLocal extends AConvexConnected {
 		return request(m);
 	}
 
+	/**
+	 * Runs the query against the local peer's current state on a virtual thread of its
+	 * own, which completes the returned future. It takes nothing from the peer: its
+	 * query handler stays free for network queries and data requests, and the query's
+	 * continuations never run on a peer thread. A raw QUERY message sent with
+	 * {@link #message(Message)} still takes the peer's queue, as from the network.
+	 */
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) {
-		Message m=Message.createQuery((CVMLong)null,query,address);
-		return request(m);
+		return CompletableFuture.supplyAsync(() -> executeQuery(query,address),ThreadUtils.getVirtualExecutor());
+	}
+
+	/**
+	 * Runs the query on the calling thread. Juice bounds it, so it needs no timeout.
+	 */
+	@Override
+	protected Result querySync(ACell query, Address address, long timeoutMillis) {
+		return executeQuery(query,address);
+	}
+
+	private Result executeQuery(ACell query, Address address) {
+		AConnection conn=connection;
+		if ((conn==null)||conn.isClosed()) return Result.CLOSED_CONNECTION;
+		try {
+			ResultContext rc=server.getPeer().executeQuery(query,address);
+			return Result.fromContext(conn.nextRequestID(),rc).withSource(SourceCodes.PEER);
+		} catch (Exception e) {
+			return Result.fromException(e).withSource(SourceCodes.PEER);
+		}
 	}
 
 	@Override

@@ -24,7 +24,6 @@ import convex.core.cvm.Migrations;
 import convex.core.cvm.State;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
-import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
@@ -56,8 +55,8 @@ class InboundQueueBackpressureTest {
 	}
 
 	/**
-	 * A local client's callback on the query handler thread cannot wait for space in the
-	 * query queue: only that thread empties it, so the wait could only time out.
+	 * A callback on the query handler thread cannot wait for space in the query queue:
+	 * only that thread empties it, so the wait could only time out.
 	 */
 	@Test
 	@Timeout(60)
@@ -77,7 +76,8 @@ class InboundQueueBackpressureTest {
 					if (outcome.isDone()) return;
 					for (int i=0;i<Config.QUERY_QUEUE_SIZE;i++) convex.trySend(QUERY);
 					long start=System.nanoTime();
-					Result result=convex.query(CVMLong.ONE).join();
+					// A raw query takes the query queue, as from the network
+					Result result=convex.request(QUERY).join();
 					outcome.complete(new Outcome(result,System.nanoTime()-start));
 				});
 				assertTrue(convex.trySend(QUERY));
