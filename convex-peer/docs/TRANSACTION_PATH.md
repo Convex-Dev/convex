@@ -550,6 +550,6 @@ Etch on spinning disk), this adds latency between CVM execution and result repor
 | `DEFAULT_MIN_BLOCK_TIME` | 10ms | TransactionHandler | Min interval between blocks |
 | `AWAIT_BELIEFS_PAUSE` | 30ms | BeliefPropagator | Belief poll timeout |
 | `BELIEF_QUEUE_SIZE` | 200 | Config | Acquired Belief and trusted propagation queue capacities |
-| `DEFAULT_CLIENT_TIMEOUT` | 8000ms | Config | Client gives up after this |
+| `DEFAULT_CLIENT_TIMEOUT` | 20000ms | Config | Client gives up after this |
 | `SIGN_CHUNK_SIZE` | 100 | Peer | Txns per parallel sig task |
 | CVMExecutor poll timeout | 100ms | CVMExecutor | Idle belief poll |
