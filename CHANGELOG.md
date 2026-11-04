@@ -109,6 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Make a busy lattice node pause connections it opened, as it does those opened to it, instead of refusing data requests on them or dropping what the peer sends. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#inbound-pipeline))
 - Resume a paused TLS connection without waiting for more data: a message already received could sit unread until the peer sent another.
 - Stop `Result.fromException` interrupting the calling thread when it is given an interrupt from another thread, which could break a lattice node's store I/O; code that catches an `InterruptedException` itself keeps its interrupt status with `Result.fromInterrupt`.
+- Keep the caller's interrupt status when `ConnectionManager.connectToPeer` is interrupted while connecting, so a peer that is shutting down no longer polls another peer's status first.
 
 ## [0.8.18] - 2026-10-25
 

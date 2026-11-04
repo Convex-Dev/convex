@@ -469,6 +469,8 @@ public class ConnectionManager extends AConnectionManager {
 			if (opened!=null) pendingConnections.remove(opened);
 			closeSilently(opened);
 			result.completeExceptionally(e);
+			// Throwing an interrupt cleared this thread's status: restore it for the caller
+			if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 		}
 		return result;
 	}

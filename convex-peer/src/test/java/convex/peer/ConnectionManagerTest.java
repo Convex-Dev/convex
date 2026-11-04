@@ -9,7 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -435,6 +438,26 @@ public class ConnectionManagerTest {
 			manager.pollBelief(remoteKey,connection);
 			assertTrue(connection.isConnected(),"an arbitrary error code starts no connectivity-failure window");
 		} finally {
+			server.close();
+		}
+	}
+
+	@Test
+	public void testInterruptedConnectKeepsInterruptStatus() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(214));
+		// Accepts TCP but never answers the TLS handshake, so the connect cannot finish
+		try (ServerSocket silent=new ServerSocket(0,50,InetAddress.getLoopbackAddress())) {
+			ConnectionManager manager=new ConnectionManager(server);
+			URI endpoint=new URI("tls",null,"127.0.0.1",silent.getLocalPort(),null,null,null);
+
+			Thread.currentThread().interrupt();
+			CompletableFuture<Convex> result=manager.connectToPeer(endpoint,AKeyPair.createSeeded(215).getAccountKey());
+
+			assertTrue(Thread.interrupted(),"the caller must keep its interrupt status");
+			assertTrue(result.isCompletedExceptionally());
+			assertTrue(result.exceptionNow() instanceof InterruptedException);
+		} finally {
+			Thread.interrupted();
 			server.close();
 		}
 	}
