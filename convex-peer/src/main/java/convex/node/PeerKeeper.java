@@ -146,12 +146,14 @@ final class PeerKeeper {
 			elapsed=clock.getAsLong()-since;
 			failed=++failures;
 		}
+		// Failing to connect is normal operation: report the first failure of a period, not each retry
 		if (elapsed>=giveUpMillis) {
-			log.warn("Gave up peer {} after {} s without reaching it: {}",name,elapsed/1000,cause.getMessage());
+			log.info("Gave up peer {} after {} s without reaching it: {}",name,elapsed/1000,cause.getMessage());
 			kept.completeExceptionally(new IllegalStateException("Gave up peer "+name+": "+cause.getMessage(),cause));
 			return;
 		}
-		log.warn("Could not reach peer {}: {}; trying again",name,cause.getMessage());
+		if (failed==1) log.info("Could not reach peer {}: {}; trying again",name,cause.getMessage());
+		else log.debug("Could not reach peer {}: {}; trying again",name,cause.getMessage());
 		scheduler.schedule(LatticeConnectionManager.calculateBackoff(failed),this::attempt);
 	}
 }

@@ -10,7 +10,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -250,6 +253,58 @@ public class P2PSeedTest {
 		resources.remove(other);
 		other.close();
 		joiner.whenConnected(hubKey.getAccountKey()).get(TIMEOUT,TimeUnit.SECONDS);
+	}
+
+	/** A restarted node dials a node it reached before alongside its seed, and keeps it once the seed is released. */
+	@Test
+	public void testNodeReachedBeforeIsKeptWhileTheSeedIsReleased() throws Exception {
+		P2PNode hub=launch(store("seed-hub"),NodeConfig.localNetwork(),0,hubKey);
+		P2PNode other=launch(store("seed-other"),NodeConfig.localNetwork(),0,otherKey);
+		EtchStore joinerStore=store("seed-joiner");
+		P2PNode first=P2PNode.create(joinerStore,NodeConfig.localNetwork(),joinerKey).serveAllInbound();
+		first.launch();
+		first.getApplication().contacts().contacted(otherKey.getAccountKey(),address(other));
+		shutDown(first);
+
+		NodeConfig config=withSeeds(seedList(hubKey.getAccountKey(),hub));
+		P2PNode restarted=P2PNode.create(joinerStore,config,ambient(1),joinerKey).serveAllInbound();
+		resources.add(restarted);
+		restarted.launch();
+		restarted.seed(P2PNode.seeds(config)).get(TIMEOUT,TimeUnit.SECONDS);
+		LatticeConnectionManager manager=restarted.propagationGroup().getConnectionManager();
+		assertNotNull(manager.getConnection(otherKey.getAccountKey()),"the node reached before stays connected");
+		assertFalse(restarted.isNamed(otherKey.getAccountKey()),"as an ordinary peer");
+	}
+
+	/** Only nodes that answered and have not failed since, at an address this node does not refuse, join the seeds. */
+	@Test
+	public void testKnownGoodNodesAnsweredAndHaveNotFailedSince() throws Exception {
+		P2PNode joiner=P2PNode.create(store("seed-joiner"),NodeConfig.localNetwork(),joinerKey);
+		resources.add(joiner);
+		ContactRecords contacts=joiner.getApplication().contacts();
+		AString address=Strings.create("tcp://localhost:18888");
+		AccountKey good=AKeyPair.createSeeded(1).getAccountKey();
+		AccountKey failing=AKeyPair.createSeeded(2).getAccountKey();
+		AccountKey blocked=AKeyPair.createSeeded(3).getAccountKey();
+		AccountKey noAddress=AKeyPair.createSeeded(4).getAccountKey();
+		contacts.contacted(good,address);
+		contacts.contacted(failing,Strings.create("tcp://localhost:18889"));
+		contacts.failed(failing);
+		contacts.contacted(blocked,Strings.create("tcp://localhost:18890"));
+		joiner.block(blocked);
+		contacts.contacted(noAddress);
+		assertEquals(List.of(new PeerName(URI.create(address.toString()),good)),joiner.knownGoodNodes());
+	}
+
+	/** A few names are chosen at random, never one twice. */
+	@Test
+	public void testPickChoosesAFewAtRandom() {
+		List<Integer> items=List.of(1,2,3,4,5,6);
+		List<Integer> picked=P2PNode.pick(items,3,new Random(1));
+		assertEquals(3,picked.size());
+		assertTrue(items.containsAll(picked));
+		assertEquals(3,new HashSet<>(picked).size(),"no name twice");
+		assertEquals(Set.of(1,2),new HashSet<>(P2PNode.pick(List.of(1,2),3,new Random(1))),"all of a shorter list");
 	}
 
 	@Test

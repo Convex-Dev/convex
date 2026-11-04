@@ -320,21 +320,32 @@ of the valid signed NodeInfo it delivered is that physically inbound connection 
 into an outbound propagation route. A node with empty `:transports` therefore supports
 bidirectional gossip without a reverse TCP connection.
 
-**Seed nodes**: A node joins a network through its seed list, kept in its local
-record (§4.6), with `P2PNode.seed`. The list holds at most 16 peer names. The seeds
-its configuration lists under `seeds`, each a `url` with an optional `key`, are added
-to it at launch, and `addSeed` and `removeSeed` change it while the node runs.
-Whenever the node has no route, as when it starts, it reads the list, and each seed's
-name is resolved and the seed connected and initialised as with `connect`; a seed
-that cannot be reached, or loses its route, is resolved again and retried after a
-backoff while it stays listed. A seed added while the node is seeding is connected to
-at once. A `did:key` seed is found where the node's records or contact addresses
-place its key.
+**Seed nodes**: Seeds are expected-good nodes that the operator trusts to enable
+connectivity to the whole network. A node joins a network through its seed list, kept
+in its local record (§4.6), with `P2PNode.seed`. The list holds at most 16 peer names.
+The seeds its configuration lists under `seeds`, each a `url` with an optional `key`,
+are added to it at launch, and `addSeed` and `removeSeed` change it while the node
+runs. A `did:key` seed is found where the node's records or contact addresses place
+its key.
+
+When it starts seeding, the node dials three seeds from the list at random and, with
+them, up to three nodes it reached before and that have not failed since, also at
+random, so that it does not learn the network from its seeds alone. Each is dialled
+once, its name resolved and the node connected and initialised as with `connect`; a
+seed that cannot be reached is not retried, and one that later loses its route is not
+redialled. A node reached before stays connected as an ordinary peer. From then on the
+node keeps its ambient slots filled from every peer it knows, wherever it learned of
+it, and redials a peer that fails after a backoff. The seeds are its last resort:
+whenever the slots are unfilled and no peer it believes good is left to dial, because
+every candidate without a route has failed since it was last reached, as when it
+reached no one at start or has lost every route, the node dials three seeds it is not
+connected to, at random, and again after a backoff while that remains so.
+
 Once the node's own ambient slots hold routes to other peers, at least one, which can
 replace the seeds, it releases every seed: the route it opened closes, and a seed whose
-record or contact address it holds stays an ordinary candidate. Seeds so
-carry a node only while it joins or rejoins, not for good; in a network too small to
-fill the slots, they stay connected. A restarted node needs no seed (§4.6).
+record or contact address it holds stays an ordinary candidate. Seeds so carry a node
+only while it joins or rejoins, not for good; in a network too small to fill the
+slots, they stay connected. A restarted node needs no seed (§4.6).
 
 **Proposed on-chain bootstrap path** (optional): A node may take seeds from the
 on-chain peer list, the keys and `:url` hosts in `PeerStatus`, alongside configured

@@ -4,16 +4,21 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -132,13 +137,20 @@ public class P2PNode implements Closeable {
 	/**
 	 * Node configuration key: the seed nodes to join a network through, a list of at
 	 * most {@link #MAX_SEEDS} entries, each a peer name as {@code url} with an optional
-	 * expected {@code key}. Read with {@link #seeds(NodeConfig)} and added to the node's
-	 * live list by {@link #seed(List)}.
+	 * expected {@code key}. Seeds are expected-good nodes that the operator trusts to
+	 * enable connectivity to the whole network. Read with {@link #seeds(NodeConfig)} and
+	 * added to the node's live list by {@link #seed(List)}.
 	 */
 	public static final AString SEEDS=Strings.intern("seeds");
 
 	/** Most seed nodes a configuration may list, and a node's live list may hold. */
 	public static final int MAX_SEEDS=Seeds.MAX_SEEDS;
+
+	/** Seeds dialled at random when a node starts seeding, and in each round of last resort. */
+	static final int SEEDS_TO_DIAL=3;
+
+	/** Nodes that answered before, dialled at random alongside the seeds when a node starts seeding. */
+	static final int KNOWN_NODES_TO_DIAL=3;
 
 	private static final AString SEED_KEY=Strings.intern("key");
 	private static final AString SEED_URL=Strings.intern("url");
@@ -166,8 +178,10 @@ public class P2PNode implements Closeable {
 	private final Set<AccountKey> named=ConcurrentHashMap.newKeySet();
 	/** Completes when seeds are first released; null until seeding starts. Guarded by this node. */
 	private CompletableFuture<Void> seeding;
-	/** The seeding round in progress, or null between rounds. */
+	/** The seeding round still dialling, or null between rounds. */
 	private volatile SeedRound seedRound;
+	/** The node each seed name proved it was, from its last connection. */
+	private final Map<PeerName,AccountKey> seedKeys=new ConcurrentHashMap<>();
 	/** Freezes P2P application configuration at the same boundary as NodeServer. */
 	private boolean launchStarted;
 
@@ -720,22 +734,31 @@ public class P2PNode implements Closeable {
 
 	/**
 	 * Adds seed names to this node's live list, as {@link #addSeed} does, and joins the
-	 * network through the seeds listed, and again whenever this node is left with no
-	 * route. Each time it has none, as when it starts, it reads the live list, resolves
-	 * each seed's name with this node's records and blocklist and connects to it: once a
-	 * seed proves its key, this node pushes its own record and pulls the seed's registry,
-	 * which names other nodes to connect to. A seed that cannot be resolved or reached,
-	 * fails its challenge or loses its route is resolved again and retried after a
-	 * backoff, without holding up the others. A seed added while this node is seeding is
-	 * connected to at once, and one removed is not retried.
+	 * network. Seeds are expected-good nodes that the operator trusts to enable
+	 * connectivity to the whole network. Once connected, a node needs them no more: it
+	 * keeps its slots filled from the peers it learns about, wherever it learned of them.
+	 *
+	 * <p>Seeding starts once. The node dials three seeds from its live list, chosen at
+	 * random, and with them up to three nodes it reached before and that have not failed
+	 * since, also at random, so that it does not learn the network from its seeds alone.
+	 * Each is dialled once: its name is resolved with this node's records and blocklist,
+	 * and once it proves its key this node pushes its own record and pulls its registry,
+	 * which names other nodes to connect to. A seed that cannot be reached or fails its
+	 * challenge is not retried, and one that later loses its route is not redialled. A
+	 * node reached before stays connected as an ordinary peer.</p>
+	 *
+	 * <p>After that the seeds are a last resort. Whenever this node's ambient slots are
+	 * unfilled and no peer it believes good is left to dial, as when it reached no one at
+	 * start or has lost every route, it dials three seeds it is not connected to, chosen
+	 * at random, and again after a backoff while that remains so. A seed added while a
+	 * round is dialling is dialled at once, and one removed is not dialled again.</p>
 	 *
 	 * <p>Once this node's own ambient slots hold routes to other peers, they can replace
 	 * the seeds, so every seed is released: the route this node opened to it closes, and
-	 * it stays a candidate where this node's records place it. A seed so carries a node
-	 * only while it joins. In a network too small to fill the slots, seeds stay
-	 * connected. A seed also named with {@link #connect} stays connected. A blocked seed,
-	 * one at a blocked address or one that turns out to be this node is skipped until the
-	 * next round. Seeding stops when the node closes.</p>
+	 * it stays a candidate where this node's records place it. In a network too small to
+	 * fill the slots, seeds stay connected. A seed also named with {@link #connect} stays
+	 * connected. A blocked seed, one at a blocked address or one that turns out to be
+	 * this node is skipped. Seeding stops when the node closes.</p>
 	 *
 	 * <p>A name with this node's own key is left out, so seed nodes may share one
 	 * configuration that lists them all, and a name beyond {@link #MAX_SEEDS} is left out
@@ -764,15 +787,16 @@ public class P2PNode implements Closeable {
 		if (round!=null) for (PeerName seed:seeds) round.add(seed);
 		if (seeding==null) {
 			seeding=new CompletableFuture<>();
-			seedWhenIsolated(seeding);
+			startSeeding(seeding);
 		}
 		return list.all().isEmpty()?CompletableFuture.completedFuture(null):seeding;
 	}
 
 	/**
 	 * Adds a seed to this node's live list, kept in its {@code :local} record so the
-	 * seed survives a restart, replacing any seed at the same URI. A node that is seeding
-	 * connects to it at once; otherwise it is used the next time this node seeds.
+	 * seed survives a restart, replacing any seed at the same URI. A seed added while a
+	 * round of seeding is dialling is dialled at once; otherwise it may be chosen in a
+	 * later round.
 	 *
 	 * @param seed seed name, as {@link PeerResolver#parse(String)} reads it
 	 * @return whether no seed was listed at its URI before
@@ -791,8 +815,8 @@ public class P2PNode implements Closeable {
 
 	/**
 	 * Removes the seed at a name's URI from this node's live list, whatever key it
-	 * names. A seed not yet reached is not retried; one reached is released with the
-	 * others when the round ends.
+	 * names. A seed removed is not dialled again; one reached is released with the
+	 * others when its round ends.
 	 *
 	 * @param seed seed name
 	 * @return whether a seed was listed at its URI
@@ -814,89 +838,212 @@ public class P2PNode implements Closeable {
 		return keyPair!=null && keyPair.getAccountKey().equals(seed.key());
 	}
 
-	/** Once this node has no route, connects to its seeds until other peers fill its ambient slots, then again. */
-	private void seedWhenIsolated(CompletableFuture<Void> released) {
-		LatticeConnectionManager manager=propagator.getConnectionManager();
-		manager.whenIsolated().thenCompose(isolated -> {
-			SeedRound round=new SeedRound();
-			// Published before the list is read, so a seed added meanwhile reaches the round
-			seedRound=round;
-			List<PeerName> seeds=application.seeds().all();
-			if (!seeds.isEmpty()) log.info("Joining the network through {} seed nodes",seeds.size());
-			for (PeerName seed:seeds) round.add(seed);
-			return manager.whenAmbientTargetMet().whenComplete((met,error) -> round.end());
-		}).whenComplete((met,error) -> {
+	/** Starts seeding: dials a few seeds and nodes reached before, then turns to the seeds only as a last resort. */
+	private void startSeeding(CompletableFuture<Void> released) {
+		SeedRound round=new SeedRound(released);
+		// Published before the list is read, so a seed added meanwhile reaches the round
+		seedRound=round;
+		List<PeerName> seeds=pick(application.seeds().all(),SEEDS_TO_DIAL,ThreadLocalRandom.current());
+		List<PeerName> known=pick(knownGoodNodes(),KNOWN_NODES_TO_DIAL,ThreadLocalRandom.current());
+		if (!seeds.isEmpty()) log.info("Joining the network through {} seed nodes",seeds.size());
+		for (PeerName seed:seeds) round.add(seed);
+		for (PeerName node:known) round.addKnown(node);
+		round.close().whenComplete((dialled,error) -> seedWhenStarved(0));
+	}
+
+	/**
+	 * Turns to the seeds as a last resort: once this node's ambient slots are unfilled
+	 * and no peer it believes good is left to dial, dials a few seeds after a backoff,
+	 * and again while that remains so. Stops when the node closes.
+	 *
+	 * @param rounds rounds of last resort that have just left this node starved
+	 */
+	private void seedWhenStarved(int rounds) {
+		CompletableFuture<Void> starved=propagator.getConnectionManager().whenStarved();
+		// Each round that leaves this node still starved backs off further; a wait starts afresh
+		int round=starved.isDone()?rounds+1:1;
+		starved.thenCompose(ignored -> {
+			CompletableFuture<Void> due=new CompletableFuture<>();
+			CompletableFuture.delayedExecutor(LatticeConnectionManager.calculateBackoff(round),TimeUnit.MILLISECONDS)
+				.execute(() -> due.complete(null));
+			return due;
+		}).thenCompose(ignored -> seedAsLastResort()).whenComplete((dialled,error) -> {
 			// Fails only when the node closes
-			if (error!=null) {
-				released.completeExceptionally(error);
-				return;
-			}
-			released.complete(null);
-			seedWhenIsolated(released);
+			if (error==null) seedWhenStarved(round);
 		});
 	}
 
-	/** One round of seeding: keeps each seed connected until the round ends, then releases the seeds reached. */
+	/** One round of last resort: dials a few seeds this node is not connected to, chosen at random. */
+	private CompletableFuture<Void> seedAsLastResort() {
+		if (!server.isRunning()) return CompletableFuture.completedFuture(null);
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		SeedRound round=new SeedRound(null);
+		seedRound=round;
+		List<PeerName> unconnected=new ArrayList<>();
+		for (PeerName seed:application.seeds().all()) {
+			AccountKey key=seedKeys.get(seed);
+			if (key==null || manager.getConnection(key)==null) unconnected.add(seed);
+		}
+		List<PeerName> seeds=pick(unconnected,SEEDS_TO_DIAL,ThreadLocalRandom.current());
+		if (!seeds.isEmpty()) log.info("No other peer left to dial: turning to {} seed nodes",seeds.size());
+		for (PeerName seed:seeds) round.add(seed);
+		return round.close();
+	}
+
+	/** Up to a number of items from a list, chosen at random. */
+	static <T> List<T> pick(List<T> items,int count,Random random) {
+		List<T> shuffled=new ArrayList<>(items);
+		Utils.shuffle(shuffled,random);
+		return List.copyOf(shuffled.subList(0,Math.min(count,shuffled.size())));
+	}
+
+	/**
+	 * Nodes this node reached before and that have not failed since, each named at the
+	 * address it found the node's key at. Never a blocked node, one at an address this
+	 * node refuses, or this node itself.
+	 */
+	List<PeerName> knownGoodNodes() {
+		ContactRecords contacts=application.contacts();
+		if (contacts==null) return List.of();
+		Blocklist blocklist=application.blocklist();
+		List<PeerName> nodes=new ArrayList<>();
+		for (Map.Entry<AccountKey,AHashMap<Keyword,ACell>> entry:contacts.all().entrySet()) {
+			AccountKey key=entry.getKey();
+			AString address=ContactRecords.address(entry.getValue());
+			if (address==null || !ContactRecords.answered(entry.getValue()) || blocklist.isBlocked(key)
+					|| blocklist.refuses(address) || (keyPair!=null && keyPair.getAccountKey().equals(key))) continue;
+			try {
+				nodes.add(new PeerName(URI.create(address.toString()),key));
+			} catch (IllegalArgumentException e) {
+				// Not an address a peer name can hold
+			}
+		}
+		return nodes;
+	}
+
+	/**
+	 * One round of seeding: dials each of its names once, then releases the seeds it
+	 * reached once other peers fill this node's slots. A node reached before is kept as
+	 * an ordinary peer instead.
+	 */
 	private final class SeedRound {
 		private final Set<AccountKey> reached=ConcurrentHashMap.newKeySet();
-		/** Seeds this round has started on, so none is dialled twice at once. */
+		/** Names this round has dialled, so none is dialled twice. */
 		private final Set<PeerName> started=ConcurrentHashMap.newKeySet();
+		/** Dials still running, and one more until the round stops taking names. */
+		private final AtomicInteger running=new AtomicInteger(1);
+		private final CompletableFuture<Void> dialled=new CompletableFuture<>();
+		/** Completed when the seeds are released, or null if no caller waits. */
+		private final CompletableFuture<Void> released;
+		private final AtomicBoolean awaiting=new AtomicBoolean();
 		private volatile boolean over;
 
-		/** Starts connecting to a seed, unless this round already has or it names this node. */
-		void add(PeerName seed) {
-			if (!isOwn(seed) && started.add(seed)) attempt(seed,0);
+		SeedRound(CompletableFuture<Void> released) {
+			this.released=released;
+			if (released!=null) awaitRelease();
 		}
 
 		/**
-		 * Resolves a seed and connects to it, again after a backoff if that fails or its
-		 * route goes. A seed that is blocked, or is this node, is skipped until the next
-		 * round; one no longer listed as it was is dropped.
+		 * Ends the round once other peers fill this node's slots. Only a round with a
+		 * caller or a seed to release waits, so rounds that reach no one leave nothing behind.
 		 */
-		void attempt(PeerName seed,int failures) {
-			if (over || !server.isRunning()) return;
-			if (!application.seeds().contains(seed)) {
-				started.remove(seed);
-				return;
+		private void awaitRelease() {
+			if (!awaiting.compareAndSet(false,true)) return;
+			propagator.getConnectionManager().whenAmbientTargetMet().whenComplete((met,error) -> end(error));
+		}
+
+		/** Dials a seed once, unless this round already has or it names this node. */
+		void add(PeerName seed) {
+			if (!isOwn(seed) && started.add(seed)) attempt(seed,true);
+		}
+
+		/** Dials a node reached before once; admitted, it stays connected as an ordinary peer. */
+		void addKnown(PeerName node) {
+			if (started.add(node)) attempt(node,false);
+		}
+
+		/**
+		 * Returns a future completing once every dial this round started has finished.
+		 * Until then it takes seeds added meanwhile.
+		 */
+		CompletableFuture<Void> close() {
+			dialled.whenComplete((ignored,error) -> {
+				if (seedRound==this) seedRound=null;
+			});
+			finished();
+			return dialled;
+		}
+
+		private void finished() {
+			if (running.decrementAndGet()==0) dialled.complete(null);
+		}
+
+		/**
+		 * Resolves a name and connects to it once, then waits for the peer's
+		 * initialisation, which pulls its registry. A seed no longer listed, or a node
+		 * this node already has a route to, is not dialled.
+		 */
+		private void attempt(PeerName name,boolean seed) {
+			if (!server.isRunning() || (seed && !application.seeds().contains(name))) return;
+			AccountKey known=(name.key()!=null)?name.key():seedKeys.get(name);
+			if (known!=null && propagator.getConnectionManager().getConnection(known)!=null) return;
+			running.incrementAndGet();
+			CompletableFuture<Convex> connecting;
+			try {
+				connecting=network.connectPeer(propagator,name);
+			} catch (RuntimeException e) {
+				connecting=CompletableFuture.failedFuture(e);
 			}
-			network.connectPeer(propagator,seed).whenComplete((peer,error) -> {
-				Throwable cause=(error instanceof CompletionException && error.getCause()!=null)?error.getCause():error;
-				AccountKey key=(error==null)?peer.getVerifiedPeer():null;
-				if (cause instanceof SecurityException || cause instanceof IllegalArgumentException
-						|| (key!=null && isBlocked(key))) {
-					log.info("Skipping seed {}: {}",seed,(cause==null)?"blocked":cause.getMessage());
-					return;
+			connecting.whenComplete((peer,error) -> {
+				try {
+					if (!admitted(name,seed,(error==null)?peer.getVerifiedPeer():null,error)) {
+						finished();
+						return;
+					}
+					initialisePeer(peer).whenComplete((initialised,failure) -> finished());
+				} catch (RuntimeException e) {
+					finished();
 				}
-				if (key==null) {
-					log.debug("Seed {} not reached: {}",seed,(cause==null)?"no key proved":cause.getMessage());
-					retry(seed,failures+1);
-					return;
-				}
-				reached.add(key);
-				// Admitted after the round ended, so released at once
-				if (over) {
-					releaseSeed(key);
-					return;
-				}
-				propagator.getConnectionManager().whenDisconnected(key).thenRun(() -> {
-					reached.remove(key);
-					retry(seed,1);
-				});
 			});
 		}
 
-		private void retry(PeerName seed,int failures) {
-			if (over) return;
-			CompletableFuture.delayedExecutor(LatticeConnectionManager.calculateBackoff(failures),TimeUnit.MILLISECONDS)
-				.execute(() -> attempt(seed,failures));
+		/** Logs how a dial went and keeps or releases what it reached; returns whether a peer was admitted. */
+		private boolean admitted(PeerName name,boolean seed,AccountKey key,Throwable error) {
+			Throwable cause=(error instanceof CompletionException && error.getCause()!=null)?error.getCause():error;
+			String kind=seed?"seed":"node";
+			if (cause instanceof SecurityException || cause instanceof IllegalArgumentException
+					|| (key!=null && isBlocked(key))) {
+				log.info("Skipping {} {}: {}",kind,name,(cause==null)?"blocked":cause.getMessage());
+				return false;
+			}
+			if (key==null) {
+				String reason=(cause==null)?"no key proved":cause.getMessage();
+				if (seed) log.info("Could not connect to seed {}: {}",name,reason);
+				else log.debug("Could not reconnect to node {}: {}",name,reason);
+				return false;
+			}
+			if (!seed) {
+				log.debug("Reconnected to node {}",key);
+				keepKnownNode(key);
+				return true;
+			}
+			log.info("Connected to seed {} as {}",name,key);
+			seedKeys.put(name,key);
+			reached.add(key);
+			awaitRelease();
+			// Admitted after the round ended, so released at once
+			if (over) releaseSeed(key);
+			return true;
 		}
 
-		/** Ends the round and releases the seeds reached; an attempt still dialling releases its seed when admitted. */
-		void end() {
+		/** Ends the round: releases the seeds reached, and completes the future a caller waits on. */
+		private void end(Throwable error) {
 			over=true;
-			if (seedRound==this) seedRound=null;
 			if (!reached.isEmpty()) log.info("Released seed nodes: other peers now fill this node's slots");
 			for (AccountKey key:reached) releaseSeed(key);
+			if (released==null) return;
+			if (error==null) released.complete(null);
+			else released.completeExceptionally(error);
 		}
 	}
 
@@ -904,6 +1051,18 @@ public class P2PNode implements Closeable {
 	private void releaseSeed(AccountKey key) {
 		if (named.contains(key)) return;
 		propagator.getConnectionManager().releasePeer(key);
+		offerKnown(key);
+	}
+
+	/** Keeps a node reached before connected as an ordinary peer, unless the operator named it. */
+	private void keepKnownNode(AccountKey key) {
+		if (named.contains(key)) return;
+		propagator.getConnectionManager().releasePeer(key,true);
+		offerKnown(key);
+	}
+
+	/** Offers a node as a candidate where this node knows it: its record's transports, else its contact address. */
+	private void offerKnown(AccountKey key) {
 		NodeDirectory.NodeRecord record=application.directory().records().get(key);
 		if (record!=null) offer(record);
 		offerContact(key);
