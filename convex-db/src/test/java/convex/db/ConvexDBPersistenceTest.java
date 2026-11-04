@@ -83,11 +83,10 @@ public class ConvexDBPersistenceTest {
 		return LatticeHost.open(Maps.empty(), store);
 	}
 
-	/** Unregisters, stops ingress, closes the host to save, then the server, then the store. */
+	/** Unregisters, closes the host to save, then the server, then the store. */
 	private void persistAndClose() throws Exception {
 		ConvexDB cdb = ConvexDB.lookup(DB_NAME);
 		if (cdb != null) cdb.unregister(DB_NAME);
-		server.stopIngress();
 		server.getHost().close();
 		server.close(); server = null;
 		store.close(); store = null;

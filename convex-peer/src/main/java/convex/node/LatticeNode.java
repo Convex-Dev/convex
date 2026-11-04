@@ -35,10 +35,9 @@ import convex.net.PeerTarget;
  *
  * <p>The node takes no lock of its own. Its identity, serving policy and peer
  * methods never wait, so network callbacks such as a listener's selector may call
- * them. Launch, stopping ingress, close, adding a listener and creating or removing
- * a group wait for sockets, groups or the host: the application calls them from
- * management code, one after another, and never from a callback those waits depend
- * on.</p>
+ * them. Launch, close, adding a listener and creating or removing a group wait for
+ * sockets, groups or the host: the application calls them from management code, one
+ * after another, and never from a callback those waits depend on.</p>
  *
  * <p>For custom transports, assemble {@link NodeServer} and
  * {@link LatticeListener} directly. This convenience owns no domain policy.</p>
@@ -60,8 +59,6 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	private final LatticeListener listener;
 	/** Every listener this node opens and closes, its own first. */
 	private final List<LatticeListener> listeners=new CopyOnWriteArrayList<>();
-	/** Raised by stopping ingress and by close: a listener added afterwards is never opened. */
-	private volatile boolean stopped;
 	/** The configured identity; groups get only its signer. */
 	private volatile Identity identity=Identity.NONE;
 	/** The resolver for peer names, or null until set or first used. */
@@ -204,7 +201,7 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 		var added=new LatticeListener(config,groups);
 		listeners.add(added);
 		// Before the server runs, launch opens it with the others
-		if (!stopped && server.isRunning()) {
+		if (server.isRunning()) {
 			try {
 				added.launch();
 			} catch (IOException | InterruptedException | RuntimeException | Error e) {
@@ -334,22 +331,6 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	/** Actual bound address of this node's own listener, or null when listening is disabled. */
 	public InetSocketAddress getHostAddress() { return listener.getHostAddress(); }
 
-	/**
-	 * Stops networking changing the host: closes every listener for good, then drains
-	 * the server's accepted inbound work, as {@link NodeServer#stopIngress()} does.
-	 * Publication continues; see convex-peer/docs/SHUTDOWN.md for the service order.
-	 */
-	public void stopIngress() {
-		stopped=true;
-		try {
-			Throwable failure=closeListeners();
-			if (failure instanceof RuntimeException e) throw e;
-			if (failure instanceof Error e) throw e;
-		} finally {
-			server.stopIngress();
-		}
-	}
-
 	/** Closes every listener, each even if another fails, and returns the first failure, with any later one suppressed. */
 	private Throwable closeListeners() {
 		Throwable failure=null;
@@ -365,13 +346,13 @@ public final class LatticeNode<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Stops acceptance and ingress, sends what the host has published, then detaches
-	 * the server from the host. Both steps always run; the first failure is thrown,
-	 * with any later one suppressed.
+	 * Closes every listener for good, then the server, which sends what the host has
+	 * published and detaches from the host. Both steps always run; the first failure
+	 * is thrown, with any later one suppressed. A service closes its host first, so
+	 * peers receive the host's final checkpoint; see convex-peer/docs/SHUTDOWN.md.
 	 */
 	@Override
 	public void close() throws IOException {
-		stopped=true;
 		stopKeeping(null);
 		Throwable failure=closeListeners();
 		try {

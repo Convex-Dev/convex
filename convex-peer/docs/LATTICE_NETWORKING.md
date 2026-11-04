@@ -73,10 +73,10 @@ node, or at once if the node is running. The wrapper starts the server before it
 listeners, closes every listener before draining the server, and cleans up a failed
 launch. Closing a listener is final. Neither the node nor its listeners take a lock:
 the node's identity, serving policy and peer methods never wait, and network
-callbacks such as a selector may call them. Launch, `stopIngress`, close,
-`addListener` and creating or removing a group wait for sockets, groups or the host,
-so the application calls them from management code, one after another. The host
-store remains caller-owned.
+callbacks such as a selector may call them. Launch, close, `addListener` and
+creating or removing a group wait for sockets, groups or the host, so the
+application calls them from management code, one after another. The host store
+remains caller-owned.
 `NodeServer` detaches its publisher on close or failed launch, restoring local host
 publication and permitting a replacement server. Only one publisher may attach at
 a time. The wrapper creates no implicit propagator group and changes no group policy.
@@ -131,7 +131,6 @@ transport.launch();
 // Shutdown (see SHUTDOWN.md): closes the host, then the node, then the store
 try (nodeStore; node; var host = node.getHost()) {
     transport.close();
-    node.stopIngress();
 }
 ```
 

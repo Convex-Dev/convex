@@ -445,7 +445,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	/**
 	 * Closes the host: stops any automatic flushing, then retains and flushes a final
 	 * snapshot exactly as {@link #checkpoint()} does. A service with a node shuts
-	 * down with {@code try (store; node; host) { node.stopIngress(); app.sync(); }},
+	 * down with {@code try (store; node; host) { app.sync(); }},
 	 * so the node sends the final snapshot to its peers; see
 	 * convex-peer/docs/SHUTDOWN.md.
 	 *

@@ -13,86 +13,18 @@ import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
-import convex.core.data.AVector;
 import convex.core.data.Blobs;
-import convex.core.data.Sets;
-import convex.core.data.Vectors;
-import convex.core.data.prim.CVMLong;
-import convex.core.message.Message;
-import convex.core.message.MessageTag;
-import convex.core.message.MessageType;
 import convex.core.store.MemoryStore;
-import convex.core.util.ThreadUtils;
 import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
 
-/** Service shutdown: stop ingress, sync drafts, close the host, then close the node (#778). */
+/** Service shutdown: sync drafts, close the host, then close the node (#778). */
 class NodeShutdownTest {
 
 	/**
-	 * Work accepted before {@link NodeServer#stopIngress()} lands before it returns;
-	 * afterwards nothing from networking changes the host, while host syncs are still
-	 * published. So drafts synced next include every accepted merge.
-	 */
-	@Test void stopIngressLandsAcceptedWorkThenKeepsPublishing() throws Exception {
-		BlockingWriteStore ingressStore=new BlockingWriteStore("Lattice propagator ingress");
-		try (var primaryStore=new MemoryStore()) {
-			LatticeHost<ASet<ACell>> host=RelayHost.open(SetLattice.create(),primaryStore);
-			NodeServer<ASet<ACell>> node=new NodeServer<>(host,NodeConfig.port(0));
-			LatticePropagator primary=new LatticePropagator(primaryStore);
-			LatticePropagator ingress=new LatticePropagator(ingressStore);
-			node.addPropagator(primary);
-			node.addPropagator(ingress);
-			LatticeListener listener=new LatticeListener(NodeConfig.port(0));
-			listener.registerPropagator(ingress);
-			listener.setSelector(connection -> ingress);
-			try {
-				node.launch();
-				listener.launch();
-				try (ConvexRemote source=ConvexRemote.connect(listener.getHostAddress())) {
-					AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,null,Vectors.empty(),
-						Sets.of(CVMLong.create(778)));
-					assertTrue(source.trySend(Message.create(MessageType.LATTICE_VALUE,payload,payload.getEncoding())));
-					assertTrue(ingressStore.entered.await(5,TimeUnit.SECONDS),
-						"the ingress worker should hold the accepted message");
-				}
-
-				listener.close();
-				CompletableFuture<Void> stopping=CompletableFuture.runAsync(node::stopIngress,
-					ThreadUtils.getVirtualExecutor());
-				ingressStore.release();
-				stopping.get(10,TimeUnit.SECONDS);
-				assertTrue(node.getLocalValue().contains(CVMLong.create(778)),
-					"accepted work lands before stopIngress returns");
-				assertFalse(node.isRunning());
-
-				assertEquals(NodeServer.MergeOutcome.REJECTED,
-					node.mergeInbound(new ACell[0],Sets.of(CVMLong.create(779))));
-				assertFalse(node.getLocalValue().contains(CVMLong.create(779)),
-					"networking must not change the host after stopIngress");
-
-				// Primary may still be announcing the 778 merge, so wait for 780 itself
-				CompletableFuture<ACell> announced=primary.whenAnnounced(
-					value -> ((ASet<?>)value).contains(CVMLong.create(780)));
-				host.cursor().updateAndGet(set -> set.include(CVMLong.create(780)));
-				host.sync();
-				announced.get(10,TimeUnit.SECONDS); // publication continues until the node closes
-
-				node.close();
-				assertEquals(NodeServer.LifecycleState.STOPPED,node.getLifecycleState());
-			} finally {
-				ingressStore.release();
-				listener.close();
-				node.close();
-				ingressStore.close();
-			}
-		}
-	}
-
-	/**
-	 * A draft synced after ingress stops is saved by the host's final checkpoint, which
-	 * the still-attached node sends to a connected peer as it closes.
+	 * A draft synced at shutdown is saved by the host's final checkpoint, which the
+	 * still-attached node sends to a connected peer as it closes.
 	 */
 	@Test void finalCheckpointReachesConnectedPeer() throws Exception {
 		AKeyPair senderKey=AKeyPair.createSeeded(7781);
@@ -120,7 +52,6 @@ class NodeShutdownTest {
 				ConvexRemote route=ConvexRemote.connect(receiver.getHostAddress());
 				senderGroup.addPeer(receiverGroup.getTransportKey(),route).get(10,TimeUnit.SECONDS);
 
-				sender.stopIngress();
 				app.cursor().updateAndGet(set -> set.include(draft));
 				app.sync();
 				assertFalse(senderStore.<ASet<ACell>>getRootData().contains(draft),

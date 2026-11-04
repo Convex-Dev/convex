@@ -345,7 +345,6 @@ public class P2PSeedTest {
 	/** Shuts a node down as a service does, keeping its store for a restart. */
 	private static void shutDown(P2PNode node) throws Exception {
 		try (node; var host=node.getNodeServer().getHost()) {
-			node.stopIngress();
 			node.getApplication().sync();
 		}
 	}

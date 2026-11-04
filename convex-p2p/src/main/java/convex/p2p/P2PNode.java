@@ -1378,16 +1378,9 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * Stops networking changing the host, as {@link LatticeNode#stopIngress()} does.
-	 * Publication continues; see convex-peer/docs/SHUTDOWN.md for the service order.
-	 */
-	public void stopIngress() {
-		network.stopIngress();
-	}
-
-	/**
 	 * Stops networking, sending what the host has published to connected peers first.
-	 * Neither publishes pending host edits nor flushes the borrowed store.
+	 * Neither publishes pending host edits nor flushes the borrowed store; a service
+	 * closes the host first, as convex-peer/docs/SHUTDOWN.md describes.
 	 */
 	@Override
 	public void close() throws IOException {
@@ -1457,11 +1450,10 @@ public class P2PNode implements Closeable {
 		var host=node.getNodeServer().getHost();
 		// Runs once; a second caller waits until it has finished
 		Shutdown.Once shutdown=Shutdown.once(() -> {
-			// Stop ingress and sync the application's local state, then close the host
-			// (stops flushing, final checkpoint published through the node), then the
-			// node (sends it to peers), then the store.
+			// Sync the application's local state, then close the host (stops flushing,
+			// final checkpoint published through the node), then the node (sends it to
+			// peers), then the store.
 			try (store; node; host) {
-				node.stopIngress();
 				node.getApplication().sync();
 			} catch (IOException | RuntimeException e) {
 				log.warn("Unable to finish P2P service shutdown",e);

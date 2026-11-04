@@ -219,7 +219,6 @@ public class DlfsStart extends ACommand {
 				} catch (RuntimeException e) {
 					log.warn("Error stopping DLFS HTTP server",e);
 				}
-				node.stopIngress();
 				try {
 					driveManager.sync();
 				} catch (RuntimeException e) {

@@ -207,7 +207,7 @@ Connection conn = cdb.getConnection("market");
 
 // Shutdown (see convex-peer/docs/SHUTDOWN.md): closes the host, the server, the store
 try (store; server; host) {
-    server.stopIngress(); // replication no longer changes the host
+    conn.close();
 }
 ```
 

@@ -958,17 +958,6 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Stops new protocol admission and drains work already accepted by this group.
-	 * The publication worker remains live so merges completed during the drain can
-	 * still receive authoritative node notifications.
-	 *
-	 * @throws IOException if accepted endpoint work cannot be drained
-	 */
-	public void stopIngress() throws IOException {
-		if (endpoint!=null) endpoint.close();
-	}
-
-	/**
 	 * Drains ingress and publication work and closes this group's inbound sockets
 	 * and outbound routes. Stores remain caller-owned. To also remove the group
 	 * from its node's lifecycle and notifications, use
@@ -977,7 +966,9 @@ public class LatticePropagator implements Closeable {
 	@Override
 	public void close() {
 		try {
-			stopIngress();
+			// Stop admitting protocol work and drain what was accepted, while the
+			// publication worker still runs so those merges are announced
+			if (endpoint!=null) endpoint.close();
 		} catch (IOException e) {
 			recordFailure("ingress shutdown",e);
 			log.warn("Unable to drain propagation protocol endpoint cleanly",e);

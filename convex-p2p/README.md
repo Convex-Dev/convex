@@ -279,8 +279,9 @@ connected directly to a standalone `LatticeHost` for local use.
 The owning service chooses durability through `node.getNodeServer().getHost()`:
 call `checkpoint()` for a durable save, or publish with `sync()` and use a scoped
 `autoFlush(Duration)` for batched barriers. Shut down with
-`try (store; node; host) { node.stopIngress(); }`, so peers receive the final
-checkpoint; see [shutdown](../convex-peer/docs/SHUTDOWN.md).
+`try (store; node; host) { node.getApplication().sync(); }`, which closes the host
+before the node, so peers receive the final checkpoint; see
+[shutdown](../convex-peer/docs/SHUTDOWN.md).
 
 ### The user area API
 

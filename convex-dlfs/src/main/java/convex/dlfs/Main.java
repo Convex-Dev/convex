@@ -152,7 +152,6 @@ public final class Main {
 				} catch (RuntimeException e) {
 					System.err.println("Failed to stop DLFS HTTP server: "+e.getMessage());
 				}
-				node.stopIngress();
 				try {
 					drives.sync();
 				} catch (RuntimeException e) {

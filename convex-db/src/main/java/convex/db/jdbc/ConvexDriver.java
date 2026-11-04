@@ -408,15 +408,15 @@ public class ConvexDriver extends Driver {
 		}
 
 		/**
-		 * Stops ingress, closes the host to save (publishing through the node), then
-		 * closes the node and the store; no-op for an in-memory instance.
+		 * Closes the host to save (publishing through the node), then the node and the
+		 * store; no-op for an in-memory instance.
 		 */
 		void close() throws IOException {
 			if (server == null) return;
 			Shutdown.removeHook(Shutdown.SERVICE, shutdownHook);
 			var host = server.getHost();
 			try (store; server; host) {
-				server.stopIngress();
+				// Each closes in turn, host first
 			}
 		}
 	}

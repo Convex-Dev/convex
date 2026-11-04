@@ -464,8 +464,8 @@ The P2P package's service, which `convex p2p start` runs, has these parts:
 
 - **Main class:** `P2PNode.main` reads a JSON5 configuration of node settings,
   `seeds`, `store` and `keypair`. `P2PNode.serve` launches the node and joins the
-  network through the seeds; at shutdown it stops ingress, syncs the application
-  and closes the host, node and store.
+  network through the seeds; at shutdown it syncs the application and closes the
+  host, node and store.
 - **Store:** the Etch file the configuration names, or a temporary store.
 - **Host and application:** `P2PNode.create` opens the host from the store and
   registers one application, `P2PApplication`. It owns the regions `:p2p` (node

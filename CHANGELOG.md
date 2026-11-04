@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Speed up `Index.assoc` up to threefold for newly created or decoded keys, which it now compares by bytes instead of hashing.
 - Keep Convex DB JDBC connections to the driver's own parameter, `database`: a URL with any other is refused, and other connection properties are ignored. ([JDBC](convex-db/docs/JDBC.md#url-format))
 - Resolve Convex DB SQL names as the SQL standard does: unquoted names fold to upper case and compare exactly, where any case matched before. A database's `:identifiers` setting can choose `:lower`, as in PostgreSQL, or `:insensitive` instead, for JDBC and PostgreSQL wire connections alike; the JDBC `caseSensitive` parameter is gone. ([Identifier Case](convex-db/README.md#identifier-case), [#812](https://github.com/Convex-Dev/convex/issues/812))
-- Send a lattice node's final state to its peers when it shuts down: services stop ingress with `stopIngress()`, then close the host before the node. ([Shutdown](convex-peer/docs/SHUTDOWN.md), [#778](https://github.com/Convex-Dev/convex/issues/778))
+- Send a lattice node's final state to its peers when it shuts down: services close the host before the node. ([Shutdown](convex-peer/docs/SHUTDOWN.md), [#778](https://github.com/Convex-Dev/convex/issues/778))
 - Upgrade inbound lattice connections only through `LatticePropagator.authenticateInboundRoute`; `LatticeConnectionManager.upgradeInboundConnection` is no longer public.
 - Make closing a `LatticeListener` final and launching an open one do nothing; a `LatticeNode`'s listeners serve the node's groups, which are created and removed only through the node. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md))
 - Verify an HS256 JWT with `JWT.verifySymmetric`, which returns its claims as `verifyPublic` does, checks `alg` and compares signatures in constant time; it replaces the static `JWT.verifyHS256(jwt, secret)`. ([Verifying](convex-core/docs/JWT.md#verifying))
@@ -86,7 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reject malformed queue states before installation, and report concurrent queue worker failures to producers, flush callers and shutdown.
 - Keep Etch stores usable when a thread using them is interrupted, including when a lattice node closes or a peer disconnects mid-acquisition. ([#776](https://github.com/Convex-Dev/convex/issues/776))
 - Reopen Etch v3 stores without manual repair after a crash during a start-up garbage collection. ([#748](https://github.com/Convex-Dev/convex/issues/748))
-- Harden shutdown of lattice nodes and HTTP servers: no merges after close, in-flight requests finish, and servers no longer keep the JVM alive. ([#777](https://github.com/Convex-Dev/convex/issues/777))
+- Harden shutdown of HTTP servers: in-flight requests finish, and servers no longer keep the JVM alive. ([#777](https://github.com/Convex-Dev/convex/issues/777))
 - Improve the PostgreSQL wire protocol in Convex DB: text parameters are parsed by their type, and a failed batch stops at the error. ([#772](https://github.com/Convex-Dev/convex/issues/772))
 - Keep dropped tables and schema changes in Convex DB when a replica that missed them writes rows later. ([#779](https://github.com/Convex-Dev/convex/issues/779))
 - Keep rows from before a Convex DB `DROP TABLE` from returning when the table is created again or a copy that missed the drop merges. ([#784](https://github.com/Convex-Dev/convex/issues/784))

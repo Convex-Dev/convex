@@ -283,7 +283,6 @@ try (store; var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, m
         networkedServer.start(0);
         // Run the application's service loop here, until shutdown is requested.
     }
-    network.stopIngress(); // no merge lands after the drafts below sync
     routes.sync();
 } // closes the host (final checkpoint, sent to peers), the network, then the store
 ```

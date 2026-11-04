@@ -71,16 +71,6 @@ class LatticeNodeTest {
 		}
 	}
 
-	/** Once ingress stops, a listener added to the node is never opened. */
-	@Test void noListenerOpensAfterIngressStops() throws Exception {
-		try (var store=new MemoryStore();
-				var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch()) {
-			node.stopIngress();
-			assertFalse(node.getListener().isRunning());
-			assertFalse(node.addListener(NodeConfig.port(0)).isRunning());
-		}
-	}
-
 	/**
 	 * A selector runs on the network thread that close waits for to close the listener's
 	 * connections, so it may read the node's identity and set its serving policy while
@@ -242,9 +232,9 @@ class LatticeNodeTest {
 				try (var client=ConvexRemote.connect(second.getHostAddress())) {
 					assertEquals(ErrorCodes.TRUST,pingError(client),"a removed group is unregistered from every listener");
 				}
-				network.stopIngress();
+				network.close();
 				assertFalse(network.getListener().isRunning());
-				assertFalse(second.isRunning(),"stopping ingress closes every listener");
+				assertFalse(second.isRunning(),"closing the node closes every listener");
 			}
 		}
 	}

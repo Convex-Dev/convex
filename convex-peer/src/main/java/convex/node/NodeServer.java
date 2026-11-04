@@ -9,9 +9,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,10 +51,10 @@ import convex.lattice.cursor.AForkableCursor;
  * while they drain.</p>
  *
  * <p><b>Threading.</b> Lifecycle calls take no lock. The application launches,
- * stops ingress, closes, and adds or removes groups from management code, one call
- * after another, never from a group's message handler or a publication callback; a
- * lifecycle call made while launch runs fails. Host syncs, inbound deliveries and
- * pulls may run on any thread.</p>
+ * closes, and adds or removes groups from management code, one call after another,
+ * never from a group's message handler or a publication callback; a lifecycle call
+ * made while launch runs fails. Host syncs, inbound deliveries and pulls may run on
+ * any thread.</p>
  *
  * <p><b>Failure isolation.</b> Host-root publication is the mandatory part of a
  * host sync. Propagator initialisation, notification, worker and shutdown
@@ -80,14 +78,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final Set<LatticePropagator> attachedPropagators=ConcurrentHashMap.newKeySet();
 
 	private final Function<V,V> publisher=this::publishApplicationRoot;
-
-	/**
-	 * Admits deliveries from networking: inbound merges and pull results, each with
-	 * its host sync. {@link #stopIngress()} shuts it after the ingress drain and waits
-	 * for a delivery in progress, so nothing from networking changes the host after.
-	 */
-	private final ReentrantReadWriteLock deliveryGate=new ReentrantReadWriteLock();
-	private boolean acceptingDeliveries=true; // guarded by deliveryGate
 
 	/** Complete lifecycle for resources owned by the node host. */
 	enum LifecycleState {
@@ -129,7 +119,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public void launch() throws IOException,InterruptedException {
 		validateLaunchRequest();
 		lifecycleState=LifecycleState.STARTING;
-		setAcceptingDeliveries(true);
 		try {
 			configurePublicationPipeline();
 			seedPropagationViews();
@@ -172,7 +161,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private void abortFailedLaunch(Throwable failure) {
 		lifecycleState=LifecycleState.STOPPING;
-		setAcceptingDeliveries(false);
 		for (LatticePropagator propagator:propagators) {
 			try {
 				propagator.close();
@@ -200,12 +188,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	public CompletableFuture<V> pull(LatticePropagator source,Convex peer) {
 		requireAttached(source);
-		return source.pull(peer).thenApply(acquired -> deliver(() -> {
+		return source.pull(peer).thenApply(acquired -> {
 			requireAttached(source);
 			mergePulledValue(acquired);
 			host.sync();
 			return cursor.get();
-		},NodeServer::stopped));
+		});
 	}
 
 	/**
@@ -226,12 +214,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public CompletableFuture<ACell> pullPath(LatticePropagator source,Convex peer,
 			boolean background,ACell... path) {
 		requireAttached(source);
-		return source.pullPath(peer,background,path).thenApply(acquired -> deliver(() -> {
+		return source.pullPath(peer,background,path).thenApply(acquired -> {
 			requireAttached(source);
 			if (acquired!=null) mergeIncoming(acquired,path);
 			host.sync();
 			return RT.<ACell>getIn(cursor.get(),path);
-		},NodeServer::stopped));
+		});
 	}
 
 	/**
@@ -279,14 +267,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 		requireAttached(source);
 		try {
 			List<ACell> values=source.pullAll().get(30,TimeUnit.SECONDS);
-			return deliver(() -> {
-				for (ACell acquired:values) {
-					requireAttached(source);
-					mergePulledValue(acquired);
-				}
-				host.sync();
-				return true;
-			},NodeServer::stopped);
+			for (ACell acquired:values) {
+				requireAttached(source);
+				mergePulledValue(acquired);
+			}
+			host.sync();
+			return true;
 		} catch (Exception e) {
 			log.warn("Pull through propagator group failed",e);
 			return false;
@@ -573,41 +559,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * acquisition or filtering concern crosses this boundary.
 	 */
 	MergeOutcome mergeInbound(ACell[] path,ACell value) {
-		return deliver(() -> {
-			ACell before=cursor.get();
-			if (!mergeIncoming(value,path)) return MergeOutcome.REJECTED;
-			ACell after=cursor.get();
-			boolean changed=before!=after && (before==null || !before.equals(after));
-			if (changed) host.sync();
-			return new MergeOutcome(true,changed);
-		},() -> MergeOutcome.REJECTED);
-	}
-
-	/**
-	 * Runs one delivery from networking with its host sync, or {@code stopped} once
-	 * close has stopped deliveries. See {@link #deliveryGate}.
-	 */
-	private <T> T deliver(Supplier<T> delivery,Supplier<T> stopped) {
-		deliveryGate.readLock().lock();
-		try {
-			return acceptingDeliveries ? delivery.get() : stopped.get();
-		} finally {
-			deliveryGate.readLock().unlock();
-		}
-	}
-
-	private static <T> T stopped() {
-		throw new IllegalStateException("NodeServer is not running");
-	}
-
-	/** Waits for any delivery in progress when stopping deliveries. */
-	private void setAcceptingDeliveries(boolean accepting) {
-		deliveryGate.writeLock().lock();
-		try {
-			acceptingDeliveries=accepting;
-		} finally {
-			deliveryGate.writeLock().unlock();
-		}
+		ACell before=cursor.get();
+		if (!mergeIncoming(value,path)) return MergeOutcome.REJECTED;
+		ACell after=cursor.get();
+		boolean changed=before!=after && (before==null || !before.equals(after));
+		if (changed) host.sync();
+		return new MergeOutcome(true,changed);
 	}
 
 	boolean mergeIncoming(ACell value,ACell... path) {
@@ -628,40 +585,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Stops networking changing the host while publication continues. Each group
-	 * stops admitting protocol work and drains what it has accepted; then deliveries
-	 * close, so an ingress worker that overran the drain, or a late pull, is rejected
-	 * rather than merged. Host syncs still reach every group until {@link #close()},
-	 * which sends them to peers before closing routes.
-	 *
-	 * <p>This is the first step of service shutdown; see convex-peer/docs/SHUTDOWN.md.
-	 * Calling it again, before launch or after close does nothing; {@link #close()}
-	 * calls it first. Group failures are isolated, and groups can no longer be added
-	 * or removed, as in close.</p>
-	 */
-	public void stopIngress() {
-		if (lifecycleState==LifecycleState.STARTING) {
-			throw new IllegalStateException(
-				"Cannot stop NodeServer while launch is in progress");
-		}
-		if (lifecycleState!=LifecycleState.RUNNING) return;
-		lifecycleState=LifecycleState.STOPPING;
-
-		for (LatticePropagator propagator:propagators) {
-			runIsolated(propagator,"ingress drain",propagator::stopIngress);
-		}
-		// Work accepted before the drain has landed. An ingress worker that overran
-		// the drain timeout, or a late pull, is now rejected rather than merged.
-		setAcceptingDeliveries(false);
-	}
-
-	/**
-	 * Stops ingress, if not already stopped, then drains each group's publication,
-	 * sending what the host has published to connected peers within the group's
-	 * shutdown timeout, and closes its routes. Does not publish pending host edits or
-	 * flush its store; saving belongs to the owning host/service lifecycle. Once
-	 * close returns, no inbound merge or pull result changes the host until the
-	 * next launch.
+	 * Closes each group: it stops admitting protocol work, drains what it accepted and
+	 * its publication, sending what the host has published to connected peers within
+	 * its shutdown timeout, and closes its routes. Does not publish pending host edits
+	 * or flush its store; saving belongs to the owning host/service lifecycle, which
+	 * closes the host first so peers receive its final checkpoint. See
+	 * convex-peer/docs/SHUTDOWN.md.
 	 */
 	@Override
 	public void close() throws IOException {
@@ -678,7 +607,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// Attachment transfers lifecycle ownership even before launch. This matters
 			// when an application has already supplied manager-owned peer connections.
 			lifecycleState=LifecycleState.STOPPING;
-			setAcceptingDeliveries(false);
 			for (LatticePropagator propagator:propagators) {
 				runIsolated(propagator,"pre-launch shutdown",propagator::close);
 			}
@@ -689,8 +617,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			throw new IllegalStateException(
 				"Cannot close NodeServer while launch is in progress");
 		}
-		stopIngress();
-
+		lifecycleState=LifecycleState.STOPPING;
 		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"shutdown",propagator::close);
 		}

@@ -361,12 +361,11 @@ public class DLFSBrowser extends AbstractGUI {
 	}
 
 	/**
-	 * Stops ingress, closes the host (which saves, publishing through the node), then
-	 * the node and the store. Drives close with them.
+	 * Closes the host (which saves, publishing through the node), then the node and
+	 * the store. Drives close with them.
 	 */
 	private void closeNodeServer() {
 		if (nodeServer != null) {
-			nodeServer.stopIngress();
 			try {
 				nodeServer.getHost().close();
 			} catch (IOException e) {
