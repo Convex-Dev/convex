@@ -512,8 +512,9 @@ public abstract class Convex implements AutoCloseable {
 	private CompletableFuture<Result> submit(CompletableFuture<ATransaction> pending) {
 		try {
 			return inOrder(pending,signed->transact(signed),(result,e)->result.complete(Result.fromException(e)));
+		} catch (InterruptedException e) {
+			return CompletableFuture.completedFuture(Result.fromInterrupt(e));
 		} catch (Exception e) {
-			// Note this handles InterruptedException correctly (maintains interrupt)
 			return CompletableFuture.completedFuture(Result.fromException(e));
 		}
 	}
@@ -1134,6 +1135,8 @@ public abstract class Convex implements AutoCloseable {
 			throw e;
 		} catch (ResultException e) {
 			throw e;
+		} catch (InterruptedException e) {
+			throw new ResultException(Result.fromInterrupt(e),e);
 		} catch (Exception e) {
 			throw new ResultException(e);
 		} finally {
@@ -1385,8 +1388,9 @@ public abstract class Convex implements AutoCloseable {
 			}
 			CVMLong bal = (CVMLong) result.getValue();
 			return bal.longValue();
+		} catch (InterruptedException ex) {
+			throw new ResultException(Result.fromInterrupt(ex),ex);
 		} catch (Exception ex) {
-			// Note InterruptedException correctly handled here
 			throw new ResultException(ex);
 		} finally {
 			if (future!=null) future.cancel(true);

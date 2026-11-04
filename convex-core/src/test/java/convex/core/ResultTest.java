@@ -1,10 +1,15 @@
 package convex.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 import org.junit.jupiter.api.Test;
 
@@ -92,7 +97,41 @@ public class ResultTest {
 		Result a=Result.error(Keywords.FOO, "Blah").withSource(SourceCodes.CLIENT);
 		assertSame(a,Result.fromException(new ResultException(a)));
 	}
-	
+
+	@Test public void testFromExceptionLeavesInterruptStatus() {
+		Thread.interrupted();
+		try {
+			// An interrupt passed in may come from another thread: this one stays uninterrupted
+			assertInterrupted(Result.fromException(new InterruptedException()));
+			assertInterrupted(Result.fromException(new ExecutionException(new InterruptedException())));
+			assertInterrupted(Result.fromException(new CompletionException(new InterruptedException())));
+			assertInterrupted(new ResultException(new InterruptedException()).getResult());
+			assertFalse(Thread.currentThread().isInterrupted());
+
+			// A status the caller already restored is kept
+			Thread.currentThread().interrupt();
+			assertInterrupted(Result.fromException(new InterruptedException()));
+			assertTrue(Thread.currentThread().isInterrupted());
+		} finally {
+			Thread.interrupted();
+		}
+	}
+
+	@Test public void testFromInterruptRestoresInterruptStatus() {
+		Thread.interrupted();
+		try {
+			assertInterrupted(Result.fromInterrupt(new InterruptedException()));
+			assertTrue(Thread.currentThread().isInterrupted());
+		} finally {
+			Thread.interrupted();
+		}
+	}
+
+	private static void assertInterrupted(Result r) {
+		assertEquals(ErrorCodes.INTERRUPTED,r.getErrorCode());
+		assertEquals(SourceCodes.CLIENT,r.getSource());
+	}
+
 	@Test
 	public void testBadBuild() {
 		assertThrows(IllegalArgumentException.class,()->Result.buildFromVector(Vectors.of(1,2,3,4,5,6,7)));

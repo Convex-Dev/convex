@@ -574,6 +574,8 @@ public class ChainAPI extends ABaseAPI {
 			setResult(ctx, r);
 		} catch (BadRequestResponse e) {
 			throw e;
+		} catch (InterruptedException e) {
+			setResult(ctx, Result.fromInterrupt(e));
 		} catch (Exception e) {
 			setResult(ctx, Result.fromException(e));
 		}

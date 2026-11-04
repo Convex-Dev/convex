@@ -30,6 +30,13 @@ public class ResultException extends Exception {
 		this(Result.error(errorCode, message));
 	}
 
+	/**
+	 * Wraps an exception with its Result from {@link Result#fromException(Throwable)},
+	 * which leaves the interrupt status alone: catch an {@link InterruptedException}
+	 * separately and use {@link Result#fromInterrupt(InterruptedException)}.
+	 *
+	 * @param ex Exception caught
+	 */
 	public ResultException(Exception ex) {
 		this(Result.fromException(ex),ex);
 	}

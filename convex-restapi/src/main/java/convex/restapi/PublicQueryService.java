@@ -88,6 +88,8 @@ public final class PublicQueryService {
 			Result result=Objects.requireNonNull(executor.execute(form,address,maxJuice),
 					"Query executor returned null");
 			return result.withSource(SourceCodes.PEER).withID(id);
+		} catch (InterruptedException e) {
+			return Result.fromInterrupt(e).withSource(SourceCodes.PEER).withID(id);
 		} catch (Exception e) {
 			return Result.fromException(e).withSource(SourceCodes.PEER).withID(id);
 		} finally {

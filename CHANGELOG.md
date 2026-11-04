@@ -104,6 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Complete the final flush when an interrupted thread closes a host's automatic flushing, and keep that thread's interrupt status.
 - Never publish a P2P node's `:local` state or accept another's, even when its lattice declares `:local`.
 - Stop closing a lattice peer's connection because either node is busy or the local store fails.
+- Stop `Result.fromException` interrupting the calling thread when it is given an interrupt from another thread, which could break a lattice node's store I/O; code that catches an `InterruptedException` itself keeps its interrupt status with `Result.fromInterrupt`.
 
 ## [0.8.18] - 2026-10-25
 
