@@ -502,15 +502,18 @@ these policies:
   down to a quarter ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)).
 - **A stalled reader loses only its own replies.** Bytes handed to Netty but not
   yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`,
-  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified peer). Over that cap
+  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a connection a lattice node has
+  verified). Over that cap
   the connection's results are refused and logged at debug. The client sees a
   `:TIMEOUT`.
 - **Shedding load.** A client result that finds the shared bound full is refused.
   The writer only hands messages to Netty, so this takes a server too short of CPU
   for the writer to keep up.
-- **Trusted peers first.** Replies to verified peer connections go into a lane the
-  writer drains first and that is exempt from the shared bound, so consensus and
-  lattice replies never queue behind client results.
+- **Verified lattice peers first.** Replies to connections a lattice node has
+  verified go into a lane the writer drains first and that is exempt from the
+  shared bound, so they never queue behind client results. A consensus peer
+  verifies no connection opened to it, so its replies to other peers' requests
+  share the client lane.
 
 ### Test Tool
 
@@ -549,7 +552,7 @@ Etch on spinning disk), this adds latency between CVM execution and result repor
 | `MAX_TRANSACTIONS_PER_BLOCK` | 1024 | Constants | Block size limit |
 | `DEFAULT_MIN_BLOCK_TIME` | 10ms | TransactionHandler | Min interval between blocks |
 | `AWAIT_BELIEFS_PAUSE` | 30ms | BeliefPropagator | Belief poll timeout |
-| `BELIEF_QUEUE_SIZE` | 200 | Config | Acquired Belief and trusted propagation queue capacities |
+| `BELIEF_QUEUE_SIZE` | 200 | Config | Acquired Belief and propagation queue capacities |
 | `DEFAULT_CLIENT_TIMEOUT` | 20000ms | Config | Client gives up after this |
 | `SIGN_CHUNK_SIZE` | 100 | Peer | Txns per parallel sig task |
 | CVMExecutor poll timeout | 100ms | CVMExecutor | Idle belief poll |

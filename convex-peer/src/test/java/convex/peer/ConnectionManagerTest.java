@@ -333,8 +333,13 @@ public class ConnectionManagerTest {
 		}
 	}
 
+	/**
+	 * Polling is how Beliefs keep arriving from the peers we chose, so pushes from any
+	 * connection filling their queue must not stop it. Only a full queue of polled
+	 * Beliefs does.
+	 */
 	@Test
-	public void testStatusPollDoesNotAcquireIntoSaturatedInput() throws Exception {
+	public void testStatusPollAcquiresUntilPolledInputSaturated() throws Exception {
 		Server server=createPollingServer(AKeyPair.createSeeded(209));
 		try {
 			ConnectionManager manager=server.getConnectionManager();
@@ -353,8 +358,11 @@ public class ConnectionManagerTest {
 				assertTrue(propagator.queuePropagation(filler));
 			}
 			manager.pollBelief(remote.getAccountKey(),connection);
+			assertEquals(1,connection.acquireCount,"a full push queue does not stop polling");
 
-			assertEquals(0,connection.acquireCount);
+			while (propagator.queueBelief(Belief.initial())) {}
+			manager.pollBelief(remote.getAccountKey(),connection);
+			assertEquals(1,connection.acquireCount,"no acquisition while polled Beliefs cannot be queued");
 		} finally {
 			server.close();
 		}

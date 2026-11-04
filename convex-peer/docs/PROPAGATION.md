@@ -128,8 +128,8 @@ which is both unnecessary and invalid when the value exceeds the 50 MB frame
 limit. The propagator drains every retained acquired Belief alongside wire
 updates and compares all signed Orders before performing one merge; values from
 different peers never overwrite each other in a shared pending slot. Polling is
-deferred while either trusted input queue is full and capacity is checked again
-before acquisition. A STATUS timeout is initially only a missed health probe; a
+deferred only while this queue is full, and capacity is checked again before
+acquisition: pushes filling the wire queue never defer it. A STATUS timeout is initially only a missed health probe; a
 connection is retired if it remains unresponsive for a full minute, while any
 non-connectivity result resets that period.
 
@@ -146,8 +146,7 @@ protocol limits:
 | Concurrent lattice acquisitions | 1,024 | `inboundQueueSize` |
 | DATA_REQUESTs served at once over routes the node opened | 16, a quarter per route | `maxDataRequests` |
 | Belief or own-Order delta message | 4 MiB | `:max-belief-delta-message-size` |
-| Trusted CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
-| Untrusted CPoS DATA/BELIEF queue | 10 messages and 4 MiB | `Config` constants |
+| CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
 | Complete Beliefs acquired by status polling | 200 Belief references | `Config.BELIEF_QUEUE_SIZE` |
 | Outbound queue, per client connection | 128 messages and 16 MiB | `Config` constants |
 | Outbound queue, per connection to a peer | 65,536 messages and 256 MB; the last message admitted may exceed it | `Config` constants |

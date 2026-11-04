@@ -19,6 +19,7 @@ import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
@@ -85,19 +86,12 @@ public class BeliefPropagator extends AThreadedComponent {
 		Config.BELIEF_QUEUE_SIZE);
 
 	/**
-	 * Ordered DATA and BELIEF messages received from trusted connections. DATA must
+	 * Ordered DATA and BELIEF messages received from any connection. DATA must
 	 * remain ahead of the root that references it until both reach this thread.
 	 */
 	// TODO: use config if provided
 	private final BoundedMessageQueue propagationQueue = new BoundedMessageQueue(
 		Config.BELIEF_QUEUE_SIZE,Config.BELIEF_QUEUE_BYTE_LIMIT,true);
-
-	/**
-	 * Small bounded queue for propagation from unverified inbound connections.
-	 * Best-effort buffering during the brief verification round-trip.
-	 */
-	private final BoundedMessageQueue untrustedPropagationQueue = new BoundedMessageQueue(
-		Config.UNTRUSTED_BELIEF_QUEUE_SIZE,Config.UNTRUSTED_BELIEF_QUEUE_BYTE_LIMIT);
 
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
@@ -151,26 +145,16 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 
 	/**
-	 * Queues propagation from an unverified connection on a best-effort basis.
-	 * Silently drops if the small untrusted queue is full.
-	 * @param message propagation message
-	 * @return true if queued, false otherwise
-	 */
-	public boolean queueUntrustedPropagation(Message message) {
-		return untrustedPropagationQueue.offer(message);
-	}
-
-	/**
-	 * Tests whether status polling may add another complete Belief without
-	 * competing with a saturated consensus input queue. This is advisory: either
-	 * queue may fill immediately afterwards, in which case the later offer is
-	 * simply dropped.
+	 * Tests whether status polling may add another complete Belief. This depends
+	 * only on the polled Belief queue: polling the peers this peer chose is how
+	 * Beliefs keep arriving while pushes from any connection fill the propagation
+	 * queue. This is advisory: the queue may fill immediately afterwards, in which
+	 * case the later offer is simply dropped.
 	 *
-	 * @return true if both trusted consensus input queues retain capacity
+	 * @return true if the polled Belief queue has capacity
 	 */
 	boolean hasBeliefPollCapacity() {
-		return (beliefQueue.remainingCapacity()>0)
-			&& (propagationQueue.getFillFraction()<1.0);
+		return beliefQueue.remainingCapacity()>0;
 	}
 	
 	Belief belief=null;
@@ -423,13 +407,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		beliefQueue.drainTo(acquiredBeliefs);
 		if (firstEvent!=null) propagationMessages.add(firstEvent);
 		propagationQueue.drainTo(propagationMessages);
-		if (acquiredBeliefs.isEmpty() && propagationMessages.isEmpty()) {
-			return null; // don't wake up for untrusted propagation alone
-		}
-
-		// Peek at one untrusted message per cycle (non-blocking, never wait)
-		Message untrusted=untrustedPropagationQueue.poll();
-		if (untrusted!=null) propagationMessages.add(untrusted);
+		if (acquiredBeliefs.isEmpty() && propagationMessages.isEmpty()) return null;
 
 		if (log.isDebugEnabled()) {
 			log.debug("Beliefs acquired: {}, propagation messages received: {}",
@@ -512,6 +490,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	private boolean mergeBeliefValue(HashMap<AccountKey, SignedData<Order>> orders, ACell value, Message source) {
 		boolean changed=false;
 		AccountKey myKey=server.getPeerKey();
+		State state=server.getPeer().getConsensusState();
 		beliefReceivedCount++;
 		Collection<SignedData<Order>> incoming=Belief.extractOrders(value);
 		for (SignedData<Order> so: incoming) {
@@ -519,13 +498,15 @@ public class BeliefPropagator extends AThreadedComponent {
 			try {
 				// Keep the best candidate for every Peer across the whole merge batch.
 				if (Cells.equals(myKey,key)) continue;
+				// The merge ignores Orders from unstaked keys, which anyone can make:
+				// drop them before the costly signature check and store write
+				if (!BeliefMerge.isValidPeer(state,key)) continue;
 				if (orders.containsKey(key)) {
 					Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
 					Order oldOrder=RT.ensureCVM(orders.get(key).getValue(),Order.class);
 					if (!BeliefMerge.compareOrders(oldOrder,newOrder)) continue;
 				}
 
-				// TODO: check if Peer key is valid in current state?
 				if (!so.checkSignature()) {
 					if (source!=null) {
 						server.getConnectionManager().alertBadMessage(source,"Bad Order Signature!!");

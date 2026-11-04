@@ -131,10 +131,13 @@ So a client that sends faster than it reads is slowed by TCP, like one whose req
 fill a queue, rather than losing results. Pausing always holds a decoded request, so
 that Netty's decoder does not ask the socket for more input while reads are off.
 
-A verified peer's reads are never paused for its replies: it has a far larger
-allowance (`Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT`) and a lane of its own. A client
-reply that finds the shared queue full is refused: the writer only hands messages to
-Netty, so that takes a server too short of CPU for the writer to keep up.
+A connection a lattice node has verified is never paused for its replies: it has a
+far larger allowance (`Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT`) and a lane of its own.
+A consensus peer verifies no connection opened to it
+([PEER_PRIORITY.md](PEER_PRIORITY.md)), so every connection to it is treated as a
+client here. A client reply that finds the shared queue full is refused: the writer
+only hands messages to Netty, so that takes a server too short of CPU for the writer
+to keep up.
 
 ## Queue Processing
 
@@ -151,8 +154,9 @@ message queue for wire DATA/BELIEF sequences, and a count-bounded FIFO for compl
 Beliefs already acquired into the local store by status polling. Local Beliefs are
 never encoded merely to measure their queue footprint. Either queue drops a new
 entry when full; neither applies connection backpressure. Periodic status polling
-is deferred while either trusted input queue is full, and a changed remote Belief
-is acquired only while that capacity remains available.
+is deferred only while the queue of polled Beliefs is full, and a changed remote
+Belief is acquired only while it has room: pushes filling the message queue never
+stop polling ([PEER_PRIORITY.md](PEER_PRIORITY.md#liveness)).
 
 ## Connection Limiting
 
@@ -237,15 +241,10 @@ query load.
 
 The protocol allows messages up to 50 MB, primarily for peer Belief messages. A
 client has no reason to send a 50 MB message — transactions and queries are
-typically under 100 KB. Once peer/client channel classification is implemented,
-client channels should enforce a smaller limit (e.g. 1 MB) to prevent malicious
-cumulation buffer growth.
-
-### Peer Priority
-
-Peer-to-peer Belief propagation should not be affected by client load. This
-requires distinguishing peer channels from client channels — a prerequisite for
-both max message size and priority scheduling. See [PEER_PRIORITY.md](PEER_PRIORITY.md).
+typically under 100 KB. But peer Beliefs arrive on inbound connections like client
+requests, and a consensus peer does not tell the two apart
+([PEER_PRIORITY.md](PEER_PRIORITY.md)), so a smaller limit cannot yet be set for
+clients alone to prevent malicious cumulation buffer growth.
 
 ### QueryHandler Parallelism
 

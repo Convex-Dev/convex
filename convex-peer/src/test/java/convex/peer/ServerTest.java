@@ -64,6 +64,7 @@ import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.AConnection;
+import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
@@ -435,19 +436,34 @@ public class ServerTest {
 		}
 	}
 
+	/**
+	 * DATA and Beliefs join the ordered propagation queue whoever sends them, with no
+	 * reply: each Order is judged on its own when merged.
+	 */
 	@Test
-	public void testBeliefTrustRouting() throws Exception {
-		Server server = network.SERVER;
+	public void testPropagationAcceptedFromAnyConnection() throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config); // not launched: queue is not drained
+		try {
+			// The server's end of a connection from an unverified sender, recording replies
+			ArrayList<Message> replies=new ArrayList<>();
+			LocalConnection sender=LocalConnection.createPair(replies::add,m -> true);
+			AConnection serverEnd=sender.getPaired();
+			assertFalse(serverEnd.isTrusted());
 
-		// Test that processBelief routes correctly based on trust
-		// A local (ConvexLocal) connection should go to the trusted queue
-		Convex local = network.CONVEX;
-		Result r = local.querySync("*balance*");
-		assertFalse(r.isError(), "Local connection should work normally");
+			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024)
+				.withConnection(serverEnd);
+			Message belief=Message.createBelief(network.SERVER.getBelief()).withConnection(serverEnd);
+			assertNull(server.processMessage(data));
+			for (int i=1; i<Config.BELIEF_QUEUE_SIZE; i++) assertNull(server.processMessage(belief));
 
-		// The server should be live and processing beliefs
-		assertTrue(server.isLive());
-		assertTrue(server.getBeliefPropagator().getBeliefBroadcastCount() >= 0);
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			assertFalse(propagator.queuePropagation(belief),"the sender's DATA and Beliefs filled the queue");
+			assertTrue(replies.isEmpty(),"nothing is refused or answered");
+		} finally {
+			server.close();
+		}
 	}
 
 	/**
@@ -535,20 +551,6 @@ public class ServerTest {
 		} finally {
 			transactionHandler.setRequestObserver(null);
 		}
-	}
-
-	@Test
-	public void testUntrustedBeliefQueueBounded() throws Exception {
-		Server server = network.SERVER;
-		BeliefPropagator propagator = server.getBeliefPropagator();
-
-		// Queue more untrusted beliefs than the queue can hold
-		// They should be silently dropped
-		for (int i = 0; i < Config.UNTRUSTED_BELIEF_QUEUE_SIZE + 5; i++) {
-			propagator.queueUntrustedPropagation(
-				convex.core.message.Message.createBelief(server.getBelief()));
-		}
-		// No exception, no blocking — bounded queue works
 	}
 
 	@Test
@@ -719,9 +721,44 @@ public class ServerTest {
 		}
 	}
 
-	/** Saturated wire propagation is dropped without producing connection backpressure. */
+	/** An Order from a key that is not a staked peer is dropped before it is checked or stored. */
 	@Test
-	public void testTrustedBeliefQueueDropsWithoutBackpressure() throws Exception {
+	public void testUnstakedOrdersNotStored() throws Exception {
+		AKeyPair local=AKeyPair.createSeeded(113);
+		AKeyPair staked=AKeyPair.createSeeded(114);
+		AKeyPair unstaked=AKeyPair.createSeeded(115);
+		State genesis=Init.createState(List.of(local.getAccountKey(),staked.getAccountKey()));
+		Peer peer=Peer.createGenesisPeer(local,genesis);
+
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config);
+		try {
+			server.getCVMExecutor().setPeer(peer);
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			propagator.belief=peer.getBelief();
+			Belief fromStaked=Belief.create(staked,Order.create());
+			Belief fromUnstaked=Belief.create(unstaked,Order.create());
+			assertTrue(propagator.queueBelief(fromStaked));
+			assertTrue(propagator.queueBelief(fromUnstaked));
+			propagator.loop();
+
+			SignedData<Order> stakedOrder=fromStaked.getOrders().get(staked.getAccountKey());
+			SignedData<Order> unstakedOrder=fromUnstaked.getOrders().get(unstaked.getAccountKey());
+			assertNotNull(server.getStore().refForHash(stakedOrder.getHash()));
+			assertNull(server.getStore().refForHash(unstakedOrder.getHash()),"an unstaked key's Order is never stored");
+			assertNull(propagator.belief.getOrders().get(unstaked.getAccountKey()));
+		} finally {
+			server.close();
+		}
+	}
+
+	/**
+	 * Saturated wire propagation is dropped without producing connection backpressure,
+	 * and leaves polling free to acquire Beliefs.
+	 */
+	@Test
+	public void testBeliefQueueDropsWithoutBackpressure() throws Exception {
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE,new MemoryStore());
 		Server server=Server.create(config); // not launched: queue is not drained
@@ -733,7 +770,7 @@ public class ServerTest {
 				assertTrue(propagator.queuePropagation(belief));
 			}
 			assertFalse(propagator.queuePropagation(belief));
-			assertFalse(propagator.hasBeliefPollCapacity());
+			assertTrue(propagator.hasBeliefPollCapacity(),"pushes filling their queue must not stop polling");
 			assertNull(server.processMessage(belief));
 
 			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024);

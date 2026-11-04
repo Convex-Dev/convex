@@ -539,24 +539,24 @@ public class ConnectionManager extends AConnectionManager {
 	private final ConcurrentHashMap<Hash, Long> missingRequests = new ConcurrentHashMap<>();
 
 	/**
-	 * Called to signal missing data in a received Belief or Order. Requests the
-	 * missing value, and transitively whatever it needs, from the peer that sent the
-	 * message, since it must hold the data, or failing that from the Order's author.
-	 * The message itself is dropped; the next update from that peer merges once the
-	 * data has arrived. Requests for one hash are rate limited so a merge that keeps
-	 * failing while the acquisition is in flight does not repeat the request.
+	 * Called to signal missing data in a received Order. Requests the missing value,
+	 * and transitively whatever it needs, from the Order's author over this peer's
+	 * own connection to it, since the author must hold the data. Whoever sent the
+	 * message is not known, so data missing outside any Order is not requested: it
+	 * arrives with a later Belief or by polling. The message itself is dropped; a
+	 * later update merges once the data has arrived. Requests for one hash are rate
+	 * limited so a merge that keeps failing while the acquisition is in flight does
+	 * not repeat the request.
 	 *
 	 * @param m Message which caused alert
 	 * @param e Missing data exception encountered
-	 * @param peerKey Peer key which triggered missing data, or null if unknown
+	 * @param peerKey Author of the Order with missing data, or null if unknown
 	 */
 	public void alertMissing(Message m, MissingDataException e, AccountKey peerKey) {
 		try {
 			Hash h = e.getMissingHash();
-			if (h == null) return;
-			AccountKey sender = (m.getConnection() == null) ? null : m.getConnection().getTrustedKey();
-			Convex conn = (sender == null) ? null : getConnection(sender);
-			if ((conn == null) && (peerKey != null)) conn = getConnection(peerKey);
+			if ((h == null) || (peerKey == null)) return;
+			Convex conn = getConnection(peerKey);
 			if ((conn == null) || !conn.isConnected()) return;
 
 			long now = Utils.getCurrentTimestamp();

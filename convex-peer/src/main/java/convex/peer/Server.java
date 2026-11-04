@@ -55,7 +55,6 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.lang.RT;
-import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -160,11 +159,6 @@ public class Server implements Closeable {
 	 * Executes read-only queries against the latest consensus state, independently of transaction processing.
 	 */
 	protected final QueryHandler queryHandler=new QueryHandler(this);
-
-	/**
-	 * Verifies untrusted inbound connections via server-initiated challenge/response.
-	 */
-	private final InboundVerifier inboundVerifier = new InboundVerifier(this);
 
 	/**
 	 * Pre-allocated retry predicates for backpressure. These are returned by
@@ -612,9 +606,7 @@ public class Server implements Closeable {
 			case COMMAND:
 				return null;
 			case RESULT:
-				// Correlate replies to requests initiated by this physical connection.
-				if (m.getConnection()!=null && m.getConnection().completeRequest(m)) return null;
-				returnError(m,ErrorCodes.UNEXPECTED,Strings.UNEXPECTED_RESULT);
+				// The server sends no requests, so no result is expected: ignore it (CAD015)
 				return null;
 			default:
 				returnError(m,ErrorCodes.FORMAT,Strings.UNRECOGNISED_MESSAGE_TYPE);
@@ -640,14 +632,12 @@ public class Server implements Closeable {
 		}
 	}
 
-	/** Offers DATA to the propagation queue so it retains wire order off the I/O thread. */
+	/**
+	 * Offers DATA to the propagation queue so it retains wire order off the I/O thread.
+	 * Accepted from any connection: DATA is staging only, and nothing it holds counts
+	 * until a valid Belief refers to it.
+	 */
 	private boolean processData(Message message) {
-		AConnection conn=message.getConnection();
-		if (conn!=null && !conn.isTrusted()) {
-			inboundVerifier.maybeStart(conn);
-			returnError(message,ErrorCodes.TRUST,Strings.create("DATA requires a verified Peer"));
-			return true;
-		}
 		return propagator.queuePropagation(message);
 	}
 
@@ -833,30 +823,17 @@ public class Server implements Closeable {
 
 	private void processChallenge(Message m) {
 		manager.processChallenge(m, getPeer());
-		// If they're verifying us, also try to verify them
-		AConnection conn = m.getConnection();
-		if (conn != null) inboundVerifier.maybeStart(conn);
 	}
 
-
-
 	/**
-	 * Process an incoming message that represents a Belief.
-	 * Trusted connections go to the main queue; untrusted go to a small
-	 * best-effort queue and trigger server-initiated verification.
+	 * Process an incoming message that represents a Belief. Whoever sent it, each
+	 * Order it carries is judged on its own (signature, stake and age), so it joins the
+	 * ordered propagation queue behind any DATA from the same connection.
 	 * @param m Belief message to process
+	 * @return true if queued, false if the queue is full and the Belief was dropped
 	 */
 	protected boolean processBelief(Message m) {
-		AConnection conn=m.getConnection();
-		if (conn==null || conn.isTrusted()) {
-			// Trusted or local (ConvexLocal) — ordered propagation queue
-			return propagator.queuePropagation(m);
-		} else {
-			// Untrusted inbound — best-effort queue, trigger verification
-			propagator.queueUntrustedPropagation(m);
-			inboundVerifier.maybeStart(conn);
-			return true;
-		}
+		return propagator.queuePropagation(m);
 	}
 
 	/**
@@ -929,7 +906,6 @@ public class Server implements Closeable {
 			manager.close();
 			nio.close();
 			if (tls!=null) tls.close();
-			inboundVerifier.close();
 			closeOwnedStore();
 			shutdownFuture.complete(Utils.getCurrentTimestamp());
 			return;
@@ -943,10 +919,9 @@ public class Server implements Closeable {
 		// Close manager, we don't want any management actions during shutdown!
 		manager.close();
 
-		// Stop ingress and cancel connection-bound verification before worker/store shutdown.
+		// Stop ingress before worker/store shutdown.
 		nio.close();
 		if (tls!=null) tls.close();
-		inboundVerifier.close();
 
 		// Shut down propagator, no point sending any more Beliefs
 		propagator.close();
@@ -1109,16 +1084,6 @@ public class Server implements Closeable {
 
 	public ConnectionManager getConnectionManager() {
 		return manager;
-	}
-
-	/** Number of inbound connections successfully verified since startup. */
-	public long getInboundVerifiedCount() {
-		return inboundVerifier.getVerifiedCount();
-	}
-
-	/** Number of inbound verifications currently in progress. */
-	public int getInboundPendingVerifications() {
-		return inboundVerifier.getPendingCount();
 	}
 
 	public HashMap<Keyword, Object> getConfig() {

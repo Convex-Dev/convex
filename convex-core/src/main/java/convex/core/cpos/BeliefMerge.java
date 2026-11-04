@@ -150,11 +150,29 @@ public class BeliefMerge {
 	 * @return True if valid Peer, false otherwise.
 	 */
 	private boolean isValidPeer(ABlob key) {
+		return isValidPeer(peers,key);
+	}
+
+	/**
+	 * Tests whether a Belief merge in the given consensus state considers a Peer's
+	 * Order: the Peer must be registered with at least the minimum effective stake.
+	 * Lets a receiver drop Orders that no merge would use before checking their
+	 * signatures or storing them.
+	 *
+	 * @param state Consensus state
+	 * @param key Peer key to test
+	 * @return True if the merge considers this Peer's Order, false otherwise
+	 */
+	public static boolean isValidPeer(State state, ABlob key) {
+		return isValidPeer(state.getPeers(),key);
+	}
+
+	private static boolean isValidPeer(Index<AArrayBlob, PeerStatus> peers, ABlob key) {
 		PeerStatus ps=RT.ensureCVM(peers.get(key),PeerStatus.class);
 		if (ps==null) return false;
-		
+
 		if (ps.getPeerStake()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return false;
-		
+
 		return true;
 	}
 

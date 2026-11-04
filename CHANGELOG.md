@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deliver each block's transaction results on a thread of their own, so a peer keeps applying blocks while clients are slow to take results or an in-process client's continuations run; a client may receive a later block's result before an earlier one's. ([Result reporting](convex-peer/docs/TRANSACTION_PATH.md#result-reporting))
 - Report a closed connection to a client as `:CONNECT`, and fail a message too large to send, instead of reporting either as load: `AConnection.sendMessage` now throws when a message cannot be sent. ([Client backpressure](convex-peer/docs/CLIENT_BACKPRESSURE.md#aconnection-interface))
 - Slow a client that reads its results more slowly than it sends requests by not reading its requests until they drain, instead of making peer threads wait to send results; `AConnection.returnMessageBlocking` and `Message.returnResultBlocking` are removed, since no send on a peer waits. ([Reply backlog](convex-peer/docs/BACKPRESSURE.md#reply-backlog))
+- Judge each Belief by its signed Orders, whoever sends it: a peer no longer challenges peers that connect to it, accepts Beliefs and DATA from any connection, and drops Orders from unstaked keys before checking their signatures, while polling the peers it chose keeps consensus moving whatever others send. ([Peer trust](convex-peer/docs/PEER_PRIORITY.md), [#826](https://github.com/Convex-Dev/convex/issues/826))
 
 ### Deprecated
 

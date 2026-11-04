@@ -375,7 +375,7 @@ The pair is created at construction time. The mode depends on keypair presence:
 - `createReturnable(clientHandler, serverHandler)` — client end return-only
 - Server end cannot `sendMessage` to client (`supportsMessage()` = false)
 - `returnMessage` works — results flow back through the awaiting map
-- No trust accumulation; `InboundVerifier` skips these connections
+- No trust accumulation; a server cannot verify these connections
 
 **Queries** do not use the pair. `querySync` runs the query against the peer's
 current state on the calling thread, and `query` on a virtual thread of its own,
@@ -438,40 +438,42 @@ if (conn.supportsMessage()) {
 }
 ```
 
-Used for protocol exchange (challenge/response verification), data push, and
-any server-initiated communication. Only works on bidirectional connections.
-`supportsMessage()` returns false on return-only connections — check before
-attempting.
+Used by lattice nodes for protocol exchange (challenge/response verification),
+data push, and other server-initiated communication. Only works on bidirectional
+connections. `supportsMessage()` returns false on return-only connections — check
+before attempting. A consensus peer's server sends nothing but results
+([PEER_PRIORITY.md](PEER_PRIORITY.md)).
 
 ### 5.3 Trust Checks
 
 ```java
 AConnection conn = msg.getConnection();
 if (conn != null && conn.isTrusted()) {
-    // trusted path — e.g. priority belief queue
+    // verified sender — e.g. a lattice node accepts its merge data
 } else {
-    // untrusted path — e.g. best-effort queue, trigger verification
+    // unverified sender
 }
 ```
 
 Messages on return-only connections are always untrusted (`supportsMessage()`
 returns false so verification cannot be initiated). Persistent bidirectional
-connections can accumulate trust via verification.
+connections can accumulate trust via verification. A consensus peer makes no such
+check: it judges a Belief by its signed Orders, whoever sent it.
 
 ### 5.4 Verification
 
-`InboundVerifier` triggers server-initiated verification when an untrusted
-connection sends a message that would benefit from trust (e.g. a belief):
+A lattice node verifies an inbound connection that claims a key it wants to trust
+(`LatticeInboundVerifier`):
 
 1. Check `conn.supportsMessage()` — if false, skip verification entirely
-2. `conn.sendMessage(challenge)` — send CHALLENGE on the connection
+2. Send a CHALLENGE naming the claimed key as a request on the connection
 3. The other end's handler receives the CHALLENGE and auto-responds
-4. The response routes back through the pair to the server
+4. The response routes back to the request on that connection
 5. Verification succeeds → `conn.setTrustedKey(remoteKey)`
 6. Subsequent messages on this connection are trusted
 
-See [PEER_PRIORITY.md](PEER_PRIORITY.md) for the full verification flow and
-belief priority model.
+A consensus peer verifies only connections it opens; see
+[PEER_PRIORITY.md](PEER_PRIORITY.md).
 
 Application-specific policy (e.g. "is this key a registered peer in consensus
 state") is separate from the connection-layer verification. The connection
@@ -482,8 +484,8 @@ identity means.
 
 | Actor | Connection type | Mode | Trust | Verification |
 |---|---|---|---|---|
-| Network peer (`ConvexRemote`) | Network socket | bidirectional | yes | client or server initiated |
-| In-memory peer/agent (`ConvexLocal` + keypair) | Local pair (persistent) | bidirectional | yes | client or server initiated |
+| Network peer (`ConvexRemote`) | Network socket | bidirectional | yes | client initiated; a lattice node's server may also verify |
+| In-memory peer/agent (`ConvexLocal` + keypair) | Local pair (persistent) | bidirectional | yes | client initiated |
 | Shared REST gateway (`ConvexLocal`, no keypair) | Local pair (persistent) | return-only | no | not possible |
 | HTTP endpoint (`ChainAPI`) | Via shared `ConvexLocal` | return-only | no | not possible |
 | Direct fast path (`ConvexDirect`) | None | direct calls | n/a | n/a |
