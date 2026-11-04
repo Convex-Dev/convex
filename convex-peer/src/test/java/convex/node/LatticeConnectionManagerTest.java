@@ -235,6 +235,65 @@ public class LatticeConnectionManagerTest {
 		assertTrue(manager.getDesiredPeers().containsKey(discovered),"a candidate is left as it is");
 	}
 
+	/** A candidate that failed since it was last reached is still retried, but no longer believed good. */
+	@Test public void testStarvedOnceEveryCandidateLeftToDialHasFailed() {
+		manager.setPeerTargets(1,0);
+		assertTrue(manager.whenStarved().isDone(),"a node that knows no peer is starved at once");
+		AccountKey failing=candidate(1);
+		CompletableFuture<Void> starved=manager.whenStarved();
+		assertFalse(starved.isDone(),"a candidate not yet tried is believed good");
+		manager.maintainConnections();
+		manager.maintainConnections();
+		assertFalse(starved.isDone(),"an attempt in flight may yet succeed");
+		manager.dials.remove(failing).completeExceptionally(new java.io.IOException("refused"));
+		manager.maintainConnections();
+		assertTrue(starved.isDone() && !starved.isCompletedExceptionally());
+
+		candidate(2);
+		CompletableFuture<Void> fresh=manager.whenStarved();
+		assertFalse(fresh.isDone(),"a new candidate is believed good");
+		fill(1);
+		assertFalse(fresh.isDone(),"the slot is filled");
+		manager.close();
+		assertTrue(fresh.isCompletedExceptionally());
+		assertTrue(manager.whenStarved().isCompletedExceptionally());
+	}
+
+	/** A named peer released with its route kept becomes an ordinary peer that fills a slot. */
+	@Test public void testReleaseKeepingTheRouteLeavesAnOrdinaryPeer() {
+		manager.setPeerTargets(1,0);
+		AccountKey known=AKeyPair.createSeeded(100).getAccountKey();
+		manager.connectPeer(known,new InetSocketAddress("localhost",1));
+		assertTrue(manager.updateDiscoveredPeer(known,Vectors.of(Strings.create("tcp://localhost:1")),1));
+		fill(1);
+		CompletableFuture<Void> met=manager.whenAmbientTargetMet();
+		assertFalse(met.isDone(),"a named route does not count towards the slots");
+
+		manager.releasePeer(known,true);
+		assertNotNull(manager.getConnection(known),"the route stays open");
+		assertTrue(met.isDone(),"as an ordinary peer it fills the slot");
+		for (int i=0;i<10;i++) {
+			manager.maintainConnections();
+			manager.completeDials();
+		}
+		assertNotNull(manager.getConnection(known),"ambient selection keeps it");
+
+		// An operator's address alone makes no candidate: the route stays, with nothing to dial
+		AccountKey unlisted=AKeyPair.createSeeded(101).getAccountKey();
+		manager.connectPeer(unlisted,new InetSocketAddress("localhost",2));
+		fill(2);
+		manager.releasePeer(unlisted,true);
+		assertNotNull(manager.getConnection(unlisted),"the route stays open");
+		assertNull(manager.getDesiredPeers().get(unlisted).transports,"with nothing to dial");
+		assertTrue(manager.updateDiscoveredPeer(unlisted,Vectors.of(Strings.create("tcp://localhost:2")),1),
+			"until discovery lists it");
+
+		AccountKey unreached=AKeyPair.createSeeded(102).getAccountKey();
+		manager.connectPeer(unreached,new InetSocketAddress("localhost",3));
+		manager.releasePeer(unreached,true);
+		assertFalse(manager.getDesiredPeers().containsKey(unreached),"a peer without a route or a candidate entry is forgotten");
+	}
+
 	@Test public void testOutstandingWorkIsNotTrimmedAndBootstrapIsNotActivity() {
 		manager.setPeerTargets(1,1);
 		candidate(1);

@@ -183,6 +183,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Futures awaiting a maintenance pass that finds no authenticated route. Lock held. */
 	private final List<CompletableFuture<Void>> isolationWaiters=new ArrayList<>();
 
+	/** Futures awaiting a maintenance pass that finds no believed-good candidate left to dial. Lock held. */
+	private final List<CompletableFuture<Void>> starvationWaiters=new ArrayList<>();
+
 	/** Wakes the single maintenance thread when desired-peer state changes. */
 	private final Semaphore maintenanceSignal = new Semaphore(0);
 
@@ -347,6 +350,50 @@ public class LatticeConnectionManager extends AConnectionManager {
 		List<CompletableFuture<Void>> isolated=new ArrayList<>(isolationWaiters);
 		isolationWaiters.clear();
 		return isolated;
+	}
+
+	/**
+	 * Returns a future that completes once this node's ambient slots are unfilled and it
+	 * has no believed-good candidate left to dial: no attempt is in flight, and every
+	 * candidate it holds no route to has failed since it was last reached. Failing
+	 * candidates are still retried; this is when a node can also turn to a source of
+	 * last resort, such as its seeds. Completes at once if that holds now, as for a node
+	 * that knows no peer, otherwise when a maintenance pass finds it. Fails when the
+	 * manager closes.
+	 *
+	 * @return future completing when no believed-good candidate is left to dial
+	 */
+	public CompletableFuture<Void> whenStarved() {
+		synchronized (connectionLock) {
+			if (!accepting) {
+				return CompletableFuture.failedFuture(new IllegalStateException("Connection manager is closed"));
+			}
+			if (isStarved()) return CompletableFuture.completedFuture(null);
+			CompletableFuture<Void> waiter=new CompletableFuture<>();
+			starvationWaiters.add(waiter);
+			return waiter;
+		}
+	}
+
+	/** Whether the ambient slots are unfilled and no believed-good candidate is left to dial. Lock held. */
+	private boolean isStarved() {
+		if (isAmbientTargetMet()) return false;
+		if (!dialling.isEmpty() || !pendingConnections.isEmpty() || !endpointIntents.isEmpty()) return false;
+		for (var entry:desiredPeers.entrySet()) {
+			AccountKey key=entry.getKey();
+			if (activity.get(key).explicit || hasRouteOrAttempt(key)) continue;
+			DesiredPeer desired=entry.getValue();
+			if (hasDialTarget(desired) && desired.getFailCount()==0) return false;
+		}
+		return true;
+	}
+
+	/** Removes the starvation waiters to complete, once no believed-good candidate is left. Lock held. */
+	private List<CompletableFuture<Void>> takeStarvationWaiters() {
+		if (starvationWaiters.isEmpty() || !isStarved()) return List.of();
+		List<CompletableFuture<Void>> starved=new ArrayList<>(starvationWaiters);
+		starvationWaiters.clear();
+		return starved;
 	}
 
 	/** Removes the ambient waiters to complete, once the target is met. Lock held. */
@@ -707,6 +754,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 			ambientWaiters.clear();
 			stateWaiters.addAll(isolationWaiters);
 			isolationWaiters.clear();
+			stateWaiters.addAll(starvationWaiters);
+			starvationWaiters.clear();
 			disconnected = new ArrayList<>(disconnectWaiters.values());
 			disconnectWaiters.clear();
 			// The listener/endpoint owns these physical inbound connections. Closing
@@ -1534,28 +1583,58 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * @param peerKey key of the peer to release
 	 */
 	public void releasePeer(AccountKey peerKey) {
+		releasePeer(peerKey,false);
+	}
+
+	/**
+	 * Withdraws explicit intent as {@link #releasePeer(AccountKey)} does, but can keep
+	 * the route this node opened. With {@code keepRoute}, a peer this node holds a route
+	 * to stays connected as an ordinary candidate, which ambient selection keeps or
+	 * trims like any other route, as for a node this node trusts from past contact and
+	 * keeps for as long as it serves. That holds even for a peer held from its target,
+	 * which has no address to dial: discovery can supply one afterwards, and an
+	 * operator-supplied address alone still never makes a candidate. A peer that cannot
+	 * stay a candidate is closed and forgotten either way.
+	 *
+	 * @param peerKey key of the peer to release
+	 * @param keepRoute whether a peer this node holds a route to keeps it
+	 */
+	public void releasePeer(AccountKey peerKey,boolean keepRoute) {
 		if (peerKey == null) return;
-		Convex removed;
+		Convex removed=null;
 		PendingConnection pending=null;
-		CompletableFuture<Convex> waiter;
+		CompletableFuture<Convex> waiter=null;
+		List<CompletableFuture<Void>> met=List.of();
 		synchronized (connectionLock) {
 			PeerActivity state=activity.get(peerKey);
 			if (state==null || !state.explicit) return;
 			DesiredPeer desired=desiredPeers.get(peerKey);
-			if (desired.discovered && hasDialTarget(desired) && candidateCount<maxDesiredPeers) {
+			boolean room=candidateCount<maxDesiredPeers;
+			boolean candidate=desired.discovered && hasDialTarget(desired) && room;
+			boolean keep=keepRoute && room && (candidate || connections.containsKey(peerKey));
+			if (candidate || keep) {
 				state.explicit=false;
+				state.held=false;
 				candidateCount++;
+				// Nothing to dial until discovery lists the peer
+				if (!candidate) desiredPeers.put(peerKey,DesiredPeer.create(peerKey));
 			} else {
 				desiredPeers.remove(peerKey);
 				activity.remove(peerKey);
 				dialling.remove(peerKey);
 				pending=pendingConnections.remove(peerKey);
 			}
-			removed=connections.remove(peerKey);
-			// Maintenance checks an inbound route the peer opened from its next pass
-			if (removed!=null) health.remove(peerKey);
-			waiter=connectionWaiters.remove(peerKey);
+			if (keep) {
+				// The route now counts towards the ambient target
+				met=takeMetAmbientWaiters();
+			} else {
+				removed=connections.remove(peerKey);
+				// Maintenance checks an inbound route the peer opened from its next pass
+				if (removed!=null) health.remove(peerKey);
+				waiter=connectionWaiters.remove(peerKey);
+			}
 		}
+		for (CompletableFuture<Void> each:met) each.complete(null);
 		if (removed != null) {
 			closeSilently(removed);
 			log.debug("Released peer: {}", peerKey);
@@ -1887,10 +1966,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 		for (EndpointIntent intent:identifications) startIdentification(intent);
 		for (DesiredPeer desired:attempts) startDial(desired);
 		List<CompletableFuture<Void>> isolated;
+		List<CompletableFuture<Void>> starved;
 		synchronized (connectionLock) {
 			isolated=takeIsolationWaiters();
+			starved=takeStarvationWaiters();
 		}
 		for (CompletableFuture<Void> waiter:isolated) waiter.complete(null);
+		for (CompletableFuture<Void> waiter:starved) waiter.complete(null);
 	}
 
 	/**

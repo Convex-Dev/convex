@@ -410,11 +410,18 @@ active peers for two minutes. Explicit `connectPeer`/`addPeer` intent survives
 discovery metadata updates and may exceed these targets until `removePeer`, or until
 `releasePeer` withdraws it: that closes the route this node opened, keeps any route
 the peer opened, and leaves the peer a candidate only if discovery lists it.
+`releasePeer(key, true)` instead keeps a route this node holds to the peer, which
+becomes an ordinary candidate filling an ambient slot like any other route; a peer
+with nothing to dial, such as one held from its target or known only by an
+operator-supplied address, is redialled only once discovery lists it.
 `whenAmbientTargetMet` completes once routes to peers that are not explicit fill the
 ambient target, and number at least one, which is when an application can release
-peers it used as seeds. `whenIsolated` completes once a maintenance pass finds no
-authenticated route in either direction, or at once when there is none, which is when
-it can seed again.
+peers it used as seeds. `whenStarved` completes once the ambient target is unmet and no
+believed-good candidate is left to dial: no attempt is in flight, and every candidate
+without a route has failed since it was last reached. Failing candidates are still
+retried; this is when an application can turn to a source of last resort, such as its
+seeds. `whenIsolated` completes once a maintenance pass finds no authenticated route in
+either direction, or at once when there is none.
 Pending socket opens and identity challenges reserve slots, with at most four
 automatic attempts outstanding, attempts to reach a node known only by its endpoint
 among them. Each attempt runs independently of maintenance.
