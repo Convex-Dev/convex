@@ -122,6 +122,11 @@ import convex.social.Social;
  * handles transient routed messages and is not a lattice concern. P2PNode uses its
  * node key as both transport identity and NodeInfo owner; social DIDs and their
  * signing keys remain independent.</p>
+ *
+ * <p><b>Threading.</b> The node takes no lock: the application running it decides the
+ * order of its calls and makes them one after another. Configure the node, launch it,
+ * then seed it; configuration fails once launch has begun, and seeding fails until the
+ * node's server is running.</p>
  */
 public class P2PNode implements Closeable {
 
@@ -176,7 +181,7 @@ public class P2PNode implements Closeable {
 		new ConcurrentHashMap<>();
 	/** Nodes the operator named, whose records are kept however full the registry is. */
 	private final Set<AccountKey> named=ConcurrentHashMap.newKeySet();
-	/** Completes when seeds are first released; null until seeding starts. Guarded by this node. */
+	/** Completes when seeds are first released; null until seeding starts. */
 	private CompletableFuture<Void> seeding;
 	/** The seeding round still dialling, or null between rounds. */
 	private volatile SeedRound seedRound;
@@ -443,7 +448,7 @@ public class P2PNode implements Closeable {
 	 * @param popKeys unique remote PoP node keys
 	 * @return this node, for chaining
 	 */
-	public synchronized P2PNode pointsOfPresence(AccountKey... popKeys) {
+	public P2PNode pointsOfPresence(AccountKey... popKeys) {
 		requireNew("pointsOfPresence");
 		AVector<AccountKey> pops=Vectors.empty();
 		if (popKeys!=null) {
@@ -460,7 +465,7 @@ public class P2PNode implements Closeable {
 	 *
 	 * @return this node, for chaining
 	 */
-	public synchronized P2PNode relayMessages() {
+	public P2PNode relayMessages() {
 		requireNew("relayMessages");
 		application.directory().setRelay(true);
 		pointOfPresence.setRelay(true);
@@ -506,7 +511,7 @@ public class P2PNode implements Closeable {
 	 * @throws IOException If an IO error occurs during launch
 	 * @throws InterruptedException If the operation is interrupted
 	 */
-	public synchronized void launch() throws IOException, InterruptedException {
+	public void launch() throws IOException, InterruptedException {
 		validateLaunchConfiguration();
 		requireNew("launch");
 		launchStarted=true;
@@ -768,7 +773,7 @@ public class P2PNode implements Closeable {
 	 * @param seeds seed names to add, as {@link #seeds(NodeConfig)} reads them
 	 * @return future completing when the seeds are first released, at once if none is listed
 	 */
-	public synchronized CompletableFuture<Void> seed(List<PeerName> seeds) {
+	public CompletableFuture<Void> seed(List<PeerName> seeds) {
 		if (!server.isRunning()) {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("P2P node must be launched before seeding"));

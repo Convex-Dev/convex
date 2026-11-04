@@ -10,6 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.URI;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -33,6 +36,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeContext;
+import convex.net.PeerName;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import convex.node.RelayHost;
@@ -94,6 +98,23 @@ public class P2PNodeTest {
 		node.launch();
 
 		assertTrue(node.isRunning());
+	}
+
+	/**
+	 * Seeding needs a running node, configuration precedes launch, a node launches
+	 * once, and seeding starts once.
+	 */
+	@Test
+	public void testCallsOutOfOrderFail() throws Exception {
+		node=P2PNode.create(store,NodeConfig.port(-1),AKeyPair.generate());
+		assertTrue(node.seed(List.of()).isCompletedExceptionally(),"seeding needs a running node");
+		node.launch();
+		assertThrows(IllegalStateException.class,node::relayMessages);
+		assertThrows(IllegalStateException.class,() -> node.pointsOfPresence());
+		assertThrows(IllegalStateException.class,node::launch,"a node launches once");
+		assertTrue(node.isRunning());
+		CompletableFuture<Void> seeding=node.seed(List.of(new PeerName(URI.create("tcp://localhost:1"),null)));
+		assertSame(seeding,node.seed(List.of()),"seeding starts once");
 	}
 
 	/** The base transport must not discover P2P behaviour from the root's shape. */
