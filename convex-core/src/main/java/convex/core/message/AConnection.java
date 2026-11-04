@@ -273,6 +273,18 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * As {@link #returnMessageBlocking(Message)}, waiting at most the given time,
+	 * so that a caller returning several messages can bound its total wait.
+	 *
+	 * @param msg Message to return
+	 * @param timeoutMillis Longest wait in milliseconds; zero or less does not wait
+	 * @return true if the message was accepted for delivery
+	 */
+	public boolean returnMessageBlocking(Message msg, long timeoutMillis) {
+		return returnMessage(msg);
+	}
+
+	/**
 	 * Checks if this connection supports general message sending (as opposed
 	 * to result-only delivery via {@link #returnMessage(Message)}).
 	 *

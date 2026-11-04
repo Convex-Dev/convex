@@ -48,7 +48,12 @@ Client                          Peer Server
 │                   │    applyBlock → applyTransactions (sequential)
 │                   │  persistPeerData()
 │                   │  maybeReportTransactions()
-│                   │    interests.get(hash) → m.returnResult(res)
+│                   │    interests.remove(hash) → collect results
+└────────┬─────────┘
+         │ one virtual thread per block
+         ▼
+┌──────────────────┐
+│ Result delivery   │  m.returnResultBlocking(res, remaining)
 └────────┬─────────┘
          │
          ▼
@@ -109,7 +114,7 @@ interests.put(sd.getHash(), m);   // ConcurrentHashMap<Hash, Message>
 
 Maps transaction hash → original Message so results can be returned later.
 Uses `ConcurrentHashMap` because `registerInterest()` runs on the TransactionHandler
-thread while `reportTransactions()` (which reads and removes interests) runs on the
+thread while `reportTransactions()` (which removes interests) runs on the
 CVMExecutor thread.
 
 ## Stage 3: BeliefPropagator
@@ -230,9 +235,16 @@ if (newConsensusPoint > reportedConsensusPoint) {
 }
 ```
 
-For each new finalised block:
-1. Look up `interests.get(txHash)` → original Message
-2. `m.returnResult(res)` → sends result back to client via Netty
+For each new finalised block, the executor:
+1. Removes `interests.remove(txHash)` → original Message, and builds its result
+2. Starts a virtual thread for the block, which returns each result in order with
+   `m.returnResultBlocking(res, remaining)`
+
+The executor never waits for delivery: not for outbound capacity, nor to encode a
+result, nor for an in-process client's continuations, which run on the delivery
+thread. Each block's results are delivered independently, so one client can receive
+a later block's result before an earlier block's. A message sent without a request
+ID gets no result.
 
 ## Timing Analysis
 
@@ -472,7 +484,7 @@ flushing happens, enabling batching at the connection level.
 
 ### Server Result Return
 
-`reportTransactions()` calls `m.returnResultBlocking(res)` per result. On a Netty
+Each block's delivery thread calls `m.returnResultBlocking(res, remaining)` per result. On a Netty
 server connection this offers the encoded result to the server's single
 `ServerOutboundQueue`, shared by every inbound connection and bounded by the bytes it
 holds (`Config.SERVER_OUTBOUND_QUEUE_BYTE_LIMIT`). One writer thread hands queued
@@ -482,11 +494,10 @@ channel.
 
 The queue applies three policies:
 
-- **Backpressure, not loss.** If the shared bound is full, the reporting thread
-  (the `CVMExecutor`) waits for space, up to `Config.DEFAULT_INTERNAL_TIMEOUT`.
-  Delaying state updates is preferable to dropping results globally. Consensus is
-  unaffected: Belief propagation runs on outbound connections with their own queues,
-  and hands beliefs to the executor through a latest-value slot that never blocks.
+- **Backpressure, not loss.** If the shared bound is full, a block's delivery
+  thread waits for space, up to `Config.DEFAULT_INTERNAL_TIMEOUT` for the whole
+  block; after that, each remaining result is offered without waiting and dropped
+  if refused. The executor keeps applying blocks meanwhile.
 - **A stalled reader loses only its own replies.** Bytes handed to Netty but not
   yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`,
   or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified peer).

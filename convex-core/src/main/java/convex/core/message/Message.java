@@ -705,41 +705,59 @@ public class Message {
 
 
 	/**
-	 * Reports a result back to the originator of the message.
-	 * 
-	 * Will set a Result ID if necessary.
-	 * 
+	 * Reports a result back to the originator of the message, with the message's
+	 * request ID. A message without a request ID asked for no result, so it gets none.
+	 *
 	 * @param res Result record
-	 * @return True if reported successfully, false otherwise
-	 * @throws IllegalStateException if original message did not specify a return ID
+	 * @return True if reported successfully, false otherwise, including when the
+	 *         message has no request ID
 	 */
 	public boolean returnResult(Result res) {
-		return returnMessage(createReturnResult(res));
+		Message msg=createReturnResult(res);
+		if (msg==null) return false;
+		return returnMessage(msg);
 	}
 
 	/**
 	 * Returns a Result for this message, waiting a bounded time if the connection's
 	 * shared outbound capacity is exhausted. For handler threads only; see
-	 * {@link AConnection#returnMessageBlocking(Message)}.
+	 * {@link AConnection#returnMessageBlocking(Message)}. A message without a request
+	 * ID gets no result.
 	 *
 	 * @param res Result to return
 	 * @return true if the result was accepted for delivery
 	 */
 	public boolean returnResultBlocking(Result res) {
 		Message msg=createReturnResult(res);
-		AConnection conn=connection;
-		if (conn==null) throw new IllegalStateException("No connection for return message");
-		return conn.returnMessageBlocking(msg);
+		if (msg==null) return false;
+		return returnConnection().returnMessageBlocking(msg);
 	}
 
+	/**
+	 * As {@link #returnResultBlocking(Result)}, waiting at most the given time for
+	 * outbound capacity; see {@link AConnection#returnMessageBlocking(Message, long)}.
+	 *
+	 * @param res Result to return
+	 * @param timeoutMillis Longest wait in milliseconds; zero or less does not wait
+	 * @return true if the result was accepted for delivery
+	 */
+	public boolean returnResultBlocking(Result res, long timeoutMillis) {
+		Message msg=createReturnResult(res);
+		if (msg==null) return false;
+		return returnConnection().returnMessageBlocking(msg,timeoutMillis);
+	}
+
+	/** The result message for this message's request ID, or null if it has none. */
 	private Message createReturnResult(Result res) {
-		ACell id=getRequestID(); // what was the request ID of original message?
-		if (id!=null) {
-			// Make sure Result has correct result ID
-			return Message.createResult(res.withID(id));
-		} else {
-			throw new IllegalStateException("Trying to return result with no original request ID in "+this);
-		}
+		ACell id=getRequestID();
+		if (id==null) return null;
+		return Message.createResult(res.withID(id));
+	}
+
+	private AConnection returnConnection() {
+		AConnection conn=connection;
+		if (conn==null) throw new IllegalStateException("No connection for return message");
+		return conn;
 	}
 	
 	/**
