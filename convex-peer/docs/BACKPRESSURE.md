@@ -118,11 +118,14 @@ Replies to a client go through the server's shared outbound queue, and no thread
 waits to add one: a reply is queued, or refused at once. Each connection counts its
 backlog, the bytes of its replies queued or handed to Netty and not yet written:
 
-| Backlog | Effect |
-|---------|--------|
-| Half `Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT` | The handler holds back the next request it decodes and stops reading the socket |
-| Written down to a quarter | The write completion that crosses it delivers the held request and resumes reading |
-| The whole limit | Further replies to that client are refused: it is not reading |
+| Condition | Effect |
+|-----------|--------|
+| Backlog reaches half `Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT` | The handler holds back the next request it decodes and stops reading the socket |
+| Backlog written down to a quarter | The write completion that crosses it delivers the held request and resumes reading |
+| More than the whole limit handed to Netty and not yet written | Further replies to that client are refused: it is not reading |
+
+Replies queued but not yet handed to Netty do not count towards the refusal, so a
+burst of results for one client is absorbed by the shared queue.
 
 So a client that sends faster than it reads is slowed by TCP, like one whose requests
 fill a queue, rather than losing results. Pausing always holds a decoded request, so

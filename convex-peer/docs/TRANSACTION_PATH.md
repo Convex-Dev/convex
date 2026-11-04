@@ -500,10 +500,11 @@ these policies:
   From half the client allowance (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`),
   the server stops reading that client's requests until the backlog is written
   down to a quarter ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)).
-- **A stalled reader loses only its own replies.** Over its allowance
-  (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`, or
-  `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified peer) a connection's
-  results are refused and logged at debug. The client sees a `:TIMEOUT`.
+- **A stalled reader loses only its own replies.** Bytes handed to Netty but not
+  yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`,
+  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified peer). Over that cap
+  the connection's results are refused and logged at debug. The client sees a
+  `:TIMEOUT`.
 - **Shedding load.** A client result that finds the shared bound full is refused.
   The writer only hands messages to Netty, so this takes a server too short of CPU
   for the writer to keep up.

@@ -23,16 +23,16 @@ import io.netty.channel.Channel;
  * client results.</p>
  *
  * <p>Nothing waits to add a message: it is queued, or refused at once. The writer
- * is the only thread that waits, for work. Each connection's backlog, the bytes
- * queued for it or handed to Netty and not yet written, is bounded by an
- * allowance: a small one for a client, a large one for a verified peer, which is
- * buffered for rather than cut off when it lags. Over its allowance a
- * connection's further replies are refused, and only its own. Before that, from
- * half its allowance, a client's requests stop being read until its backlog is
- * written down to a quarter (see {@link NettyInboundHandler}), so a client that
- * sends faster than it reads is slowed at its socket rather than losing results.
- * A client reply that finds the shared bound full is refused: the server is
- * shedding load.</p>
+ * is the only thread that waits, for work. What a connection has handed to Netty
+ * but not yet written is bounded by an allowance: a small one for a client, a
+ * large one for a verified peer, which is buffered for rather than cut off when it
+ * lags. Over its allowance a connection's further replies are refused, and only
+ * its own. Each connection also counts its backlog, the bytes queued for it or
+ * handed to Netty and not yet written. From half the client allowance, a client's
+ * requests stop being read until its backlog is written down to a quarter (see
+ * {@link NettyInboundHandler}), so a client that sends faster than it reads is
+ * slowed at its socket rather than losing results. A client reply that finds the
+ * shared bound full is refused: the server is shedding load.</p>
  */
 final class ServerOutboundQueue {
 
@@ -59,7 +59,7 @@ final class ServerOutboundQueue {
 
 	/**
 	 * @param byteLimit Maximum encoded bytes held in the queue for untrusted connections
-	 * @param connectionByteLimit Backlog of unwritten bytes beyond which a client connection's replies are refused
+	 * @param connectionByteLimit Bytes handed to Netty but unwritten beyond which a client connection's replies are refused
 	 */
 	ServerOutboundQueue(long byteLimit, long connectionByteLimit) {
 		this(byteLimit, connectionByteLimit, Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT, true);
@@ -88,7 +88,7 @@ final class ServerOutboundQueue {
 	 * towards the connection's backlog until written or discarded.
 	 *
 	 * @return true if queued; false if the queue is closed, the shared bound is full, or the
-	 *         connection's backlog is already over its allowance
+	 *         connection already has more than its allowance handed to Netty and unwritten
 	 */
 	boolean offer(NettyServerConnection connection, Channel channel, Message message, int bytes) {
 		if (bytes < 0 || connection.getPendingBytes() >= allowance(connection)) return false;
@@ -102,7 +102,7 @@ final class ServerOutboundQueue {
 				queuedBytes += bytes;
 				ordinary.addLast(e);
 			}
-			connection.addPendingBytes(bytes);
+			connection.addBacklog(bytes);
 			notify(); // only the writer waits
 		}
 		return true;
@@ -114,7 +114,7 @@ final class ServerOutboundQueue {
 	 * its replies, which it is buffered for instead.
 	 */
 	boolean isBacklogged(NettyServerConnection connection) {
-		return !connection.isTrusted() && connection.getPendingBytes() >= connectionByteLimit / 2;
+		return !connection.isTrusted() && connection.getBacklog() >= connectionByteLimit / 2;
 	}
 
 	/**
@@ -123,7 +123,7 @@ final class ServerOutboundQueue {
 	 * reading resume.
 	 */
 	private void release(NettyServerConnection connection, int bytes) {
-		long after = connection.addPendingBytes(-bytes);
+		long after = connection.addBacklog(-bytes);
 		long resume = connectionByteLimit / 4;
 		if (after <= resume && after + bytes > resume) connection.backlogDrained();
 	}
@@ -197,10 +197,15 @@ final class ServerOutboundQueue {
 			release(conn, bytes);
 			return;
 		}
+		conn.addPendingBytes(bytes);
 		try {
-			ch.write(e.message()).addListener(f -> release(conn, bytes));
+			ch.write(e.message()).addListener(f -> {
+				conn.addPendingBytes(-bytes);
+				release(conn, bytes);
+			});
 			touched.add(ch);
 		} catch (RuntimeException ex) {
+			conn.addPendingBytes(-bytes);
 			release(conn, bytes);
 			log.warn("Failed to write server reply", ex);
 		}

@@ -16,10 +16,10 @@ import io.netty.channel.Channel;
  * <p>Encodes on the caller thread, then offers the message to the server's shared
  * {@link ServerOutboundQueue}. No send waits, so every form is safe on any thread:
  * a message is queued, or refused at once if the shared queue is full or this
- * connection's backlog of unwritten replies is over its allowance, so a reader that
- * stalls loses only its own replies. Before that, a client whose backlog grows
- * stops having its requests read until the backlog drains. One instance per
- * accepted client channel.</p>
+ * connection already has more than its allowance handed to Netty and unwritten, so
+ * a reader that stalls loses only its own replies. Before that, a client whose
+ * backlog of replies grows stops having its requests read until the backlog
+ * drains. One instance per accepted client channel.</p>
  */
 class NettyServerConnection extends AConnection {
 
@@ -27,8 +27,11 @@ class NettyServerConnection extends AConnection {
 	private final NettyInboundHandler inboundHandler;
 	private final ServerOutboundQueue outbound;
 
-	/** Encoded bytes queued for this channel or handed to Netty, and not yet written. */
+	/** Encoded bytes handed to Netty for this channel and not yet reported written. */
 	private final AtomicLong pendingBytes = new AtomicLong();
+
+	/** Encoded bytes queued for this channel or handed to Netty, and not yet written. */
+	private final AtomicLong backlog = new AtomicLong();
 
 	NettyServerConnection(Channel channel, NettyInboundHandler inboundHandler, ServerOutboundQueue outbound) {
 		this.channel = channel;
@@ -39,8 +42,8 @@ class NettyServerConnection extends AConnection {
 	/**
 	 * Queues a message for this channel without waiting.
 	 *
-	 * @return false at once if the shared queue is full or this connection's backlog
-	 *         is over its allowance
+	 * @return false at once if the shared queue is full or this connection has more
+	 *         than its allowance handed to Netty and unwritten
 	 */
 	@Override
 	public boolean sendMessage(Message msg) throws ClosedChannelException {
@@ -62,13 +65,21 @@ class NettyServerConnection extends AConnection {
 		}
 	}
 
-	/** Adds to this connection's backlog, returning the new backlog. */
-	long addPendingBytes(int delta) {
-		return pendingBytes.addAndGet(delta);
+	void addPendingBytes(int delta) {
+		pendingBytes.addAndGet(delta);
 	}
 
 	long getPendingBytes() {
 		return pendingBytes.get();
+	}
+
+	/** Adds to this connection's backlog, returning the new backlog. */
+	long addBacklog(int delta) {
+		return backlog.addAndGet(delta);
+	}
+
+	long getBacklog() {
+		return backlog.get();
 	}
 
 	/** Whether this connection's requests should not be read until its replies drain. */

@@ -105,7 +105,7 @@ public class ServerOutboundQueueTest {
 			// With the shared bound full, every form of send is refused at once
 			assertFalse(conn.sendMessage(m));
 			assertFalse(conn.returnMessage(m));
-			assertEquals(size, conn.getPendingBytes(), "a refused reply adds nothing to the backlog");
+			assertEquals(size, conn.getBacklog(), "a refused reply adds nothing to the backlog");
 
 			assertEquals(1, queue.drainBatch());
 			assertTrue(conn.sendMessage(m), "accepted once the writer frees the shared bound");
@@ -123,22 +123,26 @@ public class ServerOutboundQueueTest {
 	public void testBacklogCountsQueuedReplies() {
 		Message m = message(600);
 		int size = size(m);
-		// A client may have 4.5 replies in its backlog: reads pause from half that
-		ServerOutboundQueue queue = new ServerOutboundQueue(size * 10, 4 * size + size / 2, false);
+		// A client may have 4 replies handed to Netty and unwritten: reads pause from a backlog of 2
+		ServerOutboundQueue queue = new ServerOutboundQueue(size * 10, 4 * size, false);
 		EmbeddedChannel ch = new EmbeddedChannel(new NettyOutboundHandler());
 		try {
 			NettyServerConnection conn = connection(ch, queue);
 			assertTrue(conn.trySendMessage(m));
-			assertTrue(conn.trySendMessage(m));
-			assertEquals(2 * size, conn.getPendingBytes(), "queued replies count before the writer hands them over");
+			assertEquals(size, conn.getBacklog(), "a queued reply counts before the writer hands it over");
 			assertFalse(conn.isBacklogged());
 			assertTrue(conn.trySendMessage(m));
 			assertTrue(conn.isBacklogged());
 
+			// The allowance bounds what is handed to Netty: a burst beyond it waits in the shared queue
+			for (int i = 0; i < 4; i++) assertTrue(conn.trySendMessage(m));
+			assertEquals(6 * size, conn.getBacklog());
+			assertEquals(0, conn.getPendingBytes());
+
 			// Replies for a channel that closes before hand-over leave the backlog too
 			ch.close().syncUninterruptibly();
-			assertEquals(3, queue.drainBatch());
-			assertEquals(0, conn.getPendingBytes());
+			assertEquals(6, queue.drainBatch());
+			assertEquals(0, conn.getBacklog());
 			assertFalse(conn.isBacklogged());
 		} finally {
 			queue.close();
