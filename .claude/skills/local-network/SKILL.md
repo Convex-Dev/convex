@@ -223,7 +223,7 @@ Blob. Domain readers should parse compatible Blob values with
 `AccountKey.parse` or `AccountKey.create`; do not use `instanceof AccountKey`
 as a wire-format validity check.
 
-The rules in `AGENTS.md` apply: never bind fixed ports and never sleep. Wait on
-futures, latches or another API whose contract represents the required state.
+Never bind fixed ports and never sleep. Wait on futures, latches or another API
+whose contract represents the required state.
 
 Stop the network when finished: close listeners before nodes, then close stores.

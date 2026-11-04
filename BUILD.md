@@ -66,6 +66,20 @@ Keep the generator and trial settings unchanged during replay. Add a small
 deterministic regression for a confirmed bug while retaining fresh random
 generation in the property suite.
 
+### Test hazards and diagnosis
+
+Small `CVMLong`s, booleans, empty collections and core functions are cached cells
+shared across the test JVM. Never write one under a synthetic Etch key or a fake
+hash: that corrupts its hash for every later test in the JVM. Use fresh, randomly
+seeded blobs of about 30 bytes instead.
+
+To reproduce an intermittent failure, loop it in one JVM under CPU load in a soak
+test gated by `-Dconvex.soak=true`, as `JoinNetworkSoakTest` does.
+
+A test run that hangs at near-zero CPU is a class-initialisation deadlock: run
+`ClassInitCycles` (`convex-integration/src/test/java/convex/tools`) to find the
+cycle.
+
 ## CI Workflows
 
 Four GitHub Actions workflows handle continuous integration:

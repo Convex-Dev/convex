@@ -38,19 +38,11 @@ releases.
 
 ## Agent tooling
 
-Skills live in `.claude/skills/<name>/SKILL.md`:
-
-- *Orientation* — `ecosystem`, `cad-reference`
-- *Working on Convex* — `build-convex`, `local-network`, `peer`, `etch`, `issue-triage`
-- *Protocol internals* — `protocol-versions`, `cad3-encoding`, `juice`, `memory`
-- *Writing CVM code* — `convex-lisp` (shared CVM conventions: read it first),
-  `trust`, `deploy`, `query`, `transact`
-- *Using a network* — `account`, `transfer`, `token`, `cns`, `convex-db`, `dlfs`
-
-Codex reads forwarding entries in `.agents/skills/<name>/SKILL.md`: the same `name`
-and `description` frontmatter and a link to the canonical file. Adding, renaming or
-removing a skill updates both directories and this list. Convex MCP tools are
-optional per-user configuration; without them, use the CLI as the skills describe.
+Skills live in `.claude/skills/<name>/SKILL.md`. Codex reads forwarding entries in
+`.agents/skills/<name>/SKILL.md`: the same `name` and `description` frontmatter and
+a link to the canonical file, so adding, renaming or removing a skill updates both
+directories. Convex MCP tools are optional per-user configuration; without them,
+use the CLI as the skills describe.
 
 ## Specifications and docs
 
@@ -68,17 +60,10 @@ clients, peers and operators see and can rely on. A module's `docs/` (and
 linking the CAD rather than repeating it. Internals (invariants, races, protected
 methods) live only in code comments. Each module also has a README.
 
-## Protocol versions
-
-Networks carry a protocol version, counted from `0` at genesis. **Version 1 is the
-target** (the upgrade bootstrap plus every bug known at genesis): write and test
-against v1 semantics, the `ACVMTest` default (`InitTest.UPGRADED`).
-`Migrations.LIVE_VERSION` is what live peers run, and gates releases against breaking
-them. Before changing CVM behaviour, read the `protocol-versions` skill and
-`convex-core/docs/UPGRADE.md` for its tier and whether it needs a version gate.
-
 ## Design rules
 
+- Protocol version 1 is the target: write and test against v1 semantics. Before
+  changing CVM behaviour, read the `protocol-versions` skill.
 - Changes to core data and encoding code (`Index`, `CAD3Encoder`, `Format`, `Ref`,
   `ACell`, equality) start with the analysis and proposed design, agreed before any
   edit: these paths decide canonical encodings, hashes and memory accounting.
@@ -116,21 +101,3 @@ them. Before changing CVM behaviour, read the `protocol-versions` skill and
 | `convex-benchmarks` | JMH benchmarks only; application-level performance trials live in the `flair` repository |
 | `convex-observer` | Network monitoring tools |
 | `convex-integration` | Build assembly (produces convex.jar) |
-
-## Tests
-
-JUnit 6: Jupiter, plus the Vintage engine for the junit-quickcheck `*PropertyTest`
-classes (see BUILD.md).
-
-- Never write shared cached cells (small `CVMLong`s, booleans, empty collections,
-  core functions) under synthetic Etch keys or fake hashes: that corrupts their
-  hashes for the whole test JVM. Use fresh, randomly seeded blobs of about 30 bytes.
-- To reproduce an intermittent failure, loop it in one JVM under CPU load in a soak
-  test gated by `-Dconvex.soak=true` (`JoinNetworkSoakTest` is the model).
-- A test run that hangs at near-zero CPU is a class-initialisation deadlock: run
-  `ClassInitCycles` (`convex-integration/src/test/java/convex/tools`).
-
-## Network defaults
-
-- **Protonet** (production): `peer.convex.live`
-- **Testnet** (default for tooling and MCP): `https://mikera1337-convex-testnet.hf.space`

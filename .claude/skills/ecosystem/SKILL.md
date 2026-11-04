@@ -52,8 +52,8 @@ with the network implementation.
 ## Networks
 
 - **Protonet** (production): `peer.convex.live`
-- Testnets are used for tooling and experimentation; the endpoint in use is
-  recorded in `AGENTS.md` under Network Defaults.
+- **Testnet** (default for tooling and MCP):
+  `https://mikera1337-convex-testnet.hf.space`
 
 Anything you deploy to Protonet is real. Confirm the target network before any
 transaction, and prefer a local network for development — see the
