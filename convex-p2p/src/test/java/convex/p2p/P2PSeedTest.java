@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -97,6 +100,28 @@ public class P2PSeedTest {
 		P2PNode other=launch(store("seed-other"),NodeConfig.localNetwork(),0,otherKey);
 		other.connect(hubKey.getAccountKey(),hub.getHostAddress()).get(TIMEOUT,TimeUnit.SECONDS);
 		return hub;
+	}
+
+	/**
+	 * Once seeding starts, the node is dialling a seed. The seed here accepts the
+	 * connection and never answers, so the attempt stays in progress and no other
+	 * node is needed.
+	 */
+	@Test
+	public void testSeedingStartsAConnectionAttempt() throws Exception {
+		try (ServerSocket seed=new ServerSocket()) {
+			seed.bind(new InetSocketAddress("127.0.0.1",0));
+			seed.setSoTimeout((int)TimeUnit.SECONDS.toMillis(TIMEOUT));
+			P2PNode joiner=launch(store("seed-joiner"),NodeConfig.localNetwork(),1,joinerKey);
+			LatticeConnectionManager manager=joiner.propagationGroup().getConnectionManager();
+			assertTrue(manager.whenStarved().isDone(),"a node that knows no peer has nothing to dial");
+
+			joiner.seed(List.of(new PeerName(URI.create("tcp://127.0.0.1:"+seed.getLocalPort()),hubKey.getAccountKey())));
+			assertFalse(manager.whenStarved().isDone(),"a connection attempt is in progress");
+			try (Socket dialled=seed.accept()) {
+				assertFalse(manager.whenStarved().isDone(),"the attempt waits for the seed to answer");
+			}
+		}
 	}
 
 	@Test
