@@ -224,6 +224,49 @@ public class PeerTest {
 		assertEquals(Vectors.createLongs(0,0),later.getTransactionLocation(txs[0].getHash()));
 		assertNull(later.getTransactionLocation(otherTx.getHash()));
 	}
+
+	/**
+	 * A transaction included in several Blocks is reported by the copy that ran, whether
+	 * it succeeded or failed, and otherwise by its first copy.
+	 */
+	@Test
+	public void testRepeatedTransactionLookups() throws InvalidDataException {
+		SignedData<ATransaction> txA=KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 1, "(+ 1 1)"));
+		SignedData<ATransaction> txB=KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 2, "(+ 2 2)"));
+		SignedData<ATransaction> txC=KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 3, "(+ 3 3)"));
+		SignedData<ATransaction> txD=KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 4, "(fail :ASSERT \"no\")"));
+		// B too early, A runs, B runs, A again, D too early, C runs, D runs and fails
+		List<SignedData<ATransaction>> sequence=List.of(txB, txA, txB, txA, txD, txC, txD);
+
+		Peer p=Peer.create(KP, GENESIS);
+		long ts=p.getTimestamp();
+		for (int i=0; i<sequence.size(); i++) {
+			p=p.proposeBlock(Block.of(ts+i, sequence.get(i)));
+		}
+		p=p.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs().updateState();
+		assertEquals(7,p.getStatePosition());
+		assertEquals(ErrorCodes.SEQUENCE,p.getBlockResult(0).getResult(0).getErrorCode());
+		assertEquals(ErrorCodes.SEQUENCE,p.getBlockResult(3).getResult(0).getErrorCode());
+
+		// The first copy ran
+		assertEquals(Vectors.createLongs(1,0),p.getTransactionLocation(txA.getHash()));
+		assertEquals(CVMLong.create(2),p.getTransactionResult(txA.getHash()).getValue());
+
+		// A later copy ran
+		assertEquals(Vectors.createLongs(2,0),p.getTransactionLocation(txB.getHash()));
+		assertEquals(CVMLong.create(4),p.getTransactionResult(txB.getHash()).getValue());
+
+		// The copy that ran failed
+		assertEquals(Vectors.createLongs(6,0),p.getTransactionLocation(txD.getHash()));
+		assertEquals(ErrorCodes.ASSERT,p.getTransactionResult(txD.getHash()).getErrorCode());
+		assertEquals(txD,p.getTransaction(txD.getHash()));
+
+		// Before the copy that ran, the first copy's rejection is the outcome
+		Peer earlier=p.truncateState(5);
+		assertEquals(Vectors.createLongs(4,0),earlier.getTransactionLocation(txD.getHash()));
+		assertEquals(ErrorCodes.SEQUENCE,earlier.getTransactionResult(txD.getHash()).getErrorCode());
+		assertEquals(Vectors.createLongs(2,0),earlier.getTransactionLocation(txB.getHash()));
+	}
 	
 	/**
 	 * Small test: single block with a few mixed good/bad signature transactions.

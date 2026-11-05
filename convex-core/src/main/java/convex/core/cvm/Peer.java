@@ -957,7 +957,10 @@ public class Peer {
 	}
 
 	/**
-	 * Gets the result of an executed transaction
+	 * Gets the result of an executed transaction. For a transaction included in more than
+	 * one Block, this is the result of the copy that ran, or of the first copy if none did:
+	 * running uses up the transaction's sequence number, so at most one copy runs.
+	 *
 	 * @param txID Hash of the signed transaction
 	 * @return Result, or null if this Peer has not executed the transaction
 	 */
@@ -980,7 +983,8 @@ public class Peer {
 	}
 
 	/**
-	 * Gets the location of an executed transaction
+	 * Gets the location of an executed transaction: of the copy that ran, for one included
+	 * in more than one Block, as {@link #getTransactionResult(ABlob)} describes
 	 * @param transactionID Hash of the signed transaction
 	 * @return Vector of Block position and transaction position, or null if this Peer has not executed it
 	 */
@@ -1016,7 +1020,7 @@ public class Peer {
 	private AVector<CVMLong> locateTransaction(ABlob txID) {
 		AVector<SignedData<Block>> blocks=getIndexedBlocks();
 		long limit=getIndexLimit(blocks);
-		return getIndex(blocks,limit).getTransactionLocation(txID,limit);
+		return getIndex(blocks,limit).getTransactionLocation(this,txID,limit);
 	}
 
 	/** Blocks of this Peer's own Order, which lookups index */
