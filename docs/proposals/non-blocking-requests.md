@@ -37,6 +37,8 @@ a subclass marks the cases where the message was never queued.
   loop and on a handler thread, and can block the shared timer thread for up to 8 s.
 - `Convex.transact` sends while holding the client's monitor, so one blocked send stalls every
   other transaction on that client.
+- The client keeps a transaction's sequence number as soon as it signs it, even if the message
+  is never sent. The next transaction then fails with `:SEQUENCE`.
 - The `*Sync` methods start their own timer only after the blocking send returns:
   `requestStatusSync(2000)` can take about 10 s.
 
@@ -120,16 +122,24 @@ caller.
 
 Requests on one connection are committed in call order, apart from those that are dropped.
 
-The client signs and submits transactions in call order, so they reach the peer in sequence
-order. A transaction dropped before it is queued leaves a gap: transactions from the same
-client that were already signed with later sequence numbers fail with `:SEQUENCE`. A caller
-that needs each transaction's outcome before sending the next uses `transactSync`; a caller
-that pipelines transactions handles `:TIMEOUT` and `:SEQUENCE`.
+### Transaction sequence numbers
 
-The client reserves a sequence number when it signs and forgets it only on `:SEQUENCE`. When
-a transaction is known not to have been sent and no later transaction has been signed since,
-the client rewinds its cached sequence number, so a synchronous caller's next transaction does
-not fail needlessly.
+The client's cached sequence number advances only when a transaction's message is queued.
+The client signs a transaction with the next number, but keeps that number only once the
+message is on the send queue, behind every earlier transaction from the same client. A
+transaction that is never queued leaves the cached number where it was.
+
+So the client signs a transaction only once the previous one is queued, or known not to have
+been. Until then, later transactions wait in the client, unsigned. Their deadlines still run,
+and one whose deadline passes fails with `SendTimeoutException` without using a number.
+Transactions therefore reach the send queue, and the peer, in sequence order, and the client
+leaves no gaps of its own making.
+
+A transaction can still fail to run after it is queued: the connection closes before it is
+written, the peer sheds it, or it is lost. Its number is then used up, and the next
+transaction fails with `:SEQUENCE`. On `:SEQUENCE` the client forgets its cached number and
+looks it up again, as today. A caller that needs each outcome before sending the next uses
+`transactSync`; a caller that pipelines transactions handles `:TIMEOUT` and `:SEQUENCE`.
 
 ## Who sees a change
 
@@ -161,8 +171,9 @@ These apply to network clients (`ConvexRemote`); in-JVM clients are a later step
   - The waiting area extends the send queue in `NettyConnection`.
 - **Blocking send:** once one-way `Convex.message()` stops blocking too, nothing calls
   `AConnection.sendMessage(Message)` any more.
-- **Deferred:** a public signal that completes when a request is committed, for producers that
-  want to pace on commit rather than on results. Nothing needs it yet.
+- **Queued signal:** something that completes when a request's message is queued, or fails
+  with the not-sent exception. The client needs it to sign transactions in order. Whether
+  callers get it too, for example to pace on, is open.
 
 ### Implementation requirements
 
@@ -220,7 +231,9 @@ Each step updates the docs it changes.
      never queued.
    - A request whose deadline passes before it is queued fails with `SendTimeoutException`,
      and one whose connection closes first with `ClosedBeforeSendException`.
-   - Transactions known not to have been sent rewind the cached sequence number, as above.
+   - The cached sequence number advances only when a transaction is queued, as above. In this
+     step the send still happens while holding the client's monitor, so the client learns
+     whether the transaction was queued before it signs the next one.
    - The time-limited send stays protected.
    - Callers see a difference only when a send gives up. A client set to a timeout under 8 s
      stops waiting at its deadline. A transaction that was never sent no longer makes the next
@@ -239,9 +252,10 @@ Taken one at a time, in this order.
 1. **The exception for no room.** It covers a full waiting area, and in step 1 the transport's
    8 s wait running out. A type of our own naming the cause, or keep
    `RejectedExecutionException`. Also how `Result.fromException` maps it. Needed for step 1.
-2. **How a client Result shows "not sent"** for a timeout or a close before the message was
-   queued. The client's own sequence-number rewind can check the exception; callers deciding
-   whether to retry need it in the Result.
+2. **How the client learns a request was queued, and how a Result shows "not sent".** The
+   client needs the first to keep sequence numbers, which `Convex` does above the transport
+   for every kind of client. Callers deciding whether to retry need the second. One mechanism
+   may serve both. Needed for step 1.
 3. **At the waiting area's cap.** Refuse (recommended) or block. Blocking would bring back waits
    on threads borrowed from callbacks.
 4. **Broadcasts and other non-request messages** (`trySendMessage`) **while requests are
