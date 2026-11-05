@@ -88,12 +88,11 @@ final class LatticeProtocolEndpoint implements Closeable {
 		new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<Message,Throwable> acquisitionFailures=
 		new ConcurrentHashMap<>();
-	private final Object acquisitionLifecycleLock=new Object();
 	private final LatticeInboundVerifier inboundVerifier;
 
 	private volatile boolean acceptingInbound;
 	private volatile boolean inboundRunning;
-	private boolean acceptingAcquisitions;
+	private volatile boolean acceptingAcquisitions;
 	private Thread inboundThread;
 	private Thread maintenanceThread;
 
@@ -141,9 +140,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 		inboundQueue.open();
 		inboundRunning=true;
 		acceptingInbound=true;
-		synchronized (acquisitionLifecycleLock) {
-			acceptingAcquisitions=true;
-		}
+		acceptingAcquisitions=true;
 		inboundThread=Thread.ofPlatform().daemon().name("Lattice propagator ingress").start(this::inboundLoop);
 		maintenanceThread=Thread.ofVirtual().name("Lattice propagator connection maintenance")
 			.start(this::maintenanceLoop);
@@ -152,10 +149,13 @@ final class LatticeProtocolEndpoint implements Closeable {
 	/** Assigns a physical inbound connection permanently to this endpoint. */
 	void attachInbound(AConnection connection) {
 		if (connection==null) throw new IllegalArgumentException("Connection must not be null");
-		synchronized (inboundConnections) {
-			if (!acceptingInbound) throw new IllegalStateException("Propagator group is not accepting connections");
-			if (connection.isClosed()) throw new IllegalStateException("Inbound connection is closed");
-			inboundConnections.add(connection);
+		if (connection.isClosed()) throw new IllegalStateException("Inbound connection is closed");
+		// Added before checking: close stops admission before collecting its sockets,
+		// so either close closes this connection or the check turns it away
+		inboundConnections.add(connection);
+		if (!acceptingInbound) {
+			inboundConnections.remove(connection);
+			throw new IllegalStateException("Propagator group is not accepting connections");
 		}
 	}
 
@@ -661,21 +661,22 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private CompletableFuture<ACell> acquireHash(AConnection connection,Hash hash) {
 		Acquiror acquiror=Acquiror.fromMessages(hash,store,hashes ->
 			connection.request(Message.createDataRequest(null,hashes),Config.DEFAULT_INTERNAL_TIMEOUT));
-		Set<Acquiror> acquisitions;
-		synchronized (acquisitionLifecycleLock) {
-			if (!acceptingAcquisitions) {
-				acquiror.close();
-				return CompletableFuture.failedFuture(new IOException("Propagator group is stopping"));
-			}
-			acquisitions=activeAcquirors.computeIfAbsent(connection,c -> ConcurrentHashMap.newKeySet());
+		// Recorded before checking: closing stops admission before collecting fetches, so
+		// either close closes this one or the check does, before it starts
+		activeAcquirors.compute(connection,(c,acquisitions) -> {
+			if (acquisitions==null) acquisitions=ConcurrentHashMap.newKeySet();
 			acquisitions.add(acquiror);
-		}
-		acquiror.getTerminationFuture().whenComplete((ignored,error) -> {
-			synchronized (acquisitionLifecycleLock) {
-				acquisitions.remove(acquiror);
-				if (acquisitions.isEmpty()) activeAcquirors.remove(connection,acquisitions);
-			}
+			return acquisitions;
 		});
+		acquiror.getTerminationFuture().whenComplete((ignored,error) ->
+			activeAcquirors.computeIfPresent(connection,(c,acquisitions) -> {
+				acquisitions.remove(acquiror);
+				return acquisitions.isEmpty() ? null : acquisitions;
+			}));
+		if (!acceptingAcquisitions) {
+			acquiror.close();
+			return CompletableFuture.failedFuture(new IOException("Propagator group is stopping"));
+		}
 		return acquiror.getFuture();
 	}
 
@@ -868,11 +869,10 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	private void stopAcquisitions() throws IOException {
+		// Stop admission before collecting: a fetch recorded after this is turned away by its own check
+		acceptingAcquisitions=false;
 		ArrayList<Acquiror> acquisitions=new ArrayList<>();
-		synchronized (acquisitionLifecycleLock) {
-			acceptingAcquisitions=false;
-			for (Set<Acquiror> values:activeAcquirors.values()) acquisitions.addAll(values);
-		}
+		for (Set<Acquiror> values:activeAcquirors.values()) acquisitions.addAll(values);
 		acquisitions.forEach(Acquiror::close);
 		long timeout=config.getInboundShutdownTimeout();
 		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(timeout);
@@ -891,9 +891,9 @@ final class LatticeProtocolEndpoint implements Closeable {
 
 	@Override
 	public void close() throws IOException {
-		synchronized (inboundConnections) {
-			acceptingInbound=false;
-		}
+		// Stop admission before collecting sockets below: a connection attached after
+		// this is turned away by its own check
+		acceptingInbound=false;
 		inboundRunning=false;
 		inboundVerifier.close();
 		IOException failure=null;

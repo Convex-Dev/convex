@@ -46,6 +46,7 @@ import convex.net.impl.netty.NettyServer;
 public final class LatticeListener implements Closeable {
 
 	private static final Logger log=LoggerFactory.getLogger(LatticeListener.class);
+	private static final String UNAVAILABLE_GROUP="Inbound propagation policy selected an unavailable group";
 
 	private final NodeConfig config;
 	private final Set<LatticePropagator> allowedPropagators;
@@ -213,6 +214,8 @@ public final class LatticeListener implements Closeable {
 				if (!(e instanceof StackOverflowError)) throw e;
 				return containFailure(connection,propagator,e);
 			} catch (Throwable e) {
+				// A group removed meanwhile turns connections away as it closes: no failure
+				if (!allowedPropagators.contains(propagator)) return reject(message,UNAVAILABLE_GROUP);
 				return containFailure(connection,propagator,e);
 			}
 			// A connection's messages arrive one at a time, so nothing else assigns it.
@@ -221,7 +224,7 @@ public final class LatticeListener implements Closeable {
 			assignments.put(connection,propagator);
 			if (!allowedPropagators.contains(propagator)) {
 				removeConnection(connection);
-				return reject(message,"Inbound propagation policy selected an unavailable group");
+				return reject(message,UNAVAILABLE_GROUP);
 			}
 		}
 		try {
@@ -292,7 +295,7 @@ public final class LatticeListener implements Closeable {
 			if (selected==null) return new Selection(null,"No propagation policy admits this connection");
 			if (!allowedPropagators.contains(selected)) {
 				log.warn("Inbound policy selected a propagator not registered with this listener");
-				return new Selection(null,"Inbound propagation policy selected an unavailable group");
+				return new Selection(null,UNAVAILABLE_GROUP);
 			}
 			return new Selection(selected,null);
 		} catch (VirtualMachineError e) {
