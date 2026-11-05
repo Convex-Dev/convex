@@ -9,58 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Let applications choose how each Convex DB database merges, with per-row last-write-wins provided, and supply the clock that stamps its writes. ([Merge Policy](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-policy), [Clock](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#clock), [#779](https://github.com/Convex-Dev/convex/issues/779), [#781](https://github.com/Convex-Dev/convex/issues/781), [#784](https://github.com/Convex-Dev/convex/issues/784))
-- Encrypt Convex DB's PostgreSQL wire connections with TLS: clients connect with `sslmode=require` up to `verify-full` (proposed by @trsb-standards). ([TLS](convex-db/README.md#tls), [#756](https://github.com/Convex-Dev/convex/issues/756))
-- Run transactions from PostgreSQL clients with `BEGIN`, `COMMIT` and `ROLLBACK`, and use scalar subqueries, `IS TRUE`, `IS FALSE` and `ROUND` in Convex DB SQL (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
-- Run a P2P node with `convex p2p start` or a JSON5 configuration: it joins through seed nodes, turns to them again only when it has no other peer, and rejoins from the nodes it remembers after a restart. ([Running a node](convex-p2p/README.md#running-a-node), [#716](https://github.com/Convex-Dev/convex/issues/716))
-- Block P2P nodes by key, address or host, with a blocklist that survives a restart. ([Local Evidence](convex-peer/docs/P2P_DESIGN.md#46-local-evidence-partial), [#814](https://github.com/Convex-Dev/convex/issues/814))
-- Name lattice peers by `did:web` as well as by address in `convex dlfs start --peer`, `convex p2p start --seed` and their configurations; a lost peer is resolved again and reconnected. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#connection-capabilities), [CAD043](https://docs.convex.world/docs/cad/did))
-- Replicate two DLFS nodes both ways with `convex dlfs start --serve-inbound` on one and `--peer` naming it on the other. ([DLFS](convex-dlfs/README.md#run-a-webdav-server))
-- Read and upload large DLFS files over WebDAV in bounded memory: reads accept HTTP `Range` requests, and an upload is published in one atomic update that checks `If-Match` and `If-None-Match`, so a failed or conflicting upload leaves the file as it was. ([#790](https://github.com/Convex-Dev/convex/issues/790))
-- Check a silent lattice connection after 60 seconds and close a dead one within 90, by default. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md))
-- Extend the Java APIs for lattice networking, persistence, private state, large blobs and JWT signing; see the [lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#retention-durability-and-networking) and [networking](convex-peer/docs/LATTICE_NETWORKING.md) guides. ([#769](https://github.com/Convex-Dev/convex/issues/769), [#805](https://github.com/Convex-Dev/convex/issues/805), [#815](https://github.com/Convex-Dev/convex/issues/815))
+- Let applications choose how each Convex DB database merges and which clock stamps its writes. ([Merge Policy](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-policy))
+- Encrypt Convex DB's PostgreSQL connections with TLS (proposed by @trsb-standards). ([TLS](convex-db/README.md#tls))
+- Support PostgreSQL client transactions and more standard SQL in Convex DB (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
+- Run a P2P node with `convex p2p start`, joining through seeds and rejoining after a restart. ([Running a node](convex-p2p/README.md#running-a-node))
+- Block unwanted P2P nodes by key, address or host. ([Local Evidence](convex-peer/docs/P2P_DESIGN.md#46-local-evidence-partial))
+- Name lattice peers by `did:web` as well as by address. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#connection-capabilities))
+- Replicate DLFS nodes both ways. ([DLFS](convex-dlfs/README.md#run-a-webdav-server))
+- Stream large DLFS files over WebDAV, with byte ranges and atomic uploads. ([#790](https://github.com/Convex-Dev/convex/issues/790))
+- Give lattice applications more control over networking, persistence and private state. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md))
 
 ### Changed
 
-- Serve the REST server's DID documents with standard `Multikey` keys, readable by standard DID resolvers; `alsoKnownAs` lists only an account's `did:convex`. ([CAD043](https://docs.convex.world/docs/cad/did))
-- Start `convex.p2p.P2PNode` from a JSON5 configuration file, holding its store and a stable key, instead of an Etch file. ([Running a node](convex-p2p/README.md#running-a-node))
-- Remove `convex dlfs start --url`, which has not advertised the node since 0.8.16; `convex p2p start --url` advertises a P2P node.
-- Make Convex DB's SQL `INSERT` standard: a primary key the table already holds, or one repeated in the statement, is an integrity constraint violation (`23000` through JDBC, `23505` over the PostgreSQL wire protocol) and nothing is written, where it replaced the row before. ([#799](https://github.com/Convex-Dev/convex/issues/799))
-- Resolve Convex DB SQL names as the SQL standard does: unquoted names fold to upper case, where any case matched before. A database's `:identifiers` setting can choose PostgreSQL's lower case or case-insensitive matching instead; the JDBC `caseSensitive` parameter is gone. ([Identifier Case](convex-db/README.md#identifier-case), [#812](https://github.com/Convex-Dev/convex/issues/812))
-- Refuse Convex DB JDBC URLs with any parameter but `database`, and ignore other connection properties. ([JDBC](convex-db/docs/JDBC.md#url-format))
-- Speed up Convex DB: replicating a few rows of a large table costs only those rows, and a prepared statement over the PostgreSQL wire protocol is planned once per connection. ([#767](https://github.com/Convex-Dev/convex/pull/767), [#786](https://github.com/Convex-Dev/convex/issues/786))
-- Send a lattice node's final state to its peers when it shuts down. ([Shutdown](convex-peer/docs/SHUTDOWN.md), [#778](https://github.com/Convex-Dev/convex/issues/778))
-- Accept Beliefs from any connection, judging each by its signed Orders: a peer no longer challenges peers that connect to it, and polling the peers it chose keeps consensus moving whatever others send. ([Peer trust](convex-peer/docs/PEER_PRIORITY.md), [#826](https://github.com/Convex-Dev/convex/issues/826))
-- Keep a peer responsive when clients are slow: each block's results are delivered on a thread of their own, so a client may receive a later block's result before an earlier one's; a client that reads its results slowly has its requests left unread until they drain; and an in-process client's queries no longer hold up network queries. ([Result reporting](convex-peer/docs/TRANSACTION_PATH.md#result-reporting), [Reply backlog](convex-peer/docs/BACKPRESSURE.md#reply-backlog))
-- Report a closed connection to a client as `:CONNECT`, and fail a message too large to send, instead of reporting either as load. ([Client backpressure](convex-peer/docs/CLIENT_BACKPRESSURE.md#aconnection-interface))
-- Limit how many data requests a lattice node serves at once. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#inbound-pipeline))
-- Simplify the Java APIs for lattice applications, Convex DB setup, lattice networking and JWT verification; see the [lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#composition-and-sharing) guide when upgrading. ([#779](https://github.com/Convex-Dev/convex/issues/779), [#784](https://github.com/Convex-Dev/convex/issues/784))
+- Speed up Convex DB replication and prepared statements. ([#786](https://github.com/Convex-Dev/convex/issues/786))
+- Follow the SQL standard for Convex DB `INSERT` and name case, and accept only `database` in JDBC URLs; see [Identifier Case](convex-db/README.md#identifier-case) when upgrading.
+- Configure `convex.p2p.P2PNode` with a JSON5 file, and advertise nodes with `convex p2p start --url` in place of `convex dlfs start --url`. ([Running a node](convex-p2p/README.md#running-a-node))
+- Serve DID documents that standard DID resolvers read. ([CAD043](https://docs.convex.world/docs/cad/did))
+- Keep peers responsive to slow clients; a client may now receive a later block's results first. ([Result reporting](convex-peer/docs/TRANSACTION_PATH.md#result-reporting))
+- Report a closed client connection as `:CONNECT`. ([Client backpressure](convex-peer/docs/CLIENT_BACKPRESSURE.md#aconnection-interface))
+- Judge each Belief by its signed Orders, whichever connection brings it. ([Peer trust](convex-peer/docs/PEER_PRIORITY.md))
+- Send a lattice node's final state to its peers as it shuts down. ([Shutdown](convex-peer/docs/SHUTDOWN.md))
+- Simplify the Java APIs for lattice applications, networking and Convex DB; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading.
 
 ### Fixed
 
-- Accept lattice roots of any size when their updates fit the network message limits. ([Propagation](convex-peer/docs/PROPAGATION.md), [#822](https://github.com/Convex-Dev/convex/issues/822))
-- Replicate lattice updates with missing cells over connections opened by the receiving node. ([#820](https://github.com/Convex-Dev/convex/issues/820))
-- Make `convex dlfs start --peer` connect to the peers it names; startup fails if one cannot be reached. ([DLFS](convex-dlfs/README.md#run-a-webdav-server), [#629](https://github.com/Convex-Dev/convex/issues/629))
-- Keep lattice connections open under load: a busy node pauses a connection, whichever side opened it, instead of refusing its data requests or dropping what the peer sends, and neither a busy node nor a store failure closes it. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#inbound-pipeline))
-- Keep the peers a lattice node chooses: nodes that connect in no longer take its peer slots, and nodes found by P2P discovery no longer crowd out the nodes you name. ([Live peer selection](convex-peer/docs/LATTICE_NETWORKING.md#live-peer-selection), [#814](https://github.com/Convex-Dev/convex/issues/814))
-- Stop peer and lattice node shutdowns hanging or waiting on other peers, including a TLS peer that stops reading.
-- Stop a send to a full queue holding up every connection on a network thread for 8 seconds. ([Client backpressure](convex-peer/docs/CLIENT_BACKPRESSURE.md#aconnection-interface))
-- Recover a P2P peer connection after a first attempt that failed at once, and read a message a paused TLS connection has already received without waiting for more data.
-- Keep Etch stores usable when a thread using them is interrupted, and reopen Etch v3 stores without repair after a crash during start-up garbage collection. ([#776](https://github.com/Convex-Dev/convex/issues/776), [#748](https://github.com/Convex-Dev/convex/issues/748))
-- Complete a lattice host's final save when the thread closing it is interrupted.
-- Let in-flight requests finish when an HTTP server shuts down, and stop servers keeping the JVM alive. ([#777](https://github.com/Convex-Dev/convex/issues/777))
-- Keep a key when the `signingDeleteKey` MCP tool is given the wrong passphrase, and report the error. ([MCP Auth](convex-restapi/docs/MCP_AUTH.md#deletekey))
-- Keep lattice KV updates and deletes: concurrent updates are preserved, and a stale replica can no longer restore a deleted key. ([#807](https://github.com/Convex-Dev/convex/issues/807))
-- Never publish a P2P node's `:local` state or accept another's.
-- Accept lattice data, including Convex DB replicas, under an account or DID only from signers its owner authorises. ([Replica Ownership](convex-db/README.md#replica-ownership), [#780](https://github.com/Convex-Dev/convex/issues/780), [#782](https://github.com/Convex-Dev/convex/issues/782))
-- Keep percent-encoded characters in a DID, so `did:web:example.com%3A8080` no longer equals `did:web:example.com:8080`. ([#816](https://github.com/Convex-Dev/convex/issues/816))
-- Keep an application's Convex DB connections on its own database, whatever else is registered under the same name. ([#789](https://github.com/Convex-Dev/convex/issues/789))
-- Keep Convex DB drops and schema changes when a replica that missed them merges or writes later, and keep rows from before a `DROP TABLE` from returning when the table is created again. ([#779](https://github.com/Convex-Dev/convex/issues/779), [#784](https://github.com/Convex-Dev/convex/issues/784))
-- Read integers beyond 64 bits in Convex DB: `BIGINT` columns and integer sums are presented as `NUMERIC` through JDBC and the PostgreSQL wire protocol. ([Types](convex-db/docs/SQL-TYPES.md), [#757](https://github.com/Convex-Dev/convex/issues/757))
-- Keep Convex DB prepared statements correct when their table is dropped or re-created with other columns. ([#785](https://github.com/Convex-Dev/convex/issues/785))
-- Correct Convex DB SQL for `IN` and `EXISTS` subqueries on larger tables, NULL join keys, `FILTER (WHERE ...)` and `CASE` in aggregates, and names in DDL; an `UPDATE` that keeps its key is one row write, and a multi-row `INSERT` is atomic (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
-- Work with more PostgreSQL clients: Convex DB's wire server sends results in the format each client asks for, splits statements by PostgreSQL's lexical rules, accepts `DEALLOCATE`, and describes statements without running them (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
-- Parse PostgreSQL wire text parameters by their type, and stop a failed batch at the error. ([#772](https://github.com/Convex-Dev/convex/issues/772))
+- Replicate lattice data reliably, for roots of any size and connections under load. ([Propagation](convex-peer/docs/PROPAGATION.md))
+- Keep the peers a lattice node chooses, and close dead connections within 90 seconds. ([Live peer selection](convex-peer/docs/LATTICE_NETWORKING.md#live-peer-selection))
+- Connect `convex dlfs start --peer` to the peers it names. ([#629](https://github.com/Convex-Dev/convex/issues/629))
+- Shut down peers, lattice nodes and HTTP servers promptly and cleanly.
+- Keep Etch stores safe across interrupts and crashed start-ups. ([#748](https://github.com/Convex-Dev/convex/issues/748))
+- Keep replicated data consistent and owner-signed, including lattice KV deletes and Convex DB schema changes. ([Replica Ownership](convex-db/README.md#replica-ownership))
+- Keep each application's Convex DB connections on its own database. ([#789](https://github.com/Convex-Dev/convex/issues/789))
+- Improve Convex DB's SQL and PostgreSQL client compatibility, including integers beyond 64 bits (with fixes from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
+- Keep a P2P node's `:local` state private, and MCP signing keys safe from a wrong passphrase. ([MCP Auth](convex-restapi/docs/MCP_AUTH.md#deletekey))
+- Handle percent-encoded `did:web` names correctly. ([#816](https://github.com/Convex-Dev/convex/issues/816))
 
 ## [0.8.18] - 2026-10-25
 

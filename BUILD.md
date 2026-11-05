@@ -129,8 +129,22 @@ gh run list --branch develop --limit 1
 
 ### 2. Update CHANGELOG
 
+The changelog is for users and operators: people running nodes and services, and
+clients using SQL, JDBC, PostgreSQL, WebDAV, REST or the CLI. Entries are written
+this way as changes land, and the unreleased section is cleaned up before each
+release:
+
+- Each entry is a short, positive headline in the imperative ("Support…", "Speed
+  up…", "Keep…"), with at most one link, to its doc or issue.
+- Related entries are merged. Implementation detail stays out: class, method and
+  constant names, dependency bumps, build plumbing, test-only refactors and agent
+  tooling. Embedders read the code, so Java API changes share one entry pointing
+  at the design notes.
+- A breaking change gets one entry pointing at its doc.
+
+Then:
+
 - Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the tag and heading must match).
-- Finalise the `### Added` / `### Changed` / `### Fixed` bullets for this version.
 - Commit to `develop`.
 
 ### 3. Merge to master

@@ -31,10 +31,8 @@ releases.
   files out here.
 - Exploitable vulnerabilities go through [SECURITY.md](SECURITY.md) as private
   reports; never put exploit detail in a public issue, PR, commit or comment.
-- `CHANGELOG.md` records user-visible changes only: no dependency bumps, build
-  plumbing, test-only refactors or agent tooling. Entries are one-line highlights
-  in the imperative ("Support…", "Speed up…") linking the doc or issue, without
-  implementation detail; a breaking change gets one line pointing at its doc.
+- `CHANGELOG.md` entries are short headlines for users and operators, written as
+  [BUILD.md](BUILD.md#2-update-changelog) describes.
 
 ## Agent tooling
 
