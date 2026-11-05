@@ -164,7 +164,7 @@ public class ServerTest {
 
 		AKeyPair  kp=server.getKeyPair();
 
-		Convex convex = network.CONVEX;
+		Convex convex = network.getLocalClient();
 		assertTrue(convex.getBalance()>0);
 		
 		Result r=convex.transactSync("(create-account "+kp.getAccountKey()+")");
@@ -186,16 +186,17 @@ public class ServerTest {
 		InetSocketAddress hostAddress=network.SERVER.getHostAddress();
 		// This is a test of flooding a client connection with async messages. Should eventually throw an IOExcepion
 		// from backpressure and *not* bring down the server.
-		ConvexRemote convex=Convex.connect(hostAddress, network.VILLAIN,network.VILLAIN_KEYPAIR);
+		ConvexRemote convex=network.getClient();
+		Address origin=convex.getAddress();
 
 		ACell cmd=Reader.read("(def tmp (inc tmp))");
 		// Might block, but no issue
 		for (int i=0; i<100; i++) {
-			convex.transact(Invoke.create(network.VILLAIN, 0, cmd));
+			convex.transact(Invoke.create(origin, 0, cmd));
 		}
-		
+
 		// Should still get status OK
-		Convex convex2=Convex.connect(hostAddress, network.HERO,network.HERO_KEYPAIR);
+		Convex convex2=Convex.connect(hostAddress);
 		assertNotNull(convex2.requestStatusSync(2000));
 	}
 
@@ -487,12 +488,13 @@ public class ServerTest {
 		// Construct a SignedData whose value is unresolvable. Signature contents are
 		// irrelevant — the peer must reject before attempting any verification that
 		// would require the missing cell.
+		AKeyPair kp=AKeyPair.generate();
 		SignedData<ATransaction> badSigned = SignedData.create(
-				network.HERO_KEYPAIR.getAccountKey(),
+				kp.getAccountKey(),
 				Ed25519Signature.ZERO,
 				badRef);
 
-		Convex convex = Convex.connect(server, network.HERO, network.HERO_KEYPAIR);
+		Convex convex = network.getLocalClient(kp);
 		try {
 			// 3 second timeout is generous — a correct peer responds in milliseconds.
 			// If the peer is broken in the old way, this test times out rather than
@@ -512,32 +514,24 @@ public class ServerTest {
 	 * After a valid client transaction is accepted, the SignedData must be
 	 * persisted in the peer's store by intake time. This enforces the invariant
 	 * that block production can never fail on missing data.
-	 *
-	 * Uses the shared HERO connection so sequence caching stays in sync with
-	 * other tests.
 	 */
 	@Test
 	public void testTransactionPersistedAtIntake() throws Exception {
 		Server server = network.SERVER;
-		Convex convex = network.CONVEX;
+		AKeyPair kp=AKeyPair.generate();
+		Convex convex = network.getLocalClient(kp);
 		TransactionHandler transactionHandler=server.getTransactionHandler();
 		CompletableFuture<SignedData<ATransaction>> accepted=new CompletableFuture<>();
-		// Transaction sequencing is owned by the shared client. Hold its monitor
-		// across sequence selection, signing and submission so concurrently running
-		// tests cannot allocate the same sequence between these operations.
-		SignedData<ATransaction> signed;
 		try {
-			synchronized (convex) {
-				// Use a non-trivial command to ensure the signed cell has child refs
-				ATransaction tx = Invoke.create(network.HERO, convex.getSequence() + 1,
-						Reader.read("(do (def x 1) (def y 2) (+ x y))"));
-				signed = network.HERO_KEYPAIR.signData(tx);
-				Hash expectedHash=signed.getHash();
-				transactionHandler.setRequestObserver(observed -> {
-					if (expectedHash.equals(observed.getHash())) accepted.complete(observed);
-				});
-				convex.transact(signed);
-			}
+			// Use a non-trivial command to ensure the signed cell has child refs
+			ATransaction tx = Invoke.create(convex.getAddress(), convex.getSequence() + 1,
+					Reader.read("(do (def x 1) (def y 2) (+ x y))"));
+			SignedData<ATransaction> signed = kp.signData(tx);
+			Hash expectedHash=signed.getHash();
+			transactionHandler.setRequestObserver(observed -> {
+				if (expectedHash.equals(observed.getHash())) accepted.complete(observed);
+			});
+			convex.transact(signed);
 
 			SignedData<ATransaction> observed=accepted.get(
 				Config.DEFAULT_CLIENT_TIMEOUT,TimeUnit.MILLISECONDS);

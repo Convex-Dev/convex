@@ -36,7 +36,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
-import convex.core.lang.RT;
 import convex.etch.EtchStore;
 
 public class JoinNetworkTest {
@@ -55,23 +54,14 @@ public class JoinNetworkTest {
 		// We plan to stake twice the minimum amount
 		long STAKE=CPoSConstants.MINIMUM_EFFECTIVE_STAKE*2;
 		
+		// A peer controller account with enough coins to stake, and a test user account
+		Address controller=network.createAccount(kp.getAccountKey(),STAKE*2);
+		Address user=network.createAccount(kp.getAccountKey(),STAKE);
+
 		synchronized(network.SERVER) {
-			Convex heroConvex=network.CONVEX;
-
-			// Create new peer controller account, ensure it has enough coins to stake
-			Address controller=heroConvex.createAccountSync(kp.getAccountKey());
-			Result trans=heroConvex.transferSync(controller,STAKE*2);
-			assertFalse(trans.isError());
-
-			// create test user account
-			Address user=heroConvex.createAccountSync(kp.getAccountKey());
-			trans=heroConvex.transferSync(user,STAKE);
-			assertFalse(trans.isError());
-
 			Convex convex=Convex.connect(network.SERVER.getHostAddress(), controller, kp);
 			Result cresult=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
 			assertFalse(cresult.isError(),()->"Failed to create peer: "+cresult.toString());
-			assertEquals(RT.cvm(STAKE),trans.getValue());
 
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR,kp);
