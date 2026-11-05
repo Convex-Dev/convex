@@ -50,6 +50,10 @@ import convex.lattice.cursor.TransactionalRootCursor;
  * automatic flushing and saves a final checkpoint. The store stays open for the
  * service that owns it.</p>
  *
+ * <p><b>Threading.</b> Syncs, flushes, checkpoints and incoming deliveries may run
+ * on any thread; publication is serialised. The service adds applications at
+ * setup and closes the host at shutdown, one call after another.</p>
+ *
  * @param <V> Root lattice value type
  */
 public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> implements Closeable {
@@ -58,7 +62,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	private final LatticeHost<V> origin;
 	private final ReentrantLock syncLock=new ReentrantLock();
 	private Function<V,V> publisher;
-	private AutoFlush autoFlush;
+	private volatile AutoFlush autoFlush;
 	private boolean closed;
 	private volatile List<ALatticeComponent<V>> applications=List.of();
 
@@ -259,7 +263,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * replay previous input or merge existing host state into it. Applications manage
 	 * their own children; only root components register here.
 	 */
-	public synchronized <C extends ALatticeComponent<V>> C addApplication(C application) {
+	public <C extends ALatticeComponent<V>> C addApplication(C application) {
 		Objects.requireNonNull(application,"Application must not be null");
 		var updated=new ArrayList<>(applications);
 		updated.add(application);
@@ -458,30 +462,24 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * <p>Once closed, {@link #sync()}, {@link #sync(Function)}, {@link #checkpoint()},
 	 * {@link #flush()}, {@link #autoFlush(Duration)} and {@link #attachPublisher(Function)}
 	 * throw {@link IllegalStateException}. Reads still work. Incoming merges may still
-	 * change the in-memory value but cannot be retained, so a node whose ingress is
-	 * still open fails its syncs. Closing again does nothing.</p>
+	 * change the in-memory value but cannot be retained, so a node still running
+	 * fails its syncs. Closing again does nothing.</p>
 	 *
 	 * @throws IOException if the final checkpoint fails; the host stays open and a
 	 *         later close retries
 	 */
 	@Override
 	public void close() throws IOException {
-		for (;;) {
-			AutoFlush flusher;
-			syncLock.lock();
-			try {
-				if (closed) return;
-				flusher=autoFlush;
-				if (flusher==null) {
-					if (store!=null) checkpoint();
-					closed=true;
-					return;
-				}
-			} finally {
-				syncLock.unlock();
-			}
-			// Outside syncLock: the worker's flush takes it, and closing waits for the worker.
-			flusher.close();
+		// Outside syncLock: the worker's flush takes it, and closing waits for the worker
+		AutoFlush flusher=autoFlush;
+		if (flusher!=null) flusher.close();
+		syncLock.lock();
+		try {
+			if (closed) return;
+			if (store!=null) checkpoint();
+			closed=true;
+		} finally {
+			syncLock.unlock();
 		}
 	}
 

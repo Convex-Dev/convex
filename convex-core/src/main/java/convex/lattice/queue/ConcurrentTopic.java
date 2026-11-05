@@ -21,7 +21,9 @@ import convex.core.data.AHashMap;
  * <p>Call {@link #start()} before offering records or flushing. {@link #close()}
  * stops admission, drains accepted records and joins all workers. It reports any
  * worker failure and preserves the caller's interrupt status. A closed topic
- * cannot be restarted. Closing this wrapper does not close its primary topic.</p>
+ * cannot be restarted. Closing this wrapper does not close its primary topic.
+ * The owner starts and closes it, one call after the other, without a lock;
+ * producers and flush callers may run on any thread.</p>
  *
  * <pre>{@code
  * try (ConcurrentTopic ct = ConcurrentTopic.create(mq.topic("events"), 4, 4096)) {
@@ -73,7 +75,7 @@ public class ConcurrentTopic implements AutoCloseable {
 	}
 
 	/** Starts the workers once; repeated calls while running are harmless. */
-	public synchronized void start() {
+	public void start() {
 		checkFailure();
 		if (state==State.RUNNING) return;
 		if (state!=State.NEW) throw new IllegalStateException("Concurrent topic is closed");
@@ -113,7 +115,7 @@ public class ConcurrentTopic implements AutoCloseable {
 
 	/** Stops admission and waits for accepted work, including when the caller is interrupted. */
 	@Override
-	public synchronized void close() {
+	public void close() {
 		if (state==State.CLOSED) return;
 		if (state==State.NEW) {
 			state=State.CLOSED;

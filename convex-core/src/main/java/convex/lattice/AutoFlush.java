@@ -13,7 +13,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * A host's scoped durability worker. Flushes already-retained state; never syncs
  * applications or advances the retained root. The store remains caller-owned.
- * Closing the host closes this resource.
+ * Closing the host closes this resource. Its owner closes it, directly or by
+ * closing the host, never from two threads at once; closing again does nothing.
  */
 public final class AutoFlush implements Closeable {
 	private final LatticeHost<?> host;
@@ -59,12 +60,6 @@ public final class AutoFlush implements Closeable {
 		if (Thread.currentThread()==worker) {
 			throw new IllegalStateException("Close automatic flushing from its owner, not its failure callback");
 		}
-		synchronized (this) {
-			closeResources();
-		}
-	}
-
-	private void closeResources() throws IOException {
 		if (closed) return;
 		executor.shutdown();
 		// A surrounding resource scope may close the store as soon as we return.

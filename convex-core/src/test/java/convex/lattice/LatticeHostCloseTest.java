@@ -52,34 +52,6 @@ class LatticeHostCloseTest {
 		assertEquals(1,flushes.get());
 	}
 
-	@Test void concurrentCloseWaitsForTheCloseInProgress() throws Exception {
-		var flushing=new CountDownLatch(1);
-		var release=new CountDownLatch(1);
-		var flushes=new AtomicInteger();
-		var store=new MemoryStore() {
-			@Override public void flush() {
-				flushes.incrementAndGet();
-				flushing.countDown();
-				try { assertTrue(release.await(10,TimeUnit.SECONDS)); }
-				catch (InterruptedException e) { throw new AssertionError(e); }
-			}
-		};
-		var host=LatticeHost.create(CVMLong.ONE,store);
-		host.cursor().set(CVMLong.TWO);
-		// e.g. a Shutdown.SERVICE hook and normal shutdown closing together
-		var first=closeAsync(host);
-		CompletableFuture<Void> second;
-		try {
-			assertTrue(flushing.await(10,TimeUnit.SECONDS));
-			second=closeAsync(host);
-			assertFalse(second.isDone(),"A second close cannot return before the first completes");
-		} finally { release.countDown(); }
-		first.get(10,TimeUnit.SECONDS);
-		second.get(10,TimeUnit.SECONDS);
-		assertEquals(1,flushes.get());
-		assertEquals(CVMLong.TWO,store.getRootData());
-	}
-
 	@Test void closedHostRefusesRetentionButStillReads() throws Exception {
 		var store=new MemoryStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);
