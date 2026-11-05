@@ -76,11 +76,6 @@ import convex.lattice.cursor.Cursors;
  */
 public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> {
 
-	/**
-	 * Version string for the Convex DB module.
-	 */
-	public static final String VERSION = "0.8.4-SNAPSHOT";
-
 	/** Keyword for the tables section within a database. */
 	public static final Keyword KEY_TABLES = Keyword.intern("tables");
 
