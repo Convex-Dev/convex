@@ -13,8 +13,10 @@ each other's Orders, so knowing which connection a Belief arrived on would vouch
 nothing it contains.
 
 A consensus peer therefore verifies only the connections it opens. It never challenges a
-connection opened to it, and sends nothing on that connection but results
-([CAD015](https://docs.convex.world/docs/cad/peercomms) Trust).
+connection opened to it ([CAD015](https://docs.convex.world/docs/cad/peercomms) Trust).
+Besides results, it sends on that connection only a request for data missing from an
+update that arrived on it ([PROPAGATION.md](PROPAGATION.md)). What comes back is
+content-addressed and judged like any other data.
 
 ## Liveness
 
@@ -31,13 +33,17 @@ consensus:
 2. **Cheap rejection.** `BeliefPropagator` drops an Order from a key that is not a staked
    peer before checking its signature or storing it, and an Order no newer than the one
    it holds before checking its signature. A bad signature ends processing of the message
-   carrying it.
+   carrying it. The exception is an update with data missing that this peer fetches: its
+   cells, and whatever the fetch brings, are stored before any Order in it is judged, as
+   pushed DATA is. With one fetch at a time, that is one update at a time.
 3. **A bounded queue.** Pushed DATA and Beliefs from every connection share one ordered
    queue, bounded by count and bytes. When it is full, further pushes are dropped; the
    connection is never paused for them.
 
 While junk fills the queue, pushes from real peers can be dropped with it, and consensus
-proceeds at the polling rate.
+proceeds at the polling rate. A sender that never answers can likewise hold a peer's one
+fetch of missing data for up to the poll delay at a time, and with it the same polling
+rate at worst.
 
 ## Inbound Connections
 
@@ -46,14 +52,14 @@ proceeds at the polling rate.
 | BELIEF | Joins the propagation queue, whoever sent it |
 | DATA | Joins the propagation queue, whoever sent it. Its cells are staged in the store; they count only once a valid Belief refers to them |
 | CHALLENGE | Answered with this peer's key, so whoever opened the connection can verify it |
-| RESULT | Ignored: the server sends no requests (CAD015) |
+| RESULT | Completes this peer's request on that connection, a fetch of missing data; any other is ignored (CAD015) |
 
 Accepting DATA from any connection is under review: a peer could instead accept it only
 from a sender it has verified separately ([#826](https://github.com/Convex-Dev/convex/issues/826)).
 
-Missing data in a received Order is requested from the Order's author, over this peer's
-own connection to it. Who sent a Belief is not known, so data missing outside any Order is
-not requested: it arrives with a later Belief or by polling.
+Data missing from a received Belief or Order is requested from the connection it arrived
+on, one fetch at a time ([PROPAGATION.md](PROPAGATION.md)). A peer's own connections to
+other peers answer such requests from its store.
 
 Lattice nodes do verify connections opened to them; see
 [LATTICE_NETWORKING.md](LATTICE_NETWORKING.md).

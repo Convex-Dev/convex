@@ -441,8 +441,8 @@ if (conn.supportsMessage()) {
 Used by lattice nodes for protocol exchange (challenge/response verification),
 data push, and other server-initiated communication. Only works on bidirectional
 connections. `supportsMessage()` returns false on return-only connections — check
-before attempting. A consensus peer's server sends nothing but results
-([PEER_PRIORITY.md](PEER_PRIORITY.md)).
+before attempting. A consensus peer's server sends only results, and requests for data
+missing from an update back to whoever sent it ([PEER_PRIORITY.md](PEER_PRIORITY.md)).
 
 ### 5.3 Trust Checks
 

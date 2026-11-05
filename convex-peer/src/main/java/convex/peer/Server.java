@@ -50,11 +50,13 @@ import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.lang.RT;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -606,7 +608,7 @@ public class Server implements Closeable {
 			case COMMAND:
 				return null;
 			case RESULT:
-				// The server sends no requests, so no result is expected: ignore it (CAD015)
+				// Not a reply to any request this peer sent: ignore it (CAD015)
 				return null;
 			default:
 				returnError(m,ErrorCodes.FORMAT,Strings.UNRECOGNISED_MESSAGE_TYPE);
@@ -642,16 +644,16 @@ public class Server implements Closeable {
 	}
 
 	/** Stages a previously authorised DATA message on the Belief propagator thread. */
-	void stageData(Message message) throws IOException, convex.core.exceptions.BadFormatException {
+	void stageData(Message message) throws IOException, BadFormatException {
 		AVector<?> payload=RT.ensureVector(message.getPayload());
 		// Bounded by the inbound message length only: novelty has no cell-count limit
 		if (payload==null || payload.count()<2 || !MessageTag.DATA.equals(payload.get(0))) {
-			throw new convex.core.exceptions.BadFormatException("Invalid DATA message format");
+			throw new BadFormatException("Invalid DATA message format");
 		}
 		for (long i=1; i<payload.count(); i++) {
 			ACell cell=payload.get(i);
 			if (cell==null || cell.isEmbedded()) {
-				throw new convex.core.exceptions.BadFormatException("DATA message contains invalid cell");
+				throw new BadFormatException("DATA message contains invalid cell");
 			}
 			Cells.store(cell,store);
 		}
@@ -667,6 +669,7 @@ public class Server implements Closeable {
 	 * @return a retry Predicate for a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> deliverMessage(Message m) {
+		if (completeReply(m)) return null;
 		try {
 			m.getPayload(getStore());
 		} catch (Exception e) {
@@ -681,6 +684,33 @@ public class Server implements Closeable {
 		}
 		observeMessageReceived(m);
 		return processMessage(m);
+	}
+
+	/**
+	 * Completes a reply to a request this peer sent on the message's connection, such
+	 * as a fetch of data missing from an update. Matching reads only the reply's ID:
+	 * the requester decodes it with its own store.
+	 */
+	private boolean completeReply(Message m) {
+		AConnection connection=m.getConnection();
+		if (connection==null) return false;
+		try {
+			return connection.completeRequest(m);
+		} catch (BadFormatException e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Takes a DATA_REQUEST that arrives on one of this peer's own connections to other
+	 * peers, handling it as one from any inbound connection.
+	 *
+	 * @param m DATA_REQUEST message
+	 * @return a retry Predicate if the query queue is full, otherwise null
+	 */
+	Predicate<Message> deliverDataRequest(Message m) {
+		if (queryHandler.offerQuery(m)) return null;
+		return queryRetry;
 	}
 
 	/**

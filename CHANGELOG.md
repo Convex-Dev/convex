@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Replicate lattice data reliably, for roots of any size and connections under load. ([Propagation](convex-peer/docs/PROPAGATION.md))
+- Reach consensus without waiting for a poll when a peer misses part of a Belief update, as often happens while a network starts. ([Propagation](convex-peer/docs/PROPAGATION.md))
 - Keep the peers a lattice node chooses, and close dead connections within 90 seconds. ([Live peer selection](convex-peer/docs/LATTICE_NETWORKING.md#live-peer-selection))
 - Connect `convex dlfs start --peer` to the peers it names. ([#629](https://github.com/Convex-Dev/convex/issues/629))
 - Shut down peers, lattice nodes and HTTP servers promptly and cleanly.

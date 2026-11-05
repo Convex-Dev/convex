@@ -8,12 +8,15 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.Acquiror;
 import convex.core.cpos.Belief;
 import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.Block;
@@ -29,9 +32,11 @@ import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.BoundedMessageQueue;
 import convex.core.message.MessageType;
+import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 
@@ -458,7 +463,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				return mergeBeliefValue(orders,payload,m);
 			} catch (MissingDataException e) {
 				log.debug("Missing data in Belief message "+m.getHash());
-				server.getConnectionManager().alertMissing(m,e,null);
+				fetchMissing(m);
 			} catch (BadFormatException e1) {
 				log.debug("Malformed Belief message");
 			}
@@ -522,7 +527,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				changed=true;
 			} catch (MissingDataException e) {
 				if (source!=null) {
-					server.getConnectionManager().alertMissing(source,e,key);
+					fetchMissing(source);
 				} else {
 					log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
 				}
@@ -534,6 +539,61 @@ public class BeliefPropagator extends AThreadedComponent {
 		return changed;
 	}
 	
+	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
+	private final AtomicBoolean fetching=new AtomicBoolean();
+
+	/** The latest fetch, completing once it has been dropped or its update queued again. */
+	private volatile CompletableFuture<?> missingDataFetch=null;
+
+	/**
+	 * Fetches what an update lacks from the connection it arrived on: whoever sent a
+	 * delta holds everything it refers to (CAD015). At most one fetch is outstanding.
+	 * A miss while one is under way is ignored, because the same Orders usually arrive
+	 * soon from other peers. The update's own cells are stored first, so only what it
+	 * left out is requested. Once that has arrived the update is queued again to merge.
+	 * A fetch that fails, or takes longer than the poll delay, is dropped.
+	 *
+	 * <p>The request goes only to the sender, so a sender that never answers delays
+	 * nothing beyond the poll: it holds the one fetch at most for the poll delay.</p>
+	 *
+	 * @param m Update that could not be merged
+	 */
+	private void fetchMissing(Message m) {
+		AConnection connection=m.getConnection();
+		if ((connection==null)||!connection.supportsMessage()) return;
+		if (!fetching.compareAndSet(false,true)) return;
+		try {
+			AStore store=getStore();
+			ACell update=Cells.store(m.getPayload(store),store);
+			long timeout=server.getConnectionManager().getPollDelay();
+			Acquiror acquiror=Acquiror.fromMessages(update.getHash(),store,hashes ->
+				connection.request(Message.createDataRequest(null,hashes),timeout));
+			missingDataFetch=acquiror.<ACell>getFuture()
+				.orTimeout(timeout,TimeUnit.MILLISECONDS)
+				.handle((value,error) -> {
+					acquiror.close();
+					fetching.set(false);
+					if (error==null) {
+						if (!queuePropagation(m)) log.debug("Propagation queue full: fetched update dropped");
+					} else {
+						log.debug("Fetch of missing update data dropped: {}",error.toString());
+					}
+					return null;
+				});
+		} catch (Exception e) {
+			fetching.set(false);
+			log.debug("Unable to fetch missing update data",e);
+		}
+	}
+
+	/**
+	 * Gets the latest fetch of data missing from an update, or null if none has started.
+	 * It completes once the fetch has been dropped or its update queued again.
+	 */
+	CompletableFuture<?> getMissingDataFetch() {
+		return missingDataFetch;
+	}
+
 	private void observeOrderUpdate(SignedData<Order> so) {
 		Consumer<SignedData<Order>> obs=orderUpdateObserver;
 		if (obs!=null) {
@@ -551,9 +611,9 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Creates the own-Order update: our signed Order and everything reachable from it
 	 * that this peer has not yet announced, normally one new Block with its
 	 * transactions. A Block of any size is carried: when the update does not fit one
-	 * delta, DATA messages precede the Order on each peer's ordered queue. Announcing
-	 * here is honest because every message is offered to every peer and never
-	 * superseded.
+	 * delta, DATA messages precede the Order on each peer's ordered queue. Every
+	 * message is offered to every connected peer; a peer that misses one, or connects
+	 * later, fetches what it lacks from whoever sends it the next update.
 	 *
 	 * @return the update's messages, ending with the Order; empty if this peer has no Order yet
 	 */

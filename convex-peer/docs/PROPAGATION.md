@@ -103,14 +103,27 @@ bound (`BeliefPropagator.MAX_UPDATE_BYTES`); novelty beyond it stays in the stor
 `UpdateAccumulator` does this shaping because what to carry eagerly is a peer's
 decision, not the data layer's.
 
-Every remaining way to miss data, a full queue or a relayed Order whose Blocks
-this peer has not seen, ends in a request rather than a timer:
-`ConnectionManager.alertMissing` acquires the missing hash from the peer that
-sent the message, rate limited per hash, and the next update merges once the
-data has arrived. Periodic status polling remains the recovery of last resort,
-including for idle peers which have outbound connections but receive no inbound
-propagation. One random outbound peer is probed per interval; an unchanged Belief
-hash costs no acquisition.
+A delta leaves out every cell its sender has announced before, to anyone: the
+record of what has been announced is per store, not per receiver. A receiver can
+therefore lack cells an update refers to. It may not have been connected when
+they were first sent (a peer broadcasts as soon as it starts, while its
+connections are still opening). A queue may have refused the update that carried
+them. Or the receiver may have dropped that update because something else was
+missing, since decoding an update never stores the cells it carries.
+
+Such an update ends in a request rather than a timer. `BeliefPropagator` stores
+the update's own cells, fetches what they lack from the connection the update
+arrived on, and queues the update again to merge once that has arrived. The
+sender holds everything it refers to, and a peer's own connections to other
+peers answer these requests from its store, as its server answers any
+connection. A peer has at most one fetch outstanding: a miss while one is under
+way is not chased, because the same Orders usually arrive soon from other peers.
+A fetch that fails, or takes longer than the poll delay, is dropped.
+
+Periodic status polling remains the recovery of last resort, including for idle
+peers which have outbound connections but receive no inbound propagation. One
+random outbound peer is probed per interval; an unchanged Belief hash costs no
+acquisition.
 
 Inbound CPoS DATA and BELIEF messages share one ordered, byte-bounded processing
 queue off the Netty event loop. This preserves the DATA-before-root order for a
@@ -148,6 +161,7 @@ protocol limits:
 | Belief or own-Order delta message | 4 MiB | `:max-belief-delta-message-size` |
 | CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
 | Complete Beliefs acquired by status polling | 200 Belief references | `Config.BELIEF_QUEUE_SIZE` |
+| Fetches of data missing from an update | 1, for at most the poll delay | `:poll-delay` |
 | Outbound queue, per client connection | 128 messages and 16 MiB | `Config` constants |
 | Outbound queue, per connection to a peer | 65,536 messages and 256 MB; the last message admitted may exceed it | `Config` constants |
 | Materialised messages per consensus update | 256 MB | `BeliefPropagator.MAX_UPDATE_BYTES` |
@@ -184,6 +198,6 @@ CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
 - `convex.node.NoveltyCollector` — bounded novelty collection for lattice deltas
 - `convex.core.message.BoundedMessageQueue` — count- and byte-bounded FIFO
 - `convex.node.LatticePropagator` — lattice chunking and periodic root sync
-- `convex.peer.BeliefPropagator` — own-Order then Belief update cadence
+- `convex.peer.BeliefPropagator` — own-Order then Belief update cadence, and the fetch of data missing from a received update
 - `convex.peer.AConnectionManager` — message-agnostic non-blocking fan-out
 - `convex.net.impl.netty.NettyConnection` — per-connection outbound queues
