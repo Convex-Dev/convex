@@ -19,9 +19,9 @@ request waits in a per-connection waiting area until the send queue has room. On
 per request covers waiting, sending and the reply.
 
 Putting a message on the send queue commits it. Before that, a request can be dropped; after
-it, the message is sent unless the connection closes first. The result says which:
-`FULL_CLIENT_BUFFER` means the request was never queued, `:TIMEOUT` means it was queued but no
-reply came in time.
+it, the message is sent unless the connection closes first. A request that ends without a
+reply fails with an exception naming the cause (a timeout, a close, a full waiting area), and
+a subclass marks the cases where the message was never queued.
 
 ## Why
 
@@ -89,15 +89,26 @@ thread, never on the JDK's shared timer thread.
 | What ended the request | Sent? | Connection reports | Client Result |
 |---|---|---|---|
 | A reply | Yes | The reply | The reply's Result |
-| Deadline, while waiting | No | Not-sent exception | `FULL_CLIENT_BUFFER` (`:LOAD`, source `:COMM`) |
-| Waiting area full | No | Not-sent exception | `FULL_CLIENT_BUFFER` |
-| Cancel, while waiting | No | `CancellationException` | None: the future is cancelled |
-| Close, while waiting | No | `ClosedChannelException` | `CLOSED_CONNECTION` |
+| Deadline, while waiting | No | `SendTimeoutException` | `:TIMEOUT`, marked not sent |
 | Deadline, after commit | Unknown | `TimeoutException` | `:TIMEOUT` (source `:COMM`) |
+| Close, while waiting | No | `ClosedBeforeSendException` | `CLOSED_CONNECTION`, marked not sent |
 | Close, after commit | Unknown | `ClosedChannelException` | `CLOSED_CONNECTION` |
+| Waiting area full | No | Open: see decisions | `FULL_CLIENT_BUFFER` (`:LOAD`, source `:COMM`) |
+| Cancel, while waiting | No | `CancellationException` | None: the future is cancelled |
+| Message too large for one frame | No | `IllegalArgumentException` | None: the call fails, as for any invalid request |
 
-`FULL_CLIENT_BUFFER` already means "never sent" today. With the commit rule, `:TIMEOUT` comes
-to mean "sent, no reply in time".
+Each exception names its cause with the JDK's type for it. Whether the request was sent is
+how far it got, not a cause, so a subclass marks the cases that end before the message was
+queued, as the JDK's `HttpConnectTimeoutException` marks an HTTP request that timed out before
+it was sent:
+
+- `SendTimeoutException` extends `java.util.concurrent.TimeoutException`: the deadline passed
+  before the message was queued.
+- `ClosedBeforeSendException` extends `java.nio.channels.ClosedChannelException`: the
+  connection closed before the message was queued.
+
+Code that catches the parent type still works, and the mark travels with the exception through
+any chain of futures. How a client Result shows "not sent" is open.
 
 ### Synchronous calls
 
@@ -137,6 +148,8 @@ These apply to network clients (`ConvexRemote`); in-JVM clients are a later step
 ## API changes
 
 - **Public signatures:** none change.
+- **New public types:** `SendTimeoutException` and `ClosedBeforeSendException` in
+  `convex.core.exceptions`, as above.
 - **Contracts:**
   - `AConnection.request` and `sendRequest` never block, commit as above and report the
     outcomes above.
@@ -187,7 +200,8 @@ These are independent of the steps below.
 - **`Result.fromException` turns unknown exceptions into `:EXCEPTION` with a stack trace.** That
   includes the `RejectedExecutionException` for a refused send.
   `LatticeProtocolEndpoint` returns that result to the remote peer when our own buffer refused
-  an acquisition request. Map "not sent" explicitly, and send no stack trace to a peer.
+  an acquisition request. Map the full-buffer exception explicitly, and send no stack trace to
+  a peer.
 - **The lattice ingress thread can wait up to 8 s on its own inbound queue.**
   - This happens when an acquisition completes at once, in `beginLatticeAcquisition`, because
     another acquisition has just stored the missing data. Its completion then runs on the
@@ -204,7 +218,8 @@ Each step updates the docs it changes.
    - The caller's wait for room ends at the request's deadline or the transport's 8 s, whichever
      is first. It is claimed under the queue's lock, so a request whose deadline has passed is
      never queued.
-   - The result says whether the request was queued.
+   - A request whose deadline passes before it is queued fails with `SendTimeoutException`,
+     and one whose connection closes first with `ClosedBeforeSendException`.
    - Transactions known not to have been sent rewind the cached sequence number, as above.
    - The time-limited send stays protected.
    - Callers see a difference only when a send gives up. A client set to a timeout under 8 s
@@ -221,10 +236,12 @@ Each step updates the docs it changes.
 
 Taken one at a time, in this order.
 
-1. **The connection-level exception for "not sent".** Either a new type, or keep
-   `RejectedExecutionException`. Also whether `Result.fromException` maps it. Needed for step 1.
-2. **Close before commit and close after commit.** Report them differently, or both as
-   `CLOSED_CONNECTION` as today.
+1. **The exception for no room.** It covers a full waiting area, and in step 1 the transport's
+   8 s wait running out. A type of our own naming the cause, or keep
+   `RejectedExecutionException`. Also how `Result.fromException` maps it. Needed for step 1.
+2. **How a client Result shows "not sent"** for a timeout or a close before the message was
+   queued. The client's own sequence-number rewind can check the exception; callers deciding
+   whether to retry need it in the Result.
 3. **At the waiting area's cap.** Refuse (recommended) or block. Blocking would bring back waits
    on threads borrowed from callbacks.
 4. **Broadcasts and other non-request messages** (`trySendMessage`) **while requests are
