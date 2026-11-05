@@ -102,7 +102,7 @@ DriverManager.getConnection("jdbc:convex:file:/data/market.etch")
     │     ├── Found → return new Connection on existing cursor/store
     │     └── Not found:
     │           ├── EtchStore.create(file)          — opens or creates Etch file
-    │           ├── LatticeHost.open(Maps.empty(), store)
+    │           ├── LatticeHost.open(ConvexDB.EMPTY, store)
     │           │                                   — restores the retained root
     │           ├── host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge))
     │           │                                   — the ConvexDB the driver keeps
@@ -197,7 +197,7 @@ For advanced use cases (replication, custom NodeServer config):
 
 ```java
 EtchStore store = EtchStore.create(new File("/data/market.etch"));
-LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.open(Maps.empty(), store);
+var host = LatticeHost.open(ConvexDB.EMPTY, store);
 ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 var server = new NodeServer<>(host, config);
 server.launch();

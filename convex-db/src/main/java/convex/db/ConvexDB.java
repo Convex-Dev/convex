@@ -64,8 +64,7 @@ import convex.lattice.cursor.Cursors;
  * db.tables().createTable("users", new String[]{"id", "name"});
  *
  * // Persistent and networked: the main class keeps the ConvexDB it registers
- * LatticeHost&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; host =
- *     LatticeHost.open(Maps.empty(), store);
+ * var host = LatticeHost.open(ConvexDB.EMPTY, store);
  * ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
  * NodeServer&lt;?&gt; server = new NodeServer&lt;&gt;(host);
  * server.launch();
@@ -87,6 +86,14 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	/** Keyword for the optional settings section within a database. */
 	public static final Keyword KEY_CONFIG = Keyword.intern("config");
+
+	/**
+	 * The empty database map, typed as a ConvexDB's value. A host whose root is a
+	 * ConvexDB starts from it, {@code LatticeHost.open(ConvexDB.EMPTY, store)}, so the
+	 * host's root type matches the ConvexDB registered with it; {@code Maps.empty()}
+	 * carries no type of its own.
+	 */
+	public static final AHashMap<AString, Index<Keyword, ACell>> EMPTY = Maps.empty();
 
 	// ========== Named instance registry ==========
 
@@ -166,7 +173,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return New ConvexDB instance
 	 */
 	public static ConvexDB create(BinaryOperator<Index<Keyword, ACell>> policy, Supplier<CVMLong> clock) {
-		return new ConvexDB(Cursors.root(Maps.empty()), policy, clock);
+		return new ConvexDB(Cursors.root(EMPTY), policy, clock);
 	}
 
 	/**
@@ -225,7 +232,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return Cursor of the database's state, which may be absent
 	 */
 	public AForkableCursor<Index<Keyword, ACell>> path(AString name) {
-		return cursor().withDefault(Maps.empty()).path(name);
+		return cursor().withDefault(EMPTY).path(name);
 	}
 
 	/**

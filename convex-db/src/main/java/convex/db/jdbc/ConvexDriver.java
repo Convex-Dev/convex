@@ -18,12 +18,6 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.schema.SchemaPlus;
 
-import convex.core.data.ACell;
-import convex.core.data.AHashMap;
-import convex.core.data.AString;
-import convex.core.data.Index;
-import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
 import convex.db.ConvexDB;
@@ -339,7 +333,7 @@ public class ConvexDriver extends Driver {
 			try {
 				File file = new File(path);
 				EtchStore store = EtchStore.create(file);
-				LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.open(Maps.empty(), store);
+				var host = LatticeHost.open(ConvexDB.EMPTY, store);
 				ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 				var server = new NodeServer<>(host);
 				server.launch();

@@ -4,11 +4,6 @@ import java.util.Random;
 
 import convex.core.data.AVector;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
-import convex.core.data.AString;
-import convex.core.data.Index;
-import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
@@ -45,7 +40,7 @@ public class EtchPKLookupBench {
 
 	static void runBenchmark(int rowCount) throws Exception {
 		EtchStore store = EtchStore.createTemp("pk-bench");
-		LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.open(Maps.empty(), store);
+		var host = LatticeHost.open(ConvexDB.EMPTY, store);
 		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 		NodeServer<?> server = new NodeServer<>(host);
 		server.launch();

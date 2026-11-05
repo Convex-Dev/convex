@@ -33,7 +33,7 @@ optional and does not control saving:
 
 ```java
 try (var store = EtchStore.create(file);
-     LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.open(Maps.empty(), store)) {
+     var host = LatticeHost.open(ConvexDB.EMPTY, store)) {
     ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
     SQLDatabase db = cdb.database("mydb");
     // Perform database operations through this live view.

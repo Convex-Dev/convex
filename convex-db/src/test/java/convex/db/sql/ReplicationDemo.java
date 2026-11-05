@@ -7,12 +7,7 @@ import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
-import convex.core.data.AString;
 import convex.core.data.Hash;
-import convex.core.data.Index;
-import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.db.ConvexDB;
@@ -59,8 +54,8 @@ public class ReplicationDemo {
 		// Create NodeServers over hosts whose ConvexDB merges incoming values
 		NodeConfig configLondon=NodeConfig.port(0);
 		NodeConfig configTokyo=NodeConfig.port(0);
-		LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> hostLondon = LatticeHost.open(Maps.empty(), storeLondon);
-		LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> hostTokyo  = LatticeHost.open(Maps.empty(), storeTokyo);
+		var hostLondon = LatticeHost.open(ConvexDB.EMPTY, storeLondon);
+		var hostTokyo  = LatticeHost.open(ConvexDB.EMPTY, storeTokyo);
 		ConvexDB cdbLondon = hostLondon.addApplication(new ConvexDB(hostLondon.cursor(), RowLWW::merge));
 		ConvexDB cdbTokyo  = hostTokyo.addApplication(new ConvexDB(hostTokyo.cursor(), RowLWW::merge));
 		NodeServer<?> serverLondon = new NodeServer<>(hostLondon,configLondon);

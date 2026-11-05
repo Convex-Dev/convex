@@ -217,7 +217,7 @@ ConvexDB cdb = ConvexDB.create(MyApp::keepReference);
 
 ```java
 // Setup — the host's registered ConvexDB merges incoming values
-LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> host = LatticeHost.open(Maps.empty(), store);
+var host = LatticeHost.open(ConvexDB.EMPTY, store);
 ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 var server = new NodeServer<>(host);
 server.launch();
