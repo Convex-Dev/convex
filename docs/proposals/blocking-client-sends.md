@@ -60,7 +60,8 @@ Result's source for client users.
 ### Commit
 
 A message is committed when it goes onto the connection's send queue. Before that, a request can be
-dropped: its deadline passes, the connection closes or its thread is interrupted. After it, the
+dropped: its deadline passes, the connection closes, its thread is interrupted or it is cancelled.
+After it, the
 message is sent unless the connection closes first, and a deadline or a cancel only stops the wait
 for the reply. Nothing but the transport takes messages from the send queue; closing the connection
 discards what is left in it.
@@ -81,6 +82,10 @@ today. With replies handed off (below), only code that uses a connection directl
 
 Closing a connection closes its send queue, which refuses offers and wakes every caller waiting for
 room. Each request records whether it was queued, so close fails one that was not as never sent.
+
+A request made with a control future (`AConnection.request(Message, long, CompletableFuture)`) can be
+cancelled while its caller waits for room. The wait observes that cancel, so the message is then
+never queued; today the reply future completes but the offer carries on and can still queue it.
 
 ### Deadline
 
@@ -127,6 +132,7 @@ A connection (`AConnection.request`, `sendRequest`) reports:
 | Close, after queued | Unknown | Fails with `ClosedChannelException` |
 | Sent from a thread that may not wait, queue full | No | Fails with `RejectedExecutionException` |
 | Interrupt while waiting for room | No | Fails with `InterruptedException`; the thread keeps its status |
+| Cancel through the control future, before queued | No | Fails with `CancellationException` |
 | Message too large for one frame | No | Fails with `IllegalArgumentException` |
 
 Each exception names its cause with the JDK's type for it. Whether the request was sent is how far
@@ -192,7 +198,8 @@ for (ATransaction tx : batch) results.add(convex.transact(tx));  // blocks while
 for (var f : results) { Result r = f.join(); /* handle :TIMEOUT and :SEQUENCE */ }
 ```
 
-A callback runs on a thread that may block, so it can call the client directly:
+With replies handed off (decision 1), a callback runs on a thread that may block, so it can call
+the client directly:
 
 ```java
 convex.query(q).thenCompose(r -> convex.transact(next(r)));
@@ -203,8 +210,8 @@ convex.query(q).thenCompose(r -> convex.transact(next(r)));
 - **Synchronous callers:** their timeouts bound the whole call, and a result says whether the request
   was sent.
 - **Asynchronous callers:** `transact` also waits, within its deadline, for a sequence lookup, a
-  pre-compile or an earlier transaction. Callbacks run on a virtual thread instead of the event loop
-  or the JDK's timer thread.
+  pre-compile or an earlier transaction. With replies handed off, callbacks run on a virtual thread
+  instead of the event loop or the JDK's timer thread.
 - **Callers on threads that should stay responsive:** once the fixed 8 s goes, the longest wait for
   room is the request's deadline, 20 s by default. GUI code that calls the client on the Swing event
   thread (`REPLPanel`, `TokenInfoPanel`, `AccountChooserPanel`, `TransferPanel`) can freeze for that
@@ -236,8 +243,8 @@ convex.query(q).thenCompose(r -> convex.transact(next(r)));
   - `Convex.transact` returns once its transaction is queued or has failed. It loses "may block
     briefly if the send buffer is full" and the withdrawal on cancel, since its future is returned
     only once the transaction is queued.
-  - The `Convex` class javadoc says callbacks run on a thread that may block, replacing its advice to
-    chain with `thenCompose` and hand waiting work to an executor.
+  - With replies handed off, the `Convex` class javadoc says callbacks run on a thread that may
+    block, replacing its advice to chain with `thenCompose` and hand waiting work to an executor.
   - The `*Sync` methods' timeouts bound the whole call.
   - `prepareTransaction` states that it reserves the number it hands out.
 
@@ -282,7 +289,8 @@ Each step updates the docs it changes.
 
 1. **Close and the request's state.** Close closes the send queue instead of emptying it. Each
    request records whether it was queued, and close fails one that was not with
-   `ClosedBeforeSendException`. `failureResult` chooses `:CLIENT` or `:COMM` from that state, and
+   `ClosedBeforeSendException`. A cancel through the control future stops a caller waiting for room.
+   `failureResult` chooses `:CLIENT` or `:COMM` from that state, and
    `FULL_CLIENT_BUFFER` moves to `:CLIENT`.
 2. **The deadline and sequence numbers within today's blocking send.** The reply timer starts once
    the message is queued. The wait for room ends at the request's deadline or the transport's 8 s,
