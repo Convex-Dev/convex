@@ -8,7 +8,8 @@ import convex.lattice.LatticeOps;
  * A cursor that navigates to a path within a base cursor's value.
  *
  * <p>Reads resolve the nested value; changed writes rebuild existing ancestors.
- * A write through a missing container fails. Update functions receive the actual
+ * A write through a missing container, or to one that cannot hold its key, fails.
+ * Update functions receive the actual
  * value, including null; components supply any defaults or construction logic.
  * Atomic operations, unchanged-write handling and transaction locking come from
  * {@link ATransformCursor}.</p>

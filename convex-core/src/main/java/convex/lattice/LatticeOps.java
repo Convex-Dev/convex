@@ -39,6 +39,9 @@ public class LatticeOps {
 	 *   <li>An existing container is used regardless of the supplied lattice.</li>
 	 * </ul>
 	 *
+	 * <p>A container that cannot hold its key, such as a vector given a key that is
+	 * not an index within it, refuses the write; it is never replaced.</p>
+	 *
 	 * @param <T> Return type
 	 * @param a Root data structure (may be null if the lattice provides an empty value)
 	 * @param value Value to set at the end of the path
@@ -46,8 +49,9 @@ public class LatticeOps {
 	 * @param keys Path of keys to navigate
 	 * @return Updated root data structure
 	 * @throws IllegalStateException if a missing container cannot be created
-	 * @throws IllegalArgumentException if a non-null intermediate is not a data structure, or is a
-	 *         signed envelope (a signature covers its value, so nothing may be written through it)
+	 * @throws IllegalArgumentException if a non-null intermediate is not a data structure, cannot
+	 *         hold its key, or is a signed envelope (a signature covers its value, so nothing may
+	 *         be written through it)
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T assocIn(ACell a, ACell value, ALattice<?> lattice, ACell... keys) {
@@ -89,7 +93,12 @@ public class LatticeOps {
 
 		ACell child = struct.get(keys[i]);
 		ACell newChild = assocIn(child, value, null, keys, i + 1);
-		return RT.assoc(struct, keys[i], newChild); // returns struct unchanged if newChild == child
+		ACell updated = RT.assoc(struct, keys[i], newChild); // returns struct unchanged if newChild == child
+		// A container refuses a key it cannot hold with null, which would otherwise
+		// be written in its place one level up.
+		if (updated == null) throw new IllegalArgumentException(
+			"Cannot write key " + keys[i] + " at depth " + i + ": " + Utils.getClassName(struct) + " cannot hold it");
+		return updated;
 	}
 
 	/** Reconciles a lattice-backed publication, retaining destination keys outside a keyed lattice. */

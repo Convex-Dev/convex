@@ -53,8 +53,10 @@ returns null for absent or incompatible ancestors. Use collection component path
 when incompatible containers must be distinguished from absence. Writes
 use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. All
 intermediate containers must already exist. An absent final value can be replaced,
-but writing through an absent container throws. `assoc` and `assocIn` follow the same
-rule. A plain path write through a signed envelope is refused.
+but writing through an absent container throws, and so does a write to a container
+that cannot hold its key, such as a vector given a key that is not an index within
+it. `assoc` and `assocIn` follow the same rule. A plain path write through a signed
+envelope is refused.
 
 Root CAS uses reference identity. Path, projection and signing views compare the
 view by value equality, then make one CAS attempt against the observed underlying
