@@ -860,7 +860,7 @@ public class Server implements Closeable {
 	 * Note: Does not flush buffers to disk. 
 	 *
 	 * This will overwrite any previously persisted peer data.
-	 * @return Updated Peer value with persisted data
+	 * @return Updated Peer value with persisted data, sharing the current Peer's transaction index
 	 * @throws IOException In case of any IO Error
 	 */
 	@SuppressWarnings("unchecked")
@@ -885,7 +885,7 @@ public class Server implements Closeable {
 
 		peerData=(AMap<Keyword, ACell>) newRootData.get(rootKey);
 		log.debug( "Stored peer data with hash: {}", peerData.getHash().toHexString());
-		return Peer.fromData(getKeyPair(), peerData);
+		return Peer.fromData(getKeyPair(), peerData).withIndexFrom(peer);
 	}
 
 	/**

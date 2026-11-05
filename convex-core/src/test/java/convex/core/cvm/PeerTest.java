@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,9 +29,12 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.ObjectsTest;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
@@ -143,6 +147,82 @@ public class PeerTest {
 			assertEquals(p.getStatePosition(),pt.getStatePosition());
 			doPeerTest(pt);
 		}
+	}
+
+	/**
+	 * A Peer whose finality point is ahead of its state, as a server publishes it before
+	 * executing newly final Blocks, finds only the transactions it has executed.
+	 */
+	@Test
+	public void testLookupsCoverExecutedBlocks() throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		SignedData<ATransaction> tx=KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 1, "(+ 1 2)"));
+		p=p.proposeBlock(Block.of(p.getTimestamp(), tx));
+		p=p.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs();
+		assertEquals(1,p.getFinalityPoint());
+		assertEquals(0,p.getStatePosition());
+
+		Hash txHash=tx.getHash();
+		Hash blockHash=p.getPeerOrder().getBlock(0).getHash();
+		assertNull(p.getTransactionResult(txHash));
+		assertNull(p.getTransaction(txHash));
+		assertNull(p.getTransactionLocation(txHash));
+		assertNull(p.getBlockIndex(blockHash));
+
+		Peer executed=p.updateState();
+		assertEquals(Vectors.createLongs(0,0),executed.getTransactionLocation(txHash));
+		assertEquals(tx,executed.getTransaction(txHash));
+		assertEquals(CVMLong.create(3),executed.getTransactionResult(txHash).getValue());
+		assertEquals(CVMLong.create(0),executed.getBlockIndex(blockHash));
+
+		// The earlier Peer shares the index, which now runs ahead of it
+		assertNull(p.getTransactionResult(txHash));
+		assertNull(p.getBlockIndex(blockHash));
+	}
+
+	/**
+	 * Peers derived from one another, or reloaded from persisted data, extend one index
+	 * rather than each rebuilding it from the first Block.
+	 */
+	@Test
+	public void testLookupIndexCarriedForward() throws InvalidDataException {
+		Peer p=Peer.create(KP, GENESIS);
+		long ts=p.getTimestamp();
+		@SuppressWarnings("unchecked")
+		SignedData<ATransaction>[] txs=new SignedData[6];
+		for (int i=0; i<txs.length; i++) {
+			txs[i]=KP.signData(Invoke.create(Init.GENESIS_ADDRESS, i+1, "(* "+i+" "+i+")"));
+		}
+		for (int i=0; i<5; i++) {
+			p=p.proposeBlock(Block.of(ts+i, txs[i]));
+		}
+		p=p.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs().updateState();
+		assertEquals(CVMLong.create(16),p.getTransactionResult(txs[4].getHash()).getValue());
+		assertEquals(5,p.getIndexedPosition());
+
+		Peer reloaded=Peer.fromData(KP, p.toData()).withIndexFrom(p);
+		assertEquals(5,reloaded.getIndexedPosition());
+
+		Peer later=reloaded.proposeBlock(Block.of(ts+5, txs[5]));
+		later=later.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs().updateState();
+		assertEquals(5,later.getIndexedPosition());
+		assertEquals(CVMLong.create(25),later.getTransactionResult(txs[5].getHash()).getValue());
+		assertEquals(6,later.getIndexedPosition());
+		assertEquals(CVMLong.create(0),later.getTransactionResult(txs[0].getHash()).getValue());
+
+		// The earlier Peer shares the extension but has not executed the new Block
+		assertEquals(6,p.getIndexedPosition());
+		assertNull(p.getTransactionResult(txs[5].getHash()));
+		assertEquals(CVMLong.create(16),p.getTransactionResult(txs[4].getHash()).getValue());
+
+		// A Peer with another history rebuilds the index rather than use this one
+		SignedData<ATransaction> otherTx=KP.signData(Invoke.create(Init.GENESIS_ADDRESS, 1, "(+ 10 10)"));
+		Peer other=Peer.create(KP, GENESIS).proposeBlock(Block.of(ts, otherTx));
+		other=other.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs().updateState().withIndexFrom(later);
+		assertEquals(CVMLong.create(20),other.getTransactionResult(otherTx.getHash()).getValue());
+		assertNull(other.getTransactionResult(txs[0].getHash()));
+		assertEquals(Vectors.createLongs(0,0),later.getTransactionLocation(txs[0].getHash()));
+		assertNull(later.getTransactionLocation(otherTx.getHash()));
 	}
 	
 	/**

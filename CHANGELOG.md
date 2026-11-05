@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Connect `convex dlfs start --peer` to the peers it names. ([#629](https://github.com/Convex-Dev/convex/issues/629))
 - Shut down peers, lattice nodes and HTTP servers promptly and cleanly.
 - Keep Etch stores safe across interrupts and crashed start-ups. ([#748](https://github.com/Convex-Dev/convex/issues/748))
+- Look up transactions by hash reliably and quickly, including while a peer executes new blocks.
 - Keep replicated data consistent and owner-signed, including lattice KV deletes and Convex DB schema changes. ([Replica Ownership](convex-db/README.md#replica-ownership))
 - Keep each application's Convex DB connections on its own database. ([#789](https://github.com/Convex-Dev/convex/issues/789))
 - Improve Convex DB's SQL and PostgreSQL client compatibility, including integers beyond 64 bits (with fixes from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))

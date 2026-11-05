@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
@@ -130,8 +131,21 @@ public class Peer {
 	 */
 	private final AVector<BlockResult> blockResults;
 
+	/**
+	 * Latest index of executed transactions and Blocks, shared with the Peers derived from
+	 * this one so that each lookup indexes only newly executed Blocks. A cache: it never
+	 * changes what a lookup returns.
+	 */
+	private final AtomicReference<PeerIndex> index;
+
 	private Peer(AKeyPair kp, Belief belief, Order consensusOrder, long statePos, State state, State genesis, long history, AVector<BlockResult> results,
 			long timeStamp) {
+		this(kp,belief,consensusOrder,statePos,state,genesis,history,results,timeStamp,new AtomicReference<>(PeerIndex.EMPTY));
+	}
+
+	private Peer(AKeyPair kp, Belief belief, Order consensusOrder, long statePos, State state, State genesis, long history, AVector<BlockResult> results,
+			long timeStamp, AtomicReference<PeerIndex> index) {
+		this.index=index;
 		this.keyPair = kp;
 		this.peerKey = kp.getAccountKey();
 		this.belief = belief;
@@ -304,7 +318,7 @@ public class Peer {
 	 */
 	public Peer updateTimestamp(long newTimestamp) {
 		if (newTimestamp <= timestamp) return this;
-		return new Peer(keyPair, belief, consensusOrder,statePosition,state,genesis, historyPosition,blockResults, newTimestamp);
+		return new Peer(keyPair, belief, consensusOrder,statePosition,state,genesis, historyPosition,blockResults, newTimestamp, index);
 	}
 
 	/**
@@ -522,7 +536,7 @@ public class Peer {
 		Order order=belief.getOrder(peerKey);
 		if (order==null) order=this.consensusOrder;
 		// System.out.println(Lists.of(order.getConsensusPoints()));
-		return new Peer(keyPair, newBelief, order,statePosition,state, genesis, historyPosition,blockResults, timestamp);
+		return new Peer(keyPair, newBelief, order,statePosition,state, genesis, historyPosition,blockResults, timestamp, index);
 	}	
 	
 	/**
@@ -577,7 +591,7 @@ public class Peer {
 		// Return if we don't need to advance states
 		if (stateIndex>=targetPosition) {
 			if (stateIndex==statePosition) return this;
-			return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp);
+			return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp, index);
 		}
 		
 		// Kick off parallel signature validation
@@ -600,7 +614,7 @@ public class Peer {
 			s=newState;
 			stateIndex++;
 		}
-		return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp);
+		return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp, index);
 	}
 	
 	public Peer recalcState(long pos) {
@@ -646,7 +660,7 @@ public class Peer {
 			newHistory=0;
 			pos=0;
 		}
-		return new Peer(keyPair, belief, consensusOrder, pos, newState, genesis, newHistory, newResults, timestamp);
+		return new Peer(keyPair, belief, consensusOrder, pos, newState, genesis, newHistory, newResults, timestamp, index);
 	}
 
 	/**
@@ -942,32 +956,105 @@ public class Peer {
 		return blockResults;
 	}
 
+	/**
+	 * Gets the result of an executed transaction
+	 * @param txID Hash of the signed transaction
+	 * @return Result, or null if this Peer has not executed the transaction
+	 */
 	public Result getTransactionResult(ABlob txID) {
-		return getPeerIndex().getTransactionResult(this,txID);
+		AVector<CVMLong> loc=locateTransaction(txID);
+		if (loc==null) return null;
+		return getTransactionResult(loc);
 	}
 
-	// Private field for cached peer index
-	private PeerIndex peerIndex=new PeerIndex();
-	
-	private PeerIndex getPeerIndex() {
-		long cp=getFinalityPoint();
-		while (cp!=peerIndex.getFinalityPoint()) {
-			peerIndex= peerIndex.update(this);
-			if (peerIndex==null) peerIndex=new PeerIndex(); // in case we need to recompute
-		}
-		return peerIndex;
-	}
-
+	/**
+	 * Gets an executed transaction
+	 * @param transactionID Hash of the signed transaction
+	 * @return Signed transaction, or null if this Peer has not executed it
+	 */
 	public SignedData<ATransaction> getTransaction(Hash transactionID) {
-		return getPeerIndex().getTransaction(this, transactionID);
+		AVector<CVMLong> loc=locateTransaction(transactionID);
+		if (loc==null) return null;
+		Block block=RT.ensureCVM(getPeerOrder().getBlock(loc.get(0).longValue()).getValue(),Block.class);
+		return block.getTransactions().get(loc.get(1).longValue());
 	}
 
+	/**
+	 * Gets the location of an executed transaction
+	 * @param transactionID Hash of the signed transaction
+	 * @return Vector of Block position and transaction position, or null if this Peer has not executed it
+	 */
 	public AVector<CVMLong> getTransactionLocation(Hash transactionID) {
-		return getPeerIndex().getTransactionLocation(transactionID);
+		return locateTransaction(transactionID);
 	}
 
+	/**
+	 * Gets the position of an executed Block
+	 * @param blockHash Hash of the signed Block
+	 * @return Block position, or null if this Peer has not executed the Block
+	 */
 	public CVMLong getBlockIndex(Hash blockHash) {
-		return getPeerIndex().getBlockIndex(blockHash);
+		AVector<SignedData<Block>> blocks=getIndexedBlocks();
+		long limit=getIndexLimit(blocks);
+		return getIndex(blocks,limit).getBlockIndex(blockHash,limit);
+	}
+
+	/**
+	 * Gets this Peer sharing the transaction index of the Peer it replaces, so lookups
+	 * extend that index rather than rebuild it from the first Block. Use when this Peer
+	 * takes over from another with the same history, for example after reloading it from
+	 * persisted data. An index from another history is rebuilt on first use.
+	 *
+	 * @param previous Peer this one replaces, or null
+	 * @return Peer sharing the index of the previous Peer
+	 */
+	public Peer withIndexFrom(Peer previous) {
+		if ((previous==null)||(previous.index==index)) return this;
+		return new Peer(keyPair, belief, consensusOrder, statePosition, state, genesis, historyPosition, blockResults, timestamp, previous.index);
+	}
+
+	private AVector<CVMLong> locateTransaction(ABlob txID) {
+		AVector<SignedData<Block>> blocks=getIndexedBlocks();
+		long limit=getIndexLimit(blocks);
+		return getIndex(blocks,limit).getTransactionLocation(txID,limit);
+	}
+
+	/** Blocks of this Peer's own Order, which lookups index */
+	private AVector<SignedData<Block>> getIndexedBlocks() {
+		Order order=getPeerOrder();
+		return (order==null)?Vectors.empty():order.getBlocks();
+	}
+
+	/**
+	 * Number of leading Blocks lookups cover: those this Peer has executed. Blocks that
+	 * are final but not yet executed are left out, as their results do not exist yet.
+	 */
+	private long getIndexLimit(AVector<SignedData<Block>> blocks) {
+		return Math.min(statePosition,blocks.count());
+	}
+
+	/**
+	 * Gets an index covering at least the Blocks below the limit, extending the shared
+	 * index if this Peer has executed further and rebuilding it if it is from another
+	 * history.
+	 */
+	private PeerIndex getIndex(AVector<SignedData<Block>> blocks, long limit) {
+		PeerIndex shared=index.get();
+		PeerIndex base=shared.agrees(blocks,limit)?shared:PeerIndex.EMPTY;
+		if (base.getPosition()>=limit) return base;
+		PeerIndex extended=base.extend(blocks,limit);
+		// Share the extension unless another lookup has meanwhile indexed further on these Blocks
+		index.accumulateAndGet(extended,(current,mine) ->
+			((current==shared)||(current.getPosition()<mine.getPosition())||!current.agrees(blocks,limit))?mine:current);
+		return extended;
+	}
+
+	/**
+	 * Gets the number of leading Blocks covered by the index this Peer shares
+	 * @return Number of Blocks indexed
+	 */
+	long getIndexedPosition() {
+		return index.get().getPosition();
 	}
 
 	public Result getTransactionResult(AVector<CVMLong> pos) {
