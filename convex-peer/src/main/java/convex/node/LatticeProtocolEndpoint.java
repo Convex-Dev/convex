@@ -60,6 +60,9 @@ import convex.peer.Config;
  * <p>Neither a malformed message, a failed acquisition nor a broken application
  * handler can terminate the authoritative node publication path. Conversely,
  * this endpoint never mutates the node cursor or its durable root directly.</p>
+ *
+ * <p>Its propagator starts and closes it, one call after the other, without a
+ * lock; network threads deliver messages and attach connections meanwhile.</p>
  */
 final class LatticeProtocolEndpoint implements Closeable {
 
@@ -132,7 +135,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	/** Starts this group's ordered ingress and maintenance workers. */
-	synchronized void start() {
+	void start() {
 		if (inboundRunning) return;
 		if (inboundThread!=null) throw new IllegalStateException("Previous ingress worker is still active");
 		inboundQueue.open();
@@ -887,7 +890,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	@Override
-	public synchronized void close() throws IOException {
+	public void close() throws IOException {
 		synchronized (inboundConnections) {
 			acceptingInbound=false;
 		}

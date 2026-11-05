@@ -163,6 +163,29 @@ public class LatticePropagatorTest {
 		assertTrue(propagator2.isRunning(), "Propagator should be running");
 	}
 
+	/**
+	 * The owner starts and closes a group one call after another: starting again
+	 * changes nothing, and closing ends the group whether or not it was started.
+	 */
+	@Test
+	public void testLifecycleCallsInOrder() {
+		LatticePropagator idle=new LatticePropagator(new MemoryStore());
+		idle.close();
+		assertEquals(LatticePropagator.State.STOPPED,idle.getStatus().state(),"a group never started closes");
+
+		LatticePropagator group=new LatticePropagator(new MemoryStore());
+		group.start();
+		group.start();
+		assertTrue(group.isRunning());
+		assertEquals(LatticePropagator.State.RUNNING,group.getStatus().state());
+		assertEquals(0L,group.getStatus().failureCount(),"starting again is no failure");
+		group.close();
+		group.close();
+		assertFalse(group.isRunning());
+		assertEquals(LatticePropagator.State.STOPPED,group.getStatus().state());
+		assertEquals(0L,group.getStatus().failureCount(),"closing again is no failure");
+	}
+
 	@Test
 	public void testAddPeerReportsIdentityFailure() throws Exception {
 		AccountKey wrongKey=AKeyPair.generate().getAccountKey();

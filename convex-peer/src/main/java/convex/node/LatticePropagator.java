@@ -59,6 +59,10 @@ import convex.lattice.cursor.Root;
  * <p>The group's store is a serving and novelty cache. DATA_REQUEST responses can
  * resolve only cells materialised in this exact store. The node alone writes the
  * node root; a propagator never writes a store root of its own.</p>
+ *
+ * <p><b>Threading.</b> Start and close take no lock. The owning node, or the
+ * application for a group it runs on its own, calls them one after the other.
+ * Triggers, inbound messages and failure reports may arrive on any thread.</p>
  */
 public class LatticePropagator implements Closeable {
 
@@ -844,7 +848,7 @@ public class LatticePropagator implements Closeable {
 	 * Starts this group's connection manager, protocol endpoint and publication
 	 * worker. Attached groups are normally started by their {@link NodeServer}.
 	 */
-	public synchronized void start() {
+	public void start() {
 		if (running) {
 			log.warn("LatticePropagator already running");
 			return;

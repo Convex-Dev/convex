@@ -112,7 +112,9 @@ import convex.peer.Config;
  * <p><b>Threading.</b> Public calls, asynchronous challenge completions and the
  * maintenance worker may race. Multi-map admission/removal transitions are
  * serialised by one private lock; external futures, hooks and socket closes are
- * completed outside that lock.</p>
+ * completed outside that lock. Start and close take no lock: the owning group, or
+ * the application for a manager it runs on its own, calls them one after the
+ * other.</p>
  *
  * <p>Extends {@link AConnectionManager} for shared connection infrastructure.</p>
  *
@@ -657,7 +659,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * Starts the maintenance thread for automatic reconnection.
 	 * Safe to call multiple times — subsequent calls are no-ops.
 	 */
-	public synchronized void start() {
+	public void start() {
 		if (running) return;
 		if (workers.isShutdown()) workers=Executors.newVirtualThreadPerTaskExecutor();
 		accepting = true;
@@ -671,7 +673,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * Stops admission and maintenance, then closes all connections at once.
 	 */
 	@Override
-	public synchronized void close() {
+	public void close() {
 		stopMaintenance();
 		closeAllConnections();
 		workers.shutdownNow();
@@ -689,7 +691,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * @param timeout maximum milliseconds to wait for sent messages to be written;
 	 *        zero or less closes at once
 	 */
-	public synchronized void close(long timeout) {
+	public void close(long timeout) {
 		stopMaintenance();
 		if (timeout>0) awaitWritten(timeout);
 		close();
