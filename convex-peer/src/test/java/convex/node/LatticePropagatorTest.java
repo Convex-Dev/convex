@@ -16,7 +16,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -402,13 +404,57 @@ public class LatticePropagatorTest {
 	/** A zero interval turns periodic announcements off; publications still go out as deltas. */
 	@Test
 	public void testZeroIntervalNeverAnnounces() throws Exception {
-		assertEquals(0,announcementsWhilePublishingTwice(CVMLong.ZERO));
+		assertEquals(0,announcementsWhilePublishingTwice(CVMLong.ZERO,false));
 		// With the default interval, the check after the first publication announces at once
-		assertTrue(announcementsWhilePublishingTwice(null)>0);
+		assertTrue(announcementsWhilePublishingTwice(null,false)>0);
 	}
 
-	/** Counts the root announcements a group sends while it publishes two values in turn. */
-	private static int announcementsWhilePublishingTwice(CVMLong interval) throws Exception {
+	/** An announcement on demand restarts the interval, so the timer does not repeat it at once. */
+	@Test
+	public void testAnnouncingOnDemandRestartsTheInterval() throws Exception {
+		CVMLong hour=CVMLong.create(3_600_000);
+		assertTrue(announcementsWhilePublishingTwice(hour,false)>0,
+			"The timer announces after the first publication");
+		assertEquals(1,announcementsWhilePublishingTwice(hour,true),
+			"The timer does not repeat the announcement made on demand");
+	}
+
+	/** Announcing on demand sends the root last announced into the store, with or without the timer. */
+	@Test
+	public void testAnnounceRootOnDemand() throws Exception {
+		Blob value=Blobs.createRandom(400);
+		AtomicReference<Message> sent=new AtomicReference<>();
+		AtomicBoolean routes=new AtomicBoolean(true);
+		try (MemoryStore store=new MemoryStore()) {
+			LatticeConnectionManager manager=new LatticeConnectionManager(store) {
+				@Override public boolean hasPropagationRoutes() { return routes.get(); }
+				@Override public int broadcast(Message message) {
+					sent.set(message);
+					return 2;
+				}
+			};
+			LatticePropagator propagator=new LatticePropagator(store,manager,LatticePropagatorConfig.create(
+				Maps.of(LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.ZERO)));
+			try {
+				assertEquals(0,propagator.announceRoot(),"Nothing is announced into the store yet");
+				propagator.processSnapshot(value);
+				assertEquals(2,propagator.announceRoot());
+				assertEquals(value.getHash(),rootAnnouncementValueHash(sent.get()));
+				assertEquals(1,propagator.getRootAnnouncementCount());
+				routes.set(false);
+				assertEquals(0,propagator.announceRoot(),"No routes to announce to");
+				assertEquals(1,propagator.getRootAnnouncementCount());
+			} finally {
+				propagator.close();
+			}
+		}
+	}
+
+	/**
+	 * Counts the root announcements a group sends while it publishes two values in
+	 * turn, optionally announcing on demand once it has started.
+	 */
+	private static int announcementsWhilePublishingTwice(CVMLong interval,boolean announceFirst) throws Exception {
 		AtomicInteger announcements=new AtomicInteger();
 		try (MemoryStore store=new MemoryStore()) {
 			LatticeConnectionManager manager=new LatticeConnectionManager(store) {
@@ -422,7 +468,10 @@ public class LatticePropagatorTest {
 				: Maps.of(LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,interval));
 			LatticePropagator propagator=new LatticePropagator(store,manager,config);
 			try {
+				if (announceFirst) propagator.processSnapshot(Blobs.createRandom(400));
 				propagator.start();
+				// The worker waits for a publication before it first considers announcing
+				if (announceFirst) assertEquals(1,propagator.announceRoot());
 				for (int i=0;i<2;i++) {
 					CompletableFuture<ACell> announced=propagator.nextAnnounce();
 					propagator.triggerBroadcast(Blobs.createRandom(400));

@@ -157,9 +157,10 @@ public class LatticePropagator implements Closeable {
 	private final long rootAnnouncementInterval;
 
 	/**
-	 * Timestamp of last periodic root announcement (background thread only).
+	 * Timestamp of the last root announcement, periodic or on demand. Volatile
+	 * because an announcement on demand may come from any thread.
 	 */
-	private long lastRootAnnouncementTime = 0L;
+	private volatile long lastRootAnnouncementTime = 0L;
 
 	/**
 	 * Count of broadcasts sent. Atomic because both the caller's thread and
@@ -168,9 +169,10 @@ public class LatticePropagator implements Closeable {
 	private final java.util.concurrent.atomic.AtomicLong broadcastCount = new java.util.concurrent.atomic.AtomicLong();
 
 	/**
-	 * Count of periodic root announcements sent
+	 * Count of root announcements sent, periodic or on demand. Atomic because an
+	 * announcement on demand may come from any thread.
 	 */
-	private long rootAnnouncementCount = 0L;
+	private final java.util.concurrent.atomic.AtomicLong rootAnnouncementCount = new java.util.concurrent.atomic.AtomicLong();
 
 	/**
 	 * Serialises this group's serving-store materialisation and announcement
@@ -832,18 +834,19 @@ public class LatticePropagator implements Closeable {
 	public long getLastBroadcastTime() { return lastBroadcastTime; }
 
 	/**
-	 * Returns the wall-clock time of this group's last periodic root announcement.
+	 * Returns the wall-clock time of this group's last root announcement, periodic
+	 * or on demand.
 	 *
 	 * @return epoch time in milliseconds, or zero before the first announcement
 	 */
 	public long getLastRootAnnouncementTime() { return lastRootAnnouncementTime; }
 
 	/**
-	 * Returns the number of periodic root announcements initiated since start.
+	 * Returns the number of root announcements sent, periodic or on demand.
 	 *
-	 * @return initiated root-announcement count
+	 * @return root-announcement count
 	 */
-	public long getRootAnnouncementCount() { return rootAnnouncementCount; }
+	public long getRootAnnouncementCount() { return rootAnnouncementCount.get(); }
 
 	/**
 	 * Returns the time between this group's periodic root announcements, set by
@@ -1214,25 +1217,36 @@ public class LatticePropagator implements Closeable {
 		broadcastCount.incrementAndGet();
 	}
 
-	// ========== Periodic Root Announcement ==========
+	// ========== Root Announcement ==========
 
 	/**
-	 * Announces the root to every route once the interval has passed, changed or
-	 * not. A peer whose copy differs fetches the cells it lacks by hash, so this
-	 * recovers missed deltas; it also keeps quiet routes open.
+	 * Announces this group's root to every route now, changed or not: the last value
+	 * announced into its serving store, top cell only. A peer whose copy differs
+	 * fetches the cells it lacks by hash; a peer that already holds it merges
+	 * nothing. The periodic announcement calls this, and an announcement made here
+	 * restarts its interval. It may be called from any thread and never waits on the
+	 * network.
+	 *
+	 * @return number of routes the announcement was queued to; zero when the group
+	 *         has no routes or has announced nothing into its store yet
 	 */
+	public int announceRoot() {
+		if (!connectionManager.hasPropagationRoutes()) return 0;
+		Message message = createRootAnnouncement();
+		if (message == null) return 0;
+		int routes = connectionManager.broadcast(message);
+		lastRootAnnouncementTime = Utils.getCurrentTimestamp();
+		rootAnnouncementCount.incrementAndGet();
+		log.debug("Sent root announcement ({} bytes) to {} routes", message.getMessageData().count(), routes);
+		return routes;
+	}
+
+	/** Announces the root once the interval has passed since the last announcement. */
 	private void maybeAnnounceRoot(long currentTime) {
 		if (rootAnnouncementInterval==0) return;
 		if (currentTime-lastRootAnnouncementTime < rootAnnouncementInterval) return;
-		if (!connectionManager.hasPropagationRoutes()) return;
-
 		try {
-			Message message = createRootAnnouncement();
-			if (message == null) return;
-			connectionManager.broadcast(message);
-			lastRootAnnouncementTime = currentTime;
-			rootAnnouncementCount++;
-			log.debug("Sent root announcement ({} bytes)", message.getMessageData().count());
+			announceRoot();
 		} catch (Exception e) {
 			log.warn("Error during root announcement", e);
 		}
