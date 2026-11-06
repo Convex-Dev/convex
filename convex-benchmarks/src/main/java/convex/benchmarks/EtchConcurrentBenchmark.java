@@ -498,7 +498,7 @@ public final class EtchConcurrentBenchmark {
 		output.println("  --payload-longs N          Longs per value (default: 8; minimum: 2)");
 		output.println("  --miss-percent N           Absent-hash reads (default: 20)");
 		output.println("  --recent-percent N         Valid reads targeting recent writes (default: 20)");
-		output.println("  --direct-hit-percent N     Valid reads bypassing the L2 cache (default: 50)");
+		output.println("  --direct-hit-percent N     Valid reads bypassing the cache (default: 50)");
 		output.println("  --verify-samples N         Random reopen checks (default: 10,000)");
 		output.println("  --seed N                   Reproducible decimal or 0x seed");
 		output.println("  --directory PATH           Directory for temporary Etch files");

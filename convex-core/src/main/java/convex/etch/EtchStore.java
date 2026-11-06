@@ -44,20 +44,12 @@ public class EtchStore extends ACachedStore {
 		this(etch, etch.getConfig());
 	}
 
-	/**
-	 * Compatibility constructor overriding the configured L2 policy. New callers
-	 * can specify all settings through {@link EtchConfig} and {@link #create(File, EtchConfig)}.
-	 */
-	public EtchStore(Etch etch, boolean enableL2) {
-		this(etch, etch.getConfig().withL2Enabled(enableL2));
-	}
-
 	private EtchStore(Etch etch, EtchConfig config) {
 		this(etch,config,null);
 	}
 
 	EtchStore(Etch etch, EtchConfig config, EtchGC sharedGC) {
-		super(config.getRefCacheSize(),config.isL2Enabled());
+		super(config.getRefCacheSize());
 		this.config=config;
 		this.etch=etch;
 		this.gc=(sharedGC==null)?new EtchGC(this):sharedGC;

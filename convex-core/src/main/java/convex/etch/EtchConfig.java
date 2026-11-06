@@ -38,13 +38,15 @@ public final class EtchConfig {
 	public static final AString CIPHER=Strings.intern("cipher");
 	/** JSON-style configuration key controlling Etch v3 index encryption. */
 	public static final AString ENCRYPT_INDEX=Strings.intern("encryptIndex");
-	/** Runtime number of L1 reference-cache slots; never stored in the file header. */
+	/** Runtime number of reference-cache slots; never stored in the file header. */
 	public static final AString REF_CACHE_SIZE=Strings.intern("refCacheSize");
-	/** Runtime switch for the L2 soft-reference cache. */
-	public static final AString ENABLE_L2=Strings.intern("enableL2");
+	/**
+	 * Former switch for a second, soft-reference cache. Still accepted as a boolean so
+	 * existing configurations load, but it has no effect.
+	 */
+	private static final AString ENABLE_L2=Strings.intern("enableL2");
 
 	public static final int DEFAULT_REF_CACHE_SIZE=ACachedStore.DEFAULT_REF_CACHE_SIZE;
-	public static final boolean DEFAULT_ENABLE_L2=true;
 
 	/** Concrete mapping implementations selectable at Etch construction. */
 	public enum MappingMode {
@@ -99,7 +101,6 @@ public final class EtchConfig {
 	private final CipherMode cipherMode;
 	private final boolean encryptedIndex;
 	private final int refCacheSize;
-	private final boolean enableL2;
 	private final AMap<AString,ACell> config;
 	private final Function<AccountKey,byte[]> keyFunction;
 
@@ -116,12 +117,12 @@ public final class EtchConfig {
 			AccountKey publicKeyHint, CipherMode cipherMode, boolean encryptedIndex,
 			Function<AccountKey,byte[]> keyFunction) {
 		this(version,mappingMode,buildChains,publicKeyHint,cipherMode,encryptedIndex,
-				keyFunction,DEFAULT_REF_CACHE_SIZE,DEFAULT_ENABLE_L2);
+				keyFunction,DEFAULT_REF_CACHE_SIZE);
 	}
 
 	private EtchConfig(short version, MappingMode mappingMode, boolean buildChains,
 			AccountKey publicKeyHint, CipherMode cipherMode, boolean encryptedIndex,
-			Function<AccountKey,byte[]> keyFunction, int refCacheSize, boolean enableL2) {
+			Function<AccountKey,byte[]> keyFunction, int refCacheSize) {
 		validateVersion(version);
 		if (refCacheSize<=0) throw invalid(REF_CACHE_SIZE,"expected a positive integer, got "+refCacheSize);
 		EtchFileMapperFactory.validate(version,mappingMode);
@@ -149,7 +150,6 @@ public final class EtchConfig {
 		this.encryptedIndex=encryptedIndex;
 		this.keyFunction=keyFunction;
 		this.refCacheSize=refCacheSize;
-		this.enableL2=enableL2;
 		this.config=Maps.of(
 				VERSION,CVMLong.create(version),
 				MAPPING,Strings.create(mappingMode.configName()),
@@ -157,8 +157,7 @@ public final class EtchConfig {
 				PUBLIC_KEY_HINT,(publicKeyHint==null)?null:Strings.create(publicKeyHint.toHexString()),
 				CIPHER,Strings.create(cipherMode.configName()),
 				ENCRYPT_INDEX,CVMBool.create(encryptedIndex),
-				REF_CACHE_SIZE,CVMLong.create(refCacheSize),
-				ENABLE_L2,CVMBool.create(enableL2));
+				REF_CACHE_SIZE,CVMLong.create(refCacheSize));
 	}
 
 	/** Parses a JSON5 configuration with ordinary defaults. */
@@ -293,13 +292,9 @@ public final class EtchConfig {
 			}
 			refCacheSize=(int)requested;
 		}
-		boolean enableL2=DEFAULT_ENABLE_L2;
 		MapEntry<AString,ACell> l2Entry=source.getEntry(ENABLE_L2);
-		if (l2Entry!=null) {
-			if (!(l2Entry.getValue() instanceof CVMBool value)) {
-				throw invalid(ENABLE_L2,"expected a boolean");
-			}
-			enableL2=value.booleanValue();
+		if ((l2Entry!=null)&&!(l2Entry.getValue() instanceof CVMBool)) {
+			throw invalid(ENABLE_L2,"expected a boolean");
 		}
 
 		short version=defaultVersion;
@@ -384,7 +379,7 @@ public final class EtchConfig {
 		}
 
 		return new EtchConfig(version,mappingMode,buildChains,publicKeyHint,
-				cipherMode,encryptedIndex,keyFunction,refCacheSize,enableL2);
+				cipherMode,encryptedIndex,keyFunction,refCacheSize);
 	}
 
 	private static void validateKeys(AMap<AString,ACell> source) {
@@ -443,10 +438,6 @@ public final class EtchConfig {
 		return refCacheSize;
 	}
 
-	public boolean isL2Enabled() {
-		return enableL2;
-	}
-
 	public boolean hasKeyFunction() {
 		return keyFunction!=null;
 	}
@@ -476,7 +467,7 @@ public final class EtchConfig {
 	EtchConfig withV3FileOptions(CipherMode fileCipher, boolean fileIndexEncrypted,
 			AccountKey filePublicKeyHint) {
 		return new EtchConfig(version,mappingMode,buildChains,filePublicKeyHint,
-				fileCipher,fileIndexEncrypted,keyFunction,refCacheSize,enableL2);
+				fileCipher,fileIndexEncrypted,keyFunction,refCacheSize);
 	}
 
 	/**
@@ -486,33 +477,26 @@ public final class EtchConfig {
 	 */
 	EtchConfig forExistingFile(short fileVersion, MappingMode compatibleMapping) {
 		return new EtchConfig(fileVersion,compatibleMapping,buildChains,null,
-				CipherMode.NONE,false,keyFunction,refCacheSize,enableL2);
+				CipherMode.NONE,false,keyFunction,refCacheSize);
 	}
 
 	/** Returns a copy of this compiled configuration with the supplied hint. */
 	public EtchConfig withPublicKeyHint(AccountKey hint) {
 		return new EtchConfig(version,mappingMode,buildChains,hint,cipherMode,
-				encryptedIndex,keyFunction,refCacheSize,enableL2);
+				encryptedIndex,keyFunction,refCacheSize);
 	}
 
 	/** Returns a copy using the supplied synchronous key function. */
 	public EtchConfig withKeyFunction(Function<AccountKey,byte[]> function) {
 		return new EtchConfig(version,mappingMode,buildChains,publicKeyHint,cipherMode,
-				encryptedIndex,function,refCacheSize,enableL2);
+				encryptedIndex,function,refCacheSize);
 	}
 
-	/** Returns a copy with the specified positive L1 cache capacity. */
+	/** Returns a copy with the specified positive reference-cache capacity. */
 	public EtchConfig withRefCacheSize(int size) {
 		if (size==refCacheSize) return this;
 		return new EtchConfig(version,mappingMode,buildChains,publicKeyHint,cipherMode,
-				encryptedIndex,keyFunction,size,enableL2);
-	}
-
-	/** Returns a copy with the L2 soft-reference cache enabled or disabled. */
-	public EtchConfig withL2Enabled(boolean enabled) {
-		if (enabled==enableL2) return this;
-		return new EtchConfig(version,mappingMode,buildChains,publicKeyHint,cipherMode,
-				encryptedIndex,keyFunction,refCacheSize,enabled);
+				encryptedIndex,keyFunction,size);
 	}
 
 	@Override
@@ -523,13 +507,13 @@ public final class EtchConfig {
 				&&(buildChains==other.buildChains)
 				&&Objects.equals(publicKeyHint,other.publicKeyHint)
 				&&(cipherMode==other.cipherMode)&&(encryptedIndex==other.encryptedIndex)
-				&&(refCacheSize==other.refCacheSize)&&(enableL2==other.enableL2);
+				&&(refCacheSize==other.refCacheSize);
 	}
 
 	@Override
 	public int hashCode() {
 		return Objects.hash(version,mappingMode,buildChains,publicKeyHint,
-				cipherMode,encryptedIndex,refCacheSize,enableL2);
+				cipherMode,encryptedIndex,refCacheSize);
 	}
 
 	@Override
@@ -537,7 +521,7 @@ public final class EtchConfig {
 		return "EtchConfig[version="+version+", mapping="+mappingMode.configName()
 				+", buildChains="+buildChains+", cipher="+cipherMode.configName()
 				+", encryptedIndex="+encryptedIndex+", publicKeyHint="+publicKeyHint
-				+", refCacheSize="+refCacheSize+", enableL2="+enableL2
+				+", refCacheSize="+refCacheSize
 				+", keyFunction="+(keyFunction==null?"absent":"present")+"]";
 	}
 

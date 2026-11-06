@@ -10,36 +10,25 @@ import convex.core.data.Hash;
 import convex.core.data.Format;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
-import convex.core.util.SoftCache;
 
 /**
  * Abstract base class for stores implementing an in-memory cache of cells.
  *
- * <p>Two-tier cache:</p>
- * <ul>
- *   <li>L1: small fixed-size array probe ({@link RefCache}). Strong refs to {@link Ref}
- *       wrappers: direct refs for unpersisted cells, store-owned
- *       {@link convex.core.data.RefSoft} for stored cells. Fast hit path.</li>
- *   <li>L2: optional {@link SoftCache} keyed by content hash. Soft refs to cells, unbounded
- *       by entry count, cleared by GC under heap pressure. Catches L1 collision-evictions and
- *       avoids redundant subtree decoding.</li>
- * </ul>
+ * <p>The cache is a fixed-size array probe ({@link RefCache}) holding {@link Ref}
+ * wrappers strongly: direct refs for cells decoded but not yet stored, store-owned
+ * {@link convex.core.data.RefSoft} for stored cells. A cell evicted from it is read
+ * or decoded again when next needed. Beyond the cache, stored cells stay in memory
+ * only through the soft refs of whatever holds them.</p>
  *
- * Counters track which tier serviced each {@link #decode(Blob)} call so callers can
- * measure hit rates and the impact of disabling L2.
+ * Counters track whether the cache served each lookup, so callers can measure hit
+ * rates.
  */
 public abstract class ACachedStore extends AStore {
 
-	/** Default number of L1 reference-cache slots. */
+	/** Default number of reference-cache slots. */
 	public static final int DEFAULT_REF_CACHE_SIZE=10000;
 
 	protected final RefCache refCache;
-
-	/**
-	 * Optional L2 cache. May be null (disabled). Maps content hash to the decoded cell;
-	 * the SoftCache wraps each value in a SoftReference so entries are reclaimable.
-	 */
-	protected final SoftCache<Hash, ACell> softCache;
 
 	/**
 	 * Encoder whose branch references resolve against this store.
@@ -47,20 +36,14 @@ public abstract class ACachedStore extends AStore {
 	protected final CVMEncoder encoder=new CVMEncoder(this);
 
 	private final LongAdder l1Hits = new LongAdder();
-	private final LongAdder l2Hits = new LongAdder();
 	private final LongAdder decodes = new LongAdder();
 
 	protected ACachedStore() {
-		this(true);
+		this(DEFAULT_REF_CACHE_SIZE);
 	}
 
-	protected ACachedStore(boolean enableL2) {
-		this(DEFAULT_REF_CACHE_SIZE,enableL2);
-	}
-
-	protected ACachedStore(int refCacheSize, boolean enableL2) {
+	protected ACachedStore(int refCacheSize) {
 		this.refCache = RefCache.create(this, refCacheSize);
-		this.softCache = enableL2 ? new SoftCache<>() : null;
 	}
 
 	@Override
@@ -81,21 +64,10 @@ public abstract class ACachedStore extends AStore {
 			return (T) decoded;
 		}
 
-		// L1: array probe
 		Ref<?> cached= refCache.getCell(hash);
 		if (cached!=null) {
 			l1Hits.increment();
 			return (T) CVMEncoder.specialise(cached.getValue());
-		}
-
-		// L2: soft cache
-		if (softCache != null) {
-			ACell hit = softCache.get(hash);
-			if (hit != null) {
-				l2Hits.increment();
-				refCache.putDecoded(hit); // promote without importing foreign status
-				return (T) CVMEncoder.specialise(hit);
-			}
 		}
 
 		// Miss: full decode
@@ -103,9 +75,6 @@ public abstract class ACachedStore extends AStore {
 		decodes.increment();
 		if (embedded) return (T) decoded; // no automatic admission of embedded values
 		refCache.putDecoded(decoded);
-		if (softCache != null) {
-			softCache.put(hash, decoded);
-		}
 		return (T)decoded;
 	}
 
@@ -117,25 +86,10 @@ public abstract class ACachedStore extends AStore {
 			l1Hits.increment();
 			return (Ref<T>) ref;
 		}
-		if (softCache != null) {
-			ACell cell = softCache.get(h);
-			if (cell != null) {
-				l2Hits.increment();
-				return (Ref<T>) refCache.putDecoded(cell);
-			}
-		}
 		return null;
 	}
 
-	/**
-	 * Returns whether this store has the L2 SoftCache enabled.
-	 * @return true if L2 cache is in use
-	 */
-	public boolean isL2Enabled() {
-		return softCache != null;
-	}
-
-	/** Returns the number of slots allocated to the L1 reference cache. */
+	/** Returns the number of slots allocated to the reference cache. */
 	public int getRefCacheSize() {
 		return refCache.getSize();
 	}
@@ -145,7 +99,7 @@ public abstract class ACachedStore extends AStore {
 	 * @return current cache statistics
 	 */
 	public CacheStats getCacheStats() {
-		return new CacheStats(l1Hits.sum(), l2Hits.sum(), decodes.sum());
+		return new CacheStats(l1Hits.sum(), decodes.sum());
 	}
 
 	/**
@@ -153,7 +107,6 @@ public abstract class ACachedStore extends AStore {
 	 */
 	public void resetCacheStats() {
 		l1Hits.reset();
-		l2Hits.reset();
 		decodes.reset();
 	}
 }

@@ -318,7 +318,7 @@ public class EtchCheckpointTest {
 		byte[] newKey=new byte[32];
 		newKey[0]=42;
 		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true,
-				EtchConfig.CipherMode.AES_256_CTR,true,null,h->oldKey).withRefCacheSize(37).withL2Enabled(false);
+				EtchConfig.CipherMode.AES_256_CTR,true,null,h->oldKey).withRefCacheSize(37);
 		try (EtchStore source=EtchStore.createTemp(config)) {
 			ACell root=EtchGCLifecycleTest.tree(36000);
 			source.setRootData(root);
@@ -333,7 +333,6 @@ public class EtchCheckpointTest {
 				assertEquals(23,restored.getRefCacheSize());
 				assertEquals(newHint,restored.getConfig().getPublicKeyHint());
 				assertEquals(EtchConfig.CipherMode.CHACHA20,restored.getConfig().getCipherMode());
-				assertFalse(restored.isL2Enabled());
 			}
 			File invalid=output();
 			assertThrows(IllegalArgumentException.class,()->source.exportCheckpoint(root.getHash(),invalid,

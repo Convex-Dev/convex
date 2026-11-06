@@ -15,8 +15,8 @@ lifecycle that makes recovery unambiguous.
 ## Key points
 
 - **Configuration survives cutover.** The successor inherits the resolved
-  [Etch configuration](ETCH_CONFIG.md), including L1 cache capacity and L2
-  enablement. Its caches are fresh and bound to the successor; runtime settings
+  [Etch configuration](ETCH_CONFIG.md), including reference-cache capacity. Its
+  cache is fresh and bound to the successor; runtime settings
   are not written to the file header and must be supplied again on reopen.
 - **INV-1: an entry present in the *target* file with status ≥ `PERSISTED` has its
   entire reachable tree in the target.** It holds because the target starts empty and
@@ -79,8 +79,8 @@ that binding; `EtchStatusIntegrityTest` pins them with regression tests.
 - **S4: tree coherence.** All `RefSoft`s in one cell tree bind to the same store
   (`Refs.checkConsistentStores` checks this). A store never returns, attaches or
   caches a ref bound to a foreign store; `AStore.isForeign` is the guard and the
-  `RefCache` checks ownership on every insertion. L2 promotion reuses decoded cells
-  without adopting an attached foreign ref or its persistence claims.
+  `RefCache` checks ownership on every insertion. Caching a decoded cell never
+  adopts an attached foreign ref or its persistence claims.
 
 The read contract follows from S1: `null` is proven absence, `MissingDataException`
 means the store looked and the value is not there, and unchecked `StoreException`
@@ -438,8 +438,7 @@ compatible cipher, index-encryption, hint and mapping settings. Invalid merged
 combinations fail rather than resetting omitted options. Newly created encrypted
 files always receive fresh file salts and derived cryptographic material. Runtime
 cache/mapping settings are not encoded in the file; pass the chosen effective
-configuration when reopening. Export's private working cache disables L2 to keep
-its heap bounded.
+configuration when reopening.
 
 The child-first copy establishes completeness as it writes. Export does not run
 an additional verification pass. Callers can independently invoke

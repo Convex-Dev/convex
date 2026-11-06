@@ -322,6 +322,6 @@ public class EtchGCExample {
 	}
 
 	static String statsLine(CacheStats s) {
-		return "l1Hits=" + s.l1Hits + " l2Hits=" + s.l2Hits + " decodes=" + s.decodes;
+		return "l1Hits=" + s.l1Hits + " decodes=" + s.decodes;
 	}
 }

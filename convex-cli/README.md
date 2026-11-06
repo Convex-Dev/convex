@@ -361,10 +361,10 @@ JSON5 configuration file (see below), not a command-line option.
 The `peer.etch` object also accepts store cache options:
 
 ```json5
-{ peer: { store: "data/peer.etch", etch: { refCacheSize: 50000, enableL2: false } } }
+{ peer: { store: "data/peer.etch", etch: { refCacheSize: 50000 } } }
 ```
 
-Defaults are 10,000 L1 reference-cache slots and L2 enabled. Cache settings apply
+The default is 10,000 reference-cache slots. Cache settings apply
 when opening either a new or existing store and survive GC cutover. They are
 runtime settings, so keep supplying the configuration on subsequent launches.
 Options are validated and resolved at setup; reads and writes perform no

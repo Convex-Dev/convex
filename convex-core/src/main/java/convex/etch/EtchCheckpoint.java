@@ -43,8 +43,7 @@ final class EtchCheckpoint {
 	// Per-operation I/O boundary also permits deterministic fault/concurrency tests.
 	static class IO {
 		EtchStore create(File file, EtchConfig config) throws IOException {
-			// Export's private working cache is bounded; runtime policy is not on disk.
-			return new EtchStore(Etch.create(file,config),false);
+			return new EtchStore(Etch.create(file,config));
 		}
 		void copied(Hash hash) throws IOException { }
 		void flush(Etch file) throws IOException { file.flush(); }

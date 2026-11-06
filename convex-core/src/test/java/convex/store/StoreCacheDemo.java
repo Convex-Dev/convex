@@ -17,11 +17,12 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.ACachedStore;
 import convex.core.store.CacheStats;
-import convex.etch.Etch;
+import convex.etch.EtchConfig;
 import convex.etch.EtchStore;
 
 /**
- * Interactive demo for the {@link ACachedStore} two-tier cache.
+ * Interactive demo for the {@link ACachedStore} reference cache, comparing a small
+ * cache with the default size.
  *
  * <p>Backs onto a real on-disk Etch file at a persistent location so re-runs can
  * skip the (expensive) population step. The store path resolves to
@@ -40,8 +41,8 @@ import convex.etch.EtchStore;
  * are reported via focused passes after the mixed-workload measurement.</p>
  *
  * <p>Reads use {@link EtchStore#refForHash(Hash)}+getValue() — the production
- * path. Counters in {@link ACachedStore} cover both checkCache (L1/L2 fast path)
- * and decode (post-disk-read), so every read increments exactly one counter.</p>
+ * path. Counters in {@link ACachedStore} cover both checkCache (cache hit) and decode
+ * (post-disk-read), so every read increments exactly one counter.</p>
  *
  * <p>Profiles:</p>
  * <pre>
@@ -60,7 +61,9 @@ import convex.etch.EtchStore;
  */
 public class StoreCacheDemo {
 
-	private static final int L1_SIZE = 10000;
+	/** Cache sizes compared: a small cache, then the default. */
+	private static final int SMALL_CACHE = 2000;
+	private static final int DEFAULT_CACHE = ACachedStore.DEFAULT_REF_CACHE_SIZE;
 
 	/** Mix: 70% hot, 25% common, 5% rare. */
 	private static final double P_HOT = 0.70;
@@ -95,8 +98,8 @@ public class StoreCacheDemo {
 	 * Override to plug in a custom {@link ACachedStore} subclass. The default
 	 * uses {@link EtchStore} backed by a persistent file.
 	 */
-	protected EtchStore openStore(File file, boolean enableL2) throws IOException {
-		return new EtchStore(Etch.create(file), enableL2);
+	protected EtchStore openStore(File file, int cacheSize) throws IOException {
+		return EtchStore.create(file, EtchConfig.create().withRefCacheSize(cacheSize));
 	}
 
 	private static File storeFile(Profile p) {
@@ -159,16 +162,16 @@ public class StoreCacheDemo {
 	// Measurement
 	// ------------------------------------------------------------------
 
-	/** Aggregated result from one (profile, L2-on/off) run, used to print summary. */
+	/** Aggregated result from one (profile, cache size) run, used to print summary. */
 	private static final class RunResult {
-		final boolean l2;
+		final int cacheSize;
 		final CacheStats mix;
 		final long mixNs;
 		final TierResult hot, common, rare;
 
-		RunResult(boolean l2, CacheStats mix, long mixNs,
+		RunResult(int cacheSize, CacheStats mix, long mixNs,
 				TierResult hot, TierResult common, TierResult rare) {
-			this.l2 = l2; this.mix = mix; this.mixNs = mixNs;
+			this.cacheSize = cacheSize; this.mix = mix; this.mixNs = mixNs;
 			this.hot = hot; this.common = common; this.rare = rare;
 		}
 	}
@@ -184,16 +187,16 @@ public class StoreCacheDemo {
 		double readsPerMs() { return reads * 1e6 / Math.max(1, ns); }
 	}
 
-	private RunResult runProfile(Profile p, boolean enableL2) throws IOException, BadFormatException {
+	private RunResult runProfile(Profile p, int cacheSize) throws IOException, BadFormatException {
 		File file = storeFile(p);
 		System.out.println();
 		System.out.println("############################################################");
 		System.out.printf("# Profile: %s (hot=%d, common=%d, rare=%d), payload=%d B%n",
 				p.name(), p.hot, p.common, p.rare, p.payload);
-		System.out.printf("# L2: %s   File: %s%n", enableL2 ? "on" : "off", file);
+		System.out.printf("# Cache slots: %d   File: %s%n", cacheSize, file);
 		System.out.println("############################################################");
 
-		try (EtchStore store = openStore(file, enableL2)) {
+		try (EtchStore store = openStore(file, cacheSize)) {
 			Hash[] hot = new Hash[p.hot];
 			Hash[] common = new Hash[p.common];
 			Hash[] rare = new Hash[p.rare];
@@ -234,7 +237,7 @@ public class StoreCacheDemo {
 			report(p, mix, mixNs, tierReads, hotR, commonR, rareR);
 
 			pinned.size(); // retain
-			return new RunResult(enableL2, mix, mixNs, hotR, commonR, rareR);
+			return new RunResult(cacheSize, mix, mixNs, hotR, commonR, rareR);
 		}
 	}
 
@@ -272,33 +275,33 @@ public class StoreCacheDemo {
 				rare.reads, rare.ns / 1e6, rare.usPerRead(), rare.readsPerMs(), rare.stats);
 	}
 
-	private static void printComparison(Profile p, RunResult off, RunResult on) {
+	private static void printComparison(Profile p, RunResult small, RunResult large) {
 		System.out.println();
 		System.out.println("============================================================");
 		System.out.printf("SUMMARY: %s profile (payload=%d B, %d reads mixed)%n",
 				p.name(), p.payload, MIX_READS);
 		System.out.println("============================================================");
 		System.out.printf("%-10s %12s %12s %12s %10s%n",
-				"workload", "L2-off (ms)", "L2-on (ms)", "speedup", "decode↓");
+				"workload", small.cacheSize + " (ms)", large.cacheSize + " (ms)", "speedup", "decode↓");
 		System.out.println("------------------------------------------------------------");
-		printRow("mixed",  off.mixNs,        on.mixNs,        off.mix,         on.mix);
-		printRow("hot",    off.hot.ns,       on.hot.ns,       off.hot.stats,   on.hot.stats);
-		printRow("common", off.common.ns,    on.common.ns,    off.common.stats, on.common.stats);
-		printRow("rare",   off.rare.ns,      on.rare.ns,      off.rare.stats,  on.rare.stats);
+		printRow("mixed",  small.mixNs,      large.mixNs,      small.mix,          large.mix);
+		printRow("hot",    small.hot.ns,     large.hot.ns,     small.hot.stats,    large.hot.stats);
+		printRow("common", small.common.ns,  large.common.ns,  small.common.stats, large.common.stats);
+		printRow("rare",   small.rare.ns,    large.rare.ns,    small.rare.stats,   large.rare.stats);
 		System.out.println("------------------------------------------------------------");
-		System.out.printf("hit-rate (mixed):  off=%.3f   on=%.3f%n",
-				off.mix.hitRate(), on.mix.hitRate());
-		System.out.printf("decodes  (mixed):  off=%d   on=%d   (-%.1f%%)%n",
-				off.mix.decodes, on.mix.decodes,
-				100.0 * (off.mix.decodes - on.mix.decodes) / Math.max(1, off.mix.decodes));
+		System.out.printf("hit-rate (mixed):  %d slots=%.3f   %d slots=%.3f%n",
+				small.cacheSize, small.mix.hitRate(), large.cacheSize, large.mix.hitRate());
+		System.out.printf("decodes  (mixed):  %d slots=%d   %d slots=%d   (-%.1f%%)%n",
+				small.cacheSize, small.mix.decodes, large.cacheSize, large.mix.decodes,
+				100.0 * (small.mix.decodes - large.mix.decodes) / Math.max(1, small.mix.decodes));
 	}
 
-	private static void printRow(String label, long offNs, long onNs, CacheStats off, CacheStats on) {
-		double speedup = (double) offNs / Math.max(1, onNs);
-		long dDelta = off.decodes - on.decodes;
-		double dPct = off.decodes == 0 ? 0 : 100.0 * dDelta / off.decodes;
+	private static void printRow(String label, long smallNs, long largeNs, CacheStats small, CacheStats large) {
+		double speedup = (double) smallNs / Math.max(1, largeNs);
+		long dDelta = small.decodes - large.decodes;
+		double dPct = small.decodes == 0 ? 0 : 100.0 * dDelta / small.decodes;
 		System.out.printf("%-10s %12.1f %12.1f %11.2fx %9.1f%%%n",
-				label, offNs / 1e6, onNs / 1e6, speedup, dPct);
+				label, smallNs / 1e6, largeNs / 1e6, speedup, dPct);
 	}
 
 	// ------------------------------------------------------------------
@@ -306,7 +309,7 @@ public class StoreCacheDemo {
 	// ------------------------------------------------------------------
 
 	public static void main(String[] args) throws Exception {
-		// Args: profile name(s). Each runs both L2-on and L2-off back-to-back.
+		// Args: profile name(s). Each runs both cache sizes back-to-back.
 		List<String> profiles = (args.length == 0)
 				? Arrays.asList("small")
 				: Arrays.asList(args);
@@ -323,9 +326,9 @@ public class StoreCacheDemo {
 				System.err.println("unknown profile: " + s + " (use small | big | huge)");
 				continue;
 			}
-			RunResult off = demo.runProfile(p, false);
-			RunResult on  = demo.runProfile(p, true);
-			printComparison(p, off, on);
+			RunResult small = demo.runProfile(p, SMALL_CACHE);
+			RunResult large = demo.runProfile(p, DEFAULT_CACHE);
+			printComparison(p, small, large);
 		}
 	}
 }

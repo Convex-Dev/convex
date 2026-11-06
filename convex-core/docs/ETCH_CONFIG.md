@@ -15,30 +15,26 @@ unknown keys, incorrect types and invalid combinations are rejected at setup.
 | `cipher` | `"none"` | V3 file cipher: `"none"`, `"aes-256-ctr"` or `"chacha20"`. Encryption requires a runtime key resolver. |
 | `encryptIndex` | `false` | Encrypt the v3 index as well as data. Requires a file cipher. |
 | `publicKeyHint` | `null` | Optional 32-byte public key, written as hex, identifying key material for v3. It is not the encryption key. |
-| `refCacheSize` | `10000` | Positive integer number of L1 reference-cache slots, at most `Integer.MAX_VALUE`. Allocated separately for each store. |
-| `enableL2` | `true` | Enable the L2 soft-reference cache for decoded cells. Entries may be reclaimed under JVM memory pressure. |
+| `refCacheSize` | `10000` | Positive integer number of reference-cache slots, at most `Integer.MAX_VALUE`. Allocated separately for each store. |
+| `enableL2` | none | Accepted as a boolean so existing configurations load; it has no effect. |
 
-L1 is an array cache; increasing its capacity reduces collision evictions at the
-cost of more heap per store. L2 has no entry-count limit. Disabling it leaves L1
-active. These defaults preserve the behaviour of existing callers.
+The reference cache is an array indexed by hash; increasing its capacity reduces
+collision evictions at the cost of more heap per store. A cell evicted from it is
+read from the file or decoded again when next needed.
 
-Each L1 cache belongs to one store and checks references on insertion. Stored
-entries use `RefSoft` bound to that store, including embedded top-level values.
-Newly decoded values can reuse their existing direct ref at `UNKNOWN` status,
-avoiding a soft-reference allocation before persistence. Such direct entries
-strongly retain their values until eviction; the slot count bounds the number
-of entries, not their total memory size. Null uses its store-independent ref.
-
-L2 caches decoded values. A shared cell's attached ref can subsequently change
-when it is persisted elsewhere, so promotion to L1 checks that ref and discards
-foreign status claims. It reuses the decoded cell without changing its attached
-ref. Ownership enforcement adds no checks or allocations to L1 hits.
+Each reference cache belongs to one store and checks references on insertion.
+Stored entries use `RefSoft` bound to that store, including embedded top-level
+values. Newly decoded values can reuse their existing direct ref at `UNKNOWN`
+status, avoiding a soft-reference allocation before persistence. Such direct
+entries strongly retain their values until eviction; the slot count bounds the
+number of entries, not their total memory size. Null uses its store-independent
+ref. Ownership enforcement adds no checks or allocations to cache hits.
 
 ## Java usage
 
 ```java
 EtchConfig config = EtchConfig.parse("""
-    { refCacheSize: 50000, enableL2: false }
+    { refCacheSize: 50000 }
     """);
 try (EtchStore store = EtchStore.create(new File("data.etch"), config)) {
     EtchConfig effective = store.getConfig();
@@ -46,9 +42,8 @@ try (EtchStore store = EtchStore.create(new File("data.etch"), config)) {
 }
 ```
 
-`EtchStore.createTemp(config)` uses the same settings. Existing factory methods
-and the `EtchStore(Etch, boolean)` constructor remain available; the boolean
-overrides L2 for that store and is included in `store.getConfig()`.
+`EtchStore.createTemp(config)` uses the same settings, and the other factory
+methods remain available.
 
 `getMap()` returns an immutable map containing all resolved settings, including
 defaults and the concrete mapping backend selected for `"auto"`. It can be
@@ -59,8 +54,8 @@ Use `mapping: "auto"` again when selecting a backend for a different runtime.
 
 Configuration getters read final Java fields. Map lookups, validation and default
 resolution happen only during configuration construction. Store construction
-allocates L1 and optionally L2 once; decoding, hash lookup and persistence access
-those caches directly. Index writes use Etch's cached `buildChains` boolean.
+allocates the reference cache once; decoding, hash lookup and persistence access
+it directly. Index writes use Etch's cached `buildChains` boolean.
 There are no configuration-map lookups on these hot paths.
 
 ## Opening files and collecting
@@ -75,11 +70,10 @@ Cache and chain settings are not persisted in the Etch header. Reopening with
 no configuration uses their defaults; supply your configuration on each open.
 This also allows two stores in one process to use different cache policies.
 
-GC inherits the complete resolved configuration. Its successor starts with fresh
-caches using the same capacity and L2 setting; references bound to the predecessor
-are not copied into the successor's caches. The compatibility constructor's L2
-override also survives cutover. See [Etch GC](ETCH_GC.md) for ownership and
-snapshot lifetime, and [Etch v3](ETCHv3.md) for encryption.
+GC inherits the complete resolved configuration. Its successor starts with a
+fresh reference cache of the same capacity; references bound to the predecessor
+are not copied into it. See [Etch GC](ETCH_GC.md) for ownership and snapshot
+lifetime, and [Etch v3](ETCHv3.md) for encryption.
 
 ## Peer configuration
 
@@ -90,8 +84,7 @@ The same map is accepted as `peer.etch` in the peer's JSON5 configuration file:
   peer: {
     store: "data/peer.etch",
     etch: {
-      refCacheSize: 50000,
-      enableL2: false
+      refCacheSize: 50000
     }
   }
 }
@@ -102,8 +95,8 @@ Runtime cache settings are applied once when the peer opens the store.
 
 ## Soft references and garbage collection
 
-Stored cells stay in memory through soft references, in `RefSoft` and the L2
-cache, until the JVM reclaims them. By default the JVM keeps a softly referenced
+Stored cells stay in memory through the soft references (`RefSoft`) of whatever
+holds them until the JVM reclaims them. By default the JVM keeps a softly referenced
 value for one second per megabyte of free heap since its last use, so a busy peer
 with a large heap keeps most of what it stores, and garbage collection has ever
 more to trace. Operators who see heavy garbage-collection pressure may want to set

@@ -1,7 +1,6 @@
 package convex.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -28,16 +27,16 @@ import convex.etch.EtchConfig;
 import convex.etch.EtchStore;
 
 /**
- * Tests for the two-tier decode cache in ACachedStore (L1 RefCache + L2 SoftCache).
+ * Tests for the decode cache in ACachedStore, a fixed-size reference cache.
  *
- * <p>Strategy: generate cells that exceed the L1 capacity, read them, then re-read.
- * Without an L2 cache, the second pass re-decodes because L1 collision-eviction drops
- * earlier entries. With L2 enabled, the second pass is served from L2.</p>
+ * <p>Strategy: decode cells, then decode them again. Cells still in the cache are
+ * reused; cells evicted by collisions are decoded again, so the cache's size bounds
+ * what it holds.</p>
  */
 public class StoreCacheTest {
 
-	/** L1 fixed size — see ACachedStore.refCache. */
-	private static final int L1_SIZE = 10000;
+	/** Default cache size — see ACachedStore.refCache. */
+	private static final int CACHE_SIZE = 10000;
 
 	/** Non-embedded payload so decode()/getEncoding() round-trips through the store. */
 	private static Blob nonEmbedded(Random r) {
@@ -56,40 +55,12 @@ public class StoreCacheTest {
 	}
 
 	/**
-	 * L2 catches L1 collision-evictions. Working set is 4× L1: many entries thrash out of
-	 * L1 on the first pass, so a second pass with no L2 would re-decode most of them.
-	 * With L2 the second pass should be served almost entirely by L2.
+	 * A cached cell is reused, and the cache keeps this store's view of it: another
+	 * store's ref attached to the shared cell does not change the cache entry, and once
+	 * evicted nothing here claims the cell is stored until it is persisted.
 	 */
 	@Test
-	public void testL2CatchesL1Eviction() throws IOException, BadFormatException {
-		EtchStore store = new EtchStore(Etch.createTempEtch(), true);
-		int n = L1_SIZE * 4;
-		List<Blob> cells = generate(n, 0xC0FFEEL);
-
-		// Pin cells in memory so L2 SoftReferences are not cleared during the test.
-		List<ACell> pinned = new ArrayList<>(n);
-		for (Blob b : cells) pinned.add(store.decode(b.getEncoding()));
-
-		store.resetCacheStats();
-		decodeAll(store, cells);
-		CacheStats pass2 = store.getCacheStats();
-
-		assertEquals(n, pass2.total());
-		assertTrue(pass2.l2Hits > n / 2,
-				"expected majority of pass-2 reads to hit L2, got " + pass2);
-		assertTrue(pass2.decodes < n / 10,
-				"expected few re-decodes with L2 enabled, got " + pass2);
-		pinned.size(); // retain reference until here
-		store.close();
-	}
-
-	/**
-	 * Same-instance guarantee: a cell decoded once, then re-decoded after L1 eviction,
-	 * should be the same Java instance (shared via L2). This is the direct proof that
-	 * "multiple copies of the same value" has been eliminated for cached cells.
-	 */
-	@Test
-	public void testSharedInstanceAcrossEviction() throws IOException, BadFormatException {
+	public void testCachedCellReusedUntilEvicted() throws IOException, BadFormatException {
 		// One slot makes every eviction deterministic, including after persistence.
 		for (boolean direct:new boolean[] {false, true}) {
 			try (EtchStore store=EtchStore.createTemp(EtchConfig.create().withRefCacheSize(1));
@@ -103,22 +74,17 @@ public class StoreCacheTest {
 				assertSame(first.getRef(), original, "Fresh decodes should reuse their direct ref");
 
 				// Attaching another store's higher-status ref changes cell.getRef(),
-				// but must not change the meaning of either cache tier in this store.
+				// but must not change the meaning of this store's cache entry.
 				Ref<?> foreign=other.storeTopRef(first.getRef(), Ref.ANNOUNCED, null);
 				first.attachRef(foreign); // MemoryStore returns a direct ref without attaching it
 				assertSame(foreign, first.getRef());
 				assertSame(original, store.checkCache(target.getHash()));
-				store.decode(evict);
-				Ref<?> promoted=store.checkCache(target.getHash());
-				assertFalse(store.isForeign(promoted));
-				assertTrue(promoted.isDirect());
-				assertEquals(Ref.UNKNOWN, promoted.getStatus());
-				assertSame(first, promoted.getValue());
+				assertSame(first, store.decode(target.getEncoding()), "The cache should reuse the cell");
 
+				// Another cell takes the only slot: the evicted cell is no longer cached
 				store.decode(evict);
-				assertSame(first, store.decode(target.getEncoding()), "L2 should reuse the cell");
-				assertEquals(Ref.UNKNOWN, store.checkCache(target.getHash()).getStatus());
-				assertSame(foreign, first.getRef(), "Cache promotion must not mutate the shared cell");
+				assertNull(store.checkCache(target.getHash()));
+				assertSame(foreign, first.getRef(), "Eviction must not mutate the shared cell");
 				assertNull(store.getEtch().read(target.getHash()));
 				Ref<?> persisted=store.storeTopRef(first.getRef(), Ref.PERSISTED, null);
 				assertSame(store, ((RefSoft<?>) persisted).getStore());
@@ -129,16 +95,14 @@ public class StoreCacheTest {
 	}
 
 	/**
-	 * With L2 disabled, re-reading a working set larger than L1 must trigger large numbers
-	 * of re-decodes on the second pass. This is the negative control for the first test —
-	 * it proves the L2 is what's doing the work, not some other effect.
+	 * Re-reading a working set larger than the cache must decode most cells again:
+	 * the cache holds only what fits its slots.
 	 */
 	@Test
-	public void testL2DisabledForcesRedecode() throws IOException, BadFormatException {
-		EtchStore store = new EtchStore(Etch.createTempEtch(), false);
-		assertFalse(store.isL2Enabled());
+	public void testWorkingSetLargerThanCacheDecodesAgain() throws IOException, BadFormatException {
+		EtchStore store = new EtchStore(Etch.createTempEtch());
 
-		int n = L1_SIZE * 4;
+		int n = CACHE_SIZE * 4;
 		List<Blob> cells = generate(n, 0xDEADL);
 
 		decodeAll(store, cells);
@@ -147,44 +111,37 @@ public class StoreCacheTest {
 		CacheStats pass2 = store.getCacheStats();
 
 		assertEquals(n, pass2.total());
-		assertEquals(0, pass2.l2Hits, "L2 should be disabled");
-		// With L2 off and working set 4× L1, the vast majority must re-decode.
+		// Working set 4× the cache, so the vast majority must re-decode.
 		assertTrue(pass2.decodes > n / 2,
-				"expected many re-decodes with L2 disabled, got " + pass2);
-		// The compatibility constructor's override must also survive GC cutover.
+				"expected many re-decodes with a working set larger than the cache, got " + pass2);
+		// The cache size must survive GC cutover.
 		store.startGC();
 		store.transferGC();
 		try (EtchStore successor=store.completeGC()) {
-			assertFalse(successor.isL2Enabled());
 			assertEquals(store.getConfig(),successor.getConfig());
-			assertEquals(L1_SIZE,successor.getRefCacheSize());
+			assertEquals(CACHE_SIZE,successor.getRefCacheSize());
 		}
 		store.close();
 	}
 
 	/**
-	 * Fast-path sanity: a working set that fits in L1 must be served entirely from L1 on
-	 * repeat. L2 must not be consulted when L1 hits — this protects hot-path latency.
+	 * Fast-path sanity: a working set well within the cache is served from it on repeat.
 	 */
 	@Test
-	public void testL2NotConsultedWhenL1Hits() throws IOException, BadFormatException {
-		EtchStore store = new EtchStore(Etch.createTempEtch(), true);
-		// Small working set so single-slot RefCache collisions are negligible.
-		// (RefCache uses single-slot linear hashing, so even modest n gets some collisions —
-		// hence the "vast majority" assertion rather than equality.)
+	public void testWorkingSetWithinCacheHits() throws IOException, BadFormatException {
+		EtchStore store = new EtchStore(Etch.createTempEtch());
+		// Small working set so slot collisions are rare. (RefCache maps each hash to
+		// one slot, so even modest n can collide — hence "vast majority", not equality.)
 		int n = 50;
 		List<Blob> cells = generate(n, 0xFEEDL);
-
-		List<ACell> pinned = new ArrayList<>(n);
-		for (Blob b : cells) pinned.add(store.decode(b.getEncoding()));
+		decodeAll(store, cells);
 
 		store.resetCacheStats();
 		decodeAll(store, cells);
 		CacheStats pass2 = store.getCacheStats();
 
-		assertEquals(0, pass2.decodes, "no re-decodes expected: " + pass2);
-		assertTrue(pass2.l1Hits >= n - 5, "vast majority should hit L1: " + pass2);
-		pinned.size();
+		assertEquals(n, pass2.total());
+		assertTrue(pass2.l1Hits >= n - 5, "vast majority should hit the cache: " + pass2);
 		store.close();
 	}
 }

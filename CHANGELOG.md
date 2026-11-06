@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Report a closed client connection as `:CONNECT`. ([Client backpressure](convex-peer/docs/CLIENT_BACKPRESSURE.md#aconnection-interface))
 - Judge each Belief by its signed Orders, whichever connection brings it. ([Peer trust](convex-peer/docs/PEER_PRIORITY.md))
 - Send a lattice node's final state to its peers as it shuts down. ([Shutdown](convex-peer/docs/SHUTDOWN.md))
+- Keep peers fast under sustained load with a single bounded cache per Etch store; the `enableL2` setting no longer has an effect. ([Etch configuration](convex-core/docs/ETCH_CONFIG.md#options-and-defaults))
 - Simplify the Java APIs for lattice applications, networking and Convex DB; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading.
 
 ### Fixed

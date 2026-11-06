@@ -41,7 +41,7 @@ public class EtchConfiguredLifecycleTest {
 	@ParameterizedTest
 	@MethodSource("gcCases")
 	public void testIndependentCheckpoint(MatrixCase c, boolean collecting) throws IOException {
-		EtchConfig config=c.config().withRefCacheSize(19).withL2Enabled(false);
+		EtchConfig config=c.config().withRefCacheSize(19);
 		File output=File.createTempFile("etch-checkpoint-matrix",".etch");
 		assertTrue(output.delete());
 		output.deleteOnExit();
@@ -115,10 +115,9 @@ public class EtchConfiguredLifecycleTest {
 		AVector<ACell> expected=EtchGCLifecycleTest.tree(seed);
 		AVector<ACell> previousRoot=EtchGCLifecycleTest.tree(seed-10);
 		AVector<ACell> garbage=EtchGCLifecycleTest.tree(seed-20);
-		EtchConfig config=matrixCase.config().withRefCacheSize(37).withL2Enabled(false);
+		EtchConfig config=matrixCase.config().withRefCacheSize(37);
 		EtchStore old=EtchStore.create(base,config);
 		assertEquals(37,old.getRefCacheSize());
-		assertFalse(old.isL2Enabled());
 		EtchStore successor=null;
 		try {
 			old.setRootData(garbage);
@@ -130,7 +129,6 @@ public class EtchConfiguredLifecycleTest {
 			assertEquals(config,successor.getConfig());
 			assertEquals(config,successor.getEtch().getConfig());
 			assertEquals(37,successor.getRefCacheSize());
-			assertFalse(successor.isL2Enabled());
 			assertTrue(base.exists()); // retained until the caller closes the legacy view
 			assertTrue(new File(base.getPath()+".gc-defunct").exists());
 			assertNotNull(old.getEtch().read(garbage.getHash()));
@@ -152,7 +150,6 @@ public class EtchConfiguredLifecycleTest {
 			assertEquals(expected,reopened.getRootData(),matrixCase.name());
 			assertEquals(config,reopened.getConfig(),matrixCase.name());
 			assertEquals(37,reopened.getRefCacheSize());
-			assertFalse(reopened.isL2Enabled());
 		}
 		if (backup!=null) {
 			try (EtchStore saved=EtchStore.create(backup,config)) {
@@ -161,7 +158,6 @@ public class EtchConfiguredLifecycleTest {
 				assertNull(saved.getEtch().read(expected.getHash()));
 				assertEquals(config,saved.getConfig());
 				assertEquals(37,saved.getRefCacheSize());
-				assertFalse(saved.isL2Enabled());
 			}
 		}
 		markRelatedForDeletion(base);
@@ -171,7 +167,7 @@ public class EtchConfiguredLifecycleTest {
 	@MethodSource("gcCases")
 	@Execution(ExecutionMode.CONCURRENT)
 	public void testSuccessiveGCWithLegacyViews(MatrixCase matrixCase, boolean oldestFirst) throws IOException {
-		EtchConfig config=matrixCase.config().withRefCacheSize(1).withL2Enabled(false);
+		EtchConfig config=matrixCase.config().withRefCacheSize(1);
 		File base=File.createTempFile("etch-generations-"+matrixCase.name(),".etch");
 		File backup=new File(base.getPath()+".snapshot");
 		AVector<ACell> intermediateOnly=EtchGCLifecycleTest.tree(11000);

@@ -624,7 +624,7 @@ public class EtchGCLifecycleTest {
 
 	@Test
 	public void testCurrentClosePreservesOlderReadViews() throws IOException {
-		EtchConfig config=EtchConfig.create().withRefCacheSize(1).withL2Enabled(false);
+		EtchConfig config=EtchConfig.create().withRefCacheSize(1);
 		try (EtchStore a=EtchStore.createTemp(config)) {
 			a.setRootData(tree(18000));
 			a.startGC();
