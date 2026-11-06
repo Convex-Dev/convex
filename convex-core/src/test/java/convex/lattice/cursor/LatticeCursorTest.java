@@ -1043,13 +1043,13 @@ public class LatticeCursorTest {
 		assertCVMEquals(77, result.get(Keywords.BAR));
 	}
 
-	// ===== KV Database with lattice path resolution =====
+	// ===== KV Database through a lattice path =====
 
 	/**
 	 * Demonstrates the full lifecycle of a KV database accessed through
-	 * JSON path resolution and lattice cursors:
+	 * lattice cursors:
 	 *
-	 * 1. Resolve a JSON path to canonical CVM keys
+	 * 1. Take the :kv path from the root lattice
 	 * 2. Descend a root cursor to the :kv level (OwnerLattice)
 	 * 3. Populate a KVDatabase using its high-level API
 	 * 4. Merge the database's owner-map replica into the cursor
@@ -1064,15 +1064,10 @@ public class LatticeCursorTest {
 		// Create root lattice cursor for the full lattice state
 		Root<Index<Keyword, ACell>> root = Cursors.root(Lattice.ROOT.zero());
 
-		// === Step 1: Resolve JSON path to :kv level ===
+		// === Step 1: Path to the :kv level ===
 		// :kv is OwnerLattice(MapLattice(KVStoreLattice))
 		// Database names are per-owner (inside the signed value), not global keys
-		ACell[] kvPath = Lattice.ROOT.resolvePath(Strings.create("kv"));
-		assertNotNull(kvPath, "Path ['kv'] should resolve");
-		assertEquals(Keywords.KV, kvPath[0]);
-
-		// Round-trip: CVM key back to JSON
-		assertEquals(Strings.create("kv"), ALattice.toJSONKey(kvPath[0]));
+		ACell[] kvPath = {Keywords.KV};
 
 		// === Step 2: Descend root cursor to the :kv level (OwnerLattice) ===
 		ALattice<ACell> kvLattice = Lattice.ROOT.path(kvPath);

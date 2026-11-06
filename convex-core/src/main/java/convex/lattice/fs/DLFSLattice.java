@@ -146,18 +146,6 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		return DLFSNode.isValidNodeShallow(value);
 	}
 
-	@Override
-	public ACell resolveKey(ACell key) {
-		// DLFS node is a vector — only integer keys are valid at this level
-		if (key instanceof AInteger) return key;
-		if (key instanceof AString) {
-			// Try parsing as integer for vector position access (e.g. "0" → 0)
-			AInteger n = AInteger.parse(key);
-			if (n != null) return n;
-		}
-		return null;
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {

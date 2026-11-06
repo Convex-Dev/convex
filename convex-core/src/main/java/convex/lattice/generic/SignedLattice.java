@@ -235,12 +235,6 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		return null;
 	}
 
-	/** No key resolves below a signed envelope. */
-	@Override
-	public ACell resolveKey(ACell key) {
-		return null;
-	}
-
 	/**
 	 * A signed envelope is a leaf of the lattice tree: no path continues inside it,
 	 * because nothing merges or writes there except as a complete envelope. The owning

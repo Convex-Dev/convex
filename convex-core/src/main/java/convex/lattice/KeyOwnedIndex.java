@@ -10,8 +10,9 @@ import convex.lattice.generic.OwnerKeyLattice;
 
 /**
  * An owned index whose owner key must equal the signing public key. Decoded
- * 32-byte blob keys are equivalent to AccountKey values; use the lattice's
- * resolveKey when extracting keys from decoded storage.
+ * 32-byte blob keys are equivalent to AccountKey values; use
+ * {@link AccountKey#create(convex.core.data.ABlob)} when extracting keys from
+ * decoded storage.
  */
 public class KeyOwnedIndex<V extends ACell> extends OwnedIndex<AccountKey,V> {
 

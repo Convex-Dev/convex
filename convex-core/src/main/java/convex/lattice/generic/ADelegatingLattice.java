@@ -11,7 +11,7 @@ import convex.lattice.LatticeContext;
  * <ul>
  *   <li><b>merge</b> — {@code merge}, {@code merge(context,…)}</li>
  *   <li><b>navigation / structure</b> — {@code path}, {@code zero},
- *       {@code resolveKey}, {@code checkForeign}</li>
+ *       {@code checkForeign}</li>
  * </ul>
  *
  * <p>A concrete layer overrides only the group it owns and inherits the rest as
@@ -55,9 +55,6 @@ public abstract class ADelegatingLattice<V extends ACell> extends ALattice<V> {
 
 	@Override
 	public boolean checkForeign(V value) { return (inner != null) ? inner.checkForeign(value) : true; }
-
-	@Override
-	public ACell resolveKey(ACell key) { return (inner != null) ? inner.resolveKey(key) : super.resolveKey(key); }
 
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) { return (inner != null) ? inner.path(childKey) : null; }

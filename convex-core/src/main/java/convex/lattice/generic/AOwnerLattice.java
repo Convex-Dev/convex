@@ -128,9 +128,4 @@ public abstract class AOwnerLattice<K extends ACell, V extends ACell,
 	public <T extends ACell> ALattice<T> path(ACell key) {
 		return (ALattice<T>)signingFor(key);
 	}
-
-	@Override
-	public ACell resolveKey(ACell key) {
-		return ownerKey(key);
-	}
 }

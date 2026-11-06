@@ -225,7 +225,7 @@ cursor ("select an existing value, no re-stamp" is the intent; make it a rule).
 
 ## 8. External key resolution belongs to the lattice, not the cursor
 
-**Status:** Implemented (`c1bfed931`).
+**Status:** Implemented (`c1bfed931`); superseded by entry 33.
 
 `ALattice.resolvePath(keys...)` canonicalises JSON-style keys level by level and is
 the only resolution primitive. A component navigates with
@@ -770,12 +770,29 @@ the no-argument form uses defaults. The networking narrative has one home,
 CAD text affected: CAD036 (*Lattice Node*) node construction, propagation group
 lifecycle and node identity.
 
+## 33. External keys are resolved by the component that owns each level
+
+**Status:** Implemented; agreed 6 November 2026.
+
+`ALatticeComponent.resolve` takes an external string path: each parent defines the
+names of its level and hands the rest of the path to the child responsible.
+`ValueComponent` and `JSONValueComponent` supply literal and JSON addressing for value
+locations ([Component paths](LATTICE_APPLICATIONS.md#external-component-paths)).
+The lattice-level resolution (`ALattice.resolveKey`, `resolvePath`, `toJSONKey`) is
+removed. It had no callers once cursors stopped carrying their lattice (entry 8), and
+it saw only the declared structure, so it could not choose between keys by what is
+stored. A decoded blob owner key becomes an `AccountKey` through `AccountKey.create`.
+
+CAD text affected: CAD035 *Lattice Integration*; CAD036 *JSON Key Compatibility*;
+CAD037 owner key representation.
+
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |
 |---|---|---|
 | CAD024 Data Lattice | *Cursors*, *Signed Lattice*, *Cursor Sync Guarantees*, implementation note on cursor types | 1, 3, 5, 6, 13, 15 |
-| CAD035 Lattice Cursors | *Path Cursor*, *Forkable Cursor*, *Cursor Hierarchy*, *Lattice-Aware Cursors*, *Lattice Context*, *Reference Implementation*, Java example | 2, 3, 4, 5, 6, 7, 8, 10 |
+| CAD035 Lattice Cursors | *Path Cursor*, *Forkable Cursor*, *Cursor Hierarchy*, *Lattice-Aware Cursors*, *Lattice Context*, *Lattice Integration*, *Reference Implementation*, Java example | 2, 3, 4, 5, 6, 7, 8, 10, 33 |
 | CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 |
-| CAD036 Lattice Node | pull-path merge description, node construction and restore, group lifecycle, node identity | 9, 14, 16, 32 |
+| CAD036 Lattice Node | pull-path merge description, node construction and restore, group lifecycle, node identity, *JSON Key Compatibility* | 9, 14, 16, 32, 33 |
+| CAD037 KV Database | owner key representation | 33 |
 | CAD038 Lattice Authentication | *Owner Verifier*, indirect-owner default policy, explicit authoring | 19, 20, 21, 22 |

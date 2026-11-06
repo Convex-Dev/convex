@@ -22,9 +22,9 @@ import convex.lattice.LatticeContext;
  *       {@link convex.core.data.AHashMap} (natively JSON-compatible)</li>
  * </ul>
  *
- * <p>The per-key merge loop (context-threaded), {@code zero}, {@code resolveKey},
- * {@code path} and {@code addLattice} live here. Subclasses supply only the empty
- * container, the foreign-type check, the external-key lookup ({@link #indexOfKey}),
+ * <p>The per-key merge loop (context-threaded), {@code zero}, {@code path} and
+ * {@code addLattice} live here. Subclasses supply only the empty
+ * container, the foreign-type check, the key lookup ({@link #indexOfKey}),
  * and how to reconstruct themselves ({@link #construct}).</p>
  *
  * @param <K> Canonical key type
@@ -134,12 +134,6 @@ public abstract class AKeyedLattice<K extends ACell, M extends AMap<K, ACell>> e
 	 */
 	public List<K> getKeys() {
 		return Collections.unmodifiableList(keys);
-	}
-
-	@Override
-	public ACell resolveKey(ACell key) {
-		int i = indexOfKey(key);
-		return (i >= 0) ? keys.get(i) : null;
 	}
 
 	@SuppressWarnings("unchecked")

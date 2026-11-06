@@ -1,10 +1,7 @@
 package convex.lattice.generic;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AString;
-import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.lattice.ALattice;
@@ -59,14 +56,5 @@ public class OwnerLattice<V extends ACell> extends AOwnerLattice<ACell,V,AHashMa
 	public boolean checkForeign(AHashMap<ACell, SignedData<V>> value) {
 		// Structure only: each owner's slot verifies its signer during merge
 		return value instanceof AHashMap;
-	}
-
-	@Override
-	public ACell resolveKey(ACell key) {
-		if (key instanceof ABlob) return key;
-		if (key instanceof AString s) {
-			return Blob.parse(s.toString());
-		}
-		return key;
 	}
 }
