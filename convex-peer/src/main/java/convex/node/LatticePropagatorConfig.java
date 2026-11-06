@@ -89,12 +89,22 @@ public final class LatticePropagatorConfig {
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT=Strings.intern("inboundShutdownTimeout");
 
 	/**
+	 * Milliseconds between this group's root announcements. The group sends its
+	 * current root to every route at this interval, changed or not, so a peer that
+	 * missed a delta fetches what it lacks, and a quiet route stays open through NATs
+	 * and load balancers.
+	 */
+	public static final AString ROOT_ANNOUNCEMENT_INTERVAL=Strings.intern("rootAnnouncementInterval");
+
+	/**
 	 * Milliseconds a live route may hear nothing before this group probes it. Any
-	 * traffic counts, including the root sync each end sends every
-	 * {@link LatticePropagator#ROOT_SYNC_INTERVAL}, so a healthy route is never
-	 * probed. Keep it above that interval with a margin, or probes race the root
-	 * sync. The root sync, not the probe, keeps NATs and load balancers from dropping
-	 * a quiet route. Nodes without a connection are never probed.
+	 * traffic counts, including the root announcement each end sends every
+	 * {@link #ROOT_ANNOUNCEMENT_INTERVAL}, so a healthy route is never probed. The
+	 * default is two of this group's announcement intervals. Keep it above the
+	 * interval the group's peers announce at, with a margin, or probes race their
+	 * announcements. The root announcement, not the probe, keeps NATs and load
+	 * balancers from dropping a quiet route. Nodes without a connection are never
+	 * probed.
 	 */
 	public static final AString KEEP_ALIVE=Strings.intern("keepAlive");
 
@@ -127,8 +137,14 @@ public final class LatticePropagatorConfig {
 	/** Default time allowed for accepted endpoint work to drain. */
 	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT=10_000L;
 
-	/** Default quiet time before a live route is probed: two root-sync intervals, so a probe follows a missed sync. */
-	public static final long DEFAULT_KEEP_ALIVE=2*LatticePropagator.ROOT_SYNC_INTERVAL;
+	/** Default time between root announcements. */
+	public static final long DEFAULT_ROOT_ANNOUNCEMENT_INTERVAL=30_000L;
+
+	/**
+	 * Default quiet time before a live route is probed with the default announcement
+	 * interval: two intervals, so a probe follows a missed announcement.
+	 */
+	public static final long DEFAULT_KEEP_ALIVE=2*DEFAULT_ROOT_ANNOUNCEMENT_INTERVAL;
 
 	private final AMap<AString,ACell> config;
 
@@ -275,10 +291,27 @@ public final class LatticePropagatorConfig {
 		return value;
 	}
 
-	/** Returns the quiet time in milliseconds before a live route is probed. */
+	/** Returns the time in milliseconds between this group's root announcements. */
+	public long getRootAnnouncementInterval() {
+		CVMLong configured=RT.ensureLong(config.get(ROOT_ANNOUNCEMENT_INTERVAL));
+		long value=(configured==null) ? DEFAULT_ROOT_ANNOUNCEMENT_INTERVAL : configured.longValue();
+		if (value<=0) throw new IllegalArgumentException(ROOT_ANNOUNCEMENT_INTERVAL+" must be positive: "+value);
+		return value;
+	}
+
+	/**
+	 * Returns the quiet time in milliseconds before a live route is probed. Unless
+	 * configured, it is two of this group's root announcement intervals.
+	 */
 	public long getKeepAlive() {
 		CVMLong configured=RT.ensureLong(config.get(KEEP_ALIVE));
-		long value=(configured==null) ? DEFAULT_KEEP_ALIVE : configured.longValue();
+		long value;
+		if (configured==null) {
+			long interval=getRootAnnouncementInterval();
+			value=(interval>Long.MAX_VALUE/2) ? Long.MAX_VALUE : 2*interval;
+		} else {
+			value=configured.longValue();
+		}
 		if (value<=0) throw new IllegalArgumentException(KEEP_ALIVE+" must be positive: "+value);
 		return value;
 	}

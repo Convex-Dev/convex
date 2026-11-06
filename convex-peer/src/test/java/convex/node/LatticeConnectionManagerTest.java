@@ -364,9 +364,9 @@ public class LatticeConnectionManagerTest {
 		for (int i=0;i<30;i++) candidate(i);
 		fill(16);
 		var incumbents=manager.getConnections();
-		// Model an hour of normal root sync without advancing any active-peer lease.
+		// Model an hour of normal root announcements without advancing any active-peer lease.
 		for (int i=0;i<120;i++) {
-			now.addAndGet(LatticePropagator.ROOT_SYNC_INTERVAL);
+			now.addAndGet(LatticePropagatorConfig.DEFAULT_ROOT_ANNOUNCEMENT_INTERVAL);
 			incumbents.forEach((key,peer) -> manager.received(key,peer));
 			manager.maintainConnections();
 			assertEquals(incumbents,manager.getConnections());
@@ -637,13 +637,13 @@ public class LatticeConnectionManagerTest {
 		assertEquals(List.of(key,key,key),contacted,"answered a probe");
 	}
 
-	/** Root syncs that arrive late, as they do under load, keep a route from being probed. */
-	@Test public void testLateRootSyncsNeedNoProbe() {
+	/** Root announcements that arrive late, as they do under load, keep a route from being probed. */
+	@Test public void testLateRootAnnouncementsNeedNoProbe() {
 		AccountKey key=candidate(1);
 		fill(1);
 		Object route=manager.getConnections().get(key);
 		for (int i=0; i<10; i++) {
-			now.addAndGet(LatticePropagator.ROOT_SYNC_INTERVAL+5_000);
+			now.addAndGet(LatticePropagatorConfig.DEFAULT_ROOT_ANNOUNCEMENT_INTERVAL+5_000);
 			manager.maintainConnections();
 			manager.received(key,route);
 		}

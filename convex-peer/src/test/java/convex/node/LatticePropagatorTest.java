@@ -290,7 +290,7 @@ public class LatticePropagatorTest {
 
 	/** A delta encoding failure must not hide the newly announced root from recovery. */
 	@Test
-	public void testFailedDeltaStillAdvancesRootSyncAndAnnounceFuture() throws Exception {
+	public void testFailedDeltaStillAdvancesRootAnnouncementAndAnnounceFuture() throws Exception {
 		Blob value=Blobs.createRandom(400);
 		server1.getCursor().assoc(Keyword.intern("failed-delta"),value);
 		ACell expected=server1.getLocalValue();
@@ -309,7 +309,7 @@ public class LatticePropagatorTest {
 
 			assertEquals(published,announced.get(5,TimeUnit.SECONDS));
 			assertEquals(published.getHash(),
-				rootSyncValueHash(isolated.createRootSyncMessage()));
+				rootAnnouncementValueHash(isolated.createRootAnnouncement()));
 		}
 	}
 
@@ -340,7 +340,7 @@ public class LatticePropagatorTest {
 
 	/** A queued value must not be advertised until announce has populated the store. */
 	@Test
-	public void testRootSyncUsesLastAnnouncedValue() throws Exception {
+	public void testRootAnnouncementUsesLastAnnouncedValue() throws Exception {
 		Blob announced = Blobs.createRandom(400);
 		Blob pending = Blobs.createRandom(400);
 		try (BlockingAnnounceStore store = new BlockingAnnounceStore(pending.getHash())) {
@@ -352,13 +352,13 @@ public class LatticePropagatorTest {
 				propagator.triggerBroadcast(pending);
 				assertTrue(store.blocked.await(5, TimeUnit.SECONDS));
 
-				assertEquals(announced.getHash(), rootSyncValueHash(propagator.createRootSyncMessage()),
-					"root sync must retain the last store-backed value while announce is incomplete");
+				assertEquals(announced.getHash(), rootAnnouncementValueHash(propagator.createRootAnnouncement()),
+					"root announcement must retain the last store-backed value while announce is incomplete");
 				assertNotNull(store.refForHash(announced.getHash()));
 
 				store.release.countDown();
 				assertEquals(pending, nextAnnounce.get(5, TimeUnit.SECONDS));
-				assertEquals(pending.getHash(), rootSyncValueHash(propagator.createRootSyncMessage()));
+				assertEquals(pending.getHash(), rootAnnouncementValueHash(propagator.createRootAnnouncement()));
 				assertNotNull(store.refForHash(pending.getHash()));
 			} finally {
 				store.release.countDown();
@@ -367,10 +367,41 @@ public class LatticePropagatorTest {
 		}
 	}
 
-	private static Hash rootSyncValueHash(Message message) {
+	/** Each group announces its root at the interval its own configuration sets. */
+	@Test
+	public void testRootAnnouncementIntervalIsPerGroup() throws Exception {
+		Blob value=Blobs.createRandom(400);
+		CountDownLatch announcements=new CountDownLatch(2);
+		CompletableFuture<Message> first=new CompletableFuture<>();
+		try (MemoryStore store=new MemoryStore()) {
+			LatticeConnectionManager manager=new LatticeConnectionManager(store) {
+				@Override public boolean hasPropagationRoutes() { return true; }
+				@Override public int broadcast(Message message) {
+					first.complete(message);
+					announcements.countDown();
+					return 1;
+				}
+			};
+			LatticePropagatorConfig config=LatticePropagatorConfig.create(Maps.of(
+				LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.ONE));
+			LatticePropagator propagator=new LatticePropagator(store,manager,config);
+			assertEquals(1,propagator.getRootAnnouncementInterval());
+			try {
+				propagator.processSnapshot(value);
+				propagator.start();
+				// The first goes out at once; the default interval would hold the second for 30 seconds
+				assertTrue(announcements.await(10,TimeUnit.SECONDS));
+				assertEquals(value.getHash(),rootAnnouncementValueHash(first.get()));
+			} finally {
+				propagator.close();
+			}
+		}
+	}
+
+	private static Hash rootAnnouncementValueHash(Message message) {
 		AVector<?> payload = message.getPayload();
 		assertEquals(MessageTag.LATTICE_VALUE,payload.get(0));
-		assertEquals(3L,payload.count(),"root sync should be an optimistic push");
+		assertEquals(3L,payload.count(),"root announcement should be an optimistic push");
 		return payload.getRef(2).getHash();
 	}
 

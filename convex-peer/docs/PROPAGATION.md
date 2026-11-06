@@ -48,7 +48,9 @@ best-effort:
 - If a cell cannot fit the configured delta-message limit, or the eager budget
   is exhausted, the sender falls back to the root announcement. The receiver
   can acquire missing branches by hash.
-- Periodic root-only sync detects a missed or dropped propagation attempt.
+- A periodic root announcement, every `rootAnnouncementInterval` (30 seconds by
+  default), recovers a missed or dropped propagation attempt: a receiver whose
+  copy differs fetches the cells it lacks.
 
 Advancing the store-backed state before encoding is important: an encoding or
 queueing failure cannot lose the local publication or prevent later recovery.
@@ -188,7 +190,7 @@ receiving side. A later LATTICE_VALUE or BELIEF root activates normal processing
 and requests any missing cells.
 
 Dropping an eager delta is therefore a loss of realtime delivery, not permanent
-data loss. Recovery paths are later propagation, periodic lattice root sync,
+data loss. Recovery paths are later propagation, periodic lattice root announcement,
 CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
 
 ## Relevant implementation
@@ -197,7 +199,7 @@ CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
 - `convex.peer.UpdateAccumulator` — shapes one consensus update into DATA messages then its root
 - `convex.node.NoveltyCollector` — bounded novelty collection for lattice deltas
 - `convex.core.message.BoundedMessageQueue` — count- and byte-bounded FIFO
-- `convex.node.LatticePropagator` — lattice chunking and periodic root sync
+- `convex.node.LatticePropagator` — lattice chunking and periodic root announcement
 - `convex.peer.BeliefPropagator` — own-Order then Belief update cadence, and the fetch of data missing from a received update
 - `convex.peer.AConnectionManager` — message-agnostic non-blocking fan-out
 - `convex.net.impl.netty.NettyConnection` — per-connection outbound queues

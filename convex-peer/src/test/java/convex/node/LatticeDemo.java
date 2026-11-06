@@ -240,10 +240,10 @@ public class LatticeDemo {
 					LatticePropagator propagator=propagators.get(i);
 					System.out.println("  Node " + (i + 1) + ": " +
 						propagator.getBroadcastCount() + " delta broadcasts, " +
-						propagator.getRootSyncCount() + " root syncs");
+						propagator.getRootAnnouncementCount() + " root announcements");
 				}
 				System.out.println("\n  Delta broadcasts = sending only new data to peers");
-				System.out.println("  Root syncs = sending just the top hash to check if peers need updates");
+				System.out.println("  Root announcements = sending just the top of the root, so peers fetch what they lack");
 			} else {
 				System.out.println("\n✗ FAILURE: Nodes did not converge!");
 				System.exit(1);

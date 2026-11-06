@@ -209,8 +209,8 @@ connects and proves its key, so two such nodes replicate both ways when one name
 other: start the serving node, then the other with `--peer`. Anyone who can reach its
 node port can read every replicated drive and receive its updates. Each node serves
 only its own drives over HTTP; the other node's drives are replicated but not shown. A
-node that joins receives the other's existing state with its next update or root sync,
-within about 30 seconds. Use `--serve-inbound` only for drives you are willing to
+node that joins receives the other's existing state with its next update or root
+announcement, within about 30 seconds. Use `--serve-inbound` only for drives you are willing to
 publish: serving drives to chosen nodes only is not supported
 ([#823](https://github.com/Convex-Dev/convex/issues/823)), and the option is
 provisional until it is.

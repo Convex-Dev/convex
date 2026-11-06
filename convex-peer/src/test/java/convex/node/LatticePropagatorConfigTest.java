@@ -39,6 +39,23 @@ public class LatticePropagatorConfigTest {
 	}
 
 	@Test
+	public void testRootAnnouncementInterval() {
+		assertEquals(30_000,LatticePropagatorConfig.create().getRootAnnouncementInterval());
+		var configured=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.create(5_000)));
+		assertEquals(5_000,configured.getRootAnnouncementInterval());
+		assertEquals(10_000,configured.getKeepAlive(),"Keep-alive follows the interval unless set");
+		assertEquals(7_000,LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.create(5_000),
+			LatticePropagatorConfig.KEEP_ALIVE,CVMLong.create(7_000))).getKeepAlive());
+		var invalid=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.ZERO));
+		assertThrows(IllegalArgumentException.class,invalid::getRootAnnouncementInterval);
+		assertThrows(IllegalArgumentException.class,() -> new LatticePropagator(new MemoryStore(),invalid),
+			"An invalid interval fails while the group is composed");
+	}
+
+	@Test
 	public void testHostAndGroupConfigurationAreIndependent() throws Exception {
 		NodeConfig host=NodeConfig.create(Maps.of(
 			NodeConfig.PORT,CVMLong.create(-1),

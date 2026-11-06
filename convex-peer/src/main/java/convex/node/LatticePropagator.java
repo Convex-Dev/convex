@@ -71,12 +71,6 @@ public class LatticePropagator implements Closeable {
 	private static final Logger log = LoggerFactory.getLogger(LatticePropagator.class.getName());
 
 	/**
-	 * Interval between root-only sync broadcasts (milliseconds).
-	 * Provides a lightweight periodic sync mechanism for divergence detection.
-	 */
-	public static final long ROOT_SYNC_INTERVAL = 30_000L;
-
-	/**
 	 * Serving store for novelty tracking and peer data resolution. Missing data
 	 * requests for an announced value are resolved only from this store. A
 	 * propagator never writes this store's root.
@@ -157,9 +151,15 @@ public class LatticePropagator implements Closeable {
 	private volatile long lastBroadcastTime = 0L;
 
 	/**
-	 * Timestamp of last root sync broadcast (background thread only).
+	 * Milliseconds between periodic root announcements, from the group's
+	 * configuration.
 	 */
-	private long lastRootSyncTime = 0L;
+	private final long rootAnnouncementInterval;
+
+	/**
+	 * Timestamp of last periodic root announcement (background thread only).
+	 */
+	private long lastRootAnnouncementTime = 0L;
 
 	/**
 	 * Count of broadcasts sent. Atomic because both the caller's thread and
@@ -168,9 +168,9 @@ public class LatticePropagator implements Closeable {
 	private final java.util.concurrent.atomic.AtomicLong broadcastCount = new java.util.concurrent.atomic.AtomicLong();
 
 	/**
-	 * Count of root sync broadcasts sent
+	 * Count of periodic root announcements sent
 	 */
-	private long rootSyncCount = 0L;
+	private long rootAnnouncementCount = 0L;
 
 	/**
 	 * Serialises this group's serving-store materialisation and announcement
@@ -208,6 +208,7 @@ public class LatticePropagator implements Closeable {
 		// Fail while the application is composing the group, before attachment can
 		// open any endpoint resource.
 		config.getInboundShutdownTimeout();
+		this.rootAnnouncementInterval=config.getRootAnnouncementInterval();
 		this.maxDeltaMessageSize=config.getMaxDeltaMessageSize();
 		this.maxDeltaBroadcastSize=config.getMaxDeltaBroadcastSize();
 		connectionManager.setMaxDesiredPeers(config.getMaxDesiredPeers());
@@ -831,18 +832,26 @@ public class LatticePropagator implements Closeable {
 	public long getLastBroadcastTime() { return lastBroadcastTime; }
 
 	/**
-	 * Returns the wall-clock time of this group's last periodic root sync.
+	 * Returns the wall-clock time of this group's last periodic root announcement.
 	 *
-	 * @return epoch time in milliseconds, or zero before the first root sync
+	 * @return epoch time in milliseconds, or zero before the first announcement
 	 */
-	public long getLastRootSyncTime() { return lastRootSyncTime; }
+	public long getLastRootAnnouncementTime() { return lastRootAnnouncementTime; }
 
 	/**
-	 * Returns the number of periodic root syncs initiated since start.
+	 * Returns the number of periodic root announcements initiated since start.
 	 *
-	 * @return initiated root-sync count
+	 * @return initiated root-announcement count
 	 */
-	public long getRootSyncCount() { return rootSyncCount; }
+	public long getRootAnnouncementCount() { return rootAnnouncementCount; }
+
+	/**
+	 * Returns the time between this group's periodic root announcements, set by
+	 * {@link LatticePropagatorConfig#ROOT_ANNOUNCEMENT_INTERVAL}.
+	 *
+	 * @return interval in milliseconds
+	 */
+	public long getRootAnnouncementInterval() { return rootAnnouncementInterval; }
 
 	// ========== Lifecycle ==========
 
@@ -869,7 +878,7 @@ public class LatticePropagator implements Closeable {
 			triggerQueue.open();
 			running = true;
 			lastBroadcastTime = 0L;
-			lastRootSyncTime = 0L;
+			lastRootAnnouncementTime = 0L;
 			broadcastCount.set(0L);
 
 			propagationThread = new Thread(this::propagationLoop, "Lattice propagator thread");
@@ -959,8 +968,8 @@ public class LatticePropagator implements Closeable {
 		closeRoutes(left);
 
 		transition(State.STOPPED);
-		log.debug("LatticePropagator closed (sent {} delta broadcasts, {} root syncs)",
-			broadcastCount, rootSyncCount);
+		log.debug("LatticePropagator closed (sent {} delta broadcasts, {} root announcements)",
+			broadcastCount, rootAnnouncementCount);
 	}
 
 	/**
@@ -1031,7 +1040,7 @@ public class LatticePropagator implements Closeable {
 			try {
 				ACell value;
 				if (running) {
-					value = triggerQueue.poll(ROOT_SYNC_INTERVAL, TimeUnit.MILLISECONDS);
+					value = triggerQueue.poll(rootAnnouncementInterval, TimeUnit.MILLISECONDS);
 				} else {
 					// Drain mode: non-blocking poll, exit when empty
 					value = triggerQueue.poll();
@@ -1042,9 +1051,9 @@ public class LatticePropagator implements Closeable {
 					processSnapshotSafe(value);
 				}
 
-				// Periodic root sync only while running
+				// Periodic root announcement only while running
 				if (running) {
-					maybePerformRootSync(Utils.getCurrentTimestamp());
+					maybeAnnounceRoot(Utils.getCurrentTimestamp());
 				}
 
 			} catch (InterruptedException e) {
@@ -1134,7 +1143,7 @@ public class LatticePropagator implements Closeable {
 
 			// The store-backed root becomes externally visible before best-effort network
 			// encoding. A failed delta must therefore still be eligible for periodic
-			// root sync and must still complete the caller's publication future.
+			// root announcement and must still complete the caller's publication future.
 			lastSource=source;
 			if (replacement!=null) filter=replacement;
 			announcedCursor.set(value);
@@ -1148,7 +1157,7 @@ public class LatticePropagator implements Closeable {
 				try {
 					broadcastDelta(value,noveltyCollector.getCells());
 				} catch (RuntimeException e) {
-					log.warn("Unable to encode or queue lattice delta; periodic root sync will retry",e);
+					log.warn("Unable to encode or queue lattice delta; periodic root announcement will retry",e);
 				}
 			}
 		}
@@ -1171,8 +1180,8 @@ public class LatticePropagator implements Closeable {
 		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE,emptyPath,value);
 		Message rootMessage = Message.create(MessageType.LATTICE_VALUE, payload, payload.getEncoding());
 		if (rootMessage.getMessageData().count()>maxDeltaMessageSize) {
-			log.warn("Lattice root announcement exceeds delta message limit of {} bytes; root sync will recover",
-				maxDeltaMessageSize);
+			log.warn("Lattice root announcement exceeds delta message limit of {} bytes; "
+				+"the periodic root announcement will recover",maxDeltaMessageSize);
 			return;
 		}
 		ArrayList<ACell> delta = new ArrayList<>(novelty.size()+1);
@@ -1203,33 +1212,35 @@ public class LatticePropagator implements Closeable {
 		broadcastCount.incrementAndGet();
 	}
 
-	// ========== Root Sync ==========
+	// ========== Periodic Root Announcement ==========
 
 	/**
-	 * Performs periodic root-only sync broadcast for divergence detection.
+	 * Announces the root to every route once the interval has passed, changed or
+	 * not. A peer whose copy differs fetches the cells it lacks by hash, so this
+	 * recovers missed deltas; it also keeps quiet routes open.
 	 */
-	private void maybePerformRootSync(long currentTime) {
-		if (currentTime < lastRootSyncTime + ROOT_SYNC_INTERVAL) return;
+	private void maybeAnnounceRoot(long currentTime) {
+		if (currentTime < lastRootAnnouncementTime + rootAnnouncementInterval) return;
 		if (!connectionManager.hasPropagationRoutes()) return;
 
 		try {
-			Message message = createRootSyncMessage();
+			Message message = createRootAnnouncement();
 			if (message == null) return;
 			connectionManager.broadcast(message);
-			lastRootSyncTime = currentTime;
-			rootSyncCount++;
-			log.debug("Sent root sync ({} bytes)", message.getMessageData().count());
+			lastRootAnnouncementTime = currentTime;
+			rootAnnouncementCount++;
+			log.debug("Sent root announcement ({} bytes)", message.getMessageData().count());
 		} catch (Exception e) {
-			log.warn("Error during root sync broadcast", e);
+			log.warn("Error during root announcement", e);
 		}
 	}
 
 	/**
-	 * Creates a root sync for the last value successfully announced to this
+	 * Creates a root announcement for the last value successfully announced to this
 	 * propagator's serving store. A triggered value is deliberately not externally
 	 * visible until {@link Cells#announce(ACell, Consumer, AStore)} has completed.
 	 */
-	Message createRootSyncMessage() {
+	Message createRootAnnouncement() {
 		ACell value = announcedCursor.get();
 		if (value == null) return null;
 		AVector<ACell> emptyPath = Vectors.empty();

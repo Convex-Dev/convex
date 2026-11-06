@@ -226,7 +226,7 @@ acknowledged the path-scoped `[:p2p :nodes]` update, and after the connecting
 node has pulled and merged the bootstrap node's infrastructure regions and current
 desired social-owner slots. It never bootstraps from an unrestricted full root.
 A node joining an established network therefore obtains its follow-filtered view
-without waiting for another publication or periodic root sync.
+without waiting for another publication or periodic root announcement.
 
 For a node behind NAT, give `P2PNode` a local-only transport configuration. Its
 `NodeDirectory` signs and publishes NodeInfo with an empty `:transports` vector, so
@@ -380,10 +380,11 @@ no slot, so nodes connecting in cannot displace the peers this node chose. Nor d
 targets cap NAT return paths.
 
 Maintenance checks every second, but normal incoming propagation acts as the
-heartbeat: healthy ambient peers have no scheduled rotation. Each end sends its root
-every 30 seconds, which also keeps NATs and load balancers from dropping a quiet
-route. Only after `LatticePropagatorConfig.KEEP_ALIVE` (`keepAlive`, 60 seconds by
-default) without decoded incoming traffic does it send a correlated PING, allowing a
+heartbeat: healthy ambient peers have no scheduled rotation. Each end announces its
+root every `rootAnnouncementInterval` (30 seconds by default), which also keeps NATs
+and load balancers from dropping a quiet route. Only after
+`LatticePropagatorConfig.KEEP_ALIVE` (`keepAlive`, 60 seconds by default) without
+decoded incoming traffic does it send a correlated PING, allowing a
 further 30 seconds of silence before retiring the route. Any incoming traffic cancels the
 liveness check, even if the PING reply is late or the request itself times out early.
 Known-closed routes release their slots immediately; their own retries back off while

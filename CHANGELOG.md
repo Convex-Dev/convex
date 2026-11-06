@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Report a closed client connection as `:CONNECT`. ([Client backpressure](convex-peer/docs/CLIENT_BACKPRESSURE.md#aconnection-interface))
 - Judge each Belief by its signed Orders, whichever connection brings it. ([Peer trust](convex-peer/docs/PEER_PRIORITY.md))
 - Send a lattice node's final state to its peers as it shuts down. ([Shutdown](convex-peer/docs/SHUTDOWN.md))
+- Let each lattice propagator group set how often it announces its root, and rename the root sync constant and counters to root announcement. ([Live peer selection](convex-peer/docs/LATTICE_NETWORKING.md#live-peer-selection))
 - Keep peers fast under sustained load with a single bounded cache per Etch store; the `enableL2` setting no longer has an effect. ([Etch configuration](convex-core/docs/ETCH_CONFIG.md#options-and-defaults))
 - Read from Etch stores about twice as fast by trusting each record's key as its hash; `etch validate` still checks them. ([Etch v3](convex-core/docs/ETCHv3.md#sync))
 - Reuse cells a peer already holds in its cache when decoding messages, instead of decoding another copy. ([Decoding](convex-core/docs/ENCODER_DESIGN.md#decoding))

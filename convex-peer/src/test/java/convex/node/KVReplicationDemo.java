@@ -175,7 +175,7 @@ public class KVReplicationDemo {
 				LatticePropagator p=propagators.get(i);
 				System.out.println("Node " + i + ": "
 					+ p.getBroadcastCount() + " broadcasts, "
-					+ p.getRootSyncCount() + " root syncs");
+					+ p.getRootAnnouncementCount() + " root announcements");
 			}
 
 		} finally {
