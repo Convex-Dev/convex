@@ -54,24 +54,53 @@ class CursorPresenceTest {
 		assertNull(missing.get());
 	}
 
-	@Test void invalidTraversalIsNeverHiddenByFallbacks() {
-		var scalar=Root.<ACell>create(CVMLong.ONE).path(A);
-		assertThrows(IllegalArgumentException.class,scalar::get);
-		assertThrows(IllegalArgumentException.class,scalar::exists);
-		assertThrows(IllegalArgumentException.class,() -> scalar.getOrDefault(FALLBACK));
-		var index=Root.create(Index.none());
-		assertThrows(IllegalArgumentException.class,() -> index.getOrDefault(null,CVMLong.ONE));
+	@Test void unresolvableTraversalIsAbsent() {
+		assertAbsent(CVMLong.ONE,A);
+		assertAbsent(Maps.of(A,CVMLong.ONE),A,B);
+		assertAbsent(null,A);
+		assertAbsent(Index.none(),CVMLong.ONE);
+		assertAbsent(Index.none(),(ACell)null);
 		for (ACell value:new ACell[] {Vectors.of(null,CVMLong.ONE),Lists.of(null,CVMLong.ONE)}) {
 			var root=Root.create(value);
 			assertNull(root.get(CVMLong.ZERO));
 			assertTrue(root.path(CVMLong.ZERO).exists());
 			assertEquals(CVMLong.ONE,root.get(CVMLong.ONE));
 			assertEquals(CVMLong.ONE,root.get(CVMBigInteger.wrap(BigInteger.ONE)));
-			assertThrows(IndexOutOfBoundsException.class,() -> root.get(CVMBigInteger.wrap(BigInteger.ONE.shiftLeft(64))));
-			assertThrows(IndexOutOfBoundsException.class,() -> root.get(CVMLong.create(2)));
-			assertThrows(IndexOutOfBoundsException.class,() -> root.getOrDefault(FALLBACK,CVMLong.MINUS_ONE));
-			assertThrows(IllegalArgumentException.class,() -> root.getOrDefault(FALLBACK,A));
+			assertAbsent(value,CVMBigInteger.wrap(BigInteger.ONE.shiftLeft(64)));
+			assertAbsent(value,CVMLong.create(2));
+			assertAbsent(value,CVMLong.MINUS_ONE);
+			assertAbsent(value,A);
+			assertAbsent(value,(ACell)null);
 		}
+	}
+
+	private static void assertAbsent(ACell value,ACell... keys) {
+		var root=Root.create(value);
+		assertThrows(MissingValueException.class,() -> root.get(keys));
+		assertSame(FALLBACK,root.getOrDefault(FALLBACK,keys));
+		var direct=root.path(keys);
+		AForkableCursor<ACell> chained=root;
+		for (ACell key:keys) chained=chained.path(key);
+		for (var path:java.util.List.of(direct,chained)) {
+			assertThrows(MissingValueException.class,path::get);
+			assertFalse(path.exists());
+			assertSame(FALLBACK,path.getOrDefault(FALLBACK));
+		}
+		assertSame(value,root.get());
+	}
+
+	@Test void changedWritesStillRejectIncompatibleContainers() {
+		assertWriteRefused(CVMLong.ONE,A);
+		assertWriteRefused(Maps.of(A,CVMLong.ONE),A,B);
+		assertWriteRefused(Index.none(),CVMLong.ONE);
+		assertWriteRefused(Vectors.of(CVMLong.ZERO),A);
+		assertWriteRefused(Vectors.of(CVMLong.ZERO),CVMLong.ONE);
+	}
+
+	private static void assertWriteRefused(ACell value,ACell... keys) {
+		var root=Root.create(value);
+		assertThrows(IllegalArgumentException.class,() -> root.path(keys).set(FALLBACK));
+		assertSame(value,root.get());
 	}
 
 	@Test void setMembershipIsNotInferredFromFalseyValues() {

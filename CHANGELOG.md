@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Make cursor reads fail on missing locations and invalid traversal; add explicit optional reads and presence checks. ([Cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths))
+- Make required cursor reads fail on absent or unresolvable paths; add explicit optional reads and presence checks. ([Cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths))
 - Return nested cursor reads as `ACell`, requiring explicit casts or checks for narrower types. ([Cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths))
 - Speed up Convex DB replication and prepared statements. ([#786](https://github.com/Convex-Dev/convex/issues/786))
 - Follow the SQL standard for Convex DB `INSERT` and name case, and accept only `database` in JDBC URLs; see [Identifier Case](convex-db/README.md#identifier-case) when upgrading.

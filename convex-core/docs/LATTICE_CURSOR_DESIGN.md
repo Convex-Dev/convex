@@ -59,8 +59,10 @@ nil and an entry storing nil are present: reading either returns null.
 `getOrDefault(fallback, keys...)` does the same for a nested path without creating
 a cursor. A stored nil does not select the fallback. `exists()` tests presence,
 including nil. Each operation reads one snapshot; separate calls need not observe
-the same snapshot. Invalid traversal through a scalar, an incompatible Index or
-sequence key, or an out-of-range position throws even for optional reads and presence checks.
+the same snapshot. Traversal through a scalar, an incompatible Index or sequence
+key, or an out-of-range position all mean the addressed value is absent. Required
+reads throw `MissingValueException`; optional reads return their fallback, and
+presence checks return false.
 
 `path(keys...)` creates a view without reading or changing state. Writes
 use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. All

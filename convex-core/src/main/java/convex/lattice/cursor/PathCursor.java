@@ -7,7 +7,7 @@ import convex.lattice.LatticeOps;
 /**
  * A cursor that navigates to a path within a base cursor's value.
  *
- * <p>Required reads throw for absence or invalid traversal; a stored nil remains
+ * <p>Required reads throw for absence, including unresolvable paths; a stored nil remains
  * nil. Optional reads handle absence explicitly. Changed writes rebuild existing ancestors.
  * A write through a missing container, or to one that cannot hold its key, fails.
  * Update functions receive the actual

@@ -30,12 +30,12 @@ public abstract class ACursor<V extends ACell> {
 	 */
 	protected Object readValue() { return get(); }
 
-	/** Whether this location holds a value, including nil. Invalid traversal throws. */
+	/** Whether this location holds a value, including nil. Unresolvable paths are absent. */
 	public boolean exists() { return readValue()!=MISSING; }
 
 	/**
 	 * Returns the value, or the supplied fallback for an absent location. A stored
-	 * nil stays nil. Invalid traversal still throws. Presence and value come from
+	 * nil stays nil. Unresolvable paths use the fallback. Presence and value come from
 	 * one snapshot; expected absence does not construct an exception.
 	 */
 	@SuppressWarnings("unchecked")
