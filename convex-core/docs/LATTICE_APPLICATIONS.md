@@ -201,7 +201,8 @@ Two value components supply reusable addressing policies:
 | `JSONValueComponent<V>` | Keys as the JSON rendering shows them, explicitly selected by the parent |
 
 The JSON variant lets a client address what it reads in the
-[CAD044](https://docs.convex.world/docs/cad/json) rendering of a value:
+[CAD044](https://docs.convex.world/docs/cad/json) rendering of a value, for these
+containers and key types:
 
 - In a vector or list, a segment is a position: a non-negative decimal integer
   with no sign, whitespace or leading zero.
