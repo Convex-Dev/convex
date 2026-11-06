@@ -99,3 +99,14 @@ The same map is accepted as `peer.etch` in the peer's JSON5 configuration file:
 
 The file location remains `peer.store` (or the Java factory's `File` argument).
 Runtime cache settings are applied once when the peer opens the store.
+
+## Soft references and garbage collection
+
+Stored cells stay in memory through soft references, in `RefSoft` and the L2
+cache, until the JVM reclaims them. By default the JVM keeps a softly referenced
+value for one second per megabyte of free heap since its last use, so a busy peer
+with a large heap keeps most of what it stores, and garbage collection has ever
+more to trace. Operators who see heavy garbage-collection pressure may want to set
+`-XX:SoftRefLRUPolicyMSPerMB` below the JVM default of 1000. With the G1
+collector, only 0 lets young collections reclaim them; other values wait for a
+marking cycle.
