@@ -24,6 +24,7 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
@@ -49,6 +50,22 @@ public class EtchTest {
 			assertNull(etch.read(Hash.NULL_HASH,pointer));
 		} finally {
 			store.close();
+		}
+	}
+
+	/**
+	 * Reads trust the store: a record's key becomes its cell's hash without the
+	 * encoding being hashed again. EtchRecordVerifier is what checks records.
+	 */
+	@Test
+	public void testReadTakesHashFromKey() throws IOException {
+		try (EtchStore store=EtchStore.createTemp()) {
+			Etch etch=store.getEtch();
+			// A synthetic key, as only a test can write, on a fresh non-embedded value
+			Blob value=Blob.createRandom(new Random(0x7357L), Format.MAX_EMBEDDED_LENGTH+1);
+			Hash key=Hash.fromHex("0000000000000001000000000000000000000000000000000000000000000000");
+			etch.write(key, value.getRef());
+			assertEquals(key, etch.read(key).getValue().getHash());
 		}
 	}
 
