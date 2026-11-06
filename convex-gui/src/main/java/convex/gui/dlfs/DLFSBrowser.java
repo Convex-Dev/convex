@@ -41,6 +41,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.FileUtils;
+import convex.core.util.Shutdown;
 import convex.dlfs.DLFSServer;
 import convex.etch.EtchStore;
 import convex.gui.components.AbstractGUI;
@@ -82,8 +83,8 @@ import net.miginfocom.swing.MigLayout;
  * Since both GUI and WebDAV share the same DLFSLocal instances, operations
  * through either path are automatically consistent.
  *
- * <p>The NodeServer handles persistence (via {@code LatticePropagator}) and
- * can sync with remote lattice peers over the binary protocol.
+ * <p>The node runs locally, with no listener. Edits are saved when the host
+ * closes: when the browser closes or switches store, and at JVM shutdown.
  */
 @SuppressWarnings("serial")
 public class DLFSBrowser extends AbstractGUI {
@@ -131,6 +132,9 @@ public class DLFSBrowser extends AbstractGUI {
 	/** Current Etch store (owned by this browser — must be closed on shutdown) */
 	private EtchStore etchStore;
 
+	/** Shutdown, run once: when the browser closes, or at JVM shutdown if that comes first */
+	private final Shutdown.Once shutdownTask = Shutdown.once(this::shutdown);
+
 	// UI
 	private final JMenuBar menuBar = new JMenuBar();
 	private final JList<String> driveList;
@@ -146,7 +150,12 @@ public class DLFSBrowser extends AbstractGUI {
 
 	public DLFSBrowser(File storeFile) {
 		super("DLFS Browser");
-		own(this::shutdown);
+		// Saves at JVM shutdown too (Ctrl+C, logging off), before Etch files close
+		Shutdown.addHook(Shutdown.SERVICE, shutdownTask);
+		own(() -> {
+			Shutdown.removeHook(Shutdown.SERVICE, shutdownTask);
+			shutdownTask.run();
+		});
 
 		// Launch NodeServer with Etch store
 		try {
@@ -674,7 +683,7 @@ public class DLFSBrowser extends AbstractGUI {
 		super.afterRun();
 	}
 
-	/** Stops the browser, WebDAV and the NodeServer (persisting state). Released on close. */
+	/** Stops the browser, WebDAV and the NodeServer, saving state. Runs once, as {@link #shutdownTask}. */
 	private void shutdown() {
 		if (panel != null) {
 			panel.close();

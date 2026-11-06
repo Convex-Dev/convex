@@ -15,16 +15,23 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
+import convex.core.data.AVector;
+import convex.core.data.Blobs;
+import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.RowLWW;
+import convex.etch.EtchStore;
 import convex.node.NodeServer;
 
 /**
@@ -300,6 +307,32 @@ public class ConvexDriverTest {
 			assertTrue(rs.next());
 			assertEquals("Bob", rs.getString(1));
 		}
+	}
+
+	/** A file database that fails to open is refused as an SQLException and leaves the file unlocked. */
+	@Test
+	public void testFailedFileOpenReleasesStore() throws Exception {
+		File tempFile = File.createTempFile("convex-driver-failed-open", ".etch");
+		tempFile.delete();
+		tempFile.deleteOnExit();
+		// A root stored without the cell it refers to: the store opens and locks its
+		// file, then the node cannot save the root it starts from
+		EtchStore broken = EtchStore.create(tempFile);
+		AVector<ACell> root = Vectors.of(Blobs.createRandom(new Random(1), 1000));
+		broken.storeTopRef(root.getRef(), Ref.STORED, null);
+		broken.getEtch().setRootHash(root.getHash());
+		broken.close();
+		String url = "jdbc:convex:file:" + tempFile.getAbsolutePath().replace('\\', '/');
+
+		SQLException first = assertThrows(SQLException.class, () -> DriverManager.getConnection(url));
+		assertTrue(first.getCause() instanceof MissingDataException, String.valueOf(first.getCause()));
+		// Refused the same way again, not by the lock the first attempt left behind
+		SQLException second = assertThrows(SQLException.class, () -> DriverManager.getConnection(url));
+		assertTrue(second.getCause() instanceof MissingDataException, String.valueOf(second.getCause()));
+		assertFalse(ConvexDriver.instances.containsKey("file:" + tempFile.getCanonicalPath()));
+
+		EtchStore reopened = EtchStore.create(tempFile);
+		reopened.close();
 	}
 
 	@Test

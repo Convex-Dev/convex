@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Look up transactions by hash reliably and quickly, reporting the copy that ran when one is included more than once.
 - Keep replicated data consistent and owner-signed, including lattice KV deletes and Convex DB schema changes. ([Replica Ownership](convex-db/README.md#replica-ownership))
 - Keep each application's Convex DB connections on its own database. ([#789](https://github.com/Convex-Dev/convex/issues/789))
+- Free a Convex DB file that fails to open for the next connection, and save DLFS browser edits when the JVM exits. ([#828](https://github.com/Convex-Dev/convex/issues/828))
 - Improve Convex DB's SQL and PostgreSQL client compatibility, including integers beyond 64 bits (with fixes from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Keep a P2P node's `:local` state private, and MCP signing keys safe from a wrong passphrase. ([MCP Auth](convex-restapi/docs/MCP_AUTH.md#deletekey))
 - Handle percent-encoded `did:web` names correctly. ([#816](https://github.com/Convex-Dev/convex/issues/816))

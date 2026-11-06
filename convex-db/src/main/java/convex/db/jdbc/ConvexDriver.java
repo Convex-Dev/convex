@@ -319,7 +319,11 @@ public class ConvexDriver extends Driver {
 		}).cdb;
 	}
 
-	/** Gets or creates a file-backed instance, saved at JVM shutdown unless closed first. */
+	/**
+	 * Gets or creates a file-backed instance, saved at JVM shutdown unless closed first.
+	 *
+	 * @throws SQLException if the instance cannot be opened; nothing it opened stays open
+	 */
 	private ManagedInstance resolveFileInstance(String path) throws SQLException {
 		String key;
 		try {
@@ -328,23 +332,57 @@ public class ConvexDriver extends Driver {
 			key = "file:" + new File(path).getAbsolutePath();
 		}
 
-		final String canonicalKey = key;
-		ManagedInstance inst = instances.computeIfAbsent(canonicalKey, k -> {
-			try {
-				File file = new File(path);
-				EtchStore store = EtchStore.create(file);
-				var host = LatticeHost.open(ConvexDB.EMPTY, store);
-				ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
-				var server = new NodeServer<>(host);
-				server.launch();
-				ManagedInstance created = new ManagedInstance(cdb, server, store);
-				Shutdown.addHook(Shutdown.SERVICE, created.shutdownHook);
-				return created;
-			} catch (Exception e) {
-				throw new RuntimeException("Failed to open Etch store: " + path, e);
+		try {
+			return instances.computeIfAbsent(key, k -> {
+				try {
+					return openFileInstance(new File(path));
+				} catch (Exception e) {
+					throw new OpenFailure(e);
+				}
+			});
+		} catch (OpenFailure e) {
+			if (e.getCause() instanceof InterruptedException) Thread.currentThread().interrupt();
+			throw new SQLException("Failed to open Etch store: " + path, e.getCause());
+		}
+	}
+
+	/**
+	 * Opens the store, the host and the node over a file. If a step fails, the node
+	 * and the store are closed again, so the store's file lock is released.
+	 */
+	private static ManagedInstance openFileInstance(File file) throws Exception {
+		EtchStore store = EtchStore.create(file);
+		NodeServer<?> launched = null;
+		try {
+			var host = LatticeHost.open(ConvexDB.EMPTY, store);
+			ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+			var server = new NodeServer<>(host);
+			launched = server;
+			server.launch();
+			ManagedInstance created = new ManagedInstance(cdb, server, store);
+			Shutdown.addHook(Shutdown.SERVICE, created.shutdownHook);
+			return created;
+		} catch (Exception | Error e) {
+			// Not the host: closing it saves, and an open that failed has nothing to save
+			if (launched != null) {
+				try {
+					launched.close();
+				} catch (Exception | Error cleanup) {
+					e.addSuppressed(cleanup);
+				}
 			}
-		});
-		return inst;
+			store.close();
+			throw e;
+		}
+	}
+
+	/** Carries a failure to open a file instance out of {@code computeIfAbsent}. */
+	private static final class OpenFailure extends RuntimeException {
+		private static final long serialVersionUID = 1L;
+
+		OpenFailure(Exception cause) {
+			super(cause);
+		}
 	}
 
 	/**
