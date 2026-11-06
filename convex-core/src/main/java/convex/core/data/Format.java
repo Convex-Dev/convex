@@ -11,7 +11,6 @@ import convex.core.cpos.CPoSConstants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.Panic;
 import convex.core.lang.RT;
-import convex.core.store.AStore;
 import convex.core.util.Bits;
 import convex.core.util.Trees;
 import convex.core.util.Utils;
@@ -449,36 +448,6 @@ public class Format {
 	}
 
 	/**
-	 * Decodes an array of Cells packed in a Blob. Cells may be partial.
-	 * @param data Data containing cell encodings in multi-cell format
-	 * @return Array of decoded cells
-	 * @throws BadFormatException In event of any encoding error detected
-	 */
-	public static ACell[] decodeCells(Blob data, AStore store) throws BadFormatException {
-		long ml=data.count();
-		if (ml>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
-		if (ml==0) return Cells.EMPTY_ARRAY;
-
-		ArrayList<ACell> cells=new ArrayList<>();
-		// First cell: decode from start of blob (may have trailing cells)
-		AEncoder.DecodeState ds = new AEncoder.DecodeState(data);
-		ACell first = store.getEncoder().read(ds);
-		if (first!=null) first.attachEncoding(data.slice(0, ds.pos - data.getInternalOffset()));
-		cells.add(first);
-		int pos = ds.pos - data.getInternalOffset();
-		while (pos<ml) {
-			long encLength=Format.readVLQCount(data.getInternalArray(), data.getInternalOffset()+pos);
-			pos+=Format.getVLQCountLength(encLength);
-			Blob enc=data.slice(pos, pos+encLength);
-			ACell result=store.decode(enc);
-			pos+=enc.count;
-			cells.add(result);
-		}
-		return cells.toArray(ACell[]::new);
-	}
-
-
-	/**
 	 * Encode a Cell completely in multi-cell message format, with no maximum size.
 	 * Format places top level cell first, following cells in arbitrary order.
 	 *
@@ -615,32 +584,6 @@ public class Format {
 
 		// Note false to prevent traversing all extra branches
 		return encodeMultiCell(result,cells,false,maxSize);
-	}
-	/**
-	 * Encodes a flat list of cells in order specified in multi-cell format
-	 * 
-	 * @param cells Cells to Encode
-	 * @return Blob containing multi-cell encoding
-	 */
-	public static Blob encodeCells(java.util.List<ACell> cells) {
-		int ml=0;
-		for (ACell a:cells) {
-			Blob enc=Cells.encode(a); // can be null in some cases, e.g. in DATA responses signalling missing data
-			int elen=enc.size();
-			if (ml>0) ml+=Format.getVLQCountLength(elen);
-			ml+=elen;
-		}
-		
-		byte[] msg=new byte[ml];
-		int ix=0;
-		for (ACell a:cells) {
-			Blob enc=Cells.encode(a); // can be null in some cases, e.g. in DATA responses signalling missing data;
-			int elen=enc.size();
-			if (ix>0) ix=Format.writeVLQCount(msg,ix,elen);
-			ix=enc.getBytes(msg, ix);
-		}
-		if (ix!=ml) throw new Panic("Bad message length expected "+ml+" but was: "+ix);
-		return Blob.wrap(msg);
 	}
 
 	/**
