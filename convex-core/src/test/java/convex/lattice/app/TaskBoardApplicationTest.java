@@ -120,7 +120,7 @@ class TaskBoardApplicationTest {
 			super(Timestamped.create(storage.withDefault(Maps.empty()),getTimestamp).cursor());
 		}
 
-		boolean exists() { return cursor().get().containsKey(TITLE); }
+		boolean isCreated() { return cursor().get().containsKey(TITLE); }
 		// Titles may have a representation introduced by another application version.
 		ACell title() { return cursor().get().get(TITLE); }
 		/** Only literal true means completed; other values remain pending until explicitly changed. */
@@ -183,7 +183,7 @@ class TaskBoardApplicationTest {
 			draft.sync(); // A rebound view has no publication boundary of its own.
 			assertEquals(Sets.of("write"),board.pending());
 			assertFalse(board.task("write").isDone());
-			assertFalse(board.task("review").exists());
+			assertFalse(board.task("review").isCreated());
 		});
 		assertEquals(Sets.of("review"),board.pending());
 		assertTrue(board.task("write").isDone());
@@ -216,7 +216,7 @@ class TaskBoardApplicationTest {
 					firstDraft.complete(null);
 					competing.orTimeout(10,TimeUnit.SECONDS).join();
 					assertFalse(board.task("review").isDone());
-					assertFalse(board.task("publish").exists());
+					assertFalse(board.task("publish").isCreated());
 				}
 				assertTrue(host.cursor().get().isEmpty());
 			});
@@ -241,7 +241,7 @@ class TaskBoardApplicationTest {
 		}));
 		assertSame(before,board.cursor().get());
 		assertEquals(Sets.of("review"),board.pending());
-		assertFalse(board.task("publish").exists());
+		assertFalse(board.task("publish").isCreated());
 	}
 
 	/** Labels are mutable display data; duplicate labels and reopening never change identity. */
@@ -327,7 +327,7 @@ class TaskBoardApplicationTest {
 		var host=LatticeHost.create();
 		var app=new TaskBoardApp(host,() -> { throw new AssertionError("No changed edit needs a timestamp"); });
 		var missing=app.board().task("missing");
-		assertFalse(missing.exists());
+		assertFalse(missing.isCreated());
 		assertNull(missing.title());
 		assertThrows(IllegalStateException.class,missing::complete);
 		assertThrows(IllegalStateException.class,missing::reopen);

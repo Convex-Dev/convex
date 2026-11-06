@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Objects;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.cursor.Persister;
@@ -94,6 +95,39 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 */
 	public AForkableCursor<V> cursor() {
 		return storage;
+	}
+
+	/** Returns this component's value, including stored nil; throws when absent. */
+	public V value() {
+		return cursor().get();
+	}
+
+	/** Whether this component's location contains a value, including stored nil. */
+	public boolean exists() {
+		return cursor().exists();
+	}
+
+	/** Resolves external string segments to the component at their destination. */
+	public final ALatticeComponent<?> resolve(AString... path) {
+		return resolve(path,0,path.length);
+	}
+
+	/**
+	 * Resolves the slice {@code [start,end)} without creating stored state.
+	 * Empty paths return this component. The base defines no external namespace;
+	 * domain components route to children using the same array and new indices.
+	 * String interpretation belongs to the selected child, independently of merge
+	 * delivery. Children must be bound to this component's current working view.
+	 *
+	 * <p>The array is borrowed for this call: implementations must not modify it
+	 * or retain it without copying. Segments within the slice must be non-null.</p>
+	 *
+	 * @return Component at the destination, which may currently be absent
+	 */
+	public ALatticeComponent<?> resolve(AString[] path,int start,int end) {
+		Objects.checkFromToIndex(start,end,path.length);
+		if (start==end) return this;
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no external path resolution");
 	}
 
 	/**

@@ -179,6 +179,51 @@ publication or incoming merge. Live views observe shared changes directly;
 staged views reconcile when they publish. Keeping a component open does not
 give it exclusive ownership of the value at its path.
 
+## External component paths
+
+`ALatticeComponent` exposes `value()`, `exists()` and `resolve(AString... path)`.
+The resolution hook is `resolve(AString[] path, int start, int end)`, with an
+exclusive end index. It returns the destination component; an empty slice returns
+the current component. Parents can pass the same array with advanced indices to
+children. The array is borrowed, so a component retaining segments must copy them.
+Resolution creates no stored state and keeps children on the current editing view,
+including within a draft or transaction.
+
+The base supports only the empty path. Each parent defines its external namespace
+and selects the component responsible for the rest of the path. External addressing
+is independent of the `child(ACell)` hook used for incoming merge delivery.
+
+Two value components supply reusable addressing policies:
+
+| Component | Segment interpretation |
+|---|---|
+| `ValueComponent<V>` | Literal `AString` keys, without inspecting the current value during resolution |
+| `JSONValueComponent<V>` | Object field names and vector array indices, explicitly selected by the parent |
+
+The JSON variant follows the object and array representations in
+[CAD044](https://docs.convex.world/docs/cad/json). An existing string field takes
+precedence over an existing keyword field, including when the string field holds
+nil. An absent field keeps its string key. Array indices are non-negative ASCII
+decimal integers; leading zeroes are accepted, signs and whitespace are not.
+Lists are not JSON arrays, and hexadecimal names are not converted to blob keys.
+Selecting this variant declares the intended addressing policy; it does not
+validate the whole value as JSON.
+
+JSON resolution selects keys from one snapshot. A returned component keeps those
+keys: resolve again to interpret a later container shape. A resolved vector index
+becomes absent if its container becomes an object, and writes through that handle
+refuse the incompatible container. Neither variant creates missing intermediate
+containers or supplies a merge rule. A parent needing those behaviours provides
+them explicitly.
+
+`value()` uses the strict cursor read contract from
+[CAD035](https://docs.convex.world/docs/cad/cursors): absent or unresolvable
+locations throw `MissingValueException`, while stored nil returns null.
+`exists()` is true for stored nil. For an optional read use
+`cursor().getOrDefault(fallback)`. Resolution does not grant signing authority or
+change the publication rules of
+[CAD045](https://docs.convex.world/docs/cad/lattice_apps).
+
 ## Publication and delivery
 
 State crosses distinct boundaries:

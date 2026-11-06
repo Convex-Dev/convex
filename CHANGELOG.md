@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Resolve component paths through literal value and explicitly selected JSON views. ([Component paths](convex-core/docs/LATTICE_APPLICATIONS.md#external-component-paths))
 - Let applications choose how each Convex DB database merges and which clock stamps its writes. ([Merge Policy](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-policy))
 - Encrypt Convex DB's PostgreSQL connections with TLS (proposed by @trsb-standards). ([TLS](convex-db/README.md#tls))
 - Support PostgreSQL client transactions and more standard SQL in Convex DB (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
