@@ -79,8 +79,14 @@ public class Transformer<S extends ACell, T extends ACell> extends AView<T> {
 	@Override
 	@SuppressWarnings("unchecked")
 	public T get() {
-		S sourceValue = ((ACursor<S>) source).get();
-		return transformFunction.apply(sourceValue);
+		return CursorValues.require(readValue());
+	}
+
+	@Override
+	@SuppressWarnings("unchecked")
+	protected Object readValue() {
+		Object value=source.readValue();
+		return value==MISSING?MISSING:transformFunction.apply((S)value);
 	}
 
 	/**

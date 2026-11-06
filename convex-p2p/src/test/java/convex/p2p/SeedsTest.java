@@ -106,6 +106,6 @@ public class SeedsTest {
 		assertTrue(relay.seeds().add(hub));
 		relay.syncHost();
 		assertEquals(List.of(hub),relay.seeds().all());
-		assertNull(host.cursor().get(LocalLattice.KEY_LOCAL));
+		assertFalse(host.cursor().path(LocalLattice.KEY_LOCAL).exists());
 	}
 }

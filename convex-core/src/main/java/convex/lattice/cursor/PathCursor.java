@@ -7,7 +7,8 @@ import convex.lattice.LatticeOps;
 /**
  * A cursor that navigates to a path within a base cursor's value.
  *
- * <p>Reads resolve the nested value; changed writes rebuild existing ancestors.
+ * <p>Required reads throw for absence or invalid traversal; a stored nil remains
+ * nil. Optional reads handle absence explicitly. Changed writes rebuild existing ancestors.
  * A write through a missing container, or to one that cannot hold its key, fails.
  * Update functions receive the actual
  * value, including null; components supply any defaults or construction logic.
@@ -30,7 +31,11 @@ public class PathCursor<V extends ACell> extends ATransformCursor<V,ACell> {
 		return new PathCursor<>(base,path);
 	}
 
-	/** Returns the actual value at the path, including nil. */
+	@Override protected Object viewValue(ACell stored) {
+		return CursorValues.at(stored,path);
+	}
+
+	/** Write operations retain the existing nil input for absent entries. */
 	@Override protected V view(ACell stored) {
 		return RT.getIn(stored,path);
 	}

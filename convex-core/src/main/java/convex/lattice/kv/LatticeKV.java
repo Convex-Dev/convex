@@ -129,7 +129,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	private AVector<ACell> getEntry(String key) {
-		Index<AString, AVector<ACell>> store = cursor().get();
+		Index<AString, AVector<ACell>> store = cursor().getOrDefault(null);
 		if (store == null) return null;
 		return store.get(key(key));
 	}
@@ -231,7 +231,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Returns all live keys
 	 */
 	public ASet<AString> keys() {
-		Index<AString, AVector<ACell>> store = cursor().get();
+		Index<AString, AVector<ACell>> store = cursor().getOrDefault(null);
 		if (store == null) return Sets.empty();
 		long now = nowMs();
 		ASet<AString> result = Sets.empty();

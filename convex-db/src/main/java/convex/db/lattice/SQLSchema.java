@@ -459,7 +459,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Array of table names
 	 */
 	public String[] getTableNames() {
-		Index<AString, AVector<ACell>> store = cursor().get();
+		Index<AString, AVector<ACell>> store = cursor().getOrDefault(null);
 		if (store == null) return new String[0];
 
 		java.util.List<String> names = new java.util.ArrayList<>();

@@ -100,7 +100,7 @@ final class Seeds {
 	/** The URIs stored, including expired and unreadable entries. */
 	private List<AString> uris() {
 		List<AString> uris=new ArrayList<>();
-		ACell stored=list.cursor().get();
+		ACell stored=list.cursor().getOrDefault(null);
 		if (!(stored instanceof Index<?,?> index)) return uris;
 		long n=index.count();
 		for (long i=0; i<n; i++) {

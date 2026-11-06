@@ -128,7 +128,7 @@ public class P2PNodeTest {
 				new NodeServer<>(RelayHost.open(P2PLattice.ROOT,store,
 					LatticeContext.create(null,keyPair)),config)) {
 			raw.launch();
-			ACell nodes=raw.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+			ACell nodes=raw.getCursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 			assertTrue(nodes==null || (nodes instanceof AHashMap<?,?> map && map.isEmpty()),
 				"schema-independent NodeServer must not publish P2P application records");
 		}
@@ -184,7 +184,7 @@ public class P2PNodeTest {
 
 		node.launch();
 
-		ACell nodes=node.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		ACell nodes=node.getCursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		assertTrue(nodes==null || (nodes instanceof AHashMap<?,?> map && map.isEmpty()));
 	}
 
@@ -286,7 +286,7 @@ public class P2PNodeTest {
 	@SuppressWarnings("unchecked")
 	private AHashMap<Keyword,ACell> nodeInfo(AccountKey key) {
 		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap<ACell,SignedData<ACell>>)
-			(ACell)node.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+			(ACell)node.getCursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		return P2PLattice.getNodeInfo(nodes,key);
 	}
 }

@@ -303,7 +303,7 @@ class FavouritesApplicationTest {
 		replicaHost.merge(newer);
 		replicaHost.merge(older);
 		localHost.merge(older); // Replays cannot resurrect the removed item.
-		assertNull(localHost.cursor().get(FAVOURITES,CHARLIE.getAccountKey()),
+		assertNull(localHost.cursor().getOrDefault(null,FAVOURITES,CHARLIE.getAccountKey()),
 			"Incoming merges wait for application publication");
 		assertEquals(local.component().cursor().get(),replica.component().cursor().get());
 		assertEquals(Sets.of(40),local.items(CHARLIE.getAccountKey()));

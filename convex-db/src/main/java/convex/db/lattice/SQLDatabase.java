@@ -300,7 +300,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Setting value, or null if the setting or the section is absent
 	 */
 	public ACell getSetting(Keyword key) {
-		Index<Keyword, ACell> state = cursor().get();
+		Index<Keyword, ACell> state = cursor().getOrDefault(null);
 		if (state == null || !(state.get(ConvexDB.KEY_CONFIG) instanceof AMap<?, ?> config)) return null;
 		return config.get(key);
 	}
@@ -488,13 +488,13 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	@Override
 	protected Index<Keyword, ACell> mergeAtPath(ACell value, ACell... path) {
 		if (!(path[0] instanceof ABlobLike<?> key) || !ConvexDB.KEY_TABLES.toBlob().equals(key.toBlob())) {
-			return cursor().get(); // other sections are not delivered
+			return cursor().getOrDefault(null); // other sections are not delivered
 		}
 		ACell tables = value;
 		if (path.length > 1) {
 			if (!(path[1] instanceof AString name) || !isEntryPath(path)) return super.mergeAtPath(value, path);
 			ACell entry = (path.length == 2) ? value : rowsEntry(value, path);
-			if (entry == null) return cursor().get();
+			if (entry == null) return cursor().getOrDefault(null);
 			tables = Index.of(name, entry);
 		}
 		Index<Keyword, ACell> incoming = Index.of(ConvexDB.KEY_TABLES, tables);

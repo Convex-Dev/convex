@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
@@ -40,8 +41,8 @@ public class CursorTest {
 		assertSame(CVMLong.ONE,cellKeyValue);
 		assertSame(CVMLong.ONE,javaKeyValue);
 		assertEquals(1,((AInteger)cellKeyValue).longValue());
-		assertNull(root.get(Strings.create("missing")));
-		assertNull(root.get("missing"));
+		assertThrows(MissingValueException.class,() -> root.get(Strings.create("missing")));
+		assertThrows(MissingValueException.class,() -> root.get("missing"));
 		assertSame(value,root.get(new ACell[0]));
 		assertSame(value,root.get(new Object[0]));
 	}

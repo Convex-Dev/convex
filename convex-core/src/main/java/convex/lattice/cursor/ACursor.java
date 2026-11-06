@@ -20,6 +20,36 @@ import convex.lattice.LatticeOps;
  */
 public abstract class ACursor<V extends ACell> {
 
+	/** Internal absence marker. Never a CVM value and never written to storage. */
+	protected static final Object MISSING=new Object();
+
+	/**
+	 * Reads one snapshot, returning a cell (including nil) or {@link #MISSING}.
+	 * Roots and total views always hold a value. Partial views override this hook
+	 * and preserve source absence without throwing or allocating a result wrapper.
+	 */
+	protected Object readValue() { return get(); }
+
+	/** Whether this location holds a value, including nil. Invalid traversal throws. */
+	public boolean exists() { return readValue()!=MISSING; }
+
+	/**
+	 * Returns the value, or the supplied fallback for an absent location. A stored
+	 * nil stays nil. Invalid traversal still throws. Presence and value come from
+	 * one snapshot; expected absence does not construct an exception.
+	 */
+	@SuppressWarnings("unchecked")
+	public V getOrDefault(V notFound) {
+		Object value=readValue();
+		return value==MISSING?notFound:(V)value;
+	}
+
+	/** Reads a nested path from one snapshot, with an explicit fallback for absence. */
+	public ACell getOrDefault(ACell notFound,ACell... path) {
+		Object value=CursorValues.at(readValue(),path);
+		return value==MISSING?notFound:(ACell)value;
+	}
+
 	// ===== Exclusive transactions =====
 
 	/**
@@ -53,23 +83,25 @@ public abstract class ACursor<V extends ACell> {
 	 * <p>The returned value reflects all prior writes to this cursor.
 	 * For path cursors, returns the value at the path within the parent.</p>
 	 *
-	 * @return Current value (may be null)
+	 * @return Current value (may be null when nil is stored)
+	 * @throws MissingValueException If the location is absent
 	 */
 	public abstract V get();
 
 	/**
 	 * Returns a value at a nested path within this cursor's value.
 	 *
-	 * <p>Equivalent to {@code RT.getIn(get(), path)}. Does not create a path cursor;
+	 * <p>Does not create a path cursor;
 	 * use {@link #path(ACell...)} for that.</p>
 	 * <p>The nested value may have a different type from this cursor's value.
 	 * Callers must explicitly cast or validate it when a narrower type is required.</p>
 	 *
 	 * @param path Keys to navigate through nested data structures
-	 * @return Value at the path, or null if path doesn't exist
+	 * @return Value at the path, including a stored nil
+	 * @throws MissingValueException If the path is absent
 	 */
 	public ACell get(ACell... path) {
-		return RT.getIn(get(), path);
+		return CursorValues.require(CursorValues.at(readValue(),path));
 	}
 
 	/**
@@ -80,10 +112,13 @@ public abstract class ACursor<V extends ACell> {
 	 * Callers must explicitly cast or validate it when a narrower type is required.</p>
 	 *
 	 * @param path Keys to navigate through nested data structures
-	 * @return Value at the path, or null if path doesn't exist
+	 * @return Value at the path, including a stored nil
+	 * @throws MissingValueException If the path is absent
 	 */
 	public ACell get(Object... path) {
-		return RT.getIn(get(), path);
+		ACell[] keys=new ACell[path.length];
+		for (int i=0; i<path.length; i++) keys[i]=RT.cvm(path[i]);
+		return get(keys);
 	}
 
 	// ===== Writes =====

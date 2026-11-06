@@ -104,9 +104,9 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		if (path.length!=0) return mergeAtPath(value,path);
 		if (value!=null) {
 			try {
-				if (!owners.checkForeign((M)value)) return storage.get();
+				if (!owners.checkForeign((M)value)) return storage.getOrDefault(null);
 			} catch (ClassCastException e) {
-				return storage.get();
+				return storage.getOrDefault(null);
 			}
 		}
 		return merge((M)value);
@@ -116,9 +116,9 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	@SuppressWarnings({"unchecked","rawtypes"})
 	@Override
 	protected M mergeAtPath(ACell value,ACell... path) {
-		if (path.length!=1) return cursor().get();
+		if (path.length!=1) return cursor().getOrDefault(null);
 		SignedLattice<V> rule=owners.signingFor(path[0]);
-		if (rule==null) return cursor().get();
+		if (rule==null) return cursor().getOrDefault(null);
 		// Keep foreign values untyped until the same entry validation as whole-map delivery.
 		AMap incoming=owners.zero();
 		return merge((M)incoming.assoc(rule.getOwner(),value));

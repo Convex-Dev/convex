@@ -300,7 +300,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 			// Rebuild drives from restored lattice state
 			drives.clear();
-			AHashMap<AString, AVector<ACell>> driveMap = drivesCursor.get();
+			AHashMap<AString, AVector<ACell>> driveMap = drivesCursor.getOrDefault(null);
 			if (driveMap != null && !driveMap.isEmpty()) {
 				for (Map.Entry<AString, AVector<ACell>> entry : driveMap.entrySet()) {
 					String name = entry.getKey().toString();

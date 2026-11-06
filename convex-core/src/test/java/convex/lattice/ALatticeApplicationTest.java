@@ -71,7 +71,7 @@ public class ALatticeApplicationTest {
 		a.add(CVMLong.ONE);
 		assertEquals(Sets.of(1),anotherView.cursor().get());
 		assertEquals(LATTICE.zero(),host.cursor().get());
-		assertNull(new Items(second).cursor().get());
+		assertFalse(new Items(second).cursor().exists());
 		new Items(second).add(CVMLong.TWO);
 		first.sync();
 		second.sync();

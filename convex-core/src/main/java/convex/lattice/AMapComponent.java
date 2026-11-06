@@ -39,8 +39,8 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 	}
 
 	/** Returns an immutable snapshot, or null for absent storage. */
-	public M get() { return requireMap(values().get()); }
-	public V get(K key) { return entry(values().get(),key); }
+	public M get() { return requireMap(values().getOrDefault(null)); }
+	public V get(K key) { return entry(values().getOrDefault(null),key); }
 	public boolean containsKey(K key) { M map=get(); return map!=null && map.containsKey(key); }
 	public long size() { M map=get(); return map==null?0:map.count(); }
 	public boolean isEmpty() { return size()==0; }

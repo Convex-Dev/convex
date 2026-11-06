@@ -130,7 +130,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Returns the underlying state vector.
 	 */
 	public AVector<ACell> getState() {
-		return cursor().get();
+		return cursor().getOrDefault(null);
 	}
 
 	/**
@@ -140,7 +140,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<AVector<ACell>> getSchema() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return null;
 		return (AVector<AVector<ACell>>) state.get(POS_SCHEMA);
 	}
@@ -152,7 +152,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public Index<ABlob, AVector<ACell>> getRows() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return null;
 		return (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
 	}
@@ -161,7 +161,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Gets the table's ctime: when it was created, or dropped for a tombstone.
 	 */
 	public CVMLong getTimestamp() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return null;
 		return (CVMLong) state.get(POS_CTIME);
 	}
@@ -170,7 +170,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Gets the table's format version: 0 for an entry without a version field.
 	 */
 	public long getVersion() {
-		return getVersion(cursor().get());
+		return getVersion(cursor().getOrDefault(null));
 	}
 
 	/**
@@ -209,7 +209,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public Binding getBinding() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (!isLiveState(state)) return null;
 		return new Binding((AVector<AVector<ACell>>) state.get(POS_SCHEMA), getVersion(state));
 	}
@@ -218,7 +218,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Checks if this table is a tombstone (dropped).
 	 */
 	public boolean isTombstone() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		return state != null && state.get(POS_SCHEMA) == null;
 	}
 
@@ -226,7 +226,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Checks if this table is live (not dropped).
 	 */
 	public boolean isLive() {
-		return isLiveState(cursor().get());
+		return isLiveState(cursor().getOrDefault(null));
 	}
 
 	/**
@@ -259,7 +259,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * Gets the number of live (non-tombstone) rows. O(1).
 	 */
 	public long getRowCount() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return 0;
 		if (state.count() <= POS_LIVE_COUNT) {
 			// Legacy state vector without liveCount — fall back to Index.count()

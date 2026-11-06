@@ -52,15 +52,40 @@ value, including `null`; no empty value is substituted.
 overloads return `ACell`: a child need not have its parent's type. Callers cast or
 validate the result explicitly when they require a narrower type.
 
-`path(keys...)` creates a view without changing state. Reads use `RT.getIn`, which
-returns null for absent or incompatible ancestors. Use collection component paths
-when incompatible containers must be distinguished from absence. Writes
+`get()` and both nested `get(keys...)` overloads are required reads. They throw
+`MissingValueException` for an absent entry or a path below nil. A root holding
+nil and an entry storing nil are present: reading either returns null.
+`getOrDefault(fallback)` handles expected absence without throwing;
+`getOrDefault(fallback, keys...)` does the same for a nested path without creating
+a cursor. A stored nil does not select the fallback. `exists()` tests presence,
+including nil. Each operation reads one snapshot; separate calls need not observe
+the same snapshot. Invalid traversal through a scalar, an incompatible Index or
+sequence key, or an out-of-range position throws even for optional reads and presence checks.
+
+`path(keys...)` creates a view without reading or changing state. Writes
 use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. All
 intermediate containers must already exist. An absent final value can be replaced,
 but writing through an absent container throws, and so does a write to a container
 that cannot hold its key, such as a vector given a key that is not an index within
 it. `assoc` and `assocIn` follow the same rule. A plain path write through a signed
 envelope is refused.
+
+Atomic updates keep their creation semantics: a missing final entry is supplied
+as null, and a changed result can insert it into an existing map. Unchanged writes
+preserve absence. Forks and transactions can likewise start from a missing location
+as nil without creating destination state. None of these operations creates a
+missing intermediate container implicitly.
+
+Transformations propagate source absence without applying their read function.
+A projection over present storage returns the value its supplied function defines,
+including nil; it cannot infer entry presence from that function. Time caches retain
+presence together with the cached value. `withDefault(value)` explicitly substitutes
+for both missing storage and nil, unlike `getOrDefault`, which substitutes only for
+absence. Its reads and unchanged writes still create no state.
+
+When migrating callers, retain required reads where absence is a defect. Use
+`getOrDefault(null)` only where missing state is expected, or `exists()` when only
+presence matters. CVM collection lookups and `RT.getIn` retain their existing rules.
 
 Root CAS uses reference identity. Path, projection and signing views compare the
 view by value equality, then make one CAS attempt against the observed underlying

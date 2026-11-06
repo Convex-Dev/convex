@@ -37,7 +37,8 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	private ForkedCursor(ACursor<V> destination) {
 		this.destination=Objects.requireNonNull(destination,"Destination must not be null");
-		this.baseline=destination.get();
+		// A fork can prepare a new entry; no destination state is created here.
+		this.baseline=destination.getOrDefault(null);
 		this.working=new TransactionalRootCursor<>(baseline);
 	}
 

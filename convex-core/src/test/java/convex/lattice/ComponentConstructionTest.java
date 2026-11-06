@@ -32,7 +32,7 @@ public class ComponentConstructionTest {
 	@Test public void plainPathsNeverCreateContainers() {
 		Root<Index<Keyword,ACell>> root=new Root<>();
 		AForkableCursor<CVMLong> path=root.path(REGION,Keywords.FOO);
-		assertNull(path.get());
+		assertFalse(path.exists());
 		assertThrows(IllegalStateException.class,() -> path.set(CVMLong.ONE));
 		assertThrows(IllegalStateException.class,() -> path.compareAndSet(null,CVMLong.ONE));
 		assertThrows(IllegalStateException.class,() -> path.updateAndGet(v -> {

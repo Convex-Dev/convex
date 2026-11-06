@@ -2152,7 +2152,7 @@ public class NodeServerTest {
 			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
 				assertEquals(CVMLong.create(111),
 						target.pullPath(peer,regionA).get(5,TimeUnit.SECONDS));
-				assertNull(target.getCursor().get(regionB));
+				assertFalse(target.getCursor().path(regionB).exists());
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 package convex.p2p;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,7 +55,7 @@ public class P2PUserTest {
 	@SuppressWarnings("unchecked")
 	private SignedData<ACell> rawIdentitySlot(AccountKey userKey) {
 		AHashMap<ACell, SignedData<ACell>> region =
-			(AHashMap<ACell, SignedData<ACell>>) (ACell) node.getCursor().get(P2PLattice.KEY_ID);
+			(AHashMap<ACell, SignedData<ACell>>) (ACell) node.getCursor().getOrDefault(null,P2PLattice.KEY_ID);
 		return (region == null) ? null : region.get(userKey);
 	}
 
@@ -275,7 +276,7 @@ public class P2PUserTest {
 		AForkableCursor<ACell> mine = node.p2p(KEY).cursor();
 		assertEquals(Strings.create("mine"),
 			((AHashMap<Keyword, ACell>) mine.get()).get(P2PLattice.ID_NAME));
-		assertNull(mine.get(otherKey), "Another user must not be reachable from this cursor");
+		assertFalse(mine.path(otherKey).exists(), "Another user must not be reachable from this cursor");
 
 		assertEquals(Strings.create("theirs"),
 			node.p2p(otherKey).getIdentity().get(P2PLattice.ID_NAME));

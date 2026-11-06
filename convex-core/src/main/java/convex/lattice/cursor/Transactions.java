@@ -88,7 +88,8 @@ public final class Transactions {
 		}
 
 		boolean commit() {
-			V observed=cursor.get();
+			// A transaction can create a missing final entry, as an atomic update can.
+			V observed=cursor.getOrDefault(null);
 			if (!computed || !Utils.equals(observed,input)) {
 				input=observed;
 				var draft=new TransactionalRootCursor<>(input);
@@ -100,7 +101,7 @@ public final class Transactions {
 			}
 			// Validate against a fresh observation, including no-ops. Its reference
 			// may differ from the input while denoting exactly the same value.
-			observed=cursor.get();
+			observed=cursor.getOrDefault(null);
 			if (!Utils.equals(observed,input)) return false;
 			if (Utils.equals(observed,result)) return true;
 			return cursor.compareAndSet(observed,result);

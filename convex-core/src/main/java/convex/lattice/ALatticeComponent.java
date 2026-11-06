@@ -143,7 +143,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 		ALatticeComponent<ACell> child=child(path[0]);
 		if (child!=null) {
 			child.mergeAt(value,Arrays.copyOfRange(path,1,path.length));
-			return cursor().get();
+			return cursor().getOrDefault(null);
 		}
 		return mergeAtPath(value,path);
 	}

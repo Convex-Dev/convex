@@ -105,7 +105,7 @@ final class NodeRegistry extends ALatticeComponent<Index<Keyword,ACell>> {
 	/** Merges an incoming {@code :p2p} region: the registry by this node's rule, any other entries as the lattice declares. */
 	@Override
 	public Index<Keyword,ACell> merge(Index<Keyword,ACell> incoming) {
-		if (incoming==null) return cursor().get();
+		if (incoming==null) return cursor().getOrDefault(null);
 		return cursor().updateAndGet(held -> {
 			Index<Keyword,ACell> base=(held==null)?P2PLattice.P2P_LATTICE.zero():held;
 			Index<Keyword,ACell> updated=P2PLattice.P2P_LATTICE.merge(base,incoming.dissoc(P2PLattice.KEY_NODES));

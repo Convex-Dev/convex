@@ -126,7 +126,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 				if (incoming.containsKey(key)) entry.getValue().mergeAt(incoming.get(key));
 			}
 		}
-		return cursor().get();
+		return cursor().getOrDefault(null);
 	}
 
 	/** Resolves keys with the same blob comparison as the underlying index. */
@@ -147,7 +147,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		if (path.length==0) return super.mergeAt(value,path);
 		ALatticeComponent<?> component=child(path[0]);
 		if (component!=null) component.mergeAt(value,Arrays.copyOfRange(path,1,path.length));
-		return cursor().get();
+		return cursor().getOrDefault(null);
 	}
 
 	/** Freezes registrations, prepares and publishes children, then reads the container. */
@@ -156,7 +156,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		regions();
 		beforeSync();
 		syncChildren();
-		return storage.get();
+		return storage.getOrDefault(null);
 	}
 
 	/**

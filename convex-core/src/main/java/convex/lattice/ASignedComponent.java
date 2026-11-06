@@ -70,7 +70,7 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 			SignedData<V> result=destination.updateAndGet(own -> lattice.mergeAndSign(own,incoming,signer));
 			return result==null?null:result.getValue();
 		}
-		if (incoming==null || lattice.merge(null,incoming)==null) return storage.get();
+		if (incoming==null || lattice.merge(null,incoming)==null) return storage.getOrDefault(null);
 		return storage.updateAndGet(own -> lattice.getValueLattice().merge(own,incoming.getValue()));
 	}
 
@@ -78,7 +78,7 @@ public abstract class ASignedComponent<V extends ACell> extends ALatticeComponen
 	@SuppressWarnings("unchecked")
 	@Override
 	public V mergeAt(ACell incoming,ACell... path) {
-		if (path.length!=0) return cursor().get();
+		if (path.length!=0) return cursor().getOrDefault(null);
 		if (incoming!=null && !(incoming instanceof SignedData<?>)) {
 			throw new IllegalArgumentException("Signed component requires a complete envelope");
 		}

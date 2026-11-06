@@ -182,7 +182,7 @@ public class NodeServerPersistenceTest {
 		ACell testValue = CVMLong.create(value);
 		Hash valueHash = Hash.get(testValue);
 
-		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server.getCursor().get(dataKey);
+		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server.getCursor().getOrDefault(null,dataKey);
 		if (dataIndex == null) {
 			dataIndex = (Index<Hash, ACell>) Index.EMPTY;
 		}

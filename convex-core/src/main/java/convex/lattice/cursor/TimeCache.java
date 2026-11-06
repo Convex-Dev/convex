@@ -53,7 +53,7 @@ public class TimeCache<V extends ACell> extends ACachedView<V> {
 	/**
 	 * The currently cached value. May be null if the source cursor returns null.
 	 */
-	private volatile V value;
+	private volatile Object value;
 
 	/**
 	 * Creates a new TimeCache with the specified source cursor and TTL.
@@ -86,6 +86,11 @@ public class TimeCache<V extends ACell> extends ACachedView<V> {
 	 */
 	@Override
 	public V get() {
+		return CursorValues.require(readValue());
+	}
+
+	@Override
+	protected Object readValue() {
 		long currentTime = Utils.getCurrentTimestamp();
 		
 		// Check if we have a valid cached value that hasn't expired
@@ -107,7 +112,7 @@ public class TimeCache<V extends ACell> extends ACachedView<V> {
 		}
 		
 		// Cache is empty or expired, fetch fresh value from source
-		V freshValue = source.get();
+		Object freshValue = source.readValue();
 		
 		// Update cache 
 		this.value = freshValue;

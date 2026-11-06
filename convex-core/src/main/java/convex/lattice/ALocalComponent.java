@@ -84,7 +84,7 @@ public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword
 	@SuppressWarnings("unchecked")
 	@Override
 	public AHashMap<Keyword,ACell> mergeAt(ACell incoming,ACell... path) {
-		if (path.length!=0 || !(incoming instanceof AHashMap<?,?> map)) return cursor().get();
+		if (path.length!=0 || !(incoming instanceof AHashMap<?,?> map)) return cursor().getOrDefault(null);
 		return merge((AHashMap<Keyword,ACell>)map);
 	}
 

@@ -26,7 +26,7 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> implements Tra
 	/** Returns the published node information, or {@code null}. */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword,ACell> getNodeInfo() {
-		return (AHashMap<Keyword,ACell>) cursor().get();
+		return (AHashMap<Keyword,ACell>) cursor().getOrDefault(null);
 	}
 
 	/** Replaces the node information in this component's working cursor. */

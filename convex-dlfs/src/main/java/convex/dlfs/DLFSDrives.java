@@ -107,7 +107,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	public DLFSDrive drive(String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return null;
 		AString name=Strings.create(driveName);
-		AHashMap<AString,AVector<ACell>> registry=cursor().get();
+		AHashMap<AString,AVector<ACell>> registry=cursor().getOrDefault(null);
 		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
@@ -228,7 +228,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 
 	/** Returns sorted drive names belonging to this owner. */
 	public List<String> driveNames() {
-		AHashMap<AString,AVector<ACell>> registry=cursor().get();
+		AHashMap<AString,AVector<ACell>> registry=cursor().getOrDefault(null);
 		if (registry==null || registry.isEmpty()) return List.of();
 		List<String> result=new ArrayList<>((int)Math.min(Integer.MAX_VALUE,registry.count()));
 		for (AString name: registry.keySet()) {
@@ -241,7 +241,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	/** Returns whether a name is live, deleted, or has never been tracked. */
 	public DriveStatus driveStatus(String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return DriveStatus.UNTRACKED;
-		AHashMap<AString,AVector<ACell>> registry=cursor().get();
+		AHashMap<AString,AVector<ACell>> registry=cursor().getOrDefault(null);
 		return status((registry==null)?null:registry.get(Strings.create(driveName)));
 	}
 

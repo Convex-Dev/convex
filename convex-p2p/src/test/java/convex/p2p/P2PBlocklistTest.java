@@ -115,7 +115,7 @@ public class P2PBlocklistTest {
 		AccountKey bob=AKeyPair.generate().getAccountKey();
 		assertTrue(node.block(bob));
 		assertTrue(node.isBlocked(bob));
-		assertNull(node.getCursor().get(LocalLattice.KEY_LOCAL));
+		assertFalse(node.getCursor().path(LocalLattice.KEY_LOCAL).exists());
 	}
 
 	/** Discovery offers no blocked node, and a node only at the addresses this node does not refuse. */
@@ -230,7 +230,7 @@ public class P2PBlocklistTest {
 		assertTrue(route.isClosed());
 		assertFalse(hub.propagationGroup().getConnectionManager().getAuthenticatedRouteKeys()
 			.contains(leafKey.getAccountKey()));
-		assertNull(hub.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,leafKey.getAccountKey()));
+		assertFalse(hub.getCursor().path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,leafKey.getAccountKey()).exists());
 	}
 
 	/** A blocked node that connects is closed once it claims its key, before any challenge. */

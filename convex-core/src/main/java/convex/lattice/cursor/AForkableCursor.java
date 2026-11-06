@@ -17,7 +17,7 @@ import convex.core.data.ACell;
 public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 
 	/**
-	 * Presents a caller-supplied value in place of absent storage, without creating
+	 * Presents a caller-supplied value in place of absent storage or nil, without creating
 	 * state. Update functions see that default too; unchanged writes keep storage
 	 * absent. Writing null clears storage and restores the default view.
 	 *
@@ -48,11 +48,11 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 	}
 
 	/**
-	 * Returns the current value. Ordinary cursors, including paths and transformed
+	 * Returns the current value, or nil for absence. Ordinary cursors, including paths and transformed
 	 * views over forks, never publish enclosing storage or invoke the merge function.
 	 * ForkedCursor overrides this to reconcile at its own destination.
 	 */
 	public V sync(BinaryOperator<V> merge) {
-		return get();
+		return getOrDefault(null);
 	}
 }

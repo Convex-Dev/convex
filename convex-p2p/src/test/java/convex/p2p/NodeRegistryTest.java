@@ -202,7 +202,7 @@ public class NodeRegistryTest {
 
 	@SuppressWarnings("unchecked")
 	private AHashMap<ACell,SignedData<ACell>> held() {
-		ACell nodes=host.cursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		ACell nodes=host.cursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		return (nodes==null)?Maps.empty():(AHashMap<ACell,SignedData<ACell>>)nodes;
 	}
 

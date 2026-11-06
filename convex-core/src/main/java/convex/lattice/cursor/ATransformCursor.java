@@ -32,6 +32,13 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 	/** Reads the view from source storage, including nil. */
 	protected abstract V view(S stored);
 
+	/**
+	 * Reads presence and value from the same source snapshot. A partial view can
+	 * return {@link #MISSING}; a total projection returns its value, including nil.
+	 * This hook is for reads; updates still use {@link #view} for their old value.
+	 */
+	protected Object viewValue(S stored) { return view(stored); }
+
 	/** Rebuilds source storage for a changed view value, including nil. */
 	protected abstract S write(S current,V value);
 
@@ -39,7 +46,13 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 	protected BiFunction<S,V,S> writeOperation() { return this::write; }
 
 	@Override protected Lock exclusiveLock() { return base.exclusiveLock(); }
-	@Override public V get() { return view(base.get()); }
+	@Override public V get() { return CursorValues.require(readValue()); }
+
+	@SuppressWarnings("unchecked")
+	@Override protected Object readValue() {
+		Object stored=base.readValue();
+		return stored==MISSING?MISSING:viewValue((S)stored);
+	}
 
 	/** Builds one source update, with preparation shared across retries. */
 	private UnaryOperator<S> sourceUpdate(UnaryOperator<V> action) {
@@ -72,7 +85,7 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 
 	/** One source CAS attempt, comparing the view by value equality. */
 	@Override public boolean compareAndSet(V expected,V value) {
-		S current=base.get();
+		S current=base.getOrDefault(null);
 		if (!Utils.equals(expected,view(current))) return false;
 		return base.compareAndSet(current,sourceUpdate(previous -> value).apply(current));
 	}

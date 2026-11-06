@@ -216,7 +216,7 @@ public class LatticePropagatorTest {
 
 		// Update server2's lattice value at [:data hash]
 		@SuppressWarnings("unchecked")
-		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server2.getCursor().get(dataKeyword);
+		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server2.getCursor().getOrDefault(null,dataKeyword);
 		if (dataIndex == null) {
 			@SuppressWarnings("unchecked")
 			Index<Hash, ACell> emptyIndex = (Index<Hash, ACell>) Index.EMPTY;
@@ -602,7 +602,7 @@ public class LatticePropagatorTest {
 			Hash valueHash = Hash.get(testValue);
 
 			@SuppressWarnings("unchecked")
-			Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server1.getCursor().get(dataKeyword);
+			Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server1.getCursor().getOrDefault(null,dataKeyword);
 			if (dataIndex == null) {
 				@SuppressWarnings("unchecked")
 				Index<Hash, ACell> emptyIndex = (Index<Hash, ACell>) Index.EMPTY;

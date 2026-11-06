@@ -117,7 +117,7 @@ public class AccessList<K extends ABlobLike<?>> extends ALatticeComponent<Index<
 	 */
 	public AHashMap<Keyword,ACell> get(K key) {
 		if (key==null || tooLong(key)) return null;
-		return live(values().get(),key,now());
+		return live(values().getOrDefault(null),key,now());
 	}
 
 	/** Lists a key with a bare entry, until it is removed. Returns whether it was not listed before. */

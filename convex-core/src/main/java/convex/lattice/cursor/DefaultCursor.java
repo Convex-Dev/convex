@@ -5,7 +5,7 @@ import java.util.Objects;
 import convex.core.data.ACell;
 
 /**
- * An explicit default for absent storage. Reads and atomic update functions see
+ * An explicit default for absent storage or nil. Reads and atomic update functions see
  * the supplied default in place of null. Reading or writing back that default
  * leaves absent storage absent; a changed value is written normally. Writing null
  * clears storage, after which reads again return the default.
@@ -26,5 +26,6 @@ public final class DefaultCursor<V extends ACell> extends AUpdateCursor<V,V> {
 	}
 
 	@Override protected V view(V stored) { return stored==null?defaultValue:stored; }
+	@Override protected Object readValue() { return view(base.getOrDefault(null)); }
 	@Override protected V prepareWrite(V value) { return value; }
 }

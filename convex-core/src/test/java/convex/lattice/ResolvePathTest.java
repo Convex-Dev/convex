@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
+import convex.lattice.cursor.MissingValueException;
 import convex.lattice.generic.JSONLattice;
 
 /**
@@ -67,7 +69,7 @@ public class ResolvePathTest {
 		assertEquals(X, resolved[0]);
 		assertEquals(Y, resolved[1]);
 		assertEquals(LEAF, root.path(resolved).get());   // "a","b" → :x,:y → leaf
-		assertNull(root.path(A, B).get());                // raw external keys don't match :x,:y
+		assertThrows(MissingValueException.class,() -> root.path(A, B).get()); // raw keys miss
 	}
 
 	/** Composition: resolving a whole path equals resolving one level at a time. */
