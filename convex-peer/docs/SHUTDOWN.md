@@ -15,8 +15,9 @@ default the examples follow; a service can change any step.
    protocol work, drains what it accepted and its publication, waits for the
    resulting broadcasts to be written to each outbound route, then closes its
    routes. The drain and the wait share the group's `inboundShutdownTimeout`.
-5. `host.close()`. The host stops its automatic sync, which publishes once more,
-   and its automatic flushing, then saves what changed after the checkpoint.
+5. `host.close()`. The host stops its automatic sync, which syncs the applications
+   once more, and its automatic flushing, then saves what changed after the
+   checkpoint.
 6. Close the store.
 
 Publishing never waits on the network: the checkpoint writes to the local store and
@@ -73,8 +74,8 @@ may keep the JVM from exiting or do work that is no longer needed.
 
 ## What each close leaves alone
 
-- Closing the host syncs no applications beyond its automatic sync's publish step,
-  and never closes the store. A closed host refuses syncs, checkpoints and flushes.
+- Closing the host syncs only the applications its automatic sync names, and never
+  closes the store. A closed host refuses syncs, checkpoints and flushes.
   If its final save fails, the host stays open and closing it again retries.
 - Closing the node neither publishes pending host state nor flushes the store; it
   sends only what the host has already published. It never closes the store, which

@@ -20,7 +20,7 @@ import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 
-/** Automatic sync: publication on a schedule, failure reporting, and the final save when it or the host closes. */
+/** Automatic sync: application and host sync on a schedule, failure reporting, and the final save when it or the host closes. */
 class LatticeHostAutoSyncTest {
 	/** An interval that never elapses during a test, so only closing runs the worker's steps. */
 	private static final Duration NEVER=Duration.ofDays(1);
@@ -40,12 +40,12 @@ class LatticeHostAutoSyncTest {
 		}
 	}
 
-	@Test void publishesThenSyncsOnEachIntervalWithoutFlushing() throws Exception {
+	@Test void syncsApplicationsThenHostOnEachIntervalWithoutFlushing() throws Exception {
 		var store=new RecordingStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);
 		var runs=new CountDownLatch(2);
 		try (var sync=host.autoSync(Duration.ofMillis(1),() -> {
-			host.cursor().set(CVMLong.TWO); // The service's application publishing its draft
+			host.cursor().set(CVMLong.TWO); // The service's application syncing its draft
 			runs.countDown();
 		})) {
 			// The worker starts its second run only after the first run's host sync.
@@ -56,7 +56,7 @@ class LatticeHostAutoSyncTest {
 		assertEquals("flush",store.events.getLast(),"Closing saves");
 	}
 
-	@Test void closingPublishesAndSavesOnceMore() throws Exception {
+	@Test void closingSyncsAndSavesOnceMore() throws Exception {
 		var store=new RecordingStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);
 		var draft=new AtomicReference<CVMLong>(CVMLong.ONE);
@@ -70,7 +70,7 @@ class LatticeHostAutoSyncTest {
 		host.autoSync(NEVER).close(); // and can start another
 	}
 
-	@Test void closingTheHostPublishesOnceMoreThenSavesOnce() throws Exception {
+	@Test void closingTheHostSyncsApplicationsOnceMoreThenSavesOnce() throws Exception {
 		var store=new RecordingStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);
 		var draft=new AtomicReference<CVMLong>(CVMLong.ONE);
@@ -78,15 +78,15 @@ class LatticeHostAutoSyncTest {
 		var flush=host.autoFlush(NEVER);
 		draft.set(CVMLong.TWO);
 		host.close();
-		assertEquals(List.of("retain 2","flush"),store.events,"The last publish, then one save with its flush");
+		assertEquals(List.of("retain 2","flush"),store.events,"The last application sync, then one save with its flush");
 		assertThrows(IllegalStateException.class,host::sync);
-		// Already closed by the host, so neither publishes nor flushes the closed host
+		// Already closed by the host, so neither syncs nor flushes the closed host
 		sync.close();
 		flush.close();
 		assertEquals(2,store.events.size());
 	}
 
-	@Test void failedPublishIsReportedSkipsThatSyncAndRetries() throws Exception {
+	@Test void failedApplicationSyncIsReportedSkipsThatHostSyncAndRetries() throws Exception {
 		var store=new RecordingStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);
 		var attempts=new AtomicInteger();
@@ -99,13 +99,13 @@ class LatticeHostAutoSyncTest {
 			if (attempt==2) synced.countDown(); // The second run's host sync has finished
 		})) {
 			assertEquals("draft invalid",sync.failure().toCompletableFuture().get(10,TimeUnit.SECONDS).getMessage());
-			assertTrue(skipped.get(10,TimeUnit.SECONDS),"A failed publish skips that interval's host sync");
+			assertTrue(skipped.get(10,TimeUnit.SECONDS),"A failed application sync skips that interval's host sync");
 			assertTrue(synced.await(10,TimeUnit.SECONDS));
 			assertTrue(store.events.contains("retain 1"),"Later runs sync again");
 		}
 	}
 
-	@Test void closingTheHostSavesWhenTheLastPublishFails() throws Exception {
+	@Test void closingTheHostSavesWhenTheLastApplicationSyncFails() throws Exception {
 		var store=new RecordingStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);
 		var sync=host.autoSync(NEVER,() -> { throw new IllegalStateException("draft invalid"); });
@@ -116,7 +116,7 @@ class LatticeHostAutoSyncTest {
 		assertThrows(IllegalStateException.class,host::sync,"Closed");
 	}
 
-	@Test void closingDirectlySavesThenThrowsThePublishFailure() throws Exception {
+	@Test void closingDirectlySavesThenThrowsTheApplicationSyncFailure() throws Exception {
 		var store=new RecordingStore();
 		var host=LatticeHost.create(CVMLong.ONE,store);
 		var sync=host.autoSync(NEVER,() -> { throw new IllegalStateException("draft invalid"); });
@@ -161,7 +161,7 @@ class LatticeHostAutoSyncTest {
 			registered.countDown();
 			assertEquals(List.of("sync","host"),outcomes.get(10,TimeUnit.SECONDS));
 		} finally {
-			host.close(); // Reports the last publish's failure rather than throwing it
+			host.close(); // Reports the last application sync's failure rather than throwing it
 		}
 		assertThrows(IllegalStateException.class,host::sync,"Closed by its owner");
 	}

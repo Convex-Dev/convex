@@ -433,8 +433,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 
 	/**
 	 * Starts scoped periodic host sync, for applications that write straight into the
-	 * host root and so have nothing to publish: {@link #autoSync(Duration, Runnable)}
-	 * with no publish step.
+	 * host root and so have nothing to sync: {@link #autoSync(Duration, Runnable)}
+	 * with no application sync.
 	 *
 	 * @param interval Delay between syncs; positive
 	 * @return The running worker, which the host also closes
@@ -445,35 +445,35 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	}
 
 	/**
-	 * Starts scoped periodic publication, for a service that accepts delayed
-	 * durability. Every interval the worker runs the publish step, such as
+	 * Starts scoped periodic sync, for a service that accepts delayed durability.
+	 * Every interval the worker runs the application sync, such as
 	 * {@code application::sync}, then syncs the host, retaining the root and handing
-	 * it to any attached node. The host never chooses what to publish: application
-	 * drafts the step leaves out stay unpublished. Nothing is flushed on the interval:
-	 * pair this with {@link #autoFlush(Duration)}, and use {@link #checkpoint()} for
-	 * durable requests.
+	 * it to any attached node. The host never chooses which applications sync: drafts
+	 * of applications the service leaves out stay unpublished. Nothing is flushed on
+	 * the interval: pair this with {@link #autoFlush(Duration)}, and use
+	 * {@link #checkpoint()} for durable requests.
 	 *
 	 * <p>Close the returned resource, or the host, before the borrowed store. Closing
-	 * the resource publishes and checkpoints once more; closing the host publishes
-	 * once more before its final checkpoint. Only one such resource may be active on
-	 * a host.</p>
+	 * the resource syncs the applications and checkpoints once more; closing the host
+	 * syncs the applications once more before its final checkpoint. Only one such
+	 * resource may be active on a host.</p>
 	 *
 	 * @param interval Delay between runs; positive
-	 * @param publish Publishes the service's application drafts; runs on the worker,
-	 *        outside the host's publication lock
+	 * @param applicationSync Syncs the service's applications with the host root;
+	 *        runs on the worker, outside the host's publication lock
 	 * @return The running worker, which the host also closes
 	 * @throws IllegalStateException if the host is closed or already has one
 	 */
-	public AutoSync autoSync(Duration interval, Runnable publish) {
-		return startAutoSync(interval,Objects.requireNonNull(publish,"Publish step must not be null"));
+	public AutoSync autoSync(Duration interval, Runnable applicationSync) {
+		return startAutoSync(interval,Objects.requireNonNull(applicationSync,"Application sync must not be null"));
 	}
 
-	private AutoSync startAutoSync(Duration interval, Runnable publish) {
+	private AutoSync startAutoSync(Duration interval, Runnable applicationSync) {
 		syncLock.lock();
 		try {
 			ensureOpen();
 			if (autoSync!=null) throw new IllegalStateException("Host already has an automatic sync");
-			autoSync=new AutoSync(this,interval,publish);
+			autoSync=new AutoSync(this,interval,applicationSync);
 			return autoSync;
 		} finally {
 			syncLock.unlock();
@@ -481,8 +481,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	}
 
 	/**
-	 * Starts scoped periodic flushing of already-retained state. It neither publishes
-	 * applications nor syncs the host; {@link #autoSync(Duration, Runnable)} does.
+	 * Starts scoped periodic flushing of already-retained state. It syncs neither
+	 * applications nor the host; {@link #autoSync(Duration, Runnable)} does.
 	 * Close the returned resource, or the host, before the borrowed store. Closing the
 	 * resource stops the worker and flushes once more; closing the host stops it
 	 * before its final checkpoint. Only one such resource may be active on a host. Use
@@ -501,20 +501,21 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	}
 
 	/**
-	 * Closes the host: stops any automatic sync, which publishes once more, and any
-	 * automatic flushing, then retains and flushes a final snapshot exactly as
-	 * {@link #checkpoint()} does. A failure of that last publish is reported through
-	 * the automatic sync's {@link AutoSync#failure()}, and the save still runs. A
+	 * Closes the host: stops any automatic sync, which syncs the applications once
+	 * more, and any automatic flushing, then retains and flushes a final snapshot
+	 * exactly as {@link #checkpoint()} does. A failure of that last application sync
+	 * is reported through the automatic sync's {@link AutoSync#failure()}, and the
+	 * save still runs. A
 	 * service with a node checkpoints first, so the node sends that checkpoint to its
 	 * peers as it closes, then closes the node before the host:
 	 * {@code try (store; host; node) { app.sync(); host.checkpoint(); }}; see
 	 * convex-peer/docs/SHUTDOWN.md.
 	 *
-	 * <p>Beyond the automatic sync's publish step, closing does not sync applications,
-	 * and like a checkpoint it does not exchange a fork with its origin. A publisher
-	 * still attached receives the final snapshot. The store stays open for the
-	 * service that owns it. Without a store there is nothing to retain, so closing
-	 * only stops the automatic workers.</p>
+	 * <p>Beyond the automatic sync's application sync, closing does not sync
+	 * applications, and like a checkpoint it does not exchange a fork with its
+	 * origin. A publisher still attached receives the final snapshot. The store stays
+	 * open for the service that owns it. Without a store there is nothing to retain,
+	 * so closing only stops the automatic workers.</p>
 	 *
 	 * <p>Once closed, {@link #sync()}, {@link #sync(Function)}, {@link #checkpoint()},
 	 * {@link #flush()}, {@link #autoSync(Duration, Runnable)}, {@link #autoFlush(Duration)}

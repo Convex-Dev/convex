@@ -302,7 +302,7 @@ public class DLFSBrowser extends AbstractGUI {
 			LatticeContext ctx = LatticeContext.create(null, keyPair);
 			nodeServer = new NodeServer<>(RelayHost.open(OWNER_LATTICE, etchStore, ctx), localConfig);
 			nodeServer.launch();
-			// Drives write straight into the host root, so there is nothing to publish first
+			// Drives write straight into the host root, so there is no application sync
 			var host = nodeServer.getHost();
 			host.autoSync(Duration.ofSeconds(1)).failure()
 				.thenAcceptAsync(error -> log.warn("DLFS store sync failed", error));

@@ -65,22 +65,22 @@ A service that accepts delayed durability can have the host save on a schedule.
 Nothing runs on a timer unless the service starts it, and a host has at most one
 of each worker:
 
-- `host.autoSync(Duration, Runnable)` runs the service's publish step, such as
+- `host.autoSync(Duration, Runnable)` runs the service's application sync, such as
   `application::sync`, then syncs the host, so the root is retained and offered to
-  replication. The host never chooses what to publish: drafts the step leaves out
-  stay unpublished. A failed publish step skips that interval's sync. The step runs
-  on the worker's thread, outside the host's publication lock.
-  `host.autoSync(Duration)` has no publish step, for applications that write
-  straight into the host root.
+  replication. The host never chooses which applications sync: drafts of those
+  the service leaves out stay unpublished. A failed application sync skips that
+  interval's host sync. The application sync runs on the worker's thread, outside
+  the host's publication lock. `host.autoSync(Duration)` has no application sync,
+  for applications that write straight into the host root.
 - `host.autoFlush(Duration)` completes a barrier for already-retained data. It
   never syncs applications or the host.
 
 Each worker exposes its first background failure through `failure()` and keeps
-running. Closing one drains it and finishes its work: the automatic sync
-publishes and checkpoints once more, and the automatic flush flushes once more.
-Closing the host stops both, runs the publish step once more, then checkpoints
-once, so a host always closes with a full save; a failure of that publish step is
-reported through `failure()` rather than stopping the save. Close the workers, or
+running. Closing one drains it and finishes its work: the automatic sync syncs
+the applications and checkpoints once more, and the automatic flush flushes once
+more. Closing the host stops both, syncs the applications once more, then
+checkpoints once, so a host always closes with a full save; a failure of that
+application sync is reported through `failure()` rather than stopping the save. Close the workers, or
 the host, before the borrowed store. A one-second sync and a 30-second flush are
 reasonable defaults. A request requiring durable completion calls
 `host.checkpoint()` before reporting success; an interval alone is not a
