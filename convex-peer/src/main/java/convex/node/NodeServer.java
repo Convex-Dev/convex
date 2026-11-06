@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -21,6 +22,7 @@ import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
+import convex.net.PeerConnectionException;
 
 /**
  * Replicates one host's published root.
@@ -210,7 +212,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return pullPath(source,peer,false,path);
 	}
 
-	/** Pulls a path, optionally as background bootstrap rather than application activity. */
+	/**
+	 * Pulls a path, optionally as background bootstrap rather than application activity.
+	 * Fails as {@link LatticePropagator#pullPath(Convex, boolean, ACell...)} describes.
+	 */
 	public CompletableFuture<ACell> pullPath(LatticePropagator source,Convex peer,
 			boolean background,ACell... path) {
 		requireAttached(source);
@@ -273,8 +278,19 @@ public class NodeServer<V extends ACell> implements Closeable {
 			}
 			host.sync();
 			return true;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
 		} catch (Exception e) {
-			log.warn("Pull through propagator group failed",e);
+			// A peer that has gone, answers late or refuses is normal operation, and
+			// a pull abandoned as the node closes needs no report
+			Throwable cause=PeerConnectionException.unwrap(e);
+			if (cause instanceof CancellationException) return false;
+			if (cause instanceof RuntimeException || cause instanceof Error) {
+				log.warn("Pull through propagator group failed",cause);
+			} else {
+				log.debug("Pull through propagator group failed: {}",cause.toString());
+			}
 			return false;
 		}
 	}

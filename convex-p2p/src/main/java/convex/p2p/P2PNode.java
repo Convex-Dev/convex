@@ -522,12 +522,10 @@ public class P2PNode implements Closeable {
 		launchStarted=true;
 		var manager=propagator.getConnectionManager();
 		// Admission is propagation policy, so the application installs it before
-		// NodeServer starts the already-configured group.
+		// NodeServer starts the already-configured group. initialisePeer reports
+		// its own failures.
 		manager.setPeerAdmissionHandler((peerKey,peer) -> initialisePeer(peer)
-			.exceptionally(error -> {
-				log.debug("Unable to initialise admitted peer {}: {}",peerKey,error.getMessage());
-				return null;
-			}));
+			.exceptionally(error -> null));
 		// The application's contact records hear what the manager learns about other nodes,
 		// and a blocked node that authenticates is dropped then
 		ContactRecords contacts=application.contacts();
@@ -1274,7 +1272,9 @@ public class P2PNode implements Closeable {
 		// Started only once the entry is in place: the work can fail at once, and
 		// forgetting a failure removes the entry, which no map update may do
 		initialised.whenComplete((ignored,error) -> {
-			if (error!=null) initialisations.remove(peer,initialised);
+			if (error==null) return;
+			initialisations.remove(peer,initialised);
+			reportInitialisationFailure(peer,error);
 		});
 		try {
 			propagator.getConnectionManager().withPeer(peer.getVerifiedPeer(),false,
@@ -1288,6 +1288,21 @@ public class P2PNode implements Closeable {
 			throw e;
 		}
 		return initialised;
+	}
+
+	/**
+	 * Logs why sending this node's record to a peer or pulling its bootstrap paths
+	 * failed. A peer that has gone, answers late or refuses is normal operation, work
+	 * abandoned as this node closes needs no report, and anything else is a fault.
+	 */
+	private static void reportInitialisationFailure(Convex peer,Throwable error) {
+		Throwable cause=PeerConnectionException.unwrap(error);
+		if (cause instanceof CancellationException) return;
+		if (cause instanceof RuntimeException || cause instanceof Error) {
+			log.warn("Could not bootstrap from node {} after an unexpected failure",peer.getVerifiedPeer(),cause);
+		} else {
+			log.info("Could not bootstrap from node {}: {}",peer.getVerifiedPeer(),cause.getMessage());
+		}
 	}
 
 	/** Pulls the application's bootstrap paths from a new peer, in order, refreshing discovery after each. */

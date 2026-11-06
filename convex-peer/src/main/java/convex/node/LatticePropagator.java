@@ -27,6 +27,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.exceptions.ResultException;
 import convex.core.exceptions.StoreException;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
@@ -38,6 +39,7 @@ import convex.core.util.LatestUpdateQueue;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Root;
+import convex.net.PeerConnectionException;
 
 /**
  * Isolated connection and publication policy group for one lattice node.
@@ -1239,6 +1241,9 @@ public class LatticePropagator implements Closeable {
 
 	// ========== Pull (Fetch from Peers) ==========
 
+	/** How long a pull waits for the cells a partial reply left missing. */
+	private static final long PULL_ACQUIRE_TIMEOUT_MS = 30_000;
+
 	/**
 	 * Pulls the latest lattice value from a specific peer into this propagator's store.
 	 *
@@ -1268,13 +1273,25 @@ public class LatticePropagator implements Closeable {
 	 *
 	 * @param peer manager-owned peer client to query
 	 * @param path path within the peer's announced lattice value; empty selects the root
-	 * @return future completing with the acquired value, or {@code null} when absent
+	 * @return future completing with the acquired value, or {@code null} when absent;
+	 *         it fails as {@link #pullPath(Convex, boolean, ACell...)} describes
 	 */
 	public CompletableFuture<ACell> pullPath(Convex peer, ACell... path) {
 		return pullPath(peer,false,path);
 	}
 
-	/** Background pulls retain outstanding work but do not earn active-peer priority. */
+	/**
+	 * Pulls one path as {@link #pullPath(Convex, ACell...)} does. Background pulls
+	 * retain outstanding work but do not earn active-peer priority.
+	 *
+	 * <p>The future fails with a checked exception for an outcome of normal operation:
+	 * {@link PeerConnectionException} if the peer is not connected,
+	 * {@link ResultException} if the peer answers with an error or the request fails,
+	 * as when the connection closes or the reply does not arrive within the client's
+	 * timeout, and {@link java.util.concurrent.TimeoutException} if missing cells are
+	 * not acquired in time. It fails with an unchecked exception only for a fault, and
+	 * is cancelled if the work is abandoned. No thread waits for the peer.</p>
+	 */
 	public CompletableFuture<ACell> pullPath(Convex peer,boolean background,ACell... path) {
 		if (peer == null) {
 			return CompletableFuture.failedFuture(new IllegalArgumentException("Peer cannot be null"));
@@ -1283,55 +1300,48 @@ public class LatticePropagator implements Closeable {
 	}
 
 	private CompletableFuture<ACell> acquirePath(Convex peer,ACell[] path) {
-		return CompletableFuture.supplyAsync(() -> {
-			try {
-				if (!peer.isConnected()) {
-					throw new RuntimeException("Peer is not connected");
-				}
+		if (!peer.isConnected()) {
+			return CompletableFuture.failedFuture(new PeerConnectionException("Peer is not connected"));
+		}
+		AVector<?> queryPayload = Vectors.create(
+				MessageTag.LATTICE_QUERY, null, Vectors.create(path));
+		Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
 
-				AVector<?> queryPayload = Vectors.create(
-						MessageTag.LATTICE_QUERY, null, Vectors.create(path));
-				Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
+		// A large value comes back as a partial reply (root plus direct branches,
+		// possibly preceded by DATA chunks). It must decode against this store so
+		// missing branches resolve lazily and the acquire fallback can complete it.
+		if (peer.getStore() == null) peer.setStore(store);
 
-				// A large value comes back as a partial reply (root plus direct branches,
-				// possibly preceded by DATA chunks). It must decode against this store so
-				// missing branches resolve lazily and the acquire fallback can complete it.
-				if (peer.getStore() == null) peer.setStore(store);
+		// The client's request times out and reports a closed connection as a result.
+		// The reply arrives on a transport thread, which must not do store work.
+		return peer.request(queryMessage)
+			.thenComposeAsync(result -> acquireReply(peer,result),ThreadUtils.getVirtualExecutor());
+	}
 
-				CompletableFuture<Result> resultFuture = peer.request(queryMessage);
-				Result result = resultFuture.get(10, TimeUnit.SECONDS);
+	/**
+	 * Stores a pull reply's value locally. A complete reply is announced directly. A
+	 * partial reply (root only, or root after DATA chunks) is completed by acquiring
+	 * from the peer: any cells the reply or its chunks staged in the store are found
+	 * there and not fetched again. Completeness is checked explicitly, since a store
+	 * may hold a partial value without throwing.
+	 */
+	private CompletableFuture<ACell> acquireReply(Convex peer,Result result) {
+		if (result.isError()) return CompletableFuture.failedFuture(new ResultException(result));
+		ACell receivedValue = result.getValue();
+		if (receivedValue == null) return CompletableFuture.completedFuture(null);
 
-				if (result.isError()) {
-					throw new RuntimeException("Pull query failed: " + result);
-				}
-
-				ACell receivedValue = result.getValue();
-				if (receivedValue == null) return null;
-
-				// 2. Store the received value locally. A complete reply is announced
-				// directly. A partial reply (root only, or root after DATA chunks) is
-				// completed by acquiring from the peer: any cells the reply or its
-				// chunks staged in the store are found there and not fetched again.
-				// Completeness is checked explicitly, since a store may hold a partial
-				// value without throwing.
-				ACell acquired;
-				HashSet<Hash> missing = new HashSet<>();
-				Ref.get(receivedValue).findMissing(missing, 1);
-				if (missing.isEmpty()) {
-					acquired = Cells.announce(receivedValue, r -> {}, store);
-				} else {
-					Hash rootHash = Hash.get(receivedValue);
-					acquired = peer.acquire(rootHash, store).get(30, TimeUnit.SECONDS);
-				}
-
-				log.debug("Acquired pulled lattice path from peer: {}", peer.getHostAddress());
-				return acquired;
-
-			} catch (Exception e) {
-				log.warn("Lattice pull failed from peer: {}", peer.getHostAddress(), e);
-				throw new RuntimeException("Lattice pull failed from peer", e);
-			}
-		},ThreadUtils.getVirtualExecutor());
+		HashSet<Hash> missing = new HashSet<>();
+		Ref.get(receivedValue).findMissing(missing, 1);
+		if (!missing.isEmpty()) {
+			return peer.<ACell>acquire(Hash.get(receivedValue), store)
+				.orTimeout(PULL_ACQUIRE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+		}
+		try {
+			return CompletableFuture.completedFuture(Cells.announce(receivedValue, r -> {}, store));
+		} catch (IOException e) {
+			// This node's own store failed: a fault, not an outcome of the pull
+			return CompletableFuture.failedFuture(new StoreException("Unable to store a pulled lattice value", e));
+		}
 	}
 
 	/**

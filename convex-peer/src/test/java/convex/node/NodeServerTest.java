@@ -60,6 +60,7 @@ import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.exceptions.ResultException;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
@@ -74,6 +75,7 @@ import convex.lattice.cursor.ACursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
+import convex.net.PeerConnectionException;
 import convex.net.impl.netty.NettyServer;
 
 /**
@@ -2406,6 +2408,35 @@ public class NodeServerTest {
 		}
 	}
 
+	/** A pull from a peer that is not connected fails with a checked connection failure (#827). */
+	@Test
+	public void testPullFromDisconnectedPeerFailsChecked() throws Exception {
+		ControlledVerificationConvex peer=new ControlledVerificationConvex();
+		peer.close();
+		try (NodeServer<AInteger> target=new TestNode<>(MaxLattice.create(),new MemoryStore())) {
+			LatticePropagator group=propagator(target);
+			target.launch();
+			ExecutionException e=assertThrows(ExecutionException.class,
+				() -> target.pullPath(group,peer).get(5,TimeUnit.SECONDS));
+			assertTrue(e.getCause() instanceof PeerConnectionException,String.valueOf(e.getCause()));
+		}
+	}
+
+	/** A pull answered with an error fails with that result, as a checked exception (#827). */
+	@Test
+	public void testPullAnsweredWithErrorFailsChecked() throws Exception {
+		ControlledVerificationConvex peer=new ControlledVerificationConvex();
+		peer.answer=Result.error(ErrorCodes.TIMEOUT,"No answer in time");
+		try (NodeServer<AInteger> target=new TestNode<>(MaxLattice.create(),new MemoryStore())) {
+			LatticePropagator group=propagator(target);
+			target.launch();
+			ExecutionException e=assertThrows(ExecutionException.class,
+				() -> target.pullPath(group,peer).get(5,TimeUnit.SECONDS));
+			assertTrue(e.getCause() instanceof ResultException,String.valueOf(e.getCause()));
+			assertEquals(ErrorCodes.TIMEOUT,((ResultException)e.getCause()).getResult().getErrorCode());
+		}
+	}
+
 	@Test
 	public void testLatticeQueryRejectsNonVectorPath() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store);
@@ -3101,6 +3132,8 @@ public class NodeServerTest {
 		private final CompletableFuture<AccountKey> verification = new CompletableFuture<>();
 		private volatile boolean connected = true;
 		private int closeCount;
+		/** What every message is answered with */
+		volatile Result answer = Result.SENT_MESSAGE;
 
 		ControlledVerificationConvex() {
 			super(null, null);
@@ -3143,7 +3176,7 @@ public class NodeServerTest {
 
 		@Override
 		public CompletableFuture<Result> message(Message message) {
-			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+			return CompletableFuture.completedFuture(answer);
 		}
 
 		@Override
