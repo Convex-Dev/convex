@@ -48,6 +48,10 @@ hook: it is one concrete method over `updateAndGet` with a store-agnostic
 callbacks may retry and must be side-effect free. They receive the actual current
 value, including `null`; no empty value is substituted.
 
+`get()` returns the cursor's declared value type. Both nested `get(keys...)`
+overloads return `ACell`: a child need not have its parent's type. Callers cast or
+validate the result explicitly when they require a narrower type.
+
 `path(keys...)` creates a view without changing state. Reads use `RT.getIn`, which
 returns null for absent or incompatible ancestors. Use collection component paths
 when incompatible containers must be distinguished from absence. Writes

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Return nested cursor reads as `ACell`, requiring explicit casts or checks for narrower types. ([Cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths))
 - Speed up Convex DB replication and prepared statements. ([#786](https://github.com/Convex-Dev/convex/issues/786))
 - Follow the SQL standard for Convex DB `INSERT` and name case, and accept only `database` in JDBC URLs; see [Identifier Case](convex-db/README.md#identifier-case) when upgrading.
 - Configure `convex.p2p.P2PNode` with a JSON5 file, and advertise nodes with `convex p2p start --url` in place of `convex dlfs start --url`. ([Running a node](convex-p2p/README.md#running-a-node))

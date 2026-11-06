@@ -62,11 +62,13 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * <p>Equivalent to {@code RT.getIn(get(), path)}. Does not create a path cursor;
 	 * use {@link #path(ACell...)} for that.</p>
+	 * <p>The nested value may have a different type from this cursor's value.
+	 * Callers must explicitly cast or validate it when a narrower type is required.</p>
 	 *
 	 * @param path Keys to navigate through nested data structures
 	 * @return Value at the path, or null if path doesn't exist
 	 */
-	public V get(ACell... path) {
+	public ACell get(ACell... path) {
 		return RT.getIn(get(), path);
 	}
 
@@ -74,11 +76,13 @@ public abstract class ACursor<V extends ACell> {
 	 * Returns a value at a nested path within this cursor's value.
 	 *
 	 * <p>Convenience overload that accepts Java objects (converted via {@link RT#cvm}).</p>
+	 * <p>The nested value may have a different type from this cursor's value.
+	 * Callers must explicitly cast or validate it when a narrower type is required.</p>
 	 *
 	 * @param path Keys to navigate through nested data structures
 	 * @return Value at the path, or null if path doesn't exist
 	 */
-	public V get(Object... path) {
+	public ACell get(Object... path) {
 		return RT.getIn(get(), path);
 	}
 
