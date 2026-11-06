@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Write blob map keys as `0x` hex in all JSON output, including REST API responses. ([CAD044](https://docs.convex.world/docs/cad/json))
 - Make required cursor reads fail on absent or unresolvable paths; add explicit optional reads and presence checks. ([Cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths))
 - Return nested cursor reads as `ACell`, requiring explicit casts or checks for narrower types. ([Cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths))
 - Speed up Convex DB replication and prepared statements. ([#786](https://github.com/Convex-Dev/convex/issues/786))
