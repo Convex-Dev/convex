@@ -205,6 +205,12 @@ follow-up messages.
    decoded one, instead of being decoded again. Storeless decode throws
    `PartialMessageException` for any branch not in the map.
 
+Decoded keys, signatures, blobs, strings and branch hashes are views of the bytes they
+were read from. So that a cell kept after a message holds only its own bytes, never the
+whole message, the top cell is read again from a copy of its own bytes when children
+follow it, and each child that is decoded is decoded from a copy of its own. A child
+whose re-encoding matches its bytes keeps that copy as its encoding.
+
 `Message` exposes two accessors: `getPayload()` returns the cached payload or null and
 never decodes; `getPayload(store)` decodes on demand, storelessly when `store` is null
 (complete messages, client side) or against the store when given (partial messages,

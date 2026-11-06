@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
@@ -658,6 +659,11 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * message's child cells are resolved eagerly via resolveRefs. Branch refs
 	 * and child cells the store already caches are reused rather than decoded.
 	 *
+	 * When child cells follow the top cell, the top cell is read again from a
+	 * copy of its own bytes and each child is decoded from a copy of its own,
+	 * so a cell kept after the message holds only its own bytes, never the
+	 * whole message.
+	 *
 	 * @param data Multi-cell encoded data
 	 * @return Decoded top-level cell
 	 * @throws BadFormatException If encoding format is invalid
@@ -676,6 +682,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		// ds.branchCount. For store-based decode, use this encoder directly.
 		CAD3Encoder readEncoder = storeless ? nullStoreEncoder() : this;
 
+		int topStart = ds.pos;
 		ACell result = readEncoder.read(ds);
 		if (result==null) {
 			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
@@ -689,6 +696,16 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			// Storeless with branches but no child data — partial message.
 			// Fall through: resolveRefs will throw PartialMessageException
 			// with the specific missing hash.
+		}
+
+		if (!ds.isConsumed()) {
+			// Children follow, so the message holds more than the top cell. Read it again
+			// from a copy of its own bytes: decoded keys, signatures, blobs and branch
+			// hashes are views of the bytes they came from, and a top cell kept after
+			// this message must not keep the whole message in memory.
+			DecodeState top = new DecodeState(Blob.wrap(Arrays.copyOfRange(ds.data, topStart, ds.pos)));
+			result = readEncoder.read(top);
+			if (!top.isConsumed()) throw new BadFormatException("Top cell length changed on second read");
 		}
 
 		// Multi-cell or storeless partial: read children and resolve branch refs
@@ -775,7 +792,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * Dispatches through this encoder's virtual {@link #read} methods.
 	 * Reads from ds.pos to ds.limit. Each child's hash is taken from its
 	 * received bytes first; a cell the store caches under that hash is reused
-	 * without decoding.
+	 * without decoding. Any other child is decoded from a copy of its own bytes.
 	 *
 	 * Input is adversarial (public internet). Validates:
 	 * <ul>
@@ -813,17 +830,26 @@ public class CAD3Encoder extends AEncoder<ACell> {
 					continue;
 				}
 
-				ACell c = this.read(ds);
+				// Decode from a copy of the child's own bytes: decoded keys, signatures,
+				// blobs and branch hashes are views of the bytes they came from, and a
+				// child kept after this message must not keep the whole message in memory
+				Blob own = Blob.wrap(Arrays.copyOfRange(ds.data, start, childEnd));
+				DecodeState cs = new DecodeState(own);
+				ACell c = this.read(cs);
 
 				if (c==null) throw new BadFormatException("Null child encoding");
 				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
-				if (ds.pos != childEnd) throw new BadFormatException("Child encoding length mismatch");
+				if (!cs.isConsumed()) throw new BadFormatException("Child encoding length mismatch");
+				ds.pos = childEnd;
 
-				// Decoding alone does not prove the received bytes canonical, so the cell
-				// keeps its own re-encoding. When that matches the received bytes, it takes
-				// the hash already computed instead of hashing again.
-				Blob encoding = c.getEncoding();
-				if ((encoding.count()==length) && encoding.equalsBytes(ds.data, start)) encoding.attachContentHash(h);
+				// Decoding alone does not prove the received bytes canonical. When the
+				// cell's re-encoding matches them, the copy becomes its encoding, with the
+				// hash already computed, so one array holds both its fields and its
+				// encoding. Otherwise the cell keeps its re-encoding and that hash.
+				if (own.equalsBytes(c.getEncoding())) {
+					own.attachContentHash(h);
+					c.attachEncoding(own);
+				}
 				acc.put(c.getHash(), c);
 			}
 		} catch (IndexOutOfBoundsException e) {

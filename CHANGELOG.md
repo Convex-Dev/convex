@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep peers fast under sustained load with a single bounded cache per Etch store; the `enableL2` setting no longer has an effect. ([Etch configuration](convex-core/docs/ETCH_CONFIG.md#options-and-defaults))
 - Read from Etch stores about twice as fast by trusting each record's key as its hash; `etch validate` still checks them. ([Etch v3](convex-core/docs/ETCHv3.md#sync))
 - Reuse cells a peer already holds in its cache when decoding messages, instead of decoding another copy. ([Decoding](convex-core/docs/ENCODER_DESIGN.md#decoding))
+- Stop cells kept from a multi-cell message holding the whole message in memory. ([Decoding](convex-core/docs/ENCODER_DESIGN.md#decoding))
 - Simplify the Java APIs for lattice applications, networking and Convex DB; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading.
 
 ### Fixed
