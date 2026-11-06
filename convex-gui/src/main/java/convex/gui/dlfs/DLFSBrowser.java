@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -83,8 +84,9 @@ import net.miginfocom.swing.MigLayout;
  * Since both GUI and WebDAV share the same DLFSLocal instances, operations
  * through either path are automatically consistent.
  *
- * <p>The node runs locally, with no listener. Edits are saved when the host
- * closes: when the browser closes or switches store, and at JVM shutdown.
+ * <p>The node runs locally, with no listener. The host retains edits every second
+ * and writes them to disk every 30 seconds, and saves in full when it closes: when
+ * the browser closes or switches store, and at JVM shutdown.
  */
 @SuppressWarnings("serial")
 public class DLFSBrowser extends AbstractGUI {
@@ -296,10 +298,16 @@ public class DLFSBrowser extends AbstractGUI {
 			NodeConfig localConfig = NodeConfig.create(Maps.of(NodeConfig.PORT, CVMLong.create(-1)));
 
 			// The relay host's live application verifies owners and signs with this key;
-			// the node replicates; the browser saves through the host explicitly.
+			// the node replicates; the host's timers save, and its close saves the rest.
 			LatticeContext ctx = LatticeContext.create(null, keyPair);
 			nodeServer = new NodeServer<>(RelayHost.open(OWNER_LATTICE, etchStore, ctx), localConfig);
 			nodeServer.launch();
+			// Drives write straight into the host root, so there is nothing to publish first
+			var host = nodeServer.getHost();
+			host.autoSync(Duration.ofSeconds(1)).failure()
+				.thenAcceptAsync(error -> log.warn("DLFS store sync failed", error));
+			host.autoFlush(Duration.ofSeconds(30)).failure()
+				.thenAcceptAsync(error -> log.warn("DLFS store flush failed", error));
 
 			// Navigate to owner's signed entry, wrap in SignedCursor
 			AForkableCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =

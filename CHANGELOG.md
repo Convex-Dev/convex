@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replicate DLFS nodes both ways. ([DLFS](convex-dlfs/README.md#run-a-webdav-server))
 - Stream large DLFS files over WebDAV, with byte ranges and atomic uploads. ([#790](https://github.com/Convex-Dev/convex/issues/790))
 - Give lattice applications more control over networking, persistence and private state. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md))
+- Let lattice services publish and save on a schedule; closing a host always ends with a full save. ([Persistence](convex-peer/docs/PERSISTENCE.md#logical-publication-and-durability))
 
 ### Changed
 

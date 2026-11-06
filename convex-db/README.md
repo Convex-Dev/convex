@@ -43,9 +43,8 @@ try (var store = EtchStore.create(file);
 
 `checkpoint()` retains the current host snapshot and completes the store's
 durability barrier. Closing the host does so once more, then the store closes.
-For batched saving, use `host.sync()` after accepted edits and scope
-`host.autoFlush(interval)` around the service lifetime; closing the host stops
-it. With a `NodeServer`, stop request handling and checkpoint, then close the
+For batched saving, scope `host.autoSync(interval)` and `host.autoFlush(interval)`
+around the service lifetime; closing the host stops both and saves. With a `NodeServer`, stop request handling and checkpoint, then close the
 server, which sends that checkpoint to peers, then the host. Closing a `NodeServer`
 saves nothing itself. See the
 executable local and JDBC reopen scenarios in

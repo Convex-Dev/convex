@@ -61,12 +61,30 @@ private draft; explicit fork sync or delivery accepts it into another host.
 `persist()` writes a draft's cells to its host's store without publishing it; the
 draft is still not retained until it is synced and checkpointed.
 
-A service can scope `host.autoFlush(Duration)` around its lifetime for periodic
-barriers. The resource exposes the first background failure through `failure()`,
-retries subsequent flushes, and drains its worker and performs a final flush on
-close. It never syncs applications or the host. Close it before the borrowed
-store. A request requiring durable completion calls `host.checkpoint()` before
-reporting success; an interval alone is not a completion guarantee.
+A service that accepts delayed durability can have the host save on a schedule.
+Nothing runs on a timer unless the service starts it, and a host has at most one
+of each worker:
+
+- `host.autoSync(Duration, Runnable)` runs the service's publish step, such as
+  `application::sync`, then syncs the host, so the root is retained and offered to
+  replication. The host never chooses what to publish: drafts the step leaves out
+  stay unpublished. A failed publish step skips that interval's sync. The step runs
+  on the worker's thread, outside the host's publication lock.
+  `host.autoSync(Duration)` has no publish step, for applications that write
+  straight into the host root.
+- `host.autoFlush(Duration)` completes a barrier for already-retained data. It
+  never syncs applications or the host.
+
+Each worker exposes its first background failure through `failure()` and keeps
+running. Closing one drains it and finishes its work: the automatic sync
+publishes and checkpoints once more, and the automatic flush flushes once more.
+Closing the host stops both, runs the publish step once more, then checkpoints
+once, so a host always closes with a full save; a failure of that publish step is
+reported through `failure()` rather than stopping the save. Close the workers, or
+the host, before the borrowed store. A one-second sync and a 30-second flush are
+reasonable defaults. A request requiring durable completion calls
+`host.checkpoint()` before reporting success; an interval alone is not a
+completion guarantee.
 
 Host construction expresses opening intent: `create` rejects a retained root,
 `open` adopts one, and `replace` explicitly writes a replacement. Optional cursor
@@ -165,8 +183,8 @@ Launch order protects serving consistency:
 3. seed every attached serving view independently;
 4. start propagator workers.
 
-The owning service chooses any initial checkpoint and starts automatic flushing
-explicitly. Networking does not install a durability worker or shutdown hook.
+The owning service chooses any initial checkpoint and starts any automatic sync
+or flushing explicitly. Networking does not install a durability worker or shutdown hook.
 
 The application opens any `LatticeListener` only after node launch has prepared
 the attached propagation endpoints.

@@ -390,11 +390,13 @@ with one signature when the application syncs it, so the application decides how
 many edits share a signature.
 
 The service chooses when to promise durability. It can checkpoint before
-acknowledging a durable request or batch flushes when delayed durability is
-acceptable. Background flushing processes already-retained state and must expose
-failures. At shutdown the service saves what it keeps in a final checkpoint, which
-its node sends to peers as it closes; see
-[shutdown](../../convex-peer/docs/SHUTDOWN.md).
+acknowledging a durable request or, when delayed durability is acceptable, have
+the host publish and flush on a schedule. The host never chooses what to publish:
+the service names it. Background workers must expose failures, and closing the
+host always ends with a full save; see
+[persistence](../../convex-peer/docs/PERSISTENCE.md#logical-publication-and-durability).
+At shutdown the service saves what it keeps in a final checkpoint, which its node
+sends to peers as it closes; see [shutdown](../../convex-peer/docs/SHUTDOWN.md).
 
 Separating these boundaries avoids forcing every edit to pay for a disk barrier
 or a network round trip. It also makes completion precise: a local edit, retained

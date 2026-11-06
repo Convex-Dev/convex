@@ -3,33 +3,23 @@ package convex.lattice;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A host's scoped durability worker. Flushes already-retained state; never syncs
  * applications or advances the retained root. The store remains caller-owned.
- * Closing the host closes this resource. Its owner closes it, directly or by
- * closing the host, never from two threads at once; closing again does nothing.
+ * Closing the host closes this resource before its final checkpoint. Its owner
+ * closes it, directly or by closing the host, never from two threads at once;
+ * closing again does nothing.
  */
 public final class AutoFlush implements Closeable {
 	private final LatticeHost<?> host;
-	private final ScheduledExecutorService executor;
-	private final CompletableFuture<Throwable> failure=new CompletableFuture<>();
+	private final HostWorker worker;
 	private boolean closed;
-	private volatile Thread worker;
 
 	AutoFlush(LatticeHost<?> host,Duration interval) {
-		long nanos=Objects.requireNonNull(interval).toNanos();
-		if (nanos<=0) throw new IllegalArgumentException("Flush interval must be positive");
 		this.host=host;
-		executor=Executors.newSingleThreadScheduledExecutor(
-			Thread.ofVirtual().name("Lattice host auto flush").factory());
-		executor.scheduleWithFixedDelay(this::flush,nanos,nanos,TimeUnit.NANOSECONDS);
+		worker=new HostWorker("Lattice host auto flush",interval,host::flush);
 	}
 
 	/**
@@ -37,48 +27,34 @@ public final class AutoFlush implements Closeable {
 	 * do not erase this signal. Monitoring code can subscribe without polling.
 	 */
 	public CompletionStage<Throwable> failure() {
-		return failure.minimalCompletionStage();
-	}
-
-	private void flush() {
-		worker=Thread.currentThread();
-		try {
-			host.flush();
-		} catch (VirtualMachineError e) {
-			if (!(e instanceof StackOverflowError)) throw e;
-			failure.complete(e);
-		} catch (Throwable e) {
-			// Includes EtchCorruptionError. A periodic task that throws is never run
-			// again, so every recoverable failure is reported and flushing continues.
-			failure.complete(e);
-		}
+		return worker.failure();
 	}
 
 	/** Stops and drains the worker, then flushes once more. Does not close the store. */
 	@Override
 	public void close() throws IOException {
-		if (Thread.currentThread()==worker) {
+		if (worker.isWorker()) {
 			throw new IllegalStateException("Close automatic flushing from its owner, not its failure callback");
 		}
+		stop(host::flush);
+	}
+
+	/** Stops and drains the worker for the host's close, whose checkpoint flushes. */
+	void closeForHost() throws IOException {
+		stop(null);
+	}
+
+	boolean isWorker() {
+		return worker.isWorker();
+	}
+
+	private void stop(HostWorker.Step last) throws IOException {
 		if (closed) return;
-		executor.shutdown();
-		// A surrounding resource scope may close the store as soon as we return.
-		// Drain and flush uninterrupted, then restore the owner's interruption.
-		// Clear it first: awaitTermination ignores it once the worker has stopped.
-		boolean interrupted=Thread.interrupted();
 		try {
-			for (;;) {
-				try {
-					if (executor.awaitTermination(Long.MAX_VALUE,TimeUnit.NANOSECONDS)) break;
-				} catch (InterruptedException e) {
-					interrupted=true;
-				}
-			}
-			host.flush();
+			worker.stop(last);
 		} finally {
 			closed=true;
 			host.releaseAutoFlush(this);
-			if (interrupted) Thread.currentThread().interrupt();
 		}
 	}
 }

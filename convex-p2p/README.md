@@ -277,8 +277,9 @@ reads the lattice and imports nothing from the node package, so it can also be
 connected directly to a standalone `LatticeHost` for local use.
 
 The owning service chooses durability through `node.getNodeServer().getHost()`:
-call `checkpoint()` for a durable save, or publish with `sync()` and use a scoped
-`autoFlush(Duration)` for batched barriers. Shut down with
+call `checkpoint()` for a durable save, or publish with `sync()`, or on a schedule
+with a scoped `autoSync(Duration)`, and use a scoped `autoFlush(Duration)` for
+batched barriers. Shut down with
 `try (store; host; node) { node.getApplication().sync(); host.checkpoint(); }`, so
 the node sends the final checkpoint to peers as it closes; see
 [shutdown](../convex-peer/docs/SHUTDOWN.md).

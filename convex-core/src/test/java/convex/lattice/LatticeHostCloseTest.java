@@ -9,6 +9,7 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -19,6 +20,7 @@ import convex.core.data.ACell;
 import convex.core.data.Blobs;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.etch.Etch;
@@ -61,6 +63,7 @@ class LatticeHostCloseTest {
 		assertThrows(IllegalStateException.class,() -> host.sync(publisher));
 		assertThrows(IllegalStateException.class,host::checkpoint);
 		assertThrows(IllegalStateException.class,host::flush);
+		assertThrows(IllegalStateException.class,() -> host.autoSync(Duration.ofDays(1)));
 		assertThrows(IllegalStateException.class,() -> host.autoFlush(Duration.ofDays(1)));
 		assertThrows(IllegalStateException.class,() -> host.attachPublisher(publisher));
 		host.detachPublisher(publisher);
@@ -75,8 +78,15 @@ class LatticeHostCloseTest {
 		var flushing=new CountDownLatch(1);
 		var release=new CountDownLatch(1);
 		var flushes=new AtomicInteger();
+		var retained=new AtomicBoolean();
+		var flushedAfterRetaining=new AtomicBoolean();
 		var store=new MemoryStore() {
+			@Override public <T extends ACell> Ref<T> setRootData(T data) {
+				if (CVMLong.TWO.equals(data)) retained.set(true);
+				return super.setRootData(data);
+			}
 			@Override public void flush() {
+				if (retained.get()) flushedAfterRetaining.set(true);
 				if (flushes.getAndIncrement()>0) return;
 				flushing.countDown();
 				try { assertTrue(release.await(10,TimeUnit.SECONDS)); }
@@ -95,8 +105,8 @@ class LatticeHostCloseTest {
 		} finally { release.countDown(); }
 		closing.get(10,TimeUnit.SECONDS);
 		assertEquals(CVMLong.TWO,store.getRootData());
+		assertTrue(flushedAfterRetaining.get(),"The final save flushes what it retained");
 		int flushed=flushes.get();
-		assertTrue(flushed>=3,"Drained flush, the resource's final flush and the checkpoint");
 		// Already closed: closing it again would otherwise flush the closed host and throw.
 		durability.close();
 		assertEquals(flushed,flushes.get());
