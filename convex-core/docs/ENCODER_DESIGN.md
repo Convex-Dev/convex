@@ -145,8 +145,9 @@ must produce the same result, state, error and Juice usage.
 Default store decoding uses `CVMEncoder`, including specialisation of a cached
 top-level value. Embedded encodings probe the cache only when their content hash
 is already available; decoding never computes that hash merely for lookup, and
-never automatically admits embedded values. Their non-embedded child refs still
-resolve through the store cache as needed. Explicit
+never automatically admits embedded values. A non-embedded branch ref whose hash
+the store's cache holds takes the cached ref, and its value, as it is decoded; other
+branch refs resolve through the store when first used. Explicit
 persistence of an embedded root is separate: it remains legal and produces a
 store-owned ref. Raw store/ref lookup remains value-oriented and does not promise
 a particular Java representation. Use the typed access helpers at that boundary.
@@ -199,8 +200,10 @@ follow-up messages.
 3. If the data is consumed and no branch refs were met, return it. A store-bound
    decoder also returns here when branches were met, because they resolve lazily.
 4. Otherwise read the child cells into a map keyed by hash and replace branch refs
-   with the decoded children. Storeless decode throws `PartialMessageException` for any
-   branch not in the map.
+   with the decoded children. Each child's hash is taken from its received bytes
+   first: a cell the store's cache holds under that hash is reused, specialised like a
+   decoded one, instead of being decoded again. Storeless decode throws
+   `PartialMessageException` for any branch not in the map.
 
 `Message` exposes two accessors: `getPayload()` returns the cached payload or null and
 never decodes; `getPayload(store)` decodes on demand, storelessly when `store` is null

@@ -81,6 +81,17 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		static final CAD3Encoder INSTANCE = new CAD3Encoder(NullStore.INSTANCE);
 	}
 
+	/**
+	 * Gives the value this encoder decodes for a cell reused from its store's cache.
+	 * Any code may have cached the cell, so an encoder with its own types converts it.
+	 *
+	 * @param cell Non-null cell from the store's cache
+	 * @return The cell as this encoder would decode it
+	 */
+	protected ACell specialiseCached(ACell cell) {
+		return cell;
+	}
+
 	@Override
 	public Blob encode(ACell a) {
 		return Cells.encode(a);
@@ -127,7 +138,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 
 	/**
 	 * Reads a Ref or embedded cell from the decode state, advancing pos.
-	 * For non-embedded refs, creates RefSoft bound to this encoder's store
+	 * For non-embedded refs, returns the store's cached ref for the hash when it
+	 * has one, otherwise creates a RefSoft bound to this encoder's store
 	 * (no thread-local lookup). For embedded cells, dispatches through this
 	 * encoder's virtual read for correct type resolution.
 	 *
@@ -146,6 +158,9 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			ds.pos += Hash.LENGTH;
 			ds.branchCount++;
 			if (store==null) throw new IllegalStateException("Cannot read Ref without a store in encoder");
+			// The hash is in hand: reuse the store's cached ref, and its value, when it has one
+			Ref<T> cached = store.checkCache(h);
+			if (cached!=null) return cached;
 			Ref<T> ref = Ref.forHash(h, store); // TODO: should be store method?
 			return ref.markEmbedded(false);
 		}
@@ -640,7 +655,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 *
 	 * Store-based decode (store!=null): uses this encoder directly. Branches
 	 * resolve lazily from the store on demand. Any branches included in the
-	 * message's child cells are resolved eagerly via resolveRefs.
+	 * message's child cells are resolved eagerly via resolveRefs. Branch refs
+	 * and child cells the store already caches are reused rather than decoded.
 	 *
 	 * @param data Multi-cell encoded data
 	 * @return Decoded top-level cell
@@ -757,7 +773,9 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	/**
 	 * Decodes VLQ-prefixed non-embedded child cells using DecodeState.
 	 * Dispatches through this encoder's virtual {@link #read} methods.
-	 * Reads from ds.pos to ds.limit.
+	 * Reads from ds.pos to ds.limit. Each child's hash is taken from its
+	 * received bytes first; a cell the store caches under that hash is reused
+	 * without decoding.
 	 *
 	 * Input is adversarial (public internet). Validates:
 	 * <ul>
@@ -777,8 +795,23 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			while(ds.pos < ds.limit) {
 				long encLength = readVLQCount(ds);
 
-				int childEnd = ds.pos + (int)encLength;
-				if (childEnd > ds.limit) throw new BadFormatException("Child encoding exceeds message bounds");
+				int start = ds.pos;
+				if (encLength > ds.limit - start) throw new BadFormatException("Child encoding exceeds message bounds");
+				int length = (int)encLength;
+				int childEnd = start + length;
+
+				// The child's hash is needed anyway: take it from the received bytes and
+				// reuse the cell the store already caches under it, without decoding
+				Hash h = Blob.wrap(ds.data, start, length).getContentHash();
+				Ref<ACell> cached = store.checkCache(h);
+				if (cached!=null) {
+					ACell c = cached.getValue();
+					if (c==null) throw new BadFormatException("Null child encoding");
+					if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
+					acc.put(h, specialiseCached(c));
+					ds.pos = childEnd;
+					continue;
+				}
 
 				ACell c = this.read(ds);
 
@@ -786,7 +819,11 @@ public class CAD3Encoder extends AEncoder<ACell> {
 				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
 				if (ds.pos != childEnd) throw new BadFormatException("Child encoding length mismatch");
 
-				// getHash() forces encoding creation, which is useful for caching later
+				// Decoding alone does not prove the received bytes canonical, so the cell
+				// keeps its own re-encoding. When that matches the received bytes, it takes
+				// the hash already computed instead of hashing again.
+				Blob encoding = c.getEncoding();
+				if ((encoding.count()==length) && encoding.equalsBytes(ds.data, start)) encoding.attachContentHash(h);
 				acc.put(c.getHash(), c);
 			}
 		} catch (IndexOutOfBoundsException e) {

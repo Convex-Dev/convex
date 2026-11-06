@@ -2,8 +2,10 @@ package convex.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -14,10 +16,12 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
+import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
 import convex.core.store.CacheStats;
@@ -92,6 +96,79 @@ public class StoreCacheTest {
 				assertNotNull(store.getEtch().read(target.getHash()), "Persistence must actually write here");
 			}
 		}
+	}
+
+	/**
+	 * A child cell sent in a message is reused from the cache instead of decoded again.
+	 * One that misses is decoded with its own encoding, not a view of the message.
+	 */
+	@Test
+	public void testMessageChildReusesCachedCell() throws IOException, BadFormatException {
+		try (EtchStore store=EtchStore.createTemp()) {
+			Blob child=nonEmbedded(new Random(0x5EEDL));
+			Blob message=Format.encodeMultiCell(Vectors.of(child), true);
+
+			AVector<ACell> fresh=store.decodeMultiCell(message);
+			ACell decoded=fresh.get(0);
+			assertEquals(child, decoded);
+			assertEquals(child.getHash(), decoded.getHash());
+			assertNotSame(message.getInternalArray(), decoded.getEncoding().getInternalArray(),
+					"A decoded child must not keep the whole message in memory");
+
+			ACell cached=store.decode(child.getEncoding());
+			AVector<ACell> again=store.decodeMultiCell(message);
+			assertSame(cached, again.get(0), "The cached cell should replace the message's copy");
+		}
+	}
+
+	/**
+	 * A branch reference to a cached cell takes the cache's ref. An unstored cell stays
+	 * with the decoded parent after the cache evicts it; a stored cell comes back as the
+	 * store's own ref.
+	 */
+	@Test
+	public void testBranchRefReusesCachedRef() throws IOException, BadFormatException {
+		// One slot makes eviction deterministic
+		try (EtchStore store=EtchStore.createTemp(EtchConfig.create().withRefCacheSize(1))) {
+			Blob child=nonEmbedded(new Random(0xC0DEL));
+			Blob parent=Vectors.of(child).getEncoding(); // the branch alone, without the child
+			ACell cached=store.decode(child.getEncoding());
+
+			AVector<ACell> decoded=store.decodeMultiCell(parent);
+			assertSame(cached.getRef(), decoded.getElementRef(0));
+
+			store.decode(nonEmbedded(new Random(0xBEEFL)).getEncoding());
+			assertNull(store.checkCache(child.getHash()));
+			assertSame(cached, decoded.get(0), "The parent should keep the unstored cell");
+
+			Ref<ACell> stored=store.storeTopRef(cached.getRef(), Ref.PERSISTED, null);
+			AVector<ACell> again=store.decodeMultiCell(parent);
+			assertSame(stored, again.getElementRef(0));
+		}
+	}
+
+	/** A message child that is embedded is rejected even when the cache holds that value. */
+	@Test
+	public void testEmbeddedChildRejectedWhenCached() throws IOException {
+		try (EtchStore store=EtchStore.createTemp()) {
+			// A fresh embedded value: storing a shared instance would change it JVM-wide
+			Blob small=Blob.fromHex("0101");
+			store.storeTopRef(small.getRef(), Ref.PERSISTED, null);
+			assertNotNull(store.checkCache(small.getHash()));
+
+			Blob child=small.getEncoding();
+			Blob message=concat(Vectors.of(1).getEncoding(), Blob.wrap(new byte[] {(byte) child.count()}), child);
+			assertThrows(BadFormatException.class, ()->store.decodeMultiCell(message));
+		}
+	}
+
+	private static Blob concat(Blob... parts) {
+		int length=0;
+		for (Blob b:parts) length+=(int) b.count();
+		byte[] bytes=new byte[length];
+		int pos=0;
+		for (Blob b:parts) pos=b.getBytes(bytes, pos);
+		return Blob.wrap(bytes);
 	}
 
 	/**
