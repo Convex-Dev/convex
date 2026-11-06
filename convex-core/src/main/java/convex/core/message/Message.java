@@ -93,6 +93,20 @@ public class Message {
 	}
 
 	/**
+	 * Bytes a DATA message spends on each cell beyond the cell's own encoding, an
+	 * upper bound. A cell's encoding plus this, summed over its cells, is never less
+	 * than the message's exact length.
+	 */
+	// Per cell: its length prefix (at most 2 bytes, as no cell encodes to more than
+	// Format.LIMIT_ENCODING_LENGTH) and its reference from the payload Vector (33).
+	// The Vector's own nodes cost about 2.5 bytes per cell: each chunk of 16 carries
+	// a header, a length prefix and a reference from the level above, and each
+	// higher level adds a node per 16 below. The surplus of more than 13 bytes per
+	// cell covers the payload's fixed part: its tag, count, prefix reference and the
+	// DATA keyword, under 50 bytes, which fewer than 16 cells only partly incur.
+	public static final long DATA_CELL_OVERHEAD = Format.MAX_VLQ_LONG_LENGTH + Ref.INDIRECT_ENCODING_LENGTH + 8;
+
+	/**
 	 * Creates one unsolicited DATA message containing independently addressable
 	 * cells. The cells are encoded once as multi-cell children of a {@code :DATA}
 	 * envelope; receivers may stage them before a later composite root arrives.
@@ -147,8 +161,9 @@ public class Message {
 
 	/**
 	 * Partitions cells into DATA messages whose encoded bodies do not exceed the
-	 * supplied limit. Embedded cells are omitted because their encodings already
-	 * travel inside their nearest non-embedded parent.
+	 * supplied limit, though they may fall a little short of it, sized by
+	 * {@link #DATA_CELL_OVERHEAD}. Embedded cells are omitted because their encodings
+	 * already travel inside their nearest non-embedded parent.
 	 *
 	 * @param cells cells to partition
 	 * @param maxMessageLength maximum encoded body length for each batch
@@ -180,37 +195,51 @@ public class Message {
 		}
 		ArrayList<Message> messages=new ArrayList<>();
 		ArrayList<ACell> batch=new ArrayList<>();
-		long totalLength=0;
+		long batchBound=0;
+		long budget=maxTotalLength;
 		for (ACell cell:cells) {
 			if (cell==null || cell.isEmbedded()) continue;
-			batch.add(cell);
-			// Bounded by encoded bytes only: novelty carries no cell-count limit
-			if (dataMessageLength(batch)>maxMessageLength) {
-				batch.remove(batch.size()-1);
-				if (batch.isEmpty()) {
-					throw new IllegalArgumentException("Cell cannot fit in DATA message limit of "
-						+maxMessageLength+" bytes");
-				}
-				long messageLength=dataMessageLength(batch);
-				if (totalLength+messageLength>maxTotalLength) return messages;
-				Message message=createDataMessage(batch,maxMessageLength);
-				messages.add(message);
-				totalLength+=messageLength;
+			// Bounded by encoded bytes only: novelty carries no cell-count limit. A running
+			// upper bound decides where each message ends, so a message may fall a little
+			// short of the limit; measuring each candidate exactly would cost the whole
+			// message again for every cell.
+			long bound=cell.getEncodingLength()+DATA_CELL_OVERHEAD;
+			if (!batch.isEmpty() && batchBound+bound>maxMessageLength) {
+				budget=addDataMessages(batch,maxMessageLength,budget,messages);
+				if (budget<0) return messages;
 				batch=new ArrayList<>();
-				batch.add(cell);
-				if (dataMessageLength(batch)>maxMessageLength) {
-					throw new IllegalArgumentException("Cell cannot fit in DATA message limit of "
-						+maxMessageLength+" bytes");
-				}
+				batchBound=0;
 			}
+			batch.add(cell);
+			batchBound+=bound;
 		}
-		if (!batch.isEmpty()) {
-			long messageLength=dataMessageLength(batch);
-			if (totalLength+messageLength<=maxTotalLength) {
-				messages.add(createDataMessage(batch,maxMessageLength));
-			}
-		}
+		if (!batch.isEmpty()) addDataMessages(batch,maxMessageLength,budget,messages);
 		return messages;
+	}
+
+	/**
+	 * Adds the DATA message for a batch, measured exactly once. A batch over the limit
+	 * is split in two, which the bound rules out except for a single cell too large
+	 * for any message.
+	 *
+	 * @return materialisation budget left, or -1 if the message would exceed it
+	 */
+	private static long addDataMessages(List<ACell> batch, int maxMessageLength, long budget,
+			List<Message> messages) {
+		long messageLength=dataMessageLength(batch);
+		if (messageLength>maxMessageLength) {
+			if (batch.size()==1) {
+				throw new IllegalArgumentException("Cell cannot fit in DATA message limit of "
+					+maxMessageLength+" bytes");
+			}
+			int half=batch.size()/2;
+			budget=addDataMessages(batch.subList(0,half),maxMessageLength,budget,messages);
+			if (budget<0) return budget;
+			return addDataMessages(batch.subList(half,batch.size()),maxMessageLength,budget,messages);
+		}
+		if (messageLength>budget) return -1;
+		messages.add(createDataMessage(batch,maxMessageLength));
+		return budget-messageLength;
 	}
 
 	private static long dataMessageLength(List<? extends ACell> cells) {
