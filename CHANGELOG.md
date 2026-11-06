@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stop cells kept from a multi-cell message holding the whole message in memory. ([Decoding](convex-core/docs/ENCODER_DESIGN.md#decoding))
 - Simplify the Java APIs for lattice applications, networking and Convex DB; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading.
 
+### Removed
+
+- Remove the legacy generic lattice application type in favour of specialised domain components. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md))
+- Remove key and path resolution from lattices: each component resolves external paths at its own level. ([Component paths](convex-core/docs/LATTICE_APPLICATIONS.md#external-component-paths))
+- Move the P2P node record helpers from convex-core to convex-p2p. ([Lattice structure](convex-p2p/README.md#lattice-structure))
+- Remove Convex DB's separate table and row lattices: its components merge their own data. ([Merge Policy](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-policy))
+
 ### Fixed
 
 - Keep peers reaching consensus under heavy transaction load. ([Propagation](convex-peer/docs/PROPAGATION.md#delta-construction-and-fan-out))
