@@ -99,6 +99,36 @@ public class StoreCacheTest {
 	}
 
 	/**
+	 * A cell read from the file enters the cache only as the store's own ref: reading the
+	 * file directly, as GC does, leaves the cache as it was, and a store read after a miss
+	 * counts one decode and caches the ref it returns.
+	 */
+	@Test
+	public void testFileReadCachesOnlyStoreRef() throws IOException, BadFormatException {
+		try (EtchStore store=EtchStore.createTemp(EtchConfig.create().withRefCacheSize(1))) {
+			Blob value=nonEmbedded(new Random(0xF11EL));
+			Blob evict=nonEmbedded(new Random(0xE71CL)).getEncoding();
+			store.storeTopRef(value.getRef(), Ref.STORED, null);
+			store.decode(evict); // takes the only slot
+			assertNull(store.checkCache(value.getHash()));
+
+			RefSoft<ACell> direct=store.getEtch().read(value.getHash());
+			assertEquals(value, direct.getValue());
+			assertNull(store.checkCache(value.getHash()), "A direct file read must not fill the cache");
+
+			store.resetCacheStats();
+			Ref<ACell> ref=store.refForHash(value.getHash());
+			assertEquals(value, ref.getValue());
+			assertSame(store, ((RefSoft<?>) ref).getStore());
+			assertTrue(ref.getStatus()>=Ref.STORED);
+			assertSame(ref, store.checkCache(value.getHash()));
+			CacheStats stats=store.getCacheStats();
+			assertEquals(1, stats.decodes, "A store read after a miss is one decode: "+stats);
+			assertEquals(1, stats.l1Hits, "Only the check above hits: "+stats);
+		}
+	}
+
+	/**
 	 * A child cell sent in a message is reused from the cache instead of decoded again.
 	 * One that misses is decoded with its own encoding, not a view of the message.
 	 */

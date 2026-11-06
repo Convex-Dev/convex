@@ -78,6 +78,19 @@ public abstract class ACachedStore extends AStore {
 		return (T)decoded;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * <p>The store reads its storage only after a cache miss and then caches the ref it
+	 * creates, so this counts one decode and leaves the cache alone.</p>
+	 */
+	@Override
+	@SuppressWarnings("unchecked")
+	public final <T extends ACell> T decodeStored(Blob encoding) throws BadFormatException {
+		ACell decoded=encoder.decode(encoding);
+		decodes.increment();
+		return (T) decoded;
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> Ref<T> checkCache(Hash h) {

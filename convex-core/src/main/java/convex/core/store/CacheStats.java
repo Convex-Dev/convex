@@ -4,7 +4,9 @@ package convex.core.store;
  * Immutable snapshot of cache counters for an {@link ACachedStore}.
  *
  * Counters reflect cache lookups: each call to {@link ACachedStore#decode(convex.core.data.Blob)}
- * increments exactly one of l1Hits or decodes, and each cache hit from
+ * increments exactly one of l1Hits or decodes, each call to
+ * {@link ACachedStore#decodeStored(convex.core.data.Blob)} (a read from storage after a miss)
+ * increments decodes, and each cache hit from
  * {@link ACachedStore#checkCache(convex.core.data.Hash)} increments l1Hits.
  */
 public final class CacheStats {

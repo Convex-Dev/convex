@@ -911,7 +911,10 @@ public class Etch {
 			// key, as only a test can, would give that shared cell a wrong hash JVM-wide.
 			Hash hash = Hash.wrap(key);
 			encoding.attachContentHash(hash);
-			T cell = reader.decode(encoding);
+			// The reader's cache is not consulted or filled here: a store read has already
+			// missed it and caches the ref created below, and other reads (GC, status
+			// checks) must not leave a direct ref where the store's own belongs.
+			T cell = reader.decodeStored(encoding);
 
 			if (memorySize > 0) {
 				// need to attach memory size for cell

@@ -24,7 +24,8 @@ read from the file or decoded again when next needed.
 
 Each reference cache belongs to one store and checks references on insertion.
 Stored entries use `RefSoft` bound to that store, including embedded top-level
-values. Newly decoded values can reuse their existing direct ref at `UNKNOWN`
+values; a cell read from the file enters the cache only that way. Values decoded
+with the store's `decode` method can reuse their existing direct ref at `UNKNOWN`
 status, avoiding a soft-reference allocation before persistence. Such direct
 entries strongly retain their values until eviction; the slot count bounds the
 number of entries, not their total memory size. Null uses its store-independent
