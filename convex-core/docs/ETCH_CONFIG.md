@@ -95,11 +95,10 @@ Runtime cache settings are applied once when the peer opens the store.
 
 ## Soft references and garbage collection
 
-Stored cells stay in memory through the soft references (`RefSoft`) of whatever
-holds them until the JVM reclaims them. By default the JVM keeps a softly referenced
-value for one second per megabyte of free heap since its last use, so a busy peer
-with a large heap keeps most of what it stores, and garbage collection has ever
-more to trace. Operators who see heavy garbage-collection pressure may want to set
+Stored cells can stay in memory through the soft references (`RefSoft`) of
+whatever holds them until the JVM reclaims them. By default the JVM keeps a softly
+referenced value for one second per megabyte of free heap since its last use.
+Operators who see heavy garbage-collection pressure may want to set
 `-XX:SoftRefLRUPolicyMSPerMB` below the JVM default of 1000. With the G1
 collector, only 0 lets young collections reclaim them; other values wait for a
 marking cycle.
