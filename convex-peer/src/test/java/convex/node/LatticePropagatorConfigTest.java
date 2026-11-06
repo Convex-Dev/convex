@@ -48,8 +48,12 @@ public class LatticePropagatorConfigTest {
 		assertEquals(7_000,LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.create(5_000),
 			LatticePropagatorConfig.KEEP_ALIVE,CVMLong.create(7_000))).getKeepAlive());
-		var invalid=LatticePropagatorConfig.create(Maps.of(
+		var off=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.ZERO));
+		assertEquals(0,off.getRootAnnouncementInterval(),"Zero turns announcements off");
+		assertEquals(LatticePropagatorConfig.DEFAULT_KEEP_ALIVE,off.getKeepAlive());
+		var invalid=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.create(-1)));
 		assertThrows(IllegalArgumentException.class,invalid::getRootAnnouncementInterval);
 		assertThrows(IllegalArgumentException.class,() -> new LatticePropagator(new MemoryStore(),invalid),
 			"An invalid interval fails while the group is composed");

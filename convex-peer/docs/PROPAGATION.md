@@ -49,8 +49,8 @@ best-effort:
   is exhausted, the sender falls back to the root announcement. The receiver
   can acquire missing branches by hash.
 - A periodic root announcement, every `rootAnnouncementInterval` (30 seconds by
-  default), recovers a missed or dropped propagation attempt: a receiver whose
-  copy differs fetches the cells it lacks.
+  default; zero turns it off), recovers a missed or dropped propagation attempt: a
+  receiver whose copy differs fetches the cells it lacks.
 
 Advancing the store-backed state before encoding is important: an encoding or
 queueing failure cannot lose the local publication or prevent later recovery.

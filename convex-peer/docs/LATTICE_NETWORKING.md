@@ -461,7 +461,10 @@ two of the group's announcement intervals, 60 seconds) without decoded incoming
 traffic, with a further 30-second grace period, so a healthy route is never probed
 and a silent one is retired within 90 seconds by default. Keep `keepAlive` above
 the interval the group's peers announce at, or probes race their announcements.
-Nodes without a route are never probed.
+Nodes without a route are never probed. An interval of zero turns announcements
+off: a peer that missed a delta, or connected after the last change, then receives
+the group's state only with its next change unless it pulls, and quiet routes stay
+open only through the peers' own announcements.
 Any incoming traffic cancels the liveness check; a late or failed probe request
 cannot evict a peer that has resumed propagation or shorten that grace period.
 New identity challenges use a separate five-second admission deadline.

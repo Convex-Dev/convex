@@ -93,6 +93,11 @@ public final class LatticePropagatorConfig {
 	 * current root to every route at this interval, changed or not, so a peer that
 	 * missed a delta fetches what it lacks, and a quiet route stays open through NATs
 	 * and load balancers.
+	 *
+	 * <p>Zero turns periodic announcements off. A peer that missed a delta, or
+	 * connected after the last change, then receives the group's state only with its
+	 * next change, unless it pulls; quiet routes stay open only through the peers'
+	 * own announcements.</p>
 	 */
 	public static final AString ROOT_ANNOUNCEMENT_INTERVAL=Strings.intern("rootAnnouncementInterval");
 
@@ -100,7 +105,8 @@ public final class LatticePropagatorConfig {
 	 * Milliseconds a live route may hear nothing before this group probes it. Any
 	 * traffic counts, including the root announcement each end sends every
 	 * {@link #ROOT_ANNOUNCEMENT_INTERVAL}, so a healthy route is never probed. The
-	 * default is two of this group's announcement intervals. Keep it above the
+	 * default is two of this group's announcement intervals, or
+	 * {@link #DEFAULT_KEEP_ALIVE} when the group does not announce. Keep it above the
 	 * interval the group's peers announce at, with a margin, or probes race their
 	 * announcements. The root announcement, not the probe, keeps NATs and load
 	 * balancers from dropping a quiet route. Nodes without a connection are never
@@ -291,24 +297,29 @@ public final class LatticePropagatorConfig {
 		return value;
 	}
 
-	/** Returns the time in milliseconds between this group's root announcements. */
+	/**
+	 * Returns the time in milliseconds between this group's root announcements, or
+	 * zero when it never announces on a timer.
+	 */
 	public long getRootAnnouncementInterval() {
 		CVMLong configured=RT.ensureLong(config.get(ROOT_ANNOUNCEMENT_INTERVAL));
 		long value=(configured==null) ? DEFAULT_ROOT_ANNOUNCEMENT_INTERVAL : configured.longValue();
-		if (value<=0) throw new IllegalArgumentException(ROOT_ANNOUNCEMENT_INTERVAL+" must be positive: "+value);
+		if (value<0) throw new IllegalArgumentException(ROOT_ANNOUNCEMENT_INTERVAL+" must not be negative: "+value);
 		return value;
 	}
 
 	/**
 	 * Returns the quiet time in milliseconds before a live route is probed. Unless
-	 * configured, it is two of this group's root announcement intervals.
+	 * configured, it is two of this group's root announcement intervals, or
+	 * {@link #DEFAULT_KEEP_ALIVE} when the group does not announce.
 	 */
 	public long getKeepAlive() {
 		CVMLong configured=RT.ensureLong(config.get(KEEP_ALIVE));
 		long value;
 		if (configured==null) {
 			long interval=getRootAnnouncementInterval();
-			value=(interval>Long.MAX_VALUE/2) ? Long.MAX_VALUE : 2*interval;
+			if (interval==0) value=DEFAULT_KEEP_ALIVE;
+			else value=(interval>Long.MAX_VALUE/2) ? Long.MAX_VALUE : 2*interval;
 		} else {
 			value=configured.longValue();
 		}

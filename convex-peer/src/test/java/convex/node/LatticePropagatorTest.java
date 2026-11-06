@@ -16,6 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -392,6 +393,44 @@ public class LatticePropagatorTest {
 				// The first goes out at once; the default interval would hold the second for 30 seconds
 				assertTrue(announcements.await(10,TimeUnit.SECONDS));
 				assertEquals(value.getHash(),rootAnnouncementValueHash(first.get()));
+			} finally {
+				propagator.close();
+			}
+		}
+	}
+
+	/** A zero interval turns periodic announcements off; publications still go out as deltas. */
+	@Test
+	public void testZeroIntervalNeverAnnounces() throws Exception {
+		assertEquals(0,announcementsWhilePublishingTwice(CVMLong.ZERO));
+		// With the default interval, the check after the first publication announces at once
+		assertTrue(announcementsWhilePublishingTwice(null)>0);
+	}
+
+	/** Counts the root announcements a group sends while it publishes two values in turn. */
+	private static int announcementsWhilePublishingTwice(CVMLong interval) throws Exception {
+		AtomicInteger announcements=new AtomicInteger();
+		try (MemoryStore store=new MemoryStore()) {
+			LatticeConnectionManager manager=new LatticeConnectionManager(store) {
+				@Override public boolean hasPropagationRoutes() { return true; }
+				@Override public int broadcast(Message message) {
+					announcements.incrementAndGet();
+					return 1;
+				}
+			};
+			LatticePropagatorConfig config=LatticePropagatorConfig.create((interval==null) ? null
+				: Maps.of(LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,interval));
+			LatticePropagator propagator=new LatticePropagator(store,manager,config);
+			try {
+				propagator.start();
+				for (int i=0;i<2;i++) {
+					CompletableFuture<ACell> announced=propagator.nextAnnounce();
+					propagator.triggerBroadcast(Blobs.createRandom(400));
+					announced.get(5,TimeUnit.SECONDS);
+				}
+				// The worker considers an announcement after each publication, so it has
+				// done so for the first by the time the second is announced
+				return announcements.get();
 			} finally {
 				propagator.close();
 			}

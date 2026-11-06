@@ -849,7 +849,7 @@ public class LatticePropagator implements Closeable {
 	 * Returns the time between this group's periodic root announcements, set by
 	 * {@link LatticePropagatorConfig#ROOT_ANNOUNCEMENT_INTERVAL}.
 	 *
-	 * @return interval in milliseconds
+	 * @return interval in milliseconds, or zero when the group never announces on a timer
 	 */
 	public long getRootAnnouncementInterval() { return rootAnnouncementInterval; }
 
@@ -1040,7 +1040,9 @@ public class LatticePropagator implements Closeable {
 			try {
 				ACell value;
 				if (running) {
-					value = triggerQueue.poll(rootAnnouncementInterval, TimeUnit.MILLISECONDS);
+					// A timed poll even with announcements off: closing the queue ends it
+					long wait=(rootAnnouncementInterval>0) ? rootAnnouncementInterval : Long.MAX_VALUE;
+					value = triggerQueue.poll(wait, TimeUnit.MILLISECONDS);
 				} else {
 					// Drain mode: non-blocking poll, exit when empty
 					value = triggerQueue.poll();
@@ -1220,7 +1222,8 @@ public class LatticePropagator implements Closeable {
 	 * recovers missed deltas; it also keeps quiet routes open.
 	 */
 	private void maybeAnnounceRoot(long currentTime) {
-		if (currentTime < lastRootAnnouncementTime + rootAnnouncementInterval) return;
+		if (rootAnnouncementInterval==0) return;
+		if (currentTime-lastRootAnnouncementTime < rootAnnouncementInterval) return;
 		if (!connectionManager.hasPropagationRoutes()) return;
 
 		try {
