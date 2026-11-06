@@ -7,14 +7,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
+import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -28,6 +32,7 @@ class ValueComponentTest {
 	private static final AString DATA=Strings.create("data");
 	private static final AString NAME=Strings.create("name");
 	private static final AString ZERO=Strings.create("0");
+	private static final AString ONE=Strings.create("1");
 	private static final AString JSON=Strings.create("json");
 	private static final AString RAW=Strings.create("raw");
 
@@ -143,19 +148,67 @@ class ValueComponentTest {
 		assertEquals(CVMLong.TWO,json.resolve(NAME).value());
 	}
 
-	@Test void JSONArrayIndicesAreDecimalPositionsAndOtherKeysAreAbsent() {
+	@Test void JSONPositionsAreCanonicalDecimalsInVectorsAndLists() {
 		var json=new JSONValueComponent<>(Root.<ACell>create(Vectors.of(null,CVMLong.ONE)));
 		assertTrue(json.resolve(ZERO).exists());
 		assertNull(json.resolve(ZERO).value());
-		assertEquals(CVMLong.ONE,json.resolve(Strings.create("01")).value());
-		for (String segment:new String[] {"", "-1", "+1", "-0", " 1", "1.0", "2", "9223372036854775807", "9223372036854775808", "١"}) {
+		assertEquals(CVMLong.ONE,json.resolve(ONE).value());
+		for (String segment:new String[] {"", "01", "-1", "+1", "-0", " 1", "1.0", "0x01", "2", "9223372036854775807", "9223372036854775808", "١"}) {
 			var child=json.resolve(Strings.create(segment));
 			assertFalse(child.exists(),segment);
 			assertThrows(MissingValueException.class,child::value,segment);
 		}
-		assertFalse(new JSONValueComponent<>(Root.create(Lists.of(CVMLong.ONE))).resolve(ZERO).exists());
-		assertFalse(new JSONValueComponent<>(Root.create(Index.of(Blob.fromHex("abcd"),CVMLong.ONE)))
-			.resolve(Strings.create("abcd")).exists());
+		var list=Root.<ACell>create(Lists.of(CVMLong.ONE,CVMLong.TWO));
+		var element=new JSONValueComponent<>(list).resolve(ONE);
+		assertEquals(CVMLong.TWO,element.value());
+		element.cursor().set(CVMLong.ZERO);
+		assertEquals(Lists.of(CVMLong.ONE,CVMLong.ZERO),list.get());
+		assertFalse(new JSONValueComponent<>(Root.create(Sets.of(CVMLong.ONE))).resolve(ZERO).exists());
+	}
+
+	@Test void JSONMapSegmentsNameKeysAsTheirJSONRenderingShows() {
+		Blob blob=Blob.fromHex("abcd");
+		Address address=Address.create(12);
+		CVMLong negative=CVMLong.create(-7);
+		var root=Root.<ACell>create(Maps.of(Symbol.create(NAME),CVMLong.ONE,blob,CVMLong.TWO,address,CVMLong.ZERO,negative,null));
+		var json=new JSONValueComponent<>(root);
+		assertEquals(CVMLong.ONE,json.resolve(NAME).value());
+		assertEquals(CVMLong.TWO,json.resolve(Strings.create("0xabcd")).value());
+		assertEquals(CVMLong.TWO,json.resolve(Strings.create("abcd")).value());
+		assertEquals(CVMLong.ZERO,json.resolve(Strings.create("#12")).value());
+		assertEquals(CVMLong.ZERO,json.resolve(Strings.create("12")).value());
+		assertTrue(json.resolve(Strings.create("-7")).exists());
+		assertNull(json.resolve(Strings.create("-7")).value());
+		json.resolve(Strings.create("0xabcd")).cursor().set(CVMLong.ONE);
+		assertEquals(CVMLong.ONE,RT.getIn(root.get(),blob));
+		var blobs=new JSONValueComponent<>(Root.create(Index.of(blob,CVMLong.ONE)));
+		assertEquals(CVMLong.ONE,blobs.resolve(Strings.create("abcd")).value());
+		assertEquals(CVMLong.ONE,blobs.resolve(Strings.create("0xabcd")).value());
+	}
+
+	@Test void JSONMapSegmentsPreferStringsThenNamesThenParsedKeys() {
+		AString twelve=Strings.create("12");
+		ACell[] keys={twelve,Keyword.create(twelve),Symbol.create(twelve),Blob.fromHex("12"),Address.create(12),CVMLong.create(12)};
+		AMap<ACell,ACell> map=Maps.empty();
+		for (int i=0; i<keys.length; i++) map=map.assoc(keys[i],CVMLong.create(i));
+		var root=Root.<ACell>create(map);
+		var json=new JSONValueComponent<>(root);
+		for (int i=0; i<keys.length; i++) {
+			assertEquals(CVMLong.create(i),json.resolve(twelve).value());
+			map=map.dissoc(keys[i]);
+			root.set(map);
+		}
+		assertFalse(json.resolve(twelve).exists());
+	}
+
+	@Test void JSONIntegerMapKeysNeverBecomePositions() {
+		var root=Root.<ACell>create(Maps.of(CVMLong.ZERO,CVMLong.ONE));
+		var key=new JSONValueComponent<>(root).resolve(ZERO);
+		assertEquals(CVMLong.ONE,key.value());
+		root.set(Vectors.of(CVMLong.TWO));
+		assertFalse(key.exists());
+		assertThrows(IllegalArgumentException.class,() -> key.cursor().set(CVMLong.ONE));
+		assertEquals(Vectors.of(CVMLong.TWO),root.get());
 	}
 
 	@Test void JSONKeysStayBoundAndWritesCannotChangeContainerKinds() {

@@ -2,23 +2,25 @@ package convex.lattice;
 
 import java.util.Objects;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
+import convex.core.data.ASequence;
 import convex.core.data.AString;
-import convex.core.data.AVector;
+import convex.core.data.Blobs;
 import convex.core.data.Keyword;
+import convex.core.data.Symbol;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ATransformCursor;
 
 /**
- * Explicit JSON addressing over a value location. Objects use string keys, or
- * existing keyword keys when the string key is absent. A present string key wins
- * even when its value is nil. Vectors use non-negative ASCII decimal indices;
- * leading zeroes are accepted, signs and whitespace are not. Other segments stay
- * literal, so an unresolvable path reads as absent under the cursor contract.
+ * Addresses a value location as its JSON rendering shows it. Vectors and lists take
+ * positions; maps and Indexes take the first existing key a segment names. A segment
+ * naming no existing key keeps its string key. Other values have no addressable
+ * children, so a path through them reads as absent under the cursor contract.
  *
  * <p>Resolution interprets all keys against one snapshot and binds those keys.
  * Later changes do not reinterpret a resolved key: resolve again to select keys
@@ -37,65 +39,91 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 	public JSONValueComponent<?> resolve(AString[] path,int start,int end) {
 		Objects.checkFromToIndex(start,end,path.length);
 		if (start==end) return this;
-		ACell[] keys=new ACell[end-start];
+		int n=end-start;
+		ACell[] keys=new ACell[n];
+		boolean[] positions=new boolean[n];
 		AForkableCursor<V> source=cursor();
 		ACell current=source.getOrDefault(null);
-		for (int i=start; i<end; i++) {
-			AString segment=Objects.requireNonNull(path[i],"Path segment must not be null");
-			ACell key=resolveKey(current,segment);
-			keys[i-start]=key;
-			current=current instanceof ADataStructure<?> data?data.get(key):null;
+		for (int i=0; i<n; i++) {
+			AString segment=Objects.requireNonNull(path[start+i],"Path segment must not be null");
+			if (current instanceof ASequence<?> sequence) {
+				CVMLong position=position(segment);
+				if (position!=null) {
+					keys[i]=position;
+					positions[i]=true;
+					long index=position.longValue();
+					current=(index<sequence.count())?sequence.get(index):null;
+					continue;
+				}
+			} else if (current instanceof AMap<?,?> map) {
+				ACell key=mapKey(map,segment);
+				keys[i]=key;
+				current=map.get(key);
+				continue;
+			}
+			keys[i]=segment;
+			current=null;
 		}
-		return new JSONValueComponent<>(new JSONPathCursor(source,keys));
+		return new JSONValueComponent<>(new JSONPathCursor(source,keys,positions));
 	}
 
-	/** Interprets one external segment against its container in the resolution snapshot. */
-	private static ACell resolveKey(ACell container,AString segment) {
-		if (container instanceof AVector<?>) {
-			CVMLong index=arrayIndex(segment);
-			return index==null?segment:index;
-		}
-		if (container instanceof AMap<?,?> map && !map.containsKey(segment)) {
-			Keyword keyword=Keyword.create(segment);
-			if (keyword!=null && map.containsKey(keyword)) return keyword;
-		}
-		return segment;
+	/** A non-negative decimal position without sign or leading zeroes, or null. */
+	private static CVMLong position(AString segment) {
+		String text=segment.toString();
+		CVMLong position=CVMLong.parse(text);
+		if (position==null) return null;
+		long index=position.longValue();
+		return (index>=0 && Long.toString(index).equals(text))?position:null;
 	}
 
-	private static CVMLong arrayIndex(AString segment) {
-		long count=segment.count();
-		if (count==0) return null;
-		long index=0;
-		for (long i=0; i<count; i++) {
-			int digit=segment.byteAt(i)-'0';
-			if (digit<0 || digit>9 || index>(Long.MAX_VALUE-digit)/10) return null;
-			index=index*10+digit;
+	/**
+	 * The first existing key the segment names: the string itself, the keyword or
+	 * symbol with that name, then the blob, address or integer Convex parses from it.
+	 * Returns the string when none exists.
+	 */
+	private static ACell mapKey(AMap<?,?> map,AString segment) {
+		if (map.containsKey(segment)) return segment;
+		ACell key=existing(map,Keyword.create(segment));
+		if (key==null) key=existing(map,Symbol.create(segment));
+		if (key==null) {
+			String text=segment.toString();
+			key=existing(map,Blobs.parse(text));
+			if (key==null) key=existing(map,Address.parse(text));
+			if (key==null) key=existing(map,AInteger.parse(text));
 		}
-		return CVMLong.create(index);
+		return (key==null)?segment:key;
+	}
+
+	private static ACell existing(AMap<?,?> map,ACell key) {
+		return (key!=null && map.containsKey(key))?key:null;
 	}
 
 	/** Owns the keys produced by resolution; they never escape to a caller. */
 	private static final class JSONPathCursor extends ATransformCursor<ACell,ACell> {
 		private final ACell[] keys;
 
+		/** Which keys are sequence positions; the others are map keys, integers included. */
+		private final boolean[] positions;
+
 		@SuppressWarnings("unchecked")
-		JSONPathCursor(AForkableCursor<?> source,ACell[] keys) {
+		JSONPathCursor(AForkableCursor<?> source,ACell[] keys,boolean[] positions) {
 			super((AForkableCursor<ACell>)source);
 			this.keys=keys;
+			this.positions=positions;
 		}
 
 		@Override protected Object viewValue(ACell stored) {
 			ACell current=stored;
-			for (ACell key:keys) {
-				if (AInteger.isLong(key)) {
-					if (!(current instanceof AVector<?> vector)) return MISSING;
-					long i=((AInteger)key).longValue();
-					if (i<0 || i>=vector.count()) return MISSING;
-					current=vector.get(i);
+			for (int i=0; i<keys.length; i++) {
+				if (positions[i]) {
+					if (!(current instanceof ASequence<?> sequence)) return MISSING;
+					long index=((CVMLong)keys[i]).longValue();
+					if (index>=sequence.count()) return MISSING;
+					current=sequence.get(index);
 				} else {
 					if (!(current instanceof AMap<?,?> map)) return MISSING;
-					ACell value=map.get(key);
-					if (value==null && !map.containsKey(key)) return MISSING;
+					ACell value=map.get(keys[i]);
+					if (value==null && !map.containsKey(keys[i])) return MISSING;
 					current=value;
 				}
 			}
@@ -109,14 +137,13 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 
 		@Override protected ACell write(ACell current,ACell value) {
 			ACell container=current;
-			for (ACell key:keys) {
-				// Missing containers are refused by assocExisting. In particular, a
-				// resolved array index must never turn into an integer object key.
-				if (container==null) break;
-				if (AInteger.isLong(key) ? !(container instanceof AVector<?>) : !(container instanceof AMap<?,?>)) {
+			for (int i=0; i<keys.length && container!=null; i++) {
+				// Missing containers are refused by assocExisting. A position must never
+				// become a map key, nor an integer map key a sequence position.
+				if (!(positions[i] ? container instanceof ASequence<?> : container instanceof AMap<?,?>)) {
 					throw new IllegalArgumentException("JSON path container no longer supports its resolved key");
 				}
-				container=((ADataStructure<?>)container).get(key);
+				container=((ADataStructure<?>)container).get(keys[i]);
 			}
 			return LatticeOps.assocExisting(current,value,keys);
 		}

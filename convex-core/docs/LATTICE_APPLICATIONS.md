@@ -198,23 +198,30 @@ Two value components supply reusable addressing policies:
 | Component | Segment interpretation |
 |---|---|
 | `ValueComponent<V>` | Literal `AString` keys, without inspecting the current value during resolution |
-| `JSONValueComponent<V>` | Object field names and vector array indices, explicitly selected by the parent |
+| `JSONValueComponent<V>` | Keys as the JSON rendering shows them, explicitly selected by the parent |
 
-The JSON variant follows the object and array representations in
-[CAD044](https://docs.convex.world/docs/cad/json). An existing string field takes
-precedence over an existing keyword field, including when the string field holds
-nil. An absent field keeps its string key. Array indices are non-negative ASCII
-decimal integers; leading zeroes are accepted, signs and whitespace are not.
-Lists are not JSON arrays, and hexadecimal names are not converted to blob keys.
+The JSON variant lets a client address what it reads in the
+[CAD044](https://docs.convex.world/docs/cad/json) rendering of a value:
+
+- In a vector or list, a segment is a position: a non-negative decimal integer
+  with no sign, whitespace or leading zero.
+- In a map or Index, a segment names the first existing key, including one holding
+  nil, from: the string itself; the keyword, then the symbol, with that name; then
+  the blob, address and integer that `Blobs.parse`, `Address.parse` and
+  `AInteger.parse` read from it. Blob keys therefore take hex with or without `0x`.
+- A segment naming no existing key keeps its string key, so a write creates a
+  string field, as parsing JSON would.
+- Sets and other values have no addressable children.
+
 Selecting this variant declares the intended addressing policy; it does not
 validate the whole value as JSON.
 
 JSON resolution selects keys from one snapshot. A returned component keeps those
-keys: resolve again to interpret a later container shape. A resolved vector index
-becomes absent if its container becomes an object, and writes through that handle
-refuse the incompatible container. Neither variant creates missing intermediate
-containers or supplies a merge rule. A parent needing those behaviours provides
-them explicitly.
+keys: resolve again to interpret a later container shape. A resolved position
+becomes absent if its container becomes a map, as does an integer map key if its
+container becomes a sequence, and writes through such a handle refuse the
+incompatible container. Neither variant creates missing intermediate containers or
+supplies a merge rule. A parent needing those behaviours provides them explicitly.
 
 `value()` uses the strict cursor read contract from
 [CAD035](https://docs.convex.world/docs/cad/cursors): absent or unresolvable
