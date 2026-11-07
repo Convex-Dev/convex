@@ -14,6 +14,16 @@ import convex.core.util.Utils;
  * rebuild source storage on a changed write; this class supplies the operations.
  * Unchanged writes preserve the source, including absent storage.
  *
+ * <p>A transform behaves as any cursor does for its consumers. It is absent where it
+ * finds no value: where its source is absent, or where its view finds nothing in a
+ * stored value. A view that should hold a value when nothing is stored is built
+ * over a source with a default ({@link AForkableCursor#withDefault}). A transform
+ * creates no storage by default: its write receives null for absent storage, and
+ * a navigating view refuses a missing container with
+ * {@link convex.lattice.PathWriteException}. A subclass whose definition knows how
+ * to build its storage, as a default, an authoring view or a component's
+ * projection does, builds it in its write.</p>
+ *
  * <p>Read and write functions must be side-effect free and may run again on a
  * conflict. The read function must accept values produced by both this view and
  * its source's write policy. Writes must preserve unrelated source state.</p>
@@ -33,9 +43,10 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 	protected abstract V view(S stored);
 
 	/**
-	 * Reads presence and value from the same source snapshot. A partial view can
-	 * return {@link #MISSING}; a total projection returns its value, including nil.
-	 * This hook is for reads; updates still use {@link #view} for their old value.
+	 * Reads presence and value from one stored source value; an absent source is
+	 * absent here without this being called. A view that finds nothing at its place
+	 * in the stored value returns {@link #MISSING}; otherwise it returns its value,
+	 * including nil. This is for reads; updates use {@link #view} for their old value.
 	 */
 	protected Object viewValue(S stored) { return view(stored); }
 

@@ -158,7 +158,7 @@ without any merge definition. The optional adapter helper
 level at a time using an explicit lattice. Its write functions use
 `LatticeOps.assocIn` to construct an absent container from the lattice's zero.
 Unknown missing container types fail; keys never determine container types.
-JSON components supply their own map or vector construction functions. No-op writes do not materialise ancestors.
+JSON value components construct nothing; a parent needing construction supplies it. No-op writes do not materialise ancestors.
 Owner envelopes still require an explicit signing boundary.
 
 Standalone components initialise their roots explicitly:
@@ -261,6 +261,14 @@ var edits = StampedCursor.create(storage, getTimestamp, lattice::stamp);
 It reads a view value, rebuilds the source on a changed write, and preserves the
 source on a no-op. Returned values reflect the source's write policy, including
 stamping. Read functions must accept the values that policy can produce.
+
+A transform behaves as any cursor does for its consumers. It is absent where it
+finds no value, including wherever its source is absent; a view that should hold a
+value when nothing is stored is built over `withDefault`. A transform creates no
+storage by default: a navigating view refuses a missing container with
+`PathWriteException`. A transform whose definition knows how to build its storage
+builds it in its write: a default from its default, an authoring view its envelope
+or record, a component's projection what its write function supplies.
 
 `ProjectionCursor` rebuilds from the current source on retries, preserving siblings.
 `AUpdateCursor` adds caching for prepared replacements. Prepared signatures are reused while retries request the
