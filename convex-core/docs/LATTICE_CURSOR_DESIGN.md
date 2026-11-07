@@ -179,10 +179,22 @@ The fork retains no merge callback. Ordinary roots, paths and transformed views
 implement `sync(merge)` as a read-only no-op without invoking that function or
 publishing any enclosing fork; a read-only view refuses it.
 
-The destination has the same value type as the fork. Representation changes compose
-through cursor views: `SignedCursor.create(slot, signer).fork()` creates unsigned
-working state which signs on publication. A signing view around a fork of envelopes
-instead signs each local edit. The component chooses this order explicitly.
+The destination has the same value type as the fork. Signing and stamping compose
+through cursor views, and where an authoring view sits relative to the fork decides
+when it applies. A fork of an authoring view keeps unauthored working state and
+authors once, on publication: `SignedCursor.create(slot, signer).fork()` signs at
+sync, and a fork of a `StampedCursor` stamps at sync. An authoring view built over a
+fork instead authors each local edit. The component chooses this order through what
+it binds: `fork()` forks bound storage and rebinding rebuilds the views above it, so
+an authoring view within bound storage applies on publication, and one the component
+builds over its storage applies to each edit. Transaction drafts follow the same rule.
+
+A fork inside a stamp reconciles before publication stamps it, so its working value
+still carries the timestamp it was forked from. When both sides changed, a
+newest-timestamp merge selects the destination and discards the fork's edits,
+however recent. The publication merge of such a component treats its own change as
+the newer, since publication stamps it. A fork outside the stamp carries the time of
+its last edit, and its publication merge can use the record's ordering unchanged.
 
 Each fork uses an independent `TransactionalRootCursor`. Sync holds its existing
 write lock while the destination's atomic update reconciles and commits by CAS.
@@ -232,10 +244,12 @@ components can delegate that public adapter to their protected `rebind` hook.
 `TransactionalComponent.exclusive()` gives an `ExclusiveComponent`, built from bound
 storage as a fork is: a read-only view of it, whose transactions rebind the domain
 component to a draft and commit to that storage under its root's lock.
-The transaction targets bound `storage()`, while the rebound view reinstalls its
-editing policies. Commit therefore does not reapply a component's timestamping
-wrapper to the prepared value. Signing views already present in bound storage
-still sign at commit; unsigned staged components defer signing to publication.
+The transaction targets bound `storage()`, while the rebound view rebuilds the
+component's editing views over the draft. An authoring view within bound storage
+applies once at commit: a signing view signs the committed value, and a stamp there
+gives it the commit's time. A stamp the component builds over its storage applies
+within the draft instead, with the time of the edit, and commit does not apply it
+again. Unsigned staged components defer signing to publication.
 Each attempt uses a fresh `TransactionalRootCursor` for its draft, supporting
 concurrent edits and nested transactions through the existing cursor machinery.
 The callback must finish its work before returning. Only the captured immutable

@@ -30,8 +30,10 @@ import convex.lattice.cursor.Transactions;
  * can also be implemented by application subclasses without changing their base
  * class or introducing a component registry. The engine is
  * {@link Transactions}; this interface adds the typed component view. Rebinding
- * reinstalls editing policies on the draft. Commit uses bound storage so those
- * policies are not applied twice.</p>
+ * rebuilds the component's editing views over the draft, so a stamp the component
+ * builds over its storage applies within the draft. Authoring within bound storage,
+ * such as a signing view or a stamp bound there, applies once at commit. Commit uses
+ * bound storage so editing views are not applied twice.</p>
  *
  * <p>Transactions rerun domain operations on conflict; they do not invoke incoming
  * merge or fork reconciliation. No lattice definition or publication merge is

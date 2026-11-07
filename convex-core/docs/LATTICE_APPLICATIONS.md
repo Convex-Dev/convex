@@ -139,7 +139,7 @@ The main design choices for a component are:
 | Position and extent | Which value it owns, which children it exposes and which siblings it preserves |
 | Live or staged state | Whether edits are immediately shared or remain private until publication |
 | Merge and acceptance | Which incoming values are meaningful and how competing versions reconcile |
-| Authoring boundary | Which complete value is stamped or signed, and whether signing happens per edit or per batch |
+| Authoring boundary | Which complete value is stamped or signed, and whether each happens per edit or once per commit or publication |
 | Atomicity | Which related operations must commit together |
 | Dependencies | Which authority information, signers, clocks and large-data storage it needs |
 
