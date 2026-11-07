@@ -193,6 +193,12 @@ The base supports only the empty path. Each parent defines its external namespac
 and selects the component responsible for the rest of the path. External addressing
 is independent of the `child(ACell)` hook used for incoming merge delivery.
 
+A segment that names no place in a component's namespace throws
+`NoSuchPathException`, as the base does for any other path. It carries a copy of
+the path array and the index of that segment in it, so a service can tell a
+caller's unknown path from a fault and say where the path stops. This differs
+from a place that exists but holds no value, which reads as absent.
+
 Two value components supply reusable addressing policies:
 
 | Component | Segment interpretation |

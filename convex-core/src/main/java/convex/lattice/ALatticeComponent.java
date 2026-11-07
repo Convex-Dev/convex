@@ -107,7 +107,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 		return cursor().exists();
 	}
 
-	/** Resolves external string segments to the component at their destination. */
+	/**
+	 * Resolves external string segments to the component at their destination.
+	 * @throws NoSuchPathException If a segment names no place
+	 */
 	public final ALatticeComponent<?> resolve(AString... path) {
 		return resolve(path,0,path.length);
 	}
@@ -118,16 +121,19 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * domain components route to children using the same array and new indices.
 	 * String interpretation belongs to the selected child, independently of merge
 	 * delivery. Children must be bound to this component's current working view.
+	 * A segment naming no place in a component's namespace throws
+	 * {@link NoSuchPathException} with that segment's index in the array.
 	 *
 	 * <p>The array is borrowed for this call: implementations must not modify it
 	 * or retain it without copying. Segments within the slice must be non-null.</p>
 	 *
 	 * @return Component at the destination, which may currently be absent
+	 * @throws NoSuchPathException If a segment names no place
 	 */
 	public ALatticeComponent<?> resolve(AString[] path,int start,int end) {
 		Objects.checkFromToIndex(start,end,path.length);
 		if (start==end) return this;
-		throw new UnsupportedOperationException(getClass().getSimpleName()+" defines no external path resolution");
+		throw new NoSuchPathException(path,start);
 	}
 
 	/**

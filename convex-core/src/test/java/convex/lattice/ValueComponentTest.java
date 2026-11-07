@@ -56,7 +56,10 @@ class ValueComponentTest {
 		assertTrue(base.exists());
 		assertSame(base,base.resolve());
 		assertSame(base,base.resolve(new AString[] {null},1,1));
-		assertThrows(UnsupportedOperationException.class,() -> base.resolve(NAME));
+		var none=assertThrows(NoSuchPathException.class,() -> base.resolve(NAME));
+		assertEquals(0,none.getIndex());
+		assertEquals(NAME,none.getSegment());
+		assertThrows(NullPointerException.class,() -> base.resolve(new AString[] {null},0,1));
 		assertThrows(UnsupportedOperationException.class,() -> new ValueComponent<>(root).merge(CVMLong.ONE));
 		assertThrows(UnsupportedOperationException.class,() -> new JSONValueComponent<>(root).merge(CVMLong.ONE));
 	}
@@ -89,7 +92,6 @@ class ValueComponentTest {
 		assertEquals(CVMLong.ONE,parent.resolve(path,1,3).value());
 		assertFalse(parent.resolve(RAW,ZERO).exists());
 		assertThrows(MissingValueException.class,() -> parent.resolve(RAW,ZERO).value());
-		assertThrows(UnsupportedOperationException.class,() -> parent.resolve(NAME));
 		Transactions.transact(root,draft -> {
 			var resolved=new Parent(draft).resolve(path,1,3);
 			resolved.cursor().set(CVMLong.TWO);
@@ -97,6 +99,21 @@ class ValueComponentTest {
 			assertEquals(CVMLong.TWO,resolved.value());
 		});
 		assertEquals(CVMLong.TWO,parent.resolve(path,1,3).value());
+	}
+
+	@Test void unknownSegmentReportsItsIndexInTheCallersArray() {
+		var parent=new Parent(Root.<ACell>create(null));
+		AString[] path={JSON,NAME,DATA};
+		var none=assertThrows(NoSuchPathException.class,() -> parent.resolve(path,1,3));
+		assertEquals(1,none.getIndex());
+		assertEquals(NAME,none.getSegment());
+		AString[] copy=none.getPath();
+		assertArrayEquals(path,copy);
+		path[1]=DATA;
+		copy[1]=DATA;
+		assertEquals(NAME,none.getPath()[1]);
+		// Every segment of a value component names a place, which may be absent
+		assertFalse(parent.resolve(JSON,NAME,DATA).exists());
 	}
 
 	@Test void exposedCursorViewIsUsedForValueAndDescendants() {
