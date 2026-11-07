@@ -66,8 +66,11 @@ public class CorePropertyTest {
 		
 		if (n>0) {
 			assertTrue(ucount>0);
-		} else {
+		} else if (a.isCanonical()) {
+			// A canonical empty structure is the shared empty instance
 			assertSame(a.empty(),a);
+		} else {
+			assertEquals(a.empty(),a);
 		}
 	}
 
