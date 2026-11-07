@@ -61,14 +61,14 @@ See [Reading domain state](docs/SOCIAL_DESIGN.md#reading-domain-state).
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-social</artifactId>
-    <version>0.8.18</version>
+    <version>0.8.19</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-social:0.8.18'
+implementation 'world.convex:convex-social:0.8.19'
 ```
 
 ## Usage
