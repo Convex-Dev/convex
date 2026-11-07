@@ -3,6 +3,10 @@ package convex.lattice;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
@@ -16,6 +20,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
@@ -35,8 +40,8 @@ class AccessListTest {
 
 	private final AtomicLong time=new AtomicLong(10);
 
-	private AccessList<ABlobLike<?>> list(Root<Index<ABlobLike<?>,ACell>> root,int maxExpiring) {
-		return new AccessList<ABlobLike<?>>(root,() -> CVMLong.create(time.get()),maxExpiring);
+	private AccessList<ABlobLike<?>> list(Root<Index<ABlobLike<?>,ACell>> root) {
+		return new AccessList<ABlobLike<?>>(root,() -> CVMLong.create(time.get()));
 	}
 
 	private static AHashMap<Keyword,ACell> until(long t) {
@@ -46,7 +51,7 @@ class AccessListTest {
 	/** A bare entry lists a key until it is removed; reads and no-op edits create nothing. */
 	@Test void aBareEntryListsAKeyUntilRemoved() {
 		var root=new Root<Index<ABlobLike<?>,ACell>>();
-		var list=list(root,4);
+		var list=list(root);
 		assertFalse(list.contains(A));
 		assertNull(list.get(A));
 		assertFalse(list.remove(A));
@@ -65,7 +70,7 @@ class AccessListTest {
 
 	/** Entries are stored as given, unknown fields included, and replaced whole. */
 	@Test void entriesAreKeptAsGiven() {
-		var list=list(new Root<>(),4);
+		var list=list(new Root<>());
 		AHashMap<Keyword,ACell> entry=Maps.of(AccessList.REASON,Strings.create("spam"),
 			AccessList.SINCE,CVMLong.create(5),CUSTOM,CVMLong.ONE);
 		assertTrue(list.add(A,entry));
@@ -77,14 +82,14 @@ class AccessListTest {
 	/** Any stored value lists its key; one that is not a record reads as a bare entry. */
 	@Test void aStoredValueThatIsNotARecordStillLists() {
 		var root=new Root<Index<ABlobLike<?>,ACell>>(Index.<ABlobLike<?>,ACell>of(A,CVMLong.ONE));
-		var list=list(root,4);
+		var list=list(root);
 		assertTrue(list.contains(A));
 		assertEquals(Maps.empty(),list.get(A));
 	}
 
 	/** Keys match by their bytes: a string and a blob with the same bytes are one key. */
 	@Test void aStringAndABlobWithTheSameBytesAreOneKey() {
-		var list=list(new Root<>(),4);
+		var list=list(new Root<>());
 		list.add(Strings.create("host.example"));
 		assertTrue(list.contains(Blob.wrap("host.example".getBytes())));
 		assertTrue(list.remove(Blob.wrap("host.example".getBytes())));
@@ -94,23 +99,23 @@ class AccessListTest {
 	/** An entry reads as absent from its {@code :until}; removing it then reports nothing listed. */
 	@Test void anExpiredEntryReadsAsAbsent() {
 		var root=new Root<Index<ABlobLike<?>,ACell>>();
-		var list=list(root,4);
+		var list=list(root);
 		assertTrue(list.add(A,until(20)));
 		time.set(19);
 		assertTrue(list.contains(A));
 		time.set(20);
 		assertFalse(list.contains(A));
 		assertNull(list.get(A));
-		assertTrue(root.get().containsKey(A),"stored until removed or dropped");
+		assertTrue(root.get().containsKey(A),"stored until explicitly removed");
 		assertTrue(list.add(A,until(30)),"an expired key is listed anew");
 		time.set(30);
 		assertFalse(list.remove(A),"an expired entry does not count as listed");
 		assertFalse(root.get().containsKey(A));
 	}
 
-	/** An {@code :until} that is not an integer is ignored: the entry stays and is not counted. */
+	/** An {@code :until} that is not an integer is ignored: the entry stays live. */
 	@Test void anUntilThatIsNotAnIntegerIsIgnored() {
-		var list=list(new Root<>(),1);
+		var list=list(new Root<>());
 		list.add(A,Maps.of(AccessList.UNTIL,Strings.create("never")));
 		list.add(B,until(50));
 		time.set(1000);
@@ -118,32 +123,36 @@ class AccessListTest {
 		assertFalse(list.contains(B));
 	}
 
-	/** At the bound, expired entries go first, then the one nearest expiry; permanent ones never. */
-	@Test void theBoundDropsExpiredEntriesThenTheOneNearestExpiry() {
+	/** Adding entries leaves cleanup and capacity policy to the application. */
+	@Test void addingEntriesNeverEvictsStoredEntries() {
 		var root=new Root<Index<ABlobLike<?>,ACell>>();
-		var list=list(root,2);
+		var list=list(root);
 		time.set(0);
 		list.add(P);
 		list.add(A,until(100));
 		list.add(B,until(50));
 		list.add(C,until(200));
 		assertTrue(list.contains(A));
-		assertFalse(root.get().containsKey(B),"nearest expiry dropped");
+		assertTrue(list.contains(B));
 		assertTrue(list.contains(C));
 		assertTrue(list.contains(P));
 
 		time.set(150);
 		list.add(D,until(300));
-		assertFalse(root.get().containsKey(A),"expired entry dropped first");
-		assertTrue(list.contains(C),"an unexpired entry stays while an expired one makes room");
+		assertTrue(root.get().containsKey(A),"expired entries remain stored");
+		assertTrue(root.get().containsKey(B));
+		assertFalse(list.contains(A));
+		assertTrue(list.contains(C));
 		assertTrue(list.contains(D));
 		assertTrue(list.contains(P));
+		for (int i=0; i<1025; i++) list.add(Strings.create("key"+i),until(Long.MAX_VALUE));
+		assertEquals(1030,root.get().count(),"no implicit capacity or maximum-expiry special case");
 	}
 
 	/** Replacing an expiring entry, or adding permanent ones, never drops another entry. */
 	@Test void replacingOrAddingPermanentEntriesDropsNothing() {
 		var root=new Root<Index<ABlobLike<?>,ACell>>();
-		var list=list(root,2);
+		var list=list(root);
 		list.add(A,until(100));
 		list.add(B,until(50));
 		list.add(B,until(60));
@@ -151,11 +160,86 @@ class AccessListTest {
 		assertEquals(12,root.get().count());
 		assertTrue(list.contains(A));
 		assertTrue(list.contains(B));
+		var string=Strings.create("host.example");
+		list.add(string,until(100));
+		assertFalse(list.add(string.toBlob(),until(200)));
+		assertEquals(until(200),list.get(string));
+		assertEquals(13,root.get().count());
+	}
+
+	@Test void cleanupUsesTheCallersPredicate() {
+		var root=new Root<Index<ABlobLike<?>,ACell>>();
+		var list=list(root);
+		list.add(A,until(20));
+		list.add(B,until(30));
+		list.add(P);
+		time.set(20);
+		long cutoff=time.get();
+		assertEquals(1,list.removeIf((key,value) -> value instanceof AHashMap<?,?> entry
+			&& AInteger.isLong(entry.get(AccessList.UNTIL))
+			&& ((AInteger)entry.get(AccessList.UNTIL)).longValue()<=cutoff));
+		assertFalse(root.get().containsKey(A));
+		assertTrue(list.contains(B));
+		assertTrue(list.contains(P));
+		assertEquals(1,list.removeIf((key,value) -> key.equals(P)));
+		assertFalse(root.get().containsKey(P));
+	}
+
+	@Test void cleanupSeesRawValuesAndDoesNotReadTheClock() {
+		var root=Root.create(Index.<ABlobLike<?>,ACell>of(A,null,B,CVMLong.ONE,C,until(0),P,Maps.empty()));
+		var list=new AccessList<>(root,() -> { throw new AssertionError("Cleanup must not read the clock"); });
+		assertEquals(2,list.removeIf((key,value) -> value==null || value instanceof CVMLong));
+		assertEquals(Index.of(C,until(0),P,Maps.empty()),root.get());
+		assertEquals(2,list.removeIf((key,value) -> true));
+		assertTrue(root.get().isEmpty());
+	}
+
+	@Test void cleanupNoOpsAndFailuresPreserveStorage() {
+		var root=new Root<Index<ABlobLike<?>,ACell>>();
+		var list=list(root);
+		assertEquals(0,list.removeIf((key,value) -> { throw new AssertionError("No entries"); }));
+		assertNull(root.get());
+		assertThrows(NullPointerException.class,() -> list.removeIf(null));
+		list.add(A);
+		list.add(B);
+		var before=root.get();
+		assertEquals(0,list.removeIf((key,value) -> false));
+		assertSame(before,root.get());
+		assertThrows(IllegalArgumentException.class,() -> list.removeIf((key,value) -> {
+			if (key.equals(B)) throw new IllegalArgumentException("Predicate failed");
+			return true;
+		}));
+		assertSame(before,root.get(),"a predicate failure must not commit partial removals");
+	}
+
+	@Test void cleanupRetriesPreserveConcurrentChangesAndReturnCommittedCount() throws Exception {
+		var root=Root.create(Index.<ABlobLike<?>,ACell>of(A,Maps.empty(),B,Maps.empty()));
+		var list=list(root);
+		var entered=new CountDownLatch(1);
+		var resume=new CountDownLatch(1);
+		var first=new AtomicBoolean(true);
+		try (var executor=Executors.newSingleThreadExecutor()) {
+			var result=executor.submit(() -> list.removeIf((key,value) -> {
+				if (first.getAndSet(false)) {
+					entered.countDown();
+					try { assertTrue(resume.await(10,TimeUnit.SECONDS)); }
+					catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
+				}
+				return key.equals(A) || key.equals(B);
+			}));
+			try {
+				assertTrue(entered.await(10,TimeUnit.SECONDS));
+				list.remove(B);
+				list.add(C);
+			} finally { resume.countDown(); }
+			assertEquals(1L,result.get(10,TimeUnit.SECONDS));
+		}
+		assertEquals(Index.of(C,Maps.empty()),root.get());
 	}
 
 	/** Keys longer than an Index matches exactly are refused, so they never alias a stored key. */
 	@Test void keysTooLongToMatchExactlyAreRefused() {
-		var list=list(new Root<>(),4);
+		var list=list(new Root<>());
 		byte[] bytes=new byte[256];
 		Arrays.fill(bytes,(byte)7);
 		Blob longest=Blob.wrap(bytes,0,255);
@@ -172,23 +256,28 @@ class AccessListTest {
 	@Test void storageThatIsNotAnIndexIsRefused() {
 		@SuppressWarnings({"unchecked","rawtypes"})
 		var root=(Root<Index<ABlobLike<?>,ACell>>)(Root)Root.create(CVMLong.ONE);
-		var list=list(root,4);
+		var list=list(root);
 		assertThrows(IllegalStateException.class,() -> list.contains(A));
 		assertThrows(IllegalStateException.class,() -> list.add(A));
 		assertThrows(IllegalStateException.class,() -> list.remove(A));
+		assertThrows(IllegalStateException.class,() -> list.removeIf((key,value) -> true));
 		assertEquals(CVMLong.ONE,root.get());
 	}
 
 	/** A fork edits independently and publishes on sync. */
 	@Test void aForkPublishesOnSync() {
 		var root=new Root<Index<ABlobLike<?>,ACell>>();
-		var list=list(root,4);
+		var list=list(root);
 		var fork=list.fork();
 		fork.add(A);
 		assertTrue(fork.contains(A));
 		assertFalse(list.contains(A));
 		fork.sync();
 		assertTrue(list.contains(A));
+		assertEquals(1,fork.removeIf((key,value) -> true));
+		assertTrue(list.contains(A),"cleanup remains private until sync");
+		fork.sync();
+		assertFalse(list.contains(A));
 	}
 
 	/** A minimal service record at {@code [:local owner :service]}, with an access list beside other state. */

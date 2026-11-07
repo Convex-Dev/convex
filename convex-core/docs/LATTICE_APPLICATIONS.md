@@ -94,6 +94,17 @@ injected clock. Inside a register such as a `:local` record, removing a key
 carries over with the record, with no tombstone. An allowlist and a blocklist are
 separate lists, and what each refuses or admits is the application's decision.
 
+Adding or replacing an access-list entry leaves every other entry stored,
+including expired ones. Reads treat expired entries as absent without deleting
+them. Applications choose capacity limits and cleanup schedules explicitly.
+`removeIf((key, value) -> ...)` atomically removes matching stored entries and
+returns the number removed. The predicate sees raw values, including nil and
+expired entries, and must be side-effect free because concurrent edits can retry
+it. For age-based cleanup, capture a cutoff before the call and compare the
+relevant entry field against it. The former expiry-capacity constructor and
+automatic eviction have been removed; construct an access list with its cursor
+and clock.
+
 The boundary determines what concurrent edits can preserve. A set inside a
 last-write-wins record is part of that record: competing versions select one
 whole record, even if the local editing API offers set operations. A union set

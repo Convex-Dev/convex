@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Leave access-list cleanup and capacity limits to the application. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#data-and-merge-boundaries))
 - Show blob map keys as `0x` hex in all JSON output, including REST API responses. ([CAD044](https://docs.convex.world/docs/cad/json))
 - Make lattice cursor reads explicit about missing data and value types; see the [cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths) when upgrading.
 - Refuse a lattice path write that cannot be made with `PathWriteException`, naming the key that does not fit. ([Cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths))

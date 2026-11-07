@@ -1,7 +1,9 @@
 package convex.lattice;
 
 import java.util.Objects;
+import java.util.function.BiPredicate;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
@@ -25,11 +27,10 @@ import convex.lattice.cursor.AForkableCursor;
  * </pre>
  *
  * <p>Only {@code :until} is read: an entry whose {@code :until} is at or before the
- * clock's time reads as absent, though it stays stored until it is removed or makes
- * room. An {@code :until} that is not an integer is ignored. At most
- * {@code maxExpiring} entries carry an integer {@code :until}; adding one more at
- * that bound first drops the entries that have expired, then the entry nearest
- * expiry. Entries without one are never counted or dropped. Keys are matched by
+ * clock's time reads as absent, though it stays stored until explicitly removed.
+ * An {@code :until} that is not an integer is ignored. Adding an entry never
+ * removes another entry. Applications choose their capacity and cleanup policies,
+ * using {@link #removeIf(BiPredicate)} for explicit cleanup. Keys are matched by
  * their bytes, so a string and a blob with the same bytes are one key; keys longer
  * than an {@link Index} matches exactly are refused.</p>
  *
@@ -53,39 +54,22 @@ public class AccessList<K extends ABlobLike<?>> extends ALatticeComponent<Index<
 	/** Optional entry field: the time from which the entry no longer applies. */
 	public static final Keyword UNTIL=Keyword.intern("until");
 
-	/** Default bound on entries with an expiry time. */
-	public static final int DEFAULT_MAX_EXPIRING=1024;
-
 	private final Supplier<CVMLong> clock;
-	private final int maxExpiring;
-
-	/**
-	 * Binds a list over a cursor, with the default bound on expiring entries.
-	 *
-	 * @param cursor Cursor holding the list's index, absent until the first addition
-	 * @param clock Supplies the time against which {@code :until} is read
-	 */
-	public AccessList(AForkableCursor<Index<K,ACell>> cursor,Supplier<CVMLong> clock) {
-		this(cursor,clock,DEFAULT_MAX_EXPIRING);
-	}
 
 	/**
 	 * Binds a list over a cursor.
 	 *
 	 * @param cursor Cursor holding the list's index, absent until the first addition
 	 * @param clock Supplies the time against which {@code :until} is read
-	 * @param maxExpiring Most entries with an expiry time, at least one
 	 */
-	public AccessList(AForkableCursor<Index<K,ACell>> cursor,Supplier<CVMLong> clock,int maxExpiring) {
+	public AccessList(AForkableCursor<Index<K,ACell>> cursor,Supplier<CVMLong> clock) {
 		super(cursor);
-		if (maxExpiring<1) throw new IllegalArgumentException("Bound on expiring entries must be positive");
 		this.clock=Objects.requireNonNull(clock,"Clock must not be null");
-		this.maxExpiring=maxExpiring;
 	}
 
 	@Override
 	protected AccessList<K> rebind(AForkableCursor<Index<K,ACell>> cursor) {
-		return new AccessList<>(cursor,clock,maxExpiring);
+		return new AccessList<>(cursor,clock);
 	}
 
 	@Override
@@ -126,8 +110,8 @@ public class AccessList<K extends ABlobLike<?>> extends ALatticeComponent<Index<
 	}
 
 	/**
-	 * Lists a key with the given entry, replacing any entry it has. An entry with an
-	 * integer {@code :until} may first make room by dropping another expiring entry.
+	 * Lists a key with the given entry, replacing any entry it has. Other entries
+	 * are unchanged, including expired ones.
 	 *
 	 * @param key Key to list
 	 * @param entry Entry record, stored as given
@@ -138,12 +122,10 @@ public class AccessList<K extends ABlobLike<?>> extends ALatticeComponent<Index<
 		if (tooLong(key)) throw new IllegalArgumentException("Key is too long for an access list");
 		if (entry==null) throw new IllegalArgumentException("Entry must not be null");
 		long now=now();
-		boolean expiring=until(entry)!=null;
 		ACell before=values().getAndUpdate(stored -> {
 			Index<K,ACell> index=requireIndex(stored);
 			if (index==null) index=Index.none();
 			if (entry.equals(index.get(key))) return index;
-			if (expiring) index=makeRoom(index,key,now);
 			return index.assoc(key,entry);
 		});
 		return live(before,key,now)==null;
@@ -161,32 +143,37 @@ public class AccessList<K extends ABlobLike<?>> extends ALatticeComponent<Index<
 	}
 
 	/**
-	 * Drops expired entries, then the entry nearest expiry, until another expiring
-	 * entry fits. The key about to be replaced is not counted.
+	 * Atomically removes stored entries matching a caller-supplied predicate.
+	 * The predicate receives each key and its raw stored value, including expired
+	 * entries, nil and values that are not records. The clock is not consulted.
+	 * It must be side-effect free: concurrent edits may cause it to run again.
+	 * A predicate failure leaves this operation's removals unapplied; absent storage
+	 * stays absent.
+	 *
+	 * @param predicate Selects the entries to remove
+	 * @return Number of entries removed by the committed update
 	 */
-	private Index<K,ACell> makeRoom(Index<K,ACell> index,K key,long now) {
-		long expiring=0;
-		K nearest=null;
-		long nearestUntil=Long.MAX_VALUE;
-		Index<K,ACell> kept=index;
-		long n=index.count();
-		for (long i=0; i<n; i++) {
-			MapEntry<K,ACell> e=index.entryAt(i);
-			CVMLong until=until(e.getValue());
-			if (until==null || e.getKey().equals(key)) continue;
-			long t=until.longValue();
-			if (t<=now) {
-				kept=kept.dissoc(e.getKey());
-				continue;
-			}
-			expiring++;
-			if (t<nearestUntil) {
-				nearest=e.getKey();
-				nearestUntil=t;
+	public long removeIf(BiPredicate<? super K,? super ACell> predicate) {
+		Objects.requireNonNull(predicate,"Predicate must not be null");
+		class Removal implements UnaryOperator<ACell> {
+			long removed;
+			@Override public ACell apply(ACell stored) {
+				removed=0;
+				Index<K,ACell> index=requireIndex(stored);
+				if (index==null) return stored;
+				Index<K,ACell> kept=index;
+				long n=index.count();
+				for (long i=0; i<n; i++) {
+					MapEntry<K,ACell> entry=index.entryAt(i);
+					if (predicate.test(entry.getKey(),entry.getValue())) kept=kept.dissoc(entry.getKey());
+				}
+				removed=n-kept.count();
+				return kept;
 			}
 		}
-		if (expiring>=maxExpiring) kept=kept.dissoc(nearest);
-		return kept;
+		Removal removal=new Removal();
+		values().update(removal);
+		return removal.removed;
 	}
 
 	/** The entry for a key in a stored index if listed and not expired, otherwise null. */
