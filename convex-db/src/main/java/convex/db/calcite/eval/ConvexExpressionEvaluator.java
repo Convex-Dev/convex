@@ -1,6 +1,7 @@
 package convex.db.calcite.eval;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +35,8 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.data.ABlob;
 import convex.db.calcite.ConvexType;
+import convex.db.calcite.ConvexColumnType;
+import convex.db.jdbc.SQLExceptions;
 
 /**
  * Evaluates RexNode expressions against ACell[] rows using CVM operations.
@@ -74,7 +77,17 @@ public class ConvexExpressionEvaluator {
 		}
 
 		if (expr instanceof RexCall call) {
-			return evaluateCall(call, row, rowType, ctx);
+			try {
+				ACell result = evaluateCall(call, row, rowType, ctx);
+				// Check the SQL result type before a surrounding expression consumes it.
+				// CVM integers themselves have arbitrary precision.
+				if (result instanceof AInteger) ConvexColumnType.toJava(result, call.getType().getSqlTypeName());
+				return result;
+			} catch (NumberFormatException e) {
+				throw SQLExceptions.data("Invalid text representation", "22P02", e);
+			} catch (ArithmeticException e) {
+				throw SQLExceptions.data("Numeric value out of range", "22003", e);
+			}
 		}
 
 		throw new UnsupportedOperationException("Unsupported expression: " + expr.getClass().getSimpleName());
@@ -215,12 +228,12 @@ public class ConvexExpressionEvaluator {
 			case IS_NOT_FALSE -> CVMBool.create(!CVMBool.FALSE.equals(args[0]));
 
 			// Arithmetic operators - use RT functions
-			case PLUS -> cellAdd(args[0], args[1]);
-			case MINUS -> RT.minus(args);
-			case TIMES -> RT.multiply(args);
-			case DIVIDE -> RT.divide(args);
+			case PLUS, CHECKED_PLUS -> cellAdd(args[0], args[1]);
+			case MINUS, CHECKED_MINUS -> RT.minus(args);
+			case TIMES, CHECKED_TIMES -> RT.multiply(args);
+			case DIVIDE, CHECKED_DIVIDE -> cellDivide(args[0], args[1], call.getType().getSqlTypeName());
 			case MOD -> cellMod(args[0], args[1]);
-			case MINUS_PREFIX -> cellNegate(args[0]);
+			case MINUS_PREFIX, CHECKED_MINUS_PREFIX -> cellNegate(args[0]);
 
 			// String operators
 			case LIKE -> cellLike(args[0], args[1]);
@@ -312,8 +325,26 @@ public class ConvexExpressionEvaluator {
 
 		SqlTypeName typeName = targetType.getSqlTypeName();
 		return switch (typeName) {
-			case BIGINT, INTEGER, SMALLINT, TINYINT -> RT.castLong(value);
-			case DOUBLE, FLOAT, REAL -> RT.castDouble(value);
+			case BIGINT, INTEGER, SMALLINT, TINYINT -> {
+				BigInteger integer;
+				if (value instanceof AString s) {
+					integer = new BigInteger(s.toString().trim());
+				} else if (value instanceof AInteger i) {
+					integer = i.big();
+				} else if (value instanceof ANumeric n && Double.isFinite(n.doubleValue())) {
+					integer = BigDecimal.valueOf(n.doubleValue()).toBigInteger();
+				} else {
+					throw SQLExceptions.data("Numeric value out of range", "22003", null);
+				}
+				AInteger result = AInteger.create(integer);
+				if (result == null) throw SQLExceptions.data("Numeric value out of range", "22003", null);
+				ConvexColumnType.toJava(result, typeName);
+				yield result;
+			}
+			case DOUBLE, FLOAT, REAL -> {
+				if (value instanceof AString s) yield CVMDouble.create(Double.parseDouble(s.toString().trim()));
+				yield RT.castDouble(value);
+			}
 			case VARCHAR, CHAR -> {
 				if (value instanceof AString) yield value;
 				yield Strings.create(value.toString());
@@ -540,6 +571,7 @@ public class ConvexExpressionEvaluator {
 	 */
 	private static ACell cellMod(ACell a, ACell b) {
 		if (a == null || b == null) return null;
+		checkDivisor(b);
 
 		// Integer mod
 		if (a instanceof AInteger ia && b instanceof AInteger ib) {
@@ -556,6 +588,21 @@ public class ConvexExpressionEvaluator {
 		}
 
 		throw new UnsupportedOperationException("Cannot mod: " + a.getClass() + " % " + b.getClass());
+	}
+
+	private static ACell cellDivide(ACell a, ACell b, SqlTypeName type) {
+		if (a == null || b == null) return null;
+		checkDivisor(b);
+		if (SqlTypeName.INT_TYPES.contains(type) && a instanceof AInteger ia && b instanceof AInteger ib) {
+			return ia.quot(ib);
+		}
+		return RT.divide(new ACell[] {a, b});
+	}
+
+	private static void checkDivisor(ACell divisor) {
+		if (divisor instanceof ANumeric n && n.doubleValue() == 0.0) {
+			throw SQLExceptions.data("Division by zero", "22012", null);
+		}
 	}
 
 	/**

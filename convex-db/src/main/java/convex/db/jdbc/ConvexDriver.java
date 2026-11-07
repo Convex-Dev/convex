@@ -114,6 +114,11 @@ public class ConvexDriver extends Driver {
 	}
 
 	@Override
+	protected String getFactoryClassName(JdbcVersion jdbcVersion) {
+		return "org.apache.calcite.jdbc.ConvexJdbcFactory";
+	}
+
+	@Override
 	public Meta createMeta(AvaticaConnection connection) {
 		return ConvexMeta.create(connection, CONNECTING.get());
 	}

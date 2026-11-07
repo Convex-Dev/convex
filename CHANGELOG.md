@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Report division by zero, invalid numeric text and overflow with the correct SQLSTATE through Convex DB's JDBC and PostgreSQL interfaces. ([#800](https://github.com/Convex-Dev/convex/issues/800))
 - Keep peers reaching consensus under heavy transaction load. ([Propagation](convex-peer/docs/PROPAGATION.md#delta-construction-and-fan-out))
 - Replicate lattice data reliably, for roots of any size and connections under load. ([Propagation](convex-peer/docs/PROPAGATION.md))
 - Reach consensus promptly when a peer misses part of a Belief update, as often happens while a network starts. ([Propagation](convex-peer/docs/PROPAGATION.md))
