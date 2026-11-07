@@ -85,8 +85,12 @@ public final class Timestamped<V extends ACell> extends ALatticeComponent<V> {
 		return unstamped.updateAndGet(own -> getLattice().merge(own,incoming));
 	}
 
-	/** Incoming updates supply the complete timestamped record. */
+	/**
+	 * Incoming updates supply the complete timestamped record. A delivery below the
+	 * record carries no timestamp to order it by, so it is ignored, whether or not a
+	 * record is held yet.
+	 */
 	@Override public V mergeAt(ACell incoming,ACell... path) {
-		return path.length==0?super.mergeAt(incoming):unstamped.get();
+		return path.length==0?super.mergeAt(incoming):unstamped.getOrDefault(null);
 	}
 }

@@ -16,6 +16,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.StampedCursor;
 import convex.lattice.generic.OwnerKeyLattice;
@@ -73,6 +74,22 @@ class TimestampedTest {
 		component.mergeAt(CVMLong.create(100),A);
 		assertSame(newer,root.get(),"a whole-record register cannot accept partial deliveries");
 		assertSame(rule,component.getLattice());
+	}
+
+	@Test void partialDeliveriesAreIgnoredWhetherOrNotARecordIsHeld() {
+		// The record's slot is a key its parent does not hold yet, so it is absent
+		Root<ACell> parent=Root.create(Maps.empty());
+		AForkableCursor<AHashMap<Keyword,ACell>> slot=parent.path(B);
+		var component=Timestamped.create(slot,() -> {
+			throw new AssertionError("Incoming merges must not read the clock");
+		});
+		assertFalse(slot.exists());
+		assertNull(component.mergeAt(CVMLong.create(100),A));
+		assertFalse(slot.exists());
+		var held=record(1,1);
+		component.merge(held);
+		assertSame(held,component.mergeAt(CVMLong.create(100),A));
+		assertSame(held,slot.get());
 	}
 
 	@Test void malformedRecordsAreIgnoredAndAllLongTimestampsAreSupported() {
