@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve Convex DB's SQL and PostgreSQL client compatibility, including integers beyond 64 bits (with fixes from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
 - Keep a P2P node's `:local` state private, and MCP signing keys safe from a wrong passphrase. ([MCP Auth](convex-restapi/docs/MCP_AUTH.md#deletekey))
 - Handle percent-encoded `did:web` names correctly. ([#816](https://github.com/Convex-Dev/convex/issues/816))
+- Read a lattice fork without waiting for its sync or for other writers to it.
 
 ## [0.8.18] - 2026-10-25
 

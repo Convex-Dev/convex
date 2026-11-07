@@ -653,7 +653,7 @@ boundaries and no-op identity through authoring views.
 Implemented 21 October 2026. Forks always use `TransactionalRootCursor` for private
 working storage. Sync holds that root's existing write lock while reconciling and
 preparing the destination CAS, then installs the result without any further merge.
-Fork reads share the lock; working writes are ordered before or after sync. The
+Fork reads take no lock; working writes are ordered before or after sync. The
 post-publication reconciliation loop and separate sync lock are removed.
 
 A failed merge or preparation leaves the fork value and baseline unchanged and

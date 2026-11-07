@@ -15,7 +15,7 @@ import convex.core.util.Utils;
  * the working value. When both changed, the merge supplied to sync decides.
  *
  * <p>Sync updates the destination atomically while holding the working root's
- * write lock. Working reads and writes are ordered around sync. Failed
+ * write lock. Working writes are ordered around sync; reads take no lock. Failed
  * reconciliation or destination preparation leaves the working value and
  * baseline unchanged. Successful publication requires no further merge.</p>
  *
@@ -127,11 +127,10 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 		return working.exclusiveLock();
 	}
 
+	/** Reads the working value without the lock; a read during sync sees the value from before it. */
 	@Override
 	public V get() {
-		Lock lock=working.exclusiveLock();
-		lock.lock();
-		try { return working.get(); } finally { lock.unlock(); }
+		return working.get();
 	}
 
 	@Override

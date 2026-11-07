@@ -195,7 +195,8 @@ merges and reconciliation at sync select older records over its edits.
 
 Each fork uses an independent `TransactionalRootCursor`. Sync holds its existing
 write lock while the destination's atomic update reconciles and commits by CAS.
-Fork reads take the same lock. A successful commit installs the reconciled working
+Fork reads take no lock: a read during sync sees the working value from before it,
+and a read after sync returns sees the published value. A successful commit installs the reconciled working
 value and advances the baseline without further user code or merging. Failed
 reconciliation or preparation commits nothing; competing destination writes remain
 independent. Destination write functions and the merge must not write or sync the same fork,

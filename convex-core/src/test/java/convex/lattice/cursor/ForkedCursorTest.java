@@ -11,6 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -89,6 +90,33 @@ public class ForkedCursorTest {
 		assertEquals(1,merges.get());
 		assertEquals(Sets.of(1,2,3),fork.sync(merge));
 		assertEquals(1,merges.get(),"The next sync sees an unchanged destination");
+	}
+
+	/** Reads take no lock, so a read while sync holds it sees the working value from before the sync. */
+	@Test public void readsDuringSyncDoNotWaitForIt() throws Exception {
+		var root=Root.<ASet<CVMLong>>create(Sets.empty());
+		var fork=root.fork();
+		fork.set(Sets.of(CVMLong.ONE));
+		root.set(Sets.of(CVMLong.TWO));
+		var seen=new AtomicReference<ASet<CVMLong>>();
+		var nested=new AtomicBoolean();
+		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+			assertEquals(Sets.of(1,2),fork.sync((own,other) -> {
+				var read=executor.submit(() -> {
+					seen.set(fork.get());
+					nested.set(fork.path(CVMLong.ONE).exists());
+				});
+				try {
+					read.get(10,TimeUnit.SECONDS);
+				} catch (Exception e) {
+					throw new AssertionError("A read waited for sync",e);
+				}
+				return union(own,other);
+			}));
+		}
+		assertEquals(Sets.of(1),seen.get(),"the read during sync sees the working value from before it");
+		assertTrue(nested.get(),"a read through a path over the fork does not wait either");
+		assertEquals(Sets.of(1,2),fork.get(),"a read after sync sees the published value");
 	}
 
 	/**
