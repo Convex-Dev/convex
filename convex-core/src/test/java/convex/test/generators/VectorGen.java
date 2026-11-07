@@ -8,8 +8,10 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.MapEntry;
+import convex.core.data.Path;
 import convex.core.data.Vectors;
 import convex.test.Samples;
 
@@ -26,7 +28,7 @@ public class VectorGen extends AGenerator<AVector> {
 	@Override
 	public AVector generate(SourceOfRandomness r, GenerationStatus status) {
 
-		int type = r.nextInt(15);
+		int type = r.nextInt(16);
 		switch (type) {
 		case 0:
 			return Vectors.empty();
@@ -68,6 +70,17 @@ public class VectorGen extends AGenerator<AVector> {
 			AVector v=generate(r,status);
 			long n=v.count();
 			return v.slice(n/3, (2*n/3));
+		}
+		case 11: {
+			// A Path, sometimes longer than one chunk, sometimes sliced from a longer request
+			int n = r.nextInt(0, 2 + (int) Math.sqrt(status.size()) + (r.nextBoolean() ? 0 : 20));
+			AString[] segments = new AString[n];
+			for (int i = 0; i < n; i++) {
+				segments[i] = Gen.STRING.generate(r, status);
+			}
+			Path path = Path.of(segments);
+			int start = r.nextInt(0, n);
+			return path.slice(start, r.nextInt(start, n));
 		}
 		default: {
 			int n = (int) (1 + (Math.sqrt(status.size())));
