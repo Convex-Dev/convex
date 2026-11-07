@@ -125,15 +125,22 @@ the result converter hands them to Calcite through the result column's codec.
 
 ## Errors
 
-The codec and the operators raise `SQLException`s with the SQL standard's SQLSTATE codes, which
-reach JDBC callers in the cause chain and pgwire clients through `ErrorResponse.fromException`.
-When Calcite wraps the exception, `fromException` takes the SQLSTATE from the first
-`SQLException` in the cause chain. Where PostgreSQL has a more specific code, the wire server
+The codec and the operators carry `SQLException`s with SQLSTATE codes. The JDBC execution
+boundary preserves an explicit SQLSTATE from Calcite's cause chain on the exception returned
+to the caller, including failures during `ResultSet.next()`. Generated Java arithmetic and
+numeric parsing failures are translated there too, including data errors in generated static
+initialisers; unrelated initialisation errors are not translated. Exact arithmetic is checked
+for overflow, and SQL integer casts are range-checked rather than truncated by the CVM.
+The pgwire server uses `ErrorResponse.fromException` to take the SQLSTATE from the first
+`SQLException` with a state in the cause chain. Where PostgreSQL has a more specific code, the wire server
 reports it instead, recognising the condition by the type of exception in the chain, never by
 its message.
 
 | Condition | JDBC | PostgreSQL wire |
 |-----------|------|-----------------|
+| Division or modulo by zero | `22012` | `22012` |
+| Numeric overflow during expression evaluation or a cast | `22003` | `22003` |
+| Invalid numeric text during expression evaluation or a cast | `22P02` | `22P02` |
 | Value out of the column's range or precision | `22003` | `22003` |
 | String or blob longer than the declared length | `22001` | `22001` |
 | Text that is not valid input for the type (pgwire parameters) | | `22P02` |

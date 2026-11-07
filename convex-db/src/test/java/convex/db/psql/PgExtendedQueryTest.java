@@ -151,7 +151,7 @@ public class PgExtendedQueryTest {
 	public void testStatementWorksAfterError() {
 		parse("s1", "SELECT 10 / $1 FROM users WHERE id = 2", PgType.INT8);
 		assertEquals("2D[2]CZ", run("s1", "5"));
-		assertEquals("2E(XX000)Z", run("s1", "0"), "division by zero fails in executing");
+		assertEquals("2E(22012)Z", run("s1", "0"), "division by zero fails in executing");
 		assertEquals("2D[5]CZ", run("s1", "2"));
 		assertEquals("2E(22P02)Z", run("s1", "abc"), "invalid text fails in binding");
 		assertEquals("2D[10]CZ", run("s1", "1"));
@@ -190,7 +190,7 @@ public class PgExtendedQueryTest {
 		parse("s1", "SELECT name FROM users WHERE id = $1", PgType.INT8);
 		parse("s2", "SELECT 10 / $1 FROM users WHERE id = 2", PgType.INT8);
 		assertEquals("2D[Bob]CZ", run("s1", "2"));
-		assertEquals("2E(XX000)Z", run("s2", "0"));
+		assertEquals("2E(22012)Z", run("s2", "0"));
 		assertEquals("12D[Alice]CZ", query("SELECT name FROM users WHERE id = $1", PgType.INT8, "1"));
 		assertEquals(3, openStatements.get());
 
