@@ -16,8 +16,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BinaryOperator;
 import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,6 +34,7 @@ import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
+import convex.lattice.cursor.Transactions;
 
 /**
  * Transactions on lattice components, one behaviour per test. A bank holds branch
@@ -151,14 +152,15 @@ class TransactionBehaviourTest {
 	 */
 	private static final class ScriptedRoot extends TransactionalRootCursor<AHashMap<Keyword,ACell>> {
 		private final boolean lockable;
-		private final Deque<UnaryOperator<AHashMap<Keyword,ACell>>> competing=new ArrayDeque<>();
+		private final Deque<BinaryOperator<AHashMap<Keyword,ACell>>> competing=new ArrayDeque<>();
 
 		ScriptedRoot(boolean lockable) {
 			super(Maps.empty());
 			this.lockable=lockable;
 		}
 
-		void competeWith(UnaryOperator<AHashMap<Keyword,ACell>> write) { competing.add(write); }
+		/** Queues another writer's commit, computed from the current value and the value the attempt proposes. */
+		void competeWith(BinaryOperator<AHashMap<Keyword,ACell>> write) { competing.add(write); }
 
 		ReentrantLock writeLock() { return (ReentrantLock)super.exclusiveLock(); }
 
@@ -166,7 +168,7 @@ class TransactionBehaviourTest {
 
 		@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> value) {
 			var write=competing.poll();
-			if (write!=null) super.set(write.apply(get()));
+			if (write!=null) super.set(write.apply(get(),value));
 			return super.compareAndSet(expected,value);
 		}
 	}
@@ -184,20 +186,20 @@ class TransactionBehaviourTest {
 	}
 
 	/** Another writer's deposit, as that writer would commit it to the whole bank. */
-	private static UnaryOperator<AHashMap<Keyword,ACell>> deposit(Keyword branch,String name,long amount) {
-		return value -> {
-			var other=new Root<>(value);
+	private static BinaryOperator<AHashMap<Keyword,ACell>> deposit(Keyword branch,String name,long amount) {
+		return (current,proposed) -> {
+			var other=new Root<>(current);
 			new Bank(other,() -> CVMLong.ZERO).branch(branch).deposit(name,amount);
 			return other.get();
 		};
 	}
 
 	/** Another writer's replacement of the bank with an equal value held in different cells. */
-	private static AHashMap<Keyword,ACell> equalCopy(AHashMap<Keyword,ACell> value) {
+	private static AHashMap<Keyword,ACell> equalCopy(AHashMap<Keyword,ACell> current,AHashMap<Keyword,ACell> proposed) {
 		AHashMap<Keyword,ACell> copy=Maps.empty();
-		for (var entry:value.entrySet()) copy=copy.assoc(entry.getKey(),entry.getValue());
-		assertEquals(value,copy);
-		assertNotSame(value,copy);
+		for (var entry:current.entrySet()) copy=copy.assoc(entry.getKey(),entry.getValue());
+		assertEquals(current,copy);
+		assertNotSame(current,copy);
 		return copy;
 	}
 
@@ -280,6 +282,21 @@ class TransactionBehaviourTest {
 		assertEquals(1,runs.get(),"Inputs compare by value, not by reference");
 		assertEquals(1L,receipt);
 		assertEquals(70,bank.branch(NORTH).balance("alice"));
+	}
+
+	@Test void competingCommitOfTheSameValueStillRerunsTheOperations() {
+		var root=new ScriptedRoot(false);
+		Ledger north=bank(root).branch(NORTH);
+		root.competeWith((current,proposed) -> proposed); // another writer commits exactly this attempt's value
+		var runs=new AtomicInteger();
+		long receipt=north.transact(draft -> {
+			runs.incrementAndGet();
+			return draft.transfer("alice","bob",30);
+		});
+		assertEquals(2,runs.get(),"Commit checks the input the run saw, not the value it would write");
+		assertEquals(2L,receipt);
+		assertEquals(40,north.balance("alice"),"Both transfers happened");
+		assertEquals(60,north.balance("bob"));
 	}
 
 	@Test void competingWriteOutsideTheComponentDoesNotRerunIt() {
@@ -385,16 +402,22 @@ class TransactionBehaviourTest {
 		assertEquals(CVMLong.create(before+3),north.storage().get().get(Timestamped.TIMESTAMP));
 	}
 
-	@Test void retainedDraftCannotChangeCommittedState() {
+	@Test void retainedDraftAndItsForksCannotChangeCommittedState() {
 		Bank bank=bank(new ScriptedRoot(false));
 		var retained=new AtomicReference<Bank>();
+		var fork=new AtomicReference<Bank>();
 		bank.execute(draft -> {
 			retained.set(draft);
 			draft.branch(NORTH).transfer("alice","bob",30);
+			fork.set(draft.fork());
 		});
+		fork.get().branch(NORTH).deposit("bob",5);
+		fork.get().sync(); // publishes into the retained draft, which is all it was forked from
+		assertEquals(35,retained.get().branch(NORTH).balance("bob"));
 		retained.get().branch(NORTH).transfer("alice","bob",30);
 		assertEquals(40,retained.get().branch(NORTH).balance("alice"));
 		assertEquals(70,bank.branch(NORTH).balance("alice"));
+		assertEquals(30,bank.branch(NORTH).balance("bob"));
 	}
 
 	@Test void stagedTransactionCommitsToTheForkUntilSync() {
@@ -446,6 +469,10 @@ class TransactionBehaviourTest {
 	@Test void exclusiveTransactionsNeedARootWithALock() {
 		Bank bank=bank(new ScriptedRoot(false));
 		assertThrows(UnsupportedOperationException.class,bank::exclusive);
+		var runs=new AtomicInteger();
+		assertThrows(UnsupportedOperationException.class,
+			() -> Transactions.executeExclusively(bank.storage(),draft -> runs.incrementAndGet()));
+		assertEquals(0,runs.get(),"Refused before the callback runs");
 		Bank staged=bank.fork();
 		staged.exclusive().execute(draft -> draft.branch(NORTH).transfer("alice","bob",30));
 		assertEquals(70,staged.branch(NORTH).balance("alice"),"A fork's working storage always has a lock");
@@ -459,9 +486,14 @@ class TransactionBehaviourTest {
 		var exclusive=bank.exclusive();
 		bank.branch(NORTH).deposit("alice",5);
 		assertEquals(bank.value(),exclusive.value(),"Reads follow the source");
+		assertTrue(exclusive.exists());
+		var before=bank.value();
 		assertThrows(ReadOnlyCursorException.class,() -> exclusive.cursor().set(Maps.empty()));
 		assertThrows(ReadOnlyCursorException.class,exclusive::sync);
 		assertThrows(UnsupportedOperationException.class,exclusive::fork);
+		assertThrows(UnsupportedOperationException.class,exclusive::persist);
+		assertThrows(UnsupportedOperationException.class,() -> exclusive.merge(Maps.empty()));
+		assertSame(before,bank.value());
 	}
 
 	// ===== Asynchronous transactions =====
