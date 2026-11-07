@@ -16,6 +16,7 @@ ACursor<V>                                get / atomic update / persist / path
     ├── Root<V>                           atomic value holder
     │   └── TransactionalRootCursor<V>    opt-in coordinated writes
     ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
+    ├── ReadOnlyCursor<V>                 refuses every write; reads, paths and forks pass through
     └── ATransformCursor<V,S>             shared atomic mutable-view operations
         ├── PathCursor<V>                 navigation through existing containers
         ├── ProjectionCursor<S,V>         caller-supplied read/rebuild functions
@@ -97,6 +98,16 @@ changed an unrelated field. Atomic update operations retry as needed.
 Multi-key paths use one `PathCursor`. External key conversion remains a lattice or
 component concern; cursors accept canonical CVM keys.
 
+`readOnly()` returns a read-only view of a forkable cursor, which a component can
+bind like any other storage. Reads pass through under the same contract. Every
+write, even one that changes nothing, throws `ReadOnlyCursorException` before the
+source is touched. Paths, defaults and transformed views over it write through it,
+so they are refused too, and a component built over it is read-only throughout. A
+fork of the view is ordinary writable storage, but its sync publishes through the
+view and is refused. A transaction that changes nothing commits, since it writes
+nothing. `AView` subclasses refuse writes with the same exception, an
+`UnsupportedOperationException`.
+
 ## Persistence
 
 `persist(persister)` replaces the value a cursor holds with the equal value a
@@ -107,7 +118,7 @@ edited value; persisting again only finds the cells already stored. A fork persi
 its working value, then its reconciled baseline outside its lock, replacing the
 baseline only if no sync has moved it meanwhile. Views hold no value of their own:
 they treat the equal value as unchanged, so the cells are stored and their source
-is left to its owner.
+is left to its owner. A read-only view refuses to persist, as it refuses any write.
 
 ## Component-supplied construction
 

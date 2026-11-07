@@ -42,6 +42,17 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 		return PathCursor.create(this, path);
 	}
 
+	/**
+	 * Returns a read-only view of this cursor. Reads pass through; every write through
+	 * the view, its paths or views over it throws {@link ReadOnlyCursorException}.
+	 * A fork of the view is writable working storage whose sync is refused.
+	 *
+	 * @return Read-only view, or this cursor if it is one already
+	 */
+	public AForkableCursor<V> readOnly() {
+		return new ReadOnlyCursor<>(this);
+	}
+
 	/** Creates isolated working storage which publishes here when explicitly synced. */
 	public ForkedCursor<V> fork() {
 		return ForkedCursor.create(this);
