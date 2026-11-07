@@ -21,11 +21,9 @@ import convex.lattice.cursor.Transactions;
  * Complete all draft work before returning from the callback. Retained views and
  * their forks remain independent storage; later edits do not change live state.</p>
  *
- * <p>{@link #transact} returns the callback's result from the run that committed, so
- * it describes exactly the committed change; {@link #execute} returns nothing. A
- * result is a local fact about this commit, not about what replicas hold after
- * merging. {@link #exclusive()} gives the form whose callbacks run once under the
- * root's write lock.</p>
+ * <p>{@link #transact} returns the callback's result from the run that committed;
+ * {@link #execute} returns nothing. {@link #exclusive()} gives the form whose
+ * callbacks run once under the root's write lock.</p>
  *
  * <p>Implementations need only provide their bound storage and a factory which binds the
  * same domain operations and configuration to a supplied cursor. This interface

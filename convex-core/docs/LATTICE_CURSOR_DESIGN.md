@@ -222,8 +222,7 @@ state. Applications may add preparation and managed-child publication explicitly
 
 `Transactions` runs a synchronous callback against a private draft and commits by
 CAS, preserving each operation under contention. `transact` returns the result of
-the run that committed, so it describes exactly the committed change; `execute`
-returns nothing. `TransactionalRootCursor` opts into a shared write lock for
+the run that committed; `execute` returns nothing. `TransactionalRootCursor` opts into a shared write lock for
 exclusive execution, where the callback runs once under the lock, and for contention
 fallback. Derived views forward that lock through their existing source links. Typed domain
 transactions use `TransactionalComponent.withCursor` to retain component policy;

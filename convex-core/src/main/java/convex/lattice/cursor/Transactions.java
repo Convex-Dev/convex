@@ -21,10 +21,8 @@ import convex.core.util.Utils;
  * Typed domain transactions build on this in
  * {@code TransactionalComponent}.</p>
  *
- * <p>{@code transact} returns the callback's result from the run that committed, so
- * it describes exactly the committed change; {@code execute} returns nothing. A
- * result is a local fact about this commit, not about what replicas hold after
- * merging.</p>
+ * <p>{@code transact} returns the callback's result from the run that committed;
+ * {@code execute} returns nothing.</p>
  *
  * <p>Ordinary roots retry optimistically without limit. A root supporting
  * exclusive transactions falls back to its write lock after three failed commit
