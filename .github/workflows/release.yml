@@ -1,15 +1,10 @@
 # .github/workflows/release.yml
 # Creates a GitHub Release with convex.jar (plus SHA-256 checksum, SBOM and a
-# signed build-provenance attestation) when a version tag is pushed, then builds
-# and pushes the Docker images for the release.
+# signed build-provenance attestation) when a version tag is pushed. Docker
+# images are published separately, through docker.yml.
 #
-# Docker must be a job here rather than a `release: [published]` trigger in
-# docker.yml: releases created with the workflow's GITHUB_TOKEN do not fire
-# workflow events (GitHub's recursion guard), so such a trigger never runs.
-#
-# Provenance attestations are verifiable with:
+# The jar's provenance attestation is verifiable with:
 #   gh attestation verify convex.jar -R Convex-Dev/convex
-#   gh attestation verify oci://docker.io/convexlive/convex:<version> -R Convex-Dev/convex
 name: Release
 
 on:
@@ -114,37 +109,3 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  docker:
-    needs: release
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push Docker images
-        id: push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          push: true
-          tags: |
-            convexlive/convex:${{ github.ref_name }}
-            convexlive/convex:latest
-
-      - name: Attest Docker image provenance
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-name: docker.io/convexlive/convex
-          subject-digest: ${{ steps.push.outputs.digest }}

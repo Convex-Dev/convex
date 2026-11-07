@@ -94,9 +94,7 @@ Static security analysis for the Java codebase (tests run separately in `build.y
 
 ### Release (`release.yml`)
 
-Triggered when a version tag is pushed (e.g. `0.8.3`). Builds, tests, and creates a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). A follow-on `docker` job then builds and pushes `convexlive/convex:<version>` and `convexlive/convex:latest` to Docker Hub.
-
-(The Docker build must be a job inside this workflow: releases created with the workflow `GITHUB_TOKEN` do not fire `release: [published]` events, so a separate workflow triggered on release publication would never run.)
+Triggered when a version tag is pushed (e.g. `0.8.3`). Builds, tests, and creates a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). It does not publish Docker images.
 
 ### Docker (`docker.yml`)
 
@@ -230,10 +228,8 @@ git push origin 0.8.4
 
 The tag triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
 
-A ruleset restricts release tags to accounts that can bypass it. When the push
-bypasses the rule, git still prints a rule message (`Bypassed rule violations`, or
-`Cannot create ref due to creations being restricted`) followed by `* [new tag]`:
-the tag landed. `GH013` with `! [remote rejected]` means it did not. Confirm with
+A ruleset stops release tags being moved or deleted, except by accounts that can
+bypass it; creating one is not restricted. Confirm the tag with
 `git ls-remote --tags origin 0.8.4`.
 
 ### 7. Confirm GitHub Release is live
@@ -247,7 +243,6 @@ Verify:
 - `convex.jar` is attached as an asset, along with its SHA-256 checksum (`convex.jar.sha256`) and the SBOM (`convex-<version>-sbom.json`)
 - Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex` (it may print nothing on success: exit code 0 means verified, or add `--format json`)
 - Changelog content is correct (not the fallback "See CHANGELOG.md for details" — if that shows, the changelog section header didn't match the tag and the workflow should have failed; investigate).
-- Docker images pushed: `convexlive/convex:<version>` and a freshly-updated `latest` at https://hub.docker.com/r/convexlive/convex/tags
 
 Do **not** proceed to Maven Central until the GitHub Release is confirmed live.
 
@@ -261,7 +256,8 @@ same tag — no tag surgery needed:
 gh run rerun <run-id> --failed
 ```
 
-For a real problem, fix the underlying issue on master, then delete and re-push the tag:
+For a real problem, fix the underlying issue on master, then delete and re-push the
+tag. Only an account that can bypass the tag ruleset can delete it:
 
 ```bash
 # Delete locally and on remote

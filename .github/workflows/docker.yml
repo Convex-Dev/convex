@@ -1,8 +1,7 @@
 # .github/workflows/docker.yml
-# Manually builds and pushes a Docker image to Docker Hub (e.g. snapshot builds,
-# or re-publishing a release tag ad hoc).
+# Manually builds and pushes a Docker image to Docker Hub, for a release tag or
+# a snapshot. Releases do not publish images.
 #
-# Release images are built automatically by the `docker` job in release.yml.
 # Do NOT add a `release: [published]` trigger here: releases created with the
 # workflow GITHUB_TOKEN do not fire workflow events, so it would never run.
 name: Docker
