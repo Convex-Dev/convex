@@ -94,7 +94,7 @@ Static security analysis for the Java codebase (tests run separately in `build.y
 
 ### Release (`release.yml`)
 
-Triggered when a version tag is pushed (e.g. `0.8.3`). Builds, tests, and creates a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). It does not publish Docker images.
+Run by hand on `master` with the version to release (step 6). Builds and tests that commit, then creates the version tag and a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). It does not publish Docker images.
 
 ### Docker (`docker.yml`)
 
@@ -142,7 +142,7 @@ release:
 
 Then:
 
-- Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the tag and heading must match).
+- Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the version and heading must match).
 - Commit to `develop` and push it. The release is made from `origin/develop`.
 
 ### 3. Merge to master in a release worktree
@@ -209,28 +209,17 @@ use it before Maven Central has it.
 
 Quick last-line-of-defence check: the uberjar launches, main class resolves, CLI wiring is intact. Maven Central publishes are irrevocable, so catch uberjar class-path regressions now.
 
-### 6. Push master, then tag
-
-Push `master` first. CI has not yet built its version commit, so wait for the
-Build run on that commit to pass before anything public is tagged:
+### 6. Push master and run the release workflow
 
 ```bash
 git push origin master
-gh run list --commit "$(git rev-parse HEAD)" --workflow build.yml
+gh workflow run release.yml --ref master -f version=0.8.4
 ```
 
-Then tag:
-
-```bash
-git tag 0.8.4
-git push origin 0.8.4
-```
-
-The tag triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
-
-A ruleset stops release tags being moved or deleted, except by accounts that can
-bypass it; creating one is not restricted. Confirm the tag with
-`git ls-remote --tags origin 0.8.4`.
+The workflow checks that the version matches the poms, has a changelog section and
+is not yet tagged, then builds and tests `master`. Only when all of that passes does
+it create the tag and the GitHub Release, on the commit it built. A ruleset stops
+release tags being moved or deleted, so a tag is final once created.
 
 ### 7. Confirm GitHub Release is live
 
@@ -242,40 +231,24 @@ Verify:
 - Release status is not draft/pre-release
 - `convex.jar` is attached as an asset, along with its SHA-256 checksum (`convex.jar.sha256`) and the SBOM (`convex-<version>-sbom.json`)
 - Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex` (it may print nothing on success: exit code 0 means verified, or add `--format json`)
-- Changelog content is correct (not the fallback "See CHANGELOG.md for details" — if that shows, the changelog section header didn't match the tag and the workflow should have failed; investigate).
+- The release text is the version's changelog section.
 
 Do **not** proceed to Maven Central until the GitHub Release is confirmed live.
 
 #### If the release workflow fails
 
-First check whether the failure is transient (e.g. a flaky test, runner hiccup) or a
-real problem with the commit. For a transient failure, re-run the failed jobs on the
-same tag — no tag surgery needed:
-
-```bash
-gh run rerun <run-id> --failed
-```
-
-For a real problem, fix the underlying issue on master, then delete and re-push the
-tag. Only an account that can bypass the tag ruleset can delete it:
-
-```bash
-# Delete locally and on remote
-git tag -d 0.8.4
-git push origin :refs/tags/0.8.4
-
-# Re-tag on the fixed commit and push
-git tag 0.8.4
-git push origin 0.8.4
-```
-
-A stray GitHub Release created by a failed workflow run also needs to be deleted from the Releases page — `softprops/action-gh-release` will refuse to overwrite a release with the same tag name.
+A failed run creates no tag and no release. Find the cause, fix it on `develop`,
+merge it into the release worktree's `master` as in step 3, push `master` and run
+the workflow again. A failure outside the commit, such as a runner fault, needs only
+`gh run rerun <run-id>`.
 
 ### 8. Deploy to Maven Central
 
-Only after confirming the GitHub Release is live, from the release worktree at the tag:
+Only after confirming the GitHub Release is live, from the release worktree, once
+`git fetch --tags` shows the new tag on its `HEAD`:
 
 ```bash
+git fetch --tags && git describe --tags --exact-match HEAD
 ./mvnw deploy -Prelease
 ```
 

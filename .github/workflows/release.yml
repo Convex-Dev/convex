@@ -1,26 +1,36 @@
 # .github/workflows/release.yml
-# Creates a GitHub Release with convex.jar (plus SHA-256 checksum, SBOM and a
-# signed build-provenance attestation) when a version tag is pushed. Docker
-# images are published separately, through docker.yml.
+# Releases the version named when the workflow is run by hand on master:
+#   gh workflow run release.yml --ref master -f version=<version>
+# It builds and tests that commit, then creates the tag and a GitHub Release
+# with convex.jar (plus SHA-256 checksum, SBOM and a signed build-provenance
+# attestation) as its last step, so a failed run leaves no tag. Docker images
+# are published separately, through docker.yml.
 #
 # The jar's provenance attestation is verifiable with:
 #   gh attestation verify convex.jar -R Convex-Dev/convex
 name: Release
 
 on:
-  push:
-    tags:
-      - '*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release; must match the poms (e.g. 0.8.20)'
+        required: true
 
 permissions:
   contents: write
   id-token: write      # OIDC token for signing build-provenance attestations
   attestations: write  # store attestations against the repository
 
+# One release at a time; a second run waits for the first
+concurrency: release
+
 jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      VERSION: ${{ inputs.version }}
 
     steps:
       - name: Checkout repository
@@ -35,29 +45,51 @@ jobs:
           java-version: 25
           cache: maven
 
-      # A tag on a commit where versions:set was not run would otherwise release
-      # a jar whose internal version is still -SNAPSHOT (BUILD.md step 4)
-      - name: Verify tag matches project version
+      # Everything that can be checked without a build fails here, in seconds
+      - name: Check version, tag and changelog
+        id: changelog
         run: |
-          VERSION=$(./mvnw -B -q -DforceStdout help:evaluate -Dexpression=project.version)
-          if [ "$VERSION" != "${{ github.ref_name }}" ]; then
-            echo "::error::Tag ${{ github.ref_name }} does not match project version ${VERSION}. Run the versions:set release step (BUILD.md step 4) before tagging."
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' must be a release version such as 0.8.20."
             exit 1
           fi
+          POM_VERSION=$(./mvnw -B -q -DforceStdout help:evaluate -Dexpression=project.version)
+          if [ "$POM_VERSION" != "$VERSION" ]; then
+            echo "::error::Version $VERSION does not match project version $POM_VERSION. Run the versions:set release step (BUILD.md step 4) first."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" > /dev/null; then
+            echo "::error::Tag $VERSION already exists."
+            exit 1
+          fi
+          CHANGELOG=$(awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 {flag=1; next}
+            flag && /^## \[/ {exit}
+            flag {print}
+          ' CHANGELOG.md)
+          if [ -z "$CHANGELOG" ]; then
+            echo "::error::No CHANGELOG.md section found for [$VERSION]. Rename the [X.Y.Z-SNAPSHOT] heading to [$VERSION] with a release date first."
+            exit 1
+          fi
+          {
+            echo 'changelog<<EOF'
+            echo "$CHANGELOG"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build with tests
         run: ./mvnw -B -Dconvex.test.extended=true clean install
 
-      # Keep the tag workflow self-contained: the ordinary Build workflow runs
-      # independently and must not be the only guard for Central-bound artifacts.
+      # The ordinary Build workflow runs independently and must not be the only
+      # guard for Central-bound artifacts.
       - name: Verify release artifacts
         run: ./mvnw -B -Prelease -DskipTests package
 
       - name: Smoke test release version
         run: |
           JAR_VERSION=$(java -jar convex-integration/target/convex.jar --version)
-          if [ "$JAR_VERSION" != "${{ github.ref_name }}" ]; then
-            echo "::error::Built convex.jar reports ${JAR_VERSION}, expected ${{ github.ref_name }}."
+          if [ "$JAR_VERSION" != "$VERSION" ]; then
+            echo "::error::Built convex.jar reports ${JAR_VERSION}, expected $VERSION."
             exit 1
           fi
 
@@ -68,44 +100,28 @@ jobs:
           # skipNotDeployed=false: the plugin otherwise skips every module because
           # deploy is skipped outside the Maven Central publishing profile
           ./mvnw -B -Dcyclonedx.skipNotDeployed=false org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
-          cp target/CycloneDX-Sbom.json "convex-${{ github.ref_name }}-sbom.json"
+          cp target/CycloneDX-Sbom.json "convex-$VERSION-sbom.json"
           (cd convex-integration/target && sha256sum convex.jar > convex.jar.sha256)
-
-      - name: Extract changelog for this version
-        id: changelog
-        run: |
-          VERSION="${{ github.ref_name }}"
-          CHANGELOG=$(awk -v ver="$VERSION" '
-            index($0, "## [" ver "]") == 1 {flag=1; next}
-            flag && /^## \[/ {exit}
-            flag {print}
-          ' CHANGELOG.md)
-          if [ -z "$CHANGELOG" ]; then
-            echo "::error::No CHANGELOG.md section found for [$VERSION]. Rename the [X.Y.Z-SNAPSHOT] heading to [$VERSION] with a release date before tagging."
-            exit 1
-          fi
-          {
-            echo 'changelog<<EOF'
-            echo "$CHANGELOG"
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: convex-integration/target/convex.jar
 
-      - name: Create GitHub Release
+      # Creates the tag on the commit just built, together with the release
+      - name: Create tag and GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          name: Release ${{ github.ref_name }}
+          tag_name: ${{ inputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Release ${{ inputs.version }}
           body: ${{ steps.changelog.outputs.changelog }}
           draft: false
           prerelease: false
           files: |
             convex-integration/target/convex.jar
             convex-integration/target/convex.jar.sha256
-            convex-${{ github.ref_name }}-sbom.json
+            convex-${{ inputs.version }}-sbom.json
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
