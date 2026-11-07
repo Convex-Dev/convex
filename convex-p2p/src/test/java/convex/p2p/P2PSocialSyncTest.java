@@ -143,11 +143,13 @@ public class P2PSocialSyncTest {
 		assertFalse(bobInfrastructureView.getStatus().hasFailures());
 		assertTrue(bobNode.propagationGroup().getStatus().isOperational());
 		assertFalse(bobNode.propagationGroup().getStatus().hasFailures());
+		// The view first announces as the node starts, before launch publishes
+		// Bob's node record, and announces the record on a later update
 		@SuppressWarnings("unchecked")
 		Index<Keyword,ACell> infrastructure=(Index<Keyword,ACell>)
-			bobInfrastructureView.getLastAnnouncedValue();
+			bobInfrastructureView.whenAnnounced(value -> value instanceof Index<?,?> index
+				&& index.get(P2PLattice.KEY_P2P)!=null).get(5,TimeUnit.SECONDS);
 		assertNull(infrastructure.get(Social.KEY_SOCIAL));
-		assertTrue(infrastructure.get(P2PLattice.KEY_P2P)!=null);
 		assertEquals(3,Set.of(aliceNode.getPort(),bobNode.getPort(),carolNode.getPort()).size());
 
 		Convex aliceToBob=aliceNode.connect(bobNodeKey.getAccountKey(),
@@ -225,8 +227,7 @@ public class P2PSocialSyncTest {
 		assertEquals(1L,bobBrokenView.getStatus().failureCount());
 		@SuppressWarnings("unchecked")
 		Index<Keyword,ACell> recoveredView=(Index<Keyword,ACell>)
-			bobBrokenView.getLastAnnouncedValue();
-		assertTrue(recoveredView!=null,"the failed view should recover on a later update");
+			bobBrokenView.whenAnnounced().get(5,TimeUnit.SECONDS);
 		assertNull(recoveredView.get(Social.KEY_SOCIAL));
 		@SuppressWarnings("unchecked")
 		Index<Keyword,ACell> finalInfrastructure=(Index<Keyword,ACell>)
