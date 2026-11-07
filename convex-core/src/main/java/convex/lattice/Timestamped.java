@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Keyword;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.StampedCursor;
@@ -39,7 +40,7 @@ public final class Timestamped<V extends ACell> extends ALatticeComponent<V> {
 
 	private static final ALattice<AHashMap<Keyword,ACell>> ORDER=new ALattice<>() {
 		private final LWWLattice<AHashMap<Keyword,ACell>> ordering=LWWLattice.create(
-			record -> ((CVMLong)record.get(TIMESTAMP)).longValue());
+			record -> ((AInteger)record.get(TIMESTAMP)).longValue());
 
 		@Override public AHashMap<Keyword,ACell> merge(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
 			if (!checkForeign(other)) return own;
@@ -48,7 +49,7 @@ public final class Timestamped<V extends ACell> extends ALatticeComponent<V> {
 		}
 
 		@Override public boolean checkForeign(AHashMap<Keyword,ACell> value) {
-			return value!=null && value.get(TIMESTAMP) instanceof CVMLong;
+			return value!=null && AInteger.isLong(value.get(TIMESTAMP));
 		}
 
 		@Override public AHashMap<Keyword,ACell> zero() { return null; }
