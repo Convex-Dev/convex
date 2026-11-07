@@ -34,19 +34,25 @@ public class KVCounter {
 		Index<AString, AVector<ACell>> index = (counterValue != null)
 			? (Index<AString, AVector<ACell>>) counterValue
 			: empty();
-		AVector<ACell> existing = index.get(replicaID);
+		return index.update(replicaID, KVCounter::add, CVMLong.create(amount));
+	}
+
+	/**
+	 * Adds an amount to a replica's counts, starting from zero for a new replica
+	 */
+	private static AVector<ACell> add(AVector<ACell> existing, CVMLong amount) {
 		long pos = 0, neg = 0;
 		if (existing != null) {
 			pos = ((CVMLong) existing.get(POS_POSITIVE)).longValue();
 			neg = ((CVMLong) existing.get(POS_NEGATIVE)).longValue();
 		}
-		if (amount >= 0) {
-			pos += amount;
+		long a = amount.longValue();
+		if (a >= 0) {
+			pos += a;
 		} else {
-			neg += (-amount);
+			neg += (-a);
 		}
-		AVector<ACell> entry = Vectors.of(CVMLong.create(pos), CVMLong.create(neg));
-		return index.assoc(replicaID, entry);
+		return Vectors.of(CVMLong.create(pos), CVMLong.create(neg));
 	}
 
 	/**

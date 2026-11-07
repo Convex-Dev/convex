@@ -6,15 +6,15 @@ A SQL database is a tree of lattice cursors. Each component navigates to its
 section of the tree via `cursor.path(key)`, which creates a descended cursor.
 
 ```
-NodeServer LatticeHost       ← persistence and publication policy
+LatticeHost                     ← persistence and publication policy
   │
-  └── ConvexDB / RootCursor    ← database-map application component
+  └── ConvexDB                  ← registered application: database name → database
         │
-        └── path("mydb")       ← MapLattice: db name → database
+        └── path("mydb")        ← SQLDatabase: :tables → table store, optional :config → settings
               │
-              └── path(:tables) ← KeyedLattice: keyword → section
+              └── path(:tables) ← SQLSchema: table name → table entry
                     │
-                    └── path("users") ← TableStoreLattice: table name → table state
+                    └── path("users") ← SQLTable: schema, rows, ctime, live count, version
 ```
 
 Each `path()` call creates a lightweight descended cursor that reads/writes through
@@ -22,35 +22,57 @@ its parent. A `set()` or `updateAndGet()` at any level atomically propagates
 up the chain to the root `AtomicReference`. No copies, no extra work — just
 `assocIn` on the immutable tree and a `compareAndSet` at the root.
 
+`ConvexDB` takes the cursor of a database map and assumes nothing about where that
+lies. Where the databases live is the application's choice: it can root the map at
+the host root, under a region of its own or inside another application, and it
+registers the `ConvexDB` with its host to receive incoming values. By convention,
+an application's own databases live under `:app`; `:sql` is intended for publicly
+shared data such as reference tables. The main class keeps the `ConvexDB` it
+registers, as the [API summary](#api-summary) shows.
+
 ## Component ↔ Cursor Mapping
 
 Each component extends `ALatticeComponent<V>`, wrapping one cursor in the chain:
 
 ```
 LatticeHost   cursor: AHashMap<AString, Index>    hosted root
-  └── ConvexDB  cursor: AHashMap<AString, Index>    same cursor, application policy child
+  └── ConvexDB  cursor: AHashMap<AString, Index>    database map (here the same cursor)
         └── SQLDatabase cursor: Index<Keyword, ACell>   path(database-name)
               └── SQLSchema cursor: Index<AString, AVector> path(:tables)
                     └── SQLTable cursor: AVector<ACell>      path(table-name)
 ```
 
-`database()`, `tables()` and `getTable()` each call `cursor.path(key)` to descend one level.
-The returned component wraps the descended cursor. This is the same pattern as
+`database()`, `tables()` and `table()` each construct the child component over
+`cursor.path(key)`, one level down, passing on the merge policy and clock. This is the same pattern as
 `SocialUser.feed()` and `SocialUser.follows()` in convex-social.
 
-The component-parent chain is deliberately separate from the cursor-parent chain.
-Calling `persist()` delegates from `SQLTable` through `SQLSchema`, `SQLDatabase`
-and `ConvexDB` to `LatticeHost` without changing or synchronising any cursor. A fork is
-a component with its own working state; its sync reconciles that state into the live
-cursor it came from under the database lattice.
+Components hold no link to their parent. Constructing one reads and writes nothing:
+connecting to a database that does not exist, or reading it, creates no state. The
+first changed write creates the database, and the table store within it, through
+the cursor defaults.
+
+## Clock
+
+Writes are stamped with a clock the application supplies, a `Supplier<CVMLong>`
+given to `ConvexDB` (or to a standalone `SQLDatabase` or `SQLSchema`), defaulting to
+the runtime clock. The factories pass it down to every database and table, and forks
+and transactions keep it. Each write reads it once: creating or dropping a table
+stamps the table entry with its `ctime`, and inserting or deleting a row stamps the
+row. Merges never read it, and incoming values keep their timestamps.
+
+The clock is how a writer orders its writes, so it is the application's policy, and
+the merge policy takes the stamps as written. A single writer that needs every later
+write to win supplies strictly increasing stamps; otherwise two writes in the same
+millisecond tie, and a tie keeps the value already held. Under `RowLWW`, a row
+stamped before its table's `ctime` belongs to an earlier table and is dropped on
+merge, so a clock that reads behind a table's creation loses the rows it stamps.
 
 ## Cursor Descent
 
 Each child component retains its descended cursor rather than repeatedly reading
 and associating through raw parent values. Its `updateAndGet` operation delegates
 the immutable update back through the cursor chain atomically. This encapsulates
-navigation and preserves the lattice type at every path without adding another
-copy of the application state.
+navigation without adding another copy of the application state.
 
 ## Transaction Forks
 
@@ -58,7 +80,7 @@ copy of the application state.
 transaction forks that `SQLDatabase`; this gives atomic commit and cheap rollback:
 
 ```
-RootCursor / ConvexDB              ← hosted database map
+ConvexDB                           ← hosted database map
   │
   └── SQLDatabase cursor           ← live database path
         │
@@ -71,24 +93,23 @@ Each transaction forks from the database cursor. Within a transaction, all
 reads see the snapshot at fork time, and all writes accumulate locally.
 
 - **Commit**: `tx.sync()` merges the transaction fork back into the DB cursor
-  via lattice merge. This is atomic and in-memory — just a `compareAndSet` on
-  the DB cursor's `AtomicReference`.
+  with the database's merge policy. This is atomic and in-memory — just a
+  `compareAndSet` on the DB cursor's `AtomicReference`.
 - **Rollback**: discard the transaction cursor. The DB cursor is untouched.
-- **Conflict resolution**: lattice merge semantics handle concurrent
-  transactions. Two transactions inserting different rows merge cleanly.
-  Two transactions updating the same row resolve via LWW (last timestamp wins).
+- **Conflict resolution**: the policy reconciles concurrent transactions, and is
+  consulted only when both have changed the database. Under `RowLWW`, two
+  transactions inserting different rows merge cleanly, and two updating the same
+  row resolve by the later timestamp.
 
 ### Why this works
 
 The transaction is a component fork: a `SQLDatabase` with its own working state,
 snapshotting the database value at fork time, whose destination is the live cursor.
-`sync()` merges the working value into the destination with the database lattice,
-which merges at each level of the tree. No locks, no conflict detection: the lattice
-algebra guarantees convergence.
+`sync()` merges the working value into the destination with the database's policy
+and publishes the tables; the destination's other sections stay as they are.
 
 ```java
-ConvexDB cdb = ConvexDB.connect(server.getHost());
-SQLDatabase db = cdb.database("mydb");
+SQLDatabase db = cdb.database("mydb");   // cdb: the ConvexDB registered with the host
 
 // Transaction 1
 SQLDatabase tx1 = db.fork();
@@ -100,35 +121,106 @@ SQLDatabase tx2 = db.fork();
 tx2.tables().insert("users", row2);
 tx2.sync();  // merge into db cursor (both rows now visible)
 
-// Publish the hosted application root, then request physical durability
-cdb.sync();
-server.getHost().flush();
+// Retain the host's current snapshot and make it durable
+server.getHost().checkpoint();
 ```
 
-## Lattice Merge at Each Level
+## Merge Policy
 
-Each cursor level has a lattice type that defines merge semantics for replication:
+How a database merges is not built into Convex DB: whatever constructs a database
+supplies its merge policy, a pure function of the own and incoming database states
+(`BinaryOperator<Index<Keyword, ACell>>`), and there is no default. An application
+whose tables several writers update row by row can use the per-row last-write-wins
+policy Convex DB provides, `RowLWW::merge`; one that serialises its updates, schema
+changes included, supplies a policy that follows its own ordering.
 
-| Level | Lattice | Merge Strategy |
-|-------|---------|---------------|
-| db map | `MapLattice` | union of db names, per-db merge |
-| database | `KeyedLattice` | per-keyword section merge |
-| table store | `TableStoreLattice` (`IndexLattice`) | union of table names, per-table merge |
-| table entry | `SQLTableLattice` | LWW schema, row-level merge |
-| row index | `TableLattice` (`IndexLattice`) | union of PKs, per-row merge |
-| row entry | `RowLattice` | LWW by timestamp |
+The database is the unit of merging, as it is of transactions. `ConvexDB` passes its
+policy to each database through `database(name)`, and merges the database map by name,
+each database with that policy: nothing spans databases. The table store and tables
+are live views for table operations, with no merge of their own, so they are not
+forked separately: a transaction forks the database.
 
-Merge happens when `sync()` on a fork converges into its parent (local fork) or
-when the NodeServer receives remote state (replication). The lattice guarantees
-convergence regardless of merge order.
+Every route by which state arrives reaches the policy:
 
-## Target API
+- **Incoming values**: the host delivers them to its registered `ConvexDB`, which
+  merges each database with its policy.
+- **Path delivery**: a delivery below a database is lifted to a database state holding
+  only what was delivered, then merged with the policy, so a delivery and a
+  whole-value merge agree. The table store (`[database, :tables]`), a table entry
+  (`[database, :tables, table]`), its rows (`[database, :tables, table, 1]`) or one row
+  (`[database, :tables, table, 1, key]`) can be delivered; rows are lifted into a table
+  entry without a `ctime`. Deliveries to other sections are ignored, and other paths
+  are refused.
+- **Fork publication**: `sync()` reconciles a fork with its destination through the
+  policy. `SQLDatabase` publishes only its tables: the destination's other sections
+  stay as they are.
+- **Replicas**: `SQLDatabase.mergeReplicas` verifies each signed replica with
+  `acceptsReplica`, then merges its state with the policy.
+
+### Per-row last-write-wins
+
+`RowLWW` is a set of pure functions, one for each level:
+
+| Level | Function | Rule |
+|-------|----------|------|
+| database | `merge` | `:tables` by `mergeTables`; other sections, `:config` included, are ignored on receipt and kept where held |
+| table store | `mergeTables` | union of table names; each entry by `mergeTable` |
+| table entry | `mergeTable` | LWW schema on `ctime`, own on a tie; a dropped table's tombstone wins in the same way; rows by `mergeRows`, whichever schema wins |
+| rows | `mergeRows` | by key; a row held on one side only survives if written at or after the other side's `ctime` |
+| row entry | `mergeRow` | LWW by timestamp; equal timestamps favour deletion, otherwise own |
+
+An entry's `ctime` is the time the table was created, or dropped for a tombstone: row
+writes leave it unchanged. A row written before a table was created belongs to an
+earlier table of that name, so when one side holds a row the other lacks, the row
+survives only if it was written at or after the other side's `ctime`. Rows written
+before a `DROP TABLE` therefore never return, whether a copy missed the drop or the
+table was created again, and every copy of a single writer's tables converges to the
+writer's own while its clock stamps each write at or after the table's `ctime`. `DROP TABLE`
+writes only the tombstone: a dropped table holds just the rows written after it was
+dropped, which no reader sees.
+
+A table entry without a `ctime` carries only rows, from a delivery below the entry: its
+rows merge into a table that exists, live or dropped, as those of a whole entry would,
+and an absent table takes nothing. Merges that accept nothing create nothing: a
+database or table store that is absent stays absent. Equal timestamps keep the
+established value, as described in the
+[lattice application design](../../convex-core/docs/LATTICE_APPLICATIONS.md).
+
+Who may change a table's schema, drop it or create it again, and how those changes
+are ordered between writers, is application policy. Under `RowLWW`, two creations of a
+table by different writers are different tables: rows written to the earlier one
+before the later creation are dropped, while rows written after it still merge. A
+table is therefore created once and replicated. An application with several writers
+changing schemas sequences those changes itself, or supplies another policy.
+
+### Composing a policy
+
+The `RowLWW` functions are public, so an application can compose a variant from them.
+For example, a policy that keeps the entry it holds for a reference table, so that no
+merge changes it, and merges the other tables row by row:
 
 ```java
-// Setup — ConvexDB is attached to the NodeServer policy root
-var server = ConvexDB.createNodeServer(store);
+static Index<Keyword, ACell> keepReference(Index<Keyword, ACell> own, Index<Keyword, ACell> other) {
+    Index<Keyword, ACell> merged = RowLWW.merge(own, other);
+    AVector<ACell> held = reference(own);   // the "reference" entry of own's :tables, or null
+    if (held == null || held.equals(reference(merged))) return merged;
+    Index<AString, AVector<ACell>> tables = (Index<AString, AVector<ACell>>) merged.get(ConvexDB.KEY_TABLES);
+    return merged.assoc(ConvexDB.KEY_TABLES, tables.assoc(REFERENCE, held));
+}
+
+ConvexDB cdb = ConvexDB.create(MyApp::keepReference);
+```
+
+`ConvexDBMergeTest` exercises such a policy across every route.
+
+## API Summary
+
+```java
+// Setup — the host's registered ConvexDB merges incoming values
+var host = LatticeHost.open(ConvexDB.EMPTY, store);
+ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+var server = new NodeServer<>(host);
 server.launch();
-ConvexDB cdb = ConvexDB.connect(server.getHost());
 SQLDatabase db = cdb.database("mydb");
 
 // DDL (directly on db, outside transaction)
@@ -141,11 +233,10 @@ tx.tables().insert("users", row2);
 tx.tables().deleteByKey("users", oldPk);
 tx.sync();    // commit: atomic merge into db cursor
 
-// Publish and flush through host policy
-cdb.sync();
-server.getHost().flush();
+// Save durably through the host
+server.getHost().checkpoint();
 ```
 
-Each component owns its cursor and delegates application policy through its
-component parent. The transaction fork gives atomic commit, free rollback and
-conflict-free concurrent merges without confusing persistence with cursor sync.
+Each component owns its cursor, and each database merges with the policy its wrapper
+supplies. The transaction fork gives atomic commit, free rollback and concurrent
+merges by that policy without confusing persistence with cursor sync.

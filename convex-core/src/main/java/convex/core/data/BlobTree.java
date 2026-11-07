@@ -1,10 +1,7 @@
 package convex.core.data;
 
-import java.io.InputStream;
-import java.io.SequenceInputStream;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
-import java.util.Enumeration;
 
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
@@ -279,6 +276,15 @@ public class BlobTree extends ABlob {
 	public boolean equals(BlobTree b) {
 		if (b == this) return true;
 		if (b.count != count) return false;
+		Hash h=cachedHash();
+		if (h!=null) {
+			Hash hb=b.cachedHash();
+			if (hb!=null) return h.equals(hb);
+		}
+		// A branch tree compares by hash, which any parent encoding or store needs
+		// anyway, so the work is kept. An embedded tree (a few chunks) compares its
+		// children through their refs.
+		if (!compareAsEmbedded(b)) return getHash().equals(b.getHash());
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
 			if (!children[i].equals(b.children[i])) return false;
@@ -455,29 +461,6 @@ public class BlobTree extends ABlob {
 	}
 	
 	@Override
-	public InputStream getInputStream() {
-		return new SequenceInputStream(enumerateChildStreams());
-	}
-	
-	Enumeration<InputStream> enumerateChildStreams() {
-		return new ChildEnumeration();
-	}
-	
-	private class ChildEnumeration implements Enumeration<InputStream> {
-		private int i=0;
-
-		@Override
-		public boolean hasMoreElements() {
-			return i<childCount();
-		}
-
-		@Override
-		public InputStream nextElement() {
-			return getChild(i++).getInputStream();
-		}
-	}
-	
-	@Override
 	public void validateCell() throws InvalidDataException {
 		int n = children.length;
 		if ((n < 2) | (n > FANOUT)) throw new InvalidDataException("Illegal number of BlobTree children: " + n, this);
@@ -576,7 +559,7 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public BlobTree updateRefs(IRefFunction func) {
+	protected BlobTree rebuildRefs(IRefFunction func) {
 		Ref<ABlob>[] newChildren = Ref.updateRefs(children, func);
 		return withChildren(newChildren);
 	}

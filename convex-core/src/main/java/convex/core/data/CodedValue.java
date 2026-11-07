@@ -61,7 +61,13 @@ public class CodedValue extends ACell {
 
 	@Override
 	public boolean equals(ACell a) {
-		return Cells.equalsGeneric(this, a);
+		if (a==this) return true;
+		if (a instanceof CodedValue cv) {
+			if (tag!=cv.tag) return false;
+			// Children compare through their refs: embedded by value, branch by hash
+			return codeRef.equals(cv.codeRef)&&valueRef.equals(cv.valueRef);
+		}
+		return Cells.equalsEncoding(this, a); // e.g. an op with the same tag
 	}
 
 	@Override
@@ -100,11 +106,11 @@ public class CodedValue extends ACell {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public CodedValue updateRefs(IRefFunction func) {
+	@Override
+	protected CodedValue rebuildRefs(IRefFunction func) {
 		Ref<ACell> nc=func.apply(codeRef);
 		Ref<ACell> nv=func.apply(valueRef);
 		if ((nc==codeRef)&&(nv==valueRef)) return this;
-		
 		return new CodedValue(tag,nc,nv);
 	}
 

@@ -225,7 +225,7 @@ cursor ("select an existing value, no re-stamp" is the intent; make it a rule).
 
 ## 8. External key resolution belongs to the lattice, not the cursor
 
-**Status:** Implemented (`c1bfed931`).
+**Status:** Implemented (`c1bfed931`); superseded by entry 33.
 
 `ALattice.resolvePath(keys...)` canonicalises JSON-style keys level by level and is
 the only resolution primitive. A component navigates with
@@ -251,7 +251,7 @@ CAD text affected: CAD036 (*Lattice Node*), how pull-path merges are described.
 
 **Status:** Implemented (0.8.18 work, engine moved in `c1bfed931`).
 
-`Transactions.transact` and `transactLocked` run a callback against a private draft
+`Transactions.transact` and `transactExclusively` run a callback against a private draft
 of a cursor's value and commit by compare-and-set, with locked fallback on a
 `TransactionalRootCursor`. `TransactionalComponent` builds typed domain drafts on
 it. Neither CAD035 nor CAD045 describes transactions; this is an addition to specify,
@@ -472,8 +472,8 @@ for transactions across its sets. These applications need no custom root merge o
 sync implementation.
 
 The host accepts any root component, so a normal application can inherit
-`AKeyedRegions` without also inheriting `ALatticeApplication`. The latter remains a
-convenience for root lattice navigation and custom application merges. This is a
+`AKeyedRegions` without also inheriting `ALatticeApplication`. The latter is for
+applications with root-level behaviour of their own, such as a custom merge. This is a
 component composition choice, not a change to lattice merge algorithms or encoding.
 
 CAD text affected: CAD045 *Application Architecture*, *Wrapper Pattern* and
@@ -497,10 +497,10 @@ prevent unrelated valid entries merging. A malformed containing value can still
 abort the atomic merge. Value lattices remain responsible for domain validation.
 
 CAD038 *Owner Verifier* describes context-based verification; these components use
-the instance-bound verifier already introduced by the typed owner lattices. Its
-fail-closed guidance and legacy permissive fallback conflict for indirect owners:
-the new components require an explicit verifier, as agreed, while the legacy
-`OwnerLattice` authorisation fallback remains unchanged. CAD043 governs identity
+the instance-bound verifier already introduced by the typed owner lattices. Every
+owner rule fails closed: without a verifier, an owner must be an account key that
+signed its own value, and any other owner is refused. A verifier, bound or in a
+context, decides for every owner. CAD043 governs identity
 resolution and CAD004 distinguishes account identity, keys and controllers; this
 change supplies no new DID method or account-authorisation rules. Applications
 provide local resolver data, and a changed resolver governs future verification
@@ -598,8 +598,9 @@ immutable values without constructing a lattice definition.
 
 `LatticeComponent` is the explicit adapter for lattice-based implementations. It
 owns lattice path reduction, optional shape-based cursor construction and keyed
-publication reconciliation for simple values and caller-supplied lattices.
-`LatticeApplication` opts into these operations (see entry 25). Domain components extend
+publication reconciliation for simple values and caller-supplied lattices. A host
+registers one directly when a lattice is the whole of a root's behaviour, as
+`RelayHost` does. Domain components extend
 `ALatticeComponent` directly and call lattice rules in explicit publication or
 domain operations; using a lattice internally does not grant generic incoming
 merge or path routing. Owned maps explicitly accept complete owner envelopes and
@@ -616,14 +617,15 @@ Implemented 20 October 2026. `ALatticeApplication` extends `ALatticeComponent`
 without accepting an `ALattice`. It retains application preparation and adds the
 managed-child publication stage: `beforeSync()`, `syncChildren()`, then its own
 boundary. Failure prevents later stages but does not undo successful children.
-`AKeyedRegions` extends this application base, freezes registrations before
-preparation and publishes children in registration order. Nested applications
-participate through the same lifecycle. The empty collection remains inert.
+`AKeyedRegions` is a component with the same two stages and no publication of its
+own boundary: it freezes registrations before preparation and publishes children in
+registration order. Nested region containers prepare through the same stages. The
+empty collection remains inert.
 
-`LatticeApplication` is the explicit, extensible adapter for a supplied root lattice.
-The P2P and DLFS APIs that accept such lattices opt into it. Generic lattice path
-reduction and publication reconciliation are shared with `LatticeComponent` through
-`LatticeOps`; neither operation is required by ordinary applications. Standard
+There is no root-lattice application class. An application that keeps a lattice
+for its own merge, as `P2PApplication` does, calls `LatticeOps` for path reduction
+and publication reconciliation, the operations `LatticeComponent` uses; neither is
+required by ordinary applications. Standard
 region entry points navigate their known index/map types without a root lattice.
 This preserves CAD045's component boundaries and CAD035's fork semantics.
 
@@ -632,7 +634,10 @@ This preserves CAD045's component boundaries and CAD035's fork semantics.
 Implemented. A component binds the storage it is given, `super(cursor)`. A staged
 component is one constructed over a fork of its destination, `destination.fork()`,
 and a component fork is `rebind(storage.fork())`, the same class over a forked
-cursor. There is no second constructor form and no ownership flag.
+cursor. There is no second constructor form and no ownership flag. Applications
+follow the same rule: one holding a private copy of the root is built over
+`host.cursor().fork()` with `host::persist`, and no application constructor takes
+a host.
 
 `sync()` publishes the bound storage with the component's own reconciliation,
 `storage.sync(this::mergePublication)`. On a fork that reconciles and publishes into
@@ -648,7 +653,7 @@ boundaries and no-op identity through authoring views.
 Implemented 21 October 2026. Forks always use `TransactionalRootCursor` for private
 working storage. Sync holds that root's existing write lock while reconciling and
 preparing the destination CAS, then installs the result without any further merge.
-Fork reads share the lock; working writes are ordered before or after sync. The
+Fork reads take no lock; working writes are ordered before or after sync. The
 post-publication reconciliation loop and separate sync lock are removed.
 
 A failed merge or preparation leaves the fork value and baseline unchanged and
@@ -755,21 +760,39 @@ the node runs: dynamic is the default unless something genuinely cannot change. 
 node may carry a primary DID and an authorised key as the default transport identity
 of new groups; the DID is optional, and more capable nodes will want one.
 
-`LatticeNode` is the standard TCP assembly. The hand-assembled node setups (the P2P
-node, the CLI and DLFS servers, ConvexDB and the GUI browser) port to it
-(Convex-Dev/convex#769); the wrapper's own design stays open. The networking
-narrative has one home, `convex-peer/docs/LATTICE_NETWORKING.md`; the applications
-manual points there.
+`LatticeNode` is the standard TCP assembly: the P2P node and the CLI and DLFS servers
+use it (Convex-Dev/convex#769). ConvexDB and the GUI browser replicate without a
+listener, so they use `NodeServer` directly. A group reads its limits from its own
+configuration map, never the node's; `createPropagator(groupConfig)` supplies one and
+the no-argument form uses defaults. The networking narrative has one home,
+`convex-peer/docs/LATTICE_NETWORKING.md`; the applications manual points there.
 
 CAD text affected: CAD036 (*Lattice Node*) node construction, propagation group
 lifecycle and node identity.
+
+## 33. External keys are resolved by the component that owns each level
+
+**Status:** Implemented; agreed 6 November 2026.
+
+`ALatticeComponent.resolve` takes an external string path: each parent defines the
+names of its level and hands the rest of the path to the child responsible.
+`ValueComponent` and `JSONValueComponent` supply literal and JSON addressing for value
+locations ([Component paths](LATTICE_APPLICATIONS.md#external-component-paths)).
+The lattice-level resolution (`ALattice.resolveKey`, `resolvePath`, `toJSONKey`) is
+removed. It had no callers once cursors stopped carrying their lattice (entry 8), and
+it saw only the declared structure, so it could not choose between keys by what is
+stored. A decoded blob owner key becomes an `AccountKey` through `AccountKey.create`.
+
+CAD text affected: CAD035 *Lattice Integration*; CAD036 *JSON Key Compatibility*;
+CAD037 owner key representation.
 
 ## CAD-by-CAD summary
 
 | CAD | Sections | Entries |
 |---|---|---|
 | CAD024 Data Lattice | *Cursors*, *Signed Lattice*, *Cursor Sync Guarantees*, implementation note on cursor types | 1, 3, 5, 6, 13, 15 |
-| CAD035 Lattice Cursors | *Path Cursor*, *Forkable Cursor*, *Cursor Hierarchy*, *Lattice-Aware Cursors*, *Lattice Context*, *Reference Implementation*, Java example | 2, 3, 4, 5, 6, 7, 8, 10 |
+| CAD035 Lattice Cursors | *Path Cursor*, *Forkable Cursor*, *Cursor Hierarchy*, *Lattice-Aware Cursors*, *Lattice Context*, *Lattice Integration*, *Reference Implementation*, Java example | 2, 3, 4, 5, 6, 7, 8, 10, 33 |
 | CAD045 Lattice Applications | *Application Architecture*, *Custom Lattice Types*, *Zero Values*, *Lattice Continuity*, *Signing Boundary*, *Local Trust vs Network Verification*, *Wrapper Pattern*, *Writing Data*, *Fork and Sync*, *Connecting to Node Infrastructure*, *Reference Implementation*, *Cursor Chain* | 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 |
-| CAD036 Lattice Node | pull-path merge description, node construction and restore, group lifecycle, node identity | 9, 14, 16, 32 |
+| CAD036 Lattice Node | pull-path merge description, node construction and restore, group lifecycle, node identity, *JSON Key Compatibility* | 9, 14, 16, 32, 33 |
+| CAD037 KV Database | owner key representation | 33 |
 | CAD038 Lattice Authentication | *Owner Verifier*, indirect-owner default policy, explicit authoring | 19, 20, 21, 22 |

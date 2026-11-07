@@ -50,6 +50,28 @@ public class LatticeConnectionHealthTest {
 		}
 	}
 
+	/** A value can arrive just before its connection closes: authenticating the closed connection is no failure. */
+	@Test
+	public void testClosedInboundConnectionIsLeftAlone() throws Exception {
+		var config=LatticePropagatorConfig.create();
+		var group=new LatticePropagator(new MemoryStore(),config);
+		var key=AKeyPair.generate().getAccountKey();
+		try (var endpoint=new LatticeProtocolEndpoint(group,null,config)) {
+			endpoint.start();
+			var connection=LocalConnection.createPair(message -> true,message -> true);
+			endpoint.attachInbound(connection);
+			connection.close();
+			endpoint.sweepClosedConnections();
+			assertFalse(endpoint.ownsInbound(connection));
+			endpoint.authenticateInbound(connection,key);
+			assertTrue(endpoint.authenticatingInboundKeys().isEmpty());
+
+			var elsewhere=LocalConnection.createPair(message -> true,message -> true);
+			assertThrows(IllegalStateException.class,() -> endpoint.authenticateInbound(elsewhere,key),
+				"an open connection this group does not own is still refused");
+		}
+	}
+
 	@Test
 	public void testProbesOverBothRouteDirections() throws Exception {
 		var aliceKey=AKeyPair.generate();

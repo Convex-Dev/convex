@@ -174,7 +174,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public AVector<T> updateRefs(IRefFunction func) {
+	protected AVector<T> rebuildRefs(IRefFunction func) {
 		return toVector().updateRefs(func);
 	}
 

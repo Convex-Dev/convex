@@ -14,7 +14,9 @@ import convex.core.data.ACell;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.ProjectionCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
@@ -32,7 +34,7 @@ public class ComponentConstructionTest {
 	@Test public void plainPathsNeverCreateContainers() {
 		Root<Index<Keyword,ACell>> root=new Root<>();
 		AForkableCursor<CVMLong> path=root.path(REGION,Keywords.FOO);
-		assertNull(path.get());
+		assertFalse(path.exists());
 		assertThrows(IllegalStateException.class,() -> path.set(CVMLong.ONE));
 		assertThrows(IllegalStateException.class,() -> path.compareAndSet(null,CVMLong.ONE));
 		assertThrows(IllegalStateException.class,() -> path.updateAndGet(v -> {
@@ -48,7 +50,8 @@ public class ComponentConstructionTest {
 	@Test public void componentViewsConstructOnlyOnWrite() {
 		Root<Index<Keyword,ACell>> root=new Root<>();
 		AForkableCursor<CVMLong> view=LatticeComponent.resolve(root,OUTER,REGION,Keywords.FOO);
-		assertNull(view.get());
+		assertFalse(view.exists());
+		assertThrows(MissingValueException.class,view::get);
 		assertNull(root.get());
 		assertNull(view.updateAndGet(value -> value));
 		assertTrue(view.compareAndSet(null,null));
@@ -59,6 +62,20 @@ public class ComponentConstructionTest {
 		}));
 		assertEquals(OUTER.zero().assoc(REGION,INNER.zero().assoc(Keywords.FOO,CVMLong.ONE)),root.get());
 		assertEquals(CVMLong.TWO,view.updateAndGet(value -> CVMLong.create(value.longValue()+1)));
+	}
+
+	@Test public void componentViewsReadMissingKeysAsAbsentAndStoredNilAsNil() {
+		Root<Index<Keyword,ACell>> root=Root.create(OUTER.zero().assoc(REGION,INNER.zero()));
+		AForkableCursor<CVMLong> missing=LatticeComponent.resolve(root,OUTER,REGION,Keywords.BAR);
+		assertFalse(missing.exists());
+		assertThrows(MissingValueException.class,missing::get);
+		assertSame(CVMLong.ZERO,missing.getOrDefault(CVMLong.ZERO));
+		assertFalse(root.path(REGION,Keywords.BAR).exists(),"the same as a plain path");
+		root.set(OUTER.zero().assoc(REGION,INNER.zero().assoc(Keywords.BAR,null)));
+		assertTrue(missing.exists());
+		assertNull(missing.get());
+		missing.set(CVMLong.ONE);
+		assertEquals(CVMLong.ONE,RT.getIn(root.get(),REGION,Keywords.BAR));
 	}
 
 	@Test public void constructionFailureLeavesSourceUntouched() {
@@ -107,7 +124,7 @@ public class ComponentConstructionTest {
 		assertEquals(CVMLong.ONE,view.getAndSet(CVMLong.TWO));
 		assertEquals(CVMLong.TWO,view.getAndAccumulate(CVMLong.ONE,(a,b) -> CVMLong.create(a.longValue()+b.longValue())));
 		assertEquals(CVMLong.create(4),view.accumulateAndGet(CVMLong.ONE,(a,b) -> CVMLong.create(a.longValue()+b.longValue())));
-		Transactions.transactLocked(view,draft -> draft.set(CVMLong.create(5)));
+		Transactions.executeExclusively(view,draft -> draft.set(CVMLong.create(5)));
 		assertEquals(CVMLong.create(5),view.get());
 	}
 }

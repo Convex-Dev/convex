@@ -27,7 +27,12 @@ public class DataStructuresPropertyTest {
 
 		ADataStructure<?> e = a.empty();
 		if (c == 0) {
-			assertSame(a, e);
+			// A canonical empty structure is the shared empty instance
+			if (a.isCanonical()) {
+				assertSame(a, e);
+			} else {
+				assertEquals(a, e);
+			}
 		}
 
 		assertEquals(0, e.count());

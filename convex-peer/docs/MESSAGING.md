@@ -37,7 +37,7 @@ with another participant. It provides three communication methods:
 | Method | Semantics | Blocking | Used for |
 |---|---|---|---|
 | `returnMessage(Message)` | Deliver a result to the other end | Non-blocking | Result delivery from processing threads |
-| `sendMessage(Message)` | Push an arbitrary message to the other end | May block (bounded) | General messaging, protocol exchange |
+| `sendMessage(Message)` | Push an arbitrary message to the other end; throws if it cannot be sent ([CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md#aconnection-interface)) | May block (bounded) | General messaging, protocol exchange |
 | `supportsMessage()` | Check if `sendMessage` is available | — | Guard before protocol exchange |
 
 `returnMessage` and `sendMessage` are independent capabilities. A connection
@@ -178,7 +178,8 @@ handler (null) and no general messaging.
 ### 3.4 Return-Only Pairs
 
 When an end has `acceptsMessages = false`, the paired end's `sendMessage`
-returns false for that direction. `returnMessage` is unaffected — results
+throws `UnsupportedOperationException` for that direction, and its
+`trySendMessage` returns false. `returnMessage` is unaffected — results
 always flow through. This structurally prevents server-initiated protocol
 exchange (e.g. challenge/response verification) on return-only connections
 while preserving result delivery.
@@ -206,7 +207,17 @@ it.
 ```java
 AConnection connect(URI endpoint, Consumer<Message> receiveAction, int maxMessageLength)
     throws IOException, InterruptedException, TimeoutException;
+
+AConnection connectWithDelivery(URI endpoint, Function<Message, Predicate<Message>> delivery,
+    int maxMessageLength) throws IOException, InterruptedException, TimeoutException;
 ```
+
+`connectWithDelivery` takes a delivery that may ask to wait by returning a retry,
+as a server's delivery does when a queue is full. The built-in Netty transports
+then stop reading that connection until the retry accepts the message or gives
+up ([BACKPRESSURE.md](BACKPRESSURE.md)). The default, used by a factory that
+implements only `connect` and by the NIO client, cannot pause: it answers a request
+it is asked to wait for with `:LOAD` at once and drops anything else.
 
 The factory installs the receive limit before delivery starts and returns a
 ready connection, including any transport handshake. `AConnection` continues
@@ -273,12 +284,16 @@ that communicate via an `AConnection`:
 
 - **Connection field** — `protected AConnection connection`, managed by
   `setConnection()` / `close()`
-- **Result correlation** — `returnMessageHandler` delegates matching to the
+- **Result correlation** — `returnMessageDelivery` delegates matching to the
   physical connection, then decodes the result with the client's store and
   applies transaction bookkeeping.
 - **Protocol handling** — incoming protocol messages (e.g. server-initiated
   CHALLENGE) are handled automatically (auto-response with the client's
-  keypair).
+  keypair). Reverse DATA_REQUESTs and other unsolicited messages go to the
+  deliveries set with `setDataRequestDelivery` and `setUnsolicitedMessageDelivery`,
+  which may ask to wait; `ConvexRemote` passes that request on to its transport.
+  `returnMessageHandler`, for paths that cannot pause such as `ConvexLocal`,
+  answers it with `:LOAD` instead.
 - **`message(Message)`** — delegates requests to the connection with their IDs
   unchanged. Fire-and-forget messages (no request ID) are sent directly and return
   `Result.SENT_MESSAGE`.
@@ -309,6 +324,23 @@ still have normal Java cancellation semantics and do not propagate cancellation.
 An added `orTimeout` on the returned owned future also releases its request.
 In contrast, `get(timeout)` only stops that wait: cancel explicitly to abandon it.
 Neither cancellation nor expiry implies that a submitted transaction did not run.
+
+A reply completes the client's future on the thread that delivers it: a network
+event loop for a remote client, or for `ConvexLocal` the local peer's thread that
+produced the reply. That is the thread delivering the results of the transaction's
+block, the transaction handler for a transaction refused on arrival, the query
+handler for a raw QUERY message, and the calling thread itself for a status or ping
+request; a `ConvexLocal` query takes no peer thread (§4.4). A timeout or close
+completes it on the timeout scheduler or the closing thread. Stages attached with
+`thenApply`, `thenCompose`, `whenComplete` and the other non-async methods run on
+that thread without a hand-off, so they must not block: an event loop serves many
+connections, and a local peer's threads serve every client, or every client with a
+transaction in the same block. A stage may send a
+further request: where its thread would wait for queue space that only it frees,
+the send fails at once with `FULL_CLIENT_BUFFER` instead
+([CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md)). A stage that needs another
+reply chains it with `thenCompose` rather than waiting; only work that must wait,
+such as a `*Sync` call, belongs in an `*Async` stage with an executor.
 
 `sendRequest(message, timeout)` preserves caller-supplied numeric IDs for the raw
 Java APIs. Outstanding duplicates are rejected; completed IDs remain reusable
@@ -343,7 +375,15 @@ The pair is created at construction time. The mode depends on keypair presence:
 - `createReturnable(clientHandler, serverHandler)` — client end return-only
 - Server end cannot `sendMessage` to client (`supportsMessage()` = false)
 - `returnMessage` works — results flow back through the awaiting map
-- No trust accumulation; `InboundVerifier` skips these connections
+- No trust accumulation; a server cannot verify these connections
+
+**Queries** do not use the pair. `querySync` runs the query against the peer's
+current state on the calling thread, and `query` on a virtual thread of its own,
+which completes the returned future. A local query therefore never waits in, or
+holds up, the peer's query handler, which stays free for network queries and data
+requests, and its continuations never run on a peer thread. A raw QUERY message
+sent with `message` or `request` still takes the peer's query queue, as from the
+network (§4.6).
 
 ### 4.5 `ConvexDirect` — Fast Path
 
@@ -398,40 +438,42 @@ if (conn.supportsMessage()) {
 }
 ```
 
-Used for protocol exchange (challenge/response verification), data push, and
-any server-initiated communication. Only works on bidirectional connections.
-`supportsMessage()` returns false on return-only connections — check before
-attempting.
+Used by lattice nodes for protocol exchange (challenge/response verification),
+data push, and other server-initiated communication. Only works on bidirectional
+connections. `supportsMessage()` returns false on return-only connections — check
+before attempting. A consensus peer's server sends only results, and requests for data
+missing from an update back to whoever sent it ([PEER_PRIORITY.md](PEER_PRIORITY.md)).
 
 ### 5.3 Trust Checks
 
 ```java
 AConnection conn = msg.getConnection();
 if (conn != null && conn.isTrusted()) {
-    // trusted path — e.g. priority belief queue
+    // verified sender — e.g. a lattice node accepts its merge data
 } else {
-    // untrusted path — e.g. best-effort queue, trigger verification
+    // unverified sender
 }
 ```
 
 Messages on return-only connections are always untrusted (`supportsMessage()`
 returns false so verification cannot be initiated). Persistent bidirectional
-connections can accumulate trust via verification.
+connections can accumulate trust via verification. A consensus peer makes no such
+check: it judges a Belief by its signed Orders, whoever sent it.
 
 ### 5.4 Verification
 
-`InboundVerifier` triggers server-initiated verification when an untrusted
-connection sends a message that would benefit from trust (e.g. a belief):
+A lattice node verifies an inbound connection that claims a key it wants to trust
+(`LatticeInboundVerifier`):
 
 1. Check `conn.supportsMessage()` — if false, skip verification entirely
-2. `conn.sendMessage(challenge)` — send CHALLENGE on the connection
+2. Send a CHALLENGE naming the claimed key as a request on the connection
 3. The other end's handler receives the CHALLENGE and auto-responds
-4. The response routes back through the pair to the server
+4. The response routes back to the request on that connection
 5. Verification succeeds → `conn.setTrustedKey(remoteKey)`
 6. Subsequent messages on this connection are trusted
 
-See [PEER_PRIORITY.md](PEER_PRIORITY.md) for the full verification flow and
-belief priority model.
+A consensus peer verifies only connections it opens; see
+[PEER_PRIORITY.md](PEER_PRIORITY.md).
 
 Application-specific policy (e.g. "is this key a registered peer in consensus
 state") is separate from the connection-layer verification. The connection
@@ -442,8 +484,8 @@ identity means.
 
 | Actor | Connection type | Mode | Trust | Verification |
 |---|---|---|---|---|
-| Network peer (`ConvexRemote`) | Network socket | bidirectional | yes | client or server initiated |
-| In-memory peer/agent (`ConvexLocal` + keypair) | Local pair (persistent) | bidirectional | yes | client or server initiated |
+| Network peer (`ConvexRemote`) | Network socket | bidirectional | yes | client initiated; a lattice node's server may also verify |
+| In-memory peer/agent (`ConvexLocal` + keypair) | Local pair (persistent) | bidirectional | yes | client initiated |
 | Shared REST gateway (`ConvexLocal`, no keypair) | Local pair (persistent) | return-only | no | not possible |
 | HTTP endpoint (`ChainAPI`) | Via shared `ConvexLocal` | return-only | no | not possible |
 | Direct fast path (`ConvexDirect`) | None | direct calls | n/a | n/a |

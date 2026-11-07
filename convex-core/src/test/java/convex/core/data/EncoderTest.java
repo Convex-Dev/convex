@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -346,6 +348,31 @@ public class EncoderTest {
 		ACell decoded = CVM.decodeMultiCell(enc);
 		assertEquals(small, decoded);
 		assertTrue(Refs.allRefsDirect(decoded));
+	}
+
+	/**
+	 * Cells kept after a multi-cell message hold only their own bytes: neither the top
+	 * cell's key nor a child's data is a view of the whole message, and a canonical child
+	 * keeps one array for both its data and its encoding.
+	 */
+	@Test public void testMultiCellPartsHoldOwnBytes() throws BadFormatException {
+		Blob payload = Blob.createRandom(new java.util.Random(0x0B17L), Format.MAX_EMBEDDED_LENGTH + 1);
+		SignedData<Blob> signed = SignedData.sign(Samples.KEY_PAIR, payload);
+		Blob enc = Format.encodeMultiCell(signed, true);
+		byte[] message = enc.getInternalArray();
+
+		for (AEncoder<ACell> encoder : java.util.List.<AEncoder<ACell>>of(CVM, CAD3)) {
+			SignedData<?> decoded = (SignedData<?>) encoder.decodeMultiCell(enc);
+			assertEquals(signed, decoded);
+			assertTrue(decoded.checkSignature());
+			assertNotSame(message, decoded.getAccountKey().getInternalArray(), "The top cell must not hold the message");
+
+			Blob child = (Blob) decoded.getValue();
+			assertEquals(payload, child);
+			assertNotSame(message, child.getInternalArray(), "A child must not hold the message");
+			assertSame(child.getInternalArray(), child.getEncoding().getInternalArray(),
+					"A canonical child should keep one array for its data and its encoding");
+		}
 	}
 
 	// ==================== Adversarial decodeMultiCell tests ====================

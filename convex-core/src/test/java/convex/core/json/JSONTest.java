@@ -22,6 +22,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -180,6 +181,12 @@ public class JSONTest {
 		assertEquals(Maps.of("1",2), RT.cvm(JSON.json(Maps.of(1,2))));
 		assertEquals(Maps.of("[]",3), RT.cvm(JSON.json(Maps.of(Vectors.empty(),3))));
 		assertEquals(Maps.of("[\"\" 3]",4), RT.cvm(JSON.json(Maps.of(Vectors.of("",3),4))));
+
+		// Blob keys read back as the same blob, as blob values do
+		AMap<ACell,ACell> blobKeyed=RT.cvm(JSON.json(Maps.of(Blob.SINGLE_ONE,1)));
+		AString blobKey=(AString)blobKeyed.getKeys().get(0);
+		assertEquals(Blob.SINGLE_ONE,Blobs.parse(blobKey));
+		assertEquals(blobKey,RT.cvm(JSON.json(Blob.SINGLE_ONE)));
 	}
 	
 	@Test
@@ -621,6 +628,10 @@ public class JSONTest {
 		doCVMJSONTest(CVMChar.MAX_VALUE);
 		doCVMJSONTest(CVMChar.create('"'));
 		doCVMJSONTest(Vectors.of(1,Strings.COLON,Maps.of(null,Sets.empty())));
+
+		// Every writer gives the same keys
+		doCVMJSONTest(Maps.of(Blob.SINGLE_ONE,1,Address.create(13),2,Symbols.FOO,3));
+		doCVMJSONTest(Index.of(Blob.SINGLE_ONE,1));
 	}
 
 	

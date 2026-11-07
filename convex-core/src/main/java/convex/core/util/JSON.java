@@ -430,7 +430,7 @@ public class JSON {
 	            int pos = 0;
 	            for (int i = 0; i < size; i++) {
 	            	MapEntry<?,?> me=m.entryAt(i);
-	                AString k = keyValue(me.getKey());
+	                AString k = Strings.create(jsonKey(me.getKey()));
 	                appendWhitespaceString(sb, entryIndent);
 	                sb.append(toString(k));
 	                sb.append(": ");
@@ -467,17 +467,6 @@ public class JSON {
         return sb;
     }
     
-    /**
-     * Convert any CVM value into a JSON style key
-     * @param key
-     * @return
-     */
-    private static AString keyValue(ACell key) {
-    	if (key instanceof ASymbolic symKey)
-			return symKey.getName();
-		return RT.str(key);
-	}
-
     /**
      * Appends a whitespace string of the specified length.
      *
@@ -742,8 +731,11 @@ public class JSON {
 	}
 	
 	/**
-	 * Gets a String from a value suitable for use as a JSON map key
-	 * 
+	 * Gets the JSON object key for a CVM map key, as CAD044 specifies: a string
+	 * as it is, a keyword or symbol as its name, and any other value as its
+	 * printed form (a blob as {@code 0x} and hex, an address as {@code #13}).
+	 * Every JSON writer here uses this for map keys.
+	 *
 	 * @param k Value to convert to a JSON key
 	 * @return String usable as JSON key
 	 */

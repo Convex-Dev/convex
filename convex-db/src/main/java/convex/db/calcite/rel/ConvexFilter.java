@@ -128,6 +128,8 @@ public class ConvexFilter extends Filter implements ConvexRel {
 		ConvexTable convexTable = scan.getTable().unwrap(ConvexTable.class);
 		if (convexTable == null) return null;
 
+		// The lookup reads the scan's table, so only under the binding the scan was planned against
+		convexTable.boundTable(scan.getBinding());
 		ConvexSchema schema = convexTable.getSchema();
 		AVector<ACell> row = schema.getTables().selectByKey(convexTable.getTableName(), pkValue);
 		if (row == null) return ConvexEnumerable.empty();

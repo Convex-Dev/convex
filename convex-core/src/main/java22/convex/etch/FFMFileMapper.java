@@ -11,6 +11,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.Arrays;
 
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 
 /**
@@ -284,7 +285,7 @@ final class FFMFileMapper extends AFileMapper {
 			current=mappings;
 			if (covers(current,position,requiredEnd)) return;
 
-			long fileSize=channel.size();
+			long fileSize=ThreadUtils.callUninterruptibly(channel::size);
 			if (!writable&&(requiredEnd>fileSize)) {
 				throw new IOException("Read beyond physical Etch file: end="+requiredEnd+" size="+fileSize);
 			}
@@ -322,14 +323,17 @@ final class FFMFileMapper extends AFileMapper {
 
 		long targetEnd=Math.addExact(start,target);
 		if (targetEnd>fileSize) {
-			extendFile(targetEnd);
+			ThreadUtils.runUninterruptibly(() -> extendFile(channel,targetEnd));
 			fileSize=targetEnd;
 		}
 
+		// A shared arena may be mapped on the I/O thread and used from any thread
 		Arena arena=Arena.ofShared();
+		MapMode mode=readOnly?MapMode.READ_ONLY:MapMode.READ_WRITE;
+		long mappedLength=target;
 		MemorySegment segment;
 		try {
-			segment=channel.map(readOnly?MapMode.READ_ONLY:MapMode.READ_WRITE,start,target,arena);
+			segment=ThreadUtils.callUninterruptibly(() -> channel.map(mode,start,mappedLength,arena));
 		} catch (IOException | RuntimeException e) {
 			arena.close();
 			throw e;
@@ -351,7 +355,7 @@ final class FFMFileMapper extends AFileMapper {
 		return fileSize;
 	}
 
-	private void extendFile(long targetEnd) throws IOException {
+	private static void extendFile(FileChannel channel, long targetEnd) throws IOException {
 		if (channel.size()>=targetEnd) return;
 		ByteBuffer marker=ByteBuffer.allocate(1);
 		while (marker.hasRemaining()) {
@@ -421,7 +425,7 @@ final class FFMFileMapper extends AFileMapper {
 		for (Mapping mapping:mappings) {
 			if (mapping!=null) mapping.segment.force();
 		}
-		channel.force(false);
+		ThreadUtils.runUninterruptibly(() -> channel.force(false));
 	}
 
 	@Override

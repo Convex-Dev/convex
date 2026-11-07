@@ -60,12 +60,17 @@ public class Cells {
 	}
 	
 	/**
-	 * Generic Cell equality, used if better implementation not available.
+	 * Tests equality by encoding: two cells are equal exactly when their encodings are.
+	 * Uses the cheapest form already available: identity, the tag (the first encoded
+	 * byte), hashes if both are cached, then the encodings themselves. Never computes
+	 * either cell's hash; building an encoding hashes only branch children that lack one.
+	 * Types compare their own fields where that is cheaper, and use this against a
+	 * different Java class with the same encoding, such as a generically decoded value.
 	 * @param a First cell to compare
 	 * @param b Second cell to compare
 	 * @return True if cells are equal, false otherwise
 	 */
-	public static boolean equalsGeneric(ACell a, ACell b) {
+	public static boolean equalsEncoding(ACell a, ACell b) {
 		if (a==b) return true; // important optimisation for e.g. hashmap equality
 		if ((b==null)||(a==null)) return false; // no non-null Cell is equal to null
 		if (!(a.getTag()==b.getTag())) return false; // Different tags never equal

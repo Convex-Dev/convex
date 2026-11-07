@@ -6,8 +6,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.security.KeyPair;
-import java.security.KeyStore;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -18,7 +16,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 
 import org.junit.jupiter.api.Test;
@@ -27,6 +24,7 @@ import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.CertUtils;
+import convex.core.crypto.TLS;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
 import convex.core.data.Maps;
@@ -49,15 +47,7 @@ public class PeerKeyTLSTest {
 	}
 
 	private static SSLContext serverContext(KeyPair tlsKey, X509Certificate certificate) throws Exception {
-		char[] password="test-only".toCharArray();
-		KeyStore identity=KeyStore.getInstance("PKCS12");
-		identity.load(null,null);
-		identity.setKeyEntry("tls",tlsKey.getPrivate(),password,new Certificate[] {certificate});
-		KeyManagerFactory kmf=KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-		kmf.init(identity,password);
-		SSLContext context=SSLContext.getInstance("TLS");
-		context.init(kmf.getKeyManagers(),null,null);
-		return context;
+		return TLS.serverContext(tlsKey.getPrivate(),certificate);
 	}
 
 	private static URI endpoint(int port) {

@@ -2,6 +2,8 @@ package convex.node;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -11,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Result;
-import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -19,6 +20,7 @@ import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
+import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 
 /**
@@ -27,8 +29,8 @@ import convex.core.message.Message;
  *
  * <p>Operator assignment to a {@link LatticePropagator} permits inbound lattice
  * access but does not authenticate the remote endpoint. This verifier preserves
- * that distinction: only a successful live challenge, followed by confirmation
- * that the proven key is an admitted desired peer, can call
+ * that distinction: only a successful live challenge for the key the application
+ * vouched for on this connection can call
  * {@link LatticeConnectionManager#upgradeInboundConnection(AConnection)}.</p>
  */
 final class LatticeInboundVerifier {
@@ -40,22 +42,21 @@ final class LatticeInboundVerifier {
 			AccountKey claimedKey,
 			CompletableFuture<Message> future) {}
 
-	/** Supplies the propagation group's transport identity at challenge time. */
-	private final Supplier<AKeyPair> keyPairSupplier;
+	/** Supplies the propagator group's transport identity at challenge time. */
+	private final Supplier<ChallengeSigner> signerSupplier;
 	private final SecureRandom random = new SecureRandom();
 	private final ConcurrentHashMap<AConnection, PendingVerification> active =
 		new ConcurrentHashMap<>();
 
-	LatticeInboundVerifier(Supplier<AKeyPair> keyPairSupplier) {
-		this.keyPairSupplier = keyPairSupplier;
+	LatticeInboundVerifier(Supplier<ChallengeSigner> signerSupplier) {
+		this.signerSupplier = signerSupplier;
 	}
 
 	/** Starts at most one non-blocking authentication attempt per inbound connection. */
 	void maybeStart(AConnection connection, LatticePropagator owner, AccountKey claimedKey) {
 		if (connection == null || owner == null || connection.isClosed()
 				|| connection.isTrusted() || !connection.supportsMessage()
-				|| claimedKey == null
-				|| !owner.getConnectionManager().isDesiredPeer(claimedKey)) return;
+				|| claimedKey == null) return;
 
 		CompletableFuture<Message> resultFuture = new CompletableFuture<>();
 		PendingVerification pending = new PendingVerification(owner, claimedKey, resultFuture);
@@ -71,13 +72,12 @@ final class LatticeInboundVerifier {
 
 	private void verify(AConnection connection, PendingVerification pending) {
 		try {
-			AKeyPair keyPair = keyPairSupplier.get();
-			if (keyPair == null) return;
+			ChallengeSigner signer = signerSupplier.get();
+			if (signer == null) return;
 
 			Hash token = Blob.createRandom(random, 16).getHash();
-			AccountKey ownKey = keyPair.getAccountKey();
-			SignedData<ACell> signed = Message.signChallenge(keyPair, token,
-				pending.claimedKey(), Message.LATTICE_PEER_CHALLENGE_CONTEXT);
+			AccountKey ownKey = signer.getAccountKey();
+			SignedData<ACell> signed = signer.challenge(token, pending.claimedKey());
 			Message resultMessage = connection.request(Message.createChallenge(null,signed),0,pending.future())
 				.get(TIMEOUT_MS,TimeUnit.MILLISECONDS);
 			try {
@@ -92,18 +92,13 @@ final class LatticeInboundVerifier {
 			AccountKey remoteKey = Message.verifyChallengeResponse(
 				result, token, ownKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT,
 				pending.claimedKey());
-			if (remoteKey == null) return;
-			LatticeConnectionManager manager = pending.owner().getConnectionManager();
-			if (!manager.isDesiredPeer(remoteKey)) {
-				log.debug("Authenticated inbound key {} has no admitted node identity", remoteKey);
-				return;
-			}
-			if (connection.isClosed()) return;
+			if (remoteKey == null || connection.isClosed()) return;
 
-			// Trust is established only here. upgradeInboundConnection independently
-			// asserts this binding before granting the outbound propagation capability.
+			// Trust is established only here, for the key the application vouched for:
+			// the response above must be signed by that key. upgradeInboundConnection
+			// independently refuses a connection without a trusted key.
 			connection.setTrustedKey(remoteKey);
-			manager.upgradeInboundConnection(connection);
+			pending.owner().getConnectionManager().upgradeInboundConnection(connection);
 		} catch (Exception e) {
 			log.debug("Inbound lattice authentication failed for {}: {}",
 				connection.getRemoteAddress(), e.getMessage());
@@ -111,6 +106,13 @@ final class LatticeInboundVerifier {
 			pending.future().cancel(false);
 			active.remove(connection, pending);
 		}
+	}
+
+	/** The keys claimed by the connections being challenged now. */
+	Set<AccountKey> claimedKeys() {
+		HashSet<AccountKey> keys = new HashSet<>();
+		for (PendingVerification pending : active.values()) keys.add(pending.claimedKey());
+		return keys;
 	}
 
 	/** Cancels verification state when the propagator observes physical disconnect. */

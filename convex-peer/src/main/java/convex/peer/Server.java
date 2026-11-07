@@ -50,6 +50,7 @@ import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.UpgradeError;
@@ -127,9 +128,8 @@ public class Server implements Closeable {
 		Predicate<Message> retry = deliverMessage(m);
 		if (retry != null) {
 			if (!retry.test(m)) {
-				Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD).withSource(SourceCodes.PEER);
 				try {
-					m.returnResult(r);
+					m.returnResult(Result.SERVER_LOADED);
 				} catch (Exception e) {
 					// best effort
 				}
@@ -161,11 +161,6 @@ public class Server implements Closeable {
 	 * Executes read-only queries against the latest consensus state, independently of transaction processing.
 	 */
 	protected final QueryHandler queryHandler=new QueryHandler(this);
-
-	/**
-	 * Verifies untrusted inbound connections via server-initiated challenge/response.
-	 */
-	private final InboundVerifier inboundVerifier = new InboundVerifier(this);
 
 	/**
 	 * Pre-allocated retry predicates for backpressure. These are returned by
@@ -613,9 +608,7 @@ public class Server implements Closeable {
 			case COMMAND:
 				return null;
 			case RESULT:
-				// Correlate replies to requests initiated by this physical connection.
-				if (m.getConnection()!=null && m.getConnection().completeRequest(m)) return null;
-				returnError(m,ErrorCodes.UNEXPECTED,Strings.UNEXPECTED_RESULT);
+				// Not a reply to any request this peer sent: ignore it (CAD015)
 				return null;
 			default:
 				returnError(m,ErrorCodes.FORMAT,Strings.UNRECOGNISED_MESSAGE_TYPE);
@@ -641,28 +634,26 @@ public class Server implements Closeable {
 		}
 	}
 
-	/** Offers DATA to the propagation queue so it retains wire order off the I/O thread. */
+	/**
+	 * Offers DATA to the propagation queue so it retains wire order off the I/O thread.
+	 * Accepted from any connection: DATA is staging only, and nothing it holds counts
+	 * until a valid Belief refers to it.
+	 */
 	private boolean processData(Message message) {
-		AConnection conn=message.getConnection();
-		if (conn!=null && !conn.isTrusted()) {
-			inboundVerifier.maybeStart(conn);
-			returnError(message,ErrorCodes.TRUST,Strings.create("DATA requires a verified Peer"));
-			return true;
-		}
 		return propagator.queuePropagation(message);
 	}
 
 	/** Stages a previously authorised DATA message on the Belief propagator thread. */
-	void stageData(Message message) throws IOException, convex.core.exceptions.BadFormatException {
+	void stageData(Message message) throws IOException, BadFormatException {
 		AVector<?> payload=RT.ensureVector(message.getPayload());
 		// Bounded by the inbound message length only: novelty has no cell-count limit
 		if (payload==null || payload.count()<2 || !MessageTag.DATA.equals(payload.get(0))) {
-			throw new convex.core.exceptions.BadFormatException("Invalid DATA message format");
+			throw new BadFormatException("Invalid DATA message format");
 		}
 		for (long i=1; i<payload.count(); i++) {
 			ACell cell=payload.get(i);
 			if (cell==null || cell.isEmbedded()) {
-				throw new convex.core.exceptions.BadFormatException("DATA message contains invalid cell");
+				throw new BadFormatException("DATA message contains invalid cell");
 			}
 			Cells.store(cell,store);
 		}
@@ -678,6 +669,7 @@ public class Server implements Closeable {
 	 * @return a retry Predicate for a saturated request queue, otherwise null
 	 */
 	public Predicate<Message> deliverMessage(Message m) {
+		if (completeReply(m)) return null;
 		try {
 			m.getPayload(getStore());
 		} catch (Exception e) {
@@ -692,6 +684,33 @@ public class Server implements Closeable {
 		}
 		observeMessageReceived(m);
 		return processMessage(m);
+	}
+
+	/**
+	 * Completes a reply to a request this peer sent on the message's connection, such
+	 * as a fetch of data missing from an update. Matching reads only the reply's ID:
+	 * the requester decodes it with its own store.
+	 */
+	private boolean completeReply(Message m) {
+		AConnection connection=m.getConnection();
+		if (connection==null) return false;
+		try {
+			return connection.completeRequest(m);
+		} catch (BadFormatException e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Takes a DATA_REQUEST that arrives on one of this peer's own connections to other
+	 * peers, handling it as one from any inbound connection.
+	 *
+	 * @param m DATA_REQUEST message
+	 * @return a retry Predicate if the query queue is full, otherwise null
+	 */
+	Predicate<Message> deliverDataRequest(Message m) {
+		if (queryHandler.offerQuery(m)) return null;
+		return queryRetry;
 	}
 
 	/**
@@ -834,30 +853,17 @@ public class Server implements Closeable {
 
 	private void processChallenge(Message m) {
 		manager.processChallenge(m, getPeer());
-		// If they're verifying us, also try to verify them
-		AConnection conn = m.getConnection();
-		if (conn != null) inboundVerifier.maybeStart(conn);
 	}
 
-
-
 	/**
-	 * Process an incoming message that represents a Belief.
-	 * Trusted connections go to the main queue; untrusted go to a small
-	 * best-effort queue and trigger server-initiated verification.
+	 * Process an incoming message that represents a Belief. Whoever sent it, each
+	 * Order it carries is judged on its own (signature, stake and age), so it joins the
+	 * ordered propagation queue behind any DATA from the same connection.
 	 * @param m Belief message to process
+	 * @return true if queued, false if the queue is full and the Belief was dropped
 	 */
 	protected boolean processBelief(Message m) {
-		AConnection conn=m.getConnection();
-		if (conn==null || conn.isTrusted()) {
-			// Trusted or local (ConvexLocal) — ordered propagation queue
-			return propagator.queuePropagation(m);
-		} else {
-			// Untrusted inbound — best-effort queue, trigger verification
-			propagator.queueUntrustedPropagation(m);
-			inboundVerifier.maybeStart(conn);
-			return true;
-		}
+		return propagator.queuePropagation(m);
 	}
 
 	/**
@@ -884,7 +890,7 @@ public class Server implements Closeable {
 	 * Note: Does not flush buffers to disk. 
 	 *
 	 * This will overwrite any previously persisted peer data.
-	 * @return Updated Peer value with persisted data
+	 * @return Updated Peer value with persisted data, sharing the current Peer's transaction index
 	 * @throws IOException In case of any IO Error
 	 */
 	@SuppressWarnings("unchecked")
@@ -909,7 +915,7 @@ public class Server implements Closeable {
 
 		peerData=(AMap<Keyword, ACell>) newRootData.get(rootKey);
 		log.debug( "Stored peer data with hash: {}", peerData.getHash().toHexString());
-		return Peer.fromData(getKeyPair(), peerData);
+		return Peer.fromData(getKeyPair(), peerData).withIndexFrom(peer);
 	}
 
 	/**
@@ -930,7 +936,6 @@ public class Server implements Closeable {
 			manager.close();
 			nio.close();
 			if (tls!=null) tls.close();
-			inboundVerifier.close();
 			closeOwnedStore();
 			shutdownFuture.complete(Utils.getCurrentTimestamp());
 			return;
@@ -944,10 +949,9 @@ public class Server implements Closeable {
 		// Close manager, we don't want any management actions during shutdown!
 		manager.close();
 
-		// Stop ingress and cancel connection-bound verification before worker/store shutdown.
+		// Stop ingress before worker/store shutdown.
 		nio.close();
 		if (tls!=null) tls.close();
-		inboundVerifier.close();
 
 		// Shut down propagator, no point sending any more Beliefs
 		propagator.close();
@@ -1110,16 +1114,6 @@ public class Server implements Closeable {
 
 	public ConnectionManager getConnectionManager() {
 		return manager;
-	}
-
-	/** Number of inbound connections successfully verified since startup. */
-	public long getInboundVerifiedCount() {
-		return inboundVerifier.getVerifiedCount();
-	}
-
-	/** Number of inbound verifications currently in progress. */
-	public int getInboundPendingVerifications() {
-		return inboundVerifier.getPendingCount();
 	}
 
 	public HashMap<Keyword, Object> getConfig() {

@@ -278,8 +278,6 @@ public class MailLatticeTest {
 		assertEquals(e1.signed(),at1.merge(null,e1.signed()));
 		assertNull(at1.merge(null,e2.signed()));
 		assertNull(at1.merge(null,receipt(BOB,BOB_DID,e2).signed()));
-		assertEquals(e1.key(),BOB_MAILBOX.resolveKey(Strings.create(e1.key().toHexString())));
-		assertNull(BOB_MAILBOX.resolveKey(Strings.create("ff")));
 		assertThrows(IllegalArgumentException.class,
 			() -> MailEntryLattice.create(BOB_DID,Blob.fromHex("ff"),DIDKeyAuthorizer.CONVEX));
 	}
@@ -303,8 +301,6 @@ public class MailLatticeTest {
 			Strings.create("not a did"),entries(e),
 			Strings.create("did:key"),entries(e));
 		assertEquals(0,Mail.LATTICE.merge(Mail.LATTICE.zero(),junk).count());
-		assertNull(Mail.LATTICE.resolveKey(Strings.create("not a did")));
-		assertEquals(BOB_DID,Mail.LATTICE.resolveKey(BOB_DID));
 		ALattice<ACell> child=Mail.LATTICE.path(BOB_DID);
 		assertNotNull(child);
 		assertNull(Mail.LATTICE.path(Strings.create("nope")));

@@ -39,7 +39,7 @@
  * by operator policy to one propagator view. A manager-opened outbound socket is
  * held in verification limbo until the expected node key answers a challenge.
  * A physically inbound socket becomes an outbound route only after
- * {@code LatticeInboundVerifier} proves its key and
+ * {@code LatticeInboundVerifier} proves the key its application vouched for and
  * {@code LatticeConnectionManager.upgradeInboundConnection} records the
  * explicit upgrade.</p>
  *
@@ -52,14 +52,14 @@
  *
  * <ol>
  *   <li>An application transport assigns the connection to one selected
- *       propagation group.</li>
+ *       propagator group.</li>
  *   <li>That group's endpoint performs a bounded queue offer.</li>
  *   <li>Untrusted input is decoded without a store. Trusted partial input may
  *       acquire missing cells into that propagator's store.</li>
  *   <li>The complete value is persisted in the group's store.</li>
  *   <li>The node hands the value to its host, whose applications take what they
  *       want from it under their own lattices.
- *       Host-root publication completes before each propagation group is
+ *       Host-root publication completes before each propagator group is
  *       notified independently.</li>
  *   <li>An optional {@link convex.node.InboundLatticeListener} may observe the
  *       accepted path and value without changing the merge outcome.</li>
@@ -71,7 +71,7 @@
  * failures: the application decides whether a degraded group should be restarted,
  * replaced or left running.</p>
  *
- * <p>The calling application explicitly creates each propagation group and may
+ * <p>The calling application explicitly creates each propagator group and may
  * configure it while running. {@link convex.node.LatticeNode} combines dynamic
  * group creation with a TCP listener; custom assemblies can compose transports
  * separately. {@code NodeServer}

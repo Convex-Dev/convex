@@ -68,8 +68,9 @@ applications own merge semantics. The host owns root retention and durability;
 of one live application over a whole lattice. It does not publish or interpret
 `NodeInfo`, inspect `:p2p` / `:social` paths, or implement discovery policy. The
 calling application explicitly creates each `LatticePropagator`; there is no
-implicit/default group. `LatticeNode.createPropagator()` creates and registers a
-group using the host store, starting it if running. Identity, filters and handlers
+implicit/default group. `LatticeNode.createPropagator(groupConfig)` creates and
+registers a group using the host store, starting it if running; the no-argument
+form uses default limits, not the node's config. Identity, filters and handlers
 may be configured dynamically. A zero-propagator node
 is a valid local persistent node. Each propagator owns its connection manager,
 transport identity, trust, bounded protocol endpoint, filters and serving store,
@@ -96,7 +97,7 @@ For a small lattice network test:
 > **CAD036 envelopes:** use `[:LV path value]` for an optimistic push with no
 > acknowledgement, and `[:LV id path value]` when the sender needs a Result after
 > merge. `Message.withID` upgrades the optimistic form without replacing its path.
-> Lattice gossip and root sync use the lean optimistic form. Every `:LV` and `:LQ`
+> Lattice gossip and root announcements use the lean optimistic form. Every `:LV` and `:LQ`
 > path is a vector, with `[]` selecting the root; do not use nil, omitted or scalar
 > paths. A four-field `:LV` with a nil ID remains an accepted fire-and-forget wire
 > representation, but is not needed for new optimistic pushes.
@@ -111,7 +112,7 @@ For a small lattice network test:
 > inbound upgrade verifies both challenge signatures, a random nonce, responder and
 > challenger audiences, the fixed lattice-peer context and an admitted signed
 > NodeInfo. Shared-listener connections are bounded by `NodeConfig`; each
-> propagation group's desired peers, protocol state and queues are bounded by
+> propagator group's desired peers, protocol state and queues are bounded by
 > `LatticePropagatorConfig`.
 
 For a direct `NodeServer` network test, the minimum composition is explicit:
@@ -185,10 +186,10 @@ the node merely to treat the first group as a privileged "primary" group.
    `SocialUser`, apply its feed and follow actions, sync that fork once, then
    sync the application root. A `Social` fork is outside the owner boundary and
    therefore still signs each user edit inside the unpublished fork.
-6. Automatic gossip is fire-and-forget. To verify it without sleeping, capture
-   `nextAnnounce()` before publishing and re-arm it until the expected application
-   state is present. The announce signals that this propagation group has
-   materialised its served view after the host has merged the value and the
+6. Automatic gossip is fire-and-forget. To verify it without sleeping, wait on
+   `group.whenAnnounced(condition)` for the expected application state. It
+   completes once this propagator group serves a value satisfying the condition
+   and has queued its broadcast, after the host has merged the value and the
    node has published the root. A host sync itself guarantees only node
    publication; do not assume it completed group fan-out. Use an explicit
    `receivingServer.pull(group, connection).get(timeout)`
@@ -206,12 +207,12 @@ combined-map callers; do not use it in new tests merely because both objects use
 the same underlying CAD map representation.
 
 Treat a node key as its P2P/transport signer, not automatically as an
-application user's identity or signing key. For an `OwnerLattice` keyed by an
-indirect owner such as a DID, install a fail-closed owner verifier in the
-`LatticeContext`; without one, indirect owners use the compatibility-lenient
-fallback. Give identity-sensitive tests separate node keys and application
-owner/signing keys. The social cursor API accepts canonical base DIDs and uses
-`DIDKeyAuthorizer` for the signer binding. Cover `did:key`, `did:convex` and
+application user's identity or signing key. Without an owner verifier, an owner
+lattice accepts only owners that are account keys (or `did:key`), each signed by
+its own key; for an indirect owner such as an address or another DID, supply a
+verifier, which then decides for every owner. Give identity-sensitive tests
+separate node keys and application owner/signing keys. The social cursor API
+accepts canonical base DIDs and uses `DIDKeyAuthorizer` for the signer binding. Cover `did:key`, `did:convex` and
 `did:web` with pinned local state or deterministic resolver fixtures—never depend
 on public web resolution in a unit test. `serveAllInbound()` controls network
 access and does not replace DID owner authorisation.
@@ -222,7 +223,7 @@ Blob. Domain readers should parse compatible Blob values with
 `AccountKey.parse` or `AccountKey.create`; do not use `instanceof AccountKey`
 as a wire-format validity check.
 
-The rules in `AGENTS.md` apply: never bind fixed ports and never sleep. Wait on
-futures, latches or another API whose contract represents the required state.
+Never bind fixed ports and never sleep. Wait on futures, latches or another API
+whose contract represents the required state.
 
 Stop the network when finished: close listeners before nodes, then close stores.

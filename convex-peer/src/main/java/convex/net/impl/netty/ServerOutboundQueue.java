@@ -17,18 +17,22 @@ import io.netty.channel.Channel;
  * thread, which flushes each touched channel once per batch. The queue is a
  * burst absorber bounded by the total encoded bytes it holds: bytes are
  * released as soon as a message is handed to Netty, so a slow reader can never
- * pin the shared bound or delay other connections. What a connection has
- * handed to Netty but not yet written is bounded separately per connection: a
- * small allowance for a client, a large one for a verified peer, which is
- * buffered for rather than cut off when it lags. Once over its allowance a
- * connection's further replies are refused, and only its own.</p>
+ * pin the shared bound or delay other connections. Traffic to trusted peers is
+ * queued in a lane that the writer drains first and that is exempt from the
+ * shared bound, so consensus and lattice replies are never held up behind
+ * client results.</p>
  *
- * <p>Two policies sit on top of the bound. Traffic to trusted peers is queued
- * in a lane that the writer drains first and that is exempt from the shared
- * bound, so consensus and lattice replies are never held up behind client
- * results. Client results may instead wait for space through
- * {@link #offerBlocking}, applying backpressure to the reporting thread rather
- * than dropping results when the server as a whole is overloaded.</p>
+ * <p>Nothing waits to add a message: it is queued, or refused at once. The writer
+ * is the only thread that waits, for work. What a connection has handed to Netty
+ * but not yet written is bounded by an allowance: a small one for a client, a
+ * large one for a verified peer, which is buffered for rather than cut off when it
+ * lags. Over its allowance a connection's further replies are refused, and only
+ * its own. Each connection also counts its backlog, the bytes queued for it or
+ * handed to Netty and not yet written. From half the client allowance, a client's
+ * requests stop being read until its backlog is written down to a quarter (see
+ * {@link NettyInboundHandler}), so a client that sends faster than it reads is
+ * slowed at its socket rather than losing results. A client reply that finds the
+ * shared bound full is refused: the server is shedding load.</p>
  */
 final class ServerOutboundQueue {
 
@@ -80,56 +84,52 @@ final class ServerOutboundQueue {
 	}
 
 	/**
-	 * Queues a message for a connection without waiting.
+	 * Queues a message for a connection, never waiting. The message's bytes count
+	 * towards the connection's backlog until written or discarded.
 	 *
 	 * @return true if queued; false if the queue is closed, the shared bound is full, or the
-	 *         connection already has more than its cap handed to Netty and unwritten
+	 *         connection already has more than its allowance handed to Netty and unwritten
 	 */
 	boolean offer(NettyServerConnection connection, Channel channel, Message message, int bytes) {
-		try {
-			return offer(connection, channel, message, bytes, 0);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
-	}
-
-	/**
-	 * Queues a message for a connection, waiting up to the timeout for space in the
-	 * shared bound. Never waits for a connection that is over its own cap or closed:
-	 * those are refused at once, so a stalled reader cannot hold up the caller.
-	 *
-	 * @return true if queued, false if refused or the wait timed out
-	 */
-	boolean offerBlocking(NettyServerConnection connection, Channel channel, Message message, int bytes,
-			long timeoutMillis) throws InterruptedException {
-		return offer(connection, channel, message, bytes, Math.max(0, timeoutMillis));
-	}
-
-	private boolean offer(NettyServerConnection connection, Channel channel, Message message, int bytes,
-			long timeoutMillis) throws InterruptedException {
-		long allowance = connection.isTrusted() ? trustedConnectionByteLimit : connectionByteLimit;
-		if (bytes < 0 || connection.getPendingBytes() >= allowance) return false;
+		if (bytes < 0 || connection.getPendingBytes() >= allowance(connection)) return false;
 		Entry e = new Entry(connection, channel, message, bytes);
 		synchronized (this) {
 			if (!running) return false;
 			if (connection.isTrusted()) {
 				priority.addLast(e);
 			} else {
-				if (bytes > byteLimit) return false;
-				long deadline = System.currentTimeMillis() + timeoutMillis;
-				while (queuedBytes + bytes > byteLimit) {
-					long remaining = deadline - System.currentTimeMillis();
-					if (remaining <= 0) return false;
-					wait(remaining);
-					if (!running) return false;
-				}
+				if (queuedBytes + bytes > byteLimit) return false;
 				queuedBytes += bytes;
 				ordinary.addLast(e);
 			}
-			notifyAll();
+			connection.addBacklog(bytes);
+			notify(); // only the writer waits
 		}
 		return true;
+	}
+
+	/**
+	 * Whether a connection's backlog is high enough that its requests should not be
+	 * read: half the client allowance. A verified peer's reads are never paused for
+	 * its replies, which it is buffered for instead.
+	 */
+	boolean isBacklogged(NettyServerConnection connection) {
+		return !connection.isTrusted() && connection.getBacklog() >= connectionByteLimit / 2;
+	}
+
+	/**
+	 * Releases bytes of a connection's backlog once written or discarded. Crossing
+	 * down to a quarter of the client allowance lets a connection that stopped
+	 * reading resume.
+	 */
+	private void release(NettyServerConnection connection, int bytes) {
+		long after = connection.addBacklog(-bytes);
+		long resume = connectionByteLimit / 4;
+		if (after <= resume && after + bytes > resume) connection.backlogDrained();
+	}
+
+	private long allowance(NettyServerConnection connection) {
+		return connection.isTrusted() ? trustedConnectionByteLimit : connectionByteLimit;
 	}
 
 	/** Encoded bytes currently held for untrusted connections, not yet handed to Netty. */
@@ -142,10 +142,7 @@ final class ServerOutboundQueue {
 		Entry e = priority.pollFirst();
 		if (e != null) return e;
 		e = ordinary.pollFirst();
-		if (e != null) {
-			queuedBytes -= e.bytes();
-			notifyAll(); // space freed for a blocked offer
-		}
+		if (e != null) queuedBytes -= e.bytes();
 		return e;
 	}
 
@@ -194,19 +191,27 @@ final class ServerOutboundQueue {
 
 	private void write(Entry e, LinkedHashSet<Channel> touched) {
 		Channel ch = e.channel();
-		if (!ch.isActive()) return;
 		NettyServerConnection conn = e.connection();
 		int bytes = e.bytes();
+		if (!ch.isActive()) {
+			release(conn, bytes);
+			return;
+		}
 		conn.addPendingBytes(bytes);
 		try {
-			ch.write(e.message()).addListener(f -> conn.addPendingBytes(-bytes));
+			ch.write(e.message()).addListener(f -> {
+				conn.addPendingBytes(-bytes);
+				release(conn, bytes);
+			});
 			touched.add(ch);
 		} catch (RuntimeException ex) {
 			conn.addPendingBytes(-bytes);
+			release(conn, bytes);
 			log.warn("Failed to write server reply", ex);
 		}
 	}
 
+	/** Stops the writer. Replies still queued are discarded: their channels are closed by now. */
 	void close() {
 		synchronized (this) {
 			running = false;

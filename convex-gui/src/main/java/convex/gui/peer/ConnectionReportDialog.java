@@ -82,19 +82,13 @@ public class ConnectionReportDialog extends JDialog {
 
 			// Inbound
 			int inboundCount = server.getInboundConnectionCount();
-			long verified = server.getInboundVerifiedCount();
-			int pendingVerify = server.getInboundPendingVerifications();
 			sb.append("  Inbound:  ");
 			if (inboundCount >= 0) {
 				sb.append(inboundCount).append(" channels");
 			} else {
 				sb.append("n/a");
 			}
-			sb.append("  (verified: ").append(verified);
-			if (pendingVerify > 0) {
-				sb.append(", verifying: ").append(pendingVerify);
-			}
-			sb.append(")\n");
+			sb.append("\n");
 
 			// Outbound
 			ConnectionManager cm = server.getConnectionManager();

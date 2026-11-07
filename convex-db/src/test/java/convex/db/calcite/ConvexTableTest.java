@@ -7,14 +7,19 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
+import convex.db.jdbc.IdentifierPolicy;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -37,8 +42,9 @@ public class ConvexTableTest {
 	void setUp() throws Exception {
 		// Use unique database name for each test to avoid schema cache conflicts
 		dbName = "testdb_" + (++testCounter) + "_" + System.currentTimeMillis();
-		cdb = ConvexDB.create();
+		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database(dbName);
+		IdentifierPolicy.LOWER.applyTo(db);
 		cdb.register(dbName);
 		// Create typed table: id (INTEGER), name (VARCHAR), amount (INTEGER)
 		db.tables().createTable("test_table",
@@ -234,6 +240,144 @@ public class ConvexTableTest {
 	/**
 	 * Tests that WHERE clause with no matches returns 0 updated rows.
 	 */
+	/**
+	 * An UPDATE that keeps its key writes the row once; only a key change deletes the old
+	 * row first. Each write reads the database clock once, so a counting clock sees them.
+	 */
+	@Test
+	void testUpdateWritesOnce() throws Exception {
+		AtomicLong ticks = new AtomicLong();
+		Supplier<CVMLong> clock = () -> CVMLong.create(ticks.incrementAndGet());
+		ConvexDB counted = ConvexDB.create(RowLWW::merge, clock);
+		String name = dbName + "_clock";
+		IdentifierPolicy.LOWER.applyTo(counted.database(name));
+		counted.database(name).tables().createTable("t",
+			new String[]{"id", "amount"}, new ConvexType[]{ConvexType.INTEGER, ConvexType.INTEGER});
+		counted.register(name);
+		try (Connection c = DriverManager.getConnection("jdbc:convex:database=" + name);
+			 Statement stmt = c.createStatement()) {
+			stmt.executeUpdate("INSERT INTO t VALUES (1, 10)");
+			long before = ticks.get();
+			assertEquals(1, stmt.executeUpdate("UPDATE t SET amount = 20 WHERE id = 1"));
+			assertEquals(before + 1, ticks.get(), "an update in place is one write");
+			assertEquals(1, stmt.executeUpdate("UPDATE t SET id = 2 WHERE id = 1"));
+			assertEquals(before + 3, ticks.get(), "a key change deletes the old row, then writes the new");
+			try (ResultSet rs = stmt.executeQuery("SELECT id, amount FROM t")) {
+				assertTrue(rs.next());
+				assertEquals(2, rs.getInt(1));
+				assertEquals(20, rs.getInt(2));
+				assertFalse(rs.next());
+			}
+		} finally {
+			counted.unregister(name);
+		}
+	}
+
+	/**
+	 * A multi-row INSERT is one write, and atomic: a value that does not fit its column
+	 * leaves none of the statement's rows written.
+	 */
+	@Test
+	void testMultiRowInsertIsOneAtomicWrite() throws Exception {
+		AtomicLong ticks = new AtomicLong();
+		ConvexDB counted = ConvexDB.create(RowLWW::merge, () -> CVMLong.create(ticks.incrementAndGet()));
+		String name = dbName + "_batch";
+		SQLDatabase cdb2 = counted.database(name);
+		IdentifierPolicy.LOWER.applyTo(cdb2);
+		cdb2.tables().createTable("t", new String[]{"id", "amount"}, new ConvexType[]{ConvexType.INTEGER, ConvexType.INTEGER});
+		counted.register(name);
+		try (Connection c = DriverManager.getConnection("jdbc:convex:database=" + name);
+			 Statement stmt = c.createStatement()) {
+			long before = ticks.get();
+			assertEquals(3, stmt.executeUpdate("INSERT INTO t VALUES (1, 10), (2, 20), (3, 30)"));
+			assertEquals(before + 1, ticks.get(), "three rows, one write");
+			assertEquals(3, cdb2.tables().getRowCount("t"));
+
+			assertThrows(SQLException.class,
+				() -> stmt.executeUpdate("INSERT INTO t VALUES (4, 40), (5, 99999999999999999999999)"));
+			assertEquals(3, cdb2.tables().getRowCount("t"), "no row of the failed statement is written");
+			assertNull(cdb2.tables().selectByKey("t", CVMLong.create(4)));
+		} finally {
+			counted.unregister(name);
+		}
+	}
+
+	/**
+	 * INSERT adds only new rows, as the SQL standard has it: a key the table holds, or one
+	 * repeated in the statement, is an integrity constraint violation (23000) and writes
+	 * nothing. A deleted key may be inserted again.
+	 */
+	@Test
+	void testInsertOfAnExistingKeyIsAUniqueViolation() throws Exception {
+		try (Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'one', 10)");
+
+			SQLException taken = assertThrows(SQLException.class,
+				() -> stmt.executeUpdate("INSERT INTO test_table VALUES (2, 'two', 20), (1, 'uno', 11)"));
+			assertDuplicateKey(taken);
+			assertEquals(1, db.tables().getRowCount("test_table"), "nothing of the statement is written");
+			assertEquals("one", db.tables().selectByKey("test_table", CVMLong.create(1)).get(1).toString());
+
+			SQLException repeated = assertThrows(SQLException.class,
+				() -> stmt.executeUpdate("INSERT INTO test_table VALUES (3, 'a', 1), (3, 'b', 2)"));
+			assertDuplicateKey(repeated);
+			assertNull(db.tables().selectByKey("test_table", CVMLong.create(3)));
+
+			stmt.executeUpdate("DELETE FROM test_table WHERE id = 1");
+			assertEquals(1, stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'again', 12)"));
+		}
+	}
+
+	/** An UPDATE that moves a row to a key the table holds is the same violation. */
+	@Test
+	void testUpdateToAnExistingKeyIsAUniqueViolation() throws Exception {
+		try (Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'one', 10), (2, 'two', 20)");
+			assertDuplicateKey(assertThrows(SQLException.class,
+				() -> stmt.executeUpdate("UPDATE test_table SET id = 2 WHERE id = 1")));
+			assertEquals("one", db.tables().selectByKey("test_table", CVMLong.create(1)).get(1).toString());
+		}
+	}
+
+	/**
+	 * A duplicate key reaches JDBC callers as the standard integrity constraint violation,
+	 * with the lattice's DuplicateKeyException as its cause.
+	 */
+	private static void assertDuplicateKey(SQLException e) {
+		java.sql.SQLIntegrityConstraintViolationException violation = null;
+		for (Throwable c = e; c != null && violation == null; c = c.getCause()) {
+			if (c instanceof java.sql.SQLIntegrityConstraintViolationException v) violation = v;
+		}
+		assertNotNull(violation, "an integrity constraint violation in the cause chain");
+		assertEquals("23000", violation.getSQLState());
+		assertInstanceOf(convex.db.lattice.DuplicateKeyException.class, violation.getCause());
+	}
+
+	@Test
+	void testInsertNew() {
+		convex.core.data.AVector<convex.core.data.ACell> row =
+			convex.core.data.Vectors.of(CVMLong.create(5), convex.core.data.Strings.create("e"), CVMLong.create(5));
+		convex.core.data.AString t = convex.core.data.Strings.create("test_table");
+		assertEquals(1, db.tables().insertNew(t, java.util.List.of(row)));
+		convex.db.lattice.DuplicateKeyException e = assertThrows(convex.db.lattice.DuplicateKeyException.class,
+			() -> db.tables().insertNew(t, java.util.List.of(row)));
+		assertEquals(row, e.getRow());
+		// The lattice API's insert is an upsert
+		assertTrue(db.tables().insert("test_table", row));
+	}
+
+	@Test
+	void testInsertAll() {
+		java.util.List<convex.core.data.AVector<convex.core.data.ACell>> rows = java.util.List.of(
+			convex.core.data.Vectors.of(CVMLong.create(7), convex.core.data.Strings.create("a"), CVMLong.create(1)),
+			convex.core.data.Vectors.of(CVMLong.create(8), convex.core.data.Strings.create("b"), CVMLong.create(2)),
+			convex.core.data.Vectors.of(CVMLong.create(7), convex.core.data.Strings.create("c"), CVMLong.create(3)));
+		assertEquals(3, db.tables().insertAll("test_table", rows));
+		assertEquals(2, db.tables().getRowCount("test_table"), "a later row of the same key replaces the earlier");
+		assertEquals("c", db.tables().selectByKey("test_table", CVMLong.create(7)).get(1).toString());
+		assertEquals(0, db.tables().insertAll("no_such_table", rows));
+	}
+
 	@Test
 	void testUpdateNoMatch() throws SQLException {
 		try (Statement stmt = conn.createStatement()) {

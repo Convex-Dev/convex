@@ -40,6 +40,7 @@ import convex.core.data.Keyword;
 import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
+import convex.core.data.Path;
 import convex.core.data.SetLeaf;
 import convex.core.data.SetTree;
 import convex.core.data.Sets;
@@ -73,6 +74,10 @@ public class Samples {
 	 * run GC on it: unrelated tests may be using it concurrently. Private stores
 	 * are for tests of creation/reopening, GC, configuration, retained roots or
 	 * exact store contents.
+	 *
+	 * A {@code @ParameterizedTest} given this store as an argument must set
+	 * {@code autoCloseArguments = false}: JUnit closes AutoCloseable arguments after
+	 * each invocation, which would close it for every later test in the JVM.
 	 */
 	public static final EtchStore TEST_STORE = createTestStore("test-store");
 
@@ -328,6 +333,7 @@ public class Samples {
 			Lists.empty(),
 			INT_VECTOR_300,
 			Vectors.empty(),
+			Path.of(Strings.create("a"),Strings.create("b")).slice(1),
 			LONG_MAP_100,
 			Syntax.of(1),
 			Syntax.create(Vectors.empty(),Maps.of(1,2)),

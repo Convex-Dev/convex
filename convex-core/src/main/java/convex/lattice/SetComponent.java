@@ -50,7 +50,7 @@ public class SetComponent<V extends ACell> extends ALatticeComponent<ASet<V>> {
 
 	/** Returns the current set or null for absence; fails on incompatible storage. */
 	public ASet<V> get() {
-		return requireSet(values().get());
+		return requireSet(values().getOrDefault(null));
 	}
 
 	public boolean contains(V value) { ASet<V> set=get(); return set!=null && set.contains(value); }

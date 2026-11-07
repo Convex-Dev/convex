@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
+import convex.core.crypto.TLS;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.message.Message;
@@ -35,6 +36,7 @@ import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.GlobalEventExecutor;
 
 public class NettyServer extends AServer {
@@ -73,8 +75,11 @@ public class NettyServer extends AServer {
 
 	protected synchronized static EventLoopGroup getEventLoopGroup() {
 		if (bossGroup!=null) return bossGroup;
-		// Boss group only accepts inbound connections — 1 thread is sufficient
-		bossGroup=new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+		// Boss group only accepts inbound connections — 1 thread is sufficient.
+		// Daemon, like the worker group: the shutdown hook that stops it only runs
+		// once the JVM begins to exit, which a live non-daemon thread prevents.
+		DefaultThreadFactory tf = new DefaultThreadFactory("convex-netty-boss", true);
+		bossGroup=new MultiThreadIoEventLoopGroup(1, tf, NioIoHandler.newFactory());
 		Shutdown.addHook(Shutdown.SERVER,()->{
 			EventLoopGroup bg=bossGroup;
 			if (bg!=null) {
@@ -154,8 +159,7 @@ public class NettyServer extends AServer {
             	 }
             	 clientChannels.add(ch);
 				 if (sslContext!=null) {
-					 SSLEngine engine=sslContext.createSSLEngine();
-					 engine.setUseClientMode(false);
+					 SSLEngine engine=TLS.serverEngine(sslContext);
 					 SslHandler ssl=new SslHandler(engine);
 					 ssl.setHandshakeTimeoutMillis(Config.DEFAULT_INTERNAL_TIMEOUT);
 					 ch.pipeline().addLast(ssl);
@@ -274,6 +278,12 @@ public class NettyServer extends AServer {
 	}
 
 
+	/**
+	 * Sets the action for each received message. It runs on a network event loop that
+	 * serves many connections, so it must not block: hand off any work that may wait.
+	 *
+	 * @param handler action for each received message
+	 */
 	public void setReceiveAction(Consumer<Message> handler) {
 		receiveAction=handler;
 	}

@@ -202,17 +202,7 @@ public class KVDemo {
 		System.out.println("  HGETALL profile = " + db.hgetall("profile"));
 
 		// -------------------------------------------------------
-		// 12. GC (garbage collection)
-		// -------------------------------------------------------
-		System.out.println("\n--- GC ---");
-		long before = db.keys().count();
-		long removed = db.gc();
-		long after = db.keys().count();
-		System.out.println("GC removed " + removed + " tombstones/expired entries");
-		System.out.println("Keys before GC: " + before + ", after: " + after);
-
-		// -------------------------------------------------------
-		// 13. Benchmarks
+		// 12. Benchmarks
 		// -------------------------------------------------------
 		System.out.println("\n--- Benchmarks ---");
 

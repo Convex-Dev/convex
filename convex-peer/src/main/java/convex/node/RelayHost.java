@@ -6,11 +6,11 @@ import java.util.Objects;
 import convex.core.data.ACell;
 import convex.core.store.AStore;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeApplication;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
 
-/** Assembles a host with one live application over a supplied whole-value lattice. */
+/** Assembles a host whose one application is a live {@link LatticeComponent} over a supplied whole-value lattice. */
 public final class RelayHost {
 	private RelayHost() {}
 
@@ -24,9 +24,7 @@ public final class RelayHost {
 			LatticeContext context) throws IOException {
 		Objects.requireNonNull(lattice,"Lattice must not be null");
 		var host=LatticeHost.open(lattice.zero(),store);
-		var application=LatticeApplication.live(lattice,host);
-		application.setContext(context);
-		host.addApplication(application);
+		host.addApplication(LatticeComponent.live(lattice,host.cursor(),context));
 		return host;
 	}
 

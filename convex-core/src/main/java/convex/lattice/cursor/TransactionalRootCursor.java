@@ -12,8 +12,8 @@ import convex.core.data.ACell;
  * All mutation entry points coordinate their commits through one root-owned lock.
  * Ordinary update functions still execute optimistically outside the lock, while
  * root reads remain lock-free. Live views inherit this policy. Forks always use
- * this root for their independent working state so sync can exclude working writes;
- * fork reads also coordinate with sync. No background workers are created.
+ * this root for their independent working state so sync can exclude working writes.
+ * No background workers are created.
  *
  * <p>Choose this variant when constructing the shared host. A locking wrapper
  * around a path cannot exclude writes through other views of an ordinary root.</p>

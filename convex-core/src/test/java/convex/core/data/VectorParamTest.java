@@ -30,7 +30,17 @@ public class VectorParamTest {
 						{ "Length 10 vector", Samples.INT_VECTOR_10 }, { "Length 16 vector", Samples.INT_VECTOR_16 },
 						{ "Length 23 vector", Samples.INT_VECTOR_23 }, { "Length 32 vector", Samples.INT_VECTOR_32 },
 						{ "Length 300 vector", Samples.INT_VECTOR_300 },
-						{ "Length 256 tree vector", Samples.INT_VECTOR_256 } });
+						{ "Length 256 tree vector", Samples.INT_VECTOR_256 },
+						{ "Empty Path", Path.of() }, { "Path", path(3) }, { "Path slice", path(3).slice(1) },
+						{ "Empty Path slice", path(3).slice(3) },
+						{ "Path of large strings", Path.of(Samples.NON_EMBEDDED_STRING, Samples.MIN_TREE_STRING) },
+						{ "Length 40 Path", path(40) }, { "Length 34 Path slice", path(40).slice(3, 37) } });
+	}
+
+	private static Path path(int n) {
+		AString[] segments = new AString[n];
+		for (int i = 0; i < n; i++) segments[i] = Strings.create("s" + i);
+		return Path.of(segments);
 	}
 
 	@ParameterizedTest(name = "{index}: {0}")

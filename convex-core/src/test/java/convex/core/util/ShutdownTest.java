@@ -3,6 +3,7 @@ package convex.core.util;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
@@ -12,11 +13,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Regression tests for #604: {@link Shutdown#addHook} raced on the shared backing
@@ -27,7 +28,10 @@ import org.junit.jupiter.api.Test;
  * clear every registered hook process-wide (each open Etch store registers one),
  * disturbing other tests. Instead we inspect the private map directly (same package)
  * and tidy up our own entries afterwards.</p>
+ *
+ * <p>Also covers {@link Shutdown#once}, the run-once task services register.</p>
  */
+@Timeout(60)
 public class ShutdownTest {
 
 	/** Priority base chosen well clear of the real hook priorities (60..120). */
@@ -90,7 +94,7 @@ public class ShutdownTest {
 			threads.add(t);
 			t.start();
 		}
-		assertTrue(done.await(30, TimeUnit.SECONDS), "threads did not complete");
+		done.await();
 		for (Thread t : threads) t.join();
 		assertNull(failure.get(), () -> "addHook threw under concurrency: " + failure.get());
 
@@ -131,7 +135,7 @@ public class ShutdownTest {
 			threads.add(t);
 			t.start();
 		}
-		assertTrue(done.await(30, TimeUnit.SECONDS), "threads did not complete");
+		done.await();
 		for (Thread t : threads) t.join();
 		assertNull(failure.get(), () -> "addHook threw under concurrency: " + failure.get());
 
@@ -142,6 +146,74 @@ public class ShutdownTest {
 			assertEquals(n, hookCount(group), "lost hooks in shared group");
 		} finally {
 			order.remove(priority);
+		}
+	}
+
+	/** Every caller of a service's shutdown, however concurrent, runs it at most once. */
+	@Test
+	public void testOnceRunsTheActionOnce() throws Exception {
+		final int n = 16;
+		AtomicInteger calls = new AtomicInteger();
+		Shutdown.Once once = Shutdown.once(calls::incrementAndGet);
+		CyclicBarrier barrier = new CyclicBarrier(n);
+		List<Thread> threads = new ArrayList<>();
+		for (int i = 0; i < n; i++) {
+			Thread t = new Thread(() -> {
+				try {
+					barrier.await();
+					once.run();
+				} catch (Exception e) {
+					throw new AssertionError(e);
+				}
+			});
+			threads.add(t);
+			t.start();
+		}
+		for (Thread t : threads) t.join();
+		assertEquals(1, calls.get());
+		once.await(); // returns at once: the action has run
+	}
+
+	/** The first caller sees a failed shutdown; it still counts as run for later callers. */
+	@Test
+	public void testOnceFailureReachesTheFirstCallerOnly() throws Exception {
+		AtomicInteger calls = new AtomicInteger();
+		Shutdown.Once once = Shutdown.once(() -> {
+			calls.incrementAndGet();
+			throw new IllegalStateException("save failed");
+		});
+		assertThrows(IllegalStateException.class, once::run);
+		once.run();
+		once.await();
+		assertEquals(1, calls.get());
+	}
+
+	/** A caller waiting for a shutdown in progress stops waiting when interrupted and keeps its interrupt. */
+	@Test
+	public void testOnceInterruptedWaiterKeepsItsInterrupt() throws Exception {
+		CountDownLatch entered = new CountDownLatch(1);
+		CountDownLatch release = new CountDownLatch(1);
+		AtomicInteger calls = new AtomicInteger();
+		Shutdown.Once once = Shutdown.once(() -> {
+			calls.incrementAndGet();
+			entered.countDown();
+			try {
+				release.await();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+		});
+		Thread first = new Thread(once);
+		first.start();
+		try {
+			entered.await();
+			Thread.currentThread().interrupt();
+			once.run();
+			assertTrue(Thread.interrupted(), "the waiter keeps its interrupt");
+			assertEquals(1, calls.get(), "a waiting caller never runs the action itself");
+		} finally {
+			release.countDown();
+			first.join();
 		}
 	}
 

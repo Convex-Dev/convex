@@ -312,6 +312,8 @@ public class ConvexJSON {
 			CompletableFuture<Map<String, Object>> future = transactAsync(code);
 			Map<String, Object> result=future.get();
 			return result;
+		} catch (InterruptedException e) {
+			return Result.fromInterrupt(e).toJSON();
 		} catch (Exception e) {
 			return Result.fromException(e).toJSON();
 		}

@@ -353,21 +353,7 @@ public class EncodingTest {
 		assertEquals(v,v2);
 	}
 
-	@Test public void testMultiCellEncoding() throws BadFormatException {
-		ArrayList<ACell> al=new ArrayList<ACell>();
-		al.add(CVMLong.ONE);
-		al.add(Vectors.of(1,2,3));
-		al.add(CVMDouble.ZERO);
-		
-		Blob enc=Format.encodeCells(al);
-		
-		ACell[] cs=Format.decodeCells(enc, Samples.TEST_STORE);
-		assertEquals(CVMLong.ONE,cs[0]);
-		assertEquals(CVMDouble.ZERO,cs[2]);
-		assertEquals(3,cs.length);
-	}
-	
-	@Test 
+	@Test
 	public void testSignedDataEncoding() throws BadFormatException {
 		ABlob bigBlob=Blob.createRandom(new Random(123), 10000).toCanonical();
 		Invoke trans=Invoke.create(Address.create(607), 6976, Vectors.of(1,bigBlob,2,bigBlob));

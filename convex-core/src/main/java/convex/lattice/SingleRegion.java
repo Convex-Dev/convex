@@ -16,17 +16,6 @@ public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions 
 
 	private final C component;
 
-	/** Wraps an existing, correctly bound component, which may be shared. */
-	public SingleRegion(LatticeHost<Index<Keyword,ACell>> host,Keyword key,C component) {
-		this(host.cursor(),key,component);
-	}
-
-	/** Constructs a new component at the named region of a host. */
-	protected <V extends ACell> SingleRegion(LatticeHost<Index<Keyword,ACell>> host,
-			Keyword key,RegionFactory<V,C> factory) {
-		this(host.cursor(),key,factory);
-	}
-
 	/** Wraps an existing component at a root or nested container. */
 	public SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,
 			Keyword key,C component) {
@@ -34,17 +23,15 @@ public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions 
 		this.component=region(key,component);
 	}
 
-	/** Constructs a new component at a root or nested container. */
+	/**
+	 * Constructs a new component at a root or nested container. The factory runs
+	 * during this constructor, so a subclass that overrides {@link #cursor()} cannot
+	 * use it: the subclass's view is not yet initialised.
+	 */
 	protected <V extends ACell> SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,
 			Keyword key,RegionFactory<V,C> factory) {
 		super(cursor);
 		component=createRegion(key,factory);
-	}
-
-	/** Creates a single region and its child at the host root. */
-	public static <V extends ACell,C extends ALatticeComponent<?>> SingleRegion<C> create(
-			LatticeHost<Index<Keyword,ACell>> host,Keyword key,RegionFactory<V,C> factory) {
-		return new SingleRegion<C>(host,key,factory);
 	}
 
 	/** Creates a single region and its child at a root or nested container. */

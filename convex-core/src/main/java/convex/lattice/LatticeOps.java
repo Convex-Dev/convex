@@ -39,15 +39,19 @@ public class LatticeOps {
 	 *   <li>An existing container is used regardless of the supplied lattice.</li>
 	 * </ul>
 	 *
+	 * <p>A container that cannot hold its key, such as a vector given a key that is
+	 * not an index within it, refuses the write; it is never replaced.</p>
+	 *
 	 * @param <T> Return type
 	 * @param a Root data structure (may be null if the lattice provides an empty value)
 	 * @param value Value to set at the end of the path
 	 * @param lattice Lattice of {@code a}'s position, or null for none
 	 * @param keys Path of keys to navigate
 	 * @return Updated root data structure
-	 * @throws IllegalStateException if a missing container cannot be created
-	 * @throws IllegalArgumentException if a non-null intermediate is not a data structure, or is a
-	 *         signed envelope (a signature covers its value, so nothing may be written through it)
+	 * @throws PathWriteException if a missing container cannot be created, or a container is not
+	 *         a data structure or cannot hold its key
+	 * @throws IllegalArgumentException if an intermediate is a signed envelope (a signature covers
+	 *         its value, so nothing may be written through it)
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T assocIn(ACell a, ACell value, ALattice<?> lattice, ACell... keys) {
@@ -66,12 +70,11 @@ public class LatticeOps {
 		if (data == null) {
 			if (i == 0) {
 				data = (lattice == null) ? null : lattice.zero();
-				if (data == null) throw new IllegalStateException(
-					"Cannot write through an absent value: no empty value is known for this position");
+				if (data == null) throw new PathWriteException(
+					"Cannot write through an absent value: no empty value is known for this position",keys,i);
 			} else {
-				throw new IllegalStateException(
-					"Cannot write through non-existent path at depth " + i
-					+ ": the intermediate container's type is unknown here; supply component construction logic");
+				throw new PathWriteException(
+					"Cannot write through an absent container: its type is unknown here; supply component construction logic",keys,i);
 			}
 		}
 		if (data instanceof SignedData) {
@@ -83,13 +86,18 @@ public class LatticeOps {
 				+ ": wrap the owner's slot with SignedCursor.create");
 		}
 		if (!(data instanceof ADataStructure<?> struct)) {
-			throw new IllegalArgumentException(
-				"Not a data structure at depth " + i + ", found " + Utils.getClassName(data));
+			throw new PathWriteException(
+				"Cannot write a key into " + Utils.getClassName(data) + ", which is not a data structure",keys,i);
 		}
 
 		ACell child = struct.get(keys[i]);
 		ACell newChild = assocIn(child, value, null, keys, i + 1);
-		return RT.assoc(struct, keys[i], newChild); // returns struct unchanged if newChild == child
+		ACell updated = RT.assoc(struct, keys[i], newChild); // returns struct unchanged if newChild == child
+		// A container refuses a key it cannot hold with null, which would otherwise
+		// be written in its place one level up.
+		if (updated == null) throw new PathWriteException(
+			"Cannot write the key: " + Utils.getClassName(struct) + " cannot hold it",keys,i);
+		return updated;
 	}
 
 	/** Reconciles a lattice-backed publication, retaining destination keys outside a keyed lattice. */

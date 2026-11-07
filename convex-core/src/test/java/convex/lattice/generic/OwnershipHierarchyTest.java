@@ -96,7 +96,6 @@ public class OwnershipHierarchyTest {
 		forkComponent.sync();
 		assertEquals(CVMLong.create(3),value.get());
 		assertTrue(root.get().get(DID).checkSignature());
-		assertEquals(DID,lattice.resolveKey(DID));
 	}
 
 	@Test
@@ -174,14 +173,12 @@ public class OwnershipHierarchyTest {
 		assertEquals(good,lattice.merge(null,good));
 		assertEquals(lattice.zero(),lattice.merge(null,bad));
 		assertSame(good,lattice.merge(LatticeContext.create(null,BOB,(o,k) -> true),good,bad));
-		assertEquals(owner,lattice.resolveKey(Strings.create(owner.toHexString())));
-		assertNull(lattice.resolveKey(DID));
 		assertNull(lattice.path(Blob.EMPTY));
 		assertNull(lattice.path(DID));
 
 		// Decoding an account key can yield its ordinary blob representation.
 		Blob encodedKey=Blob.fromHex(owner.toHexString());
-		assertEquals(owner,lattice.resolveKey(encodedKey));
+		assertEquals(owner,encodedKey);
 		var root=Cursors.root(lattice.zero());
 		policy.set(LatticeContext.create(null,ALICE));
 		convex.lattice.ComponentTestSupport.signed(root.path(encodedKey), lattice, encodedKey, policy::get).set(CVMLong.ONE);
@@ -221,12 +218,11 @@ public class OwnershipHierarchyTest {
 		ACell wireKey=decoded.entryAt(0).getKey();
 		assertInstanceOf(Blob.class,wireKey);
 		assertFalse(wireKey instanceof AccountKey);
-		AccountKey owner=lattice.resolveKey(wireKey);
+		AccountKey owner=AccountKey.create((Blob)wireKey);
 		assertEquals(ALICE.getAccountKey(),owner);
 		var merged=lattice.merge(null,decoded);
 		assertEquals(value,merged);
-		AccountKey mergedOwner=lattice.resolveKey(merged.entryAt(0).getKey());
-		assertEquals(owner,mergedOwner);
+		assertEquals(ALICE.getAccountKey(),merged.entryAt(0).getKey());
 		assertSame(merged,lattice.merge(merged,decoded));
 		var root=Cursors.root(decoded);
 		policy.set(LatticeContext.create(null,ALICE));

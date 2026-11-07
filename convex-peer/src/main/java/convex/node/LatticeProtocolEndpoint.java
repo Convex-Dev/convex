@@ -20,20 +20,24 @@ import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.CPoSConstants;
-import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ResultException;
+import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.BoundedMessageQueue;
+import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -46,7 +50,7 @@ import convex.peer.Config;
 /**
  * Connection-facing CAD036 endpoint owned by one {@link LatticePropagator}.
  *
- * <p>The endpoint is the isolation boundary for a propagation policy group. It
+ * <p>The endpoint is the isolation boundary for a propagator group. It
  * owns that group's bounded inbound queue, connection statistics, missing-cell
  * acquisition, challenge correlation and application extension messages. It
  * decodes and projects complete values in the propagator's serving store, then
@@ -56,6 +60,9 @@ import convex.peer.Config;
  * <p>Neither a malformed message, a failed acquisition nor a broken application
  * handler can terminate the authoritative node publication path. Conversely,
  * this endpoint never mutates the node cursor or its durable root directly.</p>
+ *
+ * <p>Its propagator starts and closes it, one call after the other, without a
+ * lock; network threads deliver messages and attach connections meanwhile.</p>
  */
 final class LatticeProtocolEndpoint implements Closeable {
 
@@ -71,7 +78,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private final Predicate<Message> inboundRetry=this::offerInboundBlocking;
 	private final Predicate<Message> inboundRejected=message -> false;
 
-	/** Physically inbound connections assigned to this propagation policy group. */
+	/** Physically inbound connections assigned to this propagator group. */
 	private final Set<AConnection> inboundConnections=ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<AConnection,ConnectionStats> connectionStats=
 		new ConcurrentHashMap<>();
@@ -81,18 +88,18 @@ final class LatticeProtocolEndpoint implements Closeable {
 		new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<Message,Throwable> acquisitionFailures=
 		new ConcurrentHashMap<>();
-	private final Object acquisitionLifecycleLock=new Object();
 	private final LatticeInboundVerifier inboundVerifier;
 
 	private volatile boolean acceptingInbound;
 	private volatile boolean inboundRunning;
-	private boolean acceptingAcquisitions;
+	private volatile boolean acceptingAcquisitions;
 	private Thread inboundThread;
 	private Thread maintenanceThread;
 
-	private volatile AKeyPair transportKeyPair;
+	private volatile ChallengeSigner transportSigner;
 	private volatile Predicate<Message> applicationMessageHandler;
 	private volatile InboundLatticeListener inboundLatticeListener;
+	private volatile Predicate<AccountKey> challengerAdmission;
 
 	LatticeProtocolEndpoint(LatticePropagator propagator,NodeServer<?> node,
 			LatticePropagatorConfig config) {
@@ -103,12 +110,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 		this.inboundQueue=new BoundedMessageQueue(
 			config.getInboundQueueSize(),config.getMaxInboundQueueBytes());
 		this.acquisitionPermits=new Semaphore(config.getInboundQueueSize());
-		this.inboundVerifier=new LatticeInboundVerifier(() -> transportKeyPair);
+		this.inboundVerifier=new LatticeInboundVerifier(() -> transportSigner);
 	}
 
 	/** Configures the identity used only for live transport possession proofs. */
-	void setTransportKeyPair(AKeyPair keyPair) {
-		this.transportKeyPair=keyPair;
+	void setTransportSigner(ChallengeSigner signer) {
+		this.transportSigner=signer;
 	}
 
 	/** Configures the handler for complete application extension messages. */
@@ -121,15 +128,19 @@ final class LatticeProtocolEndpoint implements Closeable {
 		this.inboundLatticeListener=listener;
 	}
 
+	/** Configures which nodes that challenge this group over inbound connections are challenged back. */
+	void setChallengerAdmission(Predicate<AccountKey> admission) {
+		this.challengerAdmission=admission;
+	}
+
 	/** Starts this group's ordered ingress and maintenance workers. */
-	synchronized void start() {
+	void start() {
 		if (inboundRunning) return;
 		if (inboundThread!=null) throw new IllegalStateException("Previous ingress worker is still active");
+		inboundQueue.open();
 		inboundRunning=true;
 		acceptingInbound=true;
-		synchronized (acquisitionLifecycleLock) {
-			acceptingAcquisitions=true;
-		}
+		acceptingAcquisitions=true;
 		inboundThread=Thread.ofPlatform().daemon().name("Lattice propagator ingress").start(this::inboundLoop);
 		maintenanceThread=Thread.ofVirtual().name("Lattice propagator connection maintenance")
 			.start(this::maintenanceLoop);
@@ -138,10 +149,13 @@ final class LatticeProtocolEndpoint implements Closeable {
 	/** Assigns a physical inbound connection permanently to this endpoint. */
 	void attachInbound(AConnection connection) {
 		if (connection==null) throw new IllegalArgumentException("Connection must not be null");
-		synchronized (inboundConnections) {
-			if (!acceptingInbound) throw new IllegalStateException("Propagation group is not accepting connections");
-			if (connection.isClosed()) throw new IllegalStateException("Inbound connection is closed");
-			inboundConnections.add(connection);
+		if (connection.isClosed()) throw new IllegalStateException("Inbound connection is closed");
+		// Added before checking: close stops admission before collecting its sockets,
+		// so either close closes this connection or the check turns it away
+		inboundConnections.add(connection);
+		if (!acceptingInbound) {
+			inboundConnections.remove(connection);
+			throw new IllegalStateException("Propagator group is not accepting connections");
 		}
 	}
 
@@ -155,6 +169,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 	 * to pause reads and retry through the returned predicate.
 	 */
 	Predicate<Message> deliver(Message message) {
+		if (completeReply(message)) return null;
 		if (!acceptingInbound) return inboundRejected;
 		if (inboundQueue.offer(message)) {
 			// Shutdown may have drained the queue between the admission check and
@@ -166,19 +181,38 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	/**
+	 * Completes a reply to a request this node sent on the message's connection, as a
+	 * client connection does, so it neither waits in the queue nor takes its space.
+	 * Matching reads only the reply's ID; the requester decodes it on its own thread.
+	 * The reply still counts as traffic for the route's liveness.
+	 */
+	private boolean completeReply(Message message) {
+		AConnection connection=message.getConnection();
+		if (connection==null) return false;
+		try {
+			if (!connection.completeRequest(message)) return false;
+		} catch (BadFormatException e) {
+			return false;
+		}
+		if (connection.isTrusted()) {
+			propagator.getConnectionManager().received(connection.getTrustedKey(),connection);
+		}
+		return true;
+	}
+
+	/**
 	 * Accepts reverse traffic from a manager-owned authenticated outbound route.
 	 * This bypasses physical inbound assignment but not the endpoint's queue or
-	 * protocol validation.
+	 * protocol validation. A full queue asks the route to pause reading and retry,
+	 * as {@link #deliver(Message)} does for an inbound connection.
 	 */
-	void receiveFromManagedOutbound(Convex peer,Message message) {
+	Predicate<Message> receiveFromManagedOutbound(Convex peer,Message message) {
 		AccountKeyBinding binding=AccountKeyBinding.from(peer,message);
 		if (binding==null || propagator.getConnectionManager().getConnection(binding.key())!=peer) {
 			log.debug("Dropped reverse message without current outbound admission");
-			return;
+			return null;
 		}
-		if (deliver(message)!=null) {
-			log.debug("Dropped reverse lattice message because this policy queue is full or stopping");
-		}
+		return deliver(message);
 	}
 
 	/** Starts possession verification for an inbound route owned by this group. */
@@ -188,9 +222,16 @@ final class LatticeProtocolEndpoint implements Closeable {
 			throw new IllegalArgumentException("Connection and expected key must not be null");
 		}
 		if (!ownsInbound(connection)) {
-			throw new IllegalStateException("Inbound connection belongs to another propagation group");
+			// A connection leaves this group once it has closed, and then has nothing to authenticate
+			if (connection.isClosed()) return;
+			throw new IllegalStateException("Inbound connection belongs to another propagator group");
 		}
 		inboundVerifier.maybeStart(connection,propagator,expectedKey);
+	}
+
+	/** The keys inbound connections are being challenged for. */
+	Set<AccountKey> authenticatingInboundKeys() {
+		return inboundVerifier.claimedKeys();
 	}
 
 	/** Releases every resource scoped to one physical connection. */
@@ -232,7 +273,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 		boolean acquired=acquiredMessages.remove(message)!=null;
 		if (!acquired && acquisitionFailure==null) recordReceived(stats);
 		if (acquisitionFailure!=null) {
-			recordMergeReject(connection,stats);
+			if (isSenderFault(acquisitionFailure)) recordMergeReject(connection,stats);
 			returnLatticeResult(message,Result.fromException(acquisitionFailure));
 			return null;
 		}
@@ -418,7 +459,37 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	private void processChallenge(Message message) {
-		message.respondToChallenge(transportKeyPair,Message.LATTICE_PEER_CHALLENGE_CONTEXT::equals);
+		// Decided before answering, so a challenger that has the answer has also been
+		// challenged back, if it ever will be
+		admitChallenger(message);
+		message.respondToChallenge(transportSigner);
+	}
+
+	/**
+	 * Challenges back a node that challenged this group by name over an inbound
+	 * connection, when the application admits its key; proving it makes the
+	 * connection an outbound route. A challenge naming no key, or another node's, is
+	 * one any node could replay, so it admits nothing.
+	 */
+	private void admitChallenger(Message message) {
+		Predicate<AccountKey> admission=challengerAdmission;
+		ChallengeSigner signer=transportSigner;
+		AConnection connection=message.getConnection();
+		if (admission==null || signer==null || connection==null || connection.isTrusted()
+				|| !ownsInbound(connection)) return;
+		try {
+			AVector<ACell> payload=message.getPayload();
+			if (payload==null || payload.count()!=3 || !(payload.get(2) instanceof SignedData<?> signed)) return;
+			if (!(signed.getValue() instanceof AVector<?> challenge) || challenge.count()!=3) return;
+			if (!signer.getAccountKey().equals(RT.ensureAccountKey(challenge.get(1)))) return;
+			if (!Message.LATTICE_PEER_CHALLENGE_CONTEXT.equals(challenge.get(2))) return;
+			if (!signed.checkSignature()) return;
+			AccountKey challenger=signed.getAccountKey();
+			if (challenger==null || challenger.equals(signer.getAccountKey()) || !admission.test(challenger)) return;
+			inboundVerifier.maybeStart(connection,propagator,challenger);
+		} catch (RuntimeException e) {
+			log.debug("Unable to admit challenger on {}: {}",connection.getRemoteAddress(),e.getMessage());
+		}
 	}
 
 	private void processApplicationMessage(Message message,ConnectionContext context) {
@@ -449,7 +520,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 			recordMergeReject(message.getConnection(),stats);
 			returnLatticeResult(message,Result.error(ErrorCodes.FORMAT,e.getMessage()));
 		} catch (IOException e) {
-			recordMergeReject(message.getConnection(),stats);
+			// Our own store failed, which says nothing about the sender
 			returnLatticeResult(message,Result.fromException(e));
 		}
 	}
@@ -460,7 +531,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 		HashSet<Hash> missing=new HashSet<>();
 		Ref.get(value).findMissing(missing,1);
 		if (!missing.isEmpty()) throw new MissingDataException(store,missing.iterator().next());
-		if (!withinInboundSizeLimit(value)) throw new BadFormatException("Acquired lattice value exceeds inbound size limit");
 		// What the host's applications take from the value is theirs to decide
 		ACell complete=Cells.persist(value,store);
 		AVector<?> completePayload=Vectors.create(
@@ -472,12 +542,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private void processLatticeValue(Message message,ConnectionStats stats) throws BadFormatException {
 		LatticeValuePayload payload=parseLatticeValuePayload(message);
 		ACell value=payload.value();
-		if (!withinInboundSizeLimit(value)) {
-			recordMergeReject(message.getConnection(),stats);
-			returnLatticeResult(message,Result.error(ErrorCodes.MEMORY,
-				"LATTICE_VALUE exceeds the inbound size limit"));
-			return;
-		}
 
 		ACell[] path=payload.path().toCellArray();
 		NodeServer.MergeOutcome outcome=node.mergeInbound(path,value);
@@ -536,10 +600,6 @@ final class LatticeProtocolEndpoint implements Closeable {
 		return new LatticeValuePayload(id,path,value);
 	}
 
-	private boolean withinInboundSizeLimit(ACell value) {
-		return ACell.getMemorySize(value)<=config.getMaxInboundValueSize();
-	}
-
 	private void beginLatticeAcquisition(Message message,ConnectionStats stats) {
 		AConnection connection=message.getConnection();
 		if (connection==null) {
@@ -547,7 +607,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 			return;
 		}
 		if (!acquisitionPermits.tryAcquire()) {
-			recordMergeReject(connection,stats);
+			// Our own load, which says nothing about the sender
 			returnLatticeResult(message,Result.error(ErrorCodes.LOAD,
 				"Lattice acquisition capacity exhausted"));
 			return;
@@ -599,33 +659,37 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	private CompletableFuture<ACell> acquireHash(AConnection connection,Hash hash) {
-		Acquiror acquiror=Acquiror.create(hash,store,hashes -> requestMissing(connection,hashes));
-		Set<Acquiror> acquisitions;
-		synchronized (acquisitionLifecycleLock) {
-			if (!acceptingAcquisitions) {
-				acquiror.close();
-				return CompletableFuture.failedFuture(new IOException("Propagation group is stopping"));
-			}
-			acquisitions=activeAcquirors.computeIfAbsent(connection,c -> ConcurrentHashMap.newKeySet());
+		Acquiror acquiror=Acquiror.fromMessages(hash,store,hashes ->
+			connection.request(Message.createDataRequest(null,hashes),Config.DEFAULT_INTERNAL_TIMEOUT));
+		// Recorded before checking: closing stops admission before collecting fetches, so
+		// either close closes this one or the check does, before it starts
+		activeAcquirors.compute(connection,(c,acquisitions) -> {
+			if (acquisitions==null) acquisitions=ConcurrentHashMap.newKeySet();
 			acquisitions.add(acquiror);
-		}
-		acquiror.getTerminationFuture().whenComplete((ignored,error) -> {
-			synchronized (acquisitionLifecycleLock) {
-				acquisitions.remove(acquiror);
-				if (acquisitions.isEmpty()) activeAcquirors.remove(connection,acquisitions);
-			}
+			return acquisitions;
 		});
+		acquiror.getTerminationFuture().whenComplete((ignored,error) ->
+			activeAcquirors.computeIfPresent(connection,(c,acquisitions) -> {
+				acquisitions.remove(acquiror);
+				return acquisitions.isEmpty() ? null : acquisitions;
+			}));
+		if (!acceptingAcquisitions) {
+			acquiror.close();
+			return CompletableFuture.failedFuture(new IOException("Propagator group is stopping"));
+		}
 		return acquiror.getFuture();
-	}
-
-	private CompletableFuture<Result> requestMissing(AConnection connection,Hash[] hashes) {
-		return requestResult(connection,Message.createDataRequest(null,hashes));
 	}
 
 	/** Correlated liveness probe on an authenticated, listener-owned return route. */
 	CompletableFuture<?> probe(AConnection connection) {
 		if (connection==null) return CompletableFuture.failedFuture(new IOException("Lattice source connection is closed"));
 		return FutureUtils.map(connection.request(Message.createPing(null),Config.DEFAULT_INTERNAL_TIMEOUT),message -> {
+			// A reply completes undecoded, so the requester decodes it
+			try {
+				message.getPayload(null);
+			} catch (BadFormatException e) {
+				throw new IllegalStateException("Invalid PING response",e);
+			}
 			Result result=message.toResult();
 			if (result.isError() || !(result.getValue() instanceof CVMLong)) {
 				throw new IllegalStateException("Invalid PING response");
@@ -634,9 +698,16 @@ final class LatticeProtocolEndpoint implements Closeable {
 		});
 	}
 
-	private CompletableFuture<Result> requestResult(AConnection connection,Message request) {
-		if (connection==null) return CompletableFuture.failedFuture(new IOException("Lattice source connection is closed"));
-		return FutureUtils.map(connection.request(request,Config.DEFAULT_INTERNAL_TIMEOUT),Message::toResult);
+	/**
+	 * Whether a failed acquisition shows the sender at fault: its value was
+	 * malformed, or it answered a data request with an error other than :LOAD.
+	 * Load on either side, an unanswered request and local failures count
+	 * neither way, as {@code convex.peer.ConnectionManager} treats a peer's :LOAD.
+	 */
+	private static boolean isSenderFault(Throwable failure) {
+		if (failure instanceof BadFormatException) return true;
+		if (failure instanceof ResultException e) return !ErrorCodes.LOAD.equals(e.getResult().getErrorCode());
+		return false;
 	}
 
 	private static Throwable unwrapCompletion(Throwable error) {
@@ -798,11 +869,10 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	private void stopAcquisitions() throws IOException {
+		// Stop admission before collecting: a fetch recorded after this is turned away by its own check
+		acceptingAcquisitions=false;
 		ArrayList<Acquiror> acquisitions=new ArrayList<>();
-		synchronized (acquisitionLifecycleLock) {
-			acceptingAcquisitions=false;
-			for (Set<Acquiror> values:activeAcquirors.values()) acquisitions.addAll(values);
-		}
+		for (Set<Acquiror> values:activeAcquirors.values()) acquisitions.addAll(values);
 		acquisitions.forEach(Acquiror::close);
 		long timeout=config.getInboundShutdownTimeout();
 		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(timeout);
@@ -820,10 +890,10 @@ final class LatticeProtocolEndpoint implements Closeable {
 	}
 
 	@Override
-	public synchronized void close() throws IOException {
-		synchronized (inboundConnections) {
-			acceptingInbound=false;
-		}
+	public void close() throws IOException {
+		// Stop admission before collecting sockets below: a connection attached after
+		// this is turned away by its own check
+		acceptingInbound=false;
 		inboundRunning=false;
 		inboundVerifier.close();
 		IOException failure=null;
@@ -836,10 +906,12 @@ final class LatticeProtocolEndpoint implements Closeable {
 		// Continue every independent cleanup step even when one acquisition or
 		// worker refuses to stop. NodeServer isolates the eventual group failure,
 		// but the group should still release everything else that it can.
-		inboundQueue.signalAll();
+		// Closing the queue wakes the worker once it has drained. Never interrupt
+		// it: it may be inside store I/O, and NIO closes an interrupted thread's
+		// file channel for every user of the store (#776).
+		inboundQueue.close();
 		Thread worker=inboundThread;
 		if (worker!=null) {
-			worker.interrupt();
 			try {
 				worker.join(config.getInboundShutdownTimeout());
 			} catch (InterruptedException e) {

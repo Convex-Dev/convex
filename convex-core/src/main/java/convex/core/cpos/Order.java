@@ -408,7 +408,7 @@ public class Order extends ARecordGeneric {
 	@Override
 	public boolean equals(ACell o) {
 		if (o instanceof Order other) return equals(other);
-		return Cells.equalsGeneric(this, o);
+		return Cells.equalsEncoding(this, o);
 	}
 	
 	public boolean equals(Order o) {

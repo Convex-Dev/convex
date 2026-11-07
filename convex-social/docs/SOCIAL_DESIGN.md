@@ -129,7 +129,7 @@ logical retention is defined by the projected root.
 
 Every admitted owner slot must:
 
-1. be a complete value within the configured inbound size bound;
+1. be a complete value;
 2. contain a signed social index, without requiring known schemas for every field;
 3. have a valid Ed25519 signature;
 4. use a signer authorised for the path DID.
@@ -162,7 +162,7 @@ challenger key as audience, and the same context. Both signatures are verified.
 
 `NodeConfig.maxConnections` bounds sockets accepted by the shared listener, while
 `LatticePropagatorConfig.maxDesiredPeers` bounds configured plus discovery-driven
-peer intent for each propagation group (both default to 256). Group message,
+peer intent for each propagator group (both default to 256). Group message,
 queue, acquisition and rejection limits provide the remaining generic resource
 bounds.
 

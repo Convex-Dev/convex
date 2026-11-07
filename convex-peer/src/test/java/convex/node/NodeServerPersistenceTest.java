@@ -182,7 +182,7 @@ public class NodeServerPersistenceTest {
 		ACell testValue = CVMLong.create(value);
 		Hash valueHash = Hash.get(testValue);
 
-		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server.getCursor().get(dataKey);
+		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server.getCursor().getOrDefault(null,dataKey);
 		if (dataIndex == null) {
 			dataIndex = (Index<Hash, ACell>) Index.EMPTY;
 		}
@@ -221,23 +221,11 @@ public class NodeServerPersistenceTest {
 	private void syncBackupFromPrimary() throws Exception {
 		// Sync primary so propagator has the latest value for query responses.
 		ACell expected=primary.getCursor().get();
-		CompletableFuture<ACell> announced=nextAnnouncement(
-			propagationGroup(primary),expected,16);
+		CompletableFuture<ACell> announced=propagationGroup(primary).whenAnnounced(expected::equals);
 		primary.getHost().sync();
 		announced.get(5,TimeUnit.SECONDS);
 
 		pullBackupFromPrimary();
-	}
-
-	/** Waits on propagation signals for one exact authoritative snapshot. */
-	private static CompletableFuture<ACell> nextAnnouncement(
-			LatticePropagator propagator,ACell expected,int remaining) {
-		return propagator.nextAnnounce().thenCompose(value -> {
-			if (expected.equals(value)) return CompletableFuture.completedFuture(value);
-			if (remaining<=1) return CompletableFuture.failedFuture(
-				new AssertionError("Expected propagation snapshot did not arrive"));
-			return nextAnnouncement(propagator,expected,remaining-1);
-		});
 	}
 
 	/** Pulls the currently announced primary snapshot without syncing it first. */

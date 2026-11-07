@@ -95,7 +95,7 @@ public final class Address extends AExtensionValue {
 		if (o instanceof Address addr) {
 			return value==addr.value;
 		} else {
-			return Cells.equalsGeneric(this, o);
+			return Cells.equalsEncoding(this, o);
 		}
 	}
 

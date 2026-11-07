@@ -8,6 +8,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Random;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -384,6 +386,143 @@ public class DLFSServerTest {
 			.header("If-None-Match", "*")
 			.PUT(HttpRequest.BodyPublishers.ofString("v3")).build(), HttpResponse.BodyHandlers.ofString());
 		assertEquals(412, createOnly.statusCode());
+	}
+
+	@Test
+	void testPutStreamsLargeFile() throws Exception {
+		byte[] first = new byte[(3 << 20) / 2];
+		new Random(791).nextBytes(first);
+		String path = driveURL + "large-put.bin";
+		assertEquals(201, client.send(HttpRequest.newBuilder(URI.create(path))
+			.PUT(HttpRequest.BodyPublishers.ofByteArray(first)).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+		assertArrayEquals(first, getRange(path, null, null).body());
+
+		// A body of unknown length streams too
+		byte[] second = Arrays.copyOf(first, 5000);
+		assertEquals(204, client.send(HttpRequest.newBuilder(URI.create(path))
+			.PUT(HttpRequest.BodyPublishers.ofInputStream(() -> new java.io.ByteArrayInputStream(second))).build(),
+			HttpResponse.BodyHandlers.ofString()).statusCode());
+		assertArrayEquals(second, getRange(path, null, null).body());
+	}
+
+	@Test
+	void testPutConditions() throws Exception {
+		String path = driveURL + "put-conditions.txt";
+		HttpResponse<String> missing = client.send(HttpRequest.newBuilder(URI.create(path))
+			.header("If-Match", "*")
+			.PUT(HttpRequest.BodyPublishers.ofString("v0")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(412, missing.statusCode());
+		assertEquals(404, getRange(path, null, null).statusCode());
+
+		HttpResponse<String> created = client.send(HttpRequest.newBuilder(URI.create(path))
+			.header("If-None-Match", "*")
+			.PUT(HttpRequest.BodyPublishers.ofString("v1")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(201, created.statusCode());
+		String etag = getRange(path, null, null).headers().firstValue("ETag").orElseThrow();
+
+		HttpResponse<String> listed = client.send(HttpRequest.newBuilder(URI.create(path))
+			.header("If-Match", "\"other\", " + etag)
+			.PUT(HttpRequest.BodyPublishers.ofString("v2")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(204, listed.statusCode());
+
+		HttpResponse<String> notThis = client.send(HttpRequest.newBuilder(URI.create(path))
+			.header("If-None-Match", getRange(path, null, null).headers().firstValue("ETag").orElseThrow())
+			.PUT(HttpRequest.BodyPublishers.ofString("v3")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(412, notThis.statusCode());
+		assertEquals("v2", new String(getRange(path, null, null).body()));
+	}
+
+	@Test
+	void testPutLimitWhileStreaming() throws Exception {
+		try (DLFSServer limited = DLFSServer.createEphemeral().setMaxRequestSize(8)) {
+			limited.getDriveManager().createDrive(null, "limited");
+			limited.start(0);
+			String url = "http://localhost:" + limited.getPort() + "/dlfs/limited/streamed.txt";
+			HttpResponse<String> response = client.send(HttpRequest.newBuilder(URI.create(url))
+				.PUT(HttpRequest.BodyPublishers.ofInputStream(() -> new java.io.ByteArrayInputStream(new byte[9]))).build(),
+				HttpResponse.BodyHandlers.ofString());
+			assertEquals(413, response.statusCode());
+			assertEquals(404, getRange(url, null, null).statusCode());
+		}
+	}
+
+	@Test
+	void testPutOnDirectory() throws Exception {
+		String dir = driveURL + "put-target-dir/";
+		assertEquals(201, client.send(HttpRequest.newBuilder(URI.create(dir))
+			.method("MKCOL", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+		HttpResponse<String> put = client.send(HttpRequest.newBuilder(URI.create(driveURL + "put-target-dir"))
+			.PUT(HttpRequest.BodyPublishers.ofString("x")).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(405, put.statusCode());
+	}
+
+	@Test
+	void testRangeRequests() throws Exception {
+		byte[] content = new byte[3 * 4096 + 100];
+		new Random(790).nextBytes(content);
+		int n = content.length;
+		String path = driveURL + "range.bin";
+		assertEquals(201, client.send(HttpRequest.newBuilder(URI.create(path))
+			.PUT(HttpRequest.BodyPublishers.ofByteArray(content)).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+
+		HttpResponse<byte[]> full = getRange(path, null, null);
+		assertEquals(200, full.statusCode());
+		assertArrayEquals(content, full.body());
+		assertEquals("bytes", full.headers().firstValue("Accept-Ranges").orElse(null));
+		String etag = full.headers().firstValue("ETag").orElseThrow();
+
+		HttpResponse<String> head = client.send(HttpRequest.newBuilder(URI.create(path))
+			.method("HEAD", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, head.statusCode());
+		assertEquals(String.valueOf(n), head.headers().firstValue("Content-Length").orElse(null));
+		assertEquals("bytes", head.headers().firstValue("Accept-Ranges").orElse(null));
+		assertEquals(etag, head.headers().firstValue("ETag").orElse(null));
+
+		assertPartial(getRange(path, "bytes=4000-4199", null), content, 4000, 4199);
+		assertPartial(getRange(path, "bytes=8192-", null), content, 8192, n - 1);
+		assertPartial(getRange(path, "bytes=-100", null), content, n - 100, n - 1);
+		assertPartial(getRange(path, "bytes=4000-4199", etag), content, 4000, 4199);
+
+		HttpResponse<byte[]> beyond = getRange(path, "bytes=" + n + "-", null);
+		assertEquals(416, beyond.statusCode());
+		assertEquals("bytes */" + n, beyond.headers().firstValue("Content-Range").orElse(null));
+
+		// Several ranges, or a stale If-Range, get the whole file
+		HttpResponse<byte[]> several = getRange(path, "bytes=0-9,20-29", null);
+		assertEquals(200, several.statusCode());
+		assertArrayEquals(content, several.body());
+		HttpResponse<byte[]> stale = getRange(path, "bytes=0-9", "\"stale\"");
+		assertEquals(200, stale.statusCode());
+		assertArrayEquals(content, stale.body());
+	}
+
+	@Test
+	void testFileResponsesAreNotCompressed() throws Exception {
+		String path = driveURL + "compressible.txt";
+		client.send(HttpRequest.newBuilder(URI.create(path))
+			.PUT(HttpRequest.BodyPublishers.ofString("compressible ".repeat(1000))).build(), HttpResponse.BodyHandlers.ofString());
+		for (String range : new String[] { null, "bytes=100-5099" }) {
+			HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(path)).header("Accept-Encoding", "gzip").GET();
+			if (range != null) req.header("Range", range);
+			HttpResponse<byte[]> resp = client.send(req.build(), HttpResponse.BodyHandlers.ofByteArray());
+			assertTrue(resp.headers().firstValue("Content-Encoding").isEmpty());
+			assertEquals(String.valueOf(resp.body().length), resp.headers().firstValue("Content-Length").orElse(null));
+		}
+	}
+
+	private static HttpResponse<byte[]> getRange(String url, String range, String ifRange) throws Exception {
+		HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(url)).GET();
+		if (range != null) req.header("Range", range);
+		if (ifRange != null) req.header("If-Range", ifRange);
+		return client.send(req.build(), HttpResponse.BodyHandlers.ofByteArray());
+	}
+
+	private static void assertPartial(HttpResponse<byte[]> resp, byte[] content, int first, int last) {
+		assertEquals(206, resp.statusCode());
+		assertEquals("bytes " + first + "-" + last + "/" + content.length,
+			resp.headers().firstValue("Content-Range").orElse(null));
+		assertEquals(String.valueOf(last - first + 1), resp.headers().firstValue("Content-Length").orElse(null));
+		assertArrayEquals(Arrays.copyOfRange(content, first, last + 1), resp.body());
 	}
 
 	@Test

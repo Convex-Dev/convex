@@ -16,13 +16,11 @@ import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Index;
-import convex.db.calcite.ConvexSchema;
 import convex.db.calcite.ConvexTable;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.convention.ConvexEnumerable;
 import convex.db.calcite.convention.ConvexRel;
 import convex.db.lattice.SQLRow;
-import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLTable;
 
 /**
@@ -30,12 +28,26 @@ import convex.db.lattice.SQLTable;
  *
  * <p>Reads rows from SQLSchema and returns them as ACell[] directly,
  * with no conversion to Java types.
+ *
+ * <p>The scan carries the binding (schema and format version) of the table it was
+ * planned against, and reads rows only while the table still has it.
  */
 public class ConvexTableScan extends TableScan implements ConvexRel {
 
-	public ConvexTableScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table) {
+	private final SQLTable.Binding binding;
+
+	/**
+	 * @param binding Binding of the table the plan is built for, from {@link ConvexTable#bind}
+	 */
+	public ConvexTableScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, SQLTable.Binding binding) {
 		super(cluster, traitSet, List.of(), table);
 		assert getConvention() == ConvexConvention.INSTANCE;
+		this.binding = binding;
+	}
+
+	/** The binding of the table this scan was planned against. */
+	public SQLTable.Binding getBinding() {
+		return binding;
 	}
 
 	@Override
@@ -52,12 +64,7 @@ public class ConvexTableScan extends TableScan implements ConvexRel {
 			return ConvexEnumerable.empty();
 		}
 
-		ConvexSchema schema = convexTable.getSchema();
-		SQLSchema tables = schema.getTables();
-		String tableName = convexTable.getTableName();
-
-		SQLTable sqlTable = tables.getLiveTable(tableName);
-		if (sqlTable == null) return ConvexEnumerable.empty();
+		SQLTable sqlTable = convexTable.boundTable(binding);
 
 		Index<ABlob, AVector<ACell>> rawRows = sqlTable.getRows();
 		if (rawRows == null) return ConvexEnumerable.empty();

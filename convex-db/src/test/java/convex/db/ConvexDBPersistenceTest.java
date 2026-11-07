@@ -20,12 +20,15 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLSchema;
 import convex.etch.EtchStore;
+import convex.lattice.LatticeHost;
 import convex.node.NodeServer;
 
 /**
@@ -39,7 +42,7 @@ import convex.node.NodeServer;
 public class ConvexDBPersistenceTest {
 
 	private static final String DB_NAME = "persist_test";
-	private static final String TABLE_NAME = "t";
+	private static final String TABLE_NAME = "T";
 
 	private NodeServer<AHashMap<AString,Index<Keyword,ACell>>> server;
 	private EtchStore store;
@@ -67,20 +70,25 @@ public class ConvexDBPersistenceTest {
 		if (store == null) {
 			store = EtchStore.create(etchFile);
 		}
-		server = ConvexDB.createNodeServer(store);
+		var host = open(store);
+		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+		server = new NodeServer<>(host);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getHost());
-		cdb.database(DB_NAME); // ensure database path exists
 		cdb.register(DB_NAME);
 		return cdb;
 	}
 
-	/** Unregisters, closes the server, then the host to save, then the store. */
+	/** Opens a host over the database map the store retains, or an empty one. */
+	private static LatticeHost<AHashMap<AString,Index<Keyword,ACell>>> open(EtchStore store) throws IOException {
+		return LatticeHost.open(Maps.empty(), store);
+	}
+
+	/** Unregisters, closes the host to save, then the server, then the store. */
 	private void persistAndClose() throws Exception {
 		ConvexDB cdb = ConvexDB.lookup(DB_NAME);
 		if (cdb != null) cdb.unregister(DB_NAME);
-		server.close();
-		server.getHost().close(); server = null;
+		server.getHost().close();
+		server.close(); server = null;
 		store.close(); store = null;
 	}
 
@@ -140,15 +148,15 @@ public class ConvexDBPersistenceTest {
 	@Test public void testLocalHostSaveAndReopen() throws Exception {
 		File file;
 		// Closing the host saves, before its store closes.
-		try (var localStore=EtchStore.createTemp("db-local-host"); var host=ConvexDB.openHost(localStore)) {
+		try (var localStore=EtchStore.createTemp("db-local-host"); var host=open(localStore)) {
 			file=localStore.getFile();
-			var db=ConvexDB.connect(host);
+			var db=host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 			createTable(db.database(DB_NAME));
 			insertViaLattice(db.database(DB_NAME).tables(),0,10);
 		}
 		try (var reopenedStore=EtchStore.create(file)) {
-			var host=ConvexDB.openHost(reopenedStore);
-			var db=ConvexDB.connect(host);
+			var host=open(reopenedStore);
+			var db=host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
 			db.register(DB_NAME);
 			try { verifyJdbcCount(10); verifyJdbcRow(9); }
 			finally { db.unregister(DB_NAME); }

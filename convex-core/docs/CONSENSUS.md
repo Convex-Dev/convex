@@ -174,19 +174,19 @@ trust in a specific peer for submission is a separate, explicit choice.
   deterministically rather than diverging; the trigger is unforgeable on-chain
   state, so withdrawal is not selectively targetable. See `UPGRADE.md`.
 
-### Open items
+### Known limitations
 
 - **Fork recovery is disabled** (`ENABLE_FORK_RECOVERY`): peers filter Orders
-  inconsistent with their own consensus rather than reorganising. Enabling it
-  is tracked in [#480](https://github.com/Convex-Dev/convex/issues/480).
-- **Proposal-switching patience** (`KEEP_PROPOSAL_TIME`) is fixed;
-  randomisation to reduce synchronised flapping is a noted refinement.
+  inconsistent with their own consensus rather than reorganising. Fork
+  detection and recovery: [#480](https://github.com/Convex-Dev/convex/issues/480).
+- **Proposal-switching patience** (`KEEP_PROPOSAL_TIME`) is a fixed 100 ms,
+  the same for every peer.
 - **`create-peer` accepts any 32-byte key**, so a peer record can be squatted
-  for a key the creator does not own. The key holder cannot be impersonated,
-  since Block signatures need the private key. Accepted for now.
+  for a key the creator does not own. Accepted: the key holder cannot be
+  impersonated, since Block signatures need the private key.
 - **Eviction refunds are effectively unpriced**: `evictPeer` extends the juice
   limit per delegated-stake refund so eviction always completes. Accepted,
-  since refunds only move value to its owners.
+  since refunds only move value to their owners.
 
 ## Design decisions
 

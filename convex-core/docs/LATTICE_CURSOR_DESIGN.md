@@ -11,11 +11,12 @@ component-owned working state and batched signing.
 ## Class hierarchy
 
 ```text
-ACursor<V>                                get / atomic update / path
+ACursor<V>                                get / atomic update / persist / path
 └── AForkableCursor<V>                    typed paths; fork(); sync(merge)
     ├── Root<V>                           atomic value holder
     │   └── TransactionalRootCursor<V>    opt-in coordinated writes
     ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
+    ├── ReadOnlyCursor<V>                 refuses every write; reads, paths and forks pass through
     └── ATransformCursor<V,S>             shared atomic mutable-view operations
         ├── PathCursor<V>                 navigation through existing containers
         ├── ProjectionCursor<S,V>         caller-supplied read/rebuild functions
@@ -24,12 +25,22 @@ ACursor<V>                                get / atomic update / path
             ├── SignedCursor<V>           explicit signing function
             └── DefaultCursor<V>          explicit default for absent storage
 AView<T>                                  read-only cursor views
-Transactions                              optimistic and locked subtree transactions
+Transactions                              optimistic and exclusive subtree transactions
 ```
 
 There are no `Merge`, `Ownership`, `Signing`, `Stamping` or `Shape` interfaces.
 Lattice classes retain their domain methods directly. Specialised cursors accept
 ordinary Java functions supplied by their owning components.
+
+The base contract stays minimal: get, atomic update and path at one location.
+Subclasses and compositions add behaviour; the base gains no capability hooks that
+every subclass and view would have to forward. A service owned by the root gets at
+most one hook, resolved through existing source links: `exclusiveLock()`, for
+transactions and fork publication, is the only one. Storage, durability and
+publication attach at the host, and a module that needs a store mid-write, such as
+DLFS writing blob checkpoints, takes it as an explicit parameter. `persist` is not a
+hook: it is one concrete method over `updateAndGet` with a store-agnostic
+`Persister`, which views inherit and only `ForkedCursor` overrides.
 
 ## Atomic operations and paths
 
@@ -38,13 +49,47 @@ ordinary Java functions supplied by their owning components.
 callbacks may retry and must be side-effect free. They receive the actual current
 value, including `null`; no empty value is substituted.
 
-`path(keys...)` creates a view without changing state. Reads use `RT.getIn`, which
-returns null for absent or incompatible ancestors. Use collection component paths
-when incompatible containers must be distinguished from absence. Writes
+`get()` returns the cursor's declared value type. Both nested `get(keys...)`
+overloads return `ACell`: a child need not have its parent's type. Callers cast or
+validate the result explicitly when they require a narrower type.
+
+`get()` and both nested `get(keys...)` overloads are required reads. They throw
+`MissingValueException` for an absent entry or a path below nil. A root holding
+nil and an entry storing nil are present: reading either returns null.
+`getOrDefault(fallback)` handles expected absence without throwing;
+`getOrDefault(fallback, keys...)` does the same for a nested path without creating
+a cursor. A stored nil does not select the fallback. `exists()` tests presence,
+including nil. Each operation reads one snapshot; separate calls need not observe
+the same snapshot. Traversal through a scalar, an incompatible Index or sequence
+key, or an out-of-range position all mean the addressed value is absent. Required
+reads throw `MissingValueException`; optional reads return their fallback, and
+presence checks return false.
+
+`path(keys...)` creates a view without reading or changing state. Writes
 use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. All
 intermediate containers must already exist. An absent final value can be replaced,
-but writing through an absent container throws. `assoc` and `assocIn` follow the same
-rule. A plain path write through a signed envelope is refused.
+but writing through an absent container throws `PathWriteException`, and so does a
+write to a container that cannot hold its key, such as a vector given a key that is
+not an index within it. The exception carries the keys from the one that does not
+fit, and its depth. `assoc` and `assocIn` follow the same rule. A plain path write
+through a signed envelope is refused with `IllegalArgumentException`.
+
+Atomic updates keep their creation semantics: a missing final entry is supplied
+as null, and a changed result can insert it into an existing map. Unchanged writes
+preserve absence. Forks and transactions can likewise start from a missing location
+as nil without creating destination state. None of these operations creates a
+missing intermediate container implicitly.
+
+Transformations propagate source absence without applying their read function.
+A projection over present storage returns the value its supplied function defines,
+including nil; it cannot infer entry presence from that function. Time caches retain
+presence together with the cached value. `withDefault(value)` explicitly substitutes
+for both missing storage and nil, unlike `getOrDefault`, which substitutes only for
+absence. Its reads and unchanged writes still create no state.
+
+When migrating callers, retain required reads where absence is a defect. Use
+`getOrDefault(null)` only where missing state is expected, or `exists()` when only
+presence matters. CVM collection lookups and `RT.getIn` retain their existing rules.
 
 Root CAS uses reference identity. Path, projection and signing views compare the
 view by value equality, then make one CAS attempt against the observed underlying
@@ -54,9 +99,34 @@ changed an unrelated field. Atomic update operations retry as needed.
 Multi-key paths use one `PathCursor`. External key conversion remains a lattice or
 component concern; cursors accept canonical CVM keys.
 
+`readOnly()` returns a read-only view of a forkable cursor, which a component can
+bind like any other storage. Reads pass through under the same contract. Every
+write, even one that changes nothing, throws `ReadOnlyCursorException` before the
+source is touched. Paths, defaults and transformed views over it write through it,
+so they are refused too, and a component built over it is read-only throughout. A
+fork of the view is ordinary writable storage, but its sync publishes through the
+view and is refused. Syncing the view itself is refused as well: it can publish
+nothing, so a component bound to it fails instead of appearing to publish its
+source. Paths and views over it keep the ordinary sync, which only reads. A
+transaction that changes nothing commits, since it writes nothing. `AView` subclasses refuse writes with the same exception, an
+`UnsupportedOperationException`.
+
+## Persistence
+
+`persist(persister)` replaces the value a cursor holds with the equal value a
+`Persister` returns, such as `LatticeHost::persist`, in one atomic update. On an
+Etch store the stored cells are then soft references and need not stay in memory.
+The cursor holds no store. An edit landing meanwhile repeats the update on the
+edited value; persisting again only finds the cells already stored. A fork persists
+its working value, then its reconciled baseline outside its lock, replacing the
+baseline only if no sync has moved it meanwhile. Views hold no value of their own:
+they treat the equal value as unchanged, so the cells are stored and their source
+is left to its owner. A read-only view refuses to persist, as it refuses any write.
+
 ## Component-supplied construction
 
 For ordinary collections, use `MapComponent.path(key)` or `IndexComponent.path(key)`.
+An entry reads as a path does: a missing key is absent and a stored nil is present.
 They reject incompatible stored containers and create a correctly typed container
 only on a changed write. Their pure `createContainer()` hook can supply initial
 contents or refuse creation. Reads and no-op edits leave missing storage absent.
@@ -64,7 +134,10 @@ contents or refuse creation. Reads and no-op edits leave missing storage absent.
 For custom representations, a component can use
 `ProjectionCursor.create(source, read, write)` to expose a child without requiring
 existing containers. The cursor only executes the supplied
-functions; the component's write function chooses what to construct:
+functions; the component's write function chooses what to construct. A projection
+is present wherever its source is, so the child below reads as nil when its key is
+missing. A child whose absence matters is a transform that reports it from
+`viewValue`, as the collection entries do:
 
 ```java
 var child = ProjectionCursor.create(source,
@@ -85,11 +158,12 @@ or reading it has no state-changing effects.
 
 `cursor.withDefault(emptyContainer).path(key)` supplies a known container type
 without any merge definition. The optional adapter helper
-`LatticeComponent.resolve(cursor, lattice, path...)` supplies such functions one
-level at a time using an explicit lattice. Its write functions use
-`LatticeOps.assocIn` to construct an absent container from the lattice's zero.
+`LatticeComponent.resolve(cursor, lattice, keys...)` builds a path cursor for each
+lattice key, using an explicit lattice. It reads as any path does, so a missing
+key is absent. Its writes use `LatticeOps.assocIn` to construct an absent
+container from the lattice's zero at that level.
 Unknown missing container types fail; keys never determine container types.
-JSON components supply their own map or vector construction functions. No-op writes do not materialise ancestors.
+JSON value components construct nothing; a parent needing construction supplies it. No-op writes do not materialise ancestors.
 Owner envelopes still require an explicit signing boundary.
 
 Standalone components initialise their roots explicitly:
@@ -107,16 +181,26 @@ that publication: an unchanged copy adopts the destination, an unchanged destina
 accepts the working value, and divergent changes invoke the supplied function.
 The fork retains no merge callback. Ordinary roots, paths and transformed views
 implement `sync(merge)` as a read-only no-op without invoking that function or
-publishing any enclosing fork.
+publishing any enclosing fork; a read-only view refuses it.
 
-The destination has the same value type as the fork. Representation changes compose
-through cursor views: `SignedCursor.create(slot, signer).fork()` creates unsigned
-working state which signs on publication. A signing view around a fork of envelopes
-instead signs each local edit. The component chooses this order explicitly.
+The destination has the same value type as the fork. Signing and stamping compose
+through cursor views, and where an authoring view sits relative to the fork decides
+when it applies. A fork of an authoring view keeps unauthored working state and
+authors once, on publication: `SignedCursor.create(slot, signer).fork()` signs at
+sync, and a fork of a `StampedCursor` stamps at sync. An authoring view built over a
+fork instead authors each local edit. The component chooses this order through what
+it binds: `fork()` forks bound storage and rebinding rebuilds the views above it, so
+an authoring view within bound storage applies on publication, and one the component
+builds over its storage applies to each edit. Transaction drafts follow the same rule.
+
+A fork that takes part in timestamp-ordered merges sits outside its stamp. Inside
+it, the fork's working value keeps the timestamp it was forked from, so incoming
+merges and reconciliation at sync select older records over its edits.
 
 Each fork uses an independent `TransactionalRootCursor`. Sync holds its existing
 write lock while the destination's atomic update reconciles and commits by CAS.
-Fork reads take the same lock. A successful commit installs the reconciled working
+Fork reads take no lock: a read during sync sees the working value from before it,
+and a read after sync returns sees the published value. A successful commit installs the reconciled working
 value and advances the baseline without further user code or merging. Failed
 reconciliation or preparation commits nothing; competing destination writes remain
 independent. Destination write functions and the merge must not write or sync the same fork,
@@ -153,15 +237,21 @@ when the editing view supplies a default. Reads and ordinary view sync never aut
 state. Applications may add preparation and managed-child publication explicitly.
 
 `Transactions` runs a synchronous callback against a private draft and commits by
-CAS, preserving each operation under contention. `TransactionalRootCursor` opts
-into a shared write lock for explicit locked execution and contention fallback.
-Derived views forward that lock through their existing source links. Typed domain
+CAS, preserving each operation under contention. `transact` returns the result of
+the run that committed; `execute` returns nothing. `TransactionalRootCursor` opts into a shared write lock for
+exclusive execution, where the callback runs once under the lock, and for contention
+fallback. Derived views forward that lock through their existing source links. Typed domain
 transactions use `TransactionalComponent.withCursor` to retain component policy;
 components can delegate that public adapter to their protected `rebind` hook.
-The transaction targets bound `storage()`, while the rebound view reinstalls its
-editing policies. Commit therefore does not reapply a component's timestamping
-wrapper to the prepared value. Signing views already present in bound storage
-still sign at commit; unsigned staged components defer signing to publication.
+`TransactionalComponent.exclusive()` gives an `ExclusiveComponent`, built from bound
+storage as a fork is: a read-only view of it, whose transactions rebind the domain
+component to a draft and commit to that storage under its root's lock.
+The transaction targets bound `storage()`, while the rebound view rebuilds the
+component's editing views over the draft. An authoring view within bound storage
+applies once at commit: a signing view signs the committed value, and a stamp there
+gives it the commit's time. A stamp the component builds over its storage applies
+within the draft instead, with the time of the edit, and commit does not apply it
+again. Unsigned staged components defer signing to publication.
 Each attempt uses a fresh `TransactionalRootCursor` for its draft, supporting
 concurrent edits and nested transactions through the existing cursor machinery.
 The callback must finish its work before returning. Only the captured immutable
@@ -189,6 +279,14 @@ It reads a view value, rebuilds the source on a changed write, and preserves the
 source on a no-op. Returned values reflect the source's write policy, including
 stamping. Read functions must accept the values that policy can produce.
 
+A transform behaves as any cursor does for its consumers. It is absent where it
+finds no value, including wherever its source is absent; a view that should hold a
+value when nothing is stored is built over `withDefault`. A transform creates no
+storage by default: a navigating view refuses a missing container with
+`PathWriteException`. A transform whose definition knows how to build its storage
+builds it in its write: a default from its default, an authoring view its envelope
+or record, a component's projection what its write function supplies.
+
 `ProjectionCursor` rebuilds from the current source on retries, preserving siblings.
 `AUpdateCursor` adds caching for prepared replacements. Prepared signatures are reused while retries request the
 same value; a genuinely different payload must be signed again. `StampedCursor`
@@ -203,7 +301,8 @@ so local authoring uses the same authorisation as incoming verification.
 cannot distinguish local edits from incoming state: the component retains the
 underlying cursor when incoming merges must preserve their original timestamps.
 Neither wrapper merges values or controls publication timing. Use `SignedComponent`
-for unsigned working state that is signed only when published.
+for unsigned working state that is signed only when published, and
+`ALocalComponent` for a service's stamped record in `:local`.
 
 ## Code and specifications
 

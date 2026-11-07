@@ -39,9 +39,8 @@ public abstract class ACAD3Record extends ARecord<CVMLong,ACell> {
 
 	@Override
 	public boolean equals(ACell a) {
-		if (a==null) return false;
-		if (a.getTag()!=tag) return false;
-		return getEncoding().equals(a.getEncoding());
+		// Generic records are read from encodings, so compare those (cached hashes first)
+		return Cells.equalsEncoding(this, a);
 	}
 
 	@Override
@@ -57,9 +56,6 @@ public abstract class ACAD3Record extends ARecord<CVMLong,ACell> {
 	
 	@Override
 	public abstract Ref<ACell> getRef(int i);
-	
-	@Override
-	public abstract ACell updateRefs(IRefFunction func);
 
 	@Override
 	public boolean isCanonical() {

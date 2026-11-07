@@ -385,7 +385,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public MapLeaf updateRefs(IRefFunction func) {
+	protected MapLeaf rebuildRefs(IRefFunction func) {
 		int n = entries.length;
 		if (n == 0) return this;
 		MapEntry<K, V>[] newEntries = entries;
@@ -399,9 +399,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		if (newEntries==entries) return this;
 		// Note: we assume no key hashes have changed
-		MapLeaf result= new MapLeaf(newEntries);
-		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
-		return result;
+		return new MapLeaf(newEntries);
 	}
 
 	/**

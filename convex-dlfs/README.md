@@ -57,8 +57,8 @@ implementation 'world.convex:convex-dlfs:0.8.18'
 
 ### Run a WebDAV server
 
-The module has a standalone entry point which composes the full NodeServer-hosted
-lattice application stack without the Convex CLI:
+The module has a standalone entry point which composes the full lattice application
+stack on a `LatticeNode` without the Convex CLI:
 
 ```bash
 java -cp convex.jar convex.dlfs.Main \
@@ -109,12 +109,14 @@ synchronisation. This belongs to the DLFS application; other components on the
 same host may use different allowances or no clock-based admission. Move existing
 `node.maxFutureTimestampSkew` settings into the `dlfs` section.
 
-Bootstrap entries pair a TCP address with its expected `AccountKey`; the connection
-manager challenges that identity after connecting and keeps an unverified connection
-under the conservative message-size cap. Verification failure is not yet a fatal
-transport error, so this is identity-aware bootstrap rather than a private trust
-boundary. Bootstrap contacts are not a separate DLFS concept: the same `NodeServer`
-connection and lattice propagation path carries `:p2p` discovery data and DLFS state.
+Each bootstrap entry names a peer under `url`, as `--peer` does, with an optional
+expected `key`: the node must prove that key, or with none the key it proves first. The
+connection manager holds the connection under the conservative message-size cap until
+the node proves it; a node that does not is disconnected, never admitted. Bootstrap
+peers are connected in the background, resolved again and reconnected when they cannot
+be reached or their route is lost, and given up after ten minutes without success.
+Bootstrap contacts are not a separate DLFS concept: they use the same lattice
+connection and propagation path as DLFS state.
 Bootstrap configures the outbound side only; the remote node must separately grant an
 inbound lattice view.
 
@@ -185,12 +187,40 @@ a stable keystore key (`--key` or `--public-key`). This prevents a restart from 
 selecting a different owner. Registry mutations and file writes are persisted
 synchronously at the service `sync()` boundary.
 
+`convex dlfs start --peer <peer>` connects to another DLFS node before serving, and is
+repeatable. A peer is named as `tcp://host:port`, `tls://host:port`, `host:port` (a
+missing port is the default peer port, 18888) or a
+`did:web` whose document lists the node's key under `authentication` and its endpoints
+as `ConvexLatticeNode` services
+([CAD043](https://docs.convex.world/docs/cad/did)); `<key>@<peer>` requires that key.
+DLFS nodes listen on TCP only ([#797](https://github.com/Convex-Dev/convex/issues/797)),
+so `tls://` reaches one only through a proxy that terminates TLS. A peer named by
+address is admitted under the key it proves, which the command prints, and a `did:web`
+under a key its document lists; startup fails if a peer cannot be reached or proves no
+such key. A peer whose route is lost later is resolved again and reconnected, and given
+up after ten minutes without success. A `did:key`, or a `did:web` with no endpoints,
+cannot be used: a DLFS node keeps no node records to find it by. The peer must serve its lattice view to inbound
+connections: `convex dlfs start --serve-inbound` does, as does `convex.dlfs.Main` with
+`latticeInbound: "public"` or `--serve-inbound`. Without it, `convex dlfs start` refuses
+inbound lattice connections.
+
+A `convex dlfs start --serve-inbound` node also sends its updates back to any node that
+connects and proves its key, so two such nodes replicate both ways when one names the
+other: start the serving node, then the other with `--peer`. Anyone who can reach its
+node port can read every replicated drive and receive its updates. Each node serves
+only its own drives over HTTP; the other node's drives are replicated but not shown. A
+node that joins receives the other's existing state with its next update or root
+announcement, within about 30 seconds. Use `--serve-inbound` only for drives you are willing to
+publish: serving drives to chosen nodes only is not supported
+([#823](https://github.com/Convex-Dev/convex/issues/823)), and the option is
+provisional until it is.
+
 ### Host DLFS in a lattice application
 
-`DLFSApplication` extends the general `ALatticeApplication` component over the
-complete hosted lattice root. It composes a physical, multi-owner `DLFSRegion`
-at a path of region keys, with no separate root lattice definition. It extends
-`Regions`, so applications can register other components alongside DLFS. The stack accepts a generic `LatticeHost` and has no
+`DLFSApplication` is a `Regions` component over the complete hosted lattice root,
+registered with the host as its application. It composes a physical, multi-owner
+`DLFSRegion` at a path of region keys, with no separate root lattice definition,
+and other components can be registered alongside DLFS. The stack accepts a generic `LatticeHost` and has no
 dependency on `NodeServer`.
 
 ```java
@@ -226,12 +256,14 @@ Networked bootstrap supplies the host; the DLFS component API is unchanged:
 
 ```java
 NodeConfig nodeConfig = NodeConfig.port(0);
-var host = LatticeHost.open(store);
-var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
-    Utils::getCurrentTimestampCell, 30_000,
-    Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
 var did = DID.forKey(myKeyPair.getAccountKey());
-try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPair).launch()) {
+try (store;
+     var host = LatticeHost.open(store);
+     var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPair)) {
+    var networkedApp = host.addApplication(new DLFSApplication(host, myKeyPair::signData,
+        Utils::getCurrentTimestampCell, 30_000,
+        Keyword.intern("app"), Keyword.intern("example"), Keyword.intern("documents")));
+    network.launch();
     var group = network.createPropagator();
     network.serveAllInbound(group); // explicitly allow inbound access to this view
 
@@ -253,20 +285,21 @@ try (var network = new LatticeNode<>(host, nodeConfig).setIdentity(did, myKeyPai
         networkedServer.start(0);
         // Run the application's service loop here, until shutdown is requested.
     }
-}
+    routes.sync();
+    host.checkpoint(); // saved, and sent to peers as the network closes
+} // closes the network, the host, then the store
 ```
 
 The propagator inherits the node's identity key and can be configured with peers
 while running. An empty peer list is safe. Closing the network stops its listener
-and propagators; the caller retains ownership of the store.
+and propagators; it never closes the store.
 
 The callbacks above promise durable completion by calling `checkpoint()` before
 returning. A callback using `host.sync()` instead retains and offers the root to
 replication but leaves the physical barrier to the service's policy, for example
-a scoped `host.autoFlush(Duration.ofSeconds(1))`. Close the HTTP service first,
-then networking, then the host, which stops the durability resource and saves a
-final checkpoint, then the store. A failed checkpoint
-must fail the request; it does not undo a file write already made locally.
+a scoped `host.autoFlush(Duration.ofSeconds(1))`. A failed checkpoint must fail
+the request; it does not undo a file write already made locally. Shutdown follows
+the [standard order](../convex-peer/docs/SHUTDOWN.md).
 
 Custom owner authority and region placement can be supplied together:
 

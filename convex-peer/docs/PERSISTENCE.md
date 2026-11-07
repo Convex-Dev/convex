@@ -22,8 +22,8 @@ LatticeHost.sync()
 
 A successful `sync()` confirms logical publication to the host store, if one is
 present. It does not confirm a physical durability barrier or that a propagation
-group has announced or sent its view. Subscribe to `propagator.nextAnnounce()`
-before triggering publication when that later boundary matters.
+group has announced or sent its view. Wait on `propagator.whenAnnounced(condition)`
+when that later boundary matters.
 
 ## Networking is optional
 
@@ -58,13 +58,33 @@ Applications must publish their own staged changes first. A checkpoint never
 accepts private application drafts and never exchanges a forked host with its
 origin. Checkpointing a private host with a separate store therefore saves a
 private draft; explicit fork sync or delivery accepts it into another host.
+`persist()` writes a draft's cells to its host's store without publishing it; the
+draft is still not retained until it is synced and checkpointed.
 
-A service can scope `host.autoFlush(Duration)` around its lifetime for periodic
-barriers. The resource exposes the first background failure through `failure()`,
-retries subsequent flushes, and drains its worker and performs a final flush on
-close. It never syncs applications or the host. Close it before the borrowed
-store. A request requiring durable completion calls `host.checkpoint()` before
-reporting success; an interval alone is not a completion guarantee.
+A service that accepts delayed durability can have the host save on a schedule.
+Nothing runs on a timer unless the service starts it, and a host has at most one
+of each worker:
+
+- `host.autoSync(Duration, Runnable)` runs the service's application sync, such as
+  `application::sync`, then syncs the host, so the root is retained and offered to
+  replication. The host never chooses which applications sync: drafts of those
+  the service leaves out stay unpublished. A failed application sync skips that
+  interval's host sync. The application sync runs on the worker's thread, outside
+  the host's publication lock. `host.autoSync(Duration)` has no application sync,
+  for applications that write straight into the host root.
+- `host.autoFlush(Duration)` completes a barrier for already-retained data. It
+  never syncs applications or the host.
+
+Each worker exposes its first background failure through `failure()` and keeps
+running. Closing one drains it and finishes its work: the automatic sync syncs
+the applications and checkpoints once more, and the automatic flush flushes once
+more. Closing the host stops both, syncs the applications once more, then
+checkpoints once, so a host always closes with a full save; a failure of that
+application sync is reported through `failure()` rather than stopping the save. Close the workers, or
+the host, before the borrowed store. A one-second sync and a 30-second flush are
+reasonable defaults. A request requiring durable completion calls
+`host.checkpoint()` before reporting success; an interval alone is not a
+completion guarantee.
 
 Host construction expresses opening intent: `create` rejects a retained root,
 `open` adopts one, and `replace` explicitly writes a replacement. Optional cursor
@@ -111,7 +131,7 @@ boundary for filtered public views.
 
 ## Inbound persistence boundary
 
-Inbound protocol work happens in the selected propagation group:
+Inbound protocol work happens in the selected propagator group:
 
 1. bounded queue admission;
 2. complete-value decode or trusted acquisition into the serving store;
@@ -163,51 +183,34 @@ Launch order protects serving consistency:
 3. seed every attached serving view independently;
 4. start propagator workers.
 
-The owning service chooses any initial checkpoint and starts automatic flushing
-explicitly. Networking does not install a durability worker or shutdown hook.
+The owning service chooses any initial checkpoint and starts any automatic sync
+or flushing explicitly. Networking does not install a durability worker or shutdown hook.
 
 The application opens any `LatticeListener` only after node launch has prepared
 the attached propagation endpoints.
 
-Shutdown order prevents new work racing store closure:
-
-1. the service stops requests and closes transports to stop admission;
-2. `NodeServer.close()` drains accepted messages and closes each group;
-3. the service syncs any application drafts it wants retained;
-4. `LatticeHost.close()` stops automatic flushing and saves a final checkpoint;
-5. the service closes its store.
-
-With try-with-resources, `try (store; host; node) {...}` closes the node, then
-the host, then the store. Closing the host neither syncs applications nor closes
-the store. A closed host refuses further syncs, checkpoints and flushes. If the
-final checkpoint fails, the host stays open and closing again retries.
-
-Only the service that owns the host closes it. A component running on a host it
-was given, such as an embedded engine, syncs its own drafts at shutdown and leaves
-closing the host to its owner.
-
-A service that shuts down from a JVM shutdown hook registers that work with
-`Shutdown.addHook(Shutdown.SERVICE, ...)`, not `Runtime.addShutdownHook`. The JVM
-runs separate hooks concurrently, so a separate hook races Convex's own hook,
-which closes transports and every Etch file. The `SERVICE` level completes first.
-
-Network close does not publish pending host state or flush the store. The host
-and its applications remain usable after detachment.
-
-`NodeServer` does not close application-supplied stores. Store ownership remains
-with the caller that created them.
+Shutdown syncs drafts and checkpoints the host, then closes the node, the host and
+the store, as `try (store; host; node) { application.sync(); host.checkpoint(); }`
+does; see [shutdown](SHUTDOWN.md).
 
 ## Waiting in tests and applications
 
-Do not sleep or assume that a host sync completed propagation. Capture the
-appropriate signal before triggering work:
+Do not sleep or assume that a host sync completed propagation. Wait for the
+state you need:
 
 ```java
-CompletableFuture<ACell> served = propagator.nextAnnounce();
 app.sync();                     // the application publishes into the host root
-node.getHost().sync();          // the host root is now published to the node store
-served.get(timeout, unit);      // this group's served view is now materialised
+ACell published = node.getHost().sync(); // the host root is now published to the node store
+propagator.whenAnnounced(published::equals).get(timeout, unit);
+                                // this group serves it, and its broadcast is queued
 ```
+
+`whenAnnounced(condition)` completes with the group's latest announced value if
+it already satisfies the condition, otherwise with the first later one that does,
+so an announcement already in flight cannot satisfy it early. Announcements
+coalesce, so test for the state wanted rather than one exact value when other
+writes may follow. `whenAnnounced()` waits for any announcement, and
+`nextAnnounce()` for the next one, whatever its value.
 
 For network convergence, wait on the pull future, correlated protocol result or
 an application-level future/latch that represents the condition being tested.

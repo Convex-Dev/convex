@@ -95,6 +95,21 @@ public class PublicQueryServiceTest {
 	}
 
 	@Test
+	public void testInterruptedQueryKeepsInterruptStatus() {
+		PublicQueryService service=new PublicQueryService((form,address,maxJuice) -> {
+			throw new InterruptedException("Expected test interrupt");
+		},1,0L,PublicQueryService.MAX_QUERY_JUICE);
+
+		Thread.interrupted();
+		try {
+			assertEquals(ErrorCodes.INTERRUPTED,service.execute(CVMLong.ZERO,null).getErrorCode());
+			assertTrue(Thread.currentThread().isInterrupted());
+		} finally {
+			Thread.interrupted();
+		}
+	}
+
+	@Test
 	public void testLoadResultMapsToServiceUnavailable() {
 		AGenericAPI api=new AGenericAPI() {
 			@Override

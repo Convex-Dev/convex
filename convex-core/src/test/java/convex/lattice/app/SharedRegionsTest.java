@@ -49,9 +49,9 @@ class SharedRegionsTest {
 	/** Alternating publications cannot overwrite a sibling with an old root snapshot. */
 	@Test void aStagedApplicationNeverPublishesRegionsItDoesNotDeclare() {
 		var host=LatticeHost.create();
-		var a=new Regions(host);
+		var a=new Regions(host.cursor());
 		var aItems=a.create(A,(AForkableCursor<ASet<ACell>> cursor) -> new Items(cursor).fork());
-		var b=new Regions(host);
+		var b=new Regions(host.cursor());
 		var bItems=b.create(B,(AForkableCursor<ASet<ACell>> cursor) -> new Items(cursor).fork());
 		host.addApplication(a);
 		host.addApplication(b);
@@ -82,9 +82,9 @@ class SharedRegionsTest {
 	/** One incoming root updates both working regions, whose publication remains independent. */
 	@Test void incomingRegionsSurviveAnotherApplicationsPublication() {
 		var host=LatticeHost.create();
-		var a=new Regions(host);
+		var a=new Regions(host.cursor());
 		var aItems=a.create(A,(AForkableCursor<ASet<ACell>> cursor) -> new Items(cursor).fork());
-		var b=new Regions(host);
+		var b=new Regions(host.cursor());
 		var bItems=b.create(B,(AForkableCursor<ASet<ACell>> cursor) -> new Items(cursor).fork());
 		host.addApplication(a);
 		host.addApplication(b);

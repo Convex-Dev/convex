@@ -2,8 +2,10 @@ package convex.gui.dlfs;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,6 +42,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.FileUtils;
+import convex.core.util.Shutdown;
 import convex.dlfs.DLFSServer;
 import convex.etch.EtchStore;
 import convex.gui.components.AbstractGUI;
@@ -81,8 +84,9 @@ import net.miginfocom.swing.MigLayout;
  * Since both GUI and WebDAV share the same DLFSLocal instances, operations
  * through either path are automatically consistent.
  *
- * <p>The NodeServer handles persistence (via {@code LatticePropagator}) and
- * can sync with remote lattice peers over the binary protocol.
+ * <p>The node runs locally, with no listener. The host retains edits every second
+ * and writes them to disk every 30 seconds, and saves in full when it closes: when
+ * the browser closes or switches store, and at JVM shutdown.
  */
 @SuppressWarnings("serial")
 public class DLFSBrowser extends AbstractGUI {
@@ -130,6 +134,9 @@ public class DLFSBrowser extends AbstractGUI {
 	/** Current Etch store (owned by this browser — must be closed on shutdown) */
 	private EtchStore etchStore;
 
+	/** Shutdown, run once: when the browser closes, or at JVM shutdown if that comes first */
+	private final Shutdown.Once shutdownTask = Shutdown.once(this::shutdown);
+
 	// UI
 	private final JMenuBar menuBar = new JMenuBar();
 	private final JList<String> driveList;
@@ -145,10 +152,19 @@ public class DLFSBrowser extends AbstractGUI {
 
 	public DLFSBrowser(File storeFile) {
 		super("DLFS Browser");
-		own(this::shutdown);
+		// Saves at JVM shutdown too (Ctrl+C, logging off), before Etch files close
+		Shutdown.addHook(Shutdown.SERVICE, shutdownTask);
+		own(() -> {
+			Shutdown.removeHook(Shutdown.SERVICE, shutdownTask);
+			shutdownTask.run();
+		});
 
 		// Launch NodeServer with Etch store
-		openStore(storeFile);
+		try {
+			openStore(storeFile);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 
 		// Start WebDAV, seeding with existing drives
 		startWebDAV();
@@ -250,8 +266,9 @@ public class DLFSBrowser extends AbstractGUI {
 	/**
 	 * Opens an Etch store and launches a NodeServer for the DLFS lattice.
 	 * Restores drives from the store if data exists, otherwise creates a demo drive.
+	 * On failure, closes whatever it opened.
 	 */
-	private void openStore(File file) {
+	private void openStore(File file) throws IOException {
 		this.storeFile = file;
 		try {
 			etchStore = EtchStore.create(FileUtils.ensureFilePath(file));
@@ -264,20 +281,12 @@ public class DLFSBrowser extends AbstractGUI {
 				JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE,
 				null, new String[]{"Use Temp Store", "Cancel"}, "Use Temp Store");
 			if (choice == 0) {
-				try {
-					etchStore = EtchStore.createTemp("dlfs-temp");
-					this.storeFile = new File(etchStore.getFileName());
-					log.info("Using temporary store: {}", storeFile);
-				} catch (IOException e2) {
-					log.error("Failed to create temporary store", e2);
-					throw new RuntimeException("Failed to create temporary DLFS store", e2);
-				}
+				etchStore = EtchStore.createTemp("dlfs-temp");
+				this.storeFile = new File(etchStore.getFileName());
+				log.info("Using temporary store: {}", storeFile);
 			} else {
-				throw new RuntimeException("Store is locked: " + file);
+				throw new IOException("Store is locked: " + file);
 			}
-		} catch (Exception e) {
-			log.error("Failed to open store: {}", file, e);
-			throw new RuntimeException("Failed to open DLFS store: " + file, e);
 		}
 
 		try {
@@ -289,10 +298,16 @@ public class DLFSBrowser extends AbstractGUI {
 			NodeConfig localConfig = NodeConfig.create(Maps.of(NodeConfig.PORT, CVMLong.create(-1)));
 
 			// The relay host's live application verifies owners and signs with this key;
-			// the node replicates; the browser saves through the host explicitly.
+			// the node replicates; the host's timers save, and its close saves the rest.
 			LatticeContext ctx = LatticeContext.create(null, keyPair);
 			nodeServer = new NodeServer<>(RelayHost.open(OWNER_LATTICE, etchStore, ctx), localConfig);
 			nodeServer.launch();
+			// Drives write straight into the host root, so there is no application sync
+			var host = nodeServer.getHost();
+			host.autoSync(Duration.ofSeconds(1)).failure()
+				.thenAcceptAsync(error -> log.warn("DLFS store sync failed", error));
+			host.autoFlush(Duration.ofSeconds(30)).failure()
+				.thenAcceptAsync(error -> log.warn("DLFS store flush failed", error));
 
 			// Navigate to owner's signed entry, wrap in SignedCursor
 			AForkableCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
@@ -302,7 +317,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 			// Rebuild drives from restored lattice state
 			drives.clear();
-			AHashMap<AString, AVector<ACell>> driveMap = drivesCursor.get();
+			AHashMap<AString, AVector<ACell>> driveMap = drivesCursor.getOrDefault(null);
 			if (driveMap != null && !driveMap.isEmpty()) {
 				for (Map.Entry<AString, AVector<ACell>> entry : driveMap.entrySet()) {
 					String name = entry.getKey().toString();
@@ -318,28 +333,34 @@ public class DLFSBrowser extends AbstractGUI {
 				log.info("Created new DLFS store with demo drive: {}", file);
 			}
 		} catch (Exception e) {
-			log.error("Failed to launch NodeServer: {}", file, e);
-			throw new RuntimeException("Failed to open DLFS store: " + file, e);
+			closeNodeServer();
+			throw new IOException("Failed to open DLFS store: " + file, e);
 		}
 	}
 
 	/**
-	 * Closes the current NodeServer (persisting state) and opens a new store.
+	 * Switches to another store. WebDAV stops before the store it serves closes,
+	 * and the current host saves as it closes. If the new store cannot be opened,
+	 * the previous one is reopened and the failure is thrown for the caller to report.
 	 */
-	private void switchStore(File newFile) {
-		// Close current NodeServer — persists final state
+	void switchStore(File newFile) throws IOException {
+		File previous = storeFile;
+		stopWebDAV();
 		closeNodeServer();
 
-		// Close WebDAV
-		if (webdavServer != null) {
-			webdavServer.close();
-			webdavServer = null;
+		IOException failure = null;
+		try {
+			openStore(newFile);
+		} catch (IOException e) {
+			failure = e;
+			try {
+				openStore(previous);
+			} catch (IOException restore) {
+				failure.addSuppressed(restore);
+			}
 		}
 
-		// Open new store
-		openStore(newFile);
-
-		// Restart WebDAV with new drives
+		// Restart WebDAV with the drives now open
 		startWebDAV();
 
 		// Refresh UI
@@ -353,21 +374,39 @@ public class DLFSBrowser extends AbstractGUI {
 			currentDriveName = null;
 		}
 		updateStatusBar();
+		if (failure != null) throw failure;
 	}
 
+	/**
+	 * Closes the node, then the host, which saves, then the store, the reverse of
+	 * opening. The node has no peers to send a final checkpoint to. Drives close with
+	 * them.
+	 */
 	private void closeNodeServer() {
 		if (nodeServer != null) {
 			try {
 				nodeServer.close();
-				nodeServer.getHost().close();
 			} catch (IOException e) {
 				log.warn("Error closing NodeServer: {}", e.getMessage());
 			}
+			try {
+				nodeServer.getHost().close();
+			} catch (IOException e) {
+				log.warn("Error saving DLFS store: {}", e.getMessage());
+			}
 			nodeServer = null;
 		}
+		drives.clear();
 		if (etchStore != null) {
 			etchStore.close();
 			etchStore = null;
+		}
+	}
+
+	private void stopWebDAV() {
+		if (webdavServer != null) {
+			webdavServer.close();
+			webdavServer = null;
 		}
 	}
 
@@ -502,7 +541,14 @@ public class DLFSBrowser extends AbstractGUI {
 			return;
 		}
 
-		switchStore(selected);
+		try {
+			switchStore(selected);
+		} catch (IOException e) {
+			log.warn("Failed to open DLFS store: {}", selected, e);
+			JOptionPane.showMessageDialog(this,
+				"Could not open store:\n" + selected.getAbsolutePath() + "\n\n" + e.getMessage(),
+				"Error", JOptionPane.ERROR_MESSAGE);
+		}
 	}
 
 	private void refreshDriveList() {
@@ -645,15 +691,12 @@ public class DLFSBrowser extends AbstractGUI {
 		super.afterRun();
 	}
 
-	/** Stops the browser, WebDAV and the NodeServer (persisting state). Released on close. */
+	/** Stops the browser, WebDAV and the NodeServer, saving state. Runs once, as {@link #shutdownTask}. */
 	private void shutdown() {
 		if (panel != null) {
 			panel.close();
 		}
-		if (webdavServer != null) {
-			webdavServer.close();
-			webdavServer = null;
-		}
+		stopWebDAV();
 		closeNodeServer();
 	}
 

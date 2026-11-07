@@ -13,17 +13,13 @@ Convex DB provides SQL query capabilities over lattice data structures, built on
 ## Quick Start
 
 ```java
-// 1. Create a ConvexDB and a named database
-ConvexDB cdb = ConvexDB.create();
-SQLDatabase db = cdb.database("mydb");
+// 1. Create a ConvexDB, choosing how its databases merge
+ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 
-// 2. Register for JDBC/PostgreSQL access
-cdb.register("mydb");
+// 2. Connect via JDBC to a named database within it
+Connection conn = cdb.getConnection("mydb");
 
-// 3. Connect via JDBC
-Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
-
-// 4. Use standard SQL
+// 3. Use standard SQL
 Statement stmt = conn.createStatement();
 stmt.execute("CREATE TABLE users (id, name, email)");
 stmt.execute("INSERT INTO users VALUES (1, 'Alice', 'alice@example.com')");
@@ -36,9 +32,10 @@ For a durable local installation, open a host over an Etch store. Networking is
 optional and does not control saving:
 
 ```java
-try (var store = EtchStore.create(file); var host = ConvexDB.openHost(store)) {
-    var db = ConvexDB.connect(host);
-    db.database("mydb");
+try (var store = EtchStore.create(file);
+     var host = LatticeHost.open(ConvexDB.EMPTY, store)) {
+    ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+    SQLDatabase db = cdb.database("mydb");
     // Perform database operations through this live view.
     host.checkpoint();
 }
@@ -46,10 +43,10 @@ try (var store = EtchStore.create(file); var host = ConvexDB.openHost(store)) {
 
 `checkpoint()` retains the current host snapshot and completes the store's
 durability barrier. Closing the host does so once more, then the store closes.
-For batched saving, use `host.sync()` after accepted edits and scope
-`host.autoFlush(interval)` around the service lifetime; closing the host stops
-it. Stop request handling and close any `NodeServer` before closing the host.
-Closing an optional `NodeServer` does not save pending database edits. See the
+For batched saving, scope `host.autoSync(interval)` and `host.autoFlush(interval)`
+around the service lifetime; closing the host stops both and saves. With a `NodeServer`, stop request handling and checkpoint, then close the
+server, which sends that checkpoint to peers, then the host. Closing a `NodeServer`
+saves nothing itself. See the
 executable local and JDBC reopen scenarios in
 [`ConvexDBPersistenceTest`](src/test/java/convex/db/ConvexDBPersistenceTest.java).
 
@@ -58,8 +55,13 @@ Convex DB provides a standard JDBC driver for SQL access.
 ### Connection URL
 
 ```
-jdbc:convex:database=<database-name>
+jdbc:convex:<name>              — named in-memory database (also jdbc:convex:mem:<name>)
+jdbc:convex:file:<path>         — persistent, Etch-backed database
+jdbc:convex:database=<name>     — a ConvexDB registered with register(<name>)
 ```
+
+[docs/JDBC.md](docs/JDBC.md) describes the URL parameters and when file-backed
+databases are saved.
 
 The `jdbc:convex:` driver is local and in-process: there is no network protocol
 between the JDBC client and the database, so the URL takes no host or port. To
@@ -73,7 +75,7 @@ a PostgreSQL client or driver.
 import java.sql.*;
 
 // Driver auto-registers via ServiceLoader
-Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
+Connection conn = DriverManager.getConnection("jdbc:convex:mydb");
 
 // DDL
 Statement stmt = conn.createStatement();
@@ -107,9 +109,35 @@ Convex DB supports standard SQL via Apache Calcite:
 - **DDL**: `CREATE TABLE`, `DROP TABLE`
 - **DML**: `INSERT`, `UPDATE`, `DELETE`
 - **Queries**: `SELECT`, `WHERE`, `ORDER BY`, `LIMIT`, `OFFSET`
-- **Joins**: `INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN`, `CROSS JOIN`
+- **Joins**: `INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN`, `FULL OUTER JOIN`, `CROSS JOIN`
+- **Set operations and subqueries**: `UNION [ALL]`, `INTERSECT`, `EXCEPT`, `IN` and `EXISTS` subqueries
 - **Aggregations**: `GROUP BY`, `HAVING`, `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`
 - **Expressions**: Arithmetic, string functions, `CASE`, `COALESCE`, `CAST`
+
+### Identifier Case
+
+SQL names resolve as the SQL standard says by default: unquoted names fold to upper
+case, quoted names keep their case, and names compare exactly. `CREATE TABLE users`
+creates `USERS`, which `SELECT * FROM users` finds. A table created through the
+lattice API keeps the name it was given, so a table created as `users` is
+`"users"` in SQL.
+
+Each database chooses its policy in its `:identifiers` setting, and every JDBC and
+PostgreSQL wire connection opened from then on applies it:
+
+| Setting | Unquoted names | Comparison |
+|---------|----------------|------------|
+| `:upper` (default) | fold to upper case | exact |
+| `:lower` | fold to lower case, as in PostgreSQL | exact |
+| `:insensitive` | fold to upper case | any case |
+
+```java
+IdentifierPolicy.LOWER.applyTo(db);   // SELECT * FROM users now finds "users"
+```
+
+A database holding a policy this implementation does not know cannot be opened for
+SQL (`0A000`). Changing the policy of a database that already has tables changes
+which names its existing SQL resolves to.
 
 ### Transactions
 
@@ -135,7 +163,7 @@ Connect to Convex DB using any PostgreSQL client.
 
 ```java
 // Create and register database
-ConvexDB cdb = ConvexDB.create();
+ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 cdb.database("mydb");
 cdb.register("mydb");
 
@@ -147,6 +175,22 @@ PgServer server = PgServer.builder()
     .build();
 server.start();
 ```
+
+### TLS
+
+Give the server an `SSLContext` holding its certificate and private key, and clients that request TLS are upgraded before they send their startup message or password:
+
+```java
+KeyStore identity = PFXTools.loadStore(new File("server.p12"), "storepass".toCharArray());
+PgServer server = PgServer.builder()
+    .port(5432)
+    .database("mydb")
+    .password("secret")
+    .sslContext(TLS.serverContext(identity, "keypass".toCharArray()))
+    .build();
+```
+
+Once TLS is offered, a client that does not request it is refused with SQLSTATE `28000`, as PostgreSQL's `hostssl` does. Set `.allowPlaintext(true)` to admit such clients as well. Clients connect as they would to PostgreSQL, from `sslmode=require` up to `sslmode=verify-full` when the certificate names the server's host. [CAD055](https://docs.convex.world/docs/cad/transport_security) specifies the behaviour.
 
 ### Command Line
 
@@ -173,6 +217,10 @@ import psycopg2
 conn = psycopg2.connect(host="localhost", port=5432, dbname="mydb")
 ```
 
+Results go to each client in the format it asks for: text, or binary for the types it
+decodes itself, as pgjdbc requests for numbers, timestamps and byte strings once a
+statement is prepared server-side.
+
 ### Compatible Tools
 
 The PostgreSQL server works with:
@@ -189,7 +237,11 @@ Some PostgreSQL-specific features are not yet supported:
 - Regex operators (`~`, `!~`, `~*`)
 - Some system catalog tables (pg_proc, pg_index, pg_constraint)
 - PostgreSQL-specific functions
-- Transaction isolation across connections (read-committed level via lattice fork/sync)
+- Serialisable transactions: a transaction reads a snapshot taken when it begins, and
+  merges with concurrent changes at commit by the database's policy. `BEGIN`, `COMMIT`
+  and `ROLLBACK` (and their `START TRANSACTION`, `END` and `ABORT` forms) run such a
+  transaction; `ISOLATION LEVEL SERIALIZABLE`, `READ ONLY`, savepoints, chained and
+  two-phase transactions are refused with SQLSTATE `0A000`
 
 ## Lattice Tables API
 
@@ -198,7 +250,7 @@ For direct programmatic access without SQL overhead.
 ### Creating Tables
 
 ```java
-SQLDatabase db = SQLDatabase.create("mydb", keyPair);
+SQLDatabase db = SQLDatabase.create("mydb", keyPair, RowLWW::merge);
 SQLSchema schema = db.tables();
 
 // Create table with column names
@@ -228,6 +280,13 @@ schema.insert("users", values);
 // Insert with auto-conversion from Java values (first value is the primary key)
 schema.insert("users", 2, "Bob", "bob@example.com");
 
+// insert and insertAll are upserts: a row replaces any row of its key
+// Insert several rows in one atomic write
+schema.insertAll("users", List.of(row1, row2, row3));
+
+// Insert only new rows, as SQL's INSERT does: a taken key throws DuplicateKeyException
+schema.insertNew(Strings.create("users"), List.of(row4));
+
 // Select by key
 AVector<ACell> row = schema.selectByKey("users", CVMLong.create(1));
 
@@ -250,48 +309,85 @@ int count = schema.getColumnCount("users");
 
 ## Replication
 
-Tables support lattice-based replication with conflict-free merging.
+Databases replicate by lattice merge. How two copies of a database merge is a policy
+the application supplies when it creates a `ConvexDB` or `SQLDatabase`; there is no
+default. The policy merges incoming values, deliveries, transactions and replicas
+alike; see [Merge Policy](docs/LATTICE-DB-ARCHITECTURE.md#merge-policy).
 
-### Merge Semantics
+### Per-row last-write-wins
+
+`RowLWW::merge` is the policy Convex DB provides for tables that several writers
+update row by row:
 
 - **Tables**: Last-write-wins (LWW) for schema changes
 - **Rows**: LWW with row-level granularity
 - **Conflicts**: Latest timestamp wins; equal timestamps favour deletions
+- **Re-creation**: Rows written before a table was created belong to an earlier table
+  of that name, so rows from before a `DROP TABLE` never return
+
+An application that serialises its updates, schema changes included, supplies its
+own policy, or composes one from the `RowLWW` functions.
 
 ### Replicating Between Nodes
 
+A table is created once and replicated; if each node created it, the later creation
+would be a different table, without the rows written to the earlier one before it.
+
 ```java
 // Node 1: Create and populate
-SQLDatabase db1 = SQLDatabase.create("shared", keyPair1);
+SQLDatabase db1 = SQLDatabase.create("shared", keyPair1, RowLWW::merge);
 db1.tables().createTable("data", new String[]{"id", "value"});
 db1.tables().insert("data", 1, "hello");  // first column is the primary key
 
-// Node 2: Create same structure
-SQLDatabase db2 = SQLDatabase.create("shared", keyPair2);
-db2.tables().createTable("data", new String[]{"id", "value"});
+// Node 2: Receive the table from Node 1, then write
+SQLDatabase db2 = SQLDatabase.create("shared", keyPair2, RowLWW::merge);
+db2.mergeReplicas(db1.exportReplica());
+db2.tables().insert("data", 2, "world");
 
 // Merge Node 2's changes into Node 1
 db1.mergeReplicas(db2.exportReplica());
-
-// Merge Node 1's changes into Node 2
-db2.mergeReplicas(db1.exportReplica());
 ```
+
+### Replica Ownership
+
+`mergeReplicas` accepts a replica when its signer is authorised for the owner it is
+published under and its signature verifies ([CAD038](https://docs.convex.world/docs/cad/lattice_auth)).
+By default, an owner that is an account key, or a self-certifying `did:key`, must be the
+signer, and any other owner, such as an account address or a `did:web`, is refused. To
+support other owners, supply an owner verifier. It replaces the default and decides for
+every owner, account keys included:
+
+```java
+// (owner, signer key) -> whether that key may sign for the owner
+BiPredicate<ACell, AccountKey> verifier = (owner, key) -> authority.isAuthorised(owner, key);
+SQLDatabase db = SQLDatabase.create("shared", keyPair, Address.create(1337), verifier, RowLWW::merge);
+```
+
+The verifier must be thread-safe and use authority data already held locally. The same
+rule applies to `exportReplica`, which throws if this node's key is not authorised for
+its owner, so a node never publishes a replica that its peers would refuse.
 
 ### Selective Replication
 
+To apply another rule, such as trusting only known keys, override `acceptsReplica` in a
+subclass of `SQLDatabase`. The override also governs this node's own export, so a set of
+trusted keys includes the node's own:
+
 ```java
-// Only merge replicas from trusted keys
-Predicate<AccountKey> trustFilter = key -> trustedKeys.contains(key);
-db1.mergeReplicas(remoteReplicas, trustFilter);
+@Override
+protected boolean acceptsReplica(ACell owner, SignedData<?> replica) {
+    return trustedKeys.contains(replica.getAccountKey()) && super.acceptsReplica(owner, replica);
+}
 ```
 
 ## Data Types
 
-Convex DB maps between SQL types and Convex lattice types:
+Convex DB maps between SQL types and Convex lattice types (see [SQL-TYPES.md](docs/SQL-TYPES.md)):
 
 | SQL Type | Convex Type | Notes |
 |----------|-------------|-------|
-| BIGINT | CVMLong | 64-bit signed integer |
+| BIGINT | AInteger | Any CVM integer; read as `NUMERIC` with scale 0 |
+| INTEGER | CVMLong | 64-bit signed integer; read as `BIGINT` |
 | DOUBLE | CVMDouble | 64-bit floating point |
 | VARCHAR | AString | Unicode string |
 | BOOLEAN | CVMBool | true/false |
@@ -302,16 +398,27 @@ Convex DB maps between SQL types and Convex lattice types:
 
 ### Lattice Structure
 
+A database map, held wherever the application roots it:
 ```
-:sql → OwnerLattice → SignedLattice → MapLattice → TableStoreLattice
-        owner-key → signed(db-name → table-store)
+AHashMap<AString, Index>
+  db-name → {:tables table-store, :config settings}
 ```
+
+The `:config` section is optional: a map of setting keywords to values, such as
+`{:identifiers :lower}` (see [Identifier Case](#identifier-case)). Absent settings
+take their defaults, and settings Convex DB does not use are kept.
 
 Where table-store is:
 ```
 Index<AString, AVector>
-  table-name → [schema, rows, utime]
+  table-name → [schema, rows, ctime, live-count, version]
 ```
+
+A version 0 entry has no `version` field
+([CAD039](https://docs.convex.world/docs/cad/convex_sql)).
+
+A replica exported by `SQLDatabase.exportReplica` is
+`owner-key → signed(db-name → database)`.
 
 And rows is:
 ```
@@ -323,7 +430,7 @@ Index<ABlob, AVector>
 
 ```
 convex.db             - ConvexDB root lattice component
-convex.db.lattice     - SQLDatabase, SQLSchema, SQLTable, SQLRow
+convex.db.lattice     - SQLDatabase, SQLSchema, SQLTable, SQLRow, RowLWW
 convex.db.calcite     - Apache Calcite integration
 convex.db.jdbc        - JDBC driver
 convex.db.psql        - PostgreSQL wire protocol server

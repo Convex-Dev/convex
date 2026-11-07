@@ -1,6 +1,8 @@
 package convex.core.data;
 
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.UnaryOperator;
 
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -81,6 +83,34 @@ public abstract class AIndex<K extends ABlobLike<?>, V extends ACell> extends AM
 	 */
 	@Override
 	public abstract AIndex<K, V> assoc(ACell key, ACell value);
+
+	/**
+	 * Updates the value for a key, as {@link AMap#update(ACell, BiFunction, Object)}.
+	 *
+	 * Returns null if the key is not a valid Index key
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	public final <A> AIndex<K, V> update(ACell key, BiFunction<? super V, ? super A, ? extends V> function, A arg) {
+		if (key instanceof ABlobLike) return update((K)key,function,arg);
+		return null;
+	}
+
+	/**
+	 * Updates the value for a key, as {@link AMap#update(ACell, UnaryOperator)}.
+	 *
+	 * Returns null if the key is not a valid Index key
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	public final AIndex<K, V> update(ACell key, UnaryOperator<V> function) {
+		if (key instanceof ABlobLike) return update((K)key,function);
+		return null;
+	}
+
+	public abstract <A> AIndex<K, V> update(K key, BiFunction<? super V, ? super A, ? extends V> function, A arg);
+
+	public abstract AIndex<K, V> update(K key, UnaryOperator<V> function);
 
 	@SuppressWarnings("unchecked")
 	@Override

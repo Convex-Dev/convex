@@ -54,6 +54,12 @@ public class QueueLattice extends ALattice<AVector<ACell>> {
 
 		// Fast path: identical values
 		if (Utils.equals(ownValue, otherValue)) return ownValue;
+		if (!validShape(otherValue)) return ownValue;
+		// Previously accepted records need no second validation. Appending to a large
+		// shared vector checks only the new suffix, using its structural sharing.
+		AVector<ACell> incomingEntries=getEntries(otherValue);
+		long shared=getEntries(ownValue).commonPrefixLength(incomingEntries);
+		if (!validEntries(incomingEntries,shared)) return ownValue;
 
 		// Extract slots
 		long ownStart = getStartOffset(ownValue);
@@ -94,15 +100,23 @@ public class QueueLattice extends ALattice<AVector<ACell>> {
 
 	@Override
 	public boolean checkForeign(AVector<ACell> value) {
-		if (value == null) return false;
-		if (!(value instanceof AVector)) return false;
-		if (value.count() < STATE_LENGTH) return false;
-		// Check startOffset is a CVMLong
-		ACell startOffset = value.get(POS_START_OFFSET);
-		if (!(startOffset instanceof CVMLong)) return false;
-		// Check timestamp is a CVMLong
-		ACell timestamp = value.get(POS_TIMESTAMP);
-		if (!(timestamp instanceof CVMLong)) return false;
+		return validShape(value) && validEntries(getEntries(value),0);
+	}
+
+	private static boolean validShape(AVector<ACell> value) {
+		if (value==null || value.count()!=STATE_LENGTH) return false;
+		if (!(value.get(POS_ENTRIES) instanceof AVector<?> entries)) return false;
+		if (!(value.get(POS_META) instanceof AHashMap<?,?>)) return false;
+		if (!(value.get(POS_TIMESTAMP) instanceof CVMLong)) return false;
+		if (!(value.get(POS_START_OFFSET) instanceof CVMLong offset)) return false;
+		long start=offset.longValue();
+		return start>=0 && entries.count()<=Long.MAX_VALUE-start;
+	}
+
+	private static boolean validEntries(AVector<ACell> entries,long from) {
+		for (long i=from;i<entries.count();i++) {
+			if (!(entries.get(i) instanceof AVector<?> entry) || !QueueEntry.isValid(entry)) return false;
+		}
 		return true;
 	}
 

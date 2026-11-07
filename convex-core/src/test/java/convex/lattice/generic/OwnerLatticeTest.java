@@ -25,10 +25,9 @@ import convex.lattice.LatticeContext;
  * OwnerLattice maps owner identities to signed values. During merge, it verifies
  * that the signer (from SignedData) is authorised for the claimed owner identity.
  *
- * Owner types supported:
- * - AccountKey / 32-byte Blob: direct equality with signer
- * - Address: delegate to verifier (e.g. account lookup)
- * - String (DID): delegate to verifier (e.g. DID resolution)
+ * A context's owner verifier, when present, decides for every owner. Without one:
+ * - AccountKey / 32-byte Blob / did:key: direct equality with signer
+ * - Address, other DIDs and other identities: refused
  *
  * @see <a href="https://docs.convex.world/cad/038_lattice_auth">CAD038: Lattice Authentication</a>
  */
@@ -232,22 +231,21 @@ public class OwnerLatticeTest {
 		assertNotNull(result.get(didOwner), "did:key: with matching signer should be accepted");
 	}
 
-	// ===== Lenient Mode Tests =====
+	// ===== Default Rule Tests =====
 
 	@Test
-	public void testNoVerifierLenientMode() {
+	public void testNoVerifierRefusesIndirectOwners() {
 		AKeyPair kp = AKeyPair.generate();
 		OwnerLattice<AInteger> lattice = OwnerLattice.create(MaxLattice.create());
-
-		// String owner with no verifier → lenient mode accepts
-		ACell stringOwner = Strings.create("any-string-owner");
 		SignedData<AInteger> signed = kp.signData(CVMLong.create(99));
 
-		// Context without verifier
-		LatticeContext ctx = LatticeContext.create(null, kp);
-		AHashMap<ACell, SignedData<AInteger>> result = lattice.merge(ctx, Maps.empty(), Maps.of(stringOwner, signed));
-
-		assertNotNull(result.get(stringOwner), "Lenient mode should accept string owner without verifier");
+		for (ACell owner : new ACell[] {Strings.create("any-string-owner"), Strings.create("did:web:example.com"), Address.create(99)}) {
+			AHashMap<ACell, SignedData<AInteger>> incoming = Maps.of(owner, signed);
+			assertNull(lattice.merge(LatticeContext.create(null, kp), Maps.empty(), incoming).get(owner),
+				"Indirect owner without a verifier must be refused");
+			assertNull(lattice.merge(LatticeContext.EMPTY, Maps.empty(), incoming).get(owner));
+			assertNull(lattice.merge(Maps.empty(), incoming).get(owner));
+		}
 	}
 
 	@Test
@@ -308,7 +306,7 @@ public class OwnerLatticeTest {
 		Address addressOwner = Address.create(999);
 		ACell didOwner = Strings.create("did:example:123");
 
-		// Verifier handles Address and DID owners
+		// The verifier decides for every owner, so it handles the key owner too
 		BiPredicate<ACell, AccountKey> verifier = (owner, signerKey) -> {
 			if (owner instanceof Address addr && addr.longValue() == 999) {
 				return kpAddress.getAccountKey().equals(signerKey);
@@ -316,7 +314,7 @@ public class OwnerLatticeTest {
 			if (owner instanceof convex.core.data.AString s && s.toString().equals("did:example:123")) {
 				return kpDid.getAccountKey().equals(signerKey);
 			}
-			return false;
+			return owner.equals(signerKey);
 		};
 
 		LatticeContext ctx = LatticeContext.create(null, kpBlob, verifier);

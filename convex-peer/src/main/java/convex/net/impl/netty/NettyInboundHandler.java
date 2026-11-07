@@ -8,12 +8,9 @@ import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.ErrorCodes;
 import convex.core.Result;
-import convex.core.SourceCodes;
 import convex.core.cpos.CPoSConstants;
 import convex.core.data.Blob;
-import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
@@ -34,6 +31,13 @@ import io.netty.handler.codec.ByteToMessageDecoder;
  * the kernel receive buffer to fill, which triggers a TCP zero-window advertisement
  * back to the sender. This naturally slows the client without any application-level
  * error codes or retry logic.
+ *
+ * <p>On a server channel, reads also pause while the client's replies are backed up
+ * ({@link NettyServerConnection#isBacklogged()}): the next decoded message is held
+ * back, and delivered when the backlog drains, which resumes reading. No thread waits
+ * for that; the write completions that drain the backlog resume it. Pausing always
+ * holds a decoded message, so that the decoder does not ask the socket for more input
+ * while reads are off.
  *
  * @see <a href="https://docs.convex.world/blog/parking-ticket-pattern">The Parking Ticket Pattern</a>
  */
@@ -76,6 +80,18 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 * the retry completes.
 	 */
 	private volatile boolean backpressured = false;
+
+	/** The server connection whose reply backlog can pause reads, or null for a client channel. */
+	private NettyServerConnection replies;
+
+	/**
+	 * A decoded message held back while this channel's replies are backed up, delivered
+	 * when they drain. Written on the event loop; read by the thread that drains them.
+	 */
+	private volatile Message held;
+
+	/** Context of the decode that held {@link #held}. Event loop only. */
+	private ChannelHandlerContext heldContext;
 
 	/**
 	 * Set once decoding has thrown. A framing error leaves the reader mid-message with no
@@ -154,6 +170,7 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 */
 	void setConnection(AConnection conn) {
 		this.connection = conn;
+		this.replies = (conn instanceof NettyServerConnection server) ? server : null;
 	}
 
 	/**
@@ -166,14 +183,14 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 
 	@Override
 	protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
-		// Gate: stop decoding while a message is being retried on a virtual thread.
-		// ByteToMessageDecoder sees no progress and stops its loop.
-		// Remaining bytes stay in the cumulation buffer, preserving order.
+		// Gate: stop decoding while a message is being retried on a virtual thread, or
+		// held until replies drain. ByteToMessageDecoder sees no progress and stops its
+		// loop. Remaining bytes stay in the cumulation buffer, preserving order.
 		if (failed) {
 			in.skipBytes(in.readableBytes());
 			return;
 		}
-		if (backpressured) return;
+		if (backpressured || held != null) return;
 
 		try {
 	   		in.markReaderIndex(); // mark reader position, may revert to this if no complete message
@@ -225,49 +242,19 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 			? Message.create(conn, Blob.wrap(messageData))
 			: Message.create(Blob.wrap(messageData));
 			out.add(m);
-			Predicate<Message> retry = deliver.apply(m);
-			if (retry != null) {
-				// Queue full — pause this channel, retry on virtual thread
-				backpressured = true;
+			NettyServerConnection r = replies;
+			if (r != null && r.isBacklogged()) {
+				// Replies backed up: hold this message and stop reading until they drain.
+				// Adding it to out above keeps the decoder from asking for more input.
+				heldContext = ctx;
+				held = m;
 				ctx.channel().config().setAutoRead(false);
-
-				Thread.startVirtualThread(() -> {
-					try {
-						boolean delivered = retry.test(m);
-						if (!delivered) {
-							// Timeout — return :LOAD error
-							Result r = Result.create(m.getID(),
-								Strings.SERVER_LOADED, ErrorCodes.LOAD)
-								.withSource(SourceCodes.PEER);
-							try {
-								m.returnResult(r);
-							} catch (Exception e) {
-								// best effort
-							}
-						}
-					} finally {
-						// Resume reading. Order matters: clear the flag first
-						// so decode() will process data, then re-enable autoRead.
-						backpressured = false;
-						ctx.channel().config().setAutoRead(true);
-
-						// Flush data stranded in ByteToMessageDecoder's cumulation
-						// buffer. When decode() returned early (backpressured gate),
-						// any bytes already read from the socket stay in cumulation.
-						// Re-enabling autoRead only helps if NEW data arrives on
-						// the socket. To process already-buffered data, we fire a
-						// synthetic channelRead with an empty buffer — this triggers
-						// ByteToMessageDecoder.callDecode() on the existing cumulation.
-						ctx.channel().eventLoop().execute(() -> {
-							try {
-								ctx.pipeline().fireChannelRead(Unpooled.EMPTY_BUFFER);
-							} catch (Exception e) {
-								ctx.fireExceptionCaught(e);
-							}
-						});
-					}
-				});
+				if (r.isBacklogged()) return;
+				// Drained meanwhile, by a release that may not have seen the held message
+				held = null;
+				ctx.channel().config().setAutoRead(true);
 			}
+			dispatch(ctx, m);
 		} catch (Throwable e) {
 			failed = true;
 			in.skipBytes(in.readableBytes());
@@ -281,6 +268,73 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 				log.warn("Inbound message handling error: {}",e.getMessage());
 			}
 			throw e;
+		}
+	}
+
+	/**
+	 * Delivers a decoded message. If the server cannot take it yet, pauses reading and
+	 * retries on a virtual thread, resuming reading on the event loop when done.
+	 * Event loop only.
+	 */
+	private void dispatch(ChannelHandlerContext ctx, Message m) {
+		Predicate<Message> retry = deliver.apply(m);
+		if (retry == null) return;
+		// Queue full — pause this channel, retry on virtual thread
+		backpressured = true;
+		ctx.channel().config().setAutoRead(false);
+
+		Thread.startVirtualThread(() -> {
+			try {
+				boolean delivered = retry.test(m);
+				if (!delivered) {
+					// Timeout — return :LOAD error
+					try {
+						m.returnResult(Result.SERVER_LOADED);
+					} catch (Exception e) {
+						// best effort
+					}
+				}
+			} finally {
+				ctx.channel().eventLoop().execute(() -> {
+					backpressured = false;
+					resumeReading(ctx);
+				});
+			}
+		});
+	}
+
+	/** Whether a message is held back until this channel's replies drain. */
+	boolean isHolding() {
+		return held != null;
+	}
+
+	/**
+	 * Delivers the held message and resumes reading, unless the replies are backed up
+	 * again, in which case a later drain resumes. Event loop only.
+	 */
+	void resumeHeld() {
+		Message m = held;
+		if (m == null || replies.isBacklogged()) return;
+		ChannelHandlerContext ctx = heldContext;
+		held = null;
+		dispatch(ctx, m);
+		if (!backpressured) resumeReading(ctx);
+	}
+
+	/**
+	 * Re-enables reading and decodes data stranded in ByteToMessageDecoder's cumulation
+	 * buffer: bytes already read from the socket stay there while decoding is paused,
+	 * and re-enabling autoRead only helps if NEW data arrives on the socket. A
+	 * synthetic channelRead with an empty buffer triggers callDecode() on the existing
+	 * cumulation. It goes to this handler directly: fired from the pipeline head, a TLS
+	 * handler would consume it as ciphertext. Event loop only.
+	 */
+	private void resumeReading(ChannelHandlerContext ctx) {
+		ctx.channel().config().setAutoRead(true);
+		try {
+			channelRead(ctx, Unpooled.EMPTY_BUFFER);
+		} catch (Exception e) {
+			ctx.fireExceptionCaught(e);
 		}
 	}
 }

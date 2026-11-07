@@ -49,6 +49,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
@@ -66,6 +67,13 @@ import convex.peer.Server;
  * asynchronously via a peer. 
  * 
  * This can be used by both peers and JVM-based clients.
+ *
+ * Futures returned by a client may complete on the thread that delivers the
+ * reply, such as a network event loop or a local peer's own thread. Stages
+ * attached with non-async methods such as {@code thenApply} then run on that
+ * thread, so they must not block: chain further requests with
+ * {@code thenCompose}, and attach only work that must wait with an
+ * {@code *Async} method and an executor.
  *
  * "I'm doing a (free) operating system (just a hobby, won't be big and
  * professional like gnu)" - Linus Torvalds
@@ -86,6 +94,11 @@ public abstract class Convex implements AutoCloseable {
 	 * Key pair for this Client
 	 */
 	protected AKeyPair keyPair;
+
+	/**
+	 * Proves this client's key in challenge/response in place of the key pair, or null
+	 */
+	protected volatile ChallengeSigner challengeSigner;
 
 	/**
 	 * Current Address for this Client
@@ -253,6 +266,17 @@ public abstract class Convex implements AutoCloseable {
 
 	public synchronized void setKeyPair(AKeyPair kp) {
 		this.keyPair = kp;
+	}
+
+	/**
+	 * Sets the signer this client proves its key with in challenge/response, in place
+	 * of its key pair. The client then challenges peers and answers their challenges
+	 * only in the signer's context, and the signer signs nothing else.
+	 *
+	 * @param signer challenge signer, or null to use the key pair
+	 */
+	public void setChallengeSigner(ChallengeSigner signer) {
+		this.challengeSigner = signer;
 	}
 
 	public void setNextSequence(long nextSequence) {
@@ -488,8 +512,9 @@ public abstract class Convex implements AutoCloseable {
 	private CompletableFuture<Result> submit(CompletableFuture<ATransaction> pending) {
 		try {
 			return inOrder(pending,signed->transact(signed),(result,e)->result.complete(Result.fromException(e)));
+		} catch (InterruptedException e) {
+			return CompletableFuture.completedFuture(Result.fromInterrupt(e));
 		} catch (Exception e) {
-			// Note this handles InterruptedException correctly (maintains interrupt)
 			return CompletableFuture.completedFuture(Result.fromException(e));
 		}
 	}
@@ -975,6 +1000,20 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
+	 * Returns a future completing once the messages sent so far with
+	 * {@link #trySend(Message)} have been written to the transport, for example so a
+	 * final broadcast can leave before the connection closes. No acknowledgement
+	 * from the remote end is implied. Fails if the connection closes first, or by
+	 * default, where completion cannot be reported.
+	 *
+	 * @return future for sent messages written
+	 */
+	public CompletableFuture<Void> flushOutbound() {
+		return CompletableFuture.failedFuture(
+			new UnsupportedOperationException("Client cannot report written messages"));
+	}
+
+	/**
 	 * Sets the bounds of the outbound queue behind this connection, if it has one.
 	 * A peer raises them for its connections to other peers. No effect by default.
 	 *
@@ -1096,6 +1135,8 @@ public abstract class Convex implements AutoCloseable {
 			throw e;
 		} catch (ResultException e) {
 			throw e;
+		} catch (InterruptedException e) {
+			throw new ResultException(Result.fromInterrupt(e),e);
 		} catch (Exception e) {
 			throw new ResultException(e);
 		} finally {
@@ -1144,13 +1185,21 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	@SuppressWarnings("unchecked")
 	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey, ACell contextID) {
-		AKeyPair kp = keyPair;
-		if (kp == null) return CompletableFuture.completedFuture(null);
+		ChallengeSigner signer = challengeSigner;
+		if (signer == null) {
+			AKeyPair kp = keyPair;
+			if (kp == null) return CompletableFuture.completedFuture(null);
+			signer = ChallengeSigner.create(kp, contextID);
+		} else if (!Utils.equals(signer.getContext(), contextID)) {
+			// A challenge signer proves its key in its own context only
+			log.debug("verifyPeer: challenge signer is for context {}, not {}", signer.getContext(), contextID);
+			return CompletableFuture.completedFuture(null);
+		}
 
 		Hash token = Blob.createRandom(new SecureRandom(), CHALLENGE_TOKEN_BYTES).getHash();
-		AccountKey ownKey = kp.getAccountKey();
+		AccountKey ownKey = signer.getAccountKey();
 
-		SignedData<ACell> signed = Message.signChallenge(kp, token, expectedKey, contextID);
+		SignedData<ACell> signed = signer.challenge(token, expectedKey);
 
 		return FutureUtils.map(sendChallenge(signed),result -> {
 			try {
@@ -1339,8 +1388,9 @@ public abstract class Convex implements AutoCloseable {
 			}
 			CVMLong bal = (CVMLong) result.getValue();
 			return bal.longValue();
+		} catch (InterruptedException ex) {
+			throw new ResultException(Result.fromInterrupt(ex),ex);
 		} catch (Exception ex) {
-			// Note InterruptedException correctly handled here
 			throw new ResultException(ex);
 		} finally {
 			if (future!=null) future.cancel(true);

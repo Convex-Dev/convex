@@ -2,11 +2,11 @@ package convex.net.impl.netty;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,9 +24,9 @@ import io.netty.channel.embedded.EmbeddedChannel;
 
 /**
  * Replies to inbound connections pass through one shared queue bounded by the
- * bytes it holds. A channel that stops draining pins only its own small
- * in-flight allowance; client results wait for shared space rather than being
- * dropped; trusted peers are served first and never wait behind client results.
+ * bytes it holds. No send waits. A channel that stops draining pins only its own
+ * small backlog allowance; trusted peers are served first and never wait behind
+ * client results.
  */
 public class ServerOutboundQueueTest {
 
@@ -93,7 +93,7 @@ public class ServerOutboundQueueTest {
 	}
 
 	@Test
-	public void testBlockingSendWaitsForSharedSpace() throws Exception {
+	public void testSendRefusedWhileSharedBoundFull() throws Exception {
 		Message m = message(600);
 		int size = size(m);
 		ServerOutboundQueue queue = new ServerOutboundQueue(size + size / 2, size * 10, false);
@@ -102,16 +102,16 @@ public class ServerOutboundQueueTest {
 			NettyServerConnection conn = connection(ch, queue);
 			assertTrue(conn.trySendMessage(m));
 
-			// A blocking send waits until the writer frees the shared bound. Hand over
-			// exactly one entry: the freed space lets the blocked send enqueue at any
-			// moment after that, so a whole-batch drain could pick it up too.
-			CompletableFuture<Boolean> blocked = CompletableFuture.supplyAsync(() -> conn.sendMessage(m));
-			assertEquals(1, queue.drainBatch(1));
-			assertTrue(blocked.get(5, TimeUnit.SECONDS), "blocked send proceeds once space is freed");
-			assertEquals(size, queue.getQueuedBytes());
-			assertEquals(1, queue.drainBatch(1));
+			// With the shared bound full, every form of send is refused at once
+			assertFalse(conn.sendMessage(m));
+			assertFalse(conn.returnMessage(m));
+			assertEquals(size, conn.getBacklog(), "a refused reply adds nothing to the backlog");
 
-			// A message that can never fit is refused without waiting
+			assertEquals(1, queue.drainBatch());
+			assertTrue(conn.sendMessage(m), "accepted once the writer frees the shared bound");
+			assertEquals(1, queue.drainBatch());
+
+			// A message that can never fit is refused
 			assertFalse(conn.sendMessage(message(size * 2)));
 		} finally {
 			queue.close();
@@ -120,7 +120,38 @@ public class ServerOutboundQueueTest {
 	}
 
 	@Test
-	public void testStuckChannelPinsOnlyItsOwnAllowance() {
+	public void testBacklogCountsQueuedReplies() {
+		Message m = message(600);
+		int size = size(m);
+		// A client may have 4 replies handed to Netty and unwritten: reads pause from a backlog of 2
+		ServerOutboundQueue queue = new ServerOutboundQueue(size * 10, 4 * size, false);
+		EmbeddedChannel ch = new EmbeddedChannel(new NettyOutboundHandler());
+		try {
+			NettyServerConnection conn = connection(ch, queue);
+			assertTrue(conn.trySendMessage(m));
+			assertEquals(size, conn.getBacklog(), "a queued reply counts before the writer hands it over");
+			assertFalse(conn.isBacklogged());
+			assertTrue(conn.trySendMessage(m));
+			assertTrue(conn.isBacklogged());
+
+			// The allowance bounds what is handed to Netty: a burst beyond it waits in the shared queue
+			for (int i = 0; i < 4; i++) assertTrue(conn.trySendMessage(m));
+			assertEquals(6 * size, conn.getBacklog());
+			assertEquals(0, conn.getPendingBytes());
+
+			// Replies for a channel that closes before hand-over leave the backlog too
+			ch.close().syncUninterruptibly();
+			assertEquals(6, queue.drainBatch());
+			assertEquals(0, conn.getBacklog());
+			assertFalse(conn.isBacklogged());
+		} finally {
+			queue.close();
+			ch.finishAndReleaseAll();
+		}
+	}
+
+	@Test
+	public void testStuckChannelPinsOnlyItsOwnAllowance() throws Exception {
 		Message m = message(600);
 		int size = size(m);
 		ServerOutboundQueue queue = new ServerOutboundQueue(size * 10, size + size / 2, false);
@@ -139,9 +170,7 @@ public class ServerOutboundQueueTest {
 			assertEquals(2 * size, slowConn.getPendingBytes());
 
 			assertFalse(slowConn.trySendMessage(m), "over its cap, the stuck reader's further replies are refused");
-			long start = System.nanoTime();
-			assertFalse(slowConn.sendMessage(m), "a blocking send never waits for a stalled reader");
-			assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(1));
+			assertFalse(slowConn.sendMessage(m));
 			assertTrue(otherConn.trySendMessage(m), "other connections are unaffected");
 			assertEquals(1, queue.drainBatch());
 			assertEquals(0, otherConn.getPendingBytes());
@@ -172,6 +201,7 @@ public class ServerOutboundQueueTest {
 				assertEquals(1, queue.drainBatch());
 			}
 			assertEquals(4 * size, conn.getPendingBytes());
+			assertFalse(conn.isBacklogged(), "a verified peer's reads never pause for its replies");
 			assertFalse(conn.trySendMessage(m), "over the peer allowance, further replies are refused");
 
 			stuck.complete();
@@ -184,7 +214,7 @@ public class ServerOutboundQueueTest {
 	}
 
 	@Test
-	public void testTrustedPeerServedFirstAndNeverWaits() {
+	public void testTrustedPeerServedFirstAndNeverWaits() throws Exception {
 		Message m = message(600);
 		int size = size(m);
 		ServerOutboundQueue queue = new ServerOutboundQueue(size + size / 2, size * 10, false);
@@ -222,7 +252,7 @@ public class ServerOutboundQueueTest {
 			NettyServerConnection conn = connection(ch, queue);
 			ch.close().syncUninterruptibly();
 			assertFalse(conn.trySendMessage(m));
-			assertFalse(conn.sendMessage(m));
+			assertThrows(ClosedChannelException.class, () -> conn.sendMessage(m));
 			assertEquals(0, queue.getQueuedBytes());
 		} finally {
 			queue.close();

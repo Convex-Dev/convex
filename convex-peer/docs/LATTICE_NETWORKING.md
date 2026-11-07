@@ -8,8 +8,9 @@ The central boundary is simple:
 
 - `NodeServer` replicates one assembled `LatticeHost`; the host's applications
   own the root's merge semantics.
-- The calling application constructs propagation policy groups.
-- The calling application composes inbound transports independently.
+- The service ([anatomy](../../convex-core/docs/LATTICE_APPLICATIONS.md#service-anatomy))
+  constructs propagator groups.
+- The service composes inbound transports independently.
 - Each `LatticePropagator` owns its routes, serving view and protocol work, and
   merges nothing.
 - Attaching a propagator connects it to the node for publication and inbound
@@ -31,26 +32,54 @@ try (var network = new LatticeNode<>(host, config).launch()) {
 
 `createPropagator()` creates and registers a group using the host store and starts
 it when the network is running. No separate add or activation call is needed.
-New groups have no peers or assigned inbound sockets. `removePropagator(group)`
-revokes inbound assignments and closes that group without stopping other groups.
+New groups have no peers or assigned inbound sockets. A group reads its limits from
+its own configuration, never the node's: `createPropagator(groupConfig)` supplies
+one, and the no-argument form uses defaults. Both publish the host's value
+unfiltered; `createPropagator(groupConfig, filter)` gives the group its publication
+filter from the start and refuses a null one. `removePropagator(group)` revokes the
+group's inbound assignments on every listener and closes it without stopping other
+groups.
+
+`LatticeNode` is the standard TCP assembly: the DLFS server, `convex dlfs start` and
+`P2PNode` use it. A host replicated without a listener, such as a Convex DB managed
+instance or the GUI DLFS browser, uses `NodeServer` directly.
 
 The node may configure a primary DID and an authorised key pair with `setIdentity`.
 The two-argument overload validates `did:key`; other methods require an explicit
 `DIDKeyAuthorizer` backed by authenticated resolver data. The binding is checked
-when configured. New groups use that key by default; without a configured identity
-their key is null. No transient keys are generated. Group-specific key overrides
-remain possible, and existing groups keep their keys when the node default changes.
+when configured. New groups prove that key by default; without a configured identity
+they have none. No transient keys are generated. Group-specific overrides remain
+possible, and existing groups keep their identities when the node default changes.
 The primary DID is local configuration: remote peers still verify possession of
 the expected public key, resolving any DID binding through their own trust policy.
 
-`serveAllInbound(group)` is an explicit public serving choice. Otherwise the listener
-denies inbound access unless the caller installs a selector. The selector can change
-while running; existing sockets keep their assigned group until closed or revoked. The
-wrapper starts the server before the listener, closes the listener before draining
-the server, and cleans up a failed launch. The host store remains caller-owned.
+A group holds a `ChallengeSigner` for its key, never the key pair: the group, its
+connection manager and the clients it dials can sign challenges and answers in the
+lattice challenge context and nothing else, and a dialled client refuses a challenge
+in any other context. `setTransportKeyPair(keyPair)` wraps a key pair in one;
+`setTransportSigner(signer)` takes one directly, and
+`setIdentity(did, signer, authorizer)` configures the node with a signer alone, so
+the node never holds the key pair either. Lattice data is signed by the
+applications' own signers.
+
+`serveAllInbound(group)` is an explicit public serving choice on the node's own
+listener. Otherwise a listener denies inbound access unless the caller installs a
+selector. The selector can change while running; existing sockets keep their assigned
+group until closed or revoked. `addListener(listenerConfig)` adds a listener on another
+port, with its own connection and message limits, for groups reached separately, such
+as a trusted or replication port. Any group can be assigned through any listener, and
+a new listener denies every connection until given a selector. It opens with the
+node, or at once if the node is running. The wrapper starts the server before its
+listeners, closes every listener before draining the server, and cleans up a failed
+launch. Closing a listener is final. Neither the node nor its listeners take a lock:
+the node's identity, serving policy and peer methods never wait, and network
+callbacks such as a selector may call them. Launch, close, `addListener` and
+creating or removing a group wait for sockets, groups or the host, so the
+application calls them from management code, one after another. The host store
+remains caller-owned.
 `NodeServer` detaches its publisher on close or failed launch, restoring local host
 publication and permitting a replacement server. Only one publisher may attach at
-a time. The wrapper creates no implicit propagation group and changes no group policy.
+a time. The wrapper creates no implicit propagator group and changes no group policy.
 
 Group identity, message handlers, observers and publication filters can change
 while running. A filter change reprojects the latest processed source before
@@ -65,11 +94,11 @@ apply to subsequent handshakes; established routes are not reauthenticated.
 | `LatticeHost` and its applications | The published root, which applications receive incoming values, and the lattices that merge them | Replication, transport, persistence scheduling |
 | `NodeServer` | Node store root, persistence barriers, attached-group lifecycle and update fan-out for one assembled host | Lattice, merge policy, sockets, peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
 | `LatticeListener` | Application-owned TCP acceptance, physical limits and one immutable connection-to-group assignment | Propagator lifecycle, per-connection protocol state, serving stores, trust or lattice merge |
-| `LatticePropagator` | One propagation policy group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
+| `LatticePropagator` | One propagator group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
 | `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, challenge state, statistics and extension handler | Node persistence, peer discovery, application schemas or which values are wanted |
-| `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification and admitted outbound routes | Discovery records, listener assignment, lattice merge or application-owner validation |
+| `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification, admitted outbound routes and serving `DATA_REQUEST` on them from the group's store | Discovery records, listener assignment, lattice merge or application-owner validation |
 | `ALattice` / `LatticeContext` | Value validation, merge semantics and application signing authority | Transport identity and routing |
-| Application wrapper | Construction, lifecycle order, transport composition, connection assignment, discovery translation and application handlers | Generic protocol internals |
+| Service | Construction, lifecycle order, transport composition and connection assignment; today also connecting its applications' network decisions, such as discovery and message handling, to the node ([anatomy](../../convex-core/docs/LATTICE_APPLICATIONS.md#network-decisions-and-mechanics)) | Generic protocol internals |
 
 `LatticeListener` is the public standard TCP transport.
 `LatticeProtocolEndpoint` remains package-private behind the transport-facing
@@ -78,7 +107,7 @@ internals.
 
 ## Application composition
 
-For custom serving stores, limits or transports, the application can assemble groups directly:
+For custom serving stores or transports, the application can assemble groups directly:
 
 ```java
 NodeConfig nodeConfig = NodeConfig.port(0);
@@ -99,11 +128,11 @@ transport.setSelector(connection -> publicGroup);
 node.launch();
 transport.launch();
 
-// Shutdown order: stop ingress, drain groups, close the host to save, close the store.
-transport.close();
-node.close();
-node.getHost().close();
-nodeStore.close();
+// Shutdown (see SHUTDOWN.md): saves, then closes the node, the host and the store
+try (nodeStore; var host = node.getHost(); node) {
+    transport.close();
+    host.checkpoint();
+}
 ```
 
 `NodeConfig` contains authoritative persistence, standard-listener and application
@@ -115,9 +144,12 @@ neither object and does not copy keys, filters or handlers into the group. An
 application with several groups retains their references and selects the
 intended group explicitly for pulls and connection assignment.
 
-`LatticePropagatorConfig.from(NodeConfig)` preserves combined-map callers during
-migration. New composition should construct the two configurations separately;
-matching key names do not imply inheritance.
+Both configurations are CVM maps; the Java classes are typed views of them.
+`LatticePropagatorConfig.from(NodeConfig)` reads the node's map as a group's, which
+is how the DLFS server and `P2PNode` let one config section carry both. A key is then
+read by every component that reads that name: `maxConnections` caps the listener's
+sockets and also sets when each group sweeps its per-connection statistics. New
+composition gives the node and each group a map of its own.
 
 ## Connection capabilities
 
@@ -137,13 +169,19 @@ An assigned connection can later be upgraded:
 ```text
 physical inbound socket
         |
-        +-- application selector --> one propagation group
+        +-- application selector --> one propagator group
         |
         +-- expected key proves possession for this challenge audience
                     |
                     v
           authenticated outbound route
 ```
+
+A group holds one upgraded route per key. When another connection proves a key whose
+route is live, the group pings that route: if it answers within the five-second
+admission deadline it is kept and the new connection is closed; otherwise the new
+connection replaces it. A route that still works is not taken over, and a node that
+reconnects over a socket that has silently died regains its route within that deadline.
 
 Manager-owned outbound connections follow their own admission path:
 
@@ -154,6 +192,79 @@ bounded desired-peer intent
         -> admitted manager-owned route
 ```
 
+A node known only by its endpoint, named with `connectPeer(URI)`, is challenged for
+no particular key, then again naming the key it proved. The key becomes explicit
+intent at that endpoint, so reconnections challenge for that key. This proves the node holds the key it names, not
+that it is the node the caller meant; over `tls://` the certificate vouches for the
+host name first. A node that cannot be reached or proves no key gets three attempts,
+with the usual retry backoff, then the caller's future fails, so a service that needs
+its peers in order to start fails promptly rather than waiting on one that is not
+there.
+
+Operators name peers the same way wherever a peer is named: `tcp://host:port`,
+`tls://host:port`, `host:port` (a missing port is the default peer port), `did:web` or
+`did:key`, optionally beside an expected
+key (`<key>@<peer>`, or `{key, url}` in configuration). `PeerResolver.parse` checks a
+name without network access, and `PeerResolver.resolve` turns it into a target. A
+transport name is dialled as written. A DID is resolved through the shared
+`DIDResolver`, which fetches a `did:web` document over HTTPS: the peer must prove a key
+the document lists under `authentication`, and is dialled at the endpoints of its
+`ConvexLatticeNode` services ([CAD043](https://docs.convex.world/docs/cad/did)). A
+`did:key`, or a document without those services, is located by key in the node's
+records, which a node that keeps them supplies to its resolver; without a record the
+name fails as having no known address. An expected key narrows the target to that key.
+
+What an operator relies on depends on how the peer is named. A `tcp://` address proves
+nothing about who answers: the peer is admitted under whatever key it proves. Over
+`tls://` the JVM trust store vouches for the host name first. An expected key is the
+operator's own copy, and the address only locates it. A `did:web` rests on whoever
+controls the domain's web server and certificate, who can name any key; an expected key
+beside it guards against a compromised domain. A `did:key` names the key itself, and
+its address comes from a node record the key holder signed. The resolver resolves
+whichever DIDs it is asked for, bounding each fetch in size and time, so a caller that
+resolves DIDs arriving from the network sets its own limits on how many and how often.
+
+A peer resolved from its name is a `PeerTarget`: the keys it may prove, none meaning
+any, and the endpoints to dial it at. `connectPeer(PeerTarget)` makes one bounded
+attempt, dialling the endpoints in turn, each at least once and three times in all at
+least, with the usual backoff. It challenges for the target's key when it names one;
+otherwise it learns the node's key as above and admits it only if the target names no
+keys or lists it. The admitted route is held: kept, safe from trimming, but never
+redialled nor given an address from discovery. When it closes the peer is forgotten
+and `whenDisconnected(key)` completes, and what happens next is the caller's; a caller
+wanting the manager to reconnect by itself declares desired intent instead, and a peer
+that already has it keeps it. Cancelling the attempt abandons it.
+
+`LatticeNode.connectPeer(group, name)` resolves a peer name with the node's
+`PeerResolver` and makes that one attempt. `LatticeNode.keepPeer` keeps a peer an
+operator named: when it cannot be reached or its route goes, the name is resolved
+again before the next attempt, after the usual backoff, so a moved endpoint or a
+changed DID document is picked up and a key the document no longer lists is not
+admitted again. A peer named by a transport URI without a key is held to the key it
+first proved. A peer unreachable for a whole period, ten minutes by default, is given
+up and reported; each lost route starts a new period.
+
+A connection future reports an expected failure as a checked exception: a
+`PeerConnectionException` when the name cannot be resolved or the peer reached, with
+the network error as its cause, or its subtype `PeerRefusedException` when the peer is
+reached but not admitted, because it fails the challenge, proves a key other than
+the one expected, turns out to be this node, or the application refuses it. A wait or
+attempt that is abandoned, because the manager closes or the peer is released,
+removed or replaced, is cancelled. Misuse, such as an invalid argument or identifying
+a peer without a key of one's own, fails with an unchecked exception, as a fault does,
+so a caller can retry or report the checked failures and warn of anything else. A
+kept peer is retried only on a `PeerConnectionException`, and stops with a warning on
+a fault.
+
+A group can also gossip with nodes that connect to it. With
+`setChallengerAdmission(predicate)`, a node that challenges the group over an inbound
+connection, naming the group's transport key, is challenged back if the predicate
+admits its key, and proving it upgrades the connection. The predicate is how the
+application admits keys, as CAD036 requires. A challenge naming no key, or another
+node's, is answered but admits nothing: it could be a replay of one the challenger
+sent elsewhere. Admission spends the group's bandwidth on the node, bounded by the
+listener's connection limit, and grants no trust in the values it sends.
+
 Zero-trust connectivity is still useful. Public complete values can be checked
 by the application lattice regardless of route authentication. Trust controls
 route capability and partial-data acquisition; it never replaces signed lattice
@@ -163,7 +274,10 @@ authorisation.
 
 Once the listener assigns a socket, all work belongs to that group:
 
-1. The Netty event loop offers the message to the group's bounded queue.
+1. The Netty event loop offers the message to the group's bounded queue. When the
+   queue is full the connection stops reading until there is room. A reply to
+   one of this node's own requests completes as it arrives and never enters the
+   queue.
 2. The endpoint decodes the message against the group's serving store only when
    the connection is trusted; unverified values must already be complete.
 3. Protocol handlers deal with queries, values, DATA, challenges and application
@@ -173,15 +287,23 @@ Once the listener assigns a socket, all work belongs to that group:
 6. `NodeServer` hands the value to its host, whose applications take what they
    want from it under their own lattices, then publishes the host root to the
    node store. Which values are wanted is the applications' decision alone; the
-   propagation group filters only what it serves.
+   propagator group filters only what it serves.
 7. The node schedules a non-blocking update for every attached group.
 
 `DATA` only materialises independently addressable cells in the selected serving
 store. It never merges a lattice root. `DATA_REQUEST` is scoped to the same
 store, so one group cannot expose another group's private or filtered cache.
+A peer may also send `DATA_REQUEST` over a route this node opened to it. The
+connection manager serves at most `maxDataRequests` of those at once, 16 by
+default, off the network thread. One route may hold a quarter of them, and at
+least one, so a single peer cannot crowd out the rest. A request beyond either
+limit makes its route stop reading until a permit frees, and is answered with
+`:LOAD` only if none frees within 8 seconds. Values and other messages a peer
+sends over such a route enter the group's queue as they do on an inbound
+connection, and wait for room in the same way.
 
 The correlated response to `LATTICE_VALUE` confirms delivery to the host and
-logical root publication. It does not wait for every propagation group to
+logical root publication. It does not wait for every propagator group to
 materialise or broadcast its view.
 
 ## Publication pipeline
@@ -192,12 +314,15 @@ nothing. Its worker:
 1. applies the publication projection;
 2. announces the result into the group's serving store;
 3. updates the group's queryable announced cursor; and
-4. sends a bounded delta, or later a root sync, to its routes.
+4. sends a bounded delta to its routes; its periodic root announcement covers any
+   that is lost.
 
 The update queue may coalesce consecutive monotonic snapshots. The latest value
 must converge; there is no requirement for one network frame per application
-action. `nextAnnounce()` is the deterministic signal for callers that need to
-wait until a group has materialised its next served view.
+action. `whenAnnounced(condition)` is the deterministic signal for callers that
+need to wait until a group serves a state: it completes once an announced value
+satisfies the condition and that value's broadcast is queued. See
+[persistence](PERSISTENCE.md#waiting-in-tests-and-applications).
 
 A propagator never writes a store root. Its store is a serving and novelty
 boundary; launch seeds each one from the host's current root.
@@ -229,13 +354,10 @@ coupling recovery policy to `NodeServer`. A running group may report prior or
 intermittent failures; `Status.isOperational()` describes lifecycle, while
 `Status.hasFailures()` describes observed degradation.
 
-Shutdown is composed in the opposite order: the application closes every
-transport, then `NodeServer.close()` asks each endpoint to drain and drains and
-closes each group. Each group cleanup is independent. Endpoint cleanup also
-continues after a timed-out acquisition so one stuck resource does not suppress
-the remaining cleanup steps. Closing neither publishes pending host state nor
-flushes the store: the owning service then closes the host, which saves, and
-closes its store, as described in [persistence](PERSISTENCE.md#lifecycle).
+Shutdown runs in the opposite order; [shutdown](SHUTDOWN.md) gives the full
+sequence. Each group's cleanup is independent, and endpoint cleanup continues
+after a timed-out acquisition, so one stuck resource does not suppress the
+remaining steps.
 
 Store failures while the node runs are surfaced by `NodeServer` and host sync;
 saving failures by the host's `checkpoint()` or `flush()`. Listener failures are
@@ -279,9 +401,12 @@ operations do not introduce runtime group creation or subscription negotiation.
 ## Naming
 
 - **desired**: retained bounded candidate or explicit intent for a route to an identity.
+- **held**: an explicit route admitted from a resolved peer target, kept while it
+  lasts and never redialled.
 - **pending**: a manager-owned socket exists but admission is incomplete.
 - **assigned**: application policy selected one group for an inbound socket.
-- **trusted**: a live challenge proved possession of the expected transport key.
+- **trusted**: a live challenge proved possession of the expected transport key, or of
+  the key a node known only by its endpoint named.
 - **upgraded**: an assigned inbound socket is also installed as an authenticated
   outbound route.
 - **owner-authorised**: signed application data passed lattice validation; this
@@ -289,24 +414,59 @@ operations do not introduce runtime group creation or subscription negotiation.
 
 ## Live peer selection
 
-`maxDesiredPeers` bounds candidates (default 256). The independent soft targets
+A discovered node is a candidate only while it advertises a supported transport
+to dial; `maxDesiredPeers` bounds candidates (default 256). Explicit
+`connectPeer`/`addPeer` intent is not counted and is never refused for capacity,
+and inbound route upgrades do not depend on it. The independent soft targets
 `ambientPeers` and `activePeers` default to 16 each. Maintenance retains healthy
 ambient incumbents, samples replacements, and prioritises the most recently used
 active peers for two minutes. Explicit `connectPeer`/`addPeer` intent survives
-discovery metadata updates and may exceed these targets until `removePeer`.
+discovery metadata updates and may exceed these targets until `removePeer`, or until
+`releasePeer` withdraws it: that closes the route this node opened, keeps any route
+the peer opened, and leaves the peer a candidate only if discovery lists it.
+`releasePeer(key, true)` instead keeps a route this node holds to the peer, which
+becomes an ordinary candidate filling an ambient slot like any other route; a peer
+with nothing to dial, such as one held from its target or known only by an
+operator-supplied address, is redialled only once discovery lists it.
+`whenAmbientTargetMet` completes once routes to peers that are not explicit fill the
+ambient target, and number at least one, which is when an application can release
+peers it used as seeds. `whenStarved` completes once the ambient target is unmet and no
+believed-good candidate is left to dial: no attempt is in flight, and every candidate
+without a route has failed since it was last reached. Failing candidates are still
+retried; this is when an application can turn to a source of last resort, such as its
+seeds. `whenIsolated` completes once a maintenance pass finds no authenticated route in
+either direction, or at once when there is none.
 Pending socket opens and identity challenges reserve slots, with at most four
-automatic attempts outstanding. Each attempt runs independently of maintenance.
+automatic attempts outstanding, attempts to reach a node known only by its endpoint
+among them. Each attempt runs independently of maintenance.
 
 `markActive` records useful directed traffic. `withPeer` protects an asynchronous
 operation from trimming and can optionally record activity. Application pulls and
 authenticated point-message routes use these hooks; background bootstrap, broadcast
-gossip and PING traffic do not earn priority. Inbound and outbound routes to one key
-count once. Inbound physical sockets remain owned by their listener/endpoint, so
-soft targets are not an aggregate socket limit.
+gossip and PING traffic do not earn priority.
+
+The targets count only routes this node opens. A peer reached only through an
+authenticated inbound route takes no ambient or active slot and is not dialled, so
+peers that connect in cannot displace the ones this node chose. Inbound physical
+sockets remain owned by their listener/endpoint, so soft targets are not an
+aggregate socket limit.
 
 Maintenance runs every second, but normal propagation supplies the heartbeat and
-healthy ambient peers are not periodically rotated. Only two minutes without
-decoded incoming traffic triggers a probe, with a further 30-second grace period.
+healthy ambient peers are not periodically rotated. Each end also announces its
+root to every route every `rootAnnouncementInterval` (30 seconds by default, set
+per group), changed or not. A peer whose copy differs fetches the cells it lacks,
+which recovers missed deltas, and the traffic keeps NATs and load balancers from
+dropping a quiet route. A live route is probed only after `keepAlive` (by default
+two of the group's announcement intervals, 60 seconds) without decoded incoming
+traffic, with a further 30-second grace period, so a healthy route is never probed
+and a silent one is retired within 90 seconds by default. Keep `keepAlive` above
+the interval the group's peers announce at, or probes race their announcements.
+Nodes without a route are never probed. An interval of zero turns announcements
+off: a peer that missed a delta, or connected after the last change, then receives
+the group's state only with its next change unless it pulls, and quiet routes stay
+open only through the peers' own announcements. A service can announce whenever
+it chooses with `announceRoot()`, which is what the timer calls; an announcement
+made that way restarts the interval.
 Any incoming traffic cancels the liveness check; a late or failed probe request
 cannot evict a peer that has resumed propagation or shorten that grace period.
 New identity challenges use a separate five-second admission deadline.

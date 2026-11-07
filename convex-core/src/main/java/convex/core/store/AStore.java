@@ -160,7 +160,21 @@ public abstract class AStore implements Closeable {
 	public <T extends ACell> T decode(Blob encoding) throws BadFormatException {
 		return (T) getEncoder().decode(encoding);
 	}
-	
+
+	/**
+	 * Decodes a Cell read from this store's own storage. The caller already has the
+	 * encoding's hash and binds the result to this store, so a caching store neither
+	 * looks the cell up in its cache nor adds it.
+	 * @param encoding Encoding of Cell, read from this store
+	 * @return Decoded Cell (may be a null value)
+	 *
+	 * @throws BadFormatException If cell encoding is invalid
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T decodeStored(Blob encoding) throws BadFormatException {
+		return (T) getEncoder().decode(encoding);
+	}
+
 	public abstract AEncoder<ACell> getEncoder();
 
 	/**

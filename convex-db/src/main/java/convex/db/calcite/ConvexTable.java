@@ -25,10 +25,10 @@ import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.util.ImmutableBitSet;
 
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Vectors;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.rel.ConvexTableScan;
-import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLTable;
 
 /**
@@ -55,19 +55,20 @@ public class ConvexTable extends AbstractQueryableTable
 
 	@Override
 	public RelDataType getRowType(RelDataTypeFactory typeFactory) {
+		return rowType(schema.getTables().getBinding(tableName), typeFactory);
+	}
+
+	/** The row type of a table with the given binding: no columns if it has none. */
+	private static RelDataType rowType(SQLTable.Binding binding, RelDataTypeFactory typeFactory) {
 		RelDataTypeFactory.Builder builder = typeFactory.builder();
-
-		SQLSchema tables = schema.getTables();
-		String[] columnNames = tables.getColumnNames(tableName);
-		ConvexColumnType[] columnTypes = tables.getColumnTypes(tableName);
-
-		if (columnNames != null && columnTypes != null) {
+		if (binding != null) {
+			String[] columnNames = binding.columnNames();
+			ConvexColumnType[] columnTypes = binding.columnTypes();
 			for (int i = 0; i < columnNames.length; i++) {
 				RelDataType type = columnTypes[i].toRelDataType(typeFactory);
 				builder.add(columnNames[i], typeFactory.createTypeWithNullability(type, true));
 			}
 		}
-
 		return builder.build();
 	}
 
@@ -79,11 +80,55 @@ public class ConvexTable extends AbstractQueryableTable
 	@Override
 	public RelNode toRel(RelOptTable.ToRelContext context, RelOptTable relOptTable) {
 		RelOptCluster cluster = context.getCluster();
-		// TODO: declare PK collation on trait set once ConvexConvention
-		// operators properly propagate collation traits through the plan.
-		// Currently the planner elides sorts at the Enumerable boundary.
+		// No PK collation is declared: CONVEX operators do not propagate collation traits (#795)
 		RelTraitSet traitSet = cluster.traitSetOf(ConvexConvention.INSTANCE);
-		return new ConvexTableScan(cluster, traitSet, relOptTable);
+		return new ConvexTableScan(cluster, traitSet, relOptTable, bind(relOptTable, cluster.getTypeFactory()));
+	}
+
+	// ========== Plan binding (CAD039) ==========
+
+	/**
+	 * The binding a plan over this table is built for: its schema and format version now.
+	 * The plan's row type was validated a moment earlier, so this checks the two agree.
+	 *
+	 * @param planned The table as the plan sees it
+	 * @param typeFactory Type factory of the plan
+	 * @throws StalePlanException if the table changed while the statement was planned
+	 */
+	public SQLTable.Binding bind(RelOptTable planned, RelDataTypeFactory typeFactory) {
+		SQLTable.Binding binding = schema.getTables().getBinding(tableName);
+		if (binding == null || !rowType(binding, typeFactory).equals(planned.getRowType())) {
+			throw new StalePlanException(tableName);
+		}
+		return binding;
+	}
+
+	/**
+	 * The live table, provided it still has the binding a plan over it was built for.
+	 * Every read of the table's rows by a plan goes through this: rows read under another
+	 * schema or version would be misread, so the plan fails instead.
+	 *
+	 * @param planned Binding the plan was built for
+	 * @throws StalePlanException if the table has been dropped, or its schema or version changed
+	 */
+	public SQLTable boundTable(SQLTable.Binding planned) {
+		SQLTable table = schema.getTables().getLiveTable(tableName);
+		if (table == null || !planned.equals(table.getBinding())) {
+			throw new StalePlanException(tableName);
+		}
+		return table;
+	}
+
+	/**
+	 * This table, provided it still has the binding a plan over it was built for. Called
+	 * from the generated code of a plan that writes the table, before any row is written.
+	 *
+	 * @param planned Binding the plan was built for
+	 * @throws StalePlanException if the table has been dropped, or its schema or version changed
+	 */
+	public ConvexTable bound(SQLTable.Binding planned) {
+		boundTable(planned);
+		return this;
 	}
 
 	public ConvexColumnType[] getColumnTypes() {
@@ -95,10 +140,10 @@ public class ConvexTable extends AbstractQueryableTable
 	 *
 	 * <p>Provides:
 	 * <ul>
-	 *   <li>Row count from the Index (O(1), may include tombstones)
+	 *   <li>Row count from the table's live count (O(1))
 	 *   <li>Primary key declaration (column 0 is unique)
-	 *   <li>Sort order (rows are sorted by PK via the radix tree Index)
 	 * </ul>
+	 * Neither the PK sort order nor column cardinality is declared (#795).
 	 */
 	@Override
 	public Statistic getStatistic() {
@@ -112,8 +157,6 @@ public class ConvexTable extends AbstractQueryableTable
 		// PK is column 0
 		List<ImmutableBitSet> keys = List.of(ImmutableBitSet.of(0));
 
-		// TODO: declare PK collation once trait propagation is implemented
-		// TODO: add column cardinality for selectivity estimation
 		return Statistics.of(rowCount, keys);
 	}
 
@@ -159,16 +202,22 @@ public class ConvexTable extends AbstractQueryableTable
 
 	// ========== DML Operations (called from generated code) ==========
 
+	/**
+	 * Inserts the rows of an INSERT in one atomic write, as the SQL standard has it: every
+	 * value is converted to its column's type first, and a key the table already holds, or
+	 * one repeated in the statement, is an integrity constraint violation (SQLSTATE 23000).
+	 * Either way nothing is written.
+	 */
 	public long executeInsert(Enumerable<?> input) {
 		try {
-			long count = 0;
+			List<AVector<ACell>> rows = new java.util.ArrayList<>();
 			for (Object value : input) {
 				Object[] row=normaliseRow(value);
-				if (row != null && insertRow(row)) {
-					count++;
-				}
+				if (row != null && row.length > 0) rows.add(toCells(row));
 			}
-			return count;
+			return schema.getTables().insertNew(convex.core.data.Strings.create(tableName), rows);
+		} catch (convex.db.lattice.DuplicateKeyException e) {
+			throw uniqueViolation(e);
 		} catch (ExceptionInInitializerError e) {
 			throw wrapTypeError(e, "INSERT");
 		}
@@ -208,14 +257,16 @@ public class ConvexTable extends AbstractQueryableTable
 				ACell oldPk = toCell(row[0], 0);
 				ACell newPk = toCell(updatedRow[0], 0);
 
+				// A changed key moves the row: free the old key first, once the new one is known
+				// to be free. Otherwise the insert replaces the row under its key in one write;
+				// deleting first would publish a tombstone that can tie with, and outlive, the
+				// new row on a replica.
 				if (pkBeingUpdated && !oldPk.equals(newPk)) {
 					if (schema.getTables().selectByKey(tableName, newPk) != null) {
-						throw new RuntimeException("Unique constraint violation: primary key '" +
-							newPk + "' already exists in table '" + tableName + "'");
+						throw uniqueViolation(new convex.db.lattice.DuplicateKeyException(toCells(updatedRow)));
 					}
+					schema.getTables().deleteByKey(tableName, oldPk);
 				}
-
-				schema.getTables().deleteByKey(tableName, oldPk);
 				if (insertRow(updatedRow)) {
 					count++;
 				}
@@ -264,13 +315,29 @@ public class ConvexTable extends AbstractQueryableTable
 
 	private boolean insertRow(Object[] row) {
 		if (row == null || row.length < 1) return false;
+		return schema.getTables().insert(tableName, toCells(row));
+	}
+
+	/**
+	 * A violation of this table's primary key: in the cause chain, the SQL standard's
+	 * integrity constraint violation (SQLSTATE 23000), caused by the duplicate key.
+	 */
+	private RuntimeException uniqueViolation(convex.db.lattice.DuplicateKeyException duplicate) {
+		String message = "Unique constraint violation: duplicate key value violates the primary key of table \""
+			+ tableName + "\": key (" + duplicate.getRow().get(0) + ") already exists";
+		java.sql.SQLException sql = new java.sql.SQLIntegrityConstraintViolationException(message, "23000", duplicate);
+		return new IllegalStateException(message, sql);
+	}
+
+	/** A row's values as cells of their columns' types. */
+	private AVector<ACell> toCells(Object[] row) {
 		ConvexColumnType[] types = getColumnTypes();
 		ACell[] cells = new ACell[row.length];
 		for (int i = 0; i < row.length; i++) {
 			ConvexColumnType type = (types != null && i < types.length) ? types[i] : ConvexColumnType.of(ConvexType.ANY);
 			cells[i] = type.toCell(row[i]);
 		}
-		return schema.getTables().insert(tableName, Vectors.of(cells));
+		return Vectors.of(cells);
 	}
 
 	private ACell toCell(Object v, int columnIndex) {

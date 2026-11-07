@@ -81,7 +81,7 @@ public class StringTree extends AString {
 	}
 
 	@Override
-	public StringTree updateRefs(IRefFunction func) {
+	protected StringTree rebuildRefs(IRefFunction func) {
 		BlobTree bt2=data.updateRefs(func);
 		if (bt2==data) return this;
 		return new StringTree(bt2);
@@ -132,7 +132,22 @@ public class StringTree extends AString {
 		if (this==b) return true;
 		if (b==null) return false;
 		if (count()!=b.count()) return false;
-		return Cells.equalsGeneric(this, b);
+		if (b instanceof StringTree st) {
+			Hash h=cachedHash();
+			if (h!=null) {
+				Hash hb=st.cachedHash();
+				if (hb!=null) return h.equals(hb);
+			}
+			// A branch tree compares by hash, which any parent encoding or store needs
+			// anyway, so the work is kept. An embedded tree (a few chunks) compares its
+			// chunk tree, whose children compare through their refs.
+			if (!compareAsEmbedded(st)) return getHash().equals(st.getHash());
+			return data.equals(st.data);
+		}
+		// Another string of this length is non-canonical: compare with its canonical form
+		ACell c=b.getCanonical();
+		if (c==b) return false;
+		return equals(c);
 	}
 
 	@Override

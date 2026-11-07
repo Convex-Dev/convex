@@ -1,11 +1,7 @@
 package convex.lattice;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.ASequence;
 import convex.core.data.Cells;
-import convex.core.data.Keyword;
-import convex.core.data.Strings;
 import convex.core.lang.RT;
 
 /**
@@ -128,79 +124,6 @@ public abstract class ALattice<V extends ACell> {
 	 * @return true if the foreign value is an acceptable lattice value
 	 */
 	public abstract boolean checkForeign(V value);
-
-	/**
-	 * Resolves an external key (e.g. JSON string) to the canonical CVM key
-	 * used by this lattice level. Returns null if the key cannot be resolved
-	 * to a valid child key.
-	 *
-	 * <p>Used by JSON-based APIs to translate path elements before calling
-	 * standard lattice operations like {@code descend()}. Normal CVM code
-	 * that already uses canonical key types does not need this.
-	 *
-	 * <p>Default implementation returns the key unchanged.
-	 *
-	 * @param key External key to resolve
-	 * @return Canonical CVM key, or null if the key is not valid
-	 */
-	public ACell resolveKey(ACell key) {
-		return key;
-	}
-
-	/**
-	 * Converts a canonical CVM key to its JSON-compatible representation.
-	 * Keywords become their name strings; blobs become hex strings;
-	 * other types (AString, AInteger) pass through unchanged.
-	 *
-	 * @param key CVM key to convert
-	 * @return JSON-compatible key
-	 */
-	public static ACell toJSONKey(ACell key) {
-		if (key instanceof Keyword k) return k.getName();
-		if (key instanceof ABlob b) return Strings.create(b.toHexString());
-		return key;
-	}
-
-	/**
-	 * Resolves a JSON path (array of external keys) to canonical CVM keys by
-	 * walking the lattice hierarchy. Each key is resolved via {@link #resolveKey}
-	 * at the appropriate lattice level.
-	 *
-	 * @param jsonPath External keys to resolve
-	 * @return Array of canonical CVM keys, or null if resolution fails at any level
-	 */
-	public ACell[] resolvePath(ACell... jsonPath) {
-		int n=jsonPath.length;
-		// Copy-on-change: start with the input array and clone only when a key first
-		// resolves to a different canonical key. If resolution is the identity (keys
-		// already canonical), the input is returned unchanged — no reconstruction.
-		ACell[] out=jsonPath;
-		ALattice<?> current=this;
-		for (int i=0; i<n; i++) {
-			ACell resolved=current.resolveKey(jsonPath[i]);
-			if (resolved==null) return null;
-			if (resolved!=jsonPath[i]) {
-				if (out==jsonPath) out=jsonPath.clone();
-				out[i]=resolved;
-			}
-			if (i<n-1) {
-				current=current.path(resolved);
-				if (current==null) return null;
-			}
-		}
-		return out;
-	}
-
-	/**
-	 * Resolves a sequence of external keys to canonical CVM keys — the
-	 * {@link ASequence} form of {@link #resolvePath(ACell...)}, to which it delegates.
-	 *
-	 * @param jsonPath Sequence of external keys to resolve
-	 * @return Array of canonical CVM keys, or null if resolution fails at any level
-	 */
-	public ACell[] resolvePath(ASequence<ACell> jsonPath) {
-		return resolvePath(jsonPath.toCellArray());
-	}
 
 	/**
 	 * Get the sub-lattice at the specified path

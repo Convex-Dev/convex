@@ -9,6 +9,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -51,6 +52,43 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @return An updated map with the new association, or null if the association fails
 	 */
 	public abstract AMap<K,V> assoc(ACell key, ACell value);
+
+	/**
+	 * Updates the value for a key, equivalent in value to
+	 * {@code assoc(key, function.apply(get(key), arg))}. The function receives null
+	 * for an absent key, and a null result is stored as a nil value: unlike
+	 * {@link #mergeDifferences}, it does not remove the key. If the function returns
+	 * the current value instance of a present key, this map is returned unchanged.
+	 * The function must be pure: it may be applied again.
+	 *
+	 * Passing the varying input as {@code arg} lets a caller reuse one function
+	 * instance rather than build a closure per call.
+	 *
+	 * @param <A> Type of the function argument
+	 * @param key Key to update
+	 * @param function Function of the current value and the argument
+	 * @param arg Argument passed to the function
+	 * @return Updated map, or null if the association fails
+	 */
+	public <A> AMap<K, V> update(ACell key, BiFunction<? super V, ? super A, ? extends V> function, A arg) {
+		MapEntry<K, V> e=getEntry(key);
+		V value=(e==null)?null:e.getValue();
+		V newValue=function.apply(value,arg);
+		if ((e!=null)&&(newValue==value)) return this;
+		return assoc(key,newValue);
+	}
+
+	/**
+	 * Updates the value for a key with a function of the current value, as
+	 * {@link #update(ACell, BiFunction, Object)}. Builds no closure.
+	 *
+	 * @param key Key to update
+	 * @param function Function of the current value
+	 * @return Updated map, or null if the association fails
+	 */
+	public AMap<K, V> update(ACell key, UnaryOperator<V> function) {
+		return update(key,(v,f) -> f.apply(v),function);
+	}
 
 
 	/**

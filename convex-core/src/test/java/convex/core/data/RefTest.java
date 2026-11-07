@@ -3,6 +3,7 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,10 +28,104 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
+import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class RefTest {
+
+	@Test
+	public void testSoftEqualityHashesBranch() {
+		// A soft ref compares by hash. Comparing it with an unhashed direct ref to a
+		// branch value hashes that value once and leaves the hash cached on the direct
+		// ref, so repeated and shared comparisons never walk the value again.
+		AVector<CVMLong> resident=Vectors.repeat(CVMLong.ONE,256);
+		RefSoft<AVector<CVMLong>> soft=RefSoft.create(new MemoryStore(),resident,Ref.UNKNOWN);
+		AVector<CVMLong> other=Vectors.repeat(CVMLong.ONE,256);
+		Ref<AVector<CVMLong>> direct=other.getRef();
+		assertNull(direct.cachedHash());
+
+		assertTrue(soft.equals(direct));
+		assertEquals(soft.getHash(),direct.cachedHash());
+		assertTrue(direct.equals(soft));
+
+		Ref<AVector<CVMLong>> different=Vectors.repeat(CVMLong.ONE,65536).getRef();
+		assertNull(different.cachedHash());
+		assertFalse(soft.equals(different));
+		assertNotNull(different.cachedHash());
+		assertFalse(different.equals(soft));
+	}
+
+	@Test
+	public void testDirectEqualityEmbeddedByValue() {
+		// Embedded values compare by value: no encoding ever needs their hash, so
+		// comparing two separately built small vectors computes no hash at all.
+		ACell[] as=new ACell[16];
+		ACell[] bs=new ACell[16];
+		for (int i=0; i<16; i++) {
+			as[i]=CVMLong.create(1000000+i);
+			bs[i]=CVMLong.create(1000000+i);
+		}
+		AVector<CVMLong> a=Vectors.create(as);
+		AVector<CVMLong> b=Vectors.create(bs);
+		Ref<AVector<CVMLong>> ra=a.getRef();
+		Ref<AVector<CVMLong>> rb=b.getRef();
+		assertTrue(ra.isEmbedded());
+		assertTrue(ra.equals(rb));
+		assertTrue(rb.equals(ra));
+		assertNull(ra.cachedHash());
+		assertNull(rb.cachedHash());
+		for (int i=0; i<16; i++) {
+			assertNull(a.getRef(i).cachedHash());
+			assertNull(b.getRef(i).cachedHash());
+		}
+		bs[15]=CVMLong.create(-1);
+		assertFalse(ra.equals(Vectors.create(bs).getRef()));
+		assertNull(ra.cachedHash());
+	}
+
+	@Test
+	public void testDirectEqualityEmbeddedAgainstBranch() {
+		// Equal values have the same canonical encoding, so a value embedded on one
+		// side only is unequal, and neither side is hashed to find that out.
+		Ref<AVector<CVMLong>> small=Vectors.repeat(CVMLong.ONE,16).getRef();
+		Ref<AVector<CVMLong>> big=Vectors.repeat(CVMLong.ONE,256).getRef();
+		assertTrue(small.isEmbedded());
+		assertFalse(big.isEmbedded());
+		assertFalse(small.equals(big));
+		assertFalse(big.equals(small));
+		assertNull(small.cachedHash());
+		assertNull(big.cachedHash());
+	}
+
+	@Test
+	public void testSoftEqualityWithoutStoredValue() {
+		for (int size : new int[] {1, 256}) {
+			Blob value=Blob.wrap(new byte[size]);
+			Hash hash=value.getHash();
+			MemoryStore store=new MemoryStore();
+			Ref<Blob> soft=Ref.forHash(hash,store);
+			assertThrows(MissingDataException.class,soft::getValue);
+			assertTrue(soft.equals(soft));
+
+			for (boolean equal : new boolean[] {true, false}) {
+				for (boolean softFirst : new boolean[] {true, false}) {
+					byte[] bytes=new byte[size];
+					if (!equal) bytes[size-1]=1;
+					Blob other=Blob.wrap(bytes);
+					Ref<Blob> direct=RefDirect.create(other);
+					// Each direction must start cold: the first comparison caches the hash.
+					assertNull(direct.cachedHash());
+					assertNull(other.cachedHash());
+					assertEquals(equal,softFirst?soft.equals(direct):direct.equals(soft));
+					assertEquals(equal,value.getEncoding().equals(other.getEncoding()));
+					assertEquals(equal,soft.equals(direct));
+					assertEquals(equal,direct.equals(soft));
+				}
+			}
+			assertThrows(MissingDataException.class,soft::getValue);
+		}
+	}
 
 	@Test
 	public void testMissingData() {
@@ -453,5 +548,90 @@ public class RefTest {
 		// Embedded value: decode from encoding and compare Ref
 		ACell decoded = Samples.TEST_STORE.decode(b);
 		assertEquals(ref, decoded.getRef());
+	}
+
+	@Test
+	public void testEmbeddingCheckCreatesRefOnlyForWalk() {
+		// A check that walks the children keeps its answer on a Ref, created when the value
+		// holds none. Three shapes: fully embedded, a branch, and embedded with a branch child.
+		Random rnd=new Random(811);
+		AHashMap<CVMLong,CVMLong> small=Maps.of(1L,2L,3L,4L);
+		AVector<CVMLong> branch=Vectors.empty();
+		for (int i=0; i<300; i++) branch=branch.conj(CVMLong.create(i));
+		AHashMap<CVMLong,ACell> mixed=Maps.of(1L,Blob.createRandom(rnd,200));
+		for (ACell c : new ACell[] {small,branch,mixed}) {
+			assertTrue(c.isCanonical()); // a non-canonical cell measures through its canonical form
+			assertNull(c.cachedRef);
+			boolean embedded=c.isEmbedded();
+			assertEquals(c.getEncodingLength()<=Format.MAX_EMBEDDED_LENGTH, embedded);
+			Ref<?> r=c.cachedRef;
+			assertNotNull(r);
+			assertEquals(embedded?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK, r.getFlags()&Ref.EMBEDDING_MASK);
+			assertEquals(embedded, c.isEmbedded());
+			assertSame(r, c.cachedRef);
+		}
+		assertTrue(small.isEmbedded());
+		assertFalse(branch.isEmbedded());
+		assertTrue(mixed.isEmbedded());
+		assertEquals(Format.FULL_EMBEDDED_MEMORY_SIZE, small.memorySize);
+		assertTrue(mixed.memorySize<0);
+
+		// No children: the header length answers, and an embedded value keeps a zero memory size
+		Blob smallBlob=Blob.createRandom(rnd,100);
+		assertNull(smallBlob.cachedRef);
+		assertTrue(smallBlob.isEmbedded());
+		assertNull(smallBlob.cachedRef);
+		assertEquals(Format.FULL_EMBEDDED_MEMORY_SIZE, smallBlob.memorySize);
+		Blob bigBlob=Blob.createRandom(rnd,1000);
+		assertFalse(bigBlob.isEmbedded());
+		assertNull(bigBlob.cachedRef);
+
+		// A cached encoding answers from its length
+		AHashMap<CVMLong,ACell> encoded=Maps.of(2L,Blob.createRandom(rnd,200));
+		encoded.getEncoding();
+		assertNull(encoded.cachedRef);
+		assertTrue(encoded.isEmbedded());
+		assertNull(encoded.cachedRef);
+
+		// A non-canonical value measures through its canonical form and records on the Ref
+		// that getCanonical leaves behind, whether the walk completes or stops early
+		ACell[] blobs=new ACell[8];
+		for (int i=0; i<8; i++) blobs[i]=Blob.createRandom(rnd,200);
+		AVector<ACell> oneBlob=Vectors.of(blobs[0]);
+		AVector<ACell> eightBlobs=Vectors.of((Object[])blobs);
+		for (ACell c : new ACell[] {oneBlob,eightBlobs}) {
+			assertFalse(c.isCanonical());
+			assertNull(c.cachedRef);
+			boolean embedded=c.isEmbedded();
+			Ref<?> r=c.cachedRef;
+			assertNotNull(r);
+			assertEquals(embedded?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK, r.getFlags()&Ref.EMBEDDING_MASK);
+			assertEquals(embedded, c.isEmbedded());
+			assertSame(r, c.cachedRef);
+		}
+		assertTrue(oneBlob.isEmbedded());
+		assertFalse(eightBlobs.isEmbedded());
+	}
+
+	@Test
+	public void testEmbeddingCheckRecordsOnExistingRef() {
+		// With a Ref attached and the encoding cached, the check answers from the encoding
+		// length and must still record the status on that Ref. A fully embedded value
+		// would answer from its zero memory size instead, so use one with a branch child.
+		Random rnd=new Random(811);
+		AHashMap<CVMLong,ACell> mixed=Maps.of(1L,Blob.createRandom(rnd,200));
+		mixed.getEncoding();
+		Ref<?> mr=mixed.getRef();
+		assertEquals(0, mr.getFlags()&Ref.EMBEDDING_MASK);
+		assertTrue(mixed.isEmbedded());
+		assertEquals(Ref.KNOWN_EMBEDDED_MASK, mr.getFlags()&Ref.EMBEDDING_MASK);
+
+		AVector<CVMLong> branch=Vectors.empty();
+		for (int i=0; i<300; i++) branch=branch.conj(CVMLong.create(i));
+		branch.getEncoding();
+		Ref<?> br=branch.getRef();
+		assertEquals(0, br.getFlags()&Ref.EMBEDDING_MASK);
+		assertFalse(branch.isEmbedded());
+		assertEquals(Ref.NON_EMBEDDED_MASK, br.getFlags()&Ref.EMBEDDING_MASK);
 	}
 }

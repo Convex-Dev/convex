@@ -46,9 +46,16 @@ import convex.lattice.cursor.TransactionalRootCursor;
  * default store or thread-local store is created or substituted. {@link #store()}
  * returns null. A store-backed host can also be hosted by a networked NodeServer.</p>
  *
- * <p>{@link #close()} is the service's shutdown step for host state: it stops
- * automatic flushing and saves a final checkpoint. The store stays open for the
- * service that owns it.</p>
+ * <p>A service that accepts delayed durability can have the host publish and flush
+ * on a schedule, with {@link #autoSync(Duration, Runnable)} and
+ * {@link #autoFlush(Duration)}; nothing runs on a timer unless it asks.
+ * {@link #close()} is the service's shutdown step for host state: it stops those
+ * workers and saves a final checkpoint. The store stays open for the service that
+ * owns it.</p>
+ *
+ * <p><b>Threading.</b> Syncs, flushes, checkpoints and incoming deliveries may run
+ * on any thread; publication is serialised. The service adds applications at
+ * setup and closes the host at shutdown, one call after another.</p>
  *
  * @param <V> Root lattice value type
  */
@@ -58,7 +65,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	private final LatticeHost<V> origin;
 	private final ReentrantLock syncLock=new ReentrantLock();
 	private Function<V,V> publisher;
-	private AutoFlush autoFlush;
+	private volatile AutoSync autoSync;
+	private volatile AutoFlush autoFlush;
 	private boolean closed;
 	private volatile List<ALatticeComponent<V>> applications=List.of();
 
@@ -259,7 +267,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * replay previous input or merge existing host state into it. Applications manage
 	 * their own children; only root components register here.
 	 */
-	public synchronized <C extends ALatticeComponent<V>> C addApplication(C application) {
+	public <C extends ALatticeComponent<V>> C addApplication(C application) {
 		Objects.requireNonNull(application,"Application must not be null");
 		var updated=new ArrayList<>(applications);
 		updated.add(application);
@@ -283,10 +291,13 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 
 	/**
 	 * Persists the current root value without changing the cursor or publishing.
+	 * Unlike a component's working state, the root keeps its references until
+	 * {@link #sync()} installs the retained snapshot.
 	 *
 	 * @return Persisted current root value
 	 * @throws IOException If persistence fails
 	 */
+	@Override
 	public V persist() throws IOException {
 		return persist(cursor().get());
 	}
@@ -421,11 +432,61 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	}
 
 	/**
-	 * Starts scoped periodic flushing of already-retained state. Neither application
-	 * publication nor host sync is automatic. Close the returned resource, or the host,
-	 * before the borrowed store; either stops the worker and performs a final flush.
-	 * Only one such resource may be active on a host. Use {@link #checkpoint()} for
-	 * durable requests.
+	 * Starts scoped periodic host sync, for applications that write straight into the
+	 * host root and so have nothing to sync: {@link #autoSync(Duration, Runnable)}
+	 * with no application sync.
+	 *
+	 * @param interval Delay between syncs; positive
+	 * @return The running worker, which the host also closes
+	 * @throws IllegalStateException if the host is closed or already has one
+	 */
+	public AutoSync autoSync(Duration interval) {
+		return startAutoSync(interval,null);
+	}
+
+	/**
+	 * Starts scoped periodic sync, for a service that accepts delayed durability.
+	 * Every interval the worker runs the application sync, such as
+	 * {@code application::sync}, then syncs the host, retaining the root and handing
+	 * it to any attached node. The host never chooses which applications sync: drafts
+	 * of applications the service leaves out stay unpublished. Nothing is flushed on
+	 * the interval: pair this with {@link #autoFlush(Duration)}, and use
+	 * {@link #checkpoint()} for durable requests.
+	 *
+	 * <p>Close the returned resource, or the host, before the borrowed store. Closing
+	 * the resource syncs the applications and checkpoints once more; closing the host
+	 * syncs the applications once more before its final checkpoint. Only one such
+	 * resource may be active on a host.</p>
+	 *
+	 * @param interval Delay between runs; positive
+	 * @param applicationSync Syncs the service's applications with the host root;
+	 *        runs on the worker, outside the host's publication lock
+	 * @return The running worker, which the host also closes
+	 * @throws IllegalStateException if the host is closed or already has one
+	 */
+	public AutoSync autoSync(Duration interval, Runnable applicationSync) {
+		return startAutoSync(interval,Objects.requireNonNull(applicationSync,"Application sync must not be null"));
+	}
+
+	private AutoSync startAutoSync(Duration interval, Runnable applicationSync) {
+		syncLock.lock();
+		try {
+			ensureOpen();
+			if (autoSync!=null) throw new IllegalStateException("Host already has an automatic sync");
+			autoSync=new AutoSync(this,interval,applicationSync);
+			return autoSync;
+		} finally {
+			syncLock.unlock();
+		}
+	}
+
+	/**
+	 * Starts scoped periodic flushing of already-retained state. It syncs neither
+	 * applications nor the host; {@link #autoSync(Duration, Runnable)} does.
+	 * Close the returned resource, or the host, before the borrowed store. Closing the
+	 * resource stops the worker and flushes once more; closing the host stops it
+	 * before its final checkpoint. Only one such resource may be active on a host. Use
+	 * {@link #checkpoint()} for durable requests.
 	 */
 	public AutoFlush autoFlush(Duration interval) {
 		syncLock.lock();
@@ -440,47 +501,64 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	}
 
 	/**
-	 * Closes the host: stops any automatic flushing, then retains and flushes a final
-	 * snapshot exactly as {@link #checkpoint()} does. Close any node first and the
-	 * store afterwards, as {@code try (store; host; node) {...}} does.
+	 * Closes the host: stops any automatic sync, which syncs the applications once
+	 * more, and any automatic flushing, then retains and flushes a final snapshot
+	 * exactly as {@link #checkpoint()} does. A failure of that last application sync
+	 * is reported through the automatic sync's {@link AutoSync#failure()}, and the
+	 * save still runs. A
+	 * service with a node checkpoints first, so the node sends that checkpoint to its
+	 * peers as it closes, then closes the node before the host:
+	 * {@code try (store; host; node) { app.sync(); host.checkpoint(); }}; see
+	 * convex-peer/docs/SHUTDOWN.md.
 	 *
-	 * <p>Like a checkpoint, closing does not sync applications or exchange a fork
-	 * with its origin. A publisher still attached receives the final snapshot. The
-	 * store stays open for the service that owns it. Without a store there is
-	 * nothing to retain, so closing only stops automatic flushing.</p>
+	 * <p>Beyond the automatic sync's application sync, closing does not sync
+	 * applications, and like a checkpoint it does not exchange a fork with its
+	 * origin. A publisher still attached receives the final snapshot. The store stays
+	 * open for the service that owns it. Without a store there is nothing to retain,
+	 * so closing only stops the automatic workers.</p>
 	 *
 	 * <p>Once closed, {@link #sync()}, {@link #sync(Function)}, {@link #checkpoint()},
-	 * {@link #flush()}, {@link #autoFlush(Duration)} and {@link #attachPublisher(Function)}
-	 * throw {@link IllegalStateException}. Reads still work. Incoming merges may still
-	 * change the in-memory value but cannot be retained, so a node still attached
-	 * fails its syncs. Closing again does nothing.</p>
+	 * {@link #flush()}, {@link #autoSync(Duration, Runnable)}, {@link #autoFlush(Duration)}
+	 * and {@link #attachPublisher(Function)} throw {@link IllegalStateException}. Reads
+	 * still work. Incoming merges may still change the in-memory value but cannot be
+	 * retained, so a node still running fails its syncs. Closing again does nothing.</p>
 	 *
 	 * @throws IOException if the final checkpoint fails; the host stays open and a
-	 *         later close retries
+	 *         later close retries, without the automatic workers, which have stopped
+	 * @throws IllegalStateException if called from an automatic worker's thread, such
+	 *         as its failure callback, which closing must wait for
 	 */
 	@Override
 	public void close() throws IOException {
-		for (;;) {
-			AutoFlush flusher;
-			syncLock.lock();
-			try {
-				if (closed) return;
-				flusher=autoFlush;
-				if (flusher==null) {
-					if (store!=null) checkpoint();
-					closed=true;
-					return;
-				}
-			} finally {
-				syncLock.unlock();
-			}
-			// Outside syncLock: the worker's flush takes it, and closing waits for the worker.
-			flusher.close();
+		// Outside syncLock: the workers' steps take it, and stopping waits for them
+		AutoSync syncer=autoSync;
+		AutoFlush flusher=autoFlush;
+		if ((syncer!=null && syncer.isWorker()) || (flusher!=null && flusher.isWorker())) {
+			throw new IllegalStateException("Close the host from its owner, not an automatic worker's failure callback");
+		}
+		if (syncer!=null) syncer.closeForHost();
+		if (flusher!=null) flusher.closeForHost();
+		syncLock.lock();
+		try {
+			if (closed) return;
+			if (store!=null) checkpoint();
+			closed=true;
+		} finally {
+			syncLock.unlock();
 		}
 	}
 
 	private void ensureOpen() {
 		if (closed) throw new IllegalStateException("Lattice host is closed");
+	}
+
+	void releaseAutoSync(AutoSync resource) {
+		syncLock.lock();
+		try {
+			if (autoSync==resource) autoSync=null;
+		} finally {
+			syncLock.unlock();
+		}
 	}
 
 	void releaseAutoFlush(AutoFlush resource) {

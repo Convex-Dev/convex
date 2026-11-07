@@ -22,6 +22,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.generic.KeyedLattice;
@@ -39,7 +40,7 @@ class KeyedRegionsTest {
 	private static final Keyword NESTED=Keyword.intern("nested");
 
 	private static class TestRegions extends Regions {
-		TestRegions(LatticeHost<Index<Keyword,ACell>> host) { super(host); }
+		TestRegions(LatticeHost<Index<Keyword,ACell>> host) { super(host.cursor()); }
 		TestRegions(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
 		Counter counter(Keyword key) { return create(key,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork()); }
 		Members members(Keyword key) { return create(key,(AForkableCursor<ASet<CVMLong>> cursor) -> new Members(cursor).fork()); }
@@ -64,12 +65,12 @@ class KeyedRegionsTest {
 
 	@Test void singleAndMultipleRegionsShareTheSameWorkspaceAndPolicy() {
 		var host=LatticeHost.create();
-		var single=SingleRegion.create(host,A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
+		var single=SingleRegion.create(host.cursor(),A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
 		var shared=single.component();
 		shared.setContext(LatticeContext.EMPTY.withSigningKey(AKeyPair.createSeeded(42)));
 		var context=shared.getContext();
-		var multiple=new Regions(host,Map.of(A,shared));
-		var another=new SingleRegion<>(host,A,shared);
+		var multiple=new Regions(host.cursor(),Map.of(A,shared));
+		var another=new SingleRegion<>(host.cursor(),A,shared);
 		assertSame(shared,another.component());
 		assertSame(context,shared.getContext());
 		host.addApplication(single);
@@ -85,7 +86,7 @@ class KeyedRegionsTest {
 
 	@Test void concreteRegionsComposeAtNestedPathsWithoutCreatingUnusedState() {
 		var host=LatticeHost.create();
-		var root=new Regions(host);
+		var root=new Regions(host.cursor());
 		var nested=root.<Index<Keyword,ACell>,Regions>create(NESTED,Regions::new);
 		var child=nested.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor).fork());
 		var alias=new Regions(nested.cursor());
@@ -102,7 +103,7 @@ class KeyedRegionsTest {
 		var store=new MemoryStore();
 		var initial=Index.<Keyword,ACell>of(A,CVMLong.ONE,NESTED,Index.of(B,Strings.create("keep")));
 		var host=LatticeHost.create(initial,store);
-		var app=new Regions(host);
+		var app=new Regions(host.cursor());
 		host.addApplication(app);
 		for (int i=0;i<12;i++) {
 			var incoming=Index.<Keyword,ACell>of(A,CVMLong.create(i),UNKNOWN,Sets.of(i));
@@ -208,7 +209,7 @@ class KeyedRegionsTest {
 		});
 		var child=nested.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
 		assertNull(root.get());
-		assertNull(child.cursor().get());
+		assertFalse(child.cursor().exists());
 		child.cursor().set(CVMLong.ONE); // Even an entry matching the initial value must retain its siblings.
 		assertEquals(Index.of(UNKNOWN,opaque,NESTED,Index.of(A,CVMLong.ONE,B,opaque)),root.get());
 		var before=root.get();
@@ -372,7 +373,7 @@ class KeyedRegionsTest {
 				deliveries.incrementAndGet();
 				// A domain rule, deliberately different from any inferred lattice merge.
 				if (incoming==null || CVMLong.TWO.equals(incoming)) cursor().set(incoming);
-				return cursor().get();
+				return cursor().getOrDefault(null);
 			}
 		});
 		app.merge(Index.of(A,CVMLong.ONE));
@@ -493,5 +494,32 @@ class KeyedRegionsTest {
 		assertThrows(IllegalStateException.class,app::sync);
 		assertEquals(Index.of(A,CVMLong.ONE),host.cursor().get());
 		assertEquals(CVMLong.TWO,pending.cursor().get());
+	}
+
+	/** Regions whose editing view refuses writes. */
+	private static class ReadOnlyRegions extends Regions {
+		private final AForkableCursor<Index<Keyword,ACell>> editing;
+		final Counter constructed;
+		final Counter added;
+
+		ReadOnlyRegions(AForkableCursor<Index<Keyword,ACell>> cursor,Counter elsewhere) {
+			super(cursor);
+			editing=super.cursor().readOnly();
+			constructed=create(A,(AForkableCursor<AInteger> region) -> new Counter(region));
+			added=add(B,elsewhere);
+		}
+
+		@Override public AForkableCursor<Index<Keyword,ACell>> cursor() { return editing; }
+	}
+
+	/** A constructed child edits through its parent's editing view; an added child keeps its own binding. */
+	@Test void constructedChildrenEditThroughTheParentsEditingView() {
+		var root=Root.<Index<Keyword,ACell>>create(null);
+		var elsewhere=Root.<AInteger>create(null);
+		var app=new ReadOnlyRegions(root,new Counter(elsewhere));
+		assertThrows(ReadOnlyCursorException.class,() -> app.constructed.cursor().set(CVMLong.ONE));
+		assertNull(root.get(),"the parent's editing view refused the child's edit");
+		app.added.cursor().set(CVMLong.ONE);
+		assertEquals(CVMLong.ONE,elsewhere.get());
 	}
 }

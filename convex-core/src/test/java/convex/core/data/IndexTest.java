@@ -1,6 +1,8 @@
 package convex.core.data;
 
 import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertEqualityCachesNothing;
+import static convex.test.Assertions.assertEqualityHashesRoots;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,9 +24,11 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +51,35 @@ import convex.etch.EtchStore;
 import convex.test.Samples;
 
 public class IndexTest {
+
+	@Test
+	public void testTreeEquality() {
+		// An embedded tree compares its entry and children: nothing is encoded or hashed
+		Index<Address, CVMLong> a = Index.none(), b = Index.none(), c = Index.none();
+		for (long i = 0; i < 3; i++) {
+			Address k=Address.create(i);
+			CVMLong v=CVMLong.create(i);
+			a = a.assoc(k, v);
+			b = b.assoc(k, v);
+			c = c.assoc(k, (i==2)?CVMLong.create(-1):v);
+		}
+		assertTrue(a.getDepth()>0);
+		assertTrue(a.isEmbedded());
+		assertEqualityCachesNothing(a,b,c);
+
+		// A branch tree compares by hash, which is kept. Keys spread over all sixteen
+		// digits below the common leading nibble, so the root has sixteen branch children
+		a = Index.none(); b = Index.none(); c = Index.none();
+		for (long i = 0; i < 300; i++) {
+			Address k=Address.create(((i%16)<<56)|i);
+			CVMLong v=CVMLong.create(i);
+			a = a.assoc(k, v);
+			b = b.assoc(k, v);
+			c = c.assoc(k, (i==299)?CVMLong.create(-1):v);
+		}
+		assertFalse(a.isEmbedded());
+		assertEqualityHashesRoots(a,b,c);
+	}
 
 	@Test
 	public void testEmpty() throws InvalidDataException {
@@ -545,6 +578,7 @@ public class IndexTest {
 				Index<Blob,CVMLong> updated=index.assoc(zero,CVMLong.create(999));
 				assertEquals(CVMLong.create(999),updated.get(zero));
 				assertEquals(Index.MAX_DEPTH,updated.dissoc(zero).count());
+				assertEquals(updated,index.update(zero,(v,a) -> a,CVMLong.create(999)));
 
 				long[] visited=new long[1];
 				index.forEach((k,v) -> visited[0]++);
@@ -562,6 +596,83 @@ public class IndexTest {
 		worker.start();
 		worker.join();
 		if (failure.get()!=null) throw new AssertionError("Maximum-depth Index operation failed",failure.get());
+	}
+
+	/** Update matches get then assoc for present, absent, prefix, nil-valued and aliased keys. */
+	@Test
+	public void testUpdate() throws InvalidDataException {
+		Random r=new Random(7312);
+		byte[] alphabet={0x00,0x01,0x10,(byte)0xFF};
+		List<ABlob> keys=new ArrayList<>();
+		for (int i=0;i<200;i++) {
+			// Short keys over a small alphabet are often prefixes of one another
+			byte[] bytes=new byte[r.nextInt(7)];
+			for (int j=0;j<bytes.length;j++) bytes[j]=alphabet[r.nextInt(alphabet.length)];
+			keys.add(Blob.wrap(bytes));
+			keys.add(Blob.createRandom(r,16));
+		}
+		byte[] base=new byte[300];
+		Arrays.fill(base,(byte)0x51);
+		byte[] aliasBytes=Arrays.copyOf(base,400);
+		aliasBytes[399]=0x77;
+		keys.add(Blob.wrap(base));
+		keys.add(Blob.wrap(aliasBytes)); // aliases the previous key on its first 255 bytes
+
+		Index<ABlob,CVMLong> index=Index.none();
+		for (int i=0;i<keys.size();i+=2) index=index.assoc(keys.get(i),CVMLong.create(i));
+		Blob nil=Blob.fromHex("0110");
+		index=index.assoc(nil,null); // present with a nil value
+		keys.add(nil);
+		index.validate();
+
+		BiFunction<CVMLong,CVMLong,CVMLong> plus=(count,delta) -> (count==null)?delta:CVMLong.create(count.longValue()+delta.longValue());
+		CVMLong delta=CVMLong.create(5);
+		for (ABlob key:keys) {
+			Index<ABlob,CVMLong> updated=index.update(key,plus,delta);
+			assertEquals(index.assoc(key,plus.apply(index.get(key),delta)),updated);
+			updated.validate();
+			Index<ABlob,CVMLong> unary=index.update(key,v -> plus.apply(v,delta));
+			assertEquals(updated,unary);
+			ACell cellKey=key;
+			AIndex<ABlob,CVMLong> viaCell=index.update(cellKey,plus,delta);
+			assertEquals(updated,viaCell);
+			if (index.containsKey(key)) assertSame(index,index.update(key,(v,a) -> v,null));
+		}
+		assertNull(index.update(null,plus,delta));
+		assertNull(index.update(null,v -> v));
+		assertNull(index.update(CVMLong.ONE,plus,delta)); // not a valid Index key
+		assertNull(index.update(CVMLong.ONE,v -> v));
+
+		AString shorter=Strings.create("counter-7"), longer=Strings.create("counter-70");
+		Index<AString,CVMLong> names=Index.of(shorter,CVMLong.ONE,longer,CVMLong.ONE);
+		assertEquals(Index.of(shorter,CVMLong.create(6),longer,CVMLong.ONE),names.update(shorter,plus,delta));
+		assertEquals(Index.of(shorter,CVMLong.ONE,longer,CVMLong.create(6)),names.update(longer,plus,delta));
+	}
+
+	/** Assoc compares key bytes without hashing either key, whether it replaces, forks or extends an entry. */
+	@Test
+	public void testAssocLeavesKeysUnhashed() {
+		Random r=new Random(5821);
+		List<Blob> keys=new ArrayList<>();
+		Index<ABlob,CVMLong> index=Index.none();
+		for (int i=0;i<20;i++) {
+			// Distinct keys of equal length: each sits alone in a single-entry node
+			Blob key=Blob.createRandom(r,30);
+			keys.add(key);
+			index=index.assoc(key,CVMLong.create(i));
+		}
+		List<Blob> added=new ArrayList<>();
+		for (Blob key:keys) added.add(Blob.wrap(key.getBytes())); // same bytes, new instance
+		byte[] forked=keys.get(0).getBytes();
+		forked[29]^=0x01;
+		added.add(Blob.wrap(forked));
+		added.add(Blob.wrap(Arrays.copyOf(keys.get(0).getBytes(),31)));
+		for (Blob key:added) index=index.assoc(key,CVMLong.create(-1));
+
+		for (Blob key:keys) assertNull(key.cachedHash());
+		for (Blob key:added) assertNull(key.cachedHash());
+		assertEquals(22,index.count());
+		for (Blob key:added) assertEquals(CVMLong.create(-1),index.get(key));
 	}
 
 	@Test
@@ -1325,6 +1436,11 @@ public class IndexTest {
 			assertEquals(m.mergeDifferences(changed,(a,b) -> b),Index.mergeDeep(m,changed,(a,b) -> b));
 			assertEquals(m.mergeDifferences(changed,(a,b) -> (a==null)?b:a),Index.mergeDeep(m,changed,(a,b) -> (a==null)?b:a));
 			assertEquals(m.mergeDifferences(changed,(a,b) -> null),Index.mergeDeep(m,changed,(a,b) -> null));
+
+			assertSame(m,Index.mergeIntoDeep(m,m,(a,b) -> b));
+			assertEquals(m.merge(changed,(a,b) -> b),Index.mergeIntoDeep(m,changed,(a,b) -> b));
+			assertEquals(m.merge(changed,(a,b) -> (a==null)?b:a),Index.mergeIntoDeep(m,changed,(a,b) -> (a==null)?b:a));
+			assertEquals(m.merge(changed,(a,b) -> null),Index.mergeIntoDeep(m,changed,(a,b) -> null));
 		}
 	}
 }

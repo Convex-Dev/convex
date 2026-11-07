@@ -14,12 +14,14 @@ import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,12 +56,16 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.Ref;
 import convex.core.message.AConnection;
+import convex.core.message.ChallengeSigner;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.exceptions.ResultException;
 import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.etch.Etch;
+import convex.etch.EtchStore;
 import convex.lattice.ALattice;
 import convex.lattice.ALatticeApplication;
 import convex.lattice.Lattice;
@@ -69,6 +75,7 @@ import convex.lattice.cursor.ACursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
+import convex.net.PeerConnectionException;
 import convex.net.impl.netty.NettyServer;
 
 /**
@@ -211,7 +218,7 @@ public class NodeServerTest {
 		assertFalse(setNodeServer.isRunning());
 	}
 
-	/** A local host needs no implicit/default propagation policy group. */
+	/** A local host needs no implicit/default propagator group. */
 	@Test
 	public void testLaunchWithoutPropagatorsPersistsLocally() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
@@ -225,7 +232,7 @@ public class NodeServerTest {
 		assertTrue(maxNodeServer.isRunning());
 	}
 
-	/** Runtime policy remains on the propagation group, not the authoritative node. */
+	/** Runtime policy remains on the propagator group, not the authoritative node. */
 	@Test
 	public void testPropagatorPolicyCanChangeWhileRunning() throws Exception {
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,NodeConfig.port(-1));
@@ -271,7 +278,7 @@ public class NodeServerTest {
 		CompletableFuture<LatticePropagator.Failure> failureSignal=broken.nextFailure();
 
 		maxNodeServer.launch();
-		assertTrue(maxNodeServer.isRunning(),"a failed propagation group must not fail launch");
+		assertTrue(maxNodeServer.isRunning(),"a failed propagator group must not fail launch");
 		assertEquals("initial view materialisation",
 			failureSignal.get(5,TimeUnit.SECONDS).operation());
 		assertTrue(broken.getStatus().hasFailures());
@@ -302,10 +309,6 @@ public class NodeServerTest {
 
 		@Override public void triggerBroadcast(ACell value) {
 			throw new IllegalStateException("simulated notification failure");
-		}
-
-		@Override public void stopIngress() throws IOException {
-			throw new IOException("simulated ingress shutdown failure");
 		}
 
 		@Override public void triggerAndClose(ACell finalValue) {
@@ -421,34 +424,6 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * #564: inbound values over the configured size limit are rejected before merge.
-	 */
-	@Test
-	public void testInboundValueSizeLimit() {
-		ALattice<AInteger> lattice = MaxLattice.create();
-
-		// A node configured with a tight inbound size limit (100 bytes)
-		NodeConfig tight = NodeConfig.create(Maps.of(NodeConfig.MAX_INBOUND_VALUE_SIZE, CVMLong.create(100)));
-		maxNodeServer = new TestNode<>(lattice, store, tight);
-
-		// A small (embedded) value is within the limit
-		assertTrue(propagator(maxNodeServer).withinInboundSizeLimit(CVMLong.ONE));
-
-		// A large value exceeds the limit and is rejected
-		convex.core.data.ABlob big = convex.core.data.Blob.wrap(new byte[500]);
-		assertTrue(big.getMemorySize() > 100); // sanity: this value really is over the limit
-		assertFalse(propagator(maxNodeServer).withinInboundSizeLimit(big));
-
-		// Under the default (permissive) config, the same large value is accepted
-		NodeServer<AInteger> permissive = new TestNode<>(lattice, store);
-		try {
-			assertTrue(propagator(permissive).withinInboundSizeLimit(big));
-		} finally {
-			try { permissive.close(); } catch (Exception e) { /* ignore */ }
-		}
-	}
-
-	/**
 	 * #562: an inbound value of the wrong type for the target lattice is rejected cleanly
 	 * and leaves the cursor unchanged (the merge aborts atomically).
 	 */
@@ -499,9 +474,9 @@ public class NodeServerTest {
 		assertEquals(16*1024*1024,groupDefaults.getMaxDeltaBroadcastSize());
 		assertEquals(convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH,
 			groupDefaults.getMaxTrustedMessageSize());
-		assertEquals(groupDefaults.getMaxMessageSize(),groupDefaults.getMaxInboundValueSize());
 		assertEquals(256,groupDefaults.getMaxConnections());
 		assertEquals(1024,groupDefaults.getInboundQueueSize());
+		assertEquals(16,groupDefaults.getMaxDataRequests());
 		assertEquals(16*1024*1024,groupDefaults.getMaxInboundQueueBytes());
 		assertEquals(10_000L,groupDefaults.getInboundShutdownTimeout());
 
@@ -518,6 +493,7 @@ public class NodeServerTest {
 			LatticePropagatorConfig.MAX_TRUSTED_MESSAGE_SIZE,CVMLong.create(65536),
 			LatticePropagatorConfig.MAX_CONNECTIONS,CVMLong.create(12),
 			LatticePropagatorConfig.INBOUND_QUEUE_SIZE,CVMLong.create(34),
+			LatticePropagatorConfig.MAX_DATA_REQUESTS,CVMLong.create(5),
 			LatticePropagatorConfig.MAX_INBOUND_QUEUE_BYTES,CVMLong.create(65536),
 			LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.create(56)));
 		assertEquals(8192,group.getMaxMessageSize());
@@ -526,12 +502,16 @@ public class NodeServerTest {
 		assertEquals(65536,group.getMaxTrustedMessageSize());
 		assertEquals(12,group.getMaxConnections());
 		assertEquals(34,group.getInboundQueueSize());
+		assertEquals(5,group.getMaxDataRequests());
 		assertEquals(65536,group.getMaxInboundQueueBytes());
 		assertEquals(56,group.getInboundShutdownTimeout());
 
 		LatticePropagatorConfig invalid=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.INBOUND_QUEUE_SIZE,CVMLong.ZERO));
 		assertThrows(IllegalArgumentException.class,invalid::getInboundQueueSize);
+		LatticePropagatorConfig invalidDataRequests=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_DATA_REQUESTS,CVMLong.ZERO));
+		assertThrows(IllegalArgumentException.class,invalidDataRequests::getMaxDataRequests);
 		LatticePropagatorConfig invalidTimeout=LatticePropagatorConfig.create(Maps.of(
 			LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.ZERO));
 		assertThrows(IllegalArgumentException.class, invalidTimeout::getInboundShutdownTimeout);
@@ -589,36 +569,6 @@ public class NodeServerTest {
 				throw new StoreException("simulated primary-store failure");
 			}
 			return super.setRootData(data);
-		}
-	}
-
-	/** Store gate used to hold launch at its first root checkpoint deterministically. */
-	static final class BlockingRootStore extends MemoryStore {
-		final CountDownLatch rootWriteEntered = new CountDownLatch(1);
-		final CountDownLatch releaseRootWrite = new CountDownLatch(1);
-		volatile boolean blockRootWrite = true;
-
-		@Override
-		public <T extends ACell> Ref<T> setRootData(T data) {
-			if (blockRootWrite) {
-				rootWriteEntered.countDown();
-				boolean interrupted = false;
-				while (true) {
-					try {
-						releaseRootWrite.await();
-						break;
-					} catch (InterruptedException e) {
-						interrupted = true;
-					}
-				}
-				if (interrupted) Thread.currentThread().interrupt();
-			}
-			return super.setRootData(data);
-		}
-
-		void release() {
-			blockRootWrite = false;
-			releaseRootWrite.countDown();
 		}
 	}
 
@@ -1026,7 +976,7 @@ public class NodeServerTest {
 		try (AStore ingressStore=new MemoryStore()) {
 			ASet<ACell> value=Sets.of(Blobs.createRandom(400));
 			LatticeHost<ASet<ACell>> host=LatticeHost.create(Sets.empty(),ingressStore);
-			var indifferent=new ALatticeApplication<ASet<ACell>>(host) {
+			var indifferent=new ALatticeApplication<ASet<ACell>>(host.cursor().fork(),host::persist) {
 				@Override public ASet<ACell> merge(ASet<ACell> incoming) { return cursor().get(); }
 			};
 			host.addApplication(indifferent);
@@ -1150,6 +1100,130 @@ public class NodeServerTest {
 				peer.close();
 			}
 		}
+	}
+
+	/**
+	 * Reverse DATA_REQUESTs over every route draw on one pool: with it held by one
+	 * route, another route's request waits rather than being refused, and is served
+	 * once the pool is free again. Each request reports what it needs as it is
+	 * delivered, so no step depends on timing.
+	 */
+	@Test
+	public void testReverseDataRequestsShareOnePool() throws Exception {
+		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore();
+				LatticeConnectionManager manager = new LatticeConnectionManager(servingStore)) {
+			manager.setDataRequestLimit(1);
+			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
+			servingStore.blockedHash = value.getHash();
+			var route0 = manager.dataRequestDelivery();
+			var route1 = manager.dataRequestDelivery();
+			ScriptedPeer peer = new ScriptedPeer();
+			try {
+				assertNull(route0.apply(dataRequest(81, value, peer)));
+				// Route 0's request holds the pool's only permit at the store gate
+				assertTrue(servingStore.requested.await(5, TimeUnit.SECONDS));
+				Message waiting = dataRequest(82, value, peer);
+				Predicate<Message> retry = route1.apply(waiting);
+				assertNotNull(retry, "a request finding the pool taken waits rather than being refused");
+				CompletableFuture<Boolean> taken = testAsync(retry, waiting);
+
+				servingStore.release.countDown();
+				assertTrue(taken.get(5, TimeUnit.SECONDS));
+				assertServed(value, peer.awaitResult(81));
+				assertServed(value, peer.awaitResult(82));
+			} finally {
+				servingStore.release.countDown();
+			}
+		}
+	}
+
+	/** One route holds at most a quarter of the pool, so another route is served while the first waits. */
+	@Test
+	public void testReverseDataRequestRouteShare() throws Exception {
+		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore();
+				LatticeConnectionManager manager = new LatticeConnectionManager(servingStore)) {
+			manager.setDataRequestLimit(8);
+			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
+			servingStore.blockedHash = value.getHash();
+			var route0 = manager.dataRequestDelivery();
+			var route1 = manager.dataRequestDelivery();
+			ScriptedPeer peer = new ScriptedPeer();
+			try {
+				// The first two hold route 0's share of two behind the store gate
+				assertNull(route0.apply(dataRequest(81, value, peer)));
+				assertNull(route0.apply(dataRequest(82, value, peer)));
+				Message third = dataRequest(83, value, peer);
+				Predicate<Message> retry = route0.apply(third);
+				assertNotNull(retry, "a route beyond its share waits though the pool has permits to spare");
+				assertNull(route1.apply(dataRequest(84, value, peer)), "another route is served at once");
+				CompletableFuture<Boolean> taken = testAsync(retry, third);
+
+				servingStore.release.countDown();
+				assertTrue(taken.get(5, TimeUnit.SECONDS));
+				for (long id = 81; id <= 84; id++) assertServed(value, peer.awaitResult(id));
+			} finally {
+				servingStore.release.countDown();
+			}
+		}
+	}
+
+	/** A request that gives up waiting returns what it took, so later requests on its route are served. */
+	@Test
+	public void testAbandonedDataRequestWaitReturnsPermits() throws Exception {
+		try (BlockingReadMemoryStore servingStore = new BlockingReadMemoryStore();
+				LatticeConnectionManager manager = new LatticeConnectionManager(servingStore)) {
+			manager.setDataRequestLimit(1);
+			Blob value = Cells.persist(Blobs.createRandom(400), servingStore);
+			servingStore.blockedHash = value.getHash();
+			var route0 = manager.dataRequestDelivery();
+			var route1 = manager.dataRequestDelivery();
+			ScriptedPeer peer = new ScriptedPeer();
+			try {
+				assertNull(route0.apply(dataRequest(81, value, peer)));
+				assertTrue(servingStore.requested.await(5, TimeUnit.SECONDS));
+				Message abandoned = dataRequest(82, value, peer);
+				Predicate<Message> retry = route1.apply(abandoned);
+				assertNotNull(retry);
+				CompletableFuture<Boolean> gaveUp = new CompletableFuture<>();
+				Thread waiter = Thread.ofVirtual().start(() -> gaveUp.complete(retry.test(abandoned)));
+				// Parked only for the pool, so it already holds its route's permit
+				awaitTimedWait(waiter);
+				waiter.interrupt();
+				assertFalse(gaveUp.get(5, TimeUnit.SECONDS), "an interrupted wait gives up");
+
+				servingStore.release.countDown();
+				assertServed(value, peer.awaitResult(81));
+				Message later = dataRequest(83, value, peer);
+				Predicate<Message> laterRetry = route1.apply(later);
+				if (laterRetry != null) assertTrue(laterRetry.test(later));
+				assertServed(value, peer.awaitResult(83));
+			} finally {
+				servingStore.release.countDown();
+			}
+		}
+	}
+
+	private static Message dataRequest(long id, Blob value, AConnection connection) {
+		return Message.createDataRequest(CVMLong.create(id), value.getHash()).withConnection(connection);
+	}
+
+	/** Spins until a thread parks with a timeout, the only wait it can reach here. */
+	private static void awaitTimedWait(Thread thread) {
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+		while (thread.getState() != Thread.State.TIMED_WAITING) {
+			assertTrue(System.nanoTime() < deadline, "the thread should wait for a permit");
+			Thread.onSpinWait();
+		}
+	}
+
+	/** Runs a delivery's retry on its own thread, as a paused connection does. */
+	private static CompletableFuture<Boolean> testAsync(Predicate<Message> retry, Message message) {
+		return CompletableFuture.supplyAsync(() -> retry.test(message), task -> Thread.ofVirtual().start(task));
+	}
+
+	private static void assertServed(Blob value, Result result) {
+		assertFalse(result.isError(), "expected data, got " + result);
+		assertEquals(value, ((AVector<?>) result.getValue()).get(0));
 	}
 
 	/**
@@ -1278,6 +1352,56 @@ public class NodeServerTest {
 		}
 	}
 
+	/**
+	 * Closing a node must not interrupt an ingress worker inside a store write: an
+	 * interrupt during Etch channel I/O closes the file channel for every user of
+	 * the store (#776). The worker outlives the drain timeout and is left to finish.
+	 */
+	@Test
+	public void testCloseDoesNotInterruptIngressStoreWrite() throws Exception {
+		MemoryStore primaryStore = new MemoryStore();
+		BlockingWriteStore ingressStore = new BlockingWriteStore("Lattice propagator ingress");
+		NodeServer<ASet<ACell>> receiver = null;
+		ConvexRemote source = null;
+		try {
+			LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+				LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.create(100)));
+			LatticePropagator primary = new LatticePropagator(primaryStore,groupConfig);
+			LatticePropagator ingress = new LatticePropagator(ingressStore,groupConfig);
+			receiver = new TestNode<>(SetLattice.create(), primaryStore, NodeConfig.port(0));
+			receiver.addPropagator(primary);
+			receiver.addPropagator(ingress);
+			selectInboundPropagator(receiver,connection -> ingress);
+			receiver.launch();
+
+			// A complete, embedded value is accepted from an unverified connection and
+			// persisted into the group's store by the ingress worker.
+			source = ConvexRemote.connect(address(receiver));
+			AVector<?> payload = Vectors.create(
+				MessageTag.LATTICE_VALUE, null, Vectors.empty(), Sets.of(CVMLong.create(776)));
+			assertTrue(source.trySend(Message.create(
+				MessageType.LATTICE_VALUE, payload, payload.getEncoding())));
+			assertTrue(ingressStore.entered.await(5, TimeUnit.SECONDS),
+				"the ingress worker should enter the controlled store write");
+
+			receiver.close();
+			assertEquals(NodeServer.LifecycleState.STOPPED,receiver.getLifecycleState());
+
+			ingressStore.release();
+			assertTrue(ingressStore.finished.await(5, TimeUnit.SECONDS));
+			assertFalse(ingressStore.wasInterrupted(), "node close must never interrupt store I/O");
+
+			ingressStore.heldThread().join(5000);
+			assertFalse(ingressStore.heldThread().isAlive(), "the ingress worker should finish its message");
+		} finally {
+			ingressStore.release();
+			if (receiver != null) receiver.close();
+			if (source != null) source.close();
+			ingressStore.close();
+			primaryStore.close();
+		}
+	}
+
 	// ===== #567: public URL validation =====
 
 	/**
@@ -1340,74 +1464,35 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Lifecycle state is explicit, and configuration freezes atomically when the
-	 * first launch begins. Latches hold launch inside its initial root checkpoint;
-	 * the competing mutation future must remain blocked on the lifecycle monitor
-	 * until launch publishes RUNNING, then reject against that completed state.
+	 * Lifecycle state is explicit. Groups are added before launch or while running,
+	 * each once, and a stopped node relaunches with the groups it kept.
 	 */
 	@Test
-	public void testDynamicAdditionSerialisesWithLaunch() throws Exception {
-		BlockingRootStore testStore = new BlockingRootStore();
-		NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), testStore, NodeConfig.port(-1));
-		LatticePropagator primary = new LatticePropagator(testStore,LatticePropagatorConfig.create());
-		node.addPropagator(primary);
+	public void testGroupsAreAddedBeforeLaunchOrWhileRunning() throws Exception {
+		try (MemoryStore testStore=new MemoryStore();
+				NodeServer<AInteger> node=new TestNode<>(MaxLattice.create(),testStore,NodeConfig.port(-1))) {
+			LatticePropagator primary=new LatticePropagator(testStore,LatticePropagatorConfig.create());
+			node.addPropagator(primary);
+			assertEquals(NodeServer.LifecycleState.NEW,node.getLifecycleState());
+			assertThrows(UnsupportedOperationException.class,node.getPropagators()::clear,
+				"callers must not be able to reorder or remove attached propagators");
 
-		assertEquals(NodeServer.LifecycleState.NEW, node.getLifecycleState());
-		assertThrows(UnsupportedOperationException.class, node.getPropagators()::clear,
-			"callers must not be able to reorder or remove attached propagators");
-
-		CompletableFuture<Void> launchFuture = CompletableFuture.runAsync(() -> {
-			try {
-				node.launch();
-			} catch (IOException | InterruptedException e) {
-				throw new CompletionException(e);
-			}
-		});
-
-		CountDownLatch mutationStarted = new CountDownLatch(1);
-		try {
-			assertTrue(testStore.rootWriteEntered.await(5, TimeUnit.SECONDS));
-			assertEquals(NodeServer.LifecycleState.STARTING, node.getLifecycleState());
-
-			CompletableFuture<Throwable> mutationFuture = CompletableFuture.supplyAsync(() -> {
-				mutationStarted.countDown();
-				try {
-					node.addPropagator(new LatticePropagator(testStore));
-					return null;
-				} catch (Throwable t) {
-					return t;
-				}
-			});
-			assertTrue(mutationStarted.await(5, TimeUnit.SECONDS));
-			assertFalse(mutationFuture.isDone(),
-				"configuration mutation must serialize behind the in-progress launch");
-
-			testStore.release();
-			launchFuture.get(5, TimeUnit.SECONDS);
-			assertEquals(NodeServer.LifecycleState.RUNNING, node.getLifecycleState());
-			assertNull(mutationFuture.get(5, TimeUnit.SECONDS));
+			node.launch();
+			assertEquals(NodeServer.LifecycleState.RUNNING,node.getLifecycleState());
+			node.addPropagator(new LatticePropagator(testStore));
 			assertEquals(2,node.getPropagators().size());
-			assertTrue(node.getPropagators().get(1).isRunning());
-			assertThrows(IllegalArgumentException.class, () -> node.addPropagator(primary));
+			assertTrue(node.getPropagators().get(1).isRunning(),"a group added while running starts at once");
+			assertThrows(IllegalArgumentException.class,() -> node.addPropagator(primary));
 
 			node.close();
-			assertEquals(NodeServer.LifecycleState.STOPPED, node.getLifecycleState());
+			assertEquals(NodeServer.LifecycleState.STOPPED,node.getLifecycleState());
 			assertThrows(IllegalStateException.class,
 				() -> node.addPropagator(new LatticePropagator(testStore)),
 				"adding groups requires a new or running node");
 
 			node.launch();
-			assertEquals(NodeServer.LifecycleState.RUNNING, node.getLifecycleState(),
+			assertEquals(NodeServer.LifecycleState.RUNNING,node.getLifecycleState(),
 				"a stopped node may relaunch with its retained groups");
-		} finally {
-			testStore.release();
-			try {
-				launchFuture.get(5, TimeUnit.SECONDS);
-			} catch (Exception e) {
-				// The assertions above report the original launch failure if there was one.
-			}
-			node.close();
-			testStore.close();
 		}
 	}
 
@@ -1420,6 +1505,59 @@ public class NodeServerTest {
 		@Override public boolean sendMessage(Message msg) { return true; }
 		@Override public boolean trySendMessage(Message msg) { sent.incrementAndGet(); return true; }
 		@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.1", 30000); }
+		@Override public boolean isClosed() { return closed; }
+		@Override public void close() { closed = true; }
+		@Override public long getReceivedCount() { return 0; }
+	}
+
+	/**
+	 * A trusted peer whose data requests the test answers, or refuses to send, and
+	 * which collects the results returned to it by ID.
+	 */
+	static final class ScriptedPeer extends AConnection {
+		final LinkedBlockingQueue<Message> requests = new LinkedBlockingQueue<>();
+		final ConcurrentHashMap<ACell,CompletableFuture<Result>> results = new ConcurrentHashMap<>();
+		volatile boolean refuseSends = false;
+		volatile boolean closed = false;
+
+		ScriptedPeer() {
+			this(AKeyPair.generate().getAccountKey());
+		}
+
+		ScriptedPeer(AccountKey key) {
+			setTrustedKey(key);
+		}
+
+		@Override public boolean sendMessage(Message msg) {
+			if (refuseSends) return false;
+			requests.add(msg);
+			return true;
+		}
+
+		@Override public boolean trySendMessage(Message msg) {
+			if (msg.getType() == MessageType.RESULT) {
+				Result result = msg.toResult();
+				result(result.getID()).complete(result);
+			}
+			return true;
+		}
+
+		CompletableFuture<Result> result(ACell id) {
+			return results.computeIfAbsent(id, key -> new CompletableFuture<>());
+		}
+
+		Result awaitResult(long id) throws Exception {
+			return result(CVMLong.create(id)).get(5, TimeUnit.SECONDS);
+		}
+
+		void answerNextRequest(Result reply) throws Exception {
+			Message request = requests.poll(5, TimeUnit.SECONDS);
+			assertNotNull(request, "the endpoint should request the missing data");
+			Message response = Message.createResult(reply.withID(request.getRequestID())).withConnection(this);
+			assertTrue(completeRequest(response));
+		}
+
+		@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.2", 30000); }
 		@Override public boolean isClosed() { return closed; }
 		@Override public void close() { closed = true; }
 		@Override public long getReceivedCount() { return 0; }
@@ -1591,6 +1729,13 @@ public class NodeServerTest {
 		return Message.create(MessageType.LATTICE_VALUE, payload).withConnection(conn);
 	}
 
+	/** A LATTICE_VALUE with an ID whose one branch, a random blob, the receiver must acquire. */
+	private static Message partialLatticeValue(long id, AConnection conn) {
+		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, CVMLong.create(id), Vectors.empty(),
+			Sets.of(Blobs.createRandom(400)));
+		return Message.create(MessageType.LATTICE_VALUE, null, payload.getEncoding()).withConnection(conn);
+	}
+
 	/** A recoverable Error in one message must not terminate the single inbound consumer. */
 	@Test
 	public void testInboundDispatcherSurvivesStackOverflow() throws Exception {
@@ -1606,6 +1751,84 @@ public class NodeServerTest {
 			assertEquals(CVMLong.create(42), nextAnnounce.get(10, TimeUnit.SECONDS));
 			assertTrue(faulting.closed, "the connection responsible for the Error must be closed");
 			assertTrue(node.isRunning(), "a recoverable message Error must not stop the node");
+		}
+	}
+
+	/**
+	 * A reply to this node's own request on a connection opened to it completes as it
+	 * arrives, without waiting behind messages the group has yet to process.
+	 */
+	@Test
+	public void testReplyCompletesWhileGroupIsBusy() throws Exception {
+		BlockingMessage blocking = new BlockingMessage();
+		ScriptedPeer peer = new ScriptedPeer();
+		try (NodeServer<AInteger> node = new TestNode<>(MaxLattice.create(), store)) {
+			LatticePropagator propagator=propagator(node);
+			node.launch();
+			try {
+				assertNull(propagator.deliverIncomingMessage(blocking));
+				assertTrue(blocking.entered.await(5, TimeUnit.SECONDS), "the group's processing thread is held");
+
+				CompletableFuture<Message> reply = peer.request(Message.createPing(null), 5000);
+				Message request = peer.requests.poll(5, TimeUnit.SECONDS);
+				assertNotNull(request);
+				Message response = Message.createResult(Result.create(request.getRequestID(), CVMLong.ONE)).withConnection(peer);
+				assertNull(propagator.deliverIncomingMessage(response));
+				assertTrue(reply.isDone(), "the reply must not wait for the group's processing thread");
+			} finally {
+				// Before the node closes, which would otherwise wait for the held thread
+				blocking.release.countDown();
+			}
+		}
+	}
+
+	/**
+	 * A value pushed over a route this node opened waits for room in the group's
+	 * queue, as one over a connection opened to the node does, rather than being dropped.
+	 */
+	@Test
+	public void testPushedValueWaitsForQueueSpace() throws Exception {
+		AKeyPair aliceKey = AKeyPair.generate();
+		AKeyPair bobKey = AKeyPair.generate();
+		MaxLattice lattice = MaxLattice.create();
+		BlockingMessage blocking = new BlockingMessage();
+		try (MemoryStore aliceStore = new MemoryStore(); MemoryStore bobStore = new MemoryStore()) {
+			LatticePropagator aliceGroup = new LatticePropagator(aliceStore, LatticePropagatorConfig.create(Maps.of(
+				LatticePropagatorConfig.INBOUND_QUEUE_SIZE, CVMLong.ONE)));
+			LatticePropagator bobGroup = new LatticePropagator(bobStore, LatticePropagatorConfig.create());
+			aliceGroup.setTransportSigner(ChallengeSigner.create(aliceKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT));
+			bobGroup.setTransportSigner(ChallengeSigner.create(bobKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT));
+			try (var alice = new NodeServer<>(RelayHost.open(lattice, aliceStore), NodeConfig.port(-1));
+					var bob = new NodeServer<>(RelayHost.open(lattice, bobStore), NodeConfig.localNetwork());
+					var listener = new LatticeListener(NodeConfig.localNetwork())) {
+				alice.addPropagator(aliceGroup);
+				bob.addPropagator(bobGroup);
+				listener.registerPropagator(bobGroup);
+				listener.setSelector(connection -> bobGroup);
+				alice.launch();
+				bob.launch();
+				listener.launch();
+				Convex route = aliceGroup.getConnectionManager().connectPeer(bobKey.getAccountKey(),
+					new InetSocketAddress("localhost", listener.getPort())).get(5, TimeUnit.SECONDS);
+
+				Predicate<Message> retry;
+				ScriptedPeer fromBob = new ScriptedPeer(bobKey.getAccountKey());
+				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, CVMLong.create(7), Vectors.empty(), CVMLong.create(7));
+				Message pushed = Message.create(MessageType.LATTICE_VALUE, payload).withConnection(fromBob);
+				try {
+					// Hold Alice's processing thread, then fill her one-message queue
+					assertNull(aliceGroup.deliverIncomingMessage(blocking));
+					assertTrue(blocking.entered.await(5, TimeUnit.SECONDS));
+					assertNull(aliceGroup.deliverIncomingMessage(latticeValue(CVMLong.ONE, null)));
+					retry = aliceGroup.receiveFromManagedOutbound(route, pushed);
+					assertNotNull(retry, "a full queue asks the route to wait rather than dropping the value");
+				} finally {
+					// Before the nodes close, which would otherwise wait for the held thread
+					blocking.release.countDown();
+				}
+				assertTrue(retry.test(pushed));
+				assertFalse(fromBob.awaitResult(7).isError(), "the pushed value is merged and answered");
+			}
 		}
 	}
 
@@ -1683,6 +1906,106 @@ public class NodeServerTest {
 		LatticePropagator.InboundStats aggregate=endpoint.getInboundStats();
 		assertTrue(aggregate.mergesAccepted()>=1);
 		assertTrue(aggregate.mergesRejected()>=2);
+	}
+
+	/** Launches a MaxLattice node with one group, closing a route after two rejects. */
+	private LatticePropagator launchTwoRejectGroup(AStore nodeStore,int acquisitions)
+			throws IOException, InterruptedException {
+		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS,CVMLong.create(2),
+			LatticePropagatorConfig.INBOUND_QUEUE_SIZE,CVMLong.create(acquisitions)));
+		maxNodeServer = new TestNode<>(MaxLattice.create(), nodeStore, NodeConfig.port(-1));
+		maxNodeServer.addPropagator(new LatticePropagator(nodeStore,groupConfig));
+		maxNodeServer.launch();
+		return propagator(maxNodeServer);
+	}
+
+	/**
+	 * A sender that is busy, or that this node cannot reach because its own send
+	 * buffer is full, is not at fault: neither counts towards closing its route nor
+	 * resets the count. One that answers for its missing data wrongly is.
+	 */
+	@Test
+	public void testSenderLoadDoesNotCountAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+		ScriptedPeer peer=new ScriptedPeer();
+		endpoint.handleIncomingMessage(latticeValue(Blob.wrap(new byte[8]),peer)); // reject 1
+
+		endpoint.handleIncomingMessage(partialLatticeValue(1,peer));
+		peer.answerNextRequest(Result.error(ErrorCodes.LOAD,"Busy"));
+		assertEquals(ErrorCodes.LOAD,peer.awaitResult(1).getErrorCode());
+		assertFalse(peer.isClosed(),"a busy sender is not at fault");
+
+		peer.refuseSends=true;
+		endpoint.handleIncomingMessage(partialLatticeValue(2,peer));
+		assertTrue(peer.awaitResult(2).isError());
+		assertFalse(peer.isClosed(),"our full send buffer is not the sender's fault");
+		peer.refuseSends=false;
+
+		endpoint.handleIncomingMessage(partialLatticeValue(3,peer));
+		peer.answerNextRequest(Result.error(ErrorCodes.MISSING,"Not held"));
+		assertEquals(ErrorCodes.MISSING,peer.awaitResult(3).getErrorCode());
+		assertTrue(peer.isClosed(),"a sender lacking the data it announced is at fault, for the second reject");
+	}
+
+	/** This node's own full acquisition pool neither counts against the sender nor resets the count. */
+	@Test
+	public void testOwnAcquisitionLoadDoesNotCountAsReject() throws Exception {
+		LatticePropagator endpoint=launchTwoRejectGroup(store,1);
+		ScriptedPeer peer=new ScriptedPeer();
+		Blob badValue=Blob.wrap(new byte[8]);
+		endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 1
+
+		// Holds the only acquisition permit: its data request is never answered
+		endpoint.handleIncomingMessage(partialLatticeValue(1,peer));
+		endpoint.handleIncomingMessage(partialLatticeValue(2,peer));
+		assertEquals(ErrorCodes.LOAD,peer.awaitResult(2).getErrorCode());
+		assertFalse(peer.isClosed(),"this node's load is not the sender's fault");
+
+		endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 2
+		assertTrue(peer.isClosed(),"the refusal must not have reset the count");
+	}
+
+	/** An Etch store that fails to persist one chosen value, as a full disk would. */
+	static final class PersistFailingStore extends EtchStore {
+		volatile Hash failing;
+
+		PersistFailingStore() throws IOException {
+			super(Etch.createTempEtch("persist-failing"));
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler)
+				throws IOException {
+			Hash target = failing;
+			if (target != null && target.equals(ref.getHash())) throw new IOException("Simulated store failure");
+			return super.storeTopRef(ref, status, noveltyHandler);
+		}
+	}
+
+	/** A failure in this node's own store neither counts against the sender nor resets the count. */
+	@Test
+	public void testOwnStoreFailureDoesNotCountAsReject() throws Exception {
+		PersistFailingStore failingStore=new PersistFailingStore();
+		try {
+			LatticePropagator endpoint=launchTwoRejectGroup(failingStore,LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE);
+			ScriptedPeer peer=new ScriptedPeer();
+			Blob badValue=Blob.wrap(new byte[8]);
+			endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 1
+
+			Blob unstorable=Blobs.createRandom(400);
+			failingStore.failing=unstorable.getHash();
+			AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,CVMLong.create(1),Vectors.empty(),unstorable);
+			endpoint.handleIncomingMessage(Message.create(MessageType.LATTICE_VALUE,payload).withConnection(peer));
+			assertEquals(ErrorCodes.IO,peer.awaitResult(1).getErrorCode());
+			assertFalse(peer.isClosed(),"this node's store failure is not the sender's fault");
+
+			endpoint.handleIncomingMessage(latticeValue(badValue,peer)); // reject 2
+			assertTrue(peer.isClosed(),"the failure must not have reset the count");
+		} finally {
+			if (maxNodeServer != null) maxNodeServer.close();
+			failingStore.close();
+		}
 	}
 
 	/**
@@ -1831,7 +2154,7 @@ public class NodeServerTest {
 			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
 				assertEquals(CVMLong.create(111),
 						target.pullPath(peer,regionA).get(5,TimeUnit.SECONDS));
-				assertNull(target.getCursor().get(regionB));
+				assertFalse(target.getCursor().path(regionB).exists());
 			}
 		}
 	}
@@ -2082,6 +2405,35 @@ public class NodeServerTest {
 				assertEquals(CVMLong.create(42),
 						target.pullPath(peer,outer,inner).get(5,TimeUnit.SECONDS));
 			}
+		}
+	}
+
+	/** A pull from a peer that is not connected fails with a checked connection failure (#827). */
+	@Test
+	public void testPullFromDisconnectedPeerFailsChecked() throws Exception {
+		ControlledVerificationConvex peer=new ControlledVerificationConvex();
+		peer.close();
+		try (NodeServer<AInteger> target=new TestNode<>(MaxLattice.create(),new MemoryStore())) {
+			LatticePropagator group=propagator(target);
+			target.launch();
+			ExecutionException e=assertThrows(ExecutionException.class,
+				() -> target.pullPath(group,peer).get(5,TimeUnit.SECONDS));
+			assertTrue(e.getCause() instanceof PeerConnectionException,String.valueOf(e.getCause()));
+		}
+	}
+
+	/** A pull answered with an error fails with that result, as a checked exception (#827). */
+	@Test
+	public void testPullAnsweredWithErrorFailsChecked() throws Exception {
+		ControlledVerificationConvex peer=new ControlledVerificationConvex();
+		peer.answer=Result.error(ErrorCodes.TIMEOUT,"No answer in time");
+		try (NodeServer<AInteger> target=new TestNode<>(MaxLattice.create(),new MemoryStore())) {
+			LatticePropagator group=propagator(target);
+			target.launch();
+			ExecutionException e=assertThrows(ExecutionException.class,
+				() -> target.pullPath(group,peer).get(5,TimeUnit.SECONDS));
+			assertTrue(e.getCause() instanceof ResultException,String.valueOf(e.getCause()));
+			assertEquals(ErrorCodes.TIMEOUT,((ResultException)e.getCause()).getResult().getErrorCode());
 		}
 	}
 
@@ -2409,9 +2761,12 @@ public class NodeServerTest {
 		cm.close();
 	}
 
-	/** An inbound socket becomes an outbound route only after both trust and admission. */
+	/**
+	 * An inbound socket becomes an outbound route only after authentication. The
+	 * key needs no desired-peer entry: the application vouched for it.
+	 */
 	@Test
-	public void testInboundRouteUpgradeRequiresAuthenticatedAdmittedIdentity() throws Exception {
+	public void testInboundRouteUpgradeRequiresAuthenticatedIdentity() throws Exception {
 		LatticeConnectionManager cm = new LatticeConnectionManager(store);
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
 		RecordingConnection inbound = new RecordingConnection();
@@ -2421,12 +2776,8 @@ public class NodeServerTest {
 		assertFalse(cm.hasUpgradedInboundConnection(peerKey));
 
 		inbound.setTrustedKey(peerKey);
-		assertThrows(SecurityException.class, () -> cm.upgradeInboundConnection(inbound),
-			"a proven but unadmitted key must not become a propagation route");
-
-		cm.addPeer(peerKey);
 		CompletableFuture<AConnection> upgraded = cm.whenInboundConnectionUpgraded(peerKey);
-		assertSame(inbound, cm.upgradeInboundConnection(inbound));
+		assertSame(inbound, cm.upgradeInboundConnection(inbound).get(5, TimeUnit.SECONDS));
 		assertSame(inbound, upgraded.get(5, TimeUnit.SECONDS));
 		assertTrue(cm.hasUpgradedInboundConnection(peerKey));
 		assertFalse(cm.isConnected(peerKey),
@@ -2476,34 +2827,49 @@ public class NodeServerTest {
 		cm.removePeer(key2);
 	}
 
-	/** Discovery and explicit additions share one hard desired-peer bound. */
+	/** Discovered candidates are bounded; explicit intent is never refused for capacity. */
 	@Test
 	public void testDesiredPeerLimit() throws Exception {
 		NodeConfig cfg=NodeConfig.create(Maps.of(
-			NodeConfig.MAX_DESIRED_PEERS,CVMLong.create(2)));
+			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(2),
+			LatticePropagatorConfig.AMBIENT_PEERS,CVMLong.create(0)));
 		maxNodeServer=new TestNode<>(MaxLattice.create(),store,cfg);
 		propagator(maxNodeServer);
 		maxNodeServer.launch();
 		LatticeConnectionManager cm=propagator(maxNodeServer).getConnectionManager();
 		assertEquals(2,cm.getMaxDesiredPeers());
 
-		for (int i=0; i<3; i++) {
-			cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),i+1);
-		}
+		// Candidates must be dialable; with no ambient slots none is dialled
+		AVector<AString> tcp=Vectors.of(Strings.create("tcp://localhost:1"));
+		AccountKey first=AKeyPair.generate().getAccountKey();
+		assertTrue(cm.updateDiscoveredPeer(first,tcp,1));
+		assertTrue(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,2));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,3));
 		assertEquals(2,cm.getDesiredPeers().size());
 
-		CompletableFuture<Convex> rejected=cm.connectPeer(
-			AKeyPair.generate().getAccountKey(),new InetSocketAddress("localhost",1));
-		assertThrows(ExecutionException.class,
-			() -> rejected.get(5,TimeUnit.SECONDS));
-		assertEquals(2,cm.getDesiredPeers().size());
+		// A full candidate pool does not stop explicit intent
+		AccountKey named=AKeyPair.generate().getAccountKey();
+		cm.addPeer(named);
+		assertTrue(cm.getDesiredPeers().containsKey(named));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,4));
+
+		// Naming a candidate makes it explicit, which frees its candidate slot
+		cm.addPeer(first);
+		AccountKey later=AKeyPair.generate().getAccountKey();
+		assertTrue(cm.updateDiscoveredPeer(later,tcp,5));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,6));
+
+		// Removing a candidate frees its slot; removing explicit intent does not add one
+		cm.removePeer(later);
+		cm.removePeer(named);
+		assertTrue(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,7));
+		assertFalse(cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),tcp,8));
 	}
 
 	@Test
 	public void testRejectedOwnedPeerConnectionIsClosed() {
 		LatticeConnectionManager cm=new LatticeConnectionManager(store);
-		cm.setMaxDesiredPeers(1);
-		cm.addPeer(AKeyPair.createSeeded(301).getAccountKey());
+		cm.close();
 		ControlledVerificationConvex rejected=new ControlledVerificationConvex();
 
 		CompletableFuture<Convex> admission=cm.addPeer(
@@ -2512,7 +2878,6 @@ public class NodeServerTest {
 		assertTrue(admission.isCompletedExceptionally());
 		assertFalse(rejected.isConnected());
 		assertEquals(1,rejected.closeCount);
-		cm.close();
 	}
 
 	@Test
@@ -2767,6 +3132,8 @@ public class NodeServerTest {
 		private final CompletableFuture<AccountKey> verification = new CompletableFuture<>();
 		private volatile boolean connected = true;
 		private int closeCount;
+		/** What every message is answered with */
+		volatile Result answer = Result.SENT_MESSAGE;
 
 		ControlledVerificationConvex() {
 			super(null, null);
@@ -2809,7 +3176,7 @@ public class NodeServerTest {
 
 		@Override
 		public CompletableFuture<Result> message(Message message) {
-			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+			return CompletableFuture.completedFuture(answer);
 		}
 
 		@Override

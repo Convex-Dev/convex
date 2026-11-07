@@ -1,6 +1,8 @@
 package convex.core.message;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
@@ -19,7 +21,7 @@ import convex.core.exceptions.BadFormatException;
  * and receive {@link Message} instances. Every inbound {@code Message} carries a
  * reference to the {@code AConnection} it arrived on, enabling the server to:
  * <ul>
- *   <li>Route result messages back to the originator via {@link #sendMessage(Message)}</li>
+ *   <li>Route result messages back to the originator via {@link #returnMessage(Message)}</li>
  *   <li>Check trust status via {@link #isTrusted()} for Belief admission and backpressure</li>
  *   <li>Close misbehaving connections via {@link #close()}</li>
  * </ul>
@@ -82,7 +84,7 @@ public abstract class AConnection {
 		RequestFuture reply=null;
 		try {
 			if (future!=null && future.isDone()) return future;
-			if (requestsClosed || isClosed()) throw new IllegalStateException("Connection closed");
+			if (requestsClosed || isClosed()) throw new ClosedChannelException();
 			ACell id=message.getRequestID();
 			if (id==null) throw new IllegalArgumentException("Non-null request ID required");
 			var pending=awaiting;
@@ -99,12 +101,14 @@ public abstract class AConnection {
 			if (future!=null) reply.listenToControl();
 			// Close publishes requestsClosed BEFORE draining. If this insertion missed
 			// that drain, this recheck completes it. No registration lock is needed.
-			if (requestsClosed) throw new IllegalStateException("Connection closed");
+			if (requestsClosed) throw new ClosedChannelException();
 			if (timeout>0) reply.orTimeout(timeout,TimeUnit.MILLISECONDS);
 			if (!reply.isDone() && !sendMessage(message)) {
 				throw new RejectedExecutionException("Unable to send request");
 			}
 		} catch (Exception e) {
+			// The request reports the interrupt; this thread keeps its status.
+			if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 			if (reply!=null) reply.completeExceptionally(e);
 			else {
 				if (future==null) return CompletableFuture.failedFuture(e);
@@ -199,7 +203,7 @@ public abstract class AConnection {
 		pending.forEach((id,future) -> {
 			if (pending.remove(id,future)) {
 				future.pending=null;
-				future.completeExceptionally(new IllegalStateException("Connection closed"));
+				future.completeExceptionally(new ClosedChannelException());
 			}
 		});
 	}
@@ -259,20 +263,6 @@ public abstract class AConnection {
 	}
 
 	/**
-	 * Returns a message to the remote end, waiting a bounded time if the
-	 * connection's shared outbound capacity is exhausted. For handler threads that
-	 * report client results and may apply backpressure; never call from an I/O
-	 * thread. A connection that cannot accept the message for its own reasons
-	 * (closed, or its reader is not draining) still refuses at once.
-	 *
-	 * @param msg Message to return
-	 * @return true if the message was accepted for delivery
-	 */
-	public boolean returnMessageBlocking(Message msg) {
-		return returnMessage(msg);
-	}
-
-	/**
 	 * Checks if this connection supports general message sending (as opposed
 	 * to result-only delivery via {@link #returnMessage(Message)}).
 	 *
@@ -298,6 +288,20 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * Returns a future completing once every message this connection has accepted
+	 * for sending has been written to its transport, for example so a final message
+	 * can leave before the connection closes. Written is not delivered: no
+	 * acknowledgement from the remote end is implied. The future fails if the
+	 * connection closes first. Unsupported connections fail explicitly.
+	 *
+	 * @return future for queued messages written
+	 */
+	public CompletableFuture<Void> flushOutbound() {
+		return CompletableFuture.failedFuture(
+			new UnsupportedOperationException("Connection cannot report written messages"));
+	}
+
+	/**
 	 * Updates the encoded inbound message limit. Wire transports must enforce this
 	 * before allocating a frame. Unsupported connections fail explicitly.
 	 * @param limit maximum encoded message bytes
@@ -307,19 +311,29 @@ public abstract class AConnection {
 	}
 
 	/**
-	 * Sends a message over this connection. May block with a bounded timeout
-	 * if the outbound queue is full (e.g. outbound client connections under
-	 * backpressure). Callers that must not block should use
-	 * {@link #trySendMessage(Message)} instead.
+	 * Sends a message over this connection. If the outbound queue is full, the
+	 * transport may wait a bounded time for space, so that backpressure reaches the
+	 * sending thread, but never on a thread that empties the queue, such as the
+	 * transport's I/O thread. A server's connection to its client never waits: it
+	 * slows the client by not reading its requests instead. Callers that must not
+	 * wait use {@link #trySendMessage(Message)}.
 	 *
 	 * @param msg Message to send
-	 * @return true if message queued/sent successfully, false otherwise
+	 * @return true if the message was accepted for sending; false if the queue had
+	 *         no room within the wait, or at once on a thread that may not wait
+	 * @throws ClosedChannelException if the connection is closed
+	 * @throws IOException if the transport fails to send
+	 * @throws InterruptedException if interrupted while waiting for space
+	 * @throws IllegalArgumentException if the message cannot be encoded in one frame
+	 * @throws UnsupportedOperationException if this connection takes no general
+	 *         messages; see {@link #supportsMessage()}
 	 */
-	public abstract boolean sendMessage(Message msg);
+	public abstract boolean sendMessage(Message msg) throws IOException, InterruptedException;
 
 	/**
-	 * Sends a message without blocking. Returns immediately with false if the
-	 * message cannot be queued (buffer full, connection closed, etc.).
+	 * Sends a message without blocking. Returns false at once if the message
+	 * cannot be queued for any reason: no room, connection closed, or too large
+	 * to send. Never throws for those reasons.
 	 *
 	 * <p>Used by {@link Message#returnMessage(Message)} to deliver results
 	 * back to the originator. Server processing threads must never block on
@@ -349,7 +363,11 @@ public abstract class AConnection {
 	public abstract boolean isClosed();
 
 	/**
-	 * Closes this connection. Idempotent — safe to call multiple times.
+	 * Closes this connection without waiting for the transport, so it is safe on any
+	 * thread. On return, outstanding requests have failed and {@link #isClosed()} is
+	 * true; the transport releases its resources on its own thread, and a message
+	 * already arriving may still be delivered until then. Idempotent — safe to call
+	 * multiple times.
 	 */
 	public abstract void close();
 

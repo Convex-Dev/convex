@@ -129,17 +129,13 @@ public class TransactionHandler extends AThreadedComponent {
 
 	/**
 	 * Offer a transaction for handling, blocking until space is available or timeout.
-	 * Used as the retry predicate for backpressure.
+	 * Used as the retry predicate for backpressure. Does not wait on this handler's
+	 * own thread, for example in a local client's callback for a transaction result.
 	 * @param m Message offered
 	 * @return True if queued for handling, false on timeout or interruption
 	 */
 	public boolean offerTransactionBlocking(Message m) {
-		try {
-			return txMessageQueue.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
+		return offerBlocking(txMessageQueue, m);
 	}
 	
 	/**
@@ -325,38 +321,58 @@ public class TransactionHandler extends AThreadedComponent {
 		}
 	}
 	
+	/**
+	 * Reports the results of one of this peer's blocks to the clients waiting for them.
+	 * The calling thread, normally the CVM executor, only collects the results and
+	 * clears their interests; a virtual thread of their own delivers them. So neither
+	 * the encoding of a large result nor an in-process client's continuations hold up
+	 * the peer's state, and each block's delivery is independent of the others'.
+	 */
 	void reportTransactions(Block block, BlockResult br, long blockNum) {
 		// TODO: consider culling old interests after some time period
 		int nTrans = block.length();
+		ArrayList<Message> recipients=new ArrayList<>();
+		ArrayList<Result> results=new ArrayList<>();
 		HashMap<Keyword,ACell> extInfo=new HashMap<>(5);
 		for (long j = 0; j < nTrans; j++) {
 			SignedData<ATransaction> t = block.getTransactions().get(j);
 			Hash h = t.getHash();
-			Message m = interests.get(h);
-			if (m != null) {
-				// ACell id = m.getID();
-				// log.info("Returning transaction result ID {}", id);
-				Result res = null;
-				
-				try {
-					res=br.getResults().get(j);
-					extInfo.put(Keywords.LOC,Vectors.createLongs(blockNum,j));
-					extInfo.put(Keywords.TX,t.getHash());
-					
-					res=res.withExtraInfo(extInfo);
-				} catch (Exception e) {
-					res=Result.error(ErrorCodes.FATAL, "Failed to produce result").withSource(SourceCodes.PEER);
-				}
+			Message m = interests.remove(h);
+			if (m == null) continue;
+			Result res;
+			try {
+				res=br.getResults().get(j);
+				extInfo.put(Keywords.LOC,Vectors.createLongs(blockNum,j));
+				extInfo.put(Keywords.TX,t.getHash());
+				res=res.withExtraInfo(extInfo);
+			} catch (Exception e) {
+				res=Result.error(ErrorCodes.FATAL, "Failed to produce result").withSource(SourceCodes.PEER);
+			}
+			observeTransactionResponse(t,res);
+			recipients.add(m);
+			results.add(res);
+		}
+		if (recipients.isEmpty()) return;
+		Thread.ofVirtual().name("Transaction results for block "+blockNum).start(() -> deliverResults(recipients,results));
+	}
 
-				// Waits for shared outbound capacity (backpressure on state updates is
-				// preferable to losing results); refused only if this client's connection
-				// is closed or its reader is not draining, which is normal operation.
-				boolean reported = m.returnResultBlocking(res);
-				if (!reported && log.isDebugEnabled()) {
-					log.debug("Dropped transaction result for connection {}", m.getConnection());
-				}
-				observeTransactionResponse(t,res);
-				interests.remove(h,m);
+	/**
+	 * Delivers one block's results in order, never waiting. A result is refused if its
+	 * client's connection is closed or its reader is not draining, which is normal
+	 * operation, or if the server is shedding load.
+	 */
+	private static void deliverResults(ArrayList<Message> recipients, ArrayList<Result> results) {
+		for (int i=0; i<recipients.size(); i++) {
+			Message m=recipients.get(i);
+			boolean reported;
+			try {
+				reported=m.returnResult(results.get(i));
+			} catch (Exception e) {
+				log.warn("Failed to deliver transaction result for connection {}",m.getConnection(),e);
+				continue;
+			}
+			if (!reported && log.isDebugEnabled()) {
+				log.debug("Dropped transaction result for connection {}", m.getConnection());
 			}
 		}
 	}

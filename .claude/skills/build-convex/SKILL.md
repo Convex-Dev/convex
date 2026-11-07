@@ -39,8 +39,11 @@ The default when no arguments are given:
 Use a clean, sequential build before claiming work is done:
 
 ```bash
-./mvnw -B clean install
+./mvnw -B clean verify
 ```
+
+Use `install` only when another local project needs the fresh artifacts: it
+copies them into `~/.m2`.
 
 For a single module's tests:
 

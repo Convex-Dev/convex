@@ -22,6 +22,12 @@ import convex.core.lang.RT;
  * {@link convex.peer.PeerConfig}, providing typed accessors with sensible
  * defaults. The underlying config map is immutable.</p>
  *
+ * <p>The map is the configuration, as parsed from a service's JSON5; this class
+ * holds nothing else and adds no meaning beyond typed accessors and defaults.
+ * Every component given the map reads the keys it knows by name, so a setting
+ * that must differ between components belongs in a separate map, as
+ * {@link LatticePropagatorConfig} is for a propagator group.</p>
+ *
  * <p>Key names reuse {@link convex.peer.PeerConfig} constants where they
  * overlap (port) so configurations are consistent
  * across peer and lattice node servers.</p>
@@ -54,7 +60,7 @@ public class NodeConfig {
 	 *  {@link NodeServer} itself ignores this field. */
 	public static final AString URL = Strings.intern("url");
 
-	/** @deprecated Use {@link LatticePropagatorConfig#MAX_INBOUND_VALUE_SIZE}. */
+	/** @deprecated Ignored. Configure encoded frame limits on the listener and propagator group. */
 	@Deprecated
 	public static final AString MAX_INBOUND_VALUE_SIZE =
 		LatticePropagatorConfig.MAX_INBOUND_VALUE_SIZE;
@@ -266,16 +272,12 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Returns the maximum memory size of a complete inbound lattice value admitted
-	 * by a propagation endpoint. Larger values are rejected before the authoritative
-	 * merge, bounding work from untrusted peers. The default is the configured message cap.
-	 *
-	 * @deprecated Use {@link LatticePropagatorConfig#getMaxInboundValueSize()}.
-	 * @return maximum inbound value size in bytes
+	 * @deprecated CAD036 limits encoded messages.
+	 * @return {@link Long#MAX_VALUE}
 	 */
 	@Deprecated
 	public long getMaxInboundValueSize() {
-		return LatticePropagatorConfig.from(this).getMaxInboundValueSize();
+		return Long.MAX_VALUE;
 	}
 
 	/**
@@ -292,9 +294,9 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Returns the number of consecutive rejected or undecodable inbound messages
-	 * allowed per connection before its circuit breaker closes it. An accepted
-	 * merge resets the streak; zero disables the breaker.
+	 * Returns the number of consecutive rejected inbound messages allowed per
+	 * connection before its circuit breaker closes it; zero disables the breaker.
+	 * {@link LatticePropagatorConfig#MAX_CONSECUTIVE_REJECTS} says what counts.
 	 *
 	 * @deprecated Use {@link LatticePropagatorConfig#getMaxConsecutiveRejects()}.
 	 * @return consecutive-reject limit, or zero when disabled
@@ -316,8 +318,7 @@ public class NodeConfig {
 
 	/**
 	 * Returns the maximum encoded body size used for outbound lattice delta chunks.
-	 * This is independent of the complete inbound value-size policy. It defaults
-	 * to the conservative public frame limit advertised by this node.
+	 * It defaults to the conservative public frame limit advertised by this node.
 	 *
 	 * @deprecated Use {@link LatticePropagatorConfig#getMaxDeltaMessageSize()}.
 	 * @return maximum outbound delta chunk size in bytes

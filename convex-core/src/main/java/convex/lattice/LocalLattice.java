@@ -16,22 +16,30 @@ import convex.lattice.generic.OwnerLattice;
  *
  * The `:local` key in a lattice root maps to an OwnerLattice where each peer
  * has its own signed slot keyed by AccountKey. Each slot contains an
- * {@code Index<Keyword, ACell>} — a keyword-keyed map of peer-local data.
+ * {@code AHashMap<Keyword, ACell>} — one entry per application or service, each
+ * a whole value merged by LWW on its own {@code :timestamp}.
  *
  * Structure:
  * <pre>
  *   :local → OwnerLattice
- *     peer-key-A → Signed(Index&lt;Keyword, ACell&gt;)
- *     peer-key-B → Signed(Index&lt;Keyword, ACell&gt;)
+ *     peer-key-A → Signed(AHashMap&lt;Keyword, ACell&gt;)
+ *       :signing → {:timestamp t, ...}
+ *     peer-key-B → Signed(AHashMap&lt;Keyword, ACell&gt;)
  * </pre>
  *
- * This data is intended for peer-local storage (encrypted secrets, signing
- * keys, configuration) but uses standard lattice semantics so that:
+ * This region holds any application state that is not meant to be shared
+ * externally (encrypted secrets, signing keys, configuration, what a node has seen of
+ * other nodes). One application instance writes and manages each slot. It may
+ * be replicated, for example for backup, but is not published for others to
+ * use. It still uses standard lattice semantics so that:
  * <ul>
  *   <li>Multiple peers can share a store without conflicts</li>
  *   <li>OwnerLattice merge preserves each peer's slot independently</li>
- *   <li>Data can be safely replicated for fault tolerance</li>
+ *   <li>A replica or restored backup merges cleanly</li>
  * </ul>
+ *
+ * Services keep their records through {@link ALocalComponent}, which edits a
+ * private copy and signs the slot once each time the application syncs it.
  */
 public class LocalLattice {
 
@@ -44,9 +52,11 @@ public class LocalLattice {
 	 * Value lattice for per-peer data. Uses a MapLattice that merges each
 	 * keyword's value independently via LWW (timestamp-based last-write-wins).
 	 *
-	 * Each service (e.g. :signing) stores its own timestamped map. Concurrent
-	 * updates to different services merge cleanly; updates to the same service
-	 * resolve by picking the higher timestamp.
+	 * Each service (e.g. :signing) stores its own timestamped map. One application
+	 * instance writes it, so the timestamp matters when a copy comes back, as in
+	 * restoring a backup: the newer of the two wins, so a stale backup never
+	 * overwrites newer state and a newer one replaces stale state. Services merge
+	 * independently of each other.
 	 */
 	private static final MapLattice<Keyword, ACell> VALUE_LATTICE =
 			MapLattice.create(LWWLattice.INSTANCE);
@@ -77,7 +87,7 @@ public class LocalLattice {
 	 *
 	 * @param localValue The OwnerLattice value
 	 * @param peerKey The peer's public key
-	 * @return The peer's Index&lt;Keyword, ACell&gt; data, or null if not present
+	 * @return The peer's keyword-keyed data, or null if not present
 	 */
 	public static AHashMap<Keyword, ACell> getSlot(
 			AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> localValue,

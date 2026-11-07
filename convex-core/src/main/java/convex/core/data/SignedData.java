@@ -310,16 +310,23 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 	}
 
 	@Override
-	public SignedData<T> updateRefs(IRefFunction func) {
+	protected SignedData<T> rebuildRefs(IRefFunction func) {
 		@SuppressWarnings("unchecked")
 		Ref<T> newValueRef = (Ref<T>) func.apply(valueRef);
 		if (valueRef == newValueRef) return this;
-		
-		// SECURITY: preserve verification flags
 		SignedData<T> newSD= new SignedData<T>(newValueRef, pubKey, signature);
-		Ref<?> sdr=newSD.getRef();
-		sdr.setFlags(Ref.mergeFlags(sdr.getFlags(), getRef().getFlags()));
-		newSD.attachEncoding(encoding); // optimisation to keep encoding
+		// A checked signature is a fact about the value, recorded on this Cell's own Ref
+		// (see markValidated). Carry those bits on a Ref of the new Cell so the check is
+		// not repeated, and nothing else: status is for the caller changing the Refs to
+		// decide, and attachRef merges these bits into whatever Ref it attaches.
+		Ref<?> r=cachedRef;
+		if (r!=null) {
+			int verification=r.getFlags()&Ref.VERIFICATION_MASK;
+			if (verification!=0) {
+				Ref<?> sdr=newSD.getRef();
+				sdr.setFlags(sdr.getFlags()|verification);
+			}
+		}
 		return newSD;
 	}
 

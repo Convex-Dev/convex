@@ -16,7 +16,8 @@ import convex.core.lang.RT;
 public abstract class ADataFn<T extends ACell> extends AFn<T> {
 
 	@Override
-	public AFn<T> updateRefs(IRefFunction func) {
+	protected AFn<T> rebuildRefs(IRefFunction func) {
+		// Rebuild the wrapped data structure, then wrap it as a function again
 		return RT.castFunction(getCanonical().updateRefs(func));
 	}
 
@@ -57,5 +58,13 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 	@Override
 	public byte getTag() {
 		return getCanonical().getTag();
+	}
+
+	/** Compares as the wrapped data value; the other side may be a wrapper too. */
+	@Override
+	public boolean equals(ACell a) {
+		if (a==this) return true;
+		if (a==null) return false;
+		return getCanonical().equals(a.getCanonical());
 	}
 }

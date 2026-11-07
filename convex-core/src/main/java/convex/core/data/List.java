@@ -210,8 +210,8 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	public List<T> updateRefs(IRefFunction func) {
-		AVector<T> newData = (AVector<T>) data.updateRefs(func);
+	protected List<T> rebuildRefs(IRefFunction func) {
+		AVector<T> newData = data.updateRefs(func);
 		if (newData == data) return this;
 		return new List<T>(newData);
 	}
@@ -359,7 +359,10 @@ public class List<T extends ACell> extends AList<T> {
 
 	@Override
 	public void forEach(Consumer<? super T> action) {
-		data.forEach(action);
+		ListIterator<T> it = data.listIterator(count);
+		while (it.hasPrevious()) {
+			action.accept(it.previous());
+		}
 	}
 
 	@Override
@@ -381,7 +384,7 @@ public class List<T extends ACell> extends AList<T> {
 	protected <R> void copyToArray(R[] arr, int offset) {
 		int n=Utils.checkedInt(count);
 		for (int i=0; i<n; i++) {
-			arr[offset+i]=(R)get(offset+i);
+			arr[offset+i]=(R)get(i);
 		}
 	}
 

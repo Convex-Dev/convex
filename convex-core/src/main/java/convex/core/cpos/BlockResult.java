@@ -139,7 +139,7 @@ public class BlockResult extends ARecordGeneric {
 	@Override 
 	public boolean equals(ACell a) {
 		if (a instanceof BlockResult)return equals((BlockResult)a);
-		return Cells.equalsGeneric(this,a);
+		return Cells.equalsEncoding(this,a);
 	}
 	
 	/**

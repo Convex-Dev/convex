@@ -67,7 +67,7 @@ final class SocialReplicationPolicy {
 	Set<AString> desiredOwners() {
 		HashSet<AString> desired=new HashSet<>(localUsers);
 		desired.addAll(pins);
-		ACell raw=application.cursor().get(Social.KEY_SOCIAL);
+		ACell raw=application.cursor().getOrDefault(null,Social.KEY_SOCIAL);
 		if (raw==null) return Set.copyOf(desired);
 		@SuppressWarnings("unchecked")
 		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> typed=

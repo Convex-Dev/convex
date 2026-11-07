@@ -45,7 +45,7 @@ public class Cursors {
 
 	/**
 	 * Creates an opt-in transactional root, whose writes coordinate through one lock
-	 * so that {@link Transactions#transactLocked} and contention fallback are available.
+	 * so that {@link Transactions#transactExclusively} and contention fallback are available.
 	 *
 	 * @param <V> Type of cursor value
 	 * @param value Initial value

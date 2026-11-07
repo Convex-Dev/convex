@@ -7,8 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
-import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -16,6 +17,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.Keyword;
 import convex.dlfs.DLFSConfig;
+import convex.net.PeerName;
 
 public class DLFSConfigTest {
 
@@ -45,7 +47,7 @@ public class DLFSConfigTest {
 			    port: 0,
 			    store: 'memory',
 			    keypair: '%s',
-			    bootstrap: [{key: '%s', url: 'tcp://127.0.0.1:18888'}],
+			    bootstrap: [{key: '%s', url: 'tcp://127.0.0.1:18888'}, {url: 'did:web:files.example.com'}],
 			  },
 			  dlfs: {
 			    maxFutureTimestampSkew: 1234,
@@ -76,9 +78,8 @@ public class DLFSConfigTest {
 		assertEquals(4096,config.getMaxRequestBytes());
 		assertTrue(config.isPublicLatticeInbound());
 
-		var peer=config.getBootstrapPeers().get(0);
-		assertEquals(seedKey.getAccountKey(),peer.key());
-		assertEquals(InetSocketAddress.createUnresolved("127.0.0.1",18888),peer.address());
+		assertEquals(List.of(new PeerName(URI.create("tcp://127.0.0.1:18888"),seedKey.getAccountKey()),
+			new PeerName(URI.create("did:web:files.example.com"),null)),config.getBootstrapPeers());
 	}
 
 	@Test
@@ -108,6 +109,12 @@ public class DLFSConfigTest {
 		assertThrows(IllegalArgumentException.class,()->DLFSConfig.parse(
 			"{node:{bootstrap:[{key:'"+AKeyPair.createSeeded(1).getAccountKey().toHexString()
 			+"',url:'https://localhost:18888'}]}}").validate());
+		assertThrows(IllegalArgumentException.class,()->DLFSConfig.parse(
+			"{node:{bootstrap:[{url:'tcp://localhost:0'}]}}").validate());
+		assertThrows(IllegalArgumentException.class,()->DLFSConfig.parse(
+			"{node:{bootstrap:[{url:'did:convex:13'}]}}").validate());
+		assertThrows(IllegalArgumentException.class,()->DLFSConfig.parse(
+			"{node:{bootstrap:[{key:'did:web:x.example',url:'tcp://localhost:18888'}]}}").validate());
 		assertThrows(IllegalArgumentException.class,()->DLFSConfig.parse(
 			"{security:{latticeInbound:'private'}}").validate());
 		assertThrows(IllegalArgumentException.class,()->DLFSConfig.parse(

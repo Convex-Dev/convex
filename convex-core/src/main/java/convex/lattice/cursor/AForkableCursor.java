@@ -17,7 +17,7 @@ import convex.core.data.ACell;
 public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 
 	/**
-	 * Presents a caller-supplied value in place of absent storage, without creating
+	 * Presents a caller-supplied value in place of absent storage or nil, without creating
 	 * state. Update functions see that default too; unchanged writes keep storage
 	 * absent. Writing null clears storage and restores the default view.
 	 *
@@ -42,17 +42,30 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 		return PathCursor.create(this, path);
 	}
 
+	/**
+	 * Returns a read-only view of this cursor. Reads pass through; every write through
+	 * the view, its paths or views over it throws {@link ReadOnlyCursorException}, and
+	 * so does syncing the view itself; paths and views over it sync by reading. A fork
+	 * of the view is writable working storage whose sync is refused.
+	 *
+	 * @return Read-only view, or this cursor if it is one already
+	 */
+	public AForkableCursor<V> readOnly() {
+		return new ReadOnlyCursor<>(this);
+	}
+
 	/** Creates isolated working storage which publishes here when explicitly synced. */
 	public ForkedCursor<V> fork() {
 		return ForkedCursor.create(this);
 	}
 
 	/**
-	 * Returns the current value. Ordinary cursors, including paths and transformed
+	 * Returns the current value, or nil for absence. Ordinary cursors, including paths and transformed
 	 * views over forks, never publish enclosing storage or invoke the merge function.
-	 * ForkedCursor overrides this to reconcile at its own destination.
+	 * ForkedCursor overrides this to reconcile at its own destination, and a read-only
+	 * view to refuse it.
 	 */
 	public V sync(BinaryOperator<V> merge) {
-		return get();
+		return getOrDefault(null);
 	}
 }

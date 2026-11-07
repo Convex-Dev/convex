@@ -22,12 +22,13 @@ import convex.core.store.AStore;
 import convex.core.util.Shutdown;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexSchema;
-import convex.db.calcite.ConvexSchemaFactory;
 import convex.db.calcite.ConvexLogicalTableModifyRule;
 import convex.db.calcite.ConvexTableModifyRule;
 import convex.db.calcite.rules.ConvexRules;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.etch.EtchStore;
+import convex.lattice.LatticeHost;
 import convex.node.NodeServer;
 
 import org.apache.calcite.adapter.enumerable.EnumerableRules;
@@ -51,10 +52,18 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  * <pre>
  * jdbc:convex:file:/data/store.etch;database=market
  * </pre>
+ * A URL may carry only {@code database}, and any other parameter is refused. Of the
+ * connection properties, only that one is read. How SQL identifiers resolve is the
+ * database's own setting, {@link IdentifierPolicy}.
  *
  * <p>A file-backed database is saved durably on each commit, when a connection
  * closes, by {@link #closeAll()} and at JVM shutdown. Auto-committed statements
  * on a connection that stays open are saved when it closes.
+ *
+ * <p>The in-memory and file-backed instances this driver creates merge with the
+ * per-row last-write-wins policy, {@link RowLWW#merge}, which also reconciles
+ * concurrent transactions. An application that needs another policy constructs its
+ * own {@link ConvexDB} and connects with {@link ConvexDB#getConnection(String)}.
  *
  * <p>Usage:
  * <pre>
@@ -64,8 +73,7 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  * // Persistent
  * Connection conn = DriverManager.getConnection("jdbc:convex:file:/data/mydb.etch");
  *
- * // Direct from ConvexDB instance (no DriverManager)
- * ConvexDB cdb = ConvexDB.connect(server.getHost());
+ * // Direct from a ConvexDB the application holds (no DriverManager)
  * Connection conn = cdb.getConnection("mydb");
  * </pre>
  *
@@ -78,11 +86,14 @@ public class ConvexDriver extends Driver {
 
 	public static final String PREFIX = "jdbc:convex:";
 
+	/** Parameter naming the database within the instance. */
+	static final String PARAM_DATABASE = "database";
+
 	/** Open database instances, keyed by canonical identifier. */
 	public static final ConcurrentHashMap<String, ManagedInstance> instances = new ConcurrentHashMap<>();
 
-	/** File instance being connected; Avatica creates the meta inside {@code super.connect}. */
-	private static final ThreadLocal<ManagedInstance> CONNECTING = new ThreadLocal<>();
+	/** Save action of the connection being opened; Avatica creates the meta inside {@code super.connect}. */
+	private static final ThreadLocal<Runnable> CONNECTING = new ThreadLocal<>();
 
 	static {
 		new ConvexDriver().register();
@@ -104,8 +115,7 @@ public class ConvexDriver extends Driver {
 
 	@Override
 	public Meta createMeta(AvaticaConnection connection) {
-		ManagedInstance file = CONNECTING.get();
-		return ConvexMeta.create(connection, (file == null) ? null : file::checkpoint);
+		return ConvexMeta.create(connection, CONNECTING.get());
 	}
 
 	@Override
@@ -120,14 +130,6 @@ public class ConvexDriver extends Driver {
 		// Parse the URL into mode + identifier + params
 		ParsedURL parsed = parseURL(url, info);
 
-		// Set Calcite defaults
-		if (!info.containsKey("caseSensitive")) {
-			info.setProperty("caseSensitive", "false");
-		}
-		if (!info.containsKey("parserFactory")) {
-			info.setProperty("parserFactory", "convex.db.calcite.ConvexDdlExecutor#PARSER_FACTORY");
-		}
-
 		// Resolve the ConvexDB instance
 		ManagedInstance file = (parsed.mode == ParsedURL.Mode.FILE) ? resolveFileInstance(parsed.identifier) : null;
 		ConvexDB cdb = (file != null) ? file.cdb : resolveInstance(parsed);
@@ -135,52 +137,62 @@ public class ConvexDriver extends Driver {
 			throw new SQLException("Cannot resolve database for URL: " + url);
 		}
 
+		return open(cdb.database(parsed.database), (file == null) ? null : file::checkpoint);
+	}
+
+	/**
+	 * Creates a JDBC Connection bound to a database of a ConvexDB instance, as
+	 * {@link ConvexDB#getConnection(String)}. The database is reached through the
+	 * connection only: no URL is parsed, and the driver's instances are untouched.
+	 *
+	 * @param cdb ConvexDB instance
+	 * @param database Database name within the ConvexDB, which may be any string
+	 * @return JDBC Connection
+	 */
+	public static Connection connect(ConvexDB cdb, String database) throws SQLException {
+		Connection conn = new ConvexDriver().open(cdb.database(database), null);
+		if (conn == null) {
+			throw new SQLException("Failed to create connection");
+		}
+		return conn;
+	}
+
+	/**
+	 * Opens a Calcite connection whose schema is the given database, under its own
+	 * name, resolving identifiers by the database's {@link IdentifierPolicy}.
+	 * Transactions on the connection fork that database.
+	 *
+	 * @param db Database the connection is bound to
+	 * @param save Saves published state durably after each commit and when the
+	 *        connection closes, or null for none
+	 * @return JDBC Connection, or null if Calcite does not accept the URL
+	 * @throws SQLException with SQLSTATE 0A000 if the database's identifier policy is unknown
+	 */
+	private Connection open(SQLDatabase db, Runnable save) throws SQLException {
+		// Calcite reads only the properties set here, from a URL with no parameters:
+		// its plugin properties name classes to load, so none comes from a caller
+		Properties props = new Properties();
+		IdentifierPolicy.of(db).setProperties(props);
+		props.setProperty("parserFactory", "convex.db.calcite.ConvexDdlExecutor#PARSER_FACTORY");
+		// Column types are presented in this type system, so it is not optional
+		props.setProperty("typeSystem", "convex.db.calcite.ConvexTypeSystem#INSTANCE");
+
 		// Get connection from Calcite
 		Connection conn;
-		CONNECTING.set(file);
+		CONNECTING.set(save);
 		try {
-			conn = super.connect(url, info);
+			conn = super.connect(PREFIX, props);
 		} finally {
 			CONNECTING.remove();
 		}
 		if (conn == null) return null;
 
 		// Set up ConvexSchema
-		if (parsed.database != null && conn instanceof CalciteConnection calciteConn) {
-			SQLDatabase db = cdb.database(parsed.database);
-			ConvexSchema schema = new ConvexSchema(db, parsed.database);
+		if (conn instanceof CalciteConnection calciteConn) {
+			String name = db.getName().toString();
 			SchemaPlus rootSchema = calciteConn.getRootSchema();
-			rootSchema.add(parsed.database, schema);
-			calciteConn.setSchema(parsed.database);
-		}
-
-		return conn;
-	}
-
-	/**
-	 * Creates a JDBC Connection directly from a ConvexDB instance.
-	 * Registers the instance in the managed map so DML generated code
-	 * can find it.
-	 *
-	 * @param cdb ConvexDB instance
-	 * @param database Database name within the ConvexDB
-	 * @return JDBC Connection
-	 */
-	public static Connection connect(ConvexDB cdb, String database) throws SQLException {
-		// Register the provided ConvexDB under the mem: key so that all code
-		// paths (schema setup, DML generated code) find the same instance
-		String key = "mem:" + database;
-		instances.put(key, new ManagedInstance(cdb, null, null));
-
-		Properties info = new Properties();
-		info.setProperty("caseSensitive", "false");
-		info.setProperty("parserFactory", "convex.db.calcite.ConvexDdlExecutor#PARSER_FACTORY");
-
-		ConvexDriver driver = new ConvexDriver();
-		// Use mem: URL — resolveInstance will find our pre-registered instance
-		Connection conn = ((Driver) driver).connect(PREFIX + database, info);
-		if (conn == null) {
-			throw new SQLException("Failed to create connection");
+			rootSchema.add(name, new ConvexSchema(db, name));
+			calciteConn.setSchema(name);
 		}
 
 		return conn;
@@ -203,25 +215,30 @@ public class ConvexDriver extends Driver {
 	}
 
 	/**
-	 * Parses a JDBC URL into mode, identifier, and database name.
+	 * Parses a JDBC URL into mode, identifier and database name.
+	 * The URL may carry only the driver's own parameters, which override the same
+	 * connection properties; no other connection property is read.
+	 *
+	 * @throws SQLException if the URL carries any other parameter, or a malformed one
 	 */
-	ParsedURL parseURL(String url, Properties info) {
+	ParsedURL parseURL(String url, Properties info) throws SQLException {
 		String params = url.substring(PREFIX.length());
 
 		// Split off semicolon-separated parameters
 		String path = params;
-		String dbParam = info.getProperty("database");
+		String dbParam = info.getProperty(PARAM_DATABASE);
 		if (params.contains(";")) {
 			String[] parts = params.split(";", 2);
 			path = parts[0];
-			// Parse remaining params
 			for (String kv : parts[1].split(";")) {
+				if (kv.isBlank()) continue;
 				int eq = kv.indexOf('=');
-				if (eq > 0) {
-					String key = kv.substring(0, eq).trim();
-					String val = kv.substring(eq + 1).trim();
-					if ("database".equals(key)) dbParam = val;
-					info.setProperty(key, val);
+				if (eq <= 0) throw new SQLException("Malformed connection parameter: " + kv);
+				String key = kv.substring(0, eq).trim();
+				String val = kv.substring(eq + 1).trim();
+				switch (key) {
+					case PARAM_DATABASE -> dbParam = val;
+					default -> throw new SQLException("Unknown connection parameter: " + key);
 				}
 			}
 		}
@@ -297,12 +314,16 @@ public class ConvexDriver extends Driver {
 	private ConvexDB resolveMemInstance(String name) {
 		String key = "mem:" + name;
 		return instances.computeIfAbsent(key, k -> {
-			ConvexDB cdb = ConvexDB.create();
+			ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 			return new ManagedInstance(cdb, null, null);
 		}).cdb;
 	}
 
-	/** Gets or creates a file-backed instance, saved at JVM shutdown unless closed first. */
+	/**
+	 * Gets or creates a file-backed instance, saved at JVM shutdown unless closed first.
+	 *
+	 * @throws SQLException if the instance cannot be opened; nothing it opened stays open
+	 */
 	private ManagedInstance resolveFileInstance(String path) throws SQLException {
 		String key;
 		try {
@@ -311,22 +332,57 @@ public class ConvexDriver extends Driver {
 			key = "file:" + new File(path).getAbsolutePath();
 		}
 
-		final String canonicalKey = key;
-		ManagedInstance inst = instances.computeIfAbsent(canonicalKey, k -> {
-			try {
-				File file = new File(path);
-				EtchStore store = EtchStore.create(file);
-				var server = ConvexDB.createNodeServer(store);
-				server.launch();
-				ConvexDB cdb = ConvexDB.connect(server.getHost());
-				ManagedInstance created = new ManagedInstance(cdb, server, store);
-				Shutdown.addHook(Shutdown.SERVICE, created.shutdownHook);
-				return created;
-			} catch (Exception e) {
-				throw new RuntimeException("Failed to open Etch store: " + path, e);
+		try {
+			return instances.computeIfAbsent(key, k -> {
+				try {
+					return openFileInstance(new File(path));
+				} catch (Exception e) {
+					throw new OpenFailure(e);
+				}
+			});
+		} catch (OpenFailure e) {
+			if (e.getCause() instanceof InterruptedException) Thread.currentThread().interrupt();
+			throw new SQLException("Failed to open Etch store: " + path, e.getCause());
+		}
+	}
+
+	/**
+	 * Opens the store, the host and the node over a file. If a step fails, the node
+	 * and the store are closed again, so the store's file lock is released.
+	 */
+	private static ManagedInstance openFileInstance(File file) throws Exception {
+		EtchStore store = EtchStore.create(file);
+		NodeServer<?> launched = null;
+		try {
+			var host = LatticeHost.open(ConvexDB.EMPTY, store);
+			ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+			var server = new NodeServer<>(host);
+			launched = server;
+			server.launch();
+			ManagedInstance created = new ManagedInstance(cdb, server, store);
+			Shutdown.addHook(Shutdown.SERVICE, created.shutdownHook);
+			return created;
+		} catch (Exception | Error e) {
+			// Not the host: closing it saves, and an open that failed has nothing to save
+			if (launched != null) {
+				try {
+					launched.close();
+				} catch (Exception | Error cleanup) {
+					e.addSuppressed(cleanup);
+				}
 			}
-		});
-		return inst;
+			store.close();
+			throw e;
+		}
+	}
+
+	/** Carries a failure to open a file instance out of {@code computeIfAbsent}. */
+	private static final class OpenFailure extends RuntimeException {
+		private static final long serialVersionUID = 1L;
+
+		OpenFailure(Exception cause) {
+			super(cause);
+		}
 	}
 
 	/**
@@ -383,15 +439,16 @@ public class ConvexDriver extends Driver {
 			}
 		}
 
-		/** Stops the node, closes the host to save, then closes the store; no-op for an in-memory instance. */
+		/**
+		 * Saves, publishing through the node, then closes the node, the host and the
+		 * store; no-op for an in-memory instance.
+		 */
 		void close() throws IOException {
 			if (server == null) return;
 			Shutdown.removeHook(Shutdown.SERVICE, shutdownHook);
-			try {
-				server.close();
-				server.getHost().close();
-			} finally {
-				store.close();
+			var host = server.getHost();
+			try (store; host; server) {
+				host.checkpoint();
 			}
 		}
 	}

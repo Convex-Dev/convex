@@ -28,6 +28,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | `SignatureBenchmark` | Ed25519 signature generation and verification |
 | `LatencyBenchmark` | Round-trip transaction latency on a small local peer network |
 | `LocalPeerBenchmark` | Transactions and queries through a local in-process peer |
+| `ClientCallbackBenchmark` | Query round trips for local and remote clients: waiting callers, and callbacks that send a second query |
 | `ThreadCoordinationBenchmark` | Inter-thread queue handoff overhead |
 
 ## Running Benchmarks
@@ -202,6 +203,36 @@ java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
 ```
 
 Open `flight.jfr` in JDK Mission Control for detailed analysis.
+
+### Comparing a change to core internals
+
+Judge a `convex-core` internals change (equality, `Ref`, hashing) on the aggregate
+benchmarks, not on microbenchmarks alone: `BigBlockBenchmark`, `EtchBenchmark`,
+`LatticeTransactionBenchmark` and `LocalPeerBenchmark`. The lattice path updates are
+the sensitive case for equality and hashing, since each nested cursor level compares
+old and new values; a regression there can rate neutral in ref-level benchmarks and
+the test suite.
+
+1. Compile the old core in a separate worktree, never by checking old files out in
+   your working tree:
+
+   ```bash
+   git worktree add <scratch>/convex-before <commit>
+   (cd <scratch>/convex-before && ./mvnw -B -o -q compile -pl convex-core -am)
+   ```
+
+2. Run the current `convex-benchmarks/target/classes` twice, once with each
+   `convex-core/target/classes` (old and new) on the classpath and everything else
+   unchanged, alternating before and after rounds in separate JVMs, for example with
+   JMH options `-f 0 -wi 3 -i 8 -w 1 -r 1 -bm avgt -tu us`.
+3. Add `-prof gc` to read allocation per operation (`gc.alloc.rate.norm`, B/op); it
+   works in-process with `-f 0`, and saving one object per cell shows there when
+   time cannot.
+
+`BigBlockBenchmark` draws its transactions from an unseeded `Random`, so its
+allocation varies by tens of kB/op between JVMs: compare medians over four or more
+alternating pairs, and read small allocation savings from the lattice and Etch
+benchmarks. When a result moves, bisect per commit with further worktrees.
 
 ## Example Results
 

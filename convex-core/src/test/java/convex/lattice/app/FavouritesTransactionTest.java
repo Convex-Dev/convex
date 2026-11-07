@@ -30,7 +30,7 @@ class FavouritesTransactionTest {
 			value -> { signatures.incrementAndGet(); return ALICE.signData(value); },
 			() -> CVMLong.create(stamps.incrementAndGet()));
 		var retained=new AtomicReference<SetComponent<ACell>>();
-		live.transact(draft -> {
+		live.execute(draft -> {
 			retained.set(draft.itemSet);
 			draft.add(42);
 			draft.itemSet.add(CVMLong.create(7));
@@ -46,7 +46,7 @@ class FavouritesTransactionTest {
 		retained.get().add(CVMLong.create(99));
 		assertEquals(Sets.of(42,7),live.items(),"Escaped children remain attached to private storage");
 		int before=stamps.get();
-		live.transact(draft -> draft.add(42));
+		live.execute(draft -> draft.add(42));
 		assertEquals(before,stamps.get());
 		assertEquals(1,signatures.get());
 		assertSame(signed,app.component().get(ALICE.getAccountKey()));
@@ -64,7 +64,7 @@ class FavouritesTransactionTest {
 				signatures.incrementAndGet();
 				return key.get()==null?null:key.get().signData(value);
 			},() -> CVMLong.TWO);
-		assertThrows(IllegalArgumentException.class,() -> live.transact(draft -> {
+		assertThrows(IllegalArgumentException.class,() -> live.execute(draft -> {
 			draft.remove(1);
 			draft.add(2);
 			throw new IllegalArgumentException("abort");
@@ -72,13 +72,13 @@ class FavouritesTransactionTest {
 		assertEquals(0,signatures.get());
 		assertSame(original,app.component().get(ALICE.getAccountKey()));
 		key.set(null);
-		assertThrows(IllegalStateException.class,() -> live.transact(draft -> {
+		assertThrows(IllegalStateException.class,() -> live.execute(draft -> {
 			draft.remove(1);
 			draft.add(2);
 		}));
 		assertSame(original,app.component().get(ALICE.getAccountKey()));
 		key.set(ALICE);
-		live.transact(draft -> { draft.remove(1); draft.add(2); });
+		live.execute(draft -> { draft.remove(1); draft.add(2); });
 		assertEquals(Sets.of(2),live.items());
 		assertTrue(app.component().get(ALICE.getAccountKey()).checkSignature());
 	}
@@ -95,7 +95,7 @@ class FavouritesTransactionTest {
 				try { app.user(ALICE).add(99); }
 				finally { changed.countDown(); }
 			});
-			live.transact(draft -> {
+			live.execute(draft -> {
 				draft.add(42);
 				draft.add(7);
 				if (calls.incrementAndGet()==1) {
@@ -114,9 +114,9 @@ class FavouritesTransactionTest {
 		var app=new FavouritesApp(LatticeHost.create(),() -> CVMLong.ONE);
 		var live=app.user(ALICE);
 		var fork=live.fork();
-		fork.transact(draft -> {
+		fork.execute(draft -> {
 			draft.add(42);
-			draft.transact(nested -> nested.add(7));
+			draft.execute(nested -> nested.add(7));
 			draft.sync(); // The private transaction root has no publication destination.
 		});
 		assertEquals(Sets.of(42,7),fork.items());

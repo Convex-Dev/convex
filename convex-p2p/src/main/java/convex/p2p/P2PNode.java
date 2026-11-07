@@ -1,53 +1,78 @@
 package convex.p2p;
 
 import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
+import convex.auth.did.DID;
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
+import convex.core.util.ConfigUtils;
+import convex.core.util.FileUtils;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.generic.KeyedLattice;
+import convex.net.PeerConnectionException;
+import convex.net.PeerName;
+import convex.net.PeerRefusedException;
+import convex.net.PeerResolver;
+import convex.net.PeerTarget;
+import convex.net.Transports;
 import convex.node.LatticeConnectionManager;
 import convex.node.LatticeListener;
+import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
-import convex.node.RelayHost;
 import convex.social.Social;
 
 /**
@@ -56,9 +81,9 @@ import convex.social.Social;
  * <p>This is the main entry point for convex-p2p — a rollup package, so this is the
  * <em>only</em> node server, with no separate social or per-application node. It
  * assembles the node up to the lattice root: a host opened from the store as
- * configured, the replicating {@link NodeServer}, one propagation group and an
- * application-owned {@link LatticeListener}. From the root down, the
- * {@link P2PApplication} configured on the host owns the lattice and the P2P policy.</p>
+ * configured, and a {@link LatticeNode} with one propagator group. From the root
+ * down, the {@link P2PApplication} configured on the host owns the lattice and the
+ * P2P policy.</p>
  *
  * <p><b>Regions are configuration.</b> {@link #create(AStore, NodeConfig, AKeyPair)}
  * serves {@link P2PLattice#NODE_ROOT} — the P2P regions plus the bundled application
@@ -72,13 +97,15 @@ import convex.social.Social;
  * then pulls and merges the bootstrap node's {@code :p2p} and {@code :id} regions and
  * each currently desired complete social-owner slot. This lets existing and
  * late-joining nodes discover each other without accepting unrelated social owners.
- * On-chain bootstrap and public PoP selection remain to be built on top.</p>
+ * {@link #seed(List)} joins through seed nodes the same way and lets them go once
+ * other peers can replace them. On-chain bootstrap and public PoP selection
+ * remain to be built on top.</p>
  *
  * <p><b>Inbound policy.</b> The application-owned listener denies all network
  * lattice traffic until an operator assigns inbound connections to a propagator.
  * {@link #create} leaves that policy unset (deny-by-default); use
  * {@link #serveAllInbound()} for an intentionally public single-view node, or
- * configure the listener returned by {@link #getTransport()} before {@link #launch()}.
+ * configure the listener returned by {@link #getTransport()}.
  * Assignment permits zero-trust public access but does not authenticate or upgrade the
  * connection. Complete social values still pass follow-aware DID admission before
  * persistence.</p>
@@ -86,48 +113,162 @@ import convex.social.Social;
  * <p><b>Layering.</b> {@link NodeServer} is the schema-independent replication layer
  * over the assembled host and merges nothing. The {@link P2PApplication} is the host's
  * receiver: it merges incoming values through its lattice, projected to what this node
- * wants, keeps the validated node directory and lists the paths to pull from a new peer. This
- * class owns the transport and the moments replication knows about: after the
- * transport binds it asks the application to publish the node's record, when a peer
- * is admitted it pulls the application's bootstrap paths, and when an inbound value
- * is accepted it turns the application's refreshed directory into connection intent
- * and authenticates a route the application has validated. {@link PointOfPresence}
+ * wants, keeps the node records it wants with the validated node directory and lists
+ * the paths to pull from a new peer. This class owns the transport and the moments
+ * replication knows about: after the transport binds it asks the application to
+ * publish the node's record, when a peer is admitted it pulls the application's
+ * bootstrap paths, and when an inbound value is accepted it turns the application's
+ * refreshed directory into connection candidates and authenticates a route the
+ * application has validated. It tells the application's node registry which nodes it
+ * routes to, which the operator named and which are its Points of Presence, so their
+ * records are kept. {@link PointOfPresence}
  * handles transient routed messages and is not a lattice concern. P2PNode uses its
  * node key as both transport identity and NodeInfo owner; social DIDs and their
  * signing keys remain independent.</p>
+ *
+ * <p><b>Threading.</b> The node takes no lock: the application running it decides the
+ * order of its calls and makes them one after another. Configure the node, launch it,
+ * then seed it; configuration fails once launch has begun, and seeding fails until the
+ * node's server is running.</p>
  */
 public class P2PNode implements Closeable {
 
 	private static final Logger log = LoggerFactory.getLogger(P2PNode.class.getName());
 
+	/**
+	 * Node configuration key: the node records a node keeps besides pinned ones
+	 * (Long, default 1024). The directory is not a connection list, so this is
+	 * independent of the peers a node connects to.
+	 */
+	public static final AString MAX_NODE_RECORDS=Strings.intern("maxNodeRecords");
+
+	/**
+	 * Node configuration key: the seed nodes to join a network through, a list of at
+	 * most {@link #MAX_SEEDS} entries, each a peer name as {@code url} with an optional
+	 * expected {@code key}. Seeds are expected-good nodes that the operator trusts to
+	 * enable connectivity to the whole network. Read with {@link #seeds(NodeConfig)} and
+	 * added to the node's live list by {@link #seed(List)}.
+	 */
+	public static final AString SEEDS=Strings.intern("seeds");
+
+	/** Most seed nodes a configuration may list, and a node's live list may hold. */
+	public static final int MAX_SEEDS=Seeds.MAX_SEEDS;
+
+	/** Seeds dialled at random when a node starts seeding, and in each round of last resort. */
+	static final int SEEDS_TO_DIAL=3;
+
+	/** Nodes that answered before, dialled at random alongside the seeds when a node starts seeding. */
+	static final int KNOWN_NODES_TO_DIAL=3;
+
+	private static final AString SEED_KEY=Strings.intern("key");
+	private static final AString SEED_URL=Strings.intern("url");
+
+	/** Launcher configuration key: the Etch store file. Not a node setting. */
+	public static final AString STORE=Strings.intern("store");
+
+	/**
+	 * Launcher configuration key: the node key's Ed25519 seed in hex, read with
+	 * {@link #keyPair(ACell)}. Not a node setting, and kept out of the node's configuration.
+	 */
+	public static final AString KEYPAIR=Strings.intern("keypair");
+
+	private final LatticeNode<Index<Keyword, ACell>> network;
+	/** The network's server, which replicates the host. */
 	private final NodeServer<Index<Keyword, ACell>> server;
 	private final LatticePropagator propagator;
-	private final LatticeListener transport;
 	private final P2PApplication application;
 	private final NodeConfig config;
 	private final AKeyPair keyPair;
 	private final PointOfPresence pointOfPresence;
 	private final ConcurrentHashMap<Convex,CompletableFuture<Void>> initialisations=
 		new ConcurrentHashMap<>();
+	/** Nodes the operator named, whose records are kept however full the registry is. */
+	private final Set<AccountKey> named=ConcurrentHashMap.newKeySet();
+	/** Completes when seeds are first released; null until seeding starts. */
+	private CompletableFuture<Void> seeding;
+	/** The seeding round still dialling, or null between rounds. */
+	private volatile SeedRound seedRound;
+	/** The last backoff before seeding as a last resort; closing cancels it, so no timer outlives the node. */
+	private volatile CompletableFuture<Void> seedBackoff;
+	/** The node each seed name proved it was, from its last connection. */
+	private final Map<PeerName,AccountKey> seedKeys=new ConcurrentHashMap<>();
 	/** Freezes P2P application configuration at the same boundary as NodeServer. */
 	private boolean launchStarted;
 
-	private P2PNode(NodeServer<Index<Keyword, ACell>> server,P2PApplication application,
-			LatticePropagator propagator,LatticeListener transport,NodeConfig config,AKeyPair keyPair) {
-		this.server=server;
+	private P2PNode(LatticeNode<Index<Keyword, ACell>> network,P2PApplication application,
+			LatticePropagator propagator,NodeConfig config,AKeyPair keyPair) {
+		this.network=network;
+		this.server=network.getServer();
 		this.application=application;
 		this.propagator=propagator;
-		this.transport=transport;
 		this.config=config;
 		this.keyPair=keyPair;
+		NodeRegistry registry=application.registry();
 		NodeDirectory directory=application.directory();
-		directory.setMaxRecords(propagator.getConnectionManager().getMaxDesiredPeers());
-		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,directory);
-		// The application merges incoming roots through its policy's projection; the
-		// propagation group publishes through the same projection.
-		propagator.setPublicationFilter(application.policy()::projectRoot);
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		registry.setMaxRecords(maxNodeRecords(config));
+		// Named nodes, nodes with an authenticated route or one being authenticated, and
+		// Points of Presence keep their records
+		registry.setPinned(() -> {
+			Set<AccountKey> pinned=new HashSet<>(named);
+			pinned.addAll(manager.getAuthenticatedRouteKeys());
+			pinned.addAll(propagator.getAuthenticatingInboundKeys());
+			for (AccountKey pop:directory.pointsOfPresence()) pinned.add(pop);
+			return pinned;
+		});
+		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,directory,application.blocklist());
+		// The application merges incoming roots through its projection; the
+		// propagator group publishes through the same projection.
+		propagator.setPublicationFilter(application::project);
 		propagator.setApplicationMessageHandler(pointOfPresence::handle);
 		propagator.setInboundLatticeListener(this::onAcceptedInbound);
+		// Names resolve against what this node knows, and never to a node or address it blocks
+		network.setPeerResolver(new PeerResolver(PeerResolver.defaultDIDResolver(),this::knownTransports) {
+			@Override
+			public CompletableFuture<PeerTarget> resolve(PeerName name) {
+				return super.resolve(name).thenCompose(P2PNode.this::permitted);
+			}
+		});
+	}
+
+	/** The configured bound on node records kept besides pinned ones. */
+	static int maxNodeRecords(NodeConfig config) {
+		ACell value=config.getMap().get(MAX_NODE_RECORDS);
+		if (value==null) return NodeRegistry.DEFAULT_MAX_RECORDS;
+		CVMLong bound=RT.ensureLong(value);
+		if (bound==null || bound.longValue()<0 || bound.longValue()>Integer.MAX_VALUE) {
+			throw new IllegalArgumentException(MAX_NODE_RECORDS+" must be between 0 and "+Integer.MAX_VALUE+": "+value);
+		}
+		return (int)bound.longValue();
+	}
+
+	/**
+	 * Reads the seed nodes a configuration lists under {@link #SEEDS}, for
+	 * {@link #seed(List)}: each entry's {@code url} is a peer name, as
+	 * {@link PeerResolver#parse(String, String)} reads it, with its optional {@code key}.
+	 *
+	 * @param config node configuration
+	 * @return seed names in configured order, empty if none
+	 * @throws IllegalArgumentException if the list or an entry is invalid
+	 */
+	public static List<PeerName> seeds(NodeConfig config) {
+		List<PeerName> seeds=new ArrayList<>();
+		ACell value=config.getMap().get(SEEDS);
+		if (value==null) return seeds;
+		if (!(value instanceof AVector<?> list)) {
+			throw new IllegalArgumentException(SEEDS+" must be a list of {url, key} entries");
+		}
+		if (list.count()>MAX_SEEDS) {
+			throw new IllegalArgumentException(SEEDS+" lists more than "+MAX_SEEDS+" nodes");
+		}
+		for (ACell entry:list) {
+			AMap<ACell,ACell> seed=RT.ensureMap(entry);
+			AString url=(seed==null)?null:RT.ensureString(seed.get(SEED_URL));
+			if (url==null) throw new IllegalArgumentException("Seed needs a URL: "+entry);
+			ACell key=seed.get(SEED_KEY);
+			seeds.add(PeerResolver.parse(url.toString(),(key==null)?null:key.toString()));
+		}
+		return seeds;
 	}
 
 	/**
@@ -228,15 +369,11 @@ public class P2PNode implements Closeable {
 			Utils::getCurrentTimestampCell,didAuthorizer);
 		host.addApplication(application);
 
-		NodeServer<Index<Keyword, ACell>> server=new NodeServer<>(host,effectiveConfig);
-		LatticeConnectionManager manager=new LatticeConnectionManager(store);
-		LatticePropagator propagator=new LatticePropagator(store,manager,effectivePropagatorConfig);
-		propagator.setTransportKeyPair(keyPair);
-		LatticeListener transport=new LatticeListener(effectiveConfig);
-		transport.registerPropagator(propagator);
-		P2PNode node=new P2PNode(server,application,propagator,transport,effectiveConfig,keyPair);
-		server.addPropagator(propagator);
-		return node;
+		// The node key is the transport identity of the group created next
+		LatticeNode<Index<Keyword,ACell>> network=new LatticeNode<>(host,effectiveConfig);
+		if (keyPair!=null) network.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
+		LatticePropagator propagator=network.createPropagator(effectivePropagatorConfig);
+		return new P2PNode(network,application,propagator,effectiveConfig,keyPair);
 	}
 
 	/** Registers and opens this node's local {@code did:key} social user. */
@@ -287,16 +424,21 @@ public class P2PNode implements Closeable {
 
 	/**
 	 * Grants every inbound network connection this application's public propagation
-	 * group. This is appropriate only for an intentionally public node serving a
-	 * single lattice view.
+	 * group, except one from an IP address this node has blocked, which is closed.
+	 * This is appropriate only for an intentionally public node serving a single
+	 * lattice view.
 	 * The connection remains untrusted unless the independent node-key challenge
 	 * succeeds, and the application still takes only the social owners it wants.
-	 * Must be called before {@link #launch()}.
+	 * May be called while running: connections accepted afterwards use the group,
+	 * and established sockets keep their assignment, as
+	 * {@link LatticeNode#serveAllInbound(LatticePropagator)} does.
 	 *
 	 * @return this node, for chaining
 	 */
 	public P2PNode serveAllInbound() {
-		transport.setSelector(connection -> propagator);
+		Blocklist blocklist=application.blocklist();
+		network.getListener().setSelector(connection ->
+			blocklist.refuses(connection.getRemoteAddress())?null:propagator);
 		return this;
 	}
 
@@ -311,7 +453,7 @@ public class P2PNode implements Closeable {
 	 * @param popKeys unique remote PoP node keys
 	 * @return this node, for chaining
 	 */
-	public synchronized P2PNode pointsOfPresence(AccountKey... popKeys) {
+	public P2PNode pointsOfPresence(AccountKey... popKeys) {
 		requireNew("pointsOfPresence");
 		AVector<AccountKey> pops=Vectors.empty();
 		if (popKeys!=null) {
@@ -328,7 +470,7 @@ public class P2PNode implements Closeable {
 	 *
 	 * @return this node, for chaining
 	 */
-	public synchronized P2PNode relayMessages() {
+	public P2PNode relayMessages() {
 		requireNew("relayMessages");
 		application.directory().setRelay(true);
 		pointOfPresence.setRelay(true);
@@ -374,36 +516,38 @@ public class P2PNode implements Closeable {
 	 * @throws IOException If an IO error occurs during launch
 	 * @throws InterruptedException If the operation is interrupted
 	 */
-	public synchronized void launch() throws IOException, InterruptedException {
+	public void launch() throws IOException, InterruptedException {
 		validateLaunchConfiguration();
 		requireNew("launch");
 		launchStarted=true;
 		var manager=propagator.getConnectionManager();
 		// Admission is propagation policy, so the application installs it before
-		// NodeServer starts the already-configured group.
+		// NodeServer starts the already-configured group. initialisePeer reports
+		// its own failures.
 		manager.setPeerAdmissionHandler((peerKey,peer) -> initialisePeer(peer)
-			.exceptionally(error -> {
-				log.debug("Unable to initialise admitted peer {}: {}",peerKey,error.getMessage());
-				return null;
-			}));
-		server.launch();
+			.exceptionally(error -> null));
+		// The application's contact records hear what the manager learns about other nodes,
+		// and a blocked node that authenticates is dropped then
+		ContactRecords contacts=application.contacts();
+		manager.setContactHandlers(this::contacted,(contacts==null)?null:contacts::failed);
+		// A failed launch closes the network itself
+		network.launch();
 		try {
-			transport.launch();
 			// The transport knows its port now, so the application can publish the node's record.
-			application.directory().publishOwnRecord(config.getAdvertisedURL(transport.getPort()));
+			Integer port = getPort();
+			application.directory().publishOwnRecord(config.getAdvertisedURL(port));
 			refreshDiscovery();
+			offerContacts();
 			for (Convex peer:manager.getPeers()) initialisePeer(peer);
-			Integer port = transport.getPort();
 			if (port != null && port >= 0) {
 				log.info("Convex P2P node listening on port {}", port);
 			} else {
 				log.info("Convex P2P node started in local-only mode");
 			}
-		} catch (IOException | InterruptedException | RuntimeException | Error e) {
-			transport.close();
+		} catch (RuntimeException | Error e) {
 			try {
-				server.close();
-			} catch (IOException closeFailure) {
+				network.close();
+			} catch (IOException | RuntimeException | Error closeFailure) {
 				e.addSuppressed(closeFailure);
 			}
 			throw e;
@@ -431,25 +575,105 @@ public class P2PNode implements Closeable {
 	/**
 	 * Replication accepted an inbound value. The application reads what it means for
 	 * the node registry; this node acts on connections: refreshed discovery becomes
-	 * connection intent, and a validated one-record registry update may authenticate
-	 * the inbound route that carried it.
+	 * connection candidates, and a validated one-record registry update may authenticate
+	 * the inbound route that carried it. A connection claiming a blocked node is closed.
 	 */
 	private void onAcceptedInbound(AConnection connection,LatticePropagator source,
 			ACell[] path,ACell value,boolean changed) {
 		if (!NodeDirectory.mayAffectRegistry(path)) return;
 		AccountKey claimed=application.directory().claimedOwner(path,value);
-		refreshDiscovery();
+		if (connection!=null && claimed!=null && application.blocklist().isBlocked(claimed)) {
+			connection.close();
+			return;
+		}
 		if (connection!=null && claimed!=null) {
 			source.authenticateInboundRoute(connection,claimed);
+			// The claimant keeps its record while its route is authenticated, so a
+			// record a full registry turned away is merged again
+			var host=server.getHost();
+			Index<Keyword,ACell> before=host.cursor().get();
+			host.mergeAt(value,path);
+			if (!before.equals(host.cursor().get())) host.sync();
 		}
+		refreshDiscovery();
 	}
 
-	/** Turns the application's refreshed directory into this node's connection intent. */
+	/** Offers the application's refreshed directory as this node's connection candidates. */
 	private void refreshDiscovery() {
-		LatticeConnectionManager manager=propagator.getConnectionManager();
-		for (NodeDirectory.NodeRecord record:application.directory().refresh()) {
-			manager.updateDiscoveredPeer(record.peerKey(),record.transports(),record.timestamp());
+		for (NodeDirectory.NodeRecord record:application.directory().refresh()) offer(record);
+	}
+
+	/** Offers a node as a connection candidate at the transports this node does not refuse; never a blocked node. */
+	private void offer(NodeDirectory.NodeRecord record) {
+		Blocklist blocklist=application.blocklist();
+		if (blocklist.isBlocked(record.peerKey())) return;
+		propagator.getConnectionManager().updateDiscoveredPeer(record.peerKey(),
+			blocklist.dialable(record.transports()),record.timestamp());
+	}
+
+	/** Reports authenticated contact to the contact records, or drops a blocked node at once. */
+	private void contacted(AccountKey peerKey) {
+		if (application.blocklist().isBlocked(peerKey)) {
+			drop(peerKey);
+			return;
 		}
+		ContactRecords contacts=application.contacts();
+		if (contacts!=null) contacts.contacted(peerKey,dialledAddress(peerKey));
+	}
+
+	/** The address of a live route this node dialled and proved the node's key over, or null. */
+	private AString dialledAddress(AccountKey peerKey) {
+		Convex outbound=propagator.getConnectionManager().getConnection(peerKey);
+		if (!(outbound instanceof ConvexRemote remote) || remote.getEndpoint()==null
+				|| !peerKey.equals(remote.getVerifiedPeer())) return null;
+		return Strings.create(remote.getEndpoint().toString());
+	}
+
+	/**
+	 * Offers each node this node has dialled before as a connection candidate at the
+	 * address it found the node's key at. A node record names newer transports and
+	 * replaces it.
+	 */
+	private void offerContacts() {
+		ContactRecords contacts=application.contacts();
+		if (contacts==null) return;
+		for (Map.Entry<AccountKey,AHashMap<Keyword,ACell>> entry:contacts.all().entrySet()) offerContact(entry.getKey());
+	}
+
+	/** Offers a node as a connection candidate at the address this node found its key at, if any. */
+	private void offerContact(AccountKey key) {
+		ContactRecords contacts=application.contacts();
+		AString address=(contacts==null)?null:ContactRecords.address(contacts.get(key));
+		Blocklist blocklist=application.blocklist();
+		if (address==null || blocklist.isBlocked(key)) return;
+		propagator.getConnectionManager().updateDiscoveredPeer(key,
+			blocklist.dialable(Vectors.<AString>of(address)),Long.MIN_VALUE);
+	}
+
+	/** Closes every connection to a node, including one it opened, and forgets it as a candidate. */
+	private void drop(AccountKey peerKey) {
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		AConnection inbound=manager.getUpgradedInboundConnection(peerKey);
+		manager.removePeer(peerKey);
+		if (inbound!=null) inbound.close();
+	}
+
+	/** Whether this node refuses to dial a node at an address: the node, the address or its host is blocked. */
+	private boolean refuses(AccountKey peerKey,InetSocketAddress address) {
+		Blocklist blocklist=application.blocklist();
+		return blocklist.isBlocked(peerKey)
+			|| (address!=null && blocklist.refuses(Strings.create(Transports.endpoint(address).toString())));
+	}
+
+	/** Whether a node's live route is at an address this node refuses. */
+	private boolean refusesRoute(LatticeConnectionManager manager,AccountKey peerKey) {
+		Blocklist blocklist=application.blocklist();
+		Convex outbound=manager.getConnection(peerKey);
+		if (outbound!=null && blocklist.refuses(outbound.getHostAddress())) return true;
+		if (outbound instanceof ConvexRemote remote && remote.getEndpoint()!=null
+				&& blocklist.refuses(Strings.create(remote.getEndpoint().toString()))) return true;
+		AConnection inbound=manager.getUpgradedInboundConnection(peerKey);
+		return inbound!=null && blocklist.refuses(inbound.getRemoteAddress());
 	}
 
 	/**
@@ -466,31 +690,619 @@ public class P2PNode implements Closeable {
 	 * gossip even when this node publishes an empty {@code :transports} vector because
 	 * it is behind NAT. A late joiner obtains only its follow-filtered social view.</p>
 	 *
+	 * <p>A blocked node, or one at a blocked address, is refused at once.</p>
+	 *
 	 * @param peerKey expected AccountKey of the bootstrap node
 	 * @param address bootstrap node's TCP address
 	 * @return future completing after connection admission, own-identity merge and
-	 *         local merge of the bootstrap node's selective bootstrap paths
+	 *         local merge of the bootstrap node's selective bootstrap paths, or failing
+	 *         with a {@link PeerRefusedException} if the node or address is blocked;
+	 *         otherwise it fails or is cancelled as
+	 *         {@link LatticeConnectionManager#connectPeer(AccountKey, InetSocketAddress)} does
 	 */
 	public CompletableFuture<Convex> connect(AccountKey peerKey, InetSocketAddress address) {
 		if (!server.isRunning()) {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("P2P node must be launched before connecting"));
 		}
+		if (refuses(peerKey,address)) {
+			return CompletableFuture.failedFuture(
+				new PeerRefusedException("Node "+peerKey+" at "+address+" is blocked"));
+		}
+		// A node the operator named keeps its record however full the registry is
+		named.add(peerKey);
 		return propagator.getConnectionManager().connectPeer(peerKey,address)
 			.thenCompose(peer -> initialisePeer(peer).thenApply(ignored -> peer));
 	}
 
+	/**
+	 * Connects to a peer the operator names, as {@link #connect(AccountKey, InetSocketAddress)}
+	 * does, and keeps it as {@link LatticeNode#keepPeer} does: the name is resolved with
+	 * this node's records and blocklist, and again before every reconnection.
+	 *
+	 * @param name peer name, as {@link PeerResolver#parse(String)} reads it
+	 * @return future completing after admission, own-identity merge and local merge of
+	 *         the peer's bootstrap paths; failing with a {@link PeerRefusedException} if
+	 *         the peer is blocked or refused, or a {@link PeerConnectionException} if the
+	 *         name cannot be resolved or the peer reached
+	 */
+	public CompletableFuture<Convex> connect(PeerName name) {
+		if (!server.isRunning()) {
+			return CompletableFuture.failedFuture(
+				new IllegalStateException("P2P node must be launched before connecting"));
+		}
+		return network.connectPeer(propagator,name).thenCompose(peer -> {
+			AccountKey key=peer.getVerifiedPeer();
+			if (isBlocked(key)) {
+				return CompletableFuture.<Convex>failedFuture(new PeerRefusedException("Node "+key+" is blocked"));
+			}
+			// A node the operator named keeps its record however full the registry is
+			named.add(key);
+			network.keepPeer(propagator,name,peer);
+			return initialisePeer(peer).thenApply(ignored -> peer);
+		});
+	}
+
+	/**
+	 * Adds seed names to this node's live list, as {@link #addSeed} does, and joins the
+	 * network. Seeds are expected-good nodes that the operator trusts to enable
+	 * connectivity to the whole network. Once connected, a node needs them no more: it
+	 * keeps its slots filled from the peers it learns about, wherever it learned of them.
+	 *
+	 * <p>Seeding starts once. The node dials three seeds from its live list, chosen at
+	 * random, and with them up to three nodes it reached before and that have not failed
+	 * since, also at random, so that it does not learn the network from its seeds alone.
+	 * Each is dialled once: its name is resolved with this node's records and blocklist,
+	 * and once it proves its key this node pushes its own record and pulls its registry,
+	 * which names other nodes to connect to. A seed that cannot be reached or fails its
+	 * challenge is not retried, and one that later loses its route is not redialled. A
+	 * node reached before stays connected as an ordinary peer.</p>
+	 *
+	 * <p>After that the seeds are a last resort. Whenever this node's ambient slots are
+	 * unfilled and no peer it believes good is left to dial, as when it reached no one at
+	 * start or has lost every route, it dials three seeds it is not connected to, chosen
+	 * at random, and again after a backoff while that remains so. A seed added while a
+	 * round is dialling is dialled at once, and one removed is not dialled again.</p>
+	 *
+	 * <p>Once this node's own ambient slots hold routes to other peers, they can replace
+	 * the seeds, so every seed is released: the route this node opened to it closes, and
+	 * it stays a candidate where this node's records place it. In a network too small to
+	 * fill the slots, seeds stay connected. A seed also named with {@link #connect} stays
+	 * connected. A blocked seed, one at a blocked address or one that turns out to be
+	 * this node is skipped. Seeding stops when the node closes.</p>
+	 *
+	 * <p>A name with this node's own key is left out, so seed nodes may share one
+	 * configuration that lists them all, and a name beyond {@link #MAX_SEEDS} is left out
+	 * with a warning, so the list a node kept never stops it starting. Seeding starts
+	 * once: a later call adds its names to the live list.</p>
+	 *
+	 * @param seeds seed names to add, as {@link #seeds(NodeConfig)} reads them
+	 * @return future completing when the seeds are first released, at once if none is
+	 *         listed; cancelled if the node closes first
+	 */
+	public CompletableFuture<Void> seed(List<PeerName> seeds) {
+		if (!server.isRunning()) {
+			return CompletableFuture.failedFuture(
+				new IllegalStateException("P2P node must be launched before seeding"));
+		}
+		Seeds list=application.seeds();
+		for (PeerName seed:seeds) {
+			if (isOwn(seed)) continue;
+			try {
+				list.add(seed);
+			} catch (IllegalStateException e) {
+				log.warn("Seed {} left out: {}",seed,e.getMessage());
+			}
+		}
+		if (!seeds.isEmpty()) application.syncHost();
+		SeedRound round=seedRound;
+		if (round!=null) for (PeerName seed:seeds) round.add(seed);
+		if (seeding==null) {
+			seeding=new CompletableFuture<>();
+			startSeeding(seeding);
+		}
+		return list.all().isEmpty()?CompletableFuture.completedFuture(null):seeding;
+	}
+
+	/**
+	 * Adds a seed to this node's live list, kept in its {@code :local} record so the
+	 * seed survives a restart, replacing any seed at the same URI. A seed added while a
+	 * round of seeding is dialling is dialled at once; otherwise it may be chosen in a
+	 * later round.
+	 *
+	 * @param seed seed name, as {@link PeerResolver#parse(String)} reads it
+	 * @return whether no seed was listed at its URI before
+	 * @throws IllegalArgumentException if it names this node's own key
+	 * @throws IllegalStateException if {@link #MAX_SEEDS} seeds at other URIs are listed
+	 */
+	public boolean addSeed(PeerName seed) {
+		if (seed==null) throw new IllegalArgumentException("Seed name must not be null");
+		if (isOwn(seed)) throw new IllegalArgumentException("A node cannot seed from itself");
+		boolean added=application.seeds().add(seed);
+		application.syncHost();
+		SeedRound round=seedRound;
+		if (round!=null) round.add(seed);
+		return added;
+	}
+
+	/**
+	 * Removes the seed at a name's URI from this node's live list, whatever key it
+	 * names. A seed removed is not dialled again; one reached is released with the
+	 * others when its round ends.
+	 *
+	 * @param seed seed name
+	 * @return whether a seed was listed at its URI
+	 */
+	public boolean removeSeed(PeerName seed) {
+		if (seed==null) throw new IllegalArgumentException("Seed name must not be null");
+		boolean removed=application.seeds().remove(seed);
+		application.syncHost();
+		return removed;
+	}
+
+	/** The seeds in this node's live list. */
+	public List<PeerName> getSeeds() {
+		return application.seeds().all();
+	}
+
+	/** Whether a seed name says it is this node. */
+	private boolean isOwn(PeerName seed) {
+		return keyPair!=null && keyPair.getAccountKey().equals(seed.key());
+	}
+
+	/** Starts seeding: dials a few seeds and nodes reached before, then turns to the seeds only as a last resort. */
+	private void startSeeding(CompletableFuture<Void> released) {
+		SeedRound round=new SeedRound(released);
+		// Published before the list is read, so a seed added meanwhile reaches the round
+		seedRound=round;
+		List<PeerName> seeds=pick(application.seeds().all(),SEEDS_TO_DIAL,ThreadLocalRandom.current());
+		List<PeerName> known=pick(knownGoodNodes(),KNOWN_NODES_TO_DIAL,ThreadLocalRandom.current());
+		if (!seeds.isEmpty()) log.info("Joining the network through {} seed nodes",seeds.size());
+		for (PeerName seed:seeds) round.add(seed);
+		for (PeerName node:known) round.addKnown(node);
+		round.close().whenComplete((dialled,error) -> seedWhenStarved(0));
+	}
+
+	/**
+	 * Turns to the seeds as a last resort: once this node's ambient slots are unfilled
+	 * and no peer it believes good is left to dial, dials a few seeds after a backoff,
+	 * and again while that remains so. Stops when the node closes.
+	 *
+	 * @param rounds rounds of last resort that have just left this node starved
+	 */
+	private void seedWhenStarved(int rounds) {
+		CompletableFuture<Void> starved=propagator.getConnectionManager().whenStarved();
+		// Each round that leaves this node still starved backs off further; a wait starts afresh
+		int round=starved.isDone()?rounds+1:1;
+		starved.thenCompose(ignored -> startSeedBackoff(LatticeConnectionManager.calculateBackoff(round)))
+			// Dials off the JDK's timer thread, which every delay in the JVM shares
+			.thenComposeAsync(ignored -> seedAsLastResort())
+			.whenComplete((dialled,error) -> {
+				if (error==null) {
+					seedWhenStarved(round);
+					return;
+				}
+				Throwable cause=PeerConnectionException.unwrap(error);
+				// Closing the node cancels the wait and the backoff: seeding ends with it
+				if (cause instanceof CancellationException) return;
+				log.warn("Stopped seeding as a last resort after an unexpected failure",cause);
+			});
+	}
+
+	/** A backoff before seeding as a last resort, which closing the node cancels with its timer. */
+	private CompletableFuture<Void> startSeedBackoff(long millis) {
+		CompletableFuture<Void> due=new CompletableFuture<Void>().completeOnTimeout(null,millis,TimeUnit.MILLISECONDS);
+		seedBackoff=due;
+		// Closed meanwhile, perhaps before this backoff was published for closing to cancel
+		if (!server.isRunning()) due.cancel(false);
+		return due;
+	}
+
+	/** The last backoff before seeding as a last resort, or null if none has started. */
+	CompletableFuture<Void> seedBackoff() {
+		return seedBackoff;
+	}
+
+	/** One round of last resort: dials a few seeds this node is not connected to, chosen at random. */
+	private CompletableFuture<Void> seedAsLastResort() {
+		if (!server.isRunning()) return CompletableFuture.completedFuture(null);
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		SeedRound round=new SeedRound(null);
+		seedRound=round;
+		List<PeerName> unconnected=new ArrayList<>();
+		for (PeerName seed:application.seeds().all()) {
+			AccountKey key=seedKeys.get(seed);
+			if (key==null || manager.getConnection(key)==null) unconnected.add(seed);
+		}
+		List<PeerName> seeds=pick(unconnected,SEEDS_TO_DIAL,ThreadLocalRandom.current());
+		if (!seeds.isEmpty()) log.info("No other peer left to dial: turning to {} seed nodes",seeds.size());
+		for (PeerName seed:seeds) round.add(seed);
+		return round.close();
+	}
+
+	/** Up to a number of items from a list, chosen at random. */
+	static <T> List<T> pick(List<T> items,int count,Random random) {
+		List<T> shuffled=new ArrayList<>(items);
+		Utils.shuffle(shuffled,random);
+		return List.copyOf(shuffled.subList(0,Math.min(count,shuffled.size())));
+	}
+
+	/**
+	 * Nodes this node reached before and that have not failed since, each named at the
+	 * address it found the node's key at. Never a blocked node, one at an address this
+	 * node refuses, or this node itself.
+	 */
+	List<PeerName> knownGoodNodes() {
+		ContactRecords contacts=application.contacts();
+		if (contacts==null) return List.of();
+		Blocklist blocklist=application.blocklist();
+		List<PeerName> nodes=new ArrayList<>();
+		for (Map.Entry<AccountKey,AHashMap<Keyword,ACell>> entry:contacts.all().entrySet()) {
+			AccountKey key=entry.getKey();
+			AString address=ContactRecords.address(entry.getValue());
+			if (address==null || !ContactRecords.answered(entry.getValue()) || blocklist.isBlocked(key)
+					|| blocklist.refuses(address) || (keyPair!=null && keyPair.getAccountKey().equals(key))) continue;
+			try {
+				nodes.add(new PeerName(URI.create(address.toString()),key));
+			} catch (IllegalArgumentException e) {
+				// Not an address a peer name can hold
+			}
+		}
+		return nodes;
+	}
+
+	/**
+	 * One round of seeding: dials each of its names once, then releases the seeds it
+	 * reached once other peers fill this node's slots. A node reached before is kept as
+	 * an ordinary peer instead.
+	 */
+	private final class SeedRound {
+		private final Set<AccountKey> reached=ConcurrentHashMap.newKeySet();
+		/** Names this round has dialled, so none is dialled twice. */
+		private final Set<PeerName> started=ConcurrentHashMap.newKeySet();
+		/** Dials still running, and one more until the round stops taking names. */
+		private final AtomicInteger running=new AtomicInteger(1);
+		private final CompletableFuture<Void> dialled=new CompletableFuture<>();
+		/** Completed when the seeds are released, or null if no caller waits. */
+		private final CompletableFuture<Void> released;
+		private final AtomicBoolean awaiting=new AtomicBoolean();
+		private volatile boolean over;
+
+		SeedRound(CompletableFuture<Void> released) {
+			this.released=released;
+			if (released!=null) awaitRelease();
+		}
+
+		/**
+		 * Ends the round once other peers fill this node's slots. Only a round with a
+		 * caller or a seed to release waits, so rounds that reach no one leave nothing behind.
+		 */
+		private void awaitRelease() {
+			if (!awaiting.compareAndSet(false,true)) return;
+			propagator.getConnectionManager().whenAmbientTargetMet().whenComplete((met,error) -> end(error));
+		}
+
+		/** Dials a seed once, unless this round already has or it names this node. */
+		void add(PeerName seed) {
+			if (!isOwn(seed) && started.add(seed)) attempt(seed,true);
+		}
+
+		/** Dials a node reached before once; admitted, it stays connected as an ordinary peer. */
+		void addKnown(PeerName node) {
+			if (started.add(node)) attempt(node,false);
+		}
+
+		/**
+		 * Returns a future completing once every dial this round started has finished.
+		 * Until then it takes seeds added meanwhile.
+		 */
+		CompletableFuture<Void> close() {
+			dialled.whenComplete((ignored,error) -> {
+				if (seedRound==this) seedRound=null;
+			});
+			finished();
+			return dialled;
+		}
+
+		private void finished() {
+			if (running.decrementAndGet()==0) dialled.complete(null);
+		}
+
+		/**
+		 * Resolves a name and connects to it once, then waits for the peer's
+		 * initialisation, which pulls its registry. A seed no longer listed, or a node
+		 * this node already has a route to, is not dialled.
+		 */
+		private void attempt(PeerName name,boolean seed) {
+			if (!server.isRunning() || (seed && !application.seeds().contains(name))) return;
+			AccountKey known=(name.key()!=null)?name.key():seedKeys.get(name);
+			if (known!=null && propagator.getConnectionManager().getConnection(known)!=null) return;
+			running.incrementAndGet();
+			CompletableFuture<Convex> connecting;
+			try {
+				connecting=network.connectPeer(propagator,name);
+			} catch (RuntimeException e) {
+				connecting=CompletableFuture.failedFuture(e);
+			}
+			connecting.whenComplete((peer,error) -> {
+				try {
+					if (!admitted(name,seed,(error==null)?peer.getVerifiedPeer():null,error)) {
+						finished();
+						return;
+					}
+					initialisePeer(peer).whenComplete((initialised,failure) -> finished());
+				} catch (RuntimeException e) {
+					log.warn("Seeding from {} failed unexpectedly",name,e);
+					finished();
+				}
+			});
+		}
+
+		/**
+		 * Logs how a dial went and keeps or releases what it reached; returns whether a
+		 * peer was admitted. A refused or unreachable peer is normal operation, an
+		 * abandoned dial means this node is closing, and anything else is a fault.
+		 */
+		private boolean admitted(PeerName name,boolean seed,AccountKey key,Throwable error) {
+			String kind=seed?"seed":"node";
+			if (error!=null) {
+				Throwable cause=PeerConnectionException.unwrap(error);
+				if (cause instanceof CancellationException) return false;
+				if (cause instanceof PeerRefusedException) {
+					log.info("Skipping {} {}: {}",kind,name,cause.getMessage());
+				} else if (cause instanceof PeerConnectionException) {
+					if (seed) log.info("Could not connect to seed {}: {}",name,cause.getMessage());
+					else log.debug("Could not reconnect to node {}: {}",name,cause.getMessage());
+				} else {
+					log.warn("Could not connect to {} {} after an unexpected failure",kind,name,cause);
+				}
+				return false;
+			}
+			if (key!=null && isBlocked(key)) {
+				log.info("Skipping {} {}: blocked",kind,name);
+				return false;
+			}
+			if (key==null) {
+				// Admitted without proving a key, as by a node without a key pair
+				if (seed) log.info("Could not connect to seed {}: no key proved",name);
+				else log.debug("Could not reconnect to node {}: no key proved",name);
+				return false;
+			}
+			if (!seed) {
+				log.debug("Reconnected to node {}",key);
+				keepKnownNode(key);
+				return true;
+			}
+			log.info("Connected to seed {} as {}",name,key);
+			seedKeys.put(name,key);
+			reached.add(key);
+			awaitRelease();
+			// Admitted after the round ended, so released at once
+			if (over) releaseSeed(key);
+			return true;
+		}
+
+		/** Ends the round: releases the seeds reached, and completes the future a caller waits on. */
+		private void end(Throwable error) {
+			over=true;
+			if (!reached.isEmpty()) log.info("Released seed nodes: other peers now fill this node's slots");
+			for (AccountKey key:reached) releaseSeed(key);
+			if (released==null) return;
+			if (error==null) released.complete(null);
+			else released.completeExceptionally(error);
+		}
+	}
+
+	/** Releases a seed this node reached, unless the operator named it; it stays a candidate where this node knows it. */
+	private void releaseSeed(AccountKey key) {
+		if (named.contains(key)) return;
+		propagator.getConnectionManager().releasePeer(key);
+		offerKnown(key);
+	}
+
+	/** Keeps a node reached before connected as an ordinary peer, unless the operator named it. */
+	private void keepKnownNode(AccountKey key) {
+		if (named.contains(key)) return;
+		propagator.getConnectionManager().releasePeer(key,true);
+		offerKnown(key);
+	}
+
+	/** Offers a node as a candidate where this node knows it: its record's transports, else its contact address. */
+	private void offerKnown(AccountKey key) {
+		NodeDirectory.NodeRecord record=application.directory().records().get(key);
+		if (record!=null) offer(record);
+		offerContact(key);
+	}
+
+	/** Transports this node knows for a node: its record's, else the address it found its key at. */
+	private AVector<AString> knownTransports(AccountKey key) {
+		NodeDirectory.NodeRecord record=application.directory().records().get(key);
+		if (record!=null && record.transports().count()>0) return record.transports();
+		ContactRecords contacts=application.contacts();
+		AString address=(contacts==null)?null:ContactRecords.address(contacts.get(key));
+		return (address==null)?null:Vectors.<AString>of(address);
+	}
+
+	/**
+	 * A resolved peer without the addresses this node refuses, or a
+	 * {@link PeerRefusedException} if this node blocks every key the peer may prove, or
+	 * refuses every address.
+	 */
+	private CompletableFuture<PeerTarget> permitted(PeerTarget target) {
+		Blocklist blocklist=application.blocklist();
+		AVector<AccountKey> keys=target.keys();
+		if (!keys.isEmpty()) {
+			AVector<AccountKey> allowed=Vectors.empty();
+			for (AccountKey key:keys) {
+				if (!blocklist.isBlocked(key)) allowed=allowed.conj(key);
+			}
+			if (allowed.isEmpty()) {
+				return CompletableFuture.failedFuture(new PeerRefusedException("Peer "+target.name()+" is blocked"));
+			}
+			keys=allowed;
+		}
+		AVector<AString> endpoints=blocklist.dialable(target.endpoints());
+		if (endpoints.isEmpty()) {
+			return CompletableFuture.failedFuture(
+				new PeerRefusedException("Every address of peer "+target.name()+" is blocked"));
+		}
+		return CompletableFuture.completedFuture(new PeerTarget(target.name(),keys,endpoints));
+	}
+
+	/**
+	 * Blocks a node. Its record is dropped and refused, every connection to it is
+	 * closed, including one it opened, and no message is taken from it, sent to it or
+	 * relayed through it. It stops being a node the operator named. The blocklist is
+	 * synced into this node's {@code :local} record, which the host keeps.
+	 *
+	 * @param node key of the node to block
+	 * @return whether it was not blocked before
+	 */
+	public boolean block(AccountKey node) {
+		if (node==null) throw new IllegalArgumentException("Node key must not be null");
+		boolean added=application.block(node);
+		named.remove(node);
+		application.syncHost();
+		drop(node);
+		return added;
+	}
+
+	/**
+	 * Blocks a transport address, such as {@code tcp://host:port}, or a host. This node
+	 * dials no blocked address and no address at a blocked host, and takes no inbound
+	 * connection from a blocked IP address. A node with a route at such an address, or
+	 * advertising one, is dropped and offered again at its other addresses. A host name
+	 * is matched as written, without DNS. The blocklist is synced as for
+	 * {@link #block(AccountKey)}.
+	 *
+	 * @param address transport address or host
+	 * @return whether it was not blocked before
+	 * @throws IllegalArgumentException if the address is neither
+	 */
+	public boolean block(AString address) {
+		Blocklist blocklist=application.blocklist();
+		boolean added=blocklist.block(address);
+		application.syncHost();
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		Map<AccountKey,NodeDirectory.NodeRecord> records=application.directory().records();
+		Set<AccountKey> affected=new HashSet<>();
+		for (NodeDirectory.NodeRecord record:records.values()) {
+			if (blocklist.dialable(record.transports())!=record.transports()) affected.add(record.peerKey());
+		}
+		for (AccountKey key:manager.getAuthenticatedRouteKeys()) {
+			if (refusesRoute(manager,key)) affected.add(key);
+		}
+		for (AccountKey key:affected) {
+			drop(key);
+			NodeDirectory.NodeRecord record=records.get(key);
+			if (record!=null) offer(record);
+		}
+		return added;
+	}
+
+	/**
+	 * Unblocks a node. Its record is taken again when it next arrives, making it a
+	 * candidate again. The blocklist is synced as for {@link #block(AccountKey)}.
+	 *
+	 * @param node key of the node to unblock
+	 * @return whether it was blocked
+	 */
+	public boolean unblock(AccountKey node) {
+		boolean removed=application.blocklist().unblock(node);
+		application.syncHost();
+		return removed;
+	}
+
+	/**
+	 * Unblocks a transport address or a host. A node that advertises addresses this
+	 * node refused, and that it has no route to, is offered again with every address it
+	 * no longer refuses; a node with a route, or one the operator named, keeps the
+	 * addresses it has until its record changes. The blocklist is synced as for
+	 * {@link #block(AccountKey)}.
+	 *
+	 * @param address transport address or host
+	 * @return whether it was blocked
+	 * @throws IllegalArgumentException if the address is neither
+	 */
+	public boolean unblock(AString address) {
+		Blocklist blocklist=application.blocklist();
+		List<NodeDirectory.NodeRecord> refused=new ArrayList<>();
+		for (NodeDirectory.NodeRecord record:application.directory().records().values()) {
+			if (blocklist.dialable(record.transports())!=record.transports()) refused.add(record);
+		}
+		boolean removed=blocklist.unblock(address);
+		application.syncHost();
+		LatticeConnectionManager manager=propagator.getConnectionManager();
+		Set<AccountKey> routes=manager.getAuthenticatedRouteKeys();
+		for (NodeDirectory.NodeRecord record:refused) {
+			AccountKey key=record.peerKey();
+			if (routes.contains(key) || named.contains(key)) continue;
+			// The same record again is no newer, so the candidate is replaced
+			manager.removePeer(key);
+			offer(record);
+		}
+		return removed;
+	}
+
+	/** Whether the operator named a node, so its record is kept however full the registry is. */
+	boolean isNamed(AccountKey node) {
+		return named.contains(node);
+	}
+
+	/** Whether a node is blocked. */
+	public boolean isBlocked(AccountKey node) {
+		return application.blocklist().isBlocked(node);
+	}
+
+	/**
+	 * Whether a transport address or a host is itself blocked: an address at a blocked
+	 * host is refused but not itself blocked.
+	 *
+	 * @throws IllegalArgumentException if the address is neither
+	 */
+	public boolean isBlocked(AString address) {
+		return application.blocklist().isBlocked(address);
+	}
+
 	private CompletableFuture<Void> initialisePeer(Convex peer) {
 		initialisations.keySet().removeIf(p -> !p.isConnected());
-		return initialisations.computeIfAbsent(peer,p -> {
-			CompletableFuture<Void> initialised=propagator.getConnectionManager().withPeer(
-				p.getVerifiedPeer(),false,() -> pushOwnNodeInfo(p)
-					.thenCompose(ignored -> pullBootstrap(p)));
-			initialised.whenComplete((ignored,error) -> {
-				if (error!=null) initialisations.remove(p,initialised);
-			});
-			return initialised;
+		CompletableFuture<Void> initialised=new CompletableFuture<>();
+		CompletableFuture<Void> existing=initialisations.putIfAbsent(peer,initialised);
+		if (existing!=null) return existing;
+		// Started only once the entry is in place: the work can fail at once, and
+		// forgetting a failure removes the entry, which no map update may do
+		initialised.whenComplete((ignored,error) -> {
+			if (error==null) return;
+			initialisations.remove(peer,initialised);
+			reportInitialisationFailure(peer,error);
 		});
+		try {
+			propagator.getConnectionManager().withPeer(peer.getVerifiedPeer(),false,
+				() -> pushOwnNodeInfo(peer).thenCompose(ignored -> pullBootstrap(peer)))
+				.whenComplete((ignored,error) -> {
+					if (error==null) initialised.complete(null);
+					else initialised.completeExceptionally(error);
+				});
+		} catch (RuntimeException | Error e) {
+			initialised.completeExceptionally(e);
+			throw e;
+		}
+		return initialised;
+	}
+
+	/**
+	 * Logs why sending this node's record to a peer or pulling its bootstrap paths
+	 * failed. A peer that has gone, answers late or refuses is normal operation, work
+	 * abandoned as this node closes needs no report, and anything else is a fault.
+	 */
+	private static void reportInitialisationFailure(Convex peer,Throwable error) {
+		Throwable cause=PeerConnectionException.unwrap(error);
+		if (cause instanceof CancellationException) return;
+		if (cause instanceof RuntimeException || cause instanceof Error) {
+			log.warn("Could not bootstrap from node {} after an unexpected failure",peer.getVerifiedPeer(),cause);
+		} else {
+			log.info("Could not bootstrap from node {}: {}",peer.getVerifiedPeer(),cause.getMessage());
+		}
 	}
 
 	/** Pulls the application's bootstrap paths from a new peer, in order, refreshing discovery after each. */
@@ -595,10 +1407,10 @@ public class P2PNode implements Closeable {
 	 * @return application-owned lattice listener
 	 */
 	public LatticeListener getTransport() {
-		return transport;
+		return network.getListener();
 	}
 
-	/** Package test hook for this wrapper's application-owned propagation group. */
+	/** Package test hook for this wrapper's application-owned propagator group. */
 	LatticePropagator propagationGroup() {
 		return propagator;
 	}
@@ -610,12 +1422,12 @@ public class P2PNode implements Closeable {
 	 * @return configured or bound port, or {@code null} when unspecified
 	 */
 	public Integer getPort() {
-		return transport.getPort();
+		return network.getListener().getPort();
 	}
 
 	/** Returns the bound inbound TCP address, or {@code null} when none is open. */
 	public InetSocketAddress getHostAddress() {
-		return transport.getHostAddress();
+		return network.getHostAddress();
 	}
 
 	/**
@@ -624,59 +1436,128 @@ public class P2PNode implements Closeable {
 	 * @return true if the node has been launched and not closed
 	 */
 	public boolean isRunning() {
-		return server.isRunning() && transport.isRunning();
-	}
-
-	/** Stops networking; the service then saves by closing {@code getNodeServer().getHost()}. */
-	@Override
-	public void close() throws IOException {
-		transport.close();
-		server.close();
+		return server.isRunning() && network.getListener().isRunning();
 	}
 
 	/**
-	 * Stub command line entry point. Launches a public P2P node and runs until the
-	 * JVM is terminated.
+	 * Stops networking, sending what the host has published to connected peers first.
+	 * Neither publishes pending host edits nor flushes the borrowed store; a service
+	 * checkpoints the host first, as convex-peer/docs/SHUTDOWN.md describes.
+	 */
+	@Override
+	public void close() throws IOException {
+		try {
+			network.close();
+		} finally {
+			// Once the server stops, a backoff started later cancels itself
+			CompletableFuture<Void> backoff=seedBackoff;
+			if (backoff!=null) backoff.cancel(false);
+		}
+	}
+
+	/**
+	 * Command line entry point. Launches a public P2P node, joins the network through
+	 * any configured seeds and runs until the JVM is terminated.
 	 *
-	 * @param args Optional Etch store file path; a temporary store is used if absent
-	 * @throws IOException If the store or node cannot be opened
+	 * <p>The optional argument is a JSON5 file holding the node configuration, such as
+	 * {@code port}, {@code url}, {@code maxNodeRecords} and {@code seeds}, plus
+	 * {@code store}, the Etch store file, and {@code keypair}, the node key's Ed25519
+	 * seed in hex. A store needs a stable key, since the node keeps its own record and
+	 * its contact records under it. Without a store the node uses a temporary one, and
+	 * without a key it generates one.</p>
+	 *
+	 * @param args Optional JSON5 configuration file
+	 * @throws IOException If the configuration, store or node cannot be opened
 	 * @throws InterruptedException If interrupted while running
 	 */
 	public static void main(String[] args) throws IOException, InterruptedException {
-		AStore store = (args.length > 0)
-			? EtchStore.create(new File(args[0]))
-			: EtchStore.createTemp("convex-p2p");
-
-		AKeyPair keyPair = AKeyPair.generate();
+		AMap<AString,ACell> settings=(args.length>0)?ConfigUtils.readConfigFile(args[0]):Maps.empty();
+		AString storeFile=RT.ensureString(settings.get(STORE));
+		AKeyPair configuredKey=keyPair(settings.get(KEYPAIR));
+		if (storeFile!=null && configuredKey==null) {
+			throw new IllegalArgumentException("A store needs a stable node key: set "+KEYPAIR);
+		}
+		// The key stays out of the configuration given to the node
+		NodeConfig config=NodeConfig.create(settings.dissoc(STORE).dissoc(KEYPAIR));
+		// Invalid seeds fail before the store opens
+		seeds(config);
+		AKeyPair keyPair=(configuredKey!=null)?configuredKey:AKeyPair.generate();
 		log.info("Node key: {}", keyPair.getAccountKey().toChecksumHex());
 
-		P2PNode node = P2PNode.create(store, NodeConfig.create(), keyPair).serveAllInbound();
-		var host=node.getNodeServer().getHost();
-		host.autoFlush(Duration.ofSeconds(30)).failure()
-			.thenAcceptAsync(error -> log.warn("P2P store flush failed",error));
-		var stopped=new CountDownLatch(1);
-		var closing=new AtomicBoolean();
-		Runnable shutdown=() -> {
-			if (!closing.compareAndSet(false,true)) return;
-			// Close replication, then the host (stops flushing, final checkpoint), then the store.
-			try (store; host; node) {
-				// Resource order defines the service's shutdown policy.
-			} catch (IOException e) {
-				log.warn("Unable to finish P2P service shutdown",e);
-			} finally {
-				stopped.countDown();
-			}
-		};
+		AStore store = (storeFile!=null)
+			? EtchStore.create(FileUtils.getFile(storeFile.toString()))
+			: EtchStore.createTemp("convex-p2p");
+		serve(store,config,keyPair,node -> {});
+	}
+
+	/**
+	 * Runs a public node as a service until the JVM shuts down. Launches the node,
+	 * adds the seeds the configuration lists to its live list and joins the network
+	 * through that list, as {@link #seed(List)} does, then on shutdown stops it in the order
+	 * convex-peer/docs/SHUTDOWN.md prescribes and closes the store.
+	 *
+	 * @param store store the node opens its host from; closed when the service ends
+	 * @param config node configuration, including any {@link #SEEDS}
+	 * @param keyPair node key
+	 * @param started called once the node is launched, before the service waits
+	 * @throws IOException If the node cannot be launched
+	 * @throws InterruptedException If interrupted while running
+	 * @throws IllegalArgumentException If the configuration is invalid
+	 */
+	public static void serve(AStore store,NodeConfig config,AKeyPair keyPair,Consumer<P2PNode> started)
+			throws IOException, InterruptedException {
+		List<PeerName> seeds;
+		P2PNode node;
 		try {
+			seeds=seeds(config);
+			node = P2PNode.create(store, config, keyPair).serveAllInbound();
+		} catch (RuntimeException e) {
+			store.close();
+			throw e;
+		}
+		var host=node.getNodeServer().getHost();
+		// Runs once; a second caller waits until it has finished
+		Shutdown.Once shutdown=Shutdown.once(() -> {
+			// Sync the application's local state and checkpoint, then close the node
+			// (sends the checkpoint to peers), the host (stops flushing, saves anything
+			// merged since) and the store.
+			try (store; host; node) {
+				node.getApplication().sync();
+				host.checkpoint();
+			} catch (IOException | RuntimeException e) {
+				log.warn("Unable to finish P2P service shutdown",e);
+			}
+		});
+		try {
+			host.autoFlush(Duration.ofSeconds(30)).failure()
+				.thenAcceptAsync(error -> log.warn("P2P store flush failed",error));
 			node.launch();
 			host.checkpoint();
+			node.seed(seeds);
+			started.accept(node);
 			// Runs in Convex's shutdown order, before transports and Etch files close
 			Shutdown.addHook(Shutdown.SERVICE,shutdown);
-			// A real service can run its control loop here.
-			stopped.await();
+			shutdown.await();
 		} finally {
 			Shutdown.removeHook(Shutdown.SERVICE,shutdown);
 			shutdown.run();
 		}
+	}
+
+	/**
+	 * Reads a launcher's node key, as {@link #KEYPAIR} holds it.
+	 *
+	 * @param seed Ed25519 seed in hex, or null
+	 * @return the key pair, or null if no seed is set
+	 * @throws IllegalArgumentException if the seed is not a valid Ed25519 seed
+	 */
+	public static AKeyPair keyPair(ACell seed) {
+		if (seed==null) return null;
+		AString hex=RT.ensureString(seed);
+		Blob bytes=(hex==null)?null:Blob.parse(hex.toString());
+		if (bytes==null || bytes.count()!=AKeyPair.SEED_LENGTH) {
+			throw new IllegalArgumentException(KEYPAIR+" must be a "+AKeyPair.SEED_LENGTH+"-byte Ed25519 seed in hex");
+		}
+		return AKeyPair.create(bytes);
 	}
 }

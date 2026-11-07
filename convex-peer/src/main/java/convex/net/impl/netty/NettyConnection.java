@@ -3,6 +3,11 @@ package convex.net.impl.netty;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.channels.ClosedChannelException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -15,6 +20,7 @@ import javax.net.ssl.SSLParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.crypto.TLS;
 import convex.core.data.Vectors;
 import convex.core.message.BoundedMessageQueue;
 import convex.core.message.Message;
@@ -37,6 +43,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.util.concurrent.EventExecutor;
 
 public class NettyConnection extends AConnection {
 
@@ -64,6 +71,12 @@ public class NettyConnection extends AConnection {
 	 */
 	private final BoundedMessageQueue outbound = new BoundedMessageQueue(
 		Config.OUTBOUND_QUEUE_SIZE, Config.OUTBOUND_QUEUE_BYTE_LIMIT, true);
+
+	/** Future of the last message handed to the channel. Event loop only. */
+	private ChannelFuture lastWrite;
+
+	/** Flush requests waiting for the outbound queue to empty. Event loop only. */
+	private final ArrayList<CompletableFuture<Void>> flushWaiters = new ArrayList<>();
 
 	private NettyConnection(Channel channel, NettyInboundHandler inbound) {
 		this.channel = channel;
@@ -140,11 +153,20 @@ public class NettyConnection extends AConnection {
 	/** Disable hostname checks only when the context authenticates an expected peer key. */
 	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction,
 			int maxMessageLength, SSLContext sslContext, boolean verifyHostname) throws InterruptedException, IOException {
-		Function<Message, Predicate<Message>> deliverFn = m -> {
+		return connectWithDelivery(sa, m -> {
 			receiveAction.accept(m);
 			return null;
-		};
-		NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
+		}, maxMessageLength, sslContext, verifyHostname);
+	}
+
+	/**
+	 * Connects with a delivery that may ask to wait by returning a retry, as a
+	 * server connection's does: this connection then stops reading until the retry,
+	 * run on a virtual thread, accepts the message or gives up.
+	 */
+	public static NettyConnection connectWithDelivery(SocketAddress sa, Function<Message, Predicate<Message>> delivery,
+			int maxMessageLength, SSLContext sslContext, boolean verifyHostname) throws InterruptedException, IOException {
+		NettyInboundHandler inbound=new NettyInboundHandler(delivery,null,maxMessageLength);
 		NettyConnection client=new NettyConnection(null,inbound);
 		inbound.setConnection(client);
 		SslHandler ssl;
@@ -152,8 +174,7 @@ public class NettyConnection extends AConnection {
 			ssl=null;
 		} else {
 			InetSocketAddress address=(InetSocketAddress)sa;
-			SSLEngine engine=sslContext.createSSLEngine(address.getHostString(),address.getPort());
-			engine.setUseClientMode(true);
+			SSLEngine engine=TLS.clientEngine(sslContext,address.getHostString(),address.getPort());
 			SSLParameters parameters=engine.getSSLParameters();
 			parameters.setEndpointIdentificationAlgorithm(verifyHostname ? "HTTPS" : null);
 			engine.setSSLParameters(parameters);
@@ -179,6 +200,7 @@ public class NettyConnection extends AConnection {
 						public void channelInactive(ChannelHandlerContext ctx) {
 							// Clear queue to wake any threads blocked on offer(timeout)
 							client.clearOutbound();
+							client.failFlushWaiters();
 							ctx.fireChannelInactive();
 						}
 					},
@@ -205,7 +227,7 @@ public class NettyConnection extends AConnection {
 			connected=true;
 			return client;
 		} finally {
-			if (!connected) chan.close().syncUninterruptibly();
+			if (!connected) chan.close();
 		}
 	}
 
@@ -225,21 +247,35 @@ public class NettyConnection extends AConnection {
 	 *
 	 * <p>This is an outbound client connection, so blocking with a bounded
 	 * timeout is acceptable — the caller's virtual thread parks while the
-	 * outbound queue drains.</p>
+	 * outbound queue drains. On an event loop it does not wait: those threads
+	 * drain this queue and every other, so a full queue fails the send at once.</p>
 	 */
 	@Override
-	public boolean sendMessage(Message m) {
+	public boolean sendMessage(Message m) throws IOException, InterruptedException {
 		Channel ch = channel;
-		if (ch == null || !ch.isActive()) return false;
-		if (encodedLength(m)<0) return false;
-		boolean queued;
-		try {
-			queued = outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
+		if (ch == null || !ch.isActive()) throw new ClosedChannelException();
+		m.getMessageData(); // encodes on this thread, or throws if too large for a frame
+		boolean queued = outbound.offer(m)
+			|| (!inEventLoop(ch.eventLoop().parent())
+				&& outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS));
+		if (queued && afterQueue(ch, m)) return true;
+		// Closing clears the queue, which also wakes a waiting send
+		if (!ch.isActive()) throw new ClosedChannelException();
+		return false;
+	}
+
+	/**
+	 * Whether the calling thread is one of this group's event loops. Client and server
+	 * channels share the group, so a wait on any of its loops stalls every connection
+	 * that loop serves, and on a channel's own loop could never end early. A loop
+	 * outside any group, such as an embedded channel's, has no group to stall.
+	 */
+	static boolean inEventLoop(EventLoopGroup group) {
+		if (group==null) return false;
+		for (EventExecutor loop : group) {
+			if (loop.inEventLoop()) return true;
 		}
-		return queued && afterQueue(ch, m);
+		return false;
 	}
 
 	/**
@@ -300,12 +336,64 @@ public class NettyConnection extends AConnection {
 		while (ch.isWritable() && ch.isActive()) {
 			Message m=outbound.poll();
 			if (m == null) break;
-			ch.write(m);
+			lastWrite=ch.write(m);
 			count++;
 		}
 		if (count > 0) {
 			ch.flush();
 		}
+		if (!flushWaiters.isEmpty() && outbound.isEmpty()) completeFlushWaiters();
+	}
+
+	/**
+	 * Completes once the outbound queue is empty and the last message taken from it
+	 * has been written to the socket, so every message queued before this call is
+	 * covered. Messages queued meanwhile are waited for too, so continuous sending
+	 * delays completion. Fails if the channel closes first.
+	 */
+	@Override
+	public CompletableFuture<Void> flushOutbound() {
+		Channel ch = channel;
+		if (ch == null) return CompletableFuture.failedFuture(new IOException("Connection is closed"));
+		CompletableFuture<Void> written = new CompletableFuture<>();
+		try {
+			ch.eventLoop().execute(() -> {
+				if (!ch.isActive()) {
+					written.completeExceptionally(new IOException("Connection is closed"));
+					return;
+				}
+				flushWaiters.add(written);
+				doFlush();
+			});
+		} catch (RejectedExecutionException e) {
+			written.completeExceptionally(e);
+		}
+		return written;
+	}
+
+	/** Netty completes writes in order, so the last write's completion covers every waiter. */
+	private void completeFlushWaiters() {
+		List<CompletableFuture<Void>> waiting = List.copyOf(flushWaiters);
+		flushWaiters.clear();
+		ChannelFuture written = lastWrite;
+		if (written == null) {
+			waiting.forEach(w -> w.complete(null));
+			return;
+		}
+		written.addListener(f -> {
+			for (CompletableFuture<Void> w : waiting) {
+				if (f.isSuccess()) w.complete(null);
+				else w.completeExceptionally(f.cause());
+			}
+		});
+	}
+
+	/** Fails flush requests when the channel goes inactive. Event loop only. */
+	private void failFlushWaiters() {
+		if (flushWaiters.isEmpty()) return;
+		IOException closed = new IOException("Connection closed before queued messages were written");
+		flushWaiters.forEach(w -> w.completeExceptionally(closed));
+		flushWaiters.clear();
 	}
 
 	@Override
@@ -351,9 +439,9 @@ public class NettyConnection extends AConnection {
 		clearOutbound();
 		closeRequests();
 		if (ch==null) return;
-		ChannelFuture closeFuture=ch.close();
-		if (!ch.eventLoop().inEventLoop()) closeFuture.syncUninterruptibly();
- 	}
+		// The event loop releases the socket; waiting for it here could block one event loop on another
+		ch.close();
+	}
 
 	@Override
 	public long getReceivedCount() {

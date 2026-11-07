@@ -51,13 +51,13 @@ Key features across the host and its groups:
   missing cells through correlated requests; unverified sources must send complete values
 - **Copy-on-write cursor** — atomic updates via `cursor.updateAndGet()`
 - **LatticeContext** — carries signing keys through the lattice hierarchy for `OwnerLattice`/`SignedLattice` verification
-- **LatticePropagator** — an application-configured propagation policy group
+- **LatticePropagator** — an application-configured propagator group
   owning its routes, serving store, filters and protocol endpoint
 
 `NodeServer` is schema-independent. It does not recognise `:p2p`, publish NodeInfo,
 refresh discovery state or apply social/PoP policy. `P2PNode` composes those concerns;
 its `NodeDirectory` translates validated `[:p2p :nodes]` records into the generic
-connection intent accepted by `LatticeConnectionManager`.
+connection candidates accepted by `LatticeConnectionManager`.
 
 ### 2.3 Consensus (Server + BeliefPropagator)
 
@@ -173,14 +173,17 @@ The `:convex` keyword at the root level is a namespace for Convex-native protoco
 
 ### 4.1 Lattice Paths
 
-P2P state lives under the `:p2p` region with two sub-regions:
+P2P discovery and routing use three paths, each keyed by node key:
 
 ```
-[:p2p :nodes]  → OwnerLattice<NodeInfo>   Known peers and their metadata
-[:p2p :kad]    → KadLattice               Kademlia routing table
+[:p2p :nodes <node key>]  → SignedData<NodeInfo>        Node records this node keeps
+[:kad <node key>]         → SignedData<routing view>    Each node's own Kademlia view   [FUTURE]
+[:local <node key> :p2p]  → local evidence              What this node has seen of others  [PARTIAL]
 ```
 
-Both follow standard lattice merge semantics with SignedData verification.
+Node records and routing views are shared. Each entry is signed by its node key and
+merges by the standard owner rule, and each node holds only the entries it wants
+(§4.2). `:local` holds application state that is not meant to be shared externally (§4.6).
 
 ### 4.2 Node Registry: `[:p2p :nodes]`
 
@@ -198,15 +201,14 @@ This uses `OwnerLattice` — the same pattern as `:kv` and `:fs`. The AccountKey
 
 ```clojure
 ;; NodeInfo (wrapped in SignedData)
-{:transports  ["tcp://peer.convex.world:18888"
-                "wss://peer.convex.world/ws"
-                "https://peer.convex.world"]
- :timestamp   1708000000000       ;; monotonic, milliseconds
- :pops        [0xdef456...]        ;; node keys providing a return path
- :relay       true                ;; willing to relay bounded signed messages
- :regions     #{:convex :p2p :data :fs :kv}  ;; lattice regions this peer serves
- :version     "0.8.3"             ;; protocol version
- :metadata    {...}}              ;; optional additional metadata
+{:timestamp   1708000000000            ;; owner's clock, milliseconds
+ :transports  ["tcp://peer.convex.world:18888"
+               "wss://peer.convex.world/ws"]
+ :pops        [0xdef456...]             ;; node keys providing a return path
+ :relay       true                     ;; willing to relay bounded signed messages
+ :regions     #{:p2p :id :kad :social}  ;; top-level regions this node is interested in
+ :type        "Convex Lattice Node"
+ :version     "0.8.18"}                ;; software version
 ```
 
 `:transports` may be an empty vector. That is an explicit, signed statement that
@@ -214,7 +216,13 @@ the node is identifiable but not directly dialable, as for an outbound-only node
 behind NAT. Private or guessed addresses must not be advertised as public transports.
 `:pops` contains at most 16 unique remote node keys and `:relay` defaults to false
 when absent. These fields advertise routing intent; they do not authenticate or open
-a connection.
+a connection. `:regions` names the top-level regions the node is interested in, so
+other nodes can locate nodes interested in the same regions (§4.5). It describes the
+node to the network; it is not a rule for how the node's applications or code are
+structured. It never includes `:local`.
+
+The record format and its validation belong to the P2P application in
+`convex-p2p`, which merges the registry through its own component.
 
 #### Merge Function
 
@@ -222,15 +230,85 @@ Standard `OwnerLattice` merge with additional NodeInfo-specific rules:
 
 - **Signature verification** via `OwnerLattice` — signer must match owner key
 - **Timestamp monotonicity** — newer NodeInfo replaces older (LWW per owner)
-- **Conditional acceptance** via `LatticeContext` — nodes may reject entries from peers with zero on-chain stake, unregistered peers, etc.
+- **Admission** — any correctly self-signed record is accepted. Optional stronger
+  proofs, and local policies that use them, are proposed in
+  [#713](https://github.com/Convex-Dev/convex/issues/713).
+- **Retention** — each node keeps only the records it wants (below).
 
-#### Relationship to On-Chain PeerStatus
+The owner's `:timestamp` orders only that owner's own records. A node whose clock
+falls behind its last published record cannot replace that record until its clock
+passes it. The timestamp is never evidence that the node is alive (§4.6).
 
-On-chain `PeerStatus` (in global consensus state) is the **single source of truth** for peer identity: AccountKey, stake, controller address, delegated stakes, balance, and metadata (including a `:url` hostname entry). This is the authoritative peer registry — if a peer isn't registered on-chain with stake, it isn't a peer.
+#### Retention
 
-The P2P node registry at `[:p2p :nodes]` provides **supplementary off-chain metadata** for operational convenience: multiple transport URIs, supported lattice regions, protocol version, and capabilities. This data propagates faster than on-chain updates (gossip vs. consensus finality) but has weaker guarantees (no finality, latest-timestamp-wins). It is always subordinate to the on-chain record.
+Each node holds only the node records it wants, as it does for social owners. The
+P2P application's component for the region, `NodeRegistry`, defines the registry's
+merge: the owner rule, applied only to the records the node wants. It holds no local
+state: the application supplies the blocklist check and the contact standings from
+`:local` (§4.6), and the node supplies the nodes to keep. Nodes
+that accept every record converge under the owner rule; a node that turns records
+away holds a subset of theirs. An incoming record that differs from the one held is
+checked before it is merged, and the node publishes only what it holds. There is no
+global directory: each node passes on the records it keeps, so discovery spreads as
+gossip of samples, and the registry's cost to a node stays bounded however many keys
+exist.
 
-**Implemented bootstrap path**: An operator gives `P2PNode.connect` one node
+A node always keeps, without counting them:
+
+- its own record;
+- records of nodes the operator named with `connect`;
+- records of nodes it has an authenticated route to, including NAT leaves that
+  connected in, and of a node whose inbound route it is authenticating;
+- records of its own Points of Presence.
+
+These are bounded by configuration and by the node's connection limit. Beyond them
+it keeps up to `maxNodeRecords` records (1024 by default, in the node configuration),
+in order: nodes that answered and have not failed since, then nodes never reached,
+then nodes that failed. The registry is a directory, not a connection list, so this
+bound is independent of how many peers the node connects to. Nothing an incoming
+value or connection can create escapes a bound. Within each group the order is a
+hash of the node key salted with a secret the node draws when it starts. Other nodes
+cannot predict the order, so none can choose which records a node keeps. It is
+stable while the node runs, so a record turned away is turned away again when it
+next arrives, and exchanges between nodes settle. The evidence comes from `:local`
+(§4.6), never from the record itself.
+
+The checks on an incoming record run cheapest first:
+
+1. a record of a node this node has blocked (§4.6) is refused;
+2. a record over 4 KB (`P2PLattice.MAX_NODE_RECORD_SIZE`) is refused;
+3. a new node competing for a place in a full registry is refused if it ranks below
+   the lowest record held;
+4. a record that is not newer under the owner rule is ignored;
+5. a record that is not a valid NodeInfo is refused, leaving any held one.
+
+The node's own record skips the size and validity checks. Held records are not
+checked again; they leave only when outranked or blocked. Each node keeps a different
+subset, so every exchange offers records turned away before, and each costs a
+comparison. A dropped record leaves the node directory but stays a connection
+candidate.
+
+A NAT leaf pushes its record before the receiving node authenticates its route, so a
+full registry may turn the record away. The receiving node keeps the leaf's record
+while it authenticates the route, and merges the pushed record again. If the
+authentication fails, the record competes like any other at the next merge.
+
+A node can route a point message only through records it keeps. Finding an
+arbitrary node by key is Kademlia's job (§4.3).
+
+#### Node identity and Convex peers
+
+A P2P node is identified by its node key alone. Its signed NodeInfo needs no
+on-chain registration or stake, and no node rejects a record for lacking either.
+
+A node key may also belong to a Convex peer registered in on-chain `PeerStatus`.
+That is orthogonal to discovery, connection and routing. Local policy may treat it
+as extra trust, as one of the optional proofs proposed in #713, and on-chain peer
+entries are one optional bootstrap source (§6.3).
+
+**Implemented bootstrap path**: An operator gives `P2PNode.connect` one node by a peer
+name, which the node resolves with its records and blocklist and keeps
+([LATTICE_NETWORKING.md](LATTICE_NETWORKING.md#connection-capabilities)), or by node
 AccountKey and TCP address. After challenge/response verifies that endpoint, the
 connecting node pushes only its own signed `[:p2p :nodes]` entry and waits for a
 post-merge acknowledgement. It then pulls and merges the bootstrap node's `:p2p` and
@@ -238,48 +316,184 @@ post-merge acknowledgement. It then pulls and merges the bootstrap node's `:p2p`
 therefore receives its follow-filtered view without an unrestricted full-root pull or
 waiting for another publication. The receiving node independently challenges the connecting
 node over the same full-duplex socket. Only after the live connection proves the key
-of an admitted signed NodeInfo record is that physically inbound connection upgraded
+of the valid signed NodeInfo it delivered is that physically inbound connection upgraded
 into an outbound propagation route. A node with empty `:transports` therefore supports
 bidirectional gossip without a reverse TCP connection.
 
-**Proposed on-chain bootstrap path**: A new node reads the on-chain peer list
-(PeerStatus records with hostnames), connects to a peer via the on-chain `:url`, then
-pulls the P2P node registry to discover richer transport metadata. The on-chain URL is
-the fallback when P2P metadata is unavailable.
+**Seed nodes**: Seeds are expected-good nodes that the operator trusts to enable
+connectivity to the whole network. A node joins a network through its seed list, kept
+in its local record (§4.6), with `P2PNode.seed`. The list holds at most 16 peer names.
+The seeds its configuration lists under `seeds`, each a `url` with an optional `key`,
+are added to it at launch, and `addSeed` and `removeSeed` change it while the node
+runs. A `did:key` seed is found where the node's records or contact addresses place
+its key.
 
-**Validation**: Nodes should validate P2P entries against on-chain state — reject NodeInfo from AccountKeys not registered on-chain, or from peers with zero stake. The on-chain PeerStatus is the trust anchor; the P2P lattice is a convenience cache.
+When it starts seeding, the node dials three seeds from the list at random and, with
+them, up to three nodes it reached before and that have not failed since, also at
+random, so that it does not learn the network from its seeds alone. Each is dialled
+once, its name resolved and the node connected and initialised as with `connect`; a
+seed that cannot be reached is not retried, and one that later loses its route is not
+redialled. A node reached before stays connected as an ordinary peer. From then on the
+node keeps its ambient slots filled from every peer it knows, wherever it learned of
+it, and redials a peer that fails after a backoff. The seeds are its last resort:
+whenever the slots are unfilled and no peer it believes good is left to dial, because
+every candidate without a route has failed since it was last reached, as when it
+reached no one at start or has lost every route, the node dials three seeds it is not
+connected to, at random, and again after a backoff while that remains so.
+
+Once the node's own ambient slots hold routes to other peers, at least one, which can
+replace the seeds, it releases every seed: the route it opened closes, and a seed whose
+record or contact address it holds stays an ordinary candidate. Seeds so carry a node
+only while it joins or rejoins, not for good; in a network too small to fill the
+slots, they stay connected. A restarted node needs no seed (§4.6).
+
+**Proposed on-chain bootstrap path** (optional): A node may take seeds from the
+on-chain peer list, the keys and `:url` hosts in `PeerStatus`, alongside configured
+seeds and retained records. Each connection is authenticated by the same challenge/response
+for the listed key, and the node then pulls the P2P registry as from any bootstrap
+peer.
 
 ### 4.3 Kademlia Routing [FUTURE]
 
-Kademlia provides O(log N) lookup of any peer by AccountKey, using XOR distance. The `Kademlia` utility class already provides `proximity()` and `distance()` functions. `KadLattice` exists as a stub.
+Kademlia provides O(log N) lookup of any node by key, using XOR distance. The `Kademlia` utility class already provides `proximity()` and `distance()` functions. `KadLattice` exists as a stub.
 
-This is planned for **future implementation** when the network scales beyond what the node registry and on-chain peer list can efficiently serve. For current network sizes (up to hundreds of peers), strategies 1-3 in §4.4 are sufficient.
+Routing state is owner-keyed. `[:kad <node key>]` holds one node's signed routing
+view, its k-buckets. Each node maintains only its own view, because the view depends
+on its own key position, but views are shareable: another node can read a view to
+find nodes closer to the key it is looking for. A node keeps the views it wants, as
+it does node records. The region stays reserved (`ReservedLattice`) until the view's
+format and merge are designed.
 
-When implemented, Kademlia routing state would be **node-local** (not propagated) since each node's k-bucket view is inherently specific to its own key position. It would live under `:local` or as a non-propagated local data structure.
+This is planned for when the network outgrows what retained node records can serve.
+For current network sizes (up to hundreds of nodes), strategies 1-3 in §4.4 are
+sufficient.
 
 ### 4.4 Peer Discovery Strategies
 
 A node uses multiple strategies to discover and maintain connections, in order:
 
-1. **Configured peers** — Explicitly supplied connection endpoints (bootstrap
-   nodes, operator preferences). `P2PNode.connect` and
-   `LatticeConnectionManager.connectPeer` implement the one-peer case; configuration
-   file integration remains future work. Connections are authenticated and maintained
-   persistently.
+1. **Configured peers** — Seed nodes from the node's seed list, which its
+   configuration adds to, held only until other peers can replace them (§4.2), and
+   nodes the operator names with
+   `P2PNode.connect`, which are kept. Every connection is authenticated by
+   challenge/response.
 
-2. **On-chain peer registry** — `PeerStatus` entries in consensus state provide hostname/URL for staked peers. Used for bootstrapping and as fallback. `ConnectionManager` already uses stake-weighted random selection from this registry.
+2. **On-chain peer registry** [PROPOSED, optional] — `PeerStatus` entries in
+   consensus state name registered Convex peers' keys and `:url` hosts. A node may
+   use them as bootstrap seeds; they confer no P2P identity.
 
-3. **P2P node registry** (`[:p2p :nodes]`) — Richer transport metadata propagated via gossip. Provides multi-protocol endpoints and faster updates than on-chain.
+3. **P2P node registry** (`[:p2p :nodes]`) — Each node's own signed transport
+   metadata, passed on by every node that keeps it (§4.2). This is where discovery
+   happens once a node has bootstrapped.
 
 4. **Kademlia lookup** [FUTURE] — For discovering specific peers by AccountKey when direct routing is needed. O(log N) hops. Not needed at current network scale; planned for future growth.
 
 ### 4.5 Selective Attention
 
-Nodes only propagate lattice regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. The P2P node registry advertises which regions each peer serves, enabling efficient gossip targeting.
+Nodes only propagate lattice regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. A node finds peers interested in the same regions through their records' `:regions` (§4.2); choosing peers by region is [PROPOSED].
 
 This is natural in the `NodeServer` model: the application attaches propagators
 with the appropriate filtered views, while a node only merges values governed by
 its configured lattice.
+
+### 4.6 Local Evidence [PARTIAL]
+
+What a node has seen of other nodes is its own business. It lives at
+`[:local <own node key> :p2p]`: `:local` holds application state that is not meant
+to be shared externally, written and managed by one application instance. The P2P
+application's projection, which the node's group publishes through, leaves `:local`
+out in both directions. A group with a filter that keeps `:local` can still publish
+it, for backup, diagnostics or failover replication; the receiving node keeps it only
+if one of its applications accepts it, which the P2P application does not.
+
+`ContactRecords` holds a contact record per node key: the last authenticated contact,
+the address this node last dialled and found the node's key at, the failures since
+that contact and the last failure.
+
+```clojure
+;; Value at [:local <own node key> :p2p]
+{:timestamp 1708000000000
+ :contacts  {0xabc123... {:last-contact 1708000000000, :failures 0,
+                          :address "tcp://198.51.100.20:18888"}
+             0xdef456... {:last-contact 1707990000000, :failures 2,
+                          :last-failure 1707999000000}}
+ :blocked   {0x789abc...                {}
+             "tcp://203.0.113.5:18888"  {}
+             "198.51.100.7"             {}}
+ :seeds     {"did:web:seed.example.com"       {}
+             "tcp://seed2.example.com:18888"  {:key 0xabc123...}}}
+```
+
+Only an authenticated connection counts as contact: a verified outbound admission or
+an inbound route upgrade, and then each `keepAlive` interval (60 seconds by default)
+in which the route is heard from or answers a probe. A failure is a dial or identity
+challenge that failed for a desired peer, or an authenticated route that stopped
+answering. Nothing the owner writes in its node record, such as `:timestamp`, ever
+counts. Only a verified route this node dialled records an address: a route the other
+node opened says nothing about where it can be reached.
+
+Only live connections, which hold a socket and a slot, are probed. A node that
+answered and has not failed since keeps that standing whether or not this node is
+connected to it: time alone is no evidence against it, and nothing dials it just to
+check.
+
+Nodes connecting in can create records, so at most 1024 nodes have one
+(`ContactRecords.MAX_NODES`). A new node beyond that replaces one with failures if
+there is one, otherwise the one this node has been out of touch with longest. A live
+route keeps reporting contact, so it is never the oldest.
+
+`LatticeConnectionManager` sees every dial, challenge and silence and reports contact
+and failures through `setContactHandlers`. It knows no lattice paths. The P2P node
+routes the reports to the application's `ContactRecords`, an `ALocalComponent`: each
+report edits its private copy and signs nothing. The application syncs the copy into
+its `:local` slot, signing the slot once, whenever it syncs the host to publish its
+own record, and when the service shuts down as [SHUTDOWN.md](SHUTDOWN.md) prescribes;
+a service that skips that sync loses what changed since. The host persists the slot
+with the rest of its root, so after a restart the records start from what the host
+retained. A node without a key keeps none. At launch each node with a recorded address
+becomes a connection candidate there, so a restarted node rejoins any node it dialled
+without a seed, using only its own records. The registry is retained the same way, and
+its records become candidates too; a node record names newer transports than a contact
+address.
+
+The same record holds, at `:blocked`, the node keys, transport addresses and hosts
+the operator blocked with `P2PNode.block`, as an `AccessList`
+([LATTICE_APPLICATIONS.md](../../convex-core/docs/LATTICE_APPLICATIONS.md#data-and-merge-boundaries)).
+The record is replaced whole, so an unblock survives a restart and an older copy of
+the record cannot bring back a removed block. `block` and `unblock` sync the host at
+once; durability is the service's, as for contacts. A node without a key keeps its
+list in memory. What an entry refuses:
+
+- a node key: its record (§4.2), its connections, including one it opened, being a
+  connection candidate, and point messages from it, to it or through it;
+- a transport address, such as `tcp://host:port`: dialling it;
+- a host: dialling any address at it and, for an IP address, inbound connections
+  from it, which `serveAllInbound` turns away. A host name is matched as written,
+  without DNS, so it refuses only dialling.
+
+An address is stored in one form whatever its spelling: scheme and host in lower
+case, the port explicit, an IP address in standard text. The P2P node checks the
+list wherever it hands the connection manager a peer, which holds no list itself
+(§8.2). Blocking a node closes its connections at once, and a blocked node that
+connects in is closed when it claims its key, or dropped if it authenticates.
+Blocking an address drops the nodes with a route at it or advertising it, and
+offers them again at their other addresses. An unauthenticated inbound connection
+already open when its address is blocked stays open until it closes, with no route.
+
+The same record holds, at `:seeds`, the node's seed list (§4.2): an `AccessList` from
+each peer URI to an entry that may name the key the peer must prove. Each distinct URI
+is one seed, though several may reach the same node. It is the live list, read each
+time the node seeds; configuration only adds to it, and `addSeed` and `removeSeed`
+change it and sync the host at once. A node without a key keeps its list in memory.
+
+Proposed for the same record:
+
+- failures per address, since many keys can name one address;
+- blocks the node adds itself, with an expiry, for misbehaviour such as repeated
+  failed challenges.
+
+Retention (§4.2) ranks node records by this evidence. Candidate selection
+deliberately does not (§8.2).
 
 ## 5. Transport Layer [PROPOSED]
 
@@ -385,11 +599,9 @@ wss://peer.convex.world/ws               WebSocket binary (clients)
 https://peer.convex.world                HTTPS REST + MCP
 ```
 
-Public key addressing for peer-to-peer:
-
-```
-tcp://0xabc123...@peer.convex.world:18888
-```
+A transport URI names where to reach a node, never its key. A node record pairs its
+transports with the key that signs it; where an operator expects a key, it is given
+beside the URI ([LATTICE_NETWORKING.md](LATTICE_NETWORKING.md#connection-capabilities)).
 
 ### 6.2 Transport Selection
 
@@ -400,16 +612,20 @@ Clients select the best available transport from the peer's advertised set:
 - **Simple API callers** use HTTPS
 - **AI agents / MCP clients** use WSS or Streamable HTTP
 
-### 6.3 On-Chain as Source of Truth
+### 6.3 On-Chain Bootstrap [PROPOSED, optional]
 
-On-chain `PeerStatus` is the authoritative peer registry. Its metadata includes a `:url` entry (hostname) which is the primary and always-available connection point. The P2P node registry provides supplementary transport metadata.
+On-chain `PeerStatus` lists registered Convex peers with their keys and a `:url`
+host. A node may use these as bootstrap seeds alongside configured seeds and retained
+records. They are not a source of P2P identity or transports: the node authenticates
+each one by challenge/response for the listed key, and learns transports from the P2P
+registry once connected.
 
 **Bootstrap flow**:
 
-1. New node reads on-chain peer list — `PeerStatus` records with hostnames and stakes
-2. Connects to staked peers via on-chain `:url` (TCP or HTTPS)
-3. Optionally pulls P2P node registry (`[:p2p :nodes]`) for richer transport metadata
-4. Establishes preferred connections using advertised URIs where available, falling back to on-chain hostname
+1. Read the on-chain peer list: keys and `:url` hosts
+2. Connect to listed hosts, expecting the listed key
+3. Pull the P2P node registry (`[:p2p :nodes]`) as from any bootstrap peer
+4. Continue with candidates discovered from the registry
 
 ## 7. Authentication [EXISTS + PROPOSED]
 
@@ -462,8 +678,11 @@ INBOUND / AUTHENTICATED / OUTBOUND-PROPAGATION ROUTE
 
 `NodeServer` owns the physical inbound connection throughout. The explicit upgrade
 adds it to `LatticeConnectionManager`'s outbound broadcast routes; it does not turn it
-into a `Convex` client or transfer connection ownership. The upgrade method rejects an
-untrusted connection and a proven key with no admitted node identity. Disconnect
+into a `Convex` client or transfer connection ownership. The application vouches for
+the key it expects on that connection (P2P: the connection delivered that key's own
+valid signed NodeInfo), and the upgrade happens only after the connection proves that
+key. Desired-peer membership plays no part, so discovered candidates cannot block an
+upgrade. The upgrade method rejects an untrusted connection. Disconnect
 revokes both the trust-bound route and all ordinary inbound per-connection state.
 
 Manager-owned outbound clients have the mirror behaviour. After authenticating their
@@ -499,12 +718,21 @@ CONNECTING → CONNECTED → DISCONNECTED
 
 For lattice nodes, `LatticeConnectionManager` separately maintains identity-keyed
 desired, pending and admitted connections. A configured node key keeps a socket in
-capability-free limbo until challenge/response succeeds. Desired peers are populated
-through generic connection APIs; in the P2P application, `NodeDirectory` validates
-correctly owner-signed `[:p2p :nodes]` records and translates their transport fields.
-The connection manager itself never reads that lattice path or parses NodeInfo. Callers
-can await admission without polling. Explicit and discovered desired peers share the
-configurable `maxDesiredPeers` cap (256 by default).
+capability-free limbo until challenge/response succeeds. Desired peers are of two
+kinds. Explicit peers come from the operator through `connectPeer` and `addPeer` and
+are kept until removed or, as for seeds, released. Discovered peers are only
+candidates for ambient slots: in the P2P application, `NodeDirectory` validates correctly owner-signed `[:p2p :nodes]` records
+and translates their transport fields. Discovery never makes a node a wanted peer,
+and a node with no supported transport to dial, such as a NAT leaf, is not a
+candidate. The connection manager itself never reads that lattice path or parses NodeInfo,
+and holds no blocklist: the P2P node offers a candidate only at the addresses it does
+not refuse, never offers or connects to a blocked node, and drops one that
+authenticates (§4.6). Callers
+can await admission without polling. Discovered candidates are bounded by the
+configurable `maxDesiredPeers` cap (256 by default); explicit peers are not counted,
+and a full candidate pool never refuses explicit intent or an inbound route upgrade.
+Vacant ambient slots are filled from the candidates at random, so connections stay
+spread across the network rather than settling into fixed clusters.
 That cap bounds candidates, not live connections. The soft live targets are 16
 ambient peers plus up to 16 recently active communicators (`ambientPeers` and
 `activePeers` in `LatticePropagatorConfig`). Explicit connections may exceed them.
@@ -515,6 +743,8 @@ liveness and pending-attempt rules.
 It also keeps authenticated inbound connections in a separate upgraded-route map.
 Ordinary inbound sockets never appear in broadcasts; an upgraded route is selected
 only when no live manager-owned outbound client already serves the same peer key.
+A peer reached only through an upgraded route takes no ambient or active slot, so
+nodes that connect in cannot displace the peers this node chose.
 
 ### 8.3 Reconnection [EXISTS — lattice nodes]
 
@@ -571,8 +801,9 @@ On reconnect, if the current transport repeatedly fails, the next is tried.
 ### 9.1 Architecture
 
 `NodeServer` remains schema-independent: it replicates an assembled host and
-merges nothing itself. The calling application constructs its propagation groups
-and transport hosts, while P2P policy stays above all three layers:
+merges nothing itself. The service constructs its propagator groups and transport
+hosts, while P2P policy stays above all three layers (see
+[service anatomy](../../convex-core/docs/LATTICE_APPLICATIONS.md#service-anatomy)):
 
 ```
 P2PNode / NodeDirectory (P2P schema, discovery and policy)
@@ -580,7 +811,7 @@ P2PNode / NodeDirectory (P2P schema, discovery and policy)
 ├── LatticeListener (application-owned inbound TCP and group routing)
 └── LatticePropagator (application-configured replication policy group)
     ├── LatticeProtocolEndpoint (CAD036 queues, acquisition and trust)
-    └── LatticeConnectionManager (external routes and desired-peer bounds)
+    └── LatticeConnectionManager (external routes, explicit peers and bounded candidates)
 ```
 
 ### 9.2 Message Routing
@@ -644,21 +875,21 @@ Nodes apply acceptance rules during lattice merges via `LatticeContext`:
 
 - **Always**: reject invalid signatures (enforced by `OwnerLattice`/`SignedLattice`)
 - **Always**: reject non-monotonic timestamps (enforced by LWW merge)
-- **Optional**: reject entries from peers with zero on-chain stake
-- **Optional**: reject entries from unregistered peers
+- **Optional**: local admission policies using stronger proofs, such as Convex peer
+  status ([#713](https://github.com/Convex-Dev/convex/issues/713))
 - **Optional**: rate limiting to prevent metadata spam
 
 These rules are enforced locally. Invalid entries are silently discarded and cannot propagate through the network because every honest node independently validates.
 
-## 11. Peer Lifecycle
+## 11. Node Lifecycle
 
-1. **Registration**: Peer registers on-chain with AccountKey and stake
-2. **Bootstrap**: Connects to configured peers or on-chain hostnames
+1. **Identity**: The node uses its own node key. A node that is also a Convex peer may use its registered peer key; registration is optional
+2. **Bootstrap**: Connects to configured seeds or named peers, to the records it retained before a restart or, optionally, to on-chain peer hosts
 3. **Advertisement**: Publishes `SignedData<NodeInfo>` to `[:p2p :nodes]`
-4. **Discovery**: Discovered by other peers via P2P gossip (and optionally Kademlia)
-5. **Connection**: Peers establish connections using advertised transport URIs
-6. **Participation**: Peer joins lattice regions (consensus, data, etc.) via selective attention
-7. **Departure**: NodeInfo ages out; peer can withdraw stake on-chain
+4. **Discovery**: Discovered by other nodes via P2P gossip (and optionally Kademlia); each keeps the record if it wants it
+5. **Connection**: Nodes establish connections using advertised transport URIs
+6. **Participation**: The node joins lattice regions (consensus, data, etc.) via selective attention
+7. **Departure**: A newer record with no transports takes it out of other nodes' candidates; an unreachable node keeps its record while attempts on it back off ([#814](https://github.com/Convex-Dev/convex/issues/814)); a Convex peer withdraws its stake on-chain separately
 
 ## 12. Lattice Path Summary
 
@@ -683,15 +914,19 @@ Lattice.ROOT (KeyedLattice)
 
 ### 13.2 KadLattice — Future Work (DECIDED)
 
-Kademlia routing is deferred until network scale demands it. Current peer discovery via on-chain PeerStatus + P2P node registry + configured peers is sufficient for hundreds of peers. When implemented, Kademlia state will be node-local (not propagated) since each node's k-bucket view is specific to its own key position.
+Kademlia routing is deferred until network scale demands it. Discovery through configured peers and the P2P node registry is sufficient for hundreds of nodes. When implemented, Kademlia state will be owner-keyed at `[:kad <node key>]`: each node maintains its own view, since it depends on its key position, and views are shareable (§4.3).
 
 ### 13.3 Server Architecture — Netty + Javalin (DECIDED)
 
 Netty handles binary protocol (TCP + WSS): high-performance peer-to-peer lattice traffic. Javalin handles HTTP-based APIs (REST + MCP + SSE): web-friendly with JSON, middleware, CORS. Both frameworks connect to the same `NodeServer` and `Server` instances.
 
-### 13.4 PeerStatus as Source of Truth (DECIDED)
+### 13.4 Node Identity Is the Node Key (DECIDED)
 
-On-chain `PeerStatus` is the single source of truth for peer identity, stake, and primary hostname. The P2P node registry (`[:p2p :nodes]`) provides supplementary off-chain metadata (transport URIs, supported regions, protocol version) validated against on-chain state. Nodes reject P2P entries from unregistered or zero-stake peers.
+A P2P node is identified by its self-signed node key; no on-chain registration or
+stake is required, and the node registry (`[:p2p :nodes]`) is not validated against
+on-chain state. Being a Convex peer registered in `PeerStatus` is orthogonal: local
+policy may treat it as extra trust (#713), and on-chain peer entries are one optional
+bootstrap source (§6.3).
 
 ### 13.5 BeliefLattice Merge Context (OPEN)
 
@@ -707,11 +942,18 @@ This needs to be resolved before Phase 2 of the consensus migration.
 ## 14. Implementation Phases
 
 ### Phase 1 — P2P Node Registry
-- Implement `NodeInfoLattice` (LWW per owner, validated against on-chain PeerStatus)
+- Implement the node registry (LWW per owner, signed by each node key)
 - Register `[:p2p :nodes]` in `Lattice.ROOT` with `OwnerLattice<NodeInfo>`
 - `NodeServer` propagates P2P metadata via existing LATTICE_VALUE gossip
 - Peers advertise transport URIs; `ConnectionManager` uses them for connection selection
 - Existing BELIEF messages and `BeliefPropagator` unchanged
+
+### Phase 1b — Retention and Local Evidence
+- Node records name the regions each node is interested in (`:regions`, §4.2)
+- Contact records reported by the connection manager and kept in `:local` (§4.6)
+- Each node keeps only the records it wants, ranked by that evidence (§4.2)
+- Seed nodes released once other peers replace them, and rejoining from retained records (§4.2)
+- Operator blocklists of node keys and addresses in the same record (§4.6)
 
 ### Phase 2 — Consensus as Lattice Region
 - Implement `BeliefLattice` wrapping `BeliefMerge` with CPoS semantics
@@ -731,15 +973,20 @@ This needs to be resolved before Phase 2 of the consensus migration.
 
 ### Future — Kademlia
 - Implement `KadLattice` for O(log N) routing when network scale demands it
-- Node-local only (not propagated)
+- Owner-keyed: each node publishes its own routing view at `[:kad <node key>]`
+
+### Future — Shared Blocklists
+- Publish blocklists for other nodes to subscribe to, as an owner-signed `AccessList`
+  in its own region, unlike a node's private list in `:local` (§4.6)
+- A node chooses whose lists it follows, and reads them together with its own
 
 ## 15. Summary
 
-The Convex peer network is built on lattice technology — the same algebraic foundations, data structures, security model, and propagation mechanisms used by every other part of the ecosystem. On-chain `PeerStatus` is the single source of truth for peer identity and stake.
+The Convex peer network is built on lattice technology — the same algebraic foundations, data structures, security model, and propagation mechanisms used by every other part of the ecosystem. A P2P node's identity is its own signed node key; being a Convex peer as well is optional and orthogonal.
 
 The design extends this with:
 
-1. **P2P peer discovery** at `[:p2p :nodes]` — `OwnerLattice`-based signed peer metadata, validated against on-chain PeerStatus, propagated via `NodeServer` gossip
+1. **P2P node discovery** at `[:p2p :nodes]` — `OwnerLattice`-based metadata signed by each node key, propagated via `NodeServer` gossip, with each node keeping the records it wants
 2. **Consensus beliefs as a lattice region** at `[:convex <genesis-hash> :peers]` — gradual migration from dedicated BELIEF messages to standard LATTICE_VALUE protocol
 3. **NodeServer as the unified P2P core** — all lattice propagation (including consensus) through one mechanism, with `BeliefPropagator` as a timing-specific wrapper
 4. **Multi-transport support** — Netty for binary (TCP + WSS), Javalin for HTTP (REST + MCP), with transport advertisement and failover
@@ -748,5 +995,5 @@ This means:
 - One propagation mechanism (`NodeServer` + `LatticePropagator`) serves all regions
 - One security model (SignedData + AccountKey) authenticates everything
 - One encoding format (CAD3) on the wire and in storage
-- On-chain PeerStatus as the trust anchor; P2P lattice as the operational layer
+- Each node's own key as its identity, with Convex peer status as optional extra trust
 - Transport is a thin adapter layer beneath the unified lattice protocol

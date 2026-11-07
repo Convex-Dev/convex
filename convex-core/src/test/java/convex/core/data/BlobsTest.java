@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import static convex.test.Assertions.assertEqualityCachesNothing;
+import static convex.test.Assertions.assertEqualityHashesRoots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -29,6 +31,29 @@ import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class BlobsTest {
+
+	@Test public void testTreeEquality() {
+		// A tree of two chunks is embedded: it compares its children, nothing hashed
+		long len=2*Blob.CHUNK_LENGTH+1;
+		ABlob a=Blobs.createRandom(new java.util.Random(1234), len);
+		ABlob b=Blobs.createRandom(new java.util.Random(1234), len);
+		byte[] bs=a.getBytes();
+		bs[(int)len-1]^=1;
+		ABlob c=(ABlob) Blob.create(bs).getCanonical();
+		assertTrue(a instanceof BlobTree);
+		assertTrue(a.isEmbedded());
+		assertEqualityCachesNothing(a,b,c);
+
+		// A tree of many chunks is a branch: it compares by hash, which is kept
+		len=20*Blob.CHUNK_LENGTH;
+		ABlob ba=Blobs.createRandom(new java.util.Random(99), len);
+		ABlob bb=Blobs.createRandom(new java.util.Random(99), len);
+		bs=ba.getBytes();
+		bs[(int)len-1]^=1;
+		ABlob bc=(ABlob) Blob.create(bs).getCanonical();
+		assertFalse(ba.isEmbedded());
+		assertEqualityHashesRoots(ba,bb,bc);
+	}
 
 	@Test public void testConstants() {
 		assertEquals(4096,Blob.CHUNK_LENGTH); // verify expected constant value of 4k
@@ -413,6 +438,27 @@ public class BlobsTest {
 		
 		Blob flat=b.toFlatBlob();
 		doBlobTests(flat);
+	}
+
+	@Test
+	public void testFlatBlobOverOneChunkMeasuresAsItsTree() {
+		int C=Blob.CHUNK_LENGTH;
+		for (int n: new int[] {C+1, 2*C+1, 3*C, 10*C}) {
+			byte[] bytes=new byte[n];
+			for (int i=0; i<n; i++) bytes[i]=(byte)i;
+			Blob flat=Blob.wrap(bytes);
+			assertFalse(flat.isCanonical());
+			if (n==C+1) assertTrue(flat.isEmbedded()); // its tree embeds, with a chunk as a branch
+
+			// Measured before anything builds its canonical form
+			long memorySize=flat.getMemorySize();
+			ABlob tree=BlobTree.create(Blob.wrap(bytes.clone()));
+			assertEquals(tree.getMemorySize(),memorySize);
+			assertTrue(memorySize>n);
+			assertFalse(flat.isCompletelyEncoded());
+			assertEquals(Cells.storageSize(tree),Cells.storageSize(flat));
+			assertEquals(Vectors.of(tree).getMemorySize(),Vectors.of(Blob.wrap(bytes)).getMemorySize());
+		}
 	}
 	
 	@Test

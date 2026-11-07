@@ -10,7 +10,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
-import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.AForkableCursor;
 
@@ -62,19 +61,19 @@ public class P2PUser {
 	}
 
 	/**
-	 * Creates a user facade over an application whose root lattice includes the P2P
-	 * regions. This overload opens a read view without signing capability.
+	 * Creates a user facade over a root component holding the P2P regions. This
+	 * overload opens a read view without signing capability.
 	 *
-	 * @param application Application at the root whose lattice declares the P2P regions
+	 * @param application Root component, normally the application, whose cursor holds the P2P regions
 	 * @param userKey P2P user key
 	 * @return P2P user facade
 	 */
-	public static P2PUser create(ALatticeApplication<Index<Keyword,ACell>> application,AccountKey userKey) {
+	public static P2PUser create(ALatticeComponent<Index<Keyword,ACell>> application,AccountKey userKey) {
 		return create(application,userKey,null);
 	}
 
 	/** Opens both owned slots with one owner-aware signer, which may serve multiple keys. */
-	public static P2PUser create(ALatticeApplication<Index<Keyword,ACell>> application, AccountKey userKey,
+	public static P2PUser create(ALatticeComponent<Index<Keyword,ACell>> application, AccountKey userKey,
 			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		if (application==null) throw new IllegalArgumentException("Application must not be null");
 		if (userKey==null) throw new IllegalArgumentException("User key must not be null");

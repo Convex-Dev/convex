@@ -32,6 +32,7 @@ public class KVEntryLattice extends ALattice<AVector<ACell>> {
 		}
 		if (otherValue == null) return ownValue;
 		if (Utils.equals(ownValue, otherValue)) return ownValue;
+		if (!checkForeign(otherValue)) return ownValue;
 
 		long timeA = KVEntry.getUTime(ownValue).longValue();
 		long timeB = KVEntry.getUTime(otherValue).longValue();

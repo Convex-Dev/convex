@@ -2,7 +2,6 @@ package convex.core.cvm;
 
 import convex.core.data.ACell;
 import convex.core.data.Cells;
-import convex.core.data.IRefFunction;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 
@@ -71,10 +70,7 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 	 */
 
 	protected abstract int encodeAfterOpcode(byte[] bs, int pos);
-	
-	@Override
-	public abstract AOp<T> updateRefs(IRefFunction func);
-	
+
 	@Override
 	public byte getTag() {
 		return CVMTag.OP_CODED;
@@ -82,6 +78,6 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 	
 	@Override
 	public boolean equals(ACell o) {
-		return Cells.equalsGeneric(this, o);
+		return Cells.equalsEncoding(this, o);
 	}
 }

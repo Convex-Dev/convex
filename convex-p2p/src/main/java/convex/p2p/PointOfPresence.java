@@ -45,7 +45,8 @@ import convex.p2p.NodeDirectory.NodeRecord;
  * outside the signature for honest loop avoidance and diagnostics; replay
  * protection is keyed by the signed envelope hash, so a relay cannot evade it by
  * rewriting that path. Relays send only over routes whose remote node key has
- * passed challenge/response.</p>
+ * passed challenge/response. A message from a blocked node is dropped, and none is
+ * sent to or through one.</p>
  */
 final class PointOfPresence {
 
@@ -74,6 +75,7 @@ final class PointOfPresence {
 	private final NodeServer<?> server;
 	private final LatticePropagator propagator;
 	private final NodeDirectory directory;
+	private final Blocklist blocklist;
 	private final AKeyPair keyPair;
 	private final AccountKey ownKey;
 	private volatile boolean relay;
@@ -94,11 +96,12 @@ final class PointOfPresence {
 		};
 
 	PointOfPresence(NodeServer<?> server,LatticePropagator propagator,AKeyPair keyPair,
-			NodeDirectory directory) {
+			NodeDirectory directory,Blocklist blocklist) {
 		this.server=server;
 		this.propagator=propagator;
 		this.keyPair=keyPair;
 		this.directory=directory;
+		this.blocklist=blocklist;
 		this.ownKey=(keyPair==null) ? null : keyPair.getAccountKey();
 	}
 
@@ -162,7 +165,7 @@ final class PointOfPresence {
 			if (rawPath==null) return false;
 
 			Envelope envelope=parseEnvelope(rawSigned,rawEnvelope);
-			if (envelope==null) return false;
+			if (envelope==null || blocklist.isBlocked(envelope.sender())) return false;
 			AVector<AccountKey> path=parsePath(rawPath,envelope.sender(),envelope.maxHops());
 			if (path==null) return false;
 
@@ -258,10 +261,12 @@ final class PointOfPresence {
 	}
 
 	private boolean route(Envelope envelope,AVector<AccountKey> path,Message message) {
+		AccountKey destination=envelope.destination();
+		if (blocklist.isBlocked(destination)) return false;
 		LatticeConnectionManager manager=propagator.getConnectionManager();
 		Set<AccountKey> routes=manager.getAuthenticatedRouteKeys();
 		routes.removeAll(toSet(path));
-		AccountKey destination=envelope.destination();
+		routes.removeIf(blocklist::isBlocked);
 		if (routes.contains(destination)) {
 			return manager.trySendAuthenticated(destination,message);
 		}

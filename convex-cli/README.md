@@ -361,10 +361,10 @@ JSON5 configuration file (see below), not a command-line option.
 The `peer.etch` object also accepts store cache options:
 
 ```json5
-{ peer: { store: "data/peer.etch", etch: { refCacheSize: 50000, enableL2: false } } }
+{ peer: { store: "data/peer.etch", etch: { refCacheSize: 50000 } } }
 ```
 
-Defaults are 10,000 L1 reference-cache slots and L2 enabled. Cache settings apply
+The default is 10,000 reference-cache slots. Cache settings apply
 when opening either a new or existing store and survive GC cutover. They are
 runtime settings, so keep supplying the configuration on subsequent launches.
 Options are validated and resolved at setup; reads and writes perform no
@@ -450,6 +450,23 @@ source encryption policy and require the source key to open.
 See [Etch GC](../convex-core/docs/ETCH_GC.md#snapshot-and-collect) for API usage,
 Windows mapping behaviour and recovery, or run `convex etch gc --help` for options.
 
+## DLFS file server
+
+`dlfs start` serves DLFS drives over WebDAV and replicates them with other DLFS
+nodes. To replicate two nodes both ways, start one serving inbound peers, then name it
+from the other with `--peer`:
+
+```bash
+convex dlfs start --key 0x7e66429ca... --etch a.etch --serve-inbound
+convex dlfs start --key 0x2b5f61d0e... --etch b.etch --port 8081 --node-port 19889 --peer tcp://localhost:19888
+```
+
+A peer is named by address or `did:web`, optionally as `<key>@<peer>`. Startup fails if
+a peer cannot be reached; a peer lost later is resolved again and reconnected.
+`--serve-inbound` lets anyone who can reach the node port read every replicated drive.
+See the [DLFS README](../convex-dlfs/README.md#run-a-webdav-server) for peer names and
+what serving inbound exposes.
+
 ## Global Options
 
 These options work with most commands:
@@ -517,6 +534,10 @@ convex
 
   dlfs        Operate a DLFS (Data Lattice File System) server
     start     Start a DLFS WebDAV server with lattice replication
+
+  p2p         Operate a P2P lattice node
+    start     Start a node, joining the network through any seed nodes
+              (see convex-p2p/README.md, "Running a node")
 
   desktop     Launch GUI application
 

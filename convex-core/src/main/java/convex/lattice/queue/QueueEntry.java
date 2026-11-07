@@ -98,10 +98,12 @@ public class QueueEntry {
 	/**
 	 * Checks if an entry is a valid queue entry structure.
 	 */
-	public static boolean isValid(AVector<ACell> entry) {
+	public static boolean isValid(AVector<?> entry) {
 		if (entry == null) return false;
-		if (entry.count() < ENTRY_LENGTH) return false;
+		if (entry.count() != ENTRY_LENGTH) return false;
 		ACell ts = entry.get(POS_TIMESTAMP);
-		return (ts instanceof CVMLong);
+		ACell headers=entry.get(POS_HEADERS);
+		return ts instanceof CVMLong && entry.get(POS_VALUE)!=null
+			&& (headers==null || headers instanceof AHashMap<?,?>);
 	}
 }

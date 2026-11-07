@@ -1,6 +1,8 @@
 package convex.core.data;
 
 import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertEqualityCachesNothing;
+import static convex.test.Assertions.assertEqualityHashesRoots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -30,6 +32,48 @@ import convex.test.Samples;
  * Tests for CVM Map data structures.
  */
 public class MapsTest {
+
+	@Test
+	public void testTreeEquality() {
+		// An embedded tree compares its children: nothing is encoded or hashed
+		AMap<CVMLong, CVMLong> a = Maps.empty(), b = Maps.empty(), c = Maps.empty();
+		for (long i = 0; i < 17; i++) {
+			CVMLong k=CVMLong.create(i);
+			a = a.assoc(k, k);
+			b = b.assoc(k, k);
+			c = c.assoc(k, (i==16)?CVMLong.create(-1):k);
+		}
+		assertTrue(a instanceof MapTree);
+		assertTrue(a.isEmbedded());
+		assertEqualityCachesNothing(a,b,c);
+
+		// A branch tree compares by hash, which is kept
+		a = Maps.empty(); b = Maps.empty(); c = Maps.empty();
+		for (long i = 0; i < 300; i++) {
+			CVMLong k=CVMLong.create(1000000+i);
+			a = a.assoc(k, k);
+			b = b.assoc(k, k);
+			c = c.assoc(k, (i==299)?CVMLong.create(-1):k);
+		}
+		assertFalse(a.isEmbedded());
+		assertEqualityHashesRoots(a,b,c);
+
+		// Same shape, one embedded and one branch: unequal whichever side decides the path
+		AMap<CVMLong, ACell> small = Maps.empty(), big = Maps.empty(), big2 = Maps.empty();
+		for (long i = 0; i < 17; i++) {
+			CVMLong k=CVMLong.create(i);
+			small = small.assoc(k, k);
+			big = big.assoc(k, Strings.create("value number "+i+" padded to be long enough to make the tree a branch"));
+			big2 = big2.assoc(k, Strings.create("value number "+i+" padded to be long enough to make the tree a branch"));
+		}
+		assertTrue(small.isEmbedded()); // small knows, big does not
+		assertFalse(small.equals(big));
+		assertFalse(big.equals(small));
+		assertFalse(big2.isEmbedded()); // big2 knows
+		assertFalse(big2.equals(small));
+		assertFalse(small.equals(big2));
+		assertEquals(big,big2);
+	}
 
 	@Test
 	public void testMapBuilding() throws InvalidDataException, ValidationException {
@@ -423,7 +467,10 @@ public class MapsTest {
 			K firstKey=firstEntry.getKey();
 			assertEquals(firstEntry,m.getEntryByHash(Hash.get(firstKey)));
 			assertEquals(m,m.assocEntry(firstEntry));
-			
+			AHashMap<K, V> updated=m.update(firstKey,v -> null);
+			assertEquals(m.assoc(firstKey,null),updated);
+
+
 			// Test a smaller version of this map
 			AHashMap<K, V> smaller = m.dissoc(firstKey);
 			assertEquals(n-1,smaller.count());

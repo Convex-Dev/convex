@@ -2,15 +2,20 @@ package convex.api;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.data.Blobs;
 import convex.core.data.prim.CVMLong;
+import convex.core.message.AConnection;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
@@ -156,5 +161,82 @@ public class RequestCorrelationTest {
 			assertEquals(Result.FULL_CLIENT_BUFFER,client.requestStatus().get(5,TimeUnit.SECONDS));
 			assertFalse(client.hasPendingRequests());
 		}
+	}
+
+	/** A closed connection reports :CONNECT, for a request it leaves unanswered and for any later send. */
+	@Test public void testClosedConnectionReportsConnect() throws Exception {
+		try (ConvexRemote client=new ConvexRemote(null,null)) {
+			LocalConnection connection=LocalConnection.createReturnable(m -> true,m -> true);
+			client.setConnection(connection);
+			client.setTimeout(0);
+			var unanswered=client.requestStatus();
+			assertFalse(unanswered.isDone());
+			connection.close();
+			assertEquals(ErrorCodes.CONNECT,unanswered.get(5,TimeUnit.SECONDS).getErrorCode());
+			assertEquals(ErrorCodes.CONNECT,client.requestStatus().get(5,TimeUnit.SECONDS).getErrorCode());
+			assertEquals(ErrorCodes.CONNECT,client.message(Message.createGoodBye()).get(5,TimeUnit.SECONDS).getErrorCode());
+			assertFalse(client.hasPendingRequests());
+		}
+	}
+
+	/** A failed write reports :IO, for a request and a message alike. */
+	@Test public void testSendIOFailureReportsIO() throws Exception {
+		try (ConvexRemote client=new ConvexRemote(null,null)) {
+			client.setConnection(new FailingConnection(new IOException("Write failed")));
+			assertEquals(ErrorCodes.IO,client.requestStatus().get(5,TimeUnit.SECONDS).getErrorCode());
+			assertEquals(ErrorCodes.IO,client.message(Message.createGoodBye()).get(5,TimeUnit.SECONDS).getErrorCode());
+			assertFalse(client.hasPendingRequests());
+		}
+	}
+
+	/** An interrupted send reports :INTERRUPTED, and the calling thread keeps its interrupt status. */
+	@Test public void testInterruptedSendKeepsInterruptStatus() throws Exception {
+		try (ConvexRemote client=new ConvexRemote(null,null)) {
+			client.setConnection(new FailingConnection(new InterruptedException()));
+			try {
+				assertEquals(ErrorCodes.INTERRUPTED,client.requestStatus().join().getErrorCode());
+				assertTrue(Thread.interrupted());
+				assertEquals(ErrorCodes.INTERRUPTED,client.message(Message.createGoodBye()).join().getErrorCode());
+				assertTrue(Thread.interrupted());
+			} finally {
+				Thread.interrupted();
+			}
+			assertFalse(client.hasPendingRequests());
+		}
+	}
+
+	/** A message too large to send fails the call, as an invalid request does, rather than giving a Result. */
+	@Test public void testOversizedMessageFailsCall() throws Exception {
+		try (ConvexRemote client=new ConvexRemote(null,null)) {
+			client.setConnection(new FailingConnection(new IllegalArgumentException("Too large for one frame")));
+			ExecutionException failed=assertThrows(ExecutionException.class,
+				() -> client.requestStatus().get(5,TimeUnit.SECONDS));
+			assertInstanceOf(IllegalArgumentException.class,failed.getCause());
+			failed=assertThrows(ExecutionException.class,
+				() -> client.message(Message.createGoodBye()).get(5,TimeUnit.SECONDS));
+			assertInstanceOf(IllegalArgumentException.class,failed.getCause());
+			assertFalse(client.hasPendingRequests());
+		}
+	}
+
+	/** An open connection whose every send fails with the given exception. */
+	private static final class FailingConnection extends AConnection {
+		private final Exception failure;
+
+		FailingConnection(Exception failure) {
+			this.failure=failure;
+		}
+
+		@Override public boolean sendMessage(Message msg) throws IOException, InterruptedException {
+			if (failure instanceof IOException e) throw e;
+			if (failure instanceof InterruptedException e) throw e;
+			throw (RuntimeException)failure;
+		}
+
+		@Override public boolean trySendMessage(Message msg) { return false; }
+		@Override public InetSocketAddress getRemoteAddress() { return null; }
+		@Override public boolean isClosed() { return false; }
+		@Override public void close() { closeRequests(); }
+		@Override public long getReceivedCount() { return 0; }
 	}
 }

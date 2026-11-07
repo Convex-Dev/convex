@@ -1,7 +1,6 @@
 package convex.core.data.prim;
 
 import convex.core.data.ACell;
-import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 
 /**
@@ -57,11 +56,6 @@ public abstract  class APrimitive extends ACell {
 		throw new IndexOutOfBoundsException(i);
 	}
 
-	@Override
-	public final ACell updateRefs(IRefFunction func) {
-		return this;
-	}
-	
 	@Override
 	public final int getRefCount() {
 		// No Refs - primitives are always a leaf cell!

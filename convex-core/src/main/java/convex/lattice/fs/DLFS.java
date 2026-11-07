@@ -104,7 +104,7 @@ public class DLFS {
 	public static DLFSLocal open(AForkableCursor<?> parent, AString driveName, AStore store) {
 		var drives=(AForkableCursor<AHashMap<AString,AVector<ACell>>>)parent;
 		AForkableCursor<AVector<ACell>> cursor=new MapComponent<>(drives).path(driveName);
-		if (cursor.get()==null) return null;
+		if (cursor.getOrDefault(null)==null) return null;
 		return DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store,DLFSLocation.at(parent,driveName));
 	}
 

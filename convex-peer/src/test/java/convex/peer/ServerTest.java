@@ -64,6 +64,7 @@ import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.AConnection;
+import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
@@ -163,7 +164,7 @@ public class ServerTest {
 
 		AKeyPair  kp=server.getKeyPair();
 
-		Convex convex = network.CONVEX;
+		Convex convex = network.getLocalClient();
 		assertTrue(convex.getBalance()>0);
 		
 		Result r=convex.transactSync("(create-account "+kp.getAccountKey()+")");
@@ -185,16 +186,17 @@ public class ServerTest {
 		InetSocketAddress hostAddress=network.SERVER.getHostAddress();
 		// This is a test of flooding a client connection with async messages. Should eventually throw an IOExcepion
 		// from backpressure and *not* bring down the server.
-		ConvexRemote convex=Convex.connect(hostAddress, network.VILLAIN,network.VILLAIN_KEYPAIR);
+		ConvexRemote convex=network.getClient();
+		Address origin=convex.getAddress();
 
 		ACell cmd=Reader.read("(def tmp (inc tmp))");
 		// Might block, but no issue
 		for (int i=0; i<100; i++) {
-			convex.transact(Invoke.create(network.VILLAIN, 0, cmd));
+			convex.transact(Invoke.create(origin, 0, cmd));
 		}
-		
+
 		// Should still get status OK
-		Convex convex2=Convex.connect(hostAddress, network.HERO,network.HERO_KEYPAIR);
+		Convex convex2=Convex.connect(hostAddress);
 		assertNotNull(convex2.requestStatusSync(2000));
 	}
 
@@ -435,19 +437,34 @@ public class ServerTest {
 		}
 	}
 
+	/**
+	 * DATA and Beliefs join the ordered propagation queue whoever sends them, with no
+	 * reply: each Order is judged on its own when merged.
+	 */
 	@Test
-	public void testBeliefTrustRouting() throws Exception {
-		Server server = network.SERVER;
+	public void testPropagationAcceptedFromAnyConnection() throws Exception {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config); // not launched: queue is not drained
+		try {
+			// The server's end of a connection from an unverified sender, recording replies
+			ArrayList<Message> replies=new ArrayList<>();
+			LocalConnection sender=LocalConnection.createPair(replies::add,m -> true);
+			AConnection serverEnd=sender.getPaired();
+			assertFalse(serverEnd.isTrusted());
 
-		// Test that processBelief routes correctly based on trust
-		// A local (ConvexLocal) connection should go to the trusted queue
-		Convex local = network.CONVEX;
-		Result r = local.querySync("*balance*");
-		assertFalse(r.isError(), "Local connection should work normally");
+			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024)
+				.withConnection(serverEnd);
+			Message belief=Message.createBelief(network.SERVER.getBelief()).withConnection(serverEnd);
+			assertNull(server.processMessage(data));
+			for (int i=1; i<Config.BELIEF_QUEUE_SIZE; i++) assertNull(server.processMessage(belief));
 
-		// The server should be live and processing beliefs
-		assertTrue(server.isLive());
-		assertTrue(server.getBeliefPropagator().getBeliefBroadcastCount() >= 0);
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			assertFalse(propagator.queuePropagation(belief),"the sender's DATA and Beliefs filled the queue");
+			assertTrue(replies.isEmpty(),"nothing is refused or answered");
+		} finally {
+			server.close();
+		}
 	}
 
 	/**
@@ -471,12 +488,13 @@ public class ServerTest {
 		// Construct a SignedData whose value is unresolvable. Signature contents are
 		// irrelevant — the peer must reject before attempting any verification that
 		// would require the missing cell.
+		AKeyPair kp=AKeyPair.generate();
 		SignedData<ATransaction> badSigned = SignedData.create(
-				network.HERO_KEYPAIR.getAccountKey(),
+				kp.getAccountKey(),
 				Ed25519Signature.ZERO,
 				badRef);
 
-		Convex convex = Convex.connect(server, network.HERO, network.HERO_KEYPAIR);
+		Convex convex = network.getLocalClient(kp);
 		try {
 			// 3 second timeout is generous — a correct peer responds in milliseconds.
 			// If the peer is broken in the old way, this test times out rather than
@@ -496,32 +514,24 @@ public class ServerTest {
 	 * After a valid client transaction is accepted, the SignedData must be
 	 * persisted in the peer's store by intake time. This enforces the invariant
 	 * that block production can never fail on missing data.
-	 *
-	 * Uses the shared HERO connection so sequence caching stays in sync with
-	 * other tests.
 	 */
 	@Test
 	public void testTransactionPersistedAtIntake() throws Exception {
 		Server server = network.SERVER;
-		Convex convex = network.CONVEX;
+		AKeyPair kp=AKeyPair.generate();
+		Convex convex = network.getLocalClient(kp);
 		TransactionHandler transactionHandler=server.getTransactionHandler();
 		CompletableFuture<SignedData<ATransaction>> accepted=new CompletableFuture<>();
-		// Transaction sequencing is owned by the shared client. Hold its monitor
-		// across sequence selection, signing and submission so concurrently running
-		// tests cannot allocate the same sequence between these operations.
-		SignedData<ATransaction> signed;
 		try {
-			synchronized (convex) {
-				// Use a non-trivial command to ensure the signed cell has child refs
-				ATransaction tx = Invoke.create(network.HERO, convex.getSequence() + 1,
-						Reader.read("(do (def x 1) (def y 2) (+ x y))"));
-				signed = network.HERO_KEYPAIR.signData(tx);
-				Hash expectedHash=signed.getHash();
-				transactionHandler.setRequestObserver(observed -> {
-					if (expectedHash.equals(observed.getHash())) accepted.complete(observed);
-				});
-				convex.transact(signed);
-			}
+			// Use a non-trivial command to ensure the signed cell has child refs
+			ATransaction tx = Invoke.create(convex.getAddress(), convex.getSequence() + 1,
+					Reader.read("(do (def x 1) (def y 2) (+ x y))"));
+			SignedData<ATransaction> signed = kp.signData(tx);
+			Hash expectedHash=signed.getHash();
+			transactionHandler.setRequestObserver(observed -> {
+				if (expectedHash.equals(observed.getHash())) accepted.complete(observed);
+			});
+			convex.transact(signed);
 
 			SignedData<ATransaction> observed=accepted.get(
 				Config.DEFAULT_CLIENT_TIMEOUT,TimeUnit.MILLISECONDS);
@@ -535,20 +545,6 @@ public class ServerTest {
 		} finally {
 			transactionHandler.setRequestObserver(null);
 		}
-	}
-
-	@Test
-	public void testUntrustedBeliefQueueBounded() throws Exception {
-		Server server = network.SERVER;
-		BeliefPropagator propagator = server.getBeliefPropagator();
-
-		// Queue more untrusted beliefs than the queue can hold
-		// They should be silently dropped
-		for (int i = 0; i < Config.UNTRUSTED_BELIEF_QUEUE_SIZE + 5; i++) {
-			propagator.queueUntrustedPropagation(
-				convex.core.message.Message.createBelief(server.getBelief()));
-		}
-		// No exception, no blocking — bounded queue works
 	}
 
 	@Test
@@ -719,9 +715,44 @@ public class ServerTest {
 		}
 	}
 
-	/** Saturated wire propagation is dropped without producing connection backpressure. */
+	/** An Order from a key that is not a staked peer is dropped before it is checked or stored. */
 	@Test
-	public void testTrustedBeliefQueueDropsWithoutBackpressure() throws Exception {
+	public void testUnstakedOrdersNotStored() throws Exception {
+		AKeyPair local=AKeyPair.createSeeded(113);
+		AKeyPair staked=AKeyPair.createSeeded(114);
+		AKeyPair unstaked=AKeyPair.createSeeded(115);
+		State genesis=Init.createState(List.of(local.getAccountKey(),staked.getAccountKey()));
+		Peer peer=Peer.createGenesisPeer(local,genesis);
+
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,new MemoryStore());
+		Server server=Server.create(config);
+		try {
+			server.getCVMExecutor().setPeer(peer);
+			BeliefPropagator propagator=server.getBeliefPropagator();
+			propagator.belief=peer.getBelief();
+			Belief fromStaked=Belief.create(staked,Order.create());
+			Belief fromUnstaked=Belief.create(unstaked,Order.create());
+			assertTrue(propagator.queueBelief(fromStaked));
+			assertTrue(propagator.queueBelief(fromUnstaked));
+			propagator.loop();
+
+			SignedData<Order> stakedOrder=fromStaked.getOrders().get(staked.getAccountKey());
+			SignedData<Order> unstakedOrder=fromUnstaked.getOrders().get(unstaked.getAccountKey());
+			assertNotNull(server.getStore().refForHash(stakedOrder.getHash()));
+			assertNull(server.getStore().refForHash(unstakedOrder.getHash()),"an unstaked key's Order is never stored");
+			assertNull(propagator.belief.getOrders().get(unstaked.getAccountKey()));
+		} finally {
+			server.close();
+		}
+	}
+
+	/**
+	 * Saturated wire propagation is dropped without producing connection backpressure,
+	 * and leaves polling free to acquire Beliefs.
+	 */
+	@Test
+	public void testBeliefQueueDropsWithoutBackpressure() throws Exception {
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE,new MemoryStore());
 		Server server=Server.create(config); // not launched: queue is not drained
@@ -733,7 +764,7 @@ public class ServerTest {
 				assertTrue(propagator.queuePropagation(belief));
 			}
 			assertFalse(propagator.queuePropagation(belief));
-			assertFalse(propagator.hasBeliefPollCapacity());
+			assertTrue(propagator.hasBeliefPollCapacity(),"pushes filling their queue must not stop polling");
 			assertNull(server.processMessage(belief));
 
 			Message data=Message.createDataMessage(List.of(Blobs.createRandom(400)),1024);

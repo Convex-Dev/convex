@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -21,13 +22,14 @@ import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.lattice.LatticeHost;
 import convex.lattice.cursor.AForkableCursor;
+import convex.net.PeerConnectionException;
 
 /**
  * Replicates one host's published root.
  *
  * <p>{@code NodeServer} is replication only. It hands incoming values to its
  * {@link LatticeHost}, which delegates them to the applications configured to
- * receive them, and it publishes the host's root to its propagation groups. It
+ * receive them, and it publishes the host's root to its propagator groups. It
  * holds no lattice, no merge policy and no applications of its own: assemble the
  * host and its applications first, for example with {@link RelayHost}, then
  * construct the node from the host. The host owns retention and durability;
@@ -50,9 +52,15 @@ import convex.lattice.cursor.AForkableCursor;
  * Transports must be closed before this server so no new ingress reaches groups
  * while they drain.</p>
  *
+ * <p><b>Threading.</b> Lifecycle calls take no lock. The application launches,
+ * closes, and adds or removes groups from management code, one call after another,
+ * never from a group's message handler or a publication callback; a lifecycle call
+ * made while launch runs fails. Host syncs, inbound deliveries and pulls may run on
+ * any thread.</p>
+ *
  * <p><b>Failure isolation.</b> Host-root publication is the mandatory part of a
  * host sync. Propagator initialisation, notification, worker and shutdown
- * failures are contained and logged independently; one propagation policy group
+ * failures are contained and logged independently; one propagator group
  * cannot fail a host sync or another group. Only
  * failures of the node store are surfaced by this class; transport failures
  * remain visible to their application owner.</p>
@@ -110,7 +118,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @throws IOException if node store initialisation fails
 	 */
-	public synchronized void launch() throws IOException,InterruptedException {
+	public void launch() throws IOException,InterruptedException {
 		validateLaunchRequest();
 		lifecycleState=LifecycleState.STARTING;
 		try {
@@ -118,7 +126,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			seedPropagationViews();
 			startPropagationServices();
 			lifecycleState=LifecycleState.RUNNING;
-			log.debug("NodeServer started with {} propagation group(s)",
+			log.debug("NodeServer started with {} propagator group(s)",
 				propagators.size());
 		} catch (IOException | RuntimeException | Error e) {
 			abortFailedLaunch(e);
@@ -171,7 +179,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Pulls a complete root through an explicitly chosen propagation group and
+	 * Pulls a complete root through an explicitly chosen propagator group and
 	 * delivers it to the host. Configured applications may keep their
 	 * results private; only already-published host state is persisted and propagated.
 	 *
@@ -191,7 +199,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Pulls one path through an explicitly chosen propagation group.
+	 * Pulls one path through an explicitly chosen propagator group.
 	 * Path selection and handling belong to configured applications. A successful
 	 * pull does not force application publication.
 	 *
@@ -204,7 +212,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return pullPath(source,peer,false,path);
 	}
 
-	/** Pulls a path, optionally as background bootstrap rather than application activity. */
+	/**
+	 * Pulls a path, optionally as background bootstrap rather than application activity.
+	 * Fails as {@link LatticePropagator#pullPath(Convex, boolean, ACell...)} describes.
+	 */
 	public CompletableFuture<ACell> pullPath(LatticePropagator source,Convex peer,
 			boolean background,ACell... path) {
 		requireAttached(source);
@@ -212,7 +223,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			requireAttached(source);
 			if (acquired!=null) mergeIncoming(acquired,path);
 			host.sync();
-			return RT.getIn(cursor.get(),path);
+			return RT.<ACell>getIn(cursor.get(),path);
 		});
 	}
 
@@ -252,7 +263,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Pulls roots from every current manager-owned peer client in an explicit
-	 * propagation group and publishes the resulting host root.
+	 * propagator group and publishes the resulting host root.
 	 *
 	 * @param source application-selected attached group
 	 * @return {@code true} if every pull completed successfully
@@ -260,14 +271,26 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public boolean pull(LatticePropagator source) {
 		requireAttached(source);
 		try {
-			for (ACell acquired:source.pullAll().get(30,TimeUnit.SECONDS)) {
+			List<ACell> values=source.pullAll().get(30,TimeUnit.SECONDS);
+			for (ACell acquired:values) {
 				requireAttached(source);
 				mergePulledValue(acquired);
 			}
 			host.sync();
 			return true;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
 		} catch (Exception e) {
-			log.warn("Pull through propagation group failed",e);
+			// A peer that has gone, answers late or refuses is normal operation, and
+			// a pull abandoned as the node closes needs no report
+			Throwable cause=PeerConnectionException.unwrap(e);
+			if (cause instanceof CancellationException) return false;
+			if (cause instanceof RuntimeException || cause instanceof Error) {
+				log.warn("Pull through propagator group failed",cause);
+			} else {
+				log.debug("Pull through propagator group failed: {}",cause.toString());
+			}
 			return false;
 		}
 	}
@@ -405,7 +428,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Returns an immutable snapshot of attached propagation policy groups.
+	 * Returns an immutable snapshot of attached propagator groups.
 	 *
 	 * @return attached groups in attachment order
 	 */
@@ -414,7 +437,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Attaches a propagation policy group, starting it if the server is running.
+	 * Attaches a propagator group, starting it if the server is running.
 	 *
 	 * <p>This operation deliberately performs no policy configuration. In
 	 * particular it does not supply an identity, filters, handlers or peer routes.
@@ -424,7 +447,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @param propagator configured policy group to attach
 	 */
-	public synchronized void addPropagator(LatticePropagator propagator) {
+	public void addPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
 		if (lifecycleState!=LifecycleState.NEW && lifecycleState!=LifecycleState.RUNNING) {
 			throw new IllegalStateException("Cannot add a propagator while the node is starting or stopped");
@@ -454,7 +477,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Removes and shuts down one propagation group without stopping the node.
+	 * Removes and shuts down one propagator group without stopping the node.
 	 *
 	 * <p>Stops future node notifications and explicit pulls through this group,
 	 * drains its accepted work and closes its routes, including assigned inbound
@@ -468,13 +491,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * group is excluded from subsequent node launches. Shutdown failures are
 	 * isolated and available through {@link LatticePropagator#getStatus()}.</p>
 	 *
-	 * <p>This blocking lifecycle operation must be called from application
-	 * management code, outside group message handlers and publication callbacks.</p>
-	 *
 	 * @param propagator group to remove
 	 * @return {@code true} if removed, or {@code false} if it was not attached
 	 */
-	public synchronized boolean removePropagator(LatticePropagator propagator) {
+	public boolean removePropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
 		if (lifecycleState==LifecycleState.STARTING || lifecycleState==LifecycleState.STOPPING) {
 			throw new IllegalStateException("Cannot remove a group during node launch or shutdown");
@@ -489,7 +509,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private void requireAttached(LatticePropagator propagator) {
 		if (propagator==null || !attachedPropagators.contains(propagator)) {
-			throw new IllegalArgumentException("Propagation group is not attached to this node");
+			throw new IllegalArgumentException("Propagator group is not attached to this node");
 		}
 	}
 
@@ -533,7 +553,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			log.debug("Contained propagation-group stack overflow",e);
 		} catch (Throwable e) {
 			propagator.recordFailure(operation,e);
-			log.warn("Propagation group failed during {}; isolated {}: {}: {}",
+			log.warn("Propagator group failed during {}; isolated {}: {}: {}",
 				operation,propagator,e.getClass().getSimpleName(),e.getMessage());
 			log.debug("Isolated propagation-group failure",e);
 		}
@@ -581,11 +601,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Drains each group independently. Does not publish pending host edits or
-	 * flush its store; saving belongs to the owning host/service lifecycle.
+	 * Closes each group: it stops admitting protocol work, drains what it accepted and
+	 * its publication, sending what the host has published to connected peers within
+	 * its shutdown timeout, and closes its routes. Does not publish pending host edits
+	 * or flush its store; saving belongs to the owning host/service lifecycle, which
+	 * checkpoints the host before closing the node so peers receive that checkpoint.
+	 * See convex-peer/docs/SHUTDOWN.md.
 	 */
 	@Override
-	public synchronized void close() throws IOException {
+	public void close() throws IOException {
 		try {
 			closeResources();
 		} finally {
@@ -607,14 +631,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 		if (lifecycleState==LifecycleState.STARTING) {
 			throw new IllegalStateException(
-				"Cannot close NodeServer re-entrantly while launch is in progress");
+				"Cannot close NodeServer while launch is in progress");
 		}
 		lifecycleState=LifecycleState.STOPPING;
-
-		for (LatticePropagator propagator:propagators) {
-			runIsolated(propagator,"ingress drain",propagator::stopIngress);
-		}
-
 		for (LatticePropagator propagator:propagators) {
 			runIsolated(propagator,"shutdown",propagator::close);
 		}

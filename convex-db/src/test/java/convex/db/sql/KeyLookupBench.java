@@ -10,6 +10,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -46,7 +47,7 @@ public class KeyLookupBench {
 	}
 
 	static void benchLattice(int tableSize) {
-		SQLDatabase db = SQLDatabase.create(DB_NAME, convex.core.crypto.AKeyPair.generate());
+		SQLDatabase db = SQLDatabase.create(DB_NAME, convex.core.crypto.AKeyPair.generate(), RowLWW::merge);
 		db.tables().createTable("t", new String[]{"id", "name", "val"},
 				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.INTEGER});
 
@@ -82,7 +83,7 @@ public class KeyLookupBench {
 	}
 
 	static void benchJdbc(int tableSize) throws Exception {
-		ConvexDB cdb = ConvexDB.create();
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 		SQLDatabase db = cdb.database(DB_NAME);
 		db.tables().createTable("t", new String[]{"id", "name", "val"},
 				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.INTEGER});
@@ -138,7 +139,7 @@ public class KeyLookupBench {
 	}
 
 	static void benchJoin(int tableSize) throws Exception {
-		ConvexDB cdb = ConvexDB.create();
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 		SQLDatabase db = cdb.database("joinbench");
 		db.tables().createTable("customers", new String[]{"id", "name", "city"},
 				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.VARCHAR});

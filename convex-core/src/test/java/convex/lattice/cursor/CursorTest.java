@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,12 +21,31 @@ import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 
 public class CursorTest {
+
+	@Test public void testNestedReadsHaveIndependentTypes() {
+		AMap<ACell,ACell> value=Maps.of(Strings.create("count"),CVMLong.ONE);
+		Root<AMap<ACell,ACell>> root=Root.create(value);
+		AMap<ACell,ACell> current=root.get();
+		assertSame(value,current);
+
+		// Inference must not insert a cast to the parent's map type.
+		var cellKeyValue=root.get(Strings.create("count"));
+		var javaKeyValue=root.get("count");
+		assertSame(CVMLong.ONE,cellKeyValue);
+		assertSame(CVMLong.ONE,javaKeyValue);
+		assertEquals(1,((AInteger)cellKeyValue).longValue());
+		assertThrows(MissingValueException.class,() -> root.get(Strings.create("missing")));
+		assertThrows(MissingValueException.class,() -> root.get("missing"));
+		assertSame(value,root.get(new ACell[0]));
+		assertSame(value,root.get(new Object[0]));
+	}
 
 	@Test public void testRoot() {
 		Root<AInteger> root=new Root<>();

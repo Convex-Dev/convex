@@ -131,12 +131,10 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 
 	@Override
 	public boolean equals(Ref<T> a) {
-		if (a.hash!=null) {
-			// prefer hash comparison, this avoid potential store lookups
-			return hash.equals(a.hash);
-		}
-		// compare by value
-		return Cells.equals(getValue(),a.getValue());
+		// A soft ref always holds a hash, so compare hashes and never read the store.
+		// Hashing the other side caches the result on it, which keeps a comparison
+		// linear in distinct cells however much structure the values share.
+		return hash.equals(a.getHash());
 	}
 
 	@Override

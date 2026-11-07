@@ -2,12 +2,17 @@ package convex.cli.dlfs;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.Convex;
 import convex.auth.did.DID;
 import convex.cli.ACommand;
 import convex.cli.CLIError;
@@ -20,7 +25,6 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.Shutdown;
@@ -32,30 +36,31 @@ import convex.dlfs.DLFSServer;
 import convex.lattice.LatticeHost;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
+import convex.net.PeerName;
+import convex.net.PeerResolver;
 import convex.node.NodeConfig;
-import convex.node.LatticeListener;
+import convex.node.LatticeNode;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
-import convex.node.NodeServer;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Mixin;
 
 /**
- * Starts a DLFS WebDAV server backed by lattice replication via NodeServer.
+ * Starts a DLFS WebDAV server backed by lattice replication on a {@link LatticeNode}.
  *
- * <p>Drives are connected to the NodeServer's cursor at {@code :fs},
- * so changes propagate to peers automatically.
+ * <p>Drives belong to the DLFS application on the node's host at {@code :fs}, so
+ * synced changes propagate to peers.
  *
  * <p>Usage:
  * <pre>
- * convex dlfs start --port 8080 --node-port 19888 --drive home
+ * convex dlfs start --port 8080 --node-port 19888 --drive home --peer tcp://peer.example.com:19888
  * </pre>
  */
 @Command(name="start",
 	mixinStandardHelpOptions=true,
-	description="Starts a DLFS WebDAV server with lattice replication via NodeServer.")
+	description="Starts a DLFS WebDAV server with lattice replication.")
 public class DlfsStart extends ACommand {
 
 	private static final Logger log = LoggerFactory.getLogger(DlfsStart.class);
@@ -85,7 +90,10 @@ public class DlfsStart extends ACommand {
 	private String[] driveNames;
 
 	@Option(names={"--peer"},
-		description="Remote peer address(es) to connect to for replication (host:port).")
+		description="Peer to replicate with: tcp://host:port, tls://host:port, host:port or a did:web, "
+			+"optionally as <key>@<peer> to require that key. A missing port is 18888. A transport peer is admitted under the key it "
+			+"proves, a did:web under a key its document lists. Startup fails if one cannot be reached; "
+			+"afterwards a lost peer is resolved again and reconnected. Repeatable.")
 	private String[] peers;
 
 	@Option(names={"--public-key"},
@@ -97,9 +105,11 @@ public class DlfsStart extends ACommand {
 		description="Etch store file for persistence. If omitted, uses in-memory store.")
 	private String etchFile;
 
-	@Option(names={"--url"},
-		description="Public URL for this node (enables P2P discovery). Must be reachable from the internet.")
-	private String publicUrl;
+	@Option(names={"--serve-inbound"},
+		description="Serve this node's lattice view to every node that connects, and send its updates to any "
+			+"that proves its key, so a peer naming this node with --peer replicates both ways. "
+			+"Anyone who can reach the node port can read every replicated drive.")
+	private boolean serveInbound;
 
 	@Option(names={"--no-tray"},
 		description="Disable the system tray icon.")
@@ -124,60 +134,65 @@ public class DlfsStart extends ACommand {
 				throw new CLIError(ExitCodes.CONFIG, "Invalid drive name: " + driveName);
 			}
 		}
+		List<PeerName> peerNames=peerNames(peers);
 		// Resolve or generate key pair
 		AKeyPair keyPair = resolveKeyPair();
 		inform("Key: " + keyPair.getAccountKey().toChecksumHex());
 
-		// Create store
+		NodeConfig config = buildNodeConfig();
 		AStore store = createStore();
 
-		// Build NodeConfig
-		NodeConfig config = buildNodeConfig();
-
 		// Register DLFS before starting any incoming delivery.
-		NodeServer<Index<Keyword,ACell>> nodeServer;
-		DLFSApplication application;
+		LatticeHost<Index<Keyword,ACell>> host;
 		try {
-			var host=LatticeHost.open(store);
-			application=host.addApplication(new DLFSApplication(host,keyPair::signData));
-			nodeServer=new NodeServer<>(host,config);
+			host=LatticeHost.open(store);
 		} catch (IOException e) {
 			store.close();
 			throw new CLIError(ExitCodes.CONFIG, "Failed to open node store: " + e.getMessage(), e);
+		} catch (RuntimeException e) {
+			store.close();
+			throw e;
 		}
-		LatticePropagator propagator=new LatticePropagator(store,LatticePropagatorConfig.from(config));
-		propagator.setTransportKeyPair(keyPair);
-		nodeServer.addPropagator(propagator);
-		LatticeListener latticeTransport=new LatticeListener(config);
-		latticeTransport.registerPropagator(propagator);
+		DLFSApplication application;
+		LatticeNode<Index<Keyword,ACell>> node;
+		LatticePropagator propagator;
+		try {
+			application=host.addApplication(new DLFSApplication(host,keyPair::signData));
+			node=new LatticeNode<>(host,config)
+				.setIdentity(DID.forKey(keyPair.getAccountKey()),keyPair);
+			// The command's node config also carries the group limits
+			propagator=node.createPropagator(LatticePropagatorConfig.from(config));
+			if (serveInbound) {
+				node.serveAllInbound(propagator);
+				// Gossip with any node that connects and proves its key: it can read this view anyway
+				propagator.setChallengerAdmission(key -> true);
+			}
+		} catch (RuntimeException e) {
+			// Nothing is launched yet, so closing the host and the store is enough
+			closeFailedStart(e,store,null,host);
+			throw e;
+		}
 
 		try {
-			nodeServer.launch();
-			latticeTransport.launch();
+			node.launch();
+		} catch (InterruptedException e) {
+			closeFailedStart(e,store,node,host);
+			throw e;
 		} catch (Exception e) {
-			latticeTransport.close();
-			try {
-				nodeServer.close();
-			} catch (Exception closeError) {
-				e.addSuppressed(closeError);
-			}
-			store.close();
-			throw new CLIError(ExitCodes.CONFIG, "Failed to launch NodeServer: " + e.getMessage(), e);
+			closeFailedStart(e,store,node,host);
+			throw new CLIError(ExitCodes.CONFIG, "Failed to launch lattice node: " + e.getMessage(), e);
 		}
-		inform("Lattice transport started on port " + latticeTransport.getPort());
-
-		// Connect to remote peers
-		connectPeers(propagator);
+		inform("Lattice transport started on port " + node.getListener().getPort()
+			+ (serveInbound ? ", serving inbound peers" : ", refusing inbound peers"));
 
 		// Serve the local owner's drives through the application's registered region.
+		// Starting the HTTP server is the last step, so a failure leaves nothing of it open.
 		AccountKey accountKey = keyPair.getAccountKey();
-		DLFSDriveManager driveManager=createDriveManager(nodeServer.getHost(),application,accountKey);
-		DLFSServer dlfsServer = DLFSServer.createWithAudience(driveManager,keyPair);
-		// The CLI currently exposes shared anonymous drives on the loopback-only server.
-		// Authentication-aware per-user drive provisioning is a separate product concern.
-		dlfsServer.setRequireAuthForWrites(false);
-
+		DLFSDriveManager driveManager;
+		DLFSServer dlfsServer;
 		try {
+			connectPeers(node,propagator,peerNames);
+			driveManager=createDriveManager(host,application,accountKey);
 			for (String driveName : driveNames) {
 				boolean created=driveManager.createDrive(null, driveName);
 				if (!created && driveManager.getDrive(null, driveName)==null) {
@@ -186,16 +201,13 @@ public class DlfsStart extends ACommand {
 				inform("Drive '" + driveName + "' connected to lattice at :fs/" + accountKey.toHexString(6) + ".../" + driveName);
 			}
 			driveManager.sync();
+			dlfsServer = DLFSServer.createWithAudience(driveManager,keyPair);
+			// The CLI currently exposes shared anonymous drives on the loopback-only server.
+			// Authentication-aware per-user drive provisioning is a separate product concern.
+			dlfsServer.setRequireAuthForWrites(false);
 			dlfsServer.start(port);
-		} catch (RuntimeException e) {
-			dlfsServer.close();
-			latticeTransport.close();
-			try {
-				nodeServer.close();
-			} catch (Exception closeError) {
-				e.addSuppressed(closeError);
-			}
-			store.close();
+		} catch (InterruptedException | RuntimeException e) {
+			closeFailedStart(e,store,node,host);
 			throw e;
 		}
 		informSuccess("DLFS WebDAV server running on http://localhost:" + dlfsServer.getPort() + "/dlfs/");
@@ -205,50 +217,54 @@ public class DlfsStart extends ACommand {
 
 		cli().notifyStartup();
 
-		AtomicBoolean closing=new AtomicBoolean();
-		CountDownLatch closed=new CountDownLatch(1);
-		Runnable shutdown=()->{
-			if (!closing.compareAndSet(false,true)) {
-				// Another thread is closing: wait, so neither process exit nor the
-				// Etch shutdown hook can overtake its final flush.
-				try { closed.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-				return;
-			}
-			try {
-				dlfsServer.close();
-				latticeTransport.close();
+		// Runs once; a second caller, such as the JVM hook after the tray, waits until
+		// it has finished, so neither process exit nor Etch closing overtakes the save
+		Shutdown.Once shutdown=Shutdown.once(()->{
+			// Saves, then closes the node (sending that save to peers), the host and the store
+			try (store; host; node) {
 				try {
-					nodeServer.close();
-				} catch (Exception e) {
-					log.warn("Error closing NodeServer", e);
+					dlfsServer.close();
+				} catch (RuntimeException e) {
+					log.warn("Error stopping DLFS HTTP server",e);
 				}
 				try {
-					nodeServer.getHost().close();
-				} catch (Exception e) {
+					// Syncs the drives and the application, then checkpoints the host
+					driveManager.sync();
+				} catch (RuntimeException e) {
 					log.warn("Error saving DLFS state",e);
 				}
-				store.close();
-			} finally {
-				closed.countDown();
+			} catch (Exception e) {
+				// The first failure, with any later close failures suppressed
+				log.warn("Error shutting down DLFS",e);
 			}
-		};
+		});
 
-		// JVM and tray shutdown use the same idempotent close path. Registered in
-		// Convex's shutdown order so it completes before transports and Etch files close.
+		// JVM and tray shutdown use the same close path. Registered in Convex's
+		// shutdown order so it completes before transports and Etch files close.
 		Shutdown.addHook(Shutdown.SERVICE,shutdown);
 		String webUrl="http://localhost:"+dlfsServer.getPort()+"/dlfs/";
 		boolean trayInstalled=!noTray&&TrayManager.install(
 			"Convex DLFS on port "+dlfsServer.getPort(),"Open Web",()->Toolkit.launchBrowser(webUrl),shutdown);
 
 		try {
-			// Block until node server shuts down
-			while (nodeServer.isRunning()) {
-				Thread.sleep(1000);
-			}
+			shutdown.await();
 		} finally {
 			if (trayInstalled) TrayManager.remove();
 			Shutdown.removeHook(Shutdown.SERVICE,shutdown);
 			shutdown.run();
+		}
+	}
+
+	/**
+	 * Closes what a failed start opened, in reverse: the node, if any, the host and the
+	 * store, behind the start failure.
+	 */
+	private static void closeFailedStart(Exception failure,AStore store,
+			LatticeNode<?> node,LatticeHost<?> host) {
+		try (store; host; node) {
+			// Closing the host saves what it retains
+		} catch (Exception closeFailure) {
+			failure.addSuppressed(closeFailure);
 		}
 	}
 
@@ -302,35 +318,41 @@ public class DlfsStart extends ACommand {
 			convex.core.data.Maps.of(
 				NodeConfig.PORT, convex.core.data.prim.CVMLong.create(nodePort)
 			);
-		if (publicUrl != null && !publicUrl.isBlank()) {
-			configMap = configMap.assoc(NodeConfig.URL, Strings.create(publicUrl));
-		}
 		return NodeConfig.create(configMap);
 	}
 
-	private void connectPeers(LatticePropagator propagator) {
-		if (peers == null) return;
-		for (int i = 0; i < peers.length; i++) {
-			String peer = peers[i];
+	/** The {@code --peer} options as peer names, refused before anything opens. */
+	static List<PeerName> peerNames(String[] peers) {
+		if (peers==null) return List.of();
+		List<PeerName> names=new ArrayList<>(peers.length);
+		for (String peer:peers) {
 			try {
-				String[] parts = peer.split(":");
-				if (parts.length != 2) {
-					informWarning("Invalid --peer address (expected host:port): " + peer);
-					continue;
-				}
-				String host = parts[0];
-				int peerPort = Integer.parseInt(parts[1]);
-				java.net.InetSocketAddress addr = new java.net.InetSocketAddress(host, peerPort);
-				convex.api.Convex connection = convex.api.ConvexRemote.connect(addr);
-				// Placeholder key, unique per peer so connections don't collide. Since we
-				// choose to trust these peers the exact key may not matter, but ideally
-				// this would be the peer's real key from a handshake. See #629
-				AccountKey peerKey = AccountKey.dummy(Integer.toHexString(i + 1));
-				propagator.addPeer(peerKey, connection);
-				inform("Connected to peer: " + peer);
-			} catch (Exception e) {
-				informWarning("Failed to connect to peer " + peer + ": " + e.getMessage());
+				names.add(PeerResolver.parse(peer));
+			} catch (IllegalArgumentException e) {
+				throw new CLIError(ExitCodes.USAGE,"--peer: "+e.getMessage(),e);
 			}
+		}
+		return names;
+	}
+
+	/**
+	 * Connects to every peer before serving, then keeps each: a lost peer is resolved
+	 * again and reconnected.
+	 */
+	private void connectPeers(LatticeNode<?> node,LatticePropagator propagator,List<PeerName> names)
+			throws InterruptedException {
+		Map<PeerName,CompletableFuture<Convex>> connecting=new LinkedHashMap<>();
+		for (PeerName name:names) connecting.put(name,node.connectPeer(propagator,name));
+		for (Map.Entry<PeerName,CompletableFuture<Convex>> entry:connecting.entrySet()) {
+			Convex admitted;
+			try {
+				admitted=entry.getValue().get();
+			} catch (ExecutionException e) {
+				Throwable cause=(e.getCause()==null)?e:e.getCause();
+				throw new CLIError(ExitCodes.NOHOST,"Cannot connect to peer "+entry.getKey()+": "+cause.getMessage(),cause);
+			}
+			inform("Connected to peer "+admitted.getVerifiedPeer().toChecksumHex()+" at "+entry.getKey());
+			node.keepPeer(propagator,entry.getKey(),admitted);
 		}
 	}
 }

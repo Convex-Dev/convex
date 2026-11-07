@@ -135,27 +135,18 @@ public class Config {
 	public static final long DEFAULT_INTERNAL_TIMEOUT = 8000;
 
 	/**
-	 * Entry bound for each trusted consensus input queue: complete acquired Beliefs
-	 * and ordered DATA/BELIEF propagation messages.
+	 * Entry bound for each consensus input queue: complete Beliefs acquired by
+	 * polling, and ordered DATA/BELIEF propagation messages.
 	 */
 	public static final int BELIEF_QUEUE_SIZE = 200;
 
 	/**
-	 * Encoded-byte threshold for the trusted wire propagation queue. The last admitted
+	 * Encoded-byte threshold for the wire propagation queue. The last admitted
 	 * message may exceed it, so every legal frame can enter an otherwise available
-	 * trusted queue. Further propagation is dropped until the queue falls below the
+	 * queue. Further propagation is dropped until the queue falls below the
 	 * threshold.
 	 */
 	public static final int BELIEF_QUEUE_BYTE_LIMIT = 16 * 1024 * 1024;
-
-	/**
-	 * Size of bounded queue for Beliefs from unverified inbound connections.
-	 * Small — best-effort buffering during the brief verification round-trip.
-	 */
-	public static final int UNTRUSTED_BELIEF_QUEUE_SIZE = 10;
-
-	/** Maximum encoded bytes retained while an inbound Peer is unverified. */
-	public static final int UNTRUSTED_BELIEF_QUEUE_BYTE_LIMIT = 4 * 1024 * 1024;
 
 	/**
 	 * Maximum number of inbound client connections accepted by the server.
@@ -200,7 +191,9 @@ public class Config {
 	 * Bytes handed to Netty for one inbound connection but not yet written, beyond
 	 * which that connection's further replies are refused. Bounds the memory a
 	 * reader that stops draining its socket can pin to roughly this much plus one
-	 * message, without affecting any other connection.
+	 * message, without affecting any other connection. From a backlog of half this
+	 * much, queued or unwritten, the server stops reading a client's requests until
+	 * its replies are written down to a quarter.
 	 */
 	public static final int SERVER_CONNECTION_PENDING_BYTE_LIMIT = 1024 * 1024;
 

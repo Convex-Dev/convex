@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Map;
@@ -18,6 +20,7 @@ import java.util.Set;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 
 /**
  * Tests for general collection types
@@ -79,7 +82,41 @@ public class CollectionsTest {
 		assertThrows(IndexOutOfBoundsException.class, () -> a.getElementRef(-1));
 		assertThrows(IndexOutOfBoundsException.class, () -> a.getElementRef(n));
 
+		doForEachTests(a);
+		doCopyToArrayTests(a);
+
 		doCollectionTests(a);
+	}
+
+	/**
+	 * Tests that copyToArray writes every element of a sequence in get order at an offset,
+	 * leaving the rest of the array untouched
+	 * @param a Any Sequence Value
+	 */
+	public static <T extends ACell> void doCopyToArrayTests(ASequence<T> a) {
+		int n = Utils.checkedInt(a.count());
+		ACell[] arr = new ACell[n + 2];
+		Arrays.fill(arr, UNLIKELY_KEYWORD);
+		a.copyToArray(arr, 1);
+		assertSame(UNLIKELY_KEYWORD, arr[0]);
+		assertSame(UNLIKELY_KEYWORD, arr[n + 1]);
+		for (int i=0; i<n; i++) {
+			assertEquals(a.get(i), arr[i + 1]);
+		}
+	}
+
+	/**
+	 * Tests that forEach visits every element of a sequence in get order
+	 * @param a Any Sequence Value
+	 */
+	public static <T extends ACell> void doForEachTests(ASequence<T> a) {
+		long n = a.count();
+		ArrayList<T> visited = new ArrayList<>();
+		a.forEach(visited::add);
+		assertEquals(n, visited.size());
+		for (int i=0; i<n; i++) {
+			assertEquals(a.get(i), visited.get(i));
+		}
 	}
 
 	static final Keyword UNLIKELY_KEYWORD=Keyword.create("this-is-not-likely-to-happen-at-random");
@@ -175,6 +212,16 @@ public class CollectionsTest {
 			assertEquals(n - 1, da.count());
 			assertNull(da.getEntry(key));
 			assertEquals(a, da.assocEntry(me));
+
+			// update is assoc of the function's result, unchanged if it returns the current value
+			assertSame(a, a.update(key, v -> v));
+			assertSame(a, a.update(key, (v, x) -> v, null));
+			assertEquals(a.assoc(key, null), a.update(key, v -> null));
+			assertEquals(a, da.update(key, (v, x) -> x, value));
+			assertEquals(a, da.update(key, v -> {
+				assertNull(v);
+				return value;
+			}));
 		}
 		
 		doMapEntrySetTests(a);

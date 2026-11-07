@@ -199,7 +199,7 @@ public class NodeNetworkTest {
 		
 		// Get the current Index at :data path (or create empty one if null)
 		@SuppressWarnings("unchecked")
-		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server0.getCursor().get(dataKeyword);
+		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server0.getCursor().getOrDefault(null,dataKeyword);
 		if (dataIndex == null) {
 			@SuppressWarnings("unchecked")
 			Index<Hash, ACell> emptyIndex = (Index<Hash, ACell>) Index.EMPTY;

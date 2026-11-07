@@ -188,6 +188,49 @@ public class DIDTest {
     	}
 
     }
+
+    @Test
+    void testPercentEncodedReservedCharacters() {
+    	// did:web port: "%3A" is not the ":" segment separator (RFC 3986 §2.2)
+    	DID port = DID.fromString("did:web:example.com%3A8080");
+    	assertEquals("did:web:example.com%3A8080", port.toString());
+    	assertEquals("example.com%3A8080", port.getID());
+    	assertNotEquals(DID.fromString("did:web:example.com:8080"), port);
+    	assertEquals(port, DID.fromString("did:web:example.com%3a8080"));
+    	assertEquals(port, new DID("web", "example.com%3A8080"));
+    	assertEquals(port.hashCode(), DID.fromString("did:web:example.com%3a8080").hashCode());
+    	doDIDTest(port);
+
+    	// An encoded "/" belongs to the id, not the path
+    	DIDURL durl = DIDURL.create("did:foo:a%2Fb/c");
+    	assertEquals("a%2Fb", durl.getDID().getID());
+    	assertEquals("/c", durl.getPath());
+
+    	// "+" is a literal character, not a form-encoded space
+    	assertEquals("did:foo:a%2Bb", DID.fromString("did:foo:a+b").toString());
+    }
+
+    @Test
+    void testPercentEncodedIDChars() {
+    	// An encoded idchar equals its plain form (RFC 3986 §6.2.2.2)
+    	DID dash = DID.fromString("did:web:my%2Dsite.com");
+    	assertEquals(DID.fromString("did:web:my-site.com"), dash);
+    	assertEquals("did:web:my-site.com", dash.toString());
+    	assertEquals("my-site.com", dash.getID());
+
+    	// "~" is unreserved but not an idchar, so its canonical form is encoded
+    	assertEquals("did:foo:a%7Eb", DID.fromString("did:foo:a~b").toString());
+    	assertEquals("did:foo:a%7Eb", DID.fromString("did:foo:a%7eb").toString());
+    }
+
+    @Test
+    void testMalformedID() {
+    	assertThrows(IllegalArgumentException.class, () -> new DID("foo", "100%"));
+    	assertThrows(IllegalArgumentException.class, () -> new DID("foo", "%4"));
+    	assertThrows(IllegalArgumentException.class, () -> new DID("foo", "%G1"));
+    	assertThrows(IllegalArgumentException.class, () -> new DID("foo", "%٣٣"));
+    	assertThrows(IllegalArgumentException.class, () -> new DID("foo", "\uD800"));
+    }
     
     @Test
     void testDifferentMethods() {
@@ -283,6 +326,18 @@ public class DIDTest {
 		assertFalse(DID.isCanonicalBase(Strings.create("did:web:example.com/path")));
 		assertFalse(DID.isCanonicalBase(Strings.create("did:web:example.com?x=1")));
 		assertFalse(DID.isCanonicalBase(Strings.create("did:web:example.com#key-1")));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:web:example.com:")));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:web:example.com%3a8080")));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:web:my%2Dsite.com")));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:web:example.com%3")));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:foo:%٣٣")));
+
+		// Canonical exactly when parsing round-trips
+		for (String s : new String[] {"did:web:example.com%3A8080:13", "did:web:example.com%3a8080",
+				"did:web:my%2Dsite.com", "did:web:example.com:8080", "did:foo:%C5%AD", "did:foo:a~b",
+				"did:foo:a%7Eb", "did:foo:a+b"}) {
+			assertEquals(DID.fromString(s).toString().equals(s), DID.isCanonicalBase(Strings.create(s)), s);
+		}
 	}
 
 	private void doDIDTest(DID did) {

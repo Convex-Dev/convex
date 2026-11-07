@@ -36,44 +36,68 @@ import convex.net.impl.netty.NettyServer;
  * only eligibility for the application selector; it does not attach, start or
  * close a propagator. The application must start the authoritative node and its
  * attached groups before opening this listener, then close the listener before
- * closing those groups.</p>
+ * closing those groups. Closing is final: a closed listener cannot be launched
+ * again.</p>
+ *
+ * <p>The listener takes no lock. Its owner launches and closes it, one after the
+ * other. Network threads assign connections while the owner registers and revokes
+ * groups; a connection that arrives as its group is revoked is turned away.</p>
  */
 public final class LatticeListener implements Closeable {
 
 	private static final Logger log=LoggerFactory.getLogger(LatticeListener.class);
+	private static final String UNAVAILABLE_GROUP="Inbound propagation policy selected an unavailable group";
 
 	private final NodeConfig config;
-	private final Set<LatticePropagator> allowedPropagators=
-		ConcurrentHashMap.newKeySet();
+	private final Set<LatticePropagator> allowedPropagators;
+	/** Whether the eligible groups are a {@link LatticeNode}'s, which only the node changes. */
+	private final boolean nodeGroups;
 	private final ConcurrentHashMap<AConnection,LatticePropagator> assignments=
 		new ConcurrentHashMap<>();
-	/** Serialises initial assignment with revocation; established traffic does not lock. */
-	private final Object assignmentLock=new Object();
 	private volatile Function<AConnection,LatticePropagator> selector;
-	private AServer server;
-	private Integer port;
+	private volatile AServer server;
+	private volatile Integer port;
 	private boolean launchStarted;
-	private boolean running;
+	private boolean closed;
+	private volatile boolean running;
 
 	/**
-	 * Creates a TCP lattice listener. No propagation group is admitted until it
+	 * Creates a TCP lattice listener. No propagator group is admitted until it
 	 * is explicitly registered and selected.
 	 *
 	 * @param config host limits and port, or {@code null} for defaults
 	 */
 	public LatticeListener(NodeConfig config) {
-		this.config=(config==null) ? NodeConfig.create() : config;
-		this.port=this.config.getPort();
+		this(config,ConcurrentHashMap.newKeySet(),false);
 	}
 
 	/**
-	 * Registers a propagation group as an eligible target of this transport.
+	 * Creates a listener of a node, which may assign connections to the node's groups.
+	 * The node adds and removes them in {@code groups}, which all its listeners share,
+	 * and calls {@link #revoke(LatticePropagator)} on each listener after removing one.
+	 */
+	LatticeListener(NodeConfig config,Set<LatticePropagator> groups) {
+		this(config,groups,true);
+	}
+
+	private LatticeListener(NodeConfig config,Set<LatticePropagator> groups,boolean nodeGroups) {
+		this.config=(config==null) ? NodeConfig.create() : config;
+		this.port=this.config.getPort();
+		this.allowedPropagators=groups;
+		this.nodeGroups=nodeGroups;
+	}
+
+	/**
+	 * Registers a propagator group as an eligible target of this transport.
 	 * The listener does not take lifecycle ownership of the group.
 	 *
 	 * @param propagator group which may receive accepted connections
+	 * @throws IllegalStateException on a {@link LatticeNode}'s listener, whose groups
+	 *         are the node's
 	 */
-	public synchronized void registerPropagator(LatticePropagator propagator) {
+	public void registerPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
+		requireOwnGroups();
 		allowedPropagators.add(propagator);
 	}
 
@@ -84,18 +108,26 @@ public final class LatticeListener implements Closeable {
 	 *
 	 * @param propagator group to unregister
 	 * @return {@code true} if registered, or {@code false} if already absent
+	 * @throws IllegalStateException on a {@link LatticeNode}'s listener, whose groups
+	 *         are the node's
 	 */
 	public boolean unregisterPropagator(LatticePropagator propagator) {
 		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
+		requireOwnGroups();
+		if (!allowedPropagators.remove(propagator)) return false;
+		revoke(propagator);
+		return true;
+	}
+
+	/**
+	 * Closes a group's sockets on this listener once the group has been removed from
+	 * the groups this listener serves.
+	 */
+	void revoke(LatticePropagator propagator) {
 		ArrayList<AConnection> connections=new ArrayList<>();
-		synchronized (assignmentLock) {
-			if (!allowedPropagators.remove(propagator)) return false;
-			assignments.forEach((connection,owner) -> {
-				if (owner==propagator) connections.add(connection);
-			});
-		}
-		// Closing a socket may call back into this listener. Never hold the assignment
-		// lock while waiting for transport cleanup or invoking group observers.
+		assignments.forEach((connection,owner) -> {
+			if (owner==propagator) connections.add(connection);
+		});
 		for (AConnection connection:connections) {
 			try {
 				connection.close();
@@ -106,7 +138,13 @@ public final class LatticeListener implements Closeable {
 				removeConnection(connection);
 			}
 		}
-		return true;
+	}
+
+	private void requireOwnGroups() {
+		if (nodeGroups) {
+			throw new IllegalStateException(
+				"A lattice node's listener serves the node's groups: add or remove them through the node");
+		}
 	}
 
 	/**
@@ -117,18 +155,22 @@ public final class LatticeListener implements Closeable {
 	 *
 	 * @param selector assignment policy, or {@code null} to deny every connection
 	 */
-	public synchronized void setSelector(Function<AConnection,LatticePropagator> selector) {
+	public void setSelector(Function<AConnection,LatticePropagator> selector) {
 		this.selector=selector;
 	}
 
 	/**
-	 * Opens the listener. A negative port represents an intentionally absent
-	 * inbound transport and completes launch without binding a socket.
+	 * Opens the listener, or does nothing if it is already open. A negative port
+	 * represents an intentionally absent inbound transport and completes launch
+	 * without binding a socket.
 	 *
 	 * @throws IOException if the transport cannot bind or start
 	 * @throws InterruptedException if launch is interrupted
+	 * @throws IllegalStateException if the listener is closed, or an earlier launch failed
 	 */
-	public synchronized void launch() throws IOException,InterruptedException {
+	public void launch() throws IOException,InterruptedException {
+		if (closed) throw new IllegalStateException("Listener is closed");
+		if (running) return;
 		requireNotLaunched("launch");
 		launchStarted=true;
 		if (port!=null && port<0) {
@@ -142,11 +184,11 @@ public final class LatticeListener implements Closeable {
 		netty.setMaxMessageLength(config.getMaxMessageSize());
 		server=netty;
 		try {
-			server.launch();
-			port=server.getPort();
+			netty.launch();
+			port=netty.getPort();
 			running=true;
 		} catch (IOException | InterruptedException | RuntimeException | Error e) {
-			server.close();
+			netty.close();
 			server=null;
 			throw e;
 		}
@@ -166,25 +208,24 @@ public final class LatticeListener implements Closeable {
 			Selection selection=select(connection);
 			propagator=selection.propagator();
 			if (propagator==null) return reject(message,selection.rejection());
-			boolean revoked;
 			try {
-				synchronized (assignmentLock) {
-					// Selection is application code and runs outside the lock. Recheck
-					// registration in case it raced with unregistration.
-					revoked=!allowedPropagators.contains(propagator);
-					if (!revoked) {
-						LatticePropagator previous=assignments.putIfAbsent(connection,propagator);
-						if (previous!=null) propagator=previous;
-						else propagator.attachInboundConnection(connection);
-					}
-				}
+				propagator.attachInboundConnection(connection);
 			} catch (VirtualMachineError e) {
 				if (!(e instanceof StackOverflowError)) throw e;
 				return containFailure(connection,propagator,e);
 			} catch (Throwable e) {
+				// A group removed meanwhile turns connections away as it closes: no failure
+				if (!allowedPropagators.contains(propagator)) return reject(message,UNAVAILABLE_GROUP);
 				return containFailure(connection,propagator,e);
 			}
-			if (revoked) return reject(message,"Inbound propagation policy selected an unavailable group");
+			// A connection's messages arrive one at a time, so nothing else assigns it.
+			// Revoking the group removes it before collecting its sockets, so checking after
+			// assigning turns the connection away here, or revocation releases it.
+			assignments.put(connection,propagator);
+			if (!allowedPropagators.contains(propagator)) {
+				removeConnection(connection);
+				return reject(message,UNAVAILABLE_GROUP);
+			}
 		}
 		try {
 			return propagator.deliverIncomingMessage(message);
@@ -199,7 +240,7 @@ public final class LatticeListener implements Closeable {
 	private Predicate<Message> containFailure(AConnection connection,
 			LatticePropagator propagator,Throwable failure) {
 		propagator.recordFailure("inbound delivery",failure);
-		log.warn("Propagation group failed while receiving; closing its connection",failure);
+		log.warn("Propagator group failed while receiving; closing its connection",failure);
 		assignments.remove(connection,propagator);
 		try {
 			propagator.removeInboundConnection(connection);
@@ -254,7 +295,7 @@ public final class LatticeListener implements Closeable {
 			if (selected==null) return new Selection(null,"No propagation policy admits this connection");
 			if (!allowedPropagators.contains(selected)) {
 				log.warn("Inbound policy selected a propagator not registered with this listener");
-				return new Selection(null,"Inbound propagation policy selected an unavailable group");
+				return new Selection(null,UNAVAILABLE_GROUP);
 			}
 			return new Selection(selected,null);
 		} catch (VirtualMachineError e) {
@@ -279,9 +320,9 @@ public final class LatticeListener implements Closeable {
 			propagator.removeInboundConnection(connection);
 		} catch (VirtualMachineError e) {
 			if (!(e instanceof StackOverflowError)) throw e;
-			log.warn("Propagation group overflowed during connection cleanup",e);
+			log.warn("Propagator group overflowed during connection cleanup",e);
 		} catch (Throwable e) {
-			log.warn("Propagation group failed during connection cleanup",e);
+			log.warn("Propagator group failed during connection cleanup",e);
 		}
 	}
 
@@ -292,7 +333,8 @@ public final class LatticeListener implements Closeable {
 
 	/** Returns the bound TCP address, or {@code null} when no socket is open. */
 	public InetSocketAddress getHostAddress() {
-		return server==null ? null : server.getHostAddress();
+		AServer current=server;
+		return current==null ? null : current.getHostAddress();
 	}
 
 	/** Returns whether launch completed and the listener has not been closed. */
@@ -300,8 +342,10 @@ public final class LatticeListener implements Closeable {
 		return running;
 	}
 
+	/** Closes the listener for good; closing again does nothing. */
 	@Override
-	public synchronized void close() {
+	public void close() {
+		closed=true;
 		AServer current=server;
 		if (current!=null) current.close();
 		for (AConnection connection:Set.copyOf(assignments.keySet())) removeConnection(connection);

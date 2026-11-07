@@ -1,7 +1,6 @@
 package convex.cli.mixins;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -20,7 +19,7 @@ public class EtchMixinTest {
 	public void testConfiguredEncryptedOpen() throws Exception {
 		File file=File.createTempFile("configured-cli", ".etch");
 		file.deleteOnExit();
-		EtchConfig config=config((byte)0x20).withRefCacheSize(43).withL2Enabled(false);
+		EtchConfig config=config((byte)0x20).withRefCacheSize(43);
 		try (EtchStore created=EtchStore.create(file,config)) {
 			created.flush();
 		}
@@ -29,12 +28,11 @@ public class EtchMixinTest {
 		try (EtchStore opened=mixin.getEtchStore(file.getPath(),config)) {
 			assertEquals(config,opened.getEtch().getConfig());
 			assertEquals(43,opened.getRefCacheSize());
-			assertFalse(opened.isL2Enabled());
 			EtchConfigMixin options=new EtchConfigMixin();
 			try (var keys=options.destinationContext(new KeyStoreMixin())) {
 				EtchConfig destination=options.destinationConfig(opened.getConfig(),keys,true);
 				assertEquals(config,destination);
-				EtchConfig plain=EtchConfig.create().withRefCacheSize(43).withL2Enabled(false);
+				EtchConfig plain=EtchConfig.create().withRefCacheSize(43);
 				assertEquals(plain,options.destinationConfig(plain,keys,true));
 				assertEquals(EtchConfig.create(),options.destinationConfig(plain,keys,false));
 			}

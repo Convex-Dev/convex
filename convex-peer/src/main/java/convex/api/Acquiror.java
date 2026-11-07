@@ -8,6 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,8 +32,10 @@ import convex.core.util.Utils;
  * One-shot, lifecycle-aware acquisition of a complete CAD3 value tree.
  *
  * <p>An Acquiror owns its virtual worker. Cancelling its future or calling
- * {@link #close()} interrupts that worker and its current request. Callers that must
- * know the worker can no longer touch its destination store can additionally use
+ * {@link #close()} cancels the current request, and the worker stops at its next
+ * step. The worker is never interrupted: it may be inside store I/O, which an
+ * interrupt can break for every user of the store. Callers that must know the
+ * worker can no longer touch its destination store can additionally use
  * {@link #awaitTermination(long, TimeUnit)}.
  *
  * <p>The request transport is deliberately abstract. Ordinary clients use the
@@ -49,14 +52,18 @@ public final class Acquiror implements AutoCloseable {
 		CompletableFuture<Result> request(Hash[] hashes);
 	}
 
+	@FunctionalInterface
+	private interface BatchRequest {
+		Result fetch(Acquiror worker, Hash[] hashes) throws Exception;
+	}
+
 	private final Hash hash;
 	private final AStore store;
-	private final DataSource source;
+	private final BatchRequest request;
 	private final CompletableFuture<ACell> future = new CompletableFuture<>();
 	private final CompletableFuture<Void> termination = new CompletableFuture<>();
 
-	private volatile Thread worker;
-	private volatile CompletableFuture<Result> currentRequest;
+	private volatile CompletableFuture<?> currentRequest;
 	private volatile boolean closed;
 	private boolean started;
 
@@ -80,9 +87,14 @@ public final class Acquiror implements AutoCloseable {
 	 * @param source data request transport
 	 */
 	public Acquiror(Hash hash, AStore store, DataSource source) {
+		this(hash, store, (worker, hashes) -> worker.awaitResponse(source.request(hashes)));
+		Objects.requireNonNull(source, "Acquisition source");
+	}
+
+	private Acquiror(Hash hash, AStore store, BatchRequest request) {
 		this.hash = Objects.requireNonNull(hash, "Acquisition hash");
 		this.store = Objects.requireNonNull(store, "Acquisition store");
-		this.source = Objects.requireNonNull(source, "Acquisition source");
+		this.request = request;
 		future.whenComplete((value, error) -> {
 			if (future.isCancelled()) cancelOwnedWork();
 		});
@@ -101,6 +113,17 @@ public final class Acquiror implements AutoCloseable {
 		return new Acquiror(hash, store, source);
 	}
 
+	/** Acquires from correlated wire replies, decoding on the worker with the destination store. */
+	public static Acquiror fromMessages(Hash hash, AStore store,
+			Function<Hash[], CompletableFuture<Message>> source) {
+		Objects.requireNonNull(source, "Acquisition source");
+		return new Acquiror(hash, store, (worker, hashes) -> {
+			Message reply = worker.awaitResponse(source.apply(hashes));
+			reply.getPayload(store);
+			return reply.toResult();
+		});
+	}
+
 	/**
 	 * Starts acquisition once and returns its stable completion future.
 	 *
@@ -112,9 +135,7 @@ public final class Acquiror implements AutoCloseable {
 		if (!started && !closed) {
 			started = true;
 			log.trace("Trying to acquire remotely: {}", hash);
-			Thread thread = Thread.ofVirtual().name("Acquiror").unstarted(this::run);
-			worker = thread;
-			thread.start();
+			Thread.ofVirtual().name("Acquiror").start(this::run);
 		}
 		if (closed && !future.isDone()) future.cancel(false);
 		return (CompletableFuture<T>) (CompletableFuture<?>) future;
@@ -171,24 +192,26 @@ public final class Acquiror implements AutoCloseable {
 
 			Hash[] requested = missing.toArray(Utils.EMPTY_HASHES);
 			if (closed) throw new CancellationException("Acquisition closed");
-			CompletableFuture<Result> request = source.request(requested);
-			if (request == null) throw new IOException("Acquisition source returned no request future");
-			currentRequest = request;
-			if (closed) {
-				request.cancel(true);
-				throw new CancellationException("Acquisition closed");
-			}
-			Result result;
-			try {
-				result = request.get();
-			} finally {
-				currentRequest = null;
-			}
-			if (closed) throw new CancellationException("Acquisition closed");
-			acceptResponse(requested, result);
+			acceptResponse(requested, request.fetch(this, requested));
 		}
 
 		throw new CancellationException("Acquisition closed");
+	}
+
+	private <T> T awaitResponse(CompletableFuture<T> response) throws Exception {
+		if (response == null) throw new IOException("Acquisition source returned no request future");
+		currentRequest = response;
+		try {
+			if (closed) {
+				response.cancel(true);
+				throw new CancellationException("Acquisition closed");
+			}
+			T value = response.get();
+			if (closed) throw new CancellationException("Acquisition closed");
+			return value;
+		} finally {
+			currentRequest = null;
+		}
 	}
 
 	private void acceptResponse(Hash[] requested, Result result)
@@ -204,6 +227,7 @@ public final class Acquiror implements AutoCloseable {
 		}
 
 		for (int i = 0; i < requested.length; i++) {
+			if (closed) throw new CancellationException("Acquisition closed");
 			ACell value = values.get(i);
 			if (value == null) {
 				throw new MissingDataException(store, requested[i]);
@@ -244,7 +268,7 @@ public final class Acquiror implements AutoCloseable {
 		}
 	}
 
-	/** Cancels the current request and interrupts this Acquiror's owned worker. */
+	/** Cancels the current request. The owned worker stops at its next step. */
 	@Override
 	public void close() {
 		cancelOwnedWork();
@@ -253,14 +277,10 @@ public final class Acquiror implements AutoCloseable {
 
 	private synchronized void cancelOwnedWork() {
 		closed = true;
-		CompletableFuture<Result> request = currentRequest;
+		// Cancelling the request wakes a worker waiting for it. The worker checks
+		// closed after publishing each request, so one of the two always sees the other.
+		CompletableFuture<?> request = currentRequest;
 		if (request != null) request.cancel(true);
-		interruptWorker();
 		if (!started) termination.complete(null);
-	}
-
-	private void interruptWorker() {
-		Thread thread = worker;
-		if (thread != null) thread.interrupt();
 	}
 }

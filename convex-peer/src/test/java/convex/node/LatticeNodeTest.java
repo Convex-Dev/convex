@@ -4,32 +4,121 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
 import convex.api.ConvexRemote;
 import convex.auth.did.DID;
+import convex.auth.did.DIDResolution;
 import convex.core.ErrorCodes;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.util.Multikey;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.StoreException;
+import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
+import convex.core.util.JSON;
 import convex.core.store.MemoryStore;
-import convex.lattice.LatticeApplication;
+import convex.lattice.LatticeComponent;
 import convex.lattice.LatticeHost;
 import convex.lattice.generic.SetLattice;
+import convex.net.PeerResolver;
+import convex.net.Transports;
 
 /** Optional networking preserves the existing host, application boundaries and store ownership. */
 class LatticeNodeTest {
+
+	/** A group reads its own configuration map; a key in the node's map is not inherited (#769). */
+	@Test void groupLimitsComeFromTheGroupConfig() throws Exception {
+		var nodeConfig=NodeConfig.create(Maps.of(NodeConfig.PORT,CVMLong.create(-1),
+			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(3)));
+		var groupConfig=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_DESIRED_PEERS,CVMLong.create(5)));
+		try (var store=new MemoryStore();
+				var network=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),nodeConfig).launch()) {
+			assertEquals(LatticePropagatorConfig.DEFAULT_MAX_DESIRED_PEERS,
+				network.createPropagator().getConnectionManager().getMaxDesiredPeers());
+			assertEquals(5,network.createPropagator(groupConfig).getConnectionManager().getMaxDesiredPeers());
+		}
+	}
+
+	/** Close is final: a closed node cannot be launched and opens no listener. */
+	@Test void aClosedNodeStaysClosed() throws Exception {
+		try (var store=new MemoryStore()) {
+			var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0));
+			var group=node.createPropagator();
+			node.close();
+			assertThrows(IllegalStateException.class,node::launch);
+			assertFalse(node.getServer().isRunning(),"a launch after close undoes itself");
+			assertFalse(group.isRunning());
+			assertFalse(node.getListener().isRunning());
+			assertFalse(node.addListener(NodeConfig.port(0)).isRunning());
+			node.close();
+		}
+	}
+
+	/**
+	 * A selector runs on the network thread that close waits for to close the listener's
+	 * connections, so it may read the node's identity and set its serving policy while
+	 * the node closes.
+	 */
+	@Test void closeNeverWaitsForASelectorThatReadsTheNode() throws Exception {
+		try (var store=new MemoryStore();
+				var others=Executors.newVirtualThreadPerTaskExecutor()) {
+			var node=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch();
+			// A node with a key keeps an unreachable peer, retrying, until it closes
+			var key=AKeyPair.createSeeded(714);
+			node.setIdentity(DID.forKey(key.getAccountKey()),key);
+			var group=node.createPropagator();
+			var selecting=new CountDownLatch(1);
+			var closing=new CountDownLatch(1);
+			node.getListener().setSelector(connection -> {
+				selecting.countDown();
+				awaitUninterruptibly(closing);
+				node.getDID();
+				node.serveAllInbound(group);
+				return group;
+			});
+			// Close stops the peers it keeps before it closes any listener
+			var kept=node.keepPeer(group,PeerResolver.parse("127.0.0.1:1"),null);
+			kept.whenComplete((value,error) -> closing.countDown());
+			try (var client=ConvexRemote.connect(node.getHostAddress())) {
+				client.message(Message.createPing(1));
+				assertTrue(selecting.await(5,TimeUnit.SECONDS));
+				assertFalse(kept.isDone(),"the peer is kept until the node closes");
+				others.submit(() -> {
+					node.close();
+					return null;
+				}).get(5,TimeUnit.SECONDS);
+			}
+			assertFalse(node.getListener().isRunning());
+		}
+	}
+
+	private static void awaitUninterruptibly(CountDownLatch latch) {
+		while (true) {
+			try {
+				latch.await();
+				return;
+			} catch (InterruptedException e) {
+				// Keep waiting: the test releases the latch
+			}
+		}
+	}
 
 	/** Node identity supplies group defaults without inventing keys or replacing group overrides. */
 	@Test void primaryIdentityIsValidatedAndUsedAsTheGroupDefault() throws Exception {
@@ -111,6 +200,69 @@ class LatticeNodeTest {
 		return result.getValue();
 	}
 
+	private static ACell pingError(ConvexRemote client) throws Exception {
+		return client.message(Message.createPing(1)).get(5,TimeUnit.SECONDS).getErrorCode();
+	}
+
+	/** A second port serves a group of its own; a group is registered on, and removed from, every listener. */
+	@Test void aSecondListenerServesAGroupOfItsOwn() throws Exception {
+		try (var store=new MemoryStore()) {
+			var host=LatticeHost.create(CVMLong.create(99),store);
+			try (var network=new LatticeNode<>(host,NodeConfig.port(0))) {
+				var open=network.createPropagator(LatticePropagatorConfig.create(),value -> CVMLong.ONE);
+				var trusted=network.createPropagator(LatticePropagatorConfig.create(),value -> CVMLong.TWO);
+				assertThrows(IllegalArgumentException.class,() -> network.createPropagator(LatticePropagatorConfig.create(),null));
+				assertEquals(List.of(open,trusted),network.getServer().getPropagators(),"a refused filter attaches no group");
+				network.serveAllInbound(open);
+				var second=network.addListener(NodeConfig.port(0));
+				assertThrows(IllegalStateException.class,() -> second.registerPropagator(open),
+					"a node's listeners serve the node's groups");
+				assertThrows(IllegalStateException.class,() -> network.getListener().unregisterPropagator(open));
+				var attachedDirectly=new LatticePropagator(store);
+				network.getServer().addPropagator(attachedDirectly);
+				assertThrows(IllegalArgumentException.class,() -> network.serveAllInbound(attachedDirectly),
+					"only a group the node created can be served");
+				network.launch();
+				assertTrue(second.isRunning(),"the node opens every listener");
+				try (var client=ConvexRemote.connect(second.getHostAddress())) {
+					assertEquals(ErrorCodes.TRUST,pingError(client),"a new listener denies until given a selector");
+				}
+				second.setSelector(connection -> trusted);
+				try (var openClient=ConvexRemote.connect(network.getHostAddress());
+						var trustedClient=ConvexRemote.connect(second.getHostAddress())) {
+					assertEquals(CVMLong.ONE,queryRoot(openClient));
+					assertEquals(CVMLong.TWO,queryRoot(trustedClient));
+				}
+				assertTrue(network.removePropagator(trusted));
+				try (var client=ConvexRemote.connect(second.getHostAddress())) {
+					assertEquals(ErrorCodes.TRUST,pingError(client),"a removed group is unregistered from every listener");
+				}
+				network.close();
+				assertFalse(network.getListener().isRunning());
+				assertFalse(second.isRunning(),"closing the node closes every listener");
+			}
+		}
+	}
+
+	/** A listener added while running opens at once and can assign existing groups; one that cannot bind fails alone. */
+	@Test void aListenerAddedWhileRunningOpensAtOnce() throws Exception {
+		try (var store=new MemoryStore(); var occupied=new ServerSocket(0)) {
+			var host=LatticeHost.create(CVMLong.ONE,store);
+			LatticeListener added;
+			try (var network=new LatticeNode<>(host,NodeConfig.port(-1)).launch()) {
+				var group=network.createPropagator(LatticePropagatorConfig.create(),value -> CVMLong.TWO);
+				assertThrows(IOException.class,() -> network.addListener(NodeConfig.port(occupied.getLocalPort())));
+				added=network.addListener(NodeConfig.port(0));
+				assertTrue(added.isRunning());
+				added.setSelector(connection -> group);
+				try (var client=ConvexRemote.connect(added.getHostAddress())) {
+					assertEquals(CVMLong.TWO,queryRoot(client));
+				}
+			}
+			assertFalse(added.isRunning(),"closing the node closes every listener");
+		}
+	}
+
 	@Test void inboundAccessRequiresAnExplicitPolicy() throws Exception {
 		try (var store=new MemoryStore()) {
 			var host=LatticeHost.create(CVMLong.ONE,store);
@@ -132,7 +284,7 @@ class LatticeNodeTest {
 		try (var sourceStore=new MemoryStore(); var targetStore=new MemoryStore()) {
 			var source=LatticeHost.create(Sets.<CVMLong>of(1),sourceStore);
 			var target=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),targetStore);
-			var app=target.addApplication(new LatticeApplication<>(SetLattice.<CVMLong>create(),target));
+			var app=target.addApplication(new LatticeComponent<>(SetLattice.<CVMLong>create(),target.cursor().fork()));
 			var sourceKey=AKeyPair.createSeeded(701);
 			try (var sender=new LatticeNode<>(source,NodeConfig.port(0)).launch();
 					var receiver=new LatticeNode<>(target,NodeConfig.port(-1)).launch()) {
@@ -150,6 +302,145 @@ class LatticeNodeTest {
 					app.sync();
 					target.sync();
 					assertEquals(Sets.of(1),targetStore.getRootData());
+				}
+			}
+		}
+	}
+
+	/** A node reached only by its address is admitted under the key it proves (#629). */
+	@Test void nodeReachedByAddressIsAdmittedUnderTheKeyItProves() throws Exception {
+		try (var serverStore=new MemoryStore(); var clientStore=new MemoryStore()) {
+			var serverKey=AKeyPair.createSeeded(705);
+			var clientKey=AKeyPair.createSeeded(706);
+			try (var server=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,serverStore),NodeConfig.port(0)).launch();
+					var client=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,clientStore),NodeConfig.port(-1)).launch()) {
+				server.setIdentity(DID.forKey(serverKey.getAccountKey()),serverKey);
+				server.serveAllInbound(server.createPropagator());
+				client.setIdentity(DID.forKey(clientKey.getAccountKey()),clientKey);
+				var manager=client.createPropagator().getConnectionManager();
+
+				var peer=manager.connectPeer(Transports.endpoint(server.getHostAddress())).get(10,TimeUnit.SECONDS);
+				assertEquals(serverKey.getAccountKey(),peer.getVerifiedPeer());
+				assertSame(peer,manager.getConnection(serverKey.getAccountKey()));
+				assertTrue(manager.getAuthenticatedRouteKeys().contains(serverKey.getAccountKey()));
+			}
+		}
+	}
+
+	/** A node named by a did:web is dialled at its document's lattice endpoint and must prove a key it lists. */
+	@Test void nodeNamedByDIDIsAdmittedUnderAKeyItsDocumentLists() throws Exception {
+		try (var serverStore=new MemoryStore(); var clientStore=new MemoryStore()) {
+			var serverKey=AKeyPair.createSeeded(707);
+			var clientKey=AKeyPair.createSeeded(708);
+			try (var server=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,serverStore),NodeConfig.port(0)).launch();
+					var client=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,clientStore),NodeConfig.port(-1)).launch()) {
+				server.setIdentity(DID.forKey(serverKey.getAccountKey()),serverKey);
+				server.serveAllInbound(server.createPropagator());
+				client.setIdentity(DID.forKey(clientKey.getAccountKey()),clientKey);
+				String did="did:web:files.example.com";
+				String document="""
+					{"id": "%1$s",
+					 "verificationMethod": [{"id": "#node", "type": "Multikey", "controller": "%1$s",
+					   "publicKeyMultibase": "%2$s"}],
+					 "authentication": ["#node"],
+					 "service": [{"id": "#lattice", "type": "ConvexLatticeNode", "serviceEndpoint": "%3$s"}]}
+					""".formatted(did,Multikey.encodePublicKey(serverKey.getAccountKey()),
+						Transports.endpoint(server.getHostAddress()));
+				client.setPeerResolver(new PeerResolver(name -> CompletableFuture.completedFuture(
+					DIDResolution.of(RT.ensureMap(JSON.parse(document)),null)),null));
+				var group=client.createPropagator();
+
+				var peer=client.connectPeer(group,PeerResolver.parse(did)).get(10,TimeUnit.SECONDS);
+				assertEquals(serverKey.getAccountKey(),peer.getVerifiedPeer());
+				var manager=group.getConnectionManager();
+				assertSame(peer,manager.getConnection(serverKey.getAccountKey()));
+				assertNull(manager.getDesiredPeers().get(serverKey.getAccountKey()).transports,"held, not redialled");
+			}
+		}
+	}
+
+	/** A node admitting challengers gets a route back to a node that dialled it, so its updates reach that node. */
+	@Test void admittedChallengerReceivesTheDialledNodesUpdates() throws Exception {
+		try (var servedStore=new MemoryStore(); var diallerStore=new MemoryStore()) {
+			var servedHost=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),servedStore);
+			var diallerHost=LatticeHost.<ASet<CVMLong>>create(Sets.empty(),diallerStore);
+			var app=diallerHost.addApplication(new LatticeComponent<>(SetLattice.<CVMLong>create(),diallerHost.cursor().fork()));
+			var servedKey=AKeyPair.createSeeded(707);
+			var diallerKey=AKeyPair.createSeeded(708);
+			try (var served=new LatticeNode<>(servedHost,NodeConfig.port(0)).launch();
+					var dialler=new LatticeNode<>(diallerHost,NodeConfig.port(-1)).launch()) {
+				served.setIdentity(DID.forKey(servedKey.getAccountKey()),servedKey);
+				var servedGroup=served.createPropagator();
+				served.serveAllInbound(servedGroup);
+				servedGroup.setChallengerAdmission(key -> true);
+				dialler.setIdentity(DID.forKey(diallerKey.getAccountKey()),diallerKey);
+				var diallerGroup=dialler.createPropagator();
+				var received=new CompletableFuture<Void>();
+				diallerGroup.setInboundLatticeListener((connection,group,path,value,changed) -> {
+					if (app.cursor().get().contains(CVMLong.ONE)) received.complete(null);
+				});
+
+				diallerGroup.getConnectionManager().connectPeer(Transports.endpoint(served.getHostAddress()))
+					.get(10,TimeUnit.SECONDS);
+				servedGroup.getConnectionManager().whenInboundConnectionUpgraded(diallerKey.getAccountKey())
+					.get(10,TimeUnit.SECONDS);
+				servedHost.cursor().set(Sets.of(1));
+				servedHost.sync();
+				received.get(10,TimeUnit.SECONDS);
+				assertEquals(Sets.of(1),app.cursor().get());
+			}
+		}
+	}
+
+	/** Without admission, serving inbound gives a node that dialled in no route back. */
+	@Test void servingInboundAloneGivesNoRouteBack() throws Exception {
+		try (var servedStore=new MemoryStore(); var diallerStore=new MemoryStore()) {
+			var servedKey=AKeyPair.createSeeded(709);
+			var diallerKey=AKeyPair.createSeeded(710);
+			try (var served=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,servedStore),NodeConfig.port(0)).launch();
+					var dialler=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,diallerStore),NodeConfig.port(-1)).launch()) {
+				served.setIdentity(DID.forKey(servedKey.getAccountKey()),servedKey);
+				var servedGroup=served.createPropagator();
+				served.serveAllInbound(servedGroup);
+				dialler.setIdentity(DID.forKey(diallerKey.getAccountKey()),diallerKey);
+				dialler.createPropagator().getConnectionManager()
+					.connectPeer(Transports.endpoint(served.getHostAddress())).get(10,TimeUnit.SECONDS);
+				// Admission is decided before the challenge is answered, so it would have begun by now
+				assertTrue(servedGroup.getAuthenticatingInboundKeys().isEmpty());
+				assertFalse(servedGroup.getConnectionManager().hasUpgradedInboundConnection(diallerKey.getAccountKey()));
+			}
+		}
+	}
+
+	/** Only a challenge naming this node, from a key the application admits, earns a challenge back. */
+	@Test void onlyANamedChallengeFromAnAdmittedKeyIsChallengedBack() throws Exception {
+		try (var store=new MemoryStore()) {
+			var servedKey=AKeyPair.createSeeded(711);
+			var admittedKey=AKeyPair.createSeeded(712);
+			var otherKey=AKeyPair.createSeeded(713);
+			try (var served=new LatticeNode<>(LatticeHost.create(CVMLong.ONE,store),NodeConfig.port(0)).launch()) {
+				served.setIdentity(DID.forKey(servedKey.getAccountKey()),servedKey);
+				var group=served.createPropagator();
+				served.serveAllInbound(group);
+				group.setChallengerAdmission(admittedKey.getAccountKey()::equals);
+				var manager=group.getConnectionManager();
+				var context=Message.LATTICE_PEER_CHALLENGE_CONTEXT;
+				try (var admitted=ConvexRemote.connect(served.getHostAddress());
+						var other=ConvexRemote.connect(served.getHostAddress())) {
+					admitted.setKeyPair(admittedKey);
+					other.setKeyPair(otherKey);
+
+					assertEquals(servedKey.getAccountKey(),admitted.verifyPeer(null,context).get(10,TimeUnit.SECONDS));
+					assertTrue(group.getAuthenticatingInboundKeys().isEmpty(),"a challenge naming no key admits nothing");
+					assertFalse(manager.hasUpgradedInboundConnection(admittedKey.getAccountKey()));
+
+					assertEquals(servedKey.getAccountKey(),other.verifyPeer(servedKey.getAccountKey(),context).get(10,TimeUnit.SECONDS));
+					assertTrue(group.getAuthenticatingInboundKeys().isEmpty(),"a key the application refuses is not challenged back");
+					assertFalse(manager.hasUpgradedInboundConnection(otherKey.getAccountKey()));
+
+					assertEquals(servedKey.getAccountKey(),admitted.verifyPeer(servedKey.getAccountKey(),context).get(10,TimeUnit.SECONDS));
+					manager.whenInboundConnectionUpgraded(admittedKey.getAccountKey()).get(10,TimeUnit.SECONDS);
+					assertTrue(manager.getAuthenticatedRouteKeys().contains(admittedKey.getAccountKey()));
 				}
 			}
 		}

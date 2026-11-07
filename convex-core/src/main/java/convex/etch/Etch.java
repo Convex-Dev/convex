@@ -902,9 +902,19 @@ public class Etch {
 		int length = encodingBytes.length;
 		Blob encoding = Blob.wrap(encodingBytes);
 		try {
+			// Trust the store: the key is the content hash of the encoding, so decoding
+			// takes it instead of hashing the bytes again. EtchRecordVerifier checks
+			// records against their keys when asked.
+			// The key becomes the content hash of the encoding attached to the decoded cell,
+			// which may be a JVM-wide cached instance (small integers, booleans, empty
+			// collections). Stored keys are content hashes; a record written under any other
+			// key, as only a test can, would give that shared cell a wrong hash JVM-wide.
 			Hash hash = Hash.wrap(key);
-			T cell = reader.decode(encoding);
 			encoding.attachContentHash(hash);
+			// The reader's cache is not consulted or filled here: a store read has already
+			// missed it and caches the ref created below, and other reads (GC, status
+			// checks) must not leave a direct ref where the store's own belongs.
+			T cell = reader.decodeStored(encoding);
 
 			if (memorySize > 0) {
 				// need to attach memory size for cell

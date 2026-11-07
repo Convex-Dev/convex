@@ -37,24 +37,22 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		extends ALatticeComponent<M> {
 
 	private final AOwnerLattice<K,V,M> owners;
-	private final AMapComponent<K,SignedData<V>,M> entries;
 
 	protected AOwnedMap(AOwnerLattice<K,V,M> owners,AForkableCursor<M> cursor) {
 		super(cursor);
 		this.owners=owners;
-		entries=new AMapComponent<>(cursor) {
-			@SuppressWarnings("unchecked")
-			@Override protected M requireMap(ACell value) {
-				if (value==null) return null;
-				try {
-					if (owners.checkForeign((M)value)) return (M)value;
-				} catch (ClassCastException e) {
-					throw new IllegalStateException("Incompatible owner map",e);
-				}
-				throw new IllegalStateException("Incompatible owner map");
-			}
-			@Override protected M createContainer() { return AOwnedMap.this.createContainer(); }
-		};
+	}
+
+	/** Returns the owner map, or null for absent storage; rejects incompatible storage. */
+	@SuppressWarnings("unchecked")
+	private M requireMap(ACell value) {
+		if (value==null) return null;
+		try {
+			if (owners.checkForeign((M)value)) return (M)value;
+		} catch (ClassCastException e) {
+			throw new IllegalStateException("Incompatible owner map",e);
+		}
+		throw new IllegalStateException("Incompatible owner map");
 	}
 
 	public final AOwnerLattice<K,V,M> getLattice() { return owners; }
@@ -104,9 +102,9 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		if (path.length!=0) return mergeAtPath(value,path);
 		if (value!=null) {
 			try {
-				if (!owners.checkForeign((M)value)) return storage.get();
+				if (!owners.checkForeign((M)value)) return storage.getOrDefault(null);
 			} catch (ClassCastException e) {
-				return storage.get();
+				return storage.getOrDefault(null);
 			}
 		}
 		return merge((M)value);
@@ -116,9 +114,9 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 	@SuppressWarnings({"unchecked","rawtypes"})
 	@Override
 	protected M mergeAtPath(ACell value,ACell... path) {
-		if (path.length!=1) return cursor().get();
+		if (path.length!=1) return cursor().getOrDefault(null);
 		SignedLattice<V> rule=owners.signingFor(path[0]);
-		if (rule==null) return cursor().get();
+		if (rule==null) return cursor().getOrDefault(null);
 		// Keep foreign values untyped until the same entry validation as whole-map delivery.
 		AMap incoming=owners.zero();
 		return merge((M)incoming.assoc(rule.getOwner(),value));
@@ -126,11 +124,14 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 
 	/** Returns the current signed entry, or null when absent. Rejects incompatible storage. */
 	public SignedData<V> get(K owner) {
-		return entries.get(owner);
+		M map=requireMap(cursor().getOrDefault(null));
+		return map==null?null:map.get(owner);
 	}
 
 	/**
 	 * Returns the signed storage path for an owner, for direct domain construction.
+	 * The path, and the authoring views and drafts built on it, are bound through
+	 * {@link #cursor()} when opened, so local edits apply this collection's editing policy.
 	 * A missing containing map uses {@link #createContainer()} only on a changed write.
 	 * Access rejects incompatible containers. Navigation does
 	 * not sign or grant authority; a signed component binds the owner rule separately.
@@ -165,8 +166,13 @@ public abstract class AOwnedMap<K extends ACell,V extends ACell,M extends AMap<K
 		return rule;
 	}
 
+	/** An owner's entry, bound through the editing view as it is now. */
 	@SuppressWarnings("unchecked")
 	private AForkableCursor<SignedData<V>> slot(SignedLattice<V> rule) {
+		var entries=new AMapComponent<K,SignedData<V>,M>(cursor()) {
+			@Override protected M requireMap(ACell value) { return AOwnedMap.this.requireMap(value); }
+			@Override protected M createContainer() { return AOwnedMap.this.createContainer(); }
+		};
 		return entries.path((K)rule.getOwner());
 	}
 }

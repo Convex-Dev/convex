@@ -548,7 +548,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public VectorTree<T> updateRefs(IRefFunction func) {
+	protected VectorTree<T> rebuildRefs(IRefFunction func) {
 		int ic = children.length;
 		Ref<AVector<T>>[] newChildren = children;
 		for (int i = 0; i < ic; i++) {
@@ -561,9 +561,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			}
 		}
 		if (newChildren==children) return this; // no change, safe to return this
-		VectorTree<T> result= new VectorTree<>(newChildren, count);
-		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
-		return result;
+		return new VectorTree<>(newChildren, count);
 	}
 
 	@Override
@@ -713,7 +711,11 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			Hash hb=b.cachedHash();
 			if (hb!=null) return ha.equals(hb);
 		}
-		
+
+		// A branch node compares by hash, which any parent encoding or store needs
+		// anyway, so the work is kept. An embedded node compares its children through
+		// their refs, since no encoding ever needs its hash.
+		if (!compareAsEmbedded(b)) return getHash().equals(b.getHash());
 		int n=children.length;
 		for (int i=0; i<n; i++) {
 			if (!children[i].equals(b.children[i])) return false;

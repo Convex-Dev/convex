@@ -16,6 +16,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -35,6 +38,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
@@ -162,6 +166,29 @@ public class LatticePropagatorTest {
 		assertTrue(propagator2.isRunning(), "Propagator should be running");
 	}
 
+	/**
+	 * The owner starts and closes a group one call after another: starting again
+	 * changes nothing, and closing ends the group whether or not it was started.
+	 */
+	@Test
+	public void testLifecycleCallsInOrder() {
+		LatticePropagator idle=new LatticePropagator(new MemoryStore());
+		idle.close();
+		assertEquals(LatticePropagator.State.STOPPED,idle.getStatus().state(),"a group never started closes");
+
+		LatticePropagator group=new LatticePropagator(new MemoryStore());
+		group.start();
+		group.start();
+		assertTrue(group.isRunning());
+		assertEquals(LatticePropagator.State.RUNNING,group.getStatus().state());
+		assertEquals(0L,group.getStatus().failureCount(),"starting again is no failure");
+		group.close();
+		group.close();
+		assertFalse(group.isRunning());
+		assertEquals(LatticePropagator.State.STOPPED,group.getStatus().state());
+		assertEquals(0L,group.getStatus().failureCount(),"closing again is no failure");
+	}
+
 	@Test
 	public void testAddPeerReportsIdentityFailure() throws Exception {
 		AccountKey wrongKey=AKeyPair.generate().getAccountKey();
@@ -192,7 +219,7 @@ public class LatticePropagatorTest {
 
 		// Update server2's lattice value at [:data hash]
 		@SuppressWarnings("unchecked")
-		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server2.getCursor().get(dataKeyword);
+		Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server2.getCursor().getOrDefault(null,dataKeyword);
 		if (dataIndex == null) {
 			@SuppressWarnings("unchecked")
 			Index<Hash, ACell> emptyIndex = (Index<Hash, ACell>) Index.EMPTY;
@@ -200,7 +227,7 @@ public class LatticePropagatorTest {
 		}
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		server2.getCursor().assoc(dataKeyword, updatedDataIndex);
-		CompletableFuture<ACell> published=nextAnnounceMatching(propagator2,
+		CompletableFuture<ACell> published=propagator2.whenAnnounced(
 			value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
 		// Synchronous commit persists the authoritative node root; propagation-view
 		// materialisation completes independently on the future above.
@@ -224,12 +251,14 @@ public class LatticePropagatorTest {
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
 		values = values.assoc(expectedHash, expected);
-		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
-			value -> expected.equals(RT.getIn(value,dataKeyword,expectedHash)));
+		Predicate<ACell> holdsExpected=value -> expected.equals(RT.getIn(value,dataKeyword,expectedHash));
+		CompletableFuture<ACell> received=propagator2.whenAnnounced(holdsExpected);
 		server1.getCursor().assoc(dataKeyword, values);
 		server1.getHost().sync();
 
 		received.get(5,TimeUnit.SECONDS);
+		// The receiver can merge before the sender counts its broadcast, so wait for the sender too
+		propagator1.whenAnnounced(holdsExpected).get(5,TimeUnit.SECONDS);
 		assertEquals(1L, propagator1.getBroadcastCount(),
 			"source should send one delta broadcast");
 		ACell merged = server2.getLocalValue();
@@ -250,7 +279,7 @@ public class LatticePropagatorTest {
 
 		propagator1.setMaxDeltaMessageSize(700);
 		Index<Hash,ACell> expectedValues=values;
-		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
+		CompletableFuture<ACell> received=propagator2.whenAnnounced(
 			value -> expectedValues.equals(RT.getIn(value,dataKeyword)));
 		server1.getCursor().assoc(dataKeyword,values);
 		server1.getHost().sync();
@@ -264,7 +293,7 @@ public class LatticePropagatorTest {
 
 	/** A delta encoding failure must not hide the newly announced root from recovery. */
 	@Test
-	public void testFailedDeltaStillAdvancesRootSyncAndAnnounceFuture() throws Exception {
+	public void testFailedDeltaStillAdvancesRootAnnouncementAndAnnounceFuture() throws Exception {
 		Blob value=Blobs.createRandom(400);
 		server1.getCursor().assoc(Keyword.intern("failed-delta"),value);
 		ACell expected=server1.getLocalValue();
@@ -283,7 +312,7 @@ public class LatticePropagatorTest {
 
 			assertEquals(published,announced.get(5,TimeUnit.SECONDS));
 			assertEquals(published.getHash(),
-				rootSyncValueHash(isolated.createRootSyncMessage()));
+				rootAnnouncementValueHash(isolated.createRootAnnouncement()));
 		}
 	}
 
@@ -295,11 +324,8 @@ public class LatticePropagatorTest {
 		ACell second = CVMLong.create(4302);
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
-		CompletableFuture<ACell> firstMerge=propagator2.nextAnnounce();
-		CompletableFuture<ACell> secondMerge=firstMerge.thenCompose(
-			value -> second.equals(RT.getIn(value,dataKeyword,second.getHash()))
-				? CompletableFuture.completedFuture(value)
-				: propagator2.nextAnnounce());
+		Predicate<ACell> holdsSecond=value -> second.equals(RT.getIn(value,dataKeyword,second.getHash()));
+		CompletableFuture<ACell> secondMerge=propagator2.whenAnnounced(holdsSecond);
 
 		server1.getCursor().assoc(dataKeyword, values.assoc(first.getHash(), first));
 		server1.getHost().sync();
@@ -308,6 +334,8 @@ public class LatticePropagatorTest {
 		server1.getHost().sync();
 
 		secondMerge.get(5,TimeUnit.SECONDS);
+		// The receiver can merge before the sender counts its broadcast, so wait for the sender too
+		propagator1.whenAnnounced(holdsSecond).get(5,TimeUnit.SECONDS);
 		assertTrue(propagator1.getBroadcastCount()>=1,
 			"the coalesced latest value must be broadcast");
 		assertEquals(second, RT.getIn(server2.getLocalValue(), dataKeyword, second.getHash()));
@@ -315,7 +343,7 @@ public class LatticePropagatorTest {
 
 	/** A queued value must not be advertised until announce has populated the store. */
 	@Test
-	public void testRootSyncUsesLastAnnouncedValue() throws Exception {
+	public void testRootAnnouncementUsesLastAnnouncedValue() throws Exception {
 		Blob announced = Blobs.createRandom(400);
 		Blob pending = Blobs.createRandom(400);
 		try (BlockingAnnounceStore store = new BlockingAnnounceStore(pending.getHash())) {
@@ -327,13 +355,13 @@ public class LatticePropagatorTest {
 				propagator.triggerBroadcast(pending);
 				assertTrue(store.blocked.await(5, TimeUnit.SECONDS));
 
-				assertEquals(announced.getHash(), rootSyncValueHash(propagator.createRootSyncMessage()),
-					"root sync must retain the last store-backed value while announce is incomplete");
+				assertEquals(announced.getHash(), rootAnnouncementValueHash(propagator.createRootAnnouncement()),
+					"root announcement must retain the last store-backed value while announce is incomplete");
 				assertNotNull(store.refForHash(announced.getHash()));
 
 				store.release.countDown();
 				assertEquals(pending, nextAnnounce.get(5, TimeUnit.SECONDS));
-				assertEquals(pending.getHash(), rootSyncValueHash(propagator.createRootSyncMessage()));
+				assertEquals(pending.getHash(), rootAnnouncementValueHash(propagator.createRootAnnouncement()));
 				assertNotNull(store.refForHash(pending.getHash()));
 			} finally {
 				store.release.countDown();
@@ -342,44 +370,127 @@ public class LatticePropagatorTest {
 		}
 	}
 
-	private static Hash rootSyncValueHash(Message message) {
+	/** Each group announces its root at the interval its own configuration sets. */
+	@Test
+	public void testRootAnnouncementIntervalIsPerGroup() throws Exception {
+		Blob value=Blobs.createRandom(400);
+		CountDownLatch announcements=new CountDownLatch(2);
+		CompletableFuture<Message> first=new CompletableFuture<>();
+		try (MemoryStore store=new MemoryStore()) {
+			LatticeConnectionManager manager=new LatticeConnectionManager(store) {
+				@Override public boolean hasPropagationRoutes() { return true; }
+				@Override public int broadcast(Message message) {
+					first.complete(message);
+					announcements.countDown();
+					return 1;
+				}
+			};
+			LatticePropagatorConfig config=LatticePropagatorConfig.create(Maps.of(
+				LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.ONE));
+			LatticePropagator propagator=new LatticePropagator(store,manager,config);
+			assertEquals(1,propagator.getRootAnnouncementInterval());
+			try {
+				propagator.processSnapshot(value);
+				propagator.start();
+				// The first goes out at once; the default interval would hold the second for 30 seconds
+				assertTrue(announcements.await(10,TimeUnit.SECONDS));
+				assertEquals(value.getHash(),rootAnnouncementValueHash(first.get()));
+			} finally {
+				propagator.close();
+			}
+		}
+	}
+
+	/** A zero interval turns periodic announcements off; publications still go out as deltas. */
+	@Test
+	public void testZeroIntervalNeverAnnounces() throws Exception {
+		assertEquals(0,announcementsWhilePublishingTwice(CVMLong.ZERO,false));
+		// With the default interval, the check after the first publication announces at once
+		assertTrue(announcementsWhilePublishingTwice(null,false)>0);
+	}
+
+	/** An announcement on demand restarts the interval, so the timer does not repeat it at once. */
+	@Test
+	public void testAnnouncingOnDemandRestartsTheInterval() throws Exception {
+		CVMLong hour=CVMLong.create(3_600_000);
+		assertTrue(announcementsWhilePublishingTwice(hour,false)>0,
+			"The timer announces after the first publication");
+		assertEquals(1,announcementsWhilePublishingTwice(hour,true),
+			"The timer does not repeat the announcement made on demand");
+	}
+
+	/** Announcing on demand sends the root last announced into the store, with or without the timer. */
+	@Test
+	public void testAnnounceRootOnDemand() throws Exception {
+		Blob value=Blobs.createRandom(400);
+		AtomicReference<Message> sent=new AtomicReference<>();
+		AtomicBoolean routes=new AtomicBoolean(true);
+		try (MemoryStore store=new MemoryStore()) {
+			LatticeConnectionManager manager=new LatticeConnectionManager(store) {
+				@Override public boolean hasPropagationRoutes() { return routes.get(); }
+				@Override public int broadcast(Message message) {
+					sent.set(message);
+					return 2;
+				}
+			};
+			LatticePropagator propagator=new LatticePropagator(store,manager,LatticePropagatorConfig.create(
+				Maps.of(LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,CVMLong.ZERO)));
+			try {
+				assertEquals(0,propagator.announceRoot(),"Nothing is announced into the store yet");
+				propagator.processSnapshot(value);
+				assertEquals(2,propagator.announceRoot());
+				assertEquals(value.getHash(),rootAnnouncementValueHash(sent.get()));
+				assertEquals(1,propagator.getRootAnnouncementCount());
+				routes.set(false);
+				assertEquals(0,propagator.announceRoot(),"No routes to announce to");
+				assertEquals(1,propagator.getRootAnnouncementCount());
+			} finally {
+				propagator.close();
+			}
+		}
+	}
+
+	/**
+	 * Counts the root announcements a group sends while it publishes two values in
+	 * turn, optionally announcing on demand once it has started.
+	 */
+	private static int announcementsWhilePublishingTwice(CVMLong interval,boolean announceFirst) throws Exception {
+		AtomicInteger announcements=new AtomicInteger();
+		try (MemoryStore store=new MemoryStore()) {
+			LatticeConnectionManager manager=new LatticeConnectionManager(store) {
+				@Override public boolean hasPropagationRoutes() { return true; }
+				@Override public int broadcast(Message message) {
+					announcements.incrementAndGet();
+					return 1;
+				}
+			};
+			LatticePropagatorConfig config=LatticePropagatorConfig.create((interval==null) ? null
+				: Maps.of(LatticePropagatorConfig.ROOT_ANNOUNCEMENT_INTERVAL,interval));
+			LatticePropagator propagator=new LatticePropagator(store,manager,config);
+			try {
+				if (announceFirst) propagator.processSnapshot(Blobs.createRandom(400));
+				propagator.start();
+				// The worker waits for a publication before it first considers announcing
+				if (announceFirst) assertEquals(1,propagator.announceRoot());
+				for (int i=0;i<2;i++) {
+					CompletableFuture<ACell> announced=propagator.nextAnnounce();
+					propagator.triggerBroadcast(Blobs.createRandom(400));
+					announced.get(5,TimeUnit.SECONDS);
+				}
+				// The worker considers an announcement after each publication, so it has
+				// done so for the first by the time the second is announced
+				return announcements.get();
+			} finally {
+				propagator.close();
+			}
+		}
+	}
+
+	private static Hash rootAnnouncementValueHash(Message message) {
 		AVector<?> payload = message.getPayload();
 		assertEquals(MessageTag.LATTICE_VALUE,payload.get(0));
-		assertEquals(3L,payload.count(),"root sync should be an optimistic push");
+		assertEquals(3L,payload.count(),"root announcement should be an optimistic push");
 		return payload.getRef(2).getHash();
-	}
-
-	/** Waits on announce signals until the expected value arrives, without polling. */
-	private static CompletableFuture<ACell> nextAnnounceMatching(
-			LatticePropagator propagator,Predicate<ACell> predicate) {
-		CompletableFuture<ACell> result=new CompletableFuture<>();
-		awaitMatching(propagator,predicate,result,16);
-		return result;
-	}
-
-	private static void awaitMatching(LatticePropagator propagator,
-			Predicate<ACell> predicate,CompletableFuture<ACell> result,int remaining) {
-		propagator.nextAnnounce().whenComplete((value,error) -> {
-			if (error!=null) {
-				result.completeExceptionally(error);
-			} else {
-				boolean matches;
-				try {
-					matches=predicate.test(value);
-				} catch (Throwable predicateFailure) {
-					result.completeExceptionally(predicateFailure);
-					return;
-				}
-				if (matches) {
-					result.complete(value);
-				} else if (remaining<=1) {
-					result.completeExceptionally(
-						new AssertionError("Expected announcement did not arrive"));
-				} else {
-					awaitMatching(propagator,predicate,result,remaining-1);
-				}
-			}
-		});
 	}
 
 	/** Filtering belongs to the propagator and runs before its store boundary. */
@@ -538,6 +649,48 @@ public class LatticePropagatorTest {
 	}
 
 	/**
+	 * Closing must not interrupt the publication worker inside a store write: an
+	 * interrupt during Etch channel I/O closes the file channel for every user of
+	 * the store (#776). The worker outlives the drain timeout and is left to finish.
+	 */
+	@Test
+	public void testCloseDoesNotInterruptPublicationStoreWrite() throws Exception {
+		try (BlockingWriteStore store = new BlockingWriteStore("Lattice propagator thread")) {
+			LatticePropagator propagator = new LatticePropagator(store, LatticePropagatorConfig.create(
+				Maps.of(LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.create(100))));
+			propagator.start();
+			try {
+				propagator.triggerBroadcast(CVMLong.create(776));
+				assertTrue(store.entered.await(5, TimeUnit.SECONDS),
+					"the publication worker should enter the controlled store write");
+				propagator.close();
+				assertEquals(LatticePropagator.State.STOPPED, propagator.getStatus().state());
+			} finally {
+				store.release();
+			}
+			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
+			assertFalse(store.wasInterrupted(), "close must never interrupt store I/O");
+		}
+	}
+
+	/** Close wakes an idle publication worker without interrupting it (#776). */
+	@Test
+	public void testCloseEndsIdlePublicationWorker() throws Exception {
+		try (BlockingWriteStore store = new BlockingWriteStore("Lattice propagator thread")) {
+			store.release();
+			LatticePropagator propagator = new LatticePropagator(store);
+			propagator.start();
+			propagator.triggerBroadcast(CVMLong.create(776));
+			assertTrue(store.finished.await(5, TimeUnit.SECONDS));
+			Thread worker = store.heldThread();
+
+			propagator.close();
+			assertFalse(worker.isAlive(), "close must end an idle worker within the drain timeout");
+			assertFalse(store.wasInterrupted());
+		}
+	}
+
+	/**
 	 * As above, but with a persistent store: the final value is announced into the
 	 * serving store before triggerAndClose returns, while the store root stays with
 	 * the node.
@@ -568,7 +721,7 @@ public class LatticePropagatorTest {
 			Hash valueHash = Hash.get(testValue);
 
 			@SuppressWarnings("unchecked")
-			Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server1.getCursor().get(dataKeyword);
+			Index<Hash, ACell> dataIndex = (Index<Hash, ACell>) server1.getCursor().getOrDefault(null,dataKeyword);
 			if (dataIndex == null) {
 				@SuppressWarnings("unchecked")
 				Index<Hash, ACell> emptyIndex = (Index<Hash, ACell>) Index.EMPTY;
@@ -576,7 +729,7 @@ public class LatticePropagatorTest {
 			}
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 			server1.getCursor().assoc(dataKeyword, updatedDataIndex);
-			CompletableFuture<ACell> published=nextAnnounceMatching(propagator1,
+			CompletableFuture<ACell> published=propagator1.whenAnnounced(
 				value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
 			// Synchronous commit persists the authoritative node root; wait for the
 			// source group to expose that exact root before pulling it.

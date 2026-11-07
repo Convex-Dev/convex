@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -168,6 +169,25 @@ public class PeerStatusTest {
 
 		assertNotSame(ps1, ps2);
 		assertEquals(ps1, ps2);
+	}
+
+	@Test public void testEqualityCachesNothing() {
+		PeerStatus ps1 = PeerStatus.create(CONTROLLER, 5000);
+		ps1 = ps1.withDelegatedStake(DELEGATOR1, 3000);
+		PeerStatus ps2 = PeerStatus.create(CONTROLLER, 5000);
+		ps2 = ps2.withDelegatedStake(DELEGATOR1, 3000);
+		PeerStatus ps3 = PeerStatus.create(CONTROLLER, 5001);
+		ps3 = ps3.withDelegatedStake(DELEGATOR1, 3000);
+
+		// Fields compare through their refs: neither record is encoded or hashed
+		assertTrue(ps1.equals(ps2));
+		assertTrue(ps2.equals(ps1));
+		assertFalse(ps1.equals(ps3));
+		assertFalse(ps3.equals(ps1));
+		for (PeerStatus ps : new PeerStatus[] { ps1, ps2, ps3 }) {
+			assertNull(ps.cachedEncoding());
+			assertNull(Cells.cachedHash(ps));
+		}
 	}
 
 	@Test public void testEqualityAfterDecode() throws BadFormatException {

@@ -14,6 +14,7 @@ import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.api.ConvexRemote;
 import convex.core.Coin;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Migrations;
@@ -24,7 +25,12 @@ import convex.core.init.Init;
 import convex.core.util.Utils;
 
 /**
- * Singleton server cluster instance
+ * Singleton server cluster instance, shared by test classes running concurrently.
+ *
+ * <p>Each test transacts from an account of its own, from {@link #getClient()},
+ * {@link #getLocalClient()} or {@link #createAccount(AccountKey, long)}. The genesis
+ * account HERO funds them: its transactions are made only here, one after another under
+ * this network's monitor, so they are always in sequence.</p>
  */
 public class TestNetwork {
 
@@ -34,6 +40,7 @@ public class TestNetwork {
 
 	private List<Server> SERVERS = null;
 
+	/** Shared client for HERO, for queries and requests only: tests never transact with it. */
 	public ConvexLocal CONVEX;
 
 	// Deterministic keypairs
@@ -87,7 +94,7 @@ public class TestNetwork {
 	 * Gets a fresh client account on the test network with 1 Gold
 	 * @return Convex Client instance
 	 */
-	public synchronized ConvexRemote getClient() {
+	public ConvexRemote getClient() {
 		return getClient(AKeyPair.generate());
 	}
 	
@@ -96,13 +103,10 @@ public class TestNetwork {
 	 * @param kp Key pair to use for client
 	 * @return Convex Client instance
 	 */
-	public synchronized ConvexRemote getClient(AKeyPair kp) {
+	public ConvexRemote getClient(AKeyPair kp) {
 		try {
-			TestNetwork network=this;
-			Address addr=network.CONVEX.createAccountSync(kp.getAccountKey());
-			network.CONVEX.transferSync(addr, Coin.GOLD);
-			ConvexRemote client=Convex.connect(network.SERVER.getHostAddress(),addr,kp);
-			return client;
+			Address addr=createAccount(kp.getAccountKey(),Coin.GOLD);
+			return Convex.connect(SERVER.getHostAddress(),addr,kp);
 		} catch (IOException | ResultException | TimeoutException t) {
 			throw Utils.sneakyThrow(t);
 		} catch (InterruptedException e) {
@@ -115,7 +119,7 @@ public class TestNetwork {
 	 * Gets a fresh local client account on the test network with 1 Gold
 	 * @return ConvexLocal Client instance
 	 */
-	public synchronized ConvexLocal getLocalClient() {
+	public ConvexLocal getLocalClient() {
 		return getLocalClient(AKeyPair.generate());
 	}
 	
@@ -124,19 +128,31 @@ public class TestNetwork {
 	 * @param kp Key pair to use for client
 	 * @return ConvexLocal Client instance
 	 */
-	public synchronized ConvexLocal getLocalClient(AKeyPair kp) {
+	public ConvexLocal getLocalClient(AKeyPair kp) {
 		try {
-			TestNetwork network=this;
-			Address addr=network.CONVEX.createAccountSync(kp.getAccountKey());
-			network.CONVEX.transferSync(addr, Coin.GOLD);
-			ConvexLocal client=Convex.connect(network.SERVER, addr, kp);
-			return client;
+			Address addr=createAccount(kp.getAccountKey(),Coin.GOLD);
+			return Convex.connect(SERVER,addr,kp);
 		} catch (ResultException t) {
 			throw Utils.sneakyThrow(t);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			return null;
 		}
+	}
+
+	/**
+	 * Creates an account for a key, funded by HERO. Every HERO transaction is made
+	 * here, one after another, so none of them races another for a sequence number.
+	 * @param key Key of the new account
+	 * @param amount Coins to transfer to it
+	 * @return Address of the new account
+	 * @throws ResultException if creating or funding the account fails
+	 */
+	public synchronized Address createAccount(AccountKey key,long amount) throws ResultException, InterruptedException {
+		Address addr=CONVEX.createAccountSync(key);
+		Result funded=CONVEX.transferSync(addr,amount);
+		if (funded.isError()) throw new ResultException(funded);
+		return addr;
 	}
 
 	public static synchronized TestNetwork getInstance() {

@@ -50,7 +50,7 @@ class ApplicationPublicationTest {
 	/** Routes complete envelopes at {@code :notebook} and publishes only that component. */
 	static final class NotebookApp extends SingleRegion<Notebook> {
 		NotebookApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair owner) {
-			super(host,NOTEBOOK,new Notebook(host.cursor().path(NOTEBOOK),owner));
+			super(host.cursor(),NOTEBOOK,new Notebook(host.cursor().path(NOTEBOOK),owner));
 		}
 
 		Notebook notebook() { return component(); }

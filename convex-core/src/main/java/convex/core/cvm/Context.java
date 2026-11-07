@@ -2098,15 +2098,17 @@ public class Context {
 
 
 	/**
-	 * Creates a new peer with the specified stake.
-	 * The accountKey must not be in the list of peers.
-	 * The accountKey must be assigned to the current transaction address
-	 * Stake must be greater than 0.
-	 * Stake must be less than to the account balance.
+	 * Creates a new peer record for the given peer key, controlled by the current
+	 * address and staked from its balance. Any 32-byte key is accepted: the caller
+	 * need not hold its private key, and cannot impersonate the peer, since Block
+	 * signatures need that key (see convex-core/docs/CONSENSUS.md).
 	 *
-	 * @param accountKey Peer Account key to create the PeerStatus
-	 * @param initialStake Initial stake amount
-	 * @return Context with final take set
+	 * Fails if a peer record already exists for the key, if the stake is zero or not
+	 * a valid amount, or if the stake exceeds the caller's balance.
+	 *
+	 * @param accountKey Peer key for the new peer record
+	 * @param initialStake Initial peer stake, in copper
+	 * @return Updated Context, or an error Context
 	 */
 	public Context createPeer(AccountKey accountKey, long initialStake) {
 		State s=getState();

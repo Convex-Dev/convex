@@ -75,7 +75,7 @@ class SignedDomainComponentTest {
 		Function<AInteger,SignedData<AInteger>> signer=ALICE::signData;
 		var first=new Count(root.path(owner),OWNERS.signingFor(owner),signer);
 		var second=new Count(root.path(owner),OWNERS.signingFor(owner),signer);
-		assertNull(first.cursor().get());
+		assertFalse(first.cursor().exists());
 		assertNull(first.sync());
 		assertSame(initial,root.get());
 		first.set(10);

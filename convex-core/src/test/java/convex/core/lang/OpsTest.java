@@ -1,5 +1,6 @@
 package convex.core.lang;
 
+import static convex.test.Assertions.assertEqualityCachesNothing;
 import static convex.test.Assertions.assertJuiceError;
 import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,6 +68,29 @@ public class OpsTest extends ACVMTest {
 	}
 
 	private final long INITIAL_JUICE = context().getJuiceAvailable();
+
+	@Test public void testEqualityCachesNothing() {
+		// Coded ops
+		AOp<?> c1=Constant.create(CVMLong.create(123456789));
+		AOp<?> c2=Constant.create(CVMLong.create(123456789));
+		AOp<?> c3=Constant.create(CVMLong.create(123456788));
+		assertEqualityCachesNothing(c1,c2,c3);
+
+		// Multi ops
+		AOp<?> d1=Do.create(c1,Local.create(0));
+		AOp<?> d2=Do.create(c2,Local.create(0));
+		AOp<?> d3=Do.create(c3,Local.create(0));
+		assertEqualityCachesNothing(d1,d2,d3);
+		assertFalse(d1.equals(Cond.create(c1,Local.create(0)))); // same ops, different tag
+		assertFalse(c1.equals(d1));
+
+		// Closures, and the Lambda ops that hold them
+		Fn<?> f1=Fn.create(Vectors.of(Symbols.FOO), Local.create(0));
+		Fn<?> f2=Fn.create(Vectors.of(Symbols.FOO), Local.create(0));
+		Fn<?> f3=Fn.create(Vectors.of(Symbols.BAR), Local.create(0));
+		assertEqualityCachesNothing(f1,f2,f3);
+		assertEqualityCachesNothing(Lambda.create(f1),Lambda.create(f2),Lambda.create(f3));
+	}
 
 	@Test
 	public void testConstant() {

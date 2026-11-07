@@ -21,8 +21,9 @@ public class DenseRecord extends ACAD3Record {
 	public static DenseRecord create(int tag,AVector<?> data) {
 		if (data==null) return null;
 		if (Tag.category(tag)!=Tag.DENSE_RECORD_BASE) return null; // not an extension value
-		
-		return new DenseRecord((byte)tag,(AVector<ACell>) data);
+
+		// The record is canonical, so it holds the canonical vector of its values
+		return new DenseRecord((byte)tag,(AVector<ACell>) data.toVector());
 	}
 		
 	@Override
@@ -52,12 +53,20 @@ public class DenseRecord extends ACAD3Record {
 	}
 
 	@Override
-	public ACell updateRefs(IRefFunction func) {
+	public boolean equals(ACell a) {
+		if (a==this) return true;
+		if (a instanceof DenseRecord dr) {
+			if (tag!=dr.tag) return false;
+			return data.equals(dr.data); // same tag: equal exactly when the data vectors are
+		}
+		return super.equals(a); // another cell with a dense record tag
+	}
+
+	@Override
+	protected ACell rebuildRefs(IRefFunction func) {
 		AVector<ACell> newData=data.updateRefs(func);
 		if (newData==data) return this;
-		DenseRecord dr= new DenseRecord(tag,newData);
-		dr.attachEncoding(getEncoding());
-		return dr;
+		return new DenseRecord(tag,newData);
 	}
 
 	@Override

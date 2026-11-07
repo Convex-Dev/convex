@@ -58,6 +58,8 @@ import convex.core.util.Utils;
  */
 public final class Result extends ARecordGeneric {
 
+	private static final System.Logger log=System.getLogger(Result.class.getName());
+
 	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR,Keywords.LOG,Keywords.INFO);
 	private static final long FIELD_COUNT=RESULT_FORMAT.count();
 
@@ -369,7 +371,13 @@ public final class Result extends ARecordGeneric {
 	}
 
 	/**
-	 * Constructs a result from a caught exception 
+	 * Constructs a result from a caught exception. An {@link InterruptedException},
+	 * directly or as the cause of an {@link ExecutionException} or
+	 * {@link CompletionException}, gives an {@code :INTERRUPTED} error without changing
+	 * the calling thread's interrupt status: the interrupt may come from another thread.
+	 * Code that catches an {@link InterruptedException} on its own thread uses
+	 * {@link #fromInterrupt(InterruptedException)} instead, which restores the status.
+	 *
 	 * @param e Exception caught
 	 * @return Result instance representing the exception (will be an error)
 	 */
@@ -404,8 +412,13 @@ public final class Result extends ARecordGeneric {
 			return fromException(e.getCause());
 		}
 		if (e instanceof InterruptedException) {
-			// This is special, we need to ensure the interrupt status is set
-			return interruptThread();
+			// Either a caller that caught this on its own thread did not restore the
+			// status, or a worker on another thread was interrupted. Neither is expected.
+			if (!Thread.currentThread().isInterrupted()) {
+				log.log(System.Logger.Level.ERROR,"InterruptedException reached Result.fromException on a thread that is not interrupted: "
+						+"restore the status where it was caught (Result.fromInterrupt), or it came from another thread",e);
+			}
+			return INTERRUPTED_RESULT;
 		}
 		Result err= Result.error(ErrorCodes.EXCEPTION,Strings.create(Utils.getClassName(e)+" : "+e.getMessage()));
 		err=err.withInfo(Keywords.TRACE, Strings.join(e.getStackTrace(),"\n")); 
@@ -419,15 +432,22 @@ public final class Result extends ARecordGeneric {
 	public static final Result CLOSED_CONNECTION = Result.error(ErrorCodes.CONNECT,Strings.create("Connection Closed")).withSource(SourceCodes.COMM);
 	public static final Result SENT_MESSAGE = Result.value(Strings.intern("Sent"));
 	public static final Result FULL_CLIENT_BUFFER = Result.error(ErrorCodes.LOAD, Strings.FULL_BUFFER).withSource(SourceCodes.COMM);
+	/** A peer shedding a request it had no capacity for, after waiting or by policy. */
+	public static final Result SERVER_LOADED = Result.error(ErrorCodes.LOAD, Strings.SERVER_LOADED).withSource(SourceCodes.PEER);
 	public static final Result BAD_FORMAT = Result.error(ErrorCodes.FORMAT, "Bad format");
 
 
 	
 	/**
-	 * Returns a Result representing a thread interrupt, AND sets the interrupt status on the current thread
+	 * Constructs the result for an {@link InterruptedException} caught on the calling
+	 * thread, and restores that thread's interrupt status, which throwing the exception
+	 * cleared. For an exception that may come from another thread, such as the failure
+	 * of a future, use {@link #fromException(Throwable)}.
+	 *
+	 * @param e Interrupt caught on the calling thread
 	 * @return Result instance representing an interruption
 	 */
-	private static Result interruptThread() {
+	public static Result fromInterrupt(InterruptedException e) {
 		Thread.currentThread().interrupt();
 		return INTERRUPTED_RESULT;
 	}

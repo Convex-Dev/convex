@@ -87,7 +87,6 @@ public class PeerConfigTest {
 		assertEquals(EtchConstants.VERSION_3,etch.getVersion());
 		assertEquals(EtchConfig.CipherMode.NONE,etch.getCipherMode());
 		assertEquals(25000,etch.getRefCacheSize());
-		assertFalse(etch.isL2Enabled());
 		assertEquals(etch,config.toLegacy().get(Keywords.ETCH_CONFIG));
 	}
 

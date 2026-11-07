@@ -115,7 +115,7 @@ public abstract class AExtensionValue extends ABlobLike<CVMLong> {
 	@Override
 	public boolean equals(ACell a) {
 		if (a instanceof AExtensionValue ev) return equals(ev);
-		return Cells.equalsGeneric(this, a);
+		return Cells.equalsEncoding(this, a);
 	}
 	
 	protected boolean equals(AExtensionValue a) {
@@ -134,11 +134,6 @@ public abstract class AExtensionValue extends ABlobLike<CVMLong> {
 		throw new IndexOutOfBoundsException(i);
 	}
 
-	@Override
-	public ACell updateRefs(IRefFunction func) {
-		return this;
-	}
-	
 	@Override
 	public final int getRefCount() {
 		// No Refs

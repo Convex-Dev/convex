@@ -2,6 +2,7 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,9 +10,12 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Cursors;
@@ -24,7 +28,8 @@ import convex.lattice.generic.MapLattice;
 
 /**
  * Tests for {@link LatticeOps#assocIn}: the write engine creates an absent base from
- * the {@link ALattice} it is given and never invents a container below it. Typed intermediates come from the component that
+ * the {@link ALattice} it is given, never invents a container below it and never
+ * replaces one that cannot hold its key. Typed intermediates come from the component that
  * owns each level, which declares them with {@code LatticeComponent.resolve}.
  */
 public class LatticeOpsTest {
@@ -151,6 +156,36 @@ public class LatticeOpsTest {
 		// Zero-length path just returns the value
 		ACell result = LatticeOps.assocIn(CVMLong.create(1), CVMLong.create(2), null);
 		assertEquals(CVMLong.create(2), result);
+	}
+
+	/** A container refuses a key it cannot hold; nothing is written in its place. */
+	@Test
+	public void testContainerThatCannotHoldItsKeyRefusesTheWrite() {
+		AString list = Strings.create("list");
+		ACell data = Maps.of(list, Vectors.of(1, 2));
+
+		assertEquals(Maps.of(list, Vectors.of(1, 9)),
+			LatticeOps.assocExisting(data, CVMLong.create(9), list, CVMLong.ONE));
+		PathWriteException named = assertThrows(PathWriteException.class,
+			() -> LatticeOps.assocExisting(data, CVMLong.ONE, list, Strings.create("x")));
+		assertEquals(1, named.getIndex());
+		assertEquals(Strings.create("x"), named.getKey());
+		assertEquals(1, assertThrows(PathWriteException.class,
+			() -> LatticeOps.assocExisting(data, CVMLong.ONE, list, CVMLong.create(2))).getIndex());
+		assertEquals(0, assertThrows(PathWriteException.class,
+			() -> LatticeOps.assocExisting(Index.none(), CVMLong.ONE, CVMLong.ONE)).getIndex());
+	}
+
+	/** A path cursor whose container cannot hold its key leaves the value as it was. */
+	@Test
+	public void testPathCursorKeepsAContainerThatRefusesItsKey() {
+		AString list = Strings.create("list");
+		ACell original = Maps.of(list, Vectors.of(1, 2));
+		Root<ACell> root = Cursors.root(original);
+
+		assertThrows(PathWriteException.class,
+			() -> root.path(list, Strings.create("x")).set(CVMLong.ONE));
+		assertSame(original, root.get());
 	}
 
 	@SuppressWarnings("unchecked")

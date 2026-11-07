@@ -1,6 +1,8 @@
 package convex.core.message;
 
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 /**
@@ -22,7 +24,7 @@ import java.util.function.Predicate;
  * shared network socket.</p>
  *
  * <p>Each end has an {@code acceptsMessages} flag set at creation time.
- * When false, the paired end's {@link #sendMessage} returns false, but
+ * When false, the paired end's {@link #sendMessage} is unsupported, but
  * {@link #returnMessage} still works. This structurally prevents
  * server-initiated protocol exchange (e.g. CHALLENGE) on return-only
  * connections while preserving result delivery.</p>
@@ -116,22 +118,34 @@ public class LocalConnection extends AConnection {
 	/**
 	 * Sends a message to the paired end's handler. The message is delivered
 	 * with the paired end's connection stamped on it, so the receiver can
-	 * return results back through the pair.
+	 * return results back through the pair. Returns the handler's answer.
 	 *
-	 * <p>Returns false if the paired end does not accept general messages
-	 * ({@code acceptsMessages = false}), has no handler, or no paired end
-	 * exists.</p>
+	 * @throws ClosedChannelException if either end is closed
+	 * @throws UnsupportedOperationException if the paired end does not accept
+	 *         general messages ({@code acceptsMessages = false}) or has no handler
 	 */
 	@Override
-	public boolean sendMessage(Message msg) {
+	public boolean sendMessage(Message msg) throws ClosedChannelException {
+		LocalConnection p = paired;
+		if (closed || p == null || p.closed) throw new ClosedChannelException();
+		if (p.handler == null || !p.acceptsMessages) {
+			throw new UnsupportedOperationException("Paired end accepts results only");
+		}
+		return p.handler.test(msg.withConnection(p));
+	}
+
+	/** As {@link #sendMessage(Message)}, returning false where that would throw. */
+	@Override
+	public boolean trySendMessage(Message msg) {
 		LocalConnection p = paired;
 		if (closed || p == null || p.closed || p.handler == null || !p.acceptsMessages) return false;
 		return p.handler.test(msg.withConnection(p));
 	}
 
+	/** Messages are handed to the paired end as they are sent, so none is ever pending. */
 	@Override
-	public boolean trySendMessage(Message msg) {
-		return sendMessage(msg);
+	public CompletableFuture<Void> flushOutbound() {
+		return CompletableFuture.completedFuture(null);
 	}
 
 	/**

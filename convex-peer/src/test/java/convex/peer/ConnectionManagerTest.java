@@ -9,7 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
@@ -329,8 +333,13 @@ public class ConnectionManagerTest {
 		}
 	}
 
+	/**
+	 * Polling is how Beliefs keep arriving from the peers we chose, so pushes from any
+	 * connection filling their queue must not stop it. Only a full queue of polled
+	 * Beliefs does.
+	 */
 	@Test
-	public void testStatusPollDoesNotAcquireIntoSaturatedInput() throws Exception {
+	public void testStatusPollAcquiresUntilPolledInputSaturated() throws Exception {
 		Server server=createPollingServer(AKeyPair.createSeeded(209));
 		try {
 			ConnectionManager manager=server.getConnectionManager();
@@ -349,8 +358,11 @@ public class ConnectionManagerTest {
 				assertTrue(propagator.queuePropagation(filler));
 			}
 			manager.pollBelief(remote.getAccountKey(),connection);
+			assertEquals(1,connection.acquireCount,"a full push queue does not stop polling");
 
-			assertEquals(0,connection.acquireCount);
+			while (propagator.queueBelief(Belief.initial())) {}
+			manager.pollBelief(remote.getAccountKey(),connection);
+			assertEquals(1,connection.acquireCount,"no acquisition while polled Beliefs cannot be queued");
 		} finally {
 			server.close();
 		}
@@ -438,6 +450,26 @@ public class ConnectionManagerTest {
 		}
 	}
 
+	@Test
+	public void testInterruptedConnectKeepsInterruptStatus() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(214));
+		// Accepts TCP but never answers the TLS handshake, so the connect cannot finish
+		try (ServerSocket silent=new ServerSocket(0,50,InetAddress.getLoopbackAddress())) {
+			ConnectionManager manager=new ConnectionManager(server);
+			URI endpoint=new URI("tls",null,"127.0.0.1",silent.getLocalPort(),null,null,null);
+
+			Thread.currentThread().interrupt();
+			CompletableFuture<Convex> result=manager.connectToPeer(endpoint,AKeyPair.createSeeded(215).getAccountKey());
+
+			assertTrue(Thread.interrupted(),"the caller must keep its interrupt status");
+			assertTrue(result.isCompletedExceptionally());
+			assertTrue(result.exceptionNow() instanceof InterruptedException);
+		} finally {
+			Thread.interrupted();
+			server.close();
+		}
+	}
+
 	private static Server createPollingServer(AKeyPair keyPair) throws Exception {
 		State genesis=Init.createState(List.of(keyPair.getAccountKey()));
 		Peer peer=Peer.createGenesisPeer(keyPair,genesis);
@@ -505,6 +537,36 @@ public class ConnectionManagerTest {
 		assertFalse(manager.addConnection(AKeyPair.createSeeded(217).getAccountKey(),late));
 		assertEquals(1,late.closeCount);
 		server.close();
+	}
+
+	@Test
+	@Timeout(60)
+	public void testCloseReleasesLockBeforeClosingConnections() throws Exception {
+		Server server=createPollingServer(AKeyPair.createSeeded(221));
+		try {
+			ConnectionManager manager=server.getConnectionManager();
+			// Closing a network connection waits for its event loop, which may be running
+			// a callback that needs the manager's lock: model that with another thread
+			SequencedConvex connection=new SequencedConvex(-1) {
+				@Override public void close() {
+					Thread callback=Thread.ofVirtual().start(() -> { synchronized (manager) {} });
+					try {
+						callback.join();
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+						throw new IllegalStateException(e);
+					}
+					super.close();
+				}
+			};
+			assertTrue(manager.addConnection(AKeyPair.createSeeded(222).getAccountKey(),connection));
+
+			manager.close();
+
+			assertEquals(1,connection.closeCount);
+		} finally {
+			server.close();
+		}
 	}
 
 	@Test

@@ -5,7 +5,6 @@ import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
-import convex.core.data.Blobs;
 import convex.core.data.Index;
 import convex.core.data.SignedData;
 import convex.lattice.ALattice;
@@ -66,12 +65,5 @@ public final class MailboxLattice extends AUnionLattice<ABlob,SignedData<ACell>,
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
 		return (ALattice<T>)entry(childKey);
-	}
-
-	/** Resolves an entry key given as a blob or as its hex string. */
-	@Override
-	public ACell resolveKey(ACell key) {
-		if (key instanceof AString s) key=Blobs.fromHex(s);
-		return MailEntryLattice.isKey(key)?key:null;
 	}
 }

@@ -37,6 +37,38 @@ public class CAD3Test extends ACVMTest {
 		ObjectsTest.doAnyValueTests(ev);
 	}
 	
+	@Test public void testCodedValueEqualityCachesNothing() {
+		CodedValue c1=CodedValue.create(0xC5, CVMLong.create(123456789), Vectors.of(1,2,3));
+		CodedValue c2=CodedValue.create(0xC5, CVMLong.create(123456789), Vectors.of(1,2,3));
+		CodedValue c3=CodedValue.create(0xC5, CVMLong.create(123456789), Vectors.of(1,2,4));
+		CodedValue c4=CodedValue.create(0xC6, CVMLong.create(123456789), Vectors.of(1,2,3));
+		assertEqualityCachesNothing(c1,c2,c3);
+		assertFalse(c1.equals(c4)); // same children, different tag
+		assertFalse(c4.equals(c1));
+	}
+
+	@Test public void testDenseRecordEqualityCachesNothing() {
+		DenseRecord d1=DenseRecord.create(0xDF, Vectors.of(CVMLong.create(123456789), Vectors.of(1,2,3)));
+		DenseRecord d2=DenseRecord.create(0xDF, Vectors.of(CVMLong.create(123456789), Vectors.of(1,2,3)));
+		DenseRecord d3=DenseRecord.create(0xDF, Vectors.of(CVMLong.create(123456789), Vectors.of(1,2,4)));
+		DenseRecord d4=DenseRecord.create(0xDE, Vectors.of(CVMLong.create(123456789), Vectors.of(1,2,3)));
+		assertEqualityCachesNothing(d1,d2,d3);
+		assertFalse(d1.equals(d4)); // same data, different tag
+		assertFalse(d4.equals(d1));
+	}
+
+	@Test public void testDenseRecordOverNonCanonicalVector() {
+		AString a=Strings.create("a");
+		AVector<?>[] sources={Path.of(),Path.of(a,a).slice(1),VectorArray.of(),VectorArray.of(1,2),MapEntry.of(1L,2L)};
+		for (AVector<?> source:sources) {
+			DenseRecord d=DenseRecord.create(0xDA,source);
+			assertTrue(d.values().isCanonical());
+			assertEquals(source,d.values());
+			assertSame(d,d.updateRefs(r->r));
+			ObjectsTest.doAnyValueTests(d);
+		}
+	}
+
 	@Test public void testExtensionCoreDefs() {
 		assertSame(Core.VECTOR,Reader.read("#["+Utils.toHexString(CVMTag.CORE_DEF)+"01]"));
 	}
@@ -82,7 +114,8 @@ public class CAD3Test extends ACVMTest {
 			assertEquals(Blob.fromHex("df03110111021103"),dr.getEncoding());
 	
 			assertEquals(3,dr.count);
-			assertSame(v,dr.values());
+			assertEquals(v,dr.values());
+			assertTrue(dr.values().isCanonical());
 			String ds="#[df03110111021103]";
 			assertEquals(ds,dr.toString());
 			assertEquals(dr,Reader.read(ds));

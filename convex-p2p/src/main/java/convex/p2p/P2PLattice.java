@@ -1,9 +1,12 @@
 package convex.p2p;
 
+import java.util.HashSet;
+
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -11,6 +14,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
@@ -79,10 +83,31 @@ import convex.social.Social;
  *
  * <h2>Relationship to {@code convex.lattice.p2p.P2PLattice}</h2>
  *
- * <p>Core declares the {@code :p2p} region and wires it into {@code Lattice.ROOT}. This
- * class reuses that same {@link convex.lattice.p2p.P2PLattice#LATTICE} instance rather than
- * redeclaring it, so the registry's merge semantics cannot drift between the two roots,
- * and adds the P2P-only {@code :id} and {@code :kad} regions alongside it.
+ * <p>Core declares the {@code :p2p} region's merge rule and wires it into
+ * {@code Lattice.ROOT}. This class reuses that same
+ * {@link convex.lattice.p2p.P2PLattice#LATTICE} instance rather than redeclaring it, and
+ * adds the P2P-only {@code :id} and {@code :kad} regions alongside it. The NodeInfo
+ * record format is defined here, with the application that validates it.
+ *
+ * <h2>NodeInfo</h2>
+ *
+ * <p>A NodeInfo map is an {@code AHashMap<Keyword, ACell>} containing:
+ * <ul>
+ *   <li>{@code :timestamp} — {@code CVMLong} millis from the owner's clock, used for
+ *       LWW ordering of that owner's records</li>
+ *   <li>{@code :transports} — {@code AVector<AString>} of public transport URIs
+ *       (e.g. {@code "tcp://peer.example.com:18888"}). Advertised entries must be
+ *       publicly reachable; an empty vector identifies an outbound-only node with no
+ *       dialable transport.</li>
+ *   <li>{@code :pops} — {@code AVector<AccountKey>} of Point of Presence nodes
+ *       through which this node expects to be reachable</li>
+ *   <li>{@code :relay} — whether this node is willing to relay bounded signed
+ *       point-to-point messages</li>
+ *   <li>{@code :regions} — {@code ASet<Keyword>} of the top-level regions this node is
+ *       interested in (optional, never {@code :local}); see {@code P2P_DESIGN.md} §4.2</li>
+ *   <li>{@code :type} — {@code AString} node software type (e.g. {@code "Convex Lattice Node"})</li>
+ *   <li>{@code :version} — {@code AString} software version</li>
+ * </ul>
  *
  * <h2>Owner binding</h2>
  *
@@ -90,10 +115,6 @@ import convex.social.Social;
  * instances. Both context-free merge and local signing require the signing key
  * to equal the owner key. Their LWW payload merge selects an existing envelope;
  * relaying those records never needs a private key or a signing context.</p>
- *
- * <p>Helpers for building and reading {@code NodeInfo} records live in
- * {@link convex.lattice.p2p.P2PLattice} ({@code createNodeInfo}, {@code createSignedEntry},
- * {@code getNodeInfo}). Identity helpers are below.
  */
 public class P2PLattice {
 
@@ -102,7 +123,7 @@ public class P2PLattice {
 	/** Top-level {@code :p2p} region: the shared node registry. */
 	public static final Keyword KEY_P2P = Keywords.P2P;
 
-	/** The {@code :nodes} sub-region of {@code :p2p}: node records signed by their P2P user. */
+	/** The {@code :nodes} sub-region of {@code :p2p}: node records signed by their node key. */
 	public static final Keyword KEY_NODES = Keywords.NODES;
 
 	/** Top-level {@code :id} region: P2P user identity records. */
@@ -130,8 +151,8 @@ public class P2PLattice {
 	/**
 	 * {@code :p2p} — the shared node registry, reusing core's region instance so it
 	 * merges identically on this root and on {@code Lattice.ROOT}. Contains
-	 * {@code :nodes}, where each P2P user owns a signed, LWW node record keyed by
-	 * their {@link AccountKey}.
+	 * {@code :nodes}, where each node owns a signed, LWW node record keyed by its
+	 * node {@link AccountKey}.
 	 */
 	public static final KeyedLattice P2P_LATTICE = convex.lattice.p2p.P2PLattice.LATTICE;
 
@@ -151,10 +172,10 @@ public class P2PLattice {
 		OwnerMapLattice.create(LWWLattice.INSTANCE,(owner,key) -> key.equals(owner));
 
 	/**
-	 * {@code :kad} — reserved for Kademlia routing state. Declared so the path is
-	 * claimed and stable, but nothing merges here: routing semantics are still open
-	 * (see {@code P2P_DESIGN.md} §4.3 and decision 13.2, which lean towards k-buckets
-	 * being node-local rather than propagated).
+	 * {@code :kad} — reserved for Kademlia routing state. Each node will keep its own
+	 * signed routing view under its node key, shareable with others (see
+	 * {@code P2P_DESIGN.md} §4.3). Declared so the path is claimed and stable, but
+	 * nothing merges here until the view's format and merge are designed.
 	 */
 	public static final ReservedLattice KAD_LATTICE =
 		ReservedLattice.create("Kademlia routing: merge semantics not yet designed");
@@ -192,6 +213,126 @@ public class P2PLattice {
 	 */
 	public static final KeyedLattice NODE_ROOT =
 		ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+
+	// ========== NodeInfo helpers ==========
+
+	/** Maximum Point of Presence declarations accepted in one NodeInfo record. */
+	public static final int MAX_POINTS_OF_PRESENCE = 16;
+
+	/**
+	 * Maximum memory size of another node's signed record that a node keeps. A
+	 * complete record with every Point of Presence is well under it.
+	 */
+	public static final long MAX_NODE_RECORD_SIZE = 4096;
+
+	/**
+	 * Creates a NodeInfo map with an explicit timestamp (#561).
+	 *
+	 * <p>The timestamp is supplied by the caller — the driving (merging or test) process —
+	 * rather than read from the system clock here; a node stamps its published NodeInfo
+	 * from its supplied clock.</p>
+	 *
+	 * @param transports Public transport URIs, or empty for an outbound-only node
+	 * @param type Node software type (e.g. "Convex Lattice Node")
+	 * @param version Software version string
+	 * @param regions Top-level regions the node is interested in (may be null or empty)
+	 * @param timestamp Timestamp in millis
+	 * @return NodeInfo map
+	 */
+	public static AHashMap<Keyword, ACell> createNodeInfo(
+			AVector<AString> transports, AString type, AString version,
+			ASet<Keyword> regions, long timestamp) {
+		return createNodeInfo(transports,type,version,regions,null,false,timestamp);
+	}
+
+	/**
+	 * Creates a NodeInfo map including Point of Presence routing metadata.
+	 *
+	 * @param transports Public transport URIs, or empty for an outbound-only node
+	 * @param type Node software type
+	 * @param version Software version string
+	 * @param pops Node keys for configured Points of Presence (may be null or empty)
+	 * @param relay Whether this node is willing to relay signed point messages
+	 * @param timestamp Timestamp in millis
+	 * @return NodeInfo map
+	 */
+	public static AHashMap<Keyword, ACell> createNodeInfo(
+			AVector<AString> transports, AString type, AString version,
+			AVector<AccountKey> pops, boolean relay, long timestamp) {
+		return createNodeInfo(transports,type,version,null,pops,relay,timestamp);
+	}
+
+	/**
+	 * Creates a complete NodeInfo map including regions of interest and PoP metadata.
+	 *
+	 * @param transports Public transport URIs, or empty for an outbound-only node
+	 * @param type Node software type
+	 * @param version Software version string
+	 * @param regions Top-level regions the node is interested in (may be null or empty)
+	 * @param pops Node keys for configured Points of Presence (may be null or empty)
+	 * @param relay Whether this node is willing to relay signed point messages
+	 * @param timestamp Timestamp in millis
+	 * @return NodeInfo map
+	 */
+	public static AHashMap<Keyword, ACell> createNodeInfo(
+			AVector<AString> transports, AString type, AString version,
+			ASet<Keyword> regions, AVector<AccountKey> pops, boolean relay,
+			long timestamp) {
+		if (pops!=null && pops.count()>MAX_POINTS_OF_PRESENCE) {
+			throw new IllegalArgumentException("Too many Points of Presence: "+pops.count());
+		}
+		if (pops!=null) {
+			HashSet<AccountKey> unique=new HashSet<>();
+			for (long i=0; i<pops.count(); i++) {
+				AccountKey pop=pops.get(i);
+				if (pop==null || !unique.add(pop)) {
+					throw new IllegalArgumentException("Points of Presence must be unique node keys");
+				}
+			}
+		}
+		AHashMap<Keyword, ACell> info = Maps.of(
+			Keywords.TIMESTAMP, CVMLong.create(timestamp),
+			Keywords.TRANSPORTS, (transports != null) ? transports : Vectors.empty(),
+			Keywords.TYPE, type,
+			Keywords.VERSION, version,
+			Keywords.POPS, (pops != null) ? pops : Vectors.empty(),
+			Keywords.RELAY, CVMBool.create(relay)
+		);
+		if (regions != null && !regions.isEmpty()) {
+			info = info.assoc(Keywords.REGIONS, regions);
+		}
+		return info;
+	}
+
+	/**
+	 * Signs a NodeInfo map into an OwnerLattice entry for merge at {@code :nodes}.
+	 *
+	 * @param keyPair The node's key pair
+	 * @param nodeInfo NodeInfo map (from {@link #createNodeInfo})
+	 * @return Single-entry owner map: {AccountKey → Signed(NodeInfo)}
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public static AHashMap<ACell, SignedData<ACell>> createSignedEntry(
+			AKeyPair keyPair, AHashMap<Keyword, ACell> nodeInfo) {
+		SignedData<ACell> signed = keyPair.signData((ACell) nodeInfo);
+		return (AHashMap) Maps.of(keyPair.getAccountKey(), signed);
+	}
+
+	/**
+	 * Gets the NodeInfo map for a specific node from a merged {@code :nodes} value.
+	 *
+	 * @param nodesValue The OwnerLattice value (map of AccountKey → SignedData)
+	 * @param nodeKey The node's public key
+	 * @return NodeInfo map, or null if not present
+	 */
+	@SuppressWarnings("unchecked")
+	public static AHashMap<Keyword, ACell> getNodeInfo(
+			AHashMap<ACell, SignedData<ACell>> nodesValue, AccountKey nodeKey) {
+		if (nodesValue == null) return null;
+		SignedData<ACell> signed = nodesValue.get(nodeKey);
+		if (signed == null) return null;
+		return (AHashMap<Keyword, ACell>) signed.getValue();
+	}
 
 	// ========== Identity helpers ==========
 

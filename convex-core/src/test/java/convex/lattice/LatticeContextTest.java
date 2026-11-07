@@ -1,21 +1,26 @@
 package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.function.BiPredicate;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 
 /**
@@ -44,6 +49,38 @@ public class LatticeContextTest {
 	public void testCreateWithNullsReturnsEmpty() {
 		LatticeContext ctx = LatticeContext.create(null, null);
 		assertEquals(LatticeContext.EMPTY, ctx);
+	}
+
+	@Test
+	public void testDefaultOwnerRuleAcceptsOnlyKeyOwners() {
+		AKeyPair owner = AKeyPair.createSeeded(7821);
+		AKeyPair other = AKeyPair.createSeeded(7822);
+		AccountKey key = owner.getAccountKey();
+		for (ACell direct : new ACell[] {key, DID.forKey(key), key.toFlatBlob()}) {
+			assertTrue(LatticeContext.EMPTY.verifyOwner(direct, key));
+			assertFalse(LatticeContext.EMPTY.verifyOwner(direct, other.getAccountKey()));
+		}
+		for (ACell indirect : new ACell[] {Address.create(1337), Strings.create("did:web:example.com"),
+				Strings.create("did:convex:1337"), Strings.create("anyone")}) {
+			assertFalse(LatticeContext.EMPTY.verifyOwner(indirect, key), "unverified owners must fail closed");
+			assertNull(LatticeContext.create(null, owner).signAs(indirect, CVMLong.ONE));
+		}
+	}
+
+	@Test
+	public void testOwnerVerifierDecidesForEveryOwner() {
+		AKeyPair owner = AKeyPair.createSeeded(7823);
+		AKeyPair delegate = AKeyPair.createSeeded(7824);
+		AccountKey key = owner.getAccountKey();
+		assertFalse(LatticeContext.EMPTY.withOwnerVerifier((o, k) -> false).verifyOwner(key, key));
+		assertTrue(LatticeContext.EMPTY.withOwnerVerifier((o, k) -> true).verifyOwner(Address.create(1), key));
+
+		// A verifier authorising a delegate for a key owner lets that delegate author it
+		BiPredicate<ACell, AccountKey> delegation = (o, k) -> key.equals(o) && delegate.getAccountKey().equals(k);
+		SignedData<CVMLong> signed = LatticeContext.create(null, delegate, delegation).signAs(key, CVMLong.ONE);
+		assertEquals(delegate.getAccountKey(), signed.getAccountKey());
+		assertNull(LatticeContext.create(null, delegate).signAs(key, CVMLong.ONE));
+		assertNull(LatticeContext.create(null, owner, delegation).signAs(key, CVMLong.ONE));
 	}
 
 	@Test

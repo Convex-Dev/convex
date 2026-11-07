@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import convex.core.data.ACell;
 import convex.core.data.Hash;
@@ -82,7 +83,9 @@ public class EtchUtils {
 	 * nor tombstone) are ROLLED BACK: their contents — which exist nowhere
 	 * else — are migrated into the live store file, tolerating a torn tail
 	 * from the crash; the root advances only if its tree then verifies
-	 * complete; the target is deleted.</li>
+	 * complete; the target is deleted. An abandoned v3 target that was never
+	 * checkpointed records no committed root, so it is deleted unread and the
+	 * live file keeps its last checkpoint.</li>
 	 * </ul>
 	 *
 	 * Every step is idempotent: a crash mid-recovery leaves a state this
@@ -91,8 +94,9 @@ public class EtchUtils {
 	 * Before the first mutation, every participating non-empty file is checked
 	 * with a direct, non-mapping header read. Encrypted v3 headers are
 	 * authenticated with the caller's compiled configuration. Normal recovery
-	 * accepts only cleanly closed v3 files; dirty v3 files require an explicitly
-	 * selected maintenance or repair operation.
+	 * accepts only cleanly closed v3 files, apart from never-checkpointed
+	 * abandoned targets; other dirty v3 files require an explicitly selected
+	 * maintenance or repair operation.
 	 *
 	 * If files cannot be renamed/deleted (e.g. pinned by memory mappings from
 	 * this same process on Windows), adoption is DEFERRED: the returned file
@@ -141,11 +145,12 @@ public class EtchUtils {
 		// The single marker (rewritten by every completeGC) names it; no marker
 		// means the base file itself is current
 		File current = null;
+		boolean markerMalformed = false;
 		String markerDiscardReason = null;
 		if (marker.exists()) {
-			String name = readMarkerName(marker, file);
+			String name = readMarkerName(marker);
 			if (name == null) {
-				markerDiscardReason = "empty or malformed";
+				markerMalformed = true;
 			} else {
 				File named = new File(file.getParentFile(), name).getCanonicalFile();
 				if (named.equals(file)) {
@@ -183,11 +188,18 @@ public class EtchUtils {
 
 		// Recovery metadata is unauthenticated. Authenticate every non-empty store
 		// file which recovery may read, delete or replace before the first mutation.
-		// Normal opening deliberately refuses dirty v3 files; callers must select the
-		// explicit maintenance/rebuild path for those.
-		validateRecoveryFiles(file,targets,config);
+		// Normal opening deliberately refuses dirty v3 files, apart from abandoned
+		// targets that were never checkpointed; callers must select the explicit
+		// maintenance/rebuild path for the others.
+		Set<File> uncommitted=validateRecoveryFiles(file,current,targets,config);
 
-		if (markerDiscardReason!=null) {
+		// Logged only once recovery acts on the marker: a refusal above reports
+		// the problem through its exception instead
+		if (markerMalformed) {
+			warn("Etch GC recovery: marker {} is empty or malformed - removing it. Any completed GC"
+					+ " target alongside {} is treated as an abandoned cycle.", marker, file.getName());
+			deleteOrThrow(marker);
+		} else if (markerDiscardReason!=null) {
 			debug("Etch GC recovery: marker {} {} - removing the stale marker.",
 					marker.getName(),markerDiscardReason);
 			deleteOrThrow(marker);
@@ -199,7 +211,7 @@ public class EtchUtils {
 		// so they are only ever deleted - rolling them back would re-introduce
 		// collected garbage. Markerless, non-defunct targets are abandoned
 		// cycles whose contents exist nowhere else: rolled back into the live
-		// file
+		// file, unless never checkpointed and so holding no committed root
 		for (File st : targets) {
 			if (st.getCanonicalFile().equals(current)) continue; // the live file itself
 			File tomb = new File(st.getPath() + ".gc-defunct");
@@ -212,6 +224,22 @@ public class EtchUtils {
 					debug("Etch GC recovery: defunct GC file {} still cannot be deleted (pinned by memory"
 							+ " mappings?). Harmless - its retained content lives elsewhere - and deletion"
 							+ " is retried on later starts.", st.getName());
+				}
+				continue;
+			}
+			if (uncommitted.contains(st.getCanonicalFile())) {
+				// Its header records no committed root, so no recovery or repair
+				// could restore any state from it: the cycle crashed before the
+				// target's first sync. The live file passed validation and was not
+				// written during the cycle, so it holds the last committed root.
+				if (st.delete()) {
+					debug("Etch GC recovery: deleted abandoned GC target {}, which was never checkpointed"
+							+ " and so holds no committed root. {} keeps its last checkpoint.",
+							st.getName(), live.getName());
+				} else {
+					debug("Etch GC recovery: abandoned GC target {} was never checkpointed but cannot be"
+							+ " deleted yet (pinned by memory mappings?). It is ignored, and deletion is"
+							+ " retried on later starts.", st.getName());
 				}
 				continue;
 			}
@@ -275,9 +303,15 @@ public class EtchUtils {
 		return false;
 	}
 
-	private static void validateRecoveryFiles(File base, List<File> targets,
+	/**
+	 * Authenticates every participating non-empty file. Dirty v3 files are refused,
+	 * except abandoned targets (neither current nor tombstoned) that were never
+	 * checkpointed: these are returned for deletion.
+	 */
+	private static Set<File> validateRecoveryFiles(File base, File current, List<File> targets,
 			EtchConfig config) throws IOException {
 		LinkedHashSet<File> files=new LinkedHashSet<>();
+		LinkedHashSet<File> uncommitted=new LinkedHashSet<>();
 		LinkedHashSet<Short> versions=new LinkedHashSet<>();
 		if (base.isFile()) files.add(base.getCanonicalFile());
 		for (File target:targets) {
@@ -312,8 +346,13 @@ public class EtchUtils {
 						throw new IOException("Etch root index extends beyond stored length: "+candidate);
 					}
 					if ((header instanceof EtchV3Header v3)&&!v3.isCleanClosed()) {
-						throw new IOException("Etch v3 GC recovery requires a cleanly closed file; "
-								+"explicit recovery or repair is required: "+candidate);
+						boolean abandoned=!candidate.equals(base) && !candidate.equals(current)
+								&& !new File(candidate.getPath()+".gc-defunct").exists();
+						if (!abandoned || !v3.isNeverCheckpointed()) {
+							throw new IOException("Etch v3 GC recovery requires a cleanly closed file; "
+									+"explicit recovery or repair is required: "+candidate);
+						}
+						uncommitted.add(candidate);
 					}
 				} finally {
 					if (header!=null) header.destroy();
@@ -328,6 +367,7 @@ public class EtchUtils {
 			debug("Etch GC recovery explicitly allowing mixed file versions {} under configured v{}",
 					versions,config.getVersion());
 		}
+		return uncommitted;
 	}
 
 	static File markerFile(File base) throws IOException {
@@ -339,16 +379,10 @@ public class EtchUtils {
 	 * This inspection is deliberately side-effect free: recovery authenticates
 	 * participating Etch files before deleting even malformed metadata.
 	 */
-	static String readMarkerName(File marker, File base) throws IOException {
+	static String readMarkerName(File marker) throws IOException {
 		List<String> lines = Files.readAllLines(marker.toPath());
 		String name = lines.isEmpty() ? "" : lines.get(0).trim();
-		if (name.isEmpty()) {
-			warn("Etch GC recovery: marker {} is empty/malformed. Any completed GC target alongside"
-					+ " {} will be treated as an abandoned cycle after store authentication.",
-					marker,base.getName());
-			return null;
-		}
-		return name;
+		return name.isEmpty() ? null : name;
 	}
 
 	private static void deleteOrThrow(File f) throws IOException {

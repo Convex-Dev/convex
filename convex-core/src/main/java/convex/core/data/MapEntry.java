@@ -162,25 +162,25 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public MapEntry<K, V> updateRefs(IRefFunction func) {
+	protected MapEntry<K, V> rebuildRefs(IRefFunction func) {
 		Ref<K> newKeyRef = (Ref<K>) func.apply(keyRef);
 		Ref<V> newValueRef = (Ref<V>) func.apply(valueRef);
-		
-		// Keep this instance if no change
 		if ((keyRef == newKeyRef) && (valueRef == newValueRef)) return this;
-		
-		MapEntry<K, V> result= new MapEntry<K, V>(newKeyRef, newValueRef);
-		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
-		return result;
+		return new MapEntry<K, V>(newKeyRef, newValueRef);
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(AVector<?> o) {
-		if (o==null) return false;
 		if (o==this) return true;
-		AVector<?> v=(AVector<?>) o;
-		if (v.count()!=2) return false;
-		return getEncoding().equals(o.getEncoding());
+		if (o==null) return false;
+		if (o instanceof MapEntry) return equals((MapEntry<K,V>)o);
+		if (o.count()!=2) return false;
+		// Any other vector of two elements has the same canonical encoding shape,
+		// so equal exactly when the element refs are
+		Ref<ACell> kr=(Ref<ACell>) keyRef;
+		Ref<ACell> vr=(Ref<ACell>) valueRef;
+		return kr.equals((Ref<ACell>)o.getElementRef(0))&&vr.equals((Ref<ACell>)o.getElementRef(1));
 	}
 
 	public boolean equals(MapEntry<K, V> b) {

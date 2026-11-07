@@ -7,7 +7,9 @@ import java.util.Random;
 import org.bouncycastle.util.Arrays;
 
 import convex.core.data.util.BlobBuilder;
+import convex.core.data.util.BlobOutputStream;
 import convex.core.lang.RT;
+import convex.core.store.AStore;
 import convex.core.util.Utils;
 
 /**
@@ -75,20 +77,30 @@ public class Blobs {
 	}
 	
 	/**
-	 * Reads an InputStream as a canonical Blob.
+	 * Reads an InputStream as a canonical Blob, entirely in memory.
 	 *
-	 * @param inputStream Stream of data to read as UTF-8 string
+	 * @param inputStream Stream to read
 	 * @return Blob content of stream
-	 * @throws IOException 
+	 * @throws IOException If the stream cannot be read
 	 */
 	public static ABlob fromStream(InputStream inputStream) throws IOException {
-		ABlob result=Blob.EMPTY;
-		while (true) {
-			byte[] bs=inputStream.readNBytes(Blob.CHUNK_LENGTH);
-			if (bs.length==0) break;
-			result=result.append(Blob.wrap(bs));
-		}
-		return result;
+		return fromStream(inputStream,null);
+	}
+
+	/**
+	 * Reads an InputStream as a canonical Blob in bounded memory. Completed
+	 * chunks are saved to the store as the content arrives, and the Blob is
+	 * saved before it is returned.
+	 *
+	 * @param inputStream Stream to read
+	 * @param store Store to save to, or null to read entirely in memory
+	 * @return Blob content of stream
+	 * @throws IOException If the stream cannot be read, or the store fails
+	 */
+	public static ABlob fromStream(InputStream inputStream, AStore store) throws IOException {
+		BlobOutputStream out=BlobOutputStream.create(store);
+		inputStream.transferTo(out);
+		return out.toBlob();
 	}
 	
 	/**

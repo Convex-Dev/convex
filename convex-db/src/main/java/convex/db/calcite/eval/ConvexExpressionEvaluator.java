@@ -1,6 +1,7 @@
 package convex.db.calcite.eval;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Set;
 
@@ -32,6 +33,7 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.data.ABlob;
+import convex.db.calcite.ConvexType;
 
 /**
  * Evaluates RexNode expressions against ACell[] rows using CVM operations.
@@ -88,27 +90,12 @@ public class ConvexExpressionEvaluator {
 
 		SqlTypeName typeName = literal.getTypeName();
 		return switch (typeName) {
-			case INTEGER, SMALLINT, TINYINT -> {
+			case INTEGER, SMALLINT, TINYINT, BIGINT -> {
 				Number n = (Number) literal.getValue();
 				yield CVMLong.create(n.longValue());
 			}
-			case BIGINT -> {
-				Number n = (Number) literal.getValue();
-				yield CVMLong.create(n.longValue()); // TODO: Use CVMBigInteger for large values
-			}
-			case DECIMAL -> {
-				BigDecimal bd = literal.getValueAs(BigDecimal.class);
-				// If it's a whole number that fits in a long, use CVMLong
-				if (bd.scale() <= 0 || bd.stripTrailingZeros().scale() <= 0) {
-					try {
-						yield CVMLong.create(bd.longValueExact());
-					} catch (ArithmeticException e) {
-						// Doesn't fit in long, use double
-						yield CVMDouble.create(bd.doubleValue());
-					}
-				}
-				yield CVMDouble.create(bd.doubleValue());
-			}
+			// Whole numbers become CVM integers of the same value, others doubles
+			case DECIMAL -> ConvexType.toNumeric(literal.getValueAs(BigDecimal.class));
 			case DOUBLE, FLOAT, REAL -> {
 				Number n = (Number) literal.getValue();
 				yield CVMDouble.create(n.doubleValue());
@@ -220,6 +207,13 @@ public class ConvexExpressionEvaluator {
 			}
 			case NOT -> CVMBool.create(!RT.bool(args[0]));
 
+			// IS TRUE family, three-valued: NULL is neither true nor false. Calcite also
+			// produces IS TRUE itself when it lifts a CASE out of an aggregate's argument.
+			case IS_TRUE -> CVMBool.create(RT.bool(args[0]));
+			case IS_NOT_TRUE -> CVMBool.create(!RT.bool(args[0]));
+			case IS_FALSE -> CVMBool.create(CVMBool.FALSE.equals(args[0]));
+			case IS_NOT_FALSE -> CVMBool.create(!CVMBool.FALSE.equals(args[0]));
+
 			// Arithmetic operators - use RT functions
 			case PLUS -> cellAdd(args[0], args[1]);
 			case MINUS -> RT.minus(args);
@@ -276,10 +270,11 @@ public class ConvexExpressionEvaluator {
 			if (range.hasUpperBound()) { sargType = range.upperEndpoint().getClass(); break; }
 		}
 
-		Object jvm = RT.jvm(cell);
-		if (sargType == BigDecimal.class && jvm instanceof Number n) {
-			return BigDecimal.valueOf(n.doubleValue());
+		if (sargType == BigDecimal.class) {
+			if (cell instanceof AInteger i) return new BigDecimal(i.big());
+			if (cell instanceof ANumeric n) return BigDecimal.valueOf(n.doubleValue());
 		}
+		Object jvm = RT.jvm(cell);
 		if (jvm instanceof Long l) return BigDecimal.valueOf(l);
 		if (jvm instanceof Integer i) return BigDecimal.valueOf(i);
 		if (jvm instanceof String s) return new NlsString(s, null, null);
@@ -343,6 +338,7 @@ public class ConvexExpressionEvaluator {
 			case "EXP" -> RT.exp(args[0]);
 			case "POWER", "POW" -> RT.pow(args);
 			case "SIGN", "SIGNUM" -> RT.signum(args[0]);
+			case "ROUND" -> cellRound(args);
 
 			// String functions (using Java String methods since no CVM equivalents)
 			case "UPPER" -> cellUpper(args[0]);
@@ -362,6 +358,31 @@ public class ConvexExpressionEvaluator {
 
 			default -> throw new UnsupportedOperationException("Function not supported: " + funcName);
 		};
+	}
+
+	/**
+	 * ROUND(x) rounds to the nearest integer and ROUND(x, n) to n decimal places, halves
+	 * away from zero; a negative n rounds to tens, hundreds and so on. An integer stays
+	 * exact: to zero or more places it is itself, to fewer it is rounded in integer
+	 * arithmetic. A double is rounded through BigDecimal and stays a double.
+	 */
+	private static ACell cellRound(ACell[] args) {
+		ANumeric value = RT.ensureNumber(args[0]);
+		if (value == null) return null;
+		int scale = 0;
+		if (args.length > 1) {
+			AInteger n = RT.ensureInteger(args[1]);
+			if (n == null) return null;
+			scale = (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, n.longValue()));
+		}
+		if (value instanceof AInteger i) {
+			if (scale >= 0) return i;
+			BigDecimal rounded = new BigDecimal(i.big()).setScale(scale, RoundingMode.HALF_UP);
+			return AInteger.create(rounded.toBigIntegerExact());
+		}
+		double d = value.doubleValue();
+		if (!Double.isFinite(d)) return value;
+		return CVMDouble.create(BigDecimal.valueOf(d).setScale(scale, RoundingMode.HALF_UP).doubleValue());
 	}
 
 	// ========== String Functions ==========

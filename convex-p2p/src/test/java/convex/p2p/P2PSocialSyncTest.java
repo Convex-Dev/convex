@@ -115,7 +115,7 @@ public class P2PSocialSyncTest {
 
 		// Bob also publishes an infrastructure-only view from a separate serving
 		// store. A third transiently broken view proves failure containment and
-		// recovery without replacing the real follow-aware propagation group.
+		// recovery without replacing the real follow-aware propagator group.
 		bobInfrastructureView=new LatticePropagator(new MemoryStore(),LatticePropagatorConfig.create());
 		bobInfrastructureView.<Index<Keyword,ACell>>setPublicationFilter(
 			value -> value.dissoc(Social.KEY_SOCIAL));
@@ -275,9 +275,7 @@ public class P2PSocialSyncTest {
 
 	/** Waits on real root-announcement signals, never elapsed time. */
 	private static CompletableFuture<Void> awaitCondition(P2PNode node,BooleanSupplier condition) {
-		if (condition.getAsBoolean()) return CompletableFuture.completedFuture(null);
-		CompletableFuture<ACell> next=node.propagationGroup().nextAnnounce();
-		if (condition.getAsBoolean()) return CompletableFuture.completedFuture(null);
-		return next.thenCompose(value -> awaitCondition(node,condition));
+		return node.propagationGroup().whenAnnounced(value -> condition.getAsBoolean())
+			.thenApply(value -> null);
 	}
 }

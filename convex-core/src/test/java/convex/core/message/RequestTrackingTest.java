@@ -9,18 +9,21 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import convex.core.Result;
 import convex.core.data.prim.CVMLong;
 
+@Timeout(60)
 class RequestTrackingTest {
 	@Test void configuredTimeoutCleansUpAndDoesNotOverwriteAReply() throws Exception {
 		LocalConnection connection=LocalConnection.createPair(m -> true,m -> true);
 		try {
 			var expired=connection.request(Message.createStatusRequest(null),1);
-			var error=assertThrows(java.util.concurrent.ExecutionException.class,() -> expired.get(5,TimeUnit.SECONDS));
+			var error=assertThrows(java.util.concurrent.ExecutionException.class,expired::get);
 			assertInstanceOf(TimeoutException.class,error.getCause());
 			assertFalse(connection.hasPendingRequests());
 			assertFalse(connection.completeRequest(Message.createResult(Result.value(CVMLong.ONE).withID(CVMLong.ZERO)).withConnection(connection)));
@@ -30,7 +33,7 @@ class RequestTrackingTest {
 			Message reply=Message.createResult(Result.value(CVMLong.ONE).withID(CVMLong.ONE)).withConnection(connection);
 			assertTrue(connection.completeRequest(reply));
 			assertFalse(signal.completeExceptionally(new TimeoutException()));
-			assertSame(reply,won.get(5,TimeUnit.SECONDS));
+			assertSame(reply,won.get());
 			assertFalse(connection.hasPendingRequests());
 		} finally {
 			connection.close();
@@ -41,21 +44,23 @@ class RequestTrackingTest {
 		LocalConnection connection=LocalConnection.createPair(m -> true,m -> true);
 		var source=new CompletableFuture<Message>();
 		var reply=connection.request(Message.createStatusRequest(null),0,source);
-		CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1);
+		// The callback runs on the JVM's shared timeout thread, so it records what it
+		// sees rather than holding that thread while the test checks
+		AtomicBoolean cancelled=new AtomicBoolean(),pending=new AtomicBoolean(true);
+		var called=new CompletableFuture<Void>();
 		reply.whenComplete((value,error) -> {
-			entered.countDown();
-			try { release.await(); }
-			catch (InterruptedException e) { throw new AssertionError(e); }
+			cancelled.set(source.isCancelled());
+			pending.set(connection.hasPendingRequests());
+			called.complete(null);
 		});
 		try {
 			reply.orTimeout(0,TimeUnit.MILLISECONDS);
-			assertTrue(entered.await(5,TimeUnit.SECONDS));
-			assertTrue(source.isCancelled());
-			assertFalse(connection.hasPendingRequests());
+			called.get();
+			assertTrue(cancelled.get());
+			assertFalse(pending.get(),"Cleanup must precede caller callbacks");
 			assertInstanceOf(TimeoutException.class,assertThrows(java.util.concurrent.ExecutionException.class,
-				() -> reply.get(5,TimeUnit.SECONDS)).getCause());
+				reply::get).getCause());
 		} finally {
-			release.countDown();
 			connection.close();
 		}
 	}
@@ -101,13 +106,13 @@ class RequestTrackingTest {
 				else (controlled ? source : reply).completeExceptionally(new TimeoutException());
 			});
 			try {
-				assertTrue(entered.await(5,TimeUnit.SECONDS));
+				entered.await();
 				assertFalse(connection.hasPendingRequests(),"Cleanup must precede caller callbacks");
 			} finally {
 				release.countDown();
 				connection.close();
 			}
-			completion.get(5,TimeUnit.SECONDS);
+			completion.get();
 		}
 	}
 
@@ -125,7 +130,7 @@ class RequestTrackingTest {
 			assertFalse(second.isDone());
 			assertTrue(connection.hasPendingRequests());
 			assertTrue(connection.completeRequest(reply));
-			assertSame(reply,second.get(5,TimeUnit.SECONDS));
+			assertSame(reply,second.get());
 			assertFalse(connection.hasPendingRequests());
 		} finally {
 			connection.close();
@@ -146,7 +151,7 @@ class RequestTrackingTest {
 		LocalConnection connection=LocalConnection.createPair(RequestTrackingTest::receive,RequestTrackingTest::receive);
 		try {
 			for (LocalConnection end:new LocalConnection[] {connection,connection.getPaired()}) {
-				Message reply=end.request(Message.createStatusRequest(null),0).get(5,TimeUnit.SECONDS);
+				Message reply=end.request(Message.createStatusRequest(null),0).get();
 				assertEquals(CVMLong.ZERO,reply.getResultID());
 				assertEquals(CVMLong.ONE,reply.toResult().getValue());
 				assertSame(end,reply.getConnection());
@@ -168,7 +173,7 @@ class RequestTrackingTest {
 			assertTrue(second.isDone());
 			assertFalse(first.isDone());
 			assertTrue(received.get(0).returnResult(Result.value(CVMLong.ZERO)));
-			assertEquals(raw.getRequestID(),first.get(5,TimeUnit.SECONDS).getResultID());
+			assertEquals(raw.getRequestID(),first.get().getResultID());
 			assertFalse(connection.hasPendingRequests());
 		} finally {
 			connection.close();
@@ -226,7 +231,7 @@ class RequestTrackingTest {
 		AConnection connection=new AConnection() {
 			@Override public boolean isClosed() {
 				checked.countDown();
-				try { assertTrue(release.await(5,TimeUnit.SECONDS)); }
+				try { release.await(); }
 				catch (InterruptedException e) { throw new AssertionError(e); }
 				return false; // State observed before the concurrent close.
 			}
@@ -239,12 +244,12 @@ class RequestTrackingTest {
 		try (var executor=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
 			var submitted=executor.submit(() -> connection.request(Message.createStatusRequest(null),0));
 			try {
-				assertTrue(checked.await(5,TimeUnit.SECONDS));
+				checked.await();
 				connection.close();
 			} finally {
 				release.countDown();
 			}
-			assertTrue(submitted.get(5,TimeUnit.SECONDS).isCompletedExceptionally());
+			assertTrue(submitted.get().isCompletedExceptionally());
 			assertFalse(connection.hasPendingRequests());
 		}
 	}

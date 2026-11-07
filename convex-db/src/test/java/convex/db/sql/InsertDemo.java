@@ -1,5 +1,6 @@
 package convex.db.sql;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -7,14 +8,22 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 
 import convex.db.ConvexDB;
 
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.etch.EtchStore;
+import convex.lattice.LatticeHost;
 import convex.node.NodeServer;
 
 /**
@@ -58,7 +67,7 @@ public class InsertDemo {
 	 */
 	static void benchmarkStandalone() throws Exception {
 		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create(DB_NAME, kp);
+		SQLDatabase db = SQLDatabase.create(DB_NAME, kp, RowLWW::merge);
 		createTable(db);
 
 		long start = System.nanoTime();
@@ -76,9 +85,11 @@ public class InsertDemo {
 	 */
 	static void benchmarkDirectLattice() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = ConvexDB.createNodeServer(store);
+		var host = open(store);
+		host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+		NodeServer<?> server = new NodeServer<>(host);
 		server.launch();
-		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
+		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME, RowLWW::merge);
 		createTable(db);
 
 		long start = System.nanoTime();
@@ -99,9 +110,10 @@ public class InsertDemo {
 	 */
 	static void benchmarkJdbcIndividual() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = ConvexDB.createNodeServer(store);
+		var host = open(store);
+		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+		NodeServer<?> server = new NodeServer<>(host);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getCursor());
 		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
 		cdb.register(DB_NAME);
@@ -132,9 +144,10 @@ public class InsertDemo {
 	 */
 	static void benchmarkJdbcPrepared() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = ConvexDB.createNodeServer(store);
+		var host = open(store);
+		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+		NodeServer<?> server = new NodeServer<>(host);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getCursor());
 		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
 		cdb.register(DB_NAME);
@@ -165,9 +178,10 @@ public class InsertDemo {
 	 */
 	static void benchmarkJdbcPreparedBatch() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = ConvexDB.createNodeServer(store);
+		var host = open(store);
+		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+		NodeServer<?> server = new NodeServer<>(host);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getCursor());
 		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
 		cdb.register(DB_NAME);
@@ -199,6 +213,11 @@ public class InsertDemo {
 	static void createTable(SQLDatabase db) {
 		db.tables().createTable("t", new String[]{"ID", "LEID", "NM"},
 				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.VARCHAR});
+	}
+
+	/** Opens a host over the database map the store retains, or an empty one. */
+	static LatticeHost<AHashMap<AString, Index<Keyword, ACell>>> open(EtchStore store) throws IOException {
+		return LatticeHost.open(Maps.empty(), store);
 	}
 
 	static void syncToStorage(NodeServer<?> server) throws Exception {

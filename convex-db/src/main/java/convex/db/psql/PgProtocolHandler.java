@@ -1,9 +1,12 @@
 package convex.db.psql;
 
+import convex.core.crypto.TLS;
+import convex.db.calcite.StalePlanException;
 import convex.db.psql.msg.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.ssl.SslHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,6 +17,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
+import javax.net.ssl.SSLContext;
+
 /**
  * Handles the PostgreSQL wire protocol and executes SQL queries.
  */
@@ -23,14 +28,18 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	private static final AtomicInteger processIdCounter = new AtomicInteger(1000);
 
 	/** Single-quoted literals and double-quoted identifiers, with doubled-quote escapes */
-	private static final Pattern QUOTED = Pattern.compile("'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"");
 
 	/** The ::type casts removed by rewriteQuery, matched as whole type names */
 	private static final Pattern CAST = Pattern.compile(
 		"(?i)::(?:integer|int4|int8|int|bigint|text|varchar|regclass|oid)\\b");
 
+	/** Time allowed for a client's TLS handshake after the server answers SSLRequest */
+	private static final long TLS_HANDSHAKE_TIMEOUT_MILLIS = 10_000;
+
 	private final Supplier<Connection> connectionSupplier;
 	private final String requiredPassword;
+	private final SSLContext sslContext;
+	private final boolean allowPlaintext;
 
 	private Connection connection;
 	private String user;
@@ -46,16 +55,51 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 * @param requiredPassword Password required for authentication, or null for trust auth
 	 */
 	public PgProtocolHandler(Supplier<Connection> connectionSupplier, String requiredPassword) {
+		this(connectionSupplier, requiredPassword, null, true);
+	}
+
+	/**
+	 * Creates a handler that may offer TLS. The channel's decoder must be created with
+	 * TLS offered when a context is given.
+	 *
+	 * @param connectionSupplier Supplies JDBC connections for query execution
+	 * @param requiredPassword Password required for authentication, or null for trust auth
+	 * @param sslContext Context presenting the server's TLS identity, or null not to offer TLS
+	 * @param allowPlaintext True to admit clients that do not request TLS when it is offered
+	 */
+	public PgProtocolHandler(Supplier<Connection> connectionSupplier, String requiredPassword,
+			SSLContext sslContext, boolean allowPlaintext) {
 		this.connectionSupplier = connectionSupplier;
 		this.requiredPassword = requiredPassword;
+		this.sslContext = sslContext;
+		this.allowPlaintext = allowPlaintext;
 		this.processId = processIdCounter.incrementAndGet();
 		this.secretKey = ThreadLocalRandom.current().nextInt();
 	}
 
+	/**
+	 * Set by an error in the extended query protocol. Like PostgreSQL, the handler then
+	 * discards every message until Sync, so no later message of a failed batch executes.
+	 */
+	private boolean discardUntilSync = false;
+
+	/**
+	 * The transaction status every ReadyForQuery reports: idle, in a transaction block, or
+	 * in a block an error has failed, where statements are refused until the block ends.
+	 */
+	private byte transactionStatus = ReadyForQuery.IDLE;
+
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+		if (discardUntilSync && isDiscardable(msg)) {
+			log.debug("Discarding {} until Sync after an error", msg.getClass().getSimpleName());
+			return;
+		}
 		if (msg instanceof PgMessageDecoder.SSLRequest) {
 			handleSSLRequest(ctx);
+		} else if (msg instanceof PgMessageDecoder.GSSENCRequest) {
+			// GSSAPI encryption is not offered; the client continues with SSLRequest or startup
+			writeByte(ctx, 'N');
 		} else if (msg instanceof PgMessageDecoder.StartupMessage startup) {
 			handleStartup(ctx, startup);
 		} else if (msg instanceof PgMessageDecoder.PasswordMessage pwd) {
@@ -84,14 +128,42 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	private void handleSSLRequest(ChannelHandlerContext ctx) {
-		// Respond with 'N' - we don't support SSL
+		if (sslContext == null || isTLS(ctx)) {
+			// TLS not offered, or already started
+			writeByte(ctx, 'N');
+			return;
+		}
+		// 'S' leaves in plaintext; everything the client sends next passes through TLS first
+		writeByte(ctx, 'S');
+		SslHandler tls = new SslHandler(TLS.serverEngine(sslContext));
+		tls.setHandshakeTimeoutMillis(TLS_HANDSHAKE_TIMEOUT_MILLIS);
+		ctx.pipeline().addFirst(tls);
+	}
+
+	private static boolean isTLS(ChannelHandlerContext ctx) {
+		return ctx.pipeline().get(SslHandler.class) != null;
+	}
+
+	private static void writeByte(ChannelHandlerContext ctx, char response) {
 		ByteBuf buf = ctx.alloc().buffer(1);
-		buf.writeByte('N');
+		buf.writeByte(response);
 		ctx.writeAndFlush(buf);
 	}
 
 	private void handleStartup(ChannelHandlerContext ctx, PgMessageDecoder.StartupMessage startup) {
 		log.debug("Startup: version={}.{}, params={}", startup.majorVersion(), startup.minorVersion(), startup.params());
+
+		if (sslContext != null && !allowPlaintext && !isTLS(ctx)) {
+			// As PostgreSQL's hostssl: a client that did not request TLS is refused
+			write(ctx, ErrorResponse.builder()
+				.severity("FATAL")
+				.code("28000")
+				.message("connection requires TLS")
+				.build());
+			ctx.flush();
+			ctx.close();
+			return;
+		}
 
 		this.user = startup.params().get("user");
 		this.database = startup.params().get("database");
@@ -165,49 +237,108 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 		if (fullSql.isEmpty()) {
 			write(ctx, new EmptyQueryResponse());
-			write(ctx, ReadyForQuery.IDLE_INSTANCE);
+			write(ctx, readyForQuery());
 			ctx.flush();
 			return;
 		}
 
-		// Split on semicolons and execute each statement
-		// Note: This is a simple split - doesn't handle semicolons in strings
-		String[] statements = fullSql.split(";");
-
-		for (String sql : statements) {
-			sql = sql.trim();
-			if (sql.isEmpty()) {
-				continue;
-			}
-
-			// Handle special commands
-			if (sql.toUpperCase().startsWith("SET ")) {
-				// Ignore SET commands for now
-				write(ctx, CommandComplete.set());
-				continue;
-			}
-
+		for (String sql : PgSqlScanner.split(fullSql)) {
 			try {
+				if (transactionControl(ctx, sql)) continue;
+				requireTransactionNotFailed();
+				if (deallocate(ctx, sql)) continue;
+
+				// Handle special commands
+				if (sql.toUpperCase().startsWith("SET ")) {
+					// Ignore SET commands for now
+					write(ctx, CommandComplete.set());
+					continue;
+				}
+
 				executeQuery(ctx, sql);
 			} catch (SQLException e) {
 				log.warn("Query error: {}", e.getMessage(), e);
-				write(ctx, ErrorResponse.fromException(e));
+				writeError(ctx, ErrorResponse.fromException(e));
 				// Stop processing on error
 				break;
 			} catch (RuntimeException e) {
 				// Runtime exceptions from Calcite (type coercion, etc.) are query errors
 				log.warn("Query execution error: {}", e.getMessage(), e);
-				write(ctx, ErrorResponse.fromException(e));
+				writeError(ctx, ErrorResponse.fromException(e));
 				break;
 			} catch (Exception e) {
 				log.error("Unexpected error", e);
-				write(ctx, ErrorResponse.fromException(e));
+				writeError(ctx, ErrorResponse.fromException(e));
 				break;
 			}
 		}
 
-		write(ctx, ReadyForQuery.IDLE_INSTANCE);
+		write(ctx, readyForQuery());
 		ctx.flush();
+	}
+
+	// ========== Transaction control ==========
+
+	/**
+	 * Runs a statement if it is transaction control, on the connection's own transaction:
+	 * BEGIN turns autocommit off, which forks the database, COMMIT syncs the fork and ROLLBACK
+	 * discards it. COMMIT of a failed block rolls it back, as PostgreSQL does. BEGIN inside a
+	 * block and COMMIT or ROLLBACK outside one change nothing.
+	 *
+	 * @return true if the statement was transaction control and has completed
+	 * @throws SQLException with SQLSTATE 0A000 for transaction control the server does not support
+	 */
+	private boolean transactionControl(ChannelHandlerContext ctx, String sql) throws SQLException {
+		PgTransactionControl.Kind kind = PgTransactionControl.classify(sql);
+		if (kind == null) return false;
+		switch (kind) {
+			case BEGIN -> {
+				if (transactionStatus == ReadyForQuery.IDLE) {
+					connection.setAutoCommit(false);
+					transactionStatus = ReadyForQuery.IN_TRANSACTION;
+				}
+				write(ctx, CommandComplete.begin());
+			}
+			case COMMIT -> {
+				boolean failed = (transactionStatus == ReadyForQuery.FAILED_TRANSACTION);
+				endTransaction(!failed);
+				write(ctx, failed ? CommandComplete.rollback() : CommandComplete.commit());
+			}
+			case ROLLBACK -> {
+				endTransaction(false);
+				write(ctx, CommandComplete.rollback());
+			}
+		}
+		return true;
+	}
+
+	/** Ends a transaction block, if one is open, and returns the connection to autocommit. */
+	private void endTransaction(boolean commit) throws SQLException {
+		if (transactionStatus == ReadyForQuery.IDLE) return;
+		transactionStatus = ReadyForQuery.IDLE;
+		try {
+			if (commit) connection.commit();
+			else connection.rollback();
+		} finally {
+			connection.setAutoCommit(true);
+		}
+	}
+
+	/** Refuses a statement in a failed transaction block, as PostgreSQL does, until the block ends. */
+	private void requireTransactionNotFailed() throws SQLException {
+		if (transactionStatus == ReadyForQuery.FAILED_TRANSACTION) {
+			throw new SQLException("current transaction is aborted, commands ignored until end of transaction block", "25P02");
+		}
+	}
+
+	/** Reports an error; inside a transaction block it fails the block. */
+	private void writeError(ChannelHandlerContext ctx, ErrorResponse error) {
+		write(ctx, error);
+		if (transactionStatus == ReadyForQuery.IN_TRANSACTION) transactionStatus = ReadyForQuery.FAILED_TRANSACTION;
+	}
+
+	private ReadyForQuery readyForQuery() {
+		return (transactionStatus == ReadyForQuery.IDLE) ? ReadyForQuery.IDLE_INSTANCE : new ReadyForQuery(transactionStatus);
 	}
 
 	private void executeQuery(ChannelHandlerContext ctx, String sql) throws SQLException {
@@ -220,6 +351,14 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 *        never sends one: there the client asks for it with Describe.
 	 */
 	private void executeQuery(ChannelHandlerContext ctx, String sql, boolean describeRows) throws SQLException {
+		executeQuery(ctx, sql, describeRows, null);
+	}
+
+	/**
+	 * As {@link #executeQuery(ChannelHandlerContext, String, boolean)}, sending the rows in
+	 * the formats the client asked for in Bind, or in text for null.
+	 */
+	private void executeQuery(ChannelHandlerContext ctx, String sql, boolean describeRows, short[] resultFormats) throws SQLException {
 		sql = rewriteQuery(sql);
 
 		// Null means return empty result (e.g., for system catalog queries)
@@ -233,7 +372,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 			if (hasResultSet) {
 				try (ResultSet rs = stmt.getResultSet()) {
-					sendResultSet(ctx, rs, describeRows);
+					sendResultSet(ctx, rs, describeRows, resultFormats);
 				}
 			} else {
 				int updateCount = stmt.getUpdateCount();
@@ -347,7 +486,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 * value does not count as an operator.
 	 */
 	static boolean hasRegexOperator(String sql) {
-		String code = QUOTED.matcher(sql).replaceAll("''");
+		String code = PgSqlScanner.code(sql);
 		return code.contains("!~") || code.contains("~*") ||
 			(code.contains("~") && !code.contains("~=") && !code.contains("~~"));
 	}
@@ -360,9 +499,15 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		return CAST.matcher(sql).replaceAll("");
 	}
 
-	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs, boolean describeRows) throws SQLException {
+	/**
+	 * Sends the rows of a result, each value in the format the client asked for in Bind:
+	 * text, or binary encoded as the type the RowDescription announces for the column.
+	 *
+	 * @param describeRows Whether to send the RowDescription first
+	 * @param resultFormats Bind's result format codes, or null for text
+	 */
+	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs, boolean describeRows, short[] resultFormats) throws SQLException {
 		ResultSetMetaData meta = rs.getMetaData();
-		int columnCount = meta.getColumnCount();
 
 		// Send row description
 		if (describeRows) {
@@ -372,7 +517,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		// Send data rows
 		long rowCount = 0;
 		while (rs.next()) {
-			write(ctx, DataRow.fromResultSet(rs, columnCount));
+			write(ctx, DataRow.fromResultSet(rs, meta, resultFormats));
 			rowCount++;
 		}
 
@@ -396,6 +541,10 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	private final Map<String, PreparedStmt> statements = new java.util.HashMap<>();
 	// Portals are bound statements ready to execute (Bind creates these)
 	private final Map<String, Portal> portals = new java.util.HashMap<>();
+	// The JDBC statement prepared for each statement above, made on its first Execute and
+	// reused for every later one: binding new values and executing again skips parsing and
+	// planning. By identity: a statement parsed again under the same name is a new one.
+	private final Map<PreparedStmt, PreparedStatement> jdbcStatements = new java.util.IdentityHashMap<>();
 
 	private void handleParse(ChannelHandlerContext ctx, PgMessageDecoder.Parse parse) {
 		if (!authenticated) {
@@ -408,16 +557,13 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			String query = parse.query();
 			log.debug("Parse: name='{}', query='{}'", name, query);
 
-			// Close existing statement with same name (PostgreSQL behavior)
-			statements.remove(name);
-
-			// Store the prepared statement
-			statements.put(name, new PreparedStmt(query, parse.paramTypes()));
+			// Store the prepared statement, closing an existing one with the same name (PostgreSQL behavior)
+			closeJdbcStatement(statements.put(name, new PreparedStmt(query, parse.paramTypes())));
 
 			write(ctx, ParseComplete.INSTANCE);
 		} catch (Exception e) {
 			log.warn("Parse error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
 
@@ -435,7 +581,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			// Find the prepared statement
 			PreparedStmt stmt = statements.get(stmtName);
 			if (stmt == null) {
-				write(ctx, ErrorResponse.builder()
+				writeExtendedError(ctx, ErrorResponse.builder()
 					.severity("ERROR")
 					.code("26000") // invalid_sql_statement_name
 					.message("prepared statement \"" + stmtName + "\" does not exist")
@@ -452,7 +598,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			write(ctx, BindComplete.INSTANCE);
 		} catch (Exception e) {
 			log.warn("Bind error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
 
@@ -469,7 +615,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				// Describe prepared statement
 				PreparedStmt stmt = statements.get(describe.name());
 				if (stmt == null) {
-					write(ctx, ErrorResponse.builder()
+					writeExtendedError(ctx, ErrorResponse.builder()
 						.severity("ERROR")
 						.code("26000")
 						.message("prepared statement \"" + describe.name() + "\" does not exist")
@@ -477,28 +623,14 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 					return;
 				}
 
-				// Send parameter description
+				RowDescription rows = describeRows(stmt);
 				write(ctx, new ParameterDescription(stmt.paramTypes()));
-
-				String query = rewriteQuery(stmt.query());
-				if (query != null && query.toUpperCase().trim().startsWith("SELECT")) {
-					// Execute to get metadata (substitute $N with NULL for metadata query)
-					String metaQuery = query.replaceAll("\\$\\d+", "NULL");
-					try (Statement s = connection.createStatement();
-						 ResultSet rs = s.executeQuery(metaQuery)) {
-						write(ctx, RowDescription.fromMetaData(rs.getMetaData()));
-					} catch (SQLException e) {
-						// If metadata query fails, return NoData
-						write(ctx, NoData.INSTANCE);
-					}
-				} else {
-					write(ctx, NoData.INSTANCE);
-				}
+				write(ctx, (rows == null) ? NoData.INSTANCE : rows);
 			} else {
 				// Describe portal
 				Portal portal = portals.get(describe.name());
 				if (portal == null) {
-					write(ctx, ErrorResponse.builder()
+					writeExtendedError(ctx, ErrorResponse.builder()
 						.severity("ERROR")
 						.code("34000") // invalid_cursor_name
 						.message("portal \"" + describe.name() + "\" does not exist")
@@ -506,22 +638,12 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 					return;
 				}
 
-				String query = rewriteQuery(portal.stmt().query());
-				if (query != null && query.toUpperCase().trim().startsWith("SELECT")) {
-					String metaQuery = query.replaceAll("\\$\\d+", "NULL");
-					try (Statement s = connection.createStatement();
-						 ResultSet rs = s.executeQuery(metaQuery)) {
-						write(ctx, RowDescription.fromMetaData(rs.getMetaData()));
-					} catch (SQLException e) {
-						write(ctx, NoData.INSTANCE);
-					}
-				} else {
-					write(ctx, NoData.INSTANCE);
-				}
+				RowDescription rows = describeRows(portal.stmt());
+				write(ctx, (rows == null) ? NoData.INSTANCE : rows);
 			}
 		} catch (Exception e) {
 			log.warn("Describe error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
 
@@ -537,7 +659,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		try {
 			Portal portal = portals.get(portalName);
 			if (portal == null) {
-				write(ctx, ErrorResponse.builder()
+				writeExtendedError(ctx, ErrorResponse.builder()
 					.severity("ERROR")
 					.code("34000")
 					.message("portal \"" + portalName + "\" does not exist")
@@ -551,25 +673,42 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 				return;
 			}
 
-			executeWithParameters(ctx, query, portal.paramValues(), portal.paramFormats(), portal.stmt().paramTypes());
+			executeWithParameters(ctx, portal.stmt(), portal.paramValues(), portal.paramFormats(), portal.resultFormats());
+		} catch (ResultTypeChanged e) {
+			log.debug("Execute error: {}", e.getMessage());
+			// PostgreSQL's routine for this error, by which clients such as pgjdbc know to
+			// prepare the statement again
+			writeExtendedError(ctx, ErrorResponse.builder()
+				.severity("ERROR")
+				.code(e.getSQLState())
+				.message(e.getMessage())
+				.routine("RevalidateCachedQuery")
+				.build());
 		} catch (SQLException e) {
 			log.warn("Execute error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		} catch (RuntimeException e) {
 			// Runtime exceptions from Calcite (type coercion, etc.) are query errors
 			log.warn("Query execution error: {}", e.getMessage(), e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		} catch (Exception e) {
 			log.error("Unexpected error during execute", e);
-			write(ctx, ErrorResponse.fromException(e));
+			writeExtendedError(ctx, ErrorResponse.fromException(e));
 		}
 	}
 
 	/**
-	 * Execute a query with bound parameters.
+	 * Execute a prepared statement with bound parameters.
 	 */
-	private void executeWithParameters(ChannelHandlerContext ctx, String sql, byte[][] paramValues, short[] paramFormats, int[] paramTypes) throws SQLException {
-		sql = rewriteQuery(sql);
+	private void executeWithParameters(ChannelHandlerContext ctx, PreparedStmt stmt, byte[][] paramValues,
+			short[] paramFormats, short[] resultFormats) throws SQLException {
+		// pgjdbc sends COMMIT and ROLLBACK through the extended protocol
+		if (transactionControl(ctx, stmt.query().trim())) return;
+		requireTransactionNotFailed();
+		if (deallocate(ctx, stmt.query())) return;
+
+		String sql = rewriteQuery(stmt.query());
+		int[] paramTypes = stmt.paramTypes();
 
 		if (sql == null) {
 			write(ctx, CommandComplete.select(0));
@@ -578,67 +717,175 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 		// If no parameters, execute directly
 		if (paramValues == null || paramValues.length == 0) {
-			executeQuery(ctx, sql, false);
+			executeQuery(ctx, sql, false, resultFormats);
 			return;
 		}
 
 		// For pg_catalog queries, substitute parameters directly
 		// (Calcite's virtual tables don't support prepared statements well)
-		String lowerSql = sql.toLowerCase();
-		if (lowerSql.contains("pg_catalog") || lowerSql.contains("pg_database") ||
-			lowerSql.contains("pg_type") || lowerSql.contains("pg_class") ||
-			lowerSql.contains("pg_namespace") || lowerSql.contains("pg_attribute") ||
-			lowerSql.contains("pg_tables")) {
+		if (isCatalogQuery(sql)) {
 			String substituted = substituteParameters(sql, paramValues, paramFormats);
-			executeQuery(ctx, substituted, false);
+			executeQuery(ctx, substituted, false, resultFormats);
 			return;
 		}
 
-		// Convert $1, $2 to ? for JDBC
-		String jdbcSql = sql.replaceAll("\\$\\d+", "?");
-
-		try (PreparedStatement pstmt = connection.prepareStatement(jdbcSql)) {
-			// Bind parameters
-			for (int i = 0; i < paramValues.length; i++) {
-				byte[] value = paramValues[i];
-				if (value == null) {
-					pstmt.setNull(i + 1, java.sql.Types.NULL);
-				} else {
-					// Determine format: 0 = text, 1 = binary
-					short format = (paramFormats != null && paramFormats.length > 0)
-						? (paramFormats.length == 1 ? paramFormats[0] : paramFormats[i])
-						: 0;
-
-					if (format == 0) {
-						// Text format - convert bytes to string
-						String strValue = new String(value, java.nio.charset.StandardCharsets.UTF_8);
-						pstmt.setString(i + 1, strValue);
-					} else {
-						// Binary format - decode by the type the client declared in Parse
-						int oid = (paramTypes != null && i < paramTypes.length) ? paramTypes[i] : 0;
-						bindBinaryParameter(pstmt, i + 1, value, oid);
-					}
-				}
+		String jdbcSql = jdbcSql(sql);
+		boolean kept = jdbcStatements.containsKey(stmt);
+		PreparedStatement pstmt = keptStatement(stmt, jdbcSql);
+		boolean hasResultSet;
+		try {
+			hasResultSet = bindAndExecute(pstmt, paramValues, paramFormats, paramTypes);
+		} catch (SQLException | RuntimeException e) {
+			// A table the kept statement uses has changed since it was prepared
+			if (!kept || !isStalePlan(e)) throw e;
+			pstmt = prepareAgain(stmt, pstmt, jdbcSql);
+			hasResultSet = bindAndExecute(pstmt, paramValues, paramFormats, paramTypes);
+		}
+		if (hasResultSet) {
+			try (ResultSet rs = pstmt.getResultSet()) {
+				sendResultSet(ctx, rs, false, resultFormats);
 			}
-
-			boolean hasResultSet = pstmt.execute();
-			if (hasResultSet) {
-				try (ResultSet rs = pstmt.getResultSet()) {
-					sendResultSet(ctx, rs, false);
-				}
+		} else {
+			int updateCount = pstmt.getUpdateCount();
+			String upperSql = sql.toUpperCase().trim();
+			if (upperSql.startsWith("INSERT")) {
+				write(ctx, CommandComplete.insert(updateCount));
+			} else if (upperSql.startsWith("UPDATE")) {
+				write(ctx, CommandComplete.update(updateCount));
+			} else if (upperSql.startsWith("DELETE")) {
+				write(ctx, CommandComplete.delete(updateCount));
 			} else {
-				int updateCount = pstmt.getUpdateCount();
-				String upperSql = sql.toUpperCase().trim();
-				if (upperSql.startsWith("INSERT")) {
-					write(ctx, CommandComplete.insert(updateCount));
-				} else if (upperSql.startsWith("UPDATE")) {
-					write(ctx, CommandComplete.update(updateCount));
-				} else if (upperSql.startsWith("DELETE")) {
-					write(ctx, CommandComplete.delete(updateCount));
+				write(ctx, new CommandComplete("OK"));
+			}
+		}
+	}
+
+	/** Binds the parameters of one execution to a statement, replacing those of the last, and executes it. */
+	private static boolean bindAndExecute(PreparedStatement pstmt, byte[][] paramValues, short[] paramFormats, int[] paramTypes) throws SQLException {
+		pstmt.clearParameters();
+		ParameterMetaData inferred = null;
+		for (int i = 0; i < paramValues.length; i++) {
+			byte[] value = paramValues[i];
+			if (value == null) {
+				pstmt.setNull(i + 1, java.sql.Types.NULL);
+			} else {
+				int oid = (paramTypes != null && i < paramTypes.length) ? paramTypes[i] : 0;
+
+				if (!PgMessageDecoder.Bind.binary(paramFormats, i)) {
+					// Text format - parse by the declared type, or the type the query implies
+					if (oid == 0 || oid == PgType.UNKNOWN) {
+						if (inferred == null) inferred = pstmt.getParameterMetaData();
+						oid = inferredType(inferred, i + 1);
+					}
+					String strValue = new String(value, java.nio.charset.StandardCharsets.UTF_8);
+					bindTextParameter(pstmt, i + 1, strValue, oid);
 				} else {
-					write(ctx, new CommandComplete("OK"));
+					// Binary format - decode by the type the client declared in Parse
+					bindBinaryParameter(pstmt, i + 1, value, oid);
 				}
 			}
+		}
+		return pstmt.execute();
+	}
+
+	/**
+	 * Prepares a kept statement again after a table it uses changed (CAD039). Like PostgreSQL,
+	 * the new JDBC statement replaces the old one only if it returns rows of the same
+	 * description, since the client may decode rows by the old one. Otherwise the old one
+	 * stays, so every execution fails with 0A000 until the client parses the statement again.
+	 */
+	private PreparedStatement prepareAgain(PreparedStmt stmt, PreparedStatement old, String jdbcSql) throws SQLException {
+		PreparedStatement fresh = connection.prepareStatement(jdbcSql);
+		if (!java.util.Objects.equals(describe(old), describe(fresh))) {
+			fresh.close();
+			throw new ResultTypeChanged();
+		}
+		jdbcStatements.put(stmt, fresh);
+		old.close();
+		return fresh;
+	}
+
+	/** The RowDescription of a statement's rows, or null if it returns none. */
+	private static RowDescription describe(PreparedStatement pstmt) throws SQLException {
+		ResultSetMetaData meta = pstmt.getMetaData();
+		return (meta == null) ? null : RowDescription.fromMetaData(meta);
+	}
+
+	/**
+	 * Whether a statement returns rows: a query or EXPLAIN, by the kind Calcite's parser gives
+	 * it. A prepared statement's metadata cannot say, since for DML it is Calcite's update
+	 * count column. A statement that does not parse is taken to return rows, so preparing it
+	 * reports the error.
+	 */
+	static boolean returnsRows(String jdbcSql) {
+		try {
+			org.apache.calcite.sql.SqlNode node = org.apache.calcite.sql.parser.SqlParser.create(jdbcSql,
+				org.apache.calcite.sql.parser.SqlParser.config()
+					.withParserFactory(convex.db.calcite.ConvexDdlExecutor.PARSER_FACTORY)).parseStmt();
+			return node.isA(org.apache.calcite.sql.SqlKind.QUERY) || node.getKind() == org.apache.calcite.sql.SqlKind.EXPLAIN;
+		} catch (org.apache.calcite.sql.parser.SqlParseException e) {
+			return true;
+		}
+	}
+
+	/**
+	 * The RowDescription of a client's prepared statement, from the metadata of its kept JDBC
+	 * statement, which preparing yields without executing anything. Null if the statement
+	 * returns no rows. Catalogue queries, which are not prepared, are described from a run
+	 * with their parameters as NULL; they read only the catalogue.
+	 */
+	private RowDescription describeRows(PreparedStmt stmt) throws SQLException {
+		if (PgTransactionControl.classify(stmt.query()) != null) return null;
+		String sql = rewriteQuery(stmt.query());
+		if (sql == null) return null;
+		if (isCatalogQuery(sql)) {
+			try (Statement s = connection.createStatement();
+				 ResultSet rs = s.executeQuery(sql.replaceAll("\\$\\d+", "NULL"))) {
+				return RowDescription.fromMetaData(rs.getMetaData());
+			}
+		}
+		String jdbcSql = jdbcSql(sql);
+		if (!returnsRows(jdbcSql)) return null;
+		return describe(keptStatement(stmt, jdbcSql));
+	}
+
+	/** The JDBC statement kept for a client's prepared statement, prepared on first use. */
+	private PreparedStatement keptStatement(PreparedStmt stmt, String jdbcSql) throws SQLException {
+		PreparedStatement pstmt = jdbcStatements.get(stmt);
+		if (pstmt == null) {
+			pstmt = connection.prepareStatement(jdbcSql);
+			jdbcStatements.put(stmt, pstmt);
+		}
+		return pstmt;
+	}
+
+	/** A query with PostgreSQL's numbered parameters as JDBC's. */
+	private static String jdbcSql(String sql) {
+		return sql.replaceAll("\\$\\d+", "?");
+	}
+
+	/** Whether a query reads the virtual catalogue tables, which Calcite does not prepare with parameters. */
+	private static boolean isCatalogQuery(String sql) {
+		String lowerSql = sql.toLowerCase();
+		return lowerSql.contains("pg_catalog") || lowerSql.contains("pg_database") ||
+			lowerSql.contains("pg_type") || lowerSql.contains("pg_class") ||
+			lowerSql.contains("pg_namespace") || lowerSql.contains("pg_attribute") ||
+			lowerSql.contains("pg_tables");
+	}
+
+	private static boolean isStalePlan(Throwable e) {
+		for (Throwable c = e; c != null; c = (c.getCause() == c) ? null : c.getCause()) {
+			if (c instanceof StalePlanException) return true;
+		}
+		return false;
+	}
+
+	/** A kept statement, prepared again after its table changed, returns rows of another description. */
+	private static final class ResultTypeChanged extends SQLException {
+		private static final long serialVersionUID = 1L;
+
+		ResultTypeChanged() {
+			super("cached plan must not change result type", "0A000");
 		}
 	}
 
@@ -649,29 +896,112 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	 * <p>The PostgreSQL JDBC driver sends numbers in binary format: setLong arrives as
 	 * the 8 bytes of an int8, not as the digits of the number. Binding those bytes as
 	 * they are hands Calcite a byte string where it expects a number, and the statement
-	 * fails. Types without a decoding here, and parameters the client declared no type
-	 * for, are bound as bytes as before.
+	 * fails. Types without a binary form in {@link PgBinaryCodec}, and parameters the
+	 * client declared no type for, are bound as bytes as before.
 	 */
 	static void bindBinaryParameter(PreparedStatement pstmt, int index, byte[] value, int oid) throws SQLException {
-		java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(value);
+		Object decoded = PgBinaryCodec.decode(value, oid);
+		if (decoded instanceof Long l) pstmt.setLong(index, l);
+		else if (decoded instanceof Double d) pstmt.setDouble(index, d);
+		else if (decoded instanceof Boolean b) pstmt.setBoolean(index, b);
+		else if (decoded instanceof java.math.BigDecimal n) pstmt.setBigDecimal(index, n);
+		else if (decoded instanceof String s) pstmt.setString(index, s);
+		else if (decoded instanceof Timestamp t) pstmt.setTimestamp(index, t);
+		else if (decoded instanceof byte[] b) pstmt.setBytes(index, b);
+		else pstmt.setBytes(index, value);
+	}
+
+
+	/**
+	 * Binds a parameter that arrived in text format, parsing it as the given type the way
+	 * PostgreSQL's input functions do: invalid input is 22P02 and out-of-range input 22003.
+	 * Text that compares as a string is bound as one, and so are types without a parser
+	 * here, as for binary format.
+	 */
+	static void bindTextParameter(PreparedStatement pstmt, int index, String value, int oid) throws SQLException {
 		switch (oid) {
-			case PgType.INT2 -> { requireLength(value, 2, "int2"); pstmt.setLong(index, buf.getShort()); }
-			case PgType.INT4 -> { requireLength(value, 4, "int4"); pstmt.setLong(index, buf.getInt()); }
-			case PgType.OID -> { requireLength(value, 4, "oid"); pstmt.setLong(index, Integer.toUnsignedLong(buf.getInt())); }
-			case PgType.INT8 -> { requireLength(value, 8, "int8"); pstmt.setLong(index, buf.getLong()); }
-			case PgType.FLOAT4 -> { requireLength(value, 4, "float4"); pstmt.setDouble(index, buf.getFloat()); }
-			case PgType.FLOAT8 -> { requireLength(value, 8, "float8"); pstmt.setDouble(index, buf.getDouble()); }
-			case PgType.BOOL -> { requireLength(value, 1, "bool"); pstmt.setBoolean(index, value[0] != 0); }
-			case PgType.TEXT, PgType.VARCHAR, PgType.CHAR, PgType.NAME ->
-				pstmt.setString(index, new String(value, java.nio.charset.StandardCharsets.UTF_8));
-			default -> pstmt.setBytes(index, value);
+			case PgType.INT2 -> pstmt.setLong(index, parseInteger(value, Short.MIN_VALUE, Short.MAX_VALUE, "smallint"));
+			case PgType.INT4 -> pstmt.setLong(index, parseInteger(value, Integer.MIN_VALUE, Integer.MAX_VALUE, "integer"));
+			case PgType.INT8 -> pstmt.setLong(index, parseInteger(value, Long.MIN_VALUE, Long.MAX_VALUE, "bigint"));
+			case PgType.OID -> pstmt.setLong(index, parseInteger(value, 0L, 0xffffffffL, "oid"));
+			case PgType.FLOAT4 -> pstmt.setDouble(index, parseFloat(value, true));
+			case PgType.FLOAT8 -> pstmt.setDouble(index, parseFloat(value, false));
+			case PgType.NUMERIC -> pstmt.setBigDecimal(index, parseNumeric(value));
+			case PgType.BOOL -> pstmt.setBoolean(index, parseBoolean(value));
+			default -> pstmt.setString(index, value);
 		}
 	}
 
-	private static void requireLength(byte[] value, int expected, String type) throws SQLException {
-		if (value.length != expected) {
-			throw new SQLException("Binary " + type + " parameter has " + value.length + " bytes, expected " + expected, "08P01");
+	/** The type the query implies for an undeclared parameter, as PostgreSQL infers it. */
+	private static int inferredType(ParameterMetaData metaData, int index) throws SQLException {
+		return switch (metaData.getParameterType(index)) {
+			case java.sql.Types.TINYINT, java.sql.Types.SMALLINT -> PgType.INT2;
+			case java.sql.Types.INTEGER -> PgType.INT4;
+			case java.sql.Types.BIGINT -> PgType.INT8;
+			case java.sql.Types.REAL -> PgType.FLOAT4;
+			case java.sql.Types.FLOAT, java.sql.Types.DOUBLE -> PgType.FLOAT8;
+			case java.sql.Types.DECIMAL, java.sql.Types.NUMERIC -> PgType.NUMERIC;
+			case java.sql.Types.BOOLEAN -> PgType.BOOL;
+			default -> PgType.UNKNOWN;
+		};
+	}
+
+	private static final Pattern INTEGER_TEXT = Pattern.compile("[+-]?\\d+");
+	private static final Pattern FLOAT_TEXT = Pattern.compile("[+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?");
+
+	private static long parseInteger(String text, long min, long max, String type) throws SQLException {
+		String s = text.strip();
+		if (!INTEGER_TEXT.matcher(s).matches()) throw invalidInput(type, text);
+		java.math.BigInteger v = new java.math.BigInteger(s);
+		if (v.bitLength() > 63 || v.longValue() < min || v.longValue() > max) {
+			throw new SQLException("value \"" + text + "\" is out of range for type " + type, "22003");
 		}
+		return v.longValue();
+	}
+
+	private static double parseFloat(String text, boolean single) throws SQLException {
+		String type = single ? "real" : "double precision";
+		String s = text.strip();
+		switch (s.toLowerCase(java.util.Locale.ROOT)) {
+			case "nan": return Double.NaN;
+			case "infinity", "+infinity", "inf", "+inf": return Double.POSITIVE_INFINITY;
+			case "-infinity", "-inf": return Double.NEGATIVE_INFINITY;
+			default: break;
+		}
+		if (!FLOAT_TEXT.matcher(s).matches()) throw invalidInput(type, text);
+		double v = single ? Float.parseFloat(s) : Double.parseDouble(s);
+		// Overflow to infinity, or a non-zero value that underflows to zero
+		boolean nonZero = s.replaceFirst("[eE].*", "").matches(".*[1-9].*");
+		if (Double.isInfinite(v) || (v == 0.0 && nonZero)) {
+			throw new SQLException("\"" + text + "\" is out of range for type " + type, "22003");
+		}
+		return v;
+	}
+
+	/** A decimal number, with an optional exponent. NaN and infinities have no exact value, so are invalid. */
+	private static java.math.BigDecimal parseNumeric(String text) throws SQLException {
+		String s = text.strip();
+		if (!FLOAT_TEXT.matcher(s).matches()) throw invalidInput("numeric", text);
+		try {
+			return new java.math.BigDecimal(s);
+		} catch (NumberFormatException e) {
+			// The exponent is beyond the range of a BigDecimal scale
+			throw new SQLException("value \"" + text + "\" is out of range for type numeric", "22003");
+		}
+	}
+
+	/** PostgreSQL's boolean spellings: true, yes, on, 1 and their opposites, or unique prefixes. */
+	private static boolean parseBoolean(String text) throws SQLException {
+		String s = text.strip().toLowerCase(java.util.Locale.ROOT);
+		if (!s.isEmpty()) {
+			if ("true".startsWith(s) || "yes".startsWith(s) || s.equals("1") || (s.length() >= 2 && "on".startsWith(s))) return true;
+			if ("false".startsWith(s) || "no".startsWith(s) || s.equals("0") || (s.length() >= 2 && "off".startsWith(s))) return false;
+		}
+		throw invalidInput("boolean", text);
+	}
+
+	private static SQLException invalidInput(String type, String text) {
+		return new SQLException("invalid input syntax for type " + type + ": \"" + text + "\"", "22P02");
 	}
 
 	/**
@@ -698,11 +1028,7 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			if (paramValues[i] == null) {
 				replacement = "NULL";
 			} else {
-				short format = (paramFormats != null && paramFormats.length > 0)
-					? (paramFormats.length == 1 ? paramFormats[0] : paramFormats[i])
-					: 0;
-
-				if (format == 0) {
+				if (!PgMessageDecoder.Bind.binary(paramFormats, i)) {
 					// Text format
 					String strValue = new String(paramValues[i], java.nio.charset.StandardCharsets.UTF_8);
 					// Check if it looks like a boolean or number
@@ -732,11 +1058,54 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		return result;
 	}
 
+	/**
+	 * Runs {@code DEALLOCATE [PREPARE] name | ALL}, the SQL form of closing prepared
+	 * statements, which clients such as PHP's PDO send. An unquoted name folds to lower
+	 * case, as PostgreSQL folds identifiers; an unknown name is 26000.
+	 *
+	 * @return true if the statement was DEALLOCATE and has completed
+	 */
+	private boolean deallocate(ChannelHandlerContext ctx, String sql) throws SQLException {
+		String target = deallocateTarget(sql);
+		if (target == null) return false;
+		if (target.isEmpty()) {
+			for (PreparedStmt stmt : statements.values()) closeJdbcStatement(stmt);
+			statements.clear();
+			write(ctx, new CommandComplete("DEALLOCATE ALL"));
+		} else {
+			PreparedStmt stmt = statements.remove(target);
+			if (stmt == null) throw new SQLException("prepared statement \"" + target + "\" does not exist", "26000");
+			closeJdbcStatement(stmt);
+			write(ctx, new CommandComplete("DEALLOCATE"));
+		}
+		return true;
+	}
+
+	/**
+	 * The statement name a DEALLOCATE names: empty for ALL, null if the statement is not
+	 * DEALLOCATE.
+	 */
+	static String deallocateTarget(String sql) throws SQLException {
+		String s = sql.strip();
+		while (s.endsWith(";")) s = s.substring(0, s.length() - 1).strip();
+		String[] words = s.split("\\s+", 3);
+		if (!words[0].equalsIgnoreCase("DEALLOCATE")) return null;
+		String name = (words.length > 1 && words[1].equalsIgnoreCase("PREPARE"))
+			? (words.length > 2 ? words[2] : "")
+			: s.substring(words[0].length()).strip();
+		if (name.isEmpty()) throw new SQLException("syntax error at end of input", "42601");
+		if (name.length() > 1 && name.startsWith("\"") && name.endsWith("\"")) {
+			return name.substring(1, name.length() - 1).replace("\"\"", "\"");
+		}
+		if (name.equalsIgnoreCase("ALL")) return "";
+		return name.toLowerCase(java.util.Locale.ROOT);
+	}
+
 	private void handleClose(ChannelHandlerContext ctx, PgMessageDecoder.Close close) {
 		log.debug("Close: type={}, name='{}'", (char) close.type(), close.name());
 
 		if (close.type() == 'S') {
-			statements.remove(close.name());
+			closeJdbcStatement(statements.remove(close.name()));
 		} else {
 			portals.remove(close.name());
 		}
@@ -755,8 +1124,22 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	private void handleSync(ChannelHandlerContext ctx) {
-		write(ctx, ReadyForQuery.IDLE_INSTANCE);
+		discardUntilSync = false;
+		write(ctx, readyForQuery());
 		ctx.flush();
+	}
+
+	/** Reports an error from an extended query message, discarding messages until Sync. */
+	private void writeExtendedError(ChannelHandlerContext ctx, ErrorResponse error) {
+		writeError(ctx, error);
+		discardUntilSync = true;
+	}
+
+	private static boolean isDiscardable(Object msg) {
+		return msg instanceof PgMessageDecoder.Parse || msg instanceof PgMessageDecoder.Bind
+			|| msg instanceof PgMessageDecoder.Describe || msg instanceof PgMessageDecoder.Execute
+			|| msg instanceof PgMessageDecoder.Close || msg instanceof PgMessageDecoder.Flush
+			|| msg instanceof PgMessageDecoder.Query;
 	}
 
 	private void handleTerminate(ChannelHandlerContext ctx) {
@@ -771,7 +1154,22 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		ctx.write(buf);
 	}
 
+	/** Closes the JDBC statement prepared for a statement that is closed or replaced, if there is one. */
+	private void closeJdbcStatement(PreparedStmt stmt) {
+		PreparedStatement pstmt = (stmt == null) ? null : jdbcStatements.remove(stmt);
+		if (pstmt != null) {
+			try {
+				pstmt.close();
+			} catch (SQLException e) {
+				log.warn("Error closing prepared statement", e);
+			}
+		}
+	}
+
 	private void closeConnection() {
+		for (PreparedStmt stmt : new java.util.ArrayList<>(jdbcStatements.keySet())) {
+			closeJdbcStatement(stmt);
+		}
 		if (connection != null) {
 			try {
 				connection.close();

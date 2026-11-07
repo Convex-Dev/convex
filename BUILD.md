@@ -21,7 +21,9 @@ replace `./mvnw` with `.\mvnw.cmd` and keep the remaining arguments unchanged.
 ./mvnw -B -T1C test
 ```
 
-Reserve `./mvnw -B clean install` for final verification and releases. Ordinary
+Use `./mvnw -B clean verify` for final verification. `install` also copies the
+artifacts into `~/.m2`, where other local projects resolve them, so keep it for
+releases and for a sibling project that needs the fresh snapshot. Ordinary
 builds do not generate source/Javadoc jars or load Maven Central publishing;
 `-Prelease` enables those release-only artifacts and services.
 
@@ -63,6 +65,20 @@ each generated parameter using the reported seeds, then rerun the property.
 Keep the generator and trial settings unchanged during replay. Add a small
 deterministic regression for a confirmed bug while retaining fresh random
 generation in the property suite.
+
+### Test hazards and diagnosis
+
+Small `CVMLong`s, booleans, empty collections and core functions are cached cells
+shared across the test JVM. Never write one under a synthetic Etch key or a fake
+hash: that corrupts its hash for every later test in the JVM. Use fresh, randomly
+seeded blobs of about 30 bytes instead.
+
+To reproduce an intermittent failure, loop it in one JVM under CPU load in a soak
+test gated by `-Dconvex.soak=true`, as `JoinNetworkSoakTest` does.
+
+A test run that hangs at near-zero CPU is a class-initialisation deadlock: run
+`ClassInitCycles` (`convex-integration/src/test/java/convex/tools`) to find the
+cycle.
 
 ## CI Workflows
 
@@ -113,19 +129,40 @@ gh run list --branch develop --limit 1
 
 ### 2. Update CHANGELOG
 
-- Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the tag and heading must match).
-- Finalise the `### Added` / `### Changed` / `### Fixed` bullets for this version.
-- Commit to `develop`.
+The changelog is for users and operators: people running nodes and services, and
+clients using SQL, JDBC, PostgreSQL, WebDAV, REST or the CLI. Entries are written
+this way as changes land, and the unreleased section is cleaned up before each
+release:
 
-### 3. Merge to master
+- Each entry is a short, positive headline in the imperative ("Support…", "Speed
+  up…", "Keep…"), with at most one link, to its doc or issue.
+- Related entries are merged. Implementation detail stays out: class, method and
+  constant names, dependency bumps, build plumbing, test-only refactors and agent
+  tooling. Embedders read the code, so Java API changes share one entry pointing
+  at the design notes.
+- A breaking change gets one entry pointing at its doc.
+
+Then:
+
+- Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the tag and heading must match).
+- Commit to `develop` and push it. The release is made from `origin/develop`.
+
+### 3. Merge to master in a release worktree
+
+The release runs in its own worktree on `master`. The main checkout stays on
+`develop` for everyone else working in it, and nothing there can move the release
+tree off the tag before the deploy in step 8. Steps 4 to 8 run in this worktree:
 
 ```bash
-git checkout develop && git pull --ff-only
-git checkout master && git pull --ff-only
-git merge develop --no-ff
+git fetch origin
+git worktree add ../convex-release master
+cd ../convex-release
+git merge --ff-only origin/master
+git merge --no-ff origin/develop
 ```
 
-The `pull --ff-only` on both branches ensures you're not merging a stale local develop or pushing a stale master.
+Merging `origin/develop` releases what was pushed and built by CI, and nothing
+committed locally since.
 
 ### 4. Set version
 
@@ -138,10 +175,10 @@ git add pom.xml '**/pom.xml' && git commit -m "Prepare for Release 0.8.4"
 
 As part of the same version-bump commit, also update:
 
-- **`project.build.outputTimestamp`** in the parent `pom.xml` — set to the current UTC
-  time (e.g. `2026-04-18T16:08:52Z`). This is frozen for reproducible builds and must
-  be refreshed each release, otherwise the new artifacts carry the previous release's
-  timestamp.
+- **`project.build.outputTimestamp`** in the parent `pom.xml` — `versions:set`
+  refreshes it to the current UTC time (e.g. `2026-04-18T16:08:52Z`); check that the
+  diff shows the new value. It is frozen for reproducible builds, so a stale value
+  would give the new artifacts the previous release's timestamp.
 - **Module README install snippets** — the Maven/Gradle `<version>` examples in the
   module `README.md` files should reference the new release version:
 
@@ -169,18 +206,35 @@ java -jar convex-integration/target/convex.jar --version
 ```
 
 Verify the reported version is the release version (e.g. `0.8.4`, not `-SNAPSHOT`).
+The `install` also puts the release into `~/.m2`, where other local projects can
+use it before Maven Central has it.
 
 Quick last-line-of-defence check: the uberjar launches, main class resolves, CLI wiring is intact. Maven Central publishes are irrevocable, so catch uberjar class-path regressions now.
 
-### 6. Tag and push
+### 6. Push master, then tag
+
+Push `master` first. CI has not yet built its version commit, so wait for the
+Build run on that commit to pass before anything public is tagged:
+
+```bash
+git push origin master
+gh run list --commit "$(git rev-parse HEAD)" --workflow build.yml
+```
+
+Then tag:
 
 ```bash
 git tag 0.8.4
-git push origin master
 git push origin 0.8.4
 ```
 
-This triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
+The tag triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
+
+A ruleset restricts release tags to accounts that can bypass it. When the push
+bypasses the rule, git still prints a rule message (`Bypassed rule violations`, or
+`Cannot create ref due to creations being restricted`) followed by `* [new tag]`:
+the tag landed. `GH013` with `! [remote rejected]` means it did not. Confirm with
+`git ls-remote --tags origin 0.8.4`.
 
 ### 7. Confirm GitHub Release is live
 
@@ -191,7 +245,7 @@ https://github.com/Convex-Dev/convex/releases
 Verify:
 - Release status is not draft/pre-release
 - `convex.jar` is attached as an asset, along with its SHA-256 checksum (`convex.jar.sha256`) and the SBOM (`convex-<version>-sbom.json`)
-- Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex`
+- Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex` (it may print nothing on success: exit code 0 means verified, or add `--format json`)
 - Changelog content is correct (not the fallback "See CHANGELOG.md for details" — if that shows, the changelog section header didn't match the tag and the workflow should have failed; investigate).
 - Docker images pushed: `convexlive/convex:<version>` and a freshly-updated `latest` at https://hub.docker.com/r/convexlive/convex/tags
 
@@ -223,10 +277,9 @@ A stray GitHub Release created by a failed workflow run also needs to be deleted
 
 ### 8. Deploy to Maven Central
 
-Only after confirming the GitHub Release is live:
+Only after confirming the GitHub Release is live, from the release worktree at the tag:
 
 ```bash
-git checkout master
 ./mvnw deploy -Prelease
 ```
 
@@ -237,10 +290,19 @@ signing-key passphrase. Do not add Maven's `-B` batch flag, which prevents that
 prompt. Unattended CI publishing must provide signing credentials through its
 secret environment rather than command-line properties.
 
+Deploy is the priority once the GitHub Release is live. Until Central confirms
+publication, keep the release worktree on `master` at the tag: do not switch
+branches or run `versions:set` in it. The deploy publishes whatever version the
+working tree holds, so a tree already moved to the next snapshot would publish the
+wrong artifacts. The main checkout can carry on with `develop` meanwhile.
+
 ### 9. Prepare next development version
 
+Only after Central has confirmed publication, remove the release worktree and, in
+the main checkout on `develop`:
+
 ```bash
-git checkout develop
+git worktree remove ../convex-release
 git merge master --no-ff
 ./mvnw -B versions:set -DnewVersion='0.8.5-SNAPSHOT' -DgenerateBackupPoms=false
 git add pom.xml '**/pom.xml' && git commit -m "Prepare for next development cycle (0.8.5-SNAPSHOT)"

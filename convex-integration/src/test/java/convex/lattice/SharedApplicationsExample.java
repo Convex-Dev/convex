@@ -51,8 +51,8 @@ public final class SharedApplicationsExample {
 
 	/** A node record for the P2P region. */
 	static AHashMap<Keyword,ACell> nodeInfo(String name,long time) {
-		return convex.lattice.p2p.P2PLattice.createNodeInfo(Vectors.empty(),
-			Strings.create(name),Strings.create("example"),Vectors.empty(),time);
+		return P2PLattice.createNodeInfo(Vectors.empty(),
+			Strings.create(name),Strings.create("example"),null,time);
 	}
 
 	/** Social feeds, staged at {@code :social}. The P2P regions are shared live. */
@@ -60,7 +60,7 @@ public final class SharedApplicationsExample {
 		private final Social social;
 
 		SocialApp(LatticeHost<Index<Keyword,ACell>> host,AKeyPair user,long time) {
-			super(host);
+			super(host.cursor());
 			social=region(Social.KEY_SOCIAL,Social.connect(cursor().path(Social.KEY_SOCIAL),
 				DIDKeyAuthorizer.CONVEX,(owner,value) -> user.signData(value),() -> CVMLong.create(time)).fork());
 		}
@@ -103,7 +103,7 @@ public final class SharedApplicationsExample {
 		private Node(EtchStore store,AKeyPair nodeKey,long time) throws Exception {
 			host=LatticeHost.open(store);
 			// Infrastructure is registered once; both domain applications use its live state.
-			host.addApplication(LatticeApplication.live(P2PLattice.ROOT,host));
+			host.addApplication(new LatticeComponent<>(P2PLattice.ROOT,host.cursor()));
 			social=host.addApplication(new SocialApp(host,ALICE,time));
 			var region=DLFSRegion.connect(host.cursor().path(Keywords.FS),store,
 				BOB::signData,() -> CVMLong.create(time));
@@ -146,17 +146,18 @@ public final class SharedApplicationsExample {
 		}
 
 		private void awaitServed() throws Exception {
-			ACell expected=host.cursor().get();
-			long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
-			while (true) {
-				var next=propagation.nextAnnounce();
-				if (expected.equals(propagation.getLastAnnouncedValue())) return;
-				next.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
-			}
+			propagation.whenAnnounced(host.cursor().get()::equals).get(10,TimeUnit.SECONDS);
 		}
 
+		/**
+		 * Saves what the host holds, then closes the network, which sends that save to
+		 * peers, and the host. Pending edits stay private: each application publishes
+		 * only when its owner chooses.
+		 */
 		@Override public void close() throws Exception {
-			network.close();
+			try (host; network) {
+				host.checkpoint();
+			}
 		}
 	}
 

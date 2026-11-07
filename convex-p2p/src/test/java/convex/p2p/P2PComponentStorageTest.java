@@ -21,7 +21,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeApplication;
+import convex.lattice.Regions;
 import convex.lattice.cursor.Root;
 
 /** Domain storage properties need neither a node nor a disk store. */
@@ -35,7 +35,7 @@ class P2PComponentStorageTest {
 		P2PLattice.createIdentity(Strings.intern("updated"),null,null,2);
 
 	private static P2PUser user(Root<ACell> root,BiFunction<ACell,ACell,SignedData<ACell>> signer) {
-		var application=new LatticeApplication<Index<Keyword,ACell>>(P2PLattice.ROOT,root.path()) {};
+		var application=new Regions(root.<Index<Keyword,ACell>>path());
 		return P2PUser.create(application,KEY,signer);
 	}
 
@@ -56,7 +56,7 @@ class P2PComponentStorageTest {
 				default -> (owner,value) -> BOB.signData(value);
 			};
 			var view=component(user(root,signer),node);
-			assertNull(view.cursor().get());
+			assertFalse(view.cursor().exists());
 			view.cursor().set(null);
 			view.sync();
 			assertNull(root.get());
@@ -103,8 +103,8 @@ class P2PComponentStorageTest {
 			assertNull(root.get());
 			assertEquals(0,signatures.get());
 		};
-		if (node) user.node().transact(edits::accept);
-		else user.identity().transact(edits::accept);
+		if (node) user.node().execute(edits::accept);
+		else user.identity().execute(edits::accept);
 		assertEquals(SECOND,component(user,node).cursor().get());
 		assertEquals(1,signatures.get());
 		ACell before=root.get();
@@ -113,8 +113,8 @@ class P2PComponentStorageTest {
 			throw new IllegalArgumentException("Aborted edit");
 		};
 		assertThrows(IllegalArgumentException.class,() -> {
-			if (node) user.node().transact(abort::accept);
-			else user.identity().transact(abort::accept);
+			if (node) user.node().execute(abort::accept);
+			else user.identity().execute(abort::accept);
 		});
 		assertSame(before,root.get());
 		assertEquals(1,signatures.get());

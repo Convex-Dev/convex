@@ -48,7 +48,12 @@ Client                          Peer Server
 │                   │    applyBlock → applyTransactions (sequential)
 │                   │  persistPeerData()
 │                   │  maybeReportTransactions()
-│                   │    interests.get(hash) → m.returnResult(res)
+│                   │    interests.remove(hash) → collect results
+└────────┬─────────┘
+         │ one virtual thread per block
+         ▼
+┌──────────────────┐
+│ Result delivery   │  m.returnResult(res), never waits
 └────────┬─────────┘
          │
          ▼
@@ -109,7 +114,7 @@ interests.put(sd.getHash(), m);   // ConcurrentHashMap<Hash, Message>
 
 Maps transaction hash → original Message so results can be returned later.
 Uses `ConcurrentHashMap` because `registerInterest()` runs on the TransactionHandler
-thread while `reportTransactions()` (which reads and removes interests) runs on the
+thread while `reportTransactions()` (which removes interests) runs on the
 CVMExecutor thread.
 
 ## Stage 3: BeliefPropagator
@@ -230,9 +235,16 @@ if (newConsensusPoint > reportedConsensusPoint) {
 }
 ```
 
-For each new finalised block:
-1. Look up `interests.get(txHash)` → original Message
-2. `m.returnResult(res)` → sends result back to client via Netty
+For each new finalised block, the executor:
+1. Removes `interests.remove(txHash)` → original Message, and builds its result
+2. Starts a virtual thread for the block, which returns each result in order with
+   `m.returnResult(res)`
+
+The executor never waits for delivery: not to encode a result, nor for an
+in-process client's continuations, which run on the delivery thread. The delivery
+thread itself never waits for outbound capacity. Each block's results are
+delivered independently, so one client can receive a later block's result before
+an earlier block's. A message sent without a request ID gets no result.
 
 ## Timing Analysis
 
@@ -472,7 +484,7 @@ flushing happens, enabling batching at the connection level.
 
 ### Server Result Return
 
-`reportTransactions()` calls `m.returnResultBlocking(res)` per result. On a Netty
+Each block's delivery thread calls `m.returnResult(res)` per result. On a Netty
 server connection this offers the encoded result to the server's single
 `ServerOutboundQueue`, shared by every inbound connection and bounded by the bytes it
 holds (`Config.SERVER_OUTBOUND_QUEUE_BYTE_LIMIT`). One writer thread hands queued
@@ -480,21 +492,28 @@ messages to Netty and flushes each touched channel once per batch, so bursts of
 results coalesce into few TCP segments without `TransactionHandler` ever seeing a
 channel.
 
-The queue applies three policies:
+Nothing waits to add a result: it is queued or refused at once. The queue applies
+these policies:
 
-- **Backpressure, not loss.** If the shared bound is full, the reporting thread
-  (the `CVMExecutor`) waits for space, up to `Config.DEFAULT_INTERNAL_TIMEOUT`.
-  Delaying state updates is preferable to dropping results globally. Consensus is
-  unaffected: Belief propagation runs on outbound connections with their own queues,
-  and hands beliefs to the executor through a latest-value slot that never blocks.
+- **Slow the client, don't lose its results.** Each connection's backlog, the
+  bytes of its replies queued or handed to Netty and not yet written, is counted.
+  From half the client allowance (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`),
+  the server stops reading that client's requests until the backlog is written
+  down to a quarter ([BACKPRESSURE.md](BACKPRESSURE.md#reply-backlog)).
 - **A stalled reader loses only its own replies.** Bytes handed to Netty but not
   yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`,
-  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a verified peer).
-  Over that cap the connection's results are refused at once, never waited for, and
-  logged at debug. The client sees a `:TIMEOUT`.
-- **Trusted peers first.** Replies to verified peer connections go into a lane the
-  writer drains first and that is exempt from the shared bound, so consensus and
-  lattice replies never queue behind client results.
+  or `Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT` for a connection a lattice node has
+  verified). Over that cap
+  the connection's results are refused and logged at debug. The client sees a
+  `:TIMEOUT`.
+- **Shedding load.** A client result that finds the shared bound full is refused.
+  The writer only hands messages to Netty, so this takes a server too short of CPU
+  for the writer to keep up.
+- **Verified lattice peers first.** Replies to connections a lattice node has
+  verified go into a lane the writer drains first and that is exempt from the
+  shared bound, so they never queue behind client results. A consensus peer
+  verifies no connection opened to it, so its replies to other peers' requests
+  share the client lane.
 
 ### Test Tool
 
@@ -533,7 +552,7 @@ Etch on spinning disk), this adds latency between CVM execution and result repor
 | `MAX_TRANSACTIONS_PER_BLOCK` | 1024 | Constants | Block size limit |
 | `DEFAULT_MIN_BLOCK_TIME` | 10ms | TransactionHandler | Min interval between blocks |
 | `AWAIT_BELIEFS_PAUSE` | 30ms | BeliefPropagator | Belief poll timeout |
-| `BELIEF_QUEUE_SIZE` | 200 | Config | Acquired Belief and trusted propagation queue capacities |
-| `DEFAULT_CLIENT_TIMEOUT` | 8000ms | Config | Client gives up after this |
+| `BELIEF_QUEUE_SIZE` | 200 | Config | Acquired Belief and propagation queue capacities |
+| `DEFAULT_CLIENT_TIMEOUT` | 20000ms | Config | Client gives up after this |
 | `SIGN_CHUNK_SIZE` | 100 | Peer | Txns per parallel sig task |
 | CVMExecutor poll timeout | 100ms | CVMExecutor | Idle belief poll |

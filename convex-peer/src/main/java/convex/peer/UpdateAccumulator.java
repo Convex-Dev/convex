@@ -29,9 +29,6 @@ import convex.core.message.MessageType;
  */
 final class UpdateAccumulator implements Consumer<Ref<ACell>> {
 
-	/** Allowance per cell for its length prefix, its reference from the DATA vector and vector nodes. */
-	private static final long CELL_OVERHEAD = Format.MAX_VLQ_LONG_LENGTH + Ref.INDIRECT_ENCODING_LENGTH + 8;
-
 	private final int messageLimit;
 	private final long byteBudget;
 	private final Hash rootHash;
@@ -72,7 +69,7 @@ final class UpdateAccumulator implements Consumer<Ref<ACell>> {
 	void add(ACell cell) {
 		if (cell == null || cell.isEmbedded()) return;
 		if (rootHash != null && rootHash.equals(cell.getHash())) return;
-		long estimate = cell.getEncodingLength() + CELL_OVERHEAD;
+		long estimate = cell.getEncodingLength() + Message.DATA_CELL_OVERHEAD;
 		if (omitted > 0 || estimate > messageLimit || materialised + batchEstimate + estimate > byteBudget) {
 			omitted++; // left in the store for receivers to pull
 			return;

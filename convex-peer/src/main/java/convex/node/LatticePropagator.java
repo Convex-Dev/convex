@@ -27,16 +27,19 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.exceptions.ResultException;
 import convex.core.exceptions.StoreException;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.message.AConnection;
+import convex.core.message.ChallengeSigner;
 import convex.core.store.AStore;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Root;
+import convex.net.PeerConnectionException;
 
 /**
  * Isolated connection and publication policy group for one lattice node.
@@ -58,16 +61,14 @@ import convex.lattice.cursor.Root;
  * <p>The group's store is a serving and novelty cache. DATA_REQUEST responses can
  * resolve only cells materialised in this exact store. The node alone writes the
  * node root; a propagator never writes a store root of its own.</p>
+ *
+ * <p><b>Threading.</b> Start and close take no lock. The owning node, or the
+ * application for a group it runs on its own, calls them one after the other.
+ * Triggers, inbound messages and failure reports may arrive on any thread.</p>
  */
 public class LatticePropagator implements Closeable {
 
 	private static final Logger log = LoggerFactory.getLogger(LatticePropagator.class.getName());
-
-	/**
-	 * Interval between root-only sync broadcasts (milliseconds).
-	 * Provides a lightweight periodic sync mechanism for divergence detection.
-	 */
-	public static final long ROOT_SYNC_INTERVAL = 30_000L;
 
 	/**
 	 * Serving store for novelty tracking and peer data resolution. Missing data
@@ -96,9 +97,10 @@ public class LatticePropagator implements Closeable {
 	private LatticeProtocolEndpoint endpoint;
 
 	/** Endpoint configuration retained until attachment. */
-	private AKeyPair transportKeyPair;
+	private ChallengeSigner transportSigner;
 	private Predicate<Message> applicationMessageHandler;
 	private InboundLatticeListener inboundLatticeListener;
+	private Predicate<AccountKey> challengerAdmission;
 
 	/** Background publication worker. */
 	private Thread propagationThread;
@@ -149,9 +151,16 @@ public class LatticePropagator implements Closeable {
 	private volatile long lastBroadcastTime = 0L;
 
 	/**
-	 * Timestamp of last root sync broadcast (background thread only).
+	 * Milliseconds between periodic root announcements, from the group's
+	 * configuration.
 	 */
-	private long lastRootSyncTime = 0L;
+	private final long rootAnnouncementInterval;
+
+	/**
+	 * Timestamp of the last root announcement, periodic or on demand. Volatile
+	 * because an announcement on demand may come from any thread.
+	 */
+	private volatile long lastRootAnnouncementTime = 0L;
 
 	/**
 	 * Count of broadcasts sent. Atomic because both the caller's thread and
@@ -160,9 +169,10 @@ public class LatticePropagator implements Closeable {
 	private final java.util.concurrent.atomic.AtomicLong broadcastCount = new java.util.concurrent.atomic.AtomicLong();
 
 	/**
-	 * Count of root sync broadcasts sent
+	 * Count of root announcements sent, periodic or on demand. Atomic because an
+	 * announcement on demand may come from any thread.
 	 */
-	private long rootSyncCount = 0L;
+	private final java.util.concurrent.atomic.AtomicLong rootAnnouncementCount = new java.util.concurrent.atomic.AtomicLong();
 
 	/**
 	 * Serialises this group's serving-store materialisation and announcement
@@ -171,7 +181,7 @@ public class LatticePropagator implements Closeable {
 	private final Object writeLock = new Object();
 
 	/**
-	 * Creates a propagation group with default limits.
+	 * Creates a propagator group with default limits.
 	 *
 	 * @param store serving store for delta tracking and data resolution
 	 * @param connectionManager connection manager for outbound routes
@@ -181,7 +191,7 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Creates a propagation group with application-supplied limits. Identity,
+	 * Creates a propagator group with application-supplied limits. Identity,
 	 * admission, projection and application hooks are optional policy configured
 	 * through the setters, including while running.
 	 *
@@ -200,16 +210,19 @@ public class LatticePropagator implements Closeable {
 		// Fail while the application is composing the group, before attachment can
 		// open any endpoint resource.
 		config.getInboundShutdownTimeout();
+		this.rootAnnouncementInterval=config.getRootAnnouncementInterval();
 		this.maxDeltaMessageSize=config.getMaxDeltaMessageSize();
 		this.maxDeltaBroadcastSize=config.getMaxDeltaBroadcastSize();
 		connectionManager.setMaxDesiredPeers(config.getMaxDesiredPeers());
 		connectionManager.setPeerTargets(config.getAmbientPeers(),config.getActivePeers());
+		connectionManager.setKeepAlive(config.getKeepAlive());
 		connectionManager.setInboundMessageLimits(
 			config.getMaxMessageSize(),config.getMaxTrustedMessageSize());
+		connectionManager.setDataRequestLimit(config.getMaxDataRequests());
 	}
 
 	/**
-	 * Creates a propagation group with a new connection manager and default limits.
+	 * Creates a propagator group with a new connection manager and default limits.
 	 *
 	 * @param store serving store for delta tracking and peer data resolution
 	 */
@@ -218,7 +231,7 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Creates a propagation group with a new connection manager and
+	 * Creates a propagator group with a new connection manager and
 	 * application-supplied limits.
 	 *
 	 * @param store serving store for delta tracking and peer data resolution
@@ -228,7 +241,7 @@ public class LatticePropagator implements Closeable {
 		this(store,new LatticeConnectionManager(store),config);
 	}
 
-	/** Observable lifecycle of one propagation policy group. */
+	/** Observable lifecycle of one propagator group. */
 	public enum State {
 		/** Constructed and not started. */
 		NEW,
@@ -253,7 +266,7 @@ public class LatticePropagator implements Closeable {
 	public record Failure(long sequence,String operation,Throwable cause,long timestamp) {}
 
 	/**
-	 * Immutable operational snapshot for one propagation policy group.
+	 * Immutable operational snapshot for one propagator group.
 	 *
 	 * @param state current lifecycle state
 	 * @param failureCount contained failures since construction
@@ -302,6 +315,7 @@ public class LatticePropagator implements Closeable {
 			Status current=status;
 			status=new Status(state,current.failureCount(),current.lastFailure());
 		}
+		if (state==State.STOPPED) failAnnounceWaits();
 	}
 
 	/** Records a contained component failure without throwing into the node host. */
@@ -345,9 +359,10 @@ public class LatticePropagator implements Closeable {
 			this.node=node;
 			if (endpoint==null) endpoint=new LatticeProtocolEndpoint(this,node,config);
 			connectionManager.setInboundProbe(endpoint::probe,endpoint::retireConnection);
-			endpoint.setTransportKeyPair(transportKeyPair);
+			endpoint.setTransportSigner(transportSigner);
 			endpoint.setApplicationMessageHandler(applicationMessageHandler);
 			endpoint.setInboundLatticeListener(inboundLatticeListener);
+			endpoint.setChallengerAdmission(challengerAdmission);
 		}
 	}
 
@@ -356,21 +371,37 @@ public class LatticePropagator implements Closeable {
 	/** Public transport identity used for possession proofs, or null when unconfigured. */
 	public AccountKey getTransportKey() {
 		synchronized (writeLock) {
-			return transportKeyPair==null?null:transportKeyPair.getAccountKey();
+			return transportSigner==null?null:transportSigner.getAccountKey();
 		}
 	}
 
 	/**
-	 * Sets the key used by this group's challenge/response endpoint.
-	 * Changes apply to subsequent handshakes; existing routes are not reauthenticated.
+	 * Sets the key used by this group's challenge/response endpoint, as
+	 * {@link #setTransportSigner} does with a signer for it in the lattice challenge
+	 * context.
 	 *
 	 * @param keyPair transport identity, or {@code null} for unverified outbound routes
 	 */
 	public void setTransportKeyPair(AKeyPair keyPair) {
+		setTransportSigner((keyPair==null)?null
+			:ChallengeSigner.create(keyPair,Message.LATTICE_PEER_CHALLENGE_CONTEXT));
+	}
+
+	/**
+	 * Sets the signer this group proves its transport identity with, for its
+	 * challenge/response endpoint and the peers its connection manager dials. The
+	 * group holds no key pair, so it can sign challenges and answers and nothing else.
+	 * Changes apply to subsequent handshakes; existing routes are not reauthenticated.
+	 *
+	 * @param signer signer in the lattice challenge context, or {@code null} for
+	 *        unverified outbound routes
+	 * @throws IllegalArgumentException if the signer is for another challenge context
+	 */
+	public void setTransportSigner(ChallengeSigner signer) {
 		synchronized (writeLock) {
-			this.transportKeyPair=keyPair;
-			if (endpoint!=null) endpoint.setTransportKeyPair(keyPair);
-			connectionManager.setKeyPair(keyPair);
+			connectionManager.setChallengeSigner(signer);
+			this.transportSigner=signer;
+			if (endpoint!=null) endpoint.setTransportSigner(signer);
 		}
 	}
 
@@ -413,6 +444,27 @@ public class LatticePropagator implements Closeable {
 		synchronized (writeLock) {
 			this.inboundLatticeListener=listener;
 			if (endpoint!=null) endpoint.setInboundLatticeListener(listener);
+		}
+	}
+
+	/**
+	 * Sets which nodes this group gossips with when they connect to it. A node that
+	 * challenges this group over an inbound connection, naming this group's transport
+	 * key, is challenged back if the predicate admits its key; once it proves the key,
+	 * the connection becomes an authenticated outbound route, as with
+	 * {@link #authenticateInboundRoute}. A challenge naming no key, which a node
+	 * dialling an endpoint sends first, is answered but admits nothing. Admission
+	 * spends this group's bandwidth on the node; it grants no trust in what it sends.
+	 *
+	 * <p><b>API note:</b> This method is provisional until a group has one policy for
+	 * who may read its view, receive its updates and send it values (#823).</p>
+	 *
+	 * @param admission keys to admit, or {@code null} to admit none, the default
+	 */
+	public void setChallengerAdmission(Predicate<AccountKey> admission) {
+		synchronized (writeLock) {
+			this.challengerAdmission=admission;
+			if (endpoint!=null) endpoint.setChallengerAdmission(admission);
 		}
 	}
 
@@ -482,7 +534,7 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Assigns a physically inbound connection to this propagation policy group.
+	 * Assigns a physically inbound connection to this propagator group.
 	 * Assignment permits this endpoint to process the connection; it does not
 	 * authenticate the remote node or add an outbound route.
 	 */
@@ -525,16 +577,32 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Starts non-blocking possession verification for an assigned inbound
-	 * connection. The expected key must already be in this group's bounded
-	 * desired-peer set. On success, the full-duplex socket becomes an authenticated
-	 * outbound route; callers may await
-	 * {@link LatticeConnectionManager#whenInboundConnectionUpgraded(AccountKey)}.
+	 * connection. The caller vouches for {@code expectedKey} on this connection; a
+	 * P2P node does so when the connection delivers that key's own valid signed
+	 * NodeInfo. Desired-peer membership is not required. On success, the full-duplex
+	 * socket becomes an authenticated outbound route; callers may await
+	 * {@link LatticeConnectionManager#whenInboundConnectionUpgraded(AccountKey)}. A
+	 * connection that has closed, as one can just after delivering its last value, is
+	 * left alone.
 	 *
 	 * @param connection assigned physical inbound connection
 	 * @param expectedKey expected remote transport key
+	 * @throws IllegalStateException if an open connection belongs to another group
 	 */
 	public void authenticateInboundRoute(AConnection connection,AccountKey expectedKey) {
 		requireEndpoint().authenticateInbound(connection,expectedKey);
+	}
+
+	/**
+	 * Returns the keys this group's inbound connections are being challenged for:
+	 * vouched for by {@link #authenticateInboundRoute}, not yet proven. A key leaves
+	 * this set once its challenge ends, after a successful one has upgraded the route.
+	 *
+	 * @return defensive set of claimed keys
+	 */
+	public Set<AccountKey> getAuthenticatingInboundKeys() {
+		LatticeProtocolEndpoint result=endpoint;
+		return (result==null)?new HashSet<>():result.authenticatingInboundKeys();
 	}
 
 	/**
@@ -565,9 +633,9 @@ public class LatticePropagator implements Closeable {
 		requireEndpoint().handle(message);
 	}
 
-	/** Package-visible size-policy probe for endpoint tests. */
-	boolean withinInboundSizeLimit(ACell value) {
-		return ACell.getMemorySize(value)<=config.getMaxInboundValueSize();
+	/** Delivers reverse traffic from an admitted outbound route as the connection manager does, for package tests. */
+	Predicate<Message> receiveFromManagedOutbound(Convex peer,Message message) {
+		return requireEndpoint().receiveFromManagedOutbound(peer,message);
 	}
 
 	private LatticeProtocolEndpoint requireEndpoint() {
@@ -633,17 +701,107 @@ public class LatticePropagator implements Closeable {
 	public ACell getLastAnnouncedValue() { return announcedCursor.get(); }
 
 	/**
-	 * Future completing with the next value announced by this propagator.
-	 *
-	 * <p>Gives callers something to wait on for propagation: capture the future
-	 * <em>before</em> triggering the change, then {@code get(timeout)} — no
-	 * sleep-polling on {@link #getLastAnnouncedValue()} required. Each announce
-	 * completes the current future and installs a fresh one, so the returned
-	 * future always reflects an announce that happens after the call.
+	 * Future completing with the next value announced by this propagator, whatever
+	 * it is. Capture it <em>before</em> triggering the change. An announcement
+	 * already in progress completes it, possibly with an older value; to wait for a
+	 * particular state, use {@link #whenAnnounced(Predicate)}. Completes, like
+	 * {@code whenAnnounced}, once the value is served and its broadcast queued.
 	 *
 	 * @return future for the next announced store-backed value
 	 */
 	public CompletableFuture<ACell> nextAnnounce() { return nextAnnounceFuture; }
+
+	/**
+	 * Future completing with a value this group has announced that satisfies the
+	 * condition: the latest announced value if it already does, otherwise the first
+	 * later one that does. Each announced value is tested; consecutive updates may
+	 * coalesce, so test for the state wanted rather than for one exact value.
+	 *
+	 * <p>Completes only once that value is served from this group's store and its
+	 * delta broadcast, if the group has routes, is queued, so
+	 * {@link #getBroadcastCount()} and the served view already include it. Delivery
+	 * to peers is not implied.</p>
+	 *
+	 * <p>The condition runs on the announcing thread, which may hold the host's
+	 * publication lock: keep it to a quick, non-blocking test. A condition that
+	 * throws fails this future only. A wait still pending when the group stops fails;
+	 * cancel the future to stop waiting earlier.</p>
+	 *
+	 * @param condition test of an announced value
+	 * @return future for the first announced value satisfying the condition
+	 */
+	public CompletableFuture<ACell> whenAnnounced(Predicate<? super ACell> condition) {
+		if (condition==null) throw new IllegalArgumentException("Condition must not be null");
+		AnnounceWait wait=new AnnounceWait(condition,new CompletableFuture<>());
+		ACell current;
+		synchronized (announceWaits) {
+			announceWaits.add(wait);
+			current=completedAnnounce;
+		}
+		wait.future.whenComplete((value,error) -> {
+			synchronized (announceWaits) { announceWaits.remove(wait); }
+		});
+		if (current!=null) wait.offer(current);
+		// After registering, so a stop between the two still fails this wait
+		if (getStatus().state()==State.STOPPED) wait.fail();
+		return wait.future;
+	}
+
+	/**
+	 * Future completing with the latest value this group has announced, or the
+	 * first one if it has announced none yet, as {@link #whenAnnounced(Predicate)}
+	 * does with a condition every value satisfies.
+	 *
+	 * @return future for an announced value
+	 */
+	public CompletableFuture<ACell> whenAnnounced() {
+		return whenAnnounced(value -> true);
+	}
+
+	/** A pending {@link #whenAnnounced(Predicate)}. */
+	private record AnnounceWait(Predicate<? super ACell> condition,CompletableFuture<ACell> future) {
+		void offer(ACell value) {
+			if (future.isDone()) return;
+			boolean matched;
+			try {
+				matched=condition.test(value);
+			} catch (VirtualMachineError e) {
+				throw e;
+			} catch (Throwable e) {
+				future.completeExceptionally(e);
+				return;
+			}
+			if (matched) future.complete(value);
+		}
+
+		void fail() {
+			future.completeExceptionally(new IllegalStateException("Propagator group stopped"));
+		}
+	}
+
+	/** Records an announcement whose broadcast is queued, and offers it to pending waits. */
+	private void completeAnnounce(long sequence,ACell value) {
+		List<AnnounceWait> waiting;
+		synchronized (announceWaits) {
+			// Announcements complete outside the publication lock, possibly out of order
+			if (sequence>completedSequence) {
+				completedSequence=sequence;
+				completedAnnounce=value;
+			}
+			if (announceWaits.isEmpty()) return;
+			waiting=List.copyOf(announceWaits);
+		}
+		for (AnnounceWait wait:waiting) wait.offer(value);
+	}
+
+	/** Fails waits still pending once the group has stopped. */
+	private void failAnnounceWaits() {
+		List<AnnounceWait> waiting;
+		synchronized (announceWaits) {
+			waiting=List.copyOf(announceWaits);
+		}
+		for (AnnounceWait wait:waiting) wait.fail();
+	}
 
 	/**
 	 * Future for the next announce. Swapped under {@link #writeLock} in
@@ -651,6 +809,16 @@ public class LatticePropagator implements Closeable {
 	 * not run while holding the pipeline lock).
 	 */
 	private volatile CompletableFuture<ACell> nextAnnounceFuture = new CompletableFuture<>();
+
+	/** Pending {@link #whenAnnounced(Predicate)} waits; also guards the two fields below. */
+	private final ArrayList<AnnounceWait> announceWaits=new ArrayList<>();
+
+	/** Latest announced value whose broadcast is queued, or null before the first. */
+	private ACell completedAnnounce;
+	private long completedSequence;
+
+	/** Orders announcements; guarded by {@link #writeLock}. */
+	private long announceSequence;
 	/**
 	 * Cursor holding the last value announced by this propagator. See
 	 * {@link #announcedCursor} for ownership and security semantics.
@@ -666,18 +834,27 @@ public class LatticePropagator implements Closeable {
 	public long getLastBroadcastTime() { return lastBroadcastTime; }
 
 	/**
-	 * Returns the wall-clock time of this group's last periodic root sync.
+	 * Returns the wall-clock time of this group's last root announcement, periodic
+	 * or on demand.
 	 *
-	 * @return epoch time in milliseconds, or zero before the first root sync
+	 * @return epoch time in milliseconds, or zero before the first announcement
 	 */
-	public long getLastRootSyncTime() { return lastRootSyncTime; }
+	public long getLastRootAnnouncementTime() { return lastRootAnnouncementTime; }
 
 	/**
-	 * Returns the number of periodic root syncs initiated since start.
+	 * Returns the number of root announcements sent, periodic or on demand.
 	 *
-	 * @return initiated root-sync count
+	 * @return root-announcement count
 	 */
-	public long getRootSyncCount() { return rootSyncCount; }
+	public long getRootAnnouncementCount() { return rootAnnouncementCount.get(); }
+
+	/**
+	 * Returns the time between this group's periodic root announcements, set by
+	 * {@link LatticePropagatorConfig#ROOT_ANNOUNCEMENT_INTERVAL}.
+	 *
+	 * @return interval in milliseconds, or zero when the group never announces on a timer
+	 */
+	public long getRootAnnouncementInterval() { return rootAnnouncementInterval; }
 
 	// ========== Lifecycle ==========
 
@@ -685,7 +862,7 @@ public class LatticePropagator implements Closeable {
 	 * Starts this group's connection manager, protocol endpoint and publication
 	 * worker. Attached groups are normally started by their {@link NodeServer}.
 	 */
-	public synchronized void start() {
+	public void start() {
 		if (running) {
 			log.warn("LatticePropagator already running");
 			return;
@@ -695,15 +872,16 @@ public class LatticePropagator implements Closeable {
 		LatticeProtocolEndpoint protocol=endpoint;
 		try {
 			if (protocol!=null) {
-				connectionManager.setPeerMessageHandler((peer,message) ->
+				connectionManager.setPeerMessageDelivery((peer,message) ->
 					protocol.receiveFromManagedOutbound(peer,message));
 			}
 			connectionManager.start();
 			if (protocol!=null) protocol.start();
 
+			triggerQueue.open();
 			running = true;
 			lastBroadcastTime = 0L;
-			lastRootSyncTime = 0L;
+			lastRootAnnouncementTime = 0L;
 			broadcastCount.set(0L);
 
 			propagationThread = new Thread(this::propagationLoop, "Lattice propagator thread");
@@ -736,38 +914,39 @@ public class LatticePropagator implements Closeable {
 	 * Triggers a final value and shuts down gracefully.
 	 *
 	 * <p>The propagator processes any remaining queued values (including the
-	 * final value if non-null) before stopping. This is the only blocking
-	 * handoff in the group — used during shutdown to finish serving-store
-	 * materialisation before routes close.</p>
+	 * final value if non-null) before stopping, then waits for the resulting
+	 * broadcasts to be written to its routes before closing them. This is the only
+	 * blocking handoff in the group. Both waits share the group's shutdown timeout;
+	 * delivery to peers stays best effort.</p>
 	 *
 	 * @param finalValue final value to process before stopping, or {@code null}
 	 */
 	public void triggerAndClose(ACell finalValue) {
 		transition(State.STOPPING);
 		if (!running && propagationThread == null) {
-			closeRoutes();
+			closeRoutes(0L);
 			transition(State.STOPPED);
 			return;
 		}
+		long timeout=config.getInboundShutdownTimeout();
+		long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(timeout);
 
 		synchronized (triggerQueue) {
 			// Seal ordinary offers before the final drain. A notification already
 			// holding a node snapshot must not enqueue after shutdown has finished.
 			running = false;
 			if (finalValue != null) triggerQueue.offer(finalValue);
-		}
-
-		if (finalValue == null && propagationThread != null) {
-			propagationThread.interrupt(); // wake thread from poll wait
+			// Wakes a waiting worker. Never interrupt it: it may be inside store
+			// I/O, and NIO closes an interrupted thread's file channel for every
+			// user of the store (#776).
+			triggerQueue.close();
 		}
 
 		if (propagationThread != null) {
 			try {
-				propagationThread.join(10_000);
+				propagationThread.join(timeout);
 				if (propagationThread.isAlive()) {
-					log.warn("LatticePropagator thread did not drain within timeout, interrupting");
-					propagationThread.interrupt();
-					propagationThread.join(2000);
+					log.warn("LatticePropagator thread did not drain within timeout, leaving it to finish");
 				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
@@ -787,22 +966,13 @@ public class LatticePropagator implements Closeable {
 			processSnapshotSafe(remaining);
 		}
 
-		closeRoutes();
+		// Let the final broadcasts leave: closing a route discards what it still queues
+		long left=Math.max(0L,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));
+		closeRoutes(left);
 
 		transition(State.STOPPED);
-		log.debug("LatticePropagator closed (sent {} delta broadcasts, {} root syncs)",
-			broadcastCount, rootSyncCount);
-	}
-
-	/**
-	 * Stops new protocol admission and drains work already accepted by this group.
-	 * The publication worker remains live so merges completed during the drain can
-	 * still receive authoritative node notifications.
-	 *
-	 * @throws IOException if accepted endpoint work cannot be drained
-	 */
-	public void stopIngress() throws IOException {
-		if (endpoint!=null) endpoint.close();
+		log.debug("LatticePropagator closed (sent {} delta broadcasts, {} root announcements)",
+			broadcastCount, rootAnnouncementCount);
 	}
 
 	/**
@@ -814,7 +984,9 @@ public class LatticePropagator implements Closeable {
 	@Override
 	public void close() {
 		try {
-			stopIngress();
+			// Stop admitting protocol work and drain what was accepted, while the
+			// publication worker still runs so those merges are announced
+			if (endpoint!=null) endpoint.close();
 		} catch (IOException e) {
 			recordFailure("ingress shutdown",e);
 			log.warn("Unable to drain propagation protocol endpoint cleanly",e);
@@ -825,10 +997,13 @@ public class LatticePropagator implements Closeable {
 		triggerAndClose(null);
 	}
 
-	/** Closes manager-owned routes even when the group was never started. */
-	private void closeRoutes() {
+	/**
+	 * Closes manager-owned routes, even when the group was never started, once their
+	 * sent messages are written or the timeout passes.
+	 */
+	private void closeRoutes(long timeout) {
 		try {
-			connectionManager.close();
+			connectionManager.close(timeout);
 		} catch (RuntimeException | StackOverflowError e) {
 			recordFailure("route shutdown",e);
 			log.warn("Unable to close propagation routes cleanly",e);
@@ -868,7 +1043,9 @@ public class LatticePropagator implements Closeable {
 			try {
 				ACell value;
 				if (running) {
-					value = triggerQueue.poll(ROOT_SYNC_INTERVAL, TimeUnit.MILLISECONDS);
+					// A timed poll even with announcements off: closing the queue ends it
+					long wait=(rootAnnouncementInterval>0) ? rootAnnouncementInterval : Long.MAX_VALUE;
+					value = triggerQueue.poll(wait, TimeUnit.MILLISECONDS);
 				} else {
 					// Drain mode: non-blocking poll, exit when empty
 					value = triggerQueue.poll();
@@ -879,9 +1056,9 @@ public class LatticePropagator implements Closeable {
 					processSnapshotSafe(value);
 				}
 
-				// Periodic root sync only while running
+				// Periodic root announcement only while running
 				if (running) {
-					maybePerformRootSync(Utils.getCurrentTimestamp());
+					maybeAnnounceRoot(Utils.getCurrentTimestamp());
 				}
 
 			} catch (InterruptedException e) {
@@ -909,7 +1086,7 @@ public class LatticePropagator implements Closeable {
 		} catch (VirtualMachineError e) {
 			if (!(e instanceof StackOverflowError)) throw e;
 			recordFailure("publication",e);
-			log.warn("Contained stack overflow in propagation policy group",e);
+			log.warn("Contained stack overflow in propagator group",e);
 		} catch (Throwable e) {
 			// A broken filter, store cache or connection implementation belongs to
 			// this policy group. It must never terminate NodeServer publication or
@@ -947,6 +1124,7 @@ public class LatticePropagator implements Closeable {
 	/** A replacement filter reprojects the latest source under the same publication lock. */
 	private ACell processSnapshot(ACell value,LatticeFilter<ACell> replacement) throws IOException {
 		CompletableFuture<ACell> announceFuture;
+		long sequence;
 		synchronized (writeLock) {
 			if (replacement!=null) {
 				value=lastSource;
@@ -970,12 +1148,13 @@ public class LatticePropagator implements Closeable {
 
 			// The store-backed root becomes externally visible before best-effort network
 			// encoding. A failed delta must therefore still be eligible for periodic
-			// root sync and must still complete the caller's publication future.
+			// root announcement and must still complete the caller's publication future.
 			lastSource=source;
 			if (replacement!=null) filter=replacement;
 			announcedCursor.set(value);
 			announceFuture = nextAnnounceFuture;
 			nextAnnounceFuture = new CompletableFuture<>();
+			sequence = ++announceSequence;
 
 			// 2. Broadcast to peers. Background triggers are already coalesced by
 			// LatestUpdateQueue; an explicitly processed snapshot must not be dropped.
@@ -983,10 +1162,11 @@ public class LatticePropagator implements Closeable {
 				try {
 					broadcastDelta(value,noveltyCollector.getCells());
 				} catch (RuntimeException e) {
-					log.warn("Unable to encode or queue lattice delta; periodic root sync will retry",e);
+					log.warn("Unable to encode or queue lattice delta; periodic root announcement will retry",e);
 				}
 			}
 		}
+		completeAnnounce(sequence,value);
 		announceFuture.complete(value);
 		return value;
 	}
@@ -1005,8 +1185,8 @@ public class LatticePropagator implements Closeable {
 		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE,emptyPath,value);
 		Message rootMessage = Message.create(MessageType.LATTICE_VALUE, payload, payload.getEncoding());
 		if (rootMessage.getMessageData().count()>maxDeltaMessageSize) {
-			log.warn("Lattice root announcement exceeds delta message limit of {} bytes; root sync will recover",
-				maxDeltaMessageSize);
+			log.warn("Lattice root announcement exceeds delta message limit of {} bytes; "
+				+"the periodic root announcement will recover",maxDeltaMessageSize);
 			return;
 		}
 		ArrayList<ACell> delta = new ArrayList<>(novelty.size()+1);
@@ -1037,33 +1217,47 @@ public class LatticePropagator implements Closeable {
 		broadcastCount.incrementAndGet();
 	}
 
-	// ========== Root Sync ==========
+	// ========== Root Announcement ==========
 
 	/**
-	 * Performs periodic root-only sync broadcast for divergence detection.
+	 * Announces this group's root to every route now, changed or not: the last value
+	 * announced into its serving store, top cell only. A peer whose copy differs
+	 * fetches the cells it lacks by hash; a peer that already holds it merges
+	 * nothing. The periodic announcement calls this, and an announcement made here
+	 * restarts its interval. It may be called from any thread and never waits on the
+	 * network.
+	 *
+	 * @return number of routes the announcement was queued to; zero when the group
+	 *         has no routes or has announced nothing into its store yet
 	 */
-	private void maybePerformRootSync(long currentTime) {
-		if (currentTime < lastRootSyncTime + ROOT_SYNC_INTERVAL) return;
-		if (!connectionManager.hasPropagationRoutes()) return;
+	public int announceRoot() {
+		if (!connectionManager.hasPropagationRoutes()) return 0;
+		Message message = createRootAnnouncement();
+		if (message == null) return 0;
+		int routes = connectionManager.broadcast(message);
+		lastRootAnnouncementTime = Utils.getCurrentTimestamp();
+		rootAnnouncementCount.incrementAndGet();
+		log.debug("Sent root announcement ({} bytes) to {} routes", message.getMessageData().count(), routes);
+		return routes;
+	}
 
+	/** Announces the root once the interval has passed since the last announcement. */
+	private void maybeAnnounceRoot(long currentTime) {
+		if (rootAnnouncementInterval==0) return;
+		if (currentTime-lastRootAnnouncementTime < rootAnnouncementInterval) return;
 		try {
-			Message message = createRootSyncMessage();
-			if (message == null) return;
-			connectionManager.broadcast(message);
-			lastRootSyncTime = currentTime;
-			rootSyncCount++;
-			log.debug("Sent root sync ({} bytes)", message.getMessageData().count());
+			announceRoot();
 		} catch (Exception e) {
-			log.warn("Error during root sync broadcast", e);
+			log.warn("Error during root announcement", e);
 		}
 	}
 
 	/**
-	 * Creates a root sync for the last value successfully announced to this
+	 * Creates a root announcement for the last value successfully announced to this
 	 * propagator's serving store. A triggered value is deliberately not externally
 	 * visible until {@link Cells#announce(ACell, Consumer, AStore)} has completed.
 	 */
-	Message createRootSyncMessage() {
+	Message createRootAnnouncement() {
 		ACell value = announcedCursor.get();
 		if (value == null) return null;
 		AVector<ACell> emptyPath = Vectors.empty();
@@ -1074,6 +1268,9 @@ public class LatticePropagator implements Closeable {
 	}
 
 	// ========== Pull (Fetch from Peers) ==========
+
+	/** How long a pull waits for the cells a partial reply left missing. */
+	private static final long PULL_ACQUIRE_TIMEOUT_MS = 30_000;
 
 	/**
 	 * Pulls the latest lattice value from a specific peer into this propagator's store.
@@ -1104,13 +1301,25 @@ public class LatticePropagator implements Closeable {
 	 *
 	 * @param peer manager-owned peer client to query
 	 * @param path path within the peer's announced lattice value; empty selects the root
-	 * @return future completing with the acquired value, or {@code null} when absent
+	 * @return future completing with the acquired value, or {@code null} when absent;
+	 *         it fails as {@link #pullPath(Convex, boolean, ACell...)} describes
 	 */
 	public CompletableFuture<ACell> pullPath(Convex peer, ACell... path) {
 		return pullPath(peer,false,path);
 	}
 
-	/** Background pulls retain outstanding work but do not earn active-peer priority. */
+	/**
+	 * Pulls one path as {@link #pullPath(Convex, ACell...)} does. Background pulls
+	 * retain outstanding work but do not earn active-peer priority.
+	 *
+	 * <p>The future fails with a checked exception for an outcome of normal operation:
+	 * {@link PeerConnectionException} if the peer is not connected,
+	 * {@link ResultException} if the peer answers with an error or the request fails,
+	 * as when the connection closes or the reply does not arrive within the client's
+	 * timeout, and {@link java.util.concurrent.TimeoutException} if missing cells are
+	 * not acquired in time. It fails with an unchecked exception only for a fault, and
+	 * is cancelled if the work is abandoned. No thread waits for the peer.</p>
+	 */
 	public CompletableFuture<ACell> pullPath(Convex peer,boolean background,ACell... path) {
 		if (peer == null) {
 			return CompletableFuture.failedFuture(new IllegalArgumentException("Peer cannot be null"));
@@ -1119,55 +1328,48 @@ public class LatticePropagator implements Closeable {
 	}
 
 	private CompletableFuture<ACell> acquirePath(Convex peer,ACell[] path) {
-		return CompletableFuture.supplyAsync(() -> {
-			try {
-				if (!peer.isConnected()) {
-					throw new RuntimeException("Peer is not connected");
-				}
+		if (!peer.isConnected()) {
+			return CompletableFuture.failedFuture(new PeerConnectionException("Peer is not connected"));
+		}
+		AVector<?> queryPayload = Vectors.create(
+				MessageTag.LATTICE_QUERY, null, Vectors.create(path));
+		Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
 
-				AVector<?> queryPayload = Vectors.create(
-						MessageTag.LATTICE_QUERY, null, Vectors.create(path));
-				Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
+		// A large value comes back as a partial reply (root plus direct branches,
+		// possibly preceded by DATA chunks). It must decode against this store so
+		// missing branches resolve lazily and the acquire fallback can complete it.
+		if (peer.getStore() == null) peer.setStore(store);
 
-				// A large value comes back as a partial reply (root plus direct branches,
-				// possibly preceded by DATA chunks). It must decode against this store so
-				// missing branches resolve lazily and the acquire fallback can complete it.
-				if (peer.getStore() == null) peer.setStore(store);
+		// The client's request times out and reports a closed connection as a result.
+		// The reply arrives on a transport thread, which must not do store work.
+		return peer.request(queryMessage)
+			.thenComposeAsync(result -> acquireReply(peer,result),ThreadUtils.getVirtualExecutor());
+	}
 
-				CompletableFuture<Result> resultFuture = peer.request(queryMessage);
-				Result result = resultFuture.get(10, TimeUnit.SECONDS);
+	/**
+	 * Stores a pull reply's value locally. A complete reply is announced directly. A
+	 * partial reply (root only, or root after DATA chunks) is completed by acquiring
+	 * from the peer: any cells the reply or its chunks staged in the store are found
+	 * there and not fetched again. Completeness is checked explicitly, since a store
+	 * may hold a partial value without throwing.
+	 */
+	private CompletableFuture<ACell> acquireReply(Convex peer,Result result) {
+		if (result.isError()) return CompletableFuture.failedFuture(new ResultException(result));
+		ACell receivedValue = result.getValue();
+		if (receivedValue == null) return CompletableFuture.completedFuture(null);
 
-				if (result.isError()) {
-					throw new RuntimeException("Pull query failed: " + result);
-				}
-
-				ACell receivedValue = result.getValue();
-				if (receivedValue == null) return null;
-
-				// 2. Store the received value locally. A complete reply is announced
-				// directly. A partial reply (root only, or root after DATA chunks) is
-				// completed by acquiring from the peer: any cells the reply or its
-				// chunks staged in the store are found there and not fetched again.
-				// Completeness is checked explicitly, since a store may hold a partial
-				// value without throwing.
-				ACell acquired;
-				HashSet<Hash> missing = new HashSet<>();
-				Ref.get(receivedValue).findMissing(missing, 1);
-				if (missing.isEmpty()) {
-					acquired = Cells.announce(receivedValue, r -> {}, store);
-				} else {
-					Hash rootHash = Hash.get(receivedValue);
-					acquired = peer.acquire(rootHash, store).get(30, TimeUnit.SECONDS);
-				}
-
-				log.debug("Acquired pulled lattice path from peer: {}", peer.getHostAddress());
-				return acquired;
-
-			} catch (Exception e) {
-				log.warn("Lattice pull failed from peer: {}", peer.getHostAddress(), e);
-				throw new RuntimeException("Lattice pull failed from peer", e);
-			}
-		},ThreadUtils.getVirtualExecutor());
+		HashSet<Hash> missing = new HashSet<>();
+		Ref.get(receivedValue).findMissing(missing, 1);
+		if (!missing.isEmpty()) {
+			return peer.<ACell>acquire(Hash.get(receivedValue), store)
+				.orTimeout(PULL_ACQUIRE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+		}
+		try {
+			return CompletableFuture.completedFuture(Cells.announce(receivedValue, r -> {}, store));
+		} catch (IOException e) {
+			// This node's own store failed: a fault, not an outcome of the pull
+			return CompletableFuture.failedFuture(new StoreException("Unable to store a pulled lattice value", e));
+		}
 	}
 
 	/**

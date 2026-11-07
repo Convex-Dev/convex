@@ -1,10 +1,12 @@
 package convex.lattice.cursor;
 
+import java.io.IOException;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
+import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.lattice.LatticeOps;
 
@@ -12,11 +14,41 @@ import convex.lattice.LatticeOps;
  * Atomic read/write access to one immutable CVM value.
  * Paths update existing nested containers atomically through their base cursor.
  * Components construct missing containers. Cursors carry no lattice policy,
- * signing context or clock; components own those concerns.
+ * signing context, clock or store; components own those concerns.
  *
  * @param <V> Value type
  */
 public abstract class ACursor<V extends ACell> {
+
+	/** Internal absence marker. Never a CVM value and never written to storage. */
+	protected static final Object MISSING=new Object();
+
+	/**
+	 * Reads one snapshot, returning a cell (including nil) or {@link #MISSING}.
+	 * Roots and total views always hold a value. Partial views override this hook
+	 * and preserve source absence without throwing or allocating a result wrapper.
+	 */
+	protected Object readValue() { return get(); }
+
+	/** Whether this location holds a value, including nil. Unresolvable paths are absent. */
+	public boolean exists() { return readValue()!=MISSING; }
+
+	/**
+	 * Returns the value, or the supplied fallback for an absent location. A stored
+	 * nil stays nil. Unresolvable paths use the fallback. Presence and value come from
+	 * one snapshot; expected absence does not construct an exception.
+	 */
+	@SuppressWarnings("unchecked")
+	public V getOrDefault(V notFound) {
+		Object value=readValue();
+		return value==MISSING?notFound:(V)value;
+	}
+
+	/** Reads a nested path from one snapshot, with an explicit fallback for absence. */
+	public ACell getOrDefault(ACell notFound,ACell... path) {
+		Object value=CursorValues.at(readValue(),path);
+		return value==MISSING?notFound:(ACell)value;
+	}
 
 	// ===== Exclusive transactions =====
 
@@ -37,7 +69,7 @@ public abstract class ACursor<V extends ACell> {
 	 * Whether this cursor's shared state supports exclusive transactions. Ordinary
 	 * roots support optimistic transactions only.
 	 *
-	 * @return true if {@link Transactions#transactLocked} is available
+	 * @return true if {@link Transactions#transactExclusively} is available
 	 */
 	public final boolean supportsExclusiveTransactions() {
 		return exclusiveLock() != null;
@@ -51,33 +83,42 @@ public abstract class ACursor<V extends ACell> {
 	 * <p>The returned value reflects all prior writes to this cursor.
 	 * For path cursors, returns the value at the path within the parent.</p>
 	 *
-	 * @return Current value (may be null)
+	 * @return Current value (may be null when nil is stored)
+	 * @throws MissingValueException If the location is absent
 	 */
 	public abstract V get();
 
 	/**
 	 * Returns a value at a nested path within this cursor's value.
 	 *
-	 * <p>Equivalent to {@code RT.getIn(get(), path)}. Does not create a path cursor;
+	 * <p>Does not create a path cursor;
 	 * use {@link #path(ACell...)} for that.</p>
+	 * <p>The nested value may have a different type from this cursor's value.
+	 * Callers must explicitly cast or validate it when a narrower type is required.</p>
 	 *
 	 * @param path Keys to navigate through nested data structures
-	 * @return Value at the path, or null if path doesn't exist
+	 * @return Value at the path, including a stored nil
+	 * @throws MissingValueException If the path is absent
 	 */
-	public V get(ACell... path) {
-		return RT.getIn(get(), path);
+	public ACell get(ACell... path) {
+		return CursorValues.require(CursorValues.at(readValue(),path));
 	}
 
 	/**
 	 * Returns a value at a nested path within this cursor's value.
 	 *
 	 * <p>Convenience overload that accepts Java objects (converted via {@link RT#cvm}).</p>
+	 * <p>The nested value may have a different type from this cursor's value.
+	 * Callers must explicitly cast or validate it when a narrower type is required.</p>
 	 *
 	 * @param path Keys to navigate through nested data structures
-	 * @return Value at the path, or null if path doesn't exist
+	 * @return Value at the path, including a stored nil
+	 * @throws MissingValueException If the path is absent
 	 */
-	public V get(Object... path) {
-		return RT.getIn(get(), path);
+	public ACell get(Object... path) {
+		ACell[] keys=new ACell[path.length];
+		for (int i=0; i<path.length; i++) keys[i]=RT.cvm(path[i]);
+		return get(keys);
 	}
 
 	// ===== Writes =====
@@ -89,6 +130,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * @param key Key to write at
 	 * @param value Value to associate
+	 * @throws convex.lattice.PathWriteException If the container is absent or cannot hold the key
 	 */
 	@SuppressWarnings("unchecked")
 	public void assoc(ACell key, ACell value) {
@@ -103,6 +145,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * @param value Value to set at the end of the path
 	 * @param keys Path of keys to navigate
+	 * @throws convex.lattice.PathWriteException If a container is absent or cannot hold its key
 	 */
 	@SuppressWarnings("unchecked")
 	public void assocIn(ACell value, ACell... keys) {
@@ -211,6 +254,38 @@ public abstract class ACursor<V extends ACell> {
 	 * @return Value after accumulation
 	 */
 	public abstract V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction);
+
+	// ===== Persistence =====
+
+	/**
+	 * Replaces the value this cursor holds with the equal value the persister returns,
+	 * in one atomic update, so the cells it has stored need not stay in memory. An
+	 * edit landing meanwhile makes the update repeat on the edited value, which is
+	 * harmless: cells already stored are found, not written again. The cursor knows no
+	 * store. A view holds no value of its own and treats the equal value as unchanged,
+	 * so the cells are stored but its source keeps what it holds.
+	 *
+	 * @param persister Writes cells and returns the equal, persisted value
+	 * @return Persisted value, or null if the cursor holds none
+	 * @throws IOException If the persister fails
+	 */
+	public V persist(Persister<V> persister) throws IOException {
+		try {
+			return updateAndGet(value -> persistValue(persister,value));
+		} catch (StoreException e) {
+			if (e.getCause() instanceof IOException cause) throw cause;
+			throw e;
+		}
+	}
+
+	private static <V extends ACell> V persistValue(Persister<V> persister,V value) {
+		if (value==null) return null;
+		try {
+			return persister.persist(value);
+		} catch (IOException e) {
+			throw new StoreException("Unable to persist cursor value",e);
+		}
+	}
 
 	@Override
 	public String toString() {

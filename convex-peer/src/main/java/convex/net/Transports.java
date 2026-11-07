@@ -9,6 +9,9 @@ import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -16,6 +19,8 @@ import javax.net.ssl.TrustManager;
 import convex.core.Constants;
 import convex.core.data.AccountKey;
 import convex.core.exceptions.BadFormatException;
+import convex.core.message.AConnection;
+import convex.core.message.Message;
 import convex.net.impl.netty.NettyConnection;
 import convex.net.impl.nio.Connection;
 import convex.peer.Config;
@@ -25,23 +30,21 @@ public final class Transports {
 
 	private Transports() {}
 
-	public static final Transport NETTY = (endpoint, receive, limit) ->
-		NettyConnection.connect(socketAddress(endpoint, "tcp"), receive, limit);
+	public static final Transport NETTY = new NettyTransport("tcp", () -> null, true);
 
+	/** Cannot pause reading: its one selector thread serves every NIO connection. */
 	public static final Transport NIO = (endpoint, receive, limit) ->
 		Connection.connect(socketAddress(endpoint, "tcp"), receive, limit);
 
 	public static final Transport TCP = Config.USE_NETTY_CLIENT ? NETTY : NIO;
 
 	/** Uses the JVM's configured key and trust stores, resolved on connection. */
-	public static final Transport TLS = (endpoint, receive, limit) ->
-		tls(defaultSSLContext()).connect(endpoint, receive, limit);
+	public static final Transport TLS = new NettyTransport("tls", Transports::defaultSSLContext, true);
 
 	/** TLS with an explicitly supplied trust policy; hostname verification is retained. */
 	public static Transport tls(SSLContext context) {
 		Objects.requireNonNull(context);
-		return (endpoint, receive, limit) ->
-			NettyConnection.connect(socketAddress(endpoint, "tls"), receive, limit, context);
+		return new NettyTransport("tls", () -> context, true);
 	}
 
 	/**
@@ -50,16 +53,40 @@ public final class Transports {
 	 */
 	public static Transport tls(AccountKey expectedPeer) {
 		Objects.requireNonNull(expectedPeer);
-		return (endpoint, receive, limit) -> {
-			SSLContext context;
+		return new NettyTransport("tls", () -> {
 			try {
-				context=SSLContext.getInstance("TLS");
+				SSLContext context=SSLContext.getInstance("TLS");
 				context.init(null,new TrustManager[] {new PeerTrustManager(expectedPeer)},null);
+				return context;
 			} catch (GeneralSecurityException | BadFormatException e) {
 				throw new IOException("Unable to initialise peer-key TLS",e);
 			}
-			return NettyConnection.connect(socketAddress(endpoint,"tls"),receive,limit,context,false);
-		};
+		}, false);
+	}
+
+	/** Supplies a TLS context on each connection, or null for plain TCP. */
+	@FunctionalInterface
+	private interface ContextSource {
+		SSLContext get() throws IOException;
+	}
+
+	/** A Netty stream transport, which pauses a connection's reading when its delivery asks to wait. */
+	private record NettyTransport(String scheme, ContextSource context, boolean verifyHostname) implements Transport {
+		@Override
+		public AConnection connect(URI endpoint, Consumer<Message> receiveAction, int limit)
+				throws IOException, InterruptedException {
+			return connectWithDelivery(endpoint, message -> {
+				receiveAction.accept(message);
+				return null;
+			}, limit);
+		}
+
+		@Override
+		public AConnection connectWithDelivery(URI endpoint, Function<Message, Predicate<Message>> delivery, int limit)
+				throws IOException, InterruptedException {
+			InetSocketAddress address=socketAddress(endpoint, scheme);
+			return NettyConnection.connectWithDelivery(address, delivery, limit, context.get(), verifyHostname);
+		}
 	}
 
 	public static SSLContext defaultSSLContext() throws IOException {
@@ -103,6 +130,46 @@ public final class Transports {
 			throw new IllegalArgumentException("Invalid peer endpoint: " + uri);
 		}
 		return uri;
+	}
+
+	/**
+	 * Parses a peer an operator names by address: a {@code tcp://} or {@code tls://}
+	 * URI, or {@code host[:port]} for TCP. A missing port is the default peer port,
+	 * written into the endpoint. A DID is a name {@link PeerResolver} resolves, so one is
+	 * refused here rather than read as a host name.
+	 *
+	 * @param peer peer address as the operator wrote it
+	 * @return the peer's transport endpoint with its port, without DNS resolution
+	 * @throws IllegalArgumentException if the peer is not named by such an endpoint
+	 */
+	public static URI peerEndpoint(String peer) {
+		if (peer==null) throw new IllegalArgumentException("Peer address required");
+		String text=peer.trim();
+		if (text.regionMatches(true,0,"did:",0,4)) {
+			throw new IllegalArgumentException("A DID is not a peer address: "+text);
+		}
+		URI endpoint;
+		try {
+			endpoint=endpoint(text);
+			forEndpoint(endpoint);
+		} catch (IllegalArgumentException e) {
+			throw new IllegalArgumentException("Invalid peer address "+text+": "+e.getMessage(),e);
+		}
+		if (endpoint.getRawQuery()!=null || (endpoint.getRawPath()!=null && !endpoint.getRawPath().isEmpty())) {
+			throw new IllegalArgumentException("Invalid peer address "+text+": a peer endpoint has no path or query");
+		}
+		int port=endpoint.getPort();
+		if (port<0) {
+			try {
+				return new URI(endpoint.getScheme(),null,endpoint.getHost(),Constants.DEFAULT_PEER_PORT,null,null,null);
+			} catch (URISyntaxException e) {
+				throw new IllegalArgumentException("Invalid peer address "+text,e);
+			}
+		}
+		if (port<1 || port>65535) {
+			throw new IllegalArgumentException("Invalid peer address "+text+": a port is from 1 to 65535");
+		}
+		return endpoint;
 	}
 
 	/** Native stream transports have no path, query or user information. */

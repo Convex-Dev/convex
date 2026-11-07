@@ -47,6 +47,11 @@ CREATE TABLE users (id, name, email)
 
 Column 0 (first column) is always the primary key. Types are inferred from inserted data.
 
+Names follow the SQL standard by default: unquoted names fold to upper case and
+compare exactly, so this creates `USERS`. A table created through the lattice API as
+`users` must be quoted in SQL (`"users"`), unless the database's identifier policy
+is `:lower` (`IdentifierPolicy.LOWER.applyTo(db)`), as a PostgreSQL user would expect.
+
 ## Inserting Data
 
 ```sql
@@ -108,7 +113,8 @@ conn.commit();    // atomic merge — all changes become visible
 
 | SQL Type | CVM Type | Notes |
 |----------|----------|-------|
-| BIGINT / INTEGER | CVMLong | 64-bit signed integer |
+| BIGINT | AInteger | Any CVM integer; read as NUMERIC (`BigDecimal`) |
+| INTEGER | CVMLong | 64-bit signed integer; read as BIGINT |
 | DOUBLE | CVMDouble | 64-bit float |
 | VARCHAR | AString | Unicode string |
 | BOOLEAN | CVMBool | true/false |
@@ -121,7 +127,8 @@ conn.commit();    // atomic merge — all changes become visible
 For programmatic access without SQL overhead:
 
 ```java
-ConvexDB cdb = ConvexDB.create();
+// The merge policy is the application's choice; RowLWW merges rows by last write
+ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 SQLDatabase db = cdb.database("mydb");
 
 // Create table

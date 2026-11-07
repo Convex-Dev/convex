@@ -13,6 +13,13 @@ thread, while all other channels continue normally.
 The result: under load, clients experience brief blocking instead of errors. Throughput
 matches processing capacity rather than queue capacity.
 
+A full queue is a reason to wait, never on its own a reason to refuse. `:LOAD` means
+the peer is deliberately shedding work: a policy limit, or a wait that ran out.
+
+Results going the other way never wait. A client whose results back up has its
+requests read no further until they drain ([Reply Backlog](#reply-backlog)), so the
+waiting is done by its socket, not by a thread of the peer.
+
 ## Architecture
 
 ```
@@ -87,11 +94,50 @@ I/O thread: decode()
                     flush stranded data
 ```
 
+### Connections a Node Opens
+
+A client connection pauses in the same way when its delivery asks to wait
+(`Transport.connectWithDelivery`, used by `ConvexRemote`). Lattice nodes rely on this
+for requests and messages a peer sends back over a route the node opened; see
+[LATTICE_NETWORKING.md](LATTICE_NETWORKING.md#inbound-pipeline). A transport that
+cannot pause, such as the NIO client whose one selector thread serves every
+connection, answers such a request with `:LOAD` at once and drops anything else.
+
 ### ConvexLocal
 
 For in-JVM clients (no network), there is no Netty handler. If the queue is full,
-`ConvexLocal` calls the retry predicate directly on the caller's thread — blocking
-is safe because the caller is an application thread, not an I/O thread.
+`ConvexLocal` calls the retry predicate directly on the caller's thread, which waits
+for space. A caller on the handler's own thread, such as a local client's callback for
+a result that handler returned, is refused at once instead: only that thread empties
+the queue, so the wait could only time out. `ConvexLocal` queries take no queue: they
+run on the client's own thread ([MESSAGING.md](MESSAGING.md) §4.4).
+
+### Reply Backlog
+
+Replies to a client go through the server's shared outbound queue, and no thread
+waits to add one: a reply is queued, or refused at once. Each connection counts its
+backlog, the bytes of its replies queued or handed to Netty and not yet written:
+
+| Condition | Effect |
+|-----------|--------|
+| Backlog reaches half `Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT` | The handler holds back the next request it decodes and stops reading the socket |
+| Backlog written down to a quarter | The write completion that crosses it delivers the held request and resumes reading |
+| More than the whole limit handed to Netty and not yet written | Further replies to that client are refused: it is not reading |
+
+Replies queued but not yet handed to Netty do not count towards the refusal, so a
+burst of results for one client is absorbed by the shared queue.
+
+So a client that sends faster than it reads is slowed by TCP, like one whose requests
+fill a queue, rather than losing results. Pausing always holds a decoded request, so
+that Netty's decoder does not ask the socket for more input while reads are off.
+
+A connection a lattice node has verified is never paused for its replies: it has a
+far larger allowance (`Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT`) and a lane of its own.
+A consensus peer verifies no connection opened to it
+([PEER_PRIORITY.md](PEER_PRIORITY.md)), so every connection to it is treated as a
+client here. A client reply that finds the shared queue full is refused: the writer
+only hands messages to Netty, so that takes a server too short of CPU for the writer
+to keep up.
 
 ## Queue Processing
 
@@ -108,8 +154,9 @@ message queue for wire DATA/BELIEF sequences, and a count-bounded FIFO for compl
 Beliefs already acquired into the local store by status polling. Local Beliefs are
 never encoded merely to measure their queue footprint. Either queue drops a new
 entry when full; neither applies connection backpressure. Periodic status polling
-is deferred while either trusted input queue is full, and a changed remote Belief
-is acquired only while that capacity remains available.
+is deferred only while the queue of polled Beliefs is full, and a changed remote
+Belief is acquired only while it has room: pushes filling the message queue never
+stop polling ([PEER_PRIORITY.md](PEER_PRIORITY.md#liveness)).
 
 ## Connection Limiting
 
@@ -161,8 +208,9 @@ handler orchestrates all channel-level backpressure. The server never sees a cha
 ### Deadlock Safety
 
 The Netty PR #6662 deadlock (both sides block on writes simultaneously) does not
-apply: server write volume is tiny (Result messages), the client's event loop is
-never blocked, and virtual threads hold no locks.
+apply: no server thread waits to send (a reply is queued or refused at once), and
+virtual threads hold no locks. A client's reads pause for its own reply backlog,
+which drains as soon as that client reads, whatever the server is doing.
 
 ## Backward Compatibility
 
@@ -193,15 +241,10 @@ query load.
 
 The protocol allows messages up to 50 MB, primarily for peer Belief messages. A
 client has no reason to send a 50 MB message — transactions and queries are
-typically under 100 KB. Once peer/client channel classification is implemented,
-client channels should enforce a smaller limit (e.g. 1 MB) to prevent malicious
-cumulation buffer growth.
-
-### Peer Priority
-
-Peer-to-peer Belief propagation should not be affected by client load. This
-requires distinguishing peer channels from client channels — a prerequisite for
-both max message size and priority scheduling. See [PEER_PRIORITY.md](PEER_PRIORITY.md).
+typically under 100 KB. But peer Beliefs arrive on inbound connections like client
+requests, and a consensus peer does not tell the two apart
+([PEER_PRIORITY.md](PEER_PRIORITY.md)), so a smaller limit cannot yet be set for
+clients alone to prevent malicious cumulation buffer growth.
 
 ### QueryHandler Parallelism
 

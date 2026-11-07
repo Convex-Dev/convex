@@ -80,7 +80,6 @@ class PeerConfigLoadingTest {
 			assertEquals(store.toFile().getCanonicalFile(),etch.getFile().getCanonicalFile());
 			assertEquals(EtchConstants.VERSION_3,etch.getEtch().getVersion());
 			assertEquals(127,etch.getRefCacheSize());
-			assertFalse(etch.isL2Enabled());
 			assertEquals(etch.getEtch().getConfig(),etch.getConfig());
 		}
 	}

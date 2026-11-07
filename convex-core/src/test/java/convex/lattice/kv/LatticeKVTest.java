@@ -10,10 +10,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -178,6 +180,29 @@ public class LatticeKVTest {
 		assertEquals(entry, KVEntryLattice.INSTANCE.merge(null, entry));
 	}
 
+	/** A malformed foreign entry is ignored, not merged, when the key already exists locally. */
+	@Test
+	public void testMergeIgnoresInvalidForeignEntry() {
+		AVector<ACell> own = KVEntry.createValue(Strings.create("a"), CVMLong.create(1000));
+		AVector<ACell> bad = Vectors.of(Strings.create("v"), Strings.create("not-a-long"), CVMLong.create(2000), null);
+		assertEquals(own, KVEntryLattice.INSTANCE.merge(own, bad));
+	}
+
+	/** Tombstones persist, so a stale replica merged in either direction cannot restore a deleted key. */
+	@Test
+	public void testDeleteSurvivesStaleReplica() {
+		var time = new AtomicReference<>(CVMLong.create(100));
+		LatticeKV kv = LatticeKV.create(Strings.create("replica"), time::get);
+		kv.set("a", Strings.create("1"));
+		Index<AString, AVector<ACell>> stale = kv.cursor().get();
+		time.set(CVMLong.create(200));
+		assertTrue(kv.del("a"));
+		Index<AString, AVector<ACell>> current = kv.cursor().get();
+
+		assertEquals(current, KVStoreLattice.INSTANCE.merge(current, stale));
+		assertEquals(current, KVStoreLattice.INSTANCE.merge(stale, current));
+	}
+
 	// ===== Core KV Operations =====
 
 	@Test
@@ -301,6 +326,28 @@ public class LatticeKVTest {
 		assertEquals(1, kv.srem("s", Strings.create("a")));
 		assertFalse(kv.sismember("s", Strings.create("a")));
 		assertEquals(1, kv.scard("s"));
+	}
+
+	/** Re-adding a removed member keeps its remove time, so merges still see the removal. */
+	@Test
+	public void testReAddKeepsRemoveTime() {
+		AString a = Strings.create("a");
+		Hash key = Hash.get(a);
+		CVMLong removed = CVMLong.create(20);
+
+		Index<ABlob, AVector<ACell>> set = KVSet.addMember(null, a, CVMLong.create(10));
+		assertEquals(CVMLong.ZERO, set.get(key).get(KVSet.POS_REMOVE_TIME));
+		set = KVSet.removeMember(set, a, removed);
+		set = KVSet.addMember(set, a, CVMLong.create(30));
+		assertEquals(Vectors.of(a, CVMLong.create(30), removed), set.get(key));
+		assertTrue(KVSet.isMember(set, a));
+
+		Index<ABlob, AVector<ACell>> zset = KVSortedSet.addMember(null, a, CVMDouble.create(1.0), CVMLong.create(10));
+		assertEquals(CVMLong.ZERO, zset.get(key).get(KVSortedSet.POS_REMOVE_TIME));
+		zset = KVSortedSet.removeMember(zset, a, removed);
+		zset = KVSortedSet.addMember(zset, a, CVMDouble.create(2.0), CVMLong.create(30));
+		assertEquals(Vectors.of(a, CVMDouble.create(2.0), CVMLong.create(30), removed), zset.get(key));
+		assertEquals(CVMDouble.create(2.0), KVSortedSet.getScore(zset, a));
 	}
 
 	@Test
@@ -478,17 +525,5 @@ public class LatticeKVTest {
 
 		// PN-Counter merge: both replica contributions preserved
 		assertEquals(8, root.incrby("counter", 0));
-	}
-
-	@Test
-	public void testGc() {
-		LatticeKV kv = LatticeKV.create();
-		kv.set("a", Strings.create("1"));
-		kv.set("b", Strings.create("2"));
-		kv.del("a");
-		long removed = kv.gc();
-		assertEquals(1, removed);
-		assertFalse(kv.exists("a"));
-		assertTrue(kv.exists("b"));
 	}
 }

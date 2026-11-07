@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+import convex.api.AConvexConnected;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.ErrorCodes;
@@ -31,7 +32,6 @@ import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
-import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.store.AStore;
@@ -75,7 +75,8 @@ public class ConnectionManager extends AConnectionManager {
 	protected final Server server;
 
 	private final SecureRandom random = new SecureRandom();
-	private long pollDelay = SERVER_POLL_DELAY;
+	/** Also read by the Belief propagator, to bound a fetch of missing data. */
+	private volatile long pollDelay = SERVER_POLL_DELAY;
 	private long lastPollTime;
 	private long lastConnectionUpdate = Utils.getCurrentTimestamp();
 
@@ -126,12 +127,17 @@ public class ConnectionManager extends AConnectionManager {
 	}
 
 	@Override
-	public synchronized void close() {
-		if (closed) return;
-		closed = true;
+	public void close() {
+		// Stop and close outside the lock: the maintenance thread and identification
+		// callbacks on event loops take it, and closing a connection waits for its loop
+		Thread managerThread;
+		synchronized (this) {
+			if (closed) return;
+			closed = true;
+			managerThread=thread;
+			thread=null;
+		}
 
-		Thread managerThread=thread;
-		thread=null;
 		if (managerThread != null) {
 			managerThread.interrupt();
 			if (managerThread != Thread.currentThread()) {
@@ -181,6 +187,11 @@ public class ConnectionManager extends AConnectionManager {
 				log.debug("Connected to Peer: {} at {}", peerKey, convex.getHostAddress());
 				// A peer we chose to connect to is buffered for, not dropped, until it is far behind
 				convex.setOutboundLimits(Config.PEER_OUTBOUND_QUEUE_SIZE, Config.PEER_OUTBOUND_QUEUE_BYTE_LIMIT);
+				// The peer fetches data missing from our updates back along this connection.
+				// It is served as for any inbound connection, so nothing new is exposed.
+				if (convex instanceof AConvexConnected connected) {
+					connected.setDataRequestDelivery(server::deliverDataRequest);
+				}
 				unresponsiveSince.remove(peerKey);
 				replaced=connections.put(peerKey, convex);
 			}
@@ -443,11 +454,12 @@ public class ConnectionManager extends AConnectionManager {
 					return;
 				}
 
-				Convex existing;
+				Convex existing=null;
 				synchronized (ConnectionManager.this) {
-					existing=getConnection(peerKey);
-					if (existing == null && !closed && addConnection(peerKey, convex)) {
-						existing=convex;
+					// Once closed, an existing route is about to be closed too
+					if (!closed) {
+						existing=getConnection(peerKey);
+						if (existing == null && addConnection(peerKey, convex)) existing=convex;
 					}
 				}
 				if (existing == null) {
@@ -463,6 +475,8 @@ public class ConnectionManager extends AConnectionManager {
 			if (opened!=null) pendingConnections.remove(opened);
 			closeSilently(opened);
 			result.completeExceptionally(e);
+			// Throwing an interrupt cleared this thread's status: restore it for the caller
+			if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 		}
 		return result;
 	}
@@ -524,46 +538,12 @@ public class ConnectionManager extends AConnectionManager {
 		log.warn(reason);
 	}
 
-	/** Minimum interval between requests for the same missing hash. */
-	static final long MISSING_REQUEST_INTERVAL = 1000;
-
-	/** Recently requested missing hashes with request time, bounding repeat requests. */
-	private final ConcurrentHashMap<Hash, Long> missingRequests = new ConcurrentHashMap<>();
-
 	/**
-	 * Called to signal missing data in a received Belief or Order. Requests the
-	 * missing value, and transitively whatever it needs, from the peer that sent the
-	 * message, since it must hold the data, or failing that from the Order's author.
-	 * The message itself is dropped; the next update from that peer merges once the
-	 * data has arrived. Requests for one hash are rate limited so a merge that keeps
-	 * failing while the acquisition is in flight does not repeat the request.
+	 * Gets the pause between Belief polls, from the {@code :poll-delay} setting
 	 *
-	 * @param m Message which caused alert
-	 * @param e Missing data exception encountered
-	 * @param peerKey Peer key which triggered missing data, or null if unknown
+	 * @return Poll delay in milliseconds
 	 */
-	public void alertMissing(Message m, MissingDataException e, AccountKey peerKey) {
-		try {
-			Hash h = e.getMissingHash();
-			if (h == null) return;
-			AccountKey sender = (m.getConnection() == null) ? null : m.getConnection().getTrustedKey();
-			Convex conn = (sender == null) ? null : getConnection(sender);
-			if ((conn == null) && (peerKey != null)) conn = getConnection(peerKey);
-			if ((conn == null) || !conn.isConnected()) return;
-
-			long now = Utils.getCurrentTimestamp();
-			Long last = missingRequests.get(h);
-			if ((last != null) && (now - last < MISSING_REQUEST_INTERVAL)) return;
-			if (missingRequests.size() > 4096) missingRequests.clear();
-			missingRequests.put(h, now);
-
-			log.debug("Requesting missing data {}", h);
-			conn.acquire(h).whenComplete((value, ex) -> {
-				missingRequests.remove(h);
-				if (ex != null) log.debug("Missing data request for {} failed: {}", h, ex.getMessage());
-			});
-		} catch (Exception ex) {
-			log.warn("Unexpected error responding to missing data", ex);
-		}
+	long getPollDelay() {
+		return pollDelay;
 	}
 }

@@ -12,7 +12,6 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
-import convex.lattice.ALatticeApplication;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.IndexComponent;
 import convex.lattice.MapComponent;
@@ -82,7 +81,7 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell,Index<ABlob,Sig
 	}
 
 	/** Connects to an application's mail region without inheriting any policy. */
-	public static Mail connect(ALatticeApplication<Index<Keyword,ACell>> application,MailLattice lattice,
+	public static Mail connect(ALatticeComponent<Index<Keyword,ACell>> application,MailLattice lattice,
 			BiFunction<ACell,ACell,SignedData<ACell>> signer) {
 		return connect(new IndexComponent<>(application.cursor()).path(KEY_MAIL),lattice,signer);
 	}

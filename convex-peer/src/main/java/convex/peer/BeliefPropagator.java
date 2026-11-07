@@ -8,17 +8,21 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.Acquiror;
 import convex.core.cpos.Belief;
 import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
@@ -28,9 +32,11 @@ import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.BoundedMessageQueue;
 import convex.core.message.MessageType;
+import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 
@@ -85,19 +91,12 @@ public class BeliefPropagator extends AThreadedComponent {
 		Config.BELIEF_QUEUE_SIZE);
 
 	/**
-	 * Ordered DATA and BELIEF messages received from trusted connections. DATA must
+	 * Ordered DATA and BELIEF messages received from any connection. DATA must
 	 * remain ahead of the root that references it until both reach this thread.
 	 */
 	// TODO: use config if provided
 	private final BoundedMessageQueue propagationQueue = new BoundedMessageQueue(
 		Config.BELIEF_QUEUE_SIZE,Config.BELIEF_QUEUE_BYTE_LIMIT,true);
-
-	/**
-	 * Small bounded queue for propagation from unverified inbound connections.
-	 * Best-effort buffering during the brief verification round-trip.
-	 */
-	private final BoundedMessageQueue untrustedPropagationQueue = new BoundedMessageQueue(
-		Config.UNTRUSTED_BELIEF_QUEUE_SIZE,Config.UNTRUSTED_BELIEF_QUEUE_BYTE_LIMIT);
 
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
@@ -151,26 +150,16 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 
 	/**
-	 * Queues propagation from an unverified connection on a best-effort basis.
-	 * Silently drops if the small untrusted queue is full.
-	 * @param message propagation message
-	 * @return true if queued, false otherwise
-	 */
-	public boolean queueUntrustedPropagation(Message message) {
-		return untrustedPropagationQueue.offer(message);
-	}
-
-	/**
-	 * Tests whether status polling may add another complete Belief without
-	 * competing with a saturated consensus input queue. This is advisory: either
-	 * queue may fill immediately afterwards, in which case the later offer is
-	 * simply dropped.
+	 * Tests whether status polling may add another complete Belief. This depends
+	 * only on the polled Belief queue: polling the peers this peer chose is how
+	 * Beliefs keep arriving while pushes from any connection fill the propagation
+	 * queue. This is advisory: the queue may fill immediately afterwards, in which
+	 * case the later offer is simply dropped.
 	 *
-	 * @return true if both trusted consensus input queues retain capacity
+	 * @return true if the polled Belief queue has capacity
 	 */
 	boolean hasBeliefPollCapacity() {
-		return (beliefQueue.remainingCapacity()>0)
-			&& (propagationQueue.getFillFraction()<1.0);
+		return beliefQueue.remainingCapacity()>0;
 	}
 	
 	Belief belief=null;
@@ -423,13 +412,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		beliefQueue.drainTo(acquiredBeliefs);
 		if (firstEvent!=null) propagationMessages.add(firstEvent);
 		propagationQueue.drainTo(propagationMessages);
-		if (acquiredBeliefs.isEmpty() && propagationMessages.isEmpty()) {
-			return null; // don't wake up for untrusted propagation alone
-		}
-
-		// Peek at one untrusted message per cycle (non-blocking, never wait)
-		Message untrusted=untrustedPropagationQueue.poll();
-		if (untrusted!=null) propagationMessages.add(untrusted);
+		if (acquiredBeliefs.isEmpty() && propagationMessages.isEmpty()) return null;
 
 		if (log.isDebugEnabled()) {
 			log.debug("Beliefs acquired: {}, propagation messages received: {}",
@@ -480,7 +463,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				return mergeBeliefValue(orders,payload,m);
 			} catch (MissingDataException e) {
 				log.debug("Missing data in Belief message "+m.getHash());
-				server.getConnectionManager().alertMissing(m,e,null);
+				fetchMissing(m);
 			} catch (BadFormatException e1) {
 				log.debug("Malformed Belief message");
 			}
@@ -512,6 +495,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	private boolean mergeBeliefValue(HashMap<AccountKey, SignedData<Order>> orders, ACell value, Message source) {
 		boolean changed=false;
 		AccountKey myKey=server.getPeerKey();
+		State state=server.getPeer().getConsensusState();
 		beliefReceivedCount++;
 		Collection<SignedData<Order>> incoming=Belief.extractOrders(value);
 		for (SignedData<Order> so: incoming) {
@@ -519,13 +503,15 @@ public class BeliefPropagator extends AThreadedComponent {
 			try {
 				// Keep the best candidate for every Peer across the whole merge batch.
 				if (Cells.equals(myKey,key)) continue;
+				// The merge ignores Orders from unstaked keys, which anyone can make:
+				// drop them before the costly signature check and store write
+				if (!BeliefMerge.isValidPeer(state,key)) continue;
 				if (orders.containsKey(key)) {
 					Order newOrder=RT.ensureCVM(so.getValue(),Order.class);
 					Order oldOrder=RT.ensureCVM(orders.get(key).getValue(),Order.class);
 					if (!BeliefMerge.compareOrders(oldOrder,newOrder)) continue;
 				}
 
-				// TODO: check if Peer key is valid in current state?
 				if (!so.checkSignature()) {
 					if (source!=null) {
 						server.getConnectionManager().alertBadMessage(source,"Bad Order Signature!!");
@@ -541,7 +527,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				changed=true;
 			} catch (MissingDataException e) {
 				if (source!=null) {
-					server.getConnectionManager().alertMissing(source,e,key);
+					fetchMissing(source);
 				} else {
 					log.warn("Locally acquired Belief is incomplete; missing {}",e.getMissingHash());
 				}
@@ -553,6 +539,61 @@ public class BeliefPropagator extends AThreadedComponent {
 		return changed;
 	}
 	
+	/** Set while a fetch of data missing from an update is outstanding: there is at most one. */
+	private final AtomicBoolean fetching=new AtomicBoolean();
+
+	/** The latest fetch, completing once it has been dropped or its update queued again. */
+	private volatile CompletableFuture<?> missingDataFetch=null;
+
+	/**
+	 * Fetches what an update lacks from the connection it arrived on: whoever sent a
+	 * delta holds everything it refers to (CAD015). At most one fetch is outstanding.
+	 * A miss while one is under way is ignored, because the same Orders usually arrive
+	 * soon from other peers. The update's own cells are stored first, so only what it
+	 * left out is requested. Once that has arrived the update is queued again to merge.
+	 * A fetch that fails, or takes longer than the poll delay, is dropped.
+	 *
+	 * <p>The request goes only to the sender, so a sender that never answers delays
+	 * nothing beyond the poll: it holds the one fetch at most for the poll delay.</p>
+	 *
+	 * @param m Update that could not be merged
+	 */
+	private void fetchMissing(Message m) {
+		AConnection connection=m.getConnection();
+		if ((connection==null)||!connection.supportsMessage()) return;
+		if (!fetching.compareAndSet(false,true)) return;
+		try {
+			AStore store=getStore();
+			ACell update=Cells.store(m.getPayload(store),store);
+			long timeout=server.getConnectionManager().getPollDelay();
+			Acquiror acquiror=Acquiror.fromMessages(update.getHash(),store,hashes ->
+				connection.request(Message.createDataRequest(null,hashes),timeout));
+			missingDataFetch=acquiror.<ACell>getFuture()
+				.orTimeout(timeout,TimeUnit.MILLISECONDS)
+				.handle((value,error) -> {
+					acquiror.close();
+					fetching.set(false);
+					if (error==null) {
+						if (!queuePropagation(m)) log.debug("Propagation queue full: fetched update dropped");
+					} else {
+						log.debug("Fetch of missing update data dropped: {}",error.toString());
+					}
+					return null;
+				});
+		} catch (Exception e) {
+			fetching.set(false);
+			log.debug("Unable to fetch missing update data",e);
+		}
+	}
+
+	/**
+	 * Gets the latest fetch of data missing from an update, or null if none has started.
+	 * It completes once the fetch has been dropped or its update queued again.
+	 */
+	CompletableFuture<?> getMissingDataFetch() {
+		return missingDataFetch;
+	}
+
 	private void observeOrderUpdate(SignedData<Order> so) {
 		Consumer<SignedData<Order>> obs=orderUpdateObserver;
 		if (obs!=null) {
@@ -570,9 +611,9 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Creates the own-Order update: our signed Order and everything reachable from it
 	 * that this peer has not yet announced, normally one new Block with its
 	 * transactions. A Block of any size is carried: when the update does not fit one
-	 * delta, DATA messages precede the Order on each peer's ordered queue. Announcing
-	 * here is honest because every message is offered to every peer and never
-	 * superseded.
+	 * delta, DATA messages precede the Order on each peer's ordered queue. Every
+	 * message is offered to every connected peer; a peer that misses one, or connects
+	 * later, fetches what it lacks from whoever sends it the next update.
 	 *
 	 * @return the update's messages, ending with the Order; empty if this peer has no Order yet
 	 */

@@ -19,7 +19,7 @@ import convex.lattice.generic.MaxLattice;
 /**
  * A group whose only route is an authenticated inbound connection upgraded to
  * an outbound route must broadcast each publication over it, not leave the
- * peer to the periodic root sync.
+ * peer to the periodic root announcement.
  */
 public class UpgradedInboundRouteBroadcastTest {
 
@@ -76,7 +76,7 @@ public class UpgradedInboundRouteBroadcastTest {
 		bob.getHost().sync();
 		assertEquals(value,announced.get(5,TimeUnit.SECONDS));
 		assertTrue(group.getBroadcastCount()>broadcasts,
-			"publication must trigger a delta broadcast, independent of periodic root sync");
+			"publication must trigger a delta broadcast, independent of periodic root announcement");
 		assertEquals(value,received.get(5,TimeUnit.SECONDS));
 	}
 }

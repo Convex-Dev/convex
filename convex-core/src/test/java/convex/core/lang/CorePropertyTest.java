@@ -66,8 +66,11 @@ public class CorePropertyTest {
 		
 		if (n>0) {
 			assertTrue(ucount>0);
-		} else {
+		} else if (a.isCanonical()) {
+			// A canonical empty structure is the shared empty instance
 			assertSame(a.empty(),a);
+		} else {
+			assertEquals(a.empty(),a);
 		}
 	}
 
@@ -199,7 +202,13 @@ public class CorePropertyTest {
 	public void testCoreArgs(@From(VectorGen.class) AVector<@From(ValueGen.class) ACell> a) throws IOException {
 		Context ctx=new CoreGenesisTest().context();
 		long initialJuice=ctx.getJuiceUsed();
-		
+
+		// CORE_FORMS is a HashMap keyed by Symbols, whose hashes are salted per JVM, so
+		// this order differs on every run. The same argument cells pass through every
+		// function, and the first to touch a lazy cell (such as a blob-backed big integer)
+		// changes its representation for the rest. A representation-dependent bug can
+		// therefore fail on one JVM and pass on another with the same seed: reproduce it
+		// with fresh arguments for each function, or against the suspect function alone.
 		for (Entry<Symbol, ACell> e: Core.CORE_FORMS.entrySet()) {
 			Symbol sym=e.getKey();
 			ACell val=e.getValue();

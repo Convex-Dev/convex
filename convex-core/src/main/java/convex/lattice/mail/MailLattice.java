@@ -64,9 +64,4 @@ public final class MailLattice extends AUnionLattice<ACell,Index<ABlob,SignedDat
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
 		return (ALattice<T>)forMailbox(childKey);
 	}
-
-	@Override
-	public ACell resolveKey(ACell key) {
-		return (key instanceof AString s && DID.isCanonicalBase(s))?s:null;
-	}
 }

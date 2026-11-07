@@ -10,13 +10,21 @@ import org.junit.jupiter.api.Test;
 
 import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.ASet;
 import convex.core.data.AString;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
+import convex.lattice.LocalLattice;
+import convex.lattice.generic.KeyedLattice;
 import convex.social.Social;
 
 /** Policy tests need neither sockets nor temporary stores. */
@@ -25,7 +33,7 @@ public class P2PPolicyTest {
 	private static final AKeyPair ALICE=AKeyPair.createSeeded(8481);
 	private static final AKeyPair BOB=AKeyPair.createSeeded(8482);
 
-	@Test void multiKeySignerAndExplicitNodeIdentityAreIndependentOfContext() {
+	@Test void multiKeySignerAndExplicitNodeIdentityKeepTheBoundOwnerRule() {
 		var keys=Map.of(ALICE.getAccountKey(),ALICE,BOB.getAccountKey(),BOB);
 		var signatures=new AtomicInteger();
 		var host=LatticeHost.create();
@@ -35,7 +43,6 @@ public class P2PPolicyTest {
 				var key=keys.get(owner);
 				return key==null?null:key.signData(value);
 			},() -> CVMLong.create(123),DIDKeyAuthorizer.CONVEX));
-		app.setContext(LatticeContext.create(CVMLong.ZERO,BOB,(owner,key) -> true));
 		for (var key:keys.keySet()) app.identity(key).setIdentity(Strings.create("identity"),null,100);
 		app.directory().publishOwnRecord(null);
 		assertEquals(CVMLong.create(123),app.node(ALICE.getAccountKey()).getNodeInfo().get(P2PLattice.ID_TIMESTAMP));
@@ -46,10 +53,71 @@ public class P2PPolicyTest {
 		app.mergeAt(incoming,P2PLattice.KEY_ID);
 		assertEquals(3,signatures.get());
 		assertEquals(Strings.create("updated"),app.identity(BOB.getAccountKey()).getIdentity().get(P2PLattice.ID_NAME));
-		// An ambient permissive context cannot replace the registry's bound owner rule.
+		// A record placed under another owner's key is refused by the bound owner rule.
 		var before=app.cursor().get();
 		app.mergeAt(Maps.of(ALICE.getAccountKey(),incoming.get(BOB.getAccountKey())),P2PLattice.KEY_ID);
 		assertSame(before,app.cursor().get());
+	}
+
+	/** A node record names the top-level regions its application serves. */
+	@Test void publishedRecordAdvertisesServedRegions() {
+		for (var root:new KeyedLattice[] {P2PLattice.ROOT,P2PLattice.NODE_ROOT,
+				P2PLattice.ROOT.addLattice(LocalLattice.KEY_LOCAL,LocalLattice.LATTICE)}) {
+			var host=LatticeHost.create();
+			var app=host.addApplication(P2PApplication.connect(root,host,ALICE.getAccountKey(),
+				(owner,value) -> ALICE.signData(value),() -> CVMLong.create(123),DIDKeyAuthorizer.CONVEX));
+			app.directory().publishOwnRecord(null);
+			ASet<Keyword> expected=Sets.of(P2PLattice.KEY_P2P,P2PLattice.KEY_ID,P2PLattice.KEY_KAD);
+			if (root==P2PLattice.NODE_ROOT) expected=expected.conj(Social.KEY_SOCIAL);
+			assertEquals(expected,app.node(ALICE.getAccountKey()).getNodeInfo().get(Keywords.REGIONS));
+		}
+	}
+
+	/** {@code :local} is never published, and never accepted, even signed by the node's own key. */
+	@Test void localStateIsNeitherPublishedNorAccepted() {
+		Keyword service=Keyword.intern("p2p");
+		var own=LocalLattice.createSlot(ALICE,Maps.of(service,Maps.of(Keywords.TIMESTAMP,CVMLong.create(1))));
+		var foreign=LocalLattice.setSlot(
+			LocalLattice.createSlot(ALICE,Maps.of(service,Maps.of(Keywords.TIMESTAMP,CVMLong.create(2)))),
+			BOB,Maps.of(service,Maps.of(Keywords.TIMESTAMP,CVMLong.create(3))));
+		for (var root:new KeyedLattice[] {P2PLattice.ROOT,P2PLattice.ROOT.addLattice(LocalLattice.KEY_LOCAL,LocalLattice.LATTICE)}) {
+			var host=LatticeHost.create();
+			var app=host.addApplication(P2PApplication.connect(root,host,ALICE.getAccountKey(),
+				(owner,value) -> ALICE.signData(value),() -> CVMLong.create(123),DIDKeyAuthorizer.CONVEX));
+			app.directory().publishOwnRecord(null);
+			host.cursor().update(r -> r.assoc(LocalLattice.KEY_LOCAL,own));
+
+			var projected=app.project(host.cursor().get());
+			assertNull(projected.get(LocalLattice.KEY_LOCAL));
+			assertNotNull(projected.get(P2PLattice.KEY_P2P));
+
+			app.merge(Index.of(LocalLattice.KEY_LOCAL,foreign));
+			app.mergeAt(foreign,LocalLattice.KEY_LOCAL);
+			app.mergeAt(foreign.get(BOB.getAccountKey()),LocalLattice.KEY_LOCAL,BOB.getAccountKey());
+			assertSame(own,host.cursor().get(LocalLattice.KEY_LOCAL));
+		}
+	}
+
+	/** {@code :regions} must be a set of keywords; any other shape invalidates the record. */
+	@Test void directoryAcceptsOnlyKeywordRegionSets() {
+		var host=LatticeHost.create();
+		var app=host.addApplication(P2PApplication.connect(P2PLattice.ROOT,host));
+		AHashMap<Keyword,ACell> base=P2PLattice.createNodeInfo(Vectors.empty(),
+			Strings.create("t"),Strings.create("v"),null,100);
+		ACell[] invalid= {Vectors.of(Keywords.P2P),Sets.of(Strings.create("p2p")),Strings.create("p2p")};
+		for (ACell regions:invalid) {
+			app.mergeAt(P2PLattice.createSignedEntry(AKeyPair.generate(),base.assoc(Keywords.REGIONS,regions)),
+				P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		}
+		assertTrue(app.directory().refresh().isEmpty());
+
+		ASet<Keyword> regions=Sets.of(Keywords.P2P,Social.KEY_SOCIAL);
+		app.mergeAt(P2PLattice.createSignedEntry(BOB,base.assoc(Keywords.REGIONS,regions)),
+			P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		var records=app.directory().refresh();
+		assertEquals(1,records.size());
+		assertEquals(BOB.getAccountKey(),records.get(0).peerKey());
+		assertEquals(regions,records.get(0).regions());
 	}
 
 	@Test void registeredDIDsShareAnOwnerAwareSocialViewAndOneVerifier() {

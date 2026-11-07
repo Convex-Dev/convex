@@ -92,7 +92,7 @@ public final class FavouritesExample {
 		alice.remove(42);
 		alice.sync(); // One signature, into the region only.
 		// A transaction reruns these operations on conflict instead of reconciling snapshots.
-		app.user(BOB).transact(bob -> {
+		app.user(BOB).execute(bob -> {
 			bob.add(99);
 			bob.add(100);
 		}); // One signature at local commit; no explicit draft sync needed.
@@ -131,7 +131,7 @@ public final class FavouritesExample {
 		/** Shares the supplied region's pending state and destination; the clock is authoring policy. */
 		FavouritesApp(LatticeHost<Index<Keyword,ACell>> host,
 				KeyOwnedIndex<AHashMap<Keyword,ACell>> shared,Supplier<CVMLong> getTimestamp) {
-			super(host,FAVOURITES,shared);
+			super(host.cursor(),FAVOURITES,shared);
 			this.getTimestamp=getTimestamp;
 		}
 

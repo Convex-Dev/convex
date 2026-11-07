@@ -78,6 +78,11 @@ public class CVMEncoder extends CAD3Encoder {
 	}
 
 	@Override
+	protected ACell specialiseCached(ACell cell) {
+		return specialise(cell);
+	}
+
+	@Override
 	protected ACell readExtension(byte tag, DecodeState ds) throws BadFormatException {
 		long code = readVLQCount(ds);
 		return specialiseExtension(tag,code);

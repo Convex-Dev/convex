@@ -44,17 +44,13 @@ public class QueryHandler extends AThreadedComponent {
 
 	/**
 	 * Offer a query for handling, blocking until space is available or timeout.
-	 * Used as the retry predicate for backpressure.
+	 * Used as the retry predicate for backpressure. Does not wait on this handler's
+	 * own thread, for example in a local client's callback for a query result.
 	 * @param m Message offered
 	 * @return True if queued for handling, false on timeout or interruption
 	 */
 	public boolean offerQueryBlocking(Message m) {
-		try {
-			return queryQueue.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
+		return offerBlocking(queryQueue, m);
 	}
 	
 
@@ -134,7 +130,7 @@ public class QueryHandler extends AThreadedComponent {
 			Result result=Result.fromContext(id, resultContext).withSource(SourceCodes.PEER);
 			
 			// Report result back to message sender
-			boolean resultReturned= m.returnResultBlocking(result);
+			boolean resultReturned= m.returnResult(result);
 
 			if (!resultReturned) {
 				log.debug("Dropped query result {} for connection {}", id, m.getConnection());

@@ -8,9 +8,11 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.ConvexDB;
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLSchema;
 import convex.etch.EtchStore;
+import convex.lattice.LatticeHost;
 import convex.node.NodeServer;
 
 /**
@@ -38,9 +40,10 @@ public class EtchPKLookupBench {
 
 	static void runBenchmark(int rowCount) throws Exception {
 		EtchStore store = EtchStore.createTemp("pk-bench");
-		NodeServer<?> server = ConvexDB.createNodeServer(store);
+		var host = LatticeHost.open(ConvexDB.EMPTY, store);
+		ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+		NodeServer<?> server = new NodeServer<>(host);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getCursor());
 		SQLDatabase db = cdb.database("bench");
 		SQLSchema tables = db.tables();
 

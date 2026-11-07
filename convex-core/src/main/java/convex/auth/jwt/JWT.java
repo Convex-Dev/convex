@@ -10,6 +10,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Objects;
+import java.util.function.Function;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -47,6 +48,9 @@ import convex.core.util.JSON;
  *   <li><b>EdDSA</b> — Ed25519 public key signing/verification (Convex native)</li>
  *   <li><b>RS256</b> — RSA-SHA256 verification (for external OAuth provider tokens)</li>
  * </ul>
+ *
+ * <p>Signers write the caller's JOSE header unchanged except for {@code alg}, which
+ * follows from the key. The signers that take no header use {@code typ: JWT}.</p>
  */
 public class JWT {
 
@@ -54,11 +58,6 @@ public class JWT {
 
 	// JWT encoding should be Base64URL without padding
 	static Base64.Encoder encoder=Base64.getUrlEncoder().withoutPadding();
-
-	static AString HEADER_HS256 = encode(Strings.intern("{\"alg\":\"HS256\",\"typ\":\"JWT\"}"));
-	static final AMap<AString,ACell> HEADER_EDDSA_BASE = Maps.of(
-		Strings.create("alg"), Strings.create("EdDSA"),
-		Strings.create("typ"), Strings.create("JWT"));
 
 	// Common claim keys
 	public static final AString ALG = Strings.intern("alg");
@@ -86,6 +85,12 @@ public class JWT {
 	private static final AString[] ACCESS_TOKEN_RESERVED = {
 		ISS, SUB, AUD, EXP, NBF, IAT, JTI, CLIENT_ID, SCOPE
 	};
+
+	private static final AString EDDSA = Strings.intern("EdDSA");
+	private static final AString HS256 = Strings.intern("HS256");
+
+	/** Header of the signers that take none: the profile UCAN 0.10 requires. EdDSA adds a kid. */
+	private static final AMap<AString,ACell> DEFAULT_HEADER = Maps.of(TYP, Strings.intern("JWT"));
 
 	// ========== Instance fields (parsed and cached) ==========
 
@@ -365,7 +370,7 @@ public class JWT {
 		return true;
 	}
 
-	// ========== Static signing methods (unchanged) ==========
+	// ========== Static signing methods ==========
 
 	/**
 	 * Build the claims for a JWT access token.
@@ -484,7 +489,8 @@ public class JWT {
 	}
 
 	/**
-	 * Build and sign a symmetric (HS256) JSON Web Token from claim data.
+	 * Build and sign a symmetric (HS256) JSON Web Token with the default header
+	 * {@code {"typ":"JWT"}}.
 	 *
 	 * @param claimData Claims to embed in the JWT payload as an {@link AMap} of
 	 *                  {@link AString} keys to {@link ACell} values.
@@ -492,21 +498,33 @@ public class JWT {
 	 * @return The encoded JWT string containing header, payload, and signature.
 	 */
 	public static AString signSymmetric(AMap<AString,ACell> claimData, ABlobLike<?> secret) {
-		AString claimString = claims(claimData);
-		AString base64Claims = encode(claimString);
-		AString toSign = HEADER_HS256.append(".").append(base64Claims);
-		AString signature = signHS256(toSign, secret);
-		return toSign.append(".").append(signature);
+		return signSymmetric(DEFAULT_HEADER,claimData,secret);
 	}
 
 	/**
-	 * Build and sign a public-key (Ed25519 / EdDSA) JSON Web Token from claim data.
+	 * Build and sign a symmetric (HS256) JSON Web Token with the caller's header.
+	 *
+	 * <p>The header is written as given, with {@code alg} added if absent.</p>
+	 *
+	 * @param header JOSE header members
+	 * @param claimData Claims to embed in the JWT payload
+	 * @param secret Shared secret key material used for HMAC signing
+	 * @return The encoded JWT string containing header, payload, and signature
+	 * @throws IllegalArgumentException if the header is null or names an algorithm other than HS256
+	 */
+	public static AString signSymmetric(AMap<AString,ACell> header, AMap<AString,ACell> claimData, ABlobLike<?> secret) {
+		byte[] key=secret.getBytes();
+		return sign(header,HS256,claimData,message->hmacSHA256(message,key));
+	}
+
+	/**
+	 * Build and sign a public-key (Ed25519 / EdDSA) JSON Web Token with the
+	 * default header {@code {"typ":"JWT"}} and the multikey-encoded public key
+	 * as {@code kid}.
 	 *
 	 * @param claimData Claims to embed in the JWT payload as an {@link AMap} of
 	 *                  {@link AString} keys to {@link ACell} values.
-	 * @param keyPair   Key pair used to produce the Ed25519 signature. The
-	 *                  multikey-encoded public key is placed in the {@code kid}
-	 *                  header parameter.
+	 * @param keyPair   Key pair used to produce the Ed25519 signature.
 	 * @return The encoded JWT string containing header, payload, and signature.
 	 */
 	public static AString signPublic(AMap<AString,ACell> claimData, AKeyPair keyPair) {
@@ -515,8 +533,8 @@ public class JWT {
 	}
 
 	/**
-	 * Build and sign a public-key (Ed25519 / EdDSA) JSON Web Token with an
-	 * explicit key identifier.
+	 * Build and sign a public-key (Ed25519 / EdDSA) JSON Web Token with the
+	 * default header {@code {"typ":"JWT"}} and an explicit key identifier.
 	 *
 	 * <p>The identifier is copied unchanged into the {@code kid} header. It may
 	 * therefore be a verification-method DID URL such as
@@ -531,16 +549,41 @@ public class JWT {
 	 */
 	public static AString signPublic(AMap<AString,ACell> claimData, AKeyPair keyPair, AString kid) {
 		if (kid==null) throw new IllegalArgumentException("JWT kid cannot be null");
-		AMap<AString,ACell> headerMap = HEADER_EDDSA_BASE.assoc(Strings.create("kid"), kid);
-		AString headerString = claims(headerMap);
-		AString base64Header = encode(headerString);
+		return signPublic(DEFAULT_HEADER.assoc(KID,kid),claimData,keyPair);
+	}
 
-		AString claimString = claims(claimData);
-		AString base64Claims = encode(claimString);
-		AString toSign = base64Header.append(".").append(base64Claims);
-		ASignature signature = keyPair.sign(Blob.wrap(toSign.getBytes()));
-		AString encodedSig = encode(signature.getBytes());
-		return toSign.append(".").append(encodedSig);
+	/**
+	 * Build and sign a public-key (Ed25519 / EdDSA) JSON Web Token with the
+	 * caller's header.
+	 *
+	 * <p>The header is written as given, with {@code alg} added if absent. Nothing
+	 * else is added: a token meant for {@link #verifyPublic(AString)} needs a
+	 * {@code kid} naming the key, as in the signers without a header.</p>
+	 *
+	 * @param header JOSE header members
+	 * @param claimData Claims to embed in the JWT payload
+	 * @param keyPair Key pair used to produce the Ed25519 signature
+	 * @return The encoded JWT string containing header, payload, and signature
+	 * @throws IllegalArgumentException if the header is null or names an algorithm other than EdDSA
+	 */
+	public static AString signPublic(AMap<AString,ACell> header, AMap<AString,ACell> claimData, AKeyPair keyPair) {
+		return sign(header,EDDSA,claimData,message->keyPair.sign(Blob.wrap(message)).getBytes());
+	}
+
+	/**
+	 * Signs claims under the caller's header. The algorithm follows from the key,
+	 * so a header naming another one is refused rather than corrected.
+	 */
+	private static AString sign(AMap<AString,ACell> header, AString alg, AMap<AString,ACell> claimData,
+			Function<byte[],byte[]> signer) {
+		if (header==null) throw new IllegalArgumentException("JWT header cannot be null");
+		if (!header.containsKey(ALG)) {
+			header=header.assoc(ALG,alg);
+		} else if (!alg.equals(header.get(ALG))) {
+			throw new IllegalArgumentException("JWT header alg must be "+alg+" for this key");
+		}
+		AString toSign=encode(claims(header)).append(".").append(encode(claims(claimData)));
+		return toSign.append(".").append(encode(signer.apply(toSign.getBytes())));
 	}
 
 	/**
@@ -559,21 +602,20 @@ public class JWT {
 		return Multikey.decodePublicKey(kid);
 	}
 
-	// ========== Static verification methods (backward compat, delegate to instance) ==========
+	// ========== Static verification methods (parse, then delegate to instance) ==========
 
 	/**
-	 * Verify an HS256 JWT against a shared secret.
+	 * Verify a symmetric (HS256) JWT against a shared secret and return the claims if valid.
 	 *
 	 * @param jwt The encoded JWT string
-	 * @param secret Shared secret key bytes
-	 * @return true if signature is valid
+	 * @param secret Shared secret key material
+	 * @return Claims map if signature is valid, or null if verification fails
 	 */
-	public static boolean verifyHS256(AString jwt, byte[] secret) {
-		int lastdot=jwt.toString().lastIndexOf('.');
-		if (lastdot<0) throw new IllegalArgumentException("Invalid JWT format, missing last dot");
-		AString msg=jwt.slice(0,lastdot);
-		AString sig=signHS256(msg,secret);
-		return sig.equals(jwt.slice(lastdot+1));
+	public static AMap<AString,ACell> verifySymmetric(AString jwt, ABlobLike<?> secret) {
+		JWT parsed = parse(jwt);
+		if (parsed == null) return null;
+		if (!parsed.verifyHS256(secret.getBytes())) return null;
+		return parsed.getClaims();
 	}
 
 	/**

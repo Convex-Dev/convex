@@ -6,7 +6,6 @@ import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.RefDirect;
 import convex.core.data.util.BlobBuilder;
@@ -153,11 +152,6 @@ public abstract class ALongBlob extends ABlob {
 		throw new IndexOutOfBoundsException(i);
 	}
 
-	@Override
-	public ACell updateRefs(IRefFunction func) {
-		return this;
-	}
-	
 	@Override
 	public int getRefCount() {
 		// No Refs

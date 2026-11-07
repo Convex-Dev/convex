@@ -62,7 +62,7 @@ public class UCANAuthorityTest {
 	// ===== Helpers =====
 
 	private static AVector<ACell> caps(ACell... capMaps) {
-		return Vectors.of(capMaps);
+		return Vectors.create(capMaps);
 	}
 
 	private static AMap<AString, ACell> cap(AString with, AString can) {

@@ -158,7 +158,7 @@ public class KVEntry {
 	 * <p>Validates the structural type of every positionally-cast field, not just the
 	 * timestamp: {@code getType}, {@code getExpire} and {@code getUTime} all blindly cast to
 	 * {@link CVMLong}, so a wrong-typed value at POS_TYPE / POS_UTIME / POS_EXPIRE would pass
-	 * an incoming entry only to throw later on {@code keys()}/{@code gc()}/reads, poisoning
+	 * an incoming entry only to throw later on {@code keys()}/reads, poisoning
 	 * store-wide operations. POS_VALUE stays opaque here — its shape (per the type tag) is
 	 * validated by the type-specific CRDT merge.</p>
 	 */

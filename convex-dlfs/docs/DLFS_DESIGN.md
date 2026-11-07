@@ -89,8 +89,8 @@ the working state of a forked component (isolated working copy).
 | `DLFileSystem` | `convex-core/.../lattice/fs/DLFileSystem.java` | Abstract base with timestamp |
 | `DLFS` | `convex-core/.../lattice/fs/DLFS.java` | Factory methods |
 | `LatticeHost` | `convex-core/.../lattice/LatticeHost.java` | Generic store-backed application root and persistence policy |
-| `ALatticeApplication` | `convex-core/.../lattice/ALatticeApplication.java` | Root-level application composition and durability boundary |
-| `DLFSApplication` | `convex-dlfs/.../dlfs/DLFSApplication.java` | Application component composing DLFS at a configured path |
+| `Regions` | `convex-core/.../lattice/Regions.java` | Component composing children at named region keys |
+| `DLFSApplication` | `convex-dlfs/.../dlfs/DLFSApplication.java` | `Regions` component composing DLFS at a configured path, registered with the host |
 | `DLFSRegion` | `convex-dlfs/.../dlfs/DLFSRegion.java` | Physical multi-owner DLFS region at an arbitrary lattice path |
 | `DLFSDrives` | `convex-dlfs/.../dlfs/DLFSDrives.java` | One owner's map of named drives |
 | `DLFSDrive` | `convex-dlfs/.../dlfs/DLFSDrive.java` | Per-drive component and hosted NIO adapter |
@@ -131,11 +131,10 @@ particular host implementation:
 
 ```
 LatticeHost<V>                  store persistence, root publication, flush
-└── ALatticeApplication<V>        complete-root application composition
-    └── DLFSApplication           registered DLFS region component
-        └── DLFSRegion            physical multi-owner lattice region
-            └── DLFSDrives        long-lived component for one owner
-                └── DLFSDrive     named drive plus local NIO view
+└── DLFSApplication             Regions component registered with the host
+    └── DLFSRegion              physical multi-owner lattice region
+        └── DLFSDrives          long-lived component for one owner
+            └── DLFSDrive       named drive plus local NIO view
 ```
 
 A local bootstrap explicitly obtains the root with `LatticeHost.open(...)`.
@@ -162,14 +161,14 @@ authenticated users can each have a drive called "home" without conflict.
 
 | Method | Drive-level | File-level |
 |--------|-------------|------------|
-| `GET` | List drive names | Read file content / directory listing |
-| `PUT` | Rejected (403) | Write file (201 Created / 204 No Content) |
+| `GET` | List drive names | Read file content or one byte range (206) / directory listing |
+| `PUT` | Rejected (403) | Write file atomically (201 Created / 204 No Content) |
 | `DELETE` | Delete drive | Delete file (tombstone) |
 | `MKCOL` | Create drive | Create directory |
 | `PROPFIND` | Drive list (207 Multi-Status) | File/directory properties (207) |
 | `MOVE` | Rename drive | Move file (read + write + delete) |
 | `COPY` | — | Copy file |
-| `HEAD` | Exists check | File metadata (Content-Type, Content-Length) |
+| `HEAD` | Exists check | File metadata (Content-Type, Content-Length, ETag) |
 | `OPTIONS` | DAV capability discovery | DAV capability discovery |
 | `LOCK`/`UNLOCK` | 501 Not Implemented | 501 Not Implemented |
 | `PROPPATCH` | 501 Not Implemented | 501 Not Implemented |
@@ -232,11 +231,35 @@ HTTP request
           → DLFSLocal (cursor.updateAndGet for writes)
 ```
 
-File operations go through the NIO filesystem abstraction. Whole-file replacements
-use `DLFileSystem.writeAllBytes` so truncate and write form one filesystem-locked
-mutation. Each external transport mutation refreshes the caller-managed timestamp and
-calls `sync()`; PUT also supports ETag-based `If-Match` and `If-None-Match`
-preconditions. DLFS itself does not advance that timestamp.
+File operations go through the NIO filesystem abstraction, apart from whole-file
+reads and writes. GET and HEAD read the file entry once and serve its blob through
+convex-restapi's `ContentResponse`, so headers and body come from one version of the
+file; GET answers a single byte
+`Range`, and file responses are not compressed, so lengths and ranges refer to the
+stored bytes. PUT streams the body into a `DLFileWriter` and installs it in one
+atomic update, checking `If-Match` and `If-None-Match` inside that update, so a body
+over the size limit, a failed upload or a failed condition publishes nothing. The MCP
+write tool uses `DLFileSystem.writeAllBytes`, also a single install. Each external
+transport mutation refreshes the caller-managed timestamp and calls `sync()`. DLFS
+itself does not advance that timestamp.
+
+### Publishing Files
+
+`DLFileSystem.install(path, blob, condition)` publishes complete content in one
+atomic update of the drive root: readers see the old file or the new one, never part
+of either. The condition tests the file's current entry inside that update
+(`DLFSCondition.ANY`, `ABSENT`, `matching(entryHash)`, or any other test of the
+entry); if it fails, `ConditionFailedException` is thrown and nothing changes.
+Install returns the entry it replaced, or null if it created the file. An existing
+entry keeps its metadata and unknown trailing fields, as CAD028 requires; the
+content is saved to the drive's store before the update, so a retry under contention
+redoes only the install.
+
+`newWriter(path, condition)` builds content in bounded memory, saving it to the
+drive's store as it arrives, and installs it on an explicit `commit()`. Closing
+without commit discards the content, so a source that fails partway publishes
+nothing; `write(path, in, condition)` commits only if the stream ends cleanly. Plain
+NIO channels keep POSIX behaviour: each write is visible as it lands.
 
 ### Content-Type Detection
 
@@ -547,8 +570,9 @@ to choose publication after successful mutations, for example
 The callback belongs to service wiring; domain components know only their cursors.
 The component hierarchy exposes its root `AStore` internally to each drive's
 `DLFSLocal` adapter, while `sync()` remains the explicit publication and replication
-boundary. Streamed blob writes install store-backed references every 16 MiB without
-moving the cursor or selecting retained GC roots. A region, drive collection or
+boundary. NIO channel writes install store-backed references every 16 MiB, and file
+writers save content every 1 MiB before their single install, without selecting
+retained GC roots. A region, drive collection or
 drive `fork()` is a temporary working component and only merges logical changes when
 explicitly synced.
 
@@ -642,6 +666,9 @@ application context confers signing authority on DLFS components.
 
 ### Filtering for Public/Private Drives
 
-Using `LatticeFilter` on propagators, private drives can be excluded from public
-broadcast while still being persisted locally. This depends on the filtering
-infrastructure in `LatticePropagator` (Phase 5 in PERSISTENCE.md).
+A publication filter on a propagator group (`LatticePropagator.setPublicationFilter`)
+can leave private drives out of the view the group announces and sends, while they are
+still persisted locally. A filter shapes the view; it is not access control: every node
+the group serves can read the filtered view. Serving drives only to chosen nodes needs
+a group policy for who may read, which does not exist yet
+([#823](https://github.com/Convex-Dev/convex/issues/823)).

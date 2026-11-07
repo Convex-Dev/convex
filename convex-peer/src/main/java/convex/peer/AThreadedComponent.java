@@ -1,8 +1,12 @@
 package convex.peer;
 
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 
@@ -76,6 +80,23 @@ public abstract class AThreadedComponent {
 	public void close() {
 		Thread t=thread;
 		t.interrupt();
+	}
+
+	/**
+	 * Offers a message to a queue this component's thread drains, waiting up to the
+	 * internal timeout for space. On that thread it does not wait: nothing else makes
+	 * room, so the wait could only time out.
+	 *
+	 * @return true if queued, false if the queue stayed full or the caller was interrupted
+	 */
+	protected boolean offerBlocking(BlockingQueue<Message> queue, Message m) {
+		if (Thread.currentThread()==thread) return queue.offer(m);
+		try {
+			return queue.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
 	}
 
 	/**

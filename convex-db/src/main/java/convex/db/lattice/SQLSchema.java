@@ -1,5 +1,8 @@
 package convex.db.lattice;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -8,7 +11,9 @@ import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.lattice.ALatticeComponent;
@@ -19,7 +24,8 @@ import convex.lattice.cursor.Cursors;
  * A SQL-like table store built on Convex lattice technology.
  *
  * <p>Provides basic table operations (CREATE TABLE, DROP TABLE, INSERT, SELECT, DELETE)
- * with lattice merge replication for conflict-free distributed operation.
+ * over a live view of a database's table store. It defines no merge: the containing
+ * {@link SQLDatabase} merges with the policy its wrapper supplies.
  *
  * <p>Primary keys must be blob-like types (Blob, AString, AccountKey, etc.) as
  * required by the Index data structure for ordering.
@@ -43,26 +49,44 @@ import convex.lattice.cursor.Cursors;
  * // Drop table
  * schema.dropTable("users");
  * </pre>
+ *
+ * <p>Writes are stamped with an explicit clock, read once per write and passed on to
+ * the tables. The application supplies the clock; how it orders a writer's writes, for
+ * example strictly increasing stamps, is the application's policy.
  */
 public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
+	private final Supplier<CVMLong> clock;
+
+	/** Binds a table store to its cursor, stamping writes with the runtime clock. */
 	public SQLSchema(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
-		super(cursor);
+		this(cursor, Utils::getCurrentTimestampCell);
 	}
 
 	/**
-	 * Creates a new empty table store.
+	 * Binds a table store to its cursor. Construction reads and writes nothing.
+	 *
+	 * @param cursor Cursor of the table store, which may be absent
+	 * @param clock Clock that stamps writes to this store and its tables
+	 */
+	public SQLSchema(AForkableCursor<Index<AString, AVector<ACell>>> cursor, Supplier<CVMLong> clock) {
+		super(cursor);
+		this.clock = Objects.requireNonNull(clock, "Clock must not be null");
+	}
+
+	/**
+	 * Creates a new empty table store, stamping writes with the runtime clock.
 	 *
 	 * @return New SQLSchema instance
 	 */
 	public static SQLSchema create() {
-		AForkableCursor<Index<AString, AVector<ACell>>> cursor =
-			Cursors.root(TableStoreLattice.INSTANCE.zero());
+		AForkableCursor<Index<AString, AVector<ACell>>> cursor = Cursors.root(Index.none());
 		return new SQLSchema(cursor);
 	}
 
 	/**
-	 * Connects to an existing cursor for cursor chain integration.
+	 * Connects to an existing cursor for cursor chain integration, stamping writes with
+	 * the runtime clock.
 	 *
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
 	 * @return New SQLSchema instance connected to the cursor
@@ -71,33 +95,43 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return new SQLSchema(cursor);
 	}
 
-	/**
-	 * Creates a forked copy of this store for independent operation.
-	 *
-	 * @return Forked SQLSchema instance
-	 */
-	public SQLSchema fork() {
-		return rebind(storage.fork());
+	/** Returns the clock that stamps writes to this store and its tables. */
+	public Supplier<CVMLong> getClock() {
+		return clock;
 	}
 
-	@Override
-	protected SQLSchema rebind(AForkableCursor<Index<AString, AVector<ACell>>> cursor) {
-		return new SQLSchema(cursor);
+	// ========== Tables ==========
+
+	/**
+	 * Returns the cursor of a named table's entry, for constructing table components.
+	 * A missing table store is created only by a changed write.
+	 *
+	 * @param name Table name
+	 * @return Cursor of the table's entry, which may be absent
+	 */
+	public AForkableCursor<AVector<ACell>> path(AString name) {
+		return cursor().withDefault(Index.none()).path(name);
+	}
+
+	/**
+	 * Returns the component for a named table, which may be absent. Construction reads
+	 * and writes nothing; table operations use this component.
+	 *
+	 * @param name Table name
+	 * @return Table component bound to {@link #path(AString)}, with this store's clock
+	 */
+	protected SQLTable table(AString name) {
+		return new SQLTable(path(name), clock);
 	}
 
 	// ========== Internal Helpers ==========
-
-	private CVMLong now() {
-		return CVMLong.create(System.currentTimeMillis());
-	}
 
 	/**
 	 * Gets a cursor-backed table by name, returning null if not found.
 	 */
 	public SQLTable getTable(AString name) {
-		AForkableCursor<AVector<ACell>> tableCursor = cursor().withDefault(Index.none()).path(name);
-		if (tableCursor.get() == null) return null;
-		return new SQLTable(tableCursor);
+		SQLTable table = table(name);
+		return (table.getState() == null) ? null : table;
 	}
 
 	/** Convenience overload. */
@@ -107,10 +141,19 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	/**
 	 * Gets a live (non-tombstone) table, returning null if not found or dropped.
+	 *
+	 * @throws IllegalStateException if the table uses a format version this implementation
+	 *         does not support
 	 */
 	public SQLTable getLiveTable(AString name) {
 		SQLTable table = getTable(name);
 		if (table == null || !table.isLive()) return null;
+		// Never read or write a table of an unknown format version as if it were another
+		long version = table.getVersion();
+		if (!SQLTable.isSupportedVersion(version)) {
+			throw new IllegalStateException("Table '" + name + "' uses format version " + version
+				+ ", which this version of Convex DB cannot read or write");
+		}
 		return table;
 	}
 
@@ -121,15 +164,15 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	/**
 	 * Converts an ACell to ABlob for use as primary key.
-	 * Supports: ABlob (direct), CVMLong (8-byte encoding), AString (UTF-8 bytes).
+	 * Supports: ABlob (direct), an integer in the 64-bit range (8-byte encoding of its
+	 * value, whatever its representation), AString (UTF-8 bytes).
 	 *
 	 * @param key The key to convert
-	 * @return ABlob representation
-	 * @throws IllegalArgumentException if key type not supported
+	 * @return ABlob representation, or null if the value has no key encoding
 	 */
-	private ABlob toKey(ACell key) {
+	private static ABlob toKey(ACell key) {
 		if (key instanceof ABlob blob) return blob;
-		if (key instanceof CVMLong n) {
+		if (key instanceof AInteger n && n.isLong()) {
 			// Encode as 8-byte big-endian
 			long v = n.longValue();
 			byte[] bytes = new byte[8];
@@ -142,7 +185,21 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		if (key instanceof AString s) {
 			return Blob.wrap(s.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
 		}
-		throw new IllegalArgumentException("Unsupported primary key type: " + key.getClass().getSimpleName());
+		return null;
+	}
+
+	/**
+	 * Converts a primary key value for writing a row.
+	 *
+	 * @throws IllegalArgumentException if the value has no key encoding
+	 */
+	private static ABlob toWriteKey(ACell key) {
+		ABlob blob = toKey(key);
+		if (blob == null) {
+			String type = (key == null) ? "null" : (key instanceof AInteger) ? "integer beyond 64 bits" : key.getClass().getSimpleName();
+			throw new IllegalArgumentException("Unsupported primary key type: " + type);
+		}
+		return blob;
 	}
 
 	// ========== Table Operations ==========
@@ -200,8 +257,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		}
 
 		// Set state on the table's cursor path
-		AForkableCursor<AVector<ACell>> tableCursor = cursor().withDefault(Index.none()).path(name);
-		tableCursor.set(SQLTable.createState((AVector<AVector<ACell>>) schema, now()));
+		path(name).set(SQLTable.createState((AVector<AVector<ACell>>) schema, clock.get()));
 		return true;
 	}
 
@@ -212,8 +268,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	public boolean dropTable(AString name) {
 		if (getLiveTable(name) == null) return false;
-		AForkableCursor<AVector<ACell>> tableCursor = cursor().withDefault(Index.none()).path(name);
-		tableCursor.set(SQLTable.createTombstoneState(now()));
+		path(name).set(SQLTable.createTombstoneState(clock.get()));
 		return true;
 	}
 
@@ -243,13 +298,8 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public String[] getColumnNames(AString name) {
-		AVector<AVector<ACell>> schema = getSchema(name);
-		if (schema == null) return null;
-		String[] result = new String[(int) schema.count()];
-		for (int i = 0; i < result.length; i++) {
-			result[i] = schema.get(i).get(0).toString();
-		}
-		return result;
+		SQLTable.Binding binding = getBinding(name);
+		return (binding == null) ? null : binding.columnNames();
 	}
 
 	/** Gets the column types for a table (with precision/scale). */
@@ -258,39 +308,18 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public ConvexColumnType[] getColumnTypes(AString name) {
-		AVector<AVector<ACell>> schema = getSchema(name);
-		if (schema == null) return null;
-		ConvexColumnType[] result = new ConvexColumnType[(int) schema.count()];
-		for (int i = 0; i < result.length; i++) {
-			AVector<ACell> colDef = schema.get(i);
-			ACell typeCell = colDef.get(1);
+		SQLTable.Binding binding = getBinding(name);
+		return (binding == null) ? null : binding.columnTypes();
+	}
 
-			ConvexType baseType;
-			if (typeCell == null) {
-				baseType = ConvexType.ANY;
-			} else {
-				baseType = ConvexType.fromName(typeCell.toString());
-			}
+	/** Gets the binding (schema and format version) of a live table, or null if it is absent or dropped. */
+	public SQLTable.Binding getBinding(String name) {
+		return getBinding(Strings.create(name));
+	}
 
-			// Read precision and scale (may be null or missing for old schemas)
-			int precision = -1;
-			int scale = -1;
-			if (colDef.count() > 2 && colDef.get(2) instanceof CVMLong p) {
-				precision = (int) p.longValue();
-			}
-			if (colDef.count() > 3 && colDef.get(3) instanceof CVMLong s) {
-				scale = (int) s.longValue();
-			}
-
-			if (scale >= 0) {
-				result[i] = ConvexColumnType.withScale(baseType, precision, scale);
-			} else if (precision >= 0) {
-				result[i] = ConvexColumnType.withPrecision(baseType, precision);
-			} else {
-				result[i] = ConvexColumnType.of(baseType);
-			}
-		}
-		return result;
+	public SQLTable.Binding getBinding(AString name) {
+		SQLTable table = getLiveTable(name);
+		return (table == null) ? null : table.getBinding();
 	}
 
 	/** Gets the row count for a table. */
@@ -306,7 +335,11 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	// ========== Row Operations ==========
 
-	/** Inserts a row into a table. First column is used as primary key. */
+	/**
+	 * Inserts or replaces a row in a table: an upsert, replacing any row of its key. First
+	 * column is used as primary key. {@link #insertNew} inserts only new rows, as SQL's
+	 * INSERT does.
+	 */
 	public boolean insert(String tableName, AVector<ACell> row) {
 		return insert(Strings.create(tableName), row);
 	}
@@ -314,8 +347,49 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	public boolean insert(AString tableName, AVector<ACell> row) {
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return false;
-		ABlob pk = toKey(row.get(0));
-		return table.insertRow(pk, row, now());
+		ABlob pk = toWriteKey(row.get(0));
+		return table.insertRow(pk, row);
+	}
+
+	/**
+	 * Inserts or replaces rows in a table in one atomic write, as {@link SQLTable#insertRows}:
+	 * an upsert. The first column of each row is its primary key. Every key is encoded before
+	 * anything is written, so a row whose key cannot be one leaves the table unchanged.
+	 *
+	 * @param tableName Table name
+	 * @param rows The rows
+	 * @return The number of rows written, 0 if the table is not live
+	 */
+	public long insertAll(String tableName, Iterable<AVector<ACell>> rows) {
+		return insertAll(Strings.create(tableName), rows);
+	}
+
+	public long insertAll(AString tableName, Iterable<AVector<ACell>> rows) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return 0;
+		return table.insertRows(keyed(rows));
+	}
+
+	/**
+	 * Inserts only new rows into a table, in one atomic write, as SQL's INSERT and
+	 * {@link SQLTable#insertNewRows}: no row may have a key the table holds or another row has.
+	 *
+	 * @param tableName Table name
+	 * @param rows The rows, each with its primary key first
+	 * @return The number of rows written, 0 if the table is not live
+	 * @throws DuplicateKeyException if a key is taken, with nothing written
+	 */
+	public long insertNew(AString tableName, Iterable<AVector<ACell>> rows) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return 0;
+		return table.insertNewRows(keyed(rows));
+	}
+
+	/** Rows with their primary keys encoded. */
+	private static java.util.List<SQLTable.Row> keyed(Iterable<AVector<ACell>> rows) {
+		java.util.List<SQLTable.Row> keyed = new java.util.ArrayList<>();
+		for (AVector<ACell> row : rows) keyed.add(new SQLTable.Row(toWriteKey(row.get(0)), row));
+		return keyed;
 	}
 
 	/** Inserts a row with auto-conversion from Java types. First value is primary key. */
@@ -328,6 +402,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return selectByKey(Strings.create(tableName), primaryKey);
 	}
 
+	/** Selects a row by primary key. A value with no key encoding selects no row, since no row can have it as its key. */
 	public AVector<ACell> selectByKey(AString tableName, ACell primaryKey) {
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return null;
@@ -336,6 +411,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		if (rows == null) return null;
 
 		ABlob key = toKey(primaryKey);
+		if (key == null) return null;
 		AVector<ACell> row = rows.get(key);
 		if (row == null || !SQLRow.isLive(row)) return null;
 		return SQLRow.getValues(row);
@@ -350,7 +426,8 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return false;
 		ABlob key = toKey(primaryKey);
-		return table.deleteRow(key, now());
+		if (key == null) return false;
+		return table.deleteRow(key);
 	}
 
 	/** Returns all live rows in a table. */
@@ -382,12 +459,15 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return Array of table names
 	 */
 	public String[] getTableNames() {
-		Index<AString, AVector<ACell>> store = cursor().get();
+		Index<AString, AVector<ACell>> store = cursor().getOrDefault(null);
 		if (store == null) return new String[0];
 
 		java.util.List<String> names = new java.util.ArrayList<>();
 		for (var entry : store.entrySet()) {
-			if (SQLTable.isLiveState(entry.getValue())) {
+			// Tables of an unsupported format version are left out, so listings and
+			// catalog queries keep working; accessing one by name is an error
+			AVector<ACell> state = entry.getValue();
+			if (SQLTable.isLiveState(state) && SQLTable.isSupportedVersion(SQLTable.getVersion(state))) {
 				names.add(entry.getKey().toString());
 			}
 		}
@@ -403,13 +483,5 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(name);
 		if (table == null) return 0;
 		return (int) table.getColumnCount();
-	}
-
-	/** Reconciles this component's draft using its domain merge rule. */
-	@Override
-	protected Index<AString, AVector<ACell>> mergePublication(
-			Index<AString, AVector<ACell>> own,
-			Index<AString, AVector<ACell>> other) {
-		return TableStoreLattice.INSTANCE.merge(own,other);
 	}
 }

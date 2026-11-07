@@ -3,12 +3,18 @@ package convex.p2p;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.URI;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +36,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeContext;
+import convex.net.PeerName;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import convex.node.RelayHost;
@@ -69,10 +76,10 @@ public class P2PNodeTest {
 		AKeyPair keyPair=AKeyPair.generate();
 		AKeyPair remote=AKeyPair.generate();
 		node=P2PNode.create(store,NodeConfig.create(),keyPair);
-		AHashMap<Keyword,ACell> info=convex.lattice.p2p.P2PLattice.createNodeInfo(
+		AHashMap<Keyword,ACell> info=P2PLattice.createNodeInfo(
 			Vectors.empty(),Strings.create("test"),Strings.create("0"),Vectors.empty(),false,
 			System.currentTimeMillis());
-		node.getNodeServer().mergeAt(convex.lattice.p2p.P2PLattice.createSignedEntry(remote,info),
+		node.getNodeServer().mergeAt(P2PLattice.createSignedEntry(remote,info),
 			P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		assertEquals(info,node.getApplication().node(remote.getAccountKey()).getNodeInfo());
 		assertEquals(info,nodeInfo(remote.getAccountKey()));
@@ -93,6 +100,23 @@ public class P2PNodeTest {
 		assertTrue(node.isRunning());
 	}
 
+	/**
+	 * Seeding needs a running node, configuration precedes launch, a node launches
+	 * once, and seeding starts once.
+	 */
+	@Test
+	public void testCallsOutOfOrderFail() throws Exception {
+		node=P2PNode.create(store,NodeConfig.port(-1),AKeyPair.generate());
+		assertTrue(node.seed(List.of()).isCompletedExceptionally(),"seeding needs a running node");
+		node.launch();
+		assertThrows(IllegalStateException.class,node::relayMessages);
+		assertThrows(IllegalStateException.class,() -> node.pointsOfPresence());
+		assertThrows(IllegalStateException.class,node::launch,"a node launches once");
+		assertTrue(node.isRunning());
+		CompletableFuture<Void> seeding=node.seed(List.of(new PeerName(URI.create("tcp://localhost:1"),null)));
+		assertSame(seeding,node.seed(List.of()),"seeding starts once");
+	}
+
 	/** The base transport must not discover P2P behaviour from the root's shape. */
 	@Test
 	public void testGenericNodeServerDoesNotPublishNodeInfo() throws Exception {
@@ -104,7 +128,7 @@ public class P2PNodeTest {
 				new NodeServer<>(RelayHost.open(P2PLattice.ROOT,store,
 					LatticeContext.create(null,keyPair)),config)) {
 			raw.launch();
-			ACell nodes=raw.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+			ACell nodes=raw.getCursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 			assertTrue(nodes==null || (nodes instanceof AHashMap<?,?> map && map.isEmpty()),
 				"schema-independent NodeServer must not publish P2P application records");
 		}
@@ -160,7 +184,7 @@ public class P2PNodeTest {
 
 		node.launch();
 
-		ACell nodes=node.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		ACell nodes=node.getCursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		assertTrue(nodes==null || (nodes instanceof AHashMap<?,?> map && map.isEmpty()));
 	}
 
@@ -180,6 +204,46 @@ public class P2PNodeTest {
 		node=P2PNode.create(store,allowed,AKeyPair.generate());
 		node.launch();
 		assertNotNull(nodeInfo(node.p2p().getUserKey()));
+	}
+
+	/**
+	 * A peer's initialisation that fails at once, as a keyless node's always does, is
+	 * forgotten, so the next connection to that peer runs it again rather than reporting
+	 * the old failure.
+	 */
+	@Test
+	public void testFailedPeerInitialisationRunsAgain() throws Exception {
+		AKeyPair hubKey=AKeyPair.generate();
+		try (EtchStore hubStore=EtchStore.createTemp("p2p-node-test-hub");
+				P2PNode hub=P2PNode.create(hubStore,NodeConfig.localNetwork(),hubKey).serveAllInbound()) {
+			hub.launch();
+			node=P2PNode.create(store,NodeConfig.port(-1),null);
+			node.launch();
+			Throwable first=connectFailure(hubKey.getAccountKey(),hub);
+			Throwable second=connectFailure(hubKey.getAccountKey(),hub);
+			assertNotSame(first,second);
+		}
+	}
+
+	/**
+	 * A node that knows no peer waits out a backoff before turning to its seeds; closing
+	 * the node cancels that backoff, and with it the timer, so nothing it started outlives it.
+	 */
+	@Test
+	public void testCloseCancelsTheSeedingBackoff() throws Exception {
+		node=P2PNode.create(store,NodeConfig.port(-1),AKeyPair.generate());
+		node.launch();
+		node.seed(List.of());
+		CompletableFuture<Void> backoff=node.seedBackoff();
+		assertNotNull(backoff,"a node that knows no peer waits to seed as a last resort");
+		assertFalse(backoff.isDone());
+		node.close();
+		assertTrue(backoff.isCancelled());
+	}
+
+	private Throwable connectFailure(AccountKey key,P2PNode hub) {
+		return assertThrows(ExecutionException.class,
+			() -> node.connect(key,hub.getHostAddress()).get(10,TimeUnit.SECONDS)).getCause();
 	}
 
 	/** The default node serves the application regions as well as the P2P ones. */
@@ -222,7 +286,7 @@ public class P2PNodeTest {
 	@SuppressWarnings("unchecked")
 	private AHashMap<Keyword,ACell> nodeInfo(AccountKey key) {
 		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap<ACell,SignedData<ACell>>)
-			(ACell)node.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
-		return convex.lattice.p2p.P2PLattice.getNodeInfo(nodes,key);
+			(ACell)node.getCursor().getOrDefault(null,P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		return P2PLattice.getNodeInfo(nodes,key);
 	}
 }

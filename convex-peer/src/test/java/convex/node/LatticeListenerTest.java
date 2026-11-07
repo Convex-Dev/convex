@@ -52,12 +52,28 @@ public class LatticeListenerTest {
 			assertTrue(listener.isRunning());
 			listener.registerPropagator(group);
 			listener.setSelector(connection -> group);
-			assertThrows(IllegalStateException.class,listener::launch);
+			int port=listener.getPort();
+			listener.launch();
+			assertEquals(port,listener.getPort(),"launching an open listener does nothing");
 
 			listener.close();
 			assertFalse(listener.isRunning());
 			assertNull(listener.getHostAddress());
 			assertTrue(node.isRunning());
+			assertThrows(IllegalStateException.class,listener::launch,"closing is final");
+			assertFalse(listener.isRunning());
+			listener.close();
+		}
+	}
+
+	/** A listener closed before it was launched never opens. */
+	@Test
+	public void testListenerClosedBeforeLaunchNeverOpens() throws Exception {
+		try (LatticeListener listener=new LatticeListener(NodeConfig.port(0))) {
+			listener.close();
+			assertThrows(IllegalStateException.class,listener::launch);
+			assertFalse(listener.isRunning());
+			assertNull(listener.getHostAddress());
 		}
 	}
 

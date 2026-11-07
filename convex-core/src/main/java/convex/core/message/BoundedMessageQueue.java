@@ -21,6 +21,7 @@ public final class BoundedMessageQueue {
 	private int messageLimit;
 	private long byteLimit;
 	private long queuedBytes;
+	private boolean closed;
 
 	public BoundedMessageQueue(int messageLimit, long byteLimit) {
 		this(messageLimit,byteLimit,false);
@@ -54,7 +55,7 @@ public final class BoundedMessageQueue {
 
 	public synchronized boolean offer(Message message) {
 		long bytes=messageBytes(message);
-		if (!canOffer(bytes)) return false;
+		if (closed || !canOffer(bytes)) return false;
 		queue.addLast(message);
 		queuedBytes+=bytes;
 		notifyAll();
@@ -67,8 +68,8 @@ public final class BoundedMessageQueue {
 		if (!allowOvershoot && bytes>byteLimit) return false;
 		long remaining=unit.toNanos(timeout);
 		long deadline=System.nanoTime()+remaining;
-		while (!canOffer(bytes)) {
-			if (remaining<=0) return false;
+		while (closed || !canOffer(bytes)) {
+			if (closed || remaining<=0) return false;
 			TimeUnit.NANOSECONDS.timedWait(this,remaining);
 			remaining=deadline-System.nanoTime();
 		}
@@ -86,7 +87,7 @@ public final class BoundedMessageQueue {
 		long remaining=unit.toNanos(timeout);
 		long deadline=System.nanoTime()+remaining;
 		while (queue.isEmpty()) {
-			if (remaining<=0) return null;
+			if (closed || remaining<=0) return null;
 			TimeUnit.NANOSECONDS.timedWait(this,remaining);
 			remaining=deadline-System.nanoTime();
 		}
@@ -151,9 +152,20 @@ public final class BoundedMessageQueue {
 		return Math.max(byCount,byBytes);
 	}
 
-	/** Wakes timed producers, for example when the owning service stops admission. */
-	public synchronized void signalAll() {
+	/**
+	 * Stops admission, for example when the owning service shuts down, and wakes
+	 * every waiter. Offers are refused and timed offers return at once. Polls
+	 * still return queued messages, then {@code null} without waiting, so a
+	 * consumer can drain the queue and stop without being interrupted.
+	 */
+	public synchronized void close() {
+		closed=true;
 		notifyAll();
+	}
+
+	/** Admits offers again after {@link #close()}, for example when a service restarts. */
+	public synchronized void open() {
+		closed=false;
 	}
 
 	private boolean canOffer(long bytes) {

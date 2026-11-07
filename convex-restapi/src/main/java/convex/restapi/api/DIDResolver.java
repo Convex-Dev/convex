@@ -7,8 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import convex.auth.did.DID;
-import convex.core.crypto.util.Base58;
+import convex.core.crypto.util.Multikey;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
@@ -33,6 +32,8 @@ import convex.core.util.JSON;
 final class DIDResolver {
 
 	static final String DID_CONTEXT = "https://www.w3.org/ns/did/v1";
+	/** Defines {@code Multikey}, which the DID 1.0 context does not. */
+	static final String MULTIKEY_CONTEXT = "https://w3id.org/security/multikey/v1";
 
 	private static final Symbol DID_REGISTRY_NAME = Symbol.create("convex.did");
 	private static final Symbol READ_RECORD = Symbol.create("read-record");
@@ -114,13 +115,10 @@ final class DIDResolver {
 		AccountKey key = account.getAccountKey();
 		Map<String, Object> document = baseDocument(documentDID, controllerDID(cnsController, documentDID));
 
-		List<String> aliases = new ArrayList<>();
-		aliases.add("did:convex:" + address.longValue());
-		if (key != null) {
-			aliases.add(DID.forKey(key).toString());
-			addVerificationMethod(document, documentDID, key);
-		}
-		document.put("alsoKnownAs", aliases);
+		// The account DID pins the account behind a name that can be repointed; the key's
+		// did:key is not listed, since the verification method already gives the key
+		if (key != null) addVerificationMethod(document, documentDID, key);
+		document.put("alsoKnownAs", List.of("did:convex:" + address.longValue()));
 
 		return Resolution.active(document, Map.of());
 	}
@@ -218,15 +216,22 @@ final class DIDResolver {
 		return fallbackDID;
 	}
 
-	private static void addVerificationMethod(Map<String, Object> document, String did, AccountKey key) {
-		String keyID = did + "#key-1";
+	/**
+	 * Adds an Ed25519 key as a {@code Multikey} verification method under
+	 * {@code authentication}, identified by the encoded key as {@code did:key} documents
+	 * identify theirs, and the context that defines {@code Multikey}.
+	 */
+	static void addVerificationMethod(Map<String, Object> document, String did, AccountKey key) {
+		String encoded = Multikey.encodePublicKey(key).toString();
+		String keyID = did + "#" + encoded;
 
 		Map<String, Object> verificationMethod = new HashMap<>();
 		verificationMethod.put("id", keyID);
-		verificationMethod.put("type", "Ed25519VerificationMethod2020");
+		verificationMethod.put("type", "Multikey");
 		verificationMethod.put("controller", did);
-		verificationMethod.put("publicKeyMultibase", "z" + Base58.encode(key.getBytes()));
+		verificationMethod.put("publicKeyMultibase", encoded);
 
+		document.put("@context", List.of(DID_CONTEXT, MULTIKEY_CONTEXT));
 		document.put("verificationMethod", List.of(verificationMethod));
 		document.put("authentication", List.of(keyID));
 	}

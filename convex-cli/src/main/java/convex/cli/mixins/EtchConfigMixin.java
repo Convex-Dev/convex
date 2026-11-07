@@ -140,15 +140,14 @@ public class EtchConfigMixin extends AMixin {
 		try {
 			if (version==3) {
 				return EtchConfig.createV3(mapping,buildChains,cipher,encryptedIndex,
-						hint,keys::resolve).withRefCacheSize(base.getRefCacheSize())
-						.withL2Enabled(base.isL2Enabled());
+						hint,keys::resolve).withRefCacheSize(base.getRefCacheSize());
 			}
 			if ((cipher!=CipherMode.NONE)||encryptedIndex||(hint!=null)) {
 				throw new CLIError(ExitCodes.USAGE,
 						"Etch encryption and public-key hints require --into-version 3");
 			}
 			return EtchConfig.create(version,mapping,buildChains)
-					.withRefCacheSize(base.getRefCacheSize()).withL2Enabled(base.isL2Enabled());
+					.withRefCacheSize(base.getRefCacheSize());
 		} catch (IllegalArgumentException e) {
 			throw new CLIError(ExitCodes.USAGE,"Invalid Etch destination configuration: "
 					+e.getMessage(),e);

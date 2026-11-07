@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
@@ -12,14 +13,17 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
@@ -78,6 +82,53 @@ public class P2PLatticeTest {
 		assertSame(Lattice.ROOT.path(Keywords.P2P), P2PLattice.ROOT.path(Keywords.P2P));
 		assertSame(Lattice.ROOT.path(Keywords.P2P, Keywords.NODES),
 			P2PLattice.ROOT.path(Keywords.P2P, Keywords.NODES));
+	}
+
+	// ===== NodeInfo format =====
+
+	@Test
+	public void testNodeInfoCreateAndRead() {
+		ASet<Keyword> regions = Sets.of(Keywords.P2P, Social.KEY_SOCIAL);
+		AHashMap<Keyword, ACell> info = P2PLattice.createNodeInfo(
+			Vectors.of(Strings.create("tcp://peer.example.com:18888")),
+			Strings.create("Convex Test Node"), Strings.create("0.8.3"), regions, 1000L);
+
+		assertEquals(CVMLong.create(1000), info.get(Keywords.TIMESTAMP));
+		assertEquals(Strings.create("Convex Test Node"), info.get(Keywords.TYPE));
+		assertEquals(Strings.create("0.8.3"), info.get(Keywords.VERSION));
+		assertEquals(regions, info.get(Keywords.REGIONS));
+		assertEquals(Vectors.of(Strings.create("tcp://peer.example.com:18888")),
+			info.get(Keywords.TRANSPORTS));
+		assertEquals(Vectors.empty(), info.get(Keywords.POPS));
+		assertEquals(CVMBool.FALSE, info.get(Keywords.RELAY));
+
+		AHashMap<ACell, SignedData<ACell>> entry = P2PLattice.createSignedEntry(KP, info);
+		assertEquals(info, P2PLattice.getNodeInfo(entry, KEY));
+		assertNull(P2PLattice.getNodeInfo(entry, AKeyPair.generate().getAccountKey()));
+		assertNull(P2PLattice.getNodeInfo(null, KEY));
+	}
+
+	/** An empty region set is left out of the record, as when no regions are given. */
+	@Test
+	public void testNodeInfoWithoutRegions() {
+		assertNull(P2PLattice.createNodeInfo(Vectors.empty(), Strings.create("t"),
+			Strings.create("v"), null, 1000L).get(Keywords.REGIONS));
+		assertNull(P2PLattice.createNodeInfo(Vectors.empty(), Strings.create("t"),
+			Strings.create("v"), Sets.empty(), 1000L).get(Keywords.REGIONS));
+	}
+
+	@Test
+	public void testNodeInfoPointsOfPresence() {
+		AccountKey first = AKeyPair.generate().getAccountKey();
+		AccountKey second = AKeyPair.generate().getAccountKey();
+		AHashMap<Keyword, ACell> info = P2PLattice.createNodeInfo(Vectors.empty(),
+			Strings.create("t"), Strings.create("v"), Vectors.of(first, second), true, 1000L);
+
+		assertEquals(Vectors.of(first, second), info.get(Keywords.POPS));
+		assertEquals(CVMBool.TRUE, info.get(Keywords.RELAY));
+
+		assertThrows(IllegalArgumentException.class, () -> P2PLattice.createNodeInfo(Vectors.empty(),
+			Strings.create("t"), Strings.create("v"), Vectors.of(first, first), true, 1000L));
 	}
 
 	// ===== :id region =====
@@ -147,14 +198,14 @@ public class P2PLatticeTest {
 	 */
 	@Test
 	public void testCoreRootIgnoresUnknownTopLevelRegions() {
-		AHashMap<Keyword, ACell> nodeInfo = convex.lattice.p2p.P2PLattice.createNodeInfo(
+		AHashMap<Keyword, ACell> nodeInfo = P2PLattice.createNodeInfo(
 			Vectors.of(Strings.create("tcp://example.com:18888")),
 			Strings.create("Convex Lattice Node"), Strings.create("test"), null, 1000L);
 
 		@SuppressWarnings("unchecked")
 		Index<Keyword, ACell> incoming = (Index<Keyword, ACell>) Index.EMPTY
 			.assoc(P2PLattice.KEY_P2P, Index.EMPTY.assoc(P2PLattice.KEY_NODES,
-				convex.lattice.p2p.P2PLattice.createSignedEntry(KP, nodeInfo)))
+				P2PLattice.createSignedEntry(KP, nodeInfo)))
 			.assoc(P2PLattice.KEY_ID, P2PLattice.createSignedIdentity(KP,
 				P2PLattice.createIdentity(Strings.create("carol"), null, null, 1000L)))
 			.assoc(P2PLattice.KEY_KAD, Vectors.of(1, 2, 3));
@@ -198,14 +249,14 @@ public class P2PLatticeTest {
 	 */
 	@Test
 	public void testSocialOffNodeStillMergesP2PRegions() {
-		AHashMap<Keyword, ACell> nodeInfo = convex.lattice.p2p.P2PLattice.createNodeInfo(
+		AHashMap<Keyword, ACell> nodeInfo = P2PLattice.createNodeInfo(
 			Vectors.of(Strings.create("tcp://example.com:18888")),
 			Strings.create("Convex Lattice Node"), Strings.create("test"), null, 1000L);
 
 		@SuppressWarnings("unchecked")
 		Index<Keyword, ACell> incoming = (Index<Keyword, ACell>) Index.EMPTY
 			.assoc(P2PLattice.KEY_P2P, Index.EMPTY.assoc(P2PLattice.KEY_NODES,
-				convex.lattice.p2p.P2PLattice.createSignedEntry(KP, nodeInfo)))
+				P2PLattice.createSignedEntry(KP, nodeInfo)))
 			.assoc(Social.KEY_SOCIAL, Maps.empty());
 
 		Index<Keyword, ACell> merged = P2PLattice.ROOT.merge(

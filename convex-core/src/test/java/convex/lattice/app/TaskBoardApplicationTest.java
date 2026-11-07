@@ -64,7 +64,7 @@ class TaskBoardApplicationTest {
 	/** Constructs the domain component directly at its host path. */
 	static final class TaskBoardApp extends SingleRegion<Board> {
 		TaskBoardApp(LatticeHost<Index<Keyword,ACell>> host,Supplier<CVMLong> getTimestamp) {
-			super(host,BOARD,new Board(host.cursor().path(BOARD),getTimestamp).fork());
+			super(host.cursor(),BOARD,new Board(host.cursor().path(BOARD),getTimestamp).fork());
 		}
 		Board board() { return component(); }
 	}
@@ -120,7 +120,7 @@ class TaskBoardApplicationTest {
 			super(Timestamped.create(storage.withDefault(Maps.empty()),getTimestamp).cursor());
 		}
 
-		boolean exists() { return cursor().get().containsKey(TITLE); }
+		boolean isCreated() { return cursor().get().containsKey(TITLE); }
 		// Titles may have a representation introduced by another application version.
 		ACell title() { return cursor().get().get(TITLE); }
 		/** Only literal true means completed; other values remain pending until explicitly changed. */
@@ -177,20 +177,20 @@ class TaskBoardApplicationTest {
 		host.addApplication(app);
 		var board=app.board();
 		board.plan("write","Write the example");
-		board.transact(draft -> {
+		board.execute(draft -> {
 			draft.plan("review","Review the example");
 			draft.task("write").complete();
 			draft.sync(); // A rebound view has no publication boundary of its own.
 			assertEquals(Sets.of("write"),board.pending());
 			assertFalse(board.task("write").isDone());
-			assertFalse(board.task("review").exists());
+			assertFalse(board.task("review").isCreated());
 		});
 		assertEquals(Sets.of("review"),board.pending());
 		assertTrue(board.task("write").isDone());
 		assertTrue(host.cursor().get().isEmpty());
 
 		// The future signals commit and publication; the timeout only bounds test failure.
-		board.transactAsync(draft -> draft.task("review").complete())
+		board.executeAsync(draft -> draft.task("review").complete())
 			.thenRun(app::sync).get(10,TimeUnit.SECONDS);
 		assertEquals(board.cursor().get(),host.cursor().get().get(BOARD));
 		assertTrue(board.pending().isEmpty());
@@ -209,14 +209,14 @@ class TaskBoardApplicationTest {
 				firstDraft.orTimeout(10,TimeUnit.SECONDS).join();
 				board.plan("other","Independent task");
 			},executor);
-			board.transact(draft -> {
+			board.execute(draft -> {
 				draft.task("review").complete();
 				draft.plan("publish","Publish"); // Stable ID across retries.
 				if (attempts.incrementAndGet()==1) {
 					firstDraft.complete(null);
 					competing.orTimeout(10,TimeUnit.SECONDS).join();
 					assertFalse(board.task("review").isDone());
-					assertFalse(board.task("publish").exists());
+					assertFalse(board.task("publish").isCreated());
 				}
 				assertTrue(host.cursor().get().isEmpty());
 			});
@@ -234,14 +234,14 @@ class TaskBoardApplicationTest {
 		var board=new TaskBoardApp(LatticeHost.create(),() -> CVMLong.ONE).board();
 		board.plan("review","Review");
 		var before=board.cursor().get();
-		assertThrows(IllegalStateException.class,() -> board.transact(draft -> {
+		assertThrows(IllegalStateException.class,() -> board.execute(draft -> {
 			draft.plan("publish","Publish");
 			draft.task("review").complete();
 			throw new IllegalStateException("Review not approved");
 		}));
 		assertSame(before,board.cursor().get());
 		assertEquals(Sets.of("review"),board.pending());
-		assertFalse(board.task("publish").exists());
+		assertFalse(board.task("publish").isCreated());
 	}
 
 	/** Labels are mutable display data; duplicate labels and reopening never change identity. */
@@ -327,7 +327,7 @@ class TaskBoardApplicationTest {
 		var host=LatticeHost.create();
 		var app=new TaskBoardApp(host,() -> { throw new AssertionError("No changed edit needs a timestamp"); });
 		var missing=app.board().task("missing");
-		assertFalse(missing.exists());
+		assertFalse(missing.isCreated());
 		assertNull(missing.title());
 		assertThrows(IllegalStateException.class,missing::complete);
 		assertThrows(IllegalStateException.class,missing::reopen);

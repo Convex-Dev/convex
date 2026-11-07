@@ -1,11 +1,16 @@
 package convex.lattice;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
+import convex.core.data.Path;
+import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
+import convex.lattice.cursor.Persister;
 
 /**
  * Domain operations over a cursor at one path.
@@ -25,8 +30,11 @@ import convex.lattice.cursor.ForkedCursor;
  * rules as implementation details. {@link LatticeComponent} adapts a supplied lattice
  * when its generic merge and navigation are the intended component behaviour.</p>
  *
- * <p>Persistence belongs to the host ({@link LatticeHost}) and to components which
- * explicitly own a store for their own data, such as DLFS drives.</p>
+ * <p>A component never holds a store. One with working state of its own persists
+ * it through a function supplied at construction ({@link #persist()}); others are
+ * persisted with their parent, and the root by the host ({@link LatticeHost}).
+ * Components which own a store for their own data, such as DLFS drives, manage it
+ * themselves.</p>
  *
  * @param <V> Value type of the wrapped cursor
  */
@@ -35,9 +43,18 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/** Working storage bound at construction; editing views do not move this boundary. */
 	protected final AForkableCursor<V> storage;
 
+	/** Persists this component's own working state, or null when its parent persists it. */
+	private final Persister<V> persister;
+
 	/** Binds the supplied storage directly, without creating another fork. */
 	protected ALatticeComponent(AForkableCursor<V> cursor) {
+		this(cursor,null);
+	}
+
+	/** Binds the supplied storage with the function that persists it, for working state of its own. */
+	protected ALatticeComponent(AForkableCursor<V> cursor,Persister<V> persister) {
 		this.storage=Objects.requireNonNull(cursor,"Component cursor must not be null");
+		this.persister=persister;
 	}
 
 	/**
@@ -80,6 +97,71 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 */
 	public AForkableCursor<V> cursor() {
 		return storage;
+	}
+
+	/** Returns this component's value, including stored nil; throws when absent. */
+	public V value() {
+		return cursor().get();
+	}
+
+	/** Whether this component's location contains a value, including stored nil. */
+	public boolean exists() {
+		return cursor().exists();
+	}
+
+	/**
+	 * Resolves external string segments to the component at their destination. The
+	 * array is read only during the call. A subclass may override this to narrow its
+	 * return type; resolution itself is {@link #resolve(AString[], int, int)}.
+	 *
+	 * @return Component at the destination, which may currently be absent
+	 * @throws NoSuchPathException If a segment names no place
+	 * @throws NullPointerException If a segment is null
+	 */
+	public ALatticeComponent<?> resolve(AString... segments) {
+		for (AString segment:segments) Objects.requireNonNull(segment,"Path segment must not be null");
+		return resolve(segments,0,segments.length);
+	}
+
+	/**
+	 * Resolves a path, which keeps its position in its request: a segment that names
+	 * no place is reported at its position there. A subclass may override this to
+	 * narrow its return type; resolution itself is {@link #resolve(AString[], int, int)}.
+	 *
+	 * @return Component at the destination, which may currently be absent
+	 * @throws NoSuchPathException If a segment names no place
+	 */
+	public ALatticeComponent<?> resolve(Path path) {
+		int start=path.position();
+		return resolve(path.request().toArray(new AString[0]),start,start+Utils.checkedInt(path.count()));
+	}
+
+	/**
+	 * Resolves segments {@code [start,end)} of a caller's request without creating
+	 * stored state. This is the method domain components override. An empty range
+	 * returns this component. The base defines no external namespace; a domain
+	 * component reads the segments it owns and routes the rest to a child as
+	 * {@code child.resolve(segments,start+n,end)}, so that {@code start} stays a
+	 * position in the request. String interpretation belongs to the selected child,
+	 * independently of merge delivery. Children must be bound to this component's
+	 * current working view.
+	 *
+	 * <p>The array is the caller's, lent for the call, and its segments are not
+	 * null. A component reads it and never writes it, and copies anything it keeps:
+	 * a resolved component keeps only the keys it selects. A segment naming no place
+	 * in a component's namespace throws {@link NoSuchPathException}, built with
+	 * {@link NoSuchPathException#NoSuchPathException(AString[], int, int)}.</p>
+	 *
+	 * @param segments Segments of the caller's request
+	 * @param start Position of the first segment to resolve
+	 * @param end End of the segments to resolve
+	 * @return Component at the destination, which may currently be absent
+	 * @throws NoSuchPathException If a segment names no place
+	 */
+	public ALatticeComponent<?> resolve(AString[] segments,int start,int end) {
+		Objects.checkFromToIndex(start,end,segments.length);
+		if (start==end) return this;
+		throw new NoSuchPathException(segments,start,end);
 	}
 
 	/**
@@ -129,7 +211,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 		ALatticeComponent<ACell> child=child(path[0]);
 		if (child!=null) {
 			child.mergeAt(value,Arrays.copyOfRange(path,1,path.length));
-			return cursor().get();
+			return cursor().getOrDefault(null);
 		}
 		return mergeAtPath(value,path);
 	}
@@ -147,6 +229,24 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 */
 	public V sync() {
 		return storage.sync(this::mergePublication);
+	}
+
+	/**
+	 * Persists this component's working state through the function supplied at
+	 * construction, without publishing it. Its storage replaces the working value
+	 * with the persisted equal in one atomic update
+	 * ({@link convex.lattice.cursor.ACursor#persist}), and a fork persists its
+	 * baseline too, so the cells need not stay in memory. Nothing is
+	 * signed and no destination changes. Persisted state survives a restart only once
+	 * synced into the host and retained. A component without a function refuses: its
+	 * state, if any, is its parent's.
+	 *
+	 * @return Persisted working value
+	 * @throws IOException If the store fails
+	 */
+	public V persist() throws IOException {
+		if (persister==null) throw new UnsupportedOperationException(getClass().getSimpleName()+" does not know how to persist");
+		return storage.persist(persister);
 	}
 
 }

@@ -142,7 +142,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> peekEntry(long offset) {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return null;
 
 		AVector<ACell> entries = QueueLattice.getEntries(state);
@@ -182,7 +182,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> peekFirstEntry() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return null;
 		AVector<ACell> entries = QueueLattice.getEntries(state);
 		if (entries.isEmpty()) return null;
@@ -194,7 +194,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> peekLastEntry() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return null;
 		AVector<ACell> entries = QueueLattice.getEntries(state);
 		if (entries.isEmpty()) return null;
@@ -207,7 +207,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Returns the first valid absolute offset, or 0 if empty.
 	 */
 	public long startOffset() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		return QueueLattice.getStartOffset(state);
 	}
 
@@ -215,7 +215,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Returns the next absolute offset to be written (exclusive end).
 	 */
 	public long endOffset() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return 0L;
 		return QueueLattice.getStartOffset(state) + QueueLattice.getEntries(state).count();
 	}
@@ -224,7 +224,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Returns the number of entries currently in the queue.
 	 */
 	public long size() {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return 0L;
 		return QueueLattice.getEntries(state).count();
 	}
@@ -243,7 +243,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> range(long fromOffset, long toOffset) {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return Vectors.empty();
 		if (fromOffset > toOffset) return Vectors.empty();
 
@@ -277,7 +277,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	 * Gets a metadata value by key.
 	 */
 	public ACell getMeta(ACell key) {
-		AVector<ACell> state = cursor().get();
+		AVector<ACell> state = cursor().getOrDefault(null);
 		if (state == null) return null;
 		AHashMap<ACell, ACell> meta = QueueLattice.getMeta(state);
 		return meta.get(key);

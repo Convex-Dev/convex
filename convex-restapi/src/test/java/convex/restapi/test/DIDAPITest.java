@@ -7,14 +7,16 @@ import java.net.http.HttpResponse;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.did.DIDDocuments;
+import convex.core.crypto.util.Multikey;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
+import convex.core.data.Vectors;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
-import convex.restapi.api.DIDAPI;
 
 public class DIDAPITest extends ARESTTest {
 
@@ -34,15 +36,13 @@ public class DIDAPITest extends ARESTTest {
 		assertTrue(id.toString().startsWith("did:web:"), "Peer DID should start with did:web:");
 		assertFalse(id.toString().contains(":did:"), "Peer DID should not have path components");
 
-		// verificationMethod must be present
-		ACell vm = doc.get(RT.cvm("verificationMethod"));
-		assertNotNull(vm, "DID document must have verificationMethod");
+		// The peer key is a standard Multikey verification method under authentication
+		assertNull(DIDDocuments.problem(doc));
+		assertEquals(Vectors.of(KP.getAccountKey()), DIDDocuments.authenticationKeys(doc));
+		assertKeyIsMultikey(doc, KP.getAccountKey());
 
-		// alsoKnownAs should include did:key
-		ACell aka = doc.get(RT.cvm("alsoKnownAs"));
-		assertNotNull(aka, "Peer DID should have alsoKnownAs");
-		assertTrue(aka.toString().contains("did:key:"), "alsoKnownAs should include did:key");
-		assertTrue(aka.toString().contains("did:convex:"), "alsoKnownAs should include did:convex");
+		// The key is in the verification method, and the peer's controller is not the peer
+		assertNull(doc.get(RT.cvm("alsoKnownAs")), "Peer DID should have no alsoKnownAs");
 	}
 
 	@Test
@@ -59,15 +59,14 @@ public class DIDAPITest extends ARESTTest {
 		assertTrue(id.toString().contains(":" + addr), "DID should contain account address");
 		assertTrue(id.toString().startsWith("did:web:"));
 
-		// verificationMethod with key
-		ACell vm = doc.get(RT.cvm("verificationMethod"));
-		assertNotNull(vm);
+		// verificationMethod with the account key
+		AccountKey key = server.getServer().getPeer().getConsensusState().getAccount(Init.GENESIS_ADDRESS).getAccountKey();
+		assertEquals(Vectors.of(key), DIDDocuments.authenticationKeys(doc));
+		assertKeyIsMultikey(doc, key);
 
-		// alsoKnownAs
+		// alsoKnownAs pins the account; the key is given by the verification method only
 		ACell aka = doc.get(RT.cvm("alsoKnownAs"));
-		assertNotNull(aka);
-		assertTrue(aka.toString().contains("did:convex:" + addr));
-		assertTrue(aka.toString().contains("did:key:"));
+		assertEquals(Vectors.of(RT.cvm("did:convex:" + addr)), aka);
 	}
 
 	@Test
@@ -116,17 +115,14 @@ public class DIDAPITest extends ARESTTest {
 		assertNull(vm, "Actor without key should not have verificationMethod");
 	}
 
-	@Test
-	public void testMultibaseEncoding() {
-		// Verify base58btc encoding produces expected format
-		AccountKey key = KP.getAccountKey();
-		String encoded = DIDAPI.multibaseEncode(key);
-		assertTrue(encoded.startsWith("z"), "Multibase base58btc should start with 'z'");
-		assertTrue(encoded.length() > 40, "Encoded key should be substantial length");
-
-		// did:key encoding should include multicodec prefix
-		String didKeyEncoded = DIDAPI.multibaseEncodeEd25519DIDKey(key);
-		assertTrue(didKeyEncoded.startsWith("z"), "did:key multibase should start with 'z'");
-		assertTrue(didKeyEncoded.length() > encoded.length(), "did:key encoding includes multicodec prefix");
+	/** The document's one verification method is a Multikey identified by the encoded key. */
+	private static void assertKeyIsMultikey(AMap<AString, ACell> doc, AccountKey key) {
+		AString did = RT.ensureString(doc.get(RT.cvm("id")));
+		AMap<AString, ACell> method = RT.ensureMap(RT.ensureVector(doc.get(RT.cvm("verificationMethod"))).get(0));
+		AString encoded = Multikey.encodePublicKey(key);
+		assertEquals(RT.cvm("Multikey"), method.get(RT.cvm("type")));
+		assertEquals(encoded, method.get(RT.cvm("publicKeyMultibase")));
+		assertEquals(did.append("#").append(encoded), method.get(RT.cvm("id")));
+		assertTrue(doc.get(RT.cvm("@context")).toString().contains("https://w3id.org/security/multikey/v1"));
 	}
 }

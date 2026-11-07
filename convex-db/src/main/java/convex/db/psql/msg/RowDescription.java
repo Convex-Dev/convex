@@ -31,14 +31,28 @@ public class RowDescription extends PgMessage {
 			if (name == null || name.isEmpty()) {
 				name = meta.getColumnName(colIndex);
 			}
-			String typeName = meta.getColumnTypeName(colIndex);
-			int typeOid = PgType.fromSqlType(typeName);
+			int typeOid = typeOid(meta, colIndex);
 			int typeLen = PgType.typeLength(typeOid);
 			int precision = meta.getPrecision(colIndex);
+			int typeMod = (typeOid == PgType.NUMERIC)
+				? PgType.numericTypeModifier(precision, meta.getScale(colIndex))
+				: precision;
 
-			columns[i] = new Column(name, 0, 0, typeOid, (short) typeLen, precision, 0);
+			columns[i] = new Column(name, 0, 0, typeOid, (short) typeLen, typeMod, 0);
 		}
 		return new RowDescription(columns);
+	}
+
+	/**
+	 * The PostgreSQL type OID announced for a result column, which is also the type its
+	 * values are encoded as.
+	 *
+	 * @param meta Metadata of the result
+	 * @param colIndex Column index, from 1
+	 * @return Type OID
+	 */
+	public static int typeOid(ResultSetMetaData meta, int colIndex) throws SQLException {
+		return PgType.fromSqlType(meta.getColumnTypeName(colIndex));
 	}
 
 	@Override
@@ -71,6 +85,17 @@ public class RowDescription extends PgMessage {
 		return columns[index];
 	}
 
+	/** Equal when it describes the same columns, so a client decodes rows by either alike. */
+	@Override
+	public boolean equals(Object o) {
+		return (o instanceof RowDescription other) && java.util.Arrays.equals(columns, other.columns);
+	}
+
+	@Override
+	public int hashCode() {
+		return java.util.Arrays.hashCode(columns);
+	}
+
 	/**
 	 * Describes a single column in a row.
 	 */
@@ -92,6 +117,18 @@ public class RowDescription extends PgMessage {
 			this.typeLen = typeLen;
 			this.typeMod = typeMod;
 			this.formatCode = (short) formatCode;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			return (o instanceof Column c) && name.equals(c.name) && tableOid == c.tableOid
+				&& columnAttr == c.columnAttr && typeOid == c.typeOid && typeLen == c.typeLen
+				&& typeMod == c.typeMod && formatCode == c.formatCode;
+		}
+
+		@Override
+		public int hashCode() {
+			return java.util.Objects.hash(name, tableOid, columnAttr, typeOid, typeLen, typeMod, formatCode);
 		}
 
 		int encodedLength() {

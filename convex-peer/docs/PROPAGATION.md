@@ -9,9 +9,9 @@ implementation choices documented here.
 
 The propagation path maintains five distinct invariants:
 
-1. A complete inbound value limit and an encoded message limit are separate.
-   Large store-backed values can arrive through many bounded DATA messages or
-   later hash-based acquisition; no single frame needs to contain the value.
+1. The receiver limits the encoded size of each message. A root can reference
+   any amount of data in the local store. Missing cells can arrive in bounded
+   DATA messages or be acquired by hash.
 2. A delta is encoded once per propagation attempt. Its immutable `Message`
    objects are shared across destination peers rather than reconstructed for
    each peer.
@@ -48,7 +48,9 @@ best-effort:
 - If a cell cannot fit the configured delta-message limit, or the eager budget
   is exhausted, the sender falls back to the root announcement. The receiver
   can acquire missing branches by hash.
-- Periodic root-only sync detects a missed or dropped propagation attempt.
+- A periodic root announcement, every `rootAnnouncementInterval` (30 seconds by
+  default; zero turns it off), recovers a missed or dropped propagation attempt: a
+  receiver whose copy differs fetches the cells it lacks.
 
 Advancing the store-backed state before encoding is important: an encoding or
 queueing failure cannot lose the local publication or prevent later recovery.
@@ -103,14 +105,27 @@ bound (`BeliefPropagator.MAX_UPDATE_BYTES`); novelty beyond it stays in the stor
 `UpdateAccumulator` does this shaping because what to carry eagerly is a peer's
 decision, not the data layer's.
 
-Every remaining way to miss data, a full queue or a relayed Order whose Blocks
-this peer has not seen, ends in a request rather than a timer:
-`ConnectionManager.alertMissing` acquires the missing hash from the peer that
-sent the message, rate limited per hash, and the next update merges once the
-data has arrived. Periodic status polling remains the recovery of last resort,
-including for idle peers which have outbound connections but receive no inbound
-propagation. One random outbound peer is probed per interval; an unchanged Belief
-hash costs no acquisition.
+A delta leaves out every cell its sender has announced before, to anyone: the
+record of what has been announced is per store, not per receiver. A receiver can
+therefore lack cells an update refers to. It may not have been connected when
+they were first sent (a peer broadcasts as soon as it starts, while its
+connections are still opening). A queue may have refused the update that carried
+them. Or the receiver may have dropped that update because something else was
+missing, since decoding an update never stores the cells it carries.
+
+Such an update ends in a request rather than a timer. `BeliefPropagator` stores
+the update's own cells, fetches what they lack from the connection the update
+arrived on, and queues the update again to merge once that has arrived. The
+sender holds everything it refers to, and a peer's own connections to other
+peers answer these requests from its store, as its server answers any
+connection. A peer has at most one fetch outstanding: a miss while one is under
+way is not chased, because the same Orders usually arrive soon from other peers.
+A fetch that fails, or takes longer than the poll delay, is dropped.
+
+Periodic status polling remains the recovery of last resort, including for idle
+peers which have outbound connections but receive no inbound propagation. One
+random outbound peer is probed per interval; an unchanged Belief hash costs no
+acquisition.
 
 Inbound CPoS DATA and BELIEF messages share one ordered, byte-bounded processing
 queue off the Netty event loop. This preserves the DATA-before-root order for a
@@ -128,8 +143,8 @@ which is both unnecessary and invalid when the value exceeds the 50 MB frame
 limit. The propagator drains every retained acquired Belief alongside wire
 updates and compares all signed Orders before performing one merge; values from
 different peers never overwrite each other in a shared pending slot. Polling is
-deferred while either trusted input queue is full and capacity is checked again
-before acquisition. A STATUS timeout is initially only a missed health probe; a
+deferred only while this queue is full, and capacity is checked again before
+acquisition: pushes filling the wire queue never defer it. A STATUS timeout is initially only a missed health probe; a
 connection is retired if it remains unresponsive for a full minute, while any
 non-connectivity result resets that period.
 
@@ -143,18 +158,18 @@ protocol limits:
 | Lattice delta message or DATA body | 4 MiB | `LatticePropagatorConfig.maxDeltaMessageSize` |
 | One eager lattice propagation | 16 MiB | `LatticePropagatorConfig.maxDeltaBroadcastSize` |
 | Node inbound processing queue | 1,024 messages and 16 MiB | `inboundQueueSize`, `maxInboundQueueBytes` |
+| Concurrent lattice acquisitions | 1,024 | `inboundQueueSize` |
+| DATA_REQUESTs served at once over routes the node opened | 16, a quarter per route | `maxDataRequests` |
 | Belief or own-Order delta message | 4 MiB | `:max-belief-delta-message-size` |
-| Trusted CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
-| Untrusted CPoS DATA/BELIEF queue | 10 messages and 4 MiB | `Config` constants |
+| CPoS DATA/BELIEF queue | 200 messages and 16 MiB | `Config` constants |
 | Complete Beliefs acquired by status polling | 200 Belief references | `Config.BELIEF_QUEUE_SIZE` |
+| Fetches of data missing from an update | 1, for at most the poll delay | `:poll-delay` |
 | Outbound queue, per client connection | 128 messages and 16 MiB | `Config` constants |
 | Outbound queue, per connection to a peer | 65,536 messages and 256 MB; the last message admitted may exceed it | `Config` constants |
 | Materialised messages per consensus update | 256 MB | `BeliefPropagator.MAX_UPDATE_BYTES` |
 | Lattice novelty retained per attempt | at most 65,536 cells, also byte-budgeted | `convex.node.NoveltyCollector` |
 
-The complete inbound lattice-value limit is separately configured with
-`LatticePropagatorConfig.maxInboundValueSize`; it does not need to equal the
-delta-message limit. Public and trusted encoded frame limits are configured per
+The legacy `maxInboundValueSize` setting is ignored. Public and trusted encoded frame limits are configured per
 group with `maxMessageSize` and `maxTrustedMessageSize` and must remain within
 the protocol maximum. `NodeConfig.maxMessageSize` independently protects each
 standard `LatticeListener` before a connection has been assigned to a group.
@@ -175,7 +190,7 @@ receiving side. A later LATTICE_VALUE or BELIEF root activates normal processing
 and requests any missing cells.
 
 Dropping an eager delta is therefore a loss of realtime delivery, not permanent
-data loss. Recovery paths are later propagation, periodic lattice root sync,
+data loss. Recovery paths are later propagation, periodic lattice root announcement,
 CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
 
 ## Relevant implementation
@@ -184,7 +199,7 @@ CPoS polling/cross-replication and ordinary DATA_REQUEST acquisition.
 - `convex.peer.UpdateAccumulator` — shapes one consensus update into DATA messages then its root
 - `convex.node.NoveltyCollector` — bounded novelty collection for lattice deltas
 - `convex.core.message.BoundedMessageQueue` — count- and byte-bounded FIFO
-- `convex.node.LatticePropagator` — lattice chunking and periodic root sync
-- `convex.peer.BeliefPropagator` — own-Order then Belief update cadence
+- `convex.node.LatticePropagator` — lattice chunking and periodic root announcement
+- `convex.peer.BeliefPropagator` — own-Order then Belief update cadence, and the fetch of data missing from a received update
 - `convex.peer.AConnectionManager` — message-agnostic non-blocking fan-out
 - `convex.net.impl.netty.NettyConnection` — per-connection outbound queues

@@ -15,6 +15,7 @@ import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexTableEnumerator;
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -55,7 +56,7 @@ public class ConvexConventionTest {
 
 	@Test
 	void testTableEnumeratorScan() {
-		SQLDatabase db = SQLDatabase.create("enum_test", convex.core.crypto.AKeyPair.generate());
+		SQLDatabase db = SQLDatabase.create("enum_test", convex.core.crypto.AKeyPair.generate(), RowLWW::merge);
 		db.tables().createTable("t", new String[]{"id", "name"},
 			new ConvexColumnType[]{ConvexColumnType.of(ConvexType.INTEGER), ConvexColumnType.varchar(50)});
 		db.tables().insert("t", 1L, "Alice");
@@ -80,7 +81,7 @@ public class ConvexConventionTest {
 
 	@Test
 	void testTableEnumeratorReset() {
-		SQLDatabase db = SQLDatabase.create("enum_reset", convex.core.crypto.AKeyPair.generate());
+		SQLDatabase db = SQLDatabase.create("enum_reset", convex.core.crypto.AKeyPair.generate(), RowLWW::merge);
 		db.tables().createTable("t", new String[]{"id"},
 			new ConvexColumnType[]{ConvexColumnType.of(ConvexType.INTEGER)});
 		db.tables().insert("t", 1L);
@@ -104,7 +105,7 @@ public class ConvexConventionTest {
 
 	@Test
 	void testTableEnumeratorEmpty() {
-		SQLDatabase db = SQLDatabase.create("enum_empty", convex.core.crypto.AKeyPair.generate());
+		SQLDatabase db = SQLDatabase.create("enum_empty", convex.core.crypto.AKeyPair.generate(), RowLWW::merge);
 		db.tables().createTable("t", new String[]{"id"},
 			new ConvexColumnType[]{ConvexColumnType.of(ConvexType.INTEGER)});
 

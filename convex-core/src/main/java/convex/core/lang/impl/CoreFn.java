@@ -6,7 +6,6 @@ import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.util.BlobBuilder;
@@ -130,11 +129,6 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	}
 	
 	@Override
-	public CoreFn<T> updateRefs(IRefFunction func) {
-		return this;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		symbol.validateCell();
 	}
@@ -155,7 +149,7 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	public boolean equals(ACell o) {
 		// This is OK since these are guaranteed to be singleton instances!
 		if (o instanceof CoreFn) return o==this;
-		return Cells.equalsGeneric(this, o);
+		return Cells.equalsEncoding(this, o);
 	}
 	
 	@Override

@@ -1,11 +1,14 @@
 package convex.dlfs;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
@@ -16,8 +19,19 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import convex.core.data.ACell;
+import convex.core.data.AVector;
+import convex.core.data.Cells;
+import convex.core.data.util.BlobChannel;
+import convex.lattice.fs.ConditionFailedException;
+import convex.lattice.fs.DLFSCondition;
+import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
+import convex.lattice.fs.DLFileWriter;
+import convex.lattice.fs.DLPath;
+import convex.lattice.fs.impl.DLFSFileAttributes;
 import convex.restapi.auth.AuthMiddleware;
+import convex.restapi.handler.ContentResponse;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
 import io.javalin.http.Handler;
@@ -219,17 +233,6 @@ public class DLFSWebDAV {
 		if (fs!=null) driveManager.syncDrive(fs);
 	}
 
-	private boolean writeCompleteFile(Path path, byte[] data) throws IOException {
-		if (data.length > maxFileSize) return false;
-		if (path.getFileSystem() instanceof DLFileSystem dlfs) {
-			dlfs.writeAllBytes((convex.lattice.fs.DLPath) path, data);
-		} else {
-			Files.write(path, data, StandardOpenOption.CREATE,
-				StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-		}
-		return true;
-	}
-
 	// ==================== Handlers ====================
 
 	/**
@@ -257,6 +260,12 @@ public class DLFSWebDAV {
 		Path path = resolveFilePath(ctx, dp);
 		if (path == null) {
 			ctx.status(404).result("Not Found: drive '" + dp.driveName() + "' does not exist");
+			return;
+		}
+
+		AVector<ACell> fileNode = getFileNode(path);
+		if (fileNode != null) {
+			sendFile(ctx, path, fileNode);
 			return;
 		}
 
@@ -317,25 +326,97 @@ public class DLFSWebDAV {
 			ctx.status(413).result("Content Too Large");
 			return;
 		}
-		byte[] body = ctx.bodyAsBytes();
-		if (body.length > maxFileSize) {
-			ctx.status(413).result("Content Too Large");
-			return;
-		}
 
-		// Ensure parent directory exists
+		// Refuse requests that cannot succeed before reading the body
 		Path parent = path.getParent();
 		if (parent != null && !Files.isDirectory(parent)) {
 			ctx.status(409).result("Conflict: parent directory does not exist");
 			return;
 		}
+		if (Files.isDirectory(path)) {
+			ctx.status(405).result("Method Not Allowed: cannot PUT to a directory");
+			return;
+		}
 
+		if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof DLPath dlp) {
+			putFile(ctx, dp, dlfs, dlp);
+			return;
+		}
+
+		byte[] body = ctx.bodyAsBytes();
+		if (body.length > maxFileSize) {
+			ctx.status(413).result("Content Too Large");
+			return;
+		}
 		boolean isNew = !Files.exists(path);
 		if (!checkWritePreconditions(ctx, path, !isNew)) return;
-		writeCompleteFile(path, body);
+		Files.write(path, body, StandardOpenOption.CREATE,
+			StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
 
 		syncDrive(ctx, dp);
 		ctx.status(isNew ? 201 : 204);
+	}
+
+	/**
+	 * Streams a PUT body into a DLFS writer and installs it in one atomic update,
+	 * with If-Match and If-None-Match checked inside that update. A body over the
+	 * size limit, a failed upload or a failed condition publishes nothing.
+	 */
+	private void putFile(Context ctx, DrivePath dp, DLFileSystem dlfs, DLPath path) throws IOException {
+		DLFSCondition condition = writeCondition(ctx);
+		// The install checks again; this refuses a doomed upload before its body arrives
+		if (!condition.test(dlfs.getNode(path))) {
+			ctx.status(412).result("Precondition Failed");
+			return;
+		}
+
+		AVector<ACell> replaced;
+		try (DLFileWriter writer = dlfs.newWriter(path, condition)) {
+			if (!copyBody(ctx.bodyInputStream(), writer, maxFileSize)) {
+				ctx.status(413).result("Content Too Large");
+				return;
+			}
+			replaced = writer.commit();
+		} catch (ConditionFailedException e) {
+			ctx.status(412).result("Precondition Failed");
+			return;
+		} catch (NoSuchFileException | NotDirectoryException e) {
+			ctx.status(409).result("Conflict: parent directory does not exist");
+			return;
+		}
+
+		syncDrive(ctx, dp);
+		ctx.status((replaced == null) ? 201 : 204);
+	}
+
+	/**
+	 * Builds the condition that If-Match and If-None-Match place on a write, to
+	 * be checked against the file's entry inside the install.
+	 */
+	private static DLFSCondition writeCondition(Context ctx) {
+		String ifMatch = ctx.header("If-Match");
+		String ifNoneMatch = ctx.header("If-None-Match");
+		return entry -> {
+			String etag = (entry == null) ? null : etagOf(entry);
+			if ((ifMatch != null) && ((etag == null) || !headerMatches(ifMatch, etag))) return false;
+			return (ifNoneMatch == null) || (etag == null) || !headerMatches(ifNoneMatch, etag);
+		};
+	}
+
+	/**
+	 * Copies a request body, refusing more than a limit
+	 * @return false if the body is longer than the limit
+	 */
+	private static boolean copyBody(InputStream body, OutputStream out, long limit) throws IOException {
+		byte[] buffer = new byte[16384];
+		long total = 0;
+		int n;
+		while ((n = body.read(buffer)) >= 0) {
+			total += n;
+			if (total > limit) return false;
+			out.write(buffer, 0, n);
+		}
+		return true;
 	}
 
 	void handleDelete(Context ctx) {
@@ -388,6 +469,12 @@ public class DLFSWebDAV {
 		Path path = resolveFilePath(ctx, dp);
 		if (path == null) {
 			ctx.status(404);
+			return;
+		}
+
+		AVector<ACell> fileNode = getFileNode(path);
+		if (fileNode != null) {
+			sendFile(ctx, path, fileNode);
 			return;
 		}
 
@@ -715,15 +802,42 @@ public class DLFSWebDAV {
 		}
 	}
 
+	/**
+	 * Gets the entry of a regular DLFS file, read once from the live drive.
+	 * @return File entry, or null if the path is not a regular DLFS file
+	 */
+	private static AVector<ACell> getFileNode(Path path) throws IOException {
+		if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof DLPath dlp) {
+			AVector<ACell> node = dlfs.getNode(dlp);
+			if (DLFSNode.isRegularFile(node)) return node;
+		}
+		return null;
+	}
+
+	/**
+	 * Answers GET or HEAD for one version of a DLFS file. All headers and the
+	 * body come from the same file entry, so a concurrent write cannot make them
+	 * disagree.
+	 */
+	private static void sendFile(Context ctx, Path path, AVector<ACell> node) throws IOException {
+		setLastModified(ctx, DLFSFileAttributes.create(node));
+		ContentResponse.send(ctx, etagOf(node), guessContentType(path.toString()),
+			BlobChannel.create(DLFSNode.getData(node)));
+	}
+
+	private static String etagOf(AVector<ACell> node) {
+		return "\"" + Cells.getHash(node).toHexString() + "\"";
+	}
+
 	private static void setETag(Context ctx, Path path) {
 		ctx.header("ETag", calculateETag(path));
 	}
 
 	private static String calculateETag(Path path) {
 		try {
-			if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof convex.lattice.fs.DLPath dlp) {
-				convex.core.data.Hash hash = dlfs.getNodeHash(dlp);
-				if (hash != null) return "\"" + hash.toHexString() + "\"";
+			if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof DLPath dlp) {
+				AVector<ACell> node = dlfs.getNode(dlp);
+				if (node != null) return etagOf(node);
 			}
 			BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
 			return "W/\"" + attrs.size() + "-" + attrs.lastModifiedTime().toMillis() + "\"";

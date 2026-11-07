@@ -8,8 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -20,22 +22,32 @@ import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
+import convex.core.cvm.Migrations;
+import convex.core.cvm.State;
 import convex.core.cvm.ops.Constant;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.core.init.Init;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
+import convex.core.store.MemoryStore;
+import convex.peer.API;
+import convex.peer.Server;
 import convex.peer.TestNetwork;
 
 /**
@@ -162,6 +174,44 @@ public class ConvexLocalTest {
 			Result result=results.get(i).join();
 			assertNull(result.getErrorCode(),"Error: "+result);
 			assertEquals(CVMLong.create(i),result.getValue());
+		}
+	}
+
+	/**
+	 * A local query runs on the calling thread, or on a virtual thread of its own when
+	 * asynchronous, so it is answered while the peer's query handler is busy.
+	 */
+	@Test
+	@Timeout(60)
+	public void testQueryWhileQueryHandlerBusy() throws Exception {
+		AKeyPair kp=AKeyPair.generate();
+		State genesis=Migrations.applyAll(Init.createState(List.of(kp.getAccountKey())));
+		try (MemoryStore store=new MemoryStore()) {
+			Map<Keyword,Object> config=Maps.hashMapOf(Keywords.KEYPAIR,kp,Keywords.STATE,genesis,Keywords.STORE,store,
+				Keywords.PORT,0,Keywords.AUTO_MANAGE,false,Keywords.OUTGOING_CONNECTIONS,0);
+			try (Server server=API.launchPeer(config)) {
+				ConvexLocal convex=Convex.connect(server);
+				CountDownLatch busy=new CountDownLatch(1);
+				CountDownLatch release=new CountDownLatch(1);
+				// A result for a raw send matches no request, so it is observed on the thread
+				// delivering it: the query handler's, which stays there until released
+				convex.setReceiveObserver(() -> {
+					busy.countDown();
+					try {
+						release.await();
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+					}
+				});
+				try {
+					assertTrue(convex.trySend(Message.createQuery(1,"1",null)));
+					busy.await();
+					assertEquals(CVMLong.ONE,convex.querySync(CVMLong.ONE).getValue());
+					assertEquals(CVMLong.ONE,convex.query(CVMLong.ONE).join().getValue());
+				} finally {
+					release.countDown();
+				}
+			}
 		}
 	}
 

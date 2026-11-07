@@ -4,6 +4,7 @@ import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -39,7 +40,7 @@ public class PgServerDemo {
 
 		// Create and register a demo database
 		System.out.println("Creating demo database: " + dbName);
-		ConvexDB cdb = ConvexDB.create();
+		ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 		SQLDatabase db = cdb.database(dbName);
 		cdb.register(dbName);
 

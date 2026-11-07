@@ -29,6 +29,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
@@ -87,8 +88,8 @@ class OwnedComponentsTest {
 		var edits=owners.authoringCursor(A,ALICE::signData);
 		var draft=owners.draft(A,ALICE::signData);
 		assertNull(owners.get(A));
-		assertNull(slot.get());
-		assertNull(edits.get());
+		assertFalse(slot.exists());
+		assertFalse(edits.exists());
 		slot.set(null);
 		draft.sync();
 		assertNull(root.get());
@@ -152,7 +153,7 @@ class OwnedComponentsTest {
 		for (boolean indexed:new boolean[] {false,true}) {
 			var owners=collection(indexed);
 			var edits=owners.authoringCursor(A,DELEGATE::signData);
-			assertNull(edits.get());
+			assertFalse(edits.exists());
 			assertNull(owners.storage().get());
 			var unauthorised=owners.authoringCursor(A,BOB::signData);
 			assertThrows(IllegalStateException.class,() -> unauthorised.set(CVMLong.ONE));
@@ -405,5 +406,22 @@ class OwnedComponentsTest {
 		assertNull(destination.get());
 		map.sync();
 		assertEquals(map.cursor().get(),destination.get());
+	}
+
+	/** Local owner edits go through the collection's editing view; incoming deliveries are already signed and merge into storage. */
+	@Test void ownerSlotsEditThroughTheCollectionsEditingView() {
+		var root=new Root<AHashMap<AString,SignedData<AInteger>>>();
+		var owners=new OwnedMap<AString,AInteger>(root,MaxLattice.INSTANCE,VERIFIER) {
+			private final AForkableCursor<AHashMap<AString,SignedData<AInteger>>> editing=super.cursor().readOnly();
+			@Override public AForkableCursor<AHashMap<AString,SignedData<AInteger>>> cursor() { return editing; }
+		};
+		assertThrows(ReadOnlyCursorException.class,() -> owners.path(A).set(ALICE.signData(CVMLong.ONE)));
+		assertThrows(ReadOnlyCursorException.class,() -> owners.authoringCursor(A,ALICE::signData).set(CVMLong.ONE));
+		var draft=owners.draft(A,ALICE::signData);
+		draft.cursor().set(CVMLong.ONE);
+		assertThrows(ReadOnlyCursorException.class,draft::sync);
+		assertNull(root.get(),"the editing view refused every local edit");
+		owners.merge(Maps.of(A,ALICE.signData(CVMLong.TWO)));
+		assertEquals(CVMLong.TWO,owners.get(A).getValue());
 	}
 }

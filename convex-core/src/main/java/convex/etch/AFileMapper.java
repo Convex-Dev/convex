@@ -13,6 +13,14 @@ import convex.core.util.Utils;
  * bounded by that length; only append operations may grow it. Implementations
  * own physical mapping and growth, while callers select whether each operation
  * uses the file cipher.</p>
+ *
+ * <p>Java closes a {@code FileChannel} when a thread in one of its blocking calls
+ * is interrupted, or enters one already interrupted, and an Etch file has one
+ * channel, so one interrupted caller would close the store for every thread.
+ * Implementations therefore run their raw channel calls (size, map, extension and
+ * channel force) through {@link convex.core.util.ThreadUtils#callUninterruptibly}.
+ * Mapped reads and writes never use the channel, so only growth and checkpoint
+ * forces take the hand-off. These calls use only the channel, never the mapper.</p>
  */
 abstract class AFileMapper implements AutoCloseable {
 	private static final int ZERO_BUFFER_SIZE=16_384;

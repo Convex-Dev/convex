@@ -30,9 +30,12 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
-import convex.lattice.LatticeApplication;
+import convex.lattice.ALatticeApplication;
 import convex.lattice.Lattice;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeHost;
+import convex.lattice.LatticeOps;
+import convex.lattice.Regions;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
 import convex.lattice.generic.KeyedLattice;
@@ -42,7 +45,7 @@ public class MailTest {
 
 	@Test void applicationAndMailboxViewsRejectIncompatibleContainersWithoutCreatingState() {
 		var root=new Root<ACell>();
-		var app=new LatticeApplication<Index<Keyword,ACell>>(KeyedLattice.create(Mail.KEY_MAIL,Mail.LATTICE),root.path()) {};
+		var app=new Regions(root.<Index<Keyword,ACell>>path());
 		var mail=Mail.connect(app,Mail.LATTICE,null);
 		var inbox=mail.mailbox(BOB_DID);
 		assertTrue(inbox.deposited().isEmpty());
@@ -74,7 +77,7 @@ public class MailTest {
 		mail.send(first);
 		mail.send(second);
 		var draft=mail.fork();
-		draft.transact(tx -> {
+		draft.execute(tx -> {
 			tx.mailbox(bob).receive(first);
 			tx.mailbox(carol).receive(second);
 		});
@@ -155,7 +158,7 @@ public class MailTest {
 		mail.send(second);
 		var inbox=mail.mailbox(BOB_DID);
 		var before=mail.cursor().get();
-		assertThrows(IllegalStateException.class,() -> mail.transact(draft -> {
+		assertThrows(IllegalStateException.class,() -> mail.execute(draft -> {
 			draft.mailbox(BOB_DID).receive(first,second);
 			assertSame(before,mail.cursor().get());
 			throw new IllegalStateException("Abort enclosing transaction");
@@ -202,7 +205,7 @@ public class MailTest {
 		var first=aliceToBob(1000,"one");
 		var second=MailEnvelope.plain(ALICE,CAROL_DID,ALICE_DID,1001,Strings.create("two"));
 		var before=mail.cursor().get();
-		mail.transact(draft -> {
+		mail.execute(draft -> {
 			draft.send(first);
 			draft.send(second);
 			assertSame(before,mail.cursor().get());
@@ -223,7 +226,7 @@ public class MailTest {
 		Mail mail=Mail.create((owner,value) -> ALICE.signData(value));
 		var envelope=aliceToBob(1000,"abandoned");
 		var before=mail.cursor().get();
-		assertThrows(IllegalStateException.class,() -> mail.transact(draft -> {
+		assertThrows(IllegalStateException.class,() -> mail.execute(draft -> {
 			draft.send(envelope);
 			throw new IllegalStateException("abort");
 		}));
@@ -251,7 +254,7 @@ public class MailTest {
 		};
 		Mail mail=Mail.connect(root,Mail.LATTICE,(owner,value) -> ALICE.signData(value));
 		var attempts=new AtomicInteger();
-		mail.transact(draft -> {
+		mail.execute(draft -> {
 			draft.send(envelope);
 			if (attempts.incrementAndGet()==1) draft.send(abandoned);
 		});
@@ -444,19 +447,18 @@ public class MailTest {
 		assertEquals(bob.cursor().get(),alice.cursor().get());
 	}
 
-	/** A root application over an in-memory root, as a host would hold it. */
-	private static final class TestRoot extends LatticeApplication<Index<Keyword,ACell>> {
-		TestRoot(KeyedLattice lattice) { super(lattice,Cursors.root(lattice.zero())); }
-		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
-		}
-	}
-
 	/** A root application with private working state over a host, as a node holds it. */
-	private static final class HostedRoot extends LatticeApplication<Index<Keyword,ACell>> {
-		HostedRoot(KeyedLattice lattice, LatticeHost<Index<Keyword,ACell>> host) { super(lattice,host); }
+	private static final class HostedRoot extends ALatticeApplication<Index<Keyword,ACell>> {
+		private final KeyedLattice lattice;
+		HostedRoot(KeyedLattice lattice, LatticeHost<Index<Keyword,ACell>> host) {
+			super(host.cursor().fork(),host::persist);
+			this.lattice=lattice;
+		}
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
-			return cursor().updateAndGet(own -> getLattice().merge(getContext(),own,other));
+			return cursor().updateAndGet(own -> lattice.merge(own,other));
+		}
+		@Override protected Index<Keyword,ACell> mergePublication(Index<Keyword,ACell> own,Index<Keyword,ACell> other) {
+			return LatticeOps.mergePublication(lattice,LatticeContext.EMPTY,own,other);
 		}
 	}
 
@@ -478,7 +480,7 @@ public class MailTest {
 	@Test
 	public void testHostedRegion() {
 		KeyedLattice root=Lattice.ROOT.addLattice(Mail.KEY_MAIL,Mail.LATTICE);
-		TestRoot app=new TestRoot(root);
+		var app=new Regions(Cursors.root(root.zero()));
 		Mail mail=Mail.connect(app,Mail.LATTICE,(owner,value) -> ALICE.signData(value));
 		MailEnvelope envelope=aliceToBob(1000,"hello bob");
 		mail.send(envelope);

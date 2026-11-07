@@ -1,5 +1,6 @@
 package convex.db.psql.msg;
 
+import convex.db.lattice.DuplicateKeyException;
 import convex.db.psql.PgMessage;
 import io.netty.buffer.ByteBuf;
 
@@ -106,6 +107,14 @@ public class ErrorResponse extends PgMessage {
 			return this;
 		}
 
+		/** The name of the server routine reporting the error, as PostgreSQL gives it. */
+		public Builder routine(String routine) {
+			if (routine != null) {
+				fields.put(ROUTINE, routine);
+			}
+			return this;
+		}
+
 		public ErrorResponse build() {
 			return new ErrorResponse(fields);
 		}
@@ -141,10 +150,20 @@ public class ErrorResponse extends PgMessage {
 			builder.detail("Caused by: " + root.getClass().getSimpleName() + ": " + rootMessage);
 		}
 
-		// Set SQL state code
-		if (t instanceof SQLException sqlEx) {
-			String sqlState = sqlEx.getSQLState();
-			builder.code(sqlState != null ? sqlState : "42000");
+		// Set SQL state code: the first one in the cause chain, since Calcite wraps the
+		// exceptions raised while executing a statement. A duplicate key, standard 23000,
+		// is PostgreSQL's more specific unique_violation. Codes come only from structured
+		// signals such as exception types and SQLStates, never from message text, which
+		// is fragile even against a library's own templates: without one, the generic
+		// code stands.
+		String sqlState = hasCause(t, DuplicateKeyException.class) ? UNIQUE_VIOLATION : null;
+		for (Throwable c = t; c != null && sqlState == null; c = (c.getCause() == c) ? null : c.getCause()) {
+			if (c instanceof SQLException sqlEx) sqlState = sqlEx.getSQLState();
+		}
+		if (sqlState != null) {
+			builder.code(sqlState);
+		} else if (t instanceof SQLException) {
+			builder.code("42000");
 		} else {
 			builder.code("XX000"); // Internal error
 		}
@@ -152,27 +171,15 @@ public class ErrorResponse extends PgMessage {
 		return builder.build();
 	}
 
-	/**
-	 * Creates a syntax error response.
-	 */
-	public static ErrorResponse syntaxError(String message, int position) {
-		return builder()
-			.severity("ERROR")
-			.code("42601") // syntax_error
-			.message(message)
-			.position(position)
-			.build();
-	}
+	/** PostgreSQL's unique_violation. */
+	static final String UNIQUE_VIOLATION = "23505";
 
-	/**
-	 * Creates an undefined table error.
-	 */
-	public static ErrorResponse undefinedTable(String tableName) {
-		return builder()
-			.severity("ERROR")
-			.code("42P01") // undefined_table
-			.message("relation \"" + tableName + "\" does not exist")
-			.build();
+	/** Whether an exception or any of its causes is of a type. */
+	private static boolean hasCause(Throwable t, Class<? extends Throwable> type) {
+		for (Throwable c = t; c != null; c = (c.getCause() == c) ? null : c.getCause()) {
+			if (type.isInstance(c)) return true;
+		}
+		return false;
 	}
 
 	/**

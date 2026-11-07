@@ -31,31 +31,24 @@ import convex.lattice.cursor.AForkableCursor;
  * publishes children into it, but does not publish the fork itself. Its owner
  * must explicitly publish the aggregate with the appropriate merge policy.</p>
  *
- * <p>Register children during construction. The first merge, path delivery or
- * sync freezes this component's registrations. Explicit children may be shared
+ * <p>Register children during construction, before any delivery or sync;
+ * registration takes no lock. The first merge, path delivery or sync freezes
+ * this component's registrations. Explicit children may be shared
  * with other applications: registration neither rebinds them nor changes their
  * policy or lifecycle. Shared children may receive repeated or concurrent
  * deliveries and syncs, so their operations must support that use.</p>
+ *
+ * <p>An application made of regions can extend this component or hold one; see
+ * {@code convex-core/docs/LATTICE_APPLICATIONS.md} for the choice.</p>
  */
-public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,ACell>> {
+public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACell>> {
 
 	private final Map<Keyword,ALatticeComponent<?>> registrations=new LinkedHashMap<>();
 	private volatile Map<Keyword,ALatticeComponent<?>> regions;
-	private final IndexComponent<Keyword,ACell> entries;
-
-	/** Constructs a root application using the host's cursor. */
-	protected AKeyedRegions(LatticeHost<Index<Keyword,ACell>> host) {
-		this(host.cursor());
-	}
 
 	/** Constructs a container view without changing or publishing its destination. */
 	protected AKeyedRegions(AForkableCursor<Index<Keyword,ACell>> cursor) {
 		super(cursor);
-		entries=new IndexComponent<>(cursor) {
-			@Override protected Index<Keyword,ACell> createContainer() {
-				return AKeyedRegions.this.createContainer();
-			}
-		};
 	}
 
 	/**
@@ -82,22 +75,30 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 	 * cursors do not expose enough binding information to verify this generally.
 	 * Registration does not relocate the component or take exclusive ownership.
 	 */
-	protected final synchronized <C extends ALatticeComponent<?>> C region(Keyword key,C component) {
+	protected final <C extends ALatticeComponent<?>> C region(Keyword key,C component) {
 		checkRegistration(key);
 		registrations.put(key,Objects.requireNonNull(component,"Region component must not be null"));
 		return component;
 	}
 
 	/**
-	 * Constructs and registers a child at this key. A missing containing index is
+	 * Constructs and registers a child at this key. The child's region cursor is
+	 * bound through {@link #cursor()} when this runs, so its edits apply this
+	 * component's editing policy; a subclass that overrides {@code cursor()}
+	 * initialises its view before creating regions. A missing containing index is
 	 * created through {@link #createContainer()} on the first changed write, never on
 	 * construction or read. Access rejects incompatible containers. The factory binds
 	 * any domain policy explicitly.
 	 */
-	protected final synchronized <V extends ACell,C extends ALatticeComponent<?>> C createRegion(
+	protected final <V extends ACell,C extends ALatticeComponent<?>> C createRegion(
 			Keyword key,RegionFactory<V,C> factory) {
 		checkRegistration(key);
 		Objects.requireNonNull(factory,"Region factory must not be null");
+		var entries=new IndexComponent<Keyword,ACell>(cursor()) {
+			@Override protected Index<Keyword,ACell> createContainer() {
+				return AKeyedRegions.this.createContainer();
+			}
+		};
 		return region(key,factory.create(entries.path(key)));
 	}
 
@@ -109,11 +110,12 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 
 	private Map<Keyword,ALatticeComponent<?>> regions() {
 		Map<Keyword,ALatticeComponent<?>> result=regions;
-		if (result!=null) return result;
-		synchronized (this) {
-			if (regions==null) regions=Collections.unmodifiableMap(new LinkedHashMap<>(registrations));
-			return regions;
+		if (result==null) {
+			// Registration has finished, so threads that freeze together build equal maps
+			result=Collections.unmodifiableMap(new LinkedHashMap<>(registrations));
+			regions=result;
 		}
+		return result;
 	}
 
 	/** Delivers present registered entries, without publishing staged children. */
@@ -126,7 +128,7 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 				if (incoming.containsKey(key)) entry.getValue().mergeAt(incoming.get(key));
 			}
 		}
-		return cursor().get();
+		return cursor().getOrDefault(null);
 	}
 
 	/** Resolves keys with the same blob comparison as the underlying index. */
@@ -147,7 +149,7 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 		if (path.length==0) return super.mergeAt(value,path);
 		ALatticeComponent<?> component=child(path[0]);
 		if (component!=null) component.mergeAt(value,Arrays.copyOfRange(path,1,path.length));
-		return cursor().get();
+		return cursor().getOrDefault(null);
 	}
 
 	/** Freezes registrations, prepares and publishes children, then reads the container. */
@@ -156,11 +158,18 @@ public abstract class AKeyedRegions extends ALatticeApplication<Index<Keyword,AC
 		regions();
 		beforeSync();
 		syncChildren();
-		return storage.get();
+		return storage.getOrDefault(null);
+	}
+
+	/**
+	 * Prepares state after registrations freeze and before any child publishes.
+	 * Failure prevents child publication. This hook can be called concurrently and
+	 * must use thread-safe component APIs.
+	 */
+	protected void beforeSync() {
 	}
 
 	/** Publishes children in registration order. The container has no staged snapshot. */
-	@Override
 	protected void syncChildren() {
 		for (var component:regions().values()) component.sync();
 	}

@@ -11,6 +11,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
@@ -163,13 +164,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public Index<K,V> updateRefs(IRefFunction func) {
+	protected Index<K,V> rebuildRefs(IRefFunction func) {
 		MapEntry<K, V> newEntry = Ref.update(entry,func);
 		Ref<Index<K, V>>[] newChildren = Ref.updateRefs(children, func);
 		if ((entry == newEntry) && (children == newChildren)) return this;
 		Index<K,V> result= new Index<K, V>(depth, newEntry, (Ref[])newChildren, mask, count);
-		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
-		result.cachedPrefix=cachedPrefix; // ref update preserves cell values, so prefix is unchanged
+		result.cachedPrefix=cachedPrefix; // a fact about the value, like the caches updateRefs carries
 		return result;
 	}
 
@@ -255,6 +255,63 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	public Index<K, V> assoc(ACell key, ACell value) {
 		if (!(key instanceof ABlobLike)) return null;
 		return assocEntry(MapEntry.create((K)key, (V)value));
+	}
+
+	/**
+	 * Updates the value for a key, as {@link AMap#update(ACell, BiFunction, Object)}.
+	 * A present key takes one descent; an absent key is inserted with {@link #assoc}.
+	 *
+	 * @param <A> Type of the function argument
+	 * @param key Key to update
+	 * @param function Function of the current value and the argument
+	 * @param arg Argument passed to the function
+	 * @return Updated Index, or null if the key is null
+	 */
+	@Override
+	public <A> Index<K, V> update(K key, BiFunction<? super V, ? super A, ? extends V> function, A arg) {
+		if (key==null) return null;
+		Index<K,V> updated;
+		try {
+			updated=updatePresent(key,key.hexLength(),function,arg);
+		} catch (StackOverflowError e) {
+			// Fully unwound; the structure is immutable, so use the two stack-safe descents.
+			return assoc(key,function.apply(get(key),arg));
+		}
+		if (updated!=null) return updated;
+		return assoc(key,function.apply(null,arg));
+	}
+
+	@Override
+	public Index<K, V> update(K key, UnaryOperator<V> function) {
+		return update(key,(v,f) -> f.apply(v),function);
+	}
+
+	/**
+	 * Replaces the value of a present key in one descent, following {@link #getEntry}.
+	 * Builds the same cells as {@link #assoc} for that key.
+	 *
+	 * @return Updated Index, or null if the key is absent
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private <A> Index<K, V> updatePresent(K key, long kl, BiFunction<? super V, ? super A, ? extends V> function, A arg) {
+		long pl=getDepth();
+		if (kl<pl) return null;
+		if ((kl==pl)||(pl==MAX_DEPTH)) {
+			if (!entryKeyMatch(key,entry)) return null;
+			V value=entry.getValue();
+			V newValue=function.apply(value,arg);
+			if (newValue==value) return this;
+			MapEntry<K,V> e=MapEntry.create(key,newValue);
+			return (count==1)?create(e):new Index<K,V>(getDepth(),e,(Ref[])children,mask,count);
+		}
+		int digit=key.getHexDigit(pl);
+		Index<K,V> child=getChild(digit);
+		if (child==null) return null;
+		if (child.getDepth()<=pl) return null; // malformed: descent must make progress
+		Index<K,V> newChild=child.updatePresent(key,kl,function,arg);
+		if (newChild==null) return null;
+		if (newChild==child) return this;
+		return withChild(digit,child,newChild);
 	}
 
 	@Override
@@ -561,14 +618,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private Index<K, V> assocEntry(MapEntry<K, V> e, long match) {
 		if (count == 0L) return create(e);
-		if (count == 1L) {
-			assert (mask == (short) 0); // should be no children
-			if (entry.keyEquals(e)) {
-				if (entry == e) return this;
-				// recreate, preserving current depth
-				return create(e);
-			}
-		}
 		ACell maybeValidKey=e.getKey();
 		if (!(maybeValidKey instanceof ABlobLike)) return null; // invalid key type!
 		ABlobLike<?> k = (ABlobLike)maybeValidKey;
@@ -672,13 +721,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			if (node.count==0L) {
 				result=create(e);
 				break;
-			}
-			if (node.count==1L) {
-				assert node.mask==(short)0;
-				if (node.entry.keyEquals(e)) {
-					result=(node.entry==e) ? node : create(e);
-					break;
-				}
 			}
 
 			ABlobLike<?> prefix=node.getPrefix();
@@ -1261,7 +1303,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		else refs[offset]=right.getRef();
 		if (overlap) refs[offset]=joined.getRef();
 		// A prefix entry precedes its descendants, so it can only come from the left.
-		return new Index<>(depth,alignedLeft?entry:null,(Ref[])refs,(short)(lm|rm),count+right.count);
+		return new Index<K,V>(depth,alignedLeft?entry:null,(Ref[])refs,(short)(lm|rm),count+right.count);
 	}
 
 	/** Iterative fallback for already ordered ranges after recursive overflow. */
@@ -1389,14 +1431,34 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * @return true if maps are equal, false otherwise.
 	 */
 	public boolean equals(Index<K, V> a) {
+		if (this == a) return true;
 		if (a==null) return false;
-		long n=this.count();
-		if (n != a.count()) return false;
-		if (this.mask!=a.mask) return false;
-		
-		if (!Cells.equals(this.entry, a.entry)) return false;
-		
-		return getHash().equals(a.getHash());
+		long n=count;
+		if (n != a.count) return false;
+		if (mask!=a.mask) return false;
+		if ((n>1)&&(getDepth()!=a.getDepth())) return false; // encoded only with more than one entry
+
+		Hash h=cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return h.equals(ha);
+		}
+
+		// A branch node compares by hash, which any parent encoding or store needs
+		// anyway, so the work is kept. An embedded node compares its entry and
+		// children through their refs, since no encoding ever needs its hash.
+		if (!compareAsEmbedded(a)) return getHash().equals(a.getHash());
+		MapEntry<K, V> e=entry;
+		MapEntry<K, V> ae=a.entry;
+		if (e!=ae) {
+			if ((e==null)||(ae==null)) return false;
+			if (!e.equals(ae)) return false;
+		}
+		int cn=children.length;
+		for (int i=0; i<cn; i++) {
+			if (!children[i].equals(a.children[i])) return false;
+		}
+		return true;
 	}
 
 	@Override
@@ -1490,6 +1552,59 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	/**
+	 * Merges another index into this one with a merge function, as {@link AMap#merge(AMap)}
+	 * merges entries. For every key in {@code b}, the result holds {@code func} applied to
+	 * this index's value (or {@code null}) and {@code b}'s value: a {@code null} result
+	 * removes the key, and a key present in both with equal values is kept without calling
+	 * {@code func}. Keys present only in this index are kept as they are and {@code func}
+	 * is not called for them.
+	 *
+	 * <p>Sub-tries of this index off the paths to {@code b}'s keys are shared unchanged
+	 * without being traversed: only nodes on those paths are rebuilt, reading their direct
+	 * children. The cost is therefore proportional to {@code b} and the key depth, not to
+	 * the size of this index. {@link #mergeDifferences(Index, MergeFunction)} instead
+	 * applies {@code func} to every key present on only one side.</p>
+	 *
+	 * <p>Identity contract as for {@link #mergeDifferences(Index, MergeFunction)}: returns
+	 * {@code this} by reference identity whenever the merged result equals {@code this}.</p>
+	 *
+	 * @param b Index whose entries are merged into this one
+	 * @param func Merge function for Index values
+	 * @return Merged Index, or {@code this} by reference identity if the result is unchanged
+	 */
+	public Index<K, V> merge(Index<K, V> b, MergeFunction<V> func) {
+		try {
+			return mergeNode(this, b, new KeepOwn<>(func));
+		} catch (StackOverflowError e) {
+			// Fully unwound, as for mergeDifferences
+			return mergeIntoDeep(this, b, func);
+		}
+	}
+
+	/**
+	 * Marks a merge that keeps entries present only in its left (own) operand as they are,
+	 * without calling the wrapped function. Only {@link #merge(Index, MergeFunction)}
+	 * creates one; the structural merge recognises it in place of a flag.
+	 */
+	private static final class KeepOwn<V> implements MergeFunction<V> {
+		private final MergeFunction<V> func;
+
+		KeepOwn(MergeFunction<V> func) {
+			this.func = func;
+		}
+
+		@Override
+		public V merge(V a, V b) {
+			return func.merge(a, b);
+		}
+
+		@Override
+		public V merge(Object key, V a, V b) {
+			return func.merge(key, a, b);
+		}
+	}
+
+	/**
 	 * Gets the child Ref for a specific digit, or null if not found.
 	 */
 	private Ref<Index<K, V>> getChildRef(int digit) {
@@ -1543,6 +1658,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			if (aref == null) {
 				nc = applySide(bref.getValue(), func, false);      // b-only child
 			} else if (bref == null) {
+				if (func instanceof KeepOwn) continue;              // a-only child kept, without traversing it
 				ac = aref.getValue();
 				nc = applySide(ac, func, true);                    // a-only child
 			} else if (aref.equals(bref)) {
@@ -1576,7 +1692,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		MapEntry<K, V> ne = singleEntry(shallow.entry, func, shallowIsLeft); // shallow entry is single-side
 		Index<K, V>[] kids = null; // built lazily on first change
 		boolean changed = (ne != shallow.entry);
-		int sm = shallow.mask & 0xFFFF;
+		// The shallow node's other children are single-side; an own side that is kept is not traversed
+		int sm = (shallowIsLeft && func instanceof KeepOwn) ? 0 : shallow.mask & 0xFFFF;
 		for (int d = 0; d < 16; d++) {
 			if (d == dig) continue;
 			if (((sm >> d) & 1) == 0) continue;
@@ -1620,9 +1737,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return new Index<K, V>(m, null, refs, (short) mask, A.count + B.count);
 	}
 
-	/** Apply {@code func} to every entry of a node as a single side (other side null). Returns the same node if unchanged. */
+	/**
+	 * Apply {@code func} to every entry of a node as a single side (other side null). Returns the
+	 * same node if unchanged, and at once for an own side that a {@link KeepOwn} merge keeps.
+	 */
 	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> applySide(Index<K, V> node, MergeFunction<V> func, boolean left) {
 		if (node.count == 0) return node;
+		if (left && func instanceof KeepOwn) return node;
 		MapEntry<K, V> ne = singleEntry(node.entry, func, left);
 		Index<K, V>[] kids = null;
 		int m = node.mask & 0xFFFF;
@@ -1689,6 +1810,34 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return result;
 	}
 
+	/**
+	 * Merge of {@code b} into {@code a} with no recursion, as {@link #merge(Index, MergeFunction)},
+	 * used once the structural merge has overflowed the thread stack. Walks {@code b} only,
+	 * looking up each key in {@code a}, so entries only {@code a} holds are neither visited nor
+	 * passed to {@code func}. Preserves the identity contract. Package-private so tests can
+	 * reach it directly.
+	 */
+	static <K extends ABlobLike<?>, V extends ACell> Index<K,V> mergeIntoDeep(
+			Index<K,V> a, Index<K,V> b, MergeFunction<V> func) {
+		Index<K,V> result=a;
+		long n=b.count;
+		for (long i=0; i<n; i++) {
+			MapEntry<K,V> be=b.entryAt(i);
+			MapEntry<K,V> ae=a.getEntry(be.getKey());
+			K key=(ae==null) ? be.getKey() : ae.getKey();
+			V av=(ae==null) ? null : ae.getValue();
+			V bv=be.getValue();
+			if (Utils.equals(av,bv)) continue;
+			V nv=func.merge(key,av,bv);
+			if (nv==null) {
+				if (ae!=null) result=result.dissocDeep(key);
+			} else if (!Utils.equals(av,nv)) {
+				result=result.assocEntryDeep(MapEntry.create(key,nv),0);
+			}
+		}
+		return result;
+	}
+
 	/** Snapshot a node's children into a digit-indexed array of size 16 (absent digits are null). */
 	@SuppressWarnings("unchecked")
 	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V>[] collectKids(Index<K, V> node) {
@@ -1746,6 +1895,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	/** Apply {@code func} to a single-side entry (other side null). Returns the entry, or null if removed. */
 	private static <K extends ABlobLike<?>, V extends ACell> MapEntry<K, V> singleEntry(MapEntry<K, V> e, MergeFunction<V> func, boolean left) {
 		if (e == null) return null;
+		if (left && func instanceof KeepOwn) return e;
 		V v = e.getValue();
 		V nv = left ? func.merge(e.getKey(), v, null) : func.merge(e.getKey(), null, v);
 		if (nv == null) return null;

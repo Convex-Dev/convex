@@ -7,8 +7,8 @@ import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Bits;
@@ -73,6 +73,12 @@ public class Local<T extends ACell> extends AOp<T> {
 	public byte getTag() {
 		return CVMTag.OP_LOCAL;
 	}
+
+	@Override
+	public boolean equals(ACell a) {
+		if (a instanceof Local<?> l) return position==l.position;
+		return Cells.equalsEncoding(this, a); // generic ExtensionValue with the local tag
+	}
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
@@ -89,11 +95,6 @@ public class Local<T extends ACell> extends AOp<T> {
 	@Override
 	public int encodeAfterOpcode(byte[] bs, int pos) {
 		throw new Error(ErrorMessages.UNREACHABLE);
-	}
-
-	@Override
-	public Local<T> updateRefs(IRefFunction func) {
-		return this;
 	}
 
 	@Override

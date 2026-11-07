@@ -162,11 +162,11 @@ allows other message transports later. HTTPS is not yet a built-in transport.
 | `Convex` | Client API (`convex.api`) for queries and transactions against a peer |
 | `ConnectionManager` | Manages peer-to-peer network connections |
 | `BeliefPropagator` | Handles CPoS belief propagation protocol |
-| `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost` and notifies propagation groups |
-| `LatticeNode` | Optional TCP networking for a host: owns the server, listener and dynamic propagation groups |
+| `NodeServer` | Lattice node (`convex.node`): replicates an assembled `LatticeHost` and notifies propagator groups |
+| `LatticeNode` | Optional TCP networking for a host: owns the server, listener and dynamic propagator groups |
 | `LatticeListener` | Application-owned inbound TCP transport and connection-to-group router |
 | `LatticePropagator` | Owns one filtered serving view, protocol endpoint and external route set |
-| `LatticeConnectionManager` | Maintains bounded connection intent and authenticated routes for one propagator; discovery schemas live in application modules |
+| `LatticeConnectionManager` | Maintains explicit peers, bounded discovered candidates and authenticated routes for one propagator; discovery schemas live in application modules |
 
 ## Lattice Node
 
@@ -194,13 +194,18 @@ try (var network = new LatticeNode<>(host, NodeConfig.localNetwork()).launch()) 
 }
 ```
 
-New groups inherit the configured node key; without an identity they have no
-transport key. For an indirect DID, supply the authoriser as the third argument
-to `setIdentity`. A group can override its own key. Changing the node default
+New groups prove the configured node key with a challenge signer, which signs
+only lattice challenges, so they never hold the key pair; without an identity
+they have no transport key. For an indirect DID, supply the authoriser as the
+third argument to `setIdentity`, which also takes a `ChallengeSigner` in place of
+the key pair. A group can override its own identity. Changing the node default
 affects future groups only.
 
-The node closes its listener, groups and server, leaving the host and its
-caller-owned store usable. A host sync persists and schedules propagation;
+The node closes its listeners, groups and server, leaving the host and its
+caller-owned store usable. A service shuts down with
+`try (store; host; network) { app.sync(); host.checkpoint(); }`, so the network
+sends the final checkpoint to peers as it closes; see [shutdown](docs/SHUTDOWN.md).
+A host sync persists and schedules propagation;
 group announcement completes asynchronously. See the
 [reading-list example](src/test/java/convex/node/app/ReadingListApplicationTest.java)
 for a complete exchange with authenticated peer admission and staged publication,
@@ -243,6 +248,7 @@ The underlying components remain available for custom transport assembly:
 - [Lattice Networking Responsibilities and Trust Boundaries](docs/LATTICE_NETWORKING.md)
 - [Delta Propagation, Backpressure and Memory Bounds](docs/PROPAGATION.md)
 - [Lattice Persistence and Node Configuration](docs/PERSISTENCE.md)
+- [Lattice Service Shutdown](docs/SHUTDOWN.md)
 - [Javadoc API Reference](https://javadoc.io/doc/world.convex/convex-peer)
 - [Convex Documentation](https://docs.convex.world)
 - [Running a Peer](https://docs.convex.world/docs/convex-peer)

@@ -18,6 +18,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.TableModify;
 import org.apache.calcite.rex.RexNode;
 
+import convex.db.lattice.SQLTable;
+
 /**
  * Relational expression for modifying a ConvexTable.
  *
@@ -69,12 +71,19 @@ public class ConvexTableModify extends TableModify implements EnumerableRel {
 		String schemaName = qualifiedName.get(0);
 		String tableName = qualifiedName.size() > 1 ? qualifiedName.get(1) : qualifiedName.get(0);
 
+		// Rows are written only while the table has the binding this plan is built for
+		ConvexTable planned = getTable().unwrap(ConvexTable.class);
+		SQLTable.Binding binding = planned.bind(getTable(), implementor.getTypeFactory());
+
 		final Expression tableExp = Expressions.call(
-			ConvexSchemaFactory.class,
-			"getTable",
-			implementor.getRootExpression(),
-			Expressions.constant(schemaName),
-			Expressions.constant(tableName));
+			Expressions.call(
+				ConvexSchemaFactory.class,
+				"getTable",
+				implementor.getRootExpression(),
+				Expressions.constant(schemaName),
+				Expressions.constant(tableName)),
+			"bound",
+			implementor.stash(binding, SQLTable.Binding.class));
 
 		// Generate code based on operation
 		final Expression countExp;

@@ -5,12 +5,75 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.19] - 2026-11-07
+
+### Added
+
+- Address lattice values by plain string paths, using the keys their JSON shows. ([Component paths](convex-core/docs/LATTICE_APPLICATIONS.md#external-component-paths))
+- Choose how each Convex DB database merges replicated writes, and which clock timestamps them. ([Merge Policy](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-policy))
+- Secure Convex DB's PostgreSQL connections with TLS (proposed by @trsb-standards). ([TLS](convex-db/README.md#tls))
+- Support PostgreSQL client transactions and more standard SQL in Convex DB (from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
+- Run a P2P node with `convex p2p start`, joining through seeds and rejoining after a restart. ([Running a node](convex-p2p/README.md#running-a-node))
+- Block unwanted P2P nodes by key, address or host. ([Local Evidence](convex-peer/docs/P2P_DESIGN.md#46-local-evidence-partial))
+- Name lattice peers by `did:web` as well as by address. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md#connection-capabilities))
+- Replicate DLFS nodes in both directions. ([DLFS](convex-dlfs/README.md#run-a-webdav-server))
+- Stream large DLFS files over WebDAV, with byte ranges and atomic uploads. ([#790](https://github.com/Convex-Dev/convex/issues/790))
+- Give lattice applications more control over networking, persistence and private state. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md))
+- Save lattice services automatically on a schedule, with a full save whenever a host closes. ([Persistence](convex-peer/docs/PERSISTENCE.md#logical-publication-and-durability))
+- Set how often lattice nodes re-announce their state to peers, turn it off, or announce on demand. ([Live peer selection](convex-peer/docs/LATTICE_NETWORKING.md#live-peer-selection))
+
+### Changed
+
+- Leave access-list cleanup and capacity limits to the application. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md#data-and-merge-boundaries))
+- Show blob map keys as `0x` hex in all JSON output, including REST API responses. ([CAD044](https://docs.convex.world/docs/cad/json))
+- Make lattice cursor reads explicit about missing data and value types; see the [cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths) when upgrading.
+- Refuse a lattice path write that cannot be made with `PathWriteException`, naming the key that does not fit. ([Cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths))
+- Speed up Convex DB replication and prepared statements. ([#786](https://github.com/Convex-Dev/convex/issues/786))
+- Follow standard SQL for `INSERT` and identifier case in Convex DB, and name databases in JDBC URLs only with `database`; see [Identifier Case](convex-db/README.md#identifier-case) when upgrading.
+- Configure P2P nodes with a JSON5 file, and advertise them with `convex p2p start --url`, which replaces `convex dlfs start --url`. ([Running a node](convex-p2p/README.md#running-a-node))
+- Serve DID documents that standard DID resolvers read. ([CAD043](https://docs.convex.world/docs/cad/did))
+- Keep peers responsive to slow clients; a client may now receive a later block's results first. ([Result reporting](convex-peer/docs/TRANSACTION_PATH.md#result-reporting))
+- Report a closed client connection clearly, as `:CONNECT`. ([Client backpressure](convex-peer/docs/CLIENT_BACKPRESSURE.md#aconnection-interface))
+- Judge each Belief by its signed Orders, whichever connection brings it. ([Peer trust](convex-peer/docs/PEER_PRIORITY.md))
+- Send a lattice node's final state to its peers as it shuts down. ([Shutdown](convex-peer/docs/SHUTDOWN.md))
+- Keep peers fast under sustained load with one bounded cache per Etch store; the `enableL2` setting no longer has an effect. ([Etch configuration](convex-core/docs/ETCH_CONFIG.md#options-and-defaults))
+- Read Etch stores about twice as fast; `etch validate` still checks every record's hash. ([Etch v3](convex-core/docs/ETCHv3.md#sync))
+- Decode messages with less memory, reusing cells a peer already holds and no longer keeping a whole message for the cells taken from it. ([Decoding](convex-core/docs/ENCODER_DESIGN.md#decoding))
+- Simplify the Java APIs for lattice applications, networking and Convex DB; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading.
+- Return results from lattice component transactions, and run one exclusively when it must not repeat; transactions with no result are now `execute`, see [Forks and transactions](convex-core/docs/LATTICE_APPLICATIONS.md#forks-and-transactions) when upgrading.
+
+### Removed
+
+- Remove the legacy generic lattice application type in favour of specialised domain components. ([Lattice applications](convex-core/docs/LATTICE_APPLICATIONS.md))
+- Remove path resolution from lattices; each component now resolves its own paths. ([Component paths](convex-core/docs/LATTICE_APPLICATIONS.md#external-component-paths))
+- Move the P2P node record helpers into convex-p2p. ([Lattice structure](convex-p2p/README.md#lattice-structure))
+- Remove Convex DB's separate table and row lattices; its components now merge their own data. ([Merge Policy](convex-db/docs/LATTICE-DB-ARCHITECTURE.md#merge-policy))
+
+### Fixed
+
+- Keep peers reaching consensus under heavy transaction load. ([Propagation](convex-peer/docs/PROPAGATION.md#delta-construction-and-fan-out))
+- Replicate lattice data reliably, for roots of any size and connections under load. ([Propagation](convex-peer/docs/PROPAGATION.md))
+- Reach consensus promptly when a peer misses part of a Belief update, as often happens while a network starts. ([Propagation](convex-peer/docs/PROPAGATION.md))
+- Keep the peers a lattice node chooses, and close dead connections within 90 seconds. ([Live peer selection](convex-peer/docs/LATTICE_NETWORKING.md#live-peer-selection))
+- Connect `convex dlfs start --peer` to the peers it names. ([#629](https://github.com/Convex-Dev/convex/issues/629))
+- Shut down peers, lattice nodes and HTTP servers promptly and cleanly.
+- Keep Etch stores safe across interrupts and crashed start-ups. ([#748](https://github.com/Convex-Dev/convex/issues/748))
+- Look up transactions by hash reliably and quickly, reporting the copy that ran when one is included more than once.
+- Keep replicated data consistent and owner-signed, including lattice KV deletes and Convex DB schema changes. ([Replica Ownership](convex-db/README.md#replica-ownership))
+- Keep each application's Convex DB connections on its own database. ([#789](https://github.com/Convex-Dev/convex/issues/789))
+- Let a Convex DB file open again after a failed attempt, and save DLFS browser edits as you work and at exit. ([#828](https://github.com/Convex-Dev/convex/issues/828))
+- Log why a P2P node could not bootstrap from a peer it connected to. ([#827](https://github.com/Convex-Dev/convex/issues/827))
+- Improve Convex DB's SQL and PostgreSQL client compatibility, including integers beyond 64 bits (with fixes from @trsb-standards). ([#812](https://github.com/Convex-Dev/convex/issues/812))
+- Keep a P2P node's `:local` state private, and MCP signing keys safe from a wrong passphrase. ([MCP Auth](convex-restapi/docs/MCP_AUTH.md#deletekey))
+- Handle percent-encoded `did:web` names correctly. ([#816](https://github.com/Convex-Dev/convex/issues/816))
+- Read a lattice fork without waiting for its sync or for other writers to it.
+
 ## [0.8.18] - 2026-10-25
 
 ### Added
 
 - Support lattice applications composed from reusable components, with signed ownership, timestamped records, forks and atomic transactions. ([Design](convex-core/docs/LATTICE_APPLICATIONS.md))
-- Allow `LatticeNode` to manage lattice networking for an application, with optional DID identity. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md))
+- Let a lattice node manage networking for an application, with optional DID identity. ([Networking](convex-peer/docs/LATTICE_NETWORKING.md))
 - Allow services to choose their durability with host checkpoints and scoped automatic flushing. ([Persistence](convex-peer/docs/PERSISTENCE.md))
 - Support DLFS file modification times and safe concurrent drive creation. ([DLFS](convex-dlfs/docs/DLFS_DESIGN.md))
 - Allow transaction simulation as an alternative to query execution, for cost estimates through REST and the Java client.
@@ -35,469 +98,385 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Etch backup snapshots during garbage collection and checkpoint exports from live stores. ([#744](https://github.com/Convex-Dev/convex/pull/744), [#750](https://github.com/Convex-Dev/convex/issues/750))
-- Per-store Etch configuration and a unified verification API. ([Configuration](convex-core/docs/ETCH_CONFIG.md), [verification](convex-core/docs/ETCH_GC.md))
-- Optional TLS peer connections with peer-key authentication. ([Details](https://github.com/Convex-Dev/convex/commit/5cec9ba4f))
-- Independent shutdown of propagation groups on running lattice nodes. ([#732](https://github.com/Convex-Dev/convex/issues/732))
+- Back up Etch stores during garbage collection, and export checkpoints from live stores. ([#750](https://github.com/Convex-Dev/convex/issues/750))
+- Configure each Etch store separately, and verify any store the same way. ([Configuration](convex-core/docs/ETCH_CONFIG.md))
+- Secure peer connections with optional TLS, authenticated by peer key. ([Details](https://github.com/Convex-Dev/convex/commit/5cec9ba4f))
+- Shut down one propagation group on a running lattice node without stopping the rest. ([#732](https://github.com/Convex-Dev/convex/issues/732))
 
 ### Changed
 
-- More responsive peer communication under load, including larger updates. The `:max-belief-delta-broadcast-size` setting is retired. ([Details](https://github.com/Convex-Dev/convex/commit/8fe213ab1))
-- Multi transactions support scoped controllers and retain complete logs and Juice accounting. ([Control](https://github.com/Convex-Dev/convex/commit/55125e920), [accounting](https://github.com/Convex-Dev/convex/commit/2e8cb0501))
+- Keep peer communication responsive under load, including larger updates; the `:max-belief-delta-broadcast-size` setting is retired. ([Details](https://github.com/Convex-Dev/convex/commit/8fe213ab1))
+- Support scoped controllers in multi transactions, with complete logs and juice accounting. ([Details](https://github.com/Convex-Dev/convex/commit/55125e920))
 
 ### Fixed
 
-- More reliable Etch collection, caching and lattice state persistence. ([GC](https://github.com/Convex-Dev/convex/issues/746), [caching](https://github.com/Convex-Dev/convex/commit/08fe97d8d), [state](https://github.com/Convex-Dev/convex/commit/1dbc4896c))
-- Robust handling of deeply nested data, CAD3 messages and malformed character literals.
-- Accurate PostgreSQL cast and operator handling in Convex DB. ([Details](https://github.com/Convex-Dev/convex/commit/0c3a4db53))
+- Make Etch garbage collection, caching and lattice state persistence more reliable. ([#746](https://github.com/Convex-Dev/convex/issues/746))
+- Handle deeply nested data, CAD3 messages and malformed character literals robustly.
+- Handle PostgreSQL casts and operators accurately in Convex DB. ([Details](https://github.com/Convex-Dev/convex/commit/0c3a4db53))
 
 ## [0.8.16] - 2026-09-02
 
 ### Added
 
-- P2P nodes can advertise Point of Presence node keys and explicit relay
-  willingness in signed NodeInfo. Opt-in PoP nodes forward bounded end-to-end
-  signed messages over authenticated routes; outbound-only nodes can exchange
-  public values or ECIES-encrypted private values through a shared PoP.
-- P2P lattice nodes can bootstrap from one authenticated node key and TCP address.
-  The connecting node pushes only its own signed NodeInfo entry, allowing the remote
-  node to challenge it on the same full-duplex socket and explicitly upgrade that
-  inbound connection into an authenticated outbound propagation route, then pulls
-  `:p2p`, `:id` and currently desired social-owner paths so late joiners receive their
-  follow-filtered application state. Outbound-only nodes may publish an empty transport vector and
-  synchronise through that original connection without a listener or reverse dial.
-  `NodeConfig.localNetwork()` provides loopback NodeInfo publication with OS-assigned
-  ports for isolated development networks.
-- Social users support owner-scoped forks, allowing several feed and follow actions to
-  be published as one signed user value.
-- Social owners and follow targets are canonical DIDs, with `did:key`, pinned numeric
-  `did:convex`, and authenticated `did:web`/`alsoKnownAs` key authorisation. The
-  top-level `:following` value uses LWP over a DID-keyed `:follows` map with whole-record
-  LWW edits and a cached last-validated signer.
-- The supported `convex.peer` module API now exports `convex.node`. Host settings
-  use `NodeConfig`, while each independently composed propagation group uses
-  `LatticePropagatorConfig` and exposes lifecycle and contained-failure status for
-  application supervision.
+- Relay signed messages between P2P nodes through opt-in Point of Presence nodes, so outbound-only nodes can exchange public or encrypted private values.
+- Bootstrap a P2P node from one authenticated peer, even without a listener of its own, with late joiners receiving their follow-filtered state.
+- Publish several social feed and follow actions as one signed update.
+- Identify social owners and follow targets by DID: `did:key`, `did:convex` and authenticated `did:web`.
 
 ### Changed
 
-- `Format.encodeMultiCell` no longer knows about message limits and never silently
-  drops cells: a new overload takes a maximum size and throws `IllegalArgumentException`
-  when it would be exceeded, with zero or less meaning no maximum. `Message.getMessageData`
-  applies the maximum message length at the transport boundary, and connections refuse
-  to send, with a logged warning, a message that cannot fit one frame (#726).
-- Lattice query replies are sized by the requesting connection's trust and decided from
-  cached memory sizes, so a query never makes a node encode more than it will send. An
-  untrusted connection receives a value in full only when it fits one message of the
-  size the node accepts from it, and otherwise the root alone to acquire the rest; a
-  trusted connection also receives bounded `DATA` chunks ahead of the root, as a
-  broadcast would.
-- Cells now compute their encoding length arithmetically from a per-type header
-  length plus their child refs, never by rendering an encoding, and `createEncoding`
-  allocates the exact size. `estimatedEncodingSize` has been removed from
-  `IWriteable`, `ACell` and `Ref`; callers needing a size should use
-  `getEncodingLength`.
-- `Hash` and `AccountKey` are now canonical cells: they encode exactly as 32-byte
-  blobs, so `getCanonical()` returns the same instance rather than a plain `Blob`.
-- Convex clients preserve reserved transaction sequences after timeouts and CVM
-  errors, preventing a shared client from reusing a sequence whose outcome is
-  unknown or which the transaction consumed.
-- CAD036 lattice paths now use one canonical vector representation. Lattice nodes
-  use `[:LV path value]` for optimistic pushes and `[:LV id path value]` for
-  confirmed pushes, and reject scalar, missing or ambiguous paths.
-- `NodeServer` now owns only the authoritative lattice merge, node-store root,
-  attached-group lifecycle and isolated update notification. Calling applications
-  must construct and configure each `LatticePropagator`; nodes no longer create
-  an implicit primary group. Applications also own `LatticeListener` transport
-  composition, permitting shared connection routing or independent transports;
-  `NodeServer` no longer exposes a port, address or inbound selector. Propagators
-  own their connection sets, trust, protocol queues, acquisition, filters and
-  serving stores, and a failed group cannot break node publication or another
-  group.
+- Compose lattice nodes from independent propagation groups and listeners, so one failing group cannot break the rest; see [lattice networking](convex-peer/docs/LATTICE_NETWORKING.md) when upgrading.
+- Never drop cells from a message silently: a message too large for one frame is refused with a warning. ([#726](https://github.com/Convex-Dev/convex/issues/726))
+- Size lattice query replies to what each connection accepts, so a query never makes a node encode more than it sends.
+- Work out cell encoding sizes without rendering the encoding.
+- Keep a shared client's transaction sequence numbers correct after timeouts and CVM errors.
+- Use one canonical path form in lattice messages, rejecting missing or ambiguous paths, as CAD036 specifies.
 
 ### Fixed
 
-- `LatticePropagator.pullPath` merged a partial reply as if complete when its store
-  held the root without every branch, since `MemoryStore` returns a missing ref rather
-  than throwing. Completeness is now checked explicitly and a partial value is acquired
-  from the peer before it is merged; the peer client is given the propagator store before
-  the query so a partial reply decodes lazily instead of being rejected.
-- Multi-cell messages containing an `Index` node deeper than 64 hex digits with
-  non-embedded children could not be decoded by a receiver that did not already
-  hold those children, because the embedding check dereferenced them. A lattice
-  query for such a value failed on the requesting node, so a joining node could
-  not bootstrap from a peer holding it (#723). `Index` now computes its encoding
-  length from its refs without loading any child.
-- DLFS directory entries with names longer than the embedded string limit (138 to
-  254 bytes) were listed but could not be opened, statted, moved or deleted once
-  their directory index had been reloaded from an Etch store, for example after a
-  restart or when a cached node was evicted from memory. Single-entry `Index` nodes
-  decoded with a non-embedded key now derive their depth from the key instead of
-  assuming the maximum, so lookups agree with iteration.
-- String interning is thread-safe. `StringStore` kept the process-wide intern
-  index in plain `HashMap`s written without synchronisation, so concurrent
-  `Strings.intern` calls could corrupt it and later lookups then recursed in
-  `HashMap$TreeNode.find` until `StackOverflowError`. Entries are now published
-  under a lock onto concurrent maps; `LoadMonitor`'s per-thread map is synchronised.
-- Social cached follow signers recognise canonical 32-byte Blob keys after CAD3 decode,
-  while active follow identities remain DIDs.
+- Acquire the rest of a partial lattice pull reply before merging it.
+- Decode messages holding deep `Index` nodes whose children the receiver lacks, so a joining node can bootstrap from a peer holding them. ([#723](https://github.com/Convex-Dev/convex/issues/723))
+- Open, move and delete DLFS entries with long names after a restart.
+- Make string interning safe across threads, preventing rare crashes under concurrent use.
+- Recognise cached social follow signers after decoding.
 
 ### Security
 
-- Point-message relays verify the invariant source signature, destination,
-  lifetime and path before forwarding, use authenticated routes only, and bound
-  message size, hops, fan-out, recent replay state and inbound rate.
-- Lattice peer trust now requires a valid two-sided Ed25519 challenge/response binding
-  a random nonce, both node-key audiences and a fixed protocol context. An assigned
-  inbound socket remains an untrusted public route until that proof and an admitted
-  owner-signed NodeInfo both succeed.
-- Unverified connections can submit only complete, size-bounded lattice values and
-  cannot stage unsolicited `DATA` or trigger missing-cell acquisition. P2P social
-  ingress validates the complete signed owner slot and DID signer before persistence,
-  retains only local users, pins and direct follows, and bounds explicit plus discovered
-  desired peers with `maxDesiredPeers`.
+- Verify relayed point messages fully before forwarding them, and bound their size, hops, fan-out, replays and rate.
+- Require a two-sided challenge-response before trusting a lattice peer.
+- Accept only complete, size-bounded values from unverified lattice connections, and validate P2P social data before storing it.
 
 ## [0.8.15] - 2026-08-24
 
 ### Added
 
-- Minimal ECIES-style Blob encryption for an `AccountKey`, using RFC 9180 HPKE with X25519, HKDF-SHA256 and AES-128-GCM. Ciphertext Blobs use the compact `enc || ct` layout with 48 bytes of overhead; recipients decrypt with their `AKeyPair` or Ed25519 seed, with a reusable decryptor for efficient batch reads.
-- REST transaction concurrency is configurable via `transact-limit` (server-wide) and `transact-limit-client` (per client, 0 to disable), so a well-resourced peer can serve more. Clients are identified by direct socket address and forwarded client-address headers are never consulted, since a limit keyed on a caller-supplied header is trivially bypassed. Behind a reverse proxy, set `transact-limit-client` to 0 and let the proxy apply per-client policy, which it can do against the true client address; the server-wide cap still bounds total load.
-- Lattice and CPoS propagation split oversized deltas into bounded `:DATA` batches followed by a root announcement. Per-message and total eager-materialisation limits are independently configurable with `maxDeltaMessageSize` / `maxDeltaBroadcastSize` and `:max-belief-delta-message-size` / `:max-belief-delta-broadcast-size`; complete inbound values retain their separate size policy.
+- Encrypt data for an account key with standard HPKE (RFC 9180), adding only 48 bytes.
+- Tune REST transaction concurrency server-wide and per client, with `transact-limit` and `transact-limit-client`.
+- Split oversized lattice and consensus updates into bounded batches, with configurable limits.
 
 ### Changed
 
-- The REST `/transact` concurrency cap rises from 2 server-wide to 10000 server-wide with 100 per client. A permit is held for the whole consensus wait, so the previous cap meant two slow transactions could stall every other caller. Request handling runs on virtual threads, so a waiting request is cheap and the higher ceiling is affordable; the per-client bound keeps one caller from taking the whole allowance.
+- Raise REST `/transact` concurrency from 2 to 10,000 server-wide, with 100 per client, so slow transactions no longer hold up other callers.
 
 ### Fixed
 
-- Priority own-Order broadcasts now carry their novel cells inline when they fit the priority message limit, and novelty from a superseded priority message is folded into the next full Belief broadcast. Announcing the Order previously consumed announce-novelty without delivering it, so no later delta carried the new Block data and receivers fell back to status polling for every confirmation round — observed as ~1.5s median transaction confirmation on an otherwise idle local 5-peer network, restored to ~35ms by this fix.
-- A peer's confirmed consensus points no longer retreat during Belief merge. Recomputing levels from the current voting set could lower consensus and finality whenever a lagging copy of another peer's Order supplied the stake that tipped the 2/3 threshold; the peer then signed the receded Order and silently truncated already-executed state, so a client could transiently observe state missing a transaction whose result had already been reported. CAD051 requires that confirmed points never retreat; consensus and finality are now ratchets (proposal may still recede when switching proposals). The bounded delta propagation in this release made lagging Order copies routine, surfacing the latent defect and causing repeated truncate-and-replay churn under load.
-- Convex DB components now retain their containing application-policy hierarchy, so nested table persistence reaches a hosted `LatticeHost` without moving cursors and database/schema forks keep the same persistence policy while synchronising only to their original cursor (#698).
-- Delta fan-out is isolated per peer so a full receiver queue cannot block healthy peers, queued bytes are bounded independently of message count, and a failed delta encoding no longer prevents the announced lattice root or publication future from advancing. CPoS prioritises a coalesced own-Order root ahead of best-effort full-Belief replication; root sync and pulls recover dropped data.
-- The GUI passphrase strength estimate awards the documented 2 bits per character category used, rather than 1. The multiply sat inside `Integer.bitCount`, where doubling a bit mask cannot change the count.
+- Confirm transactions in about 35 ms rather than 1.5 s on an idle local network, by sending new block data with each peer's Order.
+- Never let a peer's confirmed consensus points move back during a Belief merge, as CAD051 requires, so a client no longer briefly sees state missing a transaction already reported.
+- Persist nested Convex DB tables through a hosted lattice, and keep database and schema forks on the same persistence policy. ([#698](https://github.com/Convex-Dev/convex/issues/698))
+- Keep one slow receiver from holding up propagation to healthy peers, and recover dropped updates.
+- Score GUI passphrase strength as documented.
 
 ### Security
 
-- PKCS12 key stores now protect each key entry with a freshly generated random salt for password-based key derivation. Every entry was previously written with a fixed all-zero salt, so a single precomputed PBKDF2 table would have applied to every key store Convex has ever written. Existing key stores still open, since the salt is stored in the file itself; an entry is re-salted when it is next written.
-- Password-based key derivation for key store entries now runs 220,000 PBKDF2-HMAC-SHA512 iterations, up from 100,000, following current OWASP guidance. The count is recorded in each key store, so existing entries keep their own count until they are next written. Unlocking a key costs roughly 140ms rather than 65ms.
-- PEM key export now encrypts with PBES2, using AES-256-CBC and PBKDF2-HMAC-SHA512 with a random salt, replacing PKCS#5 v1.5 with RC2 at 65,536 iterations. The scheme is recorded in the PEM, so keys exported earlier still import. A stock OpenSSL 3 reads the new files directly, whereas RC2 requires its legacy provider.
-- PEM key import parses the PKCS#8 structure through `AKeyPair.createFromPKCS8` instead of taking the trailing 32 bytes as the seed. RFC 8410 permits an optional public key field, and an encoding carrying one was previously imported as a silently different key pair; encodings for other algorithms are now rejected rather than reinterpreted.
-- The peer signing service derives its `:keys` lookup hash with HKDF keyed by the peer-held encryption secret, replacing an unsalted SHA-256 of identity, public key and passphrase. The old hash let anyone holding a replica of the store brute-force the passphrase offline. Credential inputs are also canonically encoded, so field boundaries cannot be shifted. Existing entries are rewritten to the new scheme on first successful load, when the passphrase is available.
-- Locking a wallet entry now blocks signing as well as key access. `HotWalletEntry.sign` previously ignored the lock entirely.
+- Protect each key store entry with its own random salt; existing key stores still open, and are re-salted when next written.
+- Strengthen key store passwords with 220,000 PBKDF2 iterations, following OWASP guidance.
+- Encrypt exported PEM keys with PBES2 and AES-256, which stock OpenSSL 3 reads; keys exported earlier still import.
+- Import PEM keys by their PKCS#8 structure, so every valid encoding imports as the right key and other algorithms are refused.
+- Protect signing service passphrases against offline guessing from a copy of the store; existing entries upgrade on their next use.
+- Block signing, not just key access, when a wallet entry is locked.
 
 ## [0.8.14] - 2026-08-19
 
 ### Changed
 
-- The default client transaction timeout is raised from 8 to 20 seconds, so ordinary scheduling delay on a loaded machine no longer surfaces as a spurious `:TIMEOUT` result. Connection establishment and internal queue backpressure keep the previous 8 second bound under the new `Config.DEFAULT_INTERNAL_TIMEOUT`.
-- `LatticeContext` is now an extensible application policy: timestamps and signing can be resolved dynamically after one root installation, and delegated overrides replace individual capabilities. Owned data is authored through `signAs`, one authorisation rule shared with merge-time owner verification, so a wallet or key-store backed policy can write for any identity it holds and a write that no peer would accept fails locally instead.
-- Singleton `Ref` constants moved off `Ref` to break class initialisation cycles: `Ref.NULL_VALUE` is now `RefDirect.NULL_VALUE`, and `Ref.TRUE_VALUE` / `Ref.FALSE_VALUE` are now `Refs.TRUE_VALUE` / `Refs.FALSE_VALUE`. `ErrorMessages.INVALID_NUMERIC` moved to `ErrorValue.INVALID_NUMERIC`, and `ARecord.DEFAULT_VALUE` is now internal to the `Record` type descriptor.
+- Allow 20 seconds, not 8, for a client transaction by default, so a loaded machine no longer causes spurious `:TIMEOUT` results.
+- Let lattice applications sign and timestamp writes through their own policy, so a wallet or key store can write for any identity it holds, and a write no peer would accept fails locally.
 
 ### Fixed
 
-- Class initialisation cycles in core removed, each of which could deadlock two threads initialising the two ends at once: `Ref` built its own `RefDirect` subclass and read `CVMBool`, and `ARecord` constructed a `Block`.
-- Merging signed data for an owner this node cannot sign for retains the local value, rather than aborting the whole merge or attaching a non-owner signature. Merges converge the owners a node holds keys for and leave the rest to their owners.
-- Signing and timestamping a lattice write happen once per logical write, not once per compare-and-set attempt, so contention no longer multiplies calls into a wallet, key store or remote signer.
-- DLFS cursor-level embedders can supply their host store to `DLFS.connect` or `DLFS.open`, so NIO `Files.copy` and output-stream writes persist blob branches incrementally instead of retaining files larger than the JVM heap (#702).
-- DLFS mutations use the driving cursor's `LatticeContext` timestamp exactly; filesystem-level timestamp setters have been removed, and equal-timestamp merge-back preserves the current local (`own`) value, including live names competing with stale tombstones (#703).
+- Remove class initialisation cycles in core that could deadlock two threads; a few core constants moved as a result.
+- Keep the local value when merging signed data for an owner this node cannot sign for, instead of failing the whole merge.
+- Sign and timestamp each lattice write once, however often it retries.
+- Write large files through DLFS's NIO interface without holding them in memory. ([#702](https://github.com/Convex-Dev/convex/issues/702))
+- Timestamp DLFS changes exactly from their lattice context, and keep the local value when merged timestamps are equal. ([#703](https://github.com/Convex-Dev/convex/issues/703))
 
 ## [0.8.13] - 2026-08-17
 
 ### Added
 
-- Lattice applications compose local or NodeServer-hosted component trees through `ALatticeApplication`, with multi-owner DLFS applications, per-owner drives and temporary forks, and the same host-neutral stack in P2P.
-- Standalone `convex.dlfs.Main` boots a complete NodeServer-hosted DLFS without the Convex CLI, configured in JSON5 for storage, identity, bootstrap peers, HTTP limits and exposure policy.
-- CVM: `char?` type predicate for Character values (v1 protocol, #92).
-- DLFS exposes its canonical WebDAV mount path as `DLFSWebDAV.MOUNT_PATH` for embedders (#699).
+- Compose lattice applications from component trees, locally or on a node, including multi-owner DLFS with per-owner drives and forks.
+- Run a complete DLFS node without the Convex CLI, configured in JSON5.
+- Test for characters with the new `char?` predicate (v1 protocol, #92).
+- Give embedders DLFS's WebDAV mount path (#699).
 
 ### Changed
 
-- DLFS streamed writes persist blob data incrementally, keeping large uploads off heap.
-- DLFS moves are structural operations, supporting replacement without materialising file data.
-- DLFS WebDAV/MCP transport takes explicit drive routing, and accepts authentication policy independently of lattice application ownership.
-- Lattice peer connections configured with a node key stay isolated from propagation and store access until challenge-response verifies the remote identity.
-- Lattice root publication is configured by host infrastructure, while `sync()` publication and store `flush()` durability remain explicit, separate boundaries.
+- Write streamed DLFS uploads to the store as they arrive, keeping large uploads off the heap.
+- Move DLFS entries without copying their file data.
+- Route DLFS WebDAV and MCP requests to drives explicitly, with authentication separate from ownership.
+- Keep a lattice peer connection away from propagation and store access until the peer's identity is verified.
+- Keep lattice publication and store durability as separate, explicit steps.
 
 ### Fixed
 
-- DLFS WebDAV `COPY` structurally shares same-drive blobs, preventing out-of-memory failures on large files.
-- DLFS drive deletion and rename retain lattice tombstones, so stale replicas cannot resurrect deleted names (#647).
-- DLFS moves use the operation timestamp, so moved entries correctly supersede older destination tombstones after replication (#688).
-- DLFS nodes reject updates more than 30 seconds ahead of the host clock, configurable through `maxFutureTimestampSkew`.
-- Peer servers close only the stores they create, leaving caller-supplied stores open, and retire temporary Etch files at shutdown.
-- `FileUtils.getPath` and its file-loading callers resolve relative paths against the process working directory (#701).
+- Copy large DLFS files over WebDAV without running out of memory.
+- Keep deleted DLFS drives and names deleted when stale replicas sync (#647).
+- Let moved DLFS entries replace older deletions at their destination after replication (#688).
+- Reject DLFS updates more than 30 seconds ahead of the host clock, configurable with `maxFutureTimestampSkew`.
+- Close only the stores a peer server created, and remove temporary Etch files at shutdown.
+- Resolve relative file paths against the working directory (#701).
 
 ## [0.8.12] - 2026-08-13
 
 ### Added
 
-- Ed25519 JWT signing accepts explicit verification-method key IDs, while self-contained verification recognises bare multikey, `did:key` and multikey-fragment DID URL forms.
-- Lattice propagators can own filtered outbound views, preserving store-local refs and complete pending inbound merges while excluding filtered cells from announced roots across startup, replication, restore and shutdown.
-- Lattice nodes can pull and merge a selected cursor path without transferring unrelated sibling regions.
-- Etch gains offline strict validation of index structure, canonical CAD3 records, content hashes and root-tree completeness, shared with copy-out repair.
-- Etch CLI maintenance commands open encrypted v3 stores through protected key files, standard input or header-hinted keystores, and support explicit cipher, index and rekeying policy for fresh migration destinations.
+- Sign Ed25519 JWTs with explicit key IDs, and verify bare multikey, `did:key` and DID URL key forms.
+- Publish a filtered view of a lattice through each propagator.
+- Pull and merge one lattice path without transferring unrelated data.
+- Validate Etch stores offline: index structure, canonical records, hashes and root completeness.
+- Open encrypted Etch v3 stores in CLI maintenance commands with key files, standard input or keystores, and choose encryption for migrated stores.
 
 ### Changed
 
-- Lattice value messages support efficient post-merge acknowledgements through an optional request ID, while normal gossip remains fire-and-forget.
-- Peer and lattice-node launch configuration now resolves encrypted Etch stores from their header key hint by default, records the configured identity as the hint for new encrypted stores, and supports an explicit runtime key resolver for external secret providers.
-- The experimental `Symmetric` helper now uses authenticated AES-GCM and explicitly rejects ciphertext from its former unauthenticated AES-CBC implementation. Its ciphertext representation is not a stable storage or interchange format.
+- Acknowledge lattice values after merge when the sender asks, while ordinary gossip stays fire-and-forget.
+- Find an encrypted Etch store's key from the hint in its header by default, with a resolver for external secret providers.
+- Use authenticated AES-GCM in the experimental symmetric encryption helper, refusing its old AES-CBC ciphertext.
 
 ### Fixed
 
-- Lattice root sync advertises only values already available from its serving store, while inbound acquisition now resolves lazy missing references correctly and rejects malformed data responses.
-- Lattice propagation no longer drops a rapid follow-up delta behind its former 50 ms broadcast throttle; background updates remain coalesced before processing.
-- Consecutive CVX reader discard markers (`#_`) each discard one following form, matching cumulative Clojure reader behaviour (#264).
-- DLFS distinguishes missing paths from corrupt stored nodes, preserves access to readable branches, supports safe entry replacement or deletion for recovery, and rejects malformed replicated subtrees.
+- Announce only lattice roots a node can serve in full, and acquire missing data correctly.
+- Send rapid follow-up lattice updates without waiting out a 50 ms throttle.
+- Discard one form per `#_` marker in Convex Lisp, as Clojure does (#264).
+- Tell missing DLFS paths from corrupt data, keep readable branches accessible, and reject malformed replicated subtrees.
 
 ## [0.8.11] - 2026-08-10
 
 ### Added
 
-- Opt-in Etch v3 stores with crash-consistent headers, plaintext or AES-256-CTR / ChaCha20 data, independently configurable index encryption, per-file salts and verified keys. `peer.etch` configures new stores while existing stores retain their recorded format; maintenance inspection and copy-out repair tooling is included.
-- New `convex-x402` module implementing CAD042 / x402 v2 exact payments in CVM coin or CAD29 tokens, with REST facilitator endpoints, route gates, local payer signing, replay protection, flexible policies and external-facilitator support.
-- New `convex eval` and `convex repl` commands for scriptable or interactive Convex Lisp, using an effortless ephemeral local instance by default or any peer selected with `--host`.
-- New `convex mcp` stdio server with query, signed transaction, balance, CNS and status tools; `--query` offers a read-only mode.
-- Hacker Tools now builds and inspects EdDSA JWTs and Convex UCAN delegations. Key views also expose canonical, copyable `did:key` identifiers.
-- Allocation-free SipHash-2-4 with byte-key, primitive-key and zero-copy byte-range APIs.
-- DLFS gains atomic same-drive moves, structurally shared copies and `DLFSOption.RECURSIVE` for whole-subtree copy and move operations.
+- Store data in the opt-in Etch v3 format: crash-consistent, optionally encrypted with AES-256 or ChaCha20, with inspection and repair tools.
+- Accept x402 payments in Convex coin or tokens with the new `convex-x402` module (CAD042).
+- Run Convex Lisp in scripts or interactively with `convex eval` and `convex repl`.
+- Serve Convex tools to AI agents over stdio with `convex mcp`, including a read-only mode.
+- Build and inspect EdDSA JWTs and UCAN delegations in Hacker Tools, and copy any key as a `did:key`.
+- Add allocation-free SipHash-2-4 hashing.
+- Move and copy DLFS files and whole directory trees atomically, without duplicating their data.
 
 ### Changed
 
-- UCAN authority supports explicit `exp: null`; generic JWT validation treats it as an omitted optional expiry, and proof validity follows UCAN 1.0 execution-time semantics.
-- Convex UCAN JWTs now use the strict `0.10.0` profile and accept any valid DID audience. Hand-minted tokens must include `ucv`, explicit `exp`, and vector `att` / `prf` claims; use `UCAN.createJWT` or `buildPayload` plus `signJWT`.
-- `key generate` and `key export` protect secret output through the attached console or an explicit owner-only file, with deliberate stdout opt-in for automation.
-- Persistent lattice and peer stores keep the fast buffered write path, add periodic checkpoints, and complete a clean checkpoint during orderly shutdown across Etch v1, v2 and v3.
+- Accept UCANs that never expire (`exp: null`), following UCAN 1.0.
+- Issue Convex UCANs in the strict `0.10.0` profile, for any DID audience; hand-written tokens need the `ucv`, `exp`, `att` and `prf` claims.
+- Keep secrets from `key generate` and `key export` off standard output unless you ask for them there.
+- Checkpoint persistent stores periodically, and cleanly at shutdown, while keeping fast buffered writes.
 
 ### Fixed
 
-- Index keys and DLFS path components remain distinct through the standard 255-byte filesystem name limit; extended depths use canonical VLQ encoding and stack-safe cold paths (#631, #689).
-- DLFS writes and truncations advance file update times, giving replication conflicts and NIO modification times the right content ordering.
-- Etch checkpoints now publish directly reopenable v3 stores, track later mutations correctly, release encrypted resources promptly and preserve cipher ownership through online GC (#650, #686).
-- NodeServer shutdown cleanly joins periodic maintenance before the final checkpoint.
-- Network-decoded `Call` transactions now populate their argument list and invoke the target function correctly.
-- Named `did:web` documents resolve CNS aliases and scoped records; deactivated records return HTTP 410 with DID metadata (#618).
-- Seed-returning MCP tools and legacy JSON transactions protect remote cleartext HTTP by default while preserving loopback development.
-- JSON readers correctly handle long decimals, exponent notation and JSON5 hexadecimal values outside the integer fast path.
+- Keep Index keys and DLFS names distinct up to the standard 255-byte name limit (#631, #689).
+- Update DLFS file times on writes and truncations, so replication orders changes correctly.
+- Reopen Etch checkpoints directly, and keep them correct through later changes and online garbage collection (#650, #686).
+- Stop lattice node maintenance cleanly before the final checkpoint.
+- Run `Call` transactions received over the network correctly.
+- Resolve CNS aliases in named `did:web` documents, and answer deactivated ones with HTTP 410 (#618).
+- Protect seeds from remote cleartext HTTP in MCP tools and legacy JSON transactions by default.
+- Read long decimals, exponents and JSON5 hexadecimal numbers correctly.
 
 ## [0.8.10] - 2026-07-25
 
 ### Added
 
-- New `convex-p2p` module: a rollup package for lattice P2P nodes, bundling the P2P regions (`:p2p` node registry, `:id` user identity, reserved `:kad`), the application regions a node serves, and the `P2PNode` server that serves them. `node.p2p(userID).cursor()` gives an application a cursor onto one user's owned area, signed on write.
-- MCP: five new guided prompts — `resolve-name`, `call-actor`, `token`, `diagnose-transaction` and `manage-access` — covering name resolution, actor calls, fungible tokens (CAD029), transaction diagnosis, and access control (CAD022).
-- REST API: typed, secure-by-default configuration for the HTTP and MCP endpoints via the `rest`, `mcp` and `auth` sections of the JSON5 config. The faucet, query watch, process-administration routes and the generic Peer-message endpoint are each gated and stay off unless explicitly enabled; administration additionally requires an authorised operator key (the venue and consensus-controller keys by default, or a configured `did:key` allowlist) and HTTPS for non-loopback access. The public-surface resource limits are operator-tunable too — a global concurrent-request cap (`rest.maxConcurrentRequests`), the request-body ceiling (`rest.maxRequestBytes`) and the public query lane's concurrency, wait and Juice (`rest.query.*`).
+- Run lattice P2P nodes with the new `convex-p2p` module, which bundles the node registry, user identity and the application regions a node serves.
+- Add guided MCP prompts for name resolution, actor calls, tokens, transaction diagnosis and access control.
+- Configure the REST API and MCP endpoints securely by default: optional routes stay off until enabled, administration needs an authorised key and HTTPS, and resource limits are tunable.
 
 ### Changed
 
-- REST API: the `transaction/submit` endpoint now requires the complete `data` value returned by `transaction/prepare`; public transaction preparation no longer writes pending state into the Peer's primary store. Clients that previously submitted only a transaction hash must now return the full prepared data.
-- REST API: public queries run on a bounded, isolated lane separate from the Peer's network query queue, so public HTTP traffic cannot starve consensus queries. The lane admits a slice of the available cores, waits briefly for a free slot under a burst rather than rejecting, and only sheds load — with a clean "server busy" result — when saturation persists. A global concurrent-request cap bounds overall in-flight work, with long-lived SSE streams kept on their own connection limits.
-- REST API: request bodies are size-bounded even when chunked, so a streaming parser sees the same limit as a request with a declared content length.
-- Etch: version-2 stores use a Foreign Function & Memory (FFM) mapped-file backend on Java 22+, falling back to the `MappedByteBuffer` backend on Java 21; `convex.jar` ships both as a multi-release jar and selects the backend at runtime.
-- MCP: improved and streamlined the built-in prompts — clearer, accurate Convex guidance, with the shared reference (system accounts, coin units, CNS) consolidated into `convex-guide` so the task prompts stay focused.
-- `AIndex.entrySet()` now returns a lightweight immutable view, avoiding a full ordered set copy on every call while preserving sorted iteration order.
-- NodeServer: network work is dispatched through a bounded queue, keeping decode, lattice merge, synchronous persistence and response encoding off shared Netty event-loop threads
-- NodeServer: public-node defaults now cap encoded messages at 4 MiB and inbound connections at 256, while cryptographically verified outbound Peers may use a separately configurable larger message tier.
-- NodeServer: lifecycle is represented by explicit starting, running, stopping and stopped states; merge context and propagator topology freeze when first launch begins, and propagator access returns an immutable snapshot.
-- Lattice propagation: propagator-managed Peers and operator-assigned inbound connections now receive `DATA_REQUEST` access only to their selected propagator store; unassigned NodeServer requests are rejected, while membership and verification remain operator policy.
-- NodeServer: inbound lattice connections require an explicit, immutable propagator assignment; queries use that propagator's view and partial values are fully acquired and size-checked in its store before the ordered merge path can touch the cursor or primary checkpoint.
-- Lattice acquisition: `Acquiror` now owns a cancellable worker and request lifecycle, and lets NodeServer await termination before closing propagator stores.
+- Require the full prepared data on REST `transaction/submit`, so public preparation no longer writes pending state to a peer's store.
+- Run public REST queries on their own bounded lane, so HTTP traffic cannot starve consensus queries.
+- Limit REST request body sizes, including chunked bodies.
+- Use Java's newer memory-mapping API for Etch on Java 22 and later, falling back automatically on Java 21.
+- Streamline the built-in MCP prompts, with clearer Convex guidance.
+- Return `Index` entry sets as lightweight views instead of copies.
+- Keep a lattice node's network work off shared I/O threads, through a bounded queue.
+- Cap public lattice node messages at 4 MiB and connections at 256 by default, with a larger tier for verified peers.
+- Limit each lattice connection to its assigned propagator's view and store.
+- Give lattice nodes explicit lifecycle states, and wait for data acquisition to stop before closing stores.
 
 ### Fixed
 
-- REST API: explorer pagination is now bounded by a maximum page size, so public endpoints can't be driven into unbounded historical reads (#660).
-- MCP: SSE connections enforce the connection cap atomically and reject reused session IDs cleanly (#659).
-- CLI: the `NO_COLOR` environment variable now follows the [convention](https://no-color.org) of suppressing colour whenever it is set to any non-empty value. Previously its value was parsed as a boolean, so a common `NO_COLOR=1` made every command fail with "'1' is not a boolean" before it ran.
-- REST API: query watches on fast-changing queries stay connected under load — the newest result supersedes queued events.
-- NodeServer: replayed lattice values that do not change local state no longer trigger repeated announce and root persistence work.
-- NodeServer: explicitly pulled values now merge through the authoritative root before persistence or re-propagation, preventing a dominated peer value from demoting the announced or persisted root.
-- NodeServer: a primary-store failure during a synchronous checkpoint now propagates to the sync caller; memory is not rolled back, root publication is unconfirmed, and recovery remains operator policy.
-- NodeServer: a NodeInfo checkpoint failure during launch now closes every service started by that launch, leaving the node stopped and safe to retry.
-- NodeServer: an inbound dispatcher drain timeout now leaves shutdown explicitly incomplete and retryable, preventing relaunch from creating a second ordered consumer while the original thread is still active.
-- NodeServer: fresh and restored nodes seed their announced snapshot during launch, so lattice queries work immediately without an extra application sync.
-- NodeServer: lattice merge containment now rejects recoverable stack overflows without swallowing fatal JVM errors, preserving the dispatcher's fail-closed error boundary.
-- Lattice propagation: delta and root-sync encodings now retain the `LATTICE_VALUE` protocol envelope, allowing receivers to identify the path and acquire missing branches before merge.
+- Bound REST explorer page sizes (#660).
+- Enforce MCP SSE connection limits exactly, and reject reused session IDs (#659).
+- Honour `NO_COLOR` whenever it is set, as the [convention](https://no-color.org) says.
+- Keep REST query watches connected under load, with the newest result replacing queued ones.
+- Skip repeated work for replayed lattice values that change nothing.
+- Merge pulled lattice values through the node's root before saving or re-sending them.
+- Report a failed checkpoint to the code that asked for the sync.
+- Leave a lattice node stopped and safe to retry when its launch or shutdown fails part-way.
+- Answer lattice queries as soon as a node launches.
+- Contain recoverable stack overflows in lattice merges without hiding fatal errors.
+- Let receivers fetch missing branches of lattice deltas and root announcements before merging them.
 
 ## [0.8.9] - 2026-07-17
 
 ### Added
 
-- `AString.isBlank()` — allocation-free blank test on UTF-8 bytes.
-- Etch online garbage collection: reclaim unreachable store data while running, with crash-safe recovery (see `convex-core/docs/ETCH_GC.md`).
-- CLI: `convex etch gc`, `migrate` and `recover` subcommands for offline store collection, migration and recovery.
-- `VerifyNetworkUpgrade` runnable tool — rehearses a protocol upgrade against a live network with state-diff and coin-supply checks.
-- `RehearseNetworkUpgrade` runnable tool — deterministic local multi-peer upgrade activation drill.
-- REST API: live query watches over SSE — `/api/v1/watch` follows a query against finalised state (enable with `queryWatch`); `/api/v1/watch/logs` streams filtered log events.
-- CLI: system tray icon and controls for `local start`, `peer start` and `dlfs start`.
-- UCAN: caveat path predicates to scope delegations to a path subtree.
-- DLFS: drive registry persists across server restarts.
+- Test strings for blankness without allocating.
+- Reclaim unreachable Etch data while a store is running, with crash-safe recovery. ([Etch GC](convex-core/docs/ETCH_GC.md))
+- Collect, migrate and recover Etch stores offline with `convex etch gc`, `migrate` and `recover`.
+- Rehearse protocol upgrades against a live network, or as a local multi-peer drill.
+- Watch queries and logs live over SSE from the REST API.
+- Control `local start`, `peer start` and `dlfs start` from a system tray icon.
+- Scope UCAN delegations to a path subtree.
+- Keep the DLFS drive registry across server restarts.
 
 ### Changed
 
-- Fresh local/test networks launch at the latest protocol version by default (all migrations applied at genesis); pin lower with `--protocol-version` (CLI) or `:protocol-version` (peer config).
-- Etch reads are now fully lock-free.
-- Queries run with bounded execution resources.
-- Peer startup verifies any supplied state by local replay from genesis.
+- Launch fresh local and test networks at the latest protocol version by default; pin a lower one with `--protocol-version` or `:protocol-version`.
+- Read Etch stores without locks.
+- Run queries within bounded execution resources.
+- Verify any supplied state at peer startup by replaying it from genesis.
 
 ### Fixed
 
-- Etch: cross-store writes no longer copy Ref status earned in a different store.
-- Etch: reads on a closed or failing store throw `StoreException` instead of reporting values as absent.
-- Convex DB: DML transaction isolation and scalar row results.
-- MCP: scalar tool results.
+- Keep what each Etch store has saved separate when cells are written across stores.
+- Report reads from a closed or failing Etch store as errors, not as missing values.
+- Isolate Convex DB data changes in transactions, and return scalar row results correctly.
+- Return scalar MCP tool results correctly.
 
 ## [0.8.8] - 2026-07-09
 
 ### Added
 
-- CVM: `cat` core function — raw byte concatenation of BlobLike values and Characters (v1 protocol, #633).
-- CVM: `splice` core function — positional byte overwrite of a Blob or String (v1 protocol, #632).
-- UCAN: pluggable `DIDVerifier` / `RootAuthorityPolicy` — chain verification for any DID method, per-hop delegation attenuation, and self-sovereign root-authority checks (#635).
-- DLFS: delegated drive access supports delegation chains and DID-URL drive references (`did:key:zOwner.../drive`) (#635).
-- CLI: `peer -c/--config` actually loads the JSON5 config file; explicit options take precedence (#625).
-- CLI: `peer start --address` is applied at launch and verified against the on-chain controller (#624).
-- CLI: faucet commands accept scheme and port in `--host` (previously hardcoded to 8080) (#627).
-- CLI: `local start --norest` disables the REST API server (#630).
+- Concatenate blobs, strings and characters as raw bytes with the new `cat` function (v1 protocol, #633).
+- Overwrite bytes at a position in a blob or string with the new `splice` function (v1 protocol, #632).
+- Verify UCAN chains for any DID method, with per-step attenuation and root-authority checks (#635).
+- Delegate DLFS drive access through delegation chains and DID URL drive references (#635).
+- CLI: load the JSON5 config given to `peer -c/--config`, with explicit options taking precedence (#625).
+- CLI: apply `peer start --address` at launch, checked against the on-chain controller (#624).
+- CLI: give faucet commands any scheme and port in `--host` (#627).
+- CLI: run `local start --norest` without the REST API server (#630).
 
 ### Changed
 
-- CLI: consistent `-a/--address` option across all `account` subcommands, with `CONVEX_ADDRESS` (#630).
-- CLI: `convex help <command>` shows the named subcommand's help everywhere (#630).
-- CLI: failed queries and transactions now exit non-zero, so scripts can detect failure.
-- CLI: `transact --output-file` no longer opens a network connection.
-- CLI: `key delete` and `key list` no longer create an empty keystore as a side effect.
-- CLI: an ambiguous `--key` hex prefix is now an error instead of silently picking a key.
-- CLI: `key import` auto-detects BIP39 phrases and PEM text, as documented.
-- CLI: `etch --help` and `desktop --help` work like other command groups; usage headers show the full command path.
+- CLI: use the same `-a/--address` option, or `CONVEX_ADDRESS`, across every `account` subcommand (#630).
+- CLI: show any subcommand's help with `convex help <command>` (#630).
+- CLI: exit non-zero when a query or transaction fails, so scripts can detect it.
+- CLI: write `transact --output-file` without opening a network connection.
+- CLI: run `key delete` and `key list` without creating an empty keystore.
+- CLI: refuse an ambiguous `--key` hex prefix instead of picking a key.
+- CLI: recognise BIP39 phrases and PEM text in `key import` automatically, as documented.
+- CLI: give `etch` and `desktop` the same help as other command groups, with full command paths in usage headers.
 
 ### Fixed
 
-- `convex.asset`: `owns?` on a map of assets always returned true (v1 protocol, #621).
-- `asset.multi-token`: `offer` of an unheld token wiped the caller's other holdings (v1 protocol, #620).
-- NFT and box actors: `offer` receiver now normalised so non-fungibles can be transferred into boxes; `get-offer` SPI added (v1 protocol, #622).
-- Trust: `trust/trusted?` fails closed on defective monitors; delegate control action aligned to `:control`; `remove-upgradability!` also removes `change-control` (v1 protocol, #623).
-- CLI: `key generate --count N` corrupted the password for keys after the first, making them impossible to unlock.
-- CLI: `convex status` could hang indefinitely; client connections now close properly.
-- CLI: multi-address `account balance` queries, the `--peer-port` default, `local start --count 0`, and `peer create` key passwords all fixed.
-- CLI: clearer error messages with causes and proper exit codes; prompting without a console errors instead of crashing.
+- Report `owns?` correctly for a map of assets in `convex.asset` (v1 protocol, #621).
+- Keep a caller's other holdings when `asset.multi-token` offers a token they do not hold (v1 protocol, #620).
+- Transfer non-fungibles into boxes, and look up offers with the new `get-offer` (v1 protocol, #622).
+- Fail `trust/trusted?` closed on defective monitors, and make trust control actions consistent (v1 protocol, #623).
+- CLI: unlock every key made by `key generate --count N`.
+- CLI: stop `convex status` hanging, by closing client connections properly.
+- CLI: fix multi-address `account balance`, the `--peer-port` default, `local start --count 0` and `peer create` key passwords.
+- CLI: give clearer error messages and proper exit codes, and report an error when prompting without a console.
 
 ## [0.8.7] - 2026-07-06
 
 ### Added
 
-- **Network upgrade mechanism (#413)**: protocol upgrades can be scheduled on-chain to activate at a consensus timestamp — applying a state migration and bumping the protocol version, with the genesis hash unchanged. Peers that can't apply an upgrade warn their operator, then cleanly step out of consensus at the boundary and rejoin once updated. The first upgrade (protocol v1) also bundles every known bug fix, so switching on the mechanism brings a network fully up to date. New `schedule-upgrade` / `unschedule-upgrade` core functions (system accounts only). See `convex-core/docs/UPGRADE.md`.
-- `gensym` core function — a fresh unique symbol for capture-safe macros (protocol v1, #598, #602).
-- NodeServer: inbound value-size limit to bound merge cost from untrusted peers (`:maxInboundValueSize`, #564).
-- NodeServer: per-connection inbound stats and a circuit-breaker that drops connections after sustained abuse (`:maxConsecutiveRejects`, #566).
-- NodeServer: public URLs are validated at launch, so a misconfigured node fails fast instead of advertising an unreachable address (#567).
-- Peer: configurable inbound client connection limit (`:max-connections`, default 1024, #482).
-- MCP: `signingListAccounts` can resolve the on-chain addresses each key controls (`resolve=true`, #551).
-- MCP: configurable Origin allow-list for DNS-rebinding protection on private deployments (`mcp.allowedOrigins`, #552).
-- Maven wrapper (`./mvnw`) and `.editorconfig` — builds and editor settings work out of the box (#581).
+- Schedule protocol upgrades on-chain, with peers that cannot upgrade stepping aside until updated; the first, protocol v1, brings every known fix. ([Upgrades](convex-core/docs/UPGRADE.md))
+- Make capture-safe macros with the new `gensym` function (protocol v1, #598, #602).
+- Limit the size of lattice values accepted from untrusted peers (`:maxInboundValueSize`, #564).
+- Drop lattice connections after sustained abuse, with per-connection statistics (`:maxConsecutiveRejects`, #566).
+- Check a lattice node's public URLs at launch, so a misconfigured node fails fast (#567).
+- Limit a peer's inbound client connections (`:max-connections`, default 1024, #482).
+- MCP: list the on-chain addresses each signing key controls (#551).
+- MCP: protect private deployments from DNS rebinding with an Origin allow-list (`mcp.allowedOrigins`, #552).
 
 ### Changed
 
-- Multiply (`*`) now charges juice for the true O(n·m) cost of big-integer multiplication (protocol v1, #603).
-- Consensus: peers won't confirm a block dated beyond their clock plus a small skew allowance, so a future-dated block can't teleport the consensus clock forward (#595, see `convex-core/docs/CONSENSUS.md`).
-- Peer: a peer that can't apply a scheduled upgrade sheds its stake in a randomised pre-activation window, so the remaining upgraded peers still reach supermajority (`:auto-manage`, #597).
-- Lattice: write timestamps flow through `LatticeContext` (KV, Queue, P2P), making writes deterministic under a supplied clock (#561).
-- NodeServer: `setMergeContext` is now configuration-time only, so the merge context can't change under an in-flight merge (#568).
-- Lattice: boundary cursors reworked onto a shared update-on-write base (structural JSON writes, `resolve()`, no re-encoding of unchanged values); the superseded `JSONValueLattice` is removed.
-- CLI: connecting to the production Protonet peer by default now prints a one-line notice — override with `--host` or `CONVEX_HOST` (#582).
+- Charge juice for the true cost of big-integer multiplication (protocol v1, #603).
+- Refuse to confirm blocks dated beyond a peer's clock plus a small allowance, so a future-dated block cannot push the consensus clock forward (#595).
+- Shed stake ahead of an upgrade a peer cannot apply, so the upgraded peers still reach a supermajority (`:auto-manage`, #597).
+- Make lattice writes deterministic under a supplied clock (#561).
+- Fix a lattice node's merge context when it is configured, so it cannot change during a merge (#568).
+- Write JSON lattice values structurally, without re-encoding unchanged values.
+- CLI: show a one-line notice when connecting to the production Protonet peer by default, overridable with `--host` or `CONVEX_HOST` (#582).
 
 ### Fixed
 
-- `update` / `update-in` apply all arguments in their 5+ argument arities (protocol v1; reported and first fixed by @jeroenvandijk, #533, #534).
-- `convex.fungible` `add-mint` allows unlimited minting when `:max-supply` is unset, instead of blocking all mints (protocol v1, #528).
-- Convex Lisp correctness: quasiquoted sets/maps, top-level `` `~false ``, double-evaluation in `define`, `call` arity errors, and `dotimes` count expressions (protocol v1, #598).
-- `for`, `for-loop` and `switch` no longer capture user bindings that collide with their loop variables (protocol v1, #602).
-- Around twenty core docstring corrections where the docs contradicted the implementation (protocol v1, #600).
-- Integer `div`, `quot` and `rem` are correct for negative divisors and big-integer operands (#599).
-- `Shutdown.addHook` no longer races when multiple servers or nodes launch in parallel (#604).
-- `set-peer-data` updates the peer named by its key argument, plus assorted peer-op error-code and message fixes (#601).
-- LatticePropagator: `close()` now drains the final writes, making shutdown a durability guarantee point.
-- `computeSupply` no longer subtracts the reward pool, matching the `coin-supply` definition of issued supply (#598).
-- Lattice queues/topics: partition index uses `floorMod`, so a `Long.MIN_VALUE` key hash can't go negative (#561).
-- `recur` outside a function or loop reports its intended message again (#115).
-- CLI: `key generate` always shows the BIP39 mnemonic on stderr, even at `-v0` — a lost mnemonic is unrecoverable (#583).
+- Apply every argument of `update` and `update-in` with five or more arguments (protocol v1; reported and first fixed by @jeroenvandijk, #533, #534).
+- Allow unlimited minting with `convex.fungible` `add-mint` when `:max-supply` is unset (protocol v1, #528).
+- Correct quasiquoted sets and maps, top-level `` `~false ``, `define` evaluation, `call` arity errors and `dotimes` counts in Convex Lisp (protocol v1, #598).
+- Keep `for`, `for-loop` and `switch` from capturing user bindings named like their loop variables (protocol v1, #602).
+- Correct around twenty core docstrings (protocol v1, #600).
+- Compute `div`, `quot` and `rem` correctly for negative divisors and big integers (#599).
+- Register shutdown hooks safely when several servers or nodes launch at once (#604).
+- Update the peer named by `set-peer-data`'s key argument, with clearer peer-operation errors (#601).
+- Send a lattice propagator's final writes when it closes.
+- Count issued coin supply without subtracting the reward pool, matching `coin-supply` (#598).
+- Partition lattice queues and topics correctly for every key hash (#561).
+- Report the intended message for `recur` outside a function or loop (#115).
+- CLI: always show the BIP39 mnemonic from `key generate`, even at `-v0` (#583).
 
 ### Security
 
-- NodeServer: inbound lattice values from untrusted peers are handled defensively — wrong types rejected (#562), merge failures (including engineered `StackOverflowError`) contained rather than killing the receive thread (#561), and malformed KV entries rejected at validation (#561).
-- Lattice: container lattices validate foreign entries per-child even when merging into an empty region, closing a path that could commit wrong-typed or forged children to a fresh node (#561).
-- Convex DB: the Postgres wire decoder validates frame lengths and counts before allocation, closing a pre-auth denial of service (contributed by @PrazwalR, #596).
-- MCP: seed-carrying tools refuse cleartext HTTP from non-loopback clients, so Ed25519 seeds can't leak in transit (`allowHttpSeeds` opts out for private networks, #554).
-- Peer transport: malformed-frame rejections log at debug, so a hostile client can't spam the operator log (#41).
+- Handle untrusted lattice values defensively: reject wrong types, contain merge failures and validate KV entries (#561, #562).
+- Validate every child of a container lattice, even when merging into an empty region (#561).
+- Validate Postgres wire frames in Convex DB before allocating for them (contributed by @PrazwalR, #596).
+- MCP: refuse seed-carrying tool calls over cleartext HTTP from non-loopback clients, unless `allowHttpSeeds` is set (#554).
+- Log malformed peer frames at debug level, so a client cannot flood the operator log (#41).
 
 ## [0.8.6] - 2026-06-22
 
 ### Added
 
-- LatticePropagator: `nextAnnounce()` future for awaiting the next announced value, replacing the need to poll `getLastAnnouncedValue()`
-- CLI: `local start` now reports the actual peer ports in use (`Peer ports: ...`) — previously auto-assigned ports were not discoverable from the output
+- Wait for a lattice propagator's next announcement without polling.
+- CLI: see the peer ports `local start` uses in its output.
 
 ### Changed
 
-- DLFS: deletions are now tracked in a separate per-directory tombstone index (an optional 5th node element, present only when non-empty) instead of as tombstone nodes inside the live entries; existing drives load unchanged. Live directory operations (listing, emptiness, navigation) no longer scan tombstones (#587)
+- Keep DLFS deletions in their own index, so listing and navigating directories no longer scans them; existing drives load unchanged (#587).
 
 ### Fixed
 
-- Social: posts created in the same millisecond no longer collide on timestamp keys — previously the later post silently overwrote the earlier one
+- Keep every social post made in the same millisecond, instead of overwriting the earlier one.
 
 ### Security
 
-- UCAN: JWT-encoded tokens are now verified against the public key bound in the `iss` DID, not the sender-controlled `kid` header — closes an issuer-spoofing authentication bypass that allowed forging any issuer (#586)
-- UCAN: `Capability` resource matching now enforces path-segment boundaries (a grant on `w/notes` no longer covers the sibling `w/notesSECRET`) and fails closed on an empty/absent resource — closes a capability attenuation escape and fail-open (#585)
-- DLFS: lattice merge fails closed on malformed nodes from untrusted peers instead of throwing, preventing a merge-path denial of service (#590)
+- UCAN: verify JWT tokens against the issuer's DID key, not a header the sender controls (#586).
+- UCAN: match capability resources on path-segment boundaries, and fail closed on an empty resource (#585).
+- DLFS: fail closed on malformed nodes from untrusted peers (#590).
 
 ## [0.8.5] - 2026-06-11
 
 ### Added
 
-- UCANValidator: `checkTemporalBounds` for post-ingress re-validation of `nbf`/`exp` outside the parse path
-- UCANValidator: `parseTransportUCANsWithBearer` helper merging proof chain and bearer token in a single call
-- NodeServer: synchronous publication on the primary propagator — `cursor.sync()` runs announce + setRootData + broadcast on the caller's thread, returning after primary store publication; secondaries remain async; publication errors propagate to the caller (#569)
+- UCAN: re-check a token's validity period after it has been accepted, and parse a proof chain with its bearer token in one call.
+- Publish a lattice node's root synchronously on sync, reporting any failure to the caller (#569).
 
 ### Changed
 
-- CVM: cache `Local` op instances for small positions, eliminating most `Local` allocations during compile and execute (#559)
+- Avoid most local-variable allocations while compiling and running CVM code (#559).
 
 ### Fixed
 
-- TransactionHandler: reject faulty or incompletely-referenced transactions at intake; block production no longer stalls on MissingDataException (#531)
-- DLFS: directories with tombstoned-only entries now correctly delete; iteration via `Files.newDirectoryStream` skips tombstones; `mkdir` over a tombstoned name succeeds (#571)
-- LatticePropagator: serialise `processSnapshot` and `persist` pipelines so the propagator is the sole writer of `setRootData` per store and an older snapshot cannot demote the root pointer after a newer snapshot's sync returned (sole-writer invariant)
-- Server: `waitForShutdown` now always surfaces an interrupt as `InterruptedException`, even if the interrupt flag was set before the wait began — previously a pre-wait interrupt returned silently, so `convex peer start` could exit 0 instead of 130 when interrupted
+- Reject faulty or incomplete transactions on arrival, so block production no longer stalls (#531).
+- Delete DLFS directories whose entries were all deleted, hide deletions from directory listings, and create a directory over a deleted name (#571).
+- Never let an older lattice snapshot replace a newer saved root.
+- Exit `convex peer start` with code 130 when interrupted, however early the interrupt arrives.
 
 ## [0.8.4] - 2026-04-18
 
 ### Added
 
-- CellExplorer: budgeted JSON5 pretty-printer for lattice data with truncation and partial-form rendering
-- JSON5 writer (`JSON.appendJSON5`, `JSON.printJSON5`) with extended escape handling — \v, \xHH, line continuation, lenient fallback (#546)
-- UCAN capabilities, JWT validation, and DID-based authentication flows
-- MCP spec 2025-11-25 target with backward-compatible version negotiation and server extensibility hooks
-- ConvexDB: Calcite convention pipeline with index pushdown, merge joins, and table statistics
-- ConvexDB: DDL support (CREATE TABLE, DROP TABLE via JDBC) and SQL transaction support
-- ConvexDB: replication demo with Etch stores
-- DLFS: CLI, DID authentication, MCP tools, and WebDAV sync after mutations
-- L2 lattice caching
-- Javadoc overview pages and package descriptions across all published modules
-- Docker Hub automated push in CI workflows
-- Install scripts
+- Pretty-print lattice data as JSON5 within a size budget.
+- Write JSON5, including its extended escapes (#546).
+- Authenticate with UCAN capabilities, JWTs and DIDs.
+- Support the 2025-11-25 MCP specification, negotiating with older clients.
+- Convex DB: speed up queries with index pushdown, merge joins and table statistics.
+- Convex DB: create and drop tables through JDBC, and use SQL transactions.
+- Convex DB: try replication with Etch stores in a demo.
+- DLFS: use it from the CLI, with DID authentication and MCP tools, and sync WebDAV changes as they are made.
+- Cache lattice data in a second-level cache.
+- Browse Javadoc overviews and package descriptions for every published module.
+- Install Convex with install scripts.
 
 ### Changed
 
-- `JSON.appendJSON` strictly JSON-compliant: non-finite doubles emit `null` instead of the non-standard `NaN` literal (#547)
+- Write strictly standard JSON: non-finite numbers become `null` instead of `NaN` (#547).
 
 ### Fixed
 
-- ConvexDB: ORDER BY with JOIN queries (#540)
-- MCP SSE race condition on connection setup
-- NettyServer IPv4 fallback missing `sync()`; NIOServer gained matching IPv4 fallback for IPv6-unavailable hosts
-- Flaky test compile: `JSONTest` `cannot access CharStream` under JPMS with ANTLR as automatic module
-- Flaky CI tests (EncodingTest, McpTest, DLFSBrowser)
+- Convex DB: order JOIN query results correctly with ORDER BY (#540).
+- Fix an MCP SSE race at connection setup.
+- Fall back to IPv4 correctly on hosts without IPv6.
 
 ## [0.8.3] - 2026-03-02
 

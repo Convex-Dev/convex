@@ -1,36 +1,76 @@
-# Peer Priority: Trusted Channel Classification
+# Peer Trust and Belief Intake
 
-**Consumed by:** [BACKPRESSURE.md](BACKPRESSURE.md) — determines which channels are subject
-to backpressure (clients) and which are exempt (peers).
+**See also:** [BACKPRESSURE.md](BACKPRESSURE.md) — client request backpressure;
+[PROPAGATION.md](PROPAGATION.md) — Belief delta fan-out and queue bounds
 
-## Problem Statement
+## Principle
 
-All inbound connections to a Convex peer are currently treated identically. The server
-dispatch does not distinguish between a trusted peer propagating Beliefs and an untrusted
-client submitting transactions. This creates a critical vulnerability:
+A Belief is judged by what it carries, not by who sent it. A Belief is a set of signed
+Orders, and each Order counts only if it is signed by a peer with at least the minimum
+effective stake, is newer than the Order already held from that peer, and is not
+timestamped in the future ([CAD051](https://docs.convex.world/docs/cad/cpos)). Peers relay
+each other's Orders, so knowing which connection a Belief arrived on would vouch for
+nothing it contains.
 
-**An untrusted client flood can starve Belief propagation.**
+A consensus peer therefore verifies only the connections it opens. It never challenges a
+connection opened to it ([CAD015](https://docs.convex.world/docs/cad/peercomms) Trust).
+Besides results, it sends on that connection only a request for data missing from an
+update that arrived on it ([PROPAGATION.md](PROPAGATION.md)). What comes back is
+content-addressed and judged like any other data.
 
-If the server applies backpressure uniformly, legitimate peer-to-peer Belief exchange —
-the heartbeat of consensus — stops. The network stalls even though the peers themselves
-are healthy.
+## Liveness
 
-### Security Invariant
+> Traffic from any connection must never stop Belief merges between peers.
 
-> Untrusted client traffic must **never** block or delay Belief merges between peers.
+Peers push Beliefs only on connections they opened, so every pushed Belief arrives on an
+inbound connection that anyone could have opened. Three things keep junk from stopping
+consensus:
 
-This invariant must hold regardless of how many client connections exist, how fast
-clients submit transactions, or whether any queue is full.
+1. **Polling.** `ConnectionManager` polls one of the peers it chose by stake and verified
+   every poll interval, and acquires that peer's Belief into a queue of its own. Polling
+   waits only for room in that queue (`BeliefPropagator.hasBeliefPollCapacity`), so pushes
+   filling the propagation queue cannot stop it.
+2. **Cheap rejection.** `BeliefPropagator` drops an Order from a key that is not a staked
+   peer before checking its signature or storing it, and an Order no newer than the one
+   it holds before checking its signature. A bad signature ends processing of the message
+   carrying it. The exception is an update with data missing that this peer fetches: its
+   cells, and whatever the fetch brings, are stored before any Order in it is judged, as
+   pushed DATA is. With one fetch at a time, that is one update at a time.
+3. **A bounded queue.** Pushed DATA and Beliefs from every connection share one ordered
+   queue, bounded by count and bytes. When it is full, further pushes are dropped; the
+   connection is never paused for them.
 
-## Implemented: Challenge/Response Protocol
+While junk fills the queue, pushes from real peers can be dropped with it, and consensus
+proceeds at the polling rate. A sender that never answers can likewise hold a peer's one
+fetch of missing data for up to the poll delay at a time, and with it the same polling
+rate at worst.
 
-The challenge/response protocol is fully implemented and the trust loop is closed.
+## Inbound Connections
+
+| Message | Handling |
+|---------|----------|
+| BELIEF | Joins the propagation queue, whoever sent it |
+| DATA | Joins the propagation queue, whoever sent it. Its cells are staged in the store; they count only once a valid Belief refers to them |
+| CHALLENGE | Answered with this peer's key, so whoever opened the connection can verify it |
+| RESULT | Completes this peer's request on that connection, a fetch of missing data; any other is ignored (CAD015) |
+
+Accepting DATA from any connection is under review: a peer could instead accept it only
+from a sender it has verified separately ([#826](https://github.com/Convex-Dev/convex/issues/826)).
+
+Data missing from a received Belief or Order is requested from the connection it arrived
+on, one fetch at a time ([PROPAGATION.md](PROPAGATION.md)). A peer's own connections to
+other peers answer such requests from its store.
+
+Lattice nodes do verify connections opened to them; see
+[LATTICE_NETWORKING.md](LATTICE_NETWORKING.md).
+
+## Outbound Connections: Challenge/Response
 
 ### Components
 
-| Component | Status |
-|-----------|--------|
-| `AConnection.isTrusted()` / `setTrustedKey()` | Implemented — set by `ConvexRemote.setVerifiedPeer()` |
+| Component | Role |
+|-----------|------|
+| `AConnection.isTrusted()` / `setTrustedKey()` | Set by `ConvexRemote.setVerifiedPeer()` |
 | `Message.respondToChallenge()` | Shared handler — used by both peer Server and NodeServer |
 | `Convex.verifyPeer()` | Client-side API — returns `CompletableFuture<AccountKey>` |
 | `Convex.verifiedPeer` field | Set on success, cleared on close/reconnect |
@@ -56,7 +96,7 @@ Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
 - **contextID** — optional; peer Server uses networkID (genesis hash), NodeServer uses null
 - CHALLENGE messages use ID-based correlation like QUERY/STATUS/TRANSACT
 
-### Outbound Connection Flow (Implemented)
+### Connection Flow
 
 **Peer `ConnectionManager.connectToPeer()`** (async `CompletableFuture<Convex>`):
 1. Connect to remote address
@@ -70,7 +110,10 @@ Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
 2. If key pair available, fire async `verifyPeer(peerKey)` — non-blocking
 3. Connection immediately usable; `verifiedPeer` set when verification completes
 
-## Implemented: Generic Message API
+A peer's outbound connection still answers a CHALLENGE sent back on it, as any client with
+a key pair does, so released peers that challenge inbound connections can verify it.
+
+## Generic Message API
 
 `POST /api/v1/message` accepts messages in CAD3 raw (`application/cvx-raw`) or CVX text
 (`application/cvx`) format. Delivers to the peer server and returns the Result, honouring
@@ -79,55 +122,11 @@ over HTTP — `ConvexHTTP.sendChallenge()` uses this endpoint.
 
 Response size is capped at 1MB via `Cells.storageSize()` in `setContent()`.
 
-## Implemented: Error Responses
+## Error Responses
 
-`Server.processMessage()` returns specific errors for unhandled messages:
-- Unknown message type → `Result.error(:FORMAT, "Unrecognised message type")`
-- Unexpected result message → `Result.error(:UNEXPECTED, "Unexpected result message")`
-
-All error strings are static constants in `Strings` — no per-message string construction.
-
-## Trust Model
-
-Trust is **asymmetric** between outbound and inbound connections:
-
-| Direction | Trust | Rationale |
-|-----------|-------|-----------|
-| **Outbound** (we connected to them) | Verified via `verifyPeer()` → trusted | We chose who to connect to; verified their identity |
-| **Inbound** (they connected to us) | Always client by default | We don't know who they are; they could be anyone |
-
-Inbound connections are **never promoted to full peer status**. The outbound connections
-are what matter for secure Belief broadcast — we control who we broadcast to.
-
-However, other peers' outbound connections appear as our inbound connections. A remote
-peer connecting to us will send Beliefs that we need to process. We must accept these
-but protect against untrusted clients flooding the Belief queue.
-
-### Inbound Belief Handling
-
-Beliefs from inbound connections are **accepted but deprioritised until verified**:
-
-1. **Belief arrives from inbound connection `C`**
-2. **If `C.isTrusted()`** → normal Belief processing (high priority)
-3. **If not trusted** → accept into bounded low-priority Belief queue; trigger
-   server-side challenge to verify the sender
-4. **Challenge succeeds** → `C.setTrustedKey(key)`, subsequent Beliefs get normal priority
-5. **Challenge fails or low-priority queue full** → drop the Belief
-
-This means Beliefs are signed (so can be verified), and a verified inbound connection
-gets faster Belief processing. But it is still an inbound client connection — still
-subject to backpressure for non-Belief traffic.
-
-### Flood Mitigations
-
-1. **Peer count is bounded** — limited by staking requirements. A few dozen verified
-   inbound connections cannot overwhelm the server.
-2. **Beliefs are deduplicated** — `BeliefPropagator` handles duplicate detection.
-   Repeated identical Beliefs are cheap to reject.
-3. **Peers are accountable** — a misbehaving peer's key is known. The operator can
-   blacklist it or the network can slash its stake.
-4. **Low-priority queue is bounded** — unverified Belief senders can't fill the
-   high-priority path.
+`Server.processMessage()` returns an error for an unknown message type:
+`Result.error(:FORMAT, "Unrecognised message type")`. Error strings are static constants in
+`Strings` — no per-message string construction.
 
 ## Message ↔ Connection
 
@@ -138,52 +137,6 @@ See [MESSAGING.md](MESSAGING.md) for the full connection and message architectur
 channel with per-end `acceptsMessages` control — `sendMessage` can be
 structurally disabled while `returnMessage` continues to work.
 
-`AConnection.supportsMessage()` allows the server to check whether a connection
-supports general messaging before attempting protocol exchange. `InboundVerifier`
-checks this early to avoid spawning virtual threads for return-only connections.
-
-## Implemented: Inbound Belief Deprioritisation (Phase 2)
-
-### Components
-
-| Component | Status |
-|-----------|--------|
-| `BeliefPropagator.untrustedPropagationQueue` | Small bounded queue (10), non-blocking poll |
-| `Server.processBelief()` | Routes by `conn.isTrusted()` — trusted→main, untrusted→low-priority |
-| `InboundVerifier.maybeStart()` | CAS-guarded, virtual thread, sends CHALLENGE |
-| `InboundVerifier.handleResult()` | Routes inbound RESULT to pending verification |
-| `AConvexConnected.returnMessageHandler` | Auto-responds to server-initiated CHALLENGE |
-| Client-side connection on messages | `NettyConnection` sets itself on inbound handler |
-
-### Flow
-
-1. **Untrusted belief arrives** → `Server.processBelief()` checks `conn.isTrusted()`
-2. **Untrusted** → `propagator.queueUntrustedPropagation(m)` (best-effort, bounded queue)
-3. **Trigger verification** → `InboundVerifier.maybeStart(conn)` (no-op if already in progress)
-4. **Virtual thread** sends CHALLENGE on `conn`, client auto-responds via `respondToChallenge()`
-5. **Client RESULT** routed through `Server.processMessage()` → `InboundVerifier.handleResult()`
-6. **Verification succeeds** → `conn.setTrustedKey(remoteKey)`, subsequent beliefs go to the trusted propagation queue
-7. **awaitBelief()** drains trusted propagation and acquired Beliefs, then polls one untrusted belief per cycle (non-blocking)
-
-### Fast Path Guarantees
-
-- **Per-message cost (trusted):** two field reads (`getConnection()`, `isTrusted()`) + queue offer
-- **Per-message cost (untrusted, verification in progress):** above + `containsKey()` check → return
-- **No blocking** on inbound connection — reads continue for challenge response
-- **No concurrent verifications** per connection — `ConcurrentHashMap.putIfAbsent()` guard
-
-## Remaining Work
-
-- Validate a verified peer key against consensus state and minimum stake.
-
-## Summary
-
-| Aspect | Design |
-|--------|--------|
-| Outbound trust | `verifyPeer()` sets `verifiedPeer` + `AConnection.trustedKey` — **implemented** |
-| Inbound trust | Server-initiated challenge on first untrusted belief — **implemented** |
-| Belief priority | Trusted → propagation queue; untrusted → small bounded queue (1 per cycle) — **implemented** |
-| Backpressure | Applied to all inbound connections for non-Belief traffic |
-| Message routing | `Message` carries `AConnection`; paired `LocalConnection` for in-JVM — see [MESSAGING.md](MESSAGING.md) |
-| Security invariant | Untrusted clients **never** block Belief propagation — **implemented** |
-| Generic message API | `POST /api/v1/message` — CAD3 raw or CVX text — **implemented** |
+`AConnection.supportsMessage()` allows a server to check whether a connection
+supports general messaging before attempting protocol exchange, as a lattice node does
+before verifying an inbound connection.

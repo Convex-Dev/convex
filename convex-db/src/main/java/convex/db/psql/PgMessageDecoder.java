@@ -20,6 +20,25 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 
 	private boolean startupComplete = false;
 
+	/** True if the server answers SSLRequest by starting TLS */
+	private final boolean tlsOffered;
+
+	/** Creates a decoder for a server that does not offer TLS. */
+	public PgMessageDecoder() {
+		this(false);
+	}
+
+	/**
+	 * Creates a decoder.
+	 *
+	 * @param tlsOffered True if the server answers SSLRequest by starting TLS. Bytes
+	 *        already received after an SSLRequest are then refused: they arrived
+	 *        unprotected but would be read as if inside TLS (CVE-2021-23214).
+	 */
+	public PgMessageDecoder(boolean tlsOffered) {
+		this.tlsOffered = tlsOffered;
+	}
+
 	@Override
 	protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
 		if (!startupComplete) {
@@ -51,8 +70,17 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 		int version = in.readInt();
 
 		if (version == 80877103) {
-			// SSLRequest - we don't support SSL, respond with 'N'
+			if (tlsOffered && in.isReadable()) {
+				// Discard, or the decoder would still decode them when the channel closes
+				in.skipBytes(in.readableBytes());
+				throw new CorruptedFrameException("Unencrypted data after SSLRequest");
+			}
 			out.add(new SSLRequest());
+			return;
+		}
+
+		if (version == 80877104) {
+			out.add(new GSSENCRequest());
 			return;
 		}
 
@@ -203,10 +231,22 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 
 	public record StartupMessage(int majorVersion, int minorVersion, Map<String, String> params) {}
 	public record SSLRequest() {}
+	public record GSSENCRequest() {}
 	public record CancelRequest(int processId, int secretKey) {}
 	public record Query(String sql) {}
 	public record Parse(String name, String query, int[] paramTypes) {}
-	public record Bind(String portal, String statement, short[] paramFormats, byte[][] paramValues, short[] resultFormats) {}
+	public record Bind(String portal, String statement, short[] paramFormats, byte[][] paramValues, short[] resultFormats) {
+		/**
+		 * Whether value {@code index} is in binary format, as a Bind's format codes say: no
+		 * codes means every value is text, one code applies to every value, otherwise there
+		 * is one code per value.
+		 */
+		public static boolean binary(short[] formats, int index) {
+			if (formats == null || formats.length == 0) return false;
+			if (formats.length == 1) return formats[0] == 1;
+			return index < formats.length && formats[index] == 1;
+		}
+	}
 	public record Describe(byte type, String name) {}
 	public record Execute(String portal, int maxRows) {}
 	public enum Sync { INSTANCE }

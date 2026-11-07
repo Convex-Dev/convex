@@ -1,7 +1,8 @@
 package convex.lattice.fs;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.io.InputStream;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileStore;
@@ -9,7 +10,6 @@ import java.nio.file.FileSystem;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
-import java.nio.file.StandardOpenOption;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileTime;
@@ -17,10 +17,13 @@ import java.nio.file.attribute.UserPrincipalLookupService;
 import java.util.Collections;
 import java.util.Set;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.util.BlobOutputStream;
+import convex.core.store.AStore;
 import convex.lattice.fs.impl.DLDirectoryStream;
 import convex.lattice.fs.impl.DLFSFileAttributes;
 
@@ -159,26 +162,72 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	public abstract SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) throws IOException;
 
 	/**
-	 * Replaces a complete file while holding the filesystem mutation lock.
+	 * Installs content as a file in one atomic update of the drive, if the
+	 * condition holds for the file's current entry. Readers see the old file or
+	 * the new one, never part of either. The parent directory must exist.
 	 *
-	 * <p>This is intended for request-oriented APIs such as WebDAV where one PUT is
-	 * one logical mutation. It prevents the channel-open truncate and subsequent
-	 * write from interleaving with another whole-file replacement.</p>
+	 * <p>A new file gets a fresh entry. An existing file keeps its metadata and
+	 * any unknown trailing fields; its content and content time change. A deleted
+	 * name counts as absent. The content is saved to the drive's store, if any,
+	 * before the update, so a retry under contention redoes only the install.</p>
 	 *
-	 * @param path destination path in this filesystem
-	 * @param data complete new file content
-	 * @return true if the file was created, false if it replaced an existing file
+	 * @param path File to write, in this filesystem
+	 * @param content Complete new content
+	 * @param condition Condition on the current entry
+	 * @return The entry replaced, or null if the file was created
+	 * @throws ConditionFailedException If the condition does not hold; nothing changes
+	 * @throws IOException If the parent is missing or not a directory, the path is a directory, or in case of other IO error
 	 */
-	public final synchronized boolean writeAllBytes(DLPath path, byte[] data) throws IOException {
-		if (path == null || path.getFileSystem() != this) throw new IllegalArgumentException("Path belongs to another filesystem");
-		boolean created = getNode(path) == null;
-		Set<StandardOpenOption> options = Set.of(StandardOpenOption.CREATE,
-			StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-		try (SeekableByteChannel channel = newByteChannel(path, options, new FileAttribute<?>[0])) {
-			ByteBuffer source = ByteBuffer.wrap(data);
-			while (source.hasRemaining()) channel.write(source);
+	public abstract AVector<ACell> install(DLPath path, ABlob content, DLFSCondition condition) throws IOException;
+
+	/**
+	 * Gets the store that file content is saved to as it is written
+	 * @return Store, or null to keep content in memory
+	 */
+	protected abstract AStore getContentStore();
+
+	/**
+	 * Creates a writer for a new version of a file. Nothing is visible until
+	 * {@link DLFileWriter#commit()}, which installs the content subject to the
+	 * condition; closing without commit discards it.
+	 *
+	 * @param path File to write, in this filesystem
+	 * @param condition Condition on the file's entry when committing
+	 * @return New writer
+	 */
+	public DLFileWriter newWriter(DLPath path, DLFSCondition condition) {
+		checkOpen();
+		if (path.getFileSystem()!=this) throw new IllegalArgumentException("Path belongs to another filesystem");
+		return new DLFileWriter(this,path,condition,BlobOutputStream.create(getContentStore()));
+	}
+
+	/**
+	 * Writes a file from a stream, publishing it only if the stream ends cleanly.
+	 *
+	 * @param path File to write, in this filesystem
+	 * @param in Stream of complete new content
+	 * @param condition Condition on the file's entry when the stream ends
+	 * @return The entry replaced, or null if the file was created
+	 * @throws ConditionFailedException If the condition does not hold; nothing changes
+	 * @throws IOException If the stream fails, or in case of other IO error; nothing changes
+	 */
+	public AVector<ACell> write(DLPath path, InputStream in, DLFSCondition condition) throws IOException {
+		try (DLFileWriter writer=newWriter(path,condition)) {
+			in.transferTo(writer);
+			return writer.commit();
 		}
-		return created;
+	}
+
+	/**
+	 * Replaces a complete file in one atomic update.
+	 *
+	 * @param path File to write, in this filesystem
+	 * @param data Complete new content, copied
+	 * @return true if the file was created, false if it replaced an existing file
+	 * @throws IOException If the parent is missing or not a directory, the path is a directory, or in case of other IO error
+	 */
+	public final boolean writeAllBytes(DLPath path, byte[] data) throws IOException {
+		return write(path,new ByteArrayInputStream(data),DLFSCondition.ANY)==null;
 	}
 
 	/**

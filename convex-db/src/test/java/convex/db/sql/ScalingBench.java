@@ -4,6 +4,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexType;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.SQLSchema;
 
@@ -26,7 +27,7 @@ public class ScalingBench {
 		for (int n : SIZES) {
 			System.out.printf("--- %,d rows ---%n", n);
 			AKeyPair kp = AKeyPair.generate();
-			SQLDatabase db = SQLDatabase.create("bench", kp);
+			SQLDatabase db = SQLDatabase.create("bench", kp, RowLWW::merge);
 			SQLSchema tables = db.tables();
 			tables.createTable("t",
 					new String[]{"ID", "LEID", "NM"},

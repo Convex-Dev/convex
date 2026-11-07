@@ -203,7 +203,7 @@ the mailbox DID:
 `hash` and `issued-at` name the envelope and reproduce its key. `did` sits
 inside the signature so a receipt signed for one mailbox cannot be placed in
 another by someone who has seen it, even when one key is authorised for both
-DIDs, which is the ordinary `did:key` plus `did:web` alias case.
+DIDs, as when a `did:web` document lists the key a `did:key` encodes.
 
 A receipt is a complete entry on its own. If it arrives before, or without, the
 envelope it names, it is a stable tombstone that absorbs the envelope whenever it
@@ -304,8 +304,7 @@ The mail application takes `[:mail <did> ...]` values only for desired DIDs,
 selecting the desired mailboxes from a root or region value, and applies the
 checks the lattice cannot before calling its merge:
 
-- complete value within the inbound size bound; each envelope within the
-  envelope bound;
+- complete value with each envelope within the envelope bound;
 - `issued-at` within `[now - window, now + clock-lead]`;
 - per-connection and per-node deposit rate limits, with rejections counted by the
   existing per-connection circuit-breaker;
@@ -412,7 +411,7 @@ public final class Mail extends ALatticeComponent<AHashMap<ACell, Index<ABlob, S
     static Keyword KEY_MAIL                                  // :mail
     static MailLattice LATTICE                               // did:key-only default
     static Mail create(BiFunction<ACell,ACell,SignedData<ACell>> signer) // standalone root
-    static Mail connect(ALatticeApplication<Index<Keyword,ACell>> app, MailLattice lattice,
+    static Mail connect(ALatticeComponent<Index<Keyword,ACell>> app, MailLattice lattice,
         BiFunction<ACell,ACell,SignedData<ACell>> signer)
     Mailbox mailbox(AString did)                             // view of any mailbox
     Hash send(MailEnvelope envelope)                         // one atomic deposit in the recipient mailbox
@@ -551,7 +550,7 @@ Retention, in `convex-p2p`:
 Components:
 
 - standalone `Mail.create` with two key pairs: compose, deposit, open, receive,
-  observe `isReceived`; `did:web` recipient through an `alsoKnownAs` authoriser;
+  observe `isReceived`; `did:web` recipient whose key its DID document lists;
   unattributed envelope with an inner signature.
 
 Network, in `convex-integration` alongside the social and DLFS stories:
@@ -674,6 +673,7 @@ possible later if mail grows a product surface of its own.
   of old unconfirmed mail, or wait until a need appears.
 - Whether a sender may put a `:prev` reference inside the plaintext as a gap hint
   the recipient's client can display, without the lattice depending on it.
-- How `DIDKeyResolver` obtains keys for `did:web` recipients: through the same
-  `alsoKnownAs` aliases the authoriser uses, or a `keyAgreement` entry once DID
-  documents carry one.
+- Which keys `DIDKeyResolver` takes for a `did:web` recipient from its document,
+  through the shared `DIDResolver`: those under `authentication`, as peer naming
+  does, or a `keyAgreement` entry once DID documents carry one. Not `alsoKnownAs`,
+  which proves nothing by itself (CAD043).

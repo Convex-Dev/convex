@@ -1039,7 +1039,7 @@ public class State extends ARecordGeneric {
 			State as=(State)a;
 			return equals(as);
 		} else {
-			return Cells.equalsGeneric(this, a);
+			return Cells.equalsEncoding(this, a);
 		}
 	}
 	

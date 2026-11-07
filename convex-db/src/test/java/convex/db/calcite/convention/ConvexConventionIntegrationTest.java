@@ -18,6 +18,7 @@ import convex.db.calcite.ConvexColumnType;
 
 import convex.db.calcite.ConvexType;
 import convex.db.calcite.rel.ConvexResultConverter;
+import convex.db.lattice.RowLWW;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -36,22 +37,23 @@ class ConvexConventionIntegrationTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		// Create test database
-		cdb = ConvexDB.create();
+		cdb = ConvexDB.create(RowLWW::merge);
 		db = cdb.database("convex_conv_test");
 		cdb.register("convex_conv_test");
 
-		// Create table with typed columns
+		// Create table with typed columns, named as the default (standard) identifier
+		// policy resolves unquoted SQL names
 		ConvexColumnType[] types = {
 			ConvexColumnType.of(ConvexType.INTEGER),  // id
 			ConvexColumnType.varchar(100),             // name
 			ConvexColumnType.of(ConvexType.DOUBLE)     // score
 		};
-		db.tables().createTable("scores", new String[]{"id", "name", "score"}, types);
+		db.tables().createTable("SCORES", new String[]{"ID", "NAME", "SCORE"}, types);
 
 		// Insert test data
-		db.tables().insert("scores", 1L, "Alice", 95.5);
-		db.tables().insert("scores", 2L, "Bob", 87.0);
-		db.tables().insert("scores", 3L, "Carol", 92.3);
+		db.tables().insert("SCORES", 1L, "Alice", 95.5);
+		db.tables().insert("SCORES", 2L, "Bob", 87.0);
+		db.tables().insert("SCORES", 3L, "Carol", 92.3);
 
 		// Connect via JDBC
 		conn = DriverManager.getConnection("jdbc:convex:database=convex_conv_test");

@@ -21,10 +21,19 @@ import convex.core.lang.RT;
  */
 public final class LatticePropagatorConfig {
 
-	/** Maximum memory size of a complete value admitted by this group. */
+	/** @deprecated Ignored. Configure encoded frame limits with {@link #MAX_MESSAGE_SIZE} and {@link #MAX_TRUSTED_MESSAGE_SIZE}. */
+	@Deprecated
 	public static final AString MAX_INBOUND_VALUE_SIZE=Strings.intern("maxInboundValueSize");
 
-	/** Consecutive rejected messages before this group's circuit breaker closes a route. */
+	/**
+	 * Consecutive rejected messages before this group's circuit breaker closes a
+	 * route. Only messages that show the sender at fault count: malformed,
+	 * unmergeable, refused by the application handler, DATA over an unverified
+	 * route, or a value whose missing data the sender answers for wrongly. A :LOAD
+	 * refusal from either side, an unanswered data request and a local failure
+	 * count neither way. An accepted merge, DATA or application message resets the
+	 * count.
+	 */
 	public static final AString MAX_CONSECUTIVE_REJECTS=Strings.intern("maxConsecutiveRejects");
 
 	/** Maximum encoded message size on an unverified manager-owned route. */
@@ -39,7 +48,11 @@ public final class LatticePropagatorConfig {
 	/** Maximum encoded message size on a cryptographically verified route. */
 	public static final AString MAX_TRUSTED_MESSAGE_SIZE=Strings.intern("maxTrustedMessageSize");
 
-	/** Maximum physical inbound connections tracked by this group. */
+	/**
+	 * Connections this group expects to keep statistics for; it sweeps the
+	 * statistics of closed connections beyond this. Caps nothing: the listener caps
+	 * sockets with the node's {@code maxConnections}.
+	 */
 	public static final AString MAX_CONNECTIONS=Strings.intern("maxConnections");
 
 	/** Maximum desired peers retained by this group. */
@@ -51,14 +64,55 @@ public final class LatticePropagatorConfig {
 	/** Additional recently used peers to retain, excluding explicit connections. */
 	public static final AString ACTIVE_PEERS=Strings.intern("activePeers");
 
-	/** Maximum number of decoded messages awaiting ordered processing. */
+	/**
+	 * Maximum number of decoded messages awaiting ordered processing. Also bounds
+	 * concurrent missing-data acquisitions.
+	 */
 	public static final AString INBOUND_QUEUE_SIZE=Strings.intern("inboundQueueSize");
+
+	/**
+	 * DATA_REQUESTs served at once over the routes this group opened. One route may
+	 * hold a quarter of them, and at least one; a request beyond either limit pauses
+	 * its route until a permit frees, and is answered with :LOAD only if none frees
+	 * within the internal timeout.
+	 */
+	public static final AString MAX_DATA_REQUESTS=Strings.intern("maxDataRequests");
 
 	/** Maximum encoded bytes retained by this group's inbound queue. */
 	public static final AString MAX_INBOUND_QUEUE_BYTES=Strings.intern("maxInboundQueueBytes");
 
-	/** Time allowed for this group's endpoint to drain during shutdown. */
+	/**
+	 * Time allowed for each of this group's workers, ingress and publication, to drain
+	 * during shutdown. Publication's allowance includes writing its final broadcasts
+	 * to each route before the routes close.
+	 */
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT=Strings.intern("inboundShutdownTimeout");
+
+	/**
+	 * Milliseconds between this group's root announcements. The group sends its
+	 * current root to every route at this interval, changed or not, so a peer that
+	 * missed a delta fetches what it lacks, and a quiet route stays open through NATs
+	 * and load balancers.
+	 *
+	 * <p>Zero turns periodic announcements off. A peer that missed a delta, or
+	 * connected after the last change, then receives the group's state only with its
+	 * next change, unless it pulls; quiet routes stay open only through the peers'
+	 * own announcements.</p>
+	 */
+	public static final AString ROOT_ANNOUNCEMENT_INTERVAL=Strings.intern("rootAnnouncementInterval");
+
+	/**
+	 * Milliseconds a live route may hear nothing before this group probes it. Any
+	 * traffic counts, including the root announcement each end sends every
+	 * {@link #ROOT_ANNOUNCEMENT_INTERVAL}, so a healthy route is never probed. The
+	 * default is two of this group's announcement intervals, or
+	 * {@link #DEFAULT_KEEP_ALIVE} when the group does not announce. Keep it above the
+	 * interval the group's peers announce at, with a margin, or probes race their
+	 * announcements. The root announcement, not the probe, keeps NATs and load
+	 * balancers from dropping a quiet route. Nodes without a connection are never
+	 * probed.
+	 */
+	public static final AString KEEP_ALIVE=Strings.intern("keepAlive");
 
 	/** Conservative public-route message limit. */
 	public static final int DEFAULT_MAX_MESSAGE_SIZE=4*1024*1024;
@@ -74,7 +128,7 @@ public final class LatticePropagatorConfig {
 	public static final int DEFAULT_AMBIENT_PEERS=16;
 	public static final int DEFAULT_ACTIVE_PEERS=16;
 
-	/** Conservative cap on physical inbound connections tracked by one group. */
+	/** Default connections one group expects to keep statistics for. */
 	public static final int DEFAULT_MAX_CONNECTIONS=256;
 
 	/** Default number of decoded messages awaiting ordered processing. */
@@ -83,8 +137,20 @@ public final class LatticePropagatorConfig {
 	/** Default encoded bytes awaiting ordered processing. */
 	public static final int DEFAULT_MAX_INBOUND_QUEUE_BYTES=16*1024*1024;
 
+	/** Default DATA_REQUESTs served at once over the group's own routes. */
+	public static final int DEFAULT_MAX_DATA_REQUESTS=16;
+
 	/** Default time allowed for accepted endpoint work to drain. */
 	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT=10_000L;
+
+	/** Default time between root announcements. */
+	public static final long DEFAULT_ROOT_ANNOUNCEMENT_INTERVAL=30_000L;
+
+	/**
+	 * Default quiet time before a live route is probed with the default announcement
+	 * interval: two intervals, so a probe follows a missed announcement.
+	 */
+	public static final long DEFAULT_KEEP_ALIVE=2*DEFAULT_ROOT_ANNOUNCEMENT_INTERVAL;
 
 	private final AMap<AString,ACell> config;
 
@@ -128,10 +194,10 @@ public final class LatticePropagatorConfig {
 		return config;
 	}
 
-	/** Returns the maximum complete inbound value size. */
+	/** @deprecated CAD036 limits encoded messages. This legacy accessor returns {@link Long#MAX_VALUE}. */
+	@Deprecated
 	public long getMaxInboundValueSize() {
-		CVMLong value=RT.ensureLong(config.get(MAX_INBOUND_VALUE_SIZE));
-		return (value==null) ? getMaxMessageSize() : value.longValue();
+		return Long.MAX_VALUE;
 	}
 
 	/** Returns the per-connection consecutive-reject limit, or zero when disabled. */
@@ -168,7 +234,7 @@ public final class LatticePropagatorConfig {
 		return getMessageSize(MAX_TRUSTED_MESSAGE_SIZE,DEFAULT_MAX_TRUSTED_MESSAGE_SIZE);
 	}
 
-	/** Returns the physical inbound connection cap for this group. */
+	/** Returns the connections this group keeps statistics for before sweeping closed ones. */
 	public int getMaxConnections() {
 		return getPositiveInt(MAX_CONNECTIONS,DEFAULT_MAX_CONNECTIONS);
 	}
@@ -203,6 +269,11 @@ public final class LatticePropagatorConfig {
 		return getPositiveInt(INBOUND_QUEUE_SIZE,DEFAULT_INBOUND_QUEUE_SIZE);
 	}
 
+	/** Returns how many DATA_REQUESTs the group serves at once over the routes it opened. */
+	public int getMaxDataRequests() {
+		return getPositiveInt(MAX_DATA_REQUESTS,DEFAULT_MAX_DATA_REQUESTS);
+	}
+
 	/** Returns the encoded-byte capacity of this group's inbound queue. */
 	public int getMaxInboundQueueBytes() {
 		int messageLimit=getMaxMessageSize();
@@ -216,13 +287,43 @@ public final class LatticePropagatorConfig {
 		return value;
 	}
 
-	/** Returns the endpoint shutdown timeout in milliseconds. */
+	/** Returns the per-worker shutdown drain timeout in milliseconds. */
 	public long getInboundShutdownTimeout() {
 		CVMLong configured=RT.ensureLong(config.get(INBOUND_SHUTDOWN_TIMEOUT));
 		long value=(configured==null) ? DEFAULT_INBOUND_SHUTDOWN_TIMEOUT : configured.longValue();
 		if (value<=0) {
 			throw new IllegalArgumentException(INBOUND_SHUTDOWN_TIMEOUT+" must be positive: "+value);
 		}
+		return value;
+	}
+
+	/**
+	 * Returns the time in milliseconds between this group's root announcements, or
+	 * zero when it never announces on a timer.
+	 */
+	public long getRootAnnouncementInterval() {
+		CVMLong configured=RT.ensureLong(config.get(ROOT_ANNOUNCEMENT_INTERVAL));
+		long value=(configured==null) ? DEFAULT_ROOT_ANNOUNCEMENT_INTERVAL : configured.longValue();
+		if (value<0) throw new IllegalArgumentException(ROOT_ANNOUNCEMENT_INTERVAL+" must not be negative: "+value);
+		return value;
+	}
+
+	/**
+	 * Returns the quiet time in milliseconds before a live route is probed. Unless
+	 * configured, it is two of this group's root announcement intervals, or
+	 * {@link #DEFAULT_KEEP_ALIVE} when the group does not announce.
+	 */
+	public long getKeepAlive() {
+		CVMLong configured=RT.ensureLong(config.get(KEEP_ALIVE));
+		long value;
+		if (configured==null) {
+			long interval=getRootAnnouncementInterval();
+			if (interval==0) value=DEFAULT_KEEP_ALIVE;
+			else value=(interval>Long.MAX_VALUE/2) ? Long.MAX_VALUE : 2*interval;
+		} else {
+			value=configured.longValue();
+		}
+		if (value<=0) throw new IllegalArgumentException(KEEP_ALIVE+" must be positive: "+value);
 		return value;
 	}
 

@@ -33,12 +33,13 @@ Follows standard JDBC conventions (H2, Derby, HSQLDB style):
 jdbc:convex:mem:<dbName>                   — named in-memory database
 jdbc:convex:file:<path>                    — persistent (Etch-backed)
 jdbc:convex:<dbName>                       — shorthand for mem:<dbName>
+jdbc:convex:database=<dbName>              — registered database
 ```
 
 Parameters are appended with semicolons:
 
 ```
-jdbc:convex:file:/data/mydb.etch;caseSensitive=false
+jdbc:convex:file:/data/store.etch;database=market
 ```
 
 | Mode | URL | Description |
@@ -47,11 +48,17 @@ jdbc:convex:file:/data/mydb.etch;caseSensitive=false
 | In-memory (shorthand) | `jdbc:convex:market` | Same as `mem:market` |
 | Persistent (file) | `jdbc:convex:file:/data/market.etch` | Etch-backed, survives JVM restart |
 | Persistent (relative) | `jdbc:convex:file:data/market.etch` | Relative to working directory |
+| Registered | `jdbc:convex:database=market` | The `ConvexDB` registered as `market` (see [Registered Databases](#registered-databases)), otherwise as `mem:market` |
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `caseSensitive` | `false` | SQL identifier case sensitivity |
-| `create` | `true` | Create database if it does not exist |
+| `database` | file stem or instance name | Database within the instance (see [One ConvexDB, Many Databases](#one-convexdb-many-databases)) |
+
+This is the only parameter: a URL with any other is refused, and other connection
+properties are ignored. Calcite's own connection properties are set by the driver
+alone. How SQL names resolve is the database's own setting, not the connection's:
+the driver applies the database's identifier policy when a connection opens (see
+[Identifier Case](../README.md#identifier-case)).
 
 ### Database Identification
 
@@ -70,9 +77,7 @@ and HSQLDB (`jdbc:hsqldb:mem:test`, `jdbc:hsqldb:file:~/test`).
 ### How It Works
 
 The driver maintains an internal map of open database instances, keyed by
-canonical identifier (name for `mem:`, absolute file path for `file:`). This
-replaces the previous static registry that required manual `register()`/
-`unregister()` calls.
+canonical identifier (name for `mem:`, absolute file path for `file:`).
 
 ```
 DriverManager.getConnection("jdbc:convex:mem:market")
@@ -97,11 +102,12 @@ DriverManager.getConnection("jdbc:convex:file:/data/market.etch")
     │     ├── Found → return new Connection on existing cursor/store
     │     └── Not found:
     │           ├── EtchStore.create(file)          — opens or creates Etch file
-    │           ├── ConvexDB.createNodeServer(store) — RelayHost.open restores the
-    │           │                                     retained root; the node persists it
-    │           ├── server.launch()
-    │           ├── ConvexDB.connect(server.getHost()) — wraps the cursor chain
-    │           └── Store in map, return Connection
+    │           ├── LatticeHost.open(ConvexDB.EMPTY, store)
+    │           │                                   — restores the retained root
+    │           ├── host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge))
+    │           │                                   — the ConvexDB the driver keeps
+    │           ├── new NodeServer<>(host), server.launch()
+    │           └── Store in map, add a shutdown hook to save, return Connection
     │
     └── Connection wraps Calcite + ConvexSchema backed by the cursor chain
 ```
@@ -112,12 +118,16 @@ A `ConvexDB` instance wraps a single lattice cursor at the database-map level.
 It can host multiple named databases within that cursor:
 
 ```java
-ConvexDB cdb = ConvexDB.create();
+ConvexDB cdb = ConvexDB.create(RowLWW::merge);
 SQLDatabase db1 = cdb.database("market");    // cursor path: /market/:tables/...
 SQLDatabase db2 = cdb.database("analytics"); // cursor path: /analytics/:tables/...
 ```
 
-Each `database()` call navigates the cursor tree — it does not create a copy.
+Each `database()` call navigates the cursor tree — it does not create a copy, and
+creates no state until the first write. Every database merges with the policy the
+`ConvexDB` was given; the driver's `mem:` and `file:` instances use the per-row
+last-write-wins policy, `RowLWW::merge`, which also reconciles concurrent
+transactions.
 
 In the URL, a `ConvexDB` maps to the store/instance, and the database name
 selects which path within the cursor tree:
@@ -132,14 +142,28 @@ If no `database` parameter is given, the driver uses a default database name
 ### Direct API (No DriverManager)
 
 Code that already holds a `ConvexDB` instance can get a Connection directly,
-bypassing URL parsing and the instances map entirely:
+without a URL or registration:
 
 ```java
-ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 ```
 
 This is the preferred API when you manage the `NodeServer` lifecycle yourself.
+The connection is bound to that database alone: no URL reaches it, the driver's
+instances are untouched, and the name may be any string.
+
+### Registered Databases
+
+`cdb.register("mydb")` makes a `ConvexDB` reachable by name, at
+`jdbc:convex:database=mydb`, until `cdb.unregister("mydb")`. A name that is not
+registered connects to the in-memory instance of that name instead.
+
+```java
+cdb.register("mydb");
+Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
+```
+
+`PgServer` connects this way unless it is given a connection supplier.
 
 ## Usage Examples
 
@@ -173,16 +197,19 @@ For advanced use cases (replication, custom NodeServer config):
 
 ```java
 EtchStore store = EtchStore.create(new File("/data/market.etch"));
-var server = new NodeServer<>(RelayHost.open(ConvexDB.DATABASE_MAP_LATTICE, store), config);
+var host = LatticeHost.open(ConvexDB.EMPTY, store);
+ConvexDB cdb = host.addApplication(new ConvexDB(host.cursor(), RowLWW::merge));
+var server = new NodeServer<>(host, config);
 server.launch();
 
-ConvexDB cdb = ConvexDB.connect(server.getHost());
 Connection conn = cdb.getConnection("market");
 // ... use conn ...
 
-server.close();  // stop replication
-server.getHost().close(); // save accepted host state
-store.close();
+// Shutdown (see convex-peer/docs/SHUTDOWN.md): saves, then closes the server, the host, the store
+try (store; host; server) {
+    conn.close();
+    host.checkpoint();
+}
 ```
 
 ### Multiple Databases in One Store
@@ -199,8 +226,8 @@ Connection conn2 = DriverManager.getConnection(
 
 JDBC transactions use the lattice fork/sync model:
 
-- `setAutoCommit(false)` → forks the cursor (snapshot isolation)
-- `commit()` → syncs the fork back (lattice merge into parent)
+- `setAutoCommit(false)` → forks the `SQLDatabase` (snapshot isolation)
+- `commit()` → syncs the fork back, merging with the database's rule
 - `rollback()` → discards the fork
 
 Implementation: `ConvexMeta` (in `org.apache.calcite.jdbc` package).
@@ -210,24 +237,28 @@ Implementation: `ConvexMeta` (in `org.apache.calcite.jdbc` package).
 See [CALCITE.md](CALCITE.md) for the full Calcite adapter architecture.
 
 ```
-SQL → Calcite Parser → Logical Plan → ConvexConvention operators → ConvexRelExecutor → ResultSet
+SQL → Calcite Parser → Logical Plan → ConvexConvention operators → ConvexResultConverter → ResultSet
 ```
 
 Key optimisations:
 - **PK filter pushdown**: `WHERE id = ?` → O(log n) Index lookup via `selectByKey()`
-- **Plan caching**: PreparedStatements reuse compiled plans across executions
+- **Plan caching**: PreparedStatements reuse compiled plans across executions, while their tables keep the schema they were planned for. Once a table is dropped or its columns change, executing the statement fails, with a `StalePlanException` as the cause of the `SQLException`: prepare it again
 - **No materialisation**: full scans use `forEach` for single-pass O(n) traversal
 
 ## Persistence
 
-For `file:` mode databases, the driver manages persistence automatically:
+For `file:` mode databases, the driver saves durably:
 
-- **On connect**: opens (or creates) the Etch file, restores previous state
-- **Periodic**: the underlying `NodeServer` persists at configurable intervals
-- **On close**: final persist when the last connection to a store is closed
+- **On connect**: opens (or creates) the Etch file, restoring the retained state
+- **On commit**: after each commit, and when auto-commit is switched back on
+- **On connection close**: everything committed so far, auto-committed statements
+  included; an open transaction is discarded
+- **On shutdown**: `ConvexDriver.closeAll()` and a JVM shutdown hook save and close
+  every instance
 
-For `mem:` mode, data lives only in the JVM heap. It is lost when the last
-connection is closed or the JVM exits.
+For `mem:` mode, data lives only in the JVM heap. The instance stays in the
+driver's map, so later connections to the same name see it, until
+`ConvexDriver.closeAll()` or the JVM exits.
 
 ## Relationship to PgServer
 
@@ -236,32 +267,12 @@ over TCP using the PostgreSQL client protocol. It reuses the same `ConvexSchema`
 and Calcite pipeline as the JDBC driver, but adds:
 
 - Network transport (Netty)
-- PG message framing (Parse/Bind/Execute/Describe)
+- PG message framing (Parse/Bind/Execute/Describe); Describe answers from the prepared statement's metadata without executing it
+- Prepared statements kept for each connection. One whose table changed is prepared again, or, if its rows would now be described differently, fails with SQLSTATE `0A000` until the client prepares it again, as in PostgreSQL
 - `pg_catalog` virtual schema for client tool compatibility
 - Optional password authentication
 
-Both JDBC and PgServer share the same cursor chain and see the same data.
-
-## Migration from Registry API
-
-The previous API required manual registration:
-
-```java
-// Old (deprecated)
-cdb.register("mydb");
-Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
-cdb.unregister("mydb");
-```
-
-The new API is self-contained:
-
-```java
-// New — URL-based (no registration needed)
-Connection conn = DriverManager.getConnection("jdbc:convex:mydb");
-
-// New — direct API (no registration needed)
-Connection conn = cdb.getConnection("mydb");
-```
-
-The `register()`/`unregister()` methods remain for backward compatibility but
-are no longer the primary API.
+Each client connection opens a JDBC connection, by default to
+`jdbc:convex:database=<name>` for the server's database, so it shares the cursor
+chain of the `ConvexDB` registered under that name.
+`PgServer.builder().connectionSupplier(...)` supplies connections another way.

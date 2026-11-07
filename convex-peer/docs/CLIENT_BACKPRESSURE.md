@@ -13,13 +13,31 @@ application thread — no unbounded buffering, no polling threads.
 
 Two send methods — blocking and non-blocking — with no transport-specific concepts:
 
-- **`sendMessage(m)`** — blocks the calling (virtual) thread until space is available
-  or timeout. Used by `ConvexRemote.message()` for normal operation.
-- **`trySendMessage(m)`** — immediate return, false if queue full. Used when the
-  caller wants to detect overload and handle it (e.g. drop, retry later).
+- **`sendMessage(m)`** — blocks the calling (virtual) thread until space is available,
+  and returns false if none frees within the send timeout. On a Netty event loop it
+  does not wait: the loops empty every connection's queue, so a full queue returns
+  false at once. A message that cannot be sent for any other reason throws:
+  `ClosedChannelException` if the connection is closed, another `IOException` if the
+  write fails, `InterruptedException` if the wait is interrupted, and
+  `IllegalArgumentException` if the message is too large for one frame. Used by
+  requests and `Convex.message()`.
+- **`trySendMessage(m)`** — immediate return, false if the message cannot be queued
+  for any reason. Used when the caller wants to detect overload and handle it (e.g.
+  drop, retry later), such as a broadcast to many peers.
 
 The interface says nothing about TCP, Netty, writability, or event loops. Works with
 any future transport.
+
+A client reports each outcome of a send as a Result, since its calls always return
+one:
+
+| Send outcome | Client result |
+|---|---|
+| `false` | `FULL_CLIENT_BUFFER` (`:LOAD`) |
+| `ClosedChannelException` | `CLOSED_CONNECTION` (`:CONNECT`), also for requests still awaiting a reply when the connection closes |
+| other `IOException` | `:IO` |
+| `InterruptedException` | `:INTERRUPTED`; the calling thread keeps its interrupt status |
+| `IllegalArgumentException` | none: the call fails with the exception, as for any invalid request |
 
 ## Design
 
@@ -50,8 +68,7 @@ Application thread              Netty event loop
 | Application (virtual) thread | `outbound.offer()` | Queue only — never touches channel |
 | Netty event loop | `outbound.poll()`, `writeAndFlush()` | Queue and channel |
 
-The `ArrayBlockingQueue` is the only shared state. Thread-safe by design — no locks,
-no volatile flags, no custom synchronisation.
+The `BoundedMessageQueue` is the only state the two threads share.
 
 ### Drain Triggers
 
@@ -63,7 +80,8 @@ no volatile flags, no custom synchronisation.
 ### Disconnect Handling
 
 When the channel closes, `channelInactive()` clears the outbound queue, waking any
-threads blocked on `offer(timeout)`. They detect the closed channel and return `false`.
+threads blocked on `offer(timeout)`. They detect the closed channel and throw
+`ClosedChannelException`.
 
 ## End-to-End Backpressure Chain
 
@@ -100,17 +118,11 @@ No polling, no extra threads, no unbounded buffering.
 | `PEER_OUTBOUND_QUEUE_SIZE` / `PEER_OUTBOUND_QUEUE_BYTE_LIMIT` | 65,536 / 256 MB, connections to peers only | `Config` |
 | `WriteBufferWaterMark` low | 32 KB | Client bootstrap |
 | `WriteBufferWaterMark` high | 64 KB | Client bootstrap |
-| Send timeout | `DEFAULT_CLIENT_TIMEOUT` (8s) | `Config` |
+| Send timeout | `DEFAULT_INTERNAL_TIMEOUT` (8 s) | `Config` |
 
 The outbound queue absorbs brief bursts — at ~1 KB per message average, 128 entries
 is ~128 KB per connection. The watermark bounds how much data sits in Netty's buffer
 before draining pauses. Together they cap total per-connection memory.
-
-## Backward Compatibility
-
-`ConvexRemote.message()` calls `sendMessage(m)` and checks the boolean. The contract
-is the same — just properly enforced now. The only behavioural change: `sendMessage()`
-may block briefly under load instead of always returning `true`.
 
 ## Future Direction
 
