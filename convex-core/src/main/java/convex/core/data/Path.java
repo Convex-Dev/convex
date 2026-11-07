@@ -88,6 +88,40 @@ public final class Path extends ASpecialVector<AString> {
 		return slice(1);
 	}
 
+	/**
+	 * Appends a segment, keeping a path. The result is a new request, at position 0.
+	 * A value not typed as a string goes to {@link #conj(ACell)} instead, which gives
+	 * the canonical vector.
+	 *
+	 * @param segment Segment to append
+	 * @return Path of this path's segments followed by the segment
+	 * @throws NullPointerException If the segment is null
+	 */
+	public Path conj(AString segment) {
+		Objects.requireNonNull(segment,"Path segment must not be null");
+		int n=Utils.checkedInt(count);
+		AString[] joined=new AString[n+1];
+		System.arraycopy(segments,start,joined,0,n);
+		joined[n]=segment;
+		return new Path(joined,0,n+1);
+	}
+
+	/**
+	 * Appends the segments of another path, keeping a path. The result is a new
+	 * request, at position 0.
+	 *
+	 * @param rest Path whose segments follow this path's
+	 * @return Path of this path's segments followed by those of rest
+	 */
+	public Path concat(Path rest) {
+		int n=Utils.checkedInt(count);
+		int m=Utils.checkedInt(rest.count);
+		AString[] joined=new AString[n+m];
+		System.arraycopy(segments,start,joined,0,n);
+		System.arraycopy(rest.segments,rest.start,joined,n,m);
+		return new Path(joined,0,n+m);
+	}
+
 	@Override
 	public boolean equals(AVector<?> a) {
 		if (a==this) return true;
@@ -201,18 +235,8 @@ public final class Path extends ASpecialVector<AString> {
 	}
 
 	@Override
-	public AVector<AString> assoc(long i,AString value) {
-		return toVector().assoc(i,value);
-	}
-
-	@Override
 	public AVector<AString> dissocAt(long i) {
 		return toVector().dissocAt(i);
-	}
-
-	@Override
-	public AVector<AString> append(AString value) {
-		return toVector().append(value);
 	}
 
 	@Override
@@ -232,6 +256,7 @@ public final class Path extends ASpecialVector<AString> {
 
 	@Override
 	public AVector<AString> concat(ASequence<? extends AString> b) {
+		if (b instanceof Path rest) return concat(rest);
 		return toVector().concat(b);
 	}
 
@@ -263,16 +288,20 @@ public final class Path extends ASpecialVector<AString> {
 
 	@Override
 	public ListIterator<AString> listIterator() {
-		return new PathIterator(0);
+		return new PathIterator<>(0);
 	}
 
 	@Override
 	public ListIterator<AString> listIterator(long index) {
 		if ((index<0)||(index>count)) throw new IndexOutOfBoundsException(index);
-		return new PathIterator(index);
+		return new PathIterator<>(index);
 	}
 
-	private final class PathIterator implements ListIterator<AString> {
+	/**
+	 * Generic in its element type so that set and add, which take one, refuse any
+	 * value as immutable rather than casting it to a string first.
+	 */
+	private final class PathIterator<E> implements ListIterator<E> {
 		private long pos;
 
 		PathIterator(long pos) {
@@ -281,15 +310,17 @@ public final class Path extends ASpecialVector<AString> {
 
 		@Override public boolean hasNext() { return pos<count; }
 
-		@Override public AString next() {
+		@SuppressWarnings("unchecked")
+		@Override public E next() {
 			if (pos>=count) throw new NoSuchElementException();
-			return get(pos++);
+			return (E)get(pos++);
 		}
 
 		@Override public boolean hasPrevious() { return pos>0; }
 
-		@Override public AString previous() {
-			if (pos>0) return get(--pos);
+		@SuppressWarnings("unchecked")
+		@Override public E previous() {
+			if (pos>0) return (E)get(--pos);
 			throw new NoSuchElementException();
 		}
 
@@ -297,7 +328,7 @@ public final class Path extends ASpecialVector<AString> {
 		@Override public int previousIndex() { return Utils.checkedInt(pos)-1; }
 
 		@Override public void remove() { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
-		@Override public void set(AString e) { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
-		@Override public void add(AString e) { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
+		@Override public void set(E e) { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
+		@Override public void add(E e) { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
 	}
 }

@@ -191,9 +191,12 @@ A `Path` is an immutable sequence of string segments, made once from a caller's
 request with `Path.of(segments...)`. A parent reads the segments it owns and passes
 the rest to a child as `path.slice(n)`. Slices share the request's segments, so
 nothing is copied, and each keeps its `position()` in the request, while
-`request()` returns the whole request. A path is a non-canonical vector of strings
-for in-memory use: it equals, hashes and encodes as the vector holding the same
-strings, so lattice code can compare or store it like any vector.
+`request()` returns the whole request. `conj(AString)` and `concat(Path)` build a
+longer path as a new request. A path is a non-canonical vector of strings for
+in-memory use: it equals, hashes and encodes as the vector holding the same
+strings, so lattice code can compare or store it like any vector. Other vector
+operations that change it, such as `append` and `assoc`, give the canonical
+vector, whatever values they add.
 
 The base supports only the empty path. Each parent defines its external namespace
 and selects the component responsible for the rest of the path. External addressing

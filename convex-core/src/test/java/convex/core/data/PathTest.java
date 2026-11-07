@@ -3,11 +3,13 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.HashMap;
+import java.util.ListIterator;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.CVMEncoder;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 
 class PathTest {
 	private static final AString A=Strings.create("a");
@@ -77,6 +79,46 @@ class PathTest {
 		assertSame(request,request.slice(0));
 		assertNull(request.slice(2,1));
 		assertThrows(IndexOutOfBoundsException.class,() -> rest.get(2));
+	}
+
+	@SuppressWarnings({"rawtypes","unchecked"})
+	@Test void vectorOperationsAcceptAnyValue() {
+		Path path=Path.of(C,A,B).slice(1);
+		AVector vector=path;
+		assertEquals(Vectors.of(A,B,CVMLong.ONE),vector.append(CVMLong.ONE));
+		assertEquals(Vectors.of(A,B,CVMLong.ONE),vector.conj(CVMLong.ONE));
+		assertEquals(Vectors.of(A,B,null),vector.conj(null));
+		assertEquals(Vectors.of(CVMLong.ONE,B),vector.assoc(0,CVMLong.ONE));
+		assertEquals(Vectors.of(A,CVMLong.ONE),RT.assoc(path,CVMLong.ONE,CVMLong.ONE));
+		assertEquals(Vectors.of(A,B,CVMLong.ONE),path.concat(Vectors.of(CVMLong.ONE)));
+		assertEquals(Path.of(C,A,B),path.request());
+
+		ListIterator it=path.listIterator();
+		assertThrows(UnsupportedOperationException.class,()->it.set(CVMLong.ONE));
+		assertThrows(UnsupportedOperationException.class,()->it.add(CVMLong.ONE));
+	}
+
+	@Test void conjAndConcatKeepAPath() {
+		Path rest=Path.of(C,A,B).slice(1);
+		Path longer=rest.conj(C);
+		assertEquals(Vectors.of(A,B,C),longer);
+		assertEquals(0,longer.position());
+		assertSame(longer,longer.request());
+		assertEquals(Path.of(C,A,B),rest.request());
+		assertEquals(Path.of(A),Path.of().conj(A));
+		assertThrows(NullPointerException.class,()->rest.conj((AString)null));
+
+		Path joined=rest.concat(Path.of(C,B).slice(1));
+		assertEquals(Vectors.of(A,B,B),joined);
+		assertEquals(0,joined.position());
+		assertEquals(rest,rest.concat(Path.of()));
+		assertEquals(rest,Path.of().concat(rest));
+		ASequence<AString> sequence=Path.of(C);
+		assertEquals(Path.of(A,B,C),rest.concat(sequence));
+		assertTrue(rest.concat(sequence) instanceof Path);
+
+		VectorsTest.doVectorTests(longer);
+		VectorsTest.doVectorTests(joined);
 	}
 
 	@Test void ownsItsSegmentsAndRefusesNull() {
