@@ -37,7 +37,8 @@ public class ObjectsTest {
 	 */
 	public static void doAnyValueTests(ACell a) {
 		Hash h=Hash.get(a);
-				
+		ACell original=a;
+
 		try {
 			a=Cells.persist(a, Samples.TEST_STORE);
 		} catch (IOException e) {
@@ -49,6 +50,13 @@ public class ObjectsTest {
 
 		doAnyEncodingTests(a);
 		doCellTests(a);
+
+		// Persisting returns the canonical cell, so test a non-canonical cell itself too.
+		// Its children are now in the store, as the store-resolution checks need.
+		if ((original!=null)&&!original.isCanonical()) {
+			doAnyEncodingTests(original);
+			doCellTests(original);
+		}
 	}
 
 
