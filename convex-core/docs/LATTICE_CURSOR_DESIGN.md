@@ -154,9 +154,10 @@ or reading it has no state-changing effects.
 
 `cursor.withDefault(emptyContainer).path(key)` supplies a known container type
 without any merge definition. The optional adapter helper
-`LatticeComponent.resolve(cursor, lattice, path...)` supplies such functions one
-level at a time using an explicit lattice. Its write functions use
-`LatticeOps.assocIn` to construct an absent container from the lattice's zero.
+`LatticeComponent.resolve(cursor, lattice, keys...)` builds a path cursor for each
+lattice key, using an explicit lattice. It reads as any path does, so a missing
+key is absent. Its writes use `LatticeOps.assocIn` to construct an absent
+container from the lattice's zero at that level.
 Unknown missing container types fail; keys never determine container types.
 JSON value components construct nothing; a parent needing construction supplies it. No-op writes do not materialise ancestors.
 Owner envelopes still require an explicit signing boundary.

@@ -3,10 +3,8 @@ package convex.lattice;
 import java.util.Objects;
 
 import convex.core.data.ACell;
-import convex.core.lang.RT;
-import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.ProjectionCursor;
+import convex.lattice.cursor.PathCursor;
 
 /**
  * Optional adapter whose incoming merge, path reduction and publication use a supplied lattice.
@@ -80,8 +78,9 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	/**
-	 * Builds child views with component-supplied read/write functions. Each write
-	 * function uses the corresponding lattice to construct an absent container
+	 * Builds a cursor at a path of lattice keys, one {@link PathCursor} per key. Each
+	 * reads as any path does: a missing key is absent, so a required read throws.
+	 * Each write uses the lattice at its level to construct an absent container
 	 * within the atomic update. Reads and view construction never mutate state.
 	 * A missing container at an unknown level causes the write to fail. Owner
 	 * boundaries are not crossed here: an owner's slot is wrapped by its component with
@@ -99,14 +98,25 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 		AForkableCursor<ACell> c=(AForkableCursor<ACell>)cursor;
 		ALattice<?> lat=lattice;
 		for (ACell key: path) {
-			final ALattice<?> parentLattice=lat;
-			final ACell[] step={key};
-			c=ProjectionCursor.create(c,
-				value -> RT.getIn(value,step),
-				(value,child) -> Utils.equals(RT.getIn(value,step),child)
-					?value:LatticeOps.assocIn(value,child,parentLattice,step));
+			c=new LatticeStep(c,lat,key);
 			lat=(lat==null)?null:lat.path(key);
 		}
 		return (AForkableCursor<T>)c;
+	}
+
+	/** One key of a lattice path: reads as a path, and constructs an absent container from its lattice. */
+	private static final class LatticeStep extends PathCursor<ACell> {
+		private final ALattice<?> lattice;
+		private final ACell[] step;
+
+		LatticeStep(AForkableCursor<ACell> source,ALattice<?> lattice,ACell key) {
+			super(source,key);
+			this.lattice=lattice;
+			this.step=new ACell[] {key};
+		}
+
+		@Override protected ACell write(ACell current,ACell value) {
+			return LatticeOps.assocIn(current,value,lattice,step);
+		}
 	}
 }
