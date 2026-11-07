@@ -21,8 +21,9 @@ public class DenseRecord extends ACAD3Record {
 	public static DenseRecord create(int tag,AVector<?> data) {
 		if (data==null) return null;
 		if (Tag.category(tag)!=Tag.DENSE_RECORD_BASE) return null; // not an extension value
-		
-		return new DenseRecord((byte)tag,(AVector<ACell>) data);
+
+		// The record is canonical, so it holds the canonical vector of its values
+		return new DenseRecord((byte)tag,(AVector<ACell>) data.toVector());
 	}
 		
 	@Override

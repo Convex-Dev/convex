@@ -57,6 +57,18 @@ public class CAD3Test extends ACVMTest {
 		assertFalse(d4.equals(d1));
 	}
 
+	@Test public void testDenseRecordOverNonCanonicalVector() {
+		AString a=Strings.create("a");
+		AVector<?>[] sources={Path.of(),Path.of(a,a).slice(1),VectorArray.of(),VectorArray.of(1,2),MapEntry.of(1L,2L)};
+		for (AVector<?> source:sources) {
+			DenseRecord d=DenseRecord.create(0xDA,source);
+			assertTrue(d.values().isCanonical());
+			assertEquals(source,d.values());
+			assertSame(d,d.updateRefs(r->r));
+			ObjectsTest.doAnyValueTests(d);
+		}
+	}
+
 	@Test public void testExtensionCoreDefs() {
 		assertSame(Core.VECTOR,Reader.read("#["+Utils.toHexString(CVMTag.CORE_DEF)+"01]"));
 	}
@@ -102,7 +114,8 @@ public class CAD3Test extends ACVMTest {
 			assertEquals(Blob.fromHex("df03110111021103"),dr.getEncoding());
 	
 			assertEquals(3,dr.count);
-			assertSame(v,dr.values());
+			assertEquals(v,dr.values());
+			assertTrue(dr.values().isCanonical());
 			String ds="#[df03110111021103]";
 			assertEquals(ds,dr.toString());
 			assertEquals(dr,Reader.read(ds));
