@@ -4,7 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
-import convex.lattice.cursor.ProjectionCursor;
+import convex.lattice.cursor.ATransformCursor;
 
 /**
  * Atomic map operations, without replication, signing or timestamp policy.
@@ -81,7 +81,9 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 
 	/**
 	 * A shared entry view, suitable for binding a domain child component.
-	 * A changed write uses {@link #createContainer()} only when the containing map is absent.
+	 * A missing key is absent, as on a path: a required read throws, and a stored nil
+	 * is present. A changed write uses {@link #createContainer()} only when the
+	 * containing map is absent.
 	 * Setting an absent entry to null is a no-op; use {@link #put} to insert a nil value.
 	 * The caller declares the entry type for a heterogeneous map; this does not
 	 * validate the entry's representation. The child component owns that check.
@@ -91,7 +93,27 @@ public abstract class AMapComponent<K extends ACell,V extends ACell,M extends AM
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends V> AForkableCursor<T> path(K key) {
-		return ProjectionCursor.create(values(),stored -> (T)entry(stored,key),
-			(stored,value) -> associate(stored,key,value));
+		return (AForkableCursor<T>)new Entry(values(),key);
+	}
+
+	/** One entry, read through the map's storage check and written with its creation policy. */
+	private final class Entry extends ATransformCursor<V,ACell> {
+		private final K key;
+
+		Entry(AForkableCursor<ACell> values,K key) {
+			super(values);
+			this.key=key;
+		}
+
+		@Override protected V view(ACell stored) { return entry(stored,key); }
+
+		@Override protected Object viewValue(ACell stored) {
+			M map=requireMap(stored);
+			if (map==null) return MISSING;
+			V value=map.get(key);
+			return value==null && !map.containsKey(key)?MISSING:value;
+		}
+
+		@Override protected ACell write(ACell current,V value) { return associate(current,key,value); }
 	}
 }

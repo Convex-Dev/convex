@@ -195,7 +195,7 @@ public class P2PUserTest {
 		me.sync();
 
 		assertNotNull(me.getIdentity());
-		assertNull(me.nodeCursor().get(), "Publishing identity must not create a node record");
+		assertFalse(me.nodeCursor().exists(), "Publishing identity must not create a node record");
 	}
 
 	// ===== Fork / sync-on-demand =====

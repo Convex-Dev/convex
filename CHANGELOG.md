@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep a P2P node's `:local` state private, and MCP signing keys safe from a wrong passphrase. ([MCP Auth](convex-restapi/docs/MCP_AUTH.md#deletekey))
 - Handle percent-encoded `did:web` names correctly. ([#816](https://github.com/Convex-Dev/convex/issues/816))
 - Read a lattice fork without waiting for its sync or for other writers to it.
+- Report a missing key in a lattice map or index component as absent, as a path does. ([Lattice cursors](convex-core/docs/LATTICE_CURSOR_DESIGN.md#component-supplied-construction))
 
 ## [0.8.18] - 2026-10-25
 

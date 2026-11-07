@@ -56,7 +56,7 @@ class P2PComponentStorageTest {
 				default -> (owner,value) -> BOB.signData(value);
 			};
 			var view=component(user(root,signer),node);
-			assertNull(view.cursor().get());
+			assertFalse(view.cursor().exists());
 			view.cursor().set(null);
 			view.sync();
 			assertNull(root.get());

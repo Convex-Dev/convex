@@ -18,6 +18,8 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.MissingValueException;
 import convex.lattice.cursor.Root;
 
 class MapComponentTest {
@@ -61,7 +63,7 @@ class MapComponentTest {
 		var root=new Root<ACell>();
 		var map=creationPolicy(root,indexed,false);
 		assertNull(map.get());
-		assertNull(map.path(A).get());
+		assertFalse(map.path(A).exists());
 		assertEquals(0,map.size());
 		assertFalse(map.containsKey(A));
 		assertNull(map.remove(A));
@@ -141,6 +143,29 @@ class MapComponentTest {
 		assertFalse(map.containsKey(A));
 	}
 
+	/** An entry reads as a path does: a missing key is absent and a stored nil is present. */
+	@ParameterizedTest @ValueSource(booleans={false,true})
+	void entryViewsReadMissingKeysAsAbsentAndStoredNilAsNil(boolean indexed) {
+		var root=new Root<ACell>();
+		var map=component(root,indexed);
+		AForkableCursor<ACell> entry=map.path(A);
+		assertFalse(entry.exists(),"absent storage holds no entries");
+		assertThrows(MissingValueException.class,entry::get);
+		assertSame(CVMLong.ZERO,entry.getOrDefault(CVMLong.ZERO));
+		map.put(B,CVMLong.TWO);
+		assertFalse(entry.exists());
+		assertFalse(root.path(A).exists(),"the same as a plain path");
+		assertThrows(MissingValueException.class,entry::get);
+		assertSame(CVMLong.ZERO,entry.getOrDefault(CVMLong.ZERO));
+		assertFalse(new MapComponent<AString,ACell>(map.path(A)).exists(),"a component bound to a missing entry is absent");
+		map.put(A,null);
+		assertTrue(entry.exists());
+		assertNull(entry.get());
+		assertNull(entry.getOrDefault(CVMLong.ZERO),"a stored nil does not select the fallback");
+		root.set(CVMLong.ONE);
+		assertThrows(IllegalStateException.class,entry::exists,"incompatible storage is rejected, not read as absent");
+	}
+
 	@ParameterizedTest @ValueSource(booleans={false,true})
 	void equalPutLeavesStorageUnchanged(boolean indexed) {
 		var root=new Root<ACell>();
@@ -170,7 +195,7 @@ class MapComponentTest {
 		assertSame(unchanged,root.get());
 		assertSame(unchanged,map.sync());
 		assertEquals(CVMLong.TWO,map.remove(A));
-		assertNull(child.get());
+		assertFalse(child.exists());
 		assertSame(opaque,map.get(B));
 		map.clear();
 		assertTrue(map.isEmpty());

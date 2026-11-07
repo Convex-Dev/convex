@@ -208,7 +208,7 @@ class KeyedRegionsTest {
 		});
 		var child=nested.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
 		assertNull(root.get());
-		assertNull(child.cursor().get());
+		assertFalse(child.cursor().exists());
 		child.cursor().set(CVMLong.ONE); // Even an entry matching the initial value must retain its siblings.
 		assertEquals(Index.of(UNKNOWN,opaque,NESTED,Index.of(A,CVMLong.ONE,B,opaque)),root.get());
 		var before=root.get();
@@ -372,7 +372,7 @@ class KeyedRegionsTest {
 				deliveries.incrementAndGet();
 				// A domain rule, deliberately different from any inferred lattice merge.
 				if (incoming==null || CVMLong.TWO.equals(incoming)) cursor().set(incoming);
-				return cursor().get();
+				return cursor().getOrDefault(null);
 			}
 		});
 		app.merge(Index.of(A,CVMLong.ONE));

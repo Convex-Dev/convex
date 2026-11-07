@@ -8,6 +8,9 @@ import convex.core.data.ACell;
 
 /**
  * Atomic view defined by caller-supplied read and write functions.
+ * A projection is present wherever its source is: the read function's result,
+ * including null, is the viewed value. A view that can find nothing in a stored
+ * value is an {@link ATransformCursor} that reports it from {@code viewValue}.
  * The write function replaces the viewed value within the current source value.
  * Both functions must be pure: updates may retry against a changed source.
  * Reading a written value must return that value; writing the current view back

@@ -126,6 +126,7 @@ is left to its owner. A read-only view refuses to persist, as it refuses any wri
 ## Component-supplied construction
 
 For ordinary collections, use `MapComponent.path(key)` or `IndexComponent.path(key)`.
+An entry reads as a path does: a missing key is absent and a stored nil is present.
 They reject incompatible stored containers and create a correctly typed container
 only on a changed write. Their pure `createContainer()` hook can supply initial
 contents or refuse creation. Reads and no-op edits leave missing storage absent.
@@ -133,7 +134,10 @@ contents or refuse creation. Reads and no-op edits leave missing storage absent.
 For custom representations, a component can use
 `ProjectionCursor.create(source, read, write)` to expose a child without requiring
 existing containers. The cursor only executes the supplied
-functions; the component's write function chooses what to construct:
+functions; the component's write function chooses what to construct. A projection
+is present wherever its source is, so the child below reads as nil when its key is
+missing. A child whose absence matters is a transform that reports it from
+`viewValue`, as the collection entries do:
 
 ```java
 var child = ProjectionCursor.create(source,

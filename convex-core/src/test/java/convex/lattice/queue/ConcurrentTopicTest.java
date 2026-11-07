@@ -25,7 +25,7 @@ public class ConcurrentTopicTest {
 		assertThrows(IllegalArgumentException.class,() -> ConcurrentTopic.create(topic,0,8));
 		assertThrows(IllegalArgumentException.class,() -> ConcurrentTopic.create(topic,1,0));
 		assertThrows(IllegalArgumentException.class,() -> ConcurrentTopic.create(topic,1,8,0));
-		assertNull(topic.cursor().get());
+		assertFalse(topic.cursor().exists());
 		try (var ct=ConcurrentTopic.create(topic,1,8)) {
 			assertThrows(IllegalStateException.class,ct::flush);
 			assertThrows(IllegalStateException.class,() -> ct.offer(CVMLong.ONE,0));

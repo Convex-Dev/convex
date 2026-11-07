@@ -87,8 +87,8 @@ class OwnedComponentsTest {
 		var edits=owners.authoringCursor(A,ALICE::signData);
 		var draft=owners.draft(A,ALICE::signData);
 		assertNull(owners.get(A));
-		assertNull(slot.get());
-		assertNull(edits.get());
+		assertFalse(slot.exists());
+		assertFalse(edits.exists());
 		slot.set(null);
 		draft.sync();
 		assertNull(root.get());
@@ -152,7 +152,7 @@ class OwnedComponentsTest {
 		for (boolean indexed:new boolean[] {false,true}) {
 			var owners=collection(indexed);
 			var edits=owners.authoringCursor(A,DELEGATE::signData);
-			assertNull(edits.get());
+			assertFalse(edits.exists());
 			assertNull(owners.storage().get());
 			var unauthorised=owners.authoringCursor(A,BOB::signData);
 			assertThrows(IllegalStateException.class,() -> unauthorised.set(CVMLong.ONE));
