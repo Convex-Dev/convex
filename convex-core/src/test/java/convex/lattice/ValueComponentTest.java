@@ -87,7 +87,7 @@ class ValueComponentTest {
 		assertEquals(CVMLong.ONE,parent.resolve(path).value());
 		assertFalse(parent.resolve(RAW,ZERO).exists());
 		assertThrows(MissingValueException.class,() -> parent.resolve(RAW,ZERO).value());
-		Transactions.transact(root,draft -> {
+		Transactions.execute(root,draft -> {
 			var resolved=new Parent(draft).resolve(path);
 			resolved.cursor().set(CVMLong.TWO);
 			assertEquals(CVMLong.ONE,parent.resolve(path).value());

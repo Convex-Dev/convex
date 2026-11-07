@@ -251,7 +251,7 @@ CAD text affected: CAD036 (*Lattice Node*), how pull-path merges are described.
 
 **Status:** Implemented (0.8.18 work, engine moved in `c1bfed931`).
 
-`Transactions.transact` and `transactLocked` run a callback against a private draft
+`Transactions.transact` and `transactExclusively` run a callback against a private draft
 of a cursor's value and commit by compare-and-set, with locked fallback on a
 `TransactionalRootCursor`. `TransactionalComponent` builds typed domain drafts on
 it. Neither CAD035 nor CAD045 describes transactions; this is an addition to specify,

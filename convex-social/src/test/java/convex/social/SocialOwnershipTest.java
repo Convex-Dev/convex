@@ -55,7 +55,7 @@ public class SocialOwnershipTest {
 		assertEquals(BOB.getAccountKey(),social.cursor().get().get(A).getAccountKey());
 		// A transaction view retains the same owner-aware signer and clock.
 		time.set(CVMLong.create(400));
-		social.transact(draft -> {
+		social.execute(draft -> {
 			var post=draft.user(B).feed().post("transaction view");
 			assertEquals(time.get(),draft.user(B).feed().getPost(post).get(SocialPost.TIMESTAMP));
 			assertEquals(3,social.user(B).feed().count());

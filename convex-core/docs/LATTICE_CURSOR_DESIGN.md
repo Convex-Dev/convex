@@ -25,7 +25,7 @@ ACursor<V>                                get / atomic update / persist / path
             ├── SignedCursor<V>           explicit signing function
             └── DefaultCursor<V>          explicit default for absent storage
 AView<T>                                  read-only cursor views
-Transactions                              optimistic and locked subtree transactions
+Transactions                              optimistic and exclusive subtree transactions
 ```
 
 There are no `Merge`, `Ownership`, `Signing`, `Stamping` or `Shape` interfaces.
@@ -221,11 +221,16 @@ when the editing view supplies a default. Reads and ordinary view sync never aut
 state. Applications may add preparation and managed-child publication explicitly.
 
 `Transactions` runs a synchronous callback against a private draft and commits by
-CAS, preserving each operation under contention. `TransactionalRootCursor` opts
-into a shared write lock for explicit locked execution and contention fallback.
-Derived views forward that lock through their existing source links. Typed domain
+CAS, preserving each operation under contention. `transact` returns the result of
+the run that committed, so it describes exactly the committed change; `execute`
+returns nothing. `TransactionalRootCursor` opts into a shared write lock for
+exclusive execution, where the callback runs once under the lock, and for contention
+fallback. Derived views forward that lock through their existing source links. Typed domain
 transactions use `TransactionalComponent.withCursor` to retain component policy;
 components can delegate that public adapter to their protected `rebind` hook.
+`TransactionalComponent.exclusive()` gives an `ExclusiveComponent`, built from bound
+storage as a fork is: a read-only view of it, whose transactions rebind the domain
+component to a draft and commit to that storage under its root's lock.
 The transaction targets bound `storage()`, while the rebound view reinstalls its
 editing policies. Commit therefore does not reapply a component's timestamping
 wrapper to the prepared value. Signing views already present in bound storage

@@ -79,7 +79,7 @@ class ReadOnlyCursorTest {
 		assertRefused(() -> view.path(A).set(CVMLong.ONE));
 		assertRefused(() -> view.path(A).set(CVMLong.TWO));
 		assertRefused(() -> view.withDefault(Maps.empty()).path(B).set(CVMLong.TWO));
-		assertRefused(() -> Transactions.transact(view,draft -> draft.path(A).set(CVMLong.TWO)));
+		assertRefused(() -> Transactions.execute(view,draft -> draft.path(A).set(CVMLong.TWO)));
 		assertSame(value,root.get());
 		assertEquals(0,root.writes.get());
 	}

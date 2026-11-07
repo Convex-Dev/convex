@@ -107,7 +107,7 @@ public class ComponentConstructionTest {
 		assertEquals(CVMLong.ONE,view.getAndSet(CVMLong.TWO));
 		assertEquals(CVMLong.TWO,view.getAndAccumulate(CVMLong.ONE,(a,b) -> CVMLong.create(a.longValue()+b.longValue())));
 		assertEquals(CVMLong.create(4),view.accumulateAndGet(CVMLong.ONE,(a,b) -> CVMLong.create(a.longValue()+b.longValue())));
-		Transactions.transactLocked(view,draft -> draft.set(CVMLong.create(5)));
+		Transactions.executeExclusively(view,draft -> draft.set(CVMLong.create(5)));
 		assertEquals(CVMLong.create(5),view.get());
 	}
 }

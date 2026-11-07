@@ -233,7 +233,7 @@ public class SocialAppTest {
 			return alice.signData(value);
 		},() -> CVMLong.ONE);
 		var follows=social.user(alice.getAccountKey()).follows();
-		follows.transact(draft -> {
+		follows.execute(draft -> {
 			draft.follow(bob);
 			draft.follow(carol);
 			assertNull(follows.getActive());
@@ -243,7 +243,7 @@ public class SocialAppTest {
 		assertEquals(1,signatures.get());
 		var before=social.cursor().get();
 		assertTrue(before.get(DID.forKey(alice.getAccountKey())).checkSignature());
-		assertThrows(IllegalStateException.class,() -> follows.transact(draft -> {
+		assertThrows(IllegalStateException.class,() -> follows.execute(draft -> {
 			draft.unfollow(bob);
 			throw new IllegalStateException("Abort the edit");
 		}));

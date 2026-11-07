@@ -77,7 +77,7 @@ public class MailTest {
 		mail.send(first);
 		mail.send(second);
 		var draft=mail.fork();
-		draft.transact(tx -> {
+		draft.execute(tx -> {
 			tx.mailbox(bob).receive(first);
 			tx.mailbox(carol).receive(second);
 		});
@@ -158,7 +158,7 @@ public class MailTest {
 		mail.send(second);
 		var inbox=mail.mailbox(BOB_DID);
 		var before=mail.cursor().get();
-		assertThrows(IllegalStateException.class,() -> mail.transact(draft -> {
+		assertThrows(IllegalStateException.class,() -> mail.execute(draft -> {
 			draft.mailbox(BOB_DID).receive(first,second);
 			assertSame(before,mail.cursor().get());
 			throw new IllegalStateException("Abort enclosing transaction");
@@ -205,7 +205,7 @@ public class MailTest {
 		var first=aliceToBob(1000,"one");
 		var second=MailEnvelope.plain(ALICE,CAROL_DID,ALICE_DID,1001,Strings.create("two"));
 		var before=mail.cursor().get();
-		mail.transact(draft -> {
+		mail.execute(draft -> {
 			draft.send(first);
 			draft.send(second);
 			assertSame(before,mail.cursor().get());
@@ -226,7 +226,7 @@ public class MailTest {
 		Mail mail=Mail.create((owner,value) -> ALICE.signData(value));
 		var envelope=aliceToBob(1000,"abandoned");
 		var before=mail.cursor().get();
-		assertThrows(IllegalStateException.class,() -> mail.transact(draft -> {
+		assertThrows(IllegalStateException.class,() -> mail.execute(draft -> {
 			draft.send(envelope);
 			throw new IllegalStateException("abort");
 		}));
@@ -254,7 +254,7 @@ public class MailTest {
 		};
 		Mail mail=Mail.connect(root,Mail.LATTICE,(owner,value) -> ALICE.signData(value));
 		var attempts=new AtomicInteger();
-		mail.transact(draft -> {
+		mail.execute(draft -> {
 			draft.send(envelope);
 			if (attempts.incrementAndGet()==1) draft.send(abandoned);
 		});

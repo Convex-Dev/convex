@@ -352,7 +352,7 @@ public class SharedApplicationInternalsTest {
 			assertEquals(coordinated,root.supportsExclusiveTransactions());
 			assertEquals(coordinated,f.social.social.user(SOCIAL_KEY.getAccountKey()).cursor().supportsExclusiveTransactions());
 			var before=root.get();
-			f.social.transact(app -> {
+			f.social.execute(app -> {
 				var user=app.social.user(SOCIAL_KEY.getAccountKey());
 				user.feed().post("Atomic post and follow");
 				user.follows().follow(FILES_KEY.getAccountKey());
@@ -365,7 +365,7 @@ public class SharedApplicationInternalsTest {
 			assertTrue(user.follows().isFollowing(FILES_KEY.getAccountKey()));
 			assertNotNull(f.social.p2p(COMMON_KEY.getAccountKey()).node().getNodeInfo());
 			var socialState=root.get().get(Social.KEY_SOCIAL);
-			f.files.transactAsync(app -> {
+			f.files.executeAsync(app -> {
 				var drive=app.drives(FILES_KEY.getAccountKey()).createDrive("transaction");
 				try {
 					Files.writeString(drive.fileSystem().getPath("/one.txt"),"one");
@@ -380,7 +380,7 @@ public class SharedApplicationInternalsTest {
 			assertEquals("two",Files.readString(drive.fileSystem().getPath("/two.txt")));
 			assertSame(socialState,root.get().get(Social.KEY_SOCIAL));
 			var committed=root.get();
-			assertThrows(IllegalArgumentException.class,() -> f.files.transact(app -> {
+			assertThrows(IllegalArgumentException.class,() -> f.files.execute(app -> {
 				app.drives(FILES_KEY.getAccountKey()).deleteDrive("transaction");
 				throw new IllegalArgumentException("abort");
 			}));

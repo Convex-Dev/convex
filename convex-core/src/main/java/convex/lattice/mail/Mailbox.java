@@ -103,7 +103,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 			if (receipt==null || lattice.entry(envelope.key()).receipt(receipt.signed())==null) throw new IllegalStateException("No signer authorised for mailbox "+did());
 			receipts.add(receipt);
 		}
-		transact(draft -> {
+		execute(draft -> {
 			for (MailReceipt receipt:receipts) draft.merge(receipt.key(),receipt.signed());
 		});
 		return receipts;

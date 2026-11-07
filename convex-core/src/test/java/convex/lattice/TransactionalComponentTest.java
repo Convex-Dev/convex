@@ -62,7 +62,7 @@ class TransactionalComponentTest {
 		Counter live=counter(coordinated);
 		var before=live.cursor().get();
 		AtomicReference<Counter> escaped=new AtomicReference<>();
-		assertThrows(IllegalArgumentException.class,() -> live.transact(draft -> {
+		assertThrows(IllegalArgumentException.class,() -> live.execute(draft -> {
 			escaped.set(draft);
 			draft.increment();
 			assertSame(before,live.cursor().get());
@@ -72,9 +72,9 @@ class TransactionalComponentTest {
 		escaped.get().increment();
 		assertEquals(2,escaped.get().count());
 		assertSame(before,live.cursor().get());
-		live.transact(draft -> {
+		live.execute(draft -> {
 			draft.increment();
-			draft.transact(nested -> nested.increment());
+			draft.execute(nested -> nested.increment());
 			assertSame(before,live.cursor().get());
 		});
 		assertEquals(2,live.count());
@@ -84,7 +84,7 @@ class TransactionalComponentTest {
 		var live=new Root<>(CVMLong.ZERO);
 		AtomicReference<AForkableCursor<CVMLong>> retained=new AtomicReference<>();
 		AtomicReference<ForkedCursor<CVMLong>> fork=new AtomicReference<>();
-		Transactions.transact(live,draft -> {
+		Transactions.execute(live,draft -> {
 			retained.set(draft);
 			draft.set(CVMLong.ONE);
 			fork.set(draft.fork());
@@ -103,7 +103,7 @@ class TransactionalComponentTest {
 	@Test void callbackCanJoinConcurrentDraftEditsBeforeCommit() {
 		Counter live=counter();
 		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
-			live.transact(draft -> {
+			live.execute(draft -> {
 				CountDownLatch start=new CountDownLatch(1);
 				List<CompletableFuture<Void>> work=new ArrayList<>();
 				for (int i=0;i<2;i++) {
@@ -115,7 +115,7 @@ class TransactionalComponentTest {
 				start.countDown();
 				CompletableFuture.allOf(work.toArray(CompletableFuture[]::new))
 					.orTimeout(10,TimeUnit.SECONDS).join();
-				draft.transactLocked(Counter::increment);
+				draft.exclusive().execute(Counter::increment);
 				assertEquals(65,draft.count());
 				assertEquals(0,live.count());
 			});
@@ -127,12 +127,16 @@ class TransactionalComponentTest {
 	@ValueSource(booleans={false,true})
 	void asyncCompletionRunsAfterCommitAndPropagatesFailure(boolean coordinated) throws Exception {
 		Counter live=counter(coordinated);
-		assertEquals(2L,live.transactAsync(draft -> {
+		assertEquals(2L,live.executeAsync(draft -> {
 			draft.increment();
 			draft.increment();
 		}).thenApply(ignored -> live.count()).get(10,TimeUnit.SECONDS));
+		assertEquals(3L,live.transactAsync(draft -> {
+			draft.increment();
+			return draft.count();
+		}).get(10,TimeUnit.SECONDS));
 		var before=live.cursor().get();
-		var failed=live.transactAsync(draft -> {
+		var failed=live.executeAsync(draft -> {
 			draft.increment();
 			throw new IllegalArgumentException("abort");
 		},Runnable::run);
@@ -158,16 +162,43 @@ class TransactionalComponentTest {
 				live.cursor().set(equal);
 				replaced.countDown();
 			});
-			live.transact(draft -> {
+			long count=live.transact(draft -> {
 				calls.incrementAndGet();
 				read.countDown();
 				await(replaced);
 				draft.increment();
+				return draft.count();
 			});
+			assertEquals(1L,count,"The reused run's result describes the commit");
 			writer.get(10,TimeUnit.SECONDS);
 		}
 		assertEquals(1,calls.get());
 		assertEquals(1,live.count());
+	}
+
+	/** A retried transaction returns the result of its last run, which is the one that committed. */
+	@Test void resultComesFromTheRunThatCommitted() {
+		AtomicInteger commits=new AtomicInteger();
+		var root=new Root<AHashMap<Keyword,ACell>>(initial()) {
+			@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> next) {
+				if (commits.incrementAndGet()==1) {
+					super.set(next); // a concurrent increment commits first
+					return false;
+				}
+				return super.compareAndSet(expected,next);
+			}
+		};
+		AtomicInteger calls=new AtomicInteger();
+		long count=new Counter(root).transact(draft -> {
+			calls.incrementAndGet();
+			draft.increment();
+			return draft.count();
+		});
+		assertEquals(2,calls.get());
+		assertEquals(2L,count);
+		assertEquals(2,Counter.count(root.get()));
+		assertNull(Transactions.transact(root,draft -> null),"A no-op transaction returns its result too");
+		assertEquals(CVMLong.TWO,Transactions.transact(root.path(COUNT),draft -> draft.get()));
 	}
 
 	@Test void identicalConcurrentResultDoesNotCoalesceOperations() {
@@ -182,7 +213,7 @@ class TransactionalComponentTest {
 			}
 		};
 		AtomicInteger calls=new AtomicInteger();
-		new Counter(root).transact(draft -> { calls.incrementAndGet(); draft.increment(); });
+		new Counter(root).execute(draft -> { calls.incrementAndGet(); draft.increment(); });
 		assertEquals(2,calls.get());
 		assertEquals(2,commits.get());
 		assertEquals(2,Counter.count(root.get()));
@@ -212,7 +243,7 @@ class TransactionalComponentTest {
 			}
 		};
 		Counter live=new Counter(root);
-		live.transact(draft -> { callbacks.incrementAndGet(); draft.increment(); });
+		live.execute(draft -> { callbacks.incrementAndGet(); draft.increment(); });
 		assertEquals(4,callbacks.get());
 		assertEquals(1,exclusiveCalls.get());
 		assertEquals(31,live.count());
@@ -230,7 +261,7 @@ class TransactionalComponentTest {
 				root.path(OTHER).set(CVMLong.ONE);
 				changed.countDown();
 			});
-			child.transact(draft -> {
+			child.execute(draft -> {
 				calls.incrementAndGet();
 				read.countDown();
 				await(changed);
@@ -257,8 +288,8 @@ class TransactionalComponentTest {
 					await(start);
 					for (int j=0;j<100;j++) {
 						if (mode==0) live.increment();
-						else if (mode==1 || !coordinated) live.transact(Counter::increment);
-						else live.transactLocked(draft -> {
+						else if (mode==1 || !coordinated) live.execute(Counter::increment);
+						else live.exclusive().execute(draft -> {
 							lockedCallbacks.incrementAndGet();
 							draft.increment();
 						});
@@ -275,7 +306,7 @@ class TransactionalComponentTest {
 	@Test void transactionOnDetachedDraftDoesNotTouchLiveState() {
 		Counter live=counter(true);
 		Counter draft=live.withCursor(new TransactionalRootCursor<>(live.cursor().get()));
-		draft.transactLocked(Counter::increment);
+		draft.exclusive().execute(Counter::increment);
 		assertEquals(0,live.count());
 		assertEquals(1,draft.count());
 		draft.sync();
@@ -294,17 +325,19 @@ class TransactionalComponentTest {
 		};
 		Counter live=new Counter(root);
 		AtomicInteger calls=new AtomicInteger();
-		live.transact(draft -> { calls.incrementAndGet(); draft.increment(); });
+		live.execute(draft -> { calls.incrementAndGet(); draft.increment(); });
 		assertEquals(6,commits.get());
 		assertEquals(1,calls.get()); // CAS failed, but the value never changed
 		assertEquals(1,live.count());
 	}
 
-	@Test void ordinaryRootRejectsLockedTransactionBeforeRunningCallback() {
+	@Test void ordinaryRootRefusesExclusiveTransactionsBeforeRunningCallback() {
 		Counter live=counter();
 		AtomicInteger calls=new AtomicInteger();
 		assertFalse(live.cursor().supportsExclusiveTransactions());
-		assertThrows(UnsupportedOperationException.class,() -> live.transactLocked(draft -> calls.incrementAndGet()));
+		assertThrows(UnsupportedOperationException.class,live::exclusive);
+		assertThrows(UnsupportedOperationException.class,
+			() -> Transactions.executeExclusively(live.storage(),draft -> calls.incrementAndGet()));
 		assertEquals(0,calls.get());
 		assertEquals(0,live.count());
 	}
@@ -312,9 +345,9 @@ class TransactionalComponentTest {
 	@Test void noOpKeepsOriginalReferenceAndMissingPathAbsent() {
 		Counter live=counter();
 		var before=live.cursor().get();
-		live.transact(draft -> draft.cursor().set(initial()));
+		live.execute(draft -> draft.cursor().set(initial()));
 		assertSame(before,live.cursor().get());
-		Transactions.transact(live.cursor().path(OTHER),draft -> assertNull(draft.get()));
+		Transactions.execute(live.cursor().path(OTHER),draft -> assertNull(draft.get()));
 		assertSame(before,live.cursor().get());
 	}
 

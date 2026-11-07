@@ -69,7 +69,7 @@ public abstract class ACursor<V extends ACell> {
 	 * Whether this cursor's shared state supports exclusive transactions. Ordinary
 	 * roots support optimistic transactions only.
 	 *
-	 * @return true if {@link Transactions#transactLocked} is available
+	 * @return true if {@link Transactions#transactExclusively} is available
 	 */
 	public final boolean supportsExclusiveTransactions() {
 		return exclusiveLock() != null;

@@ -54,7 +54,7 @@ class TransactionalRootCursorTest {
 				action.accept(root);
 				assertFalse(callbackRunning.get(),name+" completed during the exclusive callback");
 			});
-			Transactions.transactLocked(root,draft -> {
+			Transactions.executeExclusively(root,draft -> {
 				callbackRunning.set(true);
 				try {
 					inCallback.countDown();

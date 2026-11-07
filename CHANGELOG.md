@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Read Etch stores about twice as fast; `etch validate` still checks every record's hash. ([Etch v3](convex-core/docs/ETCHv3.md#sync))
 - Decode messages with less memory, reusing cells a peer already holds and no longer keeping a whole message for the cells taken from it. ([Decoding](convex-core/docs/ENCODER_DESIGN.md#decoding))
 - Simplify the Java APIs for lattice applications, networking and Convex DB; see the [design notes](convex-core/docs/LATTICE_APPLICATIONS.md) when upgrading.
+- Return results from lattice component transactions, and run one exclusively when it must not repeat; transactions with no result are now `execute`, see [Forks and transactions](convex-core/docs/LATTICE_APPLICATIONS.md#forks-and-transactions) when upgrading.
 
 ### Removed
 

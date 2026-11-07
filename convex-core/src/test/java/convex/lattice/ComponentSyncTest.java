@@ -94,7 +94,7 @@ class ComponentSyncTest {
 		assertEquals(Sets.of(1,3),live.items.get(),"The newer whole record wins the publication conflict");
 		assertEquals(3,ticks.get(),"Reconciliation must use stored timestamps");
 
-		draft.transact(view -> {
+		draft.execute(view -> {
 			view.items.add(CVMLong.create(4));
 			assertEquals(Sets.of(1,3),draft.items.get());
 			view.sync(); // Transaction storage is a root, so this cannot publish.
@@ -115,14 +115,14 @@ class ComponentSyncTest {
 				draft.items.add(CVMLong.TWO);
 				assertNull(root.get());
 			};
-			if (locked) record.transactLocked(edit); else record.transact(edit);
+			if (locked) record.exclusive().execute(edit); else record.execute(edit);
 			assertEquals(2,ticks.get(),"Only the two changed domain edits should consult the clock");
 			assertEquals(CVMLong.TWO,root.get().get(Timestamped.TIMESTAMP));
 			var before=root.get();
-			record.transact(draft -> draft.items.add(CVMLong.ONE));
+			record.execute(draft -> draft.items.add(CVMLong.ONE));
 			assertSame(before,root.get());
 			assertEquals(2,ticks.get(),"A no-op transaction must not stamp");
-			assertThrows(IllegalStateException.class,() -> record.transact(draft -> {
+			assertThrows(IllegalStateException.class,() -> record.execute(draft -> {
 				draft.items.add(CVMLong.create(3));
 				throw new IllegalStateException("Abort");
 			}));

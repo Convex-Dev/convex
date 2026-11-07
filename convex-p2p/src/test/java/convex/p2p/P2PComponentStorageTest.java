@@ -103,8 +103,8 @@ class P2PComponentStorageTest {
 			assertNull(root.get());
 			assertEquals(0,signatures.get());
 		};
-		if (node) user.node().transact(edits::accept);
-		else user.identity().transact(edits::accept);
+		if (node) user.node().execute(edits::accept);
+		else user.identity().execute(edits::accept);
 		assertEquals(SECOND,component(user,node).cursor().get());
 		assertEquals(1,signatures.get());
 		ACell before=root.get();
@@ -113,8 +113,8 @@ class P2PComponentStorageTest {
 			throw new IllegalArgumentException("Aborted edit");
 		};
 		assertThrows(IllegalArgumentException.class,() -> {
-			if (node) user.node().transact(abort::accept);
-			else user.identity().transact(abort::accept);
+			if (node) user.node().execute(abort::accept);
+			else user.identity().execute(abort::accept);
 		});
 		assertSame(before,root.get());
 		assertEquals(1,signatures.get());

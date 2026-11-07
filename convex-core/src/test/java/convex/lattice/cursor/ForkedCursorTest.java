@@ -105,7 +105,7 @@ public class ForkedCursorTest {
 		CountDownLatch drafted=new CountDownLatch(1), published=new CountDownLatch(1);
 		AtomicInteger attempts=new AtomicInteger(), merges=new AtomicInteger();
 		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
-			var transaction=executor.submit(() -> Transactions.transact(fork,draft -> {
+			var transaction=executor.submit(() -> Transactions.execute(fork,draft -> {
 				if (attempts.incrementAndGet()==1) {
 					drafted.countDown(); // the first attempt has read {1} and is mid-flight
 					await(published);    // the sync publishes before this attempt commits

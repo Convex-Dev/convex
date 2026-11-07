@@ -177,7 +177,7 @@ class TaskBoardApplicationTest {
 		host.addApplication(app);
 		var board=app.board();
 		board.plan("write","Write the example");
-		board.transact(draft -> {
+		board.execute(draft -> {
 			draft.plan("review","Review the example");
 			draft.task("write").complete();
 			draft.sync(); // A rebound view has no publication boundary of its own.
@@ -190,7 +190,7 @@ class TaskBoardApplicationTest {
 		assertTrue(host.cursor().get().isEmpty());
 
 		// The future signals commit and publication; the timeout only bounds test failure.
-		board.transactAsync(draft -> draft.task("review").complete())
+		board.executeAsync(draft -> draft.task("review").complete())
 			.thenRun(app::sync).get(10,TimeUnit.SECONDS);
 		assertEquals(board.cursor().get(),host.cursor().get().get(BOARD));
 		assertTrue(board.pending().isEmpty());
@@ -209,7 +209,7 @@ class TaskBoardApplicationTest {
 				firstDraft.orTimeout(10,TimeUnit.SECONDS).join();
 				board.plan("other","Independent task");
 			},executor);
-			board.transact(draft -> {
+			board.execute(draft -> {
 				draft.task("review").complete();
 				draft.plan("publish","Publish"); // Stable ID across retries.
 				if (attempts.incrementAndGet()==1) {
@@ -234,7 +234,7 @@ class TaskBoardApplicationTest {
 		var board=new TaskBoardApp(LatticeHost.create(),() -> CVMLong.ONE).board();
 		board.plan("review","Review");
 		var before=board.cursor().get();
-		assertThrows(IllegalStateException.class,() -> board.transact(draft -> {
+		assertThrows(IllegalStateException.class,() -> board.execute(draft -> {
 			draft.plan("publish","Publish");
 			draft.task("review").complete();
 			throw new IllegalStateException("Review not approved");
