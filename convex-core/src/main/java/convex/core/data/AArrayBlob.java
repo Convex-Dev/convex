@@ -177,9 +177,11 @@ public abstract class AArrayBlob extends ABlob {
 	}
 	
 	@Override
-	protected long calcMemorySize() {	
-		// fast path for small Blobs, never have child cells
-		if (isEmbedded()) return 0;
+	protected long calcMemorySize() {
+		// Fast path for an embedded Blob of at most one chunk, which has no child cells.
+		// A longer flat Blob encodes as its tree, which may embed while its chunks are
+		// branches, so it measures through its child Refs like the tree.
+		if ((count<=Blob.CHUNK_LENGTH)&&isEmbedded()) return 0;
 		return super.calcMemorySize();
 	}
 

@@ -439,6 +439,27 @@ public class BlobsTest {
 		Blob flat=b.toFlatBlob();
 		doBlobTests(flat);
 	}
+
+	@Test
+	public void testFlatBlobOverOneChunkMeasuresAsItsTree() {
+		int C=Blob.CHUNK_LENGTH;
+		for (int n: new int[] {C+1, 2*C+1, 3*C, 10*C}) {
+			byte[] bytes=new byte[n];
+			for (int i=0; i<n; i++) bytes[i]=(byte)i;
+			Blob flat=Blob.wrap(bytes);
+			assertFalse(flat.isCanonical());
+			if (n==C+1) assertTrue(flat.isEmbedded()); // its tree embeds, with a chunk as a branch
+
+			// Measured before anything builds its canonical form
+			long memorySize=flat.getMemorySize();
+			ABlob tree=BlobTree.create(Blob.wrap(bytes.clone()));
+			assertEquals(tree.getMemorySize(),memorySize);
+			assertTrue(memorySize>n);
+			assertFalse(flat.isCompletelyEncoded());
+			assertEquals(Cells.storageSize(tree),Cells.storageSize(flat));
+			assertEquals(Vectors.of(tree).getMemorySize(),Vectors.of(Blob.wrap(bytes)).getMemorySize());
+		}
+	}
 	
 	@Test
 	public void testEncoding() throws BadFormatException {
