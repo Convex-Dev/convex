@@ -41,6 +41,7 @@ class PathTest {
 		assertNotEquals(Vectors.of(A,CVMLong.ONE),path);
 		assertFalse(path.isCanonical());
 		assertSame(path.getCanonical(),path.toVector());
+		ObjectsTest.doEqualityTests(path,vector);
 
 		HashMap<ACell,String> byKey=new HashMap<>();
 		byKey.put(vector,"found");
