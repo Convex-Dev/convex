@@ -189,12 +189,9 @@ it binds: `fork()` forks bound storage and rebinding rebuilds the views above it
 an authoring view within bound storage applies on publication, and one the component
 builds over its storage applies to each edit. Transaction drafts follow the same rule.
 
-A fork inside a stamp reconciles before publication stamps it, so its working value
-still carries the timestamp it was forked from. When both sides changed, a
-newest-timestamp merge selects the destination and discards the fork's edits,
-however recent. The publication merge of such a component treats its own change as
-the newer, since publication stamps it. A fork outside the stamp carries the time of
-its last edit, and its publication merge can use the record's ordering unchanged.
+A fork that takes part in timestamp-ordered merges sits outside its stamp. Inside
+it, the fork's working value keeps the timestamp it was forked from, so incoming
+merges and reconciliation at sync select older records over its edits.
 
 Each fork uses an independent `TransactionalRootCursor`. Sync holds its existing
 write lock while the destination's atomic update reconciles and commits by CAS.
