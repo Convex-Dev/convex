@@ -7,6 +7,7 @@ import java.util.Objects;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Path;
+import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.cursor.Persister;
@@ -109,29 +110,58 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Resolves external string segments to the component at their destination.
+	 * Resolves external string segments to the component at their destination. The
+	 * array is read only during the call. A subclass may override this to narrow its
+	 * return type; resolution itself is {@link #resolve(AString[], int, int)}.
+	 *
+	 * @return Component at the destination, which may currently be absent
 	 * @throws NoSuchPathException If a segment names no place
 	 * @throws NullPointerException If a segment is null
 	 */
-	public final ALatticeComponent<?> resolve(AString... path) {
-		return resolve(Path.of(path));
+	public ALatticeComponent<?> resolve(AString... segments) {
+		for (AString segment:segments) Objects.requireNonNull(segment,"Path segment must not be null");
+		return resolve(segments,0,segments.length);
 	}
 
 	/**
-	 * Resolves a path without creating stored state. An empty path returns this
-	 * component. The base defines no external namespace; domain components read
-	 * the segments they own and route the rest to a child, as {@code path.slice(n)}.
-	 * String interpretation belongs to the selected child, independently of merge
-	 * delivery. Children must be bound to this component's current working view.
-	 * A segment naming no place in a component's namespace throws
-	 * {@link NoSuchPathException} with the path from that segment.
+	 * Resolves a path, which keeps its position in its request: a segment that names
+	 * no place is reported at its position there. A subclass may override this to
+	 * narrow its return type; resolution itself is {@link #resolve(AString[], int, int)}.
 	 *
 	 * @return Component at the destination, which may currently be absent
 	 * @throws NoSuchPathException If a segment names no place
 	 */
 	public ALatticeComponent<?> resolve(Path path) {
-		if (path.isEmpty()) return this;
-		throw new NoSuchPathException(path);
+		int start=path.position();
+		return resolve(path.request().toArray(new AString[0]),start,start+Utils.checkedInt(path.count()));
+	}
+
+	/**
+	 * Resolves segments {@code [start,end)} of a caller's request without creating
+	 * stored state. This is the method domain components override. An empty range
+	 * returns this component. The base defines no external namespace; a domain
+	 * component reads the segments it owns and routes the rest to a child as
+	 * {@code child.resolve(segments,start+n,end)}, so that {@code start} stays a
+	 * position in the request. String interpretation belongs to the selected child,
+	 * independently of merge delivery. Children must be bound to this component's
+	 * current working view.
+	 *
+	 * <p>The array is the caller's, lent for the call, and its segments are not
+	 * null. A component reads it and never writes it, and copies anything it keeps:
+	 * a resolved component keeps only the keys it selects. A segment naming no place
+	 * in a component's namespace throws {@link NoSuchPathException}, built with
+	 * {@link NoSuchPathException#NoSuchPathException(AString[], int, int)}.</p>
+	 *
+	 * @param segments Segments of the caller's request
+	 * @param start Position of the first segment to resolve
+	 * @param end End of the segments to resolve
+	 * @return Component at the destination, which may currently be absent
+	 * @throws NoSuchPathException If a segment names no place
+	 */
+	public ALatticeComponent<?> resolve(AString[] segments,int start,int end) {
+		Objects.checkFromToIndex(start,end,segments.length);
+		if (start==end) return this;
+		throw new NoSuchPathException(segments,start,end);
 	}
 
 	/**

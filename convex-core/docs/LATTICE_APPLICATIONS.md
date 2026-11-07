@@ -181,15 +181,22 @@ give it exclusive ownership of the value at its path.
 
 ## External component paths
 
-`ALatticeComponent` exposes `value()`, `exists()` and `resolve(AString... path)`.
-The resolution hook is `resolve(Path path)`. It returns the destination component;
-an empty path returns the current component. Resolution creates no stored state
-and keeps children on the current editing view, including within a draft or
-transaction.
+`ALatticeComponent` exposes `value()`, `exists()` and `resolve`. Resolution is
+`resolve(AString[] segments, int start, int end)`, the method domain components
+override: it returns the component at segments `[start,end)` of a caller's
+request, and an empty range returns the current component. A parent reads the
+segments it owns and routes the rest to a child as
+`child.resolve(segments, start + n, end)`, so `start` stays a position in the
+request and routing allocates nothing. The array is the caller's, lent for the
+call: a component reads it, never writes it, and copies anything it keeps.
+`resolve(AString... segments)` resolves the whole array, refusing a null segment,
+and `resolve(Path path)` a copy of the path's request, positioned as the path. A
+component may override either to narrow its return type, as the value components
+do. Resolution creates no stored state and keeps children on the current editing
+view, including within a draft or transaction.
 
-A `Path` is an immutable sequence of string segments, made once from a caller's
-request with `Path.of(segments...)`. A parent reads the segments it owns and passes
-the rest to a child as `path.slice(n)`. Slices share the request's segments, so
+A `Path` is an immutable sequence of string segments, made from a caller's
+request with `Path.of(segments...)`. Slices share the request's segments, so
 nothing is copied, and each keeps its `position()` in the request, while
 `request()` returns the whole request. `conj(AString)` and `concat(Path)` build a
 longer path as a new request. A path is a non-canonical vector of strings for
@@ -203,12 +210,13 @@ and selects the component responsible for the rest of the path. External address
 is independent of the `child(ACell)` hook used for incoming merge delivery.
 
 A segment that names no place in a component's namespace throws
-`NoSuchPathException`, as the base does for any other path. It carries the path
-from that segment, still positioned in the request, so a service can tell a
-caller's unknown path from a fault and say where the path stops. This differs
-from a place that exists but holds no value, which reads as absent. It is an
-`IllegalStateException`: the path is well formed, but does not fit the data or
-namespace it addresses.
+`NoSuchPathException`, as the base does for any other path. It is thrown only by
+resolution, while the caller's segments are in hand. It carries the path from that
+segment, still positioned in the request, so a service can tell a caller's unknown
+path from a fault and say where the path stops. This differs from a place that
+exists but holds no value, which reads as absent. Like `PathWriteException` below,
+it is a `LatticePathException`, an `IllegalStateException`: the path is well
+formed, but does not fit the namespace or data it addresses.
 
 Two value components supply reusable addressing policies:
 
@@ -241,14 +249,16 @@ container becomes a sequence, and writes through such a handle refuse the
 incompatible container. Neither variant creates missing intermediate containers or
 supplies a merge rule. A parent needing those behaviours provides them explicitly.
 
-A write through either variant that cannot be made throws `NoSuchPathException`
-with the path from the first segment that cannot be written, positioned in the
-request. Its container is either absent, or cannot hold its key: a scalar, a
-set, a position past the end of a sequence (appending included), or a key of the
-wrong kind. For an absent container, the container is the request before that
-segment, or the component's own value when nothing precedes it. A write through
-a signed envelope is refused with `IllegalArgumentException`, as for any cursor,
-and a write that changes nothing is never refused.
+A resolved value component keeps only its keys, in its cursor: the literal
+segments, or the keys JSON resolution selected. A write through it that cannot be
+made throws `PathWriteException` with those keys from the first that cannot be
+written, and that key's depth among them, as any cursor path write does. Its
+container is either absent, or cannot hold its key: a scalar, a set, a position
+past the end of a sequence (appending included), or a key of the wrong kind. For
+an absent container, the container is the value the keys before it reach, or the
+component's own value when nothing precedes it. A write through a signed envelope
+is refused with `IllegalArgumentException`, as for any cursor, and a write that
+changes nothing is never refused.
 
 `value()` uses the strict cursor read contract from
 [CAD035](https://docs.convex.world/docs/cad/cursors): absent or unresolvable

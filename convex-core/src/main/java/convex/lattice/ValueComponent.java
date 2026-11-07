@@ -1,6 +1,7 @@
 package convex.lattice;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.Path;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.PathCursor;
@@ -9,9 +10,10 @@ import convex.lattice.cursor.PathCursor;
  * A value location with literal string-key navigation. No key coercion, container
  * creation or merge rule is inferred. Parents select a specialised component,
  * such as {@link JSONValueComponent}, where another addressing policy is intended.
- * Resolved children share this component's editing view and publication boundary.
- * A write through a resolved path whose container is absent, or cannot hold its key,
- * throws {@link NoSuchPathException} at that segment.
+ * Resolved children share this component's editing view and publication boundary,
+ * and keep only their keys, in a {@link PathCursor}. A write through one whose
+ * container is absent, or cannot hold its key, throws {@link PathWriteException}
+ * at that key.
  *
  * @param <V> Value type at this location
  */
@@ -22,27 +24,20 @@ public class ValueComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	@Override
-	public ValueComponent<?> resolve(Path path) {
-		if (path.isEmpty()) return this;
-		return new ValueComponent<>(new LiteralPath(cursor(),path));
+	public ValueComponent<?> resolve(AString... segments) {
+		return (ValueComponent<?>)super.resolve(segments);
 	}
 
-	/** A literal path whose refused writes name the caller's segment. */
-	private static final class LiteralPath extends PathCursor<ACell> {
-		private final Path path;
+	@Override
+	public ValueComponent<?> resolve(Path path) {
+		return (ValueComponent<?>)super.resolve(path);
+	}
 
-		LiteralPath(AForkableCursor<?> base,Path path) {
-			super(base,path.toCellArray());
-			this.path=path;
-		}
-
-		@Override protected ACell write(ACell current,ACell value) {
-			try {
-				return super.write(current,value);
-			} catch (LatticeOps.AbsentContainer | LatticeOps.UnholdableKey e) {
-				throw LatticeOps.refusal(e,path);
-			}
-		}
+	/** Uses each segment as a literal key, without reading the current value. */
+	@Override
+	public ValueComponent<?> resolve(AString[] segments,int start,int end) {
+		if (start==end) return this;
+		return new ValueComponent<>(new PathCursor<ACell>(cursor(),segments,start,end));
 	}
 
 	@Override protected ValueComponent<V> rebind(AForkableCursor<V> cursor) {

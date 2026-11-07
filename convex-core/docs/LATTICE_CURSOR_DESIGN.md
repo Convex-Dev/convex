@@ -68,10 +68,11 @@ presence checks return false.
 `path(keys...)` creates a view without reading or changing state. Writes
 use `LatticeOps.assocExisting` to rebuild existing ancestors atomically. All
 intermediate containers must already exist. An absent final value can be replaced,
-but writing through an absent container throws, and so does a write to a container
-that cannot hold its key, such as a vector given a key that is not an index within
-it. `assoc` and `assocIn` follow the same rule. A plain path write through a signed
-envelope is refused.
+but writing through an absent container throws `PathWriteException`, and so does a
+write to a container that cannot hold its key, such as a vector given a key that is
+not an index within it. The exception carries the keys from the one that does not
+fit, and its depth. `assoc` and `assocIn` follow the same rule. A plain path write
+through a signed envelope is refused with `IllegalArgumentException`.
 
 Atomic updates keep their creation semantics: a missing final entry is supplied
 as null, and a changed result can insert it into an existing map. Unchanged writes

@@ -130,6 +130,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * @param key Key to write at
 	 * @param value Value to associate
+	 * @throws convex.lattice.PathWriteException If the container is absent or cannot hold the key
 	 */
 	@SuppressWarnings("unchecked")
 	public void assoc(ACell key, ACell value) {
@@ -144,6 +145,7 @@ public abstract class ACursor<V extends ACell> {
 	 *
 	 * @param value Value to set at the end of the path
 	 * @param keys Path of keys to navigate
+	 * @throws convex.lattice.PathWriteException If a container is absent or cannot hold its key
 	 */
 	@SuppressWarnings("unchecked")
 	public void assocIn(ACell value, ACell... keys) {

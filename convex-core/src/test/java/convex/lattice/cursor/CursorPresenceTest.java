@@ -17,6 +17,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.PathWriteException;
 
 /** Required reads, explicit absence, and composition over one immutable snapshot. */
 class CursorPresenceTest {
@@ -99,7 +100,7 @@ class CursorPresenceTest {
 
 	private static void assertWriteRefused(ACell value,ACell... keys) {
 		var root=Root.create(value);
-		assertThrows(IllegalArgumentException.class,() -> root.path(keys).set(FALLBACK));
+		assertThrows(PathWriteException.class,() -> root.path(keys).set(FALLBACK));
 		assertSame(value,root.get());
 	}
 

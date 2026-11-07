@@ -1,5 +1,7 @@
 package convex.lattice;
 
+import java.util.Objects;
+
 import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
@@ -12,7 +14,6 @@ import convex.core.data.Path;
 import convex.core.data.Symbol;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
-import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ATransformCursor;
 
@@ -25,9 +26,10 @@ import convex.lattice.cursor.ATransformCursor;
  * <p>Resolution interprets all keys against one snapshot and binds those keys.
  * Later changes do not reinterpret a resolved key: resolve again to select keys
  * against a new shape. Missing levels do not prescribe future container types.
- * No whole-value JSON validation, merge or container creation is supplied. A write
- * whose container is absent, cannot hold its key or has changed kind throws
- * {@link NoSuchPathException} at that segment.</p>
+ * No whole-value JSON validation, merge or container creation is supplied. A
+ * resolved component keeps only the selected keys. A write through it whose
+ * container is absent, cannot hold its key or has changed kind throws
+ * {@link PathWriteException} at that key.</p>
  *
  * @param <V> Value type at this location
  */
@@ -38,15 +40,26 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 	}
 
 	@Override
+	public JSONValueComponent<?> resolve(AString... segments) {
+		return (JSONValueComponent<?>)super.resolve(segments);
+	}
+
+	@Override
 	public JSONValueComponent<?> resolve(Path path) {
-		if (path.isEmpty()) return this;
-		int n=Utils.checkedInt(path.count());
+		return (JSONValueComponent<?>)super.resolve(path);
+	}
+
+	@Override
+	public JSONValueComponent<?> resolve(AString[] segments,int start,int end) {
+		Objects.checkFromToIndex(start,end,segments.length);
+		if (start==end) return this;
+		int n=end-start;
 		ACell[] keys=new ACell[n];
 		boolean[] positions=new boolean[n];
 		AForkableCursor<V> source=cursor();
 		ACell current=source.getOrDefault(null);
 		for (int i=0; i<n; i++) {
-			AString segment=path.get(i);
+			AString segment=segments[start+i];
 			if (current instanceof ASequence<?> sequence) {
 				CVMLong position=position(segment);
 				if (position!=null) {
@@ -65,7 +78,7 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 			keys[i]=segment;
 			current=null;
 		}
-		return new JSONValueComponent<>(new JSONPathCursor(source,keys,positions,path));
+		return new JSONValueComponent<>(new JSONPathCursor(source,keys,positions));
 	}
 
 	/** A non-negative decimal position without sign or leading zeroes, or null. */
@@ -106,15 +119,11 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 		/** Which keys are sequence positions; the others are map keys, integers included. */
 		private final boolean[] positions;
 
-		/** The caller's path, one segment for each key. */
-		private final Path path;
-
 		@SuppressWarnings("unchecked")
-		JSONPathCursor(AForkableCursor<?> source,ACell[] keys,boolean[] positions,Path path) {
+		JSONPathCursor(AForkableCursor<?> source,ACell[] keys,boolean[] positions) {
 			super((AForkableCursor<ACell>)source);
 			this.keys=keys;
 			this.positions=positions;
-			this.path=path;
 		}
 
 		@Override protected Object viewValue(ACell stored) {
@@ -146,15 +155,11 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 				// Missing containers are refused by assocExisting. A position must never
 				// become a map key, nor an integer map key a sequence position.
 				if (!(positions[i] ? container instanceof ASequence<?> : container instanceof AMap<?,?>)) {
-					throw new NoSuchPathException(path.slice(i));
+					throw new PathWriteException("Cannot write the key: its container is no longer the kind it was resolved against",keys,i);
 				}
 				container=((ADataStructure<?>)container).get(keys[i]);
 			}
-			try {
-				return LatticeOps.assocExisting(current,value,keys);
-			} catch (LatticeOps.AbsentContainer | LatticeOps.UnholdableKey e) {
-				throw LatticeOps.refusal(e,path);
-			}
+			return LatticeOps.assocExisting(current,value,keys);
 		}
 	}
 

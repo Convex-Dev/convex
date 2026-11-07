@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Show blob map keys as `0x` hex in all JSON output, including REST API responses. ([CAD044](https://docs.convex.world/docs/cad/json))
 - Make lattice cursor reads explicit about missing data and value types; see the [cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths) when upgrading.
+- Refuse a lattice path write that cannot be made with `PathWriteException`, naming the key that does not fit. ([Cursor API](convex-core/docs/LATTICE_CURSOR_DESIGN.md#atomic-operations-and-paths))
 - Speed up Convex DB replication and prepared statements. ([#786](https://github.com/Convex-Dev/convex/issues/786))
 - Follow standard SQL for `INSERT` and identifier case in Convex DB, and name databases in JDBC URLs only with `database`; see [Identifier Case](convex-db/README.md#identifier-case) when upgrading.
 - Configure P2P nodes with a JSON5 file, and advertise them with `convex p2p start --url`, which replaces `convex dlfs start --url`. ([Running a node](convex-p2p/README.md#running-a-node))

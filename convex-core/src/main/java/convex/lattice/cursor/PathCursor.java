@@ -12,7 +12,8 @@ import convex.lattice.LatticeOps;
  *
  * <p>Required reads throw for absence, including unresolvable paths; a stored nil remains
  * nil. Optional reads handle absence explicitly. Changed writes rebuild existing ancestors.
- * A write through a missing container, or to one that cannot hold its key, fails.
+ * A write through a missing container, or to one that cannot hold its key, throws
+ * {@link convex.lattice.PathWriteException} at that key.
  * Update functions receive the actual
  * value, including null; components supply any defaults or construction logic.
  * Atomic operations, unchanged-write handling and transaction locking come from

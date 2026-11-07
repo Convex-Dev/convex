@@ -40,11 +40,11 @@ class ValueComponentTest {
 	private static class Parent extends ALatticeComponent<ACell> {
 		Parent(AForkableCursor<ACell> cursor) { super(cursor); }
 
-		@Override public ALatticeComponent<?> resolve(Path path) {
-			if (path.isEmpty()) return this;
-			if (JSON.equals(path.get(0))) return new JSONValueComponent<>(cursor().path(DATA)).resolve(path.slice(1));
-			if (RAW.equals(path.get(0))) return new ValueComponent<>(cursor().path(DATA)).resolve(path.slice(1));
-			return super.resolve(path);
+		@Override public ALatticeComponent<?> resolve(AString[] segments,int start,int end) {
+			if (start==end) return this;
+			if (JSON.equals(segments[start])) return new JSONValueComponent<>(cursor().path(DATA)).resolve(segments,start+1,end);
+			if (RAW.equals(segments[start])) return new ValueComponent<>(cursor().path(DATA)).resolve(segments,start+1,end);
+			return super.resolve(segments,start,end);
 		}
 	}
 
@@ -78,6 +78,11 @@ class ValueComponentTest {
 		child.cursor().set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,RT.getIn(root.get(),DATA,NAME));
 		assertSame(component,component.resolve(Path.of(DATA).slice(1)));
+		// Every form of resolution gives the value component's own type
+		ValueComponent<?> fromPath=component.resolve(Path.of(DATA,NAME));
+		ValueComponent<?> fromRange=component.resolve(new AString[] {DATA,NAME},0,1);
+		assertEquals(CVMLong.TWO,fromPath.value());
+		assertEquals(Maps.of(NAME,CVMLong.TWO),fromRange.value());
 	}
 
 	@Test void parentSelectsJSONAndDelegatesSlicesInsideTransactions() {
@@ -104,7 +109,16 @@ class ValueComponentTest {
 		assertEquals(NAME,none.getSegment());
 		assertEquals(Path.of(NAME,DATA),none.getPath());
 		assertEquals(request,none.getPath().request());
+		assertInstanceOf(LatticePathException.class,none);
 		assertThrows(IllegalArgumentException.class,() -> new NoSuchPathException(request.slice(3)));
+		// Routing through the array form reports the same position, whoever holds the array
+		AString[] segments={JSON,NAME,DATA};
+		var routed=assertThrows(NoSuchPathException.class,() -> parent.resolve(segments,1,3));
+		assertEquals(1,routed.getIndex());
+		assertEquals(request,routed.getPath().request());
+		segments[1]=DATA;
+		assertEquals(NAME,routed.getSegment());
+		assertThrows(IndexOutOfBoundsException.class,() -> parent.resolve(segments,2,4));
 		// Every segment of a value component names a place, which may be absent
 		assertFalse(parent.resolve(JSON,NAME,DATA).exists());
 	}
@@ -216,7 +230,9 @@ class ValueComponentTest {
 		assertEquals(CVMLong.ONE,key.value());
 		root.set(Vectors.of(CVMLong.TWO));
 		assertFalse(key.exists());
-		assertEquals(0,assertThrows(NoSuchPathException.class,() -> key.cursor().set(CVMLong.ONE)).getIndex());
+		var refused=assertThrows(PathWriteException.class,() -> key.cursor().set(CVMLong.ONE));
+		assertEquals(0,refused.getIndex());
+		assertEquals(CVMLong.ZERO,refused.getKey());
 		assertEquals(Vectors.of(CVMLong.TWO),root.get());
 	}
 
@@ -227,40 +243,46 @@ class ValueComponentTest {
 		ACell changed=Maps.of(DATA,Maps.of(ZERO,CVMLong.TWO,CVMLong.ZERO,CVMLong.ONE));
 		root.set(changed);
 		assertFalse(old.exists());
-		assertEquals(1,assertThrows(NoSuchPathException.class,() -> old.cursor().set(CVMLong.TWO)).getIndex());
+		assertEquals(1,assertThrows(PathWriteException.class,() -> old.cursor().set(CVMLong.TWO)).getIndex());
 		assertSame(changed,root.get());
 		assertEquals(CVMLong.TWO,json.resolve(DATA,ZERO).value());
 		root.set(Maps.empty());
 		var absent=json.resolve(DATA,NAME);
 		assertFalse(absent.exists());
-		assertEquals(1,assertThrows(NoSuchPathException.class,() -> absent.cursor().set(CVMLong.ONE)).getIndex());
+		assertEquals(1,assertThrows(PathWriteException.class,() -> absent.cursor().set(CVMLong.ONE)).getIndex());
 		assertEquals(Maps.empty(),root.get());
 		json.resolve(NAME).cursor().set(CVMLong.ONE);
 		assertEquals(Maps.of(NAME,CVMLong.ONE),root.get());
 	}
 
-	@Test void refusedWritesNameTheSegmentInTheRequest() {
+	@Test void refusedWritesNameTheKeyInTheResolvedComponent() {
 		AString two=Strings.create("2");
 		var root=Root.<ACell>create(Maps.of(DATA,Vectors.of(CVMLong.ONE),NAME,CVMLong.ONE));
 		var json=new JSONValueComponent<>(root);
-		// A position past the end, appending included, cannot be held
+		// A position past the end, appending included, cannot be held. The component
+		// keeps only its selected keys, so the refusal names those, not the request.
 		Path request=Path.of(JSON,DATA,ONE);
-		var past=assertThrows(NoSuchPathException.class,() -> json.resolve(request.slice(1)).cursor().set(CVMLong.TWO));
-		assertEquals(2,past.getIndex());
-		assertEquals(ONE,past.getSegment());
-		assertEquals(Path.of(ONE),past.getPath());
-		assertEquals(request,past.getPath().request());
+		var past=assertThrows(PathWriteException.class,() -> json.resolve(request.slice(1)).cursor().set(CVMLong.TWO));
+		assertEquals(1,past.getIndex());
+		assertEquals(CVMLong.ONE,past.getKey());
+		assertEquals(Vectors.of(CVMLong.ONE),past.getKeys());
+		assertInstanceOf(LatticePathException.class,past);
 		// A key below a scalar cannot be held
-		assertEquals(1,assertThrows(NoSuchPathException.class,() -> json.resolve(NAME,ZERO).cursor().set(CVMLong.TWO)).getIndex());
-		// An absent level: the container is the path before the segment
-		var missing=assertThrows(NoSuchPathException.class,() -> json.resolve(RAW,ZERO,two).cursor().set(CVMLong.TWO));
+		assertEquals(1,assertThrows(PathWriteException.class,() -> json.resolve(NAME,ZERO).cursor().set(CVMLong.TWO)).getIndex());
+		// An absent level: the container is the value reached by the keys before it
+		var missing=assertThrows(PathWriteException.class,() -> json.resolve(RAW,ZERO,two).cursor().set(CVMLong.TWO));
 		assertEquals(1,missing.getIndex());
-		var none=assertThrows(NoSuchPathException.class,() -> new JSONValueComponent<>(Root.<ACell>create(null)).resolve(DATA).cursor().set(CVMLong.TWO));
+		assertEquals(Vectors.of(ZERO,two),missing.getKeys());
+		var none=assertThrows(PathWriteException.class,() -> new JSONValueComponent<>(Root.<ACell>create(null)).resolve(DATA).cursor().set(CVMLong.TWO));
 		assertEquals(0,none.getIndex());
-		// Literal paths refuse the same way
+		// Literal paths refuse the same way, naming the caller's segments as keys
 		var literal=new ValueComponent<>(root);
-		assertEquals(1,assertThrows(NoSuchPathException.class,() -> literal.resolve(NAME,ZERO).cursor().set(CVMLong.TWO)).getIndex());
-		assertEquals(1,assertThrows(NoSuchPathException.class,() -> literal.resolve(RAW,ZERO).cursor().set(CVMLong.TWO)).getIndex());
+		var scalar=assertThrows(PathWriteException.class,() -> literal.resolve(NAME,ZERO).cursor().set(CVMLong.TWO));
+		assertEquals(1,scalar.getIndex());
+		assertEquals(ZERO,scalar.getKey());
+		assertEquals(1,assertThrows(PathWriteException.class,() -> literal.resolve(RAW,ZERO).cursor().set(CVMLong.TWO)).getIndex());
+		// Plain cursor paths refuse the same way
+		assertEquals(1,assertThrows(PathWriteException.class,() -> root.path(NAME,ZERO).set(CVMLong.TWO)).getIndex());
 		assertInstanceOf(IllegalStateException.class,missing);
 		assertEquals(Maps.of(DATA,Vectors.of(CVMLong.ONE),NAME,CVMLong.ONE),root.get());
 		// Unchanged writes touch nothing, so they are not refused
