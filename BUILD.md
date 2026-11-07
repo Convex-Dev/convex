@@ -145,17 +145,24 @@ release:
 Then:
 
 - Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the tag and heading must match).
-- Commit to `develop`.
+- Commit to `develop` and push it. The release is made from `origin/develop`.
 
-### 3. Merge to master
+### 3. Merge to master in a release worktree
+
+The release runs in its own worktree on `master`. The main checkout stays on
+`develop` for everyone else working in it, and nothing there can move the release
+tree off the tag before the deploy in step 8. Steps 4 to 8 run in this worktree:
 
 ```bash
-git checkout develop && git pull --ff-only
-git checkout master && git pull --ff-only
-git merge develop --no-ff
+git fetch origin
+git worktree add ../convex-release master
+cd ../convex-release
+git merge --ff-only origin/master
+git merge --no-ff origin/develop
 ```
 
-The `pull --ff-only` on both branches ensures you're not merging a stale local develop or pushing a stale master.
+Merging `origin/develop` releases what was pushed and built by CI, and nothing
+committed locally since.
 
 ### 4. Set version
 
@@ -199,18 +206,29 @@ java -jar convex-integration/target/convex.jar --version
 ```
 
 Verify the reported version is the release version (e.g. `0.8.4`, not `-SNAPSHOT`).
+The `install` also puts the release into `~/.m2`, where other local projects can
+use it before Maven Central has it.
 
 Quick last-line-of-defence check: the uberjar launches, main class resolves, CLI wiring is intact. Maven Central publishes are irrevocable, so catch uberjar class-path regressions now.
 
-### 6. Tag and push
+### 6. Push master, then tag
+
+Push `master` first. CI has not yet built its version commit, so wait for the
+Build run on that commit to pass before anything public is tagged:
+
+```bash
+git push origin master
+gh run list --commit "$(git rev-parse HEAD)" --workflow build.yml
+```
+
+Then tag:
 
 ```bash
 git tag 0.8.4
-git push origin master
 git push origin 0.8.4
 ```
 
-This triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
+The tag triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
 
 A ruleset restricts release tags to accounts that can bypass it. When the push
 bypasses the rule, git still prints a rule message (`Bypassed rule violations`, or
@@ -259,10 +277,9 @@ A stray GitHub Release created by a failed workflow run also needs to be deleted
 
 ### 8. Deploy to Maven Central
 
-Only after confirming the GitHub Release is live:
+Only after confirming the GitHub Release is live, from the release worktree at the tag:
 
 ```bash
-git checkout master
 ./mvnw deploy -Prelease
 ```
 
@@ -274,17 +291,18 @@ prompt. Unattended CI publishing must provide signing credentials through its
 secret environment rather than command-line properties.
 
 Deploy is the priority once the GitHub Release is live. Until Central confirms
-publication, keep the release checkout on `master` at the tag: do not switch
-branches, run `versions:set` or start step 9 in it. The deploy publishes whatever
-version the working tree holds, so a checkout already moved to the next snapshot
-would publish the wrong artifacts.
+publication, keep the release worktree on `master` at the tag: do not switch
+branches or run `versions:set` in it. The deploy publishes whatever version the
+working tree holds, so a tree already moved to the next snapshot would publish the
+wrong artifacts. The main checkout can carry on with `develop` meanwhile.
 
 ### 9. Prepare next development version
 
-Only after Central has confirmed publication:
+Only after Central has confirmed publication, remove the release worktree and, in
+the main checkout on `develop`:
 
 ```bash
-git checkout develop
+git worktree remove ../convex-release
 git merge master --no-ff
 ./mvnw -B versions:set -DnewVersion='0.8.5-SNAPSHOT' -DgenerateBackupPoms=false
 git add pom.xml '**/pom.xml' && git commit -m "Prepare for next development cycle (0.8.5-SNAPSHOT)"
