@@ -25,7 +25,9 @@ import convex.lattice.cursor.ATransformCursor;
  * <p>Resolution interprets all keys against one snapshot and binds those keys.
  * Later changes do not reinterpret a resolved key: resolve again to select keys
  * against a new shape. Missing levels do not prescribe future container types.
- * No whole-value JSON validation, merge or container creation is supplied.</p>
+ * No whole-value JSON validation, merge or container creation is supplied. A write
+ * whose container is absent, cannot hold its key or has changed kind throws
+ * {@link NoSuchPathException} at that segment.</p>
  *
  * @param <V> Value type at this location
  */
@@ -64,7 +66,7 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 			keys[i]=segment;
 			current=null;
 		}
-		return new JSONValueComponent<>(new JSONPathCursor(source,keys,positions));
+		return new JSONValueComponent<>(new JSONPathCursor(source,keys,positions,path,start));
 	}
 
 	/** A non-negative decimal position without sign or leading zeroes, or null. */
@@ -105,11 +107,17 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 		/** Which keys are sequence positions; the others are map keys, integers included. */
 		private final boolean[] positions;
 
+		/** The caller's path, and the index in it of the segment for the first key. */
+		private final AString[] segments;
+		private final int start;
+
 		@SuppressWarnings("unchecked")
-		JSONPathCursor(AForkableCursor<?> source,ACell[] keys,boolean[] positions) {
+		JSONPathCursor(AForkableCursor<?> source,ACell[] keys,boolean[] positions,AString[] path,int start) {
 			super((AForkableCursor<ACell>)source);
 			this.keys=keys;
 			this.positions=positions;
+			this.segments=path.clone();
+			this.start=start;
 		}
 
 		@Override protected Object viewValue(ACell stored) {
@@ -141,11 +149,15 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 				// Missing containers are refused by assocExisting. A position must never
 				// become a map key, nor an integer map key a sequence position.
 				if (!(positions[i] ? container instanceof ASequence<?> : container instanceof AMap<?,?>)) {
-					throw new IllegalArgumentException("JSON path container no longer supports its resolved key");
+					throw new NoSuchPathException(segments,start+i);
 				}
 				container=((ADataStructure<?>)container).get(keys[i]);
 			}
-			return LatticeOps.assocExisting(current,value,keys);
+			try {
+				return LatticeOps.assocExisting(current,value,keys);
+			} catch (LatticeOps.AbsentContainer | LatticeOps.UnholdableKey e) {
+				throw LatticeOps.refusal(e,segments,start);
+			}
 		}
 	}
 

@@ -1,21 +1,23 @@
 package convex.lattice;
 
-import java.util.NoSuchElementException;
 import java.util.Objects;
 
 import convex.core.data.AString;
 
 /**
- * A path segment names no place in the namespace of the component resolving it.
- * Unlike {@link convex.lattice.cursor.MissingValueException}, where the place
- * exists but holds no value, the path itself is incompatible with the component.
+ * A component path is well formed but incompatible with what it addresses. In
+ * resolution, a segment names no place in a component's namespace. In a write
+ * through a resolved path, a segment cannot be written: its container is absent,
+ * or cannot hold its key. Unlike {@link convex.lattice.cursor.MissingValueException},
+ * where the place exists but holds no value, the path itself does not fit.
  *
  * <p>It carries a copy of the whole path array the component was given, and the
- * index in that array of the first segment that names no place. Parents pass the
+ * index in that array of the first segment that does not fit. Parents pass the
  * same array to their children, so the index locates the segment for every caller,
- * whatever slice it resolved.</p>
+ * whatever slice it resolved. For an absent container, the container is the path
+ * before that segment, or the component's own value when that prefix is empty.</p>
  */
-public class NoSuchPathException extends NoSuchElementException {
+public class NoSuchPathException extends IllegalStateException {
 	private static final long serialVersionUID = 1L;
 
 	private final transient AString[] path;
@@ -23,10 +25,10 @@ public class NoSuchPathException extends NoSuchElementException {
 
 	/**
 	 * @param path Path array being resolved, as passed to the component; copied
-	 * @param index Index in {@code path} of the first segment that names no place
+	 * @param index Index in {@code path} of the first segment that does not fit
 	 */
 	public NoSuchPathException(AString[] path,int index) {
-		super("No component at path segment "+index+": "+segment(path,index));
+		super("No such path at segment "+index+": "+segment(path,index));
 		this.path=path.clone();
 		this.index=index;
 	}
@@ -40,12 +42,12 @@ public class NoSuchPathException extends NoSuchElementException {
 		return path.clone();
 	}
 
-	/** Index in the path array of the first segment that names no place. */
+	/** Index in the path array of the first segment that does not fit. */
 	public int getIndex() {
 		return index;
 	}
 
-	/** The first segment that names no place. */
+	/** The first segment that does not fit. */
 	public AString getSegment() {
 		return path[index];
 	}

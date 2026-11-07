@@ -5,6 +5,7 @@ import java.util.Map;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -70,12 +71,12 @@ public class LatticeOps {
 		if (data == null) {
 			if (i == 0) {
 				data = (lattice == null) ? null : lattice.zero();
-				if (data == null) throw new IllegalStateException(
-					"Cannot write through an absent value: no empty value is known for this position");
+				if (data == null) throw new AbsentContainer(
+					"Cannot write through an absent value: no empty value is known for this position",i);
 			} else {
-				throw new IllegalStateException(
+				throw new AbsentContainer(
 					"Cannot write through non-existent path at depth " + i
-					+ ": the intermediate container's type is unknown here; supply component construction logic");
+					+ ": the intermediate container's type is unknown here; supply component construction logic",i);
 			}
 		}
 		if (data instanceof SignedData) {
@@ -87,8 +88,8 @@ public class LatticeOps {
 				+ ": wrap the owner's slot with SignedCursor.create");
 		}
 		if (!(data instanceof ADataStructure<?> struct)) {
-			throw new IllegalArgumentException(
-				"Not a data structure at depth " + i + ", found " + Utils.getClassName(data));
+			throw new UnholdableKey(
+				"Not a data structure at depth " + i + ", found " + Utils.getClassName(data),i);
 		}
 
 		ACell child = struct.get(keys[i]);
@@ -96,9 +97,57 @@ public class LatticeOps {
 		ACell updated = RT.assoc(struct, keys[i], newChild); // returns struct unchanged if newChild == child
 		// A container refuses a key it cannot hold with null, which would otherwise
 		// be written in its place one level up.
-		if (updated == null) throw new IllegalArgumentException(
-			"Cannot write key " + keys[i] + " at depth " + i + ": " + Utils.getClassName(struct) + " cannot hold it");
+		if (updated == null) throw new UnholdableKey(
+			"Cannot write key " + keys[i] + " at depth " + i + ": " + Utils.getClassName(struct) + " cannot hold it",i);
 		return updated;
+	}
+
+	/**
+	 * A strict path write refused at a depth of its keys. The refusals keep the types
+	 * existing callers see; value components report them with {@link #refusal}.
+	 */
+	interface Refusal {
+		/** Index in the written keys of the key that could not be written. */
+		int depth();
+	}
+
+	/** The container for the key at a depth is absent. */
+	static final class AbsentContainer extends IllegalStateException implements Refusal {
+		private static final long serialVersionUID = 1L;
+		private final int depth;
+
+		AbsentContainer(String message,int depth) {
+			super(message);
+			this.depth=depth;
+		}
+
+		@Override public int depth() { return depth; }
+	}
+
+	/** The container at a depth cannot hold its key. */
+	static final class UnholdableKey extends IllegalArgumentException implements Refusal {
+		private static final long serialVersionUID = 1L;
+		private final int depth;
+
+		UnholdableKey(String message,int depth) {
+			super(message);
+			this.depth=depth;
+		}
+
+		@Override public int depth() { return depth; }
+	}
+
+	/**
+	 * Reports a refused write at the caller's segment.
+	 * @param refused Refusal of a write whose keys came from {@code path}
+	 * @param path Path array the component was given
+	 * @param start Index in {@code path} of the first written key
+	 * @return Exception naming the segment that could not be written
+	 */
+	static NoSuchPathException refusal(Refusal refused,AString[] path,int start) {
+		NoSuchPathException e=new NoSuchPathException(path,start+refused.depth());
+		e.initCause((Throwable)refused);
+		return e;
 	}
 
 	/** Reconciles a lattice-backed publication, retaining destination keys outside a keyed lattice. */

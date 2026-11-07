@@ -197,7 +197,9 @@ A segment that names no place in a component's namespace throws
 `NoSuchPathException`, as the base does for any other path. It carries a copy of
 the path array and the index of that segment in it, so a service can tell a
 caller's unknown path from a fault and say where the path stops. This differs
-from a place that exists but holds no value, which reads as absent.
+from a place that exists but holds no value, which reads as absent. It is an
+`IllegalStateException`: the path is well formed, but does not fit the data or
+namespace it addresses.
 
 Two value components supply reusable addressing policies:
 
@@ -229,6 +231,15 @@ becomes absent if its container becomes a map, as does an integer map key if its
 container becomes a sequence, and writes through such a handle refuse the
 incompatible container. Neither variant creates missing intermediate containers or
 supplies a merge rule. A parent needing those behaviours provides them explicitly.
+
+A write through either variant that cannot be made throws `NoSuchPathException`
+with the index of the first segment that cannot be written, in the array given to
+`resolve`. Its container is either absent, or cannot hold its key: a scalar, a
+set, a position past the end of a sequence (appending included), or a key of the
+wrong kind. For an absent container, the container is the path before that
+segment, or the component's own value when that prefix is empty. A write through
+a signed envelope is refused with `IllegalArgumentException`, as for any cursor,
+and a write that changes nothing is never refused.
 
 `value()` uses the strict cursor read contract from
 [CAD035](https://docs.convex.world/docs/cad/cursors): absent or unresolvable
