@@ -44,8 +44,9 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 
 	/**
 	 * Returns a read-only view of this cursor. Reads pass through; every write through
-	 * the view, its paths or views over it throws {@link ReadOnlyCursorException}.
-	 * A fork of the view is writable working storage whose sync is refused.
+	 * the view, its paths or views over it throws {@link ReadOnlyCursorException}, and
+	 * so does syncing the view itself; paths and views over it sync by reading. A fork
+	 * of the view is writable working storage whose sync is refused.
 	 *
 	 * @return Read-only view, or this cursor if it is one already
 	 */
@@ -61,7 +62,8 @@ public abstract class AForkableCursor<V extends ACell> extends ACursor<V> {
 	/**
 	 * Returns the current value, or nil for absence. Ordinary cursors, including paths and transformed
 	 * views over forks, never publish enclosing storage or invoke the merge function.
-	 * ForkedCursor overrides this to reconcile at its own destination.
+	 * ForkedCursor overrides this to reconcile at its own destination, and a read-only
+	 * view to refuse it.
 	 */
 	public V sync(BinaryOperator<V> merge) {
 		return getOrDefault(null);

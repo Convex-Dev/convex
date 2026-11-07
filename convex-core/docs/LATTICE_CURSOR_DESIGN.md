@@ -104,8 +104,10 @@ write, even one that changes nothing, throws `ReadOnlyCursorException` before th
 source is touched. Paths, defaults and transformed views over it write through it,
 so they are refused too, and a component built over it is read-only throughout. A
 fork of the view is ordinary writable storage, but its sync publishes through the
-view and is refused. A transaction that changes nothing commits, since it writes
-nothing. `AView` subclasses refuse writes with the same exception, an
+view and is refused. Syncing the view itself is refused as well: it can publish
+nothing, so a component bound to it fails instead of appearing to publish its
+source. Paths and views over it keep the ordinary sync, which only reads. A
+transaction that changes nothing commits, since it writes nothing. `AView` subclasses refuse writes with the same exception, an
 `UnsupportedOperationException`.
 
 ## Persistence
@@ -173,7 +175,7 @@ that publication: an unchanged copy adopts the destination, an unchanged destina
 accepts the working value, and divergent changes invoke the supplied function.
 The fork retains no merge callback. Ordinary roots, paths and transformed views
 implement `sync(merge)` as a read-only no-op without invoking that function or
-publishing any enclosing fork.
+publishing any enclosing fork; a read-only view refuses it.
 
 The destination has the same value type as the fork. Representation changes compose
 through cursor views: `SignedCursor.create(slot, signer).fork()` creates unsigned

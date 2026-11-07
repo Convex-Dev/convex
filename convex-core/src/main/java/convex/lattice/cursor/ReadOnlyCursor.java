@@ -15,6 +15,9 @@ import convex.core.data.ACell;
  * Paths, defaults and transformed views over this cursor write through it, so they
  * are read-only as well. A fork is ordinary writable working storage: its sync
  * publishes through this view and is refused, leaving the fork's edits in place.
+ * Syncing this view itself is refused too, since it can publish nothing: a component
+ * bound to it fails rather than appearing to publish its source. Paths and views over
+ * it keep the ordinary sync, which only reads.
  *
  * @param <V> Value type
  */
@@ -38,4 +41,5 @@ public final class ReadOnlyCursor<V extends ACell> extends AForkableCursor<V> {
 	@Override public V updateAndGet(UnaryOperator<V> updateFunction) { throw new ReadOnlyCursorException(); }
 	@Override public V getAndAccumulate(V x,BinaryOperator<V> accumulatorFunction) { throw new ReadOnlyCursorException(); }
 	@Override public V accumulateAndGet(V x,BinaryOperator<V> accumulatorFunction) { throw new ReadOnlyCursorException(); }
+	@Override public V sync(BinaryOperator<V> merge) { throw new ReadOnlyCursorException(); }
 }

@@ -92,8 +92,20 @@ class ReadOnlyCursorTest {
 		assertRefused(() -> fork.sync((own,other) -> own));
 		assertEquals(CVMLong.TWO,fork.get(A));
 		assertEquals(CVMLong.ONE,root.get(A));
-		// Sync of an ordinary cursor only reads, so the view itself syncs as one
-		assertEquals(root.get(),root.readOnly().sync((own,other) -> own));
+	}
+
+	/** The view can publish nothing, so syncing it fails; views nested under it sync by reading. */
+	@Test void syncOfTheViewIsRefusedButNestedViewsSyncByReading() {
+		var root=new CountingRoot<AHashMap<Keyword,ACell>>(Maps.of(A,CVMLong.ONE));
+		var view=root.readOnly();
+		var merges=new AtomicInteger();
+		BinaryOperator<AHashMap<Keyword,ACell>> merge=(own,other) -> { merges.incrementAndGet(); return own; };
+		assertRefused(() -> view.sync(merge));
+		assertRefused(() -> view.<AHashMap<Keyword,ACell>>path().sync(merge)); // an empty path is the view itself
+		assertEquals(CVMLong.ONE,view.path(A).sync((own,other) -> own));
+		assertEquals(root.get(),view.withDefault(Maps.empty()).sync((own,other) -> own));
+		assertEquals(0,merges.get());
+		assertEquals(0,root.writes.get());
 	}
 
 	@Test void valueComponentsOverTheViewAreReadOnlyThroughout() {
@@ -103,8 +115,11 @@ class ReadOnlyCursorTest {
 		var json=new JSONValueComponent<>(root.readOnly()).resolve(a,zero);
 		assertEquals(CVMLong.ONE,json.value());
 		assertRefused(() -> json.cursor().set(CVMLong.TWO));
-		var literal=new ValueComponent<>(root.readOnly()).resolve(a);
+		var component=new ValueComponent<>(root.readOnly());
+		var literal=component.resolve(a);
 		assertRefused(() -> literal.cursor().set(Vectors.empty()));
+		assertRefused(component::sync);
+		assertEquals(Vectors.of(CVMLong.ONE),literal.sync());
 		assertEquals(Vectors.of(CVMLong.ONE),RT.getIn(root.get(),a));
 	}
 
