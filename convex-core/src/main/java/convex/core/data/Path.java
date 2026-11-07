@@ -288,20 +288,20 @@ public final class Path extends ASpecialVector<AString> {
 
 	@Override
 	public ListIterator<AString> listIterator() {
-		return new PathIterator(0);
+		return new PathIterator<>(0);
 	}
 
 	@Override
 	public ListIterator<AString> listIterator(long index) {
 		if ((index<0)||(index>count)) throw new IndexOutOfBoundsException(index);
-		return new PathIterator(index);
+		return new PathIterator<>(index);
 	}
 
 	/**
 	 * Generic in its element type so that set and add, which take one, refuse any
 	 * value as immutable rather than casting it to a string first.
 	 */
-	private final class PathIterator implements ListIterator<AString> {
+	private final class PathIterator<T> implements ListIterator<T> {
 		private long pos;
 
 		PathIterator(long pos) {
@@ -310,15 +310,17 @@ public final class Path extends ASpecialVector<AString> {
 
 		@Override public boolean hasNext() { return pos<count; }
 
-		@Override public AString next() {
+		@SuppressWarnings("unchecked")
+		@Override public T next() {
 			if (pos>=count) throw new NoSuchElementException();
-			return (AString)get(pos++);
+			return (T)get(pos++);
 		}
 
 		@Override public boolean hasPrevious() { return pos>0; }
 
-		@Override public AString previous() {
-			if (pos>0) return (AString)get(--pos);
+		@SuppressWarnings("unchecked")
+		@Override public T previous() {
+			if (pos>0) return (T)get(--pos);
 			throw new NoSuchElementException();
 		}
 
@@ -326,7 +328,7 @@ public final class Path extends ASpecialVector<AString> {
 		@Override public int previousIndex() { return Utils.checkedInt(pos)-1; }
 
 		@Override public void remove() { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
-		@Override public void set(AString e) { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
-		@Override public void add(AString e) { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
+		@Override public void set(T e) { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
+		@Override public void add(T e) { throw new UnsupportedOperationException(ErrorMessages.immutable(this)); }
 	}
 }
