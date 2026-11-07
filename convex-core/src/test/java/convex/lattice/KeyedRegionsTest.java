@@ -22,6 +22,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.MemoryStore;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.generic.KeyedLattice;
@@ -493,5 +494,32 @@ class KeyedRegionsTest {
 		assertThrows(IllegalStateException.class,app::sync);
 		assertEquals(Index.of(A,CVMLong.ONE),host.cursor().get());
 		assertEquals(CVMLong.TWO,pending.cursor().get());
+	}
+
+	/** Regions whose editing view refuses writes. */
+	private static class ReadOnlyRegions extends Regions {
+		private final AForkableCursor<Index<Keyword,ACell>> editing;
+		final Counter constructed;
+		final Counter added;
+
+		ReadOnlyRegions(AForkableCursor<Index<Keyword,ACell>> cursor,Counter elsewhere) {
+			super(cursor);
+			editing=super.cursor().readOnly();
+			constructed=create(A,(AForkableCursor<AInteger> region) -> new Counter(region));
+			added=add(B,elsewhere);
+		}
+
+		@Override public AForkableCursor<Index<Keyword,ACell>> cursor() { return editing; }
+	}
+
+	/** A constructed child edits through its parent's editing view; an added child keeps its own binding. */
+	@Test void constructedChildrenEditThroughTheParentsEditingView() {
+		var root=Root.<Index<Keyword,ACell>>create(null);
+		var elsewhere=Root.<AInteger>create(null);
+		var app=new ReadOnlyRegions(root,new Counter(elsewhere));
+		assertThrows(ReadOnlyCursorException.class,() -> app.constructed.cursor().set(CVMLong.ONE));
+		assertNull(root.get(),"the parent's editing view refused the child's edit");
+		app.added.cursor().set(CVMLong.ONE);
+		assertEquals(CVMLong.ONE,elsewhere.get());
 	}
 }

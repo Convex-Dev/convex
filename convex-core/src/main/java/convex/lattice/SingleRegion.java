@@ -23,7 +23,11 @@ public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions 
 		this.component=region(key,component);
 	}
 
-	/** Constructs a new component at a root or nested container. */
+	/**
+	 * Constructs a new component at a root or nested container. The factory runs
+	 * during this constructor, so a subclass that overrides {@link #cursor()} cannot
+	 * use it: the subclass's view is not yet initialised.
+	 */
 	protected <V extends ACell> SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,
 			Keyword key,RegionFactory<V,C> factory) {
 		super(cursor);

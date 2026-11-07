@@ -45,16 +45,10 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 
 	private final Map<Keyword,ALatticeComponent<?>> registrations=new LinkedHashMap<>();
 	private volatile Map<Keyword,ALatticeComponent<?>> regions;
-	private final IndexComponent<Keyword,ACell> entries;
 
 	/** Constructs a container view without changing or publishing its destination. */
 	protected AKeyedRegions(AForkableCursor<Index<Keyword,ACell>> cursor) {
 		super(cursor);
-		entries=new IndexComponent<>(cursor) {
-			@Override protected Index<Keyword,ACell> createContainer() {
-				return AKeyedRegions.this.createContainer();
-			}
-		};
 	}
 
 	/**
@@ -88,7 +82,10 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	}
 
 	/**
-	 * Constructs and registers a child at this key. A missing containing index is
+	 * Constructs and registers a child at this key. The child's region cursor is
+	 * bound through {@link #cursor()} when this runs, so its edits apply this
+	 * component's editing policy; a subclass that overrides {@code cursor()}
+	 * initialises its view before creating regions. A missing containing index is
 	 * created through {@link #createContainer()} on the first changed write, never on
 	 * construction or read. Access rejects incompatible containers. The factory binds
 	 * any domain policy explicitly.
@@ -97,6 +94,11 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 			Keyword key,RegionFactory<V,C> factory) {
 		checkRegistration(key);
 		Objects.requireNonNull(factory,"Region factory must not be null");
+		var entries=new IndexComponent<Keyword,ACell>(cursor()) {
+			@Override protected Index<Keyword,ACell> createContainer() {
+				return AKeyedRegions.this.createContainer();
+			}
+		};
 		return region(key,factory.create(entries.path(key)));
 	}
 
