@@ -182,20 +182,26 @@ give it exclusive ownership of the value at its path.
 ## External component paths
 
 `ALatticeComponent` exposes `value()`, `exists()` and `resolve(AString... path)`.
-The resolution hook is `resolve(AString[] path, int start, int end)`, with an
-exclusive end index. It returns the destination component; an empty slice returns
-the current component. Parents can pass the same array with advanced indices to
-children. The array is borrowed, so a component retaining segments must copy them.
-Resolution creates no stored state and keeps children on the current editing view,
-including within a draft or transaction.
+The resolution hook is `resolve(Path path)`. It returns the destination component;
+an empty path returns the current component. Resolution creates no stored state
+and keeps children on the current editing view, including within a draft or
+transaction.
+
+A `Path` is an immutable sequence of string segments, made once from a caller's
+request with `Path.of(segments...)`. A parent reads the segments it owns and passes
+the rest to a child as `path.slice(n)`. Slices share the request's segments, so
+nothing is copied, and each keeps its `position()` in the request, while
+`request()` returns the whole request. A path is a non-canonical vector of strings
+for in-memory use: it equals, hashes and encodes as the vector holding the same
+strings, so lattice code can compare or store it like any vector.
 
 The base supports only the empty path. Each parent defines its external namespace
 and selects the component responsible for the rest of the path. External addressing
 is independent of the `child(ACell)` hook used for incoming merge delivery.
 
 A segment that names no place in a component's namespace throws
-`NoSuchPathException`, as the base does for any other path. It carries a copy of
-the path array and the index of that segment in it, so a service can tell a
+`NoSuchPathException`, as the base does for any other path. It carries the path
+from that segment, still positioned in the request, so a service can tell a
 caller's unknown path from a fault and say where the path stops. This differs
 from a place that exists but holds no value, which reads as absent. It is an
 `IllegalStateException`: the path is well formed, but does not fit the data or
@@ -233,11 +239,11 @@ incompatible container. Neither variant creates missing intermediate containers 
 supplies a merge rule. A parent needing those behaviours provides them explicitly.
 
 A write through either variant that cannot be made throws `NoSuchPathException`
-with the index of the first segment that cannot be written, in the array given to
-`resolve`. Its container is either absent, or cannot hold its key: a scalar, a
+with the path from the first segment that cannot be written, positioned in the
+request. Its container is either absent, or cannot hold its key: a scalar, a
 set, a position past the end of a sequence (appending included), or a key of the
-wrong kind. For an absent container, the container is the path before that
-segment, or the component's own value when that prefix is empty. A write through
+wrong kind. For an absent container, the container is the request before that
+segment, or the component's own value when nothing precedes it. A write through
 a signed envelope is refused with `IllegalArgumentException`, as for any cursor,
 and a write that changes nothing is never refused.
 

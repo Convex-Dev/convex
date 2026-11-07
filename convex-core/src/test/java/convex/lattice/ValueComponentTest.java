@@ -2,7 +2,6 @@ package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -16,6 +15,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
+import convex.core.data.Path;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -40,12 +40,11 @@ class ValueComponentTest {
 	private static class Parent extends ALatticeComponent<ACell> {
 		Parent(AForkableCursor<ACell> cursor) { super(cursor); }
 
-		@Override public ALatticeComponent<?> resolve(AString[] path,int start,int end) {
-			Objects.checkFromToIndex(start,end,path.length);
-			if (start==end) return this;
-			if (JSON.equals(path[start])) return new JSONValueComponent<>(cursor().path(DATA)).resolve(path,start+1,end);
-			if (RAW.equals(path[start])) return new ValueComponent<>(cursor().path(DATA)).resolve(path,start+1,end);
-			return super.resolve(path,start,end);
+		@Override public ALatticeComponent<?> resolve(Path path) {
+			if (path.isEmpty()) return this;
+			if (JSON.equals(path.get(0))) return new JSONValueComponent<>(cursor().path(DATA)).resolve(path.slice(1));
+			if (RAW.equals(path.get(0))) return new ValueComponent<>(cursor().path(DATA)).resolve(path.slice(1));
+			return super.resolve(path);
 		}
 	}
 
@@ -55,63 +54,57 @@ class ValueComponentTest {
 		assertNull(base.value());
 		assertTrue(base.exists());
 		assertSame(base,base.resolve());
-		assertSame(base,base.resolve(new AString[] {null},1,1));
+		assertSame(base,base.resolve(Path.of(NAME).slice(1)));
 		var none=assertThrows(NoSuchPathException.class,() -> base.resolve(NAME));
 		assertEquals(0,none.getIndex());
 		assertEquals(NAME,none.getSegment());
-		assertThrows(NullPointerException.class,() -> base.resolve(new AString[] {null},0,1));
+		assertThrows(NullPointerException.class,() -> base.resolve(NAME,null));
 		assertThrows(UnsupportedOperationException.class,() -> new ValueComponent<>(root).merge(CVMLong.ONE));
 		assertThrows(UnsupportedOperationException.class,() -> new JSONValueComponent<>(root).merge(CVMLong.ONE));
 	}
 
-	@Test void literalResolutionUsesOneOwnedSliceAndDoesNotRead() {
+	@Test void literalResolutionOwnsItsSegmentsAndDoesNotRead() {
 		AtomicInteger reads=new AtomicInteger();
 		Root<ACell> root=new Root<>(Maps.of(DATA,Maps.of(NAME,CVMLong.ONE))) {
 			@Override public ACell get() { reads.incrementAndGet(); return super.get(); }
 		};
 		var component=new ValueComponent<>(root);
-		AString[] path={null,DATA,NAME,null};
-		var child=component.resolve(path,1,3);
+		AString[] segments={DATA,NAME};
+		var child=component.resolve(segments);
 		assertEquals(0,reads.get());
-		path[1]=NAME;
-		path[2]=DATA;
+		segments[0]=NAME;
+		segments[1]=DATA;
 		assertEquals(CVMLong.ONE,child.value());
 		child.cursor().set(CVMLong.TWO);
 		assertEquals(CVMLong.TWO,RT.getIn(root.get(),DATA,NAME));
-		assertSame(component,component.resolve(path,2,2));
-		assertThrows(IndexOutOfBoundsException.class,() -> component.resolve(path,-1,2));
-		assertThrows(IndexOutOfBoundsException.class,() -> component.resolve(path,3,2));
-		assertThrows(IndexOutOfBoundsException.class,() -> component.resolve(path,0,5));
-		assertThrows(NullPointerException.class,() -> component.resolve(path,0,2));
+		assertSame(component,component.resolve(Path.of(DATA).slice(1)));
 	}
 
 	@Test void parentSelectsJSONAndDelegatesSlicesInsideTransactions() {
 		var root=Root.<ACell>create(Maps.of(DATA,Vectors.of(CVMLong.ONE)));
 		var parent=new Parent(root);
-		AString[] path={null,JSON,ZERO,null};
-		assertEquals(CVMLong.ONE,parent.resolve(path,1,3).value());
+		Path path=Path.of(NAME,JSON,ZERO).slice(1);
+		assertEquals(CVMLong.ONE,parent.resolve(path).value());
 		assertFalse(parent.resolve(RAW,ZERO).exists());
 		assertThrows(MissingValueException.class,() -> parent.resolve(RAW,ZERO).value());
 		Transactions.transact(root,draft -> {
-			var resolved=new Parent(draft).resolve(path,1,3);
+			var resolved=new Parent(draft).resolve(path);
 			resolved.cursor().set(CVMLong.TWO);
-			assertEquals(CVMLong.ONE,parent.resolve(path,1,3).value());
+			assertEquals(CVMLong.ONE,parent.resolve(path).value());
 			assertEquals(CVMLong.TWO,resolved.value());
 		});
-		assertEquals(CVMLong.TWO,parent.resolve(path,1,3).value());
+		assertEquals(CVMLong.TWO,parent.resolve(path).value());
 	}
 
-	@Test void unknownSegmentReportsItsIndexInTheCallersArray() {
+	@Test void unknownSegmentReportsItsPositionInTheRequest() {
 		var parent=new Parent(Root.<ACell>create(null));
-		AString[] path={JSON,NAME,DATA};
-		var none=assertThrows(NoSuchPathException.class,() -> parent.resolve(path,1,3));
+		Path request=Path.of(JSON,NAME,DATA);
+		var none=assertThrows(NoSuchPathException.class,() -> parent.resolve(request.slice(1)));
 		assertEquals(1,none.getIndex());
 		assertEquals(NAME,none.getSegment());
-		AString[] copy=none.getPath();
-		assertArrayEquals(path,copy);
-		path[1]=DATA;
-		copy[1]=DATA;
-		assertEquals(NAME,none.getPath()[1]);
+		assertEquals(Path.of(NAME,DATA),none.getPath());
+		assertEquals(request,none.getPath().request());
+		assertThrows(IllegalArgumentException.class,() -> new NoSuchPathException(request.slice(3)));
 		// Every segment of a value component names a place, which may be absent
 		assertFalse(parent.resolve(JSON,NAME,DATA).exists());
 	}
@@ -136,15 +129,14 @@ class ValueComponentTest {
 		var json=new JSONValueComponent<>(root);
 		assertSame(json,json.resolve());
 		assertEquals(0,reads.get());
-		AString[] path={null,DATA,ZERO,NAME,null};
-		var child=json.resolve(path,1,4);
+		AString[] segments={DATA,ZERO,NAME};
+		var child=json.resolve(segments);
 		assertEquals(1,reads.get());
-		path[2]=NAME;
+		segments[1]=NAME;
 		assertEquals(CVMLong.ONE,child.value());
 		assertInstanceOf(JSONValueComponent.class,json.resolve(DATA));
 		assertEquals(child.value(),json.resolve(DATA).resolve(ZERO).resolve(NAME).value());
-		assertThrows(IndexOutOfBoundsException.class,() -> json.resolve(path,1,6));
-		assertThrows(NullPointerException.class,() -> json.resolve(path,0,1));
+		assertThrows(NullPointerException.class,() -> json.resolve(DATA,null));
 	}
 
 	@Test void JSONObjectKeysRemainNamesAndPresentStringsWinOverKeywords() {
@@ -247,16 +239,17 @@ class ValueComponentTest {
 		assertEquals(Maps.of(NAME,CVMLong.ONE),root.get());
 	}
 
-	@Test void refusedWritesNameTheSegmentInTheCallersArray() {
+	@Test void refusedWritesNameTheSegmentInTheRequest() {
 		AString two=Strings.create("2");
 		var root=Root.<ACell>create(Maps.of(DATA,Vectors.of(CVMLong.ONE),NAME,CVMLong.ONE));
 		var json=new JSONValueComponent<>(root);
 		// A position past the end, appending included, cannot be held
-		AString[] path={null,DATA,ONE,null};
-		var past=assertThrows(NoSuchPathException.class,() -> json.resolve(path,1,3).cursor().set(CVMLong.TWO));
+		Path request=Path.of(JSON,DATA,ONE);
+		var past=assertThrows(NoSuchPathException.class,() -> json.resolve(request.slice(1)).cursor().set(CVMLong.TWO));
 		assertEquals(2,past.getIndex());
 		assertEquals(ONE,past.getSegment());
-		assertArrayEquals(path,past.getPath());
+		assertEquals(Path.of(ONE),past.getPath());
+		assertEquals(request,past.getPath().request());
 		// A key below a scalar cannot be held
 		assertEquals(1,assertThrows(NoSuchPathException.class,() -> json.resolve(NAME,ZERO).cursor().set(CVMLong.TWO)).getIndex());
 		// An absent level: the container is the path before the segment

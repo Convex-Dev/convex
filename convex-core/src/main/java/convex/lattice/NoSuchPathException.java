@@ -1,8 +1,7 @@
 package convex.lattice;
 
-import java.util.Objects;
-
 import convex.core.data.AString;
+import convex.core.data.Path;
 
 /**
  * A component path is well formed but incompatible with what it addresses. In
@@ -11,44 +10,42 @@ import convex.core.data.AString;
  * or cannot hold its key. Unlike {@link convex.lattice.cursor.MissingValueException},
  * where the place exists but holds no value, the path itself does not fit.
  *
- * <p>It carries a copy of the whole path array the component was given, and the
- * index in that array of the first segment that does not fit. Parents pass the
- * same array to their children, so the index locates the segment for every caller,
- * whatever slice it resolved. For an absent container, the container is the path
- * before that segment, or the component's own value when that prefix is empty.</p>
+ * <p>It carries the path from the first segment that does not fit. That path keeps
+ * its position in the caller's request, and {@link Path#request()} gives the whole
+ * request. For an absent container, the container is the request before that
+ * segment, or the component's own value when nothing precedes it.</p>
  */
 public class NoSuchPathException extends IllegalStateException {
 	private static final long serialVersionUID = 1L;
 
-	private final transient AString[] path;
-	private final int index;
+	private final transient Path path;
 
 	/**
-	 * @param path Path array being resolved, as passed to the component; copied
-	 * @param index Index in {@code path} of the first segment that does not fit
+	 * @param path Path from the first segment that does not fit
+	 * @throws IllegalArgumentException If the path is empty, so names no segment
 	 */
-	public NoSuchPathException(AString[] path,int index) {
-		super("No such path at segment "+index+": "+segment(path,index));
-		this.path=path.clone();
-		this.index=index;
+	public NoSuchPathException(Path path) {
+		super(message(path));
+		this.path=path;
 	}
 
-	private static AString segment(AString[] path,int index) {
-		return Objects.requireNonNull(path[Objects.checkIndex(index,path.length)],"Path segment must not be null");
+	private static String message(Path path) {
+		if (path.isEmpty()) throw new IllegalArgumentException("Path must name the segment that does not fit");
+		return "No such path at segment "+path.position()+": "+path.get(0);
 	}
 
-	/** A copy of the path array the component was given. */
-	public AString[] getPath() {
-		return path.clone();
+	/** The path from the first segment that does not fit, positioned in the caller's request. */
+	public Path getPath() {
+		return path;
 	}
 
-	/** Index in the path array of the first segment that does not fit. */
+	/** Index in the caller's request of the first segment that does not fit. */
 	public int getIndex() {
-		return index;
+		return path.position();
 	}
 
 	/** The first segment that does not fit. */
 	public AString getSegment() {
-		return path[index];
+		return path.get(0);
 	}
 }

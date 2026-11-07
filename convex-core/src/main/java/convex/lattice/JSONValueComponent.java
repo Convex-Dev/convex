@@ -1,7 +1,5 @@
 package convex.lattice;
 
-import java.util.Objects;
-
 import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
@@ -10,9 +8,11 @@ import convex.core.data.ASequence;
 import convex.core.data.AString;
 import convex.core.data.Blobs;
 import convex.core.data.Keyword;
+import convex.core.data.Path;
 import convex.core.data.Symbol;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ATransformCursor;
 
@@ -38,16 +38,15 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 	}
 
 	@Override
-	public JSONValueComponent<?> resolve(AString[] path,int start,int end) {
-		Objects.checkFromToIndex(start,end,path.length);
-		if (start==end) return this;
-		int n=end-start;
+	public JSONValueComponent<?> resolve(Path path) {
+		if (path.isEmpty()) return this;
+		int n=Utils.checkedInt(path.count());
 		ACell[] keys=new ACell[n];
 		boolean[] positions=new boolean[n];
 		AForkableCursor<V> source=cursor();
 		ACell current=source.getOrDefault(null);
 		for (int i=0; i<n; i++) {
-			AString segment=Objects.requireNonNull(path[start+i],"Path segment must not be null");
+			AString segment=path.get(i);
 			if (current instanceof ASequence<?> sequence) {
 				CVMLong position=position(segment);
 				if (position!=null) {
@@ -66,7 +65,7 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 			keys[i]=segment;
 			current=null;
 		}
-		return new JSONValueComponent<>(new JSONPathCursor(source,keys,positions,path,start));
+		return new JSONValueComponent<>(new JSONPathCursor(source,keys,positions,path));
 	}
 
 	/** A non-negative decimal position without sign or leading zeroes, or null. */
@@ -107,17 +106,15 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 		/** Which keys are sequence positions; the others are map keys, integers included. */
 		private final boolean[] positions;
 
-		/** The caller's path, and the index in it of the segment for the first key. */
-		private final AString[] segments;
-		private final int start;
+		/** The caller's path, one segment for each key. */
+		private final Path path;
 
 		@SuppressWarnings("unchecked")
-		JSONPathCursor(AForkableCursor<?> source,ACell[] keys,boolean[] positions,AString[] path,int start) {
+		JSONPathCursor(AForkableCursor<?> source,ACell[] keys,boolean[] positions,Path path) {
 			super((AForkableCursor<ACell>)source);
 			this.keys=keys;
 			this.positions=positions;
-			this.segments=path.clone();
-			this.start=start;
+			this.path=path;
 		}
 
 		@Override protected Object viewValue(ACell stored) {
@@ -149,14 +146,14 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 				// Missing containers are refused by assocExisting. A position must never
 				// become a map key, nor an integer map key a sequence position.
 				if (!(positions[i] ? container instanceof ASequence<?> : container instanceof AMap<?,?>)) {
-					throw new NoSuchPathException(segments,start+i);
+					throw new NoSuchPathException(path.slice(i));
 				}
 				container=((ADataStructure<?>)container).get(keys[i]);
 			}
 			try {
 				return LatticeOps.assocExisting(current,value,keys);
 			} catch (LatticeOps.AbsentContainer | LatticeOps.UnholdableKey e) {
-				throw LatticeOps.refusal(e,segments,start);
+				throw LatticeOps.refusal(e,path);
 			}
 		}
 	}

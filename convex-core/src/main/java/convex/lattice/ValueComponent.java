@@ -1,9 +1,7 @@
 package convex.lattice;
 
-import java.util.Objects;
-
 import convex.core.data.ACell;
-import convex.core.data.AString;
+import convex.core.data.Path;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.PathCursor;
 
@@ -24,29 +22,25 @@ public class ValueComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	@Override
-	public ValueComponent<?> resolve(AString[] path,int start,int end) {
-		Objects.checkFromToIndex(start,end,path.length);
-		if (start==end) return this;
-		for (int i=start; i<end; i++) Objects.requireNonNull(path[i],"Path segment must not be null");
-		return new ValueComponent<>(new LiteralPath(cursor(),path,start,end));
+	public ValueComponent<?> resolve(Path path) {
+		if (path.isEmpty()) return this;
+		return new ValueComponent<>(new LiteralPath(cursor(),path));
 	}
 
 	/** A literal path whose refused writes name the caller's segment. */
 	private static final class LiteralPath extends PathCursor<ACell> {
-		private final AString[] segments;
-		private final int start;
+		private final Path path;
 
-		LiteralPath(AForkableCursor<?> base,AString[] path,int start,int end) {
-			super(base,path,start,end);
-			this.segments=path.clone();
-			this.start=start;
+		LiteralPath(AForkableCursor<?> base,Path path) {
+			super(base,path.toCellArray());
+			this.path=path;
 		}
 
 		@Override protected ACell write(ACell current,ACell value) {
 			try {
 				return super.write(current,value);
 			} catch (LatticeOps.AbsentContainer | LatticeOps.UnholdableKey e) {
-				throw LatticeOps.refusal(e,segments,start);
+				throw LatticeOps.refusal(e,path);
 			}
 		}
 	}

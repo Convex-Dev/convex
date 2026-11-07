@@ -5,7 +5,7 @@ import java.util.Map;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
-import convex.core.data.AString;
+import convex.core.data.Path;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -139,13 +139,12 @@ public class LatticeOps {
 
 	/**
 	 * Reports a refused write at the caller's segment.
-	 * @param refused Refusal of a write whose keys came from {@code path}
-	 * @param path Path array the component was given
-	 * @param start Index in {@code path} of the first written key
+	 * @param refused Refusal of a write whose keys came from {@code path}, in order
+	 * @param path Path the component resolved to those keys
 	 * @return Exception naming the segment that could not be written
 	 */
-	static NoSuchPathException refusal(Refusal refused,AString[] path,int start) {
-		NoSuchPathException e=new NoSuchPathException(path,start+refused.depth());
+	static NoSuchPathException refusal(Refusal refused,Path path) {
+		NoSuchPathException e=new NoSuchPathException(path.slice(refused.depth()));
 		e.initCause((Throwable)refused);
 		return e;
 	}

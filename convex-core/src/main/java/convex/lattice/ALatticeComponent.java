@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.data.Path;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
 import convex.lattice.cursor.Persister;
@@ -110,30 +111,27 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/**
 	 * Resolves external string segments to the component at their destination.
 	 * @throws NoSuchPathException If a segment names no place
+	 * @throws NullPointerException If a segment is null
 	 */
 	public final ALatticeComponent<?> resolve(AString... path) {
-		return resolve(path,0,path.length);
+		return resolve(Path.of(path));
 	}
 
 	/**
-	 * Resolves the slice {@code [start,end)} without creating stored state.
-	 * Empty paths return this component. The base defines no external namespace;
-	 * domain components route to children using the same array and new indices.
+	 * Resolves a path without creating stored state. An empty path returns this
+	 * component. The base defines no external namespace; domain components read
+	 * the segments they own and route the rest to a child, as {@code path.slice(n)}.
 	 * String interpretation belongs to the selected child, independently of merge
 	 * delivery. Children must be bound to this component's current working view.
 	 * A segment naming no place in a component's namespace throws
-	 * {@link NoSuchPathException} with that segment's index in the array.
-	 *
-	 * <p>The array is borrowed for this call: implementations must not modify it
-	 * or retain it without copying. Segments within the slice must be non-null.</p>
+	 * {@link NoSuchPathException} with the path from that segment.
 	 *
 	 * @return Component at the destination, which may currently be absent
 	 * @throws NoSuchPathException If a segment names no place
 	 */
-	public ALatticeComponent<?> resolve(AString[] path,int start,int end) {
-		Objects.checkFromToIndex(start,end,path.length);
-		if (start==end) return this;
-		throw new NoSuchPathException(path,start);
+	public ALatticeComponent<?> resolve(Path path) {
+		if (path.isEmpty()) return this;
+		throw new NoSuchPathException(path);
 	}
 
 	/**
