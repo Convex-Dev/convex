@@ -65,7 +65,10 @@ final class EtchGC {
 		boolean delete;
 	}
 
-	EtchGC(EtchStore initial) {
+	private final EtchGCFileOps files;
+
+	EtchGC(EtchStore initial, EtchGCFileOps files) {
+		this.files=files;
 		state=new State(initial,new EtchStore[] {initial},null,false);
 		baseFile=initial.getFile();
 	}
@@ -200,8 +203,15 @@ final class EtchGC {
 		etch.close();
 		if (delete) {
 			File file=etch.getFile();
-			if (file.delete()) new File(file.getPath()+".gc-defunct").delete();
-			else file.deleteOnExit();
+			try {
+				if (files.delete(file)) files.delete(new File(file.getPath()+".gc-defunct"));
+				else file.deleteOnExit();
+			} catch (IOException failure) {
+				// Retirement is best effort. Preserve the tombstone and completion
+				// marker so the next recovery can retry without rolling garbage back.
+				System.getLogger("convex.etch.recovery").log(System.Logger.Level.WARNING,
+						"GC retirement deferred for "+file,failure);
+			}
 		}
 	}
 
@@ -367,11 +377,11 @@ final class EtchGC {
 				Etch source=store.getEtch();
 				source.setRootHash(target.getRootHash());
 				source.writeDataLength();
-				source.flush();
+				files.checkpoint(source);
 				// An export may retain the cancelled file beyond further collections.
 				// Mark it before retiring it so a crash never resurrects its garbage.
 				File file=target.getFile();
-				EtchUtils.writeMetadata(new File(file.getPath()+".gc-defunct").toPath(),"rolled back by cancelGC\n");
+				files.metadata(new File(file.getPath()+".gc-defunct").toPath(),"rolled back by cancelGC\n");
 				state=new State(store,s.views,null,false);
 				sweepComplete=false;
 				retire(target,true);
@@ -391,23 +401,40 @@ final class EtchGC {
 				if (target==null || s.cancelling || !sweepComplete) throw new IllegalStateException("GC transfer not complete: "+store);
 				java.util.List<Hash> missing=EtchVerifier.findMissing(target,target.getRootHash());
 				if (!missing.isEmpty()) throw new MissingDataException(store,missing.get(0));
-				target.flush();
+				files.checkpoint(target);
 				Path backup=null;
 				if (backupFile!=null) {
 					backup=store.validateGCBackup(backupFile).toPath();
-					store.getEtch().flush();
-					Files.createLink(backup,store.getFile().toPath());
+					files.checkpoint(store.getEtch());
+					try { files.link(backup,store.getFile().toPath()); }
+					catch (IOException failure) {
+						try {
+							if (Files.exists(backup) && Files.isSameFile(backup,store.getFile().toPath())) files.cleanup(backup);
+						} catch (IOException cleanup) { failure.addSuppressed(cleanup); }
+						throw failure;
+					}
 				}
 				Path tomb=new File(store.getFile().getCanonicalPath()+".gc-defunct").toPath();
+				String markerContents=EtchUtils.markerContents(target);
 				try {
-					EtchUtils.writeMetadata(tomb,"superseded by "+target.getFile().getName()+"\n");
-					EtchUtils.writeMarker(baseFile,target.getFile());
+					files.metadata(tomb,"superseded by "+target.getFile().getName()+"\n");
+					files.metadata(EtchUtils.markerFile(baseFile).toPath(),markerContents);
 				} catch (IOException e) {
-					try { Files.deleteIfExists(tomb); } catch (IOException cleanup) { e.addSuppressed(cleanup); }
-					if (backup!=null) {
-						try { Files.deleteIfExists(backup); } catch (IOException cleanup) { e.addSuppressed(cleanup); }
+					// An atomic replacement can succeed while its acknowledgement (or
+					// temporary-file cleanup) fails. The unique record proves this attempt
+					// committed; never remove its tombstone or retained snapshot.
+					Path marker=EtchUtils.markerFile(baseFile).toPath();
+					boolean committed;
+					try { committed=files.readMetadata(marker).equals(markerContents); }
+					catch (java.nio.file.NoSuchFileException absent) { committed=false; }
+					catch (IOException inspection) { e.addSuppressed(inspection); throw e; }
+					if (!committed) {
+						try { files.cleanup(tomb); } catch (IOException cleanup) { e.addSuppressed(cleanup); }
+						if (backup!=null) {
+							try { files.cleanup(backup); } catch (IOException cleanup) { e.addSuppressed(cleanup); }
+						}
+						throw e;
 					}
-					throw e;
 				}
 				EtchStore successor=new EtchStore(target,store.getConfig(),this);
 				EtchStore[] views=new EtchStore[s.views.length+1];
@@ -433,7 +460,7 @@ final class EtchGC {
 				if (view==store) break;
 			}
 			if (s.target!=null) {
-				try { s.target.flush(); }
+				try { files.checkpoint(s.target); }
 				catch (ClosedChannelException e) { if (state.target==s.target) throw e; }
 			}
 		} finally { writes.readLock().unlock(); }

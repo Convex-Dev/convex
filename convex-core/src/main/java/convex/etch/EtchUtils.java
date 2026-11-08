@@ -3,13 +3,8 @@ package convex.etch;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -133,6 +128,10 @@ public class EtchUtils {
 	}
 
 	private static File recoverConfigured(File file, EtchConfig config) throws IOException {
+		return recover(file,config,EtchGCFileOps.SYSTEM);
+	}
+
+	static File recover(File file, EtchConfig config, EtchGCFileOps files) throws IOException {
 		file = file.getCanonicalFile();
 		File marker = markerFile(file);
 		List<File> targets = gcTargets(file);
@@ -145,20 +144,24 @@ public class EtchUtils {
 		// The single marker (rewritten by every completeGC) names it; no marker
 		// means the base file itself is current
 		File current = null;
-		boolean markerMalformed = false;
 		String markerDiscardReason = null;
 		if (marker.exists()) {
 			String name = readMarkerName(marker);
 			if (name == null) {
-				markerMalformed = true;
+				throw new IOException("Malformed GC completion marker; preserve the layout for inspection: "+marker);
 			} else {
 				File named = new File(file.getParentFile(), name).getCanonicalFile();
 				if (named.equals(file)) {
+					if (hasMarkerIdentity(marker) && !markerIdentifies(marker,file,config)) {
+						throw new IOException("GC marker identity disagrees with the base file: "+file);
+					}
 					markerDiscardReason = "names the already-adopted base file";
 				} else if (!named.exists()) {
 					if (file.exists()) {
-						markerDiscardReason = "names missing target "+name
-								+" while the adopted base file is present";
+						if (!markerIdentifies(marker,file,config)) {
+							throw new IOException("Missing GC target cannot be identified as the adopted base: "+marker);
+						}
+						markerDiscardReason = "identifies the already-adopted base file";
 					} else {
 						throw new IOException("Etch GC recovery cannot proceed for " + file + ": marker "
 								+ marker.getName() + " names " + name + " as the current store file, but"
@@ -171,6 +174,9 @@ public class EtchUtils {
 					throw new IOException("Etch GC recovery marker "+marker
 							+" names a file outside the GC target set for "+file+": "+name);
 				} else {
+					if (hasMarkerIdentity(marker) && !markerIdentifies(marker,named,config)) {
+						throw new IOException("GC marker identity disagrees with target (possibly a reused name): "+named);
+					}
 					current = named;
 					debug("Etch GC recovery: completed cutover found - current store file is {}",
 							current.getName());
@@ -195,14 +201,10 @@ public class EtchUtils {
 
 		// Logged only once recovery acts on the marker: a refusal above reports
 		// the problem through its exception instead
-		if (markerMalformed) {
-			warn("Etch GC recovery: marker {} is empty or malformed - removing it. Any completed GC"
-					+ " target alongside {} is treated as an abandoned cycle.", marker, file.getName());
-			deleteOrThrow(marker);
-		} else if (markerDiscardReason!=null) {
+		if (markerDiscardReason!=null) {
 			debug("Etch GC recovery: marker {} {} - removing the stale marker.",
 					marker.getName(),markerDiscardReason);
-			deleteOrThrow(marker);
+			deleteOrThrow(marker,files);
 		}
 
 		// ---- 2: dispose of defunct targets, roll back abandoned ones ----
@@ -216,8 +218,8 @@ public class EtchUtils {
 			if (st.getCanonicalFile().equals(current)) continue; // the live file itself
 			File tomb = new File(st.getPath() + ".gc-defunct");
 			if (tomb.exists()) {
-				if (st.delete()) {
-					tomb.delete();
+				if (files.delete(st)) {
+					files.delete(tomb);
 					debug("Etch GC recovery: deleted defunct GC file {} (fully superseded or rolled back)",
 							st.getName());
 				} else {
@@ -232,7 +234,7 @@ public class EtchUtils {
 				// could restore any state from it: the cycle crashed before the
 				// target's first sync. The live file passed validation and was not
 				// written during the cycle, so it holds the last committed root.
-				if (st.delete()) {
+				if (files.delete(st)) {
 					debug("Etch GC recovery: deleted abandoned GC target {}, which was never checkpointed"
 							+ " and so holds no committed root. {} keeps its last checkpoint.",
 							st.getName(), live.getName());
@@ -251,7 +253,7 @@ public class EtchUtils {
 				continue;
 			}
 			if (st.length()==0L) {
-				deleteOrThrow(st);
+				deleteOrThrow(st,files);
 				debug("Etch GC recovery: deleted empty abandoned GC target {}",st.getName());
 				continue;
 			}
@@ -270,24 +272,28 @@ public class EtchUtils {
 		// is garbage by the retention contract. An explicitly retained snapshot
 		// has a separate name outside this recovery layout and remains untouched.
 		if (file.exists()) {
-			if (!file.delete()) {
+			if (!files.delete(file)) {
 				debug("Etch GC recovery: cannot delete superseded original {} (pinned by memory mappings"
 						+ " from this same process, e.g. on Windows?). Adoption DEFERRED: opening the"
 						+ " current store file {} directly - it holds the correct data - and the deletion"
 						+ " and installation will be retried on the next start.", file, current.getName());
 				return current;
 			}
-			new File(file.getPath() + ".gc-defunct").delete();
+			files.delete(new File(file.getPath() + ".gc-defunct"));
 		}
 		try {
-			Files.move(current.toPath(), file.toPath());
+			files.adopt(current.toPath(), file.toPath());
 		} catch (IOException e) {
+			if (!current.exists()) {
+				if (file.isFile() && markerIdentifies(marker,file,config)) return file;
+				throw new IOException("GC adoption outcome is ambiguous; preserve recovery evidence",e);
+			}
 			debug("Etch GC recovery: deleted the superseded original but cannot install {} as {} ({})."
 					+ " Opening it directly; the marker is intact, so the next start will complete the"
 					+ " adoption.", current.getName(), file.getName(), e);
 			return current;
 		}
-		if (!marker.delete()) {
+		if (!files.delete(marker)) {
 			warn("Etch GC recovery: adoption succeeded but marker {} could not be deleted. Delete it"
 					+ " manually; until then, later recoveries will detect it as stale and remove it.",
 					marker);
@@ -375,45 +381,73 @@ public class EtchUtils {
 	}
 
 	/**
-	 * Reads the file name from a GC completion marker, or null if it is malformed.
+	 * Reads the file name from a validated completion record; malformed records fail.
 	 * This inspection is deliberately side-effect free: recovery authenticates
-	 * participating Etch files before deleting even malformed metadata.
+	 * participating Etch files before changing metadata or the store layout.
 	 */
 	static String readMarkerName(File marker) throws IOException {
-		List<String> lines = Files.readAllLines(marker.toPath());
-		String name = lines.isEmpty() ? "" : lines.get(0).trim();
-		return name.isEmpty() ? null : name;
+		return readMarker(marker).name();
 	}
 
-	private static void deleteOrThrow(File f) throws IOException {
-		if (!f.delete()) {
+	private record GCMarker(String name,String identity) {}
+
+	private static GCMarker readMarker(File marker) throws IOException {
+		List<String> lines=Files.readAllLines(marker.toPath());
+		String name=lines.isEmpty()?"":lines.getFirst().trim();
+		if (name.isEmpty()) throw new IOException("Malformed GC completion marker: "+marker);
+		// Historical writers emitted exactly one filename line. Accepting arbitrary
+		// extra lines would silently downgrade a damaged new identity to legacy.
+		if (lines.size()==1) return new GCMarker(name,null);
+		if (lines.size()!=4 || !lines.get(1).equals("etch-gc-v1")
+				|| !(lines.get(2).equals("legacy") || lines.get(2).matches("v3-salt [0-9a-f]{64}"))
+				|| !lines.get(3).matches("attempt [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) {
+			throw new IOException("Malformed or unsupported GC completion marker; preserve it for inspection: "+marker);
+		}
+		return new GCMarker(name,lines.get(2).equals("legacy")?null:lines.get(2));
+	}
+
+	private static void deleteOrThrow(File f,EtchGCFileOps files) throws IOException {
+		if (!files.delete(f)) {
 			throw new IOException("Etch GC recovery cannot proceed: unable to delete " + f
 					+ ". Check filesystem permissions and remove it manually.");
 		}
 	}
 
 	static void writeMarker(File base, File target) throws IOException {
-		// Line 1 is authoritative (the target file name); any further lines are
-		// informational only
+		// Legacy single-line publication retained for package compatibility.
+		// Lifecycle cutover uses the versioned record from markerContents instead.
 		writeMetadata(markerFile(base).toPath(), target.getName() + "\n");
 	}
 
 	/** Publishes a complete metadata file without truncating the previous one. */
 	static void writeMetadata(Path path, String contents) throws IOException {
-		Path temp = Files.createTempFile(path.toAbsolutePath().getParent(),
-				path.getFileName().toString()+".", ".tmp");
-		try {
-			try (FileChannel channel = FileChannel.open(temp, StandardOpenOption.WRITE)) {
-				ByteBuffer bytes = StandardCharsets.UTF_8.encode(contents);
-				while (bytes.hasRemaining()) channel.write(bytes);
-				channel.force(true);
-			}
-			// Fail safely when atomic replacement is unsupported; never fall back
-			// to truncating a marker that names the only surviving live file.
-			Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-		} finally {
-			Files.deleteIfExists(temp);
+		EtchGCFileOps.SYSTEM.metadata(path,contents);
+	}
+
+	static String markerContents(Etch target) {
+		String identity=target.gcFileIdentity();
+		return target.getFile().getName()+"\netch-gc-v1\n"+(identity==null?"legacy":identity)+"\n"
+				+"attempt "+java.util.UUID.randomUUID()+"\n";
+	}
+
+	private static String fileIdentity(File file,EtchConfig config) throws IOException {
+		try (RandomAccessFile data=new RandomAccessFile(file,"r");
+				AFileMapper mapper=EtchFileMapperFactory.createExisting(data.getChannel(),config,file.getName(),true)) {
+			byte[] key=AEtchHeader.resolveKey(mapper,file.getName(),config);
+			AEtchHeader header=AEtchHeader.open(mapper,file.getName(),key);
+			try {
+				return header instanceof EtchV3Header v3?"v3-salt "+convex.core.util.Utils.toHexString(v3.fileSalt()):null;
+			} finally { header.destroy(); }
 		}
+	}
+
+	private static boolean hasMarkerIdentity(File marker) throws IOException {
+		return readMarker(marker).identity()!=null;
+	}
+
+	private static boolean markerIdentifies(File marker,File file,EtchConfig config) throws IOException {
+		String identity=readMarker(marker).identity();
+		return identity!=null && identity.equals(fileIdentity(file,config));
 	}
 
 	/**

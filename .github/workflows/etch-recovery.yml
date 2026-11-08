@@ -1,0 +1,29 @@
+name: Etch recovery matrix
+on:
+  pull_request:
+    paths:
+      - 'convex-core/**'
+      - 'pom.xml'
+      - '.github/workflows/etch-recovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery:
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        java: ['21', '25']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: zulu
+          java-version: ${{ matrix.java }}
+          cache: maven
+      - name: Exercise recovery and lifecycle
+        shell: bash
+        run: ./mvnw -B -pl convex-core -am -Dconvex.test.extended=true -Dtest=EtchGCFileFaultTest,EtchGCRecoveryTest,EtchGCLifecycleTest,EtchConfiguredLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false test
