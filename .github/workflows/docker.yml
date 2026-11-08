@@ -1,6 +1,7 @@
 # .github/workflows/docker.yml
 # Manually builds and pushes a Docker image to Docker Hub, for a release tag or
-# a snapshot. Releases do not publish images.
+# a snapshot. Releases do not publish images: BUILD.md (release step 10) runs
+# this from the release tag with `latest` ticked.
 #
 # Do NOT add a `release: [published]` trigger here: releases created with the
 # workflow GITHUB_TOKEN do not fire workflow events, so it would never run.
@@ -13,11 +14,20 @@ on:
         description: 'Docker image tag'
         required: true
         default: 'snapshot'
+      latest:
+        description: 'Also push the same image as latest'
+        type: boolean
+        default: false
 
 jobs:
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Inputs reach the shell as variables, never interpolated into the script
+    env:
+      IMAGE: convexlive/convex
+      TAG: ${{ inputs.tag }}
+      LATEST: ${{ inputs.latest }}
 
     steps:
       - name: Checkout repository
@@ -30,7 +40,12 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build Docker image
-        run: docker build -t "convexlive/convex:${{ github.event.inputs.tag }}" .
+        run: docker build -t "$IMAGE:$TAG" .
 
       - name: Push Docker image
-        run: docker push "convexlive/convex:${{ github.event.inputs.tag }}"
+        run: |
+          docker push "$IMAGE:$TAG"
+          if [ "$LATEST" = "true" ]; then
+            docker tag "$IMAGE:$TAG" "$IMAGE:latest"
+            docker push "$IMAGE:latest"
+          fi

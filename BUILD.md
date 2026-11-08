@@ -98,10 +98,10 @@ Run by hand on `master` with the version to release (step 6). Builds and tests t
 
 ### Docker (`docker.yml`)
 
-Manual-dispatch only: builds a Docker image and pushes a single tag to Docker Hub. Use after each release (step 10), for snapshot builds or for ad-hoc re-publishing.
+Manual-dispatch only: builds a Docker image and pushes it to Docker Hub under the given tag, and also as `latest` when that box is ticked. Use after each release (step 10), for snapshot builds or for ad-hoc re-publishing.
 
 - Snapshot: go to Actions > Docker > Run workflow, set tag to `snapshot`
-- Or via CLI: `gh workflow run docker.yml --ref <branch-or-tag> -f tag=<tag>`
+- Or via CLI: `gh workflow run docker.yml --ref <branch-or-tag> -f tag=<tag>`, adding `-f latest=true` to move `latest` too
 
 Requires two secrets configured in the GitHub repository:
 
@@ -285,11 +285,10 @@ git add pom.xml '**/pom.xml' && git commit -m "Prepare for next development cycl
 
 The release workflow does not publish Docker images. Once the tag exists, build the
 image from it and push it under the release version and `latest`, which the
-website's Downloads page names. `docker.yml` pushes one tag per run:
+website's Downloads page names:
 
 ```bash
-gh workflow run docker.yml --ref 0.8.4 -f tag=0.8.4
-gh workflow run docker.yml --ref 0.8.4 -f tag=latest
+gh workflow run docker.yml --ref 0.8.4 -f tag=0.8.4 -f latest=true
 ```
 
 ## Docker
