@@ -94,7 +94,7 @@ Static security analysis for the Java codebase (tests run separately in `build.y
 
 ### Release (`release.yml`)
 
-Run by hand on `master` with the version to release (step 6). Builds and tests that commit, then creates the version tag and a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). It also packages the tested build into the Maven Central bundle, unsigned and not uploaded, and attaches it (`convex-<version>-central-bundle.zip`, attested too) for step 8 to sign and publish. It does not publish Docker images; step 10 does that by hand.
+Run by hand on `master` with the version to release (step 6). Builds and tests that commit, then creates the version tag and a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). It does not publish Docker images; step 10 does that by hand.
 
 ### Docker (`docker.yml`)
 
@@ -148,7 +148,8 @@ Then:
 ### 3. Merge to master in a release worktree
 
 The release runs in its own worktree on `master`. The main checkout stays on
-`develop` for everyone else working in it. Steps 4 to 7 run in this worktree:
+`develop` for everyone else working in it, and nothing there can move the release
+tree off the tag before the deploy in step 8. Steps 4 to 8 run in this worktree:
 
 ```bash
 git fetch origin
@@ -229,7 +230,7 @@ https://github.com/Convex-Dev/convex/releases
 
 Verify:
 - Release status is not draft/pre-release
-- `convex.jar` is attached as an asset, along with its SHA-256 checksum (`convex.jar.sha256`), the SBOM (`convex-<version>-sbom.json`) and the unsigned Maven Central bundle (`convex-<version>-central-bundle.zip`)
+- `convex.jar` is attached as an asset, along with its SHA-256 checksum (`convex.jar.sha256`) and the SBOM (`convex-<version>-sbom.json`)
 - Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex` (it may print nothing on success: exit code 0 means verified, or add `--format json`)
 - The release text is the version's changelog section.
 
@@ -244,32 +245,31 @@ the workflow again. A failure outside the commit, such as a runner fault, needs 
 
 ### 8. Deploy to Maven Central
 
-Only after confirming the GitHub Release is live, from any checkout, in a shell whose
-`gpg` holds the signing key (on Windows, PowerShell with Gpg4win rather than Git Bash):
+Only after confirming the GitHub Release is live, from the release worktree, once
+`git fetch --tags` shows the new tag on its `HEAD`:
 
 ```bash
-java scripts/PublishToCentral.java 0.8.4
+git fetch --tags && git describe --tags --exact-match HEAD
+./mvnw deploy -Prelease
 ```
 
-This publishes the bundle the release workflow built and tested, so Central receives
-exactly those files, while the signing key never leaves this machine. The tool:
+This signs all artifacts with GPG and uploads to Maven Central via the Sonatype Central Publishing plugin. The command returns only after Central confirms publication. It requires a GPG signing key and Maven Central credentials configured locally.
 
-- downloads the release's `convex-<version>-central-bundle.zip` and checks its
-  attestation shows the release workflow built it from the commit the tag names;
-- checks every file in it belongs to that version;
-- signs each file with GPG, and uploads the result through Central's Publisher API;
-- returns once Central reports the deployment published.
+Run this local publishing command interactively: GPG needs to open pinentry for the
+signing-key passphrase. Do not add Maven's `-B` batch flag, which prevents that
+prompt. Unattended CI publishing must provide signing credentials through its
+secret environment rather than command-line properties.
 
-It needs `gh`, the GPG signing key and Maven Central credentials (server `central`
-in `~/.m2/settings.xml`, not encrypted). Run it interactively: GPG needs to open
-pinentry for the signing-key passphrase.
-
-If Central rejects a deployment, nothing is published. Read the errors the tool
-prints, drop the deployment on central.sonatype.com and run the tool again.
+Deploy is the priority once the GitHub Release is live. Until Central confirms
+publication, keep the release worktree on `master` at the tag: do not switch
+branches or run `versions:set` in it. The deploy publishes whatever version the
+working tree holds, so a tree already moved to the next snapshot would publish the
+wrong artifacts. The main checkout can carry on with `develop` meanwhile.
 
 ### 9. Prepare next development version
 
-Remove the release worktree and, in the main checkout on `develop`:
+Only after Central has confirmed publication, remove the release worktree and, in
+the main checkout on `develop`:
 
 ```bash
 git worktree remove ../convex-release
