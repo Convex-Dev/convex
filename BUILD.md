@@ -185,10 +185,11 @@ As part of the same version-bump commit, also update:
   grep -rl --include=README.md "<previous-version>" . | xargs sed -i 's/<previous-version>/<new-version>/g'
   ```
 
-- **Downstream docs and website** (separate repos) also hardcode the version and must be bumped in
-  lockstep, otherwise onboarding goes stale:
-  - **`design`** — `convex-java` Maven/Gradle coordinates and `releases/download/<version>/convex.jar`
-    URLs under `docs/tutorial/**` (note: release tags have **no** `v` prefix).
+- **Downstream docs and website** (separate repos) each hold the version in one constant, which
+  must be bumped in lockstep, otherwise onboarding goes stale:
+  - **`design`** — `CONVEX_RELEASE_VERSION` in `src/data/release.mjs`, which fills in the
+    `convex-java` coordinates and `convex.jar` download links across the docs (plain `x.y.z`,
+    with no `v` prefix). Check the pages that use it still match the release.
   - **`convex.world`** — `CONVEX_RELEASE_VERSION` in `src/data/release.ts`, shared by
     the footer and Downloads page (plain `x.y.z`, with no `v` prefix). Deploy the
     website update after the GitHub release is available.
