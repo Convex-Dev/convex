@@ -94,11 +94,11 @@ Static security analysis for the Java codebase (tests run separately in `build.y
 
 ### Release (`release.yml`)
 
-Run by hand on `master` with the version to release (step 6). Builds and tests that commit, then creates the version tag and a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). It does not publish Docker images.
+Run by hand on `master` with the version to release (step 6). Builds and tests that commit, then creates the version tag and a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). It does not publish Docker images; step 10 does that by hand.
 
 ### Docker (`docker.yml`)
 
-Manual-dispatch only: builds a Docker image and pushes a single tag to Docker Hub. Use for snapshot builds or ad-hoc re-publishing.
+Manual-dispatch only: builds a Docker image and pushes a single tag to Docker Hub. Use after each release (step 10), for snapshot builds or for ad-hoc re-publishing.
 
 - Snapshot: go to Actions > Docker > Run workflow, set tag to `snapshot`
 - Or via CLI: `gh workflow run docker.yml --ref <branch-or-tag> -f tag=<tag>`
@@ -280,6 +280,17 @@ git add pom.xml '**/pom.xml' && git commit -m "Prepare for next development cycl
 
 - Add new `## [0.8.5-SNAPSHOT] - Unreleased` section to `CHANGELOG.md` with empty `### Added` / `### Changed` / `### Fixed` subsections.
 - Commit and push `develop`.
+
+### 10. Publish the Docker image
+
+The release workflow does not publish Docker images. Once the tag exists, build the
+image from it and push it under the release version and `latest`, which the
+website's Downloads page names. `docker.yml` pushes one tag per run:
+
+```bash
+gh workflow run docker.yml --ref 0.8.4 -f tag=0.8.4
+gh workflow run docker.yml --ref 0.8.4 -f tag=latest
+```
 
 ## Docker
 
