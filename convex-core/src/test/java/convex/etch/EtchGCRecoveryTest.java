@@ -90,12 +90,20 @@ public class EtchGCRecoveryTest {
 			Path obstacle=Files.writeString(marker.resolve("obstacle"),"retain");
 			File backup=new File(base.getPath()+".snapshot");
 			assertThrows(IOException.class,()->store.completeGC(backup));
-			assertFalse(backup.exists());
+			// A directory is unreadable as marker metadata, not proof of absence.
+			// Preserve all evidence until the caller verifies the known obstacle.
+			assertTrue(backup.exists());
 			assertTrue(store.isGCInProgress());
-			assertFalse(new File(base.getPath()+".gc-defunct").exists());
-			store.cancelGC();
+			Path tomb=new File(base.getPath()+".gc-defunct").toPath();
+			assertTrue(Files.exists(tomb));
+			assertEquals("retain",Files.readString(obstacle));
+			// This fixture proves publication could not replace its own obstacle;
+			// explicitly remove that obstacle and unconfirmed evidence before retry.
 			Files.delete(obstacle);
 			Files.delete(marker);
+			Files.delete(tomb);
+			Files.delete(backup.toPath());
+			store.cancelGC();
 			store.startGC();
 			store.transferGC();
 			try (EtchStore next=store.completeGC()) {

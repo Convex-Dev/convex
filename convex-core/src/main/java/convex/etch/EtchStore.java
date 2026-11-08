@@ -48,11 +48,19 @@ public class EtchStore extends ACachedStore {
 		this(etch,config,null);
 	}
 
+	EtchStore(Etch etch, EtchGCFileOps files) {
+		this(etch,etch.getConfig(),null,files);
+	}
+
 	EtchStore(Etch etch, EtchConfig config, EtchGC sharedGC) {
+		this(etch,config,sharedGC,EtchGCFileOps.SYSTEM);
+	}
+
+	private EtchStore(Etch etch, EtchConfig config, EtchGC sharedGC, EtchGCFileOps files) {
 		super(config.getRefCacheSize());
 		this.config=config;
 		this.etch=etch;
-		this.gc=(sharedGC==null)?new EtchGC(this):sharedGC;
+		this.gc=(sharedGC==null)?new EtchGC(this,files):sharedGC;
 		etch.setStore(this);
 	}
 
@@ -161,6 +169,11 @@ public class EtchStore extends ACachedStore {
 		}
 		if (Files.exists(backupFile.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
 			throw new IOException("Backup file already exists: " + backupFile);
+		}
+		if (EtchUtils.markerFile(backup).exists()
+				|| new File(backup.getPath()+".gc-defunct").exists()
+				|| !EtchUtils.gcTargets(backup).isEmpty()) {
+			throw new IOException("Backup path has stale GC recovery files: " + backup);
 		}
 		return backup;
 	}

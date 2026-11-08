@@ -603,3 +603,9 @@ and not yet provided.
 - [CAD048: Lattice Stores](https://docs.convex.world/docs/cad/stores) — store model, status ladder, read outcomes
 - [CAD047: Etch Storage Format](https://docs.convex.world/docs/cad/etch) — the on-disk format being collected
 - [ETCHv3.md](ETCHv3.md) — v3 header, durability boundary and the repair workflow that replaces automatic rollback for dirty v3 files
+
+## Filesystem fault contract
+
+See the [cutover and snapshot crash contract](proposals/etch-gc-crash-contract.md)
+for marker identity checks, ambiguous acknowledgements, unconfirmed backups,
+platform limits and the deterministic filesystem fault matrix.

@@ -1201,6 +1201,11 @@ public class Etch {
 		return fileName;
 	}
 
+	/** Immutable, non-secret identity for GC metadata, read through the owning handle. */
+	String gcFileIdentity() {
+		return header instanceof EtchV3Header v3?"v3-salt "+Utils.toHexString(v3.fileSalt()):null;
+	}
+
 	public synchronized Hash getRootHash() throws IOException {
 		return header.getRootHash();
 	}
