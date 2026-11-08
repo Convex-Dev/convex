@@ -3,8 +3,10 @@
 #   gh workflow run release.yml --ref master -f version=<version>
 # It builds and tests that commit, then creates the tag and a GitHub Release
 # with convex.jar (plus SHA-256 checksum, SBOM and a signed build-provenance
-# attestation) as its last step, so a failed run leaves no tag. Docker images
-# are published separately, through docker.yml.
+# attestation) as its last step, so a failed run leaves no tag. The release also
+# carries the unsigned Maven Central bundle, attested too, which the maintainer
+# signs and publishes (scripts/PublishToCentral.java). Docker images are
+# published separately, through docker.yml.
 #
 # The jar's provenance attestation is verifiable with:
 #   gh attestation verify convex.jar -R Convex-Dev/convex
@@ -80,10 +82,14 @@ jobs:
       - name: Build with tests
         run: ./mvnw -B -Dconvex.test.extended=true clean install
 
-      # The ordinary Build workflow runs independently and must not be the only
-      # guard for Central-bound artifacts.
-      - name: Verify release artifacts
-        run: ./mvnw -B -Prelease -DskipTests package
+      # Packages what the tests just ran on into the Maven Central bundle,
+      # unsigned and not uploaded: signing keys stay off CI. The ordinary Build
+      # workflow runs independently and must not be the only guard for
+      # Central-bound artifacts.
+      - name: Build Maven Central bundle
+        run: |
+          ./mvnw -B -Prelease -DskipTests -Dgpg.skip -DskipUpload=true deploy
+          cp target/central-publishing/central-bundle.zip "convex-$VERSION-central-bundle.zip"
 
       - name: Smoke test release version
         run: |
@@ -106,7 +112,9 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: convex-integration/target/convex.jar
+          subject-path: |
+            convex-integration/target/convex.jar
+            convex-${{ inputs.version }}-central-bundle.zip
 
       # Creates the tag on the commit just built, together with the release
       - name: Create tag and GitHub Release
@@ -122,6 +130,7 @@ jobs:
             convex-integration/target/convex.jar
             convex-integration/target/convex.jar.sha256
             convex-${{ inputs.version }}-sbom.json
+            convex-${{ inputs.version }}-central-bundle.zip
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
