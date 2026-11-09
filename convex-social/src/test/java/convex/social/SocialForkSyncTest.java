@@ -16,7 +16,6 @@ import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.MergeConflictException;
 import convex.lattice.cursor.Root;
 
 /** Forks of feeds and follows, where both sides changed. */
@@ -41,19 +40,23 @@ class SocialForkSyncTest {
 		assertNotNull(live.getPost(remote));
 	}
 
-	@Test void aPostChangedOnBothSidesIsRefusedAndTheForkKeepsItsEdit() {
+	private static ACell publishedPost(ACell own,ACell other) {
 		var key=SocialPost.createKey(1,1);
-		Index<Blob,ACell> base=Index.of(key,CVMLong.ONE);
+		Index<Blob,ACell> base=Index.of(key,SocialPost.createPost("original",1));
 		var root=new Root<Index<Blob,ACell>>(base);
 		var forked=root.fork();
 		var fork=feed(root).rebind(forked);
-		var own=base.assoc(key,CVMLong.create(2));
-		var other=base.assoc(key,CVMLong.create(3));
-		forked.set(own);
-		root.set(other);
-		assertThrows(MergeConflictException.class,fork::sync);
-		assertEquals(own,forked.get());
-		assertEquals(other,root.get());
+		forked.set(base.assoc(key,own));
+		root.set(base.assoc(key,other));
+		fork.sync();
+		return root.get().get(key);
+	}
+
+	@Test void aPostEditedOnBothSidesResolvesByTimestamp() {
+		ACell earlier=SocialPost.createPost("earlier",100);
+		ACell later=SocialPost.createPost("later",200);
+		assertEquals(later,publishedPost(later,earlier));
+		assertEquals(later,publishedPost(earlier,later));
 	}
 
 	@Test void followsOfDifferentPeopleAreAllPublished() {
@@ -66,12 +69,21 @@ class SocialForkSyncTest {
 		assertEquals(Set.of(BOB,CAROL),live.getActive());
 	}
 
-	@Test void followingTheSamePersonAtDifferentTimesIsRefused() {
+	@Test void aFollowChangedOnBothSidesResolvesByTimestamp() {
 		var root=new Root<AHashMap<ACell,ACell>>(Maps.empty());
 		var live=new Follows(root,() -> CVMLong.ONE);
-		var fork=new Follows(root.fork(),() -> CVMLong.TWO);
-		fork.follow(BOB);
-		live.follow(BOB);
-		assertThrows(MergeConflictException.class,fork::sync);
+		var later=new Follows(root.fork(),() -> CVMLong.TWO);
+		later.follow(BOB);
+		live.unfollow(BOB);
+		later.sync();
+		assertEquals(Set.of(BOB),live.getActive(),"The fork's later follow wins");
+
+		var other=new Root<AHashMap<ACell,ACell>>(Maps.empty());
+		var laterLive=new Follows(other,() -> CVMLong.TWO);
+		var earlier=new Follows(other.fork(),() -> CVMLong.ONE);
+		earlier.follow(BOB);
+		laterLive.unfollow(BOB);
+		earlier.sync();
+		assertEquals(Set.of(),laterLive.getActive(),"The destination's later unfollow wins");
 	}
 }

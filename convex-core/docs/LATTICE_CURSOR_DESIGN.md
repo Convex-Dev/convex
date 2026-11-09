@@ -215,8 +215,10 @@ to take regions that its own components publish from the destination; each such
 component publishes through its own fork of the host.
 A component can override `mergePublication(base, own, other)` instead, to use the
 value both sides last agreed on; by default that form calls the two-value one.
-`LatticeOps.mergeChanges` is a rule for it: each side's changes are kept, so changes
-to different locations never conflict, and it throws `MergeConflictException` where
+`LatticeOps.mergeChanges` is an experimental rule for it, for a merge with no better
+way of handling conflicts. A merge that can resolve a conflict itself, as a lattice
+join does, should do that instead. Each side's changes are kept, so changes to
+different locations never conflict, and it throws `MergeConflictException` where
 both sides changed one location to different values.
 For a detached snapshot use `Root.create(cursor.get())`; atomic multi-step edits use
 `Transactions`.

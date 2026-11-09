@@ -12,7 +12,6 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.IndexComponent;
-import convex.lattice.LatticeOps;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
 
@@ -141,10 +140,10 @@ public class Feed extends IndexComponent<Blob, ACell> implements TransactionalCo
 		return new Feed(cursor,author,clock);
 	}
 
-	/** Posts made on both sides of a fork are all kept; only the same key changing on both is refused. */
+	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected Index<Blob, ACell> mergePublication(Index<Blob, ACell> base,Index<Blob, ACell> own,Index<Blob, ACell> other) {
-		return LatticeOps.mergeChanges(base,own,other);
+	protected Index<Blob, ACell> mergePublication(Index<Blob, ACell> own,Index<Blob, ACell> other) {
+		return SocialLattice.FEED_LATTICE.merge(own,other);
 	}
 
 }

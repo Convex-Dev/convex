@@ -105,8 +105,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/**
 	 * Reconciles as {@link #mergePublication(ACell,ACell)} does, also given the value
 	 * both sides last agreed on. Sync calls this form, and by default it ignores the
-	 * base. A component whose changes conflict only at the same location overrides it
-	 * with {@link LatticeOps#mergeChanges}, and then needs no two-value merge.
+	 * base. Experimental: a merge with no better way of handling conflicts, such as a
+	 * lattice join, can override it with {@link LatticeOps#mergeChanges}.
 	 *
 	 * @param base Value both sides last agreed on, or null if there was none
 	 * @param own Working value

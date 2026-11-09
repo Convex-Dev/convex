@@ -3,8 +3,9 @@ package convex.lattice.cursor;
 import convex.core.data.ACell;
 
 /**
- * Reconciles two values that changed independently from a common base. Having the
- * base shows which side changed what, which a merge of the two values alone cannot.
+ * Experimental. Reconciles two values that changed independently from a common base.
+ * Having the base shows which side changed what, which a merge of the two values
+ * alone cannot.
  *
  * @param <V> Value type
  */

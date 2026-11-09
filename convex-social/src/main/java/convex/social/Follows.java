@@ -12,7 +12,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.LatticeOps;
 import convex.lattice.MapComponent;
 import convex.lattice.TransactionalComponent;
 import convex.lattice.cursor.AForkableCursor;
@@ -111,10 +110,10 @@ public class Follows extends MapComponent<ACell, ACell> implements Transactional
 		return new Follows(cursor,clock);
 	}
 
-	/** Changes to different follows are all kept; only the same field changing on both sides is refused. */
+	/** Reconciles this component's draft using its domain merge rule. */
 	@Override
-	protected AHashMap<ACell, ACell> mergePublication(AHashMap<ACell, ACell> base,AHashMap<ACell, ACell> own,AHashMap<ACell, ACell> other) {
-		return LatticeOps.mergeChanges(base,own,other);
+	protected AHashMap<ACell, ACell> mergePublication(AHashMap<ACell, ACell> own,AHashMap<ACell, ACell> other) {
+		return SocialLattice.FOLLOWS_LATTICE.merge(own,other);
 	}
 
 }

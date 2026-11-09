@@ -121,12 +121,16 @@ public class LatticeOps {
 	}
 
 	/**
-	 * Merges two values that changed from a common base, location by location. A change
+	 * Experimental. One optional way for a component to implement its merge given a
+	 * baseline, for a merge with no better way of handling conflicts. A merge that can
+	 * resolve a conflict itself, as a lattice join does, should do that instead.
+	 *
+	 * <p>Merges two values that changed from a common base, location by location. A change
 	 * made by one side is kept, so changes to different locations never conflict, and a
 	 * delete survives where the other side left the entry alone. Where both sides
 	 * changed a location to different values the merge is rejected. Maps of the same
 	 * kind are compared entry by entry; any other value, including a record, vector or
-	 * signed envelope, is one location. Nil and an absent entry count as the same.
+	 * signed envelope, is one location. Nil and an absent entry count as the same.</p>
 	 *
 	 * <p>The result is built on {@code other}, so everything {@code own} did not change
 	 * keeps other's cells, including persisted ones. The cost follows the size of
