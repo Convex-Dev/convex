@@ -252,8 +252,8 @@ CAD text affected: CAD036 (*Lattice Node*), how pull-path merges are described.
 **Status:** Implemented (0.8.18 work, engine moved in `c1bfed931`).
 
 `Transactions.transact` and `transactExclusively` run a callback against a private draft
-of a cursor's value and commit by compare-and-set, with locked fallback on a
-`TransactionalRootCursor`. `TransactionalComponent` builds typed domain drafts on
+of a cursor's value and commit by compare-and-set, finishing under the root's claim
+after repeated conflicts. `TransactionalComponent` builds typed domain drafts on
 it. Neither CAD035 nor CAD045 describes transactions; this is an addition to specify,
 not a contradiction.
 
@@ -650,10 +650,10 @@ boundaries and no-op identity through authoring views.
 
 ## 27. Fork reconciliation completes before publication commits
 
-Implemented 21 October 2026. Forks always use `TransactionalRootCursor` for private
-working storage. Sync holds that root's existing write lock while reconciling and
+Implemented 21 October 2026. Forks use a private `Root` for working storage. Sync
+holds the claim on all of it while reconciling and
 preparing the destination CAS, then installs the result without any further merge.
-Fork reads take no lock; working writes are ordered before or after sync. The
+Fork reads never wait; working writes are ordered before or after sync. The
 post-publication reconciliation loop and separate sync lock are removed.
 
 A failed merge or preparation leaves the fork value and baseline unchanged and

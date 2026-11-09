@@ -20,7 +20,6 @@ import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.cursor.SignedCursor;
-import convex.lattice.cursor.TransactionalRootCursor;
 
 /** Publication follows bound storage, independently of editing views. */
 class ComponentSyncTest {
@@ -106,7 +105,7 @@ class ComponentSyncTest {
 
 	@Test void transactionsRetainPreparedTimestampsAndDiscardFailedEdits() {
 		for (boolean locked:new boolean[] {false,true}) {
-			var root=new TransactionalRootCursor<AHashMap<Keyword,ACell>>(null);
+			var root=new Root<AHashMap<Keyword,ACell>>(null);
 			var ticks=new AtomicLong();
 			var record=new Record(root,() -> CVMLong.create(ticks.incrementAndGet()));
 			java.util.function.Consumer<Record> edit=draft -> {

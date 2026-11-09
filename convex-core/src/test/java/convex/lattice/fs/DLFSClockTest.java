@@ -13,7 +13,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.TransactionalRootCursor;
+import convex.lattice.cursor.Root;
 import convex.lattice.fs.impl.DLFSLocal;
 
 /** Mutation time belongs to the filesystem; replication preserves the stored times. */
@@ -56,7 +56,7 @@ class DLFSClockTest {
 	@Test void aRetriedMutationReadsTheClockOnce() throws Exception {
 		var attempts=new AtomicInteger();
 		var metadata=Strings.create("concurrent edit");
-		var root=new TransactionalRootCursor<AVector<ACell>>(DLFSLattice.INSTANCE.zero()) {
+		var root=new Root<AVector<ACell>>(DLFSLattice.INSTANCE.zero()) {
 			@Override public boolean compareAndSet(AVector<ACell> expected,AVector<ACell> value) {
 				if (attempts.incrementAndGet()==1) set(expected.assoc(DLFSNode.POS_METADATA,metadata));
 				return super.compareAndSet(expected,value);

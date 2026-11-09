@@ -17,7 +17,6 @@ import convex.core.exceptions.StoreException;
 import convex.core.store.AStore;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
-import convex.lattice.cursor.TransactionalRootCursor;
 
 /**
  * Generic host for lattice application components, with optional persistence.
@@ -110,17 +109,10 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * @throws IllegalStateException if the store already holds a root
 	 */
 	public static <V extends ACell> LatticeHost<V> create(V initialValue, AStore store) {
-		return create(initialValue,store,Cursors::root);
-	}
-
-	/** Creates a fresh host with explicit cursor coordination. */
-	public static <V extends ACell> LatticeHost<V> create(V initialValue,AStore store,
-			Function<V,? extends Root<V>> rootFactory) {
-		Objects.requireNonNull(rootFactory);
 		if (store!=null && retainedRoot(store)!=null) {
 			throw new IllegalStateException("Store already holds a root: open it, or replace it explicitly");
 		}
-		return new LatticeHost<>(rootFactory.apply(initialValue),store);
+		return new LatticeHost<>(Cursors.root(initialValue),store);
 	}
 
 	/**
@@ -133,14 +125,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * @return Host over the initial value
 	 */
 	public static <V extends ACell> LatticeHost<V> replace(V initialValue, AStore store) {
-		return replace(initialValue,store,Cursors::root);
-	}
-
-	/** Replaces the retained root using explicit cursor coordination. */
-	public static <V extends ACell> LatticeHost<V> replace(V initialValue,AStore store,
-			Function<V,? extends Root<V>> rootFactory) {
 		Objects.requireNonNull(initialValue,"Replacement root must not be null");
-		Root<V> root=Objects.requireNonNull(rootFactory.apply(initialValue));
 		if (store!=null) {
 			try {
 				store.setRootData(initialValue);
@@ -148,7 +133,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 				throw new StoreException("Lattice host could not replace the retained root",e);
 			}
 		}
-		return new LatticeHost<>(root,store);
+		return new LatticeHost<>(Cursors.root(initialValue),store);
 	}
 
 	private static <T extends ACell> T retainedRoot(AStore store) {
@@ -170,15 +155,8 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	 * The caller owns the store lifecycle. A null store uses the supplied initial value.
 	 */
 	public static <V extends ACell> LatticeHost<V> open(V initialValue, AStore store) throws IOException {
-		return open(initialValue,store,Cursors::root);
-	}
-
-	/** Opens a host with explicit cursor coordination, e.g. {@code Cursors::transactionalRoot}. */
-	public static <V extends ACell> LatticeHost<V> open(V initialValue, AStore store,
-			Function<V,? extends Root<V>> rootFactory) throws IOException {
-		Objects.requireNonNull(rootFactory);
 		V retained=(store==null)?null:store.getRootData();
-		return new LatticeHost<>(rootFactory.apply(retained==null?initialValue:retained),store);
+		return new LatticeHost<>(Cursors.root(retained==null?initialValue:retained),store);
 	}
 
 	/** Returns the host store, or null for in-memory operation. The caller owns its lifecycle. */
@@ -221,10 +199,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 		if (store!=null && store==this.store) {
 			throw new IllegalArgumentException("A fork must not share its origin's store");
 		}
-		V value=cursor().get();
-		Root<V> copy=cursor().supportsExclusiveTransactions()
-			?new TransactionalRootCursor<>(value):Cursors.root(value);
-		return new LatticeHost<>(copy,store,this);
+		return new LatticeHost<>(Cursors.root(cursor().get()),store,this);
 	}
 
 	/**

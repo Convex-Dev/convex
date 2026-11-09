@@ -111,7 +111,6 @@ class NodeApplicationIngressTest {
 				assertSame(root,node.getHost());
 				assertSame(root.cursor(),node.getCursor());
 				assertSame(store,node.getStore());
-				assertFalse(node.getCursor().supportsExclusiveTransactions());
 				var app=new App(node.getHost());
 			node.getHost().addApplication(app);
 			node.launch();
@@ -145,11 +144,10 @@ class NodeApplicationIngressTest {
 	@Test void relayHostRestoresRetainedRootBeforeLocalEdits() throws Exception {
 		try (var store=EtchStore.createTemp("root-prelaunch")) {
 			store.setRootData(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.ONE)));
-			var host=LatticeHost.open(LATTICE.zero(),store,convex.lattice.cursor.Cursors::transactionalRoot);
+			var host=LatticeHost.open(LATTICE.zero(),store);
 			host.addApplication(new LatticeComponent<>(LATTICE,host.cursor()));
 			try (var node=new NodeServer<>(host)) {
 				node.mergeValue(LATTICE.zero().assoc(ITEMS,Sets.of(CVMLong.TWO)));
-				assertTrue(node.getCursor().supportsExclusiveTransactions());
 				node.launch();
 				assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),node.getLocalValue().get(ITEMS));
 				assertEquals(node.getLocalValue(),store.getRootData());

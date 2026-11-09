@@ -301,10 +301,8 @@ public class SharedApplicationInternalsTest {
 		final FilesWithP2P files;
 		final LatticePropagator socialGroup=group(socialStore,root -> project(root,Social.KEY_SOCIAL));
 		final LatticePropagator filesGroup=group(filesStore,root -> project(root,Keywords.FS));
-		Fixture() { this(false); }
-		Fixture(boolean coordinated) {
-			var cursor=coordinated?Cursors.transactionalRoot(HOST_ROOT.zero()):Cursors.root(HOST_ROOT.zero());
-			var host=new LatticeHost<>(cursor,store);
+		Fixture() {
+			var host=new LatticeHost<>(Cursors.root(HOST_ROOT.zero()),store);
 			social=new SocialWithP2P(host);
 			files=new FilesWithP2P(host);
 			host.addApplication(social);
@@ -338,19 +336,9 @@ public class SharedApplicationInternalsTest {
 		return new Data(post,drive);
 	}
 
-	@Test public void testTypedTransactionsOnOrdinaryHost() throws Exception {
-		testTypedTransactionsAcrossSharedApplicationRegions(false);
-	}
-
-	@Test public void testTypedTransactionsOnTransactionalHost() throws Exception {
-		testTypedTransactionsAcrossSharedApplicationRegions(true);
-	}
-
-	private void testTypedTransactionsAcrossSharedApplicationRegions(boolean coordinated) throws Exception {
-		try (Fixture f=new Fixture(coordinated)) {
+	@Test public void testTypedTransactionsAcrossSharedApplicationRegions() throws Exception {
+		try (Fixture f=new Fixture()) {
 			var root=f.node.getHost().cursor();
-			assertEquals(coordinated,root.supportsExclusiveTransactions());
-			assertEquals(coordinated,f.social.social.user(SOCIAL_KEY.getAccountKey()).cursor().supportsExclusiveTransactions());
 			var before=root.get();
 			f.social.execute(app -> {
 				var user=app.social.user(SOCIAL_KEY.getAccountKey());

@@ -1,9 +1,9 @@
 package convex.lattice.cursor;
 
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -56,7 +56,10 @@ public abstract class ATransformCursor<V extends ACell,S extends ACell> extends 
 	/** One write operation; subclasses may retain preparation across its retries. */
 	protected BiFunction<S,V,S> writeOperation() { return this::write; }
 
-	@Override protected Lock exclusiveLock() { return base.exclusiveLock(); }
+	@Override protected Claim claim(Function<? super V,? extends ACell> reader) {
+		return base.claim(stored -> reader.apply(view(stored)));
+	}
+
 	@Override public V get() { return CursorValues.require(readValue()); }
 
 	@SuppressWarnings("unchecked")

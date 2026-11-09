@@ -2,8 +2,8 @@ package convex.lattice.cursor;
 
 import java.io.IOException;
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -14,8 +14,8 @@ import convex.core.util.Utils;
  * An unchanged fork adopts the destination; an unchanged destination accepts
  * the working value. When both changed, the merge supplied to sync decides.
  *
- * <p>Sync updates the destination atomically while holding the working root's
- * write lock. Working writes are ordered around sync; reads take no lock. Failed
+ * <p>Sync updates the destination atomically while holding the claim on the whole
+ * working root. Working writes are ordered around sync; reads never wait. Failed
  * reconciliation or destination preparation leaves the working value and
  * baseline unchanged. Successful publication requires no further merge.</p>
  *
@@ -31,15 +31,15 @@ import convex.core.util.Utils;
 public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	private final ACursor<V> destination;
-	private final TransactionalRootCursor<V> working;
-	/** Last reconciled destination value, protected by the working root lock. */
+	private final Root<V> working;
+	/** Last reconciled destination value, protected by the working root's claim. */
 	private V baseline;
 
 	private ForkedCursor(ACursor<V> destination) {
 		this.destination=Objects.requireNonNull(destination,"Destination must not be null");
 		// A fork can prepare a new entry; no destination state is created here.
 		this.baseline=destination.getOrDefault(null);
-		this.working=new TransactionalRootCursor<>(baseline);
+		this.working=new Root<>(baseline);
 	}
 
 	/**
@@ -63,15 +63,11 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	@Override
 	public V sync(BinaryOperator<V> merge) {
 		Objects.requireNonNull(merge,"Merge function must not be null");
-		Lock lock=working.exclusiveLock();
-		lock.lock();
-		try {
+		try (Claim claim=working.claim(value -> value)) {
 			V published=destination.updateAndGet(new Reconciliation(working.get(),merge));
 			working.set(published);
 			baseline=published;
 			return published;
-		} finally {
-			lock.unlock();
 		}
 	}
 
@@ -100,22 +96,17 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	/**
 	 * Persists the working value as any cursor does, then the reconciled baseline,
 	 * so the fork keeps no copy the persister has made redundant. The baseline is
-	 * persisted outside the lock and replaced only if no sync has moved it meanwhile;
+	 * persisted outside the claim and replaced only if no sync has moved it meanwhile;
 	 * a moved baseline waits for the next persist.
 	 */
 	@Override
 	public V persist(Persister<V> persister) throws IOException {
 		V persisted=working.persist(persister);
-		Lock lock=working.exclusiveLock();
 		V previous;
-		lock.lock();
-		try { previous=baseline; } finally { lock.unlock(); }
+		try (Claim claim=working.claim(value -> value)) { previous=baseline; }
 		V retained=(previous==null)?null:persister.persist(previous);
-		lock.lock();
-		try {
+		try (Claim claim=working.claim(value -> value)) {
 			if (baseline==previous) baseline=retained;
-		} finally {
-			lock.unlock();
 		}
 		return persisted;
 	}
@@ -123,11 +114,11 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 	// ===== Working storage =====
 
 	@Override
-	protected Lock exclusiveLock() {
-		return working.exclusiveLock();
+	protected Claim claim(Function<? super V,? extends ACell> reader) {
+		return working.claim(reader);
 	}
 
-	/** Reads the working value without the lock; a read during sync sees the value from before it. */
+	/** Reads the working value without waiting; a read during sync sees the value from before it. */
 	@Override
 	public V get() {
 		return working.get();

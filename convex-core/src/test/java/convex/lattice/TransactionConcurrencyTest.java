@@ -11,8 +11,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -21,7 +19,6 @@ import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
-import convex.lattice.cursor.TransactionalRootCursor;
 
 /**
  * Transactions with writers on real threads. Each behaviour is specified
@@ -47,14 +44,14 @@ class TransactionConcurrencyTest {
 		}
 	}
 
-	private static Counter counter(boolean coordinated) {
+	private static Counter counter() {
 		AHashMap<Keyword,ACell> initial=Maps.of(COUNT,CVMLong.ZERO);
-		return new Counter(coordinated?new TransactionalRootCursor<>(initial):new Root<>(initial));
+		return new Counter(new Root<>(initial));
 	}
 
 	/** A draft is thread-safe: work the callback hands to other threads joins the transaction if it finishes first. */
 	@Test void callbackCanJoinConcurrentDraftEditsBeforeCommit() {
-		Counter live=counter(false);
+		Counter live=counter();
 		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
 			live.execute(draft -> {
 				CountDownLatch start=new CountDownLatch(1);
@@ -76,11 +73,9 @@ class TransactionConcurrencyTest {
 		assertEquals(65,live.count());
 	}
 
-	/** Plain writes, optimistic transactions and, where the root has a lock, exclusive ones all survive together. */
-	@ParameterizedTest
-	@ValueSource(booleans={false,true})
-	void everyKindOfWriterPreservesEveryChange(boolean coordinated) throws Exception {
-		Counter live=counter(coordinated);
+	/** Plain writes, optimistic transactions and exclusive ones all survive together. */
+	@Test void everyKindOfWriterPreservesEveryChange() throws Exception {
+		Counter live=counter();
 		CountDownLatch start=new CountDownLatch(1);
 		AtomicInteger exclusiveCallbacks=new AtomicInteger();
 		try (var executor=Executors.newVirtualThreadPerTaskExecutor()) {
@@ -91,7 +86,7 @@ class TransactionConcurrencyTest {
 					await(start);
 					for (int j=0;j<100;j++) {
 						if (mode==0) live.increment();
-						else if (mode==1 || !coordinated) live.execute(Counter::increment);
+						else if (mode==1) live.execute(Counter::increment);
 						else live.exclusive().execute(draft -> {
 							exclusiveCallbacks.incrementAndGet();
 							draft.increment();
@@ -103,7 +98,7 @@ class TransactionConcurrencyTest {
 			CompletableFuture.allOf(work.toArray(CompletableFuture[]::new)).get(10,TimeUnit.SECONDS);
 		}
 		assertEquals(800,live.count());
-		assertEquals(coordinated?200:0,exclusiveCallbacks.get(),"Each exclusive callback ran once");
+		assertEquals(200,exclusiveCallbacks.get(),"Each exclusive callback ran once");
 	}
 
 	private static void await(CountDownLatch latch) {

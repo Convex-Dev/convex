@@ -225,11 +225,4 @@ public class ForkedCursorTest {
 		assertEquals(CVMLong.create(4),fork.sync((own,other) -> other));
 		assertSame(root.get(),fork.get());
 	}
-
-	@Test public void workingStorageAlwaysSupportsExclusiveTransactions() {
-		assertTrue(Root.<ASet<CVMLong>>create(Sets.empty()).fork()
-			.supportsExclusiveTransactions());
-		assertTrue(new TransactionalRootCursor<ASet<CVMLong>>(Sets.empty()).fork()
-			.supportsExclusiveTransactions());
-	}
 }

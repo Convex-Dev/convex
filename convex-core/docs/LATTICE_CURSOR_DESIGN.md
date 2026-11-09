@@ -13,8 +13,7 @@ component-owned working state and batched signing.
 ```text
 ACursor<V>                                get / atomic update / persist / path
 └── AForkableCursor<V>                    typed paths; fork(); sync(merge)
-    ├── Root<V>                           atomic value holder
-    │   └── TransactionalRootCursor<V>    opt-in coordinated writes
+    ├── Root<V>                           atomic value holder; at most one claim
     ├── ForkedCursor<V>                   working copy; sync reconciles with a plug-in function
     ├── ReadOnlyCursor<V>                 refuses every write; reads, paths and forks pass through
     └── ATransformCursor<V,S>             shared atomic mutable-view operations
@@ -35,7 +34,7 @@ ordinary Java functions supplied by their owning components.
 The base contract stays minimal: get, atomic update and path at one location.
 Subclasses and compositions add behaviour; the base gains no capability hooks that
 every subclass and view would have to forward. A service owned by the root gets at
-most one hook, resolved through existing source links: `exclusiveLock()`, for
+most one hook, resolved through existing source links: `claim()`, for
 transactions and fork publication, is the only one. Storage, durability and
 publication attach at the host, and a module that needs a store mid-write, such as
 DLFS writing blob checkpoints, takes it as an explicit parameter. `persist` is not a
@@ -197,9 +196,9 @@ A fork that takes part in timestamp-ordered merges sits outside its stamp. Insid
 it, the fork's working value keeps the timestamp it was forked from, so incoming
 merges and reconciliation at sync select older records over its edits.
 
-Each fork uses an independent `TransactionalRootCursor`. Sync holds its existing
-write lock while the destination's atomic update reconciles and commits by CAS.
-Fork reads take no lock: a read during sync sees the working value from before it,
+Each fork uses an independent `Root`. Sync holds the claim on all of it while the
+destination's atomic update reconciles and commits by CAS.
+Fork reads never wait: a read during sync sees the working value from before it,
 and a read after sync returns sees the published value. A successful commit installs the reconciled working
 value and advances the baseline without further user code or merging. Failed
 reconciliation or preparation commits nothing; competing destination writes remain
@@ -243,21 +242,37 @@ state. Applications may add preparation and managed-child publication explicitly
 
 `Transactions` runs a synchronous callback against a private draft and commits by
 CAS, preserving each operation under contention. `transact` returns the result of
-the run that committed; `execute` returns nothing. `TransactionalRootCursor` opts into a shared write lock for
-exclusive execution, where the callback runs once under the lock, and for contention
-fallback. Derived views forward that lock through their existing source links. Typed domain
+the run that committed; `execute` returns nothing.
+
+Optimistic execution is the fast path for transactions that do not collide. Commit
+checks only the transaction's own value: a change elsewhere under the root never
+reruns the callback, and its finished result is applied to the new root. When its own
+value has changed twice, the transaction takes the root's claim and finishes under
+it, so transactions that collide run one at a time and a callback runs at most three
+times. An exclusive transaction starts with the claim and runs once, for work too
+expensive to repeat or with side effects.
+
+A root holds at most one claim, so claims queue whatever they cover. A claim covers
+what the claiming cursor reads: each derived view composes its own read into the
+claim through its source link, and the root needs to know nothing about paths or
+views. While a claim is held, a write that would change that part of the value waits
+for the release and recalculates, and a write that leaves it the same cell carries
+on, with no other cost. Reads never wait. Without a claim a write costs one type
+check, and nothing is recorded per transaction.
+
+Typed domain
 transactions use `rebind` to retain component policy; a component opts in by
 declaring `TransactionalComponent` and refining `rebind` to return its own type.
 `TransactionalComponent.exclusive()` gives an `ExclusiveComponent`, built from bound
 storage as a fork is: a read-only view of it, whose transactions rebind the domain
-component to a draft and commit to that storage under its root's lock.
+component to a draft and commit to that storage under its root's claim.
 The transaction targets bound `storage()`, while the rebound view rebuilds the
 component's editing views over the draft. An authoring view within bound storage
 applies once at commit: a signing view signs the committed value, and a stamp there
 gives it the commit's time. A stamp the component builds over its storage applies
 within the draft instead, with the time of the edit, and commit does not apply it
 again. Unsigned staged components defer signing to publication.
-Each attempt uses a fresh `TransactionalRootCursor` for its draft, supporting
+Each attempt uses a fresh `Root` for its draft, supporting
 concurrent edits and nested transactions through the existing cursor machinery.
 The callback must finish its work before returning. Only the captured immutable
 value is committed; later edits to a retained draft or its forks remain private.

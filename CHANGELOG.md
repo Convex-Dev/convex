@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Give lattice components one way to move onto new storage, for both forks and transactions; see [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
+- Run exclusive lattice transactions on any component, holding up only writes to the branch they claim; `TransactionalRootCursor` is gone. See [Forks, transactions and publication](convex-core/docs/LATTICE_CURSOR_DESIGN.md#forks-transactions-and-publication) when upgrading.
+- Run colliding lattice transactions one at a time after two conflicts on their own value.
 
 ### Fixed
 

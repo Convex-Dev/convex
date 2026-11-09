@@ -1,7 +1,6 @@
 package convex.lattice.cursor;
 
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -10,8 +9,7 @@ import convex.core.util.Utils;
 
 /**
  * Atomic subtree transactions over a cursor: run a callback against a private draft
- * of the cursor's value, then commit by compare-and-set, retrying while the live
- * value changes underneath.
+ * of the cursor's value, then commit by compare-and-set.
  *
  * <p>This is {@code updateAndGet} whose update function receives a cursor instead of
  * a bare value, so a callback can navigate, wrap boundaries and write through
@@ -24,11 +22,18 @@ import convex.core.util.Utils;
  * <p>{@code transact} returns the callback's result from the run that committed;
  * {@code execute} returns nothing.</p>
  *
- * <p>Ordinary roots retry optimistically without limit. A root supporting
- * exclusive transactions falls back to its write lock after three failed commit
- * attempts; {@link #transactExclusively} runs once under that lock from the start.</p>
+ * <p>Optimistic execution is the fast path for transactions that do not collide. A
+ * change elsewhere under the root never reruns a callback: its finished result is
+ * applied to the new root. When the transaction's own value has changed twice, it
+ * takes the root's one {@link Claim} and finishes under it, so transactions that
+ * collide run one at a time and a callback runs at most three times.
+ * {@link #transactExclusively} starts with the claim, for work too expensive to
+ * repeat or with side effects: its callback runs once.</p>
  */
 public final class Transactions {
+
+	/** Changes to a transaction's own value it accepts before taking the claim. */
+	private static final int CONFLICTS_BEFORE_CLAIM=2;
 
 	private Transactions() {}
 
@@ -49,12 +54,10 @@ public final class Transactions {
 		Objects.requireNonNull(cursor);
 		Objects.requireNonNull(action);
 		Transaction<V,R> attempt=new Transaction<>(cursor,action);
-		Lock lock=cursor.exclusiveLock();
-		for (int failures=0;;failures++) {
+		while (attempt.conflicts<CONFLICTS_BEFORE_CLAIM) {
 			if (attempt.commit()) return attempt.output;
-			if (lock!=null && failures==2) break;
 		}
-		return commitExclusively(attempt,lock);
+		return attempt.commitClaimed();
 	}
 
 	/**
@@ -73,31 +76,28 @@ public final class Transactions {
 	}
 
 	/**
-	 * Runs one isolated callback while excluding all other writes to the shared root,
-	 * and returns its result.
+	 * Runs one isolated callback, once, under the root's claim on this cursor's value,
+	 * and returns its result. Writes that would change this value wait until it
+	 * commits, and so do other claims on the root; writes elsewhere carry on.
 	 *
 	 * @param <V> Value type
 	 * @param <R> Result type
-	 * @param cursor Cursor whose root supports exclusive transactions
+	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
 	 * @return Result of the callback, which ran once
-	 * @throws UnsupportedOperationException if the cursor's root is an ordinary optimistic root
 	 */
 	public static <V extends ACell,R> R transactExclusively(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
 		Objects.requireNonNull(cursor);
 		Objects.requireNonNull(action);
-		Lock lock=cursor.exclusiveLock();
-		if (lock==null) throw new UnsupportedOperationException("Cursor does not support exclusive transactions");
-		return commitExclusively(new Transaction<>(cursor,action),lock);
+		return new Transaction<>(cursor,action).commitClaimed();
 	}
 
 	/**
 	 * Runs one isolated callback with no result, as {@link #transactExclusively}.
 	 *
 	 * @param <V> Value type
-	 * @param cursor Cursor whose root supports exclusive transactions
+	 * @param cursor Cursor whose value the transaction updates
 	 * @param action Operations on a private draft, completed before the callback returns
-	 * @throws UnsupportedOperationException if the cursor's root is an ordinary optimistic root
 	 */
 	public static <V extends ACell> void executeExclusively(AForkableCursor<V> cursor, Consumer<? super AForkableCursor<V>> action) {
 		Objects.requireNonNull(action);
@@ -105,16 +105,6 @@ public final class Transactions {
 			action.accept(draft);
 			return null;
 		});
-	}
-
-	private static <V extends ACell,R> R commitExclusively(Transaction<V,R> attempt, Lock lock) {
-		lock.lock();
-		try {
-			if (!attempt.commit()) throw new IllegalStateException("Re-entrant write during transaction commit");
-			return attempt.output;
-		} finally {
-			lock.unlock();
-		}
 	}
 
 	private static final class Transaction<V extends ACell,R> {
@@ -126,23 +116,31 @@ public final class Transactions {
 		private V candidate;
 		/** Result of the computed run, which is the committed run once commit succeeds. */
 		private R output;
+		/** Times a computed run was invalidated by a change to the transaction's own value. */
+		int conflicts;
 
 		Transaction(AForkableCursor<V> cursor, Function<? super AForkableCursor<V>,? extends R> action) {
 			this.cursor=cursor;
 			this.action=action;
 		}
 
+		private void run(V value) {
+			input=value;
+			var draft=new Root<>(input);
+			output=action.apply(draft);
+			V result=draft.get();
+			// Preserve the original immutable value for a no-op.
+			candidate=Utils.equals(input,result)?input:result;
+			computed=true;
+		}
+
+		/** One optimistic attempt. False leaves the caller to try again or take the claim. */
 		boolean commit() {
 			// A transaction can create a missing final entry, as an atomic update can.
 			V observed=cursor.getOrDefault(null);
 			if (!computed || !Utils.equals(observed,input)) {
-				input=observed;
-				var draft=new TransactionalRootCursor<>(input);
-				output=action.apply(draft);
-				V value=draft.get();
-				// Preserve the original immutable value for a no-op.
-				candidate=Utils.equals(input,value)?input:value;
-				computed=true;
+				if (computed && ++conflicts>=CONFLICTS_BEFORE_CLAIM) return false;
+				run(observed);
 			}
 			// Validate against a fresh observation, including no-ops. Its reference
 			// may differ from the input while denoting exactly the same value.
@@ -150,6 +148,19 @@ public final class Transactions {
 			if (!Utils.equals(observed,input)) return false;
 			if (Utils.equals(observed,candidate)) return true;
 			return cursor.compareAndSet(observed,candidate);
+		}
+
+		/** Finishes under the claim, where only a change elsewhere can fail the commit. */
+		R commitClaimed() {
+			try (Claim claim=cursor.claim(value -> value)) {
+				V observed=cursor.getOrDefault(null);
+				if (!computed || !Utils.equals(observed,input)) run(observed);
+				for (;;) {
+					observed=cursor.getOrDefault(null);
+					if (!Utils.equals(observed,input)) throw new IllegalStateException("Re-entrant write during transaction commit");
+					if (Utils.equals(observed,candidate) || cursor.compareAndSet(observed,candidate)) return output;
+				}
+			}
 		}
 	}
 }

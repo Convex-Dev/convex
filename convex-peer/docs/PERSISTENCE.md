@@ -87,8 +87,7 @@ reasonable defaults. A request requiring durable completion calls
 completion guarantee.
 
 Host construction expresses opening intent: `create` rejects a retained root,
-`open` adopts one, and `replace` explicitly writes a replacement. Optional cursor
-coordination is supplied at host construction with `Cursors::transactionalRoot`.
+`open` adopts one, and `replace` explicitly writes a replacement.
 `RelayHost.open(lattice, store, context)` adds one live relay application using
 these ordinary host rules. Storage flags are not `NodeConfig` settings.
 

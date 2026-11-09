@@ -11,8 +11,9 @@ import convex.lattice.cursor.Transactions;
 /**
  * Exclusive transactions on a component's live state, made by
  * {@link TransactionalComponent#exclusive()}. Each callback runs once, on a private
- * draft, while holding the write lock of the component's root, and commits before the
- * lock is released. Use it for operations which must not repeat.
+ * draft, under its root's one claim on this component's value, and commits before the
+ * claim is released. Use it for operations too expensive to repeat, or with side
+ * effects.
  *
  * <p>Like a fork, this is built from the component's bound storage. A fork derives
  * private working storage and rebinds the domain component to it; this derives a
@@ -25,13 +26,14 @@ import convex.lattice.cursor.Transactions;
  * Commits go to the source's bound storage, which this component holds privately
  * because the read-only view deliberately carries no write access.</p>
  *
- * <p>The lock belongs to the source's root. For a staged component it covers only
- * that component's working copy, so the fork's sync waits for a running transaction;
- * for a live component it covers every writer of the host. A fork's working storage
- * always has such a lock, so {@code fork().exclusive()} is available over any root.
+ * <p>The claim belongs to the source's root, and covers only this component's value:
+ * writes that would change it wait, including incoming merges, and writes elsewhere
+ * carry on. A root holds one claim at a time, so exclusive transactions on the same
+ * root run one after another whatever they touch. For a staged component the root is
+ * that component's working copy, so the fork's sync waits for a running transaction.
  * A transaction on a staged component commits only to its fork; publishing remains a
- * separate sync. Keep callbacks short: they must not wait for another operation on
- * the same state, sync it, or write through a captured live component.</p>
+ * separate sync. Callbacks must not wait for another operation on the same state,
+ * sync it, or write through a captured live component.</p>
  *
  * @param <V> Lattice value type
  * @param <C> Domain component type supplied to callbacks
@@ -46,15 +48,12 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 
 	ExclusiveComponent(AForkableCursor<V> target,Function<? super AForkableCursor<V>,? extends C> binder) {
 		super(target.readOnly());
-		if (!target.supportsExclusiveTransactions()) {
-			throw new UnsupportedOperationException("Cursor does not support exclusive transactions");
-		}
 		this.target=target;
 		this.binder=Objects.requireNonNull(binder);
 	}
 
 	/**
-	 * Runs domain operations once on a private view under the root's write lock,
+	 * Runs domain operations once on a private view under the root's claim,
 	 * commits them, and returns their result.
 	 *
 	 * @param <R> Result type

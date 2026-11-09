@@ -16,7 +16,7 @@ import convex.lattice.LatticeOps;
  * {@link convex.lattice.PathWriteException} at that key.
  * Update functions receive the actual
  * value, including null; components supply any defaults or construction logic.
- * Atomic operations, unchanged-write handling and transaction locking come from
+ * Atomic operations, unchanged-write handling and claims come from
  * {@link ATransformCursor}.</p>
  *
  * @param <V> Type of cursor values at the path location

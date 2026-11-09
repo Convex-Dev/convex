@@ -1,8 +1,8 @@
 package convex.lattice.cursor;
 
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -31,7 +31,7 @@ public final class ReadOnlyCursor<V extends ACell> extends AForkableCursor<V> {
 
 	@Override public V get() { return source.get(); }
 	@Override protected Object readValue() { return source.readValue(); }
-	@Override protected Lock exclusiveLock() { return source.exclusiveLock(); }
+	@Override protected Claim claim(Function<? super V,? extends ACell> reader) { return source.claim(reader); }
 	@Override public AForkableCursor<V> readOnly() { return this; }
 
 	@Override public V getAndSet(V newValue) { throw new ReadOnlyCursorException(); }

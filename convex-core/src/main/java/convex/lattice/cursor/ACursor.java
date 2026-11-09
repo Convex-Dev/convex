@@ -1,8 +1,8 @@
 package convex.lattice.cursor;
 
 import java.io.IOException;
-import java.util.concurrent.locks.Lock;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -53,26 +53,20 @@ public abstract class ACursor<V extends ACell> {
 	// ===== Exclusive transactions =====
 
 	/**
-	 * Returns the lock which serialises writes to this cursor's shared state, or null
-	 * when that state lives in an ordinary optimistic root. Derived cursors resolve
-	 * this through their existing links; {@link TransactionalRootCursor} supplies its
-	 * write lock. This is the only root-owned capability a cursor exposes, and it
-	 * supports {@link Transactions} and atomic fork publication.
+	 * Takes the {@link Claim} of the root holding this cursor's state, covering what
+	 * the reader finds in this cursor's value, and waiting for any earlier claim on
+	 * that root. Derived cursors compose their own read into the reader through their
+	 * existing links, so a root needs to know nothing about paths or views. This is
+	 * the only root-owned capability a cursor exposes, and it supports
+	 * {@link Transactions} and atomic fork publication.
 	 *
-	 * @return Shared write lock, or null when exclusive transactions are unsupported
+	 * @param reader Reads the claimed part from this cursor's value. Side-effect free;
+	 *        runs on writers' threads while the claim is held
+	 * @return The claim, to be closed by the calling thread
+	 * @throws IllegalStateException if the calling thread already holds this root's claim
 	 */
-	protected Lock exclusiveLock() {
-		return null;
-	}
-
-	/**
-	 * Whether this cursor's shared state supports exclusive transactions. Ordinary
-	 * roots support optimistic transactions only.
-	 *
-	 * @return true if {@link Transactions#transactExclusively} is available
-	 */
-	public final boolean supportsExclusiveTransactions() {
-		return exclusiveLock() != null;
+	protected Claim claim(Function<? super V,? extends ACell> reader) {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" has no root to claim");
 	}
 
 	// ===== Reads =====

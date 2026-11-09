@@ -23,12 +23,11 @@ import convex.lattice.cursor.Transactions;
  *
  * <p>{@link #transact} returns the callback's result from the run that committed;
  * {@link #execute} returns nothing. {@link #exclusive()} gives the form whose
- * callbacks run once under the root's write lock.</p>
+ * callbacks run once under the root's claim on this component's value.</p>
  *
  * <p>An {@link ALatticeComponent} opts in by declaring this interface and refining
  * {@link ALatticeComponent#rebind} to return its own type; its bound storage comes
- * from the base class, and its normal root need not be a transactional one. Application
- * subclasses can opt in without changing their base class or introducing a component
+ * from the base class, and any root will do. Application subclasses can opt in without changing their base class or introducing a component
  * registry. The engine is
  * {@link Transactions}; this interface adds the typed component view. Rebinding
  * rebuilds the component's editing views over the draft, so a stamp the component
@@ -59,9 +58,10 @@ public interface TransactionalComponent<V extends ACell,C> {
 	C rebind(AForkableCursor<V> cursor);
 
 	/**
-	 * Applies domain operations atomically, retrying conflicts, and returns the result
-	 * of the run that committed. A transactional root falls back to serial execution
-	 * after three failed attempts; an ordinary root continues optimistically. Equality,
+	 * Applies domain operations atomically and returns the result of the run that
+	 * committed. Runs optimistically; if this component's value keeps changing, the
+	 * transaction takes the root's claim and finishes under it, so the callback runs at
+	 * most three times. Changes elsewhere under the root never rerun it. Equality,
 	 * rather than Java object identity, determines whether an input has changed or an
 	 * operation leaves that input unchanged.
 	 *
@@ -86,10 +86,9 @@ public interface TransactionalComponent<V extends ACell,C> {
 
 	/**
 	 * Returns a read-only component over this one's bound storage whose transactions
-	 * each run once while holding the root's write lock.
+	 * each run once under the root's claim on this component's value.
 	 *
 	 * @return Exclusive transactions on this component's state
-	 * @throws UnsupportedOperationException if the bound storage is in an ordinary optimistic root
 	 */
 	default ExclusiveComponent<V,C> exclusive() {
 		return new ExclusiveComponent<>(storage(),this::rebind);

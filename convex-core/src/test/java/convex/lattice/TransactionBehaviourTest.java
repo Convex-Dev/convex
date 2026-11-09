@@ -4,24 +4,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BinaryOperator;
 import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -33,7 +25,6 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ReadOnlyCursorException;
 import convex.lattice.cursor.Root;
-import convex.lattice.cursor.TransactionalRootCursor;
 import convex.lattice.cursor.Transactions;
 
 /**
@@ -145,24 +136,27 @@ class TransactionBehaviourTest {
 
 	/**
 	 * Shared storage whose competing writers are scripted: each commit attempt first
-	 * applies the next queued write. Without a lock it presents as an ordinary
-	 * optimistic root, since the lock is the only capability a root exposes.
+	 * applies the next queued write.
 	 */
-	private static final class ScriptedRoot extends TransactionalRootCursor<AHashMap<Keyword,ACell>> {
-		private final boolean lockable;
+	private static final class ScriptedRoot extends Root<AHashMap<Keyword,ACell>> {
 		private final Deque<BinaryOperator<AHashMap<Keyword,ACell>>> competing=new ArrayDeque<>();
 
-		ScriptedRoot(boolean lockable) {
+		ScriptedRoot() {
 			super(Maps.empty());
-			this.lockable=lockable;
 		}
 
 		/** Queues another writer's commit, computed from the current value and the value the attempt proposes. */
 		void competeWith(BinaryOperator<AHashMap<Keyword,ACell>> write) { competing.add(write); }
 
-		ReentrantLock writeLock() { return (ReentrantLock)super.exclusiveLock(); }
-
-		@Override protected Lock exclusiveLock() { return lockable?super.exclusiveLock():null; }
+		/** Whether the calling thread holds this root's claim, the one case a second claim is refused. */
+		boolean claimedByCaller() {
+			try {
+				Transactions.executeExclusively(this,draft -> {});
+				return false;
+			} catch (IllegalStateException e) {
+				return true;
+			}
+		}
 
 		@Override public boolean compareAndSet(AHashMap<Keyword,ACell> expected,AHashMap<Keyword,ACell> value) {
 			var write=competing.poll();
@@ -203,10 +197,8 @@ class TransactionBehaviourTest {
 
 	// ===== Atomicity and isolation =====
 
-	@ParameterizedTest
-	@ValueSource(booleans={false,true})
-	void editsCommitTogetherAndStayPrivateUntilCommit(boolean lockable) {
-		Ledger north=bank(new ScriptedRoot(lockable)).branch(NORTH);
+	@Test void editsCommitTogetherAndStayPrivateUntilCommit() {
+		Ledger north=bank(new ScriptedRoot()).branch(NORTH);
 		north.execute(draft -> {
 			draft.transfer("alice","bob",30);
 			assertEquals(70,draft.balance("alice"));
@@ -218,7 +210,7 @@ class TransactionBehaviourTest {
 	}
 
 	@Test void failureDiscardsEveryEditOfTheAttempt() {
-		Bank bank=bank(new ScriptedRoot(false));
+		Bank bank=bank(new ScriptedRoot());
 		Ledger north=bank.branch(NORTH);
 		assertThrows(IllegalStateException.class,() -> north.transfer("alice","nobody",30));
 		assertEquals(70,north.balance("alice"),"Outside a transaction the debit was a separate edit");
@@ -237,7 +229,7 @@ class TransactionBehaviourTest {
 	// ===== Results =====
 
 	@Test void transactReturnsTheResultAndExecuteReturnsNothing() {
-		Ledger north=bank(new ScriptedRoot(false)).branch(NORTH);
+		Ledger north=bank(new ScriptedRoot()).branch(NORTH);
 		long first=north.transact(draft -> draft.transfer("alice","bob",10));
 		long second=north.transact(draft -> draft.transfer("alice","bob",10));
 		north.execute(draft -> draft.transfer("alice","bob",10));
@@ -248,10 +240,8 @@ class TransactionBehaviourTest {
 
 	// ===== Conflicts =====
 
-	@ParameterizedTest
-	@ValueSource(booleans={false,true})
-	void competingCommitRerunsTheOperationsAndLosesNeitherChange(boolean lockable) {
-		var root=new ScriptedRoot(lockable);
+	@Test void competingCommitRerunsTheOperationsAndLosesNeitherChange() {
+		var root=new ScriptedRoot();
 		Ledger north=bank(root).branch(NORTH);
 		root.competeWith(deposit(NORTH,"alice",50));
 		var runs=new AtomicInteger();
@@ -269,7 +259,7 @@ class TransactionBehaviourTest {
 	}
 
 	@Test void equalReplacementReusesTheRun() {
-		var root=new ScriptedRoot(false);
+		var root=new ScriptedRoot();
 		Bank bank=bank(root);
 		root.competeWith(TransactionBehaviourTest::equalCopy);
 		var runs=new AtomicInteger();
@@ -283,7 +273,7 @@ class TransactionBehaviourTest {
 	}
 
 	@Test void competingCommitOfTheSameValueStillRerunsTheOperations() {
-		var root=new ScriptedRoot(false);
+		var root=new ScriptedRoot();
 		Ledger north=bank(root).branch(NORTH);
 		root.competeWith((current,proposed) -> proposed); // another writer commits exactly this attempt's value
 		var runs=new AtomicInteger();
@@ -298,7 +288,7 @@ class TransactionBehaviourTest {
 	}
 
 	@Test void competingWriteOutsideTheComponentDoesNotRerunIt() {
-		var root=new ScriptedRoot(false);
+		var root=new ScriptedRoot();
 		Bank bank=bank(root);
 		root.competeWith(deposit(SOUTH,"carol",5));
 		var runs=new AtomicInteger();
@@ -311,29 +301,37 @@ class TransactionBehaviourTest {
 		assertEquals(5,bank.branch(SOUTH).balance("carol"));
 	}
 
-	@ParameterizedTest
-	@ValueSource(booleans={false,true})
-	void repeatedConflictsEndUnderTheLockOnlyWhereThereIsOne(boolean lockable) {
-		var root=new ScriptedRoot(lockable);
+	@Test void repeatedConflictsFinishUnderTheClaim() {
+		var root=new ScriptedRoot();
 		Ledger north=bank(root).branch(NORTH);
-		int conflicts=lockable?3:5;
-		for (int i=0;i<conflicts;i++) root.competeWith(deposit(NORTH,"alice",1));
-		List<Boolean> underLock=new ArrayList<>();
+		for (int i=0;i<2;i++) root.competeWith(deposit(NORTH,"alice",1));
+		List<Boolean> claimed=new ArrayList<>();
 		north.execute(draft -> {
-			underLock.add(root.writeLock().isHeldByCurrentThread());
+			claimed.add(root.claimedByCaller());
 			draft.transfer("alice","bob",30);
 		});
-		List<Boolean> expected=new ArrayList<>(Collections.nCopies(conflicts,false));
-		if (lockable) expected.add(true); // the fourth run holds the lock, so it cannot conflict
-		else expected.add(false); // an ordinary root retries until a run commits
-		assertEquals(expected,underLock);
-		assertEquals(70+conflicts,north.balance("alice"));
+		assertEquals(List.of(false,false,true),claimed,"The third run holds the claim, so it cannot conflict");
+		assertEquals(72,north.balance("alice"));
+		assertFalse(root.claimedByCaller(),"The claim was released");
+	}
+
+	@Test void changesElsewhereNeverLeadToTheClaim() {
+		var root=new ScriptedRoot();
+		Bank bank=bank(root);
+		for (int i=0;i<5;i++) root.competeWith(deposit(SOUTH,"carol",1));
+		List<Boolean> claimed=new ArrayList<>();
+		bank.branch(NORTH).execute(draft -> {
+			claimed.add(root.claimedByCaller());
+			draft.transfer("alice","bob",30);
+		});
+		assertEquals(List.of(false),claimed,"One run, finished without the claim");
+		assertEquals(5,bank.branch(SOUTH).balance("carol"));
 	}
 
 	// ===== Scope and composition =====
 
 	@Test void operationsAcrossBranchesNeedTheirCommonAncestor() {
-		Bank bank=bank(new ScriptedRoot(false));
+		Bank bank=bank(new ScriptedRoot());
 		bank.branch(NORTH).execute(draft -> draft.withdraw("alice",30));
 		assertThrows(IllegalStateException.class,() -> bank.branch(SOUTH).execute(draft -> draft.deposit("nobody",30)));
 		assertEquals(70,bank.branch(NORTH).balance("alice"),"Separate transactions commit separately");
@@ -352,8 +350,16 @@ class TransactionBehaviourTest {
 		assertEquals(30,bank.branch(SOUTH).balance("carol"));
 	}
 
+	@Test void transactionWithinABranchTouchesNothingAboveIt() {
+		Bank bank=bank(new ScriptedRoot());
+		var south=bank.value().get(SOUTH);
+		bank.branch(NORTH).execute(draft -> draft.transfer("alice","bob",30));
+		assertSame(south,bank.value().get(SOUTH));
+		assertNull(bank.value().get(Timestamped.TIMESTAMP),"The stamp stays on the branch that changed");
+	}
+
 	@Test void nestedTransactionIsASavepoint() {
-		Bank bank=bank(new ScriptedRoot(false));
+		Bank bank=bank(new ScriptedRoot());
 		long receipt=bank.transact(draft -> {
 			Ledger north=draft.branch(NORTH);
 			long first=north.transact(nested -> nested.transfer("alice","bob",10));
@@ -371,7 +377,7 @@ class TransactionBehaviourTest {
 	// ===== Unchanged and missing state =====
 
 	@Test void transactionThatChangesNothingWritesNothing() {
-		Bank bank=bank(new ScriptedRoot(false));
+		Bank bank=bank(new ScriptedRoot());
 		bank.branch(SOUTH).deposit("carol",5);
 		var before=bank.value();
 		long ticksBefore=ticks.get();
@@ -383,7 +389,7 @@ class TransactionBehaviourTest {
 	}
 
 	@Test void transactionCanCreateMissingState() {
-		Ledger east=bank(new ScriptedRoot(false)).branch(EAST);
+		Ledger east=bank(new ScriptedRoot()).branch(EAST);
 		assertEquals(0L,east.transact(Ledger::total));
 		assertFalse(east.storage().exists(),"Reading creates nothing");
 		east.execute(draft -> draft.open("dave",10));
@@ -393,7 +399,7 @@ class TransactionBehaviourTest {
 	// ===== Policies and lifetimes =====
 
 	@Test void editingPoliciesApplyInTheDraftAndNotAgainAtCommit() {
-		Ledger north=bank(new ScriptedRoot(false)).branch(NORTH);
+		Ledger north=bank(new ScriptedRoot()).branch(NORTH);
 		long before=ticks.get();
 		north.execute(draft -> draft.transfer("alice","bob",30));
 		assertEquals(before+3,ticks.get(),"Debit, credit and receipt are each stamped once");
@@ -401,7 +407,7 @@ class TransactionBehaviourTest {
 	}
 
 	@Test void retainedDraftAndItsForksCannotChangeCommittedState() {
-		Bank bank=bank(new ScriptedRoot(false));
+		Bank bank=bank(new ScriptedRoot());
 		var retained=new AtomicReference<Bank>();
 		var fork=new AtomicReference<Bank>();
 		bank.execute(draft -> {
@@ -419,7 +425,7 @@ class TransactionBehaviourTest {
 	}
 
 	@Test void stagedTransactionCommitsToTheForkUntilSync() {
-		Bank live=bank(new ScriptedRoot(false));
+		Bank live=bank(new ScriptedRoot());
 		Bank staged=live.fork();
 		staged.execute(draft -> {
 			draft.branch(NORTH).transfer("alice","bob",30);
@@ -433,24 +439,16 @@ class TransactionBehaviourTest {
 
 	// ===== Exclusive transactions =====
 
-	@Test void exclusiveTransactionRunsOnceHoldingTheLock() {
-		var root=new ScriptedRoot(true);
+	@Test void exclusiveTransactionRunsOnceUnderTheClaim() {
+		var root=new ScriptedRoot();
 		Bank bank=bank(root);
 		var runs=new AtomicInteger();
-		try (var other=Executors.newSingleThreadExecutor()) {
-			long receipt=bank.exclusive().transact(draft -> {
-				runs.incrementAndGet();
-				assertTrue(root.writeLock().isHeldByCurrentThread());
-				boolean taken=CompletableFuture.supplyAsync(() -> {
-					boolean locked=root.writeLock().tryLock();
-					if (locked) root.writeLock().unlock();
-					return locked;
-				},other).orTimeout(10,TimeUnit.SECONDS).join();
-				assertFalse(taken,"No other writer can take the lock meanwhile");
-				return draft.branch(NORTH).transfer("alice","bob",30);
-			});
-			assertEquals(1L,receipt);
-		}
+		long receipt=bank.exclusive().transact(draft -> {
+			runs.incrementAndGet();
+			assertTrue(root.claimedByCaller());
+			return draft.branch(NORTH).transfer("alice","bob",30);
+		});
+		assertEquals(1L,receipt);
 		assertEquals(1,runs.get());
 		assertEquals(70,bank.branch(NORTH).balance("alice"));
 
@@ -461,26 +459,23 @@ class TransactionBehaviourTest {
 			throw abort;
 		})));
 		assertSame(before,bank.value(),"A failed exclusive transaction commits nothing");
-		assertFalse(root.writeLock().isLocked());
+		assertFalse(root.claimedByCaller(),"and releases the claim");
 	}
 
-	@Test void exclusiveTransactionsNeedARootWithALock() {
-		Bank bank=bank(new ScriptedRoot(false));
-		assertThrows(UnsupportedOperationException.class,bank::exclusive);
-		var runs=new AtomicInteger();
-		assertThrows(UnsupportedOperationException.class,
-			() -> Transactions.executeExclusively(bank.storage(),draft -> runs.incrementAndGet()));
-		assertEquals(0,runs.get(),"Refused before the callback runs");
+	@Test void exclusiveTransactionsWorkOnAnyStorage() {
+		Bank bank=bank(new ScriptedRoot());
+		bank.branch(NORTH).exclusive().execute(draft -> draft.transfer("alice","bob",10));
+		assertEquals(90,bank.branch(NORTH).balance("alice"),"A branch of an ordinary root");
 		Bank staged=bank.fork();
 		staged.exclusive().execute(draft -> draft.branch(NORTH).transfer("alice","bob",30));
-		assertEquals(70,staged.branch(NORTH).balance("alice"),"A fork's working storage always has a lock");
-		assertEquals(100,bank.branch(NORTH).balance("alice"));
+		assertEquals(60,staged.branch(NORTH).balance("alice"),"A fork");
+		assertEquals(90,bank.branch(NORTH).balance("alice"));
 		bank.execute(draft -> draft.exclusive().execute(inner -> inner.branch(NORTH).transfer("alice","bob",10)));
-		assertEquals(90,bank.branch(NORTH).balance("alice"),"So does a draft, which an exclusive transaction locks alone");
+		assertEquals(80,bank.branch(NORTH).balance("alice"),"A draft");
 	}
 
 	@Test void exclusiveComponentChangesStateOnlyThroughItsTransactions() {
-		Bank bank=bank(new ScriptedRoot(true));
+		Bank bank=bank(new ScriptedRoot());
 		var exclusive=bank.exclusive();
 		bank.branch(NORTH).deposit("alice",5);
 		assertEquals(bank.value(),exclusive.value(),"Reads follow the source");
@@ -497,7 +492,7 @@ class TransactionBehaviourTest {
 	// ===== Asynchronous transactions =====
 
 	@Test void asyncTransactionsCompleteAfterCommit() {
-		Bank bank=bank(new ScriptedRoot(false));
+		Bank bank=bank(new ScriptedRoot());
 		Ledger north=bank.branch(NORTH);
 		long alice=north.transactAsync(draft -> draft.transfer("alice","bob",30),Runnable::run)
 			.thenApply(receipt -> north.balance("alice")).join();
