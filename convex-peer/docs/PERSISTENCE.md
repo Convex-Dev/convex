@@ -59,9 +59,10 @@ accepts private application drafts and never exchanges a forked host with its
 origin. Checkpointing a private host with a separate store therefore saves a
 private draft; explicit fork sync or delivery accepts it into another host.
 `persist()` writes a draft's cells to its host's store without publishing it; the
-draft is still not retained until it is synced and checkpointed. It is also what
-releases a draft's memory: a host save leaves a draft on the cells it already held,
-as [cursor persistence](../../convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence)
+draft is still not retained until it is synced and checkpointed. Persisting is also
+what releases a draft's memory, and a component given a persistence function does it
+at each `sync()`. A host save leaves a draft on the cells it already held, as
+[cursor persistence](../../convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence)
 explains.
 
 A service that accepts delayed durability can have the host save on a schedule.
@@ -106,10 +107,9 @@ publish another snapshot.
 If a local write intervenes during publication, the compare-and-set fails: the
 store-backed result is not installed and the racing write stays pending for the
 next sync. The sync result is the exact completed publication, while the live
-cursor may contain additional pending changes. The root stays on the cells it
-held, so that data remains in memory although it is stored. Only a sync with no
-write landing during it releases it; while every sync has one, what the root holds
-in memory keeps growing.
+cursor may contain additional pending changes. The root then persists as it
+stands, racing write included, so what was saved can still leave memory. Its
+cells are written, but the store's root pointer stays at the published snapshot.
 
 Propagators merge nothing. Each group serialises only the announcement of the
 host's published root into its own serving store. A value replicated back from a

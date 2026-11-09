@@ -252,21 +252,27 @@ public abstract class ACursor<V extends ACell> {
 
 	// ===== Persistence =====
 
+	/** Persisting is worth repeating for an edit that lands, but must not chase writes that never pause. */
+	private static final int PERSIST_ATTEMPTS=3;
+
 	/**
 	 * Replaces the value this cursor holds with the equal value the persister returns,
 	 * in one atomic update, so the cells it has stored need not stay in memory. An
 	 * edit landing meanwhile makes the update repeat on the edited value, which is
-	 * harmless: cells already stored are found, not written again. The cursor knows no
+	 * harmless: cells already stored are found, not written again. After three attempts
+	 * the cursor keeps the value as it stands, so writes that never pause cannot hold
+	 * this up, and a later persist switches what is then held. The cursor knows no
 	 * store. A view holds no value of its own and treats the equal value as unchanged,
 	 * so the cells are stored but its source keeps what it holds.
 	 *
 	 * @param persister Writes cells and returns the equal, persisted value
-	 * @return Persisted value, or null if the cursor holds none
+	 * @return Value now held: persisted unless the attempts ran out; null if the cursor holds none
 	 * @throws IOException If the persister fails
 	 */
 	public V persist(Persister<V> persister) throws IOException {
+		int[] attempts={0};
 		try {
-			return updateAndGet(value -> persistValue(persister,value));
+			return updateAndGet(value -> (attempts[0]++<PERSIST_ATTEMPTS)?persistValue(persister,value):value);
 		} catch (StoreException e) {
 			if (e.getCause() instanceof IOException cause) throw cause;
 			throw e;

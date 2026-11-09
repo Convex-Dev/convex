@@ -33,8 +33,9 @@ import convex.lattice.cursor.Persister;
  * into the private copy, for the next sync to publish. Where records come from is the
  * application's decision: {@code :local} is not exchanged with other nodes.</p>
  *
- * <p>Given a persistence function, such as the host's, {@link #persist()} writes the
- * private copy to the application's store without signing or touching the slot.</p>
+ * <p>Given a persistence function, such as the host's, {@link #sync()} also writes the
+ * private copy to the application's store, and {@link #persist()} does so without
+ * signing or touching the slot.</p>
  */
 public abstract class ALocalComponent extends ALatticeComponent<AHashMap<Keyword,ACell>> {
 

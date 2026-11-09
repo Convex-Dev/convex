@@ -7,6 +7,7 @@ import java.util.Objects;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Path;
+import convex.core.exceptions.StoreException;
 import convex.core.util.Utils;
 import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.ForkedCursor;
@@ -31,8 +32,8 @@ import convex.lattice.cursor.Persister;
  * when its generic merge and navigation are the intended component behaviour.</p>
  *
  * <p>A component never holds a store. One with working state of its own persists
- * it through a function supplied at construction ({@link #persist()}); others are
- * persisted with their parent, and the root by the host ({@link LatticeHost}).
+ * it through a function supplied at construction, at each {@link #sync()} and on
+ * demand with {@link #persist()}; others are persisted with their parent, and the root by the host ({@link LatticeHost}).
  * Components which own a store for their own data, such as DLFS drives, manage it
  * themselves.</p>
  *
@@ -255,9 +256,27 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * publishes into its immediate destination; ordinary cursors return their value.
 	 * Editing-view overrides cannot hide this boundary, and descendant views never
 	 * publish enclosing storage. No host persistence is implied.
+	 *
+	 * <p>A component given a persistence function then persists its working state, so
+	 * what it has published can leave memory. Persisting follows publication so that it
+	 * also covers cells built by a merge. If it fails, the publication stands and this
+	 * reports the failure.</p>
+	 *
+	 * @return Published value
+	 * @throws StoreException If persisting the working state fails
 	 */
 	public V sync() {
-		return storage.reconcile(this::mergePublication);
+		V published=storage.reconcile(this::mergePublication);
+		if (persister!=null) persistWorkingState();
+		return published;
+	}
+
+	private void persistWorkingState() {
+		try {
+			storage.persist(persister);
+		} catch (IOException e) {
+			throw new StoreException("Unable to persist working state after sync",e);
+		}
 	}
 
 	/**

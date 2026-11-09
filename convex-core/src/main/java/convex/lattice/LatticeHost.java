@@ -267,7 +267,7 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 	/**
 	 * Persists the current root value without changing the cursor or publishing.
 	 * Unlike a component's working state, the root stays on its current cells until
-	 * a {@link #sync()} with no write landing during it installs the persisted snapshot.
+	 * {@link #sync()} switches it to persisted ones.
 	 *
 	 * @return Persisted current root value
 	 * @throws IOException If persistence fails
@@ -324,12 +324,20 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 			V snapshot=cursor().get();
 			V published=publish.apply(storeRoot(snapshot));
 			// The root must switch to the persisted cells or it stays strong (see Persister).
-			// A write landing during the save fails this: that write stays pending for the
-			// next sync, and the root keeps its old cells until a sync with no write during it.
-			cursor().compareAndSet(snapshot,published);
+			// A write landing during the save stays unpublished until the next sync, so the
+			// root it is in cannot take the published value and persists as it stands instead.
+			if (!cursor().compareAndSet(snapshot,published)) persistCurrentRoot();
 			return published;
 		} finally {
 			syncLock.unlock();
+		}
+	}
+
+	private void persistCurrentRoot() {
+		try {
+			cursor().persist(this::persist);
+		} catch (IOException e) {
+			throw new StoreException("Lattice host sync failed: persistence error",e);
 		}
 	}
 

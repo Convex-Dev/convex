@@ -13,7 +13,7 @@ import convex.lattice.cursor.Persister;
  * and one holding a private copy of the root is given a fork with the function that
  * persists it, {@code super(host.cursor().fork(), host::persist)}.
  * Children may share that state or own separate publication boundaries. Which
- * children persist, and when, is the application's policy.</p>
+ * children are given such a function is the application's policy.</p>
  *
  * <p>Sync prepares the application, syncs its managed children, then publishes its
  * own working boundary. Publication stops at the destination cursor. The host owns

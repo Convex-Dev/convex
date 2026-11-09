@@ -430,17 +430,19 @@ barrier. It excludes private application drafts and writes arriving after that
 snapshot. A failed barrier does not roll back publication already performed.
 
 A component with working state of its own, given a persistence function when
-built, persists it with `persist()`. An application holding a private copy of the
-root is built as `super(host.cursor().fork(), host::persist)`. Its cells go to the
-store and the copy switches to them, so they can leave memory, but nothing is
-published, signed or retained as the root, so it survives a restart only once synced
-and checkpointed. A host save does not do this for the copy: until it is persisted, a
-copy keeps in memory what has been written to it, however much of that the host has
-saved ([cursor persistence](LATTICE_CURSOR_DESIGN.md#persistence)). The component
-never holds a store: it persists through the function it was built with. A component without one refuses,
-since its state is its parent's. Which components persist, and when, is the
-application's policy; a long-lived working copy needs persisting regularly, such as
-after each host sync.
+built, persists it at each `sync()`, straight after publishing, and on demand with
+`persist()`. An application holding a private copy of the root is built as
+`super(host.cursor().fork(), host::persist)`. Persisting puts its cells in the store
+and switches the copy to them, so they can leave memory. On its own it publishes,
+signs and retains nothing as the root, so the copy survives a restart only once
+synced and checkpointed. A host save does not do this for the copy: without a
+persistence function, a copy keeps in memory what has been written to it, however
+much of that the host has saved
+([cursor persistence](LATTICE_CURSOR_DESIGN.md#persistence)). The component
+never holds a store: it persists through the function it was built with. A component without one refuses `persist()`,
+since its state is its parent's. Which components are given one is the
+application's policy; a long-lived working copy needs one, so that its memory follows
+what it is working on.
 
 State that is not meant to be shared externally, such as configuration or what
 a node has seen of others, lives in the owner's slot in `:local`, one record per

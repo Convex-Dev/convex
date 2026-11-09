@@ -122,7 +122,9 @@ left on the original keeps the whole tree in memory, however much of it is store
 `persist(persister)` makes that switch for a cursor, replacing the value it holds
 with the equal value a `Persister` returns, such as `LatticeHost::persist`, in one
 atomic update. The cursor holds no store. An edit landing meanwhile repeats the
-update on the edited value; persisting again only finds the cells already stored. A
+update on the edited value; persisting again only finds the cells already stored.
+After three attempts the cursor keeps the value as it stands, so writes that never
+pause cannot hold a persist up, and a later persist switches what is then held. A
 fork persists its working value, then its reconciled baseline without taking a claim,
 replacing the baseline only if no sync has moved it meanwhile. Views hold no value of
 their own: they treat the equal value as unchanged, so the cells are stored and their
@@ -131,9 +133,10 @@ write.
 
 Saving a value switches nobody else. A fork is separate storage, so a host sync that
 saves its destination leaves the fork on the cells it already held. A long-lived fork
-keeps what is written to it in memory until its owner calls `persist`, or until it
-syncs with no edits since its last sync and so adopts the saved value. The host root
-switches as part of its own sync, unless a write
+keeps what is written to it in memory until it is persisted, which a component given
+a persistence function does at each sync, or until it syncs with no edits since its
+last sync and so adopts the saved value. The host root switches as part of its own
+sync, even when a write
 [lands during the save](../../convex-peer/docs/PERSISTENCE.md#ordering).
 
 ## Component-supplied construction

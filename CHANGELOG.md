@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop long-running lattice applications keeping saved data in memory: a component given a persistence function now persists at each sync, and a host sync releases saved data even when a write lands during it. ([Persistence](convex-core/docs/LATTICE_CURSOR_DESIGN.md#persistence))
+
 ## [0.8.19] - 2026-11-07
 
 ### Added
