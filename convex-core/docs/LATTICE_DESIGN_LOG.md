@@ -717,9 +717,9 @@ storage directly. Nested signed drafts reconcile unsigned state and sign only wh
 the original envelope boundary publishes.
 
 Transactions use bound `storage()`, with editing policies reinstalled on their
-private component view by `withCursor`/`rebind`. Committing a prepared timestamped
-record no longer stamps it twice. The public interface bridge remains a small
-adapter to the protected construction hook; no self-type hierarchy is introduced.
+private component view by `rebind`. Committing a prepared timestamped record no
+longer stamps it twice. `rebind` is public, so the interface binds it directly; no
+self-type hierarchy is introduced.
 
 `UnionSet` supplies standard union merging for set domain components. Reading List
 and Shared Regions use it; Notebook embeds ordinary set operations behind its own

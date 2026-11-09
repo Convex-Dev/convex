@@ -58,11 +58,25 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Binds the same domain operations and configuration to supplied working storage.
-	 * Recreate child and editing views against that storage; do not fork it or retain
-	 * children bound to this instance. Components supporting forks override this hook.
+	 * Makes this component's counterpart over the supplied working storage: the same
+	 * domain operations and configuration on a different cursor. {@link #fork()} and
+	 * each attempt of a {@link TransactionalComponent} transaction call it. Bind the
+	 * cursor directly, without forking it.
+	 *
+	 * <p>Only the cursor's value commits or publishes, so the counterpart keeps there
+	 * whatever must survive. The component decides what happens to everything else it
+	 * holds. Keep a reference to what is only read or is safe to use repeatedly, such
+	 * as a clock, signer or store. Give the counterpart its own copy of what it changes;
+	 * the copy lives and dies with the counterpart. Make child components and editing
+	 * views on the supplied cursor, when they are needed, and never retain those bound
+	 * to this instance. Leave out runtime and lifecycle state.</p>
+	 *
+	 * <p>A transaction may call this several times, and concurrently with other use of
+	 * this component, so it must be cheap and free of side effects. The default refuses.
+	 * A subclass with further configuration overrides this; one that inherits it gets
+	 * a counterpart of its parent class.</p>
 	 */
-	protected ALatticeComponent<V> rebind(AForkableCursor<V> cursor) {
+	public ALatticeComponent<V> rebind(AForkableCursor<V> cursor) {
 		throw new UnsupportedOperationException(getClass().getSimpleName()+" does not support rebinding");
 	}
 

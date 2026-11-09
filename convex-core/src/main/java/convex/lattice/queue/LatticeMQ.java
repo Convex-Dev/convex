@@ -125,7 +125,7 @@ public class LatticeMQ extends MapComponent<ACell, Index<Keyword, ACell>> {
 	}
 
 	@Override
-	protected LatticeMQ rebind(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor) {
+	public LatticeMQ rebind(AForkableCursor<AHashMap<ACell, Index<Keyword, ACell>>> cursor) {
 		return new LatticeMQ(cursor,clock);
 	}
 

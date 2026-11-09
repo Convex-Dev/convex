@@ -40,12 +40,7 @@ public final class P2PNodeRecord extends ALatticeComponent<ACell> implements Tra
 	}
 
 	@Override
-	public P2PNodeRecord withCursor(AForkableCursor<ACell> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected P2PNodeRecord rebind(AForkableCursor<ACell> cursor) {
+	public P2PNodeRecord rebind(AForkableCursor<ACell> cursor) {
 		return new P2PNodeRecord(cursor,owner);
 	}
 

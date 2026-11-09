@@ -36,7 +36,7 @@ class SignedDomainComponentTest {
 			super(path,rule,signer);
 		}
 		private Count(SignedLattice<AInteger> rule,AForkableCursor<AInteger> cursor) { super(rule,cursor); }
-		@Override protected Count rebind(AForkableCursor<AInteger> cursor) { return new Count(lattice,cursor); }
+		@Override public Count rebind(AForkableCursor<AInteger> cursor) { return new Count(lattice,cursor); }
 		@Override public Count fork() { return rebind(storage.fork()); }
 		@Override protected AInteger mergePublication(AInteger own,AInteger other) {
 			reconciliations++;

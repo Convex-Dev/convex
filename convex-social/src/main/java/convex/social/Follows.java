@@ -106,7 +106,7 @@ public class Follows extends MapComponent<ACell, ACell> implements Transactional
 	}
 
 	@Override
-	public Follows withCursor(AForkableCursor<AHashMap<ACell, ACell>> cursor) {
+	public Follows rebind(AForkableCursor<AHashMap<ACell, ACell>> cursor) {
 		return new Follows(cursor,clock);
 	}
 

@@ -58,7 +58,7 @@ public class SignedComponent<V extends ACell> extends ASignedComponent<V> {
 		super(lattice,cursor);
 	}
 
-	@Override protected SignedComponent<V> rebind(AForkableCursor<V> cursor) {
+	@Override public SignedComponent<V> rebind(AForkableCursor<V> cursor) {
 		return new SignedComponent<>(lattice,cursor);
 	}
 

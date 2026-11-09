@@ -259,7 +259,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 
 	/** Subclasses override this to return their own type, so forks keep their policy and clock. */
 	@Override
-	protected SQLDatabase rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+	public SQLDatabase rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
 		return new SQLDatabase(cursor,dbName,keyPair,ownerKey,ownerVerifier,policy,clock);
 	}
 

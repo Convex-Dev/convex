@@ -87,11 +87,7 @@ class TaskBoardApplicationTest {
 			tasks=new IndexComponent<>(cursor);
 		}
 
-		@Override public Board withCursor(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
-			return rebind(cursor);
-		}
-
-		@Override protected Board rebind(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
+		@Override public Board rebind(AForkableCursor<Index<ABlobLike<?>,AHashMap<Keyword,ACell>>> cursor) {
 			return new Board(cursor,getTimestamp);
 		}
 		@Override public Board fork() { return rebind(storage.fork()); }

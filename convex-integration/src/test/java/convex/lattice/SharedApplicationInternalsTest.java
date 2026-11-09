@@ -108,7 +108,7 @@ public class SharedApplicationInternalsTest {
 				var policy=context(SOCIAL_KEY,signing);
 				socialState=owned(host,policy,Social.KEY_SOCIAL,DID.forKey(SOCIAL_KEY.getAccountKey()));
 				social=Social.connect(cursor().path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
-					(owner,value) -> policy.signAs(owner,value),() -> timestamp).user(SOCIAL_KEY.getAccountKey()).withCursor(socialState.cursor());
+					(owner,value) -> policy.signAs(owner,value),() -> timestamp).user(SOCIAL_KEY.getAccountKey()).rebind(socialState.cursor());
 				files=null;
 				fileState=null;
 			} else {
@@ -119,7 +119,7 @@ public class SharedApplicationInternalsTest {
 			}
 			AccountKey nodeOwner=(socialApp?COMMON_KEY:FILES_KEY).getAccountKey();
 			nodeState=owned(host,context(socialApp?SOCIAL_KEY:FILES_KEY,signing),Keywords.P2P,Keywords.NODES,nodeOwner);
-			node=P2PUser.create(this,nodeOwner).node().withCursor(nodeState.cursor());
+			node=P2PUser.create(this,nodeOwner).node().rebind(nodeState.cursor());
 		}
 
 		@Override public Index<Keyword,ACell> merge(Index<Keyword,ACell> other) {
@@ -193,7 +193,7 @@ public class SharedApplicationInternalsTest {
 		socialApp.node.setNodeInfo(info);
 		filesApp.node.setNodeInfo(info);
 		assertEquals(HOST_ROOT.zero(),host.cursor().get());
-		assertNotNull(socialApp.social.withCursor(socialApp.socialState.cursor()).feed().getPost(post),
+		assertNotNull(socialApp.social.rebind(socialApp.socialState.cursor()).feed().getPost(post),
 			"Lightweight views share the owner's unsigned working state");
 		assertEquals(0,signatures.get(),"Domain edits must not sign before application sync");
 		assertEquals(HOST_ROOT.zero(),socialApp.cursor().get());
@@ -250,7 +250,7 @@ public class SharedApplicationInternalsTest {
 			social=Social.connect(cursor.path(Social.KEY_SOCIAL),convex.auth.did.DIDKeyAuthorizer.CONVEX,
 				(owner,value) -> policy.signAs(owner,value),policy::currentTimestamp);
 		}
-		@Override public SocialWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
+		@Override public SocialWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			return new SocialWithP2P(cursor,policy);
 		}
 		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> policy.signAs(key,value)); }
@@ -269,7 +269,7 @@ public class SharedApplicationInternalsTest {
 				region(key,LatticeComponent.live(P2PLattice.ROOT.path(key),cursor.path(key),context));
 			}
 		}
-		@Override public FilesWithP2P withCursor(AForkableCursor<Index<Keyword,ACell>> cursor) {
+		@Override public FilesWithP2P rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
 			return new FilesWithP2P(cursor,store(),policy);
 		}
 		P2PUser p2p(AccountKey owner) { return P2PUser.create(this,owner,(key,value) -> policy.signAs(key,value)); }

@@ -35,7 +35,7 @@ class TransactionConcurrencyTest {
 	private static final class Counter extends ALatticeComponent<AHashMap<Keyword,ACell>>
 			implements TransactionalComponent<AHashMap<Keyword,ACell>,Counter> {
 		Counter(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { super(cursor); }
-		@Override public Counter withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+		@Override public Counter rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Counter(cursor);
 		}
 		void increment() {

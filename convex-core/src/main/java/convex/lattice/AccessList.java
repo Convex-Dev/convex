@@ -68,7 +68,7 @@ public class AccessList<K extends ABlobLike<?>> extends ALatticeComponent<Index<
 	}
 
 	@Override
-	protected AccessList<K> rebind(AForkableCursor<Index<K,ACell>> cursor) {
+	public AccessList<K> rebind(AForkableCursor<Index<K,ACell>> cursor) {
 		return new AccessList<>(cursor,clock);
 	}
 

@@ -44,6 +44,8 @@ public class DLFSApplication extends Regions {
 
 	private final AStore store;
 	private final DLFSRegion dlfs;
+	/** Builds this application over other storage; null when it was given its region. */
+	private final Function<AForkableCursor<Index<Keyword,ACell>>,DLFSApplication> rebuild;
 
 	/** Creates a live DLFS relay at {@code :fs}, or an explicit path, without signing authority. */
 	public DLFSApplication(LatticeHost<Index<Keyword,ACell>> host,Keyword... path) {
@@ -105,6 +107,7 @@ public class DLFSApplication extends Regions {
 			(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> destination) ->
 				new DLFSRegion(destination,store,DLFSLocation.at(cursor,keys),verifier,
 					signer,clock,maxFutureSkew));
+		rebuild=draft -> new DLFSApplication(draft,store,verifier,signer,clock,maxFutureSkew,keys);
 	}
 
 	/**
@@ -115,6 +118,17 @@ public class DLFSApplication extends Regions {
 		super(host.cursor());
 		store=host.store();
 		dlfs=add(key,files);
+		rebuild=null;
+	}
+
+	/**
+	 * Rebuilds this application and its region over the supplied storage. An application
+	 * given an existing region refuses, since only the caller knows how it was bound.
+	 */
+	@Override
+	public DLFSApplication rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
+		if (rebuild==null) throw new UnsupportedOperationException("A DLFSApplication given an existing region cannot be rebound");
+		return rebuild.apply(cursor);
 	}
 
 	/** Returns the store available for new components' blob checkpoints. */

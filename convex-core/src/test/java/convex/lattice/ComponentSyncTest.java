@@ -30,7 +30,7 @@ class ComponentSyncTest {
 
 	private static final class Value extends ALatticeComponent<CVMLong> {
 		Value(AForkableCursor<CVMLong> cursor) { super(cursor); }
-		@Override protected Value rebind(AForkableCursor<CVMLong> cursor) { return new Value(cursor); }
+		@Override public Value rebind(AForkableCursor<CVMLong> cursor) { return new Value(cursor); }
 		@Override public Value fork() { return rebind(storage.fork()); }
 
 		static Value staged(ACursor<CVMLong> destination) {
@@ -58,10 +58,9 @@ class ComponentSyncTest {
 		}
 
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return edits.cursor(); }
-		@Override protected Record rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+		@Override public Record rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Record(cursor,clock);
 		}
-		@Override public Record withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return rebind(cursor); }
 		@Override public AHashMap<Keyword,ACell> merge(AHashMap<Keyword,ACell> incoming) { return edits.merge(incoming); }
 		@Override protected AHashMap<Keyword,ACell> mergePublication(AHashMap<Keyword,ACell> own,AHashMap<Keyword,ACell> other) {
 			return Timestamped.lattice().merge(own,other);

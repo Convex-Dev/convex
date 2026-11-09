@@ -184,13 +184,10 @@ public final class FavouritesExample {
 			itemSet=new SetComponent<>(cursor().path(ITEMS));
 		}
 
-		@Override protected Favourites rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
+		@Override public Favourites rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
 			return new Favourites(cursor,lattice,getTimestamp);
 		}
 		@Override public Favourites fork() { return rebind(storage.fork()); }
-		@Override public Favourites withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) {
-			return rebind(cursor);
-		}
 
 		/** Direct local edits use the same timestamped path as the embedded set. */
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return record.cursor(); }

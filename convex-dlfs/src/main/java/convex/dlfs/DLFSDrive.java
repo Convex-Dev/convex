@@ -93,7 +93,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		}
 		@Override public DLFSLocal clone() {
 			checkOpen();
-			return drive.withCursor(Cursors.root(drive.cursor().get())).fileSystem;
+			return drive.rebind(Cursors.root(drive.cursor().get())).fileSystem;
 		}
 		@Override public void sync() {
 			checkOpen();
@@ -108,12 +108,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	}
 
 	@Override
-	public DLFSDrive withCursor(AForkableCursor<AVector<ACell>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected DLFSDrive rebind(AForkableCursor<AVector<ACell>> cursor) {
+	public DLFSDrive rebind(AForkableCursor<AVector<ACell>> cursor) {
 		return new DLFSDrive(name,cursor,store,DLFSLocation.at(cursor),fileSystem.getClock(),lattice);
 	}
 

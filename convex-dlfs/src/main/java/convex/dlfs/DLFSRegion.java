@@ -118,12 +118,7 @@ public final class DLFSRegion extends OwnedMap<ACell,AHashMap<AString,AVector<AC
 	}
 
 	@Override
-	public DLFSRegion withCursor(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected DLFSRegion rebind(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
+	public DLFSRegion rebind(AForkableCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
 		return new DLFSRegion(this,cursor);
 	}
 

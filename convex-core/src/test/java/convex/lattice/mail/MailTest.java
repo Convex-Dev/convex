@@ -211,7 +211,7 @@ public class MailTest {
 			assertSame(before,mail.cursor().get());
 		});
 		assertEquals(2,mail.cursor().get().count());
-		Mail rebound=mail.withCursor(mail.cursor());
+		Mail rebound=mail.rebind(mail.cursor());
 		assertEquals(List.of(first),rebound.mailbox(BOB_DID).deposited());
 		assertEquals(List.of(second),rebound.mailbox(CAROL_DID).deposited());
 		// A fresh component over a saved snapshot needs no separate sender state.

@@ -167,12 +167,7 @@ public final class Mailbox extends ALatticeComponent<Index<ABlob,SignedData<ACel
 	}
 
 	@Override
-	public Mailbox withCursor(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected Mailbox rebind(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
+	public Mailbox rebind(AForkableCursor<Index<ABlob,SignedData<ACell>>> cursor) {
 		return new Mailbox(cursor,lattice,signer);
 	}
 

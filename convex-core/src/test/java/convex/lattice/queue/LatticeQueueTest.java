@@ -22,7 +22,7 @@ public class LatticeQueueTest {
 		@Override protected AVector<ACell> createContainer() {
 			throw new UnsupportedOperationException("Queue must already exist");
 		}
-		@Override protected ExistingQueue rebind(AForkableCursor<AVector<ACell>> cursor) {
+		@Override public ExistingQueue rebind(AForkableCursor<AVector<ACell>> cursor) {
 			return new ExistingQueue(cursor);
 		}
 	}

@@ -25,7 +25,7 @@ public class OwnedMap<K extends ACell,V extends ACell> extends AOwnedMap<K,V,AHa
 		super(owners,cursor);
 	}
 
-	@Override protected OwnedMap<K,V> rebind(AForkableCursor<AHashMap<K,SignedData<V>>> cursor) {
+	@Override public OwnedMap<K,V> rebind(AForkableCursor<AHashMap<K,SignedData<V>>> cursor) {
 		return new OwnedMap<>(getLattice(),cursor);
 	}
 

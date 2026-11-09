@@ -222,11 +222,16 @@ The component which supplied the destination owns the next publication step, and
 the host's own `sync()` persists and replicates. Lightweight components have no
 independent publication work. No cursor starts a worker or timer.
 
-Component constructors bind their supplied working cursor directly. The protected
-`rebind(cursor)` hook recreates the same domain operations, configuration and child
-views over new storage, without creating another fork. A component's `fork()`
-rebinds to a fork of its bound storage. Concrete subclasses can refine the return
-type without adding self-type parameters to the component hierarchy.
+Component constructors bind their supplied working cursor directly. `rebind(cursor)`
+makes the same component over new storage, without creating another fork: a
+component's `fork()` rebinds to a fork of its bound storage, and a transaction
+rebinds to each attempt's draft. Only the cursor's value commits or publishes. The
+component decides what happens to everything else it holds: a reference for what is
+only read or safe to reuse, its own copy for what it changes, and child components
+made on the new cursor when they are needed. Region containers keep their factories
+and make children on demand, so a rebound container's children are on its own
+cursor. Concrete subclasses can refine the return type without adding self-type
+parameters to the component hierarchy.
 
 The base component retains one bound `storage` cursor. Its overridable `cursor()`
 exposes the editing view, which may stamp local changes. Sync always uses bound
@@ -241,8 +246,8 @@ CAS, preserving each operation under contention. `transact` returns the result o
 the run that committed; `execute` returns nothing. `TransactionalRootCursor` opts into a shared write lock for
 exclusive execution, where the callback runs once under the lock, and for contention
 fallback. Derived views forward that lock through their existing source links. Typed domain
-transactions use `TransactionalComponent.withCursor` to retain component policy;
-components can delegate that public adapter to their protected `rebind` hook.
+transactions use `rebind` to retain component policy; a component opts in by
+declaring `TransactionalComponent` and refining `rebind` to return its own type.
 `TransactionalComponent.exclusive()` gives an `ExclusiveComponent`, built from bound
 storage as a fork is: a read-only view of it, whose transactions rebind the domain
 component to a draft and commit to that storage under its root's lock.

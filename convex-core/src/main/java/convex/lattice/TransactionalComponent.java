@@ -25,10 +25,11 @@ import convex.lattice.cursor.Transactions;
  * {@link #execute} returns nothing. {@link #exclusive()} gives the form whose
  * callbacks run once under the root's write lock.</p>
  *
- * <p>Implementations need only provide their bound storage and a factory which binds the
- * same domain operations and configuration to a supplied cursor. This interface
- * can also be implemented by application subclasses without changing their base
- * class or introducing a component registry. The engine is
+ * <p>An {@link ALatticeComponent} opts in by declaring this interface and refining
+ * {@link ALatticeComponent#rebind} to return its own type; its bound storage comes
+ * from the base class, and its normal root need not be a transactional one. Application
+ * subclasses can opt in without changing their base class or introducing a component
+ * registry. The engine is
  * {@link Transactions}; this interface adds the typed component view. Rebinding
  * rebuilds the component's editing views over the draft, so a stamp the component
  * builds over its storage applies within the draft. Authoring within bound storage,
@@ -46,19 +47,16 @@ import convex.lattice.cursor.Transactions;
  */
 public interface TransactionalComponent<V extends ACell,C> {
 
-	/** Returns bound working storage, before editing policies reinstalled by withCursor. */
+	/** Returns bound working storage, before editing policies reinstalled by rebind. */
 	AForkableCursor<V> storage();
 
 	/**
-	 * Creates a fresh component over the supplied cursor, retaining domain metadata
-	 * and any explicitly owned configuration such as a DLFS store. All mutable child
-	 * views must use the supplied cursor; never reuse children bound to the original
-	 * live cursor. Do not fork the supplied cursor: the transaction engine reads its
-	 * completed value directly. An {@link ALatticeComponent} subclass normally
-	 * delegates to its protected {@code rebind(cursor)} hook, sharing construction
-	 * with {@code fork()}. Retain configuration, not the source component's working views.
+	 * Makes this component's counterpart over one attempt's private draft. See
+	 * {@link ALatticeComponent#rebind} for what it does with state outside the cursor.
+	 * Do not fork the supplied cursor: the transaction engine reads its completed
+	 * value directly.
 	 */
-	C withCursor(AForkableCursor<V> cursor);
+	C rebind(AForkableCursor<V> cursor);
 
 	/**
 	 * Applies domain operations atomically, retrying conflicts, and returns the result
@@ -73,7 +71,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 */
 	default <R> R transact(Function<? super C,? extends R> action) {
 		Objects.requireNonNull(action);
-		return Transactions.transact(storage(),draft -> action.apply(withCursor(draft)));
+		return Transactions.transact(storage(),draft -> action.apply(rebind(draft)));
 	}
 
 	/**
@@ -83,7 +81,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 */
 	default void execute(Consumer<? super C> action) {
 		Objects.requireNonNull(action);
-		Transactions.execute(storage(),draft -> action.accept(withCursor(draft)));
+		Transactions.execute(storage(),draft -> action.accept(rebind(draft)));
 	}
 
 	/**
@@ -94,7 +92,7 @@ public interface TransactionalComponent<V extends ACell,C> {
 	 * @throws UnsupportedOperationException if the bound storage is in an ordinary optimistic root
 	 */
 	default ExclusiveComponent<V,C> exclusive() {
-		return new ExclusiveComponent<>(storage(),this::withCursor);
+		return new ExclusiveComponent<>(storage(),this::rebind);
 	}
 
 	/**

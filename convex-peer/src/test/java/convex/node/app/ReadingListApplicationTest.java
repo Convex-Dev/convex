@@ -43,7 +43,7 @@ class ReadingListApplicationTest {
 	/** Staged recommendations, combined by union both on receipt and on publication. */
 	static final class Books extends UnionSet<AString> {
 		Books(AForkableCursor<ASet<AString>> cursor) { super(cursor); }
-		@Override protected Books rebind(AForkableCursor<ASet<AString>> cursor) {
+		@Override public Books rebind(AForkableCursor<ASet<AString>> cursor) {
 			return new Books(cursor);
 		}
 		@Override public Books fork() { return rebind(storage.fork()); }

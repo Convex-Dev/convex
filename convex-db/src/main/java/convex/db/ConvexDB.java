@@ -200,7 +200,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 
 	/** Subclasses override this to return their own type, so forks keep their databases, policy and clock. */
 	@Override
-	protected ConvexDB rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
+	public ConvexDB rebind(AForkableCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
 		return new ConvexDB(cursor, policy, clock);
 	}
 

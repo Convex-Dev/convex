@@ -96,12 +96,7 @@ public class SocialUser extends IndexComponent<Keyword, ACell> implements Transa
 	}
 
 	@Override
-	public SocialUser withCursor(AForkableCursor<Index<Keyword, ACell>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected SocialUser rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+	public SocialUser rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
 		return new SocialUser(cursor,ownerDid,clock);
 	}
 

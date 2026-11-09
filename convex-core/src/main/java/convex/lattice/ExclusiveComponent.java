@@ -42,15 +42,15 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	private final AForkableCursor<V> target;
 
 	/** Binds the source's domain operations to each draft. */
-	private final Function<? super AForkableCursor<V>,? extends C> withCursor;
+	private final Function<? super AForkableCursor<V>,? extends C> binder;
 
-	ExclusiveComponent(AForkableCursor<V> target,Function<? super AForkableCursor<V>,? extends C> withCursor) {
+	ExclusiveComponent(AForkableCursor<V> target,Function<? super AForkableCursor<V>,? extends C> binder) {
 		super(target.readOnly());
 		if (!target.supportsExclusiveTransactions()) {
 			throw new UnsupportedOperationException("Cursor does not support exclusive transactions");
 		}
 		this.target=target;
-		this.withCursor=Objects.requireNonNull(withCursor);
+		this.binder=Objects.requireNonNull(binder);
 	}
 
 	/**
@@ -63,7 +63,7 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	 */
 	public <R> R transact(Function<? super C,? extends R> action) {
 		Objects.requireNonNull(action);
-		return Transactions.transactExclusively(target,draft -> action.apply(withCursor.apply(draft)));
+		return Transactions.transactExclusively(target,draft -> action.apply(binder.apply(draft)));
 	}
 
 	/**
@@ -73,6 +73,6 @@ public final class ExclusiveComponent<V extends ACell,C> extends ALatticeCompone
 	 */
 	public void execute(Consumer<? super C> action) {
 		Objects.requireNonNull(action);
-		Transactions.executeExclusively(target,draft -> action.accept(withCursor.apply(draft)));
+		Transactions.executeExclusively(target,draft -> action.accept(binder.apply(draft)));
 	}
 }

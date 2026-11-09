@@ -136,7 +136,7 @@ public class Feed extends IndexComponent<Blob, ACell> implements TransactionalCo
 	}
 
 	@Override
-	public Feed withCursor(AForkableCursor<Index<Blob, ACell>> cursor) {
+	public Feed rebind(AForkableCursor<Index<Blob, ACell>> cursor) {
 		return new Feed(cursor,author,clock);
 	}
 

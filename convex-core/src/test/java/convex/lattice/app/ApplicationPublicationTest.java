@@ -79,7 +79,7 @@ class ApplicationPublicationTest {
 			notes=new SetComponent<>(cursor());
 		}
 
-		@Override protected Notebook rebind(AForkableCursor<ASet<ACell>> cursor) {
+		@Override public Notebook rebind(AForkableCursor<ASet<ACell>> cursor) {
 			return new Notebook(owner,cursor);
 		}
 		@Override public Notebook fork() { return rebind(storage.fork()); }

@@ -160,7 +160,7 @@ public class LatticeTopic extends IndexComponent<Keyword, ACell> {
 	}
 
 	@Override
-	protected LatticeTopic rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
+	public LatticeTopic rebind(AForkableCursor<Index<Keyword, ACell>> cursor) {
 		return new LatticeTopic(cursor,clock);
 	}
 

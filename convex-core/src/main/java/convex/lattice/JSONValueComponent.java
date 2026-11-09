@@ -163,7 +163,7 @@ public class JSONValueComponent<V extends ACell> extends ValueComponent<V> {
 		}
 	}
 
-	@Override protected JSONValueComponent<V> rebind(AForkableCursor<V> cursor) {
+	@Override public JSONValueComponent<V> rebind(AForkableCursor<V> cursor) {
 		return new JSONValueComponent<>(cursor);
 	}
 

@@ -48,7 +48,7 @@ public class ALatticeComponentTest {
 			return rebind(storage.fork());
 		}
 
-		@Override protected TestComponent rebind(AForkableCursor<ASet<ACell>> cursor) { return new TestComponent(cursor); }
+		@Override public TestComponent rebind(AForkableCursor<ASet<ACell>> cursor) { return new TestComponent(cursor); }
 
 		@Override
 		protected ASet<ACell> mergePublication(ASet<ACell> own,ASet<ACell> other) {

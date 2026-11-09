@@ -51,7 +51,7 @@ class KeyedRegionsTest {
 		Counter(AForkableCursor<AInteger> cursor) {
 			super(MaxLattice.INSTANCE,cursor);
 		}
-		@Override protected Counter rebind(AForkableCursor<AInteger> cursor) { return new Counter(cursor); }
+		@Override public Counter rebind(AForkableCursor<AInteger> cursor) { return new Counter(cursor); }
 		@Override public Counter fork() { return rebind(storage.fork()); }
 	}
 
@@ -59,7 +59,7 @@ class KeyedRegionsTest {
 		Members(AForkableCursor<ASet<CVMLong>> cursor) {
 			super(SetLattice.create(),cursor);
 		}
-		@Override protected Members rebind(AForkableCursor<ASet<CVMLong>> cursor) { return new Members(cursor); }
+		@Override public Members rebind(AForkableCursor<ASet<CVMLong>> cursor) { return new Members(cursor); }
 		@Override public Members fork() { return rebind(storage.fork()); }
 	}
 
@@ -130,6 +130,96 @@ class KeyedRegionsTest {
 			assertSame(published,host.cursor().get());
 			assertSame(pending,draft.get());
 		}
+	}
+
+	/** A container that opts into transactions without any factory of its own. */
+	private static final class TransactionalRegions extends Regions
+			implements TransactionalComponent<Index<Keyword,ACell>,TransactionalRegions> {
+		TransactionalRegions(AForkableCursor<Index<Keyword,ACell>> cursor) { super(cursor); }
+		private TransactionalRegions(AForkableCursor<Index<Keyword,ACell>> cursor,TransactionalRegions source) { super(cursor,source); }
+		@Override public TransactionalRegions rebind(AForkableCursor<Index<Keyword,ACell>> cursor) { return new TransactionalRegions(cursor,this); }
+	}
+
+	private static Root<Index<Keyword,ACell>> emptyRoot() { return new Root<>(Index.<Keyword,ACell>none()); }
+
+	@Test void reboundContainerMakesEachChildOnItsOwnCursorWhenNeeded() {
+		var root=emptyRoot();
+		var made=new AtomicInteger();
+		var app=new Regions(root);
+		app.create(A,(AForkableCursor<AInteger> cursor) -> {
+			made.incrementAndGet();
+			return new Counter(cursor);
+		});
+		var draft=emptyRoot();
+		var rebound=app.rebind(draft);
+		rebound.sync();
+		assertEquals(1,made.get(),"a child nothing needed is not made");
+		rebound.mergeAt(CVMLong.ONE,A);
+		rebound.mergeAt(CVMLong.TWO,A);
+		assertEquals(2,made.get(),"made once, at the first need");
+		assertEquals(Index.of(A,CVMLong.TWO),draft.get());
+		assertTrue(root.get().isEmpty(),"the source's cursor is untouched");
+	}
+
+	@Test void reboundContainerKeepsRegionsAddedToANestedContainer() {
+		var root=emptyRoot();
+		var app=new Regions(root);
+		var nested=app.<Index<Keyword,ACell>,Regions>create(NESTED,Regions::new);
+		nested.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		var draft=emptyRoot();
+		var rebound=app.rebind(draft);
+		rebound.mergeAt(CVMLong.ONE,NESTED,A);
+		assertEquals(Index.of(NESTED,Index.of(A,CVMLong.ONE)),draft.get());
+		var unused=app.rebind(emptyRoot());
+		for (var again:List.of(rebound,unused)) {
+			var next=emptyRoot();
+			again.rebind(next).mergeAt(CVMLong.TWO,NESTED,A);
+			assertEquals(Index.of(NESTED,Index.of(A,CVMLong.TWO)),next.get(),"carried through a second rebind");
+		}
+		assertTrue(root.get().isEmpty());
+	}
+
+	@Test void reboundContainerRefusesAnExplicitChildOnlyWhenItIsNeeded() {
+		var root=emptyRoot();
+		var app=new Regions(root,Map.of(A,new Counter(root.path(A))));
+		var draft=emptyRoot();
+		var rebound=app.rebind(draft);
+		assertSame(draft.get(),rebound.sync());
+		assertThrows(UnsupportedOperationException.class,() -> rebound.mergeAt(CVMLong.ONE,A));
+		assertTrue(root.get().isEmpty(),"nothing reached the live child");
+		assertTrue(draft.get().isEmpty());
+	}
+
+	@Test void reboundSingleRegionHasItsOwnChild() {
+		var root=emptyRoot();
+		var app=SingleRegion.create(root,A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		var draft=emptyRoot();
+		var rebound=app.rebind(draft);
+		assertNotSame(app.component(),rebound.component());
+		assertSame(rebound.component(),rebound.component());
+		rebound.component().merge(CVMLong.ONE);
+		assertEquals(Index.of(A,CVMLong.ONE),draft.get());
+		assertTrue(root.get().isEmpty());
+	}
+
+	@Test void containerTransactsOnAnOrdinaryRoot() {
+		var root=emptyRoot();
+		var app=new TransactionalRegions(root);
+		app.create(A,(AForkableCursor<AInteger> cursor) -> new Counter(cursor));
+		assertThrows(IllegalStateException.class,() -> app.execute(draft -> {
+			draft.mergeAt(CVMLong.ONE,A);
+			assertEquals(Index.of(A,CVMLong.ONE),draft.cursor().get());
+			assertTrue(root.get().isEmpty(),"private until commit");
+			throw new IllegalStateException();
+		}));
+		assertTrue(root.get().isEmpty(),"a failed attempt leaves nothing");
+		app.execute(draft -> draft.mergeAt(CVMLong.TWO,A));
+		assertEquals(Index.of(A,CVMLong.TWO),root.get());
+		assertThrows(UnsupportedOperationException.class,app::exclusive,"exclusive use still needs a lock on the root");
+	}
+
+	@Test void containerHasNoWorkingStateToFork() {
+		assertThrows(UnsupportedOperationException.class,() -> new Regions(emptyRoot()).fork());
 	}
 
 	@Test void childrenPublishIntoSuppliedForkWithoutPublishingTheAggregate() {

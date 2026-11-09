@@ -75,7 +75,7 @@ public class LatticeQueue extends ALatticeComponent<AVector<ACell>> {
 	}
 
 	@Override
-	protected LatticeQueue rebind(AForkableCursor<AVector<ACell>> cursor) {
+	public LatticeQueue rebind(AForkableCursor<AVector<ACell>> cursor) {
 		return new LatticeQueue(cursor,clock);
 	}
 

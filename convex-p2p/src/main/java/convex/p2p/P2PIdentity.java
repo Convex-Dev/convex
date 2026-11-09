@@ -47,12 +47,7 @@ public final class P2PIdentity extends ALatticeComponent<ACell> implements Trans
 	}
 
 	@Override
-	public P2PIdentity withCursor(AForkableCursor<ACell> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected P2PIdentity rebind(AForkableCursor<ACell> cursor) {
+	public P2PIdentity rebind(AForkableCursor<ACell> cursor) {
 		return new P2PIdentity(cursor,owner);
 	}
 

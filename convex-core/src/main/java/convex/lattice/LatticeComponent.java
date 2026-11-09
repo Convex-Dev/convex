@@ -40,7 +40,7 @@ public class LatticeComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	@Override
-	protected LatticeComponent<V> rebind(AForkableCursor<V> cursor) {
+	public LatticeComponent<V> rebind(AForkableCursor<V> cursor) {
 		return new LatticeComponent<>(lattice,cursor,context);
 	}
 

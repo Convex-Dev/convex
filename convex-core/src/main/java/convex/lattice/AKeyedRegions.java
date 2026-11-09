@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
@@ -38,17 +39,33 @@ import convex.lattice.cursor.AForkableCursor;
  * policy or lifecycle. Shared children may receive repeated or concurrent
  * deliveries and syncs, so their operations must support that use.</p>
  *
+ * <p>A rebound container keeps its factories but none of the children made by them.
+ * It makes each child on its own cursor the first time that child is needed, so a
+ * factory must only construct, and only from the cursor it is given. Regions added
+ * to a nested container after its factory ran carry over too. An explicit child has
+ * no factory and nothing says how it was bound, so a rebound container refuses it
+ * when it is needed.</p>
+ *
  * <p>An application made of regions can extend this component or hold one; see
  * {@code convex-core/docs/LATTICE_APPLICATIONS.md} for the choice.</p>
  */
 public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACell>> {
 
-	private final Map<Keyword,ALatticeComponent<?>> registrations=new LinkedHashMap<>();
-	private volatile Map<Keyword,ALatticeComponent<?>> regions;
+	private final Map<Keyword,Region> registrations=new LinkedHashMap<>();
+	private volatile Map<Keyword,Region> regions;
 
 	/** Constructs a container view without changing or publishing its destination. */
 	protected AKeyedRegions(AForkableCursor<Index<Keyword,ACell>> cursor) {
 		super(cursor);
+	}
+
+	/**
+	 * Binds a container to new working storage with a source's regions, for a
+	 * {@link #rebind}. No child is made until it is needed.
+	 */
+	protected AKeyedRegions(AForkableCursor<Index<Keyword,ACell>> cursor,AKeyedRegions source) {
+		super(cursor);
+		adoptRegions(source);
 	}
 
 	/**
@@ -69,6 +86,67 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		C create(AForkableCursor<V> cursor);
 	}
 
+	/** One registered child, and how this container makes it if it has none yet. */
+	private final class Region {
+		private final Keyword key;
+		/** Makes the child on this container's cursor; null for an explicit child. */
+		private final RegionFactory<?,?> factory;
+		/** A container whose regions a child made here also takes, or null. */
+		private final AKeyedRegions template;
+		private final AtomicReference<ALatticeComponent<?>> component=new AtomicReference<>();
+
+		Region(Keyword key,ALatticeComponent<?> explicit) {
+			this(key,null,null);
+			component.set(explicit);
+		}
+
+		Region(Keyword key,RegionFactory<?,?> factory) {
+			this(key,factory,null);
+		}
+
+		/** The same region of another container, with no child made yet. */
+		Region(Region source) {
+			this(source.key,source.factory,
+				source.component.get() instanceof AKeyedRegions container?container:source.template);
+		}
+
+		private Region(Keyword key,RegionFactory<?,?> factory,AKeyedRegions template) {
+			this.key=key;
+			this.factory=factory;
+			this.template=template;
+		}
+
+		/** Returns the child, making it on this container's cursor at the first need. */
+		ALatticeComponent<?> child() {
+			ALatticeComponent<?> made=component.get();
+			if (made!=null) return made;
+			if (factory==null) {
+				throw new UnsupportedOperationException("Region "+key+" holds an explicit child, which cannot be made on new storage");
+			}
+			ALatticeComponent<?> created=create();
+			// A factory only constructs, so the loser of a race is simply dropped
+			ALatticeComponent<?> winner=component.compareAndExchange(null,created);
+			return (winner==null)?created:winner;
+		}
+
+		@SuppressWarnings("unchecked")
+		private ALatticeComponent<?> create() {
+			var entries=new IndexComponent<Keyword,ACell>(cursor()) {
+				@Override protected Index<Keyword,ACell> createContainer() {
+					return AKeyedRegions.this.createContainer();
+				}
+			};
+			ALatticeComponent<?> created=((RegionFactory<ACell,?>)factory).create(entries.path(key));
+			Objects.requireNonNull(created,"Region component must not be null");
+			if (template!=null && created instanceof AKeyedRegions container) container.adoptRegions(template);
+			return created;
+		}
+	}
+
+	private void adoptRegions(AKeyedRegions source) {
+		for (Region region:source.registrations.values()) registrations.putIfAbsent(region.key,new Region(region));
+	}
+
 	/**
 	 * Registers an existing child, retaining the exact instance and its policy.
 	 * The caller must supply a component bound to this region's intended destination;
@@ -77,7 +155,8 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 */
 	protected final <C extends ALatticeComponent<?>> C region(Keyword key,C component) {
 		checkRegistration(key);
-		registrations.put(key,Objects.requireNonNull(component,"Region component must not be null"));
+		Objects.requireNonNull(component,"Region component must not be null");
+		registrations.put(key,new Region(key,component));
 		return component;
 	}
 
@@ -90,16 +169,22 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	 * construction or read. Access rejects incompatible containers. The factory binds
 	 * any domain policy explicitly.
 	 */
+	@SuppressWarnings("unchecked")
 	protected final <V extends ACell,C extends ALatticeComponent<?>> C createRegion(
 			Keyword key,RegionFactory<V,C> factory) {
 		checkRegistration(key);
 		Objects.requireNonNull(factory,"Region factory must not be null");
-		var entries=new IndexComponent<Keyword,ACell>(cursor()) {
-			@Override protected Index<Keyword,ACell> createContainer() {
-				return AKeyedRegions.this.createContainer();
-			}
-		};
-		return region(key,factory.create(entries.path(key)));
+		Region region=new Region(key,factory);
+		C child=(C)region.child();
+		checkRegistration(key);
+		registrations.put(key,region);
+		return child;
+	}
+
+	/** Returns the child registered at a key, making it at the first need. */
+	@SuppressWarnings("unchecked")
+	protected final <C extends ALatticeComponent<?>> C registered(Keyword key) {
+		return (C)registrations.get(key).child();
 	}
 
 	private void checkRegistration(Keyword key) {
@@ -108,14 +193,20 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		if (registrations.containsKey(key)) throw new IllegalArgumentException("Duplicate region: "+key);
 	}
 
-	private Map<Keyword,ALatticeComponent<?>> regions() {
-		Map<Keyword,ALatticeComponent<?>> result=regions;
+	private Map<Keyword,Region> regions() {
+		Map<Keyword,Region> result=regions;
 		if (result==null) {
 			// Registration has finished, so threads that freeze together build equal maps
 			result=Collections.unmodifiableMap(new LinkedHashMap<>(registrations));
 			regions=result;
 		}
 		return result;
+	}
+
+	/** Refused: a container has no working state of its own to fork, as its children do. */
+	@Override
+	public ALatticeComponent<Index<Keyword,ACell>> fork() {
+		throw new UnsupportedOperationException(getClass().getSimpleName()+" has no working state of its own to fork");
 	}
 
 	/** Delivers present registered entries, without publishing staged children. */
@@ -125,7 +216,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		if (incoming!=null) {
 			for (var entry:selected.entrySet()) {
 				Keyword key=entry.getKey();
-				if (incoming.containsKey(key)) entry.getValue().mergeAt(incoming.get(key));
+				if (incoming.containsKey(key)) entry.getValue().child().mergeAt(incoming.get(key));
 			}
 		}
 		return cursor().getOrDefault(null);
@@ -138,7 +229,7 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 		var selected=regions();
 		if (!(key instanceof ABlobLike<?> blob)) return null;
 		for (var entry:selected.entrySet()) {
-			if (entry.getKey().toBlob().equals(blob.toBlob())) return (ALatticeComponent<V>)entry.getValue();
+			if (entry.getKey().toBlob().equals(blob.toBlob())) return (ALatticeComponent<V>)entry.getValue().child();
 		}
 		return null;
 	}
@@ -169,8 +260,14 @@ public abstract class AKeyedRegions extends ALatticeComponent<Index<Keyword,ACel
 	protected void beforeSync() {
 	}
 
-	/** Publishes children in registration order. The container has no staged snapshot. */
+	/**
+	 * Publishes children in registration order; one not yet made has nothing staged.
+	 * The container has no staged snapshot.
+	 */
 	protected void syncChildren() {
-		for (var component:regions().values()) component.sync();
+		for (Region region:regions().values()) {
+			ALatticeComponent<?> made=region.component.get();
+			if (made!=null) made.sync();
+		}
 	}
 }

@@ -14,13 +14,14 @@ import convex.lattice.cursor.AForkableCursor;
  */
 public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions {
 
-	private final C component;
+	private final Keyword key;
 
 	/** Wraps an existing component at a root or nested container. */
 	public SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,
 			Keyword key,C component) {
 		super(cursor);
-		this.component=region(key,component);
+		this.key=key;
+		region(key,component);
 	}
 
 	/**
@@ -31,7 +32,14 @@ public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions 
 	protected <V extends ACell> SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,
 			Keyword key,RegionFactory<V,C> factory) {
 		super(cursor);
-		component=createRegion(key,factory);
+		this.key=key;
+		createRegion(key,factory);
+	}
+
+	/** Binds to new working storage with a source's region, for a {@link #rebind}. */
+	protected SingleRegion(AForkableCursor<Index<Keyword,ACell>> cursor,SingleRegion<C> source) {
+		super(cursor,source);
+		this.key=source.key;
 	}
 
 	/** Creates a single region and its child at a root or nested container. */
@@ -41,8 +49,13 @@ public class SingleRegion<C extends ALatticeComponent<?>> extends AKeyedRegions 
 		return new SingleRegion<C>(cursor,key,factory);
 	}
 
+	@Override
+	public SingleRegion<C> rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
+		return new SingleRegion<C>(cursor,this);
+	}
+
 	/** Returns the exact registered component, including its pending edits. */
 	public final C component() {
-		return component;
+		return registered(key);
 	}
 }

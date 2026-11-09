@@ -70,7 +70,7 @@ class OwnedScoresApplicationTest {
 			super(destination,MaxLattice.INSTANCE,authority::isAuthorised);
 			this.authority=authority;
 		}
-		@Override protected Scores rebind(AForkableCursor<Index<AString,SignedData<AInteger>>> cursor) {
+		@Override public Scores rebind(AForkableCursor<Index<AString,SignedData<AInteger>>> cursor) {
 			return new Scores(cursor,authority);
 		}
 		@Override public Scores fork() { return rebind(storage.fork()); }

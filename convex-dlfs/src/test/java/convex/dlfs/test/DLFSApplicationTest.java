@@ -22,6 +22,7 @@ import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.LatticeHost;
+import convex.lattice.cursor.Root;
 
 /** Component boundaries, independent of transport or disk-store lifecycle. */
 public class DLFSApplicationTest {
@@ -43,6 +44,24 @@ public class DLFSApplicationTest {
 		host.merge(Index.of(UNRELATED,CVMLong.ONE));
 		host.mergeAt(CVMLong.TWO,UNRELATED);
 		assertSame(before,host.cursor().get());
+	}
+
+	@Test void reboundApplicationWorksOnItsOwnStorage() {
+		var host=LatticeHost.create();
+		var before=host.cursor().get();
+		var app=files(host);
+		var draft=new Root<>(before);
+		var rebound=app.rebind(draft);
+		assertNotSame(app.dlfs(),rebound.dlfs());
+		rebound.drives(OWNER.getAccountKey()).createDrive("home");
+		assertNotNull(draft.get().get(Keywords.FS));
+		assertSame(before,host.cursor().get());
+	}
+
+	@Test void applicationGivenAnExistingRegionCannotBeRebound() {
+		var host=LatticeHost.create();
+		var app=new DLFSApplication(host,Keywords.FS,files(LatticeHost.create()).dlfs());
+		assertThrows(UnsupportedOperationException.class,() -> app.rebind(new Root<>(host.cursor().get())));
 	}
 
 	@Test void applicationsOnOneHostHaveIndependentTimestampAdmission() {

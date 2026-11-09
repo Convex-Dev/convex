@@ -17,7 +17,7 @@ public class UnionSet<V extends ACell> extends SetComponent<V> {
 
 	public UnionSet(AForkableCursor<ASet<V>> cursor) { super(cursor); }
 
-	@Override protected UnionSet<V> rebind(AForkableCursor<ASet<V>> cursor) {
+	@Override public UnionSet<V> rebind(AForkableCursor<ASet<V>> cursor) {
 		return new UnionSet<>(cursor);
 	}
 

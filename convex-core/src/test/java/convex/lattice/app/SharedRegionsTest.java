@@ -37,7 +37,7 @@ class SharedRegionsTest {
 		Items(AForkableCursor<ASet<ACell>> destination) {
 			super(destination);
 		}
-		@Override protected Items rebind(AForkableCursor<ASet<ACell>> cursor) { return new Items(cursor); }
+		@Override public Items rebind(AForkableCursor<ASet<ACell>> cursor) { return new Items(cursor); }
 		@Override public Items fork() { return rebind(storage.fork()); }
 		void add(long item) { add(CVMLong.create(item)); }
 	}

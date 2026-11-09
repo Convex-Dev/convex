@@ -282,12 +282,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		}
 	}
 	@Override
-	public DLFSDrives withCursor(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
-		return rebind(cursor);
-	}
-
-	@Override
-	protected DLFSDrives rebind(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
+	public DLFSDrives rebind(AForkableCursor<AHashMap<AString, AVector<ACell>>> cursor) {
 		return new DLFSDrives(cursor,store,DLFSLocation.at(cursor),clock,files);
 	}
 

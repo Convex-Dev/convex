@@ -26,6 +26,16 @@ public class Regions extends AKeyedRegions {
 		components.forEach(this::region);
 	}
 
+	/** Binds to new working storage with a source's regions, for a {@link #rebind}. */
+	protected Regions(AForkableCursor<Index<Keyword,ACell>> cursor,Regions source) {
+		super(cursor,source);
+	}
+
+	@Override
+	public Regions rebind(AForkableCursor<Index<Keyword,ACell>> cursor) {
+		return new Regions(cursor,this);
+	}
+
 	/** Adds an existing, correctly bound component, which may be shared. */
 	public <C extends ALatticeComponent<?>> C add(Keyword key,C component) {
 		return region(key,component);

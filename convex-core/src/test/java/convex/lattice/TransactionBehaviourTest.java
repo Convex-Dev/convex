@@ -69,8 +69,7 @@ class TransactionBehaviourTest {
 
 		Ledger branch(Keyword name) { return new Ledger(cursor().path(name),clock); }
 
-		@Override public Bank withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return rebind(cursor); }
-		@Override protected Bank rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return new Bank(cursor,clock); }
+		@Override public Bank rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return new Bank(cursor,clock); }
 		@Override public Bank fork() { return rebind(storage.fork()); }
 	}
 
@@ -87,8 +86,7 @@ class TransactionBehaviourTest {
 		}
 
 		@Override public AForkableCursor<AHashMap<Keyword,ACell>> cursor() { return stamped.cursor(); }
-		@Override public Ledger withCursor(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return rebind(cursor); }
-		@Override protected Ledger rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return new Ledger(cursor,clock); }
+		@Override public Ledger rebind(AForkableCursor<AHashMap<Keyword,ACell>> cursor) { return new Ledger(cursor,clock); }
 
 		void open(String name,long amount) {
 			AString key=Strings.create(name);

@@ -108,7 +108,7 @@ public class LatticeKV extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	@Override
-	protected LatticeKV rebind(AForkableCursor<Index<AString,AVector<ACell>>> cursor) {
+	public LatticeKV rebind(AForkableCursor<Index<AString,AVector<ACell>>> cursor) {
 		return new LatticeKV(cursor,replicaID,clock);
 	}
 
