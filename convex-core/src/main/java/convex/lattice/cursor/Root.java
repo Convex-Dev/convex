@@ -7,6 +7,7 @@ import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
+import convex.core.util.Utils;
 
 /**
  * Atomic value storage. A root retains only its current value and has no callbacks;
@@ -163,11 +164,12 @@ public class Root<V extends ACell> extends AForkableCursor<V> {
 		}
 
 		/**
-		 * Whether a write leaving this root value must wait. Compares references:
-		 * unchanged cells are shared, and an equal value in a new cell only waits.
+		 * Whether a write leaving this root value must wait. Compares by value, as a
+		 * transaction does: an equal value in new cells, such as the persisted form of
+		 * the same data, is no change. It proceeds, and is the value the root then holds.
 		 */
 		boolean blocks(Object next) {
-			return !isOwnedByCaller() && reader.apply(next)!=seen;
+			return !isOwnedByCaller() && !Utils.equals(reader.apply(next),seen);
 		}
 
 		void awaitRelease() {

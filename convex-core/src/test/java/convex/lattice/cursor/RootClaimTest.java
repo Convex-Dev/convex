@@ -22,9 +22,12 @@ import convex.core.data.AHashMap;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.etch.EtchStore;
 import convex.lattice.LatticeComponent;
+import convex.lattice.LatticeHost;
 import convex.lattice.generic.MaxLattice;
 
 /** What a root's claim holds back, with writers on real threads ordered by latches. */
@@ -118,6 +121,88 @@ class RootClaimTest {
 		assertEquals(Maps.of(X,CVMLong.TWO,Y,CVMLong.ONE),signed.get());
 	}
 
+	@SuppressWarnings("unchecked")
+	private static AHashMap<Keyword,ACell> copyOfBranch(AHashMap<Keyword,ACell> tree,Keyword key) {
+		AHashMap<Keyword,ACell> branch=(AHashMap<Keyword,ACell>)tree.get(key);
+		AHashMap<Keyword,ACell> copy=Maps.empty();
+		for (var entry:branch.entrySet()) copy=copy.assoc(entry.getKey(),entry.getValue());
+		assertEquals(branch,copy);
+		assertNotSame(branch,copy);
+		return copy;
+	}
+
+	/** An equal tree in new cells, as persisting can give. Assoc would keep the existing map. */
+	private static AHashMap<Keyword,ACell> inNewCells(AHashMap<Keyword,ACell> tree) {
+		return Maps.of(A,copyOfBranch(tree,A),B,copyOfBranch(tree,B));
+	}
+
+	@Test void anEqualValueDoesNotWaitAndIsTheValueKept() {
+		var root=tree();
+		var written=new AtomicReference<AHashMap<Keyword,ACell>>();
+		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
+			Transactions.executeExclusively(root.<AHashMap<Keyword,ACell>>path(A),draft -> {
+				written.set(result(other.submit(() -> root.updateAndGet(RootClaimTest::inNewCells))));
+				assertNotNull(draft.get());
+			});
+		}
+		assertSame(written.get(),root.get(),"Neither commit nor release put the earlier cells back");
+	}
+
+	@Test void aNoOpTransactionDoesNotWriteItsInputOverAnEqualValue() {
+		var root=tree();
+		var written=new AtomicReference<AHashMap<Keyword,ACell>>();
+		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
+			Transactions.executeExclusively(root,
+				draft -> written.set(result(other.submit(() -> root.updateAndGet(RootClaimTest::inNewCells)))));
+		}
+		assertSame(written.get(),root.get(),"Exclusive");
+		Transactions.execute(root,draft -> written.set(root.updateAndGet(RootClaimTest::inNewCells)));
+		assertSame(written.get(),root.get(),"Optimistic");
+	}
+
+	@Test void aCommitOverAnEqualValueChangesOnlyItsOwnBranch() {
+		var root=tree();
+		AForkableCursor<AHashMap<Keyword,ACell>> claimed=root.path(A);
+		AHashMap<Keyword,ACell> committed=Maps.of(X,CVMLong.TWO);
+		var persisted=new AtomicReference<AHashMap<Keyword,ACell>>();
+		try (var other=Executors.newVirtualThreadPerTaskExecutor()) {
+			Transactions.executeExclusively(claimed,draft -> {
+				persisted.set(result(other.submit(() -> root.persist(RootClaimTest::inNewCells))));
+				draft.set(committed);
+			});
+		}
+		assertEquals(committed,claimed.get(),"An equal value is no conflict, so the run commits");
+		assertSame(persisted.get().get(B),root.get().get(B),"The persisted cells elsewhere are kept");
+	}
+
+	@Test void hostSyncDuringAClaimKeepsThePersistedRoot() throws Exception {
+		AHashMap<Keyword,ACell> record=Maps.of(X,Strings.create("not yet stored ".repeat(50)));
+		AHashMap<Keyword,ACell> value=Maps.of(A,record);
+		var published=new AtomicReference<AHashMap<Keyword,ACell>>();
+		try (var store=EtchStore.createTemp("root-claim-kept");var other=Executors.newVirtualThreadPerTaskExecutor()) {
+			var host=LatticeHost.create(value,store);
+			Transactions.executeExclusively(host.cursor().<AHashMap<Keyword,ACell>>path(A),
+				draft -> published.set(result(other.submit(() -> host.sync()))));
+			assertEquals(value,published.get());
+			assertNotSame(value,published.get(),"Persisting replaced the cells");
+			assertSame(published.get(),host.cursor().get(),"The root holds the persisted cells, not the ones the claim saw");
+		}
+	}
+
+	@Test void hostSyncDoesNotWaitForAClaim() throws Exception {
+		AHashMap<Keyword,ACell> record=Maps.of(X,Strings.create("not yet stored ".repeat(50)));
+		AHashMap<Keyword,ACell> value=Maps.of(A,record);
+		try (var store=EtchStore.createTemp("root-claim-sync");var other=Executors.newVirtualThreadPerTaskExecutor()) {
+			var host=LatticeHost.create(value,store);
+			Transactions.executeExclusively(host.cursor().<AHashMap<Keyword,ACell>>path(A),draft -> {
+				complete(other.submit(() -> host.sync()));
+				draft.set(Maps.empty());
+			});
+			assertEquals(Maps.empty(),host.cursor().get().get(A));
+			assertEquals(value,store.getRootData(),"The sync saved the value from before the commit");
+		}
+	}
+
 	@Test void writerToTheClaimedBranchRecalculatesFromTheCommittedValue() {
 		var root=tree();
 		AForkableCursor<AInteger> claimed=root.path(A,X);
@@ -193,7 +278,11 @@ class RootClaimTest {
 	}
 
 	private static void complete(Future<?> work) {
-		try { work.get(10,TimeUnit.SECONDS); }
+		result(work);
+	}
+
+	private static <T> T result(Future<T> work) {
+		try { return work.get(10,TimeUnit.SECONDS); }
 		catch (Exception e) { throw new AssertionError(e); }
 	}
 

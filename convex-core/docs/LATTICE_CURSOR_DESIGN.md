@@ -256,8 +256,10 @@ A root holds at most one claim, so claims queue whatever they cover. A claim cov
 what the claiming cursor reads: each derived view composes its own read into the
 claim through its source link, and the root needs to know nothing about paths or
 views. While a claim is held, a write that would change that part of the value waits
-for the release and recalculates, and a write that leaves it the same cell carries
-on. Reads never wait. Without a claim, each read or compare-and-set of the root adds
+for the release and recalculates, and a write that leaves it equal carries on. An
+equal value in new cells is the value the root then holds, so persisting during a
+claim keeps the persisted cells, and an exclusive transaction that changes nothing
+writes nothing over them. Reads never wait. Without a claim, each read or compare-and-set of the root adds
 one type check, and nothing is recorded per transaction.
 
 Typed domain
