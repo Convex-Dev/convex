@@ -9,6 +9,11 @@ import convex.core.data.ACell;
  * retained there, as {@code LatticeHost::persist} does. Cursors and components
  * persist through one without knowing the store.
  *
+ * <p>Whoever holds the value must switch to the one returned. On an Etch store
+ * persisting builds new cells whose children are soft references, and the cells it
+ * was given keep strong references to theirs. The two values are equal, but a holder
+ * left on the original keeps the whole tree in memory, however much of it is stored.</p>
+ *
  * @param <V> Value type
  */
 @FunctionalInterface

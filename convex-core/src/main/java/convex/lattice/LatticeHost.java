@@ -323,7 +323,9 @@ public final class LatticeHost<V extends ACell> extends ALatticeComponent<V> imp
 			ensureOpen();
 			V snapshot=cursor().get();
 			V published=publish.apply(storeRoot(snapshot));
-			// Persisted references may replace the snapshot; concurrent edits stay pending.
+			// The root must switch to the persisted cells or it stays strong (see Persister).
+			// A write landing during the save fails this, so the root keeps its old cells,
+			// and that write stays pending, until a sync with no write during it.
 			cursor().compareAndSet(snapshot,published);
 			return published;
 		} finally {

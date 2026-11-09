@@ -98,6 +98,9 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 		}
 
 		@Override public V apply(V other) {
+			// Where only this fork changed, candidate replaces other even if other is the
+			// persisted form of the base: unless this fork was persisted too, that puts
+			// strong cells back over soft ones (see Persister).
 			if (Utils.equals(candidate,previous) || Utils.equals(candidate,other)) {
 				candidate=other;
 			} else if (!Utils.equals(other,previous)) {
@@ -110,9 +113,10 @@ public final class ForkedCursor<V extends ACell> extends AForkableCursor<V> {
 
 	/**
 	 * Persists the working value as any cursor does, then the reconciled baseline,
-	 * so the fork keeps no copy the persister has made redundant. This takes no claim,
-	 * so it never waits for a transaction. The baseline is replaced only if no sync
-	 * has moved it meanwhile; a moved baseline waits for the next persist.
+	 * so the fork keeps no copy the persister has made redundant. Saving the destination,
+	 * as a host sync does, leaves this fork's cells as they were; only this switches them.
+	 * This takes no claim, so it never waits for a transaction. The baseline is replaced
+	 * only if no sync has moved it meanwhile; a moved baseline waits for the next persist.
 	 */
 	@Override
 	public V persist(Persister<V> persister) throws IOException {
